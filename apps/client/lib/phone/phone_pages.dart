@@ -20,6 +20,7 @@ import '../app/target_resolver.dart';
 import '../forum/new_chat_view.dart';
 import '../forum/post_list_column.dart';
 import '../mentions/mentions_view.dart';
+import '../new_agent/builtin_agents_entry.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../running/run_graph_screen.dart';
 import '../running/running_now_view.dart';
@@ -83,6 +84,9 @@ class PhonePageView extends StatelessWidget {
           key: ValueKey('phone.terminal.${parsed.hostId!.value}'),
           hostId: parsed.hostId!.value,
         ),
+      PhonePageKind.builtinAgents => const PhoneBuiltinAgentsPage(
+        notFound: PhoneNotFound(),
+      ),
       PhonePageKind.emergency => const PhoneEmergencyPage(
         notFound: PhoneNotFound(),
       ),
@@ -191,8 +195,9 @@ const List<SettingsSection> phoneSettingsSections = [
 ];
 
 /// The Me tab: the signed-in person, the settings sections (devices and sessions among them,
-/// M4-25), "Live" (M10, M6-16), the status page (M7-21), "Emergency" for an owner or a manager
-/// of a space ([EmergencyEntry], M5-09) and "Log out" (E7).
+/// M4-25), "Live" (M10, M6-16), the status page (M7-21), "Built-in agents" for an owner with
+/// built-in agents ([BuiltinAgentsEntry], A1-09), "Emergency" for an owner or a manager of a
+/// space ([EmergencyEntry], M5-09) and "Log out" (E7).
 class PhoneMePage extends ConsumerWidget {
   /// Creates the page.
   const PhoneMePage({super.key});
@@ -265,6 +270,7 @@ class PhoneMePage extends ConsumerWidget {
           ),
           onTap: () => context.go(statusPath),
         ),
+        const BuiltinAgentsEntry(),
         const EmergencyEntry(),
         // The gap is padding of the button, not an item of its own: an empty spacer would be
         // an empty stop and an extra item of the list for screen readers (brief M5-10).

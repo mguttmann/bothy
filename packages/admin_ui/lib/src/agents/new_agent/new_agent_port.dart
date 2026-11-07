@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The server side of "New agent" (docs/spec/26-builtin-agents.md 6.1, 7.3, 8.1, 8.2; brief
-/// A1-08 Scope): the port [NewAgentPort] with its value types and [ApiNewAgentPort] over the
-/// generated client.
+/// The server side of "New agent" and of editing a built-in agent
+/// (docs/spec/26-builtin-agents.md 4.1, 6.1, 7.3, 8.1 to 8.4; briefs A1-08 and A1-09 Scope): the
+/// port [NewAgentPort] with its value types and [ApiNewAgentPort] over the generated client.
 ///
 /// Every operation runs through the client of the signed-in session, so DPoP or the console's
 /// cookie, the refresh and the step-up interceptor apply and the step-up prompt appears where
 /// the server demands it (07 2.13: `agent.create`, `agent.tool_class.set`, `agent.update` and
-/// `agent.billing_mode.set` have step-up). The port decides no permission: whether the entry
+/// `agent.billing_mode.set`, `agent.host.set` and `agent.disable` have step-up). Each write names
+/// its [AgentChangeKind], so the prompt and the audit reason say whether the agent is created,
+/// set up, edited, moved or disabled. The port decides no permission: whether the entry
 /// shows is the server's answer (`listAgentTemplates` and `hosts_agents` reach owners only).
 library;
 
@@ -120,7 +122,12 @@ final class NewAgentContext {
     required this.meId,
     required this.onlyOwner,
     this.spaces = const [],
+    this.ownerNames = const {},
   });
+
+  /// The display names of the owners by ID (`listOwners`). Only owners write a definition
+  /// (07 2.13), so they name the author of every version.
+  final Map<String, String> ownerNames;
 
   /// The signed-in person.
   final String meId;
@@ -141,7 +148,27 @@ final class NewAgentState {
     required this.toolClass,
     this.billingMode = 'organization',
     this.holderId,
+    this.name = '',
+    this.handle = '',
+    this.description = '',
+    this.hostedBy,
+    this.active = true,
   });
+
+  /// The display name.
+  final String name;
+
+  /// The handle.
+  final String handle;
+
+  /// The description.
+  final String description;
+
+  /// The hosting runner (`hosted_by`), null for an agent that is no built-in agent.
+  final String? hostedBy;
+
+  /// Whether the agent is active; false once disabled.
+  final bool active;
 
   /// The agent ID.
   final String id;
@@ -169,6 +196,49 @@ final class StoredDefinition {
 
   /// The stored definition.
   final Map<String, Object?> json;
+}
+
+/// A stored version of a definition without its content (`AgentDefinitionVersion` of
+/// `listAgentDefinitionVersions`, 26 4.1).
+final class DefinitionVersionInfo {
+  /// Creates the entry.
+  const DefinitionVersionInfo({
+    required this.version,
+    required this.createdAt,
+    required this.createdBy,
+    required this.origin,
+  });
+
+  /// The version number.
+  final int version;
+
+  /// When it was stored.
+  final DateTime createdAt;
+
+  /// The owner who stored it.
+  final String createdBy;
+
+  /// Where its content came from (`origin_kind`).
+  final DraftOrigin origin;
+}
+
+/// What a write of the port does; it picks the step-up purpose and the audit reason
+/// ([ApiNewAgentPort.new]).
+enum AgentChangeKind {
+  /// A step of "New agent".
+  create,
+
+  /// A step of "Continue setup" of an agent without a definition (26 8.3).
+  setup,
+
+  /// A step of "Edit" or "Restore" (26 8.4).
+  edit,
+
+  /// "Change runner" (`agent.host.set`).
+  host,
+
+  /// "Disable" (`agent.disable`).
+  disable,
 }
 
 /// A field error of the server (`FieldError`): its JSON Pointer and code.
@@ -341,22 +411,52 @@ abstract interface class NewAgentPort {
   Future<NewAgentState> agent(String agentId);
 
   /// Sets the tool class (`setAgentToolClass`, step-up); [name] is the agent's name for the
-  /// prompt and the reason.
+  /// prompt and the reason, [change] what the step belongs to.
   Future<NewAgentState> setToolClass(
     NewAgentState agent,
     AgentToolClass toolClass, {
     required String name,
+    AgentChangeKind change = AgentChangeKind.create,
   });
 
   /// The current definition (`getAgentDefinition`), or null while there is none.
   Future<StoredDefinition?> definition(String agentId);
 
-  /// Stores [definition] (`putAgentDefinition`, step-up); [ifMatch] is the current version,
-  /// null for the first one.
+  /// Stores [definition] (`putAgentDefinition`, step-up); [ifMatch] is the version the edit
+  /// started from, null for the first one, so a change of another device in between answers
+  /// `412 version_conflict` (26 4.1 item 2); [change] what the step belongs to.
   Future<StoredDefinition> putDefinition(
     String agentId,
     Map<String, Object?> definition, {
     int? ifMatch,
+    required String name,
+    AgentChangeKind change = AgentChangeKind.create,
+  });
+
+  /// The built-in agents (`listAgents`, `adapter_kind = 'claude_agent'`), disabled ones
+  /// included, in the server's order.
+  Future<List<NewAgentState>> builtinAgents();
+
+  /// The stored versions of the definition of [agentId], newest first
+  /// (`listAgentDefinitionVersions`, every page).
+  Future<List<DefinitionVersionInfo>> versions(String agentId);
+
+  /// The stored [version] of the definition of [agentId] (`getAgentDefinition` with
+  /// `version`), for "Show" and "Restore" (26 8.4).
+  Future<StoredDefinition> definitionVersion(String agentId, int version);
+
+  /// Moves [agent] to the runner [runnerId] (`setAgentHost`, `If-Match`, step-up); the agent's
+  /// connections restart (26 3.1 item 4).
+  Future<NewAgentState> setHost(
+    NewAgentState agent,
+    String runnerId, {
+    required String name,
+  });
+
+  /// Disables [agentId] with the person's [reason] (`disableAgent`, step-up).
+  Future<NewAgentState> disable(
+    String agentId, {
+    required String reason,
     required String name,
   });
 
@@ -366,6 +466,7 @@ abstract interface class NewAgentPort {
     String mode, {
     String? holderId,
     required String name,
+    AgentChangeKind change = AgentChangeKind.create,
   });
 
   /// Creates the text channel [channelName] in [spaceId] (`createChannel`) and returns its ID.
@@ -374,6 +475,7 @@ abstract interface class NewAgentPort {
     String channelName, {
     required String idempotencyKey,
     required String name,
+    AgentChangeKind change = AgentChangeKind.create,
   });
 
   /// Makes [agentId] the operator of [channelId] (`getChannel`, `setChannelOperator`).
@@ -381,6 +483,7 @@ abstract interface class NewAgentPort {
     String channelId,
     String agentId, {
     required String name,
+    AgentChangeKind change = AgentChangeKind.create,
   });
 }
 
@@ -394,18 +497,33 @@ abstract interface class NewAgentPort {
 /// ```
 final class ApiNewAgentPort implements NewAgentPort {
   /// Creates the port; [purpose] gives the step-up text for the agent's name and [reason] the
-  /// audit reason of the class, billing and operator steps.
-  ApiNewAgentPort(this._api, {required this._purpose, required this._reason});
+  /// audit reason of the class, billing and operator steps of "New agent". [purposeOf] and
+  /// [reasonOf] give them per [AgentChangeKind] (edit, setup, change runner, disable); without
+  /// them every write uses [purpose] and [reason].
+  ApiNewAgentPort(
+    this._api, {
+    required String Function(String name) purpose,
+    required String Function(String name) reason,
+    String Function(AgentChangeKind change, String name)? purposeOf,
+    String Function(AgentChangeKind change, String name)? reasonOf,
+  }) : _purposeOf = purposeOf ?? ((_, name) => purpose(name)),
+       _reasonOf = reasonOf ?? ((_, name) => reason(name));
 
   final ApiClient _api;
-  final String Function(String name) _purpose;
-  final String Function(String name) _reason;
+  final String Function(AgentChangeKind change, String name) _purposeOf;
+  final String Function(AgentChangeKind change, String name) _reasonOf;
 
   AgentsApi get _agents => _api.getAgentsApi();
 
-  Map<String, Object?> _extra(String name) => {
-    stepUpPurposeExtra: _purpose(name),
-  };
+  Map<String, Object?> _extra(
+    String name, [
+    AgentChangeKind change = AgentChangeKind.create,
+  ]) => {stepUpPurposeExtra: _purposeOf(change, name)};
+
+  String _reason(
+    String name, [
+    AgentChangeKind change = AgentChangeKind.create,
+  ]) => _reasonOf(change, name);
 
   @override
   Future<NewAgentOffer?> offer() async {
@@ -459,6 +577,7 @@ final class ApiNewAgentPort implements NewAgentPort {
       meId: id,
       onlyOwner: owners.length == 1 && owners.single.user.id == id,
       spaces: [for (final s in spaces) NewAgentSpace(s.space.id, s.space.name)],
+      ownerNames: {for (final o in owners) o.user.id: o.user.displayName},
     );
   });
 
@@ -549,6 +668,7 @@ final class ApiNewAgentPort implements NewAgentPort {
     NewAgentState agent,
     AgentToolClass toolClass, {
     required String name,
+    AgentChangeKind change = AgentChangeKind.create,
   }) => _guard(
     () async => _state(
       (await _agents.setAgentToolClass(
@@ -561,9 +681,9 @@ final class ApiNewAgentPort implements NewAgentPort {
               AgentToolClass.scoped => ToolClass.scoped,
               AgentToolClass.host => ToolClass.host,
             }
-            ..reason = _reason(name),
+            ..reason = _reason(name, change),
         ),
-        extra: _extra(name),
+        extra: _extra(name, change),
       )).data!,
     ),
   );
@@ -588,6 +708,7 @@ final class ApiNewAgentPort implements NewAgentPort {
     Map<String, Object?> definition, {
     int? ifMatch,
     required String name,
+    AgentChangeKind change = AgentChangeKind.create,
   }) => _guard(
     () async => _stored(
       (await _agents.putAgentDefinition(
@@ -597,9 +718,101 @@ final class ApiNewAgentPort implements NewAgentPort {
           AgentDefinition.serializer,
           definition,
         )!,
-        extra: _extra(name),
+        extra: _extra(name, change),
       )).data!,
       fallback: definition,
+    ),
+  );
+
+  @override
+  Future<List<NewAgentState>> builtinAgents() => _guard(() async {
+    final out = <NewAgentState>[];
+    String? cursor;
+    do {
+      final page = (await _agents.listAgents(cursor: cursor)).data!;
+      for (final a in page.items) {
+        if (a.adapterKind == builtinAdapterKind) out.add(_state(a));
+      }
+      cursor = page.nextCursor;
+    } while (cursor != null);
+    return out;
+  });
+
+  @override
+  Future<List<DefinitionVersionInfo>> versions(String agentId) =>
+      _guard(() async {
+        final out = <DefinitionVersionInfo>[];
+        String? cursor;
+        do {
+          final page = (await _agents.listAgentDefinitionVersions(
+            agentId: agentId,
+            cursor: cursor,
+          )).data!;
+          for (final v in page.items) {
+            out.add(
+              DefinitionVersionInfo(
+                version: v.version,
+                createdAt: v.createdAt,
+                createdBy: v.createdBy,
+                origin: switch (v.originKind) {
+                  AgentDefinitionVersionOriginKindEnum.template =>
+                    DraftOrigin.template,
+                  AgentDefinitionVersionOriginKindEnum.interview =>
+                    DraftOrigin.interview,
+                  _ => DraftOrigin.manual,
+                },
+              ),
+            );
+          }
+          cursor = page.nextCursor;
+        } while (cursor != null);
+        // The server answers newest first; the sort keeps that order for any page size.
+        return out..sort((a, b) => b.version.compareTo(a.version));
+      });
+
+  @override
+  Future<StoredDefinition> definitionVersion(String agentId, int version) =>
+      _guard(
+        () async => _stored(
+          (await _agents.getAgentDefinition(
+            agentId: agentId,
+            version: version,
+          )).data!,
+        ),
+      );
+
+  @override
+  Future<NewAgentState> setHost(
+    NewAgentState agent,
+    String runnerId, {
+    required String name,
+  }) => _guard(
+    () async => _state(
+      (await _agents.setAgentHost(
+        agentId: agent.id,
+        ifMatch: '"${agent.version}"',
+        hostSet: HostSet(
+          (b) => b
+            ..hostedBy = runnerId
+            ..reason = _reason(name, AgentChangeKind.host),
+        ),
+        extra: _extra(name, AgentChangeKind.host),
+      )).data!,
+    ),
+  );
+
+  @override
+  Future<NewAgentState> disable(
+    String agentId, {
+    required String reason,
+    required String name,
+  }) => _guard(
+    () async => _state(
+      (await _agents.disableAgent(
+        agentId: agentId,
+        reasonBody: ReasonBody((b) => b..reason = reason),
+        extra: _extra(name, AgentChangeKind.disable),
+      )).data!,
     ),
   );
 
@@ -609,6 +822,7 @@ final class ApiNewAgentPort implements NewAgentPort {
     String mode, {
     String? holderId,
     required String name,
+    AgentChangeKind change = AgentChangeKind.create,
   }) => _guard(
     () async => _state(
       (await _agents.setAgentBillingMode(
@@ -620,9 +834,9 @@ final class ApiNewAgentPort implements NewAgentPort {
                 ? BillingMode.personal
                 : BillingMode.organization
             ..credentialHolderId = mode == 'personal' ? holderId : null
-            ..reason = _reason(name),
+            ..reason = _reason(name, change),
         ),
-        extra: _extra(name),
+        extra: _extra(name, change),
       )).data!,
     ),
   );
@@ -633,6 +847,7 @@ final class ApiNewAgentPort implements NewAgentPort {
     String channelName, {
     required String idempotencyKey,
     required String name,
+    AgentChangeKind change = AgentChangeKind.create,
   }) => _guard(
     () async => (await _api.getChannelsApi().createChannel(
       spaceId: spaceId,
@@ -642,7 +857,7 @@ final class ApiNewAgentPort implements NewAgentPort {
           ..kind = ChannelCreateKindEnum.text
           ..name = channelName,
       ),
-      extra: _extra(name),
+      extra: _extra(name, change),
     )).data!.id,
   );
 
@@ -651,6 +866,7 @@ final class ApiNewAgentPort implements NewAgentPort {
     String channelId,
     String agentId, {
     required String name,
+    AgentChangeKind change = AgentChangeKind.create,
   }) => _guard(() async {
     final channels = _api.getChannelsApi();
     final current = (await channels.getChannel(channelId: channelId)).data!;
@@ -661,9 +877,9 @@ final class ApiNewAgentPort implements NewAgentPort {
         (b) => b
           ..mode = OperatorMode.agent
           ..agentId = agentId
-          ..reason = _reason(name),
+          ..reason = _reason(name, change),
       ),
-      extra: _extra(name),
+      extra: _extra(name, change),
     );
   });
 
@@ -690,6 +906,11 @@ final class ApiNewAgentPort implements NewAgentPort {
         ? 'personal'
         : 'organization',
     holderId: a.credentialHolderId,
+    name: a.displayName,
+    handle: a.handle,
+    description: a.description,
+    hostedBy: a.hostedBy,
+    active: a.status == AgentStatusEnum.active,
   );
 
   static StoredDefinition _stored(

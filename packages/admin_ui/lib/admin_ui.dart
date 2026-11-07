@@ -110,6 +110,12 @@
 /// [NewAgentFlow] with resume, over the port [NewAgentPort] ([ApiNewAgentPort]). The entry shows
 /// only with a [NewAgentOffer]; [AgentsList] shows it and marks a built-in agent without a
 /// definition as "Not set up".
+///
+/// A1-09 edits built-in agents on the agent card ([BuiltinAgentSection], on the phone in
+/// [BuiltinAgentsView]): "Edit" and "Restore" open the same dialog with an [ExistingAgent], name
+/// the changed parts ([definitionChanges]) and save with `If-Match` and step-up; "Versions"
+/// ([AgentVersionsDialog]), "Change runner" ([ChangeRunnerDialog]), "Disable" and "Continue
+/// setup" complete it.
 library;
 
 export 'src/access/source_chain.dart';
@@ -121,9 +127,14 @@ export 'src/agents/agent_labels.dart';
 export 'src/agents/agent_page.dart';
 export 'src/agents/agent_tokens.dart';
 export 'src/agents/agents_list.dart';
+export 'src/agents/builtin/agent_versions_dialog.dart';
+export 'src/agents/builtin/builtin_agent_section.dart';
+export 'src/agents/builtin/builtin_agents_view.dart';
+export 'src/agents/builtin/change_runner_dialog.dart';
 export 'src/agents/guided_flow.dart';
 export 'src/agents/holder_dialog.dart';
 export 'src/agents/i1_explanation.dart';
+export 'src/agents/new_agent/agent_edit_changes.dart';
 export 'src/agents/new_agent/agent_interview.dart';
 export 'src/agents/new_agent/new_agent_dialog.dart';
 export 'src/agents/new_agent/new_agent_draft.dart';

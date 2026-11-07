@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The sentences of "New agent" (docs/spec/01-product.md 6.20; docs/decisions.d/A1-08.md): the
-/// step labels, one sentence for the cause of a failed step, the field errors of the server and
-/// the explanation of each tool class.
+/// The sentences of "New agent" (docs/spec/01-product.md 6.20; docs/decisions.d/A1-08.md,
+/// A1-09.md): the step labels, one sentence for the cause of a failed step, the field errors
+/// of the server, the explanation of each tool class and the changed parts of an edit.
 library;
 
+import 'package:api_client/api_client.dart' show ApiClient;
 import 'package:l10n/l10n.dart';
 
+import 'agent_edit_changes.dart';
 import 'new_agent_draft.dart';
 import 'new_agent_flow.dart';
 import 'new_agent_port.dart';
@@ -47,11 +49,14 @@ String newAgentStepLabel(
 
 /// One sentence for the cause of [failure] at [step] (01 6.20 item 4; brief A1-08 Design note
 /// 3: `host_tool_class_ceiling` after `agent.create` points to "Close" and "Change runner").
+/// In [NewAgentMode.edit] a `version_conflict` says that another device changed the agent
+/// and points to "Reload" (brief A1-09 requirement 12).
 String newAgentFailureText(
   AppLocalizations l,
   NewAgentStep step,
-  NewAgentFailure failure,
-) {
+  NewAgentFailure failure, {
+  NewAgentMode mode = NewAgentMode.create,
+}) {
   switch (failure.kind) {
     case NewAgentFailureKind.stepUpCancelled:
       return l.newAgentErrStepUp;
@@ -72,6 +77,8 @@ String newAgentFailureText(
           l.newAgentErrHandleTaken,
         (_, NewAgentStep.createChannel) when code == 'conflict' =>
           l.newAgentErrChannelTaken,
+        _ when code == 'version_conflict' && mode == NewAgentMode.edit =>
+          l.agentEditErrVersion,
         _ when code == 'version_conflict' => l.newAgentErrVersion,
         _ => problemText(l, code, reason: reason),
       };
@@ -101,3 +108,71 @@ String personalOfferText(AppLocalizations l, PersonalOffer offer) =>
 /// The sentence of an interview fallback [reason] (26 6.1 item 4).
 String interviewFallbackText(AppLocalizations l, String reason) =>
     l.newAgentInterviewFallback(reason);
+
+/// The line of one changed part [change] of an edit (brief A1-09 Design note 2).
+///
+/// Example: `agentEditChangeText(l, const DefinitionChange(DefinitionChangeKind.instructions))`
+/// is "Instructions changed".
+String agentEditChangeText(AppLocalizations l, DefinitionChange change) {
+  final kind = change.kind;
+  String className(String wire) => toolClassName(l, AgentToolClass.of(wire));
+  return switch (kind) {
+    DefinitionChangeKind.toolClass => l.agentEditChange(
+      'toolClass',
+      className(change.name),
+      className(change.from),
+    ),
+    DefinitionChangeKind.setting => l.agentEditChange(
+      'setting',
+      switch (change.name) {
+        'model' => l.newAgentModel,
+        'allowed_tools' => l.newAgentAllowedTools,
+        'max_cost_usd_per_run' => l.newAgentCostCap,
+        _ => l.agentEditWish,
+      },
+      '',
+    ),
+    _ => l.agentEditChange(kind.name, change.name, ''),
+  };
+}
+
+/// The step-up purpose of a write of [change] for the agent [name] in the person's language.
+String agentChangePurpose(
+  AppLocalizations l,
+  AgentChangeKind change,
+  String name,
+) => switch (change) {
+  AgentChangeKind.create => l.stepUpPurposeNewAgent(name),
+  AgentChangeKind.setup => l.stepUpPurposeSetUpAgent(name),
+  AgentChangeKind.edit => l.stepUpPurposeEditAgent(name),
+  AgentChangeKind.host => l.stepUpPurposeMoveAgent(name),
+  AgentChangeKind.disable => l.stepUpPurposeDisableAgent(name),
+};
+
+/// The audit reason of a write of [change] for the agent [name]; "Disable" sends the reason
+/// the person typed instead.
+String agentChangeReason(
+  AppLocalizations l,
+  AgentChangeKind change,
+  String name,
+) => switch (change) {
+  AgentChangeKind.create => l.newAgentAuditReason(name),
+  AgentChangeKind.setup => l.agentSetupAuditReason(name),
+  AgentChangeKind.host => l.agentMoveAuditReason(name),
+  AgentChangeKind.edit ||
+  AgentChangeKind.disable => l.agentEditAuditReason(name),
+};
+
+/// The [ApiNewAgentPort] over [api] with the purposes and reasons of every
+/// [AgentChangeKind] in the person's language; the desktop, the phones and the console use it,
+/// so the step-up prompt says what is changed.
+///
+/// Example: `final port = localizedAgentPort(session.api, AppLocalizations.of(context));`
+ApiNewAgentPort localizedAgentPort(ApiClient api, AppLocalizations l) =>
+    ApiNewAgentPort(
+      api,
+      purpose: l.stepUpPurposeNewAgent,
+      reason: l.newAgentAuditReason,
+      purposeOf: (change, name) => agentChangePurpose(l, change, name),
+      reasonOf: (change, name) => agentChangeReason(l, change, name),
+    );

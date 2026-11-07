@@ -128,7 +128,7 @@ class _NewAgentStepsState extends State<NewAgentSteps> {
           Padding(
             padding: const EdgeInsets.only(top: DsSpace.s8),
             child: Text(
-              newAgentFailureText(l, failed, failure),
+              newAgentFailureText(l, failed, failure, mode: flow.mode),
               key: const ValueKey('newAgent.failure'),
               style: dsTextStyle(DsType.body).copyWith(color: colors.dangerFg),
             ),

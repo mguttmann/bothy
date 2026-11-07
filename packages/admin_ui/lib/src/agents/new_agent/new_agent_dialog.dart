@@ -9,6 +9,12 @@
 /// (26 8.3). When every step is done the dialog closes with a [NewAgentResult], and the host
 /// opens the new channel or the agent card (01 6.20 item 5). On the phone the same dialog fills
 /// the screen ([NewAgentDialog.fullScreen]).
+///
+/// The same dialog edits an existing built-in agent ([ExistingAgent], brief A1-09): "Edit" and
+/// "Restore" open the preview with the stored definition and the list of changed parts and
+/// save with "Save"; a `412` offers "Reload", `definition_needs_host` offers "Remove the local
+/// servers"; "Show" is read-only; "Continue setup" starts at the ways in and runs the missing
+/// steps.
 library;
 
 import 'dart:async';
@@ -23,6 +29,42 @@ import 'new_agent_interview_view.dart';
 import 'new_agent_port.dart';
 import 'new_agent_preview.dart';
 import 'new_agent_steps.dart';
+import 'new_agent_texts.dart';
+
+/// An existing built-in agent the dialog opens for "Edit", "Restore", "Show" or "Continue
+/// setup" ([NewAgentFlow.forAgent]).
+///
+/// Example: `ExistingAgent(agent: state, runner: runner, stored: current)` edits the current
+/// definition; with `content: older.json, restoredVersion: older.version` it restores it.
+final class ExistingAgent {
+  /// Creates the description.
+  const ExistingAgent({
+    required this.agent,
+    required this.runner,
+    this.stored,
+    this.content,
+    this.restoredVersion,
+    this.shownVersion,
+  });
+
+  /// The agent as the server has it.
+  final NewAgentState agent;
+
+  /// Its hosting runner.
+  final HostingRunner runner;
+
+  /// The current definition, or null for "Continue setup".
+  final StoredDefinition? stored;
+
+  /// An older content to restore or show, or null to edit [stored].
+  final Map<String, Object?>? content;
+
+  /// The version of [content] for "Restore", or null.
+  final int? restoredVersion;
+
+  /// The version of [content] for "Show" (read-only), or null.
+  final int? shownVersion;
+}
 
 /// Opens the dialog over [port] with [offer]; returns the result when every step is done, null
 /// when the person closed it (what exists stays, 26 8.3).
@@ -42,6 +84,7 @@ Future<NewAgentResult?> showNewAgentDialog(
   required String Function() newKey,
   required Duration announceMinInterval,
   bool fullScreen = false,
+  ExistingAgent? existing,
 }) => showDialog<NewAgentResult>(
   context: context,
   barrierDismissible: false,
@@ -52,6 +95,7 @@ Future<NewAgentResult?> showNewAgentDialog(
     newKey: newKey,
     announceMinInterval: announceMinInterval,
     fullScreen: fullScreen,
+    existing: existing,
   ),
 );
 
@@ -100,6 +144,22 @@ final class NewAgentHost {
         announceMinInterval: announceMinInterval,
         fullScreen: fullScreen,
       );
+
+  /// Opens the dialog for the existing agent [existing] (A1-09); returns the result once
+  /// every step is done, null when it was closed or only shown.
+  Future<NewAgentResult?> openExisting(
+    BuildContext context,
+    NewAgentOffer offer,
+    ExistingAgent existing,
+  ) => showNewAgentDialog(
+    context,
+    port: port,
+    offer: offer,
+    newKey: newKey,
+    announceMinInterval: announceMinInterval,
+    fullScreen: fullScreen,
+    existing: existing,
+  );
 }
 
 /// Where the dialog is.
@@ -117,7 +177,11 @@ class NewAgentDialog extends StatefulWidget {
     required this.announceMinInterval,
     this.fullScreen = false,
     this.clock = DateTime.now,
+    this.existing,
   });
+
+  /// The existing agent to edit, restore, show or set up, or null for "New agent".
+  final ExistingAgent? existing;
 
   /// The server side.
   final NewAgentPort port;
@@ -150,11 +214,27 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
   @override
   void initState() {
     super.initState();
-    _flow = NewAgentFlow(
-      port: widget.port,
-      offer: widget.offer,
-      newKey: widget.newKey,
-    )..addListener(_changed);
+    final existing = widget.existing;
+    _flow =
+        (existing == null
+              ? NewAgentFlow(
+                  port: widget.port,
+                  offer: widget.offer,
+                  newKey: widget.newKey,
+                )
+              : NewAgentFlow.forAgent(
+                  port: widget.port,
+                  offer: widget.offer,
+                  newKey: widget.newKey,
+                  agent: existing.agent,
+                  runner: existing.runner,
+                  stored: existing.stored,
+                  content: existing.content,
+                  readOnly: existing.shownVersion != null,
+                ))
+          ..addListener(_changed);
+    // An edit, a restore and a shown version start at the preview.
+    if (_flow.draft != null) _stage = _Stage.preview;
     unawaited(_loadContext());
   }
 
@@ -207,6 +287,20 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
     super.dispose();
   }
 
+  String _title(AppLocalizations l) {
+    final existing = widget.existing;
+    final name = existing?.agent.name ?? '';
+    return switch (_flow.mode) {
+      NewAgentMode.create => l.newAgentTitle,
+      NewAgentMode.setup => l.agentSetupTitle(name),
+      NewAgentMode.view => l.agentViewTitle(name, existing!.shownVersion!),
+      NewAgentMode.edit => switch (existing?.restoredVersion) {
+        final v? => l.agentRestoreTitle(v, name),
+        null => l.agentEditTitle(name),
+      },
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -225,6 +319,10 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (_flow.mode == NewAgentMode.edit) ...[
+            AgentEditChanges(flow: _flow),
+            const Divider(height: DsSpace.s24),
+          ],
           if (_flow.started) ...[
             NewAgentSteps(
               flow: _flow,
@@ -233,7 +331,11 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
             ),
             const Divider(height: DsSpace.s24),
           ],
-          NewAgentPreview(flow: _flow),
+          // A reload gives a new draft; the fields start again from it.
+          KeyedSubtree(
+            key: ObjectKey(_flow.draft),
+            child: NewAgentPreview(flow: _flow),
+          ),
         ],
       ),
     };
@@ -251,7 +353,7 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
           child: Semantics(
             header: true,
             child: Text(
-              l.newAgentTitle,
+              _title(l),
               style: dsTextStyle(DsType.title)
                   .copyWith(color: context.dsColors.textPrimary),
             ),
@@ -295,6 +397,31 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
   List<Widget> _actions(AppLocalizations l) {
     final flow = _flow;
     final started = flow.started;
+    switch (flow.mode) {
+      case NewAgentMode.view:
+        return [
+          TextButton(
+            key: const ValueKey('newAgent.close'),
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(l.newAgentClose),
+          ),
+        ];
+      case NewAgentMode.edit:
+        return _editActions(l);
+      case NewAgentMode.create || NewAgentMode.setup:
+        break;
+    }
+    final primary = flow.mode == NewAgentMode.setup
+        ? FilledButton(
+            key: const ValueKey('agentEdit.continue'),
+            onPressed: flow.busy ? null : () => unawaited(flow.run()),
+            child: Text(l.agentEditContinue),
+          )
+        : FilledButton(
+            key: const ValueKey('newAgent.create'),
+            onPressed: flow.busy ? null : () => unawaited(flow.run()),
+            child: Text(l.newAgentCreate),
+          );
     return [
       if (_stage != _Stage.start && !started)
         TextButton(
@@ -308,12 +435,51 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
         child: Text(started ? l.newAgentClose : l.newAgentCancel),
       ),
       if (_stage == _Stage.preview && !started)
-        FilledButton(
-          key: const ValueKey('newAgent.create'),
-          onPressed: flow.busy ? null : () => unawaited(flow.run()),
-          child: Text(l.newAgentCreate),
-        )
+        primary
       else if (_stage == _Stage.preview && flow.failure != null)
+        FilledButton(
+          key: const ValueKey('newAgent.retry'),
+          onPressed: flow.busy ? null : () => unawaited(flow.run()),
+          child: Text(l.newAgentRetry),
+        ),
+    ];
+  }
+
+  /// "Cancel" or "Close", "Save" until it was pressed, then after a failure "Reload" for a
+  /// stale version, "Remove the local servers" for `definition_needs_host` and "Try again".
+  List<Widget> _editActions(AppLocalizations l) {
+    final flow = _flow;
+    final failure = flow.failure;
+    final stale = failure?.code == 'version_conflict';
+    final needsHost =
+        failure?.reason == 'definition_needs_host' && flow.hasLocalServers;
+    return [
+      TextButton(
+        key: ValueKey(flow.started ? 'newAgent.close' : 'newAgent.cancel'),
+        onPressed: flow.busy ? null : () => Navigator.of(context).pop(),
+        child: Text(flow.started ? l.newAgentClose : l.newAgentCancel),
+      ),
+      if (!flow.started)
+        FilledButton(
+          key: const ValueKey('agentEdit.save'),
+          onPressed: flow.busy || !flow.hasChanges
+              ? null
+              : () => unawaited(flow.run()),
+          child: Text(l.agentEditSave),
+        ),
+      if (stale)
+        FilledButton(
+          key: const ValueKey('agentEdit.reload'),
+          onPressed: flow.busy ? null : () => unawaited(flow.reload()),
+          child: Text(l.agentEditReload),
+        ),
+      if (needsHost)
+        OutlinedButton(
+          key: const ValueKey('agentEdit.removeLocal'),
+          onPressed: flow.busy ? null : flow.removeLocalServers,
+          child: Text(l.agentEditRemoveLocal),
+        ),
+      if (failure != null && !stale)
         FilledButton(
           key: const ValueKey('newAgent.retry'),
           onPressed: flow.busy ? null : () => unawaited(flow.run()),
@@ -393,6 +559,59 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
               },
             ),
           ),
+      ],
+    );
+  }
+}
+
+/// The changed parts of an edit against the version it started from (brief A1-09 Design note
+/// 2), or "No changes yet", and when a saved change applies.
+///
+/// Example: `AgentEditChanges(flow: flow)` above the preview of an edit.
+class AgentEditChanges extends StatelessWidget {
+  /// Creates the list.
+  const AgentEditChanges({super.key, required this.flow});
+
+  /// The flow of the edit.
+  final NewAgentFlow flow;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final colors = context.dsColors;
+    final changes = flow.changes;
+    final secondary = dsTextStyle(DsType.bodySm)
+        .copyWith(color: colors.textSecondary);
+    return Column(
+      key: const ValueKey('agentEdit.changes'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Semantics(
+          header: true,
+          child: Text(
+            l.agentEditChangesTitle,
+            style: dsTextStyle(DsType.bodyStrong)
+                .copyWith(color: colors.textPrimary),
+          ),
+        ),
+        const SizedBox(height: DsSpace.s4),
+        if (changes.isEmpty)
+          Text(
+            l.agentEditNoChanges,
+            key: const ValueKey('agentEdit.noChanges'),
+            style: secondary,
+          )
+        else
+          for (final (i, c) in changes.indexed)
+            Text(
+              agentEditChangeText(l, c),
+              key: ValueKey('agentEdit.change.$i'),
+              style: dsTextStyle(DsType.body)
+                  .copyWith(color: colors.textPrimary),
+            ),
+        const SizedBox(height: DsSpace.s4),
+        Text(l.agentEditChangesHint, style: secondary),
       ],
     );
   }

@@ -3,7 +3,8 @@
 /// The page of one agent of A5: adapter, presence, configured and reported mode, the server's
 /// warnings, holder, operated targets, the backend switch and the tokens
 /// (docs/spec/01-product.md 5.2 A5; 10 8, 9, 11, 13; brief M4-28 Design note 1, fixed
-/// requirements 11 to 14).
+/// requirements 11 to 14), and for a built-in agent its section with "Edit", "Versions",
+/// "Change runner", "Disable" and "Continue setup" (01 6.20 item 6; brief A1-09).
 library;
 
 import 'dart:async';
@@ -23,8 +24,11 @@ import '../hosts/host_labels.dart';
 import '../self/self_feedback.dart';
 import 'agent_labels.dart';
 import 'agent_tokens.dart';
+import 'builtin/builtin_agent_section.dart';
 import 'holder_dialog.dart';
 import 'i1_explanation.dart';
+import 'new_agent/new_agent_dialog.dart' show NewAgentHost;
+import 'new_agent/new_agent_port.dart' show builtinAdapterKind;
 import 'switch_mode_dialog.dart';
 
 /// The agent [agentId] with every field of A5.
@@ -44,6 +48,10 @@ import 'switch_mode_dialog.dart';
 /// After a successful change the page reloads the agent and runs [onChanged]; [onBack]
 /// returns to the list.
 ///
+/// With [builtin] the card of a built-in agent (`adapter_kind = 'claude_agent'`) shows the
+/// [BuiltinAgentSection]; its "Switch billing" after `hosted_holder_mismatch` opens the billing
+/// switch of this card.
+///
 /// Example:
 /// ```dart
 /// AgentPage(repository: admin, agentId: 'support', onBack: () => go(AdminLocation.agents));
@@ -59,7 +67,11 @@ class AgentPage extends StatefulWidget {
     this.clock = DateTime.now,
     this.onBack,
     this.onChanged,
+    this.builtin,
   });
+
+  /// The editing of a built-in agent (A1-09), or null for none.
+  final NewAgentHost? builtin;
 
   /// The administration's calls.
   final AdminRepository repository;
@@ -512,6 +524,20 @@ class _AgentPageState extends State<AgentPage>
                 child: Text(l.adminAgentHolderChange),
               ),
           ],
+        ),
+      if (widget.builtin case final host?
+          when a.adapterKind == builtinAdapterKind)
+        BuiltinAgentSection(
+          key: ValueKey('agentPage.builtin.${a.id}'),
+          host: host,
+          agentId: a.id,
+          timeZone: widget.timeZone,
+          clock: widget.clock,
+          onChanged: () {
+            widget.onChanged?.call();
+            unawaited(_load());
+          },
+          onSwitchBilling: denied.contains(_backend) ? null : () => _switch(a),
         ),
       const SizedBox(height: DsSpace.s16),
       AgentTokens(

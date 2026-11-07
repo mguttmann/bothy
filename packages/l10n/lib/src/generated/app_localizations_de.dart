@@ -11010,4 +11010,257 @@ class AppLocalizationsDe extends AppLocalizations {
   String runEndStateLabel(String state) {
     return 'Endstand: $state';
   }
+
+  @override
+  String agentEditTitle(String name) {
+    return '$name bearbeiten';
+  }
+
+  @override
+  String agentSetupTitle(String name) {
+    return '$name einrichten';
+  }
+
+  @override
+  String agentRestoreTitle(int version, String name) {
+    return 'Version $version von $name wiederherstellen';
+  }
+
+  @override
+  String agentViewTitle(String name, int version) {
+    return '$name, Version $version';
+  }
+
+  @override
+  String get agentEditSave => 'Speichern';
+
+  @override
+  String get agentEditContinue => 'Einrichtung fortsetzen';
+
+  @override
+  String get agentEditChangesTitle =>
+      'Änderungen gegenüber der aktuellen Version';
+
+  @override
+  String get agentEditNoChanges => 'Noch keine Änderungen.';
+
+  @override
+  String get agentEditChangesHint =>
+      'Eine gespeicherte Änderung gilt ab der nächsten Antwort des Agenten.';
+
+  @override
+  String agentEditChange(String kind, String name, String from) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'instructions': 'Anweisungen geändert',
+      'skillAdded': 'Skill $name hinzugefügt',
+      'skillRemoved': 'Skill $name entfernt',
+      'skillChanged': 'Skill $name geändert',
+      'serverAdded': 'MCP-Server $name hinzugefügt',
+      'serverRemoved': 'MCP-Server $name entfernt',
+      'serverChanged': 'MCP-Server $name geändert',
+      'setting': '$name geändert',
+      'origin': 'Herkunft geändert',
+      'other': 'Werkzeugklasse von $from zu $name',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get agentEditWish => 'Gewünschte Werkzeugklasse';
+
+  @override
+  String get agentEditReload => 'Neu laden';
+
+  @override
+  String get agentEditErrVersion =>
+      'Ein anderes Gerät hat diesen Agenten geändert. Lade neu, um von seiner aktuellen Version auszugehen; die Änderungen hier verfallen.';
+
+  @override
+  String get agentEditRemoveLocal => 'Lokale Server entfernen';
+
+  @override
+  String stepUpPurposeEditAgent(String name) {
+    return 'Agent $name bearbeiten';
+  }
+
+  @override
+  String stepUpPurposeSetUpAgent(String name) {
+    return 'Agent $name einrichten';
+  }
+
+  @override
+  String stepUpPurposeMoveAgent(String name) {
+    return 'Agent $name auf einen anderen Runner verschieben';
+  }
+
+  @override
+  String stepUpPurposeDisableAgent(String name) {
+    return 'Agent $name deaktivieren';
+  }
+
+  @override
+  String agentEditAuditReason(String name) {
+    return 'Agent $name bearbeitet';
+  }
+
+  @override
+  String agentSetupAuditReason(String name) {
+    return 'Agent $name eingerichtet';
+  }
+
+  @override
+  String agentMoveAuditReason(String name) {
+    return 'Agent $name verschoben';
+  }
+
+  @override
+  String get builtinAgentTitle => 'Eingebauter Agent';
+
+  @override
+  String builtinAgentHost(String runner) {
+    return 'Runner: $runner';
+  }
+
+  @override
+  String builtinAgentVersion(int version) {
+    return 'Definition, Version $version';
+  }
+
+  @override
+  String get builtinAgentNotSetUpHint =>
+      'Dieser Agent hat noch keine Definition und antwortet nicht. Einrichtung fortsetzen speichert eine.';
+
+  @override
+  String get builtinAgentDisabledHint => 'Dieser Agent ist deaktiviert.';
+
+  @override
+  String get builtinAgentEdit => 'Bearbeiten';
+
+  @override
+  String get builtinAgentVersions => 'Versionen';
+
+  @override
+  String get builtinAgentChangeRunner => 'Runner wechseln';
+
+  @override
+  String get builtinAgentDisable => 'Deaktivieren';
+
+  @override
+  String builtinAgentSaved(String name, int version) {
+    return '$name ist als Version $version gespeichert.';
+  }
+
+  @override
+  String builtinAgentSetUp(String name) {
+    return '$name ist eingerichtet.';
+  }
+
+  @override
+  String builtinAgentMoved(String name, String runner) {
+    return '$name ist jetzt auf $runner.';
+  }
+
+  @override
+  String builtinAgentDisabled(String name) {
+    return '$name ist deaktiviert.';
+  }
+
+  @override
+  String builtinAgentDisableTitle(String name) {
+    return '$name deaktivieren?';
+  }
+
+  @override
+  String builtinAgentDisableBody(String name) {
+    return '$name antwortet nicht mehr: seine Tokens enden und seine Verbindungen schließen. Die Definition und ihre Versionen bleiben.';
+  }
+
+  @override
+  String agentVersionsTitle(String name) {
+    return 'Versionen von $name';
+  }
+
+  @override
+  String agentVersionLine(
+    int version,
+    String when,
+    String author,
+    String origin,
+  ) {
+    String _temp0 = intl.Intl.selectLogic(origin, {
+      'template': 'aus einer Vorlage',
+      'interview': 'aus dem Interview',
+      'other': 'von Hand',
+    });
+    return 'Version $version, $when, von $author, $_temp0';
+  }
+
+  @override
+  String get agentVersionCurrent => 'Aktuell';
+
+  @override
+  String get agentVersionShow => 'Anzeigen';
+
+  @override
+  String agentVersionShowLabel(int version) {
+    return 'Version $version anzeigen';
+  }
+
+  @override
+  String get agentVersionRestore => 'Wiederherstellen';
+
+  @override
+  String agentVersionRestoreLabel(int version) {
+    return 'Version $version wiederherstellen';
+  }
+
+  @override
+  String get agentVersionsEmpty => 'Noch keine gespeicherte Version.';
+
+  @override
+  String agentHostTitle(String name) {
+    return 'Runner von $name wechseln';
+  }
+
+  @override
+  String get agentHostBody =>
+      'Die Verbindungen des Agenten starten auf dem neuen Runner neu; eine laufende Antwort bricht ab.';
+
+  @override
+  String agentHostChoice(String runner, String toolClass) {
+    return '$runner, lädt höchstens $toolClass';
+  }
+
+  @override
+  String get agentHostNone =>
+      'Kein anderer Runner ist für eingebaute Agenten verfügbar.';
+
+  @override
+  String get agentHostConfirm => 'Verschieben';
+
+  @override
+  String agentHostErrCeiling(String runner, String toolClass) {
+    return '$runner lädt höchstens die Werkzeugklasse $toolClass, unter der Klasse des Agenten. Wähle einen anderen Runner oder senke zuerst die Klasse des Agenten.';
+  }
+
+  @override
+  String get agentHostErrHolder =>
+      'Der Agent rechnet Persönlich ab, deshalb muss der neue Runner Persönlich mit demselben Inhaber der Zugangsdaten sein. Wechsle zuerst die Abrechnung auf Organisation oder wähle einen solchen Runner.';
+
+  @override
+  String get agentHostSwitchBilling => 'Abrechnung wechseln';
+
+  @override
+  String get agentHostErrNotCapable =>
+      'Dieser Runner nimmt gerade keine eingebauten Agenten auf. Wähle einen anderen Runner.';
+
+  @override
+  String get builtinAgentsEntry => 'Eingebaute Agenten';
+
+  @override
+  String get builtinAgentsEntryHint =>
+      'Bearbeiten, verschieben und deaktivieren';
+
+  @override
+  String get builtinAgentsEmpty => 'Noch keine eingebauten Agenten.';
 }

@@ -1029,6 +1029,31 @@ void main() {
       ),
     );
 
+    // A1-09: the versions, Change runner and Disable of a built-in agent (26 8.4).
+    await builtin.listAgentDefinitionVersions(agentId: hosted.id);
+    await builtin.getAgentDefinition(agentId: hosted.id, version: 1);
+    final secondRunner = h.server.world.addAgent(
+      handle: 'contract-runner-2',
+      displayName: 'Second runner',
+      adapterKind: 'code_runner',
+      hostsAgents: 'host',
+    );
+    final current = (await builtin.getAgent(agentId: hosted.id)).data!;
+    final moved = (await builtin.setAgentHost(
+      agentId: hosted.id,
+      ifMatch: '"${current.version}"',
+      hostSet: HostSet(
+        (b) => b
+          ..hostedBy = secondRunner.id
+          ..reason = 'Move agent Notes',
+      ),
+    )).data!;
+    expect(moved.hostedBy, secondRunner.id);
+    await builtin.disableAgent(
+      agentId: hosted.id,
+      reasonBody: ReasonBody((b) => b..reason = 'Not needed'),
+    );
+
     // M5-06: the child session of the Share Extension (08 7.4).
     await api.getDevicesApi().createExtensionSession(
       extensionSessionCreate: ExtensionSessionCreate(

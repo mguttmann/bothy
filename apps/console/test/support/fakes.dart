@@ -14,7 +14,16 @@ import 'package:dio/dio.dart';
 /// One request the fake server received.
 class SeenRequest {
   /// Creates the record.
-  SeenRequest(this.method, this.path, this.headers, this.body);
+  SeenRequest(
+    this.method,
+    this.path,
+    this.headers,
+    this.body, {
+    this.query = const {},
+  });
+
+  /// The query parameters, for example `version` of `getAgentDefinition`.
+  final Map<String, String> query;
 
   /// HTTP method in upper case.
   final String method;
@@ -79,10 +88,16 @@ class FakeServer implements HttpClientAdapter {
       }
       if (bytes.isNotEmpty) body = jsonDecode(utf8.decode(bytes));
     }
-    final req = SeenRequest(options.method.toUpperCase(), options.uri.path, {
-      for (final e in options.headers.entries)
-        e.key.toLowerCase(): '${e.value}',
-    }, body);
+    final req = SeenRequest(
+      options.method.toUpperCase(),
+      options.uri.path,
+      {
+        for (final e in options.headers.entries)
+          e.key.toLowerCase(): '${e.value}',
+      },
+      body,
+      query: options.uri.queryParameters,
+    );
     seen.add(req);
     final handler = routes['${req.method} ${req.path}'];
     final answer = handler == null

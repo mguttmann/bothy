@@ -61,7 +61,8 @@ import 'admin_routes.dart';
 /// link of the statistics outside the app, the system browser on the desktop and a new tab in
 /// the console (null: no link; M6-06); [statusSource] feeds the status page with its changes,
 /// the sync engine's events on the desktop and the interval of the console (null: the page is
-/// read once; M7-21); [newAgent] offers "New agent" in the agent list (null: no entry; A1-08).
+/// read once; M7-21); [newAgent] offers "New agent" in the agent list (null: no entry; A1-08)
+/// and the editing of a built-in agent on its card (A1-09).
 ///
 /// The body holds no permission logic: a screen the server refuses shows the server's reason
 /// (15 1 principle 1). A section without a screen shows the people list, as the shell does.
@@ -223,6 +224,7 @@ class AdminBody extends StatelessWidget {
         clock: clock,
         onBack: () => onNavigate(const AdminLocation(AdminSection.agents)),
         onChanged: changed,
+        builtin: newAgent,
       ),
       AdminSection.agents => AgentsList(
         repository: r,

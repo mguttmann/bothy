@@ -11,6 +11,7 @@ import 'phone/app_lock_test.dart' as app_lock;
 import 'phone/autonomous_runs_phone_test.dart' as autonomous_runs;
 import 'phone/background_test.dart' as background;
 import 'phone/dictation_test.dart' as dictation;
+import 'phone/edit_agent_test.dart' as edit_agent;
 import 'phone/emergency_test.dart' as emergency;
 import 'phone/login_flow_test.dart' as login_flow;
 import 'phone/mobile_run_graph_test.dart' as mobile_run_graph;
@@ -39,4 +40,5 @@ void main() {
   group('app lock', app_lock.main);
   group('new agent', new_agent.main);
   group('autonomous runs', autonomous_runs.main);
+  group('edit agent', edit_agent.main);
 }

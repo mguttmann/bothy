@@ -9,7 +9,9 @@
 /// shows (an owner, a server that answers `listAgentTemplates` and a runner that reports
 /// `hosts_agents`, 26 8.1), [newAgentHostOf] hands the port, the key maker and the announcement
 /// interval to an entry, and [openNewAgent] opens the dialog from the space menu and then the new
-/// channel or, on the desktop, the agent card (01 6.20 item 5).
+/// channel or, on the desktop, the agent card (01 6.20 item 5). The same host part edits a built-in
+/// agent on the agent card and on the phone's page of the built-in agents (A1-09); its port
+/// gives each write the step-up purpose of what it does (create, set up, edit, move, disable).
 library;
 
 import 'package:admin_ui/admin_ui.dart';
@@ -53,11 +55,7 @@ NewAgentHost? newAgentHostOf(
   if (services == null) return null;
   final l = AppLocalizations.of(context);
   return NewAgentHost(
-    port: ApiNewAgentPort(
-      services.auth.api,
-      purpose: l.stepUpPurposeNewAgent,
-      reason: l.newAgentAuditReason,
-    ),
+    port: localizedAgentPort(services.auth.api, l),
     newKey: services.ids.next,
     announceMinInterval: ref.read(appConfigProvider).liveAnnounceMinInterval,
     fullScreen: phone,

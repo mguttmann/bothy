@@ -134,6 +134,27 @@ without a runner that reports `hosts_agents`, which hides the entry. A host pass
 `NewAgentHost` to `AdminShell` or `AdminBody`; `AgentsList` then shows "New agent" and marks a
 built-in agent without a definition "Not set up". Rulings: docs/decisions.d/A1-08.md.
 
+## Editing built-in agents (A1-09)
+
+`BuiltinAgentSection` is the part of the agent card of a built-in agent (01 6.20 item 6; 26 8.4):
+the runner, the definition version or "Not set up", and the actions "Edit", "Versions", "Change
+runner", "Disable" and "Continue setup". `AgentPage` shows it for an agent of kind `claude_agent`
+when the host passes `builtin` (`AdminBody` passes its `newAgent`); `BuiltinAgentsView` lists every
+built-in agent with its section for the phone, which has no agent card.
+
+The editor is the dialog of "New agent" with an `ExistingAgent`: `NewAgentFlow.forAgent` edits
+(`NewAgentMode.edit`), shows a stored version read-only (`view`) or continues the setup of an
+agent without a definition (`setup`). An edit reads the stored definition into the draft
+(`NewAgentDraft.fromStored`, which keeps the stored `tool_class_wish` until a class is picked),
+names the changed parts with `definitionChanges` and `AgentEditChanges`, and saves with
+`putAgentDefinition` and `If-Match` of the version it started from; the class steps keep the order
+of 26 8.4; `reload()` answers a `412`, `removeLocalServers()` answers `definition_needs_host`.
+`AgentVersionsDialog` lists the versions (`listAgentDefinitionVersions`) and opens one with
+`getAgentDefinition?version=` for "Show" or "Restore". `ChangeRunnerDialog` moves the agent with
+`setAgentHost` and keeps each refusal in the dialog as a sentence. The port gives every write an
+`AgentChangeKind`; `localizedAgentPort` builds `ApiNewAgentPort` with the step-up purpose and the
+audit reason of each kind. Rulings: docs/decisions.d/A1-09.md.
+
 ## The page "Live" (M6-16)
 
 `LiveScreen` hosts the views of `bothy_viz` for the desktop app (D12, TV mode D13), the phone (M10)
@@ -168,7 +189,8 @@ Further rules checked by `make arch`:
 | `lib/src/grants/`, `lib/src/access/`, `lib/src/data/access_repository.dart` | the permission screens of M4-27 |
 | `lib/src/hosts/`, `lib/src/data/hosts_repository.dart` | screen A8 of M4-37 |
 | `lib/src/agents/`, `lib/src/data/agents_repository.dart` | screen A5 of M4-28 and the guided flow |
-| `lib/src/agents/new_agent/` | "New agent" of A1-08: draft, port, flow with resume, interview, preview, steps, dialog |
+| `lib/src/agents/new_agent/` | "New agent" of A1-08: draft, port, flow with resume, interview, preview, steps, dialog; the edit, restore, view and setup modes and the changed parts of A1-09 |
+| `lib/src/agents/builtin/` | editing built-in agents of A1-09: the section of the agent card, the versions, Change runner, the phone list |
 | `lib/src/apps/`, `lib/src/incoming_webhooks/`, `lib/src/secrets/`, `lib/src/data/apps_repository.dart` | apps, outgoing and incoming webhooks and the once-only secret of M6-08 |
 | `test/apps/`, `test/incoming_webhooks/`, `test/secrets/` | the app screens, subscriptions, deliveries, incoming webhooks and the once-only test over the app fake (`test/admin/apps_fake.dart`) |
 | `lib/src/emergency/`, `test/emergency/` | the emergency actions on the phone of M5-09 and their tests over the fake repository |

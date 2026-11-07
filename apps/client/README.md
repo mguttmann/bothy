@@ -55,7 +55,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/app/layout/` | the desktop shell, the four columns and their stored widths |
 | `lib/sidebar/` | the sidebar column (M4-19): head, space tree, channel rows, foot, personal order, `SidebarNavigation` for M4-24; the thread groups with their selection, rows and "All posts" (M4-40) |
 | `lib/forum/` | the forum overview D15 (M4-19, M4-40): head with the kind sentence, "Pin" and filters, rows, Done section, paging, and the new chat view (M4-41) |
-| `lib/new_agent/` | "New agent" (A1-08): the offer of the signed-in owner (`newAgentOfferProvider`), the host part of the shared dialog of `admin_ui` over the session (`newAgentHostOf`) and the entry of the space menu (`openNewAgent`) |
+| `lib/new_agent/` | "New agent" (A1-08): the offer of the signed-in owner (`newAgentOfferProvider`), the host part of the shared dialog of `admin_ui` over the session (`newAgentHostOf`) and the entry of the space menu (`openNewAgent`); editing built-in agents (A1-09): the phone's entry and page "Built-in agents" under Me (`builtin_agents_entry.dart`) |
 | `lib/new_project/` | the new project dialog (M4-43): name suggestion and field checks, the steps of `NewProjectFlow`, the port over the API and the outbox, the dialog; forums for existing folders (`ProjectSyncFlow`, its dialog) and the rename of a project forum (M4-44) |
 | `lib/thread/` | the history column (M4-20): header, message list with paging, gaps and jumps, message tiles and actions, outbox rows, dialogs (versions, conflict, delete, reactions, title, move), the D2 layout |
 | `lib/composer/` | the composer (M4-20): send path, draft sync, mention suggestions, templates; long pastes as files and long texts as one message with the rest attached (M4-47, `long_text.dart`, `attachment_chips.dart`) |
@@ -851,6 +851,35 @@ whose target is not reached, so nothing is created twice; "Close" keeps what exi
 agent list marks a built-in agent without a definition "Not set up". When every step is done the
 dialog opens the new channel, or on the desktop the agent card. Rulings:
 docs/decisions.d/A1-08.md.
+
+### Editing built-in agents (A1-09)
+
+The agent card of a built-in agent (`/admin/agents/<id>` on the desktop) shows the section
+"Built-in agent" of `admin_ui` (`BuiltinAgentSection`) through the same `newAgentHostOf` (01 6.20
+item 6; 26 8.4). The phone has no agent list of the administration, so an owner whose server
+offers "New agent" or lists a built-in agent gets "Built-in agents" under Me
+(`/admin/agents`, `builtinAgentsAvailableProvider`), a page with every built-in agent and its
+section; the dialogs fill the screen there.
+
+- "Edit" opens the preview of "New agent" with the current definition; the identity, the runner
+  and the billing mode are the agent's. Above the preview the changed parts are named (never their
+  text), and "Save" stays disabled without a change. Saving runs `putAgentDefinition` with
+  `If-Match` of the version the edit started from and step-up; a raised class is set before it and
+  a lowered one after it, each a visible step with "Try again". A `412` says that another device
+  changed the agent and offers "Reload"; `definition_needs_host` offers "Remove the local
+  servers".
+- "Versions" lists the versions newest first with time, author and origin; "Show" opens one
+  read-only, "Restore" opens it in the editor, where "Save" writes it as a new version.
+- "Change runner" offers the runners that report `hosts_agents`, says that the agent's connections
+  restart and shows `host_tool_class_ceiling`, `hosted_holder_mismatch` (with "Switch billing" on
+  the desktop) and `host_not_capable` as sentences.
+- "Disable" asks once with a reason (`agent.disable`).
+- "Continue setup" of an agent that is "Not set up" offers the ways in of "New agent" and runs the
+  steps not reached yet, the class before the definition.
+
+Each write names its kind, so the step-up prompt says "Edit the agent <name>", "Set up the agent
+<name>", "Move the agent <name> to another runner" or "Disable the agent <name>". Rulings:
+docs/decisions.d/A1-09.md.
 
 ### Project not ready (F-PROJEKT-BEREIT)
 

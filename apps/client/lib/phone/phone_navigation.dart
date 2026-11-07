@@ -75,6 +75,9 @@ enum PhonePageKind {
   /// The emergency actions of one person.
   emergencyPerson,
 
+  /// The built-in agents of an owner (01 6.20 item 6; brief A1-09).
+  builtinAgents,
+
   /// The status page (16 12, M7-21).
   status,
 
@@ -230,6 +233,9 @@ List<PhonePage> phoneStack(
     // The emergency actions under Me (brief M5-09): the only administration on the phone.
     case SectionLocation(area: 'admin', segments: ['emergency']):
       return [root, PhonePage(PhonePageKind.emergency, path)];
+    // The built-in agents under Me (brief A1-09): each agent in full on one page.
+    case SectionLocation(area: 'admin', segments: ['agents']):
+      return [root, PhonePage(PhonePageKind.builtinAgents, path)];
     case SectionLocation(area: 'admin', segments: ['emergency', _]):
       return [
         root,

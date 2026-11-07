@@ -226,12 +226,30 @@ void main() {
       expect(port.classOf(port.onlyAgent), AgentToolClass.chat);
     });
 
+    test('a template class above the ceiling of the runner stops Create before anything', () async {
+      // The template wishes host; Alex laptop loads at most scoped (A1-08 red team minor 2).
+      flow
+        ..useTemplate(filesTemplate)
+        ..runner = alexRunner;
+      await flow.run();
+      expect(flow.invalidFields, contains(PreviewField.toolClass));
+      expect(flow.failure, isNull);
+      expect(port.writes, isEmpty);
+      flow.edit((d) => d.servers.clear());
+      flow.edit((d) => d.pickClass(AgentToolClass.scoped));
+      expect(flow.invalidFields, isNot(contains(PreviewField.toolClass)));
+    });
+
     test(
-      'the ceiling of the runner fails the class step with its reason',
+      'a ceiling that fell meanwhile fails the class step with its reason',
       () async {
         flow
           ..useTemplate(filesTemplate)
-          ..runner = alexRunner;
+          ..runner = devRunner;
+        port.failNext['setToolClass'] = const NewAgentFailure.problem(
+          'conflict',
+          reason: 'host_tool_class_ceiling',
+        );
         await flow.run();
         expect(flow.failedStep, NewAgentStep.setClass);
         expect(flow.failure!.reason, 'host_tool_class_ceiling');
