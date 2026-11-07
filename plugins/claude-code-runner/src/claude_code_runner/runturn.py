@@ -2227,21 +2227,45 @@ class RunTurn:
         """
         self.handed_over = True
         process = self.process
-        if isinstance(process, KeeperGroup) and process.writer.in_flight:
-            loop = asyncio.get_running_loop()
-            deadline = loop.time() + self.cfg.kill_grace
-            while process.writer.in_flight and loop.time() < deadline:
-                await asyncio.sleep(self.cfg.poll_interval)
-            if process.writer.in_flight and self.input_write is not None:
-                written = await process.writer.abort()
-                self.input_write = {"uuid": self.input_write.get("uuid"), "bytes": written}
-                _log("partial_input", bytes=written, **self.ids)
+        if isinstance(process, KeeperGroup):
+            await self._settle_input_write(process)
         if self.keeper_start is not None and (self.launch is None or not self.launch.go_sent):
             self.keeper_start.close()  # before step 3: the keeper starts no CLI
         if self.phase == "ended" or self.record_phase not in _KEPT_PHASES:
             return False
         self._persist()
         return True
+
+    async def _settle_input_write(self, process: KeeperGroup) -> None:
+        """Finish or record the input line in flight at a handover (18.19.3).
+
+        A line whose last byte reached the pipe, within ``runner.kill_grace`` or before the
+        handover, is no longer recorded as started; a cut line keeps the count of its bytes
+        written (``partial_input``), counted from the start of the line, so the adopter writes
+        the rest first. The writer's own task may not resume before the record is saved, so
+        the count comes from the pipe writer here.
+        """
+        writer = process.writer
+        if writer.in_flight:
+            loop = asyncio.get_running_loop()
+            deadline = loop.time() + self.cfg.kill_grace
+            while writer.in_flight and loop.time() < deadline:
+                await asyncio.sleep(self.cfg.poll_interval)
+        pending = self.input_write
+        if pending is None:
+            return
+        cut = writer.in_flight
+        if cut:
+            await writer.abort()
+        count = pending.get("bytes")
+        done = count if isinstance(count, int) and not isinstance(count, bool) else 0
+        done += writer.written
+        line = self.lines.get(str(pending.get("uuid")))
+        if line is not None and done >= len(line):
+            self.input_write = None
+            return
+        self.input_write = {"uuid": pending.get("uuid"), "bytes": done}
+        _log("partial_input", bytes=done, **self.ids)
 
     async def take_over(self, record: dict[str, Any], known_steps: Mapping[str, str]) -> None:
         """Continue a run that another runner handed over or left by a crash (18.19.5 to 7).
