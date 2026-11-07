@@ -15955,6 +15955,9 @@ type RunWakeChangedPayload struct {
 	// NoteMessageId The note in the thread of an end other than `fired` (09 5.8.4).
 	NoteMessageId *Uuid `json:"note_message_id,omitempty"`
 
+	// NoteThreadSeq The `thread_seq` of the note; set with `note_message_id`.
+	NoteThreadSeq *int64 `json:"note_thread_seq,omitempty"`
+
 	// State State of a wake-up (09 5.8.1); every state other than `pending` is an end, and every end other than `fired` posts a note in the thread (09 5.8.4).
 	State RunWakeState `json:"state"`
 
