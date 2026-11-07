@@ -546,6 +546,11 @@ Built-in agents (`adapter_kind` `claude_agent`, [26-builtin-agents.md](../../../
 - **Heartbeat.** `details.capabilities.hosts_agents` (`chat`, `scoped`, `host`) is the ceiling of a
   runner; a change of it is stored at once, not with the delayed flush. A built-in agent's own
   heartbeat with it is `400` on `/details/capabilities/hosts_agents` (`not_allowed`).
+- **Visible to owners (A1-03b).** `getAgent` and `listAgents` show an owner the stored ceiling as
+  `presence.hosts_agents`, so the apps offer "New agent" only when an active runner reports it
+  (26 8.1). `Service.isOwner` reads the caller's owners row through `identity.Directory`;
+  readers of a served channel, the agent itself, `agent.updated`, the `412` body and the
+  heartbeat answer carry no such member.
 - **Ceiling.** `agent.tool_class.set` above the runner's ceiling and `agent.host.set` to a runner
   below the agent's class are `409 conflict` with reason `host_tool_class_ceiling`; a runner without a reported ceiling
   admits only `chat`.

@@ -1678,7 +1678,8 @@ actions:
 - id: agent.read
   section: agents
   description: read the agent card (name, mode badge, tool class, presence); the agent reads itself, including
-    the configured mode of its backend policy
+    the configured mode of its backend policy; an owner also sees the capability `hosts_agents` a runner reports
+    (26 8.1)
   resource: agent
   right: owner or agent-self or read on a channel that the agent operates
   owner: false

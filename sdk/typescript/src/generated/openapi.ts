@@ -8617,6 +8617,8 @@ export interface components {
             rate_limit?: components["schemas"]["AgentRateLimitState"];
             /** @description Runners only, the slot use of the last heartbeat (09 4.8); absent when the adapter does not report it. */
             run_slots?: components["schemas"]["RunSlots"];
+            /** @description Claude Code runners only, the capability `hosts_agents` of the last stored heartbeat, the highest tool class the runner loads for a hosted built-in agent (09 2.2, 26 3.1). Shown only in `getAgent` and `listAgents` to an owner, who offers "New agent" when an active runner reports it (26 8.1); absent for every other caller, in every event, in the heartbeat answer and when the runner does not report it. */
+            hosts_agents?: components["schemas"]["ToolClass"];
             billing_evidence?: components["schemas"]["BillingEvidence"];
             /** @description Known values `billing_mode_mismatch` (the reported mode has differed from the configured one for longer than `billing.mismatch_alert_after`), `billing_mode_unsupported` (no reported mode and the configured one is not in `billing_modes_supported`), `billing_evidence_unknown` (`billing_evidence.key_type` is `unknown`) and `tool_class_mismatch` (the reported tool class differs from the configured one). Only while the state is `online` or `degraded`. */
             warnings?: string[];

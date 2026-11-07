@@ -7601,6 +7601,9 @@ type AgentRuntimeStatus struct {
 	BillingModeMatches    *bool          `json:"billing_mode_matches,omitempty"`
 	BillingModesSupported *[]BillingMode `json:"billing_modes_supported,omitempty"`
 
+	// HostsAgents Claude Code runners only, the capability `hosts_agents` of the last stored heartbeat, the highest tool class the runner loads for a hosted built-in agent (09 2.2, 26 3.1). Shown only in `getAgent` and `listAgents` to an owner, who offers "New agent" when an active runner reports it (26 8.1); absent for every other caller, in every event, in the heartbeat answer and when the runner does not report it.
+	HostsAgents *ToolClass `json:"hosts_agents,omitempty"`
+
 	// LastHeartbeatAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	LastHeartbeatAt *Timestamp `json:"last_heartbeat_at,omitempty"`
 

@@ -13,13 +13,50 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// Get implements agents.Agents: agent.read on the agent, then 404 for an unknown id.
+// Get implements agents.Agents: agent.read on the agent, then 404 for an unknown id. An owner
+// also sees the stored capability hosts_agents (ownerExtras).
 func (s *Service) Get(ctx context.Context, a actor.Actor, id ids.ID) (agents.Agent, error) {
 	rec, err := s.load(ctx, a, authorize.ActionAgentRead, id)
 	if err != nil {
 		return agents.Agent{}, err
 	}
-	return s.view(ctx, rec)
+	v, err := s.view(ctx, rec)
+	if err != nil {
+		return agents.Agent{}, err
+	}
+	owner, err := s.isOwner(ctx, a)
+	if err != nil {
+		return agents.Agent{}, err
+	}
+	if owner {
+		ownerExtras(&v, rec)
+	}
+	return v, nil
+}
+
+// isOwner reports whether a is a person with an active owners row. agent.read already checked
+// the liveness of a, so this only decides which members of the answer a sees. Errors: the
+// directory's, except not_found, which is no owner.
+func (s *Service) isOwner(ctx context.Context, a actor.Actor) (bool, error) {
+	if a.Kind != actor.KindUser {
+		return false, nil
+	}
+	u, err := s.d.Directory.User(ctx, a.ID)
+	if errs.KindOf(err) == errs.KindNotFound {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return u.IsOwner, nil
+}
+
+// ownerExtras adds to v the members only an owner reads: the capability hosts_agents of the last
+// stored heartbeat, which the "New agent" entry of the apps needs (docs/spec/26-builtin-agents.md
+// 8.1). Readers of a served channel and the agent itself see the agent as before A1-03b, and
+// agent.updated never carries it, because its audience includes them.
+func ownerExtras(v *agents.Agent, rec domain.Agent) {
+	v.Presence.HostsAgents = string(rec.Reported.HostsAgents)
 }
 
 // agentsList is the list name of the cursors of listAgents.
@@ -60,7 +97,11 @@ func (s *Service) List(ctx context.Context, a actor.Actor, p agents.Page) (agent
 	if err != nil {
 		return agents.AgentPage{}, err
 	}
-	out, err := s.page(ctx, visible, limit)
+	owner, err := s.isOwner(ctx, a)
+	if err != nil {
+		return agents.AgentPage{}, err
+	}
+	out, err := s.page(ctx, visible, limit, owner)
 	if err != nil || len(visible) <= limit {
 		return out, err
 	}
@@ -85,8 +126,8 @@ func (s *Service) after(binding []byte, cursor string) (ids.ID, error) {
 	return k.ID, nil
 }
 
-// page joins the first limit visible records with their principals.
-func (s *Service) page(ctx context.Context, visible []domain.Agent, limit int) (agents.AgentPage, error) {
+// page joins the first limit visible records with their principals; owner adds ownerExtras.
+func (s *Service) page(ctx context.Context, visible []domain.Agent, limit int, owner bool) (agents.AgentPage, error) {
 	visible = visible[:min(len(visible), limit)]
 	out := agents.AgentPage{Items: make([]agents.Agent, 0, len(visible))}
 	list := make([]ids.ID, 0, len(visible))
@@ -102,7 +143,11 @@ func (s *Service) page(ctx context.Context, visible []domain.Agent, limit int) (
 		if !ok {
 			return agents.AgentPage{}, errs.New(errs.CodeInternalError, "agents: a record without its principal")
 		}
-		out.Items = append(out.Items, s.agentView(rec, pv))
+		v := s.agentView(rec, pv)
+		if owner {
+			ownerExtras(&v, rec)
+		}
+		out.Items = append(out.Items, v)
 	}
 	return out, nil
 }

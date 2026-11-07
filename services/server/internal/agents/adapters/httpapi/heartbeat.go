@@ -82,5 +82,9 @@ func presenceREST(p agents.PresenceStatus) rest.AgentRuntimeStatus {
 	if s := p.RunSlots; s != nil {
 		out.RunSlots = &rest.RunSlots{Used: s.Used, Total: s.Total}
 	}
+	if p.HostsAgents != "" {
+		c := rest.ToolClass(p.HostsAgents)
+		out.HostsAgents = &c
+	}
 	return out
 }

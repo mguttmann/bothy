@@ -40,6 +40,7 @@ class AgentRuntimeStatus:
             the adapter (`agent_heartbeat.v1`). Never quotas of an account, keys or subscription names.
         run_slots (RunSlots | Unset): Slot use of a runner (09 4.8, 18.2), `used` turns run of at most `total`
             (`runner.max_parallel_runs`) at once; `used` is at most `total`.
+        hosts_agents (ToolClass | Unset): Tool class of an agent runtime, ordered `chat` < `scoped` < `host` (07, 2.11).
         billing_evidence (BillingEvidence | Unset): How the runtime proves its actual billing mode. Never a key value or
             prefix (schema `billing_evidence.v1`).
         warnings (list[str] | Unset): Known values `billing_mode_mismatch` (the reported mode has differed from the
@@ -58,6 +59,7 @@ class AgentRuntimeStatus:
     billing_mode_matches: bool | Unset = UNSET
     rate_limit: AgentRateLimitState | Unset = UNSET
     run_slots: RunSlots | Unset = UNSET
+    hosts_agents: ToolClass | Unset = UNSET
     billing_evidence: BillingEvidence | Unset = UNSET
     warnings: list[str] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -96,6 +98,10 @@ class AgentRuntimeStatus:
         if not isinstance(self.run_slots, Unset):
             run_slots = self.run_slots.to_dict()
 
+        hosts_agents: str | Unset = UNSET
+        if not isinstance(self.hosts_agents, Unset):
+            hosts_agents = self.hosts_agents.value
+
         billing_evidence: dict[str, Any] | Unset = UNSET
         if not isinstance(self.billing_evidence, Unset):
             billing_evidence = self.billing_evidence.to_dict()
@@ -127,6 +133,8 @@ class AgentRuntimeStatus:
             field_dict["rate_limit"] = rate_limit
         if run_slots is not UNSET:
             field_dict["run_slots"] = run_slots
+        if hosts_agents is not UNSET:
+            field_dict["hosts_agents"] = hosts_agents
         if billing_evidence is not UNSET:
             field_dict["billing_evidence"] = billing_evidence
         if warnings is not UNSET:
@@ -193,6 +201,13 @@ class AgentRuntimeStatus:
         else:
             run_slots = RunSlots.from_dict(_run_slots)
 
+        _hosts_agents = d.pop("hosts_agents", UNSET)
+        hosts_agents: ToolClass | Unset
+        if isinstance(_hosts_agents, Unset):
+            hosts_agents = UNSET
+        else:
+            hosts_agents = ToolClass(_hosts_agents)
+
         _billing_evidence = d.pop("billing_evidence", UNSET)
         billing_evidence: BillingEvidence | Unset
         if isinstance(_billing_evidence, Unset):
@@ -212,6 +227,7 @@ class AgentRuntimeStatus:
             billing_mode_matches=billing_mode_matches,
             rate_limit=rate_limit,
             run_slots=run_slots,
+            hosts_agents=hosts_agents,
             billing_evidence=billing_evidence,
             warnings=warnings,
         )

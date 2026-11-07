@@ -244,7 +244,7 @@ func (s *Service) ListHosted(ctx context.Context, a actor.Actor, p agents.Page) 
 	if err != nil {
 		return agents.AgentPage{}, err
 	}
-	out, err := s.page(ctx, active, limit)
+	out, err := s.page(ctx, active, limit, false) // a runner is never an owner
 	if err != nil || len(active) <= limit {
 		return out, err
 	}

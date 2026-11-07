@@ -490,7 +490,7 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 <!-- BEGIN GENERATED: actions.agents -->
 | ID | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | RL class |
 |---|---|---|---|---|---|---|---|---|
-| `agent.read` | read the agent card (name, mode badge, tool class, presence); the agent reads itself, including the configured mode of its backend policy | agent | owner or agent-self or read on a channel that the agent operates | no | no | no | no | `rl.read` |
+| `agent.read` | read the agent card (name, mode badge, tool class, presence); the agent reads itself, including the configured mode of its backend policy; an owner also sees the capability `hosts_agents` a runner reports (26 8.1) | agent | owner or agent-self or read on a channel that the agent operates | no | no | no | no | `rl.read` |
 | `agent.create` | create an agent | instance | owner | yes | yes | yes | yes | `rl.admin` |
 | `agent.update` | change name, description, avatar, `operator_config` | agent | owner | yes | yes | yes | no | `rl.admin` |
 | `agent.disable` | disable an agent; tokens and connections end, runs are cancelled | agent | owner | yes | yes | yes | yes | `rl.admin` |
