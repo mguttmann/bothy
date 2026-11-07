@@ -1,15 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Pinned Hermes Agent version of the recording (docs/spec/09-agenten.md 17.1 and 17.10).
-# Rule (docs/DECISIONS.md D-M2-32): the newest release tag of the public repository that is
-# older than deps.min_release_age on the recording day, resolved with `git ls-remote`
-# (release tags are versions such as v0.22.5 since October 2026, D-HERMES-COMPAT-1). The
-# Python is one that Hermes' own lock installs; v0.22 locks only 3.14 (D-HERMES-COMPAT-2).
-# Renovate proposes newer tags; then record again with `make -C plugins/hermes-adapter record`.
+# Pinned Hermes Agent version of the recording (docs/spec/09-agents.md 17.1 and 17.10).
+# Rule (docs/DECISIONS-FOUNDATION.md D-M2-32-3): the newest release tag of the public repository
+# that is older than deps.min_release_age on the recording day, resolved with `git ls-remote`
+# (release tags are versions such as v0.22.5 since October 2026, D-HERMES-COMPAT-1). Exception
+# D-HERMES-MAIN-1 (docs/decisions.d/HERMES-MAIN-A8B0.md): this pin is a main commit without a
+# release tag. The Python is one that Hermes' own lock installs; it locks only 3.14
+# (D-HERMES-COMPAT-2). Renovate proposes newer tags (D-HERMES-MAIN-2); then record again with
+# `make -C plugins/hermes-adapter record`.
 repository = "https://github.com/NousResearch/hermes-agent"
-tag = "v0.22.5"
-commit = "bf0203a794a07aac3ff764972ab9087baa4e4f4e"
+# Base release: v0.23.0
+commit = "a8b0bc15053c1d71fb2bfea39007847c9e1c5673"
 python = "3.14"
 install = "uv-lock"
 extras = ["anthropic"]
-recorded_on = 2026-10-29
+recorded_on = 2026-11-07

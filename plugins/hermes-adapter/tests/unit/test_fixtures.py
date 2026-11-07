@@ -23,6 +23,7 @@ from hermes_harness.fixtures import (
 from hermes_harness.observations import SLUGS
 from hermes_harness.pin import PIN_FILE, load_pin
 from hermes_harness.scenarios import PEOPLE, Scenario, load_scenarios, timing_problems
+from pin_rules import pin_reference_problems, ruling_rows
 
 REPO = Path(__file__).resolve().parents[4]
 CHAPTER = REPO / "docs" / "spec" / "09-agents.md"
@@ -118,9 +119,8 @@ def test_section_17_10_matches_the_observations() -> None:
     pin = load_pin(PIN_FILE)
     section = _section(CHAPTER.read_text(encoding="utf-8"), "### 17.10", "\n## 18.")
     intro = section.split("| Item", 1)[0]
-    assert pin.tag is not None
-    assert pin.tag in intro
-    assert pin.commit[:12] in intro
+    pin_text = PIN_FILE.read_text(encoding="utf-8")
+    assert pin_reference_problems(pin, pin_text, intro, ruling_rows()) == []
     rows = _table_rows()
     slugs = [row[0].strip("`") for row in rows]
     assert slugs == list(SLUGS)

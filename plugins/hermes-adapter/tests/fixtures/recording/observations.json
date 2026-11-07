@@ -17,10 +17,10 @@
     ]
   },
   "egress": [],
-  "inputs_sha256": "951e586ff37ce048d2812b708412ebeb1b44b674f09786131c2d01801b6f2bb2",
+  "inputs_sha256": "82f4b1a75243a9cefe2b24c8258975ac23ed1f3d5128c170923b00fff9d1ec25",
   "pin": {
-    "commit": "bf0203a794a07aac3ff764972ab9087baa4e4f4e",
-    "tag": "v0.22.5"
+    "commit": "a8b0bc15053c1d71fb2bfea39007847c9e1c5673",
+    "tag": null
   },
   "plugin_discovery": {
     "enabled_through": "plugins.enabled",
@@ -294,8 +294,8 @@
           "switched": false
         },
         "resume_other_thread_as_admin": {
-          "earlier_text_in_next_request": false,
-          "switched": false
+          "earlier_text_in_next_request": true,
+          "switched": true
         },
         "resume_same_thread": {
           "earlier_text_in_next_request": true,
@@ -304,7 +304,7 @@
         "session_id_public": true,
         "session_id_read_through": "ctx.register_hook('pre_llm_call') keyword session_id"
       },
-      "holds": false
+      "holds": true
     },
     "steer": {
       "facts": {
@@ -325,7 +325,7 @@
       "holds": false
     }
   },
-  "recorded_on": "2026-10-29",
+  "recorded_on": "2026-11-07",
   "surface": {
     "base.MAX_MESSAGE_LENGTH": {
       "present": false
@@ -608,7 +608,8 @@
       "kind": "method",
       "params": [
         "hook_name",
-        "callback"
+        "callback",
+        "hold_stream"
       ],
       "present": true
     },

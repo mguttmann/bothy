@@ -624,8 +624,9 @@ class ServerPlatform(BasePlatformAdapter):
             return SessionSwitch.NEW
         holder = self._ran_here.get(external_session_ref)
         if holder is not None and holder != thread_id:
-            # Hermes does not move it off the other thread's live route, and the turn of this
-            # thread stalls on it (an admission conflict): fail open with the new session (9.5).
+            # Hermes v0.22.5 keeps the session on the other thread's route, and a8b0bc moves it,
+            # but the other thread's next /new ends it there: fail open with the new session on
+            # every version (9.5, D-HERMES-MAIN-4).
             _LOG.info("bind refused: the session is live in another thread until a restart")
             return SessionSwitch.NEW
         if not _session_known(external_session_ref):

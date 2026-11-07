@@ -23,4 +23,5 @@ class PlatformConfig:
         typing_status_text: str | None = ...,
         channel_overrides: dict[str, Any] = ...,
         extra: dict[str, Any] = ...,
+        disabled_by_relay: bool = ...,
     ) -> None: ...

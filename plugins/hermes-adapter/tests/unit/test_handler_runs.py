@@ -625,6 +625,32 @@ async def test_redelivered_interaction_resolves_nothing(tmp_path: Path) -> None:
     assert len(r.requests("resumeRun")) == 1
 
 
+async def test_drafts_then_the_answer_give_one_message_and_patch_only_their_run(
+    tmp_path: Path,
+) -> None:
+    """D-HERMES-MAIN-5: Hermes streams cumulative drafts, then sends the whole answer once."""
+    answer = "The trip to the lake is planned for Saturday morning."
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        if "draft" in turn.user_text:
+            rt.events.on_draft(turn.thread_id, answer[:8])
+            rt.events.on_draft(turn.thread_id, answer[:30])
+            await rt.events.on_answer(turn.thread_id, answer, str(turn.message_id))
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt) as r:
+        quiet = await r.fake.trigger("Hello @Lotse, quiet")
+        await r.until(lambda: r.finished(quiet.run_id))
+        drafted = await r.fake.trigger("Hello @Lotse, draft")
+        await r.until(lambda: r.finished(drafted.run_id))
+    assert r.fake.run_state(drafted.run_id).state == "completed"
+    assert [m["content_md"] for m in r.fake.messages] == [answer]
+    assert _ops(r).count("createMessage") == 1
+    assert ("replace", "/last_text_excerpt") in _patch_paths(r, drafted.run_id)
+    assert not any(p == "/last_text_excerpt" for _, p in _patch_paths(r, quiet.run_id))
+
+
 async def test_cancel_interrupts_and_drops_later_callbacks(tmp_path: Path) -> None:
     late: list[Any] = []
 
