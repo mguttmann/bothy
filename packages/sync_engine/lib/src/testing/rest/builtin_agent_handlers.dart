@@ -3,7 +3,10 @@
 /// Handlers of the built-in agents of stage A1 that the creation dialog calls (26 8.2; brief
 /// A1-08 Scope): `createAgent` with `hosted_by`, `setAgentToolClass`, `getAgentDefinition`,
 /// `putAgentDefinition`, `listAgentTemplates`, `interviewAgent`, and the channel steps
-/// `createChannel` and `setChannelOperator`.
+/// `createChannel` and `setChannelOperator`; and those of editing (brief A1-09 Scope):
+/// `listAgentDefinitionVersions`, `getAgentDefinition` with `version`, `setAgentHost` with
+/// `host_not_capable`, `host_tool_class_ceiling` and `hosted_holder_mismatch` (26 3.1, 10
+/// 10.3), and `disableAgent`.
 ///
 /// A small model of the server's rules, enough for the step order of 26 8.2 and 8.3: a
 /// definition with a `stdio` MCP server for an agent below `host` is refused with
@@ -55,6 +58,19 @@ void registerBuiltinAgentHandlers(
   }
 
   void stepUp(FakeRequest r) => requireCatalogStepUp(r, rest.contract, catalog);
+
+  /// Whether [id] names a runner that may host a built-in agent (26 3.1 item 2).
+  FakeAgent? capableHost(String id) {
+    final host = world.agentOf(id);
+    if (host == null ||
+        host.adapterKind != 'code_runner' ||
+        host.hostedBy != null ||
+        host.hostsAgents == null ||
+        world.people[host.id]?.status != 'active') {
+      return null;
+    }
+    return host;
+  }
 
   FakeAgent agentOf(String id) =>
       world.agentOf(id) ?? (throw const FakeProblem(404, 'not_found'));
@@ -140,12 +156,7 @@ void registerBuiltinAgentHandlers(
         );
       }
       if (hostedBy != null) {
-        final host = world.agentOf(hostedBy);
-        if (host == null ||
-            host.adapterKind != 'code_runner' ||
-            host.hostedBy != null ||
-            host.hostsAgents == null ||
-            world.people[host.id]?.status != 'active') {
+        if (capableHost(hostedBy) == null) {
           throw const FakeProblem(
             400,
             'validation_failed',
@@ -220,8 +231,96 @@ void registerBuiltinAgentHandlers(
       if (a.adapterKind != 'claude_agent' || a.definitions.isEmpty) {
         throw const FakeProblem(404, 'not_found');
       }
-      final n = a.definitions.length;
+      // `version` reads an older one for "Show" and "Restore" (26 8.4).
+      final asked = int.tryParse(r.query('version') ?? '');
+      final n = asked ?? a.definitions.length;
+      if (n < 1 || n > a.definitions.length) {
+        throw const FakeProblem(404, 'not_found');
+      }
       return FakeResponse(200, version(a, n), {'ETag': '"$n"'});
+    })
+    ..handle('listAgentDefinitionVersions', (r) {
+      owner(r);
+      final a = agentOf(r.param('agent_id'));
+      if (a.adapterKind != 'claude_agent') {
+        throw const FakeProblem(404, 'not_found');
+      }
+      // Newest first, without the text (26 4.1); the fake answers one page.
+      return FakeResponse(200, {
+        'items': [
+          for (var n = a.definitions.length; n >= 1; n--)
+            version(a, n, withDefinition: false),
+        ],
+      });
+    })
+    ..handle('setAgentHost', (r) {
+      owner(r);
+      final a = agentOf(r.param('agent_id'));
+      stepUp(r);
+      if (a.adapterKind != 'claude_agent') {
+        throw const FakeProblem(409, 'conflict', reason: 'not_a_builtin_agent');
+      }
+      final match = ifMatchOf(r);
+      if (match == null) throw const FakeProblem(428, 'precondition_required');
+      if (match != a.version) {
+        throw FakeProblem(
+          412,
+          'version_conflict',
+          current: world.agentJson(a, owner: true),
+        );
+      }
+      final to = r.json['hosted_by']! as String;
+      final host = to == a.id ? null : capableHost(to);
+      if (host == null) {
+        throw const FakeProblem(
+          400,
+          'validation_failed',
+          errors: [
+            {'pointer': '/hosted_by', 'code': 'host_not_capable'},
+          ],
+        );
+      }
+      if (_rank(a.toolClass) > _rank(host.hostsAgents ?? 'chat')) {
+        throw const FakeProblem(
+          409,
+          'conflict',
+          reason: 'host_tool_class_ceiling',
+        );
+      }
+      // 10 10.3 item 2: a personal agent stays with the credential holder of its runner.
+      if (a.billingMode == 'personal' &&
+          (host.billingMode != 'personal' ||
+              host.credentialHolderId != a.credentialHolderId ||
+              !(host.billingModesSupported ?? const []).contains('personal'))) {
+        throw const FakeProblem(
+          409,
+          'conflict',
+          reason: 'hosted_holder_mismatch',
+        );
+      }
+      final from = a.hostedBy;
+      a
+        ..hostedBy = host.id
+        ..version += 1;
+      row(r, 'agent.host.set', 'agent', a.id, {
+        'from_hosted_by': ?from,
+        'to_hosted_by': host.id,
+        'reason': r.json['reason'],
+      });
+      return card(a);
+    })
+    ..handle('disableAgent', (r) {
+      owner(r);
+      final a = agentOf(r.param('agent_id'));
+      stepUp(r);
+      final person = world.people[a.id]!;
+      if (person.status != 'disabled') {
+        person.status = 'disabled';
+        a.version += 1;
+        world.permissionVersion++;
+      }
+      row(r, 'agent.disable', 'agent', a.id, {'reason': r.json['reason']});
+      return card(a);
     })
     ..handle('putAgentDefinition', (r) {
       owner(r);
