@@ -3429,9 +3429,14 @@ blocked or failed one is `unavailable: file_blocked`, one still not ready after 
 `unavailable: file_not_ready`. A follow-up of attachments only is written with the list alone.
 An audio file of a follow-up is transcribed before the write like one of the trigger (18.14,
 addendum of 2026-11-06): the transcript stands after the text, a file without one carries
-`not transcribed: <code>` in the list and the thread gets the note. While one follow-up waits
-for its files or is transcribed, a later one waits for it, so the lines keep the order in which
-the follow-ups came.
+`not transcribed: <code>` in the list and the thread gets the note once its line is written.
+While one follow-up waits for its files or is transcribed, a later one waits for it, so the
+lines keep the order in which the follow-ups came; a redelivery of a follow-up that is being
+prepared is left and keeps its place in that order. A follow-up held for a turn process that
+has not started yet is prepared once: when it is held again between the processes of a
+recovery, the next process takes it with the files and transcripts already prepared, and the
+held follow-ups are prepared while the runner already reads the new process's output
+(addendum of 2026-11-08, issue 574).
 
 At the moment of writing the runner checks the follow-up's token again as before a start: expiry
 with `adapter.invocation_token_leeway` (4.5 point 5), the actual mode and tool class (points 8
@@ -3440,8 +3445,9 @@ and 10), the run of the turn, `trigger_kind` `followup`, and the message's threa
 so the wait for its files, its transcription and the wait for earlier follow-ups never expire
 it; and a follow-up with files is checked the same way before its files are stored or
 transcribed, so a follow-up that fails the check never touches the host (addendum of
-2026-11-06, FIX-followup-transcribe). A failed check writes nothing and patches nothing; the turn goes on, the follow-up stays
-`queued`, and the server defers it at the end of the run (section 7). A broken follow-up token
+2026-11-06, FIX-followup-transcribe). A failed check writes nothing and patches nothing; the
+turn goes on, the follow-up stays `queued`, and the server defers it at the end of the run
+(section 7). A broken follow-up token
 never ends the run (D-M2-35-1). A follow-up of a run whose turn has not started (in the inbox,
 waiting for a lock, a slot, the pre-check, or between the processes of a recovery) is kept and
 written right after the prompt line of the next turn process, in event order; a follow-up written
@@ -3455,7 +3461,11 @@ echo, stdin closes; at a `result` with such follow-ups it stays open until their
 `runner.followup_grace` after that `result`, and a follow-up that passes the check in the window
 is written and joins the set; when the window ends with follow-ups left, stdin closes and they
 stay `delivered` for the server to defer (section 7). A `result` with an error closes stdin at
-once. Every `result` without error posts one answer (each answers a different input); the cost
+once. While a follow-up offered to the open turn is not yet written or left (it waits for its
+files, is transcribed, or waits for an earlier follow-up), stdin does not close at a `result`
+or when the window ends; its preparation is bounded by `runner.followup_file_wait` and
+`runner.transcribe_timeout` (addendum of 2026-11-08, issue 574). Every `result` without error
+posts one answer (each answers a different input); the cost
 difference of the run comes from its last `result` (18.7), and the run finishes once, after the
 process exited (D-M2-35-4).
 
@@ -4019,22 +4029,26 @@ attachment without a transcript would reach the turn only as a file path.
    a follow-up offered later is written after it, so follow-ups keep their order), with stdin
    closed, stderr discarded, the allow-list environment of 18.2 without any mode part (no API
    key), its own process group and the time limit `runner.transcribe_timeout`; a stop of the run
-   ends it at once and the follow-up is not written. Meanwhile the live box shows the status
-   line "Transcribing a voice message".
+   ends it at once and the follow-up is not written, and for a follow-up so do the end of the
+   run by the server and the end of the run (addendum of 2026-11-08, issue 574). Meanwhile the
+   live box shows the status line "Transcribing a voice message", once for transcriptions that
+   run at the same time, until the last of them ends.
 3. **Transcript.** Exit status 0 and a stdout that is not empty after trimming: the text (UTF-8,
    at most 32768 bytes, cut at a character boundary) becomes the attachment's `transcript`, so it
    stands in the trigger part with the trust of the message like a transcript of the server
    (13, ADR 0054); in a follow-up's line it stands after the text as `Transcript of attachment
-   "<name>":` and the text, before the `Attachments:` list. The runner then delivers it with `submitTranscript` (`If-Match` from
-   `getFile`); a refusal (for example `409` in mode `service` or for a file that is not a voice
-   format) is logged as `transcript_not_submitted` and changes nothing else.
+   "<name>":` and the text, before the `Attachments:` list. The runner then delivers it with
+   `submitTranscript` (`If-Match` from `getFile`); a refusal (for example `409` in mode
+   `service` or for a file that is not a voice format) is logged as `transcript_not_submitted`
+   and changes nothing else.
 4. **No transcript.** Without a transcriber, or when it fails (`transcriber_unreachable`,
    `transcriber_failed`, `transcriber_timeout`, `transcript_empty`), the file entry in the
    context (or in a follow-up's `Attachments:` list) gets the line `not transcribed: <code>`
    (or `transcriber_not_configured`) and the runner posts one message in the thread before the
-   turn starts (before the follow-up's line is written), which says that the voice message was
-   not transcribed and Claude Code received only the audio file. The run goes on, and the
-   follow-up is written with its file.
+   turn starts (for a follow-up: after its line is written, and none for a follow-up that is
+   not written, which its own run transcribes again; addendum of 2026-11-08, issue 574), which
+   says that the voice message was not transcribed and Claude Code received only the audio file.
+   The run goes on, and the follow-up is written with its file.
 5. **Capability.** The runner reports `capabilities.voice_input` true exactly when
    `runner.transcribe_cmd` is set, so in mode `agent` a voice message reaches it only when it
    can transcribe (13); otherwise the server rejects it with `voice_unsupported`.

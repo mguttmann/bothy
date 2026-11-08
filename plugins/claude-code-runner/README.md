@@ -203,17 +203,20 @@ as `costs`, which the owner sees as an estimate.
 Claude Code cannot hear audio. With `runner.transcribe_cmd` set, every audio attachment
 (`audio/*`) of the triggering message that has no transcript of the server is given to that
 program before the turn starts, and every audio attachment of a follow-up before its line is
-written to the running turn (a later follow-up waits, so the order holds): the runner appends the local file path as the last argument, runs
-it without a shell, with stdin closed, stderr discarded, the allow-list environment (no API key)
-and the time limit `runner.transcribe_timeout`, and takes its stdout as the transcript. The text
-stands in the trigger part like a server transcript (in a follow-up's line after its text) and is also stored on the server with
+written to the running turn (a later follow-up waits, so the order holds; stdin stays open
+meanwhile, and a stop or the end of the run ends the transcriber): the runner appends the local
+file path as the last argument, runs it without a shell, with stdin closed, stderr discarded,
+the allow-list environment (no API key) and the time limit `runner.transcribe_timeout`, and
+takes its stdout as the transcript. The text stands in the trigger part like a server
+transcript (in a follow-up's line after its text) and is also stored on the server with
 `submitTranscript` (only accepted for a voice message in mode `agent`; any refusal is only
 logged). The heartbeat reports `capabilities.voice_input` true exactly when a transcriber is set.
 
 Without a transcriber, or when it fails (`transcriber_unreachable`, `transcriber_failed`,
 `transcriber_timeout`, `transcript_empty`), the runner posts a note in the thread that the voice
-message was not transcribed and Claude Code received only the audio file, and the turn (or the
-follow-up) gets the file entry marked `not transcribed: <code>`.
+message was not transcribed and Claude Code received only the audio file (for a follow-up once
+its line is written), and the turn (or the follow-up) gets the file entry marked
+`not transcribed: <code>`.
 
 Example with whisper.cpp: its `whisper-cli` reads WAV, so a small wrapper converts first.
 
@@ -263,8 +266,8 @@ level-one switch test holds them against the installed CLI.
   once Claude Code echoes the line (`--replay-user-messages`). Before its files are stored and
   again at the moment of writing the token is checked (expiry, judged at the time the open turn
   took the follow-up up, mode, tool class, run, `trigger_kind`, author and thread); a failed
-  check stores, transcribes and writes nothing and never ends the run. Follow-ups of a run that has not started are held
-  and written after the prompt line. After a `result` stdin stays open for
+  check stores, transcribes and writes nothing and never ends the run. Follow-ups of a run that
+  has not started are held and written after the prompt line. After a `result` stdin stays open for
   `runner.followup_grace` while written follow-ups have no echo.
 - **Background work** (09 18.5, FIX-runner-responsive-turns): a turn may end while work it
   started in the background (Bash or a subagent with `run_in_background`, a workflow) still
