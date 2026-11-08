@@ -6,6 +6,10 @@ shows with the reason in the thread, so a person never sees a bare "Error in the
 text names the cause, what to do, and the log code in backticks at the end; it never carries a
 value of the host (a path, a user or a model name), only codes and configuration key names.
 
+A run its turn completed carries ``run_ended_idle``: its process ended, so nothing waits on the
+thread any more and only a new message continues it; an orderly stop of the runner names the
+background tasks it ended (FIX-runner-silent-stop, issue 553).
+
 Examples:
     >>> cause("session_busy").endswith("(`session_busy`)")
     True
@@ -16,7 +20,9 @@ from __future__ import annotations
 __all__ = [
     "ADAPTER_STOPPED",
     "CAUSES",
+    "RUN_ENDED_IDLE",
     "TOOL_CLASS_MISMATCH",
+    "adapter_stopped_cause",
     "cause",
     "definition_refused",
     "turn_end_cause",
@@ -24,6 +30,14 @@ __all__ = [
 
 ADAPTER_STOPPED = "adapter_stopped"
 """The ``cancelled`` reason of a run whose turn an orderly stop of the runner ended (D-AR-1)."""
+
+RUN_ENDED_IDLE = "run_ended_idle"
+"""The summary code of a run its turn completed: nothing waits on the thread any more."""
+
+_STOPPED = (
+    "The runner was stopped (a restart or an update) while this run worked, so it ended the turn."
+)
+_SEND_AGAIN = "Send a message to continue in the same session"
 
 CAUSES: dict[str, str] = {
     "project_not_bound": (
@@ -85,9 +99,9 @@ CAUSES: dict[str, str] = {
     "billing_mode_mismatch": (
         "Claude Code on the runner host is logged in for another billing mode than this run needs"
     ),
-    "adapter_stopped": (
-        "The runner was stopped (a restart or an update) while this run worked, so it ended "
-        "the turn. Send a message to continue in the same session"
+    "adapter_stopped": f"{_STOPPED} {_SEND_AGAIN}",
+    "run_ended_idle": (
+        "Run ended; nothing is waiting, so this thread continues only when someone sends a message"
     ),
     "definition_missing": (
         "The runner has no agent definition it can run for this built-in agent yet, so the "
@@ -182,6 +196,43 @@ def definition_refused(codes: list[str]) -> str:
     )
 
 
+def _lost_sentence(lost_tasks: int) -> str | None:
+    """The sentence about ``lost_tasks`` background tasks that ended with a process, or None."""
+    if lost_tasks == 1:
+        return "1 background task was still running and was stopped; its result is lost."
+    if lost_tasks > 1:
+        return (
+            f"{lost_tasks} background tasks were still running and were stopped; their results "
+            "are lost."
+        )
+    return None
+
+
+def adapter_stopped_cause(lost_tasks: int) -> str:
+    """The summary of a run an orderly stop of the runner ended (D-AR-1, issue 553).
+
+    Without ``runner.turn_handover`` a restart stops the process of every own turn, and the
+    background tasks the process held end with it and never report back; the thread learns
+    how many.
+
+    Args:
+        lost_tasks: The background tasks the process held when the stop came.
+
+    Returns:
+        The text with ``adapter_stopped`` in backticks at the end.
+
+    Examples:
+        >>> adapter_stopped_cause(0) == cause("adapter_stopped")
+        True
+        >>> "2 background tasks" in adapter_stopped_cause(2)
+        True
+    """
+    lost = _lost_sentence(lost_tasks)
+    if lost is None:
+        return cause(ADAPTER_STOPPED)
+    return f"{_STOPPED} {lost} {_SEND_AGAIN} (`{ADAPTER_STOPPED}`)"
+
+
 _LOGIN_LOST = "Claude Code lost its login on the runner host during this run, so the run ended."
 _NEXT = "your next message starts a new run that continues the same session"
 
@@ -210,13 +261,9 @@ def turn_end_cause(reason: str, lost_tasks: int) -> str | None:
     parts: list[str] = []
     if reason == "runtime_not_authenticated":
         parts.append(_LOGIN_LOST)
-    if lost_tasks == 1:
-        parts.append("1 background task was still running and was stopped; its result is lost.")
-    elif lost_tasks > 1:
-        parts.append(
-            f"{lost_tasks} background tasks were still running and were stopped; their results "
-            "are lost."
-        )
+    lost = _lost_sentence(lost_tasks)
+    if lost is not None:
+        parts.append(lost)
     if not parts:
         return None
     if reason == "runtime_not_authenticated":

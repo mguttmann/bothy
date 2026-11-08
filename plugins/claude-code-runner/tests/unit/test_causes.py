@@ -5,7 +5,13 @@ from __future__ import annotations
 
 import pytest
 
-from claude_code_runner.causes import CAUSES, cause, definition_refused, turn_end_cause
+from claude_code_runner.causes import (
+    CAUSES,
+    adapter_stopped_cause,
+    cause,
+    definition_refused,
+    turn_end_cause,
+)
 
 
 def test_unbound_forum_names_what_to_do() -> None:
@@ -114,3 +120,36 @@ def test_a_refused_definition_keeps_its_summary_short() -> None:
     text = definition_refused([f"code_{i}" for i in range(60)])
     assert len(text.encode()) <= 400
     assert text.endswith("(`tool_class_mismatch`)")
+
+
+# ---- FIX-runner-silent-stop (issue 553) ------------------------------------------------------
+
+
+def test_a_run_that_ended_names_that_nothing_waits() -> None:
+    # The owner sees at once that the thread stopped and what continues it.
+    text = cause("run_ended_idle")
+    assert "nothing is waiting" in text
+    assert "sends a message" in text
+    assert text.endswith("(`run_ended_idle`)")
+
+
+def test_a_stop_without_background_work_keeps_its_cause() -> None:
+    assert adapter_stopped_cause(0) == cause("adapter_stopped")
+
+
+@pytest.mark.parametrize(
+    ("lost", "sentence"),
+    [
+        (1, "1 background task was still running and was stopped; its result is lost."),
+        (2, "2 background tasks were still running and were stopped; their results are lost."),
+    ],
+)
+def test_a_stop_names_the_background_tasks_it_ended(lost: int, sentence: str) -> None:
+    text = adapter_stopped_cause(lost)
+    assert text.startswith("The runner was stopped (a restart or an update)")
+    assert sentence in text
+    assert text.index(sentence) < text.index("Send a message")
+    assert text.endswith("(`adapter_stopped`)")
+    assert chr(0x2013) not in text
+    assert chr(0x2014) not in text
+    assert len(text.encode()) <= 400

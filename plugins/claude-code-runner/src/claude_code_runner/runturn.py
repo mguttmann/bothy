@@ -95,7 +95,13 @@ from claude_code_runner.attachments import (
     fetch_followup_files,
     followup_files_final,
 )
-from claude_code_runner.causes import ADAPTER_STOPPED, cause, turn_end_cause
+from claude_code_runner.causes import (
+    ADAPTER_STOPPED,
+    RUN_ENDED_IDLE,
+    adapter_stopped_cause,
+    cause,
+    turn_end_cause,
+)
 from claude_code_runner.commandline import HostedArgs, SessionChoice, build_argv, reported_model
 from claude_code_runner.failures import (
     ErrorKind,
@@ -448,6 +454,8 @@ class RunTurn:
         self.ledger = TurnLedger.begin("turn", 0)
         """The recovery bookkeeping of the current process (design note 12 f)."""
         self.stop_reason: str | None = state.stop_reason
+        self.stopped_tasks = 0
+        """The background tasks the process held when a stop came; a stop ends them (issue 553)."""
         self.server_ended = False
         self.reply_problem: str | None = None
         self.title = ""
@@ -676,6 +684,7 @@ class RunTurn:
         if self.stop_reason is None:
             self.stop_reason = ADAPTER_STOPPED
             self._persist()
+        self._count_stopped_tasks()
         await terminate(
             process, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval, self.ids
         )
@@ -1371,7 +1380,15 @@ class RunTurn:
             self.upload.cancel()  # the request in flight of an answer's set (M3-12 note 10 d)
         group = self.process or self.adopted_group
         if group is not None:
+            self._count_stopped_tasks()
             self._stop_group(group)
+
+    def _count_stopped_tasks(self) -> None:
+        """Keep how many background tasks the process holds as the stop comes (issue 553).
+
+        Read before the signal: the CLI reports its task list empty as the stop ends the tasks.
+        """
+        self.stopped_tasks = max(self.stopped_tasks, len(self.background.running))
 
     def _ended_by_server(self) -> None:
         # The server ended the run (409 conflict of an ended run, or 401): no finish (6 e). The
@@ -1892,7 +1909,9 @@ class RunTurn:
         if self.title_request and self.title:
             outcome = await propose_title(self.handle.client, self.state.thread_id, self.title)
             _log("title_proposed", outcome=outcome, **self.ids)
-        await self._finish("completed")
+        # The process ended, so nothing waits on the thread any more: the collapsed run line
+        # says so at once, also after a promise to go on later (issue 553).
+        await self._finish("completed", summary=cause(RUN_ENDED_IDLE))
 
     async def _fail(
         self,
@@ -1915,10 +1934,10 @@ class RunTurn:
         """``cancelled`` with the request's reason; no answer (note 6 b).
 
         An orderly stop of the runner (``adapter_stopped``, D-AR-1) names its cause for the
-        thread in the summary.
+        thread in the summary, with the background tasks the stop ended (issue 553).
         """
         reason = self.stop_reason or "user_cancelled"
-        summary = cause(reason) if reason == ADAPTER_STOPPED else None
+        summary = adapter_stopped_cause(self.stopped_tasks) if reason == ADAPTER_STOPPED else None
         await self._finish("cancelled", reason=reason, summary=summary)
 
     def _report_cost(self) -> None:
