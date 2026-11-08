@@ -156,7 +156,8 @@ async def test_a_hosted_turn_answers_in_its_folder(world: HostingWorld) -> None:
     ]
     assert argv[argv.index("--model") + 1] == "model-small"
     # The per-turn file is gone after the turn; no secret in any environment or other file.
-    assert not turn_mcp.exists()
+    # The file goes in the turn's finally, which runs after run.finish reached the server.
+    await world.until(lambda: not turn_mcp.exists())
     assert SECRET not in json.dumps(turn["env"])
     for path, content in world.all_files():
         if path.name != "docs_token":
