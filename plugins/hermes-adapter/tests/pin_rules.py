@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""How the pin is named in spec 09 17.10 and in the rulings (D-HERMES-MAIN-3).
+"""How the pin is named in spec 09 17.10 and in the rulings (D-HERMES-PIN-1, D-HERMES-MAIN-3).
 
-A pin with a release tag names its tag and ``commit[:12]`` in the 17.10 intro. A pin without a
-tag is allowed only by a ruling that names its full commit: the pin file names that ruling, and
-the intro names ``commit[:12]`` and the same ruling.
+The pin follows the newest upstream main commit and names no release tag. The pin file names
+the standing ruling ``FOLLOW_MAIN``, a row of the Hermes decision files holds it, and the 17.10
+intro carries the sentence "Current pin: ..." with ``commit[:12]`` and ``recorded_on``, which the
+daily workflow rewrites (``follow_main.py``).
 """
 
 from __future__ import annotations
@@ -11,10 +12,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from follow_main import FOLLOW_MAIN, current_pin_sentence
 from hermes_harness.pin import HermesPin
 
 REPO = Path(__file__).resolve().parents[3]
-_RULING = re.compile(r"\bD-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]+\b")
 # The Hermes decision files: only they may rule on the pin. The name prefix selects the component
 # plugins in tools/ci/components.py, so a pull request that changes one runs these tests.
 RULING_FILES = "docs/decisions.d/HERMES-"
@@ -37,16 +38,13 @@ def pin_reference_problems(
 ) -> list[str]:
     """What the 17.10 intro, the pin file and the rulings miss for ``pin``; empty when none."""
     problems = []
-    if pin.commit[:12] not in intro:
-        problems.append(f"17.10 intro does not name the commit {pin.commit[:12]}")
     if pin.tag is not None:
-        if pin.tag not in intro:
-            problems.append(f"17.10 intro does not name the tag {pin.tag}")
-        return problems
-    named = set(_RULING.findall(pin_text)) & set(_RULING.findall(intro))
-    if not any(pin.commit in rows.get(ruling, "") for ruling in named):
-        problems.append(
-            "a pin without a release tag needs a ruling that names its full commit, "
-            "named in the pin file and in the 17.10 intro"
-        )
+        problems.append(f"the pin follows upstream main ({FOLLOW_MAIN}) and names no release tag")
+    sentence = current_pin_sentence(pin.commit, pin.recorded_on)
+    if sentence not in intro.splitlines():
+        problems.append(f"17.10 intro lacks the line {sentence!r}")
+    if FOLLOW_MAIN not in pin_text:
+        problems.append(f"the pin file does not name {FOLLOW_MAIN}")
+    if FOLLOW_MAIN not in rows:
+        problems.append(f"no Hermes decision file holds the ruling {FOLLOW_MAIN}")
     return problems

@@ -2529,20 +2529,22 @@ plugin surfaces. Verified basis, retrieved 2026-10-10:
   named in the command reference (`/steer`): https://hermes-agent.nousresearch.com/docs/user-guide/cli
   [verified; `steer` measured in M2-32: it works through the global key and through `/steer`, the
   per-platform key is not read, 17.5 and 17.10 row `steer`]
-- Pinned version for tests: `plugins/hermes-adapter/tests/hermes_pin.toml` (full commit and its
-  release tag; a commit without a release tag only by a ruling that names it, now
-  D-HERMES-MAIN-1). The recording of M2-32 proves the mapping of this section against exactly this
-  version (17.10). Hermes tagged its releases by date up to `v2026.9.24` and by version since
-  October 2026 (`v0.22.x`); a version tag is always the newer release (D-HERMES-COMPAT-1).
+- Pinned version for tests: `plugins/hermes-adapter/tests/hermes_pin.toml`, the newest commit of
+  upstream `main` by its full SHA, without a release tag and without a minimum age
+  (D-HERMES-PIN-1). The workflow `hermes-pin.yml` proposes the next main commit once a day as one
+  pull request, recorded again and tested (D-HERMES-PIN-2). The recording of M2-32 proves the
+  mapping of this section against exactly the pinned commit (17.10). Hermes tagged its releases
+  by date up to `v2026.9.24` and by version since October 2026 (`v0.22.x`); a version tag is
+  always the newer release (D-HERMES-COMPAT-1).
 - Python: the adapter runs on Python 3.11 and newer, the oldest Python Hermes admits
-  (`requires-python` of `v0.22.5` and of the pinned `a8b0bc15053c`: `>=3.11,<3.15`); their locks
+  (`requires-python` of `v0.22.5` and of main commit `a8b0bc15053c`: `>=3.11,<3.15`); their locks
   install only 3.14, so
   the Fake-Hermes tests and the recording run on 3.14 and the adapter's own tests on 3.11
   (D-HERMES-COMPAT-2).
 
 Hermes is not part of the product. The adapter pins a version range of Hermes; a
 compatibility test runs against the pinned and the newest version (16.1, fake Hermes). While the
-pin is a commit without a release tag, the newest release is older than the pin (D-HERMES-MAIN-1).
+pin follows upstream main, the newest release is older than the pin (D-HERMES-PIN-1).
 
 ### 17.2 Package and registration
 
@@ -2945,10 +2947,14 @@ A notice of background work that a turn started is no report: it belongs to the 
 Measured in M2-32 against Hermes Agent `v2026.9.24` (recorded on 2026-10-12), recorded again
 against `v0.22.5`, commit `bf0203a794a0`, on 2026-10-29 (D-HERMES-COMPAT-3), and against the main
 commit `a8b0bc15053c` (no release tag) on 2026-11-07 (D-HERMES-MAIN-1), with a fake model (no
-costs). The table states the `a8b0bc15053c` results and names what changed; a row that names only
-`v0.22.5` holds unchanged for `a8b0bc15053c`. Evidence in
+costs). Since then the pin follows upstream main, and the daily workflow `hermes-pin.yml` records
+every newer main commit it proposes (D-HERMES-PIN-1, D-HERMES-PIN-2). The table states the results
+of the current pin and names what changed; a row that names only `v0.22.5` holds unchanged for
+it, a row that names `a8b0bc15053c` holds unchanged since that commit. Evidence in
 `plugins/hermes-adapter/tests/fixtures/recording/`; `observations.json` computes the verdict of
 every row from the facts, and a test keeps table and evidence equal.
+
+Current pin: upstream main commit `a8b0bc15053c`, recorded on 2026-11-08 (D-HERMES-PIN-1).
 
 | Item | Result | Evidence | Consequence |
 |---|---|---|---|
