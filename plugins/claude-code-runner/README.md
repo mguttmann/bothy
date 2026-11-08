@@ -379,7 +379,12 @@ against a server that accepts the heartbeat capability `turn_handover` and has
   runner (named in `<runner.state_dir>/runner.pid`) gets the marker `stop-turns` and SIGTERM and
   stops its own and adopted turns as in 18.6; the command then stops the turns of the records left
   itself, each run ending `cancelled` with `adapter_stopped`, and exits 0. Run it before unloading
-  or uninstalling the service.
+  or uninstalling the service, and before switching `runner.turn_handover` off.
+- **Switching the key off.** A runner without `runner.turn_handover` cannot continue a turn a
+  runner with the key left behind, so `run` refuses to start while a turn record that carries a
+  phase is left (exit 1, `start_failed` with `turn_handover_records_left`) and touches nothing;
+  `stop --turns` stops such turns through their keeper also when the key is already off
+  (`handover_records`, 09 18.19.1, issue 567).
 
 ## Costs
 

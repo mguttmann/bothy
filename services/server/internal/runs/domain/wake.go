@@ -92,8 +92,12 @@ const (
 	WakeCodeUsageWakeMax = "usage_wake_max"
 	// WakeCodeRunNotActive: run.wake.create for a run that is not active (a deferred request).
 	WakeCodeRunNotActive = "run_not_active"
-	// WakeCodeRunNotEnded: run.wake.recover for a run that is not interrupted, stale or failed.
+	// WakeCodeRunNotEnded: run.wake.recover for a run that has not ended; nothing is stored.
 	WakeCodeRunNotEnded = "run_not_ended"
+	// WakeCodeRunNotFailed: run.wake.recover for a run that ended cancelled or completed; the
+	// wake-up is stored refused with its note, because lost work of such a run gets no recovery
+	// run but must not end silently (09 18.19.9, issue 567 item 7).
+	WakeCodeRunNotFailed = "run_not_failed"
 	// WakeCodeNotPending: an operation on a wake-up that already ended.
 	WakeCodeNotPending = "wake_not_pending"
 	// WakeCodeDeadline: the deadline passed before the wake-up fired (state expired).

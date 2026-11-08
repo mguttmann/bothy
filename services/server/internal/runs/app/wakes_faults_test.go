@@ -69,7 +69,14 @@ func (r *wakeRepo) WakeByOutage(_ context.Context, run ids.ID, outage int) (app.
 }
 
 func (r *wakeRepo) WakeBySourceReason(_ context.Context, run ids.ID, reason domain.WakeReason) (app.WakeRow, bool, error) {
-	w, ok := r.find(func(w app.WakeRow) bool { return w.SourceRunID == run && w.Reason == reason })
+	w, ok := r.find(func(w app.WakeRow) bool { return w.SourceRunID == run && w.Reason == reason && w.Outage == 0 })
+	return w, ok, nil
+}
+
+func (r *wakeRepo) PendingUsageWakeOfRun(_ context.Context, run ids.ID) (app.WakeRow, bool, error) {
+	w, ok := r.find(func(w app.WakeRow) bool {
+		return w.SourceRunID == run && w.Reason == domain.WakeReasonUsageLimit && w.Outage != 0 && w.State == domain.WakePending
+	})
 	return w, ok, nil
 }
 
@@ -252,6 +259,13 @@ func (r gatedWakeRepo) WakeBySourceReason(ctx context.Context, run ids.ID, reaso
 		return app.WakeRow{}, false, err
 	}
 	return r.WakeRepository.WakeBySourceReason(ctx, run, reason)
+}
+
+func (r gatedWakeRepo) PendingUsageWakeOfRun(ctx context.Context, run ids.ID) (app.WakeRow, bool, error) {
+	if err := r.g.hit(); err != nil {
+		return app.WakeRow{}, false, err
+	}
+	return r.WakeRepository.PendingUsageWakeOfRun(ctx, run)
 }
 
 func (r gatedWakeRepo) UpdateWake(ctx context.Context, u app.WakeWrite) (app.WakeRow, bool, error) {

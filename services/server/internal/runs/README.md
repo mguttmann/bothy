@@ -774,10 +774,23 @@ message resets only that person's own counts. `run.wake_min_delay`, `run.wake_ma
 
 Rollback (requirement 19, ruling D-AR-04-1): an older server does not know `trigger_kind = wake`,
 the operations, the job and the event; it fires nothing, and a pending wake-up would wait unseen.
-Before a rollback below AR-04, let the pending wake-ups fire or cancel them (`cancelRunWake`) and
-switch `runner.wakes` and `runner.turn_handover` off first (09 18.19.1). A database rollback of
-00099 refuses while a run with `trigger_kind = wake` exists and names their count
-(`TestMigration_WakesDown`); the expand-only migrations stay in place for a binary rollback.
+Before a rollback below AR-04, let the pending wake-ups fire or cancel them (`cancelRunWake`), let
+the active wake runs end (an older server cannot deliver a queued one), and switch `runner.wakes`
+and `runner.turn_handover` off first, the latter after `claude-code-runner stop --turns` or while no
+turn runs (09 18.19.1, 16 10.1). A database rollback of 00099 refuses while a run with
+`trigger_kind = wake` exists and names their count (`TestMigration_WakesDown`); the expand-only
+migrations stay in place for a binary rollback. Ended wake runs stay readable by the older binary
+(issue 567 item 11, ruling D-I567-3): its `getRun` copies the stored `trigger_kind` into the answer
+without checking it against its enum, and the production build validates no response against the
+contract (only the test build with the tag `contract_validate` does), so a wake run reads with
+`trigger_kind` `wake`; `TestRunREST_PassesATriggerKindItDoesNotKnowThrough` holds that copy.
+
+Recovery (09 5.8.2, 18.19.9, issue 567): `run.wake.recover` answers `run_not_ended` and stores
+nothing for a run that has not ended; for a run that ended `cancelled` or `completed` it stores the
+wake-up `refused` with `run_not_failed` (note and `wake_ended`), so lost work of such a run is
+visible without a recovery run; with `usage_limit` it answers the pending `usage_limit` wake-up of
+an outage of the run when there is one and changes nothing (`PendingUsageWakeOfRun`), so one
+outage never gets two wake-ups.
 
 ## Visibility of `runs`, `run_steps` and `run_followups`
 

@@ -411,6 +411,7 @@ reveals nothing (never with `404`).
 | `run_not_active` | no `authorize` result | Reason of the audit entry of `run.wake.create` for a run that is not active (09 5.8.2, AR-04); problem code `conflict` (`409`) with the same `reason` |
 | `run_not_running` | no `authorize` result | Reason of the audit entry of `run.launch.check` for a run that is not `running` (2.14 item 4, 09 18.19.6, AR-04); problem code `conflict` (`409`) with the same `reason` |
 | `definition_needs_host` | no `authorize` result | Reason of the audit entry of `agent.tool_class.set` when a class below `host` is refused because the current definition of the built-in agent has a `stdio` MCP server ([26-builtin-agents.md](26-builtin-agents.md) 4.4 item 5, R-BA-06); problem code `conflict` (`409`) with `reason: definition_needs_host` |
+| `run_not_failed` | no `authorize` result | Reason of the audit entry of `run.wake.recover` for a source run that ended `cancelled` or `completed`: lost work of such a run gets no recovery wake-up, the wake-up is stored `refused` with the note and the notification of 09 5.8.4 (09 18.19.9, issue 567); problem code `conflict` (`409`) with the same `reason` |
 
 ### 4.2 Flow
 

@@ -1171,7 +1171,11 @@ guide (AR-09) describes the service form the handover relies on and these rules:
    `run.launch.check`, `run.wake.check`) runs before any runner switches `runner.turn_handover` or
    `runner.wakes` on; the operator checks the server version first. A server rollback below AR-04
    turns both runner keys off first. Turning a key off returns to the earlier behaviour; pending
-   wake-ups stay on the server and can be cancelled from the thread.
+   wake-ups stay on the server and can be cancelled from the thread. `runner.turn_handover` goes
+   off only after `claude-code-runner stop --turns` or while no turn runs: a runner without the
+   key cannot continue a handed-over turn, so it refuses to start while a record written with the
+   key is left (`start_failed` with `turn_handover_records_left`), and `stop --turns` stops such
+   turns also with the key already off (09 18.19.1, issue 567).
 
 ## 11. Relocation and cloud portability
 

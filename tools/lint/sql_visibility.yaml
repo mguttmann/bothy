@@ -586,6 +586,9 @@ exceptions:
   - query: runs.WakeBySourceReason
     category: after_authorize
     reason: "the recovery wake-up of the one run whose run.wake.recover authorize allowed in the same unit of work (agent-self); run_wakes has no channel_id (07 7.4 rule 1, AR-04)"
+  - query: runs.PendingUsageWakeOfRun
+    category: after_authorize
+    reason: "the pending usage-limit wake-up of an outage of the one run whose run.wake.recover authorize allowed in the same unit of work (agent-self); run_wakes has no channel_id (07 7.4 rule 1, AR-04, issue 567)"
   - query: runs.CountPendingWakes
     category: after_authorize
     reason: "a count of the pending wake-ups of the thread of the one run whose run.wake.create or run.wake.recover authorize allowed; only the number is used, nothing leaves (AR-04)"

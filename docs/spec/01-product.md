@@ -2204,14 +2204,19 @@ the desktop and the phone on a server of stage AR, not to the web console, which
 (5.5). The wake-up parts apply only for an agent that reports `wakes`, except that pending
 wake-ups and their cancel button stay visible when it no longer does (a runner that turned
 `runner.wakes` off, 16 10.1); the end-state display also applies when the agent does not report
-`wakes`.
+`wakes`, and so do the notes of item 3, which stay visible whatever the agent reports now: the
+`system` messages are messages of the thread, and the "Ended waiting" note and the usage-limit
+notice are derived from the stored run and its wake-ups, not stored as messages (issue 567).
 
 1. **Pending wake-ups.** A thread with pending wake-ups shows them above the composer: the label,
    the condition ("in 20 minutes", "at 17:55", "when the checks of #123 finish", "when the command
    succeeds"), the time it fires at the earliest, the deadline and a cancel button for the
    wake-up's person, the agent's owner and a person with `manage` on the channel.
 2. **End of a run.** The collapsed line of a finished run shows its end state ("Done", "Waiting",
-   "Needs you") and, when a wake-up is pending, when the thread continues.
+   "Needs you") and, when a wake-up is pending, when the thread continues. A finished run without
+   `end_state` (an older run, a runner with `runner.end_state` off, another runtime; 09 18.19.11)
+   shows no end state and no "Ended waiting" note: its line stays as it was before stage AR (issue
+   567).
 3. **Notes.** The `system` messages of 09 5.8.4 (refused, expired, failed, cancelled), the note
    "Ended waiting, but nothing will wake this thread" (09 18.19.11), the chain and idle cap notes
    with "Reply to continue" (09 5.8.6), and the usage-limit notice "Usage limit of the account

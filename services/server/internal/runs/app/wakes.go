@@ -557,7 +557,9 @@ func (s *Service) auditWake(ctx context.Context, a actor.Actor, act authorize.Ac
 // Recover implements runs.Wakes (recoverRunWake, run.wake.recover; 09 5.8.2, 18.19.9, 18.19.10):
 // a wake-up of kind at for an ended run of the calling agent in state failed, one per run and
 // reason (a repetition answers the first); a refusal of the autonomy checks is stored refused with
-// note and notification and answers 409.
+// note and notification and answers 409. A run that has not ended answers 409 run_not_ended and
+// stores nothing; a run that ended cancelled or completed is stored refused with run_not_failed;
+// usage_limit answers the pending usage_limit wake-up of an outage of the run when there is one.
 func (w *Wakes) Recover(ctx context.Context, in runs.RecoverWake) (runs.WakeResult, error) {
 	s := w.s
 	b, err := s.wakeBox()
@@ -588,8 +590,22 @@ func (w *Wakes) recoverTx(ctx context.Context, b *wakeBox, a actor.Actor, in run
 	if err != nil {
 		return wakeResult{}, err
 	}
-	if run.State != domain.StateFailed {
+	if !run.State.Ended() {
 		return wakeResult{}, conflict(domain.WakeCodeRunNotEnded)
+	}
+	if reason == domain.WakeReasonUsageLimit {
+		// One outage gets one wake-up: while the outage's wake-up of run.wake.create is pending,
+		// a recovery after a restart changes nothing and answers it, whatever end the source run
+		// reached (5.8.2, 18.19.10, issue 567 item 4).
+		p, found, err := b.d.Repo.PendingUsageWakeOfRun(ctx, run.ID)
+		if err != nil {
+			return wakeResult{}, err
+		}
+		if found {
+			// The answer is an allowed run.wake.recover: its audit entry names the wake-up it
+			// answers, which stays unchanged (actions.yaml audit: always).
+			return wakeResult{wake: p}, s.auditWake(ctx, a, authorize.ActionRunWakeRecover, "", run.ID, p.ID, p.Kind, p.Reason, "")
+		}
 	}
 	existing := func(ctx context.Context) (WakeRow, bool, error) {
 		return b.d.Repo.WakeBySourceReason(ctx, run.ID, reason)
@@ -606,6 +622,12 @@ func (w *Wakes) recoverTx(ctx context.Context, b *wakeBox, a actor.Actor, in run
 		ID: ids.New(), AgentID: run.AgentID, ThreadID: run.ThreadID, SourceRunID: run.ID, TriggeredBy: run.TriggeredBy, Kind: domain.WakeAt,
 		Reason: reason, State: domain.WakePending, Condition: domain.EncodeCondition(domain.WakeCondition{}), Label: in.Label,
 		NotBefore: nb, Deadline: dl, CreatedAt: now,
+	}
+	if run.State != domain.StateFailed {
+		// A run that ended cancelled or completed gets no recovery run (its end was asked for or
+		// reached); its lost work still shows: the wake-up is stored refused with the note and
+		// the notification (18.19.9, issue 567 item 7).
+		return w.refuse(ctx, b, a, authorize.ActionRunWakeRecover, nw, domain.WakeCodeRunNotFailed, true)
 	}
 	refusal, err := w.recoverRefusal(ctx, b, run, reason)
 	if err != nil {

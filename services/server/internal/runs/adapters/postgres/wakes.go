@@ -71,6 +71,16 @@ func (r *Repository) WakeBySourceReason(ctx context.Context, sourceRunID ids.ID,
 	return oneWake(row, err, "reading the recovery wake-up of a run")
 }
 
+// PendingUsageWakeOfRun implements app.WakeRepository.
+func (r *Repository) PendingUsageWakeOfRun(ctx context.Context, sourceRunID ids.ID) (app.WakeRow, bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return app.WakeRow{}, false, err
+	}
+	row, err := q.PendingUsageWakeOfRun(ctx, uuid(sourceRunID))
+	return oneWake(row, err, "reading the pending usage-limit wake-up of a run")
+}
+
 // UpdateWake implements app.WakeRepository.
 func (r *Repository) UpdateWake(ctx context.Context, w app.WakeWrite) (app.WakeRow, bool, error) {
 	q, err := r.write(ctx)

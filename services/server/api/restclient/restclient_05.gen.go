@@ -9,6 +9,75 @@ import (
 	"net/http"
 )
 
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetProblemTypeResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetProblemTypeResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r GetProblemTypeResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetProblemTypeResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetProblemTypeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetProblemTypeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetProblemTypeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetProblemTypeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UnregisterPushResponse204Headers the declared response headers of an HTTP 204 response for UnregisterPush
+type UnregisterPushResponse204Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// UnregisterPushResponse400Headers the declared response headers of an HTTP 400 response for UnregisterPush
+type UnregisterPushResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UnregisterPushResponse401Headers the declared response headers of an HTTP 401 response for UnregisterPush
+type UnregisterPushResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
 // UnregisterPushResponse403Headers the declared response headers of an HTTP 403 response for UnregisterPush
 type UnregisterPushResponse403Headers struct {
 	CorrelationId *CorrelationId
@@ -21877,7 +21946,7 @@ func (c *ClientWithResponses) CreateRunWakeWithResponse(ctx context.Context, run
 
 // RecoverRunWakeWithBodyWithResponse Create the recovery or usage-limit wake-up of an ended run
 //
-// Creates a wake-up of kind `at` with reason `recovery` (lost background work, 09 18.19.9) or `usage_limit` (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state `failed` (which `interrupted` and `stale` runs are), at most one per run and reason: a repetition answers the first one with `200`. A run that did not fail is `409 conflict` with `reason` `run_not_ended`. A refusal of the checks of 09 5.8.6 (`autonomous_not_allowed`, `wake_max_pending`, `usage_wake_max`, a refused `agent.invoke`) stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended`, and answers `409 conflict` with the reason. Audited.
+// Creates a wake-up of kind `at` with reason `recovery` (lost background work, 09 18.19.9) or `usage_limit` (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state `failed` (which `interrupted` and `stale` runs are), at most one per run and reason: a repetition answers the first one with `200`; a `usage_limit` request while a `usage_limit` wake-up of an outage of the run is pending answers that wake-up with `200` and changes nothing. A run that has not ended is `409 conflict` with `reason` `run_not_ended` and stores nothing; a run that ended `cancelled` or `completed` stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended` and answers `409 conflict` with `reason` `run_not_failed`. A refusal of the checks of 09 5.8.6 (`autonomous_not_allowed`, `wake_max_pending`, `usage_wake_max`, a refused `agent.invoke`) stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended`, and answers `409 conflict` with the reason. Audited.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -21892,7 +21961,7 @@ func (c *ClientWithResponses) RecoverRunWakeWithBodyWithResponse(ctx context.Con
 
 // RecoverRunWakeWithResponse Create the recovery or usage-limit wake-up of an ended run
 //
-// Creates a wake-up of kind `at` with reason `recovery` (lost background work, 09 18.19.9) or `usage_limit` (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state `failed` (which `interrupted` and `stale` runs are), at most one per run and reason: a repetition answers the first one with `200`. A run that did not fail is `409 conflict` with `reason` `run_not_ended`. A refusal of the checks of 09 5.8.6 (`autonomous_not_allowed`, `wake_max_pending`, `usage_wake_max`, a refused `agent.invoke`) stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended`, and answers `409 conflict` with the reason. Audited.
+// Creates a wake-up of kind `at` with reason `recovery` (lost background work, 09 18.19.9) or `usage_limit` (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state `failed` (which `interrupted` and `stale` runs are), at most one per run and reason: a repetition answers the first one with `200`; a `usage_limit` request while a `usage_limit` wake-up of an outage of the run is pending answers that wake-up with `200` and changes nothing. A run that has not ended is `409 conflict` with `reason` `run_not_ended` and stores nothing; a run that ended `cancelled` or `completed` stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended` and answers `409 conflict` with `reason` `run_not_failed`. A refusal of the checks of 09 5.8.6 (`autonomous_not_allowed`, `wake_max_pending`, `usage_wake_max`, a refused `agent.invoke`) stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended`, and answers `409 conflict` with the reason. Audited.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -22332,34 +22401,4 @@ func (c *ClientWithResponses) RestoreSpaceWithResponse(ctx context.Context, spac
 		return nil, err
 	}
 	return ParseRestoreSpaceResponse(rsp)
-}
-
-// GetStatsBackendsWithResponse Backend policy view per agent
-//
-// Per agent: configured and reported billing mode, supported modes, switches, denied invocations (I2, I3), cost per mode and the rate-limit state reported by the adapter (docs/spec/25-visualization.md, section 6.2). Agents of channels visible to the caller; cost members only with `cost.read.aggregate`. Never credentials, subscriptions or runtime names of an instance.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /stats/backends (the `GetStatsBackends` operationId).
-func (c *ClientWithResponses) GetStatsBackendsWithResponse(ctx context.Context, params *GetStatsBackendsParams, reqEditors ...RequestEditorFn) (*GetStatsBackendsResponse, error) {
-	rsp, err := c.GetStatsBackends(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetStatsBackendsResponse(rsp)
-}
-
-// GetCostStatsWithResponse Costs per space, agent or instance
-//
-// Valid cost sums (entries without a successor) per bucket and `billing_mode`, grouped by `group_by` (`space`, `agent`, `none`; default `none`). Authorized with `cost.read.aggregate` on the instance (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`; only channels the caller may read count. `personal` and `organization` are never summed together; amounts of mode `personal` are information only and appear only when `billing.show_personal_estimates` is on. `is_estimate` is true when any summed entry is an estimate. One currency per response: `currency` selects it; without it a range whose entries have one currency answers in that currency (`USD` when there is none), and a range with several currencies is `400 validation_failed` with `errors[].code` `currency_required` and the currencies found in `detail`. Ranges, buckets, time zone and cache as for `getUsageStats`.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /stats/costs (the `GetCostStats` operationId).
-func (c *ClientWithResponses) GetCostStatsWithResponse(ctx context.Context, params *GetCostStatsParams, reqEditors ...RequestEditorFn) (*GetCostStatsResponse, error) {
-	rsp, err := c.GetCostStats(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetCostStatsResponse(rsp)
 }

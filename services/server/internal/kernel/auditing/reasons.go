@@ -78,6 +78,8 @@ const (
 	ReasonRunNotActive         Reason = "run_not_active"
 	ReasonRunNotRunning        Reason = "run_not_running"
 	ReasonDefinitionNeedsHost  Reason = "definition_needs_host"
+	// ReasonRunNotFailed: run.wake.recover for a run that ended cancelled or completed (09 18.19.9).
+	ReasonRunNotFailed Reason = "run_not_failed"
 )
 
 // knownReasons is the list of 07 "4.1" in table order.
@@ -147,6 +149,7 @@ var knownReasons = []Reason{
 	ReasonRunNotActive,
 	ReasonRunNotRunning,
 	ReasonDefinitionNeedsHost,
+	ReasonRunNotFailed,
 }
 
 // KnownReasons returns the closed list of reason codes of 07 "4.1" in table order. The result is

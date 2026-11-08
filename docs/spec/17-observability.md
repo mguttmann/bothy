@@ -57,9 +57,13 @@ stored in `event_log.trace_context`; 03, 04 section 2.2).
 Autonomous runs (addendum of 2026-11-06, stage AR, R-OB-11, [09-agents.md](09-agents.md) 5.8 and
 18.19). The Claude Code runner logs, by code: `turn_handed_over`, `turn_adopted`,
 `launch_check_refused`, `wake_created`, `wake_refused`, `wake_check_failed`, `wake_check_refused`,
-`wake_input_check_failed`, `wake_fired`, `wake_expired`, `recovery_wake`, `usage_limited`,
-`usage_warning`, `usage_status_unknown`, `continuation_without_wake`, `stop_turns_timeout` and
-`durable_cron_present`. The server measures the number of pending wake-ups, wake-ups by end state
+`wake_input_check_failed`, `wake_fired`, `wake_expired`, `wake_cancelled`, `wake_failed`,
+`recovery_wake`, `usage_limited`, `usage_warning`, `usage_status_unknown`,
+`continuation_without_wake`, `stop_turns_timeout` and `durable_cron_present`. Every end of a wake-up the runner learns (from its own call or from
+`run.wake_changed`) has its own code: `wake_fired`, `wake_expired`, `wake_refused`,
+`wake_cancelled` (with the reason, for example `usage_cleared` or `cancelled_by_person`) and
+`wake_failed` (with the reason of the last failure); `wake_check_failed` names one failed check,
+not the end (issue 567). The server measures the number of pending wake-ups, wake-ups by end state
 and reason, and the chain and idle counts that reached their cap; AR-04 enters these metrics with
 their code into [signals.md](../observability/signals.md), which stays the only list of names.
 

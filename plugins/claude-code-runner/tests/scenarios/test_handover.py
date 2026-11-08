@@ -422,3 +422,42 @@ async def test_stop_turns_without_a_running_runner_stops_the_handed_over_turn(
     [finish] = finishes(world, run_id)
     assert (finish["state"], finish["reason"]) == ("cancelled", "adapter_stopped")
     assert not record_path(world, run_id).exists()
+
+
+async def test_key_switched_off_with_a_handed_over_turn_refuses_the_start_until_stop_turns(
+    world: World,
+) -> None:
+    # Issue 567 item 3: runner.turn_handover goes off only after stop --turns or while no turn
+    # runs. A runner started without the key while a record written with it is left refuses to
+    # start (exit 1, start_failed turn_handover_records_left) and touches nothing; stop --turns
+    # with the key off still stops the handed-over turn through its keeper and finishes its run.
+    first, run_id, _ = await job_turn(world, followup_grace="300ms")
+    [turn] = world.turns()
+    assert await hand_over(world, first) == HANDOVER_EXIT
+    starts = len(world.requests("startRun"))
+
+    second = world.spawn()  # the key off
+    assert await asyncio.to_thread(second.wait, PATIENCE) == 1
+    failed = [e for e in runner_log(world, 1) if e.get("event") == "start_failed"]
+    assert [e.get("code") for e in failed] == ["turn_handover_records_left"]
+    assert alive(turn["pid"])  # the turn is untouched
+    assert record(world, run_id).get("phase") == "process"
+    assert world.state_of(run_id) == "running"
+    assert len(world.requests("startRun")) == starts
+
+    command = await asyncio.to_thread(
+        subprocess.run,
+        [*world.cli_command(), "stop", "--turns", "--config", str(world.root / "runner.toml")],
+        env=world.cli_env(),
+        capture_output=True,
+        timeout=PATIENCE,
+        check=False,
+    )
+    assert command.returncode == 0, command.stderr
+    assert group_gone(turn["pgid"])
+    [finish] = finishes(world, run_id)
+    assert (finish["state"], finish["reason"]) == ("cancelled", "adapter_stopped")
+    assert not record_path(world, run_id).exists()
+
+    # Nothing is left: a runner without the key starts.
+    await world.start(world.config())
