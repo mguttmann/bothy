@@ -882,7 +882,8 @@ def test_a_push_to_main_keeps_the_full_run() -> None:
 # What a reference to a file under docs/ looks like in component code: a string that is the
 # path (`"docs/spec/01-product.md"`, `'../../docs/quality/x.md'`, `'${dir.path}/docs/spec/$name'`)
 # or path segments joined after "docs" (`REPO / "docs" / "spec" / "09-agents.md"`,
-# `filepath.Join(root, "docs", "PLAN.md")`). Comment lines only mention files.
+# `filepath.Join(root, "docs", "PLAN.md")`). Comment lines only mention files. The scan reads line
+# by line: a path split over several lines is not found (D-CSMQ-7).
 _DOC_LITERAL = re.compile(
     r"""["'`](?:\$\{[^}]+\}/|\$\w+/|(?:\.\./)+)?docs/([\w.$-]+(?:/[\w.$-]+)*)/?["'`]"""
 )
@@ -903,6 +904,13 @@ _READER = (
     ("apps/", "apps"),
     ("packages/", "apps"),
     ("design/", "apps"),
+    # Tool folders whose make target runs only in a job of one component: `make sql-visibility`
+    # and `make contract-test` (G7) for the server, `make api-breaking` for the server. The other
+    # tool folders run in the jobs of every change (gates, test (tools)) or, like
+    # tools/console-e2e, are covered by their tests in test (tools) (D-CSMQ-7).
+    ("tools/lint/", "server"),
+    ("tools/contract/", "server"),
+    ("tools/api-checks/breaking.py", "server"),
 )
 
 
@@ -962,6 +970,8 @@ def test_the_reference_scan_finds_the_known_readers() -> None:
         "plugins/hermes-adapter/tests/unit/test_pin.py",
         "plugins/hermes-adapter/tests/pin_rules.py",
         "packages/admin_ui/test/admin/access_fake.dart",
+        "tools/lint/tests/test_sql_visibility.py",
+        "tools/contract/tests/test_live_seed.py",
     ]
     refs = {(f, ref) for f, _, ref in _doc_references(repo, files)}
     assert (
@@ -972,5 +982,8 @@ def test_the_reference_scan_finds_the_known_readers() -> None:
     assert ("plugins/hermes-adapter/tests/unit/test_pin.py", "docs/spec/09-agents.md") in refs
     assert ("packages/admin_ui/test/admin/access_fake.dart", "docs/spec/$name") in refs
     assert ("plugins/hermes-adapter/tests/pin_rules.py", "docs/decisions.d/HERMES-") in refs
+    # Tool folders whose gate runs only in the job of a component are scanned like its code.
+    assert ("tools/lint/tests/test_sql_visibility.py", "docs/spec/03-data-model.md") in refs
+    assert ("tools/contract/tests/test_live_seed.py", "docs/api/openapi.yaml") in refs
     assert components.changed(["docs/decisions.d/HERMES-MAIN-A8B0.md"]) == ["plugins"]
     assert components.changed(["docs/decisions.d/M2-48.md"]) == []

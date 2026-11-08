@@ -21,7 +21,7 @@ Flow of a change: edit `actions.yaml`, run `make catalog`, generate the server a
 `api/routes` come from `actions.yaml`, see [services/server/api](../../services/server/api/README.md))
 and commit the diffs of 05, `redocly.yaml` and `services/server/api/routes` along with it. A
 manual edit in a generated block fails the gate, a stale server state `make codegen-check`; for
-that, CI selects the component `server` on a change to `actions.yaml` (`tools/ci/components.py`).
+that, CI selects the components `server` and `apps` on a change to `actions.yaml` (`tools/ci/components.py`).
 
 A new section of actions needs:
 
