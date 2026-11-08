@@ -2204,8 +2204,9 @@ the desktop and the phone on a server of stage AR, not to the web console, which
 (5.5). The wake-up parts apply only for an agent that reports `wakes`, except that pending
 wake-ups and their cancel button stay visible when it no longer does (a runner that turned
 `runner.wakes` off, 16 10.1); the end-state display also applies when the agent does not report
-`wakes`, and so do the notes of item 3: they are `system` messages of the thread and stay visible
-whatever the agent reports now (issue 567).
+`wakes`, and so do the notes of item 3, which stay visible whatever the agent reports now: the
+`system` messages are messages of the thread, and the "Ended waiting" note and the usage-limit
+notice are derived from the stored run and its wake-ups, not stored as messages (issue 567).
 
 1. **Pending wake-ups.** A thread with pending wake-ups shows them above the composer: the label,
    the condition ("in 20 minutes", "at 17:55", "when the checks of #123 finish", "when the command

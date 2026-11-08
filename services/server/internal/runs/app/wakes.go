@@ -593,9 +593,10 @@ func (w *Wakes) recoverTx(ctx context.Context, b *wakeBox, a actor.Actor, in run
 	if !run.State.Ended() {
 		return wakeResult{}, conflict(domain.WakeCodeRunNotEnded)
 	}
-	if reason == domain.WakeReasonUsageLimit && run.State == domain.StateFailed {
+	if reason == domain.WakeReasonUsageLimit {
 		// One outage gets one wake-up: while the outage's wake-up of run.wake.create is pending,
-		// a recovery after a restart changes nothing and answers it (18.19.10, issue 567 item 4).
+		// a recovery after a restart changes nothing and answers it, whatever end the source run
+		// reached (5.8.2, 18.19.10, issue 567 item 4).
 		if p, found, err := b.d.Repo.PendingUsageWakeOfRun(ctx, run.ID); err != nil || found {
 			return wakeResult{wake: p}, err
 		}

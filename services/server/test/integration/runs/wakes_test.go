@@ -226,6 +226,30 @@ func TestWake_RecoverUsageLimitWhileOutagePending(t *testing.T) {
 	w.want(w.do("lotse", http.MethodPost, "/api/v1/runs/"+r.ID+"/wakes/recover", `{"reason":"usage_limit"}`, key()...), http.StatusCreated, "")
 }
 
+// TestWake_RecoverUsageLimitWhileOutagePendingAfterAnyEnd (issue 567 item 4, 09 5.8.2): the
+// pending outage wake-up is answered for every ended source run, also one that ended cancelled
+// or completed, instead of a second, refused wake-up with run_not_failed.
+func TestWake_RecoverUsageLimitWhileOutagePendingAfterAnyEnd(t *testing.T) {
+	for _, end := range []string{`"state":"cancelled","reason":"user_cancelled"`, `"state":"completed"`} {
+		w := newWakeWorld(t, wakeCfg)
+		r := w.runOfPerson("owner")
+		reset := w.clk.Now().Add(3 * time.Hour)
+		outage := w.want(w.createWake("lotse", r.ID, `{"kind":"at","reason":"usage_limit","outage":1,"not_before":"`+reset.Format(time.RFC3339)+`"}`),
+			http.StatusCreated, "")["id"].(string)
+		w.wantOK(w.finish("lotse", r.ID, end))
+		if st := w.wake(outage).State; st != "pending" {
+			t.Fatalf("%s: the end of the run left the outage wake-up %s", end, st)
+		}
+		got := w.want(w.do("lotse", http.MethodPost, "/api/v1/runs/"+r.ID+"/wakes/recover", `{"reason":"usage_limit"}`, key()...), http.StatusOK, "")
+		if got["id"] != outage || got["state"] != "pending" {
+			t.Fatalf("%s: recover answered %v", end, got)
+		}
+		if n := w.count(`SELECT count(*) FROM run_wakes WHERE source_run_id = $1`, r.ID); n != 1 {
+			t.Fatalf("%s: %d wake-ups of one outage", end, n)
+		}
+	}
+}
+
 // TestWake_RecoverOfARunThatDidNotFail (issue 567 item 7, 09 18.19.9): lost work of a run that
 // ended cancelled or completed gets no recovery wake-up; the wake-up is stored refused with the
 // reason run_not_failed, so the thread gets the note and the person the notification; a run that
