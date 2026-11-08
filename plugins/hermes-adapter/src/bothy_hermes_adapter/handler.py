@@ -1665,6 +1665,35 @@ class HermesHandler(AgentHandler):
             with self._bound(turn):
                 turn.live.draft(text)
 
+    def on_interim(self, thread_id: UUID, text: str, *, marked: bool) -> bool:
+        """A send of a turn that is progress, not the answer: shown as the draft (09 17.3).
+
+        Hermes posts text in front of a tool call with ``send`` on its own platforms: streamed,
+        it finalizes the text before the tool boundary with a plain send; not streamed, it sends
+        it as commentary marked ``_interim_send`` (as it marks heartbeats and notices that are
+        not the turn's final). A message would put that progress between the answers, so the
+        text replaces ``/last_text_excerpt`` instead (D-ADAPTER-INTERIM-1).
+
+        Args:
+            thread_id: The thread of the send.
+            text: The text.
+            marked: Whether Hermes marked the send ``_interim_send``.
+
+        Returns:
+            True when the send is progress (marked, or Hermes' loop still runs and its last
+            model reply asked for tools); it is then no message.
+        """
+        turn = self._active(thread_id)
+        if turn is None:
+            return marked
+        if not marked and not (turn.hermes_open and not turn.final_reply):
+            return False
+        if turn.live is not None and text.strip():
+            self._touch(turn)
+            with self._bound(turn):
+                turn.live.draft(text)
+        return True
+
     async def on_answer(self, thread_id: UUID, text: str, reply_to: str | None) -> str | None:
         """The answer (``send``): one message of the run with a stored ``client_msg_id``.
 

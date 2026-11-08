@@ -154,6 +154,9 @@ _OUTCOMES: Final = {
     ProcessingOutcome.CANCELLED: TurnOutcome.CANCELLED,
 }
 _NO_RUN: Final = "no active run in this thread"
+# A send of a turn that is progress (D-ADAPTER-INTERIM-1): shown as the draft, never a message. A
+# failure, so Hermes never counts the text as delivered and still sends the turn's final answer.
+_INTERIM: Final = "interim text is shown as the run's progress"
 # How often the adapter looks at the gateway's startup restore before it connects; a poll of a
 # flag, not a deadline (the wait ends when Hermes is ready).
 _READY_POLL_S: Final = 0.1
@@ -873,6 +876,9 @@ class ServerPlatform(BasePlatformAdapter):
           session variable, so a cancelled or aborted turn's answer never becomes a report.
         * The send belongs to a turn of its thread (`_turn_send`): one message of the run, or a
           failure when no run of the thread is active any more (a late answer is never posted).
+        * A send of a turn that is progress (marked ``_interim_send``, or text in front of a tool
+          call while Hermes' loop goes on) becomes the run's draft and fails, never a message
+          (`HermesHandler.on_interim`, D-ADAPTER-INTERIM-1).
         * Anything else is a report of the agent (09 14): a cron job, a send into another
           channel or thread, or the answer of a turn Hermes ran while no run was open. The
           result of background work a run holds is no report but a turn of that run (17.12).
@@ -897,15 +903,20 @@ class ServerPlatform(BasePlatformAdapter):
             return SendResult(success=True, message_id=None)
         if reply_to is not None and reply_to in self._control_messages:
             return SendResult(success=False, error="the command has ended")
+        interim = bool((metadata or {}).get("_interim_send"))
         if reply_to is not None and reply_to in self._turn_messages:
             run = self._turn_messages[reply_to]
             if thread is None or run is None or self.handler.active_run(thread) != run:
                 return SendResult(success=False, error="no active run in this thread")
+            if self.handler.on_interim(thread, content, marked=interim):
+                return SendResult(success=False, error=_INTERIM)
             message_id = await self.handler.on_answer(thread, content, reply_to)
             if message_id is None:
                 return SendResult(success=False, error="no active run in this thread")
             return SendResult(success=True, message_id=message_id)
         if thread is not None and self._turn_send(str(chat_id), thread, env_thread):
+            if self.handler.on_interim(thread, content, marked=interim):
+                return SendResult(success=False, error=_INTERIM)
             message_id = await self.handler.on_answer(thread, content, reply_to)
             if message_id is None:
                 return SendResult(success=False, error=_NO_RUN)
