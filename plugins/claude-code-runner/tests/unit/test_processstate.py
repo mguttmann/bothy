@@ -459,3 +459,35 @@ async def test_replayed_lines_lie_between_process_start_and_offset(tmp_path: Pat
     assert got[0][1] == start
     everything = await replayed_lines(path, start, path.stat().st_size)
     assert [m["type"] for m, _, _ in everything] == ["system", "assistant", "result"]
+
+
+def test_a_followup_being_prepared_keeps_stdin_open() -> None:
+    # FIX-followup-transcribe minor (issue 574): a follow-up whose files are fetched or
+    # transcribed is not pending yet, but stdin must not close under it, neither at the result
+    # nor once runner.followup_grace has passed.
+    state = ProcessState(has_stdin=True)
+    state.apply({"type": "result", "subtype": "success", "is_error": False}, 100.0)
+    for now in (100.0, 100.0 + FOLLOWUP_GRACE + 1):
+        decision = state.decide(
+            now,
+            stdin_open=True,
+            pending=0,
+            preparing=1,
+            followup_grace=FOLLOWUP_GRACE,
+            stop_grace=STOP_GRACE,
+        )
+        assert decision is Decision.NONE
+    after = state.decide(
+        100.0, stdin_open=True, pending=0, followup_grace=FOLLOWUP_GRACE, stop_grace=STOP_GRACE
+    )
+    assert after is Decision.CLOSE  # nothing prepared: the rule of note 5 as before
+    state.apply({"type": "result", "subtype": "error_during_execution", "is_error": True}, 200.0)
+    failed = state.decide(
+        200.0,
+        stdin_open=True,
+        pending=0,
+        preparing=1,
+        followup_grace=FOLLOWUP_GRACE,
+        stop_grace=STOP_GRACE,
+    )
+    assert failed is Decision.CLOSE  # a failed turn absorbs nothing more

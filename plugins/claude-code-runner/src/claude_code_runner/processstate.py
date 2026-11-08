@@ -267,7 +267,7 @@ class ProcessState:
         """`BackgroundWork.holds` of the process."""
         return self.background.holds(now, quiet)
 
-    def decide(
+    def decide(  # noqa: PLR0913 - the inputs of the rule, all keyword-only
         self,
         now: float,
         *,
@@ -275,6 +275,7 @@ class ProcessState:
         pending: int,
         followup_grace: float,
         stop_grace: float,
+        preparing: int = 0,
     ) -> Decision:
         """The stdin and stop rule now (09 18.5; the order of the runner's checks).
 
@@ -282,6 +283,8 @@ class ProcessState:
             now: The monotonic time.
             stdin_open: The runner holds stdin open (phase ``open``).
             pending: Written inputs without echo.
+            preparing: Follow-ups offered to the open turn and not yet written or left (their
+                files are fetched or transcribed); stdin does not close under them.
             followup_grace: ``runner.followup_grace``.
             stop_grace: ``runner.stop_grace``.
 
@@ -297,7 +300,10 @@ class ProcessState:
             return Decision.HOLD
         if self.background.input_waiting:
             return Decision.WAIT
-        if stdin_open and stdin_close_due(now, self.last_result_at, pending, followup_grace):
+        # A follow-up being prepared keeps stdin open; runner.followup_file_wait and
+        # runner.transcribe_timeout bound its preparation.
+        due = stdin_close_due(now, self.last_result_at, pending, followup_grace)
+        if stdin_open and not preparing and due:
             return Decision.CLOSE
         return Decision.NONE
 
