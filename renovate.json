@@ -55,16 +55,6 @@
       ]
     },
     {
-      "description": "Hermes Agent version of the recording harness (plugins/hermes-adapter/tests/hermes_pin.toml): the recording test fails until the fixtures are recorded again, on purpose; the date tags before v0.22 (v2026.9.24) are older releases, never an update (D-HERMES-COMPAT-1)",
-      "matchManagers": ["custom.regex"],
-      "matchFileNames": ["plugins/hermes-adapter/tests/hermes_pin.toml"],
-      "groupName": "Hermes Agent recording pin",
-      "allowedVersions": "<2000",
-      "prBodyNotes": [
-        "Record again before merging: `make -C plugins/hermes-adapter record` (it also regenerates `tests/hermes_requirements.txt` when the pinned commit has no `uv.lock`), review the fixture diff in `plugins/hermes-adapter/tests/fixtures/recording/`, set `recorded_on`, and update docs/spec/09-agents.md 17.10 (and every section an adapted point names). When the current pin is a main commit without a release tag (D-HERMES-MAIN-1), check first that the proposed tag contains it: `git merge-base --is-ancestor <pinned commit> <proposed tag>`; if not, close the proposal."
-      ]
-    },
-    {
       "description": "Trivy stays on the release the vendor advisory GHSA-69fq-xp46-6x23 names as safe; a newer one needs the manual check in docs/quality/toolchain.md",
       "matchDepNames": ["trivy"],
       "enabled": false
@@ -119,29 +109,6 @@
     }
   ],
   "customManagers": [
-    {
-      "customType": "regex",
-      "description": "Pinned Hermes Agent release of the recording harness (tag and full commit)",
-      "managerFilePatterns": ["/^plugins/hermes-adapter/tests/hermes_pin\\.toml$/"],
-      "matchStrings": [
-        "tag = \"(?<currentValue>[^\"]+)\"\\ncommit = \"(?<currentDigest>[0-9a-f]{40})\""
-      ],
-      "depNameTemplate": "NousResearch/hermes-agent",
-      "packageNameTemplate": "NousResearch/hermes-agent",
-      "datasourceTemplate": "github-tags"
-    },
-    {
-      "customType": "regex",
-      "description": "Pinned Hermes Agent main commit without a release tag (D-HERMES-MAIN-2): the comment line names the base release, and the proposal writes the tagged form back",
-      "managerFilePatterns": ["/^plugins/hermes-adapter/tests/hermes_pin\\.toml$/"],
-      "matchStrings": [
-        "# Base release: (?<currentValue>[^\\s]+)\\ncommit = \"(?<currentDigest>[0-9a-f]{40})\""
-      ],
-      "autoReplaceStringTemplate": "tag = \"{{{newValue}}}\"\ncommit = \"{{{newDigest}}}\"",
-      "depNameTemplate": "NousResearch/hermes-agent",
-      "packageNameTemplate": "NousResearch/hermes-agent",
-      "datasourceTemplate": "github-tags"
-    },
     {
       "customType": "regex",
       "description": "Release binaries in tools/bin/tools.lock.json",

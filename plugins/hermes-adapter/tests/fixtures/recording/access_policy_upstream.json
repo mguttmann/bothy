@@ -188,7 +188,7 @@
       "method": "on_processing_complete"
     }
   ],
-  "inputs_sha256": "82f4b1a75243a9cefe2b24c8258975ac23ed1f3d5128c170923b00fff9d1ec25",
+  "inputs_sha256": "6d21804057794ead7fc79673c06870002497c1f9d4da91173ecdfae261ef130e",
   "model_requests": [
     {
       "credential": "none",
@@ -200,7 +200,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:023e37656c43faf3e72e54961de41670e958de279fc75480d2ce21eab4604834:5038",
+        "sha256:eb1565b56790ce2750e951d3d3ac75ce5f28d743603b01aeb888a46b84c8b24f:5036",
         "sha256:62b2cc6fe9d5219715af63d3463df1c19f5e127b91d314562c91b2aa7bbd7d95:41"
       ],
       "roles": [

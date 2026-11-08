@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """The pinned Hermes Agent version (``tests/hermes_pin.toml``).
 
-The pin names a public release of Hermes Agent by tag and full commit SHA. It is older than
-the Renovate cooldown ``deps.min_release_age`` on the day it was recorded (ADR 0041), and a
-Renovate rule asks for a new recording when a newer release appears.
+The pin names the newest upstream main commit of Hermes Agent by its full SHA, without a
+release tag and without a minimum age (D-HERMES-PIN-1); the workflow ``hermes-pin.yml``
+proposes the next one once a day and records again (D-HERMES-PIN-2). The loader still reads an
+optional ``tag``, which ``tests/pin_rules.py`` refuses for the checked-in pin.
 
 Example:
     >>> pin = load_pin(PIN_FILE)

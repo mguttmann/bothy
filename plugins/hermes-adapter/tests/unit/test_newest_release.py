@@ -87,17 +87,3 @@ def test_the_peeled_commit_of_an_annotated_tag_wins(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(fake_hermes_kit.subprocess, "run", fake_run)
     newest = fake_hermes_kit.newest_release(load_pin(PIN_FILE))
     assert (newest.tag, newest.commit) == ("v0.22.5", "bf0203a794a07aac3ff764972ab9087baa4e4f4e")
-
-
-def test_renovate_never_proposes_a_date_tag_after_the_scheme_change() -> None:
-    # Renovate compares the tags of the pin as versions too: v2026.9.24 would outrank v0.22.5.
-    import json
-
-    renovate = json.loads((fake_hermes_kit.REPO / "renovate.json").read_text(encoding="utf-8"))
-    rules = [
-        rule
-        for rule in renovate["packageRules"]
-        if rule.get("matchFileNames") == ["plugins/hermes-adapter/tests/hermes_pin.toml"]
-    ]
-    assert len(rules) == 1
-    assert rules[0]["allowedVersions"] == f"<{fake_hermes_kit._FIRST_CALENDAR_YEAR}"

@@ -154,7 +154,9 @@ analyzes Dart; locally, `flutter analyze` with `custom_lint` covers Dart. ADR 00
 ## 8. Supply chain
 
 - Actions by full commit SHA, images by digest, release binaries by sha256.
-- Renovate proposes updates only after `deps.min_release_age` and groups them.
+- Renovate proposes updates only after `deps.min_release_age` and groups them. The Hermes
+  Agent pin of the adapter recording follows upstream main without a minimum age and is proposed
+  daily by its own workflow (D-HERMES-PIN-1).
   Security updates come immediately.
 - Trivy stays on the version that the vendor advisory names as safe after the incident of
   2026-03-19 (GHSA-69fq-xp46-6x23,
