@@ -5,7 +5,6 @@ package suite
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -13,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -105,16 +105,32 @@ type instance struct {
 	statuses map[string]int
 }
 
+// suffixBase is the random start of the suffixes of this process and suffixes counts the worlds
+// built so far; see newSuffix.
+var (
+	suffixBase = func() uint32 {
+		b := make([]byte, 3)
+		_, _ = rand.Read(b)
+		return uint32(b[0])<<16 | uint32(b[1])<<8 | uint32(b[2])
+	}()
+	suffixes atomic.Uint32
+)
+
+// newSuffix returns the suffix of the names of one world: six hex digits, so a handle stays within
+// principal.handle_max_chars. It counts up from a random start, so no two worlds of a process share
+// one before 2^24 worlds: every case of a package runs on the one stack of its process, and two
+// independent random suffixes met often enough to fail a case with 409 handle taken (issue 238).
+// The random start keeps the names of two processes apart as before.
+func newSuffix() string {
+	return fmt.Sprintf("%06x", (suffixBase+suffixes.Add(1))&0xffffff)
+}
+
 // newInstance builds the world of sc for case c: people with unique handles (the case's Owner
 // made an owner by the bootstrap owner), devices, groups, agents, apps, hosts with their
 // containers and grants. Every failure fails the case.
 func newInstance(t *testing.T, env *Env, sc *Scenario, c Case) *instance {
 	t.Helper()
-	b := make([]byte, 3)
-	if _, err := rand.Read(b); err != nil {
-		t.Fatal(err)
-	}
-	w := &instance{t: t, env: env, sc: sc, c: c, sfx: hex.EncodeToString(b), ctx: t.Context(), from: time.Now().Add(-time.Second),
+	w := &instance{t: t, env: env, sc: sc, c: c, sfx: newSuffix(), ctx: t.Context(), from: time.Now().Add(-time.Second),
 		people: map[string]*person{}, devices: map[string]*harness.Client{}, groups: map[string]string{}, agents: map[string]*harness.Client{},
 		apps: map[string]*harness.Client{}, hosts: map[string]*hostInst{}, grants: map[string]string{}, sessions: map[string]*sessInst{},
 		keep: map[string]string{}, markers: map[string]string{}, fakes: map[string]*fakeHost{}, baseline: map[string]float64{},
