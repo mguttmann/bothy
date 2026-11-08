@@ -6,7 +6,9 @@
 /// forum's menu starts with "New chat in" or "New post in" (01 6.8 item 8, brief M4-41), and a
 /// forum with a project binding has "Rename project" for a person with `manage` (01 6.11,
 /// M4-44). Both menus end with "Delete channel..." or, for a project forum, "Delete project..."
-/// for a person with `manage` (01 6.18 item 1, D-DEL-14).
+/// for a person with `manage` (01 6.18 item 1, D-DEL-14). In the sidebar the entry above it
+/// archives the channel for the person alone ("Archive project" for a project forum, else
+/// "Archive") or, in the section "Archived", restores it ("Restore"; 01 6.22).
 library;
 
 import 'dart:async';
@@ -14,6 +16,7 @@ import 'dart:async';
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
 
@@ -28,6 +31,35 @@ import '../thread/providers.dart';
 import 'autonomous_runs_dialog.dart';
 import 'level_menu.dart';
 
+/// The personal archive entry of a sidebar row (01 6.22): whether the channel is [archived] in
+/// the person's own sidebar and [onSet], called with the requested archived state.
+final class ChannelArchive {
+  /// Creates the entry.
+  const ChannelArchive({required this.archived, required this.onSet});
+
+  /// Whether the row is in the section "Archived" of its space.
+  final bool archived;
+
+  /// Archives (true) or restores (false) the channel.
+  final ValueChanged<bool> onSet;
+
+  /// The label of the entry for [channel]: "Restore" for an archived row, else "Archive
+  /// project" for a forum with a project binding and "Archive" for every other channel.
+  String label(AppLocalizations l, Channel channel) => archived
+      ? l.channelMenuRestore
+      : channel.kind == ChannelKind.forum && channel.projectBound
+      ? l.channelMenuArchiveProject
+      : l.channelMenuArchive;
+
+  /// The screen reader action of the row with the same label and effect as the menu entry.
+  Map<CustomSemanticsAction, VoidCallback> semanticsActions(
+    AppLocalizations l,
+    Channel channel,
+  ) => {
+    CustomSemanticsAction(label: label(l, channel)): () => onSet(!archived),
+  };
+}
+
 /// The menu of [channel] around [child].
 class ChannelMenu extends StatelessWidget {
   /// Creates the menu of [channel].
@@ -38,7 +70,12 @@ class ChannelMenu extends StatelessWidget {
     this.newChatLabel,
     this.onNewChat,
     this.moves,
+    this.archive,
   });
+
+  /// The personal archive entry of the sidebar row (01 6.22), or null for none (the thread
+  /// header, a direct message).
+  final ChannelArchive? archive;
 
   /// "Move up" and "Move down" of the channel in the sidebar (01 6.16, M4-51), or null for none.
   final SidebarMoves? moves;
@@ -86,6 +123,17 @@ class ChannelMenu extends StatelessWidget {
         if (moves case final moves?) ...[
           const Divider(),
           ...sidebarMoveMenuItems(context, moves),
+        ],
+        if (archive case final archive?
+            when channel.kind != ChannelKind.dm) ...[
+          const Divider(),
+          DsMenuItem(
+            key: ValueKey(
+              archive.archived ? 'menu.restoreChannel' : 'menu.archiveChannel',
+            ),
+            onPressed: () => archive.onSet(!archive.archived),
+            child: Text(archive.label(AppLocalizations.of(context), channel)),
+          ),
         ],
         ...channelDeleteItems(context, ref, channel),
       ];

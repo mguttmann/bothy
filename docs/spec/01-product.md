@@ -2223,6 +2223,35 @@ wake-ups and their cancel button stay visible when it no longer does (a runner t
    shown to persons with `manage`, with the sentence that owners always may and that every other
    person's wake-ups need this switch.
 
+### 6.22 Archiving a channel or project for oneself
+
+Addendum of 2026-11-08 (R-PR-38, rulings in docs/decisions.d/PROJ-ARCHIVE.md). Reason: owner request
+of 2026-11-08; finished projects pile up in a space and should leave the list like done threads,
+without deleting anything. Applies to the desktop sidebar (D1) and to the phone sidebar (M1). Not
+the same as archiving a channel for everyone (`channel.archive`, 05), which makes it final and read
+only.
+
+1. **Entry.** The sidebar menu of a channel or forum (right click, the menu key and Shift+F10 on
+   macOS and Windows, a long press on iOS and Android) has "Archive project" for a forum with a
+   project binding and "Archive" for every other channel or forum, above the delete entry. Direct
+   messages have no such entry. Screen readers have the same action on the row.
+2. **Where it goes.** An archived channel leaves the normal list of its space and shows in a section
+   "Archived (n)" at the very bottom of its space group, below every other channel; n counts the
+   archived channels of the space. The section is collapsed by default; whether it is collapsed is
+   kept per device, like the Done section of a forum (6.1). The section is hidden while the space
+   has no archived channel.
+3. **Restore.** The menu of a row in the section has "Restore" instead of "Archive" (screen readers
+   too). The channel goes back to its earlier place: archiving does not change the person's manual
+   order of the space (6.16 item 3), so the row returns where it was.
+4. **Nothing else changes.** Archiving is personal (per person and channel) and follows the person
+   to every device (04 14, `user_channel_states.hidden_at` in 03). Nothing is deleted or made read
+   only, no right changes, nobody else sees a difference, runs keep going, and an archived channel
+   opens from its row in the section, a link, a search hit or a notification as before.
+   Notifications, unread counts and mentions of an archived channel still reach the person: its
+   row in the section shows them, and the space shows its unread dot.
+5. **Automatic arrangement.** A channel arranged by activity (6.16 item 4) stays in the section while
+   archived; activity does not bring it back.
+
 ## 7. Keyboard shortcuts
 
 Shortcuts apply on desktop. They avoid system assignments (Cmd+H, Cmd+M, Cmd+Q, Alt+F4,
@@ -2493,6 +2522,7 @@ Rules:
 | R-PR-35 | A code block without a language or with a text language (`text`, `plaintext`, `txt`, `markdown`, `md`) also offers "Copy as text", which joins the line breaks inside a paragraph with a space and keeps paragraphs, list items, headings and Markdown hard breaks; a block in a programming language never offers it and "Copy code" stays exact; the toggle of 6.14 reads "Wrap display" with a tooltip that it changes only the display (6.12 item 7, addendum of 2026-11-04). | Owner report 2026-11-04: a reply an agent had written to forward, broken by hand after about 60 to 70 characters in a fenced block, arrived as a packet of short lines in a mail or another chat whether "Wrap lines" was on or off (docs/decisions.d/F-KOPIER-FLIESSTEXT.md). |
 | R-PR-36 | Owners create a built-in agent with "New agent" from a template, an interview with the builder agent or an empty form, see and edit everything in one preview before anything is created, and confirm visible steps with step-up; the entry shows only when a runner hosts agents (6.20, addendum of 2026-11-06). | Owner request 2026-11-05: Bothy should be worth trying without another agent runtime; the preview is the only place where a person sees what a model drafted before it runs on their host ([26-builtin-agents.md](26-builtin-agents.md)). |
 | R-PR-37 | A thread shows its pending wake-ups with cancel, the end state of each finished run, and every end of a wake-up and every cap as a note of the thread (6.21, addendum of 2026-11-06). | A session that runs on alone must never end silently; the person sees what will wake the thread and can stop it. |
+| R-PR-38 | A person archives a channel or a project forum for themselves from its sidebar menu ("Archive project" for a forum with a project binding, else "Archive"); it moves into a collapsed "Archived (n)" section at the bottom of its space group, "Restore" brings it back to its earlier place, and nothing is deleted, made read only or changed for anyone else; the state follows the person to every device (6.22, addendum of 2026-11-08). | Owner request 2026-11-08: finished projects should leave the sidebar like done threads, without losing anything (docs/decisions.d/PROJ-ARCHIVE.md). |
 
 ## 14. Configuration values of this chapter
 

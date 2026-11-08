@@ -13,6 +13,51 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// GetErrorStatsWithResponse Error rates of runs and deliveries
+//
+// Metrics per bucket: `run_failure_rate` (failed per ended runs), `invocation_denials` (messages refused with `billing_mode_personal_not_holder` plus runs failed with `billing_mode_mismatch`); only for the instance (owner, without `space_id`): `webhook_failure_rate` (`failed` and `dead` per finished deliveries still within their retention), `push_failure_rate_<provider>` (registrations disabled for a provider reason per registrations active in the bucket), `scan_errors` and `scan_infected`; these have no channel and count the whole instance. A rate without a denominator is left out. Without `space_id` there is no `group_key`; with `space_id` it is the space ID. HTTP error rates come from telemetry, not from this API. Authorized with `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`. Every number of a channel counts only the channels the caller may read (`message.read`), intersected with the space; channels without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from` and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >= to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per caller scope for `stats.cache_ttl`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /stats/errors (the `GetErrorStats` operationId).
+func (c *ClientWithResponses) GetErrorStatsWithResponse(ctx context.Context, params *GetErrorStatsParams, reqEditors ...RequestEditorFn) (*GetErrorStatsResponse, error) {
+	rsp, err := c.GetErrorStats(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetErrorStatsResponse(rsp)
+}
+
+// GetStatsLiveWithResponse Current live frame
+//
+// The latest live frame (`StatsLiveFrame`) of the instance or of one space, the same frame the gateway sends as `stats.live` (docs/spec/25-visualization.md, section 5). The server returns the base frame built for the current `stats.live_interval`; polling does not rebuild it. Filtered to the channels visible to the caller; cost members only with `cost.read.aggregate`. `403 feature_disabled` when `stats.live_enabled` is off.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /stats/live (the `GetStatsLive` operationId).
+func (c *ClientWithResponses) GetStatsLiveWithResponse(ctx context.Context, params *GetStatsLiveParams, reqEditors ...RequestEditorFn) (*GetStatsLiveResponse, error) {
+	rsp, err := c.GetStatsLive(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetStatsLiveResponse(rsp)
+}
+
+// GetRunStatsWithResponse Runs per agent
+//
+// Metrics per agent and bucket of the end of a run: `runs`, `completed`, `failed`, `cancelled`, `duration_ms_p50`, `duration_ms_p95` (from start to end of the runs that started), and `failed_reason_<code>` for every `state_reason` code of failed runs that occurs. Grouped by agent (`group_key` is the agent ID). Authorized with `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`. Every number of a channel counts only the channels the caller may read (`message.read`), intersected with the space; channels without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from` and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >= to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per caller scope for `stats.cache_ttl`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /stats/runs (the `GetRunStats` operationId).
+func (c *ClientWithResponses) GetRunStatsWithResponse(ctx context.Context, params *GetRunStatsParams, reqEditors ...RequestEditorFn) (*GetRunStatsResponse, error) {
+	rsp, err := c.GetRunStats(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetRunStatsResponse(rsp)
+}
+
 // GetStatsSloWithResponse SLO traffic light from own measurement
 //
 // One entry per SLO of the Sloth files, computed from `stats_minutes` over the SLO period (docs/spec/25-visualization.md, section 6.4). Label "own measurement": values may differ from Prometheus. Requires `stats.read` on the instance (owner); a space manager gets `403 forbidden`.

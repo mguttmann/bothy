@@ -1,0 +1,15 @@
+# PROJ-ARCHIVE Archiving a channel or project for oneself
+
+Owner request of 2026-11-08: archive projects like done threads. Normative text: 01 6.22, R-PR-38;
+03 `user_channel_states.hidden_at`; 04 14 (sidebar channel); 06 R-API-31.
+
+| No | Date | Ruling | Reason |
+|---|---|---|---|
+| D-PROJ-ARCHIVE-1 | 2026-11-08 | The archive is personal, per person and channel, and follows the person to every device; it is not a state of the space or the channel. | Owner default: one person's finished project may still be active for another person. |
+| D-PROJ-ARCHIVE-2 | 2026-11-08 | Every channel and forum except a direct message can be archived; the entry reads "Archive project" for a forum with a project binding and "Archive" for every other one. | Owner default: all non-DM channels. Direct messages are not part of the space tree. |
+| D-PROJ-ARCHIVE-3 | 2026-11-08 | The archive is `user_channel_states.hidden_at`, written with the existing `putMySidebarChannel` (`hidden: true` or `false`, right `sidebar.update`) and synchronized with the existing `sidebar_channel.updated`; the channel action `channel.archive` is not used. | `channel.archive` is final and read only for everyone and removes notification preferences and webhooks; the personal sidebar state already has a write, a right, an event and a snapshot member. |
+| D-PROJ-ARCHIVE-4 | 2026-11-08 | Every member of `SidebarChannelPut` is optional and an absent one keeps the stored value; a body with no member is `400 validation_failed`; a write that changes nothing returns the stored state without a new version and without an event, so archiving twice keeps the first `hidden_at`. | An archive write must not overwrite the post order another device wrote, and a repeated tap or a retried write must not wake every device. |
+| D-PROJ-ARCHIVE-5 | 2026-11-08 | The server accepts `hidden` for every channel the caller can read, a direct message included; the clients offer it only for channels and forums of a space. | A server rule for direct messages would add an error path without a reachable client that sends it. |
+| D-PROJ-ARCHIVE-6 | 2026-11-08 | Archiving never changes the person's `channel_order`; a move of the other channels writes the whole manual order with the archived channels in their places. "Restore" therefore brings a channel back to its earlier place. | Owner request: restore to the earlier manual position. |
+| D-PROJ-ARCHIVE-7 | 2026-11-08 | The section "Archived (n)" sits at the very bottom of the space group, below every channel, and is hidden while the space has none; its collapse is kept per device in `space_view_states.archived_expanded` (collapsed by default), like the Done section of a forum. | Same pattern as 01 6.1; a collapse is a view of one device (R-PR-24). |
+| D-PROJ-ARCHIVE-8 | 2026-11-08 | An archived channel keeps its counters, mentions, notifications and runs: its row in the section shows them, the space shows its unread dot, and "next unread" reaches it even while the section is collapsed. An archived channel arranged by activity stays in the section. | Owner request: nothing is lost by archiving; the person decides when a channel comes back. |

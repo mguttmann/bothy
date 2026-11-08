@@ -55,7 +55,12 @@ class ChannelEntry extends StatefulWidget {
     this.chatsArranged = true,
     this.touch = false,
     this.channelDrag,
+    this.archive,
   });
+
+  /// The personal archive entry of the row (01 6.22): "Archive project", "Archive" or, in the
+  /// section "Archived", "Restore" in its menu and its screen reader actions; null for none.
+  final ChannelArchive? archive;
 
   /// Wraps the channel row (only the row, not its thread group) so it is dragged among the
   /// channels of its space (01 6.16, M4-51), or null.
@@ -281,13 +286,19 @@ class _ChannelEntryState extends State<ChannelEntry> {
         newChatLabel: forum && w.onAdd != null ? addLabel : null,
         onNewChat: forum ? w.onAdd : null,
         moves: w.moves,
+        archive: w.archive,
         child: Focus(
           canRequestFocus: false,
           skipTraversal: true,
           includeSemantics: false,
           onKeyEvent: _onChannelKey,
           child: Semantics(
-            customSemanticsActions: w.moves?.semanticsActions(l),
+            customSemanticsActions: w.archive == null
+                ? w.moves?.semanticsActions(l)
+                : {
+                    ...?w.moves?.semanticsActions(l),
+                    ...w.archive!.semanticsActions(l, e.channel),
+                  },
             child: DsChannelRow(
               grouped ? e.treeRowData : e.rowData,
               key: ValueKey('sidebar.channel.${e.channel.id.value}'),

@@ -1622,12 +1622,24 @@ class $UserChannelStatesTable extends UserChannelStates
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _hiddenAtMeta = const VerificationMeta(
+    'hiddenAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> hiddenAt = GeneratedColumn<DateTime>(
+    'hidden_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     channelId,
     threadOrder,
     version,
     updatedByDeviceId,
+    hiddenAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1675,6 +1687,12 @@ class $UserChannelStatesTable extends UserChannelStates
         ),
       );
     }
+    if (data.containsKey('hidden_at')) {
+      context.handle(
+        _hiddenAtMeta,
+        hiddenAt.isAcceptableOrUnknown(data['hidden_at']!, _hiddenAtMeta),
+      );
+    }
     return context;
   }
 
@@ -1700,6 +1718,10 @@ class $UserChannelStatesTable extends UserChannelStates
         DriftSqlType.string,
         data['${effectivePrefix}updated_by_device_id'],
       ),
+      hiddenAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}hidden_at'],
+      ),
     );
   }
 
@@ -1722,11 +1744,16 @@ class UserChannelStateRow extends DataClass
 
   /// 03 `user_channel_states.updated_by_device_id`.
   final String? updatedByDeviceId;
+
+  /// 03 `user_channel_states.hidden_at` (PROJ-ARCHIVE, 01 6.22): set while the person archived
+  /// the channel in the own sidebar; null while it shows.
+  final DateTime? hiddenAt;
   const UserChannelStateRow({
     required this.channelId,
     required this.threadOrder,
     required this.version,
     this.updatedByDeviceId,
+    this.hiddenAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1736,6 +1763,9 @@ class UserChannelStateRow extends DataClass
     map['version'] = Variable<int>(version);
     if (!nullToAbsent || updatedByDeviceId != null) {
       map['updated_by_device_id'] = Variable<String>(updatedByDeviceId);
+    }
+    if (!nullToAbsent || hiddenAt != null) {
+      map['hidden_at'] = Variable<DateTime>(hiddenAt);
     }
     return map;
   }
@@ -1748,6 +1778,9 @@ class UserChannelStateRow extends DataClass
       updatedByDeviceId: updatedByDeviceId == null && nullToAbsent
           ? const Value.absent()
           : Value(updatedByDeviceId),
+      hiddenAt: hiddenAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(hiddenAt),
     );
   }
 
@@ -1763,6 +1796,7 @@ class UserChannelStateRow extends DataClass
       updatedByDeviceId: serializer.fromJson<String?>(
         json['updatedByDeviceId'],
       ),
+      hiddenAt: serializer.fromJson<DateTime?>(json['hiddenAt']),
     );
   }
   @override
@@ -1773,6 +1807,7 @@ class UserChannelStateRow extends DataClass
       'threadOrder': serializer.toJson<String>(threadOrder),
       'version': serializer.toJson<int>(version),
       'updatedByDeviceId': serializer.toJson<String?>(updatedByDeviceId),
+      'hiddenAt': serializer.toJson<DateTime?>(hiddenAt),
     };
   }
 
@@ -1781,6 +1816,7 @@ class UserChannelStateRow extends DataClass
     String? threadOrder,
     int? version,
     Value<String?> updatedByDeviceId = const Value.absent(),
+    Value<DateTime?> hiddenAt = const Value.absent(),
   }) => UserChannelStateRow(
     channelId: channelId ?? this.channelId,
     threadOrder: threadOrder ?? this.threadOrder,
@@ -1788,6 +1824,7 @@ class UserChannelStateRow extends DataClass
     updatedByDeviceId: updatedByDeviceId.present
         ? updatedByDeviceId.value
         : this.updatedByDeviceId,
+    hiddenAt: hiddenAt.present ? hiddenAt.value : this.hiddenAt,
   );
   UserChannelStateRow copyWithCompanion(UserChannelStatesCompanion data) {
     return UserChannelStateRow(
@@ -1799,6 +1836,7 @@ class UserChannelStateRow extends DataClass
       updatedByDeviceId: data.updatedByDeviceId.present
           ? data.updatedByDeviceId.value
           : this.updatedByDeviceId,
+      hiddenAt: data.hiddenAt.present ? data.hiddenAt.value : this.hiddenAt,
     );
   }
 
@@ -1808,14 +1846,15 @@ class UserChannelStateRow extends DataClass
           ..write('channelId: $channelId, ')
           ..write('threadOrder: $threadOrder, ')
           ..write('version: $version, ')
-          ..write('updatedByDeviceId: $updatedByDeviceId')
+          ..write('updatedByDeviceId: $updatedByDeviceId, ')
+          ..write('hiddenAt: $hiddenAt')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode =>
-      Object.hash(channelId, threadOrder, version, updatedByDeviceId);
+      Object.hash(channelId, threadOrder, version, updatedByDeviceId, hiddenAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1823,7 +1862,8 @@ class UserChannelStateRow extends DataClass
           other.channelId == this.channelId &&
           other.threadOrder == this.threadOrder &&
           other.version == this.version &&
-          other.updatedByDeviceId == this.updatedByDeviceId);
+          other.updatedByDeviceId == this.updatedByDeviceId &&
+          other.hiddenAt == this.hiddenAt);
 }
 
 class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
@@ -1831,12 +1871,14 @@ class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
   final Value<String> threadOrder;
   final Value<int> version;
   final Value<String?> updatedByDeviceId;
+  final Value<DateTime?> hiddenAt;
   final Value<int> rowid;
   const UserChannelStatesCompanion({
     this.channelId = const Value.absent(),
     this.threadOrder = const Value.absent(),
     this.version = const Value.absent(),
     this.updatedByDeviceId = const Value.absent(),
+    this.hiddenAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   UserChannelStatesCompanion.insert({
@@ -1844,6 +1886,7 @@ class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
     this.threadOrder = const Value.absent(),
     required int version,
     this.updatedByDeviceId = const Value.absent(),
+    this.hiddenAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : channelId = Value(channelId),
        version = Value(version);
@@ -1852,6 +1895,7 @@ class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
     Expression<String>? threadOrder,
     Expression<int>? version,
     Expression<String>? updatedByDeviceId,
+    Expression<DateTime>? hiddenAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1859,6 +1903,7 @@ class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
       if (threadOrder != null) 'thread_order': threadOrder,
       if (version != null) 'version': version,
       if (updatedByDeviceId != null) 'updated_by_device_id': updatedByDeviceId,
+      if (hiddenAt != null) 'hidden_at': hiddenAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1868,6 +1913,7 @@ class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
     Value<String>? threadOrder,
     Value<int>? version,
     Value<String?>? updatedByDeviceId,
+    Value<DateTime?>? hiddenAt,
     Value<int>? rowid,
   }) {
     return UserChannelStatesCompanion(
@@ -1875,6 +1921,7 @@ class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
       threadOrder: threadOrder ?? this.threadOrder,
       version: version ?? this.version,
       updatedByDeviceId: updatedByDeviceId ?? this.updatedByDeviceId,
+      hiddenAt: hiddenAt ?? this.hiddenAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1894,6 +1941,9 @@ class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
     if (updatedByDeviceId.present) {
       map['updated_by_device_id'] = Variable<String>(updatedByDeviceId.value);
     }
+    if (hiddenAt.present) {
+      map['hidden_at'] = Variable<DateTime>(hiddenAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1907,6 +1957,7 @@ class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
           ..write('threadOrder: $threadOrder, ')
           ..write('version: $version, ')
           ..write('updatedByDeviceId: $updatedByDeviceId, ')
+          ..write('hiddenAt: $hiddenAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -20798,8 +20849,23 @@ class $SpaceViewStatesTable extends SpaceViewStates
       'CHECK ("collapsed" IN (0, 1))',
     ),
   );
+  static const VerificationMeta _archivedExpandedMeta = const VerificationMeta(
+    'archivedExpanded',
+  );
   @override
-  List<GeneratedColumn> get $columns => [spaceId, collapsed];
+  late final GeneratedColumn<bool> archivedExpanded = GeneratedColumn<bool>(
+    'archived_expanded',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("archived_expanded" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [spaceId, collapsed, archivedExpanded];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -20828,6 +20894,15 @@ class $SpaceViewStatesTable extends SpaceViewStates
     } else if (isInserting) {
       context.missing(_collapsedMeta);
     }
+    if (data.containsKey('archived_expanded')) {
+      context.handle(
+        _archivedExpandedMeta,
+        archivedExpanded.isAcceptableOrUnknown(
+          data['archived_expanded']!,
+          _archivedExpandedMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -20845,6 +20920,10 @@ class $SpaceViewStatesTable extends SpaceViewStates
         DriftSqlType.bool,
         data['${effectivePrefix}collapsed'],
       )!,
+      archivedExpanded: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}archived_expanded'],
+      )!,
     );
   }
 
@@ -20861,12 +20940,21 @@ class SpaceViewStateRow extends DataClass
 
   /// Whether the space is collapsed.
   final bool collapsed;
-  const SpaceViewStateRow({required this.spaceId, required this.collapsed});
+
+  /// Whether the section "Archived (n)" at the bottom of the space is expanded on this device
+  /// (01 6.22 item 2, PROJ-ARCHIVE); collapsed by default, like the Done section of a forum.
+  final bool archivedExpanded;
+  const SpaceViewStateRow({
+    required this.spaceId,
+    required this.collapsed,
+    required this.archivedExpanded,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['space_id'] = Variable<String>(spaceId);
     map['collapsed'] = Variable<bool>(collapsed);
+    map['archived_expanded'] = Variable<bool>(archivedExpanded);
     return map;
   }
 
@@ -20874,6 +20962,7 @@ class SpaceViewStateRow extends DataClass
     return SpaceViewStatesCompanion(
       spaceId: Value(spaceId),
       collapsed: Value(collapsed),
+      archivedExpanded: Value(archivedExpanded),
     );
   }
 
@@ -20885,6 +20974,7 @@ class SpaceViewStateRow extends DataClass
     return SpaceViewStateRow(
       spaceId: serializer.fromJson<String>(json['spaceId']),
       collapsed: serializer.fromJson<bool>(json['collapsed']),
+      archivedExpanded: serializer.fromJson<bool>(json['archivedExpanded']),
     );
   }
   @override
@@ -20893,18 +20983,26 @@ class SpaceViewStateRow extends DataClass
     return <String, dynamic>{
       'spaceId': serializer.toJson<String>(spaceId),
       'collapsed': serializer.toJson<bool>(collapsed),
+      'archivedExpanded': serializer.toJson<bool>(archivedExpanded),
     };
   }
 
-  SpaceViewStateRow copyWith({String? spaceId, bool? collapsed}) =>
-      SpaceViewStateRow(
-        spaceId: spaceId ?? this.spaceId,
-        collapsed: collapsed ?? this.collapsed,
-      );
+  SpaceViewStateRow copyWith({
+    String? spaceId,
+    bool? collapsed,
+    bool? archivedExpanded,
+  }) => SpaceViewStateRow(
+    spaceId: spaceId ?? this.spaceId,
+    collapsed: collapsed ?? this.collapsed,
+    archivedExpanded: archivedExpanded ?? this.archivedExpanded,
+  );
   SpaceViewStateRow copyWithCompanion(SpaceViewStatesCompanion data) {
     return SpaceViewStateRow(
       spaceId: data.spaceId.present ? data.spaceId.value : this.spaceId,
       collapsed: data.collapsed.present ? data.collapsed.value : this.collapsed,
+      archivedExpanded: data.archivedExpanded.present
+          ? data.archivedExpanded.value
+          : this.archivedExpanded,
     );
   }
 
@@ -20912,44 +21010,51 @@ class SpaceViewStateRow extends DataClass
   String toString() {
     return (StringBuffer('SpaceViewStateRow(')
           ..write('spaceId: $spaceId, ')
-          ..write('collapsed: $collapsed')
+          ..write('collapsed: $collapsed, ')
+          ..write('archivedExpanded: $archivedExpanded')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(spaceId, collapsed);
+  int get hashCode => Object.hash(spaceId, collapsed, archivedExpanded);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is SpaceViewStateRow &&
           other.spaceId == this.spaceId &&
-          other.collapsed == this.collapsed);
+          other.collapsed == this.collapsed &&
+          other.archivedExpanded == this.archivedExpanded);
 }
 
 class SpaceViewStatesCompanion extends UpdateCompanion<SpaceViewStateRow> {
   final Value<String> spaceId;
   final Value<bool> collapsed;
+  final Value<bool> archivedExpanded;
   final Value<int> rowid;
   const SpaceViewStatesCompanion({
     this.spaceId = const Value.absent(),
     this.collapsed = const Value.absent(),
+    this.archivedExpanded = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SpaceViewStatesCompanion.insert({
     required String spaceId,
     required bool collapsed,
+    this.archivedExpanded = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : spaceId = Value(spaceId),
        collapsed = Value(collapsed);
   static Insertable<SpaceViewStateRow> custom({
     Expression<String>? spaceId,
     Expression<bool>? collapsed,
+    Expression<bool>? archivedExpanded,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (spaceId != null) 'space_id': spaceId,
       if (collapsed != null) 'collapsed': collapsed,
+      if (archivedExpanded != null) 'archived_expanded': archivedExpanded,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -20957,11 +21062,13 @@ class SpaceViewStatesCompanion extends UpdateCompanion<SpaceViewStateRow> {
   SpaceViewStatesCompanion copyWith({
     Value<String>? spaceId,
     Value<bool>? collapsed,
+    Value<bool>? archivedExpanded,
     Value<int>? rowid,
   }) {
     return SpaceViewStatesCompanion(
       spaceId: spaceId ?? this.spaceId,
       collapsed: collapsed ?? this.collapsed,
+      archivedExpanded: archivedExpanded ?? this.archivedExpanded,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -20975,6 +21082,9 @@ class SpaceViewStatesCompanion extends UpdateCompanion<SpaceViewStateRow> {
     if (collapsed.present) {
       map['collapsed'] = Variable<bool>(collapsed.value);
     }
+    if (archivedExpanded.present) {
+      map['archived_expanded'] = Variable<bool>(archivedExpanded.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -20986,6 +21096,7 @@ class SpaceViewStatesCompanion extends UpdateCompanion<SpaceViewStateRow> {
     return (StringBuffer('SpaceViewStatesCompanion(')
           ..write('spaceId: $spaceId, ')
           ..write('collapsed: $collapsed, ')
+          ..write('archivedExpanded: $archivedExpanded, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();

@@ -16,6 +16,80 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// NewPairHostRequestWithBody constructs an http.Request for the PairHost method, with any body, and a specified content type
+func NewPairHostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/hosts/pair")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetHostRequest constructs an http.Request for the GetHost method
+func NewGetHostRequest(server string, hostId HostIdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "host_id", hostId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/hosts/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateHostRequest calls the generic UpdateHost builder with application/json body
+func NewUpdateHostRequest(server string, hostId HostIdPath, params *UpdateHostParams, body UpdateHostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateHostRequestWithBody(server, hostId, params, "application/json", bodyReader)
+}
+
 // NewUpdateHostRequestWithBody constructs an http.Request for the UpdateHost method, with any body, and a specified content type
 func NewUpdateHostRequestWithBody(server string, hostId HostIdPath, params *UpdateHostParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -13116,18 +13190,18 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /me/sidebar (the `GetMySidebar` operationId).
 	GetMySidebarWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMySidebarResponse, error)
 
-	// PutMySidebarChannelWithBodyWithResponse Reorder the posts of a channel for oneself
+	// PutMySidebarChannelWithBodyWithResponse Reorder the posts of a channel or archive it for oneself
 	//
-	// Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last write wins, no If-Match; an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+	// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order) and whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /me/sidebar/channels/{channel_id} (the `PutMySidebarChannel` operationId).
 	PutMySidebarChannelWithBodyWithResponse(ctx context.Context, channelId ChannelIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutMySidebarChannelResponse, error)
 
-	// PutMySidebarChannelWithResponse Reorder the posts of a channel for oneself
+	// PutMySidebarChannelWithResponse Reorder the posts of a channel or archive it for oneself
 	//
-	// Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last write wins, no If-Match; an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+	// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order) and whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -23560,92 +23634,4 @@ func (r LoginWithTrustedHeaderResponse) GetJSON201() *TokenResponse {
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
 func (r LoginWithTrustedHeaderResponse) GetApplicationproblemJSON400() *BadRequest {
 	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r LoginWithTrustedHeaderResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r LoginWithTrustedHeaderResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r LoginWithTrustedHeaderResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r LoginWithTrustedHeaderResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r LoginWithTrustedHeaderResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r LoginWithTrustedHeaderResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r LoginWithTrustedHeaderResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r LoginWithTrustedHeaderResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// GetChannelResponse200Headers the declared response headers of an HTTP 200 response for GetChannel
-type GetChannelResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	ETag            *string
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// GetChannelResponse400Headers the declared response headers of an HTTP 400 response for GetChannel
-type GetChannelResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetChannelResponse401Headers the declared response headers of an HTTP 401 response for GetChannel
-type GetChannelResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// GetChannelResponse403Headers the declared response headers of an HTTP 403 response for GetChannel
-type GetChannelResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetChannelResponse404Headers the declared response headers of an HTTP 404 response for GetChannel
-type GetChannelResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetChannelResponse429Headers the declared response headers of an HTTP 429 response for GetChannel
-type GetChannelResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
 }

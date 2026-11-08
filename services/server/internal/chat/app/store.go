@@ -109,8 +109,12 @@ type Store interface {
 	// SidebarStates returns the rows of user for spaces that are not archived, all of them (all)
 	// or those in visible, ascending by space (07 section 7.4 rule 1).
 	SidebarStates(ctx context.Context, user ids.ID, all bool, visible []ids.ID) ([]domain.SidebarState, error)
+	// SidebarChannelState returns the row of user for channel (PROJ-ARCHIVE); found is false
+	// when the person has none.
+	SidebarChannelState(ctx context.Context, user, channel ids.ID) (st domain.SidebarChannelState, found bool, err error)
 	// PutSidebarChannelState inserts or replaces the row of st.UserID and st.ChannelID with
-	// version + 1 (M4-51). It returns the stored row.
+	// version + 1 (M4-51), thread_order and hidden_at as given (zero is NULL). It returns the
+	// stored row.
 	PutSidebarChannelState(ctx context.Context, st domain.SidebarChannelState) (domain.SidebarChannelState, error)
 	// SidebarChannelStates returns the channel rows of user for channels that are not archived
 	// and lie in a space that is not archived: all of them (all), else those in visible or in a

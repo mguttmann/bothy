@@ -187,7 +187,7 @@ through the `Fetcher` instead.
 | `draft.deleted` | `drafts` (not while typed here) | seq |
 | `settings.updated` | `user_settings` (`deleted: true` removes the key) | version of the setting |
 | `sidebar.updated` | `user_space_states` (`channel_order` included, M4-51; not the echo of this device) | version of the state |
-| `sidebar_channel.updated` | `user_channel_states` (the own thread order of a channel, M4-51; not the echo of this device) | version of the state |
+| `sidebar_channel.updated` | `user_channel_states` (the own thread order of a channel, M4-51, and its personal archive `hidden_at`, PROJ-ARCHIVE; not the echo of this device) | version of the state |
 | `notification_pref.updated` | `notification_preferences` | version of the preference |
 | `quiet_hours.updated` | `quiet_hours_rules` (rules missing from the payload are deleted) | version per rule |
 | `file.updated` | `files` | seq |
@@ -478,7 +478,9 @@ the connections that may see them. Test controls: `addPerson`, `addSpace`, `addC
 index is `400 validation_failed` at `/sort_key`; since M4-51 with `channel_order`, a repeated
 ID is `400 validation_failed` with `duplicate`), `putMySidebarChannel` (M4-51: the own thread
 order of a visible channel, `sidebar_channel.updated`, a repeated ID `duplicate` at
-`/thread_order`; `getMySidebar` lists the rows under `channels`), `listForumTags`, `createThread` (forum posts
+`/thread_order`; PROJ-ARCHIVE: `hidden` sets or clears `hidden_at`, an absent member keeps the
+stored value, a write that changes nothing gives no new version and no event; `getMySidebar` lists
+the rows under `channels`), `listForumTags`, `createThread` (forum posts
 only; without `first_message` `400 validation_failed` at `/first_message` with the reason
 `required_for_forum_post`), `getBrandingLogo` (bytes of
 `world.logo`, else `404`) and `listChannelThreads` with `state`, `tag_id`, `sort`, `limit` and

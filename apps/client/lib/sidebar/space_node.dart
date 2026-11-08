@@ -10,7 +10,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:l10n/l10n.dart';
 
+import '../menus/channel_menu.dart' show ChannelArchive;
 import '../menus/space_menu.dart';
+import 'archived_section.dart';
 import 'channel_entry.dart';
 import 'sidebar_arrange.dart';
 import 'sidebar_drag.dart';
@@ -27,7 +29,10 @@ import 'sidebar_model.dart';
 /// menu (M4-33), which also has "Move up" and "Move down" (01 6.16, M4-51). The space row starts
 /// the drag of the space ([dragHandle]); the channels of the space are dragged among each other
 /// with [onMoveChannel] and the open posts of a forum with [onMoveThread], unless [arrangement]
-/// arranges their level by activity (D-M4-51-6).
+/// arranges their level by activity (D-M4-51-6). Below the channels the section "Archived (n)"
+/// lists the channels the person archived in the own sidebar while it is expanded
+/// ([onToggleArchived]); every channel row's menu archives or restores it ([onSetHidden], 01
+/// 6.22).
 class SpaceNode extends StatefulWidget {
   /// Creates the node.
   const SpaceNode({
@@ -53,7 +58,16 @@ class SpaceNode extends StatefulWidget {
     this.touch = false,
     this.onMoveChannel,
     this.onMoveThread,
+    this.onSetHidden,
+    this.onToggleArchived,
   });
+
+  /// Archives (true) or restores (false) a channel in the person's own sidebar (01 6.22), or
+  /// null for no such entry.
+  final void Function(ChannelId channel, bool hidden)? onSetHidden;
+
+  /// Expands (true) or collapses the section "Archived (n)" on this device, or null.
+  final ValueChanged<bool>? onToggleArchived;
 
   /// Which levels are arranged by activity (01 6.16).
   final SidebarArrangement arrangement;
@@ -159,7 +173,39 @@ class _SpaceNodeState extends State<SpaceNode> {
       :touch,
       :onMoveChannel,
       :onMoveThread,
+      :onSetHidden,
+      :onToggleArchived,
     ) = widget;
+    ChannelArchive? archiveOf(SidebarChannel c, {required bool archived}) =>
+        onSetHidden == null
+        ? null
+        : ChannelArchive(
+            archived: archived,
+            onSet: (hidden) => onSetHidden(c.channel.id, hidden),
+          );
+    ChannelEntry archivedEntry(SidebarChannel c) => ChannelEntry(
+      key: ValueKey('sidebar.entry.${c.channel.id.value}'),
+      archive: archiveOf(c, archived: true),
+      chatsArranged: arrangement.isAuto(SidebarLevel.chats),
+      touch: touch,
+      entry: c,
+      selected: c.channel.id == selectedChannel,
+      selectedThread: selectedThread,
+      onOpen: () => onOpenChannel(c.channel.id),
+      onOpenThread: onOpenThread,
+      onToggleGroup: onToggleGroup == null
+          ? null
+          : (expanded) => onToggleGroup(c.channel.id, expanded),
+      onShowAllPosts: onShowAllPosts == null
+          ? null
+          : (inFull) => onShowAllPosts(c.channel.id, inFull),
+      onAdd: onAdd == null ? null : () => onAdd(c.channel.id),
+      selectedNewChat: selectedNewChat,
+      onOpenNewChat: onOpenNewChat == null
+          ? null
+          : (entry) => onOpenNewChat(c.channel.id, entry),
+      onParent: _row.requestFocus,
+    );
     final spacesArranged = arrangement.isAuto(SidebarLevel.spaces);
     final channelsArranged = arrangement.isAuto(SidebarLevel.channels);
     final count = node.channels.length;
@@ -247,6 +293,7 @@ class _SpaceNodeState extends State<SpaceNode> {
                 child: row,
               ),
               moves: channelMoves(c.channel.id, i),
+              archive: archiveOf(c, archived: false),
               onMoveThread: onMoveThread == null
                   ? null
                   : (thread, to) => onMoveThread(c.channel.id, thread, to),
@@ -270,6 +317,16 @@ class _SpaceNodeState extends State<SpaceNode> {
                   : (entry) => onOpenNewChat(c.channel.id, entry),
               onParent: _row.requestFocus,
             ),
+        // 01 6.22 item 2: the archived channels at the very bottom of the space group.
+        if (node.expanded && node.archived.isNotEmpty) ...[
+          ArchivedSection(
+            space: space.id,
+            count: node.archived.length,
+            expanded: node.archivedExpanded,
+            onToggle: onToggleArchived ?? (_) {},
+          ),
+          for (final c in node.visibleArchived) archivedEntry(c),
+        ],
       ],
     );
   }

@@ -11263,4 +11263,18 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get builtinAgentsEmpty => 'Noch keine eingebauten Agenten.';
+
+  @override
+  String get channelMenuArchiveProject => 'Projekt archivieren';
+
+  @override
+  String get channelMenuArchive => 'Archivieren';
+
+  @override
+  String get channelMenuRestore => 'Wiederherstellen';
+
+  @override
+  String sidebarArchived(int count) {
+    return 'Archiviert ($count)';
+  }
 }

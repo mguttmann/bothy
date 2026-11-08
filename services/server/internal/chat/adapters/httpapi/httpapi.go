@@ -149,14 +149,20 @@ func (h *Spaces) PutMySidebarSpace(ctx context.Context, req rest.PutMySidebarSpa
 }
 
 // PutMySidebarChannel implements rest.StrictServerInterface (PUT /me/sidebar/channels/{channel_id},
-// M4-51). A body without thread_order, or with null, is 400 validation_failed on /thread_order
-// (the member is required); the use case checks the rest.
+// M4-51 and PROJ-ARCHIVE). A body with neither thread_order nor hidden (null counts as absent) is
+// 400 validation_failed on /thread_order (06 R-API-31); an absent member keeps the stored value;
+// the use case checks the rest.
 func (h *Spaces) PutMySidebarChannel(ctx context.Context, req rest.PutMySidebarChannelRequestObject) (rest.PutMySidebarChannelResponseObject, error) {
-	if req.Body.ThreadOrder == nil {
-		return nil, errs.New(errs.CodeValidationFailed, "thread_order is required").
-			WithFields(errs.FieldError{Pointer: "/thread_order", Code: domain.FieldRequired, Detail: "thread_order is required"})
+	if req.Body.ThreadOrder == nil && req.Body.Hidden == nil {
+		return nil, errs.New(errs.CodeValidationFailed, "thread_order or hidden is required").
+			WithFields(errs.FieldError{Pointer: "/thread_order", Code: domain.FieldRequired, Detail: "thread_order or hidden is required"})
 	}
-	st, err := h.structure.PutSidebarChannel(ctx, principal(ctx), ids.ID(req.ChannelId), chat.SidebarChannelPutCmd{ThreadOrder: idsOf(req.Body.ThreadOrder)})
+	cmd := chat.SidebarChannelPutCmd{Hidden: req.Body.Hidden}
+	if req.Body.ThreadOrder != nil {
+		order := idsOf(*req.Body.ThreadOrder)
+		cmd.ThreadOrder = &order
+	}
+	st, err := h.structure.PutSidebarChannel(ctx, principal(ctx), ids.ID(req.ChannelId), cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -215,10 +221,10 @@ func SidebarREST(st chat.SidebarState) rest.SidebarState {
 }
 
 // SidebarChannelREST converts a channel row of the sidebar (schema SidebarChannelState, M4-51);
-// thread_order is always present.
+// thread_order is always present, hidden_at only while the channel is archived (PROJ-ARCHIVE).
 func SidebarChannelREST(st chat.SidebarChannelState) rest.SidebarChannelState {
 	return rest.SidebarChannelState{
-		ChannelId: rest.Uuid(st.ChannelID), ThreadOrder: restIDs(st.ThreadOrder), Version: st.Version,
+		ChannelId: rest.Uuid(st.ChannelID), ThreadOrder: restIDs(st.ThreadOrder), HiddenAt: optionalTime(st.HiddenAt), Version: st.Version,
 		UpdatedByDeviceId: optionalID(st.UpdatedByDeviceID),
 	}
 }

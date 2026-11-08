@@ -17883,6 +17883,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No built-in agents yet.'**
   String get builtinAgentsEmpty;
+
+  /// Menu entry and accessibility action of a forum with a project binding in the sidebar that archives it for the person alone: it moves into the section "Archived" at the bottom of its space; nothing is deleted (01 section 6.22).
+  ///
+  /// In en, this message translates to:
+  /// **'Archive project'**
+  String get channelMenuArchiveProject;
+
+  /// Menu entry and accessibility action of a channel or forum without a project binding in the sidebar that archives it for the person alone: it moves into the section "Archived" at the bottom of its space; nothing is deleted (01 section 6.22).
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get channelMenuArchive;
+
+  /// Menu entry and accessibility action of a row in the section "Archived" of the sidebar that brings the channel back to its earlier place in the normal list (01 section 6.22).
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get channelMenuRestore;
+
+  /// Row at the bottom of a space in the sidebar that collapses or expands the channels and project forums the person archived for themselves (01 section 6.22); collapsed by default.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived ({count})'**
+  String sidebarArchived(int count);
 }
 
 class _AppLocalizationsDelegate

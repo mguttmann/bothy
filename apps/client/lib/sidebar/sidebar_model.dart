@@ -142,21 +142,53 @@ final class SidebarChannel {
 
 /// A space node of the tree: the space in the person's order with its channels.
 final class SidebarSpaceNode {
-  /// Creates the node.
-  const SidebarSpaceNode({required this.entry, required this.channels});
+  /// Creates the node; [manualOrder] defaults to [channels] followed by [archived].
+  SidebarSpaceNode({
+    required this.entry,
+    required this.channels,
+    this.archived = const [],
+    this.archivedExpanded = false,
+    List<ChannelId>? manualOrder,
+  }) : manualOrder =
+           manualOrder ??
+           [
+             for (final c in [...channels, ...archived]) c.channel.id,
+           ];
 
   /// The space with its personal state.
   final SidebarSpace entry;
 
-  /// The channels of the space in their order.
+  /// The channels of the space in their order, without the archived ones.
   final List<SidebarChannel> channels;
+
+  /// The channels the person archived in the own sidebar (01 6.22), in the manual order; they
+  /// show in the section "Archived (n)" at the bottom of the space.
+  final List<SidebarChannel> archived;
+
+  /// Whether the section "Archived (n)" is expanded on this device (collapsed by default).
+  final bool archivedExpanded;
+
+  /// Every channel of the space in the person's manual order, the archived ones included: a
+  /// move writes this list, so an archived channel keeps its place and comes back to it on
+  /// "Restore" (01 6.22 item 3).
+  final List<ChannelId> manualOrder;
 
   /// Whether the space shows its channels.
   bool get expanded => !entry.collapsed;
 
+  /// The archived rows on screen: those of an expanded section of an expanded space.
+  List<SidebarChannel> get visibleArchived =>
+      expanded && archivedExpanded ? archived : const [];
+
   /// A copy with [channels].
   SidebarSpaceNode copyWithChannels(List<SidebarChannel> channels) =>
-      SidebarSpaceNode(entry: entry, channels: channels);
+      SidebarSpaceNode(
+        entry: entry,
+        channels: channels,
+        archived: archived,
+        archivedExpanded: archivedExpanded,
+        manualOrder: manualOrder,
+      );
 
   /// The row data of `DsSpaceRow` (M4-07): icon and category of the space, the expanded state
   /// and whether a channel has unread items (the dot of a collapsed space, components.md 7).
@@ -166,7 +198,9 @@ final class SidebarSpaceNode {
     icon: entry.space.icon ?? '',
     category: DsCategory.fromCode(entry.space.color),
     expanded: expanded,
-    hasUnread: channels.any((c) => c.hasUnread),
+    // 01 6.22 item 4: the unread items of an archived channel still reach the person.
+    hasUnread:
+        channels.any((c) => c.hasUnread) || archived.any((c) => c.hasUnread),
   );
 }
 
@@ -255,8 +289,10 @@ final class SidebarTarget {
 /// ends; null when there is none.
 ///
 /// Rows are the channels and the thread rows of their expanded groups, in the order of the
-/// sidebar (01 7: "Next or previous channel or thread row in the sidebar"; D-SB-8); "All posts"
-/// is no target. Without [unreadOnly] only rows of expanded spaces count (the ones on screen);
+/// sidebar (01 7: "Next or previous channel or thread row in the sidebar"; D-SB-8), then the
+/// archived channels of the space (01 6.22) while their section is expanded; "All posts" is no
+/// target. With [unreadOnly] an archived channel with unread items counts like a channel of a
+/// collapsed space, so nothing unread is out of reach. Without [unreadOnly] only rows of expanded spaces count (the ones on screen);
 /// with it every channel whose row or "All posts" shows unread items, also in collapsed spaces,
 /// and every unread thread row (01 7: next or previous unread channel or thread row). A
 /// [current] that is not in the list starts from the beginning (or the end); a thread that is
@@ -281,6 +317,9 @@ SidebarTarget? neighbourTarget(
       for (final t in shown) {
         rows.add((SidebarTarget(c.channel.id, t.thread.id), _unread(t.counts)));
       }
+    }
+    for (final c in unreadOnly ? node.archived : node.visibleArchived) {
+      rows.add((SidebarTarget(c.channel.id), _unread(c.counts)));
     }
   }
   var at = current;

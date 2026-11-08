@@ -12,13 +12,18 @@ part 'sidebar_channel_put.g.dart';
 /// SidebarChannelPut
 ///
 /// Properties:
-/// * [threadOrder] - New personal order of the posts of the channel, unique IDs; an empty list returns to the default order. At most `sidebar.order_max_items`.
+/// * [threadOrder] - New personal order of the posts of the channel, unique IDs; absent keeps the stored order, an empty list returns to the default order. At most `sidebar.order_max_items`.
+/// * [hidden] - true archives the channel in the caller's own sidebar (sets `hidden_at`, kept when it is already set), false brings it back (clears `hidden_at`); absent keeps the stored state (01 6.22).
 @BuiltValue()
 abstract class SidebarChannelPut
     implements Built<SidebarChannelPut, SidebarChannelPutBuilder> {
-  /// New personal order of the posts of the channel, unique IDs; an empty list returns to the default order. At most `sidebar.order_max_items`.
+  /// New personal order of the posts of the channel, unique IDs; absent keeps the stored order, an empty list returns to the default order. At most `sidebar.order_max_items`.
   @BuiltValueField(wireName: r'thread_order')
-  BuiltList<String> get threadOrder;
+  BuiltList<String>? get threadOrder;
+
+  /// true archives the channel in the caller's own sidebar (sets `hidden_at`, kept when it is already set), false brings it back (clears `hidden_at`); absent keeps the stored state (01 6.22).
+  @BuiltValueField(wireName: r'hidden')
+  bool? get hidden;
 
   SidebarChannelPut._();
 
@@ -46,11 +51,20 @@ class _$SidebarChannelPutSerializer
     SidebarChannelPut object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
-    yield r'thread_order';
-    yield serializers.serialize(
-      object.threadOrder,
-      specifiedType: const FullType(BuiltList, [FullType(String)]),
-    );
+    if (object.threadOrder != null) {
+      yield r'thread_order';
+      yield serializers.serialize(
+        object.threadOrder,
+        specifiedType: const FullType(BuiltList, [FullType(String)]),
+      );
+    }
+    if (object.hidden != null) {
+      yield r'hidden';
+      yield serializers.serialize(
+        object.hidden,
+        specifiedType: const FullType(bool),
+      );
+    }
   }
 
   @override
@@ -81,9 +95,20 @@ class _$SidebarChannelPutSerializer
         case r'thread_order':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType(BuiltList, [FullType(String)]),
-          ) as BuiltList<String>;
+            specifiedType: const FullType.nullable(BuiltList, [
+              FullType(String),
+            ]),
+          ) as BuiltList<String>?;
+          if (valueDes == null) continue;
           result.threadOrder.replace(valueDes);
+          break;
+        case r'hidden':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(bool),
+          ) as bool?;
+          if (valueDes == null) continue;
+          result.hidden = valueDes;
           break;
         default:
           unhandled.add(key);

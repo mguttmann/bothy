@@ -16591,14 +16591,20 @@ type SidebarChannelPayload struct {
 
 // SidebarChannelPut defines model for SidebarChannelPut.
 type SidebarChannelPut struct {
-	// ThreadOrder New personal order of the posts of the channel, unique IDs; an empty list returns to the default order. At most `sidebar.order_max_items`.
-	ThreadOrder []Uuid `json:"thread_order"`
+	// Hidden true archives the channel in the caller's own sidebar (sets `hidden_at`, kept when it is already set), false brings it back (clears `hidden_at`); absent keeps the stored state (01 6.22).
+	Hidden *bool `json:"hidden,omitempty"`
+
+	// ThreadOrder New personal order of the posts of the channel, unique IDs; absent keeps the stored order, an empty list returns to the default order. At most `sidebar.order_max_items`.
+	ThreadOrder *[]Uuid `json:"thread_order,omitempty"`
 }
 
 // SidebarChannelState defines model for SidebarChannelState.
 type SidebarChannelState struct {
 	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
 	ChannelId Uuid `json:"channel_id"`
+
+	// HiddenAt Set while the caller has archived the channel in the own sidebar (01 6.22); absent while it shows in the normal list.
+	HiddenAt *Timestamp `json:"hidden_at,omitempty"`
 
 	// ThreadOrder Personal order of the open posts of the channel; empty uses the default order. At most `sidebar.order_max_items`.
 	ThreadOrder []Uuid `json:"thread_order"`

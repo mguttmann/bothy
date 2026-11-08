@@ -233,6 +233,66 @@ void main() {
     },
   );
 
+  test(
+    'the personal archive of a channel: set, no change, clear and the snapshot '
+    '(PROJ-ARCHIVE)',
+    () async {
+      final alex = h.device();
+      await signedIn(h, alex);
+      final prefs = alex.api.getPreferencesApi();
+      final order = [h.seed.releaseNotes];
+      await prefs.putMySidebarChannel(
+        channelId: h.seed.general,
+        sidebarChannelPut: SidebarChannelPut(
+          (b) => b..threadOrder = ListBuilder(order),
+        ),
+      );
+      int events() => h.server.world.log
+          .where((e) => e.type == 'sidebar_channel.updated')
+          .length;
+      final before = events();
+
+      final hidden = (await prefs.putMySidebarChannel(
+        channelId: h.seed.general,
+        sidebarChannelPut: SidebarChannelPut((b) => b..hidden = true),
+      )).data!;
+      expect(hidden.hiddenAt, isNotNull);
+      expect(hidden.threadOrder.toList(), order, reason: 'the order stays');
+      expect(hidden.version, 2);
+      expect(events(), before + 1);
+
+      final again = (await prefs.putMySidebarChannel(
+        channelId: h.seed.general,
+        sidebarChannelPut: SidebarChannelPut((b) => b..hidden = true),
+      )).data!;
+      expect(again.hiddenAt, hidden.hiddenAt);
+      expect(again.version, 2, reason: 'no change, no new version');
+      expect(events(), before + 1, reason: 'no change, no event');
+      expect(
+        (h.server.world.snapshot(h.seed.alex.id)['sidebar_channels']! as List)
+            .single,
+        contains('hidden_at'),
+      );
+
+      final shown = (await prefs.putMySidebarChannel(
+        channelId: h.seed.general,
+        sidebarChannelPut: SidebarChannelPut((b) => b..hidden = false),
+      )).data!;
+      expect(shown.hiddenAt, isNull);
+      expect(shown.version, 3);
+      expect(events(), before + 2);
+
+      final empty = await failure(
+        prefs.putMySidebarChannel(
+          channelId: h.seed.general,
+          sidebarChannelPut: SidebarChannelPut((b) => b),
+        ),
+      );
+      expect(empty?.response?.statusCode, 400);
+      expect(h.server.violations, isEmpty);
+    },
+  );
+
   test('forum tags and a post with its first message', () async {
     final alex = h.device();
     await signedIn(h, alex);

@@ -374,11 +374,100 @@ List<SidebarNewChatRow> newChatRows(Ref ref, String channelId) {
   ];
 }
 
-/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state, the
-/// thread group with its collapse state on this device (01 6.8) and the status mark (01 6.17
-/// item 6: the most urgent unseen status of its chats while "Show status on projects" is on,
-/// else that of its main history); direct messages and archived channels are not part of the
-/// tree.
+/// The spaces whose section "Archived (n)" is expanded on this device (01 6.22 item 2; kept in
+/// `space_view_states`, never synchronized); collapsed by default.
+@riverpod
+Stream<Set<SpaceId>> archivedExpandedSpaces(Ref ref) {
+  final db = ref.watch(localDatabaseProvider);
+  return db == null
+      ? Stream.value(const {})
+      : db.forumViewDao.watchArchivedExpandedSpaces();
+}
+
+/// The channels the person archived in the own sidebar (01 6.22, `user_channel_states.hidden_at`),
+/// synchronized to every device of the person.
+@riverpod
+Set<ChannelId> hiddenChannels(Ref ref) => {
+  for (final s
+      in (ref.watch(userChannelStatesProvider).value ??
+              const <ChannelId, UserChannelState>{})
+          .values)
+    if (s.hidden) s.channelId,
+};
+
+/// Every channel and forum of [spaceId] in the person's manual order (the global one in the
+/// person's `channel_order`, rows not in it first, 01 6.16 item 3), the archived ones of 01 6.22
+/// included; direct messages and channels archived for everyone are not part of the tree.
+@riverpod
+List<Channel> manualChannelsOfSpace(Ref ref, String spaceId) {
+  final space = SpaceId.parse(spaceId);
+  final state = (ref.watch(userSpaceStatesProvider).value ?? const [])
+      .where((s) => s.spaceId == space)
+      .firstOrNull;
+  return applyPersonalOrder(
+    [
+      for (final c
+          in ref.watch(spaceChannelsProvider(spaceId)).value ??
+              const <Channel>[])
+        if (c.archivedAt == null && c.kind != ChannelKind.dm) c,
+    ],
+    state?.channelOrder,
+    (c) => c.id,
+  );
+}
+
+/// The row of [c] with what it shows (01 6.8, 6.17 item 6): counters ([channelCounts]), active
+/// run, muted state, its thread group with the collapse state of this device and the status
+/// mark. An archived channel (01 6.22) builds the same row, so its unread items and mentions
+/// still show.
+SidebarChannel _sidebarChannel(Ref ref, Channel c) {
+  ref.watch(counterTicksProvider);
+  final engine = ref.watch(syncEngineProvider);
+  final reads = ref.watch(allReadStatesProvider).value ?? const [];
+  final prefs = ref.watch(notificationPreferencesProvider).value ?? const [];
+  final runs = ref.watch(activeRunsProvider).value ?? const [];
+  final collapsed = ref.watch(collapsedGroupsProvider).value ?? const {};
+  final now = ref.watch(appPortsProvider).clock.now();
+  final statuses = ref.watch(channelStatusesProvider(c.id.value));
+  // Off, a row shows only the status of its own chat: the main history of a text channel.
+  final status = ref.watch(showProjectStatusProvider)
+      ? aggregateStatus(statuses.values)
+      : statuses[c.mainThreadId];
+  return SidebarChannel(
+    channel: c,
+    counts: channelCounts(
+      engine: engine?.catchUp.countsOfChannel(c.id) ?? const {},
+      readStates: reads,
+      channel: c.id,
+    ),
+    runActive: runs.any((r) => r.channelId == c.id),
+    muted: isMuted(c.id, prefs, now: now),
+    group: ref.watch(channelThreadsProvider(c.id.value)),
+    expanded: !collapsed.contains(c.id),
+    newChatRows: ref.watch(newChatRowsProvider(c.id.value)),
+    status: status,
+  );
+}
+
+/// The channels of [spaceId] the person archived in the own sidebar (01 6.22), in the manual
+/// order, each with the row of [ChannelsOfSpace]; they show in the section "Archived (n)" at the
+/// bottom of the space.
+@riverpod
+List<SidebarChannel> archivedChannelsOfSpace(Ref ref, String spaceId) {
+  final hidden = ref.watch(hiddenChannelsProvider);
+  if (hidden.isEmpty) return const [];
+  return [
+    for (final c in ref.watch(manualChannelsOfSpaceProvider(spaceId)))
+      if (hidden.contains(c.id)) _sidebarChannel(ref, c),
+  ];
+}
+
+/// The channel rows of [spaceId] in the normal list: counters ([channelCounts]), active run,
+/// muted state, the thread group with its collapse state on this device (01 6.8) and the status
+/// mark (01 6.17 item 6: the most urgent unseen status of its chats while "Show status on
+/// projects" is on, else that of its main history); direct messages, channels archived for
+/// everyone and the channels the person archived in the own sidebar (01 6.22,
+/// [archivedChannelsOfSpaceProvider]) are not part of it.
 ///
 /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
 /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
@@ -390,27 +479,11 @@ class ChannelsOfSpace extends _$ChannelsOfSpace {
 
   @override
   List<SidebarChannel> build(String spaceId) {
-    ref.watch(counterTicksProvider);
-    final engine = ref.watch(syncEngineProvider);
-    final reads = ref.watch(allReadStatesProvider).value ?? const [];
-    final prefs = ref.watch(notificationPreferencesProvider).value ?? const [];
-    final runs = ref.watch(activeRunsProvider).value ?? const [];
-    final collapsed = ref.watch(collapsedGroupsProvider).value ?? const {};
-    final now = ref.watch(appPortsProvider).clock.now();
-    final space = SpaceId.parse(spaceId);
-    final state = (ref.watch(userSpaceStatesProvider).value ?? const [])
-        .where((s) => s.spaceId == space)
-        .firstOrNull;
-    final manual = applyPersonalOrder(
-      [
-        for (final c
-            in ref.watch(spaceChannelsProvider(spaceId)).value ??
-                const <Channel>[])
-          if (c.archivedAt == null && c.kind != ChannelKind.dm) c,
-      ],
-      state?.channelOrder,
-      (c) => c.id,
-    );
+    final hidden = ref.watch(hiddenChannelsProvider);
+    final manual = [
+      for (final c in ref.watch(manualChannelsOfSpaceProvider(spaceId)))
+        if (!hidden.contains(c.id)) c,
+    ];
     var ordered = manual;
     if (ref.watch(sidebarArrangementProvider).autoChannels) {
       final at = {
@@ -425,44 +498,34 @@ class ChannelsOfSpace extends _$ChannelsOfSpace {
     } else {
       _shown = const [];
     }
-    final showProjects = ref.watch(showProjectStatusProvider);
-    DsChatStatus? statusOf(Channel c) {
-      final statuses = ref.watch(channelStatusesProvider(c.id.value));
-      // Off, a row shows only the status of its own chat: the main history of a text channel.
-      return showProjects
-          ? aggregateStatus(statuses.values)
-          : statuses[c.mainThreadId];
-    }
-
-    return [
-      for (final c in ordered)
-        SidebarChannel(
-          channel: c,
-          counts: channelCounts(
-            engine: engine?.catchUp.countsOfChannel(c.id) ?? const {},
-            readStates: reads,
-            channel: c.id,
-          ),
-          runActive: runs.any((r) => r.channelId == c.id),
-          muted: isMuted(c.id, prefs, now: now),
-          group: ref.watch(channelThreadsProvider(c.id.value)),
-          expanded: !collapsed.contains(c.id),
-          newChatRows: ref.watch(newChatRowsProvider(c.id.value)),
-          status: statusOf(c),
-        ),
-    ];
+    return [for (final c in ordered) _sidebarChannel(ref, c)];
   }
 }
 
-/// The whole tree: the spaces in the person's order with their channel rows.
+/// The whole tree: the spaces in the person's order with their channel rows, the channels the
+/// person archived in the own sidebar (01 6.22) and whether their section is expanded on this
+/// device.
 @riverpod
-List<SidebarSpaceNode> sidebarTree(Ref ref) => [
-  for (final entry in ref.watch(spacesWithStateProvider))
-    SidebarSpaceNode(
-      entry: entry,
-      channels: ref.watch(channelsOfSpaceProvider(entry.space.id.value)),
-    ),
-];
+List<SidebarSpaceNode> sidebarTree(Ref ref) {
+  final expanded = ref.watch(archivedExpandedSpacesProvider).value ?? const {};
+  return [
+    for (final entry in ref.watch(spacesWithStateProvider))
+      SidebarSpaceNode(
+        entry: entry,
+        channels: ref.watch(channelsOfSpaceProvider(entry.space.id.value)),
+        archived: ref.watch(
+          archivedChannelsOfSpaceProvider(entry.space.id.value),
+        ),
+        archivedExpanded: expanded.contains(entry.space.id),
+        manualOrder: [
+          for (final c in ref.watch(
+            manualChannelsOfSpaceProvider(entry.space.id.value),
+          ))
+            c.id,
+        ],
+      ),
+  ];
+}
 
 /// The signed-in person as the engine's last snapshot named it, with name and avatar from
 /// the local database; null before the first snapshot of this process.

@@ -14,7 +14,9 @@
 // 11 (M4-49) the column `shell_view_state.code_blocks_unwrapped`, version 12 (M4-51) the
 // column `user_space_states.channel_order` and the mirror table `user_channel_states` with a
 // cleared cursor, version 13 (M4-52) the local-only table `thread_seen_states`, version 14 (AR-08) the mirror table
-// `run_wakes` and the column `channels.allow_autonomous_runs` with a cleared cursor; each keeps every row of the mirror. The preserved
+// `run_wakes` and the column `channels.allow_autonomous_runs` with a cleared cursor, version 15 (PROJ-ARCHIVE) the
+// columns `user_channel_states.hidden_at` and `space_view_states.archived_expanded` with a cleared cursor; each keeps
+// every row of the mirror. The preserved
 // tables are checked by
 // `survival_test.dart`.
 
@@ -30,6 +32,7 @@ import 'generated/schema_v11.dart' as v11;
 import 'generated/schema_v12.dart' as v12;
 import 'generated/schema_v13.dart' as v13;
 import 'generated/schema_v14.dart' as v14;
+import 'generated/schema_v15.dart' as v15;
 import 'generated/schema_v2.dart' as v2;
 import 'generated/schema_v3.dart' as v3;
 import 'generated/schema_v4.dart' as v4;
@@ -561,4 +564,64 @@ void main() {
       },
     );
   });
+
+  test(
+    'the migration 14 to 15 keeps the channel rows shown, the spaces with their '
+    'collapse and the archive section collapsed, and clears cursor and epoch',
+    () async {
+      const row = v14.UserChannelStatesData(
+        channelId: 'c',
+        threadOrder: '["t"]',
+        version: 3,
+        updatedByDeviceId: 'd',
+      );
+      const space = v14.SpaceViewStatesData(spaceId: 's', collapsed: 1);
+      const state = v14.SyncStateData(
+        id: 1,
+        cursor: 900,
+        syncEpoch: 'epoch-4',
+        headSeq: 900,
+        permissionVersion: 8,
+        lastSnapshotAt: 41,
+      );
+      await verifier.testWithDataIntegrity(
+        oldVersion: 14,
+        newVersion: 15,
+        createOld: v14.DatabaseAtV14.new,
+        createNew: v15.DatabaseAtV15.new,
+        openTestedDatabase: LocalDatabase.new,
+        createItems: (batch, oldDb) {
+          batch
+            ..insertAll(oldDb.userChannelStates, [row])
+            ..insertAll(oldDb.spaceViewStates, [space])
+            ..insertAll(oldDb.syncState, [state]);
+        },
+        validateItems: (newDb) async {
+          expect(await newDb.select(newDb.userChannelStates).get(), [
+            const v15.UserChannelStatesData(
+              channelId: 'c',
+              threadOrder: '["t"]',
+              version: 3,
+              updatedByDeviceId: 'd',
+            ),
+          ]);
+          expect(await newDb.select(newDb.spaceViewStates).get(), [
+            const v15.SpaceViewStatesData(
+              spaceId: 's',
+              collapsed: 1,
+              archivedExpanded: 0,
+            ),
+          ]);
+          expect(await newDb.select(newDb.syncState).get(), [
+            const v15.SyncStateData(
+              id: 1,
+              headSeq: 900,
+              permissionVersion: 8,
+              lastSnapshotAt: 41,
+            ),
+          ]);
+        },
+      );
+    },
+  );
 }

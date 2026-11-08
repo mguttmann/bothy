@@ -64,9 +64,14 @@ void main() {
           ?.where((p) => p.targetKind.code == kind && p.targetId == id)
           .firstOrNull;
 
-      // Mute the forum from the menu of its sidebar row.
+      // Mute the forum from the menu of its sidebar row. The row waits for its post: the first
+      // post row regroups the forum's entry, which would close a menu already open on it.
       await app.waitFor(
         find.byKey(ValueKey('sidebar.channel.$forum')),
+        timeout: patience,
+      );
+      await app.waitFor(
+        find.byKey(ValueKey('sidebar.thread.$post')),
         timeout: patience,
       );
       await tester.tap(

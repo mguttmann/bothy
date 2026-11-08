@@ -293,12 +293,13 @@ ThreadPermissions threadPermissions(Ref ref, String channelId) {
   );
 }
 
-/// The visible channels that are no direct message and not archived, from the sidebar's
-/// tree (move targets, 01 6.7).
+/// The visible channels that are no direct message and not archived for everyone, from the
+/// sidebar's tree (move targets, 01 6.7); a channel the person archived in the own sidebar stays
+/// a target (01 6.22 item 4).
 @riverpod
 List<Channel> visibleChannels(Ref ref) => [
   for (final node in ref.watch(sidebarTreeProvider))
-    for (final c in node.channels) c.channel,
+    for (final c in [...node.channels, ...node.archived]) c.channel,
 ];
 
 /// The threads of [channelId] (the thread starter lines of the main history, 01 5.1 D2).

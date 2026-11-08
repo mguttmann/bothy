@@ -666,7 +666,7 @@ type ServerInterface interface {
 	// GetMySidebar Read own sidebar state
 	// (GET /me/sidebar)
 	GetMySidebar(w http.ResponseWriter, r *http.Request)
-	// PutMySidebarChannel Reorder the posts of a channel for oneself
+	// PutMySidebarChannel Reorder the posts of a channel or archive it for oneself
 	// (PUT /me/sidebar/channels/{channel_id})
 	PutMySidebarChannel(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
 	// PutMySidebarSpace Collapse or reorder a space for oneself

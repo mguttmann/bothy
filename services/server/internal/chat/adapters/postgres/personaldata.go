@@ -62,10 +62,11 @@ type sidebarJSON struct {
 // (docs/api/gdpr-export/v1/sections/personal.sidebar_channels.schema.json, M4-51); the version is
 // left out like in sidebarJSON.
 type sidebarChannelJSON struct {
-	ChannelID         string    `json:"channel_id"`
-	ThreadOrder       []string  `json:"thread_order"`
-	UpdatedByDeviceID string    `json:"updated_by_device_id,omitempty"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ChannelID         string     `json:"channel_id"`
+	ThreadOrder       []string   `json:"thread_order"`
+	HiddenAt          *time.Time `json:"hidden_at,omitempty"`
+	UpdatedByDeviceID string     `json:"updated_by_device_id,omitempty"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
 // idStrings returns the string forms of list, never nil.
@@ -114,8 +115,13 @@ func (p *PersonalData) Export(ctx context.Context, e personaldata.Export, w pers
 	}
 	outChans := make([]sidebarChannelJSON, 0, len(chans))
 	for _, r := range chans {
-		outChans = append(outChans, sidebarChannelJSON{ChannelID: idOf(r.ChannelID).String(), ThreadOrder: idStrings(r.ThreadOrder),
-			UpdatedByDeviceID: optionalDevice(r.UpdatedByDeviceID), UpdatedAt: timeOf(r.UpdatedAt).UTC()})
+		row := sidebarChannelJSON{ChannelID: idOf(r.ChannelID).String(), ThreadOrder: idStrings(r.ThreadOrder),
+			UpdatedByDeviceID: optionalDevice(r.UpdatedByDeviceID), UpdatedAt: timeOf(r.UpdatedAt).UTC()}
+		if r.HiddenAt.Valid {
+			at := r.HiddenAt.Time.UTC()
+			row.HiddenAt = &at
+		}
+		outChans = append(outChans, row)
 	}
 	return w.Section(personaldata.FilePersonal, "sidebar_channels", outChans)
 }

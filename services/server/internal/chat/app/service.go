@@ -393,6 +393,7 @@ type sidebarJSON struct {
 type sidebarChannelJSON struct {
 	ChannelID         string   `json:"channel_id"`
 	ThreadOrder       []string `json:"thread_order"`
+	HiddenAt          string   `json:"hidden_at,omitempty"`
 	Version           int64    `json:"version"`
 	UpdatedByDeviceID string   `json:"updated_by_device_id,omitempty"`
 }
@@ -457,7 +458,7 @@ func (s *Service) emitSidebarChannel(ctx context.Context, space ids.ID, st domai
 	payload, err := json.Marshal(struct {
 		State sidebarChannelJSON `json:"state"`
 	}{sidebarChannelJSON{
-		ChannelID: st.ChannelID.String(), ThreadOrder: idStrings(st.ThreadOrder), Version: st.Version,
+		ChannelID: st.ChannelID.String(), ThreadOrder: idStrings(st.ThreadOrder), HiddenAt: stamp(st.HiddenAt), Version: st.Version,
 		UpdatedByDeviceID: optionalID(st.UpdatedByDeviceID),
 	}})
 	if err != nil {
@@ -507,7 +508,9 @@ func sidebarChannelView(st domain.SidebarChannelState) chat.SidebarChannelState 
 	if order == nil {
 		order = []ids.ID{}
 	}
-	return chat.SidebarChannelState{ChannelID: st.ChannelID, ThreadOrder: order, Version: st.Version, UpdatedByDeviceID: st.UpdatedByDeviceID}
+	return chat.SidebarChannelState{
+		ChannelID: st.ChannelID, ThreadOrder: order, HiddenAt: st.HiddenAt, Version: st.Version, UpdatedByDeviceID: st.UpdatedByDeviceID,
+	}
 }
 
 // codes converts field names into audit codes.

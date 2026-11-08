@@ -1348,11 +1348,310 @@ final class NewChatRowsFamily extends $Family
   String toString() => r'newChatRowsProvider';
 }
 
-/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state, the
-/// thread group with its collapse state on this device (01 6.8) and the status mark (01 6.17
-/// item 6: the most urgent unseen status of its chats while "Show status on projects" is on,
-/// else that of its main history); direct messages and archived channels are not part of the
-/// tree.
+/// The spaces whose section "Archived (n)" is expanded on this device (01 6.22 item 2; kept in
+/// `space_view_states`, never synchronized); collapsed by default.
+
+@ProviderFor(archivedExpandedSpaces)
+final archivedExpandedSpacesProvider = ArchivedExpandedSpacesProvider._();
+
+/// The spaces whose section "Archived (n)" is expanded on this device (01 6.22 item 2; kept in
+/// `space_view_states`, never synchronized); collapsed by default.
+
+final class ArchivedExpandedSpacesProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<Set<SpaceId>>,
+          Set<SpaceId>,
+          Stream<Set<SpaceId>>
+        >
+    with $FutureModifier<Set<SpaceId>>, $StreamProvider<Set<SpaceId>> {
+  /// The spaces whose section "Archived (n)" is expanded on this device (01 6.22 item 2; kept in
+  /// `space_view_states`, never synchronized); collapsed by default.
+  ArchivedExpandedSpacesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'archivedExpandedSpacesProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$archivedExpandedSpacesHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<Set<SpaceId>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<Set<SpaceId>> create(Ref ref) {
+    return archivedExpandedSpaces(ref);
+  }
+}
+
+String _$archivedExpandedSpacesHash() =>
+    r'5934b37a306102a1dc86d8f3d694ad6ae6832545';
+
+/// The channels the person archived in the own sidebar (01 6.22, `user_channel_states.hidden_at`),
+/// synchronized to every device of the person.
+
+@ProviderFor(hiddenChannels)
+final hiddenChannelsProvider = HiddenChannelsProvider._();
+
+/// The channels the person archived in the own sidebar (01 6.22, `user_channel_states.hidden_at`),
+/// synchronized to every device of the person.
+
+final class HiddenChannelsProvider
+    extends $FunctionalProvider<Set<ChannelId>, Set<ChannelId>, Set<ChannelId>>
+    with $Provider<Set<ChannelId>> {
+  /// The channels the person archived in the own sidebar (01 6.22, `user_channel_states.hidden_at`),
+  /// synchronized to every device of the person.
+  HiddenChannelsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'hiddenChannelsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$hiddenChannelsHash();
+
+  @$internal
+  @override
+  $ProviderElement<Set<ChannelId>> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Set<ChannelId> create(Ref ref) {
+    return hiddenChannels(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Set<ChannelId> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Set<ChannelId>>(value),
+    );
+  }
+}
+
+String _$hiddenChannelsHash() => r'8d89da7dc9ef97cf217d474f584712e3c598968b';
+
+/// Every channel and forum of [spaceId] in the person's manual order (the global one in the
+/// person's `channel_order`, rows not in it first, 01 6.16 item 3), the archived ones of 01 6.22
+/// included; direct messages and channels archived for everyone are not part of the tree.
+
+@ProviderFor(manualChannelsOfSpace)
+final manualChannelsOfSpaceProvider = ManualChannelsOfSpaceFamily._();
+
+/// Every channel and forum of [spaceId] in the person's manual order (the global one in the
+/// person's `channel_order`, rows not in it first, 01 6.16 item 3), the archived ones of 01 6.22
+/// included; direct messages and channels archived for everyone are not part of the tree.
+
+final class ManualChannelsOfSpaceProvider
+    extends $FunctionalProvider<List<Channel>, List<Channel>, List<Channel>>
+    with $Provider<List<Channel>> {
+  /// Every channel and forum of [spaceId] in the person's manual order (the global one in the
+  /// person's `channel_order`, rows not in it first, 01 6.16 item 3), the archived ones of 01 6.22
+  /// included; direct messages and channels archived for everyone are not part of the tree.
+  ManualChannelsOfSpaceProvider._({
+    required ManualChannelsOfSpaceFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'manualChannelsOfSpaceProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$manualChannelsOfSpaceHash();
+
+  @override
+  String toString() {
+    return r'manualChannelsOfSpaceProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<List<Channel>> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  List<Channel> create(Ref ref) {
+    final argument = this.argument as String;
+    return manualChannelsOfSpace(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<Channel> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<Channel>>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ManualChannelsOfSpaceProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$manualChannelsOfSpaceHash() =>
+    r'38184866c6f248e1f306eb1fd92287ede45d9223';
+
+/// Every channel and forum of [spaceId] in the person's manual order (the global one in the
+/// person's `channel_order`, rows not in it first, 01 6.16 item 3), the archived ones of 01 6.22
+/// included; direct messages and channels archived for everyone are not part of the tree.
+
+final class ManualChannelsOfSpaceFamily extends $Family
+    with $FunctionalFamilyOverride<List<Channel>, String> {
+  ManualChannelsOfSpaceFamily._()
+    : super(
+        retry: null,
+        name: r'manualChannelsOfSpaceProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Every channel and forum of [spaceId] in the person's manual order (the global one in the
+  /// person's `channel_order`, rows not in it first, 01 6.16 item 3), the archived ones of 01 6.22
+  /// included; direct messages and channels archived for everyone are not part of the tree.
+
+  ManualChannelsOfSpaceProvider call(String spaceId) =>
+      ManualChannelsOfSpaceProvider._(argument: spaceId, from: this);
+
+  @override
+  String toString() => r'manualChannelsOfSpaceProvider';
+}
+
+/// The channels of [spaceId] the person archived in the own sidebar (01 6.22), in the manual
+/// order, each with the row of [ChannelsOfSpace]; they show in the section "Archived (n)" at the
+/// bottom of the space.
+
+@ProviderFor(archivedChannelsOfSpace)
+final archivedChannelsOfSpaceProvider = ArchivedChannelsOfSpaceFamily._();
+
+/// The channels of [spaceId] the person archived in the own sidebar (01 6.22), in the manual
+/// order, each with the row of [ChannelsOfSpace]; they show in the section "Archived (n)" at the
+/// bottom of the space.
+
+final class ArchivedChannelsOfSpaceProvider
+    extends
+        $FunctionalProvider<
+          List<SidebarChannel>,
+          List<SidebarChannel>,
+          List<SidebarChannel>
+        >
+    with $Provider<List<SidebarChannel>> {
+  /// The channels of [spaceId] the person archived in the own sidebar (01 6.22), in the manual
+  /// order, each with the row of [ChannelsOfSpace]; they show in the section "Archived (n)" at the
+  /// bottom of the space.
+  ArchivedChannelsOfSpaceProvider._({
+    required ArchivedChannelsOfSpaceFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'archivedChannelsOfSpaceProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$archivedChannelsOfSpaceHash();
+
+  @override
+  String toString() {
+    return r'archivedChannelsOfSpaceProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<List<SidebarChannel>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  List<SidebarChannel> create(Ref ref) {
+    final argument = this.argument as String;
+    return archivedChannelsOfSpace(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<SidebarChannel> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<SidebarChannel>>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ArchivedChannelsOfSpaceProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$archivedChannelsOfSpaceHash() =>
+    r'ff62bf9c453ffef5c4fab5a7d03a8d290376a145';
+
+/// The channels of [spaceId] the person archived in the own sidebar (01 6.22), in the manual
+/// order, each with the row of [ChannelsOfSpace]; they show in the section "Archived (n)" at the
+/// bottom of the space.
+
+final class ArchivedChannelsOfSpaceFamily extends $Family
+    with $FunctionalFamilyOverride<List<SidebarChannel>, String> {
+  ArchivedChannelsOfSpaceFamily._()
+    : super(
+        retry: null,
+        name: r'archivedChannelsOfSpaceProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The channels of [spaceId] the person archived in the own sidebar (01 6.22), in the manual
+  /// order, each with the row of [ChannelsOfSpace]; they show in the section "Archived (n)" at the
+  /// bottom of the space.
+
+  ArchivedChannelsOfSpaceProvider call(String spaceId) =>
+      ArchivedChannelsOfSpaceProvider._(argument: spaceId, from: this);
+
+  @override
+  String toString() => r'archivedChannelsOfSpaceProvider';
+}
+
+/// The channel rows of [spaceId] in the normal list: counters ([channelCounts]), active run,
+/// muted state, the thread group with its collapse state on this device (01 6.8) and the status
+/// mark (01 6.17 item 6: the most urgent unseen status of its chats while "Show status on
+/// projects" is on, else that of its main history); direct messages, channels archived for
+/// everyone and the channels the person archived in the own sidebar (01 6.22,
+/// [archivedChannelsOfSpaceProvider]) are not part of it.
 ///
 /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
 /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
@@ -1361,22 +1660,24 @@ final class NewChatRowsFamily extends $Family
 @ProviderFor(ChannelsOfSpace)
 final channelsOfSpaceProvider = ChannelsOfSpaceFamily._();
 
-/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state, the
-/// thread group with its collapse state on this device (01 6.8) and the status mark (01 6.17
-/// item 6: the most urgent unseen status of its chats while "Show status on projects" is on,
-/// else that of its main history); direct messages and archived channels are not part of the
-/// tree.
+/// The channel rows of [spaceId] in the normal list: counters ([channelCounts]), active run,
+/// muted state, the thread group with its collapse state on this device (01 6.8) and the status
+/// mark (01 6.17 item 6: the most urgent unseen status of its chats while "Show status on
+/// projects" is on, else that of its main history); direct messages, channels archived for
+/// everyone and the channels the person archived in the own sidebar (01 6.22,
+/// [archivedChannelsOfSpaceProvider]) are not part of it.
 ///
 /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
 /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
 /// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4).
 final class ChannelsOfSpaceProvider
     extends $NotifierProvider<ChannelsOfSpace, List<SidebarChannel>> {
-  /// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state, the
-  /// thread group with its collapse state on this device (01 6.8) and the status mark (01 6.17
-  /// item 6: the most urgent unseen status of its chats while "Show status on projects" is on,
-  /// else that of its main history); direct messages and archived channels are not part of the
-  /// tree.
+  /// The channel rows of [spaceId] in the normal list: counters ([channelCounts]), active run,
+  /// muted state, the thread group with its collapse state on this device (01 6.8) and the status
+  /// mark (01 6.17 item 6: the most urgent unseen status of its chats while "Show status on
+  /// projects" is on, else that of its main history); direct messages, channels archived for
+  /// everyone and the channels the person archived in the own sidebar (01 6.22,
+  /// [archivedChannelsOfSpaceProvider]) are not part of it.
   ///
   /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
   /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
@@ -1425,13 +1726,14 @@ final class ChannelsOfSpaceProvider
   }
 }
 
-String _$channelsOfSpaceHash() => r'fa4f7e527eb150af786270dcad86734e41e575e7';
+String _$channelsOfSpaceHash() => r'e0166556a447a6ca8402526adee9c87c56f6e58f';
 
-/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state, the
-/// thread group with its collapse state on this device (01 6.8) and the status mark (01 6.17
-/// item 6: the most urgent unseen status of its chats while "Show status on projects" is on,
-/// else that of its main history); direct messages and archived channels are not part of the
-/// tree.
+/// The channel rows of [spaceId] in the normal list: counters ([channelCounts]), active run,
+/// muted state, the thread group with its collapse state on this device (01 6.8) and the status
+/// mark (01 6.17 item 6: the most urgent unseen status of its chats while "Show status on
+/// projects" is on, else that of its main history); direct messages, channels archived for
+/// everyone and the channels the person archived in the own sidebar (01 6.22,
+/// [archivedChannelsOfSpaceProvider]) are not part of it.
 ///
 /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
 /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
@@ -1455,11 +1757,12 @@ final class ChannelsOfSpaceFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state, the
-  /// thread group with its collapse state on this device (01 6.8) and the status mark (01 6.17
-  /// item 6: the most urgent unseen status of its chats while "Show status on projects" is on,
-  /// else that of its main history); direct messages and archived channels are not part of the
-  /// tree.
+  /// The channel rows of [spaceId] in the normal list: counters ([channelCounts]), active run,
+  /// muted state, the thread group with its collapse state on this device (01 6.8) and the status
+  /// mark (01 6.17 item 6: the most urgent unseen status of its chats while "Show status on
+  /// projects" is on, else that of its main history); direct messages, channels archived for
+  /// everyone and the channels the person archived in the own sidebar (01 6.22,
+  /// [archivedChannelsOfSpaceProvider]) are not part of it.
   ///
   /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
   /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
@@ -1472,11 +1775,12 @@ final class ChannelsOfSpaceFamily extends $Family
   String toString() => r'channelsOfSpaceProvider';
 }
 
-/// The channel rows of [spaceId]: counters ([channelCounts]), active run, muted state, the
-/// thread group with its collapse state on this device (01 6.8) and the status mark (01 6.17
-/// item 6: the most urgent unseen status of its chats while "Show status on projects" is on,
-/// else that of its main history); direct messages and archived channels are not part of the
-/// tree.
+/// The channel rows of [spaceId] in the normal list: counters ([channelCounts]), active run,
+/// muted state, the thread group with its collapse state on this device (01 6.8) and the status
+/// mark (01 6.17 item 6: the most urgent unseen status of its chats while "Show status on
+/// projects" is on, else that of its main history); direct messages, channels archived for
+/// everyone and the channels the person archived in the own sidebar (01 6.22,
+/// [archivedChannelsOfSpaceProvider]) are not part of it.
 ///
 /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
 /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
@@ -1503,12 +1807,16 @@ abstract class _$ChannelsOfSpace extends $Notifier<List<SidebarChannel>> {
   }
 }
 
-/// The whole tree: the spaces in the person's order with their channel rows.
+/// The whole tree: the spaces in the person's order with their channel rows, the channels the
+/// person archived in the own sidebar (01 6.22) and whether their section is expanded on this
+/// device.
 
 @ProviderFor(sidebarTree)
 final sidebarTreeProvider = SidebarTreeProvider._();
 
-/// The whole tree: the spaces in the person's order with their channel rows.
+/// The whole tree: the spaces in the person's order with their channel rows, the channels the
+/// person archived in the own sidebar (01 6.22) and whether their section is expanded on this
+/// device.
 
 final class SidebarTreeProvider
     extends
@@ -1518,7 +1826,9 @@ final class SidebarTreeProvider
           List<SidebarSpaceNode>
         >
     with $Provider<List<SidebarSpaceNode>> {
-  /// The whole tree: the spaces in the person's order with their channel rows.
+  /// The whole tree: the spaces in the person's order with their channel rows, the channels the
+  /// person archived in the own sidebar (01 6.22) and whether their section is expanded on this
+  /// device.
   SidebarTreeProvider._()
     : super(
         from: null,
@@ -1553,7 +1863,7 @@ final class SidebarTreeProvider
   }
 }
 
-String _$sidebarTreeHash() => r'b68c524e27cfd43f5c0327212ee4a0d534cb5624';
+String _$sidebarTreeHash() => r'806b166003f00375b3e6a2dc37e4e8b394e229fc';
 
 /// The signed-in person as the engine's last snapshot named it, with name and avatar from
 /// the local database; null before the first snapshot of this process.

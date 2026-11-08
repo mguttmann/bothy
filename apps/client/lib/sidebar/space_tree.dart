@@ -44,7 +44,16 @@ class SpaceTree extends StatelessWidget {
     this.touch = false,
     this.onMoveChannel,
     this.onMoveThread,
+    this.onSetHidden,
+    this.onToggleArchived,
   });
+
+  /// Archives (true) or restores (false) a channel in the person's own sidebar (01 6.22), or
+  /// null for no such entry.
+  final void Function(ChannelId channel, bool hidden)? onSetHidden;
+
+  /// Expands (true) or collapses the section "Archived (n)" of a space on this device, or null.
+  final void Function(SpaceId space, bool expanded)? onToggleArchived;
 
   /// Which levels are arranged by activity (01 6.16): an automatic level cannot be dragged.
   final SidebarArrangement arrangement;
@@ -163,6 +172,10 @@ class SpaceTree extends StatelessWidget {
                   ? null
                   : (channel, to) => onMoveChannel!(id, channel, to),
               onMoveThread: onMoveThread,
+              onSetHidden: onSetHidden,
+              onToggleArchived: onToggleArchived == null
+                  ? null
+                  : (expanded) => onToggleArchived!(id, expanded),
               // The space row starts the drag of the space; on a touch screen after a long
               // press, so a swipe scrolls the list (D-M4-51-6). An automatic level shows the
               // note instead.

@@ -290,7 +290,8 @@ Future<List<LevelTreeSpace>> levelTree(Ref ref) async {
       LevelTreeSpace(
         space: node.entry.space,
         channels: [
-          for (final c in node.channels)
+          // A channel archived in the own sidebar keeps its levels (01 6.22 item 4).
+          for (final c in [...node.channels, ...node.archived])
             LevelTreeChannel(
               channel: c.channel,
               threads: threadsByChannel[c.channel.id] ?? const [],

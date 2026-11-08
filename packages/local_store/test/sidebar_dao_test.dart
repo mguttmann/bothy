@@ -203,6 +203,59 @@ void main() {
     expect(all.firstWhere((s) => s.channelId == other).threadOrder, isEmpty);
   });
 
+  test(
+    'the personal archive of a channel: a local write keeps the order, the '
+    'version and the device; the server state carries it (PROJ-ARCHIVE)',
+    () async {
+      final dao = db.structureDao;
+      final forum = ChannelId.parse(uuid(0x601));
+      final fresh = ChannelId.parse(uuid(0x602));
+      final device = DeviceId.parse(uuid(0x603));
+      final at = DateTime.utc(2026, 11, 8, 9, 30);
+      final server = UserChannelState(
+        channelId: forum,
+        threadOrder: [threadId(2), threadId(1)],
+        version: const ResourceVersion(4),
+        updatedByDeviceId: device,
+      );
+      await dao.upsertUserChannelStateIfNewer(server);
+
+      await dao.putUserChannelHiddenLocally(forum, hiddenAt: at);
+      final hidden = (await dao.watchUserChannelStates().first).single;
+      expect(hidden.hiddenAt, at);
+      expect(hidden.threadOrder, server.threadOrder);
+      expect(hidden.version, server.version);
+      expect(hidden.updatedByDeviceId, device);
+
+      await dao.putUserChannelHiddenLocally(forum, hiddenAt: null);
+      expect((await dao.watchUserChannelStates().first).single, server);
+
+      // A channel without a row starts at version 0 with the default order.
+      await dao.putUserChannelHiddenLocally(fresh, hiddenAt: at);
+      final row = (await dao.watchUserChannelStates().first).firstWhere(
+        (s) => s.channelId == fresh,
+      );
+      expect(row.version, const ResourceVersion(0));
+      expect(row.threadOrder, isEmpty);
+      expect(row.hidden, isTrue);
+
+      // The server's state of another device wins by version and brings its archive.
+      final other = UserChannelState(
+        channelId: forum,
+        threadOrder: server.threadOrder,
+        version: const ResourceVersion(5),
+        hiddenAt: at,
+      );
+      expect(await dao.upsertUserChannelStateIfNewer(other), isTrue);
+      expect(
+        (await dao.watchUserChannelStates().first).firstWhere(
+          (s) => s.channelId == forum,
+        ),
+        other,
+      );
+    },
+  );
+
   test('a resync discards the personal sidebar orders: they are mirror '
       'tables (M4-51)', () {
     expect([
@@ -494,6 +547,26 @@ void main() {
       for (final t in db.mirrorTables) t.actualTableName,
     ], isNot(contains('space_view_states')));
   });
+
+  test(
+    'the section "Archived" of a space is collapsed by default and kept on '
+    'this device apart from the collapse of the space (PROJ-ARCHIVE)',
+    () async {
+      final spaceB = SpaceId.parse(uuid(0x103));
+      final dao = db.forumViewDao;
+      expect(await dao.watchArchivedExpandedSpaces().first, isEmpty);
+      await dao.setSpaceCollapsed(spaceA, collapsed: true);
+      await dao.setArchivedExpanded(spaceA, expanded: true);
+      await dao.setArchivedExpanded(spaceB, expanded: true);
+      expect(await dao.watchArchivedExpandedSpaces().first, {spaceA, spaceB});
+      // Neither write changes the collapse of the space, and a new row is an expanded space.
+      expect(await dao.watchCollapsedSpaces().first, {spaceA});
+      await dao.setSpaceCollapsed(spaceA, collapsed: false);
+      expect(await dao.watchArchivedExpandedSpaces().first, {spaceA, spaceB});
+      await dao.setArchivedExpanded(spaceA, expanded: false);
+      expect(await dao.watchArchivedExpandedSpaces().first, {spaceB});
+    },
+  );
 
   test('a resync keeps the group and overview state: they are no mirror '
       'tables', () {

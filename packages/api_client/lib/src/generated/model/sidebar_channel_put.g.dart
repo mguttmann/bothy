@@ -8,13 +8,15 @@ part of 'sidebar_channel_put.dart';
 
 class _$SidebarChannelPut extends SidebarChannelPut {
   @override
-  final BuiltList<String> threadOrder;
+  final BuiltList<String>? threadOrder;
+  @override
+  final bool? hidden;
 
   factory _$SidebarChannelPut([
     void Function(SidebarChannelPutBuilder)? updates,
   ]) => (SidebarChannelPutBuilder()..update(updates))._build();
 
-  _$SidebarChannelPut._({required this.threadOrder}) : super._();
+  _$SidebarChannelPut._({this.threadOrder, this.hidden}) : super._();
   @override
   SidebarChannelPut rebuild(void Function(SidebarChannelPutBuilder) updates) =>
       (toBuilder()..update(updates)).build();
@@ -26,22 +28,26 @@ class _$SidebarChannelPut extends SidebarChannelPut {
   @override
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
-    return other is SidebarChannelPut && threadOrder == other.threadOrder;
+    return other is SidebarChannelPut &&
+        threadOrder == other.threadOrder &&
+        hidden == other.hidden;
   }
 
   @override
   int get hashCode {
     var _$hash = 0;
     _$hash = $jc(_$hash, threadOrder.hashCode);
+    _$hash = $jc(_$hash, hidden.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
 
   @override
   String toString() {
-    return (newBuiltValueToStringHelper(
-      r'SidebarChannelPut',
-    )..add('threadOrder', threadOrder)).toString();
+    return (newBuiltValueToStringHelper(r'SidebarChannelPut')
+          ..add('threadOrder', threadOrder)
+          ..add('hidden', hidden))
+        .toString();
   }
 }
 
@@ -55,6 +61,10 @@ class SidebarChannelPutBuilder
   set threadOrder(ListBuilder<String>? threadOrder) =>
       _$this._threadOrder = threadOrder;
 
+  bool? _hidden;
+  bool? get hidden => _$this._hidden;
+  set hidden(bool? hidden) => _$this._hidden = hidden;
+
   SidebarChannelPutBuilder() {
     SidebarChannelPut._defaults(this);
   }
@@ -62,7 +72,8 @@ class SidebarChannelPutBuilder
   SidebarChannelPutBuilder get _$this {
     final $v = _$v;
     if ($v != null) {
-      _threadOrder = $v.threadOrder.toBuilder();
+      _threadOrder = $v.threadOrder?.toBuilder();
+      _hidden = $v.hidden;
       _$v = null;
     }
     return this;
@@ -84,12 +95,17 @@ class SidebarChannelPutBuilder
   _$SidebarChannelPut _build() {
     _$SidebarChannelPut _$result;
     try {
-      _$result = _$v ?? _$SidebarChannelPut._(threadOrder: threadOrder.build());
+      _$result =
+          _$v ??
+          _$SidebarChannelPut._(
+            threadOrder: _threadOrder?.build(),
+            hidden: hidden,
+          );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'threadOrder';
-        threadOrder.build();
+        _threadOrder?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'SidebarChannelPut',

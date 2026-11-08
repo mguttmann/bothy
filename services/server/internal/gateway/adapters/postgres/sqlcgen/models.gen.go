@@ -1214,6 +1214,7 @@ type UserChannelState struct {
 	Version           int64
 	UpdatedByDeviceID pgtype.UUID
 	UpdatedAt         pgtype.Timestamptz
+	HiddenAt          pgtype.Timestamptz
 }
 
 type UserIdentity struct {

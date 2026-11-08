@@ -1003,14 +1003,16 @@ SET NULL. Indexes: covered by the PK. Retention: `personal_sync`.
 
 #### `user_channel_states`
 
-Purpose: personal sidebar state per channel (the own order of the open posts of a forum), across
-devices (M4-51). Module: `chat`.
+Purpose: personal sidebar state per channel (the own order of the open posts of a forum, and
+whether the person archived the channel in the own sidebar), across devices (M4-51; archive:
+addendum of 2026-11-08, PROJ-ARCHIVE). Module: `chat`.
 
 | Field | Type | Null | Default | Rules / notes |
 |---|---|---|---|---|
 | `user_id` | `uuid` | no | | |
 | `channel_id` | `uuid` | no | | |
 | `thread_order` | `uuid[]` | no | `'{}'` | personal order of the posts; empty = the default order (last activity, newest first); posts not in the list come first in the default order; at most `sidebar.order_max_items` unique IDs, which the server does not check against existing or visible threads |
+| `hidden_at` | `timestamptz` | yes | | set while the person has archived the channel in the own sidebar (01 6.22), NULL while it shows in the normal list; set by `putMySidebarChannel` with `hidden: true` (kept when already set), cleared with `hidden: false`; personal only: it changes neither the channel, its rights, its runs nor the person's notifications, and the person's `channel_order` (`user_space_states`) is not touched, so a restored channel returns to its place |
 | `version` | `bigint` | no | `1` | for the rule see [04-sync-protocol.md](04-sync-protocol.md) |
 | `updated_by_device_id` | `uuid` | yes | | |
 | `updated_at` | `timestamptz` | no | `now()` | |

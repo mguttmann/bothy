@@ -2770,18 +2770,18 @@ type ClientInterface interface {
 	// Corresponds with GET /me/sidebar (the `GetMySidebar` operationId).
 	GetMySidebar(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PutMySidebarChannelWithBody Reorder the posts of a channel for oneself
+	// PutMySidebarChannelWithBody Reorder the posts of a channel or archive it for oneself
 	//
-	// Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last write wins, no If-Match; an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+	// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order) and whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /me/sidebar/channels/{channel_id} (the `PutMySidebarChannel` operationId).
 	PutMySidebarChannelWithBody(ctx context.Context, channelId ChannelIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PutMySidebarChannel Reorder the posts of a channel for oneself
+	// PutMySidebarChannel Reorder the posts of a channel or archive it for oneself
 	//
-	// Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last write wins, no If-Match; an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+	// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order) and whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10325,9 +10325,9 @@ func (c *Client) GetMySidebar(ctx context.Context, reqEditors ...RequestEditorFn
 	return c.Client.Do(req)
 }
 
-// PutMySidebarChannelWithBody Reorder the posts of a channel for oneself
+// PutMySidebarChannelWithBody Reorder the posts of a channel or archive it for oneself
 //
-// Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last write wins, no If-Match; an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order) and whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
 //
 // Takes any type of body and a specified content type.
 //
@@ -10344,9 +10344,9 @@ func (c *Client) PutMySidebarChannelWithBody(ctx context.Context, channelId Chan
 	return c.Client.Do(req)
 }
 
-// PutMySidebarChannel Reorder the posts of a channel for oneself
+// PutMySidebarChannel Reorder the posts of a channel or archive it for oneself
 //
-// Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last write wins, no If-Match; an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order) and whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -21654,78 +21654,4 @@ func NewPairHostRequest(server string, body PairHostJSONRequestBody) (*http.Requ
 	}
 	bodyReader = bytes.NewReader(buf)
 	return NewPairHostRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewPairHostRequestWithBody constructs an http.Request for the PairHost method, with any body, and a specified content type
-func NewPairHostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/hosts/pair")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewGetHostRequest constructs an http.Request for the GetHost method
-func NewGetHostRequest(server string, hostId HostIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "host_id", hostId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/hosts/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewUpdateHostRequest calls the generic UpdateHost builder with application/json body
-func NewUpdateHostRequest(server string, hostId HostIdPath, params *UpdateHostParams, body UpdateHostJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUpdateHostRequestWithBody(server, hostId, params, "application/json", bodyReader)
 }

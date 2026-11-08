@@ -71,7 +71,7 @@ func newPersonalWorld(t *testing.T) personalWorld {
 	exec(`INSERT INTO user_space_states (user_id, space_id) VALUES ($1, $2), ($3, $2)`, w.alex, w.finance, w.sam)
 	exec(`INSERT INTO channels (id, space_id, kind, name, sort_key, history_backfill_limit, created_by)
 		VALUES ($1, $2, 'forum', 'Projects', 'a', 20, $3)`, w.forum, w.support, w.sam)
-	exec(`INSERT INTO user_channel_states (user_id, channel_id, thread_order, updated_by_device_id) VALUES ($1, $2, ARRAY[$3::uuid], $4)`,
+	exec(`INSERT INTO user_channel_states (user_id, channel_id, thread_order, hidden_at, updated_by_device_id) VALUES ($1, $2, ARRAY[$3::uuid], now(), $4)`,
 		w.alex, w.forum, w.post, device)
 	exec(`INSERT INTO user_channel_states (user_id, channel_id) VALUES ($1, $2)`, w.sam, w.forum)
 	w.count = func(user ids.ID) int {
@@ -165,7 +165,7 @@ func TestPersonalDataExport(t *testing.T) {
 		t.Fatal(err)
 	}
 	if order, _ := chans[0]["thread_order"].([]any); len(chans) != 1 || chans[0]["channel_id"] != w.forum.String() || len(order) != 1 ||
-		order[0] != w.post.String() || chans[0]["updated_by_device_id"] == nil {
+		order[0] != w.post.String() || chans[0]["updated_by_device_id"] == nil || chans[0]["hidden_at"] == nil {
 		t.Fatalf("sidebar_channels %s", rawChans)
 	}
 

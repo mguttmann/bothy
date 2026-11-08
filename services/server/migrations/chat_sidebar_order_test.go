@@ -38,6 +38,8 @@ func TestChatSidebarOrderMigration_Schema(t *testing.T) {
 		{"version", "bigint", false, "1"},
 		{"updated_by_device_id", "uuid", true, ""},
 		{"updated_at", ts, false, "now()"},
+		// PROJ-ARCHIVE (migration 00102): the personal archive of the channel, shown by default.
+		{"hidden_at", ts, true, ""},
 	}
 	if got := principalColumns(t, conn, "user_channel_states"); !reflect.DeepEqual(got, want) {
 		t.Errorf("user_channel_states columns:\n got %+v\nwant %+v", got, want)

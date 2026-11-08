@@ -226,6 +226,11 @@ class SpaceViewStates extends Table {
   /// Whether the space is collapsed.
   BoolColumn get collapsed => boolean()();
 
+  /// Whether the section "Archived (n)" at the bottom of the space is expanded on this device
+  /// (01 6.22 item 2, PROJ-ARCHIVE); collapsed by default, like the Done section of a forum.
+  BoolColumn get archivedExpanded =>
+      boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column<Object>> get primaryKey => {spaceId};
 }

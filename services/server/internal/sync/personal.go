@@ -159,13 +159,16 @@ type SidebarState struct {
 	UpdatedByDeviceID ids.ID
 }
 
-// SidebarChannelState is the personal post order of one channel (schema SidebarChannelState,
-// M4-51).
+// SidebarChannelState is the personal post order of one channel and its personal archive (schema
+// SidebarChannelState, M4-51 and PROJ-ARCHIVE).
 type SidebarChannelState struct {
 	ChannelID ids.ID
 	// ThreadOrder is the personal order of the posts; empty is the default order.
 	ThreadOrder []ids.ID
-	Version     int64
+	// HiddenAt is set while the person has archived the channel in the own sidebar (01 6.22);
+	// zero while it shows.
+	HiddenAt time.Time
+	Version  int64
 	// UpdatedByDeviceID is the device of the last change; zero for none.
 	UpdatedByDeviceID ids.ID
 }

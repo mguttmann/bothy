@@ -78,6 +78,7 @@ UserChannelStatesCompanion userChannelStateToCompanion(
   threadOrder: Value(encodeTexts(state.threadOrder)),
   version: state.version.value,
   updatedByDeviceId: Value(state.updatedByDeviceId?.value),
+  hiddenAt: Value(state.hiddenAt?.toUtc()),
 );
 
 /// The channel sidebar state of [row].
@@ -87,6 +88,7 @@ UserChannelState userChannelStateFromRow(UserChannelStateRow row) =>
       threadOrder: decodeTexts(row.threadOrder, ThreadId.parse),
       version: ResourceVersion(row.version),
       updatedByDeviceId: optional(row.updatedByDeviceId, DeviceId.parse),
+      hiddenAt: row.hiddenAt?.toUtc(),
     );
 
 /// The insert companion of [channel]; `level` and `capabilities` stay as stored.

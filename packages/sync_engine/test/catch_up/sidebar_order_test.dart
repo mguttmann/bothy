@@ -38,9 +38,11 @@ void main() {
     required int version,
     required List<String> threadOrder,
     String? device,
+    String? hiddenAt,
   }) => {
     'channel_id': channel,
     'thread_order': threadOrder,
+    'hidden_at': ?hiddenAt,
     'version': version,
     'updated_by_device_id': ?device,
   };
@@ -198,5 +200,62 @@ void main() {
   test('a snapshot of an older server without sidebar_channels', () {
     final s = snapshotFromJson(snapshotJson()..remove('sidebar_channels'));
     expect(s.sidebarChannels, isEmpty);
+  });
+
+  test('the personal archive of a channel (PROJ-ARCHIVE): hidden_at maps, '
+      'sidebar_channel.updated of another device archives and restores, and a '
+      'snapshot carries it', () async {
+    const at = '2026-11-08T09:30:00.000Z';
+    expect(
+      sidebarChannelFromJson(
+        channelState(channelId(1), version: 2, threadOrder: [], hiddenAt: at),
+      ).hiddenAt,
+      DateTime.utc(2026, 11, 8, 9, 30),
+    );
+    expect(
+      sidebarChannelFromJson(
+        channelState(channelId(1), version: 2, threadOrder: []),
+      ).hidden,
+      isFalse,
+    );
+
+    await w.connect(cursor: 40);
+    await w.dispatch([
+      sidebarChannelUpdated(
+        41,
+        channelState(
+          channelId(1),
+          version: 3,
+          threadOrder: [threadId(1)],
+          device: otherDevice,
+          hiddenAt: at,
+        ),
+      ),
+    ]);
+    await w.push('cursor', {'seq': 41});
+    expect((await channelRows()).single.hidden, isTrue);
+    expect((await channelRows()).single.threadOrder, [t1]);
+
+    await w.dispatch([
+      sidebarChannelUpdated(
+        42,
+        channelState(
+          channelId(1),
+          version: 4,
+          threadOrder: [threadId(1)],
+          device: otherDevice,
+        ),
+      ),
+    ]);
+    await w.push('cursor', {'seq': 42});
+    expect((await channelRows()).single.hidden, isFalse);
+
+    final s = snapshotFromJson(
+      snapshotJson()
+        ..['sidebar_channels'] = [
+          channelState(channelId(2), version: 1, threadOrder: [], hiddenAt: at),
+        ],
+    );
+    expect(s.sidebarChannels.single.hidden, isTrue);
   });
 }

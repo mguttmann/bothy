@@ -259,6 +259,37 @@ void main() {
       );
     });
 
+    test('archived channels (01 6.22): rows while their section is expanded, '
+        'and an unread one is always reachable', () {
+      SidebarSpaceNode node({required bool open}) => SidebarSpaceNode(
+        entry: SidebarSpace(space: space(1)),
+        channels: [ch(1)],
+        archived: [ch(5, unread: 2), ch(6)],
+        archivedExpanded: open,
+      );
+      expect(node(open: false).manualOrder, [
+        channelId(1),
+        channelId(5),
+        channelId(6),
+      ]);
+      expect(node(open: false).rowData.hasUnread, isTrue);
+      expect(
+        neighbourTarget([node(open: false)], at(1), forward: true),
+        isNull,
+      );
+      expect(neighbourTarget([node(open: true)], at(1), forward: true), at(5));
+      expect(neighbourTarget([node(open: true)], at(6), forward: true), at(1));
+      expect(
+        neighbourTarget(
+          [node(open: false)],
+          at(1),
+          forward: true,
+          unreadOnly: true,
+        ),
+        at(5),
+      );
+    });
+
     // M4-40: thread rows of expanded groups are rows of the tree (01 7, 6.8; D-SB-8).
     SidebarChannel grouped(
       int n,

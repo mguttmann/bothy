@@ -14,8 +14,9 @@ ORDER BY space_id;
 DELETE FROM user_space_states WHERE user_id = @user_id;
 
 -- name: ListPersonalSidebarChannels :many
--- Every channel row of the person for the export (M4-51), archived channels included, by channel.
-SELECT channel_id, thread_order, updated_by_device_id, updated_at FROM user_channel_states
+-- Every channel row of the person for the export (M4-51), archived channels included, by channel;
+-- hidden_at is the person's own archive of the channel in the sidebar (PROJ-ARCHIVE).
+SELECT channel_id, thread_order, hidden_at, updated_by_device_id, updated_at FROM user_channel_states
 WHERE user_id = @user_id
 ORDER BY channel_id;
 

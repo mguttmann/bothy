@@ -98,7 +98,7 @@ class LocalDatabase extends _$LocalDatabase {
   final DateTime Function() clock;
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   /// Closes the database and releases its file, also while watched queries come and go.
   ///
@@ -215,6 +215,22 @@ class LocalDatabase extends _$LocalDatabase {
         await m.createTable(schema.runWakes);
         await m.createIndex(schema.runWakesThread);
         await m.addColumn(schema.channels, schema.channels.allowAutonomousRuns);
+        await MigrationRules.resetCursor(m);
+      },
+      // Version 15 (PROJ-ARCHIVE): the column `user_channel_states.hidden_at` of the mirror, null
+      // (shown) in every kept row, and the local-only `space_view_states.archived_expanded`,
+      // false (the section "Archived (n)" collapsed); no row moves. The cursor goes, so the next
+      // connection loads a whole snapshot with the archives other devices wrote before this
+      // upgrade (04 7.3).
+      from14To15: (m, schema) async {
+        await m.addColumn(
+          schema.userChannelStates,
+          schema.userChannelStates.hiddenAt,
+        );
+        await m.addColumn(
+          schema.spaceViewStates,
+          schema.spaceViewStates.archivedExpanded,
+        );
         await MigrationRules.resetCursor(m);
       },
     ),

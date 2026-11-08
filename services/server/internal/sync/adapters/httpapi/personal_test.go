@@ -786,6 +786,17 @@ func TestGetMySidebarChannels(t *testing.T) {
 	if _, has := items[0].(map[string]any)["channel_order"]; has {
 		t.Fatalf("the default order must be absent: %v", items[0])
 	}
+	// PROJ-ARCHIVE: the personal archive of a channel reaches every device through getMySidebar.
+	if _, has := c["hidden_at"]; has {
+		t.Fatalf("a shown channel must have no hidden_at: %v", c)
+	}
+	e.Want(e.Do("alex", http.MethodPut, "/api/v1/me/sidebar/channels/"+e.forum.String(), `{"hidden":true}`), http.StatusOK, "")
+	m = e.Want(e.Do("alex", http.MethodGet, "/api/v1/me/sidebar", ""), http.StatusOK, "")
+	chans, _ = m["channels"].([]any)
+	c, _ = chans[0].(map[string]any)
+	if order, _ := c["thread_order"].([]any); c["hidden_at"] == nil || len(order) != 1 || c["version"] != float64(2) {
+		t.Fatalf("archived channel row %v", c)
+	}
 }
 
 // TestPersonalOperationsRejectAgentToken: an agent with write on the space gets 403

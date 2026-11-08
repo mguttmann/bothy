@@ -226,12 +226,29 @@ func (r *Repository) PutSidebarChannelState(ctx context.Context, st domain.Sideb
 	}
 	row, err := q.UpsertSidebarChannelState(ctx, sqlcgen.UpsertSidebarChannelStateParams{
 		UserID: uuid(st.UserID), ChannelID: uuid(st.ChannelID), ThreadOrder: uuids(st.ThreadOrder),
-		UpdatedByDeviceID: optionalUUID(st.UpdatedByDeviceID),
+		HiddenAt: optionalTime(st.HiddenAt), UpdatedByDeviceID: optionalUUID(st.UpdatedByDeviceID),
 	})
 	if err != nil {
 		return domain.SidebarChannelState{}, mapError(err, "writing a sidebar channel state")
 	}
 	return toSidebarChannel(row), nil
+}
+
+// SidebarChannelState implements app.Store (PROJ-ARCHIVE): the row of user for channel, read in
+// the unit of work of the write.
+func (r *Repository) SidebarChannelState(ctx context.Context, user, channel ids.ID) (domain.SidebarChannelState, bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return domain.SidebarChannelState{}, false, err
+	}
+	row, err := q.GetSidebarChannelState(ctx, sqlcgen.GetSidebarChannelStateParams{UserID: uuid(user), ChannelID: uuid(channel)})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.SidebarChannelState{}, false, nil
+	}
+	if err != nil {
+		return domain.SidebarChannelState{}, false, mapError(err, "reading a sidebar channel state")
+	}
+	return toSidebarChannel(row), true, nil
 }
 
 // SidebarChannelStates implements app.Store (M4-51).
@@ -286,7 +303,7 @@ func toSidebar(row sqlcgen.UserSpaceState) domain.SidebarState {
 func toSidebarChannel(row sqlcgen.UserChannelState) domain.SidebarChannelState {
 	return domain.SidebarChannelState{
 		UserID: idOf(row.UserID), ChannelID: idOf(row.ChannelID), ThreadOrder: idsOf(row.ThreadOrder),
-		Version: row.Version, UpdatedByDeviceID: idOf(row.UpdatedByDeviceID),
+		HiddenAt: timeOf(row.HiddenAt), Version: row.Version, UpdatedByDeviceID: idOf(row.UpdatedByDeviceID),
 	}
 }
 

@@ -9,6 +9,70 @@ import (
 	"net/http"
 )
 
+// UnregisterPushResponse403Headers the declared response headers of an HTTP 403 response for UnregisterPush
+type UnregisterPushResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UnregisterPushResponse404Headers the declared response headers of an HTTP 404 response for UnregisterPush
+type UnregisterPushResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UnregisterPushResponse429Headers the declared response headers of an HTTP 429 response for UnregisterPush
+type UnregisterPushResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// UnregisterPushResponseDefaultHeaders the declared response headers of an HTTP default response for UnregisterPush
+type UnregisterPushResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type UnregisterPushResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers204 the parsed response headers for an HTTP 204 response
+	Headers204 *UnregisterPushResponse204Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *UnregisterPushResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UnregisterPushResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *UnregisterPushResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *UnregisterPushResponse404Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *UnregisterPushResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *UnregisterPushResponseDefaultHeaders
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UnregisterPushResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UnregisterPushResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
 // GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
 func (r UnregisterPushResponse) GetApplicationproblemJSON403() *Forbidden {
 	return r.ApplicationproblemJSON403
@@ -20915,9 +20979,9 @@ func (c *ClientWithResponses) GetMySidebarWithResponse(ctx context.Context, reqE
 	return ParseGetMySidebarResponse(rsp)
 }
 
-// PutMySidebarChannelWithBodyWithResponse Reorder the posts of a channel for oneself
+// PutMySidebarChannelWithBodyWithResponse Reorder the posts of a channel or archive it for oneself
 //
-// Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last write wins, no If-Match; an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order) and whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -20930,9 +20994,9 @@ func (c *ClientWithResponses) PutMySidebarChannelWithBodyWithResponse(ctx contex
 	return ParsePutMySidebarChannelResponse(rsp)
 }
 
-// PutMySidebarChannelWithResponse Reorder the posts of a channel for oneself
+// PutMySidebarChannelWithResponse Reorder the posts of a channel or archive it for oneself
 //
-// Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last write wins, no If-Match; an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order) and whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -22298,49 +22362,4 @@ func (c *ClientWithResponses) GetCostStatsWithResponse(ctx context.Context, para
 		return nil, err
 	}
 	return ParseGetCostStatsResponse(rsp)
-}
-
-// GetErrorStatsWithResponse Error rates of runs and deliveries
-//
-// Metrics per bucket: `run_failure_rate` (failed per ended runs), `invocation_denials` (messages refused with `billing_mode_personal_not_holder` plus runs failed with `billing_mode_mismatch`); only for the instance (owner, without `space_id`): `webhook_failure_rate` (`failed` and `dead` per finished deliveries still within their retention), `push_failure_rate_<provider>` (registrations disabled for a provider reason per registrations active in the bucket), `scan_errors` and `scan_infected`; these have no channel and count the whole instance. A rate without a denominator is left out. Without `space_id` there is no `group_key`; with `space_id` it is the space ID. HTTP error rates come from telemetry, not from this API. Authorized with `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`. Every number of a channel counts only the channels the caller may read (`message.read`), intersected with the space; channels without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from` and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >= to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per caller scope for `stats.cache_ttl`.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /stats/errors (the `GetErrorStats` operationId).
-func (c *ClientWithResponses) GetErrorStatsWithResponse(ctx context.Context, params *GetErrorStatsParams, reqEditors ...RequestEditorFn) (*GetErrorStatsResponse, error) {
-	rsp, err := c.GetErrorStats(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetErrorStatsResponse(rsp)
-}
-
-// GetStatsLiveWithResponse Current live frame
-//
-// The latest live frame (`StatsLiveFrame`) of the instance or of one space, the same frame the gateway sends as `stats.live` (docs/spec/25-visualization.md, section 5). The server returns the base frame built for the current `stats.live_interval`; polling does not rebuild it. Filtered to the channels visible to the caller; cost members only with `cost.read.aggregate`. `403 feature_disabled` when `stats.live_enabled` is off.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /stats/live (the `GetStatsLive` operationId).
-func (c *ClientWithResponses) GetStatsLiveWithResponse(ctx context.Context, params *GetStatsLiveParams, reqEditors ...RequestEditorFn) (*GetStatsLiveResponse, error) {
-	rsp, err := c.GetStatsLive(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetStatsLiveResponse(rsp)
-}
-
-// GetRunStatsWithResponse Runs per agent
-//
-// Metrics per agent and bucket of the end of a run: `runs`, `completed`, `failed`, `cancelled`, `duration_ms_p50`, `duration_ms_p95` (from start to end of the runs that started), and `failed_reason_<code>` for every `state_reason` code of failed runs that occurs. Grouped by agent (`group_key` is the agent ID). Authorized with `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`. Every number of a channel counts only the channels the caller may read (`message.read`), intersected with the space; channels without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from` and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >= to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per caller scope for `stats.cache_ttl`.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /stats/runs (the `GetRunStats` operationId).
-func (c *ClientWithResponses) GetRunStatsWithResponse(ctx context.Context, params *GetRunStatsParams, reqEditors ...RequestEditorFn) (*GetRunStatsResponse, error) {
-	rsp, err := c.GetRunStats(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetRunStatsResponse(rsp)
 }
