@@ -318,13 +318,22 @@ def _hostname(host: str) -> str:
     return host.rsplit(":", 1)[0] if ":" in host else host
 
 
+def expands_variable(s: str) -> bool:
+    """Report whether `s` holds ``${``, the start of a CLI variable reference.
+
+    The Claude Code CLI substitutes it in the url, headers, args and env of an MCP server from
+    its own environment (26 4.2).
+    """
+    return "${" in s
+
+
 def valid_url(u: str) -> bool:
-    """Report whether `u` is an https URL with a host, without user information and fragment.
+    """Report whether `u` is an https URL with a host, no user information, fragment or ``${``.
 
     Read as Go's url.Parse reads it: a control character, an invalid percent escape, a bad
     port or a character outside the host set fails; the scheme compares without case.
     """
-    if "#" in u or any(ord(c) < 0x20 or ord(c) == 0x7F for c in u):
+    if "#" in u or expands_variable(u) or any(ord(c) < 0x20 or ord(c) == 0x7F for c in u):
         return False
     m = _SCHEME.fullmatch(u)
     if m is None or m.group(1).lower() != "https":
@@ -593,8 +602,8 @@ class _Checker:
             ap = _at(p, "args")
             for i, v in enumerate(args):
                 a = self.str_value(_index(ap, i), v)
-                if a is not None:
-                    self.display(_index(ap, i), a)
+                if a is not None and self.display(_index(ap, i), a) and expands_variable(a):
+                    self.add(_index(ap, i), INVALID)
         self.entries(p, m, "env", valid_env_name, fold=False, reserved=reserved_env)
         if self.rank < TOOL_CLASSES.index("host") + 1:
             self.add(_at(p, "transport"), TOOL_CLASS_TOO_LOW)
@@ -635,7 +644,8 @@ class _Checker:
             vp = _at(p, "value")
             v = self.str_value(vp, m["value"])
             if v is not None:
-                self.display(vp, v)
+                if self.display(vp, v) and expands_variable(v):
+                    self.add(vp, INVALID)
                 if secret_name(name):
                     self.add(vp, SECRET_VALUE_NOT_ALLOWED)
             return

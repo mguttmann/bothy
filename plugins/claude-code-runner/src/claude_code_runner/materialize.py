@@ -40,7 +40,7 @@ from typing import Any
 from uuid import UUID
 
 from claude_code_runner.definition import Definition, Entry, McpServer
-from claude_code_runner.secrets import SecretError, SecretRef, parse_secret_ref, resolve
+from claude_code_runner.secrets import SecretError, parse_secret_ref, read_open_file
 from claude_code_runner.statedir import write_private
 
 __all__ = [
@@ -269,7 +269,9 @@ def definition_resolver(
     link, in ``<secrets_dir>/<agent_id>/`` (that subfolder itself never a link); never ``env:``
     (the runner's own environment), never another agent's folder and never one of ``refused``
     (the runner's own credentials). Without
-    ``secrets_dir`` no reference resolves. The file is then read as any ``secret_ref`` (16 5.2).
+    ``secrets_dir`` no reference resolves. The file is opened below the subfolder without
+    following a link, must have one hard link (a second name may lie outside) and is then read
+    as any ``secret_ref`` (16 5.2).
 
     Args:
         secrets_dir: ``runner.hosted_secrets_dir``.
@@ -299,12 +301,50 @@ def definition_resolver(
             raise MaterializeError("secret_unavailable") from None
         if not inside or own:
             raise MaterializeError("secret_out_of_scope")
+        fd = _open_below(scope, real.relative_to(scope).parts)
         try:
-            return resolve(SecretRef("file", str(real))).reveal()
+            # A hard link has no path to resolve: a second name may lie outside the scope.
+            single = os.fstat(fd).st_nlink == 1
+        except OSError:
+            os.close(fd)
+            raise MaterializeError("secret_unavailable") from None
+        if not single:
+            os.close(fd)
+            raise MaterializeError("secret_out_of_scope")
+        try:
+            return read_open_file(fd).reveal()
         except SecretError:
             raise MaterializeError("secret_unavailable") from None
 
     return resolve_value
+
+
+def _open_below(scope: Path, parts: Sequence[str]) -> int:
+    """Open the file ``scope/<parts>`` for reading without following any link.
+
+    Each step opens one name relative to the folder opened before (``O_NOFOLLOW``), so a link
+    swapped in after the scope check fails the open instead of leaving the scope (issue 575).
+
+    Raises:
+        MaterializeError: ``secret_unavailable`` when a step fails or ``parts`` is empty.
+    """
+    if not parts:
+        raise MaterializeError("secret_unavailable")
+    folder = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    try:
+        fd = os.open(scope, folder)
+    except OSError:
+        raise MaterializeError("secret_unavailable") from None
+    try:
+        for part in parts[:-1]:
+            step = os.open(part, folder, dir_fd=fd)
+            os.close(fd)
+            fd = step
+        return os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=fd)
+    except OSError:
+        raise MaterializeError("secret_unavailable") from None
+    finally:
+        os.close(fd)
 
 
 def _json(document: Any) -> str:

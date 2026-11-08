@@ -463,6 +463,50 @@ def test_an_agent_s_scope_that_is_a_link_is_refused(tmp_path: Path) -> None:
     assert err.value.code == "secret_out_of_scope"
 
 
+def test_a_hard_link_in_the_scope_is_refused(tmp_path: Path) -> None:
+    """A hard link in the agent's folder to a file outside resolves inside by path (issue 575)."""
+    secrets, _value = _scope(tmp_path)
+    token = _private(tmp_path / "agent_token")
+    alias = secrets / str(AGENT) / "alias"
+    os.link(token, alias)
+    with pytest.raises(MaterializeError) as err:
+        definition_resolver(secrets, AGENT, ())(f"file:{alias}")
+    assert err.value.code == "secret_out_of_scope"
+    assert "runner-credential" not in str(err.value)
+
+
+def test_a_link_swapped_in_after_the_check_is_not_followed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The open after the scope check follows no link (issue 575): a file swapped for a link
+    between the check and the open is refused, simulated by a check that sees no link."""
+    secrets, value = _scope(tmp_path)
+    token = _private(tmp_path / "agent_token")
+    sub = secrets / str(AGENT) / "sub"
+    sub.symlink_to(token.parent, target_is_directory=True)
+    value.unlink()
+    value.symlink_to(token)
+    real_resolve = Path.resolve
+
+    def blind(self: Path, strict: bool = False) -> Path:
+        if str(self).startswith(str(secrets)):
+            real_resolve(self, strict=strict)
+            return Path(os.path.normpath(self))  # the lexical path, as if no link were there
+        return real_resolve(self, strict=strict)
+
+    monkeypatch.setattr(Path, "resolve", blind)
+    for ref in (f"file:{value}", f"file:{sub / 'agent_token'}"):
+        with pytest.raises(MaterializeError) as err:
+            definition_resolver(secrets, AGENT, ())(ref)
+        assert err.value.code in ("secret_unavailable", "secret_out_of_scope")
+
+
+def test_a_file_below_a_subfolder_of_the_scope_resolves(tmp_path: Path) -> None:
+    secrets, _value = _scope(tmp_path)
+    nested = _private(secrets / str(AGENT) / "docs" / "token", "nested-value\n")
+    assert definition_resolver(secrets, AGENT, ())(f"file:{nested}") == "nested-value"
+
+
 def test_skills_absent_leave_the_plugin_without_skills(folders: AgentFolders) -> None:
     done = materialize(folders, _small(), 1, "chat")
     assert done.has_skills is False

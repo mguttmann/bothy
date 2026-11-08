@@ -440,7 +440,9 @@ func (c *checker) stdioServer(p string, m map[string]any, s *MCPServer) {
 		s.Args = []string{}
 		for i, v := range items {
 			if a, ok := c.strValue(index(ap, i), v); ok {
-				c.display(index(ap, i), a)
+				if c.display(index(ap, i), a) && ExpandsVariable(a) {
+					c.add(index(ap, i), CodeInvalid)
+				}
 				s.Args = append(s.Args, a)
 			}
 		}
@@ -523,7 +525,9 @@ func (c *checker) entryValue(p string, m map[string]any, e *Entry) {
 	if hasValue {
 		vp := at(p, "value")
 		if v, ok := c.strValue(vp, m["value"]); ok {
-			c.display(vp, v)
+			if c.display(vp, v) && ExpandsVariable(v) {
+				c.add(vp, CodeInvalid)
+			}
 			if SecretName(e.Name) {
 				c.add(vp, CodeSecretValueNotAllowed)
 			}

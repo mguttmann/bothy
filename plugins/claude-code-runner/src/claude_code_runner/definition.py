@@ -320,8 +320,17 @@ def _valid_secret_ref(ref: str) -> bool:
     return False
 
 
+def _expands_variable(text: str) -> bool:
+    """Report whether ``text`` holds ``${``, the start of a CLI variable reference.
+
+    The CLI substitutes it from its own environment in the url, headers, args and env of an MCP
+    server (26 4.2), so a plain value never holds it.
+    """
+    return "${" in text
+
+
 def _valid_url(url: str) -> bool:
-    if "#" in url:
+    if "#" in url or _expands_variable(url):
         return False
     try:
         parts = urlsplit(url)
@@ -586,7 +595,8 @@ class _Checker:
             for i, value in enumerate(items):
                 arg = self.string_value(_pointer(ap, i), value)
                 if arg is not None:
-                    self.display(_pointer(ap, i), arg)
+                    if self.display(_pointer(ap, i), arg) and _expands_variable(arg):
+                        self.add(_pointer(ap, i), "invalid")
                     args.append(arg)
         env = self.entries(p, m, "env", _valid_env_name, _reserved_env)
         if self.below_host:
@@ -651,7 +661,8 @@ class _Checker:
             vp = _pointer(p, "value")
             value = self.string_value(vp, m["value"])
             if value is not None:
-                self.display(vp, value)
+                if self.display(vp, value) and _expands_variable(value):
+                    self.add(vp, "invalid")
                 if _secret_name(name):
                     self.add(vp, "secret_value_not_allowed")
             return Entry(name, value=value)

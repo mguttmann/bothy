@@ -151,8 +151,8 @@ All limits are configuration values (section 14).
 | `instructions` | Markdown, becomes `CLAUDE.md` in the agent folder | at most `agents.definition.instructions_max_bytes`; text rules of 4.3 |
 | `skills[]` | `name`, `description`, `body`, optional `files[]` | at most `agents.definition.max_skills`; `name` matches `^[a-z0-9][a-z0-9-]{0,63}$`, unique; `description` one line, at most `agents.definition.skill_description_max_chars`; `body` Markdown, at most `agents.definition.skill_body_max_bytes`; `files[]` at most `agents.definition.max_skill_files`, each `name` a flat file name matching `^[a-z0-9][a-z0-9._-]{0,63}\.md$` other than `SKILL.md` and `content` Markdown within the same byte limit; text rules of 4.3 for `body` and every `content` |
 | `mcp_servers[]` | `name`, `transport`, then per transport | at most `agents.definition.max_mcp_servers`; `name` matches `^[a-z0-9][a-z0-9-]{0,63}$`, unique |
-| `mcp_servers[]` with `transport = http` | `url`, optional `headers[]` | `url` is `https` with a host, without user information or fragment; `headers[]` each `name` and either `value` or `secret_ref` |
-| `mcp_servers[]` with `transport = stdio` | `command`, `package`, optional `args[]`, optional `env[]` | `command` is one of `agents.mcp_stdio_runners`; `package` is pinned as `name@version` with an exact version (no range, no tag); `args[]` strings, none starting with `-` before the package; `env[]` each `name` matching `^[A-Z_][A-Z0-9_]*$`, not one of the names of 4.3 item 5, and either `value` or `secret_ref` |
+| `mcp_servers[]` with `transport = http` | `url`, optional `headers[]` | `url` is `https` with a host, without user information, fragment or `${`; `headers[]` each `name` and either `value` or `secret_ref` |
+| `mcp_servers[]` with `transport = stdio` | `command`, `package`, optional `args[]`, optional `env[]` | `command` is one of `agents.mcp_stdio_runners`; `package` is pinned as `name@version` with an exact version (no range, no tag); `args[]` strings, none starting with `-` before the package and none holding `${`; `env[]` each `name` matching `^[A-Z_][A-Z0-9_]*$`, not one of the names of 4.3 item 5, and either `value` or `secret_ref` |
 | `settings` | `model`, `tool_class_wish`, `allowed_tools[]`, `max_cost_usd_per_run` | `model` the pattern of `default_model` (09 2.2); `tool_class_wish` one of `chat`, `scoped`, `host`; `allowed_tools[]` tool names (built-in names or `mcp__<server>__<tool>` of a listed server), distinct, none starting with `-`, at most `agents.definition.max_allowed_tools`; `max_cost_usd_per_run` a decimal above zero and at most `agents.definition.max_cost_usd_per_run` |
 | `origin` | `kind`, optional `template_slug`, `template_version` | `kind` one of `template`, `interview`, `manual`; display only |
 
@@ -161,6 +161,14 @@ form of `runner.anthropic_api_key_ref`); the server never resolves it. The runne
 `file:` reference whose file lies, also after following every link, in
 `<runner.hosted_secrets_dir>/<agent_id>/` of the same agent (5.1 item 3); an `env:` reference,
 another file and every reference without that key are out of scope.
+
+No `url`, `args[]` entry or plain `value` of `headers[]` or `env[]` holds `${` (finding
+`invalid`): the pinned CLI substitutes `${VAR}` and `${VAR:-default}` there from its own
+environment (reproduced with version 2.1.288). The turn's environment is an allow list and the
+CLI blanks the organization API key, so today no secret would leak, but that rests on
+undocumented CLI behaviour; with the refusal no definition can name a variable of the turn's
+environment (issue 575). The runner writes the values unchanged into the MCP file
+(`materialize.py` `_entries`), so the check of 5.6 is the only guard there.
 
 Optional are only `files[]`, `headers[]`, `args[]`, `env[]`, `settings.model` (absent: the runner's
 default model), `settings.allowed_tools` (absent: no narrowing; empty: no named tool),
@@ -256,7 +264,15 @@ at the repository root is the conformance set of every writer (A1-02).
    to a file in its own agent's subfolder (4.2), read below the real path of the folder, so a
    subfolder that is a link resolves nothing; never to the runner's environment, another
    agent's subfolder or a credential of the runner itself (`agent_token_ref`, `dpop_key_ref`,
-   `anthropic_api_key_ref`). Empty, no reference of a definition resolves. With
+   `anthropic_api_key_ref`). The CLI's own login and configuration are no such key: under
+   `organization` they lie in `<runner.state_dir>/claude-config/`, which the folder may not
+   overlap, and under `personal` in the host user's CLI folder, which a definition reaches only
+   when the operator puts a file of it into the agent's subfolder. The file is opened one name at
+   a time below the agent's subfolder without following a link and must have exactly one hard
+   link, so a link swapped in after the check or a hard link to a file elsewhere resolves nothing
+   (`secret_out_of_scope` or `secret_unavailable`). The host operator, who alone writes the
+   folder, keeps it free of copies or links of the runner's or the CLI's credentials; a
+   definition cannot write there. Empty, no reference of a definition resolves. With
    `runner.hosted_agents` the runner refuses to start when the key is not an absolute folder (a
    link is refused), when group or others may write it, when it is equal to, inside or above
    `runner.hosted_agents_root`, `runner.state_dir` or `runner.projects_root`, or when a `file:`
@@ -697,7 +713,7 @@ hosted agent in `personal` always equals that of its hosting runner (R-BA-12).
 | ID | Test | Expected |
 |---|---|---|
 | BA-T01 | `putAgentDefinition` with one member per surface of 5.5 (frontmatter in a body, both inline shell forms, an `@` import with an absolute, a `~` and a `..` path, an unknown member at every level) | `400 validation_failed`, one field error each, nothing stored (A1-02) |
-| BA-T02 | definition with a `stdio` server for an agent below `host`; unpinned package; command outside the allow list; plain secret value; reserved environment name | refused with the field codes of 4.3 (A1-02) |
+| BA-T02 | definition with a `stdio` server for an agent below `host`; unpinned package; command outside the allow list; plain secret value; reserved environment name; `${` in a `url`, an `args[]` entry or a plain `value` | refused with the field codes of 4.3, `${` with `invalid` (A1-02, issue 575) |
 | BA-T03 | `agent.tool_class.set` below `host` while the definition has a `stdio` server | `409 conflict`, `definition_needs_host` (A1-02) |
 | BA-T04 | a person who is not an owner calls each action of 07 2.13 | `404` or `403` as 07 2.13 says, audit `deny` (A1-02, A1-03, A1-06, A1-07) |
 | BA-T05 | `issueHostedAgentToken` by the hosting runner, by another runner, for an agent hosted elsewhere, for a disabled agent | token only in the first case; `404` otherwise; audit entry without the value (A1-03) |
@@ -706,7 +722,7 @@ hosted agent in `personal` always equals that of its hosting runner (R-BA-12).
 | BA-T08 | `putProjectBinding` and `setChannelOperator` on a bound forum with a built-in agent | `operator_cannot_serve_project` (R-AG-39, A1-03) |
 | BA-T09 | runner with `runner.hosted_agents`: two hosted agents, shared slots, separate cursors and state folders; no token in any file under `runner.state_dir` or `runner.hosted_agents_root` | as 3.2 and 3.3 (A1-04) |
 | BA-T10 | runner start with `runner.hosted_agents_root` inside or above `runner.state_dir` or `runner.projects_root`, with a `CLAUDE.md` above it, writable by others | start refused, naming the key (A1-05) |
-| BA-T11 | materializer: files of 5.2 from a definition; frontmatter with a line break in `description`; a file name with `/` or `..`; settings file content exactly 5.4; a `secret_ref` naming the runner's own token, an `env:` variable, another agent's file or a link out of the agent's subfolder of `runner.hosted_secrets_dir` | as 5.2 and 5.4; injection and path escape impossible; an out-of-scope reference ends the run with `mcp_reference_unavailable` without a per-turn file (A1-05) |
+| BA-T11 | materializer: files of 5.2 from a definition; frontmatter with a line break in `description`; a file name with `/` or `..`; settings file content exactly 5.4; a `secret_ref` naming the runner's own token, an `env:` variable, another agent's file, a link out of the agent's subfolder of `runner.hosted_secrets_dir`, a hard link there to a file elsewhere or a link swapped in after the check | as 5.2 and 5.4; injection and path escape impossible; an out-of-scope reference ends the run with `mcp_reference_unavailable` without a per-turn file (A1-05) |
 | BA-T12 | rebuild: planted files of every surface of 5.5 in the agent folder and the control folder | removed before the turn; the agent's other files stay (A1-05) |
 | BA-T13 | command line per class against 5.3 with fake Claude; `stdio` server under a token below `host`; a definition failing 4.3 | exact list; `tool_class_mismatch` before `run.start` (A1-05) |
 | BA-T14 | probe against the pinned CLI with a planted skill carrying `hooks`, `allowed-tools: Bash` and both inline shell forms, and every point of 5.7 | no hook, no `Bash`, the placeholder "[shell command execution disabled by policy]"; results recorded in 5.7 (A1-05, real CLI behind its switch) |
@@ -730,7 +746,7 @@ hosted agent in `personal` always equals that of its hosting runner (R-BA-12).
 | R-BA-05 | `stdio` MCP servers need `tool_class = 'host'`; `scoped` loads only `http` servers; `chat` loads none; the definition's tool list only narrows `runner.scoped_allowed_tools` (4.4). | A local process as the host user is the `host` case of 07 2.11; the host operator keeps the ceiling (D-A1-18). |
 | R-BA-06 | `agent.tool_class.set` below `host` is refused while the current definition has a `stdio` server (4.4 item 5). | A silent downgrade would leave an agent that fails every turn with `tool_class_mismatch`; the owner removes the server first (design backlog item 10). |
 | R-BA-07 | Below `host` a hosted turn runs with `--restricted`, `--settings` of the runner and an explicit `--tools` whose baseline is what 09 18.2 grants `scoped` already, plus `Skill` only with skills, then also named in `--allowedTools`; every class gets `--strict-mcp-config`; `host` uses `--setting-sources project,local`; each point of 5.7 has a probe and a fallback (5.3, 5.7). | `--restricted` drops user, project and local settings and confines file tools; an explicit `--tools` keeps the class baseline instead of removing read-only shell and skills (red team r3 findings 3 and 4); `--restricted` alone still starts the host user's MCP servers, and `dontAsk` refuses a tool not allowed in advance (red team of A1-01, minors 2 and 3). |
-| R-BA-08 | Secret values reach a turn only through a per-turn MCP file of mode `0600` in the control folder, never through the environment (5.2), and only from the agent's own subfolder of `runner.hosted_secrets_dir` (5.1 item 3). | Concurrent turns of one host user can read each other's environment; a file outside the working folder is out of reach of `chat` and `scoped` file tools (design backlog item 4, T-BA-02). |
+| R-BA-08 | Secret values reach a turn only through a per-turn MCP file of mode `0600` in the control folder, never through the environment (5.2), and only from the agent's own subfolder of `runner.hosted_secrets_dir` (5.1 item 3), opened without following a link and with one hard link; no `url`, `args[]` entry or plain `value` of an MCP server holds `${` (4.2; server `definition.ValidURL` and `entryValue`, runner `definition.py` `_valid_url` and `entry_value`; `materialize.py` `_entries` writes values unchanged). | Concurrent turns of one host user can read each other's environment; a file outside the working folder is out of reach of `chat` and `scoped` file tools (design backlog item 4, T-BA-02); the CLI substitutes `${VAR}` in MCP values from its own environment, which would otherwise rest on undocumented behaviour to keep the organization API key out (issue 575). |
 | R-BA-09 | The interview is one owner request with its own deadline to the builder agent, short-lived, nothing stored, every draft validated like a definition, audited and logged with counts only (6.1). | The search assistant pattern is built and tested; an interview costs money, so it is audited, but its content is the owner's text and stays out of audit and logs (D-A1-10, D-A1-12; design backlog item 6). |
 | R-BA-10 | Templates are written for the repository, shipped in the image, listed by an owner read, held by a template gate that works without the private deny list; private templates come from `agents.templates_dir` (7). | Exporting a real agent is how private names leak; forks have no private list (D-A1-14 to D-A1-16). |
 | R-BA-11 | Creation composes visible steps, each its own action and audit entry, without rollback; at creation, on "Try again" and on edit a raised class is set before and a lowered class after the definition; "Try again" runs the steps not reached yet in that order; a built-in agent without a definition is "not set up" and never served (8.2 to 8.4). | The pattern of "New project" (01 6.9); a rollback across actions would need a second write path (design backlog item 6); the server refuses a `stdio` server below `host` (4.3 item 7) and a downgrade while one is there (R-BA-06), so any other order cannot store such a definition (red team of A1-01, finding 1). |

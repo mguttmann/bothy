@@ -1,0 +1,43 @@
+{
+  "tool_class": "host",
+  "definition": {
+    "instructions": "Prices are in $ and {braces} are plain text here: ${NOT_EXPANDED}.\n",
+    "skills": [],
+    "mcp_servers": [
+      {
+        "name": "docs",
+        "transport": "http",
+        "url": "https://mcp.example.com/v1/$HOME/{x}",
+        "headers": [
+          {
+            "name": "X-Price",
+            "value": "$5 {each} $ {"
+          }
+        ]
+      },
+      {
+        "name": "files",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "@example/mcp-files@1.4.2",
+        "args": [
+          "--label",
+          "$HOME"
+        ],
+        "env": [
+          {
+            "name": "FILES_LABEL",
+            "value": "$PATH {}"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "tool_class_wish": "host"
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": []
+}

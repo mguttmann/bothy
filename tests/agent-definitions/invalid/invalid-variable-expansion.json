@@ -1,0 +1,80 @@
+{
+  "tool_class": "host",
+  "definition": {
+    "instructions": "You help Alex write release notes for the team.\n",
+    "skills": [],
+    "mcp_servers": [
+      {
+        "name": "docs",
+        "transport": "http",
+        "url": "https://mcp.example.com/${ANTHROPIC_API_KEY}",
+        "headers": [
+          {
+            "name": "X-Team",
+            "value": "${ANTHROPIC_API_KEY}"
+          },
+          {
+            "name": "X-Default",
+            "value": "a ${HOME:-x} b"
+          },
+          {
+            "name": "X-Token",
+            "value": "${TOKEN}"
+          }
+        ]
+      },
+      {
+        "name": "files",
+        "transport": "stdio",
+        "command": "npx",
+        "package": "@example/mcp-files@1.4.2",
+        "args": [
+          "--root",
+          "${HOME}"
+        ],
+        "env": [
+          {
+            "name": "FILES_ROOT",
+            "value": "${PATH}"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "tool_class_wish": "host"
+    },
+    "origin": {
+      "kind": "manual"
+    }
+  },
+  "expect": [
+    {
+      "pointer": "/mcp_servers/0/url",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/mcp_servers/0/headers/0/value",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/mcp_servers/0/headers/1/value",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/mcp_servers/0/headers/2/value",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/mcp_servers/0/headers/2/value",
+      "code": "secret_value_not_allowed"
+    },
+    {
+      "pointer": "/mcp_servers/1/args/1",
+      "code": "invalid"
+    },
+    {
+      "pointer": "/mcp_servers/1/env/0/value",
+      "code": "invalid"
+    }
+  ]
+}
