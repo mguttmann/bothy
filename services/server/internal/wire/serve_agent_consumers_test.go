@@ -302,6 +302,7 @@ func TestAgentConsumers(t *testing.T) {
 	w := newConsumerWorld(t)
 
 	t.Run("TestConsumerFirstConnectionStartsAtHead", func(t *testing.T) {
+		w.in(t)
 		ch := w.newChannel(w.space, "first")
 		a := w.agent()
 		w.grant(a.id, "agent", "channel", ch.id)
@@ -331,6 +332,7 @@ func TestAgentConsumers(t *testing.T) {
 	})
 
 	t.Run("TestConsumerContinuesFromAckedSeq", func(t *testing.T) {
+		w.in(t)
 		ch := w.newChannel(w.space, "continue")
 		a := w.agent()
 		w.grant(a.id, "agent", "channel", ch.id)
@@ -363,6 +365,7 @@ func TestAgentConsumers(t *testing.T) {
 	})
 
 	t.Run("TestConsumerMaxInflightEvents", func(t *testing.T) {
+		w.in(t)
 		ch := w.newChannel(w.space, "inflight")
 		a := w.agent()
 		w.grant(a.id, "agent", "channel", ch.id)
@@ -396,6 +399,7 @@ func TestAgentConsumers(t *testing.T) {
 	})
 
 	t.Run("TestConsumerRedeliveryAfterAckTimeout", func(t *testing.T) {
+		w.in(t)
 		ch := w.newChannel(w.space, "redeliver")
 		a := w.agent()
 		w.grant(a.id, "agent", "channel", ch.id)
@@ -443,6 +447,7 @@ func TestAgentConsumers(t *testing.T) {
 	})
 
 	t.Run("TestConsumerSecondIdentifyCloses4015", func(t *testing.T) {
+		w.in(t)
 		ch := w.newChannel(w.space, "takeover")
 		a := w.agent()
 		w.grant(a.id, "agent", "channel", ch.id)
@@ -478,6 +483,7 @@ func TestAgentConsumers(t *testing.T) {
 	})
 
 	t.Run("TestConsumerAckValidation", func(t *testing.T) {
+		w.in(t)
 		ch := w.newChannel(w.space, "validation")
 		a := w.agent()
 		w.grant(a.id, "agent", "channel", ch.id)
@@ -507,6 +513,7 @@ func TestAgentConsumers(t *testing.T) {
 	})
 
 	t.Run("TestPollTakesOverGatewayConsumer", func(t *testing.T) {
+		w.in(t)
 		ch := w.newChannel(w.space, "polltakeover")
 		a := w.agent()
 		w.grant(a.id, "agent", "channel", ch.id)
@@ -525,6 +532,7 @@ func TestAgentConsumers(t *testing.T) {
 	})
 
 	t.Run("TestConsumerNameRules", func(t *testing.T) {
+		w.in(t)
 		a := w.agent()
 		// An invalid consumer name breaks the identify schema on purpose (INT-W42/2).
 		w.identifyErr(t, w.agentParams(a, "Not Valid"), 4002, wstest.WithRawClientFrames())
@@ -541,6 +549,7 @@ func TestAgentConsumers(t *testing.T) {
 	})
 
 	t.Run("TestPeopleAndAppsUnchanged", func(t *testing.T) {
+		w.in(t)
 		ch := w.newChannel(w.space, "people")
 		sam := w.newPerson("sam", identity.DeviceStateActive)
 		w.grant(sam.user, "user", "channel", ch.id)
@@ -585,6 +594,7 @@ func TestAgentConsumers(t *testing.T) {
 	})
 
 	t.Run("TestConsumerStreamIsFilteredByRights", func(t *testing.T) {
+		w.in(t)
 		allgemein := w.newChannel(w.space, "allgemein")
 		marketing := w.newChannel(w.newSpace("Marketing"), "kampagnen")
 		a := w.agent()
@@ -643,6 +653,7 @@ func TestAgentConsumers(t *testing.T) {
 	})
 
 	t.Run("TestConsumerAgentDisabledCloses4012", func(t *testing.T) {
+		w.in(t)
 		ch := w.newChannel(w.space, "disable")
 		a := w.agent()
 		w.grant(a.id, "agent", "channel", ch.id)
@@ -659,6 +670,7 @@ func TestAgentConsumers(t *testing.T) {
 	})
 
 	t.Run("TestPollRetentionGivesGone", func(t *testing.T) {
+		w.in(t)
 		ch := w.newChannel(w.space, "retention")
 		a := w.agent()
 		w.grant(a.id, "agent", "channel", ch.id)
@@ -705,6 +717,7 @@ func TestAgentConsumers(t *testing.T) {
 	}
 
 	t.Run("TestConsumerFencedSaveAcrossInstances", func(t *testing.T) {
+		w.in(t)
 		ch := w.newChannel(w.space, "fenced")
 		a := w.agent()
 		w.grant(a.id, "agent", "channel", ch.id)
@@ -730,6 +743,7 @@ func TestAgentConsumers(t *testing.T) {
 	})
 
 	t.Run("TestConsumerShutdownFlushesAck", func(t *testing.T) {
+		w.in(t)
 		ch := w.newChannel(w.space, "shutdown")
 		a := w.agent()
 		w.grant(a.id, "agent", "channel", ch.id)

@@ -4,9 +4,12 @@ package httpserver_test
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -259,6 +262,33 @@ func TestDeadline_ExceededGives503(t *testing.T) {
 	rec, ok := h.Logs.Find(httpserver.LogRequestFailed)
 	if !ok || rec.Attrs["bothy.reason"] != "deadline_exceeded" {
 		t.Fatalf("log %+v", rec)
+	}
+}
+
+// TestDeadline_SocketTimeoutLogsItsSource: a 503 for a socket deadline while the request
+// context is still live (#238: a request failed after less than a second with
+// deadline_exceeded) logs the Go types of the error chain as exception.type, so the log names the
+// connection that timed out; never the error text.
+func TestDeadline_SocketTimeoutLogsItsSource(t *testing.T) {
+	t.Parallel()
+	op := getThing()
+	h := httpservertest.New(t, httpservertest.Options{Routes: []httpservertest.Route{{Op: op,
+		Handler: httpservertest.Authorized(op.Action, func(w http.ResponseWriter, r *http.Request) {
+			cause := &net.OpError{Op: "read", Net: "tcp", Err: os.ErrDeadlineExceeded}
+			httpserver.WriteProblem(w, r, fmt.Errorf("pg: commit 203.0.113.9: %w", cause))
+		})}}})
+	resp := h.Do(h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "", "X-Mode", "fast"))
+	if resp.StatusCode != 503 || resp.Problem(t)["code"] != "unavailable" {
+		t.Fatalf("%d %s", resp.StatusCode, resp.Body)
+	}
+	rec, ok := h.Logs.Find(httpserver.LogRequestFailed)
+	if !ok || rec.Attrs["bothy.reason"] != "deadline_exceeded" || rec.Attrs["exception.type"] != "*fmt.wrapError < *net.OpError < *poll.DeadlineExceededError" {
+		t.Fatalf("log %+v", rec)
+	}
+	for _, v := range rec.Attrs {
+		if strings.Contains(v, "203.0.113.9") {
+			t.Fatalf("error text in the log: %+v", rec)
+		}
 	}
 }
 

@@ -185,6 +185,32 @@ func newGatewayWorldRole(t *testing.T, role wire.Role, deps wire.Deps, extra ...
 	return &gwWorld{t: t, db: db, owner: owner, p: p, base: "http://127.0.0.1:" + strconv.Itoa(public), id: id, pepper: pepper, cfg: gcfg, env: env, clk: clk, app: pool}
 }
 
+// in makes t the test that the helpers of w fail and wait in until t ends, so a helper that fails
+// in a subtest fails that subtest instead of calling FailNow on the parent test, which Go reports
+// as panic(nil) and which ends every later subtest too (#238). The subtests of a world that use
+// it run one after the other.
+func (w *gwWorld) in(t *testing.T) {
+	parent := w.t
+	w.t = t
+	t.Cleanup(func() { w.t = parent })
+}
+
+// TestWorldInScopesHelpersToTheSubtest: inside a subtest after in, the helpers of the world use
+// the subtest; after it, the parent again.
+func TestWorldInScopesHelpersToTheSubtest(t *testing.T) {
+	t.Parallel()
+	w := &gwWorld{t: t}
+	t.Run("sub", func(sub *testing.T) {
+		w.in(sub)
+		if w.t != sub {
+			sub.Fatal("the helpers do not use the subtest")
+		}
+	})
+	if w.t != t {
+		t.Fatal("the helpers still use the ended subtest")
+	}
+}
+
 // sql runs a statement as the schema owner.
 func (w *gwWorld) sql(query string, args ...any) {
 	w.t.Helper()
