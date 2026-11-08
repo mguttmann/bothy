@@ -523,16 +523,7 @@ func (c *checker) entryValue(p string, m map[string]any, e *Entry) {
 		return
 	}
 	if hasValue {
-		vp := at(p, "value")
-		if v, ok := c.strValue(vp, m["value"]); ok {
-			if c.display(vp, v) && ExpandsVariable(v) {
-				c.add(vp, CodeInvalid)
-			}
-			if SecretName(e.Name) {
-				c.add(vp, CodeSecretValueNotAllowed)
-			}
-			e.Value, e.HasValue = v, true
-		}
+		c.plainValue(at(p, "value"), m["value"], e)
 		return
 	}
 	rp := at(p, "secret_ref")
@@ -542,6 +533,21 @@ func (c *checker) entryValue(p string, m map[string]any, e *Entry) {
 		}
 		e.SecretRef = r
 	}
+}
+
+// plainValue checks the plain value of one entry at vp.
+func (c *checker) plainValue(vp string, raw any, e *Entry) {
+	v, ok := c.strValue(vp, raw)
+	if !ok {
+		return
+	}
+	if c.display(vp, v) && ExpandsVariable(v) {
+		c.add(vp, CodeInvalid)
+	}
+	if SecretName(e.Name) {
+		c.add(vp, CodeSecretValueNotAllowed)
+	}
+	e.Value, e.HasValue = v, true
 }
 
 // The tool class wishes.
