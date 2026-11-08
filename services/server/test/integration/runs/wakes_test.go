@@ -211,9 +211,13 @@ func TestWake_RecoverUsageLimitWhileOutagePending(t *testing.T) {
 	outage := w.want(w.createWake("lotse", r.ID, `{"kind":"at","reason":"usage_limit","outage":1,"not_before":"`+reset.Format(time.RFC3339)+`"}`),
 		http.StatusCreated, "")["id"].(string)
 	w.wantOK(w.finish("lotse", r.ID, `"state":"failed","reason":"usage_limited"`))
+	allows := w.audits("run.wake.recover", "allow", "")
 	got := w.want(w.do("lotse", http.MethodPost, "/api/v1/runs/"+r.ID+"/wakes/recover", `{"reason":"usage_limit"}`, key()...), http.StatusOK, "")
 	if got["id"] != outage || got["state"] != "pending" {
 		t.Fatalf("recover answered %v", got)
+	}
+	if n := w.audits("run.wake.recover", "allow", ""); n != allows+1 {
+		t.Fatalf("the answered recovery wrote %d allow audit entries", n-allows)
 	}
 	if n := w.count(`SELECT count(*) FROM run_wakes WHERE source_run_id = $1 AND reason = 'usage_limit'`, r.ID); n != 1 {
 		t.Fatalf("%d usage_limit wake-ups of one outage", n)
@@ -240,9 +244,13 @@ func TestWake_RecoverUsageLimitWhileOutagePendingAfterAnyEnd(t *testing.T) {
 		if st := w.wake(outage).State; st != "pending" {
 			t.Fatalf("%s: the end of the run left the outage wake-up %s", end, st)
 		}
+		allows := w.audits("run.wake.recover", "allow", "")
 		got := w.want(w.do("lotse", http.MethodPost, "/api/v1/runs/"+r.ID+"/wakes/recover", `{"reason":"usage_limit"}`, key()...), http.StatusOK, "")
 		if got["id"] != outage || got["state"] != "pending" {
 			t.Fatalf("%s: recover answered %v", end, got)
+		}
+		if n := w.audits("run.wake.recover", "allow", ""); n != allows+1 {
+			t.Fatalf("%s: the answered recovery wrote %d allow audit entries", end, n-allows)
 		}
 		if n := w.count(`SELECT count(*) FROM run_wakes WHERE source_run_id = $1`, r.ID); n != 1 {
 			t.Fatalf("%s: %d wake-ups of one outage", end, n)

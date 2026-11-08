@@ -597,8 +597,14 @@ func (w *Wakes) recoverTx(ctx context.Context, b *wakeBox, a actor.Actor, in run
 		// One outage gets one wake-up: while the outage's wake-up of run.wake.create is pending,
 		// a recovery after a restart changes nothing and answers it, whatever end the source run
 		// reached (5.8.2, 18.19.10, issue 567 item 4).
-		if p, found, err := b.d.Repo.PendingUsageWakeOfRun(ctx, run.ID); err != nil || found {
-			return wakeResult{wake: p}, err
+		p, found, err := b.d.Repo.PendingUsageWakeOfRun(ctx, run.ID)
+		if err != nil {
+			return wakeResult{}, err
+		}
+		if found {
+			// The answer is an allowed run.wake.recover: its audit entry names the wake-up it
+			// answers, which stays unchanged (actions.yaml audit: always).
+			return wakeResult{wake: p}, s.auditWake(ctx, a, authorize.ActionRunWakeRecover, "", run.ID, p.ID, p.Kind, p.Reason, "")
 		}
 	}
 	existing := func(ctx context.Context) (WakeRow, bool, error) {
