@@ -964,7 +964,7 @@ offers "Transcribe" (`file.transcribe`) only while the server transcribes for th
 stored flag `voice.enabled` is on and `getInstance` reports `voice_transcription_mode = service`
 ([12](12-files.md) 8.2). In the modes `agent` and `off`, with the switch off, and from a server
 without the field the button is hidden, on every platform, because the tap could only answer `403
-feature_disabled` or `409 transcription_unavailable` (issue 570).
+feature_disabled` or `409 conflict` with `reason` `transcription_unavailable` (issue 570).
 
 Phone (01 5.3 M5): press and hold the microphone to record, swipe left to discard, swipe up to
 lock, release to send. The app shows the remaining time and, `client.voice.limit_notice_lead`
