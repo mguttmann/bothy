@@ -578,6 +578,10 @@ never copying a file of it, and checks it itself before every turn.
   agents. Below `host` every such reference is skipped, logged (`channel_skill_skipped`) and named
   once per run in the live box status line; a missing folder is named the same way. References
   of another adapter are skipped with a debug line. Without the key no reference is read.
+  Before setting the key, know who can bind a skill: any member with `manage` on a channel can
+  bind a channel skill there, and it then acts in every `host` turn an owner starts in that
+  channel. It gains no right the member did not have, but its content is not the owner's choice;
+  keep in `channel_skills_dir` only skills you would run in such a turn.
 
 ### Probe results of 26 5.7 (pinned CLI 2.1.288)
 

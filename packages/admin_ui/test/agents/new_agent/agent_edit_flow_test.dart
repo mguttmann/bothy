@@ -349,6 +349,12 @@ void main() {
         final flow = await open('a', content: old.json);
         expect(flow.draft!.toolClass, AgentToolClass.host);
         expect(flow.steps.first, NewAgentStep.setClass);
+        // The class is raised before the definition, as for an edit (26 8.4).
+        await flow.run();
+        expect(flow.failure, isNull);
+        expect(flow.finished, isTrue);
+        expect(port.writes, ['setToolClass host', 'putDefinition']);
+        expect(port.definitionsOf('a').last, _withStdio);
       },
     );
 
