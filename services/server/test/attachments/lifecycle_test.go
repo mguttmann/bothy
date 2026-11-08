@@ -289,13 +289,57 @@ func TestMoveThread_MovesAttachmentCopies(t *testing.T) {
 	}
 }
 
+// TestMoveThread_SendOrderDecidesTheFile: a send ordered before the move accepts only a file
+// uploaded for the old channel, a send ordered after it only one uploaded for the new channel
+// (SEC-UP-9). So the order "every Eskalation file before the move, every Allgemein file after it"
+// refuses every send, which TestMoveThread_ConcurrentSendWithAttachment must allow (issue 238).
+func TestMoveThread_SendOrderDecidesTheFile(t *testing.T) {
+	t.Parallel()
+	e := start(t)
+	th := e.newThread(t, e.alex, e.allg)
+	forNew := e.file(t, e.alex, e.esk, "early.txt", []byte("uploaded for the new channel"))
+	forOld := e.file(t, e.alex, e.allg, "late.txt", []byte("uploaded for the old channel"))
+	wantProblem(t, e.send(t, e.alex, th, "Before the move", []string{forNew}, nil), http.StatusConflict, "conflict", "file_not_attachable")
+	if r := e.move(t, th, e.esk); r.Status != http.StatusOK {
+		t.Fatalf("moveThread %d %s", r.Status, r.Body)
+	}
+	wantProblem(t, e.send(t, e.alex, th, "After the move", []string{forOld}, nil), http.StatusConflict, "conflict", "file_not_attachable")
+	if n := e.count(t, `SELECT count(*) FROM message_attachments WHERE thread_id = $1`, th); n != 0 {
+		t.Fatalf("%d rows after two refused sends", n)
+	}
+	msgOf(t, e.send(t, e.alex, th, "New file after the move", []string{forNew}, nil), http.StatusCreated)
+}
+
 // TestMoveThread_ConcurrentSendWithAttachment: many parallel sends with attachments into a thread
 // while the owner moves it: at the end message_attachments.channel_id = messages.channel_id =
 // threads.channel_id for every row. A send ordered after the move refuses a file uploaded for the
-// old channel (SEC-UP-9) and accepts one uploaded for the new channel, so both kinds race.
+// old channel (SEC-UP-9) and accepts one uploaded for the new channel, so both kinds race. One
+// order refuses every send (TestMoveThread_SendOrderDecidesTheFile), which leaves no row to check;
+// such a round is repeated on a fresh thread, up to maxRaceRounds rounds.
 func TestMoveThread_ConcurrentSendWithAttachment(t *testing.T) {
 	t.Parallel()
 	e := start(t)
+	for round := 1; ; round++ {
+		if raceSendsAgainstMove(t, e) > 0 {
+			return
+		}
+		if round == maxRaceRounds {
+			t.Fatalf("no send succeeded in %d rounds", round)
+		}
+		t.Logf("round %d: every send was ordered against its file; another round", round)
+	}
+}
+
+// maxRaceRounds bounds the rounds of TestMoveThread_ConcurrentSendWithAttachment. One round
+// refuses every send only in one of many orders, so three in a row point to a defect.
+const maxRaceRounds = 3
+
+// raceSendsAgainstMove runs one round of TestMoveThread_ConcurrentSendWithAttachment on a new
+// thread: eight sends, half with a file for Allgemein and half with one for Eskalation, against the
+// move of the thread to Eskalation. It checks every answer and the copies of the rows and returns
+// the number of created messages.
+func raceSendsAgainstMove(t *testing.T, e *env) int {
+	t.Helper()
 	th := e.newThread(t, e.alex, e.allg)
 	const senders = 8
 	var list []string
@@ -346,9 +390,6 @@ func TestMoveThread_ConcurrentSendWithAttachment(t *testing.T) {
 			t.Fatalf("sender %d: %d %s\nserver log:\n%s", i, r.Status, r.Body, e.logs.lines(`"level":"ERROR"`))
 		}
 	}
-	if created == 0 {
-		t.Fatal("no send succeeded")
-	}
 	if n := e.count(t, `SELECT count(*) FROM message_attachments WHERE thread_id = $1`, th); n != created {
 		t.Fatalf("%d rows for %d created messages", n, created)
 	}
@@ -356,6 +397,7 @@ func TestMoveThread_ConcurrentSendWithAttachment(t *testing.T) {
 		WHERE a.thread_id = $1 AND (a.channel_id <> m.channel_id OR m.channel_id <> t.channel_id OR t.channel_id <> $2)`, th, e.esk); n != 0 {
 		t.Fatalf("%d rows whose copies differ from the message or the thread", n)
 	}
+	return created
 }
 
 // TestHistory_ShowsAttachments: getMessage and listThreadMessages (M1-57) show the attachments of a
