@@ -1319,20 +1319,23 @@ final class ThreadPermissionsFamily extends $Family
   String toString() => r'threadPermissionsProvider';
 }
 
-/// The visible channels that are no direct message and not archived, from the sidebar's
-/// tree (move targets, 01 6.7).
+/// The visible channels that are no direct message and not archived for everyone, from the
+/// sidebar's tree (move targets, 01 6.7); a channel the person archived in the own sidebar stays
+/// a target (01 6.22 item 4).
 
 @ProviderFor(visibleChannels)
 final visibleChannelsProvider = VisibleChannelsProvider._();
 
-/// The visible channels that are no direct message and not archived, from the sidebar's
-/// tree (move targets, 01 6.7).
+/// The visible channels that are no direct message and not archived for everyone, from the
+/// sidebar's tree (move targets, 01 6.7); a channel the person archived in the own sidebar stays
+/// a target (01 6.22 item 4).
 
 final class VisibleChannelsProvider
     extends $FunctionalProvider<List<Channel>, List<Channel>, List<Channel>>
     with $Provider<List<Channel>> {
-  /// The visible channels that are no direct message and not archived, from the sidebar's
-  /// tree (move targets, 01 6.7).
+  /// The visible channels that are no direct message and not archived for everyone, from the
+  /// sidebar's tree (move targets, 01 6.7); a channel the person archived in the own sidebar stays
+  /// a target (01 6.22 item 4).
   VisibleChannelsProvider._()
     : super(
         from: null,
@@ -1366,7 +1369,7 @@ final class VisibleChannelsProvider
   }
 }
 
-String _$visibleChannelsHash() => r'd43866547a7ec776426bae716c09075b2ea37bdd';
+String _$visibleChannelsHash() => r'e6fafc5738185e2fb0ba32b1190e04284d79486c';
 
 /// The threads of [channelId] (the thread starter lines of the main history, 01 5.1 D2).
 
