@@ -410,9 +410,10 @@ widen a `chat` or `scoped` turn, and which skill a channel gets is decided by a 
 on the channel, not by an owner (T-BA-03). A `host` turn already runs with the rights of the host
 user and only owners trigger it (SR2), so a channel skill adds nothing such a turn could not do.
 It still acts in that turn: a member with `manage` on a channel can bind a channel skill there,
-and it then runs in a `host` turn that an owner starts in the channel, with no right the member
-lacked before but with content the owner did not choose. The runner README tells the operator
-so before the key is set.
+and it then runs in a `host` turn that an owner starts in the channel, with that turn's rights (the
+host user's), which can exceed the member's, and with content the owner did not choose. Binding
+grants the member no Bothy permission. The runner README tells the operator so before the key is
+set.
 The key is new in this stage, so no running installation loads channel skills today and the rule
 changes no existing setup; a `host` agent of the runner loads them as soon as the operator sets the
 key.
