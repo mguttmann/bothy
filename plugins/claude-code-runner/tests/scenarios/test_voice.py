@@ -176,7 +176,14 @@ async def test_a_failed_transcription_of_a_followup_notes_it_and_delivers_the_fi
         "  not transcribed: transcriber_failed"
     )
     await world.until(lambda: world.fake.followup_state(run_id, message_id) == "delivered")
-    notes = [m for m in world.fake.messages if "Voice message not transcribed" in m["content_md"]]
+
+    def _notes() -> list[dict[str, Any]]:
+        note = "Voice message not transcribed"
+        return [m for m in world.fake.messages if note in m["content_md"]]
+
+    # The note is posted after the line is written and its state patched.
+    await world.until(lambda: len(_notes()) >= 1)
+    notes = _notes()
     assert len(notes) == 1
     assert "`transcriber_failed`" in notes[0]["content_md"]
     assert notes[0]["run_id"] == str(run_id)
