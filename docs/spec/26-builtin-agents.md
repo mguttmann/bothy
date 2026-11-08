@@ -409,6 +409,11 @@ checks; its frontmatter (`allowed-tools`, `hooks`), its inline shell and any plu
 widen a `chat` or `scoped` turn, and which skill a channel gets is decided by a person with `manage`
 on the channel, not by an owner (T-BA-03). A `host` turn already runs with the rights of the host
 user and only owners trigger it (SR2), so a channel skill adds nothing such a turn could not do.
+It still acts in that turn: a member with `manage` on a channel can bind a channel skill there,
+and it then runs in a `host` turn that an owner starts in the channel, with that turn's rights (the
+host user's), which can exceed the member's, and with content the owner did not choose. Binding
+grants the member no Bothy permission. The runner README tells the operator so before the key is
+set.
 The key is new in this stage, so no running installation loads channel skills today and the rule
 changes no existing setup; a `host` agent of the runner loads them as soon as the operator sets the
 key.
@@ -554,10 +559,12 @@ only if its whole entry except `name` is exactly equal. For `stdio` that is tran
 package, the full argument list (same order and count) and every `env[]` entry; for `http` it is
 transport, URL and every `headers[]` entry. An `env[]` or `headers[]` entry is equal when it has
 the same name and the same `value` or the same `secret_ref`; a switch between `value` and
-`secret_ref` is a difference. Any other field could redirect traffic or swap credentials (an
-argument or an environment value can carry an endpoint, a `secret_ref` names another key). A
-server without such a match is the field error `mcp_not_in_catalogue` at its JSON Pointer (6.1
-item 3).
+`secret_ref` is a difference. The argument list compares as a list; `env[]` and `headers[]`
+compare as sets by name (a repeated name in one list is `duplicate_name`), so their order does
+not matter but a missing or an extra entry is a difference. Any other field could redirect
+traffic or swap credentials (an argument or an environment value can carry an endpoint, a
+`secret_ref` names another key). A server without such a match is the field error
+`mcp_not_in_catalogue` at its JSON Pointer (6.1 item 3).
 
 ### 7.5 Topics
 
@@ -608,18 +615,21 @@ is stored (R-BA-06); it creates nothing twice.
 "Close" keeps what exists. Once `agent.create` succeeded, the hosting runner is shown but not
 editable in the preview; moving the agent to another runner is `agent.host.set` of 8.4, so
 "Try again" never finishes on a runner other than the one shown.
-The agent list marks a built-in agent without a definition as "not set up" with "Continue setup"
-and "Disable". Its hosting runner serves no turn for it (5.6 item 4). A test per step holds that a
-failure leaves exactly the earlier steps and their audit entries (BA-T16).
+The agent list marks a built-in agent without a definition as "not set up" with "Continue setup",
+"Change runner" (`agent.host.set` of 8.4, 01 6.20 item 6) and "Disable". Its hosting runner
+serves no turn for it (5.6 item 4). A test per step holds that a failure leaves exactly the
+earlier steps and their audit entries (BA-T16).
 
 ### 8.4 Edit and remove
 
 Owners edit instructions, skills, MCP servers and settings with the same preview and step-up
 (`putAgentDefinition`), change the host (`agent.host.set`), and disable or delete through the
-existing actions (`agent.disable`; 09 2.1). The version list offers undo (4.1 item 2). When an
-edit also changes the class, saving runs two visible steps: a raised class is set before the
-definition is written (`agent.tool_class.set`, then `putAgentDefinition`), so a newly added
-`stdio` server is accepted; a lowered class is set after it (`putAgentDefinition`, then
+existing actions (`agent.disable`; 09 2.1). The version list offers undo (4.1 item 2): "Restore"
+opens the older version in the same preview and saves it as a new version like an edit, with a
+`stdio` server in it preselecting `host`, so the class rule below holds for it too. When an
+edit or a restore also changes the class, saving runs two visible steps: a raised class is set
+before the definition is written (`agent.tool_class.set`, then `putAgentDefinition`), so a newly
+added `stdio` server is accepted; a lowered class is set after it (`putAgentDefinition`, then
 `agent.tool_class.set`), so a removed `stdio` server no longer blocks the downgrade of R-BA-06. A
 failed step keeps the earlier one and offers "Try again" as in 8.3.
 

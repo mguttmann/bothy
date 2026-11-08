@@ -262,6 +262,37 @@ func TestParseAnswer_Catalogue(t *testing.T) {
 	}
 }
 
+// TestSameServer_EntriesBySet: env[] and headers[] compare as a set by name, the argument list as
+// a list (26 7.4); a missing or extra entry is a difference.
+func TestSameServer_EntriesBySet(t *testing.T) {
+	t.Parallel()
+	head := func(entries ...definition.Entry) definition.MCPServer {
+		return definition.MCPServer{Name: "docs", Transport: definition.TransportHTTP, URL: "https://mcp.example.com/v1", Headers: entries}
+	}
+	auth, trace := refEntry("Authorization", "env:DOCS_TOKEN"), definition.Entry{Name: "X-Trace", Value: "on", HasValue: true}
+	files := catalogueFiles()
+	swapped := catalogueFiles()
+	swapped.Env = []definition.Entry{files.Env[1], files.Env[0]}
+	fewer := catalogueFiles()
+	fewer.Env = files.Env[:1]
+	for name, tc := range map[string]struct {
+		a, b definition.MCPServer
+		same bool
+	}{
+		"headers in another order": {head(auth, trace), head(trace, auth), true},
+		"one header less":          {head(auth, trace), head(auth), false},
+		"env in another order":     {files, swapped, true},
+		"one env entry less":       {files, fewer, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := interview.SameServer(tc.a, tc.b); got != tc.same {
+				t.Fatalf("SameServer = %v, want %v", got, tc.same)
+			}
+		})
+	}
+}
+
 // TestParseAnswer_EmptyCatalogue: without templates every drafted server is outside the catalogue.
 func TestParseAnswer_EmptyCatalogue(t *testing.T) {
 	t.Parallel()
