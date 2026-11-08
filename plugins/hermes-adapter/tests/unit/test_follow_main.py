@@ -283,9 +283,20 @@ def test_cli_reads_pin_and_authors_of_the_open_proposal(tmp_path: Path) -> None:
     assert OLD in (root / follow_main.PIN_PATH).read_text()
 
 
-def test_workflow_proposes_daily_on_a_free_runner_and_runs_the_recording_and_tests() -> None:
+def _runs(job: dict[str, object]) -> str:
+    steps = job["steps"]
+    assert isinstance(steps, list)
+    runs = "\n".join(str(step.get("run", "")) for step in steps)
+    return re.sub(r"\\\n\s*", "", runs)  # join continued shell lines
+
+
+def _workflow() -> tuple[dict[object, object], str]:
     text = WORKFLOW.read_text(encoding="utf-8")
-    flow = yaml.safe_load(text)
+    return yaml.safe_load(text), text
+
+
+def test_workflow_proposes_daily_on_a_free_runner_and_runs_the_recording_and_tests() -> None:
+    flow, text = _workflow()
     triggers = flow[True]  # YAML 1.1 reads the key "on" as True
     [cron] = [entry["cron"] for entry in triggers["schedule"]]
     minute, hour, day, month, weekday = cron.split()
@@ -294,17 +305,55 @@ def test_workflow_proposes_daily_on_a_free_runner_and_runs_the_recording_and_tes
     assert hour.isdigit()
     assert "workflow_dispatch" in triggers
     assert flow["permissions"] == {"contents": "read"}
-    [job] = flow["jobs"].values()
-    assert job["runs-on"] == "ubuntu-24.04"
-    assert "actions" not in job["permissions"]
-    runs = "\n".join(str(step.get("run", "")) for step in job["steps"])
-    runs = re.sub(r"\\\n\s*", "", runs)  # join continued shell lines
+    jobs = flow["jobs"]
+    assert all(job["runs-on"] == "ubuntu-24.04" for job in jobs.values())
+    assert all("actions" not in job.get("permissions", {}) for job in jobs.values())
+    runs = "\n".join(_runs(job) for job in jobs.values())
     assert "follow_main.py bump" in runs
     assert "make -C plugins/hermes-adapter record" in runs
     assert "make -C plugins/hermes-adapter test" in runs
     assert follow_main.BRANCH in text
     assert "--force-with-lease" in runs
     assert re.search(r"gh pr (create|edit)", runs)
+
+
+def test_upstream_code_never_runs_in_a_job_with_a_write_token() -> None:
+    """The recording runs upstream main code without a cooldown (D-HERMES-PIN-1).
+
+    It runs in a job that may only read; the job that pushes runs no upstream code, takes only
+    fixture files from it and commits without the repository's hooks (D-HERMES-PIN-2).
+    """
+    flow, _ = _workflow()
+    jobs = flow["jobs"]
+    writers = {
+        name: job
+        for name, job in jobs.items()
+        if any(v == "write" for v in (job.get("permissions") or {}).values())
+    }
+    readers = {name: job for name, job in jobs.items() if name not in writers}
+    assert writers
+    assert readers
+    for job in readers.values():
+        assert job.get("permissions") == {"contents": "read"}
+        assert "secrets." not in str(job)
+        assert "github.token" not in str(job)
+    # A command (line start or after ; & |), not the PR body that names the steps.
+    upstream = re.compile(
+        r"(?m)(^|[;&|])\s*(make|pytest|uv sync|uv run(?! --no-project --python 3\.14 "
+        r"plugins/hermes-adapter/tests/follow_main\.py))\b"
+    )
+    for name, job in writers.items():
+        runs = _runs(job)
+        assert not upstream.search(runs), name
+        assert "needs" in job
+        for commit in re.findall(r"git\b.*\bcommit\b", runs):
+            assert "core.hooksPath=/dev/null" in commit, commit
+        for step in job["steps"]:
+            if "GH_TOKEN" in (step.get("env") or {}):
+                assert "upload-artifact" not in str(step.get("uses", ""))
+        # Only fixture JSON files cross from the reading job, by name pattern, regular files.
+        assert "download-artifact" in str(job["steps"])
+        assert r"[a-z0-9_]+\.json" in runs
 
 
 def test_renovate_leaves_the_pin_to_the_daily_workflow() -> None:

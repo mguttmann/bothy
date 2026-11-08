@@ -2946,9 +2946,10 @@ A notice of background work that a turn started is no report: it belongs to the 
 
 Measured in M2-32 against Hermes Agent `v2026.9.24` (recorded on 2026-10-12), recorded again
 against `v0.22.5`, commit `bf0203a794a0`, on 2026-10-29 (D-HERMES-COMPAT-3), and against the main
-commit `a8b0bc15053c` (no release tag) on 2026-11-07 (D-HERMES-MAIN-1), with a fake model (no
-costs). Since then the pin follows upstream main, and the daily workflow `hermes-pin.yml` records
-every newer main commit it proposes (D-HERMES-PIN-1, D-HERMES-PIN-2). The table states the results
+commit `a8b0bc15053c` (no release tag) on 2026-11-07 (D-HERMES-MAIN-1) and again on 2026-11-08
+(D-HERMES-PIN-1), with a fake model (no costs). Since then the pin follows upstream main, and the
+daily workflow `hermes-pin.yml` records every newer main commit it proposes (D-HERMES-PIN-1,
+D-HERMES-PIN-2). The table states the results
 of the current pin and names what changed; a row that names only `v0.22.5` holds unchanged for
 it, a row that names `a8b0bc15053c` holds unchanged since that commit. Evidence in
 `plugins/hermes-adapter/tests/fixtures/recording/`; `observations.json` computes the verdict of

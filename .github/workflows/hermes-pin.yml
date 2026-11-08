@@ -1,9 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Daily proposal of the newest upstream main commit of Hermes Agent as the adapter's pin
-# (docs/decisions.d/HERMES-PIN-MAIN.md, D-HERMES-PIN-1 and D-HERMES-PIN-2). The job rewrites
-# plugins/hermes-adapter/tests/hermes_pin.toml and the "Current pin" line of spec 09 17.10,
-# records again and runs the component's tests against the new pin, and force-pushes one bundled
+# (docs/decisions.d/HERMES-PIN-MAIN.md, D-HERMES-PIN-1 and D-HERMES-PIN-2). Two jobs:
+# "record" may only read; it rewrites plugins/hermes-adapter/tests/hermes_pin.toml and the
+# "Current pin" line of spec 09 17.10, records again and runs the component's tests against the
+# new pin. That runs unreviewed upstream code without a cooldown, so no token with write access
+# and no cache that other workflows restore is ever in reach of it. "propose" runs no upstream
+# code: it rewrites pin and line again with the repository's own follow_main.py, takes only the
+# fixture JSON files from the first job, commits without hooks and force-pushes one bundled
 # proposal branch with one pull request. It never replaces a proposal that a maintainer has
 # committed to, and does nothing while main or the proposal already names the head.
 # A pull request that this token opens starts no workflow, so ci.yml runs on it once a
@@ -23,33 +27,38 @@ concurrency:
   group: hermes-pin
   cancel-in-progress: false
 
+env:
+  BRANCH: bot/hermes-main-pin
+
 jobs:
-  propose:
-    name: hermes-pin (propose the newest upstream main commit)
+  record:
+    name: hermes-pin (record and test the newest upstream main commit)
     if: github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 180
     permissions:
-      contents: write # push the proposal branch
-      pull-requests: write # open or update its pull request
-    env:
-      BRANCH: bot/hermes-main-pin
+      contents: read
+    outputs:
+      propose: ${{ steps.bump.outputs.propose }}
+      commit: ${{ steps.bump.outputs.commit }}
+      record: ${{ steps.record.outcome }}
+      test: ${{ steps.test.outcome }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
+      # No cache: this job runs upstream code, and a cache saved here would be restored by
+      # the other workflows of main.
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
-          enable-cache: true
-          cache-dependency-glob: plugins/hermes-adapter/uv.lock
+          enable-cache: false
       - id: proposal
         name: Fetch the open proposal
         run: |
           if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
             git fetch -q --no-tags origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
             echo "ref=origin/$BRANCH" >> "$GITHUB_OUTPUT"
-            echo "sha=$(git rev-parse "origin/$BRANCH")" >> "$GITHUB_OUTPUT"
           fi
       - id: bump
         name: Bump the pin to the upstream main head
@@ -68,6 +77,71 @@ jobs:
         if: steps.bump.outputs.propose == 'true'
         continue-on-error: true
         run: make -C plugins/hermes-adapter test
+      - name: Hand the fixtures to the proposing job
+        if: steps.bump.outputs.propose == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: hermes-pin-recording
+          path: plugins/hermes-adapter/tests/fixtures/recording/*.json
+          if-no-files-found: error
+          retention-days: 1
+
+  propose:
+    name: hermes-pin (propose the newest upstream main commit)
+    needs: record
+    if: (github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')) && needs.record.outputs.propose == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write # push the proposal branch
+      pull-requests: write # open or update its pull request
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - id: proposal
+        name: Fetch the open proposal
+        run: |
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
+            git fetch -q --no-tags origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+            echo "ref=origin/$BRANCH" >> "$GITHUB_OUTPUT"
+            echo "sha=$(git rev-parse "origin/$BRANCH")" >> "$GITHUB_OUTPUT"
+          fi
+      - id: bump
+        name: Bump the pin to the recorded commit
+        env:
+          PROPOSAL: ${{ steps.proposal.outputs.ref }}
+          COMMIT: ${{ needs.record.outputs.commit }}
+        run: |
+          uv run --no-project --python 3.14 plugins/hermes-adapter/tests/follow_main.py \
+            bump --root . --commit "$COMMIT" ${PROPOSAL:+--proposal "$PROPOSAL"} \
+            --github-output "$GITHUB_OUTPUT"
+      - name: Fetch the fixtures of the recording
+        if: steps.bump.outputs.propose == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: hermes-pin-recording
+          path: ${{ runner.temp }}/recording
+      - name: Take only the fixture JSON files
+        if: steps.bump.outputs.propose == 'true'
+        env:
+          SOURCE: ${{ runner.temp }}/recording
+          TARGET: plugins/hermes-adapter/tests/fixtures/recording
+        run: |
+          rm -f -- "${TARGET:?}"/*.json
+          find "$SOURCE" -mindepth 1 | while IFS= read -r path; do
+            name=${path#"$SOURCE"/}
+            if [ -f "$path" ] && [ ! -L "$path" ] && printf '%s\n' "$name" | grep -qxE '[a-z0-9_]+\.json'; then
+              cp -- "$path" "$TARGET/$name"
+            else
+              echo "::error::the recording handed over $name, which is not a fixture JSON file"
+              exit 1
+            fi
+          done
       - name: Push the proposal and open or update its pull request
         if: steps.bump.outputs.propose == 'true'
         env:
@@ -76,13 +150,14 @@ jobs:
           COMMIT: ${{ steps.bump.outputs.commit }}
           SHORT: ${{ steps.bump.outputs.short }}
           EXPECTED: ${{ steps.proposal.outputs.sha }}
-          RECORD: ${{ steps.record.outcome }}
-          TEST: ${{ steps.test.outcome }}
+          RECORD: ${{ needs.record.outputs.record }}
+          TEST: ${{ needs.record.outputs.test }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           title="chore(deps): follow Hermes Agent main to $SHORT"
-          git add -A -- plugins/hermes-adapter/tests docs/spec/09-agents.md
-          git -c user.name='github-actions[bot]' \
+          git add -A -- plugins/hermes-adapter/tests/hermes_pin.toml \
+            plugins/hermes-adapter/tests/fixtures/recording docs/spec/09-agents.md
+          git -c core.hooksPath=/dev/null -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
             commit -q -s -F - <<EOF
           $title
@@ -91,7 +166,8 @@ jobs:
           Recording: $RECORD. Tests of plugins/hermes-adapter: $TEST.
           EOF
           gh auth setup-git
-          git push -q --force-with-lease="refs/heads/$BRANCH:$EXPECTED" origin "HEAD:refs/heads/$BRANCH"
+          git -c core.hooksPath=/dev/null push -q --force-with-lease="refs/heads/$BRANCH:$EXPECTED" \
+            origin "HEAD:refs/heads/$BRANCH"
           body=$(mktemp)
           cat > "$body" <<EOF
           Proposes upstream Hermes Agent main commit \`$COMMIT\` as the pin of the Hermes adapter
@@ -115,10 +191,10 @@ jobs:
             exit 1
           fi
       - name: Fail when the recording or the tests failed
-        if: steps.bump.outputs.propose == 'true' && (steps.record.outcome != 'success' || steps.test.outcome != 'success')
+        if: steps.bump.outputs.propose == 'true' && (needs.record.outputs.record != 'success' || needs.record.outputs.test != 'success')
         env:
-          RECORD: ${{ steps.record.outcome }}
-          TEST: ${{ steps.test.outcome }}
+          RECORD: ${{ needs.record.outputs.record }}
+          TEST: ${{ needs.record.outputs.test }}
         run: |
           echo "::error::recording $RECORD, tests $TEST: the proposal names what to adapt"
           exit 1
