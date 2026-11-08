@@ -271,8 +271,11 @@ at the repository root is the conformance set of every writer (A1-02).
    a time below the agent's subfolder without following a link and must have exactly one hard
    link, so a link swapped in after the check or a hard link to a file elsewhere resolves nothing
    (`secret_out_of_scope` or `secret_unavailable`). The host operator, who alone writes the
-   folder, keeps it free of copies or links of the runner's or the CLI's credentials; a
-   definition cannot write there. Empty, no reference of a definition resolves. With
+   folder, keeps it free of copies or links of the runner's or the CLI's credentials and keeps
+   the host user's CLI folder itself outside it (the runner checks no overlap with that folder).
+   A `chat` or `scoped` turn cannot write there; a `host` turn runs with the host user's rights
+   and can, so a `host` agent's subfolder holds only secrets that agent may also change. Empty,
+   no reference of a definition resolves. With
    `runner.hosted_agents` the runner refuses to start when the key is not an absolute folder (a
    link is refused), when group or others may write it, when it is equal to, inside or above
    `runner.hosted_agents_root`, `runner.state_dir` or `runner.projects_root`, or when a `file:`

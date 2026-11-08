@@ -559,8 +559,11 @@ never copying a file of it, and checks it itself before every turn.
   references and other agents' subfolders are out of scope. The file is opened one name at a
   time without following a link and must have exactly one hard link, so a link swapped in after
   the check or a hard link to a file elsewhere resolves nothing. The host operator places each
-  agent's secrets there (mode `0600` or `0400`) and keeps copies or links of the runner's or the
-  CLI's credentials out of it; a definition cannot write there. A `url`, an `args[]` entry or a
+  agent's secrets there (mode `0600` or `0400`), keeps copies or links of the runner's or the
+  CLI's credentials out of it and keeps the host user's CLI folder itself outside it (the runner
+  checks no overlap with that folder). A `chat` or `scoped` turn cannot write there; a `host`
+  turn runs with the host user's rights and can, so a `host` agent's subfolder holds only secrets
+  that agent may also change. A `url`, an `args[]` entry or a
   plain `value` with `${` is refused by the own check (`invalid`), because the CLI substitutes
   `${VAR}` there from its own environment. Without the key no reference of a definition
   resolves. The start is refused, naming the key, when it is not an absolute folder (a link is
