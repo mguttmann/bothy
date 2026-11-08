@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import dataclasses
 import json
 import logging
 import os
@@ -43,6 +44,7 @@ if TYPE_CHECKING:
 __all__ = [
     "HANDOVER_EXIT",
     "hand_over",
+    "handover_records",
     "remove_pid_file",
     "stop_turns",
     "stop_turns_requested",
@@ -84,6 +86,31 @@ def remove_pid_file(state_dir: Path) -> None:
     with contextlib.suppress(OSError, ValueError, KeyError, TypeError):
         if int(json.loads(path.read_text())["pid"]) == os.getpid():
             path.unlink()
+
+
+def handover_records(state_dir: Path) -> list[Path]:
+    """The turn records written with ``runner.turn_handover`` (those that carry a phase).
+
+    A runner without the key cannot continue such a turn (its keeper, named pipe and launch
+    files), so it refuses to start while one is left, and ``stop --turns`` stops them through
+    the handover path whatever the key says (issue 567 item 3, 16 10.1).
+
+    Args:
+        state_dir: ``runner.state_dir``.
+
+    Returns:
+        The paths of the records with a ``phase``, sorted; an unreadable record is skipped.
+    """
+    found: list[Path] = []
+    turns = state_dir / "turns"
+    if not turns.is_dir():
+        return found
+    for path in sorted(turns.glob("*.json")):
+        with contextlib.suppress(OSError, ValueError):
+            record = json.loads(path.read_text())
+            if isinstance(record, dict) and "phase" in record:
+                found.append(path)
+    return found
 
 
 def stop_turns_requested(state_dir: Path) -> bool:
@@ -190,6 +217,10 @@ async def _stop_left(config: RunnerConfig) -> None:
     turns = config.state_dir / "turns"
     if not turns.is_dir() or not any(turns.glob("*.json")):
         return
+    if not config.turn_handover and handover_records(config.state_dir):
+        # The key went off while turns were handed over: they are still stopped through their
+        # keeper, as with the key (issue 567 item 3).
+        config = dataclasses.replace(config, turn_handover=True)
     runner = Runner(config)
     adapter = await runner.build()
     handler = runner.handler

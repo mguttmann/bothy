@@ -93,6 +93,7 @@ from claude_code_runner.environment import (
 )
 from claude_code_runner.handover import (
     hand_over,
+    handover_records,
     remove_pid_file,
     stop_turns_requested,
     write_pid_file,
@@ -1395,7 +1396,15 @@ class Runner:
 
         Returns:
             The SDK's close reason.
+
+        Raises:
+            StartError: ``turn_handover_records_left`` when ``runner.turn_handover`` is off and a
+                turn record written with it is left (issue 567 item 3).
         """
+        if not self.config.turn_handover and handover_records(self.config.state_dir):
+            # A turn handed over with the key cannot be continued without it; switch the key
+            # off only after `stop --turns` or while no turn runs (issue 567 item 3, 16 10.1).
+            raise StartError("turn_handover_records_left")
         adapter = self.adapter or await self.build()
         if self.config.turn_handover:
             write_pid_file(self.config.state_dir)  # for `stop --turns`
