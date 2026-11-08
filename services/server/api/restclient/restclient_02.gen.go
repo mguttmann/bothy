@@ -3280,7 +3280,7 @@ type ClientInterface interface {
 
 	// RecoverRunWakeWithBody Create the recovery or usage-limit wake-up of an ended run
 	//
-	// Creates a wake-up of kind `at` with reason `recovery` (lost background work, 09 18.19.9) or `usage_limit` (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state `failed` (which `interrupted` and `stale` runs are), at most one per run and reason: a repetition answers the first one with `200`. A run that did not fail is `409 conflict` with `reason` `run_not_ended`. A refusal of the checks of 09 5.8.6 (`autonomous_not_allowed`, `wake_max_pending`, `usage_wake_max`, a refused `agent.invoke`) stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended`, and answers `409 conflict` with the reason. Audited.
+	// Creates a wake-up of kind `at` with reason `recovery` (lost background work, 09 18.19.9) or `usage_limit` (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state `failed` (which `interrupted` and `stale` runs are), at most one per run and reason: a repetition answers the first one with `200`; a `usage_limit` request while a `usage_limit` wake-up of an outage of the run is pending answers that wake-up with `200` and changes nothing. A run that has not ended is `409 conflict` with `reason` `run_not_ended` and stores nothing; a run that ended `cancelled` or `completed` stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended` and answers `409 conflict` with `reason` `run_not_failed`. A refusal of the checks of 09 5.8.6 (`autonomous_not_allowed`, `wake_max_pending`, `usage_wake_max`, a refused `agent.invoke`) stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended`, and answers `409 conflict` with the reason. Audited.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3289,7 +3289,7 @@ type ClientInterface interface {
 
 	// RecoverRunWake Create the recovery or usage-limit wake-up of an ended run
 	//
-	// Creates a wake-up of kind `at` with reason `recovery` (lost background work, 09 18.19.9) or `usage_limit` (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state `failed` (which `interrupted` and `stale` runs are), at most one per run and reason: a repetition answers the first one with `200`. A run that did not fail is `409 conflict` with `reason` `run_not_ended`. A refusal of the checks of 09 5.8.6 (`autonomous_not_allowed`, `wake_max_pending`, `usage_wake_max`, a refused `agent.invoke`) stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended`, and answers `409 conflict` with the reason. Audited.
+	// Creates a wake-up of kind `at` with reason `recovery` (lost background work, 09 18.19.9) or `usage_limit` (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state `failed` (which `interrupted` and `stale` runs are), at most one per run and reason: a repetition answers the first one with `200`; a `usage_limit` request while a `usage_limit` wake-up of an outage of the run is pending answers that wake-up with `200` and changes nothing. A run that has not ended is `409 conflict` with `reason` `run_not_ended` and stores nothing; a run that ended `cancelled` or `completed` stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended` and answers `409 conflict` with `reason` `run_not_failed`. A refusal of the checks of 09 5.8.6 (`autonomous_not_allowed`, `wake_max_pending`, `usage_wake_max`, a refused `agent.invoke`) stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended`, and answers `409 conflict` with the reason. Audited.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -11405,7 +11405,7 @@ func (c *Client) CreateRunWake(ctx context.Context, runId RunIdPath, params *Cre
 
 // RecoverRunWakeWithBody Create the recovery or usage-limit wake-up of an ended run
 //
-// Creates a wake-up of kind `at` with reason `recovery` (lost background work, 09 18.19.9) or `usage_limit` (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state `failed` (which `interrupted` and `stale` runs are), at most one per run and reason: a repetition answers the first one with `200`. A run that did not fail is `409 conflict` with `reason` `run_not_ended`. A refusal of the checks of 09 5.8.6 (`autonomous_not_allowed`, `wake_max_pending`, `usage_wake_max`, a refused `agent.invoke`) stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended`, and answers `409 conflict` with the reason. Audited.
+// Creates a wake-up of kind `at` with reason `recovery` (lost background work, 09 18.19.9) or `usage_limit` (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state `failed` (which `interrupted` and `stale` runs are), at most one per run and reason: a repetition answers the first one with `200`; a `usage_limit` request while a `usage_limit` wake-up of an outage of the run is pending answers that wake-up with `200` and changes nothing. A run that has not ended is `409 conflict` with `reason` `run_not_ended` and stores nothing; a run that ended `cancelled` or `completed` stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended` and answers `409 conflict` with `reason` `run_not_failed`. A refusal of the checks of 09 5.8.6 (`autonomous_not_allowed`, `wake_max_pending`, `usage_wake_max`, a refused `agent.invoke`) stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended`, and answers `409 conflict` with the reason. Audited.
 //
 // Takes any type of body and a specified content type.
 //
@@ -11424,7 +11424,7 @@ func (c *Client) RecoverRunWakeWithBody(ctx context.Context, runId RunIdPath, pa
 
 // RecoverRunWake Create the recovery or usage-limit wake-up of an ended run
 //
-// Creates a wake-up of kind `at` with reason `recovery` (lost background work, 09 18.19.9) or `usage_limit` (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state `failed` (which `interrupted` and `stale` runs are), at most one per run and reason: a repetition answers the first one with `200`. A run that did not fail is `409 conflict` with `reason` `run_not_ended`. A refusal of the checks of 09 5.8.6 (`autonomous_not_allowed`, `wake_max_pending`, `usage_wake_max`, a refused `agent.invoke`) stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended`, and answers `409 conflict` with the reason. Audited.
+// Creates a wake-up of kind `at` with reason `recovery` (lost background work, 09 18.19.9) or `usage_limit` (the usage window ended the run, 18.19.10) for an ended run of the calling agent in state `failed` (which `interrupted` and `stale` runs are), at most one per run and reason: a repetition answers the first one with `200`; a `usage_limit` request while a `usage_limit` wake-up of an outage of the run is pending answers that wake-up with `200` and changes nothing. A run that has not ended is `409 conflict` with `reason` `run_not_ended` and stores nothing; a run that ended `cancelled` or `completed` stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended` and answers `409 conflict` with `reason` `run_not_failed`. A refusal of the checks of 09 5.8.6 (`autonomous_not_allowed`, `wake_max_pending`, `usage_wake_max`, a refused `agent.invoke`) stores the wake-up in state `refused` with the note in the thread and the notification `wake_ended`, and answers `409 conflict` with the reason. Audited.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -21599,59 +21599,4 @@ func NewCreateHostRequest(server string, params *CreateHostParams, body CreateHo
 	}
 	bodyReader = bytes.NewReader(buf)
 	return NewCreateHostRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewCreateHostRequestWithBody constructs an http.Request for the CreateHost method, with any body, and a specified content type
-func NewCreateHostRequestWithBody(server string, params *CreateHostParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/hosts")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewPairHostRequest calls the generic PairHost builder with application/json body
-func NewPairHostRequest(server string, body PairHostJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPairHostRequestWithBody(server, "application/json", bodyReader)
 }

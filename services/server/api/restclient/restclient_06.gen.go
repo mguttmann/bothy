@@ -13,6 +13,36 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// GetStatsBackendsWithResponse Backend policy view per agent
+//
+// Per agent: configured and reported billing mode, supported modes, switches, denied invocations (I2, I3), cost per mode and the rate-limit state reported by the adapter (docs/spec/25-visualization.md, section 6.2). Agents of channels visible to the caller; cost members only with `cost.read.aggregate`. Never credentials, subscriptions or runtime names of an instance.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /stats/backends (the `GetStatsBackends` operationId).
+func (c *ClientWithResponses) GetStatsBackendsWithResponse(ctx context.Context, params *GetStatsBackendsParams, reqEditors ...RequestEditorFn) (*GetStatsBackendsResponse, error) {
+	rsp, err := c.GetStatsBackends(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetStatsBackendsResponse(rsp)
+}
+
+// GetCostStatsWithResponse Costs per space, agent or instance
+//
+// Valid cost sums (entries without a successor) per bucket and `billing_mode`, grouped by `group_by` (`space`, `agent`, `none`; default `none`). Authorized with `cost.read.aggregate` on the instance (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`; only channels the caller may read count. `personal` and `organization` are never summed together; amounts of mode `personal` are information only and appear only when `billing.show_personal_estimates` is on. `is_estimate` is true when any summed entry is an estimate. One currency per response: `currency` selects it; without it a range whose entries have one currency answers in that currency (`USD` when there is none), and a range with several currencies is `400 validation_failed` with `errors[].code` `currency_required` and the currencies found in `detail`. Ranges, buckets, time zone and cache as for `getUsageStats`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /stats/costs (the `GetCostStats` operationId).
+func (c *ClientWithResponses) GetCostStatsWithResponse(ctx context.Context, params *GetCostStatsParams, reqEditors ...RequestEditorFn) (*GetCostStatsResponse, error) {
+	rsp, err := c.GetCostStats(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetCostStatsResponse(rsp)
+}
+
 // GetErrorStatsWithResponse Error rates of runs and deliveries
 //
 // Metrics per bucket: `run_failure_rate` (failed per ended runs), `invocation_denials` (messages refused with `billing_mode_personal_not_holder` plus runs failed with `billing_mode_mismatch`); only for the instance (owner, without `space_id`): `webhook_failure_rate` (`failed` and `dead` per finished deliveries still within their retention), `push_failure_rate_<provider>` (registrations disabled for a provider reason per registrations active in the bucket), `scan_errors` and `scan_infected`; these have no channel and count the whole instance. A rate without a denominator is left out. Without `space_id` there is no `group_key`; with `space_id` it is the space ID. HTTP error rates come from telemetry, not from this API. Authorized with `stats.read` on the instance (owner) or, with `space_id`, on that space (`manage`); without `space_id` and without owner status `403`, an unreadable space `404`. Every number of a channel counts only the channels the caller may read (`message.read`), intersected with the space; channels without a space (DMs) are not counted. No metric is grouped by person and no person is named. `from` and `to` are aligned down and up to the granularity (default `day`): `hour` in UTC, `day`, `week` (ISO, Monday) and `month` from local midnight of `stats.time_zone`, returned as UTC instants; a range longer than `stats.max_range`, with more than `api.stats_max_buckets` buckets or with `from >= to` is `400 validation_failed`. Buckets without a value are left out. The result is cached per caller scope for `stats.cache_ttl`.

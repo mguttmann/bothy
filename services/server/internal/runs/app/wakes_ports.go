@@ -108,6 +108,9 @@ type WakeRepository interface {
 	WakeByOutage(ctx context.Context, sourceRunID ids.ID, outage int) (row WakeRow, found bool, err error)
 	// WakeBySourceReason locks the wake-up of run.wake.recover of the source run and reason.
 	WakeBySourceReason(ctx context.Context, sourceRunID ids.ID, reason domain.WakeReason) (row WakeRow, found bool, err error)
+	// PendingUsageWakeOfRun locks the pending usage_limit wake-up of an outage of the source run
+	// (run.wake.create); found is false for none.
+	PendingUsageWakeOfRun(ctx context.Context, sourceRunID ids.ID) (row WakeRow, found bool, err error)
 	// UpdateWake runs the compare-and-swap of w and raises the version by one; changed is false
 	// when the version no longer matches.
 	UpdateWake(ctx context.Context, w WakeWrite) (row WakeRow, changed bool, err error)

@@ -143,6 +143,16 @@ func TestWake_UsageLimitOutage(t *testing.T) {
 	if !w.wake(first).NotBefore.Equal(later) {
 		t.Fatal("an earlier reset moved the wake-up back")
 	}
+	// A reset past the stored deadline moves the deadline in the same update, so not_before <=
+	// deadline holds (issue 567 item 14, R-API-30: no 500 from run_wakes_window_check).
+	beyond := w.wake(first).Deadline.Add(time.Hour)
+	w.want(w.createWake("lotse", r.ID, body(1, beyond)), http.StatusOK, "")
+	if got := w.wake(first); !got.NotBefore.Equal(beyond) || !got.Deadline.Equal(beyond.Add(wakeCfg.MaxWait)) || got.State != "pending" {
+		t.Fatalf("a reset past the deadline %+v", got)
+	}
+	if jobs := w.jobs.of(first); len(jobs) == 0 || !jobs[len(jobs)-1].Equal(beyond.Add(wakeCfg.MaxWait)) {
+		t.Fatalf("jobs after the move %v", jobs)
+	}
 	w.want(w.createWake("lotse", r.ID, body(2, reset)), http.StatusCreated, "")
 	w.want(w.createWake("lotse", r.ID, body(3, reset)), http.StatusCreated, "")
 	w.wantReason(w.createWake("lotse", r.ID, body(4, reset)), http.StatusConflict, "conflict", "usage_wake_max")
@@ -188,6 +198,71 @@ func TestWake_Recover(t *testing.T) {
 	}
 	if notes := w.notes(alex.Thread); len(notes) != 1 || !strings.Contains(notes[0], "Lost work") {
 		t.Fatalf("notes %v", notes)
+	}
+}
+
+// TestWake_RecoverUsageLimitWhileOutagePending (issue 567 item 4, 09 18.19.10): a usage_limit
+// recovery after a restart changes nothing while the outage's wake-up of run.wake.create is
+// pending, so one outage never gets two wake-ups; it answers that wake-up.
+func TestWake_RecoverUsageLimitWhileOutagePending(t *testing.T) {
+	w := newWakeWorld(t, wakeCfg)
+	r := w.runOfPerson("owner")
+	reset := w.clk.Now().Add(3 * time.Hour)
+	outage := w.want(w.createWake("lotse", r.ID, `{"kind":"at","reason":"usage_limit","outage":1,"not_before":"`+reset.Format(time.RFC3339)+`"}`),
+		http.StatusCreated, "")["id"].(string)
+	w.wantOK(w.finish("lotse", r.ID, `"state":"failed","reason":"usage_limited"`))
+	got := w.want(w.do("lotse", http.MethodPost, "/api/v1/runs/"+r.ID+"/wakes/recover", `{"reason":"usage_limit"}`, key()...), http.StatusOK, "")
+	if got["id"] != outage || got["state"] != "pending" {
+		t.Fatalf("recover answered %v", got)
+	}
+	if n := w.count(`SELECT count(*) FROM run_wakes WHERE source_run_id = $1 AND reason = 'usage_limit'`, r.ID); n != 1 {
+		t.Fatalf("%d usage_limit wake-ups of one outage", n)
+	}
+	if !w.wake(outage).NotBefore.Equal(reset) {
+		t.Fatalf("the pending wake-up changed %+v", w.wake(outage))
+	}
+	// Once that wake-up is no longer pending, a recovery after a restart gets its own.
+	w.wantOK(w.do("lotse", http.MethodPost, "/api/v1/wakes/"+outage+"/cancel", `{"reason":"usage_cleared"}`, key()...))
+	w.want(w.do("lotse", http.MethodPost, "/api/v1/runs/"+r.ID+"/wakes/recover", `{"reason":"usage_limit"}`, key()...), http.StatusCreated, "")
+}
+
+// TestWake_RecoverOfARunThatDidNotFail (issue 567 item 7, 09 18.19.9): lost work of a run that
+// ended cancelled or completed gets no recovery wake-up; the wake-up is stored refused with the
+// reason run_not_failed, so the thread gets the note and the person the notification; a run that
+// has not ended stores nothing.
+func TestWake_RecoverOfARunThatDidNotFail(t *testing.T) {
+	w := newWakeWorld(t, wakeCfg)
+	recover := func(run, body string) *httpservertest.Response {
+		return w.do("lotse", http.MethodPost, "/api/v1/runs/"+run+"/wakes/recover", body, key()...)
+	}
+	for _, end := range []string{`"state":"cancelled","reason":"user_cancelled"`, `"state":"completed"`} {
+		r := w.runOfPerson("owner")
+		w.wantReason(recover(r.ID, `{"reason":"recovery","label":"Lost background work"}`), http.StatusConflict, "conflict", "run_not_ended")
+		if n := w.count(`SELECT count(*) FROM run_wakes WHERE source_run_id = $1`, r.ID); n != 0 {
+			t.Fatalf("a running run stored %d", n)
+		}
+		w.wantOK(w.finish("lotse", r.ID, end))
+		w.wantReason(recover(r.ID, `{"reason":"recovery","label":"Lost background work"}`), http.StatusConflict, "conflict", "run_not_failed")
+		if n := w.count(`SELECT count(*) FROM run_wakes WHERE source_run_id = $1 AND state = 'refused' AND state_reason = 'run_not_failed'`,
+			r.ID); n != 1 {
+			t.Fatalf("%s: refused wake-ups %d", end, n)
+		}
+		notes := w.notes(r.Thread)
+		if len(notes) != 1 || !strings.Contains(notes[0], "Lost background work") || !strings.Contains(notes[0], "run_not_failed") {
+			t.Fatalf("%s: notes %v", end, notes)
+		}
+		ev := w.wakeEvents(r.Thread)
+		if last := ev[len(ev)-1]; last["state"] != "refused" || last["note_message_id"] == nil {
+			t.Fatalf("%s: run.wake_changed %v", end, last)
+		}
+		// A repetition (the next runner after a crash) adds no second note.
+		recover(r.ID, `{"reason":"recovery","label":"Lost background work"}`)
+		if len(w.notes(r.Thread)) != 1 {
+			t.Fatalf("%s: a second note", end)
+		}
+		if n := w.audits("run.wake.recover", "deny", "run_not_failed"); n < 1 {
+			t.Fatalf("%s: %d audit entries", end, n)
+		}
 	}
 }
 

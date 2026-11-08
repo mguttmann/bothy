@@ -208,6 +208,44 @@ func (q *Queries) LockWake(ctx context.Context, id pgtype.UUID) (RunWake, error)
 	return i, err
 }
 
+const pendingUsageWakeOfRun = `-- name: PendingUsageWakeOfRun :one
+SELECT id, agent_id, thread_id, source_run_id, triggered_by, kind, condition, label, reason, outage, not_before, deadline, state, state_reason, result_text, fired_run_id, fired_into_run_id, created_at, ended_at, version FROM run_wakes
+WHERE source_run_id = $1 AND reason = 'usage_limit' AND outage IS NOT NULL AND state = 'pending'
+ORDER BY outage DESC
+LIMIT 1
+FOR UPDATE
+`
+
+// The pending usage_limit wake-up of an outage of a source run, locked (09 18.19.10: a recovery
+// with usage_limit changes nothing while one is pending).
+func (q *Queries) PendingUsageWakeOfRun(ctx context.Context, sourceRunID pgtype.UUID) (RunWake, error) {
+	row := q.db.QueryRow(ctx, pendingUsageWakeOfRun, sourceRunID)
+	var i RunWake
+	err := row.Scan(
+		&i.ID,
+		&i.AgentID,
+		&i.ThreadID,
+		&i.SourceRunID,
+		&i.TriggeredBy,
+		&i.Kind,
+		&i.Condition,
+		&i.Label,
+		&i.Reason,
+		&i.Outage,
+		&i.NotBefore,
+		&i.Deadline,
+		&i.State,
+		&i.StateReason,
+		&i.ResultText,
+		&i.FiredRunID,
+		&i.FiredIntoRunID,
+		&i.CreatedAt,
+		&i.EndedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
 const pendingWakeCounts = `-- name: PendingWakeCounts :many
 SELECT kind, count(*) AS n FROM run_wakes WHERE state = 'pending' GROUP BY kind ORDER BY kind
 `

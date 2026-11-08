@@ -37,6 +37,15 @@ WHERE source_run_id = sqlc.arg(source_run_id) AND reason = sqlc.arg(reason) AND 
     AND (reason = 'recovery' OR reason = 'usage_limit')
 FOR UPDATE;
 
+-- name: PendingUsageWakeOfRun :one
+-- The pending usage_limit wake-up of an outage of a source run, locked (09 18.19.10: a recovery
+-- with usage_limit changes nothing while one is pending).
+SELECT * FROM run_wakes
+WHERE source_run_id = sqlc.arg(source_run_id) AND reason = 'usage_limit' AND outage IS NOT NULL AND state = 'pending'
+ORDER BY outage DESC
+LIMIT 1
+FOR UPDATE;
+
 -- name: UpdateWake :one
 -- The compare-and-swap of a state change: ended_at follows the state, the window changes only
 -- with a repeated usage_limit request, the fired columns only with a fire or a skipped input.
