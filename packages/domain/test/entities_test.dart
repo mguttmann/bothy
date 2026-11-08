@@ -106,6 +106,20 @@ void main() {
       isNot(ucs),
     );
   });
+  test('UserChannelState carries the personal archive (PROJ-ARCHIVE)', () {
+    final at = DateTime.utc(2026, 11, 8, 9);
+    final hidden = UserChannelState(
+      channelId: channel1,
+      threadOrder: [thread1, thread2],
+      version: v1,
+      updatedByDeviceId: device,
+      hiddenAt: at,
+    );
+    expect(ucs.hidden, isFalse);
+    expect(hidden.hidden, isTrue);
+    expect(hidden, isNot(ucs));
+    expect(hidden.copyWith(version: const ResourceVersion(2)).hiddenAt, at);
+  });
 
   ChannelOperator mkOp() => ChannelOperator(
     mode: OperatorMode.agent,

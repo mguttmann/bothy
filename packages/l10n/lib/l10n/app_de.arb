@@ -2960,5 +2960,9 @@
   "agentHostErrNotCapable": "Dieser Runner nimmt gerade keine eingebauten Agenten auf. Wähle einen anderen Runner.",
   "builtinAgentsEntry": "Eingebaute Agenten",
   "builtinAgentsEntryHint": "Bearbeiten, verschieben und deaktivieren",
-  "builtinAgentsEmpty": "Noch keine eingebauten Agenten."
+  "builtinAgentsEmpty": "Noch keine eingebauten Agenten.",
+  "channelMenuArchiveProject": "Projekt archivieren",
+  "channelMenuArchive": "Archivieren",
+  "channelMenuRestore": "Wiederherstellen",
+  "sidebarArchived": "Archiviert ({count})"
 }

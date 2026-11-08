@@ -100,6 +100,10 @@ class UserChannelStates extends Table {
   /// 03 `user_channel_states.updated_by_device_id`.
   TextColumn get updatedByDeviceId => text().nullable()();
 
+  /// 03 `user_channel_states.hidden_at` (PROJ-ARCHIVE, 01 6.22): set while the person archived
+  /// the channel in the own sidebar; null while it shows.
+  DateTimeColumn get hiddenAt => dateTime().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {channelId};
 }

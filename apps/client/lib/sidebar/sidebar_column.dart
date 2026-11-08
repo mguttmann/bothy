@@ -82,7 +82,16 @@ class SidebarView extends StatelessWidget {
     this.arrangement = const SidebarArrangement(),
     this.onMoveChannel,
     this.onMoveThread,
+    this.onSetHidden,
+    this.onToggleArchived,
   });
+
+  /// Archives (true) or restores (false) a channel in the person's own sidebar (01 6.22), or
+  /// null for no such entry.
+  final void Function(ChannelId channel, bool hidden)? onSetHidden;
+
+  /// Expands (true) or collapses the section "Archived (n)" of a space on this device, or null.
+  final void Function(SpaceId space, bool expanded)? onToggleArchived;
 
   /// Which levels are arranged by activity (01 6.16, M4-51): an automatic level cannot be
   /// dragged and its rows' menus say why.
@@ -248,6 +257,8 @@ class SidebarView extends StatelessWidget {
           touch: holdMode == SidebarHoldMode.touch,
           onMoveChannel: onMoveChannel,
           onMoveThread: onMoveThread,
+          onSetHidden: onSetHidden,
+          onToggleArchived: onToggleArchived,
         ),
       ),
       // The group scrolls within a share of the column, so the spaces keep their room.
@@ -540,15 +551,31 @@ class SidebarColumn extends ConsumerWidget {
       onMoveChannel: (space, channel, to) {
         final node = nodes.where((n) => n.entry.space.id == space).firstOrNull;
         if (node == null) return;
-        final all = [for (final c in node.channels) c.channel.id];
+        // The whole manual order, the archived channels in their places included, so a
+        // restored channel comes back where it was (01 6.22 item 3).
         unawaited(
           writer()?.orderChannels(
             space,
-            moveAmong(all, all, channel, to),
+            moveAmong(
+              node.manualOrder,
+              [for (final c in node.channels) c.channel.id],
+              channel,
+              to,
+            ),
             collapsed: node.entry.storedCollapsed,
           ),
         );
       },
+      // 01 6.22: the personal archive follows the person to every device (outbox); whether the
+      // section "Archived (n)" is expanded stays on this device.
+      onSetHidden: (channel, hidden) =>
+          unawaited(writer()?.setHidden(channel, hidden: hidden)),
+      onToggleArchived: (space, expanded) => unawaited(
+        ref
+            .read(localDatabaseProvider)
+            ?.forumViewDao
+            .setArchivedExpanded(space, expanded: expanded),
+      ),
       onMoveThread: (forum, thread, to) {
         final group = ref.read(channelThreadsProvider(forum.value));
         if (group == null) return;

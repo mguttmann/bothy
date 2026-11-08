@@ -314,6 +314,14 @@ and a forum post row within its forum (01 6.16): on the desktop with the mouse a
 press; the lifted row shows its name on `color.surface.sidebar-selected`. The sidebar menus have "Move
 up" and "Move down". A level arranged by activity does not lift its rows and shows a note instead.
 
+Archive for oneself (addendum of 2026-11-08, 01 6.22): the sidebar menu of a channel or forum has,
+above the delete entry and after a divider, "Archive project" (a forum with a project binding) or
+"Archive"; the row moves into the section "Archived (n)" at the very bottom of its space: a row
+indented like a channel row with the arrow (`action.expand` or `action.collapse`) and the text in
+`type.label`, `color.text.on-sidebar-secondary`, collapsed by default and hidden while the space
+has none. The rows in the section are normal channel rows with their states; their menu has
+"Restore" instead. The rows carry the same entry as a screen reader action.
+
 Delete (addendum of 2026-11-01, 01 6.18): the menus of a space, a channel or forum and a chat row
 end with a divider and "Delete space...", "Delete channel...", "Delete project..." (a forum with a
 project binding) or "Delete chat...", for whoever has the right; the "More" button of a main

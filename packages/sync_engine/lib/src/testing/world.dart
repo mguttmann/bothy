@@ -2180,13 +2180,16 @@ final class FakeWorld {
         value,
   ];
 
-  /// Stores the own thread order of [principalId] for [channelId] from a `SidebarChannelPut`
-  /// [body] (`putMySidebarChannel`, M4-51): version + 1, last write wins, and the personal
-  /// `sidebar_channel.updated`. The IDs are not checked against threads (D-M4-51-8).
+  /// Stores the own thread order of [principalId] for [channelId] and its personal archive
+  /// from a `SidebarChannelPut` [body] (`putMySidebarChannel`, M4-51 and PROJ-ARCHIVE): an
+  /// absent member keeps the stored value, `hidden: true` keeps an earlier `hidden_at` or takes
+  /// the world's time, `false` clears it; version + 1, last write wins, and the personal
+  /// `sidebar_channel.updated`. A body that changes nothing returns the stored state without a
+  /// new version or an event (06 R-API-31). The IDs are not checked against threads (D-M4-51-8).
   ///
   /// Throws [FakeProblem]: `404` for a channel the principal does not see, `400
-  /// validation_failed` for a missing `thread_order` (`required`) or a repeated ID in it
-  /// (`duplicate`), both on `/thread_order`.
+  /// validation_failed` for a body with neither `thread_order` nor `hidden` (`required`) or a
+  /// repeated ID in the order (`duplicate`), both on `/thread_order`.
   JsonMap putSidebarChannel(
     String principalId,
     String channelId,
@@ -2197,7 +2200,8 @@ final class FakeWorld {
       throw const FakeProblem(404, 'not_found');
     }
     final order = _uniqueOrder(body['thread_order'], '/thread_order');
-    if (order == null) {
+    final hide = body['hidden'];
+    if (order == null && hide is! bool) {
       throw const FakeProblem(
         400,
         'validation_failed',
@@ -2208,9 +2212,35 @@ final class FakeWorld {
     }
     final slot = '$principalId|$channelId';
     final previous = sidebarChannelStates[slot];
+    final oldOrder = [
+      for (final id in (previous?['thread_order'] as List?) ?? const [])
+        id as String,
+    ];
+    final oldHidden = previous?['hidden_at'] as String?;
+    final newOrder = order ?? oldOrder;
+    final newHidden = switch (hide) {
+      true => oldHidden ?? stamp(),
+      false => null,
+      _ => oldHidden,
+    };
+    final sameOrder =
+        newOrder.length == oldOrder.length &&
+        Iterable<int>.generate(newOrder.length)
+            .every((i) => newOrder[i] == oldOrder[i]);
+    if (previous != null && sameOrder && newHidden == oldHidden) {
+      return previous;
+    }
+    if (previous == null && order == null && newHidden == null) {
+      return {
+        'channel_id': channelId,
+        'thread_order': <String>[],
+        'version': 0,
+      };
+    }
     final state = <String, Object?>{
       'channel_id': channelId,
-      'thread_order': order,
+      'thread_order': newOrder,
+      'hidden_at': ?newHidden,
       'version': ((previous?['version'] as int?) ?? 0) + 1,
       'updated_by_device_id': ?deviceId,
     };

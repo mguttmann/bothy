@@ -188,9 +188,9 @@ func sidebarREST(st sync.SidebarState) rest.SidebarState {
 }
 
 // sidebarChannelREST converts a channel row of the sidebar (schema SidebarChannelState, M4-51);
-// thread_order is always an array.
+// thread_order is always an array, hidden_at only while the channel is archived (PROJ-ARCHIVE).
 func sidebarChannelREST(st sync.SidebarChannelState) rest.SidebarChannelState {
-	return rest.SidebarChannelState{ChannelId: rest.Uuid(st.ChannelID), ThreadOrder: restIDs(st.ThreadOrder), Version: st.Version,
+	return rest.SidebarChannelState{ChannelId: rest.Uuid(st.ChannelID), ThreadOrder: restIDs(st.ThreadOrder), HiddenAt: optionalTime(st.HiddenAt), Version: st.Version,
 		UpdatedByDeviceId: optionalID(st.UpdatedByDeviceID)}
 }
 

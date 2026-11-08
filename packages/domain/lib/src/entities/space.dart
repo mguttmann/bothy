@@ -179,10 +179,18 @@ final class UserChannelState {
     required this.threadOrder,
     required this.version,
     this.updatedByDeviceId,
+    this.hiddenAt,
   });
 
   /// Channel.
   final ChannelId channelId;
+
+  /// When the person archived the channel in the own sidebar (01 6.22, PROJ-ARCHIVE); null while
+  /// it shows in the normal list.
+  final DateTime? hiddenAt;
+
+  /// Whether the person archived the channel in the own sidebar.
+  bool get hidden => hiddenAt != null;
 
   /// Own order of the threads of the channel; empty means the default order. Threads not in
   /// the list come first (D-M4-51-3).
@@ -205,6 +213,7 @@ final class UserChannelState {
     threadOrder: threadOrder ?? this.threadOrder,
     version: version ?? this.version,
     updatedByDeviceId: updatedByDeviceId ?? this.updatedByDeviceId,
+    hiddenAt: hiddenAt,
   );
 
   @override
@@ -213,7 +222,8 @@ final class UserChannelState {
       other.channelId == channelId &&
       listEquals(other.threadOrder, threadOrder) &&
       other.version == version &&
-      other.updatedByDeviceId == updatedByDeviceId;
+      other.updatedByDeviceId == updatedByDeviceId &&
+      other.hiddenAt == hiddenAt;
 
   @override
   int get hashCode => Object.hash(
@@ -221,6 +231,7 @@ final class UserChannelState {
     Object.hashAll(threadOrder),
     version,
     updatedByDeviceId,
+    hiddenAt,
   );
 }
 

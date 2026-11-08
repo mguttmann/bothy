@@ -108,7 +108,9 @@ func TestSidebarPutChannel(t *testing.T) {
 	if order, ok := m["thread_order"].([]any); !ok || len(order) != 0 || m["version"] != float64(2) || m["updated_by_device_id"] != phone.String() {
 		t.Fatalf("second device %v", m)
 	}
-	for _, body := range []string{`{}`, `{"thread_order":null}`, `{"thread_order":` + idList(p1, p1) + `}`,
+	// A body without any member fails the schema (minProperties) before the handler.
+	w.want(w.do("alex", http.MethodPut, sidebarChannelPath(forum), `{}`), http.StatusBadRequest, "validation_failed")
+	for _, body := range []string{`{"thread_order":null}`, `{"thread_order":` + idList(p1, p1) + `}`,
 		`{"thread_order":` + idList(ids.New(), ids.New(), ids.New(), ids.New()) + `}`, `{"thread_order":["not-an-id"]}`} {
 		p := w.want(w.do("alex", http.MethodPut, sidebarChannelPath(forum), body), http.StatusBadRequest, "validation_failed")
 		if !strings.HasPrefix(pointer(p), "/thread_order") {
@@ -153,4 +155,86 @@ func TestSidebarPutChannel(t *testing.T) {
 	if got, err := w.svc.ListSidebarChannelStates(context.Background(), w.actor("alex")); err != nil || len(got) != 0 {
 		t.Fatalf("archived channel listed: %+v, %v", got, err)
 	}
+}
+
+// TestSidebarPutChannelHidden (PROJ-ARCHIVE, 01 6.22, 06 R-API-31): hidden true archives the
+// channel in the caller's own sidebar (hidden_at set, version + 1, the post order kept,
+// sidebar_channel.updated with hidden_at); the same write again changes nothing (same hidden_at and
+// version, no event); hidden false restores it (hidden_at absent) from another device of the same
+// person; restoring again changes nothing; the channel itself, its version, its read state for
+// others and its reachability stay as they were, and another person's row is untouched.
+func TestSidebarPutChannelHidden(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t)
+	alex := w.person("alex", false)
+	phone := w.session("alex-phone", alex, time.Time{})
+	support := w.create("Support")
+	w.grant(alex, support, "read")
+	forum := w.channel(support, "forum", "bugs")
+	p1 := ids.New()
+	w.want(w.do("alex", http.MethodPut, sidebarChannelPath(forum), `{"thread_order":`+idList(p1)+`}`), http.StatusOK, "")
+	w.want(w.do("owner", http.MethodPut, sidebarChannelPath(forum), `{"thread_order":[]}`), http.StatusOK, "")
+	channelVersion := w.count(`SELECT version::int FROM channels WHERE id = $1`, forum.String())
+
+	m := w.want(w.do("alex", http.MethodPut, sidebarChannelPath(forum), `{"hidden":true}`), http.StatusOK, "")
+	hiddenAt, _ := m["hidden_at"].(string)
+	if hiddenAt == "" || m["version"] != float64(2) || !slices.Equal(strs(m["thread_order"]), []string{p1.String()}) {
+		t.Fatalf("archive %v", m)
+	}
+	m = w.want(w.do("alex", http.MethodPut, sidebarChannelPath(forum), `{"hidden":true}`), http.StatusOK, "")
+	if m["hidden_at"] != hiddenAt || m["version"] != float64(2) {
+		t.Fatalf("archive again must change nothing: %v", m)
+	}
+	m = w.want(w.do("alex-phone", http.MethodPut, sidebarChannelPath(forum), `{"hidden":false}`), http.StatusOK, "")
+	if _, has := m["hidden_at"]; has || m["version"] != float64(3) || m["updated_by_device_id"] != phone.String() ||
+		!slices.Equal(strs(m["thread_order"]), []string{p1.String()}) {
+		t.Fatalf("restore %v", m)
+	}
+	m = w.want(w.do("alex", http.MethodPut, sidebarChannelPath(forum), `{"hidden":false}`), http.StatusOK, "")
+	if _, has := m["hidden_at"]; has || m["version"] != float64(3) {
+		t.Fatalf("restore again must change nothing: %v", m)
+	}
+	for _, body := range []string{`{"hidden":null}`, `{"hidden":"yes"}`} {
+		w.want(w.do("alex", http.MethodPut, sidebarChannelPath(forum), body), http.StatusBadRequest, "validation_failed")
+	}
+
+	var alexEvents []event
+	for _, e := range w.events("sidebar_channel.updated") {
+		if e.Audience == alex.String() {
+			alexEvents = append(alexEvents, e)
+		}
+	}
+	if len(alexEvents) != 3 {
+		t.Fatalf("sidebar_channel.updated for Alex: %d events, want 3 (order, archive, restore)", len(alexEvents))
+	}
+	if st, _ := alexEvents[1].Payload["state"].(map[string]any); st == nil || !sameTime(t, st["hidden_at"], hiddenAt) || st["version"] != float64(2) {
+		t.Fatalf("archive event %+v", alexEvents[1].Payload)
+	}
+	if st, _ := alexEvents[2].Payload["state"].(map[string]any); st == nil || st["hidden_at"] != nil || st["version"] != float64(3) {
+		t.Fatalf("restore event %+v", alexEvents[2].Payload)
+	}
+	// Nothing outside Alex's row changes: the channel, the owner's row, and the channel still opens.
+	if v := w.count(`SELECT version::int FROM channels WHERE id = $1 AND archived_at IS NULL AND NOT read_only`, forum.String()); v != channelVersion {
+		t.Fatalf("the channel changed: version %d, want %d", v, channelVersion)
+	}
+	if n := w.count(`SELECT count(*) FROM user_channel_states WHERE hidden_at IS NOT NULL`); n != 0 {
+		t.Fatalf("%d archived rows after the restore", n)
+	}
+	w.want(w.do("alex", http.MethodPut, sidebarChannelPath(forum), `{"hidden":true}`), http.StatusOK, "")
+	if n := w.count(`SELECT count(*) FROM user_channel_states WHERE hidden_at IS NOT NULL AND user_id = $1`, alex.String()); n != 1 {
+		t.Fatalf("Alex's row: %d archived", n)
+	}
+	if n := w.count(`SELECT count(*) FROM user_channel_states WHERE hidden_at IS NOT NULL AND user_id <> $1`, alex.String()); n != 0 {
+		t.Fatalf("another person's row was archived: %d", n)
+	}
+	w.want(w.do("alex", http.MethodGet, "/api/v1/channels/"+forum.String(), ""), http.StatusOK, "")
+}
+
+// sameTime reports whether the JSON time v names the same instant as want.
+func sameTime(t *testing.T, v any, want string) bool {
+	t.Helper()
+	got, _ := v.(string)
+	a, errA := time.Parse(time.RFC3339Nano, got)
+	b, errB := time.Parse(time.RFC3339Nano, want)
+	return errA == nil && errB == nil && a.Equal(b)
 }

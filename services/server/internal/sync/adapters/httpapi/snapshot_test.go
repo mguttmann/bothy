@@ -47,6 +47,7 @@ type snapshot struct {
 	SidebarChannels []struct {
 		ChannelID   string   `json:"channel_id"`
 		ThreadOrder []string `json:"thread_order"`
+		HiddenAt    string   `json:"hidden_at"`
 		Version     int64    `json:"version"`
 	} `json:"sidebar_channels"`
 	UnreadThreads []struct {
@@ -117,6 +118,8 @@ func TestSnapshotContents(t *testing.T) {
 		`{"collapsed":true,"channel_order":["`+forum.String()+`","`+e.supportChan.String()+`"]}`), http.StatusOK, "")
 	post := ids.New()
 	e.Want(e.Do("alex", http.MethodPut, "/api/v1/me/sidebar/channels/"+forum.String(), `{"thread_order":["`+post.String()+`"]}`), http.StatusOK, "")
+	// PROJ-ARCHIVE: the personal archive of the forum reaches a new device through the snapshot.
+	e.Want(e.Do("alex", http.MethodPut, "/api/v1/me/sidebar/channels/"+forum.String(), `{"hidden":true}`), http.StatusOK, "")
 	// A row of Alex for a channel Alex cannot read (written as a fixture) stays out (M4-51).
 	e.SQL(`INSERT INTO user_channel_states (user_id, channel_id) VALUES ($1, $2)`, e.alex.String(), e.marketingChan.String())
 
@@ -142,7 +145,8 @@ func TestSnapshotContents(t *testing.T) {
 		t.Fatalf("sidebar %+v", s.Sidebar)
 	}
 	if len(s.SidebarChannels) != 1 || s.SidebarChannels[0].ChannelID != forum.String() ||
-		!slices.Equal(s.SidebarChannels[0].ThreadOrder, []string{post.String()}) || s.SidebarChannels[0].Version != 1 {
+		!slices.Equal(s.SidebarChannels[0].ThreadOrder, []string{post.String()}) || s.SidebarChannels[0].Version != 2 ||
+		s.SidebarChannels[0].HiddenAt == "" {
 		t.Fatalf("sidebar channels %+v", s.SidebarChannels)
 	}
 	if len(s.UnreadThreads) != 1 {

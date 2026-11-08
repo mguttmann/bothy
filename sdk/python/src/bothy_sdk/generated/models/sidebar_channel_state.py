@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import Any, Self, TypeVar
 from uuid import UUID
@@ -20,12 +21,14 @@ class SidebarChannelState:
         thread_order (list[UUID]): Personal order of the open posts of the channel; empty uses the default order. At
             most `sidebar.order_max_items`.
         version (int):
+        hidden_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         updated_by_device_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
     """
 
     channel_id: UUID
     thread_order: list[UUID]
     version: int
+    hidden_at: datetime.datetime | Unset = UNSET
     updated_by_device_id: UUID | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -38,6 +41,10 @@ class SidebarChannelState:
             thread_order.append(thread_order_item)
 
         version = self.version
+
+        hidden_at: str | Unset = UNSET
+        if not isinstance(self.hidden_at, Unset):
+            hidden_at = self.hidden_at.isoformat()
 
         updated_by_device_id: str | Unset = UNSET
         if not isinstance(self.updated_by_device_id, Unset):
@@ -52,6 +59,8 @@ class SidebarChannelState:
                 "version": version,
             }
         )
+        if hidden_at is not UNSET:
+            field_dict["hidden_at"] = hidden_at
         if updated_by_device_id is not UNSET:
             field_dict["updated_by_device_id"] = updated_by_device_id
 
@@ -71,6 +80,13 @@ class SidebarChannelState:
 
         version = d.pop("version")
 
+        _hidden_at = d.pop("hidden_at", UNSET)
+        hidden_at: datetime.datetime | Unset
+        if isinstance(_hidden_at, Unset):
+            hidden_at = UNSET
+        else:
+            hidden_at = datetime.datetime.fromisoformat(_hidden_at)
+
         _updated_by_device_id = d.pop("updated_by_device_id", UNSET)
         updated_by_device_id: UUID | Unset
         if isinstance(_updated_by_device_id, Unset):
@@ -82,6 +98,7 @@ class SidebarChannelState:
             channel_id=channel_id,
             thread_order=thread_order,
             version=version,
+            hidden_at=hidden_at,
             updated_by_device_id=updated_by_device_id,
         )
 

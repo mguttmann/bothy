@@ -26,6 +26,8 @@ import '../models.dart';
 /// db.forumViewDao.watchCollapsedGroups().listen(print); // {forum}
 /// await db.forumViewDao.setSpaceCollapsed(space, collapsed: true);
 /// db.forumViewDao.watchCollapsedSpaces().listen(print); // {space}
+/// await db.forumViewDao.setArchivedExpanded(space, expanded: true);
+/// db.forumViewDao.watchArchivedExpandedSpaces().listen(print); // {space}
 /// await db.forumViewDao.setPostListShownInFull(forum, inFull: true);
 /// db.forumViewDao.watchPostListsShownInFull().listen(print); // {forum}
 /// await db.forumViewDao.setOverviewPinned(pinned: true);
@@ -114,6 +116,35 @@ final class ForumViewDao {
           SpaceViewStatesCompanion.insert(
             spaceId: space.value,
             collapsed: collapsed,
+          ),
+        );
+  }
+
+  /// The spaces whose section "Archived (n)" is expanded on this device (01 6.22 item 2,
+  /// PROJ-ARCHIVE), emitted on every change; a space without a stored row has it collapsed.
+  Stream<Set<SpaceId>> watchArchivedExpandedSpaces() =>
+      (_db.select(_db.spaceViewStates)
+            ..where((t) => t.archivedExpanded.equals(true)))
+          .map((row) => SpaceId.parse(row.spaceId))
+          .watch()
+          .map((spaces) => spaces.toSet());
+
+  /// Stores whether the section "Archived (n)" of [space] is [expanded] on this device; the
+  /// collapse of the space itself stays (a new row is an expanded space).
+  Future<void> setArchivedExpanded(
+    SpaceId space, {
+    required bool expanded,
+  }) async {
+    await _db
+        .into(_db.spaceViewStates)
+        .insert(
+          SpaceViewStatesCompanion.insert(
+            spaceId: space.value,
+            collapsed: false,
+            archivedExpanded: Value(expanded),
+          ),
+          onConflict: DoUpdate(
+            (_) => SpaceViewStatesCompanion(archivedExpanded: Value(expanded)),
           ),
         );
   }

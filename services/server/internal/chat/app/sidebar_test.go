@@ -8,6 +8,7 @@ import (
 	"errors"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -85,7 +86,7 @@ func TestSidebarChannel(t *testing.T) {
 		wantCode(t, err, errs.CodeForbidden)
 	}
 	p1, p2 := ids.New(), ids.New()
-	st, err := e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{ThreadOrder: []ids.ID{p2, p1}})
+	st, err := e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{ThreadOrder: &[]ids.ID{p2, p1}})
 	if err != nil || st.ChannelID != forum.ID || !slices.Equal(st.ThreadOrder, []ids.ID{p2, p1}) || st.Version != 1 || st.UpdatedByDeviceID != e.owner.DeviceID {
 		t.Fatalf("put %+v, %v", st, err)
 	}
@@ -106,7 +107,7 @@ func TestSidebarChannel(t *testing.T) {
 		!slices.Equal(payload.State.ThreadOrder, []string{p2.String(), p1.String()}) || payload.State.Version != 1 || payload.State.Device != e.owner.DeviceID.String() {
 		t.Fatalf("payload %+v, %v", payload, err)
 	}
-	st, err = e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{})
+	st, err = e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{ThreadOrder: &[]ids.ID{}})
 	if err != nil || len(st.ThreadOrder) != 0 || st.ThreadOrder == nil || st.Version != 2 {
 		t.Fatalf("empty %+v, %v", st, err)
 	}
@@ -114,9 +115,9 @@ func TestSidebarChannel(t *testing.T) {
 	if err := json.Unmarshal(e.events.evs[len(e.events.evs)-1].Payload, &payload); err != nil || payload.State.ThreadOrder == nil {
 		t.Fatalf("empty payload must carry []: %+v, %v", payload, err)
 	}
-	_, err = e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{ThreadOrder: []ids.ID{p1, p1}})
+	_, err = e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{ThreadOrder: &[]ids.ID{p1, p1}})
 	wantField(t, err, "/thread_order", "duplicate")
-	_, err = e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{ThreadOrder: []ids.ID{ids.New(), ids.New(), ids.New(), ids.New()}})
+	_, err = e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{ThreadOrder: &[]ids.ID{ids.New(), ids.New(), ids.New(), ids.New()}})
 	wantField(t, err, "/thread_order", "limit_reached")
 	_, err = e.svc.PutSidebarChannel(ctx, e.owner, ids.New(), chat.SidebarChannelPutCmd{})
 	wantCode(t, err, errs.CodeNotFound)
@@ -141,7 +142,7 @@ func TestSidebarChannelList(t *testing.T) {
 	sp, other := e.create(t, "Dev", ids.ID{}), e.create(t, "Ops", ids.ID{})
 	f1, f2, f3 := e.channel(t, sp.ID, "forum", "One"), e.channel(t, sp.ID, "forum", "Two"), e.channel(t, other.ID, "forum", "Three")
 	for _, c := range []ids.ID{f1.ID, f2.ID, f3.ID} {
-		if _, err := e.svc.PutSidebarChannel(ctx, e.owner, c, chat.SidebarChannelPutCmd{ThreadOrder: []ids.ID{ids.New()}}); err != nil {
+		if _, err := e.svc.PutSidebarChannel(ctx, e.owner, c, chat.SidebarChannelPutCmd{ThreadOrder: &[]ids.ID{ids.New()}}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -189,5 +190,89 @@ func TestSidebarChannelList(t *testing.T) {
 	e.az.err = errors.New("rights down")
 	if _, err := e.svc.ListSidebarChannelStates(ctx, e.owner); err == nil {
 		t.Fatal("scope error swallowed")
+	}
+}
+
+// TestSidebarChannelHidden (PROJ-ARCHIVE, 01 6.22, 06 R-API-31): hidden true archives the channel
+// for the caller (hidden_at set, version + 1, sidebar_channel.updated with hidden_at), the stored
+// post order stays; archiving again and restoring a shown channel change nothing (same version,
+// same hidden_at, no event); hidden false restores it (hidden_at cleared, absent in the payload);
+// an order write keeps the archive, and the same order again changes nothing.
+func TestSidebarChannelHidden(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := context.Background()
+	sp := e.create(t, "Dev", ids.ID{})
+	forum := e.channel(t, sp.ID, "forum", "Projects")
+	yes, no := true, false
+	p1 := ids.New()
+	if _, err := e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{ThreadOrder: &[]ids.ID{p1}}); err != nil {
+		t.Fatal(err)
+	}
+	type statePayload struct {
+		State struct {
+			ThreadOrder []string `json:"thread_order"`
+			HiddenAt    *string  `json:"hidden_at"`
+			Version     int64    `json:"version"`
+		} `json:"state"`
+	}
+	last := func() statePayload {
+		t.Helper()
+		var p statePayload
+		if err := json.Unmarshal(e.events.evs[len(e.events.evs)-1].Payload, &p); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	st, err := e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{Hidden: &yes})
+	if err != nil || st.HiddenAt.IsZero() || st.Version != 2 || !slices.Equal(st.ThreadOrder, []ids.ID{p1}) {
+		t.Fatalf("archive %+v, %v", st, err)
+	}
+	hiddenAt := st.HiddenAt
+	if p := last(); p.State.HiddenAt == nil || *p.State.HiddenAt != hiddenAt.UTC().Truncate(time.Millisecond).Format("2006-01-02T15:04:05.000Z") || p.State.Version != 2 ||
+		!slices.Equal(p.State.ThreadOrder, []string{p1.String()}) {
+		t.Fatalf("archive payload %+v", p)
+	}
+	n := len(e.events.evs)
+	st, err = e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{Hidden: &yes})
+	if err != nil || !st.HiddenAt.Equal(hiddenAt) || st.Version != 2 || len(e.events.evs) != n {
+		t.Fatalf("archive again must change nothing: %+v, %v, events %d -> %d", st, err, n, len(e.events.evs))
+	}
+	st, err = e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{ThreadOrder: &[]ids.ID{p1}})
+	if err != nil || st.Version != 2 || len(e.events.evs) != n {
+		t.Fatalf("the same order must change nothing: %+v, %v", st, err)
+	}
+	p2 := ids.New()
+	st, err = e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{ThreadOrder: &[]ids.ID{p2, p1}})
+	if err != nil || !st.HiddenAt.Equal(hiddenAt) || st.Version != 3 {
+		t.Fatalf("an order write must keep the archive: %+v, %v", st, err)
+	}
+	st, err = e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{Hidden: &no})
+	if err != nil || !st.HiddenAt.IsZero() || st.Version != 4 || !slices.Equal(st.ThreadOrder, []ids.ID{p2, p1}) {
+		t.Fatalf("restore %+v, %v", st, err)
+	}
+	if p := last(); p.State.HiddenAt != nil || p.State.Version != 4 {
+		t.Fatalf("restore payload must leave hidden_at out: %+v", p)
+	}
+	n = len(e.events.evs)
+	st, err = e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{Hidden: &no})
+	if err != nil || st.Version != 4 || len(e.events.evs) != n {
+		t.Fatalf("restore again must change nothing: %+v, %v", st, err)
+	}
+	// A channel without a row: restoring it changes nothing and writes no row; archiving creates one.
+	other := e.channel(t, sp.ID, "text", "general")
+	n = len(e.events.evs)
+	st, err = e.svc.PutSidebarChannel(ctx, e.owner, other.ID, chat.SidebarChannelPutCmd{Hidden: &no})
+	if err != nil || st.Version != 0 || st.ChannelID != other.ID || st.ThreadOrder == nil || len(e.events.evs) != n {
+		t.Fatalf("restore without a row %+v, %v", st, err)
+	}
+	st, err = e.svc.PutSidebarChannel(ctx, e.owner, other.ID, chat.SidebarChannelPutCmd{Hidden: &yes})
+	if err != nil || st.HiddenAt.IsZero() || st.Version != 1 || len(st.ThreadOrder) != 0 || len(e.events.evs) != n+1 {
+		t.Fatalf("archive without a row %+v, %v", st, err)
+	}
+	e.az.scope = authorize.Scope{InstanceWide: true}
+	list, err := e.svc.ListSidebarChannelStates(ctx, e.owner)
+	if err != nil || !slices.ContainsFunc(list, func(s chat.SidebarChannelState) bool { return s.ChannelID == other.ID && !s.HiddenAt.IsZero() }) {
+		t.Fatalf("the list must carry hidden_at: %+v, %v", list, err)
 	}
 }

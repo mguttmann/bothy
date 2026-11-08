@@ -689,6 +689,16 @@ outbox by `SidebarWriter.orderChannels` and `SidebarWriter.orderThreads` of
 `SpacesWithState` and `ChannelsOfSpace` then order by activity and hold their order while
 `SidebarHold` holds.
 
+The personal archive of a channel (01 6.22, PROJ-ARCHIVE, docs/decisions.d/PROJ-ARCHIVE.md):
+`ChannelArchive` of `lib/menus/channel_menu.dart` is the menu entry ("Archive project", "Archive",
+"Restore") and the screen reader action of a sidebar row; `SidebarWriter.setHidden` writes
+`hidden` through the outbox after the local row. `ChannelsOfSpace` leaves out the channels of
+`hiddenChannelsProvider`, `archivedChannelsOfSpaceProvider` builds their rows in the manual order,
+and `SpaceNode` shows them below `ArchivedSection` ("Archived (n)", `lib/sidebar/archived_section.dart`)
+at the bottom of the space while it is expanded on this device (`space_view_states.archived_expanded`).
+A channel move writes `SidebarSpaceNode.manualOrder`, the archived channels in their places
+included, so "Restore" brings a channel back to its earlier place.
+
 ### Status dots (M4-52)
 
 A chat row shows a status mark only for agent news the person has not seen (01 6.17, R-PR-31,

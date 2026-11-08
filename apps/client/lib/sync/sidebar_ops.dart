@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The write of the personal sidebar: the order of a space and the own channel order of a space
-/// (`putMySidebarSpace`) and the own thread order of a channel (`putMySidebarChannel`, M4-51)
-/// through the outbox (components.md 7; 04 14; brief M4-19 Design note 2). The collapse of a
+/// (`putMySidebarSpace`), the own thread order of a channel (`putMySidebarChannel`, M4-51) and
+/// the personal archive of a channel (`hidden`, the same operation, 01 6.22) through the outbox (components.md 7; 04 14; brief M4-19 Design note 2). The collapse of a
 /// space stays on its device (01 6.7, R-PR-24) and is never written here.
 library;
 
@@ -19,7 +19,7 @@ import '../sidebar/sidebar_order.dart';
 /// | Kind | Payload | Lane |
 /// |---|---|---|
 /// | `putMySidebarSpace` | `space_id`, `collapsed`, optional `sort_key`, optional `channel_order` | `sidebar:<space_id>` |
-/// | `putMySidebarChannel` | `channel_id`, `thread_order` | `sidebar-channel:<channel_id>` |
+/// | `putMySidebarChannel` | `channel_id`, optional `thread_order`, optional `hidden` | `sidebar-channel:<channel_id>` |
 ///
 /// Writes of one space or one channel run in order (the last one wins, 04 14), different ones
 /// in parallel. The `Idempotency-Key` is the entry's ID (06 7).
@@ -80,13 +80,15 @@ abstract final class SidebarOps {
     registry.register(putMySidebarChannel, (e, ctx) async {
       final body = decodePayload(e.payload);
       final order = body['thread_order'];
+      final hidden = body['hidden'];
       final response = await prefs.putMySidebarChannel(
         channelId: _channelOf(body),
-        sidebarChannelPut: SidebarChannelPut(
-          (b) => b.threadOrder = ListBuilder(
-            order is List ? order.cast<String>() : const <String>[],
-          ),
-        ),
+        // An absent member keeps the stored value on the server (06 R-API-31): an archive
+        // write sends only `hidden`, an order write only `thread_order`.
+        sidebarChannelPut: SidebarChannelPut((b) {
+          if (order is List) b.threadOrder = ListBuilder(order.cast<String>());
+          if (hidden is bool) b.hidden = hidden;
+        }),
         extra: ctx.extra,
       );
       final state = response.data;
@@ -182,6 +184,22 @@ final class SidebarWriter {
           'channel_id': channel.value,
           'thread_order': [for (final t in order) t.value],
         },
+      ),
+    );
+  }
+
+  /// Archives [channel] in the person's own sidebar ([hidden] true) or restores it (false), 01
+  /// 6.22: the local row at once (archived from now until the server's time arrives), then
+  /// `putMySidebarChannel` with `hidden` alone, so the order of its posts stays.
+  Future<void> setHidden(ChannelId channel, {required bool hidden}) async {
+    await _db.structureDao.putUserChannelHiddenLocally(
+      channel,
+      hiddenAt: hidden ? DateTime.now().toUtc() : null,
+    );
+    await _engine.outbox.enqueue(
+      OutboxRequest(
+        kind: SidebarOps.putMySidebarChannel,
+        payload: {'channel_id': channel.value, 'hidden': hidden},
       ),
     );
   }

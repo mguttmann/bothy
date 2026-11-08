@@ -14,6 +14,7 @@ part 'sidebar_channel_state.g.dart';
 /// Properties:
 /// * [channelId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [threadOrder] - Personal order of the open posts of the channel; empty uses the default order. At most `sidebar.order_max_items`.
+/// * [hiddenAt] - Set while the caller has archived the channel in the own sidebar (01 6.22); absent while it shows in the normal list.
 /// * [version]
 /// * [updatedByDeviceId] - UUIDv7 (RFC 9562), lowercase canonical form.
 @BuiltValue()
@@ -26,6 +27,10 @@ abstract class SidebarChannelState
   /// Personal order of the open posts of the channel; empty uses the default order. At most `sidebar.order_max_items`.
   @BuiltValueField(wireName: r'thread_order')
   BuiltList<String> get threadOrder;
+
+  /// Set while the caller has archived the channel in the own sidebar (01 6.22); absent while it shows in the normal list.
+  @BuiltValueField(wireName: r'hidden_at')
+  DateTime? get hiddenAt;
 
   @BuiltValueField(wireName: r'version')
   int get version;
@@ -73,6 +78,13 @@ class _$SidebarChannelStateSerializer
       object.threadOrder,
       specifiedType: const FullType(BuiltList, [FullType(String)]),
     );
+    if (object.hiddenAt != null) {
+      yield r'hidden_at';
+      yield serializers.serialize(
+        object.hiddenAt,
+        specifiedType: const FullType(DateTime),
+      );
+    }
     yield r'version';
     yield serializers.serialize(
       object.version,
@@ -125,6 +137,14 @@ class _$SidebarChannelStateSerializer
             specifiedType: const FullType(BuiltList, [FullType(String)]),
           ) as BuiltList<String>;
           result.threadOrder.replace(valueDes);
+          break;
+        case r'hidden_at':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(DateTime),
+          ) as DateTime?;
+          if (valueDes == null) continue;
+          result.hiddenAt = valueDes;
           break;
         case r'version':
           final valueDes = serializers.deserialize(

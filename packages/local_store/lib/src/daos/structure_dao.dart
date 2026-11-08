@@ -177,6 +177,31 @@ final class StructureDao {
         );
   });
 
+  /// Writes whether the person archived [channelId] in the own sidebar at once on this device,
+  /// before the server confirms it (PROJ-ARCHIVE, 01 6.22): [hiddenAt] null restores it. As
+  /// [putUserChannelStateLocally], the version, the device and the thread order stay; a missing
+  /// row starts at version 0 with the default order.
+  Future<void> putUserChannelHiddenLocally(
+    ChannelId channelId, {
+    required DateTime? hiddenAt,
+  }) => _db.transaction(() async {
+    final at = Value(hiddenAt?.toUtc());
+    final updated =
+        await (_db.update(_db.userChannelStates)
+              ..where((t) => t.channelId.equals(channelId.value)))
+            .write(UserChannelStatesCompanion(hiddenAt: at));
+    if (updated > 0) return;
+    await _db
+        .into(_db.userChannelStates)
+        .insert(
+          UserChannelStatesCompanion.insert(
+            channelId: channelId.value,
+            version: 0,
+            hiddenAt: at,
+          ),
+        );
+  });
+
   /// The sidebar states of all channels that have one (M4-51).
   Stream<List<UserChannelState>> watchUserChannelStates() =>
       _db.select(_db.userChannelStates).map(userChannelStateFromRow).watch();

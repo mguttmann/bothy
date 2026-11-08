@@ -89,12 +89,17 @@ def sync_detailed(
     client: AuthenticatedClient | Client,
     body: SidebarChannelPut,
 ) -> Response[Problem | SidebarChannelState]:
-    """Reorder the posts of a channel for oneself
+    """Reorder the posts of a channel or archive it for oneself
 
-     Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last
-    write wins, no If-Match; an empty list returns to the default order. The server checks the form of
-    the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the
-    caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes
+     Stores the caller's personal state of a channel the caller can read, version + 1, last write wins,
+    no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order,
+    absent keeps the stored order) and whether the channel is archived in the caller's sidebar
+    (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at
+    most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that
+    changes nothing returns the stored state without a new version and without an event, so archiving
+    twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it
+    changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A
+    channel the caller cannot read and an unknown one give the same 404. Writes
     `sidebar_channel.updated` for the caller.
 
     Args:
@@ -127,12 +132,17 @@ def sync(
     client: AuthenticatedClient | Client,
     body: SidebarChannelPut,
 ) -> Problem | SidebarChannelState | None:
-    """Reorder the posts of a channel for oneself
+    """Reorder the posts of a channel or archive it for oneself
 
-     Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last
-    write wins, no If-Match; an empty list returns to the default order. The server checks the form of
-    the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the
-    caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes
+     Stores the caller's personal state of a channel the caller can read, version + 1, last write wins,
+    no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order,
+    absent keeps the stored order) and whether the channel is archived in the caller's sidebar
+    (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at
+    most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that
+    changes nothing returns the stored state without a new version and without an event, so archiving
+    twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it
+    changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A
+    channel the caller cannot read and an unknown one give the same 404. Writes
     `sidebar_channel.updated` for the caller.
 
     Args:
@@ -160,12 +170,17 @@ async def asyncio_detailed(
     client: AuthenticatedClient | Client,
     body: SidebarChannelPut,
 ) -> Response[Problem | SidebarChannelState]:
-    """Reorder the posts of a channel for oneself
+    """Reorder the posts of a channel or archive it for oneself
 
-     Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last
-    write wins, no If-Match; an empty list returns to the default order. The server checks the form of
-    the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the
-    caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes
+     Stores the caller's personal state of a channel the caller can read, version + 1, last write wins,
+    no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order,
+    absent keeps the stored order) and whether the channel is archived in the caller's sidebar
+    (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at
+    most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that
+    changes nothing returns the stored state without a new version and without an event, so archiving
+    twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it
+    changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A
+    channel the caller cannot read and an unknown one give the same 404. Writes
     `sidebar_channel.updated` for the caller.
 
     Args:
@@ -196,12 +211,17 @@ async def asyncio(
     client: AuthenticatedClient | Client,
     body: SidebarChannelPut,
 ) -> Problem | SidebarChannelState | None:
-    """Reorder the posts of a channel for oneself
+    """Reorder the posts of a channel or archive it for oneself
 
-     Stores the caller's personal order of the posts of a channel the caller can read, version + 1, last
-    write wins, no If-Match; an empty list returns to the default order. The server checks the form of
-    the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the
-    caller can see. A channel the caller cannot read and an unknown one give the same 404. Writes
+     Stores the caller's personal state of a channel the caller can read, version + 1, last write wins,
+    no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order,
+    absent keeps the stored order) and whether the channel is archived in the caller's sidebar
+    (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at
+    most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that
+    changes nothing returns the stored state without a new version and without an event, so archiving
+    twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it
+    changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A
+    channel the caller cannot read and an unknown one give the same 404. Writes
     `sidebar_channel.updated` for the caller.
 
     Args:

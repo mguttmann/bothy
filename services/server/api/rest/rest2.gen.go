@@ -668,7 +668,7 @@ type StrictServerInterface interface {
 	// GetMySidebar Read own sidebar state
 	// (GET /me/sidebar)
 	GetMySidebar(ctx context.Context, request GetMySidebarRequestObject) (GetMySidebarResponseObject, error)
-	// PutMySidebarChannel Reorder the posts of a channel for oneself
+	// PutMySidebarChannel Reorder the posts of a channel or archive it for oneself
 	// (PUT /me/sidebar/channels/{channel_id})
 	PutMySidebarChannel(ctx context.Context, request PutMySidebarChannelRequestObject) (PutMySidebarChannelResponseObject, error)
 	// PutMySidebarSpace Collapse or reorder a space for oneself

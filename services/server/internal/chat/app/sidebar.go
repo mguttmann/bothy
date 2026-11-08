@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/chat/domain"
@@ -118,6 +119,11 @@ func (s *Service) ListSidebarStates(ctx context.Context, a actor.Actor) ([]chat.
 // domain.CheckSidebarOrder on /thread_order, then the upsert with version + 1 and the caller's
 // device, and sidebar_channel.updated for the caller. The IDs of the list are not checked against
 // existing threads (D-M4-51-8). There is no audit and no If-Match: the last write wins.
+//
+// PROJ-ARCHIVE (01 6.22, 06 R-API-31): a nil member keeps the stored value; Hidden true sets
+// hidden_at to the clock's time unless it is already set, false clears it. A command that
+// changes nothing (the same order, archiving an archived channel, restoring a shown one) returns
+// the stored state without a write and without an event.
 func (s *Service) PutSidebarChannel(ctx context.Context, a actor.Actor, channelID ids.ID, cmd chat.SidebarChannelPutCmd) (chat.SidebarChannelState, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {
@@ -139,22 +145,59 @@ func (s *Service) PutSidebarChannel(ctx context.Context, a actor.Actor, channelI
 		if !found {
 			return invisible()
 		}
-		if err := domain.CheckSidebarOrder("/thread_order", cmd.ThreadOrder, s.cfg.SidebarOrderMaxItems); err != nil {
-			return err
-		}
-		order := cmd.ThreadOrder
-		if order == nil {
-			order = []ids.ID{}
-		}
-		out, err = s.d.Store.PutSidebarChannelState(ctx, domain.SidebarChannelState{
-			UserID: a.ID, ChannelID: channelID, ThreadOrder: order, UpdatedByDeviceID: a.DeviceID,
-		})
-		if err != nil {
-			return err
-		}
-		return s.emitSidebarChannel(ctx, c.Channel.SpaceID, out)
+		out, err = s.writeSidebarChannel(ctx, a, c.Channel.SpaceID, channelID, cmd)
+		return err
 	})
 	return sidebarChannelView(out), err
+}
+
+// writeSidebarChannel is the write of PutSidebarChannel after the checks, inside its unit of
+// work: the stored row of the caller (the default row without one), cmd applied by
+// nextSidebarChannel, and, unless nothing changes, the upsert with the caller's device and
+// sidebar_channel.updated in space. A command that changes nothing returns the stored row.
+func (s *Service) writeSidebarChannel(ctx context.Context, a actor.Actor, space, channelID ids.ID, cmd chat.SidebarChannelPutCmd) (domain.SidebarChannelState, error) {
+	prev, stored, err := s.d.Store.SidebarChannelState(ctx, a.ID, channelID)
+	if err != nil {
+		return domain.SidebarChannelState{}, err
+	}
+	if !stored {
+		prev = domain.SidebarChannelState{UserID: a.ID, ChannelID: channelID, ThreadOrder: []ids.ID{}}
+	}
+	next, err := s.nextSidebarChannel(prev, cmd)
+	if err != nil {
+		return domain.SidebarChannelState{}, err
+	}
+	if next.Same(prev) {
+		return prev, nil
+	}
+	next.UpdatedByDeviceID = a.DeviceID
+	out, err := s.d.Store.PutSidebarChannelState(ctx, next)
+	if err != nil {
+		return domain.SidebarChannelState{}, err
+	}
+	return out, s.emitSidebarChannel(ctx, space, out)
+}
+
+// nextSidebarChannel applies cmd to the stored row prev (PROJ-ARCHIVE): a given thread_order
+// replaces the order after domain.CheckSidebarOrder (empty is the default order), Hidden true
+// keeps an earlier hidden_at or takes the clock's time, false clears it; nil members keep prev.
+func (s *Service) nextSidebarChannel(prev domain.SidebarChannelState, cmd chat.SidebarChannelPutCmd) (domain.SidebarChannelState, error) {
+	next := prev
+	if cmd.ThreadOrder != nil {
+		if err := domain.CheckSidebarOrder("/thread_order", *cmd.ThreadOrder, s.cfg.SidebarOrderMaxItems); err != nil {
+			return domain.SidebarChannelState{}, err
+		}
+		next.ThreadOrder = append([]ids.ID{}, *cmd.ThreadOrder...)
+	}
+	if cmd.Hidden != nil {
+		switch {
+		case !*cmd.Hidden:
+			next.HiddenAt = time.Time{}
+		case prev.HiddenAt.IsZero():
+			next.HiddenAt = s.d.Clock.Now()
+		}
+	}
+	return next, nil
 }
 
 // ListSidebarChannelStates implements chat.Structure (M4-51): the channel rows of the person a for

@@ -4,6 +4,7 @@ package domain
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -190,10 +191,19 @@ type SidebarChannelState struct {
 	UserID, ChannelID ids.ID
 	// ThreadOrder is the personal order of the open posts; empty is the default order.
 	ThreadOrder []ids.ID
+	// HiddenAt is set while the person has archived the channel in the own sidebar (01 6.22,
+	// PROJ-ARCHIVE); zero while it shows in the normal list.
+	HiddenAt time.Time
 	// Version counts the writes of the row.
 	Version int64
 	// UpdatedByDeviceID is the device of the last write; zero for none (personal tokens).
 	UpdatedByDeviceID ids.ID
+}
+
+// Same reports whether st and other hold the same personal state: the same post order and the
+// same archive state (PROJ-ARCHIVE); version and device do not count.
+func (st SidebarChannelState) Same(other SidebarChannelState) bool {
+	return slices.Equal(st.ThreadOrder, other.ThreadOrder) && st.HiddenAt.Equal(other.HiddenAt)
 }
 
 // CheckSidebarOrder checks a personal order list of the sidebar (M4-51, D-M4-51-8): every ID at

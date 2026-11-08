@@ -28,13 +28,20 @@ WHERE st.user_id = @user_id AND sp.archived_at IS NULL
   AND (@all_spaces::boolean OR st.space_id = ANY (@visible::uuid[]))
 ORDER BY st.space_id;
 
+-- name: GetSidebarChannelState :one
+-- The row of one person for one channel (PROJ-ARCHIVE): the write compares the new state with it,
+-- so a write that changes nothing stores nothing.
+SELECT * FROM user_channel_states WHERE user_id = @user_id AND channel_id = @channel_id;
+
 -- name: UpsertSidebarChannelState :one
--- Last write wins per channel (M4-51): the personal post order of the person for the channel,
--- version + 1, the device of the write.
-INSERT INTO user_channel_states (user_id, channel_id, thread_order, updated_by_device_id)
-VALUES (@user_id, @channel_id, @thread_order::uuid[], sqlc.narg(updated_by_device_id))
+-- Last write wins per channel (M4-51): the personal post order of the person for the channel and
+-- the personal archive (hidden_at, NULL = shown; PROJ-ARCHIVE), version + 1, the device of the
+-- write.
+INSERT INTO user_channel_states (user_id, channel_id, thread_order, hidden_at, updated_by_device_id)
+VALUES (@user_id, @channel_id, @thread_order::uuid[], sqlc.narg(hidden_at), sqlc.narg(updated_by_device_id))
 ON CONFLICT (user_id, channel_id) DO UPDATE
 SET thread_order = EXCLUDED.thread_order,
+    hidden_at = EXCLUDED.hidden_at,
     version = user_channel_states.version + 1,
     updated_by_device_id = EXCLUDED.updated_by_device_id,
     updated_at = now()

@@ -87,7 +87,7 @@ func (q *Queries) ListPersonalSidebar(ctx context.Context, userID pgtype.UUID) (
 }
 
 const listPersonalSidebarChannels = `-- name: ListPersonalSidebarChannels :many
-SELECT channel_id, thread_order, updated_by_device_id, updated_at FROM user_channel_states
+SELECT channel_id, thread_order, hidden_at, updated_by_device_id, updated_at FROM user_channel_states
 WHERE user_id = $1
 ORDER BY channel_id
 `
@@ -95,11 +95,13 @@ ORDER BY channel_id
 type ListPersonalSidebarChannelsRow struct {
 	ChannelID         pgtype.UUID
 	ThreadOrder       []pgtype.UUID
+	HiddenAt          pgtype.Timestamptz
 	UpdatedByDeviceID pgtype.UUID
 	UpdatedAt         pgtype.Timestamptz
 }
 
-// Every channel row of the person for the export (M4-51), archived channels included, by channel.
+// Every channel row of the person for the export (M4-51), archived channels included, by channel;
+// hidden_at is the person's own archive of the channel in the sidebar (PROJ-ARCHIVE).
 func (q *Queries) ListPersonalSidebarChannels(ctx context.Context, userID pgtype.UUID) ([]ListPersonalSidebarChannelsRow, error) {
 	rows, err := q.db.Query(ctx, listPersonalSidebarChannels, userID)
 	if err != nil {
@@ -112,6 +114,7 @@ func (q *Queries) ListPersonalSidebarChannels(ctx context.Context, userID pgtype
 		if err := rows.Scan(
 			&i.ChannelID,
 			&i.ThreadOrder,
+			&i.HiddenAt,
 			&i.UpdatedByDeviceID,
 			&i.UpdatedAt,
 		); err != nil {

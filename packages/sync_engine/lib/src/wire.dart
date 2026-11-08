@@ -633,12 +633,14 @@ UserSpaceState sidebarFromJson(Json j) => UserSpaceState(
   updatedByDeviceId: _opt(optStr(j, 'updated_by_device_id'), DeviceId.parse),
 );
 
-/// Maps an API `SidebarChannelState`: the own thread order of a channel (M4-51).
+/// Maps an API `SidebarChannelState`: the own thread order of a channel (M4-51) and its
+/// personal archive in the sidebar (`hidden_at`, PROJ-ARCHIVE; absent is shown).
 UserChannelState sidebarChannelFromJson(Json j) => UserChannelState(
   channelId: ChannelId.parse(str(j, 'channel_id')),
   threadOrder: [for (final t in strList(j, 'thread_order')) ThreadId.parse(t)],
   version: ResourceVersion(integer(j, 'version')),
   updatedByDeviceId: _opt(optStr(j, 'updated_by_device_id'), DeviceId.parse),
+  hiddenAt: optTime(j, 'hidden_at'),
 );
 
 /// Maps an API `NotificationPreference`.

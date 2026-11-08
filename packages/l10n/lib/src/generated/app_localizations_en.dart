@@ -11202,4 +11202,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get builtinAgentsEmpty => 'No built-in agents yet.';
+
+  @override
+  String get channelMenuArchiveProject => 'Archive project';
+
+  @override
+  String get channelMenuArchive => 'Archive';
+
+  @override
+  String get channelMenuRestore => 'Restore';
+
+  @override
+  String sidebarArchived(int count) {
+    return 'Archived ($count)';
+  }
 }

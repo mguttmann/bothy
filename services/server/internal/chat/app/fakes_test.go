@@ -345,6 +345,13 @@ func (s *store) SidebarStates(_ context.Context, user ids.ID, all bool, visible 
 	return out, s.fail
 }
 
+func (s *store) SidebarChannelState(_ context.Context, user, channel ids.ID) (domain.SidebarChannelState, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st, ok := s.channelSidebar[[2]ids.ID{user, channel}]
+	return st, ok, s.fail
+}
+
 func (s *store) PutSidebarChannelState(_ context.Context, st domain.SidebarChannelState) (domain.SidebarChannelState, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

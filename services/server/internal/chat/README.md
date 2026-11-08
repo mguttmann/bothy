@@ -92,7 +92,13 @@ Rulings: docs/DECISIONS.md M1-52.
   people only, a channel the caller cannot read is `404`) upserts the caller's `thread_order` with
   version + 1 and the device, last write wins, no If-Match, no audit, and appends
   `sidebar_channel.updated` (resource channel, audience self, no `resource.version`). A body
-  without `thread_order` is `400` on `/thread_order`.
+  with neither `thread_order` nor `hidden` is `400` on `/thread_order`.
+- PROJ-ARCHIVE (01 6.22, 06 R-API-31): `hidden` archives the channel in the caller's own sidebar
+  (`user_channel_states.hidden_at`, migration `00102_chat_sidebar_channel_hidden.sql`) or
+  restores it; an absent member keeps the stored value. `hidden: true` keeps an earlier
+  `hidden_at`, else takes the clock's time. A write that changes nothing (`domain.SidebarChannelState.Same`
+  against the stored row from `Store.SidebarChannelState`) returns the stored row without a
+  write, a new version or an event. The channel, its rights, runs and notifications do not change.
 - Both lists: unique IDs and at most `sidebar.order_max_items` (`Config.SidebarOrderMaxItems`),
   else `400 validation_failed` with `duplicate` or `limit_reached` on the member
   (`domain.CheckSidebarOrder`). The IDs are not checked against existing or visible rows (no
@@ -714,7 +720,8 @@ privacy requests (`kernel/personaldata`, 20 sections 4.4 and 5.2). Tables: `spac
   order (M4-51), device of the last change and its time; never the space name (schema
   `docs/api/gdpr-export/v1/sections/personal.sidebar.schema.json`). The section `sidebar_channels`
   (M4-51) holds every `user_channel_states` row, archived channels included: channel ID, personal
-  post order, device and time; never a name or title (schema
+  post order, the person's own archive time `hidden_at` (PROJ-ARCHIVE), device and time; never a
+  name or title (schema
   `docs/api/gdpr-export/v1/sections/personal.sidebar_channels.schema.json`).
 - Erase: step 3 (`personal`) deletes the person's `user_space_states` rows and then their
   `user_channel_states` rows, one statement each, without an event (`sidebar.updated` and

@@ -184,4 +184,48 @@ void main() {
     expect(row.threadOrder, [t1, t2]);
     expect(row.version, const ResourceVersion(3));
   });
+
+  test('setHidden archives and restores the channel at once, then sends only '
+      'hidden; the answer brings hidden_at (PROJ-ARCHIVE)', () async {
+    final routes = {
+      'PUT /me/sidebar/channels/${ch1.value}': <String, Object?>{
+        'channel_id': ch1.value,
+        'thread_order': [t1.value],
+        'hidden_at': '2026-11-08T09:30:00.000Z',
+        'version': 5,
+        'updated_by_device_id': otherDevice,
+      },
+    };
+    final adapter = _Adapter(routes);
+    final executors = OutboxExecutors();
+    SidebarOps.register(executors, client(adapter), db);
+
+    await writer.setHidden(ch1, hidden: true);
+    var row = (await db.structureDao.watchUserChannelStates().first).single;
+    expect(row.hidden, isTrue, reason: 'the local row changes at once');
+    final entry = (await db.outboxDao.allEntries()).single;
+    expect(entry.kind, SidebarOps.putMySidebarChannel);
+    expect(jsonDecode(entry.payload), {
+      'channel_id': ch1.value,
+      'hidden': true,
+    });
+    expect(executors.laneOf(entry), 'sidebar-channel:${ch1.value}');
+
+    expect((await run(executors, entry)).status, 200);
+    expect(adapter.seen.single.$2, {'hidden': true});
+    row = (await db.structureDao.watchUserChannelStates().first).single;
+    expect(row.hiddenAt, DateTime.utc(2026, 11, 8, 9, 30));
+    expect(row.threadOrder, [t1]);
+    expect(row.version, const ResourceVersion(5));
+    await db.outboxDao.delete(entry.id);
+
+    await writer.setHidden(ch1, hidden: false);
+    row = (await db.structureDao.watchUserChannelStates().first).single;
+    expect(row.hidden, isFalse);
+    expect(row.threadOrder, [t1], reason: 'the order stays');
+    expect(jsonDecode((await db.outboxDao.allEntries()).single.payload), {
+      'channel_id': ch1.value,
+      'hidden': false,
+    });
+  });
 }

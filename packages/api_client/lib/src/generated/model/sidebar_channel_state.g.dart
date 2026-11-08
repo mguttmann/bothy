@@ -12,6 +12,8 @@ class _$SidebarChannelState extends SidebarChannelState {
   @override
   final BuiltList<String> threadOrder;
   @override
+  final DateTime? hiddenAt;
+  @override
   final int version;
   @override
   final String? updatedByDeviceId;
@@ -23,6 +25,7 @@ class _$SidebarChannelState extends SidebarChannelState {
   _$SidebarChannelState._({
     required this.channelId,
     required this.threadOrder,
+    this.hiddenAt,
     required this.version,
     this.updatedByDeviceId,
   }) : super._();
@@ -41,6 +44,7 @@ class _$SidebarChannelState extends SidebarChannelState {
     return other is SidebarChannelState &&
         channelId == other.channelId &&
         threadOrder == other.threadOrder &&
+        hiddenAt == other.hiddenAt &&
         version == other.version &&
         updatedByDeviceId == other.updatedByDeviceId;
   }
@@ -50,6 +54,7 @@ class _$SidebarChannelState extends SidebarChannelState {
     var _$hash = 0;
     _$hash = $jc(_$hash, channelId.hashCode);
     _$hash = $jc(_$hash, threadOrder.hashCode);
+    _$hash = $jc(_$hash, hiddenAt.hashCode);
     _$hash = $jc(_$hash, version.hashCode);
     _$hash = $jc(_$hash, updatedByDeviceId.hashCode);
     _$hash = $jf(_$hash);
@@ -61,6 +66,7 @@ class _$SidebarChannelState extends SidebarChannelState {
     return (newBuiltValueToStringHelper(r'SidebarChannelState')
           ..add('channelId', channelId)
           ..add('threadOrder', threadOrder)
+          ..add('hiddenAt', hiddenAt)
           ..add('version', version)
           ..add('updatedByDeviceId', updatedByDeviceId))
         .toString();
@@ -81,6 +87,10 @@ class SidebarChannelStateBuilder
   set threadOrder(ListBuilder<String>? threadOrder) =>
       _$this._threadOrder = threadOrder;
 
+  DateTime? _hiddenAt;
+  DateTime? get hiddenAt => _$this._hiddenAt;
+  set hiddenAt(DateTime? hiddenAt) => _$this._hiddenAt = hiddenAt;
+
   int? _version;
   int? get version => _$this._version;
   set version(int? version) => _$this._version = version;
@@ -99,6 +109,7 @@ class SidebarChannelStateBuilder
     if ($v != null) {
       _channelId = $v.channelId;
       _threadOrder = $v.threadOrder.toBuilder();
+      _hiddenAt = $v.hiddenAt;
       _version = $v.version;
       _updatedByDeviceId = $v.updatedByDeviceId;
       _$v = null;
@@ -131,6 +142,7 @@ class SidebarChannelStateBuilder
               'channelId',
             ),
             threadOrder: threadOrder.build(),
+            hiddenAt: hiddenAt,
             version: BuiltValueNullFieldError.checkNotNull(
               version,
               r'SidebarChannelState',
