@@ -48,6 +48,9 @@ Product requirements implemented here:
 14. `rate_limit_event` in `KNOWN_TYPES`; the usage mark exactly as 18.19.10 (only `rejected` without overage sets it, unknown `status` logged and allowed, usage errors kept apart from the failure mark, no stop after an error while or after the mark, one wake-up per outage: `run.wake.create` keyed by its number, repeated with the same key when a later `rejected` frame moves `resetsAt`, which moves the pending wake-up's `not_before`, cancel with `usage_cleared` when the mark clears, `usage_limited` end, `run.wake.recover` with `usage_limit` after a restart).
 15. The live box and the thread show the texts of 18.19.10.
 16. `tests/real_cli/captured/usage_limit_<pinned version>.jsonl` holds the lines the pinned CLI writes for a refused request (`rate_limit_event` with `rejected`, and the error `result`), captured against a local stand-in that answers `429` with the headers of a used-up window (no login, no cost); `test_failures.py` classifies them, and 18.19.12 records the order of frame and `result`.
+17. A live turn that adoption finds for a run the server ended `cancelled` or `completed` (states `run.wake.recover` does not continue) is stopped as in 18.9, and the runner still calls `run.wake.recover` with reason `recovery` and a label naming the lost tasks: the server stores that wake-up `refused` with `run_not_failed` (merged with issue 567), so the thread gets the note of 5.8.4 instead of a recovery run (18.19.9); the runner logs `recovery_wake` with the reason.
+18. After a restart, `run.wake.recover` with `usage_limit` while the outage's wake-up from `run.wake.create` is pending changes nothing (the server answers that wake-up, issue 567); the runner keeps that one wake-up, cancels it with `usage_cleared` when the mark clears, and logs every end of it with its own code (`wake_cancelled`, `wake_expired`, `wake_fired`, `wake_refused`; 17, R-OB-11).
+19. The usage error that set the mark stays exempt from the stop of 18.5 after the mark clears; a new error `result` read after the mark cleared is an ordinary error and leads to the stop of 18.5 (18.19.10, issue 567).
 
 ## Scope
 
@@ -87,8 +90,8 @@ Change: `streamreader.py`, `processstate.py`, `runturn.py`, `recovery.py`, `fail
 
 ## Tests (write them first)
 
-- `tests/scenarios/test_recovery_runs.py`: each case of 18.19.9, with and without permission; AR-T05; the keeper-kill part of AR-T03.
-- `tests/scenarios/test_usage_window.py`: AR-T11 with every variant, against synthetic frames and the captured lines.
+- `tests/scenarios/test_recovery_runs.py`: each case of 18.19.9, with and without permission; AR-T05; the keeper-kill part of AR-T03; a live turn of a run the server ended `cancelled` and one it ended `completed`, each giving the note of `run_not_failed` and no recovery run (requirement 17).
+- `tests/scenarios/test_usage_window.py`: AR-T11 with every variant, against synthetic frames and the captured lines; a restart while the outage's wake-up is pending leaves one wake-up (requirement 18); an error `result` while the mark is set, then a clearing frame, then a second error `result`: no stop for the first, the stop of 18.5 for the second (requirement 19).
 
 ```sh
 (cd plugins/claude-code-runner && uv run --locked pytest -q)

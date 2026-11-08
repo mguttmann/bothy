@@ -51,6 +51,10 @@ Product requirements implemented here:
 17. Wake inputs written with the checks of 09 5.8.3 like follow-ups, a skip reported to the server; a wake input's `result` leaves stdin open while a task runs (18.19.7).
 18. The runner prompt section "Background work" says that a promise to continue needs a running background task or a wake-up and names `bothy-wake` with its forms.
 19. The durable cron file of 18.19.8: logged `durable_cron_present` once per run and named in the live box; a test against the local API stand-in decides whether the pinned CLI fires such a file in a print turn, and the result goes into 18.19.12.
+20. The backoff of failed checks is bounded by the named key `runner.wake_check_backoff_max` (18.19.8, issue 567), never by a fixed factor; `config.py` checks it is at least `runner.wake_check_interval`.
+21. `bothy-wake --list` and `--cancel` work only on wake-ups of the run's thread: the server's `run.wake.cancel` checks only agent-self of the wake-up's agent (07 2.14), so the runner checks the thread scope against its pending list and refuses `--cancel` of another thread's or an unknown id before any call (exit 1, `wake_not_in_thread`; issue 567).
+22. `--pr <owner>/<repo>#<number>` is validated by the command and again by the runner with the server's rule of 18.19.8 (exit 1, `invalid_pr`), and `gh` gets the number as its positional argument and the repository only as `--repo=<owner>/<repo>`, in an argument list without a shell (issue 567).
+23. Every wake-up end the runner learns has its own log code (17 section on autonomous runs, R-OB-11): `wake_fired`, `wake_expired`, `wake_refused`, `wake_cancelled` (with the reason) and `wake_failed` (with the reason of the last failure); `wake_check_failed` stays the code of one failed check (issue 567).
 
 ## Scope
 
@@ -98,7 +102,9 @@ Change:
 
 ## Tests (write them first)
 
-- Unit tests per form of the command, the nonce check, the answer and exit codes, the environment of a check, the timeout, the backoff, the result cut.
+- Unit tests per form of the command, the nonce check, the answer and exit codes, the environment of a check, the timeout, the backoff up to `runner.wake_check_backoff_max`, the result cut.
+- Unit tests of the scope and the validation (issue 567): `--cancel` of a wake-up of another thread of the same agent and of an unknown id is refused with `wake_not_in_thread` and sends no `run.wake.cancel`; `--pr` with a number that starts with `-`, with a sign, with a leading zero, with `0`, and with a repository outside the rule is refused with `invalid_pr` and starts no `gh`; the argument list of `gh` holds `--repo=<owner>/<repo>`.
+- The log codes `wake_cancelled` and `wake_failed` of an end by `--cancel`, by a person and after `runner.wake_check_failures` failures.
 - `tests/scenarios/test_wakes.py`: AR-T06, AR-T07, the runner parts of AR-T08 and AR-T09, AR-T10, against the fake server; a hosted agent gets the entry after the intersection.
 - `tests/real_cli/test_timer_tools.py` against the local API stand-in.
 

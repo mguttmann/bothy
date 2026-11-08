@@ -514,7 +514,8 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.wakes` |  | Runner |  | `false` | `bothy-wake`, condition checks, wake inputs, recovery and usage-window wake-ups (18.19.8 to 18.19.10); needs `runner.turn_handover`; reports `wakes` |  |
 | `runner.end_state` |  | Runner |  | `false` | the `STATE:` marker, the nudge and the note of 18.19.11 |  |
 | `runner.cli_bg_wait_ceiling` |  | Runner |  | empty | passed as `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` when set; empty means the CLI's built-in default (18.19.12) |  |
-| `runner.wake_check_interval` |  | Runner |  | `60s` | interval of the checks of a pending `pr_checks` or `command` wake-up; failures back off up to ten times this value (18.19.8); above zero |  |
+| `runner.wake_check_interval` |  | Runner |  | `60s` | interval of the checks of a pending `pr_checks` or `command` wake-up; failures back off up to `runner.wake_check_backoff_max` (18.19.8); above zero |  |
+| `runner.wake_check_backoff_max` |  | Runner |  | `10m` | longest wait between two checks of a wake-up after failures in a row (18.19.8, issue 567); at least `runner.wake_check_interval` |  |
 | `runner.wake_check_timeout` |  | Runner |  | `5m` | time limit of one `command` check or `gh` read (18.19.8); above zero |  |
 | `runner.wake_checks_max_parallel` |  | Runner |  | `2` | checks of wake-ups running at once (18.19.8); at least `1` |  |
 | `runner.wake_check_failures` |  | Runner |  | `10` | failures in a row after which a check wake-up ends `failed` with a note and a notification (18.19.8); at least `1` |  |

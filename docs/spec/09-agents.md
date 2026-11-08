@@ -1327,7 +1327,7 @@ another person could otherwise read any repository the owner can read. A refused
 | Operation (action) | Caller | Effect |
 |---|---|---|
 | `run.wake.create` | adapter with the agent's token, only for an active run of that agent in that thread | creates a wake-up with reason `agent` (from `bothy-wake`) or `usage_limit`; a `usage_limit` request carries the run's outage number as idempotency key, so a repeated request of one outage updates its pending wake-up (`not_before`) and a new outage gets its own, bounded by `run.usage_wake_max`; a refused create stores nothing, except a request the SDK outbox sent later (`deferred: true`, 18.19.8), which is stored directly in state `refused` with the reason so that 5.8.4 posts the note and notifies the person |
-| `run.wake.recover` | adapter with the agent's token | creates a wake-up of kind `at` with reason `recovery` or `usage_limit` for an ended source run of that agent and thread in state `interrupted`, `stale` or `failed`, at most one per source run and reason (idempotency key) |
+| `run.wake.recover` | adapter with the agent's token | creates a wake-up of kind `at` with reason `recovery` or `usage_limit` for an ended source run of that agent and thread in state `interrupted`, `stale` or `failed`, at most one per source run and reason (idempotency key); with `usage_limit` it changes nothing and answers the pending wake-up while a `usage_limit` wake-up of an outage of that source run (from `run.wake.create`) is pending, so one outage never gets two wake-ups (issue 567); a source run that has not ended is refused with `run_not_ended` and nothing is stored; a source run that ended `cancelled` or `completed` gets no recovery run: the wake-up is stored directly in state `refused` with the reason `run_not_failed`, so 5.8.4 posts the note and notifies the person (18.19.9, issue 567) |
 | `run.wake.list_pending` | adapter | the agent's pending wake-ups of every kind; called at start and after every reconnect |
 | `run.wake.check` | adapter with the agent's token | before every execution of a `command` check and every read of a `pr_checks` check: allow, or end the wake-up (5.8.3) |
 | `run.wake.fire` | adapter | fires a `pr_checks` or `command` wake-up with a short result text, or ends it `failed` with the reason after `runner.wake_check_failures` |
@@ -4241,6 +4241,14 @@ recovery run without the handover would be lost at the next restart. Clients sho
 controls only when the thread's agent reports `wakes`; pending wake-ups and their cancel button stay
 visible without it (01 6.21).
 
+Switching `runner.turn_handover` off (issue 567): a runner without the key cannot continue a turn
+that a runner with the key handed over or left (its keeper, named pipe and launch files, and a
+record in a phase such as `preparing` or `launching`). The key is therefore switched off only
+after `claude-code-runner stop --turns` or while no turn runs (16 10.1). A runner started with the
+key off while a turn record that carries a phase is left refuses to start, logs `start_failed`
+with the code `turn_handover_records_left` and touches nothing; `claude-code-runner stop --turns`
+stops such turns as with the key, also when the key is already off, and the next start goes on.
+
 #### 18.19.2 Orderly stop without the handover
 
 With `runner.turn_handover` off, an orderly stop of the runner (SIGTERM, SIGINT) never leaves an
@@ -4470,7 +4478,7 @@ and never completes the run" stays true, because the retry after it is a new att
 
 Launch check (R-AG-48): before a runner launches any process of a run it did not accept itself (a
 repeated try, the next attempt by the adoption rule, the retry of `compaction_retry`, a start over
-from `transcribing`), it calls `run.launch.check` (5.8.4), and the server checks the current state:
+from `transcribing`), it calls `run.launch.check` (5.8.2), and the server checks the current state:
 the run is still `running`; its person still has `trigger` on the agent in the channel and the
 agent is still allowed there; the billing mode rules of 10; for tool class `host`, the agent's
 `tool_class` is still `host` and SR2 holds for that person. The runner also compares its own
@@ -4540,6 +4548,17 @@ Command forms: `bothy-wake --after <duration>`, `--at <time>` (local time of the
 today or the next day; a full ISO 8601 time is also accepted), `--pr <owner>/<repo>#<number>`,
 `--until-success '<command>'`, each with optional `--label <text>` and `--deadline <duration or
 time>`; `bothy-wake --list` and `bothy-wake --cancel <id>` work on the thread's wake-ups. The
+thread scope is the runner's check, not the server's: `run.wake.cancel` only requires agent-self
+of the wake-up's agent (07 2.14), so the runner lists and cancels only wake-ups of its pending list
+(5.8.5) whose thread is the run's thread, and refuses `--cancel` of any other id before it calls
+the server (exit 1, reason `wake_not_in_thread`, issue 567). `--pr` is validated by `bothy-wake`
+and again by the runner before anything is sent, with the rule the server applies at create
+(AR-04): `<owner>/<repo>` matches `[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}`, and `<number>`
+is a decimal number from 1 without sign or leading zero; anything else is refused (exit 1, reason
+`invalid_pr`). The checks of `pr_checks` pass them to `gh` as separate items of an argument list,
+never through a shell: the number as the positional argument (it cannot start with `-`) and the
+repository only joined to its option as `--repo=<owner>/<repo>`, so neither can become an option of `gh` (issue 567).
+The
 command writes a request file into the run's request folder
 `<runner.state_dir>/wake-requests/<run_id>/` (mode `0700`, outside every working folder), named
 by a fresh UUID, holding the request and the run's nonce; it learns folder and nonce from the
@@ -4565,7 +4584,7 @@ execution of a `command` and every `gh` read of a `pr_checks` it calls `run.wake
 compares its own actual tool class with the answer; only on allow does it run the check, once.
 When the server cannot be reached nothing runs, and the attempt counts as a failure.
 
-- `pr_checks`: `gh pr view <number> --repo <owner>/<repo> --json headRefOid` and `gh pr checks`
+- `pr_checks`: `gh pr view <number> --repo=<owner>/<repo> --json headRefOid` and `gh pr checks`
   with the host user's `gh` login, read only, with the environment of 18.2. The wake-up fires
   when the pull request's current head commit has at least one check and none is pending; the
   result text names the head commit, whether it differs from the head recorded at create, and
@@ -4578,8 +4597,9 @@ When the server cannot be reached nothing runs, and the attempt counts as a fail
   result text is the last `runner.wake_result_max_bytes` of stdout and stderr together, cut at a
   UTF-8 boundary, without control or bidi characters. Any other end is a normal "not yet".
 - A check that cannot run (`gh` missing or failing, a spawn error, a timeout, the server
-  unreachable) counts as a failure; failures back off from `runner.wake_check_interval` up to ten
-  times that value, and after `runner.wake_check_failures` failures in a row the runner fires
+  unreachable) counts as a failure; failures back off from `runner.wake_check_interval` up to
+  `runner.wake_check_backoff_max` (issue 567), and after `runner.wake_check_failures` failures in
+  a row the runner fires
   nothing and ends the wake-up with `run.wake.fire` outcome `failed` and the reason of the last
   failure (5.8.3). A successful check resets the count.
 - At a handover or stop the runner stops its running checks (SIGTERM to their groups, SIGKILL
@@ -4595,7 +4615,7 @@ print turn.
 #### 18.19.9 Lost work and recovery runs
 
 With `runner.wakes`, when a turn ends with background tasks that did not finish, the runner calls
-`run.wake.recover` with reason `recovery` for the run (5.8.4), within the autonomy rules of 5.8.6.
+`run.wake.recover` with reason `recovery` for the run (5.8.2), within the autonomy rules of 5.8.6.
 The cases:
 
 - the next runner finds a recorded turn whose process is gone and starts no further attempt for
@@ -4605,7 +4625,11 @@ The cases:
   and the summary code `turn_lost`, so `run.wake.recover` finds an ended run and the thread does
   not wait for `agent.presence_timeout`;
 - adoption finds a live turn whose run the server already ended (`stale` after
-  `run.orphan_timeout`, `interrupted`, or ended otherwise) and stops it (18.9);
+  `run.orphan_timeout`, `interrupted`, or ended otherwise) and stops it (18.9); when that run
+  ended `cancelled` or `completed`, which `run.wake.recover` does not continue, the same call
+  stores the wake-up `refused` with the reason `run_not_failed` and its label naming the lost
+  tasks, so the thread gets the note of 5.8.4 instead of a recovery run and the person a
+  notification (5.8.2, issue 567);
 - an error `result` was followed by the stop of 18.5;
 - the CLI wrote its background ceiling line ("Background tasks still running after ...");
 - a second `context_full` ended the run;
@@ -4649,7 +4673,9 @@ in the live box. While the mark is set:
   and no later answer, the run ends `failed` with the reason `usage_limited`, its `summary`
   carrying `resetsAt` and whether a wake-up is pending. A runner that learns of the mark only
   after the run ended (a restart in between, the frame read from the stream file) calls
-  `run.wake.recover` with reason `usage_limit` instead.
+  `run.wake.recover` with reason `usage_limit` instead; while the outage's wake-up of
+  `run.wake.create` is pending that call changes nothing (5.8.2), so one outage gets one
+  wake-up.
 
 The classification keys on the frame, not on the `result` text, because the text is built by the
 CLI from parts and is not fixed (18.19.12). A rejected request that ends a turn without a
@@ -4673,8 +4699,11 @@ waiting, but nothing will wake this thread" (log code `continuation_without_wake
 phase starts with an input of a person (the run's prompt or a follow-up) or a wake input; there is
 at most one nudge per phase, and notification turns and the answer to the nudge stay in the phase.
 The answer to the nudge is posted like a follow-up answer. For `chat` the nudge is skipped and the
-note follows at once. Every finished run's summary carries `end_state` and whether a wake-up is
-pending and when (`wake_pending_until`); clients show both (01 6.21).
+note follows at once. With `runner.end_state` every finished run's summary carries `end_state` and
+whether a wake-up is pending and when (`wake_pending_until`); clients show both (01 6.21). A run
+finished without the key (an older run, a runner with `runner.end_state` off, another runtime)
+carries no `end_state`; clients then show no end state on its line and no note of this section,
+and the line stays as before (01 6.21 item 2, issue 567).
 
 #### 18.19.12 Time limits and the pinned CLI
 
@@ -4720,8 +4749,8 @@ in the next runner's first heartbeat; `run.orphan_timeout` is kept and followed 
 A hosted agent's `--max-budget-usd` (26 5.3) ends a run visibly with its cap; `disableWorkflows`
 of the hosted settings removes workflows and adds no time limit. New limits are named keys and
 visible when they end work: `run.wake_max_pending`, `run.wake_max_wait`, `run.wake_min_delay`,
-`run.usage_wake_max`, `run.autonomous_chain_max`, `run.autonomous_idle_max` (5.8) and
-`runner.wake_check_failures`.
+`run.usage_wake_max`, `run.autonomous_chain_max`, `run.autonomous_idle_max` (5.8),
+`runner.wake_check_failures` and `runner.wake_check_backoff_max`.
 
 #### 18.19.13 Tests
 
@@ -4923,7 +4952,8 @@ configuration of the respective program outside the server.
 | `runner.wakes` | Runner | `false` | `bothy-wake`, condition checks, wake inputs, recovery and usage-window wake-ups (18.19.8 to 18.19.10); needs `runner.turn_handover`; reports `wakes` |
 | `runner.end_state` | Runner | `false` | the `STATE:` marker, the nudge and the note of 18.19.11 |
 | `runner.cli_bg_wait_ceiling` | Runner | empty | passed as `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` when set; empty means the CLI's built-in default (18.19.12) |
-| `runner.wake_check_interval` | Runner | `60s` | interval of the checks of a pending `pr_checks` or `command` wake-up; failures back off up to ten times this value (18.19.8); above zero |
+| `runner.wake_check_interval` | Runner | `60s` | interval of the checks of a pending `pr_checks` or `command` wake-up; failures back off up to `runner.wake_check_backoff_max` (18.19.8); above zero |
+| `runner.wake_check_backoff_max` | Runner | `10m` | longest wait between two checks of a wake-up after failures in a row (18.19.8, issue 567); at least `runner.wake_check_interval` |
 | `runner.wake_check_timeout` | Runner | `5m` | time limit of one `command` check or `gh` read (18.19.8); above zero |
 | `runner.wake_checks_max_parallel` | Runner | `2` | checks of wake-ups running at once (18.19.8); at least `1` |
 | `runner.wake_check_failures` | Runner | `10` | failures in a row after which a check wake-up ends `failed` with a note and a notification (18.19.8); at least `1` |
