@@ -3487,8 +3487,10 @@ end `cancelled`, and the run ends by 18.9 (addendum of 2026-11-01,
 docs/decisions.d/FIX-runner-auth-failed-held.md). A run its turn completes carries the
 `summary` "Run ended; nothing is waiting, so this thread continues only when someone sends a
 message" with the code `run_ended_idle`: once the process has ended nothing waits on the thread,
-also when the last answer promised to go on later, and the collapsed run line shows that at once
-(addendum of 2026-11-08, docs/decisions.d/FIX-runner-silent-stop.md). Follow-ups it did not take stay `queued`, and
+also when the last answer promised to go on later. The apps show the summary of a completed run
+next to its state, on the collapsed run line and in the opened box, when it ends with a log code
+in backticks (the form of an adapter note, R-AG-35); any other summary of a completed run stays
+its last text (addendum of 2026-11-08, docs/decisions.d/FIX-runner-silent-stop.md). Follow-ups it did not take stay `queued`, and
 the server defers them into a new run that resumes the same session (section 7). The system prompt tells Claude Code to start work longer than about a
 minute in the background, to end the turn at once with a short reply, never to wait in a turn
 for background work, to report a notification in a few sentences and to answer a status

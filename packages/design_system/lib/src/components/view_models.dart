@@ -562,7 +562,8 @@ final class DsRunData {
   final String? lastTextExcerpt;
 
   /// The adapter's `summary` of a failed or cancelled run: the cause of [stateReason] in its
-  /// own words (09 5.4, RUNNER-NO-GIT), shown next to the reason; null for none.
+  /// own words (09 5.4, RUNNER-NO-GIT), shown next to the reason; for a completed run the
+  /// adapter's note, such as `run_ended_idle` (issue 553); null for none.
   final String? reasonDetail;
 
   /// The steps in `ordinal` order.

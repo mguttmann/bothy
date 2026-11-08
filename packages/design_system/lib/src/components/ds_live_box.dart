@@ -547,10 +547,13 @@ class DsLiveBoxState extends State<DsLiveBox> {
     );
   }
 
-  /// The cause of a failed or cancelled [run] in the adapter's words, or null.
+  /// The cause of a failed or cancelled [run], or the note of a completed one, in the
+  /// adapter's words, or null.
   static String? _reasonDetail(DsRunData run) {
     final ended =
-        run.state == DsRunState.failed || run.state == DsRunState.cancelled;
+        run.state == DsRunState.failed ||
+        run.state == DsRunState.cancelled ||
+        run.state == DsRunState.completed;
     final detail = run.reasonDetail?.trim() ?? '';
     return ended && detail.isNotEmpty ? detail : null;
   }
@@ -610,7 +613,8 @@ class DsLiveBoxState extends State<DsLiveBox> {
                       if (DsCostText.suffix(context, run.cost!) case final s?)
                         TextSpan(text: ' $s'),
                     ],
-                    // RUNNER-NO-GIT: a failed run names its cause on the line itself.
+                    // RUNNER-NO-GIT: a failed run names its cause on the line
+                    // itself, a completed run its note (issue 553).
                     if (why != null) TextSpan(text: '$dot$why'),
                     if (detail != null) TextSpan(text: '$dot$detail'),
                   ],

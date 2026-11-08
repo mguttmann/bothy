@@ -292,7 +292,8 @@ level-one switch test holds them against the installed CLI.
   (FIX-runner-auth-failed-held). Once the process has ended nothing waits on the thread any
   more, also when the last answer promised to go on later: a run its turn completes carries
   the summary "Run ended; nothing is waiting ..." with the code `run_ended_idle`, which the
-  collapsed run line shows (FIX-runner-silent-stop).
+  apps show next to the run's state on its collapsed line and in the opened box
+  (FIX-runner-silent-stop).
 - **Attachments of follow-ups** (09 18.5, FIX-scan-state-stale): a follow-up whose files are
   still being checked waits, without a lock, until the server reports every file final, at most
   `runner.followup_file_wait`; its line then lists each file after the text under

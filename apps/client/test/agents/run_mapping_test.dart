@@ -55,4 +55,28 @@ void main() {
     expect(data.reasonDetail, isNull);
     expect(data.lastTextExcerpt, 'Found the cause');
   });
+
+  // Issue 553: a note of the adapter ends with its log code in backticks (R-AG-35).
+  const idle =
+      'Run ended; nothing is waiting, so this thread continues only when '
+      'someone sends a message (`run_ended_idle`)';
+
+  test('a completed run summary with a log code is the note of the line', () {
+    final data = runFromSummary(
+      run(1, RunState.completed).copyWith(summary: idle),
+      agentName: 'Robin',
+      now: t0,
+    );
+    expect(data.reasonDetail, idle);
+    expect(data.lastTextExcerpt, isNull);
+  });
+
+  test('a completed run document with a log code carries the note', () {
+    final doc = RunDocument.fromJson({
+      ...runDoc(1, state: 'completed'),
+      'summary': idle,
+    });
+    final data = runFromDocument(doc, agentName: 'Robin', now: t0);
+    expect(data.reasonDetail, idle);
+  });
 }
