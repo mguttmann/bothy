@@ -19,7 +19,14 @@ from dataclasses import dataclass, field
 
 from bothy_sdk.auth import Secret
 
-__all__ = ["SecretError", "SecretRef", "describe", "parse_secret_ref", "resolve"]
+__all__ = [
+    "SecretError",
+    "SecretRef",
+    "describe",
+    "parse_secret_ref",
+    "read_open_file",
+    "resolve",
+]
 
 _ENV_NAME = re.compile(r"[A-Z_][A-Z0-9_]*")
 _ALLOWED_MODES = (0o400, 0o600)
@@ -108,6 +115,21 @@ def resolve(ref: SecretRef) -> Secret:
         fd = os.open(ref.target, os.O_RDONLY)
     except OSError:
         raise SecretError("missing") from None
+    return read_open_file(fd)
+
+
+def read_open_file(fd: int) -> Secret:
+    """Read the secret of a file already opened for reading, with the checks of `resolve`.
+
+    Args:
+        fd: The open file; this function closes it.
+
+    Returns:
+        The secret.
+
+    Raises:
+        SecretError: ``empty``, ``unsafe_mode`` or ``not_utf8``.
+    """
     with os.fdopen(fd, "rb") as fh:
         info = os.fstat(fh.fileno())
         if (

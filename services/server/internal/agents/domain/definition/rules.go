@@ -154,13 +154,19 @@ func ValidSecretRef(r string) bool {
 	return false
 }
 
-// ValidURL reports whether u is an https URL with a host, without user information and without a
-// fragment (26 4.2).
+// ValidURL reports whether u is an https URL with a host, without user information, without a
+// fragment and without a variable reference (26 4.2).
 func ValidURL(u string) bool {
 	p, err := url.Parse(u)
 	return err == nil && p.Scheme == "https" && p.Opaque == "" && p.Hostname() != "" && p.User == nil &&
-		!strings.Contains(u, "#")
+		!strings.Contains(u, "#") && !ExpandsVariable(u)
 }
+
+// ExpandsVariable reports whether s holds "${", the start of a variable reference that the
+// Claude Code CLI substitutes from its own environment in the url, headers, args and env of an MCP
+// server; a plain value or url with it is refused, so no definition can name a variable of the
+// turn's environment (26 4.2).
+func ExpandsVariable(s string) bool { return strings.Contains(s, "${") }
 
 // PinnedPackage reports whether p is <name>@<exact version> (26 4.3 item 6).
 func PinnedPackage(p string) bool { return packagePattern.MatchString(p) }

@@ -78,6 +78,8 @@ hosted_max_tool_class = "scoped"
 # server that names one ends the turn with mcp_reference_unavailable. The start is refused when
 # it is not an absolute folder, when group or others may write it, when it overlaps
 # hosted_agents_root, state_dir or projects_root, or when a credential of the runner lies in it.
+# Each file needs exactly one hard link and is opened without following a link; keep copies or
+# links of the runner's or the CLI's credentials out of this folder.
 hosted_secrets_dir = ""
 # Commands the runner starts for a stdio MCP server of a hosted agent's definition (26 5.6); a
 # definition naming another command is refused before the turn. Equal to the server's

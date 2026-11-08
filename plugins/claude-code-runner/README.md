@@ -561,8 +561,17 @@ never copying a file of it, and checks it itself before every turn.
 - **Secret scope** (26 5.1 item 3). A definition's `secret_ref` resolves only as
   `file:<runner.hosted_secrets_dir>/<agent_id>/<name>`, also after following links, and never to
   a credential of the runner (`agent_token_ref`, `dpop_key_ref`, `anthropic_api_key_ref`); `env:`
-  references and other agents' subfolders are out of scope. The host operator places each
-  agent's secrets there (mode `0600` or `0400`). Without the key no reference of a definition
+  references and other agents' subfolders are out of scope. The file is opened one name at a
+  time without following a link and must have exactly one hard link, so a link swapped in after
+  the check or a hard link to a file elsewhere resolves nothing. The host operator places each
+  agent's secrets there (mode `0600` or `0400`), keeps copies or links of the runner's or the
+  CLI's credentials out of it and keeps the host user's CLI folder itself outside it (the runner
+  checks no overlap with that folder). A `chat` or `scoped` turn cannot write there. A `host`
+  turn runs with the host user's rights and can read or change every file there the host user
+  can, also in other agents' subfolders: trust a `host` agent with all secrets of the host user,
+  and use a separate runner under a separate OS user for isolation. A `url`, an `args[]` entry or a
+  plain `value` with `${` is refused by the own check (`invalid`), because the CLI substitutes
+  `${VAR}` there from its own environment. Without the key no reference of a definition
   resolves. The start is refused, naming the key, when it is not an absolute folder (a link is
   refused), when group or others may write it, when it overlaps `runner.hosted_agents_root`,
   `runner.state_dir` or `runner.projects_root`, or when a `file:` credential of the runner lies
