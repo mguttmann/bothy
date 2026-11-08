@@ -182,11 +182,27 @@ func toError(r *http.Request, err error) *errs.Error {
 		return payloadTooLarge(r.Context())
 	}
 	if errors.Is(err, os.ErrDeadlineExceeded) || requestDeadline(r, err) {
-		logFailure(r, err, errs.CodeUnavailable, errs.CauseDeadlineExceeded, "")
+		goType := ""
+		if r.Context().Err() == nil {
+			// A socket deadline while the request still had time: the types name the connection
+			// that timed out (#238), the text stays out of the log.
+			goType = chainTypes(err)
+		}
+		logFailure(r, err, errs.CodeUnavailable, errs.CauseDeadlineExceeded, goType)
 		return errs.Wrap(errs.CodeUnavailable, err, "").WithCause(errs.CauseDeadlineExceeded)
 	}
 	logFailure(r, err, errs.CodeInternalError, "", fmt.Sprintf("%T", err))
 	return errs.Wrap(errs.CodeInternalError, err, "")
+}
+
+// chainTypes returns the Go types of err and of every error it wraps with Unwrap() error, outer
+// first, joined by " < ".
+func chainTypes(err error) string {
+	var types []string
+	for e := err; e != nil; e = errors.Unwrap(e) {
+		types = append(types, fmt.Sprintf("%T", e))
+	}
+	return strings.Join(types, " < ")
 }
 
 // wasInternal reports whether the first *errs.Error in the chain of err is internal_error.
