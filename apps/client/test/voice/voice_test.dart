@@ -393,12 +393,20 @@ void main() {
       tester,
     ) async {
       final (host, services) = await open(tester);
-      await host.run(
-        tester,
-        () => host.db.messagesDao.putFile(
-          voiceFile.copyWith(transcriptStatus: TranscriptStatus.none),
-        ),
+      // "Transcribe" shows only where the server transcribes (issue 570); the server may
+      // still refuse, for example after its configuration changed.
+      services.adapter.on(
+        '/instance',
+        ScriptedAnswer.json(200, instanceBody('service')),
       );
+      await host.run(tester, () async {
+        await host.db.instanceDao.put(
+          instanceWith().copyWith(features: {'voice.enabled': true}),
+        );
+        await host.db.messagesDao.putFile(
+          voiceFile.copyWith(transcriptStatus: TranscriptStatus.none),
+        );
+      });
       await host.settle(tester);
       services.adapter.on(
         path('transcribe'),

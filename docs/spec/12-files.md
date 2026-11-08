@@ -918,6 +918,8 @@ input from users (no SSRF path).
 
 `file.transcribe` (a person taps "Transcribe") starts the job in mode `service`; in the
 other modes the server responds `409 conflict` with `reason` `transcription_unavailable`.
+`getInstance` reports the effective mode of the caller (below) as `voice_transcription_mode`, so a
+client offers "Transcribe" only in `service` ([15](15-client-architecture.md) 13).
 
 Result: `transcript_status` `pending` -> `done` or `failed`, `transcript_text`,
 `transcript_language`, `file.updated`. The transcript is searchable

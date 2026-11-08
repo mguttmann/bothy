@@ -164,6 +164,12 @@ type adminEnv struct {
 
 func newAdminEnv(t *testing.T, outcome authorize.Outcome, logins instance.LoginOptionsSource) *adminEnv {
 	t.Helper()
+	return newAdminEnvWith(t, adminCfg, outcome, logins)
+}
+
+// newAdminEnvWith is newAdminEnv with the configuration cfg.
+func newAdminEnvWith(t *testing.T, cfg app.Config, outcome authorize.Outcome, logins instance.LoginOptionsSource) *adminEnv {
+	t.Helper()
 	e := &adminEnv{
 		settings: &memSettings{rows: map[string]app.SettingRow{}, lostOnce: map[string]bool{}},
 		repo:     newFakeRepo(), audit: &memAudit{}, events: &memEvents{},
@@ -174,7 +180,7 @@ func newAdminEnv(t *testing.T, outcome authorize.Outcome, logins instance.LoginO
 	if logins == nil {
 		logins = fixedLogins{}
 	}
-	a, err := app.NewAdmin(adminCfg, app.AdminDeps{
+	a, err := app.NewAdmin(cfg, app.AdminDeps{
 		Instance: e.repo, Settings: e.settings, Logins: logins, UoW: directUoW{}, Authorizer: decide{outcome},
 		Audit: e.audit, Events: e.events, Flags: e.flags, FlagGroups: e.groups, FlagUsers: e.users, Clock: clock.NewFake(time.Date(2026, 10, 13, 9, 0, 0, 0, time.UTC)),
 		Contract: app.Contract{SpecVersion: "1.2.3", GatewayVersions: []int{1}, Problems: []instance.ProblemType{

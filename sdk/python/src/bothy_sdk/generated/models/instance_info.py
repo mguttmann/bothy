@@ -7,6 +7,9 @@ from uuid import UUID
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.instance_info_voice_transcription_mode import (
+    InstanceInfoVoiceTranscriptionMode,
+)
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -45,6 +48,11 @@ class InstanceInfo:
         stats_time_zone (str | Unset): IANA name of the time zone in which the day, week and month buckets of the
             statistics operations start (`stats.time_zone`, 17 8); clients align the ranges of their statistics queries to
             its calendar days.
+        voice_transcription_mode (InstanceInfoVoiceTranscriptionMode | Unset): The effective transcription mode of voice
+            messages for the caller (12 8.2): `voice.transcription_mode`, with `service` reported as `off` while the feature
+            flag `voice.enabled` is off for the caller. Clients offer "Transcribe" (`requestTranscription`) only in
+            `service` with `voice.enabled` on; in `agent` the operator agent transcribes, in `off` nobody does. Absent from
+            a server that predates the field; a client then offers no "Transcribe".
     """
 
     instance_id: UUID
@@ -57,6 +65,7 @@ class InstanceInfo:
     telemetry_dashboard_url: str | Unset = UNSET
     grafana_embed_url: str | Unset = UNSET
     stats_time_zone: str | Unset = UNSET
+    voice_transcription_mode: InstanceInfoVoiceTranscriptionMode | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -83,6 +92,10 @@ class InstanceInfo:
 
         stats_time_zone = self.stats_time_zone
 
+        voice_transcription_mode: str | Unset = UNSET
+        if not isinstance(self.voice_transcription_mode, Unset):
+            voice_transcription_mode = self.voice_transcription_mode.value
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -102,6 +115,8 @@ class InstanceInfo:
             field_dict["grafana_embed_url"] = grafana_embed_url
         if stats_time_zone is not UNSET:
             field_dict["stats_time_zone"] = stats_time_zone
+        if voice_transcription_mode is not UNSET:
+            field_dict["voice_transcription_mode"] = voice_transcription_mode
 
         return field_dict
 
@@ -138,6 +153,15 @@ class InstanceInfo:
 
         stats_time_zone = d.pop("stats_time_zone", UNSET)
 
+        _voice_transcription_mode = d.pop("voice_transcription_mode", UNSET)
+        voice_transcription_mode: InstanceInfoVoiceTranscriptionMode | Unset
+        if isinstance(_voice_transcription_mode, Unset):
+            voice_transcription_mode = UNSET
+        else:
+            voice_transcription_mode = InstanceInfoVoiceTranscriptionMode(
+                _voice_transcription_mode
+            )
+
         instance_info = cls(
             instance_id=instance_id,
             branding=branding,
@@ -149,6 +173,7 @@ class InstanceInfo:
             telemetry_dashboard_url=telemetry_dashboard_url,
             grafana_embed_url=grafana_embed_url,
             stats_time_zone=stats_time_zone,
+            voice_transcription_mode=voice_transcription_mode,
         )
 
         instance_info.additional_properties = d

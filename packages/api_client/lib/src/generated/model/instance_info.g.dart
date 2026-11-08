@@ -6,6 +6,89 @@ part of 'instance_info.dart';
 // BuiltValueGenerator
 // **************************************************************************
 
+const InstanceInfoVoiceTranscriptionModeEnum
+_$instanceInfoVoiceTranscriptionModeEnum_off =
+    const InstanceInfoVoiceTranscriptionModeEnum._('off');
+const InstanceInfoVoiceTranscriptionModeEnum
+_$instanceInfoVoiceTranscriptionModeEnum_agent =
+    const InstanceInfoVoiceTranscriptionModeEnum._('agent');
+const InstanceInfoVoiceTranscriptionModeEnum
+_$instanceInfoVoiceTranscriptionModeEnum_service =
+    const InstanceInfoVoiceTranscriptionModeEnum._('service');
+const InstanceInfoVoiceTranscriptionModeEnum
+_$instanceInfoVoiceTranscriptionModeEnum_unknownDefaultOpenApi =
+    const InstanceInfoVoiceTranscriptionModeEnum._('unknownDefaultOpenApi');
+
+InstanceInfoVoiceTranscriptionModeEnum
+_$instanceInfoVoiceTranscriptionModeEnumValueOf(String name) {
+  switch (name) {
+    case 'off':
+      return _$instanceInfoVoiceTranscriptionModeEnum_off;
+    case 'agent':
+      return _$instanceInfoVoiceTranscriptionModeEnum_agent;
+    case 'service':
+      return _$instanceInfoVoiceTranscriptionModeEnum_service;
+    case 'unknownDefaultOpenApi':
+      return _$instanceInfoVoiceTranscriptionModeEnum_unknownDefaultOpenApi;
+    default:
+      return _$instanceInfoVoiceTranscriptionModeEnum_unknownDefaultOpenApi;
+  }
+}
+
+final BuiltSet<InstanceInfoVoiceTranscriptionModeEnum>
+_$instanceInfoVoiceTranscriptionModeEnumValues =
+    BuiltSet<InstanceInfoVoiceTranscriptionModeEnum>(
+      const <InstanceInfoVoiceTranscriptionModeEnum>[
+        _$instanceInfoVoiceTranscriptionModeEnum_off,
+        _$instanceInfoVoiceTranscriptionModeEnum_agent,
+        _$instanceInfoVoiceTranscriptionModeEnum_service,
+        _$instanceInfoVoiceTranscriptionModeEnum_unknownDefaultOpenApi,
+      ],
+    );
+
+Serializer<InstanceInfoVoiceTranscriptionModeEnum>
+_$instanceInfoVoiceTranscriptionModeEnumSerializer =
+    _$InstanceInfoVoiceTranscriptionModeEnumSerializer();
+
+class _$InstanceInfoVoiceTranscriptionModeEnumSerializer
+    implements PrimitiveSerializer<InstanceInfoVoiceTranscriptionModeEnum> {
+  static const Map<String, Object> _toWire = const <String, Object>{
+    'off': 'off',
+    'agent': 'agent',
+    'service': 'service',
+    'unknownDefaultOpenApi': 'unknown_default_open_api',
+  };
+  static const Map<Object, String> _fromWire = const <Object, String>{
+    'off': 'off',
+    'agent': 'agent',
+    'service': 'service',
+    'unknown_default_open_api': 'unknownDefaultOpenApi',
+  };
+
+  @override
+  final Iterable<Type> types = const <Type>[
+    InstanceInfoVoiceTranscriptionModeEnum,
+  ];
+  @override
+  final String wireName = 'InstanceInfoVoiceTranscriptionModeEnum';
+
+  @override
+  Object serialize(
+    Serializers serializers,
+    InstanceInfoVoiceTranscriptionModeEnum object, {
+    FullType specifiedType = FullType.unspecified,
+  }) => _toWire[object.name] ?? object.name;
+
+  @override
+  InstanceInfoVoiceTranscriptionModeEnum deserialize(
+    Serializers serializers,
+    Object serialized, {
+    FullType specifiedType = FullType.unspecified,
+  }) => InstanceInfoVoiceTranscriptionModeEnum.valueOf(
+    _fromWire[serialized] ?? (serialized is String ? serialized : ''),
+  );
+}
+
 class _$InstanceInfo extends InstanceInfo {
   @override
   final String instanceId;
@@ -27,6 +110,8 @@ class _$InstanceInfo extends InstanceInfo {
   final String? statsTimeZone;
   @override
   final AppLockPolicy appLock;
+  @override
+  final InstanceInfoVoiceTranscriptionModeEnum? voiceTranscriptionMode;
 
   factory _$InstanceInfo([void Function(InstanceInfoBuilder)? updates]) =>
       (InstanceInfoBuilder()..update(updates))._build();
@@ -42,6 +127,7 @@ class _$InstanceInfo extends InstanceInfo {
     this.grafanaEmbedUrl,
     this.statsTimeZone,
     required this.appLock,
+    this.voiceTranscriptionMode,
   }) : super._();
   @override
   InstanceInfo rebuild(void Function(InstanceInfoBuilder) updates) =>
@@ -63,7 +149,8 @@ class _$InstanceInfo extends InstanceInfo {
         telemetryDashboardUrl == other.telemetryDashboardUrl &&
         grafanaEmbedUrl == other.grafanaEmbedUrl &&
         statsTimeZone == other.statsTimeZone &&
-        appLock == other.appLock;
+        appLock == other.appLock &&
+        voiceTranscriptionMode == other.voiceTranscriptionMode;
   }
 
   @override
@@ -79,6 +166,7 @@ class _$InstanceInfo extends InstanceInfo {
     _$hash = $jc(_$hash, grafanaEmbedUrl.hashCode);
     _$hash = $jc(_$hash, statsTimeZone.hashCode);
     _$hash = $jc(_$hash, appLock.hashCode);
+    _$hash = $jc(_$hash, voiceTranscriptionMode.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -95,7 +183,8 @@ class _$InstanceInfo extends InstanceInfo {
           ..add('telemetryDashboardUrl', telemetryDashboardUrl)
           ..add('grafanaEmbedUrl', grafanaEmbedUrl)
           ..add('statsTimeZone', statsTimeZone)
-          ..add('appLock', appLock))
+          ..add('appLock', appLock)
+          ..add('voiceTranscriptionMode', voiceTranscriptionMode))
         .toString();
   }
 }
@@ -152,6 +241,13 @@ class InstanceInfoBuilder
       _$this._appLock ??= AppLockPolicyBuilder();
   set appLock(AppLockPolicyBuilder? appLock) => _$this._appLock = appLock;
 
+  InstanceInfoVoiceTranscriptionModeEnum? _voiceTranscriptionMode;
+  InstanceInfoVoiceTranscriptionModeEnum? get voiceTranscriptionMode =>
+      _$this._voiceTranscriptionMode;
+  set voiceTranscriptionMode(
+    InstanceInfoVoiceTranscriptionModeEnum? voiceTranscriptionMode,
+  ) => _$this._voiceTranscriptionMode = voiceTranscriptionMode;
+
   InstanceInfoBuilder() {
     InstanceInfo._defaults(this);
   }
@@ -169,6 +265,7 @@ class InstanceInfoBuilder
       _grafanaEmbedUrl = $v.grafanaEmbedUrl;
       _statsTimeZone = $v.statsTimeZone;
       _appLock = $v.appLock.toBuilder();
+      _voiceTranscriptionMode = $v.voiceTranscriptionMode;
       _$v = null;
     }
     return this;
@@ -215,6 +312,7 @@ class InstanceInfoBuilder
             grafanaEmbedUrl: grafanaEmbedUrl,
             statsTimeZone: statsTimeZone,
             appLock: appLock.build(),
+            voiceTranscriptionMode: voiceTranscriptionMode,
           );
     } catch (_) {
       late String _$failedField;

@@ -411,13 +411,36 @@ func (s *Admin) Info(ctx context.Context, a actor.Actor) (instance.Info, error) 
 	return instance.Info{
 		InstanceID: rec.InstanceID, Branding: b, LocaleDefault: locale, SpecVersion: s.d.Contract.SpecVersion,
 		Features: features, TelemetryDashboardURL: dashboard, GrafanaEmbedURL: embed, StatsTimeZone: s.cfg.StatsTimeZone,
-		AppLock: instance.AppLockPolicy{Required: s.cfg.AppLockRequired, After: s.cfg.AppLockAfter},
+		AppLock:                instance.AppLockPolicy{Required: s.cfg.AppLockRequired, After: s.cfg.AppLockAfter},
+		VoiceTranscriptionMode: effectiveVoiceMode(s.cfg.VoiceTranscriptionMode, features),
 		Limits: instance.Limits{
 			MessageMaxContentBytes: s.cfg.MessageMaxContentBytes, MessageMaxAttachments: s.cfg.MessageMaxAttachments,
 			FileMaxUploadBytes: s.cfg.FileMaxUploadBytes, ThreadTitleMaxChars: s.cfg.ThreadTitleMaxChars,
 			VoiceMaxDuration: s.cfg.VoiceMaxDuration,
 		},
 	}, nil
+}
+
+// The values of voice.transcription_mode that effectiveVoiceMode tells apart (12 8.2).
+const (
+	voiceModeOff     = "off"
+	voiceModeService = "service"
+)
+
+// effectiveVoiceMode is the effective transcription mode of getInstance (12 8.2, issue 570): mode,
+// except that service counts as off while voice.enabled is off in features, the flags evaluated
+// for the caller. It is the rule of files.Transcripts.Mode on the same flag evaluation; instance
+// has no edge to files, so it applies the rule to its own values.
+func effectiveVoiceMode(mode string, features []instance.EvaluatedFlag) string {
+	if mode != voiceModeService {
+		return mode
+	}
+	for _, f := range features {
+		if f.Key == instance.FlagVoiceEnabled && f.Enabled {
+			return voiceModeService
+		}
+	}
+	return voiceModeOff
 }
 
 // ownerOnly returns value (telemetry.dashboard_url or console.grafana_embed_url) when a may read

@@ -26,6 +26,7 @@ part 'instance_info.g.dart';
 /// * [grafanaEmbedUrl] - Dashboard the web console embeds on the page \"Operations (Grafana)\", from the configuration key `console.grafana_embed_url` (25 9.2). Present only for owners and only when the key is set, with the same filter as `telemetry_dashboard_url`. Only the console uses it, in an iframe with `sandbox=\"allow-scripts allow-same-origin\"` and `referrerpolicy=\"no-referrer\"` whose origin is the only `frame-src` of its CSP; the apps never embed it (25 9.1).
 /// * [statsTimeZone] - IANA name of the time zone in which the day, week and month buckets of the statistics operations start (`stats.time_zone`, 17 8); clients align the ranges of their statistics queries to its calendar days.
 /// * [appLock]
+/// * [voiceTranscriptionMode] - The effective transcription mode of voice messages for the caller (12 8.2): `voice.transcription_mode`, with `service` reported as `off` while the feature flag `voice.enabled` is off for the caller. Clients offer \"Transcribe\" (`requestTranscription`) only in `service` with `voice.enabled` on; in `agent` the operator agent transcribes, in `off` nobody does. Absent from a server that predates the field; a client then offers no \"Transcribe\".
 @BuiltValue()
 abstract class InstanceInfo
     implements Built<InstanceInfo, InstanceInfoBuilder> {
@@ -63,6 +64,11 @@ abstract class InstanceInfo
 
   @BuiltValueField(wireName: r'app_lock')
   AppLockPolicy get appLock;
+
+  /// The effective transcription mode of voice messages for the caller (12 8.2): `voice.transcription_mode`, with `service` reported as `off` while the feature flag `voice.enabled` is off for the caller. Clients offer \"Transcribe\" (`requestTranscription`) only in `service` with `voice.enabled` on; in `agent` the operator agent transcribes, in `off` nobody does. Absent from a server that predates the field; a client then offers no \"Transcribe\".
+  @BuiltValueField(wireName: r'voice_transcription_mode')
+  InstanceInfoVoiceTranscriptionModeEnum? get voiceTranscriptionMode;
+  // enum voiceTranscriptionModeEnum {  off,  agent,  service,  };
 
   InstanceInfo._();
 
@@ -143,6 +149,13 @@ class _$InstanceInfoSerializer implements PrimitiveSerializer<InstanceInfo> {
       object.appLock,
       specifiedType: const FullType(AppLockPolicy),
     );
+    if (object.voiceTranscriptionMode != null) {
+      yield r'voice_transcription_mode';
+      yield serializers.serialize(
+        object.voiceTranscriptionMode,
+        specifiedType: const FullType(InstanceInfoVoiceTranscriptionModeEnum),
+      );
+    }
   }
 
   @override
@@ -243,6 +256,16 @@ class _$InstanceInfoSerializer implements PrimitiveSerializer<InstanceInfo> {
           ) as AppLockPolicy;
           result.appLock.replace(valueDes);
           break;
+        case r'voice_transcription_mode':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(
+              InstanceInfoVoiceTranscriptionModeEnum,
+            ),
+          ) as InstanceInfoVoiceTranscriptionModeEnum?;
+          if (valueDes == null) continue;
+          result.voiceTranscriptionMode = valueDes;
+          break;
         default:
           unhandled.add(key);
           unhandled.add(value);
@@ -270,4 +293,30 @@ class _$InstanceInfoSerializer implements PrimitiveSerializer<InstanceInfo> {
     );
     return result.build();
   }
+}
+
+/// The effective transcription mode of voice messages for the caller (12 8.2): `voice.transcription_mode`, with `service` reported as `off` while the feature flag `voice.enabled` is off for the caller. Clients offer \"Transcribe\" (`requestTranscription`) only in `service` with `voice.enabled` on; in `agent` the operator agent transcribes, in `off` nobody does. Absent from a server that predates the field; a client then offers no \"Transcribe\".
+class InstanceInfoVoiceTranscriptionModeEnum extends EnumClass {
+  @BuiltValueEnumConst(wireName: r'off')
+  static const InstanceInfoVoiceTranscriptionModeEnum off =
+      _$instanceInfoVoiceTranscriptionModeEnum_off;
+  @BuiltValueEnumConst(wireName: r'agent')
+  static const InstanceInfoVoiceTranscriptionModeEnum agent =
+      _$instanceInfoVoiceTranscriptionModeEnum_agent;
+  @BuiltValueEnumConst(wireName: r'service')
+  static const InstanceInfoVoiceTranscriptionModeEnum service =
+      _$instanceInfoVoiceTranscriptionModeEnum_service;
+  @BuiltValueEnumConst(wireName: r'unknown_default_open_api', fallback: true)
+  static const InstanceInfoVoiceTranscriptionModeEnum unknownDefaultOpenApi =
+      _$instanceInfoVoiceTranscriptionModeEnum_unknownDefaultOpenApi;
+
+  static Serializer<InstanceInfoVoiceTranscriptionModeEnum> get serializer =>
+      _$instanceInfoVoiceTranscriptionModeEnumSerializer;
+
+  const InstanceInfoVoiceTranscriptionModeEnum._(String name) : super(name);
+
+  static BuiltSet<InstanceInfoVoiceTranscriptionModeEnum> get values =>
+      _$instanceInfoVoiceTranscriptionModeEnumValues;
+  static InstanceInfoVoiceTranscriptionModeEnum valueOf(String name) =>
+      _$instanceInfoVoiceTranscriptionModeEnumValueOf(name);
 }

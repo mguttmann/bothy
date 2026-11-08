@@ -3,7 +3,9 @@
 /// The transcript of a voice message (12 8.2; 15 13; brief M4-22 Design note 4): it appears
 /// when `file.updated` reports `transcript_status = done` (the text comes from
 /// `getTranscript`, the local row holds no text), "Transcribe" calls `requestTranscription`,
-/// and `409 conflict` with `reason` `transcription_unavailable` shows a short text.
+/// and `409 conflict` with `reason` `transcription_unavailable` shows a short text. "Transcribe"
+/// shows only while the server transcribes for the person (`serverTranscribesProvider`: the
+/// effective mode `service` of `getInstance` with `voice.enabled` on; issue 570).
 library;
 
 import 'dart:async';
@@ -53,6 +55,16 @@ final class FileTranscripts {
     final t = (await _api.getFilesApi().getTranscript(fileId: fileId.value))
         .data;
     return t?.text;
+  }
+
+  /// The effective transcription mode of the caller from `getInstance`
+  /// (`voice_transcription_mode`: `off`, `agent` or `service`), or null from a server without
+  /// the field (12 8.2, issue 570).
+  ///
+  /// Throws the `DioException` of the request.
+  Future<String?> serverMode() async {
+    final info = (await _api.getAdminApi().getInstance()).data;
+    return info?.voiceTranscriptionMode?.name;
   }
 
   /// Asks the server for a transcript of [fileId] (`file.transcribe`); returns null when it
@@ -150,18 +162,23 @@ class _TranscriptViewState extends ConsumerState<TranscriptView> {
         if (status == TranscriptStatus.failed) {
           children.add(line(l.transcriptFailed));
         }
-        children.add(
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: DsButton(
-              key: const ValueKey('transcript.request'),
-              label: l.transcriptRequest,
-              style: DsButtonStyle.ghost,
-              loading: _asking,
-              onPressed: () => unawaited(_request()),
+        // Only where the server transcribes for the person; elsewhere the tap could only answer
+        // feature_disabled or transcription_unavailable (issue 570).
+        final offer = ref.watch(serverTranscribesProvider).value ?? false;
+        if (offer) {
+          children.add(
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: DsButton(
+                key: const ValueKey('transcript.request'),
+                label: l.transcriptRequest,
+                style: DsButtonStyle.ghost,
+                loading: _asking,
+                onPressed: () => unawaited(_request()),
+              ),
             ),
-          ),
-        );
+          );
+        }
     }
     if (_notice case final notice?) {
       children.add(line(notice, key: const ValueKey('transcript.notice')));

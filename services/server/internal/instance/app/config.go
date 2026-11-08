@@ -42,6 +42,10 @@ type Config struct {
 	// AppLockRequired is security.app_lock_required: the owner requires the app lock on every
 	// device. The server cannot check the lock, it only delivers the policy (08 9).
 	AppLockRequired bool `config:"security.app_lock_required"`
+	// VoiceTranscriptionMode is voice.transcription_mode (off, agent or service); getInstance
+	// reports it as the effective mode of the caller, with service reported as off while
+	// voice.enabled is off for the caller (12 8.2, issue 570). "" reports nothing.
+	VoiceTranscriptionMode string `config:"voice.transcription_mode"`
 	// MinVersionIOS is client.min_version.ios; "" means no lower bound. The same holds for the
 	// other platforms and for the recommended versions.
 	MinVersionIOS string `config:"client.min_version.ios"`

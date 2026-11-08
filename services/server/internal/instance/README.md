@@ -280,7 +280,11 @@ boundaries. Since M5-08 it carries `app_lock` for every caller: `required` from
 `security.app_lock_required` (`Config.AppLockRequired`) and `after_ms` from
 `client.app_lock_after` (`Config.AppLockAfter`), the policy of the phone app lock (08 9). Both are
 process configuration in the key file `internal/wire/configkeys_instance.go`, not instance
-settings; the server cannot check the lock and only delivers the policy. `getProblemType` serves
+settings; the server cannot check the lock and only delivers the policy. Since issue 570 it carries
+`voice_transcription_mode`, the effective transcription mode of the caller:
+`voice.transcription_mode` (`Config.VoiceTranscriptionMode`), with `service` reported as `off`
+while `voice.enabled` is off in the caller's evaluated flags (the rule of `files.Transcripts.Mode`;
+`instance` binds the key itself and has no edge to `files`). `getProblemType` serves
 every code of `x-problem-codes`.
 
 **Source port.** `LoginOptionsSource` is declared here, because `instance` may not import
