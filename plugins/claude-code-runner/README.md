@@ -289,7 +289,11 @@ level-one switch test holds them against the installed CLI.
   longer holds the run for the background work: a process still alive `runner.stop_grace` after
   an error `result` is stopped (log code `turn_stopped_after_error`), its open task steps end
   `cancelled`, and the run ends with a summary that names the lost tasks
-  (FIX-runner-auth-failed-held).
+  (FIX-runner-auth-failed-held). Once the process has ended nothing waits on the thread any
+  more, also when the last answer promised to go on later: a run its turn completes carries
+  the summary "Run ended; nothing is waiting ..." with the code `run_ended_idle`, which the
+  apps show next to the run's state on its collapsed line and in the opened box
+  (FIX-runner-silent-stop).
 - **Attachments of follow-ups** (09 18.5, FIX-scan-state-stale): a follow-up whose files are
   still being checked waits, without a lock, until the server reports every file final, at most
   `runner.followup_file_wait`; its line then lists each file after the text under
@@ -421,8 +425,10 @@ uv run --locked claude-code-runner run --config /etc/claude-code-runner.toml
 `run` logs JSON lines on stderr (event codes and IDs, never content, tokens or keys) and stops on
 SIGINT or SIGTERM. Before it stops, every turn it started itself is ended as a stop by a person
 ends it (SIGINT, SIGTERM and SIGKILL to its group, each escalation logged as `stop_escalated`), and
-its run finishes `cancelled` with the reason `adapter_stopped` and a note in the thread; the turn
-record goes only once no process of the turn is left. Turns adopted after a crash keep running and
+its run finishes `cancelled` with the reason `adapter_stopped` and a note in the thread, which
+names the background tasks the stop ended (their results are lost; FIX-runner-silent-stop); the
+turn record goes only once no process of the turn is left. With `runner.turn_handover` a restart
+hands the turns over instead and no background task is lost. Turns adopted after a crash keep running and
 keep their records for the next start (docs/spec/09-agents.md 18.6, 18.9).
 
 ## Folder creation (M4-43)

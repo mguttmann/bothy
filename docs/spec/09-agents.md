@@ -3484,7 +3484,13 @@ pinned CLI may keep the process for its background work after that (about ten mi
 after a `result` with an error is stopped as in 18.6 (log code `turn_stopped_after_error`; the
 end is classified as before, the stop does not make it `stopped`); task steps still open then
 end `cancelled`, and the run ends by 18.9 (addendum of 2026-11-01,
-docs/decisions.d/FIX-runner-auth-failed-held.md). Follow-ups it did not take stay `queued`, and
+docs/decisions.d/FIX-runner-auth-failed-held.md). A run its turn completes carries the
+`summary` "Run ended; nothing is waiting, so this thread continues only when someone sends a
+message" with the code `run_ended_idle`: once the process has ended nothing waits on the thread,
+also when the last answer promised to go on later. The apps show the summary of a completed run
+next to its state, on the collapsed run line and in the opened box, when it ends with a log code
+in backticks (the form of an adapter note, R-AG-35); any other summary of a completed run stays
+its last text (addendum of 2026-11-08, docs/decisions.d/FIX-runner-silent-stop.md). Follow-ups it did not take stay `queued`, and
 the server defers them into a new run that resumes the same session (section 7). The system prompt tells Claude Code to start work longer than about a
 minute in the background, to end the turn at once with a short reply, never to wait in a turn
 for background work, to report a notification in a few sentences and to answer a status
@@ -3534,7 +3540,9 @@ stay below `agent.cancel_grace` of the server, else the server ends the run with
 Addendum of 2026-11-06 (AR-02, `docs/decisions.d/AR-02.md`): An orderly stop of the runner (SIGTERM
 or SIGINT, for example at a restart or an update) stops every turn it started itself whose process
 runs the same way, with the reason `adapter_stopped` (5.2) and a summary that names the cause for
-the thread, before the SDK shuts down; the turn record and the run files are removed only once no
+the thread and how many background tasks the process held when the stop came (they end with it
+and never report back; addendum of 2026-11-08, docs/decisions.d/FIX-runner-silent-stop.md),
+before the SDK shuts down; the turn record and the run files are removed only once no
 process of the group is left (D-AR-1 of [autonomous-runs.md](../design/autonomous-runs.md)). A turn
 the SDK's shutdown cancels before that stop reached it (it started a process in between, or
 outlived the wait of `runner.stop_grace` plus `runner.kill_grace` plus `runner.cli_probe_timeout`)

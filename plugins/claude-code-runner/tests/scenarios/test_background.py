@@ -17,6 +17,7 @@ import pytest
 from bothy_sdk.testing._patience import PATIENCE
 
 from claude_code_runner.app import Runner
+from claude_code_runner.causes import adapter_stopped_cause, cause
 
 from .conftest import World
 
@@ -204,3 +205,59 @@ async def test_login_lost_while_background_runs_ends_the_run_with_its_cause(worl
     assert await world.ended(again.run_id) == "completed"
     argv = world.turns()[-1]["argv"]
     assert argv[argv.index("--resume") + 1] == first_ref
+
+
+# ---- FIX-runner-silent-stop (issue 553) ------------------------------------------------------
+
+
+async def test_a_run_whose_process_ended_says_nothing_waits(world: World) -> None:
+    # A turn may promise to continue later while no background task runs; its process ends
+    # after the answer and nothing wakes the thread. The collapsed run line says so at once.
+    world.scenario(fixture="plain")
+    await world.start(world.config(followup_grace="200ms"))
+    run = await world.fake.trigger("Merge once CI is green", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "completed"
+    assert texts(world) == ["Done."]  # the note is no message of its own
+    assert world.fake.run(run.run_id)["summary"] == cause("run_ended_idle")
+
+
+async def test_a_run_after_its_background_work_ended_says_nothing_waits(world: World) -> None:
+    _, run_id, job = await background_run(world, followup_grace="200ms")
+    world.release(job)
+    assert await world.ended(run_id) == "completed"
+    assert world.fake.run(run_id)["summary"] == cause("run_ended_idle")
+
+
+async def test_runner_stop_names_the_background_work_it_ended(world: World) -> None:
+    # Issue 553, second case: a restart of the runner without runner.turn_handover ends the
+    # background work of a held process; the thread learns that its results are lost.
+    runner, run_id, _job = await background_run(world, followup_grace="200ms")
+    assert world.state_of(run_id) == "running"
+    await runner.stop()
+    assert await world.ended(run_id) == "cancelled"
+    finish = world.fake.run(run_id)
+    assert finish["state_reason"] == "adapter_stopped"
+    assert finish["summary"] == adapter_stopped_cause(1)
+    assert texts(world) == ["Done."]
+
+
+async def test_sdk_cancel_names_the_background_work_it_ended(world: World) -> None:
+    # The safety net of RunTurn.run (the SDK cancels the run) reports the same.
+    runner, run_id, _job = await background_run(world, followup_grace="200ms")
+    assert runner.adapter is not None
+    await runner.adapter.stop()
+    assert await world.ended(run_id) == "cancelled"
+    assert world.fake.run(run_id)["summary"] == adapter_stopped_cause(1)
+
+
+async def test_runner_stop_during_a_turn_without_background_work_keeps_the_cause(
+    world: World,
+) -> None:
+    turn = world.gate("turn_gate")
+    world.scenario(fixture="plain", turn_gate=str(turn))
+    runner = await world.start(world.config(followup_grace="200ms"))
+    run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
+    await world.until(lambda: world.calls("gate_wait"))
+    await runner.stop()
+    assert await world.ended(run.run_id) == "cancelled"
+    assert world.fake.run(run.run_id)["summary"] == cause("adapter_stopped")

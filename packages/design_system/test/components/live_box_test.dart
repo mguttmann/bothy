@@ -189,14 +189,35 @@ void main() {
     },
   );
 
-  testWidgets('a completed run shows no reason detail line', (tester) async {
+  testWidgets('a completed run shows its note on the line and in the box '
+      '(issue 553)', (tester) async {
+    const note = 'Run ended; nothing is waiting (`run_ended_idle`)';
+    const run = DsRunData(
+      id: 'r1',
+      agentName: 'Robin',
+      state: DsRunState.completed,
+      reasonDetail: note,
+    );
+    await pumpDs(
+      tester,
+      DsLiveBox.collapsed(run, announceMinInterval: _interval, onExpand: () {}),
+    );
+    expect(allText(tester), contains(note));
+    await pumpDs(
+      tester,
+      const DsLiveBox(run, visibleSteps: 6, announceMinInterval: _interval),
+    );
+    expect(find.text(note), findsOneWidget);
+  });
+
+  testWidgets('a running run shows no reason detail line', (tester) async {
     await pumpDs(
       tester,
       DsLiveBox.collapsed(
         const DsRunData(
           id: 'r1',
           agentName: 'Robin',
-          state: DsRunState.completed,
+          state: DsRunState.running,
           reasonDetail: 'never shown',
         ),
         announceMinInterval: _interval,

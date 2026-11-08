@@ -252,6 +252,38 @@ void main() {
     await t.host.dispose(tester);
   });
 
+  testWidgets('a completed run with the note run_ended_idle shows the note '
+      'on its line and in the opened box (issue 553)', (tester) async {
+    const note =
+        'Run ended; nothing is waiting, so this thread continues only when '
+        'someone sends a message (`run_ended_idle`)';
+    final t = await openRun(tester, doc: runDoc(1));
+    final ended = run(1, RunState.completed).copyWith(
+      version: const ResourceVersion(2),
+      durationMs: 60 * 1000,
+      stepCount: 1,
+      summary: note,
+    );
+    await t.host.run(tester, () => t.host.db.runsDao.upsertIfNewer(ended));
+    await t.host.settle(tester);
+    final line = find.byKey(ValueKey('runline.${runId(1).value}'));
+    expect(line, findsOneWidget);
+    expect(find.textContaining('nothing is waiting'), findsOneWidget);
+
+    t.reads.runs[runId(1)] = {
+      ...runDoc(1, version: 3, state: 'completed'),
+      'summary': note,
+    };
+    await tester.tap(line);
+    await t.host.settle(tester);
+    expect(
+      find.byKey(ValueKey('runline.open.${runId(1).value}')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('nothing is waiting'), findsOneWidget);
+    await t.host.dispose(tester);
+  });
+
   testWidgets('interrupted: "Run interrupted" with "Send again" puts the '
       'triggering text into the outbox', (tester) async {
     final t = await openRun(

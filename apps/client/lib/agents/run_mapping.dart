@@ -129,7 +129,7 @@ DsRunData runFromDocument(
     billingHolderName: mode == BillingMode.personal ? holderName : null,
     statusLine: doc.statusLine,
     lastTextExcerpt: doc.lastTextExcerpt,
-    reasonDetail: _ended(state) ? doc.summary : null,
+    reasonDetail: _note(state, doc.summary),
     steps: steps,
     toolCount: steps.where((s) => s.kind == DsStepKind.toolCall).length,
     subagentCount: steps.where((s) => s.kind == DsStepKind.subagent).length,
@@ -159,8 +159,9 @@ DsRunData runFromSummary(
 }) {
   final mode = run.billingModeUsed ?? run.billingModeExpected;
   final state = DsRunState.fromCode(run.state.code);
-  // RUNNER-NO-GIT: the summary of a failed or cancelled run is the cause of its reason.
-  final cause = _ended(state) ? run.summary : null;
+  // RUNNER-NO-GIT: the summary of a failed or cancelled run is the cause of its reason;
+  // issue 553: a completed run's summary with a log code is the adapter's note.
+  final cause = _note(state, run.summary);
   return DsRunData(
     id: run.id.value,
     agentName: agentName,
@@ -202,6 +203,20 @@ DsRunData runFromSummary(
 /// Whether [state] ended with a reason whose cause the adapter may name in its summary.
 bool _ended(DsRunState state) =>
     state == DsRunState.failed || state == DsRunState.cancelled;
+
+/// A note of the adapter ends with its log code in backticks (09 R-AG-35).
+final _noteCode = RegExp(r'\(`[a-z0-9_]+`\)$');
+
+/// The [summary] the run line shows next to the state, or null: the cause of a failed or
+/// cancelled run, and the note of a completed run whose summary ends with a log code (issue
+/// 553, `run_ended_idle`); any other summary of a completed run stays its last text.
+String? _note(DsRunState state, String? summary) {
+  if (summary == null) return null;
+  if (_ended(state)) return summary;
+  final noted =
+      state == DsRunState.completed && _noteCode.hasMatch(summary.trim());
+  return noted ? summary : null;
+}
 
 /// Why the queued [run] waits (09 5.2.1, F-WARTESCHLANGE-GRUND), or null for a run that is not
 /// queued: its `state_reason` with the [presence] of its agent (`offline` and `unknown` say the
