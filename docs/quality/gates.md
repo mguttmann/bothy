@@ -438,9 +438,12 @@ request fails only for vulnerable dependencies the pull request itself adds or c
 * For a `go.mod`, OSV-Scanner runs its own call analysis whenever `go` is on `PATH` (as in CI
   and in local runs) and then neither reports nor fails for a vulnerability that the module's
   code does not call; only `--all-vulns` lists such findings, under "Uncalled vulnerabilities",
-  and without `go` on `PATH` the analysis is skipped and they fail. So the Go modules are gated
-  on reachable findings only, the same as govulncheck. Uncalled findings of a Go module show with
-  `osv-scanner scan source --all-vulns -L <module>/go.mod` and are bumped with the next
+  and without `go` on `PATH` the analysis is skipped and they fail. An advisory without Go import
+  data cannot be classified and counts as called, so it fails even when nothing calls it. So the
+  Go modules are gated on reachable findings and on those OSV cannot classify, close to
+  govulncheck. Uncalled findings of a Go module show with
+  `"$(uv run --project tools --locked --quiet python tools/bin/fetch_tools.py path osv-scanner)"
+  scan source --all-vulns -L <module>/go.mod` (the pinned scanner) and are bumped with the next
   dependency change of that module (issue 550: x/net 0.60.0 and x/crypto 0.57.0 passed this way).
 * The fix is an upgrade of the direct dependency or an npm `overrides` entry to a fixed release
   in the affected lock file. Only when no release that the callers can use has the fix and the
