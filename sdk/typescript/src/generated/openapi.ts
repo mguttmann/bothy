@@ -6753,6 +6753,12 @@ export interface components {
              */
             stats_time_zone?: string;
             app_lock: components["schemas"]["AppLockPolicy"];
+            /**
+             * @description The effective transcription mode of voice messages for the caller (12 8.2): `voice.transcription_mode`, with `service` reported as `off` while the feature flag `voice.enabled` is off for the caller. Clients offer "Transcribe" (`requestTranscription`) only in `service` with `voice.enabled` on; in `agent` the operator agent transcribes, in `off` nobody does. Absent from a server that predates the field; a client then offers no "Transcribe".
+             * @example agent
+             * @enum {string}
+             */
+            voice_transcription_mode?: "off" | "agent" | "service";
         };
         /** @description The app lock policy of the phone apps (08 9): the server cannot check the lock, so it only delivers the two values the app enforces. Both come from the process configuration, not from an instance setting. */
         AppLockPolicy: {

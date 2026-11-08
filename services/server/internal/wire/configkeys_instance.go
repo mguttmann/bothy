@@ -65,8 +65,8 @@ func clientVersionsSemVer(v *config.Values) error {
 }
 
 // InstanceConfig binds the keys the settings, branding and discovery use cases of instance read
-// (branding.product_name_max_chars, the client limits and the app lock policy of getInstance and
-// the client versions of discovery) into one typed value (M1-46). The error names the key whose binding failed, never
+// (branding.product_name_max_chars, the client limits, the app lock policy and the transcription
+// mode of getInstance and the client versions of discovery) into one typed value (M1-46). The error names the key whose binding failed, never
 // a value.
 func InstanceConfig(v *config.Values) (app.Config, error) {
 	var c app.Config

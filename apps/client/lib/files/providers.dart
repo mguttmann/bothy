@@ -105,6 +105,31 @@ FileTranscripts? fileTranscripts(Ref ref) {
   return engine == null ? null : FileTranscripts(engine.api);
 }
 
+/// Whether `voice.enabled` is on for the person in the stored flags (`features` of the instance
+/// row, which `getInstance` and every snapshot refresh); false while unknown.
+@Riverpod(keepAlive: true)
+Stream<bool> voiceEnabled(Ref ref) {
+  final db = ref.watch(localDatabaseProvider);
+  return db == null
+      ? Stream.value(false)
+      : db.instanceDao
+            .watch()
+            .map((i) => i?.features['voice.enabled'] ?? false)
+            .distinct();
+}
+
+/// Whether the server transcribes a voice message on request for the person (12 8.2, issue
+/// 570): `voice.enabled` on and `getInstance` reporting `voice_transcription_mode = service`.
+/// The view offers "Transcribe" only then. With the switch off nothing is asked; a change of the
+/// switch asks again, because the effective mode depends on it.
+@Riverpod(keepAlive: true)
+Future<bool> serverTranscribes(Ref ref) async {
+  final on = await ref.watch(voiceEnabledProvider.future);
+  final transcripts = ref.watch(fileTranscriptsProvider);
+  if (!on || transcripts == null) return false;
+  return await transcripts.serverMode() == 'service';
+}
+
 /// The transcript text of [fileId] once `file.updated` reports `transcript_status = done`
 /// (12 8.2); null before. Read again on every change of the file.
 @riverpod

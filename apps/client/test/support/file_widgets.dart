@@ -256,3 +256,23 @@ Future<void> settleUntil(
     await host.settle(tester);
   }
 }
+
+/// The body of `getInstance` with [mode] as `voice_transcription_mode` (absent when null).
+Map<String, Object?> instanceBody(String? mode) => {
+  'instance_id': '0192f4a0-7b1c-7db7-89b9-2fe4c48dcb3e',
+  'branding': {'product_name': 'ExampleChat', 'version': 1},
+  'locale_default': 'en',
+  'spec_version': '1',
+  'features': [
+    {'key': 'voice.enabled', 'enabled': true},
+  ],
+  'limits': {
+    'message_max_content_bytes': 1000,
+    'message_max_attachments': 10,
+    'file_max_upload_bytes': 1000000,
+    'thread_title_max_chars': 200,
+    'voice_max_duration_ms': 60000,
+  },
+  'app_lock': {'required': false, 'after_ms': 300000},
+  'voice_transcription_mode': ?mode,
+};

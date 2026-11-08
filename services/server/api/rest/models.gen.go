@@ -3045,6 +3045,27 @@ func (e IncomingWebhookPostVersion) Valid() bool {
 	}
 }
 
+// Defines values for InstanceInfoVoiceTranscriptionMode.
+const (
+	InstanceInfoVoiceTranscriptionModeAgent   InstanceInfoVoiceTranscriptionMode = "agent"
+	InstanceInfoVoiceTranscriptionModeOff     InstanceInfoVoiceTranscriptionMode = "off"
+	InstanceInfoVoiceTranscriptionModeService InstanceInfoVoiceTranscriptionMode = "service"
+)
+
+// Valid indicates whether the value is a known member of the InstanceInfoVoiceTranscriptionMode enum.
+func (e InstanceInfoVoiceTranscriptionMode) Valid() bool {
+	switch e {
+	case InstanceInfoVoiceTranscriptionModeAgent:
+		return true
+	case InstanceInfoVoiceTranscriptionModeOff:
+		return true
+	case InstanceInfoVoiceTranscriptionModeService:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for InstanceUpdatedEventAudience.
 const (
 	InstanceUpdatedEventAudienceSelf InstanceUpdatedEventAudience = "self"
@@ -12875,7 +12896,17 @@ type InstanceInfo struct {
 	//
 	// Examples: https://telemetry.example.com/d/bothy
 	TelemetryDashboardUrl *string `json:"telemetry_dashboard_url,omitempty"`
+
+	// VoiceTranscriptionMode The effective transcription mode of voice messages for the caller (12 8.2): `voice.transcription_mode`, with `service` reported as `off` while the feature flag `voice.enabled` is off for the caller. Clients offer "Transcribe" (`requestTranscription`) only in `service` with `voice.enabled` on; in `agent` the operator agent transcribes, in `off` nobody does. Absent from a server that predates the field; a client then offers no "Transcribe".
+	//
+	// Examples: agent
+	VoiceTranscriptionMode *InstanceInfoVoiceTranscriptionMode `json:"voice_transcription_mode,omitempty"`
 }
+
+// InstanceInfoVoiceTranscriptionMode The effective transcription mode of voice messages for the caller (12 8.2): `voice.transcription_mode`, with `service` reported as `off` while the feature flag `voice.enabled` is off for the caller. Clients offer "Transcribe" (`requestTranscription`) only in `service` with `voice.enabled` on; in `agent` the operator agent transcribes, in `off` nobody does. Absent from a server that predates the field; a client then offers no "Transcribe".
+//
+// Examples: agent
+type InstanceInfoVoiceTranscriptionMode string
 
 // InstanceLimits Effective values of limits that clients enforce before sending.
 type InstanceLimits struct {

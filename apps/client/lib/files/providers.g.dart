@@ -638,6 +638,94 @@ final class FileTranscriptsProvider
 
 String _$fileTranscriptsHash() => r'e533b9184d66627bdd3b1321256570aa45559a95';
 
+/// Whether `voice.enabled` is on for the person in the stored flags (`features` of the instance
+/// row, which `getInstance` and every snapshot refresh); false while unknown.
+
+@ProviderFor(voiceEnabled)
+final voiceEnabledProvider = VoiceEnabledProvider._();
+
+/// Whether `voice.enabled` is on for the person in the stored flags (`features` of the instance
+/// row, which `getInstance` and every snapshot refresh); false while unknown.
+
+final class VoiceEnabledProvider
+    extends $FunctionalProvider<AsyncValue<bool>, bool, Stream<bool>>
+    with $FutureModifier<bool>, $StreamProvider<bool> {
+  /// Whether `voice.enabled` is on for the person in the stored flags (`features` of the instance
+  /// row, which `getInstance` and every snapshot refresh); false while unknown.
+  VoiceEnabledProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'voiceEnabledProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$voiceEnabledHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $StreamProviderElement(pointer);
+
+  @override
+  Stream<bool> create(Ref ref) {
+    return voiceEnabled(ref);
+  }
+}
+
+String _$voiceEnabledHash() => r'4cdbc28062dc7f850cb50e6de51a9eacc7326d7c';
+
+/// Whether the server transcribes a voice message on request for the person (12 8.2, issue
+/// 570): `voice.enabled` on and `getInstance` reporting `voice_transcription_mode = service`.
+/// The view offers "Transcribe" only then. With the switch off nothing is asked; a change of the
+/// switch asks again, because the effective mode depends on it.
+
+@ProviderFor(serverTranscribes)
+final serverTranscribesProvider = ServerTranscribesProvider._();
+
+/// Whether the server transcribes a voice message on request for the person (12 8.2, issue
+/// 570): `voice.enabled` on and `getInstance` reporting `voice_transcription_mode = service`.
+/// The view offers "Transcribe" only then. With the switch off nothing is asked; a change of the
+/// switch asks again, because the effective mode depends on it.
+
+final class ServerTranscribesProvider
+    extends $FunctionalProvider<AsyncValue<bool>, bool, FutureOr<bool>>
+    with $FutureModifier<bool>, $FutureProvider<bool> {
+  /// Whether the server transcribes a voice message on request for the person (12 8.2, issue
+  /// 570): `voice.enabled` on and `getInstance` reporting `voice_transcription_mode = service`.
+  /// The view offers "Transcribe" only then. With the switch off nothing is asked; a change of the
+  /// switch asks again, because the effective mode depends on it.
+  ServerTranscribesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'serverTranscribesProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$serverTranscribesHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<bool> create(Ref ref) {
+    return serverTranscribes(ref);
+  }
+}
+
+String _$serverTranscribesHash() => r'26101bd9129d7b51d14fcc3e40155a68b90dbee3';
+
 /// The transcript text of [fileId] once `file.updated` reports `transcript_status = done`
 /// (12 8.2); null before. Read again on every change of the file.
 

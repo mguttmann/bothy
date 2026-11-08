@@ -482,6 +482,7 @@ from .incoming_webhook_post_status import IncomingWebhookPostStatus
 from .incoming_webhook_post_version import IncomingWebhookPostVersion
 from .incoming_webhook_result import IncomingWebhookResult
 from .instance_info import InstanceInfo
+from .instance_info_voice_transcription_mode import InstanceInfoVoiceTranscriptionMode
 from .instance_limits import InstanceLimits
 from .instance_setting import InstanceSetting
 from .instance_setting_list import InstanceSettingList
@@ -1377,6 +1378,7 @@ __all__ = (
     "IncomingWebhookPostVersion",
     "IncomingWebhookResult",
     "InstanceInfo",
+    "InstanceInfoVoiceTranscriptionMode",
     "InstanceLimits",
     "InstanceSetting",
     "InstanceSettingList",

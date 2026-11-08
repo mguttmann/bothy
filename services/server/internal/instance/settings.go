@@ -143,6 +143,11 @@ type Info struct {
 	StatsTimeZone string
 	// AppLock is the app lock policy of the phone apps, reported to every caller (M5-08).
 	AppLock AppLockPolicy
+	// VoiceTranscriptionMode is the effective transcription mode of the caller (12 8.2):
+	// voice.transcription_mode, with service reported as off while voice.enabled is off for the
+	// caller; "" while the process has no mode configured. Clients offer "Transcribe" only in
+	// service (issue 570).
+	VoiceTranscriptionMode string
 }
 
 // AppLockPolicy is the app lock policy of getInstance (08 9; brief M5-08 Design note 1): both

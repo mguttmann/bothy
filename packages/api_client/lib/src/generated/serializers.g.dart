@@ -454,6 +454,7 @@ Serializers _$serializers =
           ..add(IncomingWebhookPostVersionEnum.serializer)
           ..add(IncomingWebhookResult.serializer)
           ..add(InstanceInfo.serializer)
+          ..add(InstanceInfoVoiceTranscriptionModeEnum.serializer)
           ..add(InstanceLimits.serializer)
           ..add(InstanceSetting.serializer)
           ..add(InstanceSettingList.serializer)

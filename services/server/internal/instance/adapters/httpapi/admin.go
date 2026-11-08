@@ -86,6 +86,9 @@ func (h *Admin) GetInstance(ctx context.Context, _ rest.GetInstanceRequestObject
 	if info.StatsTimeZone != "" {
 		body.StatsTimeZone = ptr(info.StatsTimeZone)
 	}
+	if info.VoiceTranscriptionMode != "" {
+		body.VoiceTranscriptionMode = ptr(rest.InstanceInfoVoiceTranscriptionMode(info.VoiceTranscriptionMode))
+	}
 	if info.TelemetryDashboardURL != "" {
 		body.TelemetryDashboardUrl = ptr(info.TelemetryDashboardURL)
 	}
