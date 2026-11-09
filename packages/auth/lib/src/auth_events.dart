@@ -20,8 +20,9 @@ enum SignOutReason {
   /// The pending device was rejected or expired (08 5.2); the app deletes its local data.
   deviceRevoked,
 
-  /// The server no longer accepts the refresh token (expired, unknown, wrong key); a new
-  /// login is needed.
+  /// The server no longer accepts the refresh token (`401 unauthenticated` or
+  /// `401 token_expired`); a new login is needed. A `401 invalid_dpop_proof` of a refresh is
+  /// never this reason: the token stays and the refresh is retried later.
   refreshRejected,
 }
 

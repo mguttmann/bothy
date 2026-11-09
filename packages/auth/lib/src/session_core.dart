@@ -153,6 +153,11 @@ final class SessionCore {
 /// interceptors never repeat for refresh or step-up.
 const String internalRequestExtra = 'auth.internal';
 
+/// Key of `RequestOptions.extra` with a [Duration] that the `DpopInterceptor` sets as the
+/// connect, send and receive timeout of the request, so a request cannot outlive its proof
+/// (the refresh sets it, `refreshRequestTimeout`).
+const String requestTimeoutExtra = 'auth.request_timeout';
+
 /// Whether [options] belongs to an operation that needs a person's token: the generated client
 /// lists the security schemes in `extra['secure']`, empty for `security: []` (06 3).
 bool needsToken(RequestOptions options) {

@@ -18,11 +18,20 @@ import 'package:dio/dio.dart';
 const String proofFromInterceptor = 'pending';
 
 /// Problem codes of a refresh that mean the refresh token is no longer usable.
-const Set<String> _rejectedCodes = {
-  'unauthenticated',
-  'token_expired',
-  'invalid_dpop_proof',
-};
+///
+/// `invalid_dpop_proof` is not one of them: the server checks the proof before it looks at the
+/// refresh token and revokes nothing for a bad proof (08 7.3), so the token is still good. A
+/// proof that arrives too old (signed before the device slept) is signed anew once by the
+/// `DpopInterceptor`; when that fails too, the refresh is [RefreshUnavailable] and the
+/// session stays.
+const Set<String> _rejectedCodes = {'unauthenticated', 'token_expired'};
+
+/// Connect, send and receive timeout of one refresh request.
+///
+/// Together they end a refresh well inside `auth.dpop_proof_max_age` (default 60 s, 08 7.3),
+/// so a request whose proof was signed before the device slept fails as a network error
+/// instead of reaching the server minutes later with an expired proof.
+const Duration refreshRequestTimeout = Duration(seconds: 15);
 
 /// Runs at most one refresh of the session's family at a time.
 ///
@@ -59,10 +68,12 @@ final class RefreshCoordinator {
 
   /// Refreshes now, or joins the refresh that is running, and returns the new access token.
   ///
-  /// On `401 session_revoked` the session ends with [SignOutReason.sessionRevoked]; on another
-  /// `401` that rejects the refresh token with [SignOutReason.refreshRejected]; both clear the
-  /// store, emit `SignedOut` and throw [SessionEnded]. A network error or any other answer
-  /// keeps the state, emits `RefreshFailed` and throws [RefreshUnavailable].
+  /// On `401 session_revoked` the session ends with [SignOutReason.sessionRevoked]; on
+  /// `401 unauthenticated` or `401 token_expired` with [SignOutReason.refreshRejected]; both
+  /// clear the store, emit `SignedOut` and throw [SessionEnded]. A network error, a timeout
+  /// ([refreshRequestTimeout]), a `401 invalid_dpop_proof` that remains after one repeat with a
+  /// fresh proof, or any other answer keeps the state and the stored refresh token, emits
+  /// `RefreshFailed` and throws [RefreshUnavailable].
   Future<String> refreshNow() {
     final running = _inflight;
     if (running != null) return running;
@@ -89,7 +100,10 @@ final class RefreshCoordinator {
         tokenRefreshRequest: TokenRefreshRequest(
           (b) => b..refreshToken = refreshToken,
         ),
-        extra: {internalRequestExtra: true},
+        extra: {
+          internalRequestExtra: true,
+          requestTimeoutExtra: refreshRequestTimeout,
+        },
       );
     } on DioException catch (e) {
       throw await _failure(e, generation);

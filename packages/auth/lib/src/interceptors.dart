@@ -18,6 +18,7 @@ import 'package:auth/src/step_up.dart';
 import 'package:dio/dio.dart';
 
 const _nonceRetried = 'auth.nonce_retried';
+const _proofRetried = 'auth.proof_retried';
 const _refreshRetried = 'auth.refresh_retried';
 const _stepUpRetried = 'auth.step_up_retried';
 const _tokenVersion = 'auth.token_version';
@@ -121,12 +122,18 @@ class RefreshInterceptor extends Interceptor {
 }
 
 /// Adds `Authorization: DPoP <token>` and a fresh `DPoP` proof, adopts every `DPoP-Nonce`, and
-/// repeats once on `401 use_dpop_nonce` (06 3.1, RFC 9449 8; brief M4-09 Design note 3).
+/// repeats once on `401 use_dpop_nonce` and once on `401 invalid_dpop_proof` (06 3.1, RFC 9449
+/// 8; brief M4-09 Design note 3).
 ///
 /// Operations that need a person's token get both headers, the proof with `ath`. Login
 /// operations get a proof without `ath` where their header parameter `DPoP` asks for one
 /// (`beginPairing`, `completePairing`, `completeOidcLogin` and the other completions) and no
-/// `Authorization`. A second `use_dpop_nonce` goes to the caller.
+/// `Authorization`. The proof is signed here, in the last `onRequest` of the auth slot, so it
+/// is as young as possible when the request leaves; a request with [requestTimeoutExtra] gets
+/// that duration as its connect, send and receive timeout. A proof the server finds invalid
+/// (most often too old: the request was held while the device slept) is signed anew with a new
+/// `iat`, `jti` and the current nonce; a second `use_dpop_nonce` or `invalid_dpop_proof` goes to
+/// the caller. Neither ends the session: the server revokes nothing for a proof error.
 class DpopInterceptor extends Interceptor {
   /// Internal: created by the session over its [SessionCore] with its `proofs`.
   DpopInterceptor(this._core, this._proofs);
@@ -139,6 +146,13 @@ class DpopInterceptor extends Interceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
+    final timeout = options.extra[requestTimeoutExtra];
+    if (timeout is Duration) {
+      options
+        ..connectTimeout = timeout
+        ..sendTimeout = timeout
+        ..receiveTimeout = timeout;
+    }
     try {
       if (needsToken(options)) {
         final state = _core.tokens.state;
@@ -185,15 +199,17 @@ class DpopInterceptor extends Interceptor {
     final options = err.requestOptions;
     final problem = problemOf(err);
     final proofRequest = needsToken(options) || carriesProofHeader(options);
-    if (!proofRequest ||
-        problem == null ||
-        problem.status != 401 ||
-        problem.code != 'use_dpop_nonce' ||
-        options.extra[_nonceRetried] == true) {
+    if (!proofRequest || problem == null || problem.status != 401) {
       return handler.next(err);
     }
-    options.extra[_nonceRetried] = true;
-    _core.log('nonce retry');
+    final flag = switch (problem.code) {
+      'use_dpop_nonce' => _nonceRetried,
+      'invalid_dpop_proof' => _proofRetried,
+      _ => null,
+    };
+    if (flag == null || options.extra[flag] == true) return handler.next(err);
+    options.extra[flag] = true;
+    _core.log(flag == _nonceRetried ? 'nonce retry' : 'proof retry');
     await _repeat(_core, err, handler);
   }
 }
