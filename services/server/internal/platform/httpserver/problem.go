@@ -186,16 +186,12 @@ func toError(r *http.Request, err error) *errs.Error {
 		return payloadTooLarge(r.Context())
 	}
 	if errors.Is(err, os.ErrDeadlineExceeded) || requestDeadline(r, err) {
-		goType := ""
-		if r.Context().Err() == nil {
-			// A socket deadline while the request still had time: the types name the connection
-			// that timed out (#238), the text stays out of the log.
-			goType = chainTypes(err)
-		}
-		logFailure(r, err, errs.CodeUnavailable, errs.CauseDeadlineExceeded, goType)
+		// The types name the source: a connection that timed out while the request still had
+		// time (#238) or the request's own deadline. The text stays out of the log.
+		logFailure(r, err, errs.CodeUnavailable, errs.CauseDeadlineExceeded, chainTypes(err))
 		return errs.Wrap(errs.CodeUnavailable, err, "").WithCause(errs.CauseDeadlineExceeded)
 	}
-	logFailure(r, err, errs.CodeInternalError, "", fmt.Sprintf("%T", err))
+	logFailure(r, err, errs.CodeInternalError, "", chainTypes(err))
 	return errs.Wrap(errs.CodeInternalError, err, "")
 }
 
@@ -236,10 +232,9 @@ func payloadTooLarge(ctx context.Context) *errs.Error {
 }
 
 // logFailure writes "request failed" at level error with the public code as error.type, the
-// internal cause as bothy.reason and the route. goType is exception.type: the Go type of an error
-// without a kind, the types of the error chain (chainTypes) for a 5xx of an error with a kind and
-// for a socket deadline (FWA/1); texts never reach the log through the allowlist of platform/otel
-// (signals.md "Logs").
+// internal cause as bothy.reason and the route. goType is exception.type: the types of the error
+// chain (chainTypes) for every 5xx (FWA/1); texts never reach the log through the allowlist of
+// platform/otel (signals.md "Logs").
 // The SQLSTATE of a database error in the chain of err is db.response.status_code (PL/56).
 func logFailure(r *http.Request, err error, code errs.Code, cause, goType string) {
 	ctx := r.Context()

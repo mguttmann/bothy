@@ -261,7 +261,7 @@ func TestDeadline_ExceededGives503(t *testing.T) {
 		t.Fatalf("%d %s", resp.StatusCode, resp.Body)
 	}
 	rec, ok := h.Logs.Find(httpserver.LogRequestFailed)
-	if !ok || rec.Attrs["bothy.reason"] != "deadline_exceeded" {
+	if !ok || rec.Attrs["bothy.reason"] != "deadline_exceeded" || rec.Attrs["exception.type"] != "context.deadlineExceededError" {
 		t.Fatalf("log %+v", rec)
 	}
 }
@@ -330,6 +330,31 @@ func TestServerError_KindErrorLogsItsSource(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestServerError_PlainErrorLogsItsChain: a 500 from an error without a kind logs the Go types
+// of its whole chain as exception.type, not only the outer type, never the text (FWA/1).
+func TestServerError_PlainErrorLogsItsChain(t *testing.T) {
+	t.Parallel()
+	op := getThing()
+	h := httpservertest.New(t, httpservertest.Options{Routes: []httpservertest.Route{{Op: op,
+		Handler: httpservertest.Authorized(op.Action, func(w http.ResponseWriter, r *http.Request) {
+			cause := &net.OpError{Op: "read", Net: "tcp", Err: errors.New("203.0.113.9 reset")}
+			httpserver.WriteProblem(w, r, fmt.Errorf("chat: 203.0.113.9: %w", cause))
+		})}}})
+	resp := h.Do(h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "", "X-Mode", "fast"))
+	if resp.StatusCode != 500 || resp.Problem(t)["code"] != "internal_error" {
+		t.Fatalf("%d %s", resp.StatusCode, resp.Body)
+	}
+	rec, ok := h.Logs.Find(httpserver.LogRequestFailed)
+	if !ok || rec.Attrs["exception.type"] != "*fmt.wrapError < *net.OpError < *errors.errorString" {
+		t.Fatalf("log %+v", rec)
+	}
+	for _, v := range rec.Attrs {
+		if strings.Contains(v, "203.0.113.9") {
+			t.Fatalf("error text in the log: %+v", rec)
+		}
 	}
 }
 
