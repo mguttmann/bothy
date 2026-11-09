@@ -297,6 +297,10 @@ class Handler:
     def active_run(self, thread):
         return self.active
 
+    def on_interim(self, thread, text, *, marked):
+        # No Hermes loop runs here: only a marked send is progress (D-ADAPTER-INTERIM-1).
+        return marked
+
     async def on_answer(self, thread, text, reply_to):
         self.calls.append(["answer", text])
         return "a-1"
