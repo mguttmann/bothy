@@ -24309,7 +24309,7 @@ components:
         status: 401
         title: 'Invalid DPoP proof'
         description: 'The DPoP proof is missing, wrongly signed, expired or does not match `cnf.jkt`.'
-        client_action: 'Sign the proof again (new `iat` and `jti`, the current nonce) and retry once; a refresh token stays valid, the server revokes nothing for a proof error. If the retry fails too, keep the session and retry later; never log out for this code alone.'
+        client_action: 'Sign the proof again (new `iat` and `jti`, the current nonce) and retry once; a refresh token stays valid, the server revokes nothing for a proof error. If the repeat gets `invalid_dpop_proof` again, keep the session and retry later; never log out for this code alone. Any other answer to the repeat (such as `session_revoked`) is handled as that code.'
       - code: forbidden
         status: 403
         title: 'Forbidden'
