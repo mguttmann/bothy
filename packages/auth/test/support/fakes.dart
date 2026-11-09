@@ -21,7 +21,16 @@ final Uri serverUrl = Uri.parse('https://chat.example.com');
 /// One request as the fake server saw it.
 class SeenRequest {
   /// Records a request.
-  SeenRequest(this.method, this.path, this.headers, this.body, this.extra);
+  SeenRequest(
+    this.method,
+    this.path,
+    this.headers,
+    this.body,
+    this.extra, {
+    this.connectTimeout,
+    this.sendTimeout,
+    this.receiveTimeout,
+  });
 
   /// HTTP method in upper case.
   final String method;
@@ -37,6 +46,15 @@ class SeenRequest {
 
   /// The request options' extra map at send time.
   final Map<String, Object?> extra;
+
+  /// The request options' connect timeout at send time, `null` without one.
+  final Duration? connectTimeout;
+
+  /// The request options' send timeout at send time, `null` without one.
+  final Duration? sendTimeout;
+
+  /// The request options' receive timeout at send time, `null` without one.
+  final Duration? receiveTimeout;
 
   /// The decoded DPoP proof: header and payload.
   ({Map<String, Object?> header, Map<String, Object?> payload})? get proof {
@@ -134,6 +152,9 @@ class FakeServer implements HttpClientAdapter {
       },
       text.isEmpty ? null : _bodyOf(text),
       Map.of(options.extra),
+      connectTimeout: options.connectTimeout,
+      sendTimeout: options.sendTimeout,
+      receiveTimeout: options.receiveTimeout,
     );
     onSend?.call(seen);
     requests.add(seen);

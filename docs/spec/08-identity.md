@@ -701,6 +701,15 @@ Following RFC 9449 (https://www.rfc-editor.org/rfc/rfc9449.html, retrieved 2026-
 - A DPoP-bound token sent as `Bearer` is rejected (RFC 9449, section 7.2).
 - Errors: `401` with `WWW-Authenticate: DPoP error="invalid_dpop_proof"` or
   `error="use_dpop_nonce"` and a new nonce.
+- A proof error revokes nothing: the proof is checked before the token or the refresh token
+  (also for `auth.token.refresh`), and no audit row is written. The client therefore answers
+  `invalid_dpop_proof` like `use_dpop_nonce`: it signs a new proof (new `iat` and `jti`, the
+  current nonce) and repeats the request once. A refresh that fails again keeps the stored
+  refresh token and is retried later; only `session_revoked`, `unauthenticated` and
+  `token_expired` end the session (15 section 8). The most common cause is a proof that was
+  signed before the device slept and reached the server after `auth.dpop_proof_max_age`; the
+  client also signs the proof directly before sending and gives a refresh request connect, send
+  and receive timeouts well below that age.
 - In the WebSocket, the proof is in `identify`, `resume` and `reauth` with the nonce from `hello`
   (04, section 6.3, R-SY-01).
 

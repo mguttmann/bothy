@@ -493,8 +493,15 @@ are in docs/DECISIONS.md D-M4-15-1.
 - **Interceptor order:** `packages/auth` fills the auth slot of `createApiClient` with
   `RefreshInterceptor`, `DpopInterceptor` and `StepUpInterceptor` in this order, so a request is
   refreshed before its proof hashes the token, and each interceptor answers only its own problem
-  code (`token_expired`, `use_dpop_nonce`, `step_up_required`) with at most one repeat.
-- **Signed out:** `401 session_revoked`, a rejected refresh, a revoked pending device, the
+  code (`token_expired`, `use_dpop_nonce`, `invalid_dpop_proof`, `step_up_required`) with at most
+  one repeat each. On `invalid_dpop_proof` the proof is signed anew (new `iat`, new `jti`, the
+  current nonce); the error never ends the session, because the server revokes nothing for it
+  ([08](08-identity.md) section 7.3). A refresh request has connect, send and receive timeouts
+  that end it well before `auth.dpop_proof_max_age`, so a request held while the device sleeps
+  fails as a network error instead of arriving minutes later with an expired proof.
+- **Signed out:** `401 session_revoked`, a refresh rejected with `unauthenticated` or
+  `token_expired` (a refresh that still gets `invalid_dpop_proof` after its repeat keeps the
+  stored refresh token and reports `RefreshFailed`), a revoked pending device, the
   gateway close `4012` and `logout` end in the event `SignedOut(reason)` of `packages/auth` after
   the secret store is cleared; for a revoked session or device (`deleteLocalData`) the app deletes
   the local data of that server (R-SY-14).
