@@ -374,6 +374,35 @@ class _RawHandler(_fake_model._Handler):
                 owner.raw.append(json.loads(raw))
         return raw
 
+    def _openai(self, turn: ScriptTurn, shape: dict[str, Any], *, stream: bool) -> None:
+        if isinstance(turn, ErrorTurn):
+            self._refuse(turn)
+        else:
+            super()._openai(turn, shape, stream=stream)
+
+    def _anthropic(self, turn: ScriptTurn, shape: dict[str, Any], *, stream: bool) -> None:
+        if isinstance(turn, ErrorTurn):
+            self._refuse(turn)
+        else:
+            super()._anthropic(turn, shape, stream=stream)
+
+    def _refuse(self, turn: ErrorTurn) -> None:
+        error = {"type": "invalid_request_error", "message": turn.message}
+        self.reply(turn.status, json.dumps({"error": error}).encode(), "application/json")
+
+
+@dataclass(frozen=True)
+class ErrorTurn(ScriptTurn):
+    """A script turn the fake model answers with an HTTP error instead of a model reply.
+
+    Attributes:
+        status: The HTTP status (a 4xx Hermes does not retry ends the turn at once).
+        message: The provider's error message.
+    """
+
+    status: int = 400
+    message: str = "the request was refused"
+
 
 @dataclass(frozen=True)
 class BoundTurn(ScriptTurn):

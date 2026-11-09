@@ -236,6 +236,9 @@ class _Turn:
     card_versions: dict[UUID, int] = field(default_factory=dict)
     abort_reason: str | None = None
     final_reply: bool = False
+    # The text of the last model reply when it asked for tools: a send of it is progress
+    # (D-ADAPTER-INTERIM-1); empty after a reply without tool calls or with an unknown text.
+    tool_text: str = ""
     upload_limit: int | None = None
     anchored: bool = True
     quotes: bool = False
@@ -1665,6 +1668,42 @@ class HermesHandler(AgentHandler):
             with self._bound(turn):
                 turn.live.draft(text)
 
+    def on_interim(self, thread_id: UUID, text: str, *, marked: bool) -> bool:
+        """A send of a turn that is progress, not the answer: shown as the draft (09 17.3).
+
+        Hermes posts text in front of a tool call with ``send`` on its own platforms: streamed,
+        it finalizes the text before the tool boundary with a plain send; not streamed, it sends
+        it as commentary marked ``_interim_send`` (as it marks heartbeats and notices that are
+        not the turn's final). A message would put that progress between the answers, so the
+        text replaces ``/last_text_excerpt`` instead (D-ADAPTER-INTERIM-1).
+
+        Args:
+            thread_id: The thread of the send.
+            text: The text.
+            marked: Whether Hermes marked the send ``_interim_send``.
+
+        Unmarked, a send is progress only on a positive sign: Hermes' loop is open and the send
+        is text of the last model reply, which asked for tools. Any other unmarked send is the
+        answer, also the error or limit text the gateway sends when a model request fails: such
+        a turn returns without ``on_session_end`` (``hermes_open`` stays set), before or after a
+        tool round, and its text is no model reply.
+
+        Returns:
+            True when the send is progress (marked, or text of the open loop's last model reply
+            that asked for tools); it is then no message.
+        """
+        turn = self._active(thread_id)
+        if turn is None:
+            return marked
+        body = text.strip()
+        if not marked and not (turn.hermes_open and body and body in turn.tool_text):
+            return False
+        if turn.live is not None and text.strip():
+            self._touch(turn)
+            with self._bound(turn):
+                turn.live.draft(text)
+        return True
+
     async def on_answer(self, thread_id: UUID, text: str, reply_to: str | None) -> str | None:
         """The answer (``send``): one message of the run with a stored ``client_msg_id``.
 
@@ -1878,15 +1917,19 @@ class HermesHandler(AgentHandler):
         if turn is not None and not turn.dropped:
             turn.usage.append(usage)
 
-    def on_model_reply(self, thread_id: UUID, tool_calls: int | None) -> None:
+    def on_model_reply(
+        self, thread_id: UUID, tool_calls: int | None, text: str | None = None
+    ) -> None:
         """A model reply of the running turn: without tool calls (or unknown) it is the last one.
 
         Hermes sends text before a tool call the same way as its answer, so only the reply's tool
-        calls tell whether the turn goes on and still takes a person's text (09 17.5).
+        calls tell whether the turn goes on and still takes a person's text (09 17.5). The text
+        of a reply that asked for tools is kept: a later send of it is progress (`on_interim`).
         """
         turn = self._turns.get(thread_id)
         if turn is not None and not turn.dropped:
             turn.final_reply = not tool_calls
+            turn.tool_text = (text or "").strip() if tool_calls else ""
 
     def on_turn_started(self, thread_id: UUID) -> None:
         """Hermes started a turn of the thread (``pre_llm_call``).

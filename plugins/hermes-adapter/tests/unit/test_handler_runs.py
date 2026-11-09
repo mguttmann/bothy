@@ -12,7 +12,7 @@ import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from adapter_kit import FakeRuntime, Rig, captured_logs, card_script, rig
@@ -649,6 +649,70 @@ async def test_drafts_then_the_answer_give_one_message_and_patch_only_their_run(
     assert _ops(r).count("createMessage") == 1
     assert ("replace", "/last_text_excerpt") in _patch_paths(r, drafted.run_id)
     assert not any(p == "/last_text_excerpt" for _, p in _patch_paths(r, quiet.run_id))
+
+
+async def test_interim_text_is_a_draft_and_only_the_answer_a_message(tmp_path: Path) -> None:
+    """D-ADAPTER-INTERIM-1: text while the loop goes on, or marked interim, is no message."""
+    interim = "Now I remove the leftover line and run the tests."
+    answer = "The tests pass."
+    seen: list[tuple[str, bool]] = []
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        thread = turn.thread_id
+        events = rt.events
+        events.on_turn_started(thread)
+        # Before any model reply a send is no progress: a request that fails ends the loop
+        # without on_session_end, and the gateway sends its error text as the answer.
+        seen.append(("before a reply", events.on_interim(thread, interim, marked=False)))
+        events.on_model_reply(thread, 2, f"{interim}\n")
+        seen.append(("after tool calls", events.on_interim(thread, interim, marked=False)))
+        # After the tool round the next request failed: its error text is no model reply.
+        seen.append(("an error text", events.on_interim(thread, "Request refused.", marked=False)))
+        events.on_model_reply(thread, 0, answer)
+        # Marked (a heartbeat, a notice) even after the last reply. The patcher is throttled, so
+        # only the last draft of the burst is sure to reach the run.
+        seen.append(
+            ("marked after the last reply", events.on_interim(thread, interim, marked=True))
+        )
+        seen.append(("the answer", events.on_interim(thread, answer, marked=False)))
+        await events.on_answer(thread, answer, str(turn.message_id))
+        # The loop ended after tool calls (an error text, a limit notice): the send is the answer.
+        events.on_model_reply(thread, 1, interim)
+        events.on_turn_ended(thread)
+        seen.append(("after the loop ended", events.on_interim(thread, interim, marked=False)))
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await r.fake.trigger("Hello @Lotse, fix it")
+        await r.until(lambda: r.finished(triggered.run_id))
+    assert seen == [
+        ("before a reply", False),
+        ("after tool calls", True),
+        ("an error text", False),
+        ("marked after the last reply", True),
+        ("the answer", False),
+        ("after the loop ended", False),
+    ]
+    assert [m["content_md"] for m in r.fake.messages] == [answer]
+    excerpts = [
+        op["value"]
+        for q in r.requests("patchRun")
+        if q.path.endswith(str(triggered.run_id))
+        for op in q.json["ops"]
+        if op["path"] == "/last_text_excerpt"
+    ]
+    assert interim in excerpts
+
+
+async def test_interim_text_without_a_run_is_not_shown(tmp_path: Path) -> None:
+    """Marked interim text of a thread without a run is still no answer; unmarked text is not
+    interim there (it stays a report, 09 14)."""
+    async with rig(tmp_path) as r:
+        thread = uuid4()
+        assert r.handler.on_interim(thread, "Working", marked=True) is True
+        assert r.handler.on_interim(thread, "A report.", marked=False) is False
+    assert not r.requests("patchRun")
 
 
 async def test_cancel_interrupts_and_drops_later_callbacks(tmp_path: Path) -> None:

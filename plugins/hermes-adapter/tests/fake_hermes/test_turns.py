@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from fake_hermes_kit import HermesWorld, gateway_log, hermes_rig
+from fake_hermes_kit import ErrorTurn, HermesWorld, Profile, gateway_log, hermes_rig
 from hermes_harness.fake_model import ScriptTurn
 
 pytestmark = pytest.mark.anyio
@@ -71,6 +71,73 @@ async def test_happy_path_steps_drafts_answer(world: HermesWorld) -> None:
         assert reports
         assert reports[0]["started"] is True
         assert reports[0]["external_session_ref"]
+
+
+INTERIM = "Now I remove the leftover line, fix the docstring, update the route description."
+
+
+def _excerpts(rig: Any, run_id: Any) -> list[str]:
+    return [
+        str(op["value"])
+        for q in rig.requests("patchRun")
+        if str(run_id) in q.path
+        for op in q.json["ops"]
+        if op["path"] == "/last_text_excerpt"
+    ]
+
+
+@pytest.mark.parametrize("streaming", [True, False], ids=["streamed", "commentary"])
+async def test_interim_text_before_a_tool_call_is_no_message(
+    world: HermesWorld, streaming: bool
+) -> None:
+    """Text before a tool call is progress in the live box, never a message (D-ADAPTER-INTERIM-1).
+
+    Streamed, Hermes finalizes the text in front of a tool boundary with a plain ``send``; not
+    streamed, it sends the text as commentary marked ``_interim_send``. Both only show progress.
+    """
+    script = [
+        ScriptTurn(text=(INTERIM,), tool_calls=(TODO,), paced=True),
+        ScriptTurn(
+            text=("The trip to the lake ", "is planned for ", "Saturday morning."), paced=True
+        ),
+    ]
+    profile = Profile(config={"streaming": {"enabled": streaming}})
+    async with hermes_rig(world, script, profile=profile, texts=[ASK, ANSWER]) as rig:
+        triggered = await rig.fake.trigger(ASK, session_mode="new")
+        try:
+            await rig.until(lambda: rig.finished(triggered.run_id), "the end of the run")
+        except AssertionError:
+            raise AssertionError(gateway_log(rig)) from None
+        assert rig.fake.run_state(triggered.run_id).state == "completed", gateway_log(rig)
+        assert [m["content_md"] for m in rig.fake.messages] == [ANSWER], gateway_log(rig)
+        assert rig.fake.messages[0]["run_id"] == str(triggered.run_id)
+        excerpts = _excerpts(rig, triggered.run_id)
+        assert any(INTERIM in e for e in excerpts), excerpts
+
+
+@pytest.mark.parametrize("after_tool", [False, True], ids=["first-request", "after-tool"])
+async def test_error_text_of_a_failed_request_is_the_message(
+    world: HermesWorld, after_tool: bool
+) -> None:
+    """A model request Hermes gives up on ends the loop without ``on_session_end``; the error
+    text the gateway then sends is the turn's message, never interim (D-ADAPTER-INTERIM-1)."""
+    refused = ErrorTurn(message="the fake provider refused the request")
+    tool = ScriptTurn(text=(INTERIM,), tool_calls=(TODO,), paced=True)
+    script = ([tool] if after_tool else []) + [refused] * 5
+    async with hermes_rig(world, script, texts=[ASK]) as rig:
+        triggered = await rig.fake.trigger(ASK, session_mode="new")
+        try:
+            await rig.until(lambda: rig.finished(triggered.run_id), "the end of the run")
+        except AssertionError:
+            raise AssertionError(gateway_log(rig)) from None
+        finals = [
+            m["content_md"]
+            for m in rig.fake.messages
+            if "the fake provider refused the request" in m["content_md"]
+            and "retrying won't help" not in m["content_md"]
+        ]
+        assert len(finals) == 1, gateway_log(rig)
+        assert all(INTERIM not in m["content_md"] for m in rig.fake.messages), gateway_log(rig)
 
 
 async def test_slash_text_never_runs_a_hermes_command(world: HermesWorld) -> None:
@@ -167,3 +234,53 @@ async def test_bind_takes_a_session_over_or_fails_open(world: HermesWorld) -> No
         report = fake.session_reports(other.thread_id)[-1]
         assert report["bind_failed"] == "session_missing", gateway_log(rig)
         assert report["external_session_ref"] not in (taken, "20260101_000000_deadbeef")
+
+
+_SWITCH = """
+import asyncio, json, sys, uuid
+from types import SimpleNamespace
+from gateway.config import Platform, PlatformConfig
+import bothy_hermes_adapter.platform as module
+# The gateway registers the platform at plugin discovery; this process runs no gateway.
+Platform._add_pseudo_member(sys.argv[1])
+module._session_known = lambda session_id: True
+platform = module.ServerPlatform(PlatformConfig(enabled=True), sys.argv[1])
+sent = []
+async def control(thread_id, text):
+    sent.append(text)
+platform._control_command = control
+holder, thread = uuid.uuid4(), uuid.uuid4()
+platform._ran_here.update({"elsewhere": holder, "here": thread})
+turn = SimpleNamespace(
+    thread_id=thread, channel_id=uuid.uuid4(), user_id=uuid.uuid4(), user_name="Alex"
+)
+other = asyncio.run(platform.switch_session(turn, "bind", "elsewhere"))
+own = asyncio.run(platform.switch_session(turn, "bind", "here"))
+print(json.dumps({"other": str(other), "own": str(own), "sent": sent}))
+"""
+
+
+async def test_switch_session_fails_open_for_a_session_live_in_another_thread(
+    world: HermesWorld,
+) -> None:
+    """D-HERMES-MAIN-4 on the method itself: ``_ran_here`` naming another thread sends no
+    ``/resume`` and gives a new session; the thread's own session still binds."""
+    import asyncio
+    import json
+    import subprocess
+
+    from fake_hermes_kit import PLATFORM_KEY
+
+    async with hermes_rig(world, [], start=False) as rig:
+        done = await asyncio.to_thread(
+            subprocess.run,
+            [str(world.python), "-c", _SWITCH, PLATFORM_KEY],
+            env=rig.env,
+            cwd=rig.homes.work,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    assert done.returncode == 0, done.stderr
+    result = json.loads(done.stdout.strip().splitlines()[-1])
+    assert result == {"other": "new", "own": "bound", "sent": ["/resume here --all"]}
