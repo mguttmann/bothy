@@ -107,7 +107,8 @@ type fieldError struct {
 // configuration key of the route's limit, and an error wrapping context.DeadlineExceeded while
 // the request context has run out becomes 503 unavailable (cause deadline_exceeded), also when an
 // adapter wrapped it as internal_error. Every other error becomes 500 internal_error; its type
-// goes to the log, never its text to the body.
+// goes to the log, never its text to the body. Every 5xx logs the Go types of the error chain
+// (never the text), so the log names the source of the error.
 //
 // The body carries type /api/v1/problems/{code}, the title of the code, status, code,
 // correlation_id from kernel/reqmeta, instance (the request path without query, with every
@@ -169,11 +170,14 @@ func toError(r *http.Request, err error) *errs.Error {
 		if e.Code == errs.CodeInternalError && requestDeadline(r, err) {
 			// Adapters wrap any database error as internal_error; the end of http.request_timeout
 			// is the server's overload, not a defect (PL/52).
-			logFailure(r, err, errs.CodeUnavailable, errs.CauseDeadlineExceeded, "")
+			logFailure(r, err, errs.CodeUnavailable, errs.CauseDeadlineExceeded, chainTypes(err))
 			return errs.Wrap(errs.CodeUnavailable, err, "").WithCause(errs.CauseDeadlineExceeded)
 		}
 		if e.Kind().Status() >= http.StatusInternalServerError {
-			logFailure(r, err, e.PublicCode(), e.Cause, "")
+			// The types name the source of a 5xx that the code alone does not (#238): a pool
+			// error for a caller context that ran out, an adapter's internal_error over a
+			// connection error. The text stays out of the log.
+			logFailure(r, err, e.PublicCode(), e.Cause, chainTypes(err))
 		}
 		return e
 	}
@@ -232,8 +236,10 @@ func payloadTooLarge(ctx context.Context) *errs.Error {
 }
 
 // logFailure writes "request failed" at level error with the public code as error.type, the
-// internal cause as bothy.reason and the route. goType names the Go type of an error without a
-// kind; texts never reach the log through the allowlist of platform/otel (signals.md "Logs").
+// internal cause as bothy.reason and the route. goType is exception.type: the Go type of an error
+// without a kind, the types of the error chain (chainTypes) for a 5xx of an error with a kind and
+// for a socket deadline (FWA/1); texts never reach the log through the allowlist of platform/otel
+// (signals.md "Logs").
 // The SQLSTATE of a database error in the chain of err is db.response.status_code (PL/56).
 func logFailure(r *http.Request, err error, code errs.Code, cause, goType string) {
 	ctx := r.Context()
