@@ -1228,7 +1228,9 @@ class ServerPlatform(BasePlatformAdapter):
         elif name == "post_api_request" and self.handler is not None:
             count = kwargs.get("assistant_tool_call_count")
             calls = count if isinstance(count, int) and not isinstance(count, bool) else None
-            self._post(self.handler.on_model_reply, thread, calls)
+            content = getattr(kwargs.get("assistant_message"), "content", None)
+            text = content if isinstance(content, str) else None
+            self._post(self.handler.on_model_reply, thread, calls, text)
             usage = _usage(kwargs)
             if usage is not None:
                 self._post(self.handler.on_usage, thread, usage)

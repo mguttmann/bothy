@@ -661,11 +661,14 @@ async def test_interim_text_is_a_draft_and_only_the_answer_a_message(tmp_path: P
         thread = turn.thread_id
         events = rt.events
         events.on_turn_started(thread)
-        # Before any model reply and after one with tool calls the loop goes on.
+        # Before any model reply a send is no progress: a request that fails ends the loop
+        # without on_session_end, and the gateway sends its error text as the answer.
         seen.append(("before a reply", events.on_interim(thread, interim, marked=False)))
-        events.on_model_reply(thread, 2)
+        events.on_model_reply(thread, 2, f"{interim}\n")
         seen.append(("after tool calls", events.on_interim(thread, interim, marked=False)))
-        events.on_model_reply(thread, 0)
+        # After the tool round the next request failed: its error text is no model reply.
+        seen.append(("an error text", events.on_interim(thread, "Request refused.", marked=False)))
+        events.on_model_reply(thread, 0, answer)
         # Marked (a heartbeat, a notice) even after the last reply. The patcher is throttled, so
         # only the last draft of the burst is sure to reach the run.
         seen.append(
@@ -674,7 +677,7 @@ async def test_interim_text_is_a_draft_and_only_the_answer_a_message(tmp_path: P
         seen.append(("the answer", events.on_interim(thread, answer, marked=False)))
         await events.on_answer(thread, answer, str(turn.message_id))
         # The loop ended after tool calls (an error text, a limit notice): the send is the answer.
-        events.on_model_reply(thread, 1)
+        events.on_model_reply(thread, 1, interim)
         events.on_turn_ended(thread)
         seen.append(("after the loop ended", events.on_interim(thread, interim, marked=False)))
         return TurnOutcome.COMPLETED
@@ -684,8 +687,9 @@ async def test_interim_text_is_a_draft_and_only_the_answer_a_message(tmp_path: P
         triggered = await r.fake.trigger("Hello @Lotse, fix it")
         await r.until(lambda: r.finished(triggered.run_id))
     assert seen == [
-        ("before a reply", True),
+        ("before a reply", False),
         ("after tool calls", True),
+        ("an error text", False),
         ("marked after the last reply", True),
         ("the answer", False),
         ("after the loop ended", False),

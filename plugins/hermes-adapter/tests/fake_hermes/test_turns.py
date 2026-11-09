@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from fake_hermes_kit import HermesWorld, Profile, gateway_log, hermes_rig
+from fake_hermes_kit import ErrorTurn, HermesWorld, Profile, gateway_log, hermes_rig
 from hermes_harness.fake_model import ScriptTurn
 
 pytestmark = pytest.mark.anyio
@@ -113,6 +113,31 @@ async def test_interim_text_before_a_tool_call_is_no_message(
         assert rig.fake.messages[0]["run_id"] == str(triggered.run_id)
         excerpts = _excerpts(rig, triggered.run_id)
         assert any(INTERIM in e for e in excerpts), excerpts
+
+
+@pytest.mark.parametrize("after_tool", [False, True], ids=["first-request", "after-tool"])
+async def test_error_text_of_a_failed_request_is_the_message(
+    world: HermesWorld, after_tool: bool
+) -> None:
+    """A model request Hermes gives up on ends the loop without ``on_session_end``; the error
+    text the gateway then sends is the turn's message, never interim (D-ADAPTER-INTERIM-1)."""
+    refused = ErrorTurn(message="the fake provider refused the request")
+    tool = ScriptTurn(text=(INTERIM,), tool_calls=(TODO,), paced=True)
+    script = ([tool] if after_tool else []) + [refused] * 5
+    async with hermes_rig(world, script, texts=[ASK]) as rig:
+        triggered = await rig.fake.trigger(ASK, session_mode="new")
+        try:
+            await rig.until(lambda: rig.finished(triggered.run_id), "the end of the run")
+        except AssertionError:
+            raise AssertionError(gateway_log(rig)) from None
+        finals = [
+            m["content_md"]
+            for m in rig.fake.messages
+            if "the fake provider refused the request" in m["content_md"]
+            and "retrying won't help" not in m["content_md"]
+        ]
+        assert len(finals) == 1, gateway_log(rig)
+        assert all(INTERIM not in m["content_md"] for m in rig.fake.messages), gateway_log(rig)
 
 
 async def test_slash_text_never_runs_a_hermes_command(world: HermesWorld) -> None:

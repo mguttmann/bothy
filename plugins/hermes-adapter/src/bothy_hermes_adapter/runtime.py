@@ -569,6 +569,8 @@ class RuntimeEvents(Protocol):
         """The token counts of one model request of the running turn."""
         ...
 
-    def on_model_reply(self, thread_id: UUID, tool_calls: int | None) -> None:
-        """One model reply of the running turn with its number of tool calls (``None``: unknown)."""
+    def on_model_reply(
+        self, thread_id: UUID, tool_calls: int | None, text: str | None = None
+    ) -> None:
+        """One model reply of the running turn: its tool calls and its text (``None``: unknown)."""
         ...
