@@ -4,6 +4,7 @@ package httpserver_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -260,7 +261,7 @@ func TestDeadline_ExceededGives503(t *testing.T) {
 		t.Fatalf("%d %s", resp.StatusCode, resp.Body)
 	}
 	rec, ok := h.Logs.Find(httpserver.LogRequestFailed)
-	if !ok || rec.Attrs["bothy.reason"] != "deadline_exceeded" {
+	if !ok || rec.Attrs["bothy.reason"] != "deadline_exceeded" || rec.Attrs["exception.type"] != "context.deadlineExceededError" {
 		t.Fatalf("log %+v", rec)
 	}
 }
@@ -283,6 +284,71 @@ func TestDeadline_SocketTimeoutLogsItsSource(t *testing.T) {
 	}
 	rec, ok := h.Logs.Find(httpserver.LogRequestFailed)
 	if !ok || rec.Attrs["bothy.reason"] != "deadline_exceeded" || rec.Attrs["exception.type"] != "*fmt.wrapError < *net.OpError < *poll.DeadlineExceededError" {
+		t.Fatalf("log %+v", rec)
+	}
+	for _, v := range rec.Attrs {
+		if strings.Contains(v, "203.0.113.9") {
+			t.Fatalf("error text in the log: %+v", rec)
+		}
+	}
+}
+
+// TestServerError_KindErrorLogsItsSource: a 5xx from an error with a kind logs the Go types of
+// its chain as exception.type too, never the text (#238: a 503 deadline_exceeded within a second
+// and 500 internal_error answers without SQLSTATE came through this path and named no source).
+// Both the error of the pool for a caller context that ran out and an adapter's internal_error
+// count.
+func TestServerError_KindErrorLogsItsSource(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name, code, reason, types string
+		err                       error
+	}{
+		{"pool deadline", "unavailable", "deadline_exceeded", "*errs.Error < *pgconn.PgError",
+			errs.Wrap(errs.CodeUnavailable, &pgconn.PgError{Code: "57014", Message: "at 203.0.113.9"}, "").WithCause(errs.CauseDeadlineExceeded)},
+		{"internal", "internal_error", "", "*errs.Error < *fmt.wrapError < *net.OpError < *errors.errorString",
+			errs.Wrap(errs.CodeInternalError, fmt.Errorf("chat: 203.0.113.9: %w", &net.OpError{Op: "read", Net: "tcp", Err: errors.New("203.0.113.9 reset")}), "")},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			op := getThing()
+			h := httpservertest.New(t, httpservertest.Options{Routes: []httpservertest.Route{{Op: op,
+				Handler: httpservertest.Authorized(op.Action, func(w http.ResponseWriter, r *http.Request) {
+					httpserver.WriteProblem(w, r, c.err)
+				})}}})
+			resp := h.Do(h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "", "X-Mode", "fast"))
+			if resp.Problem(t)["code"] != c.code {
+				t.Fatalf("%d %s", resp.StatusCode, resp.Body)
+			}
+			rec, ok := h.Logs.Find(httpserver.LogRequestFailed)
+			if !ok || rec.Attrs["bothy.reason"] != c.reason || rec.Attrs["exception.type"] != c.types {
+				t.Fatalf("log %+v", rec)
+			}
+			for _, v := range rec.Attrs {
+				if strings.Contains(v, "203.0.113.9") {
+					t.Fatalf("error text in the log: %+v", rec)
+				}
+			}
+		})
+	}
+}
+
+// TestServerError_PlainErrorLogsItsChain: a 500 from an error without a kind logs the Go types
+// of its whole chain as exception.type, not only the outer type, never the text (FWA/1).
+func TestServerError_PlainErrorLogsItsChain(t *testing.T) {
+	t.Parallel()
+	op := getThing()
+	h := httpservertest.New(t, httpservertest.Options{Routes: []httpservertest.Route{{Op: op,
+		Handler: httpservertest.Authorized(op.Action, func(w http.ResponseWriter, r *http.Request) {
+			cause := &net.OpError{Op: "read", Net: "tcp", Err: errors.New("203.0.113.9 reset")}
+			httpserver.WriteProblem(w, r, fmt.Errorf("chat: 203.0.113.9: %w", cause))
+		})}}})
+	resp := h.Do(h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "", "X-Mode", "fast"))
+	if resp.StatusCode != 500 || resp.Problem(t)["code"] != "internal_error" {
+		t.Fatalf("%d %s", resp.StatusCode, resp.Body)
+	}
+	rec, ok := h.Logs.Find(httpserver.LogRequestFailed)
+	if !ok || rec.Attrs["exception.type"] != "*fmt.wrapError < *net.OpError < *errors.errorString" {
 		t.Fatalf("log %+v", rec)
 	}
 	for _, v := range rec.Attrs {

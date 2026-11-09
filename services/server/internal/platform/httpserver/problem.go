@@ -107,7 +107,8 @@ type fieldError struct {
 // configuration key of the route's limit, and an error wrapping context.DeadlineExceeded while
 // the request context has run out becomes 503 unavailable (cause deadline_exceeded), also when an
 // adapter wrapped it as internal_error. Every other error becomes 500 internal_error; its type
-// goes to the log, never its text to the body.
+// goes to the log, never its text to the body. Every 5xx logs the Go types of the error chain
+// (never the text), so the log names the source of the error.
 //
 // The body carries type /api/v1/problems/{code}, the title of the code, status, code,
 // correlation_id from kernel/reqmeta, instance (the request path without query, with every
@@ -169,11 +170,14 @@ func toError(r *http.Request, err error) *errs.Error {
 		if e.Code == errs.CodeInternalError && requestDeadline(r, err) {
 			// Adapters wrap any database error as internal_error; the end of http.request_timeout
 			// is the server's overload, not a defect (PL/52).
-			logFailure(r, err, errs.CodeUnavailable, errs.CauseDeadlineExceeded, "")
+			logFailure(r, err, errs.CodeUnavailable, errs.CauseDeadlineExceeded, chainTypes(err))
 			return errs.Wrap(errs.CodeUnavailable, err, "").WithCause(errs.CauseDeadlineExceeded)
 		}
 		if e.Kind().Status() >= http.StatusInternalServerError {
-			logFailure(r, err, e.PublicCode(), e.Cause, "")
+			// The types name the source of a 5xx that the code alone does not (#238): a pool
+			// error for a caller context that ran out, an adapter's internal_error over a
+			// connection error. The text stays out of the log.
+			logFailure(r, err, e.PublicCode(), e.Cause, chainTypes(err))
 		}
 		return e
 	}
@@ -182,16 +186,12 @@ func toError(r *http.Request, err error) *errs.Error {
 		return payloadTooLarge(r.Context())
 	}
 	if errors.Is(err, os.ErrDeadlineExceeded) || requestDeadline(r, err) {
-		goType := ""
-		if r.Context().Err() == nil {
-			// A socket deadline while the request still had time: the types name the connection
-			// that timed out (#238), the text stays out of the log.
-			goType = chainTypes(err)
-		}
-		logFailure(r, err, errs.CodeUnavailable, errs.CauseDeadlineExceeded, goType)
+		// The types name the source: a connection that timed out while the request still had
+		// time (#238) or the request's own deadline. The text stays out of the log.
+		logFailure(r, err, errs.CodeUnavailable, errs.CauseDeadlineExceeded, chainTypes(err))
 		return errs.Wrap(errs.CodeUnavailable, err, "").WithCause(errs.CauseDeadlineExceeded)
 	}
-	logFailure(r, err, errs.CodeInternalError, "", fmt.Sprintf("%T", err))
+	logFailure(r, err, errs.CodeInternalError, "", chainTypes(err))
 	return errs.Wrap(errs.CodeInternalError, err, "")
 }
 
@@ -232,8 +232,9 @@ func payloadTooLarge(ctx context.Context) *errs.Error {
 }
 
 // logFailure writes "request failed" at level error with the public code as error.type, the
-// internal cause as bothy.reason and the route. goType names the Go type of an error without a
-// kind; texts never reach the log through the allowlist of platform/otel (signals.md "Logs").
+// internal cause as bothy.reason and the route. goType is exception.type: the types of the error
+// chain (chainTypes) for every 5xx (FWA/1); texts never reach the log through the allowlist of
+// platform/otel (signals.md "Logs").
 // The SQLSTATE of a database error in the chain of err is db.response.status_code (PL/56).
 func logFailure(r *http.Request, err error, code errs.Code, cause, goType string) {
 	ctx := r.Context()
