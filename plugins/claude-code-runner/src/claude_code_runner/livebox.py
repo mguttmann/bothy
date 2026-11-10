@@ -24,7 +24,8 @@ them to ``agent.run_update_min_interval`` and rebases on version conflicts. Read
   ``workflow_agent`` under the workflow step, name ``workflow_agent``, title the ``label``,
   detail ``type``, ``phase``, ``last_tool`` and ``usage``; ``done`` ends it ``completed``,
   ``failed`` and ``error`` end it ``failed``; the end of the workflow ends its open agents. The
-  content previews (``promptPreview``, ``resultPreview``) are never sent.
+  content previews (``promptPreview``, ``resultPreview``) are never sent. An agent listed
+  before it started has no ``agentId`` yet; its step is kept when the ID appears.
 * ``tool_progress``: counted; ``/metrics/progress_events`` is patched only when the last change
   of the turn is older than ``runner.progress_patch_interval``, so a long tool is not stalled
   (09 5.5, 18.4); `LiveBox.keepalive` does the same while only background work runs between
@@ -37,7 +38,8 @@ them to ``agent.run_update_min_interval`` and rebases on version conflicts. Read
 Steps carry no ``detail`` beyond the subagent type and the task usage (data economy) and never
 tool input other than the title line. The fields ``tool_use_id``, ``task_type`` (with
 `WORKFLOW_TASK_TYPE`) and ``usage`` were checked against the files of the pinned CLI
-(``tests/fixtures/recording``, ruling D-M2-51-1).
+(``tests/fixtures/recording``, ruling D-M2-51-1); ``tests/real_cli/record.py`` writes the
+recordings again when the pin moves.
 
 Examples:
     >>> step_title({"command": "git status\\n--short"})
@@ -418,12 +420,9 @@ class LiveBox:
         for entry in progress:
             if not isinstance(entry, Mapping) or entry.get("type") != "workflow_agent":
                 continue
-            ref = entry.get("agentId")
-            if not isinstance(ref, str) or not ref:
-                ref = entry.get("index")
-            if not isinstance(ref, (str, int)) or isinstance(ref, bool):
+            key = self._agent_key(task_id, entry)
+            if key is None:
                 continue
-            key = f"{task_id}/{ref}"
             detail = self._agent_detail_of(entry)
             step = self._agents.get(key)
             if step is None:
@@ -445,6 +444,25 @@ class LiveBox:
             end = _AGENT_END.get(str(entry.get("state")))
             if end is not None:
                 self._end(step, end)
+
+    def _agent_key(self, task_id: str, entry: Mapping[str, Any]) -> str | None:
+        # An agent is known by its agentId. The CLI lists an agent that waits for its start
+        # (agents of one phase side by side) without one and adds it when the agent starts:
+        # the step the entry got under its index is then kept under the ID.
+        index = entry.get("index")
+        waiting = (
+            f"{task_id}/{index}"
+            if isinstance(index, (str, int)) and not isinstance(index, bool)
+            else None
+        )
+        ref = entry.get("agentId")
+        if not isinstance(ref, str) or not ref:
+            return waiting
+        key = f"{task_id}/{ref}"
+        if key not in self._agents and waiting in self._agents:
+            self._agents[key] = self._agents.pop(waiting)
+            self.steps_changed = True
+        return key
 
     @staticmethod
     def _agent_detail_of(entry: Mapping[str, Any]) -> dict[str, Any]:

@@ -3,10 +3,12 @@
 
 A turn may start work that outlives it: Bash with ``run_in_background``, a background subagent
 or a workflow. The pinned CLI reports the running set in every ``system/background_tasks_changed``
-(an empty list once the last one ended) and keeps that work only while its stdin is open: when
-its input ends it stops the work and exits. After the last task ended it starts a turn by itself
-(``system/init``, then a ``result`` that names no input) for the task's notification, and a new
-input line written between turns starts a turn of its own at once.
+(an empty list once the last one ended). Once its input ended it takes no further line and
+stops the work some time after: every task at its background ceiling, a background shell at the
+shell's own time limit (up to 2.1.288 after five seconds; 09 18.19.12). After the last task
+ended it starts a turn by itself (``system/init``, then a ``result`` that names no input) for
+the task's notification, and a new input line written between turns starts a turn of its own
+at once.
 
 `BackgroundWork` follows those messages; `BackgroundWork.holds` tells the runner to keep stdin
 open: while a task runs, while a turn of a process that had background work runs, and for a

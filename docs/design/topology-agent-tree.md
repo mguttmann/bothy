@@ -31,7 +31,8 @@ Done means:
 ## 2. What the runner already knows
 
 Read from the stream recordings the runner keeps per turn (`<state>/sessions/<session>/<turn>.stream.jsonl`)
-of the pinned CLI 2.1.288:
+of the pinned CLI 2.1.288 (the pin of 2026-11-01; a turn of 2.1.321 with the same signals is
+recorded in `plugins/claude-code-runner/tests/fixtures/recording/agent_tree_2.1.321.jsonl`):
 
 | Signal | Stream | Reported before this change |
 |---|---|---|

@@ -290,8 +290,8 @@ ceiling: any content of a definition, a template or an interview draft that the 
 code or as a permission grant would let a `scoped` or `chat` agent run host code or widen its tools
 beyond `runner.scoped_allowed_tools` without SR2. In this stage the rule holds for every class, so
 there is one schema; `host` adds only `stdio` MCP servers, and a later ruling may open more for
-`host` alone. Surfaces of the pinned CLI 2.1.288, found in the strings of the binary and in its
-`claude --help` on 2026-11-06:
+`host` alone. Surfaces of the pinned CLI 2.1.288 (the pin of that date; 2.1.321 since
+2026-11-10), found in the strings of the binary and in its `claude --help` on 2026-11-06:
 
 | Surface | What the CLI does with it | Closed by |
 |---|---|---|

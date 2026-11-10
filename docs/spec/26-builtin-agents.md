@@ -164,7 +164,8 @@ another file and every reference without that key are out of scope.
 
 No `url`, `args[]` entry or plain `value` of `headers[]` or `env[]` holds `${` (finding
 `invalid`): the pinned CLI substitutes `${VAR}` and `${VAR:-default}` there from its own
-environment (reproduced with version 2.1.288). The turn's environment is an allow list and the
+environment (reproduced with version 2.1.288, and again with 2.1.321 on 2026-11-10 for `url` and
+`headers`). The turn's environment is an allow list and the
 CLI blanks the organization API key, so today no secret would leak, but that rests on
 undocumented CLI behaviour; with the refusal no definition can name a variable of the turn's
 environment (issue 575). The runner writes the values unchanged into the MCP file
@@ -194,7 +195,8 @@ template gate, on every template (section 7); the runner repeats it before every
 3. **Inline shell** (`inline_shell`): in `instructions`, a skill `body` or a file `content`, the
    form `` !`<command>` `` at the start of the text or after white space, or a fenced code block
    opened with `` ```! ``. The pinned CLI runs both as shell when a skill loads; its strings
-   (version 2.1.288, read on 2026-11-06) hold these two patterns, which the check covers at least:
+   (version 2.1.288, read on 2026-11-06; unchanged in 2.1.321, read on 2026-11-10) hold these two
+   patterns, which the check covers at least:
 
     ```text
     /```!\s*\n?[\s\S]*?\n?```/g
@@ -328,7 +330,7 @@ user's configuration ("add --strict-mcp-config to skip MCP servers too", help te
 CLI). `dontAsk` refuses a tool that is not allowed in advance, so `Skill` is named in
 `--allowedTools` wherever `--tools` carries it. `--restricted` keeps user, project and local
 settings files out and confines the file tools to the working folder (help text of the pinned CLI
-2.1.288, read on 2026-11-06); its fallback is in 5.7. A test compares the whole list per class (BA-T13).
+2.1.288, read on 2026-11-06, and of 2.1.321, read on 2026-11-10); its fallback is in 5.7. A test compares the whole list per class (BA-T13).
 
 ### 5.4 Runner settings
 
@@ -347,7 +349,9 @@ source cannot turn them off.
 The CLI interprets these places as code or as permission grants; the closed schema (4.3) keeps the
 definition out of each, and the runner owns or removes each file (5.6). Read from the strings and
 the `--help` of the pinned CLI 2.1.288 on 2026-11-05 and 2026-11-06 (design note D-A1-18 and the
-red team rounds of the design note).
+red team rounds of the design note); the names of the table and the free level of 5.7 were held
+against 2.1.321 on 2026-11-10 (D-FIX-RUNNER-CLI-PIN-321-1), the rows were not read again one by
+one.
 
 | Surface | What the CLI does with it | Closed by |
 |---|---|---|
@@ -396,7 +400,8 @@ and applies the fallback when the probe fails:
 | `Read` and a read-only shell command (`cat`) under `scoped` reading the per-turn MCP file of its own turn and of a concurrent turn in the control folder | refused, the path lies outside the working folder | below `host` the runner loads only MCP servers without a `secret_ref`; the preview says so, and the gap is recorded as a residual risk of T-BA-02 |
 | The end of a turn stopped by `--max-budget-usd` | a `result` the runner recognizes | the run ends `failed` with `runtime_error` and the cause `cost_cap_reached` in the summary either way (5.8) |
 
-Results (A1-05, pinned CLI 2.1.288, `tests/real_cli/test_hosted_probe.py`): the free level of the
+Results (A1-05, pinned CLI 2.1.288, and again with 2.1.321 on 2026-11-10,
+`tests/real_cli/test_hosted_probe.py`): the free level of the
 probe ran on 2026-11-06 and passed: `--help` names every flag of 5.3 (`--tools` takes several
 values), and the CLI holds the three switches of 5.4, the `result` subtype
 `error_max_budget_usd` that a turn stopped by `--max-budget-usd` ends with, and the placeholder

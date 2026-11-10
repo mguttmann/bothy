@@ -17,6 +17,7 @@ from claude_code_runner.failures import (
     api_error_text,
     classify_turn_end,
 )
+from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fake_claude" / "fixtures"
 # Lines the real CLI wrote, unchanged (not replayed by the fake).
@@ -136,13 +137,17 @@ def test_only_the_cli_api_error_is_the_assistant_channel() -> None:
 
 
 def test_captured_cli_api_errors_classify() -> None:
-    """Lines the pinned CLI 2.1.288 wrote against a local API answering 400, 401 and 400."""
-    lines = [
-        json.loads(line)
-        for line in (CAPTURED / "api_errors_2.1.288.jsonl").read_text("utf-8").splitlines()
-    ]
+    """Lines the pinned CLI wrote against a local API answering 400, 401 and 400."""
+    captured = CAPTURED / f"api_errors_{PINNED_CLAUDE_CODE_VERSION}.jsonl"
+    lines = [json.loads(line) for line in captured.read_text("utf-8").splitlines()]
     errors = [m for m in lines if m["type"] == "assistant"]
     results = [m for m in lines if m["type"] == "result"]
+    assert [m["api_error_status"] for m in results] == [400, 401, 400]
+    too_old = api_error_text(errors[2]) or ""
+    assert f"Claude Code {PINNED_CLAUDE_CODE_VERSION} does not support this model" in too_old
+    # The scenario of the outdated CLI plays the captured text.
+    fixture = json.loads((FIXTURES / "cli_too_old.jsonl").read_text("utf-8").splitlines()[0])
+    assert fixture["error_text"] == too_old
     kinds = [
         classify_turn_end(
             TurnEvidence(
@@ -162,8 +167,12 @@ LIVE_TOO_OLD = (
     "version 2.1.280 or newer is required"
 )
 POLICY_TOO_OLD = (
-    "API Error: 400 Claude Code 2.1.288 is older than the minimum version required by your "
+    "API Error: 400 Claude Code 2.1.321 is older than the minimum version required by your "
     "organization's policy"
+)
+# The third text of the too-old pattern, which the pinned CLI knows since 2.1.321.
+ORGANIZATION_TOO_OLD = (
+    "API Error: 400 Claude Code 2.1.330 or later is required for your organization"
 )
 
 
@@ -191,6 +200,32 @@ def test_cli_below_a_policy_floor_is_actionable() -> None:
         "policy requires. Update Claude Code (the runner reports runtime_version_unsupported "
         "until it is updated).",
     )
+
+
+def test_cli_below_an_organization_minimum_is_actionable() -> None:
+    """The organization's minimum names its version; the run says what to do."""
+    result = {"type": "result", "subtype": "success", "is_error": True}
+    end = classify_turn_end(
+        TurnEvidence(init_seen=True, result=result, assistant_text=ORGANIZATION_TOO_OLD)
+    )
+    assert end.outcome == "runtime_version_unsupported"
+    assert end.required_version == "2.1.330"
+    assert end.errors == (
+        "Claude Code on the runner host is too old for the organization: version 2.1.330 or "
+        "later is required. Update Claude Code (the runner reports runtime_version_unsupported "
+        "until it is updated).",
+    )
+    unreadable = classify_turn_end(
+        TurnEvidence(
+            init_seen=True,
+            assistant_text="Claude Code next or later is required for your organization",
+        )
+    )
+    assert unreadable.outcome == "runtime_version_unsupported"
+    assert unreadable.required_version is None
+    # Only the API error channel counts: the model's own words never mark the CLI outdated.
+    quoted = {"type": "result", "subtype": "error_during_execution", "result": ORGANIZATION_TOO_OLD}
+    assert classify_turn_end(TurnEvidence(init_seen=True, result=quoted)).outcome == "runtime_error"
 
 
 def test_quoted_too_old_text_is_not_the_cli_answer() -> None:

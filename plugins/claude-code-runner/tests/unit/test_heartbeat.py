@@ -113,16 +113,36 @@ async def test_probe_unreachable(tmp_path: Path) -> None:
 
 def test_pin_is_a_version_that_serves_current_models() -> None:
     # 2.1.259 was refused by the API for current models ("version 2.1.280 or newer is
-    # required", 2026-10-29); the pin moved to 2.1.288 (RUNNER-CLI-PIN).
-    assert PINNED_CLAUDE_CODE_VERSION == "2.1.288"
+    # required", 2026-10-29); the pin moved to 2.1.288 (RUNNER-CLI-PIN) and then to 2.1.321
+    # (FIX-RUNNER-CLI-PIN-321).
+    assert PINNED_CLAUDE_CODE_VERSION == "2.1.321"
     assert parse_version(PINNED_CLAUDE_CODE_VERSION) >= (2, 1, 280)  # type: ignore[operator]
+
+
+@pytest.mark.anyio
+async def test_cli_2_1_321_is_the_tested_version(tmp_path: Path) -> None:
+    """A host with Claude Code 2.1.321 is online; the former pin 2.1.288 only warns."""
+    current = script(tmp_path, "print('2.1.321 (Claude Code)')")
+    probe = await probe_version(current, {}, tmp_path, PATIENCE)
+    assert (probe.version, probe.reasons, probe.blocking) == ("2.1.321", (), False)
+    status = runtime_status(probe, [], None)
+    assert (status.state, status.degraded_reasons) == ("online", ())
+    assert status.runtime_version == "2.1.321"
+    former = script(tmp_path, "print('2.1.288 (Claude Code)')")
+    probe = await probe_version(former, {}, tmp_path, PATIENCE)
+    assert (probe.version, probe.reasons) == ("2.1.288", ("runtime_version_untested",))
+    assert not probe.blocking
+    assert runtime_status(probe, [], None).state == "degraded"
 
 
 @pytest.mark.anyio
 async def test_probe_below_a_raised_minimum_is_unsupported(tmp_path: Path) -> None:
     """A minimum the API named for the model makes an older CLI unsupported (blocking)."""
     prog = script(tmp_path, f"print('{PINNED_CLAUDE_CODE_VERSION} (Claude Code)')")
-    probe = await probe_version(prog, {}, tmp_path, PATIENCE, minimum="2.1.300")
+    above = raised_minimum(
+        MIN_CLAUDE_CODE_VERSION, current=PINNED_CLAUDE_CODE_VERSION, required=None
+    )
+    probe = await probe_version(prog, {}, tmp_path, PATIENCE, minimum=above)
     assert probe.version == PINNED_CLAUDE_CODE_VERSION
     assert probe.reasons == ("runtime_version_unsupported",)
     assert probe.blocking
@@ -136,9 +156,9 @@ async def test_probe_below_a_raised_minimum_is_unsupported(tmp_path: Path) -> No
         # The API named the version: it becomes the minimum.
         ("2.1.259", "2.1.259", "2.1.280", "2.1.280"),
         # Never lowered by a smaller or unreadable requirement.
-        ("2.1.288", "2.1.300", "2.1.280", "2.1.300"),
+        ("2.1.321", "2.1.330", "2.1.280", "2.1.330"),
         # No version named (an organization's policy): anything after the probed one.
-        ("2.1.288", "2.1.259", None, "2.1.289"),
+        ("2.1.321", "2.1.259", None, "2.1.322"),
         # Nothing probed and nothing named: unchanged.
         (None, "2.1.259", None, "2.1.259"),
     ],

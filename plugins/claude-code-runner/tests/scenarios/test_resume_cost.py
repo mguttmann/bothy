@@ -6,7 +6,7 @@ of the transcript's last ``cost-state`` line. A session the runner never saw (a 
 import, or one started outside the runner) or one continued outside it since its last run must
 not book those old totals again. The runner reads the same line before the first process of a
 run that resumes and books the difference; a later process of the run takes nothing. The values
-come from the pinned CLI's recording in ``tests/fixtures/recording/resumed_session_2.1.288``.
+come from the pinned CLI's recording in ``tests/fixtures/recording/resumed_session_<version>``.
 """
 
 from __future__ import annotations
@@ -19,12 +19,17 @@ from typing import Any
 import pytest
 from bothy_sdk.ids import uuid7
 
+from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
+
 from .conftest import World
 
 pytestmark = pytest.mark.anyio
 
 RECORDED = (
-    Path(__file__).resolve().parents[1] / "fixtures" / "recording" / "resumed_session_2.1.288"
+    Path(__file__).resolve().parents[1]
+    / "fixtures"
+    / "recording"
+    / f"resumed_session_{PINNED_CLAUDE_CODE_VERSION}"
 )
 # The invented reference of the recording (the runner needs UUIDs).
 REF = "0192d3a0-0000-4000-8000-0000000000b2"

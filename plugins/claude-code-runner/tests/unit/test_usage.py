@@ -11,6 +11,7 @@ from typing import Any
 
 from bothy_sdk.generated.models import CostReport
 
+from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
 from claude_code_runner.usage import (
     ModelUsage,
     UsageStore,
@@ -29,7 +30,10 @@ from claude_code_runner.usage import (
 
 # The pinned CLI's transcript of a session and the stream of its resumed turn (RUNNER-RESUME-COST).
 RECORDED = (
-    Path(__file__).resolve().parents[1] / "fixtures" / "recording" / "resumed_session_2.1.288"
+    Path(__file__).resolve().parents[1]
+    / "fixtures"
+    / "recording"
+    / f"resumed_session_{PINNED_CLAUDE_CODE_VERSION}"
 )
 RECORDED_REF = "0192d3a0-0000-4000-8000-0000000000b2"
 

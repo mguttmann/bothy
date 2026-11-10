@@ -57,7 +57,7 @@ the title once per new session and reports the cost of the run.
 | `reply_attachments.py`, `reply_upload.py` | Answer attachments: `ATTACH:` lines, roots, denied patterns, the checks of one file and of the set, the notice; staging, upload, sending and the persisted set (M3-12) |
 | `tests/unit/`, `tests/scenarios/` | Unit tests; scenarios with Fake-Claude and the SDK FakeServer |
 | `tests/fake_claude/` | Fake-Claude (plays `fixtures/*.jsonl`, constructed from the message shapes of 18.4 and the texts of the pinned CLI; see 09 16.1) |
-| `tests/real_cli/` | Tests against the installed CLI, only behind switches (see below) |
+| `tests/real_cli/` | Tests against the installed CLI, only behind switches (see below); `record.py` writes the recordings of the pinned CLI against the stand-in `stand_in.py` ("Changing the pinned version") |
 | `tests/realserver/` | The end-to-end suite: the runner with Fake-Claude against the server of this tree (`make adapters-e2e`) |
 | `tests/fixtures/baseline/`, `tests/unit/test_byte_equal_baseline.py` | The command line, heartbeats and served channels of the runner without the keys of stage A1, recorded before A1-04 and compared byte for byte (BA-T20) |
 | `keeper.py`, `launch.py` | With `runner.turn_handover`: the keeper program of one launch, and the runner's side of the launch handshake, the group of keeper and CLI, the named pipe writer and the cases of a `launching` record (09 18.19.4, 18.19.5) |
@@ -89,11 +89,13 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
   of `organization` live in the runner's own configuration folder and those of `personal` under
   `HOME`; M2-35 handles a missing session (fail open).
 - Install exactly the pinned Claude Code version (`PINNED_CLAUDE_CODE_VERSION` in
-  `heartbeat.py`, 2.1.288) and keep automatic updates of the CLI off; another version reports
+  `heartbeat.py`, 2.1.321) and keep automatic updates of the CLI off; another version reports
   `runtime_version_untested`, an older one `runtime_version_unsupported` and refuses runs.
+  `claude-code-runner check-config --config <file>` prints `runtime ok` for the pinned version.
 - The API refuses a model to a CLI below the model's minimum version ("Claude Code <v> does not
-  support this model; version <v> or newer is required", or the minimum of an organization's
-  policy). The run then ends `runtime_error` with a box note that names the required version and
+  support this model; version <v> or newer is required", the minimum of an organization's
+  policy, or "Claude Code <v> or later is required for your organization"). The run then ends
+  `runtime_error` with a box note that names the required version and
   says to update Claude Code; the runner raises its minimum to that version, reports `degraded`
   with `runtime_version_unsupported` at once and refuses runs until a version probe (before
   every heartbeat) finds a CLI at that version. The raised minimum lives in memory: a restart
@@ -102,6 +104,18 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
   a selector in square brackets, such as a context window (`<model>[1m]`): the CLI gets the
   value as it is, `startRun` and `agent_session.report` get the model name without the suffix,
   because the server's model name (09 2.2) has no `[`.
+- `runner.default_model` and a binding's model must name a model the API serves, such as
+  `claude-fable-5-2[1m]`. The runner does not check the name, and Claude Code passes any value
+  to the API unchanged. A placeholder such as `model-large` (the value of the example file
+  until 2026-11-10) is unknown to the API: without a fallback model the turn fails with "There's
+  an issue with the selected model", and with one Claude Code answers the turn with the fallback
+  model and says so only in a stream message the runner does not read (`system`
+  `model_fallback`), while the live box still names the configured value (run against a local
+  stand-in for the API). A `personal` turn of the runner's own agent loads the Claude Code
+  settings under the `HOME` of the runner's account, so a fallback model set there makes such
+  a placeholder run on that model without a sign in the thread. An `organization` turn loads
+  the settings of the runner's own configuration folder instead, and a hosted agent's turn
+  loads no settings of the user ("Turns of built-in agents").
 - `runner.forward_ssh_agent` gives every turn the runner user's SSH keys; keep it off unless the
   projects need it.
 - Keep `runner.progress_patch_interval` below `run.stall_after` of the server, else a run whose
@@ -248,15 +262,20 @@ throttles them to `agent.run_update_min_interval`.
 | `user` | the `tool_result` ends its step `completed` or `failed`; the echo of the own prompt is ignored |
 | `tool_progress` | counted; `/metrics/progress_events` only when the last change of the turn is older than `runner.progress_patch_interval`, so a long tool is not stalled (09 5.5) |
 | `system/task_*` | a step `subagent` (`task_type` `local_agent`), `workflow` (`local_workflow`) or `background_job`, under the step of the tool call its `tool_use_id` names (at the root without one); `usage` (`total_tokens`, `tool_uses`, `duration_ms`) of `task_progress` and `task_notification` becomes `detail.usage` (`tokens`, `tool_uses`, `duration_ms`), never a cost; `completed`, `failed`, `stopped` end the step; `ambient` tasks get none |
-| `system/task_progress` `workflow_progress` | one `subagent` step `workflow_agent` per agent of the workflow, title its label, under the workflow step, `detail` `phase`, `last_tool` and `usage`; `done` ends it, the end of the workflow ends its open agents; the prompt and result previews are never sent. A foreground command of a workflow agent (`owned_by_subagent` with an unknown `tool_use_id`) gets no step |
+| `system/task_progress` `workflow_progress` | one `subagent` step `workflow_agent` per agent of the workflow, title its label, under the workflow step, `detail` `phase`, `last_tool` and `usage`; `done` ends it, the end of the workflow ends its open agents; an agent listed before its start (without `agentId`) keeps its step when the ID appears; the prompt and result previews are never sent. A foreground command of a workflow agent (`owned_by_subagent` with an unknown `tool_use_id`) gets no step |
 | `system/background_tasks_changed` | open `background_job` steps outside the set end `completed`; `/metrics/background_jobs` |
 | `system/status` | `compacting` sets `/status_line`, its absence removes it |
 | `system/api_retry` | `/metrics/api_retries`, `/metrics/last_api_retry` |
 
 The run graph fields (`tool_use_id`, `task_type`, `usage`, the workflow type `local_workflow`)
-were read from the files of the pinned CLI 2.1.259 without a session (ruling D-M2-51-1) and read
-again in 2.1.288 (`tests/fixtures/recording/stream_fields_2.1.288.json`, D-RUNNER-CLI-PIN-1); the
-level-one switch test holds them against the installed CLI.
+were read from the files of the pinned CLI 2.1.259 without a session (ruling D-M2-51-1), read
+again in 2.1.288 (D-RUNNER-CLI-PIN-1) and in 2.1.321
+(`tests/fixtures/recording/stream_fields_2.1.321.json`, D-FIX-RUNNER-CLI-PIN-321-3: the members
+of every message of the table above, from the message schemas in the CLI's file and from a
+recorded turn). The level-one switch test holds the recorded table against the installed CLI.
+2.1.321 adds members the runner does not read (`run_id`, `parent_task_id` and `awaited` of a
+task, `wakeup_source` of a queued input, the cache write durations of `modelUsage`) and names the
+model in `system/init` and `modelUsage` without the selector in square brackets.
 
 ## Follow-ups, stop and error paths (M2-35)
 
@@ -271,9 +290,11 @@ level-one switch test holds them against the installed CLI.
   `runner.followup_grace` while written follow-ups have no echo.
 - **Background work** (09 18.5, FIX-runner-responsive-turns): a turn may end while work it
   started in the background (Bash or a subagent with `run_in_background`, a workflow) still
-  runs. Claude Code stops that work when its stdin ends, so the runner keeps stdin open while the
-  stream lists a background task, and for a process that had one also during a turn and for
-  `runner.followup_grace` after the last line (log code `stdin_held_for_background`). A
+  runs. Claude Code takes no input once its stdin ended and stops that work some time after
+  (at its background ceiling; a background shell at its own time limit since 2.1.321, after
+  the short grace of a sweep before; values in 09 18.19.12), so the runner keeps stdin open
+  while the stream lists a background task, and for a process that had one also during a turn
+  and for `runner.followup_grace` after the last line (log code `stdin_held_for_background`). A
   `result` while the input line is still queued in Claude Code (`command_lifecycle`, for
   example the empty turns for tasks a previous process lost) neither closes stdin nor starts
   the follow-up window, and an input that starts waits for its own `result`
@@ -601,10 +622,10 @@ never copying a file of it, and checks it itself before every turn.
   member's, and its content is not the owner's choice; binding grants the member no Bothy
   permission. Keep in `channel_skills_dir` only skills you would run in such a turn.
 
-### Probe results of 26 5.7 (pinned CLI 2.1.288)
+### Probe results of 26 5.7 (pinned CLI 2.1.321)
 
 `tests/real_cli/test_hosted_probe.py` has one probe per row of 26 5.7. Level one (free) ran on
-2026-11-06 against 2.1.288 and passed: `--help` names every flag of 26 5.3 (`--tools` takes
+2026-11-06 against 2.1.288 and on 2026-11-10 against 2.1.321 and passed: `--help` names every flag of 26 5.3 (`--tools` takes
 several values), and the CLI holds `disableSkillShellExecution`, `disableAllHooks`,
 `disableWorkflows`, the result subtype `error_max_budget_usd` and the placeholder "[shell command
 execution disabled by policy]". Level two (one real turn per row, costs money) has not run: it
@@ -748,6 +769,10 @@ no login of the developer is touched. The real CLI runs only behind switches:
   tests/real_cli` checks the installed version against the pin and the flags of `--help`, and
   that every recognised error text of `ERROR_TEXTS` and every stream type and member the runner
   reads occur in the files of the installed CLI (`test_pinned_cli.py`); a missing CLI fails. The
+  same file checks that the runner's version probe reports the installed CLI `online` and
+  `check-config` prints `runtime ok` for it, that the
+  recorded stream field table equals a fresh read of the CLI's file, and that every text of the
+  CLI's own "too old" pattern is one the runner recognises. The
   pinned CLI can be installed into a temporary folder from the npm package of the platform
   (`@anthropic-ai/claude-code-<platform>` at the pinned version) without a login.
   `test_named_pipe.py` runs the pinned CLI with a named pipe as stdin against a local stand-in for
@@ -762,6 +787,34 @@ no login of the developer is touched. The real CLI runs only behind switches:
   (400), a refused key (401) and a CLI below the model's minimum (400). `test_failures.py`
   classifies them. A change of the pin captures them again with the new version.
 
+### Changing the pinned version
+
+A change of `PINNED_CLAUDE_CODE_VERSION` is one change with new recordings (design note 15 of
+M2-34). Install the new CLI into a temporary folder from the npm package of the platform, set
+the constant (and `PINNED` of `tests/fake_claude/fake_claude.py`), then record:
+
+```sh
+cd plugins/claude-code-runner
+CLAUDE_CODE_RUNNER_CLAUDE_BIN=<the new claude> uv run --locked python tests/real_cli/record.py
+CLAUDE_CODE_RUNNER_RECORD_BASELINE=1 uv run --locked pytest -q tests/unit/test_byte_equal_baseline.py
+CLAUDE_CODE_RUNNER_REAL_CLI=1 CLAUDE_CODE_RUNNER_CLAUDE_BIN=<the new claude> \
+  uv run --locked pytest tests/real_cli
+```
+
+`record.py` starts the CLI only against the stand-in `tests/real_cli/stand_in.py` (no login, no
+model call; it takes a few minutes, because Claude Code retries a refused key) and writes
+`tests/fixtures/recording/stream_fields_<v>.json`, `agent_tree_<v>.jsonl`,
+`resumed_session_<v>/` and `tests/real_cli/captured/api_errors_<v>.jsonl`; remove the files of
+the old version, give the `fixture_meta` lines of `tests/fake_claude/fixtures` the new version
+and the fixture `cli_too_old.jsonl` the captured text. The program refuses a CLI that is not the
+pinned version and a temporary folder that lies below a `CLAUDE.md` or a `.claude` folder (the
+CLI would read a developer's own instructions there; point `TMPDIR` at a folder outside the home
+folder then). Then read the stream table of 09 18.4 and the findings of 09 18.19.12 and 26 5
+against the new CLI, change the mapping and the error texts where the CLI changed, and record
+what was read in `docs/decisions.d/`. The baseline files change only in `runtime_version`. The
+doc comment of the pin names that fragment, and the texts about the pin say what the CLI does,
+never which host runs or showed what (the repository is public; `tests/unit/test_versions.py`).
+
 ## To check before the build
 
 - Does `system/init` come before the first model request with `--input-format stream-json`?
@@ -769,7 +822,7 @@ no login of the developer is touched. The real CLI runs only behind switches:
   `system/init` interrupts the turn with SIGINT.
 - Is `/compact` available in print mode of the pinned version? Yes: the command `compact` of
   Claude Code 2.1.259 has `supportsNonInteractive: true` in the files of the pinned CLI
-  (retrieved 2026-10-24, again in 2.1.288 on 2026-10-29), and the Agent SDK page on slash commands sends `/compact` as a prompt
+  (retrieved 2026-10-24, again in 2.1.288 on 2026-10-29 and in 2.1.321 on 2026-11-10), and the Agent SDK page on slash commands sends `/compact` as a prompt
   and reports it with a `system` message `compact_boundary`
   (https://code.claude.com/docs/en/agent-sdk/slash-commands, retrieved 2026-10-24). That the CLI
   takes it as the content of a stream-json `user` line is not run with a real session yet (level

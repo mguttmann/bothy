@@ -46,11 +46,13 @@ __all__ = [
 MIN_CLAUDE_CODE_VERSION = "2.1.259"
 """The version 09 18.2 names for ``--permission-prompts none``."""
 
-PINNED_CLAUDE_CODE_VERSION = "2.1.288"
+PINNED_CLAUDE_CODE_VERSION = "2.1.321"
 """The version the fixtures and the stream field table were written for (RK-14).
 
 2.1.259 until 2026-10-29, when the API refused current models to it ("version 2.1.280 or newer
-is required"); docs/DECISIONS.md D-RUNNER-CLI-PIN-1."""
+is required"; D-RUNNER-CLI-PIN-1), then 2.1.288 until 2026-11-10, since then 2.1.321
+(docs/decisions.d/FIX-RUNNER-CLI-PIN-321.md). A change of the pin records the fixtures again
+with ``tests/real_cli/record.py`` and runs level one of the real-CLI suite."""
 
 CAPABILITIES: Mapping[str, bool | str] = {
     "followups": "steer",

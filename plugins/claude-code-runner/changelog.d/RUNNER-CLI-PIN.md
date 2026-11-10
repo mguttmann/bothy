@@ -1,8 +1,9 @@
 ### Changed
 
-- The pinned Claude Code version is 2.1.288 (was 2.1.259, which the API no longer serves current
-  models to). The fixtures, the stream field recording and the captured API errors name and come
-  from 2.1.288.
+- The pinned Claude Code version left 2.1.259, which the API no longer serves current models
+  to (2.1.288 on 2026-10-29; the entry of FIX-RUNNER-CLI-PIN-321 names the pin of today). The
+  fixtures, the stream field recording and the captured API errors name and come from the
+  pinned version.
 
 ### Fixed
 

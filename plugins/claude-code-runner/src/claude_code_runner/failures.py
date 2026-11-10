@@ -40,11 +40,11 @@ __all__ = [
 
 _PINNED_FILE = (
     "claude (package @anthropic-ai/claude-code-darwin-arm64 2.1.259, read again in 2.1.288 on "
-    "2026-10-29)"
+    "2026-10-29 and in 2.1.321 on 2026-11-10)"
 )
 _CAPTURED = (
-    "tests/real_cli/captured/api_errors_2.1.288.jsonl (the pinned CLI against a local API, "
-    "2026-10-29)"
+    "tests/real_cli/captured/api_errors_2.1.321.jsonl (the pinned CLI against a local API, "
+    "2026-11-10)"
 )
 
 
@@ -60,9 +60,10 @@ class ErrorKind(Enum):
     NOT_AUTHENTICATED = "not_authenticated"
     """The runtime has no valid login or key."""
     VERSION_UNSUPPORTED = "runtime_version_unsupported"
-    """The API refused the request because the CLI is below the model's (or a policy's)
-    minimum version; the run ends ``runtime_error`` and the runner reports the degraded reason
-    ``runtime_version_unsupported`` until the CLI is updated (D-RUNNER-CLI-PIN-2)."""
+    """The API refused the request because the CLI is below the model's (or a policy's or an
+    organization's) minimum version; the run ends ``runtime_error`` and the runner reports the
+    degraded reason ``runtime_version_unsupported`` until the CLI is updated
+    (D-RUNNER-CLI-PIN-2)."""
 
 
 @dataclass(frozen=True)
@@ -136,11 +137,22 @@ ERROR_TEXTS: tuple[ErrorText, ...] = (
         "assistant",
         f"{_PINNED_FILE}: the second branch of the same pattern (retrieved 2026-10-29)",
     ),
+    ErrorText(
+        ErrorKind.VERSION_UNSUPPORTED,
+        "or later is required for your organization",
+        "assistant",
+        "claude (package @anthropic-ai/claude-code-darwin-arm64 2.1.321): the third branch of "
+        "the same pattern, 'Claude Code <v> or later is required for your organization', new "
+        "in the pinned CLI (retrieved 2026-11-10)",
+    ),
 )
 """The recognised texts in match order; the first matching entry decides."""
 
 _BEFORE_INIT_ONLY = frozenset({ErrorKind.SESSION_MISSING, ErrorKind.SESSION_EXISTS})
 _REQUIRED = re.compile(r"does not support this model; version v?(\d+\.\d+\.\d+) or newer")
+_ORGANIZATION = re.compile(
+    r"Claude Code v?(\d+\.\d+\.\d+) or later is required for your organization"
+)
 _UPDATE = "Update Claude Code (the runner reports runtime_version_unsupported until it is updated)."
 
 
@@ -274,8 +286,9 @@ def classify_turn_end(evidence: TurnEvidence) -> TurnEnd:
 
 BUDGET_SUBTYPE = "error_max_budget_usd"
 """The ``subtype`` of the ``result`` the pinned CLI sends when ``--max-budget-usd`` stops a turn
-(claude 2.1.288: the result schema lists it, and the print mode writes "Exceeded USD budget" for
-it; read from the binary on 2026-11-06, decisions.d/A1-05.md)."""
+(the result schema of the CLI's file lists it, and the print mode writes "Exceeded USD budget"
+for it; read from claude 2.1.288 on 2026-11-06, decisions.d/A1-05.md, and again from 2.1.321 on
+2026-11-10)."""
 
 
 def cost_cap_reached(result: Mapping[str, Any] | None, cap: float | None) -> bool:
@@ -312,15 +325,23 @@ def _too_old(text: str, label: str) -> TurnEnd:
     The API's text is not repeated: only the version digits are taken from it.
     """
     found = _REQUIRED.search(text)
-    if found is None:
+    if found is not None:
+        required = found.group(1)
         message = (
-            "Claude Code on the runner host is older than the minimum version the organization's "
-            f"policy requires. {_UPDATE}"
+            f"Claude Code on the runner host is too old for the model: version {required} or "
+            f"newer is required. {_UPDATE}"
         )
-        return TurnEnd(ErrorKind.VERSION_UNSUPPORTED.value, (message,), label)
-    required = found.group(1)
+        return TurnEnd(ErrorKind.VERSION_UNSUPPORTED.value, (message,), label, required)
+    found = _ORGANIZATION.search(text)
+    if found is not None:
+        required = found.group(1)
+        message = (
+            f"Claude Code on the runner host is too old for the organization: version {required} "
+            f"or later is required. {_UPDATE}"
+        )
+        return TurnEnd(ErrorKind.VERSION_UNSUPPORTED.value, (message,), label, required)
     message = (
-        f"Claude Code on the runner host is too old for the model: version {required} or newer "
-        f"is required. {_UPDATE}"
+        "Claude Code on the runner host is older than the minimum version the organization's "
+        f"policy requires. {_UPDATE}"
     )
-    return TurnEnd(ErrorKind.VERSION_UNSUPPORTED.value, (message,), label, required)
+    return TurnEnd(ErrorKind.VERSION_UNSUPPORTED.value, (message,), label)

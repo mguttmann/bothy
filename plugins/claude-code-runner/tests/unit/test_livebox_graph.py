@@ -7,11 +7,47 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
 from claude_code_runner.livebox import WORKFLOW_TASK_TYPE, LiveBox
 
 from .test_livebox import OWN, Patch
 
-RECORDING = Path(__file__).parent.parent / "fixtures" / "recording" / "stream_fields_2.1.288.json"
+RECORDING = (
+    Path(__file__).parent.parent
+    / "fixtures"
+    / "recording"
+    / f"stream_fields_{PINNED_CLAUDE_CODE_VERSION}.json"
+)
+# What the runner reads of each stream message (09 18.4, 18.5, 18.7, 18.9).
+READ_MEMBERS = {
+    "system/init": ["model", "apiKeySource"],
+    "assistant": ["message", "parent_tool_use_id", "is_api_error_message"],
+    "user": ["message", "isReplay"],
+    "system/task_started": [
+        "task_id",
+        "tool_use_id",
+        "description",
+        "task_type",
+        "ambient",
+        "is_backgrounded",
+        "owned_by_subagent",
+    ],
+    "system/task_progress": ["task_id", "tool_use_id", "usage", "workflow_progress"],
+    "system/task_updated": ["task_id"],
+    "system/task_notification": ["task_id", "tool_use_id", "status", "usage", "ambient"],
+    "system/background_tasks_changed": ["tasks"],
+    "system/status": ["status"],
+    "system/api_retry": ["attempt", "max_retries", "retry_delay_ms", "error"],
+    "command_lifecycle": ["command_uuid", "state"],
+    "result/success": [
+        "is_error",
+        "result",
+        "modelUsage",
+        "total_cost_usd",
+        "user_message_uuid",
+        "user_message_uuids",
+    ],
+}
 T0 = datetime(2026, 10, 21, 9, 0, tzinfo=UTC)
 INTERVAL = 120.0
 
@@ -41,13 +77,27 @@ def _box(clock: Clock) -> tuple[LiveBox, Patch]:
 
 def test_mapping_uses_only_recorded_fields() -> None:
     recording = json.loads(RECORDING.read_text())
-    assert recording["cli_version"] == "2.1.288"
+    assert recording["cli_version"] == PINNED_CLAUDE_CODE_VERSION
     assert recording["workflow_task_type"] == WORKFLOW_TASK_TYPE
     assert WORKFLOW_TASK_TYPE in recording["task_types"]
-    for subtype in ("system/task_started", "system/task_notification"):
-        assert "tool_use_id" in recording["messages"][subtype]
-    assert "usage" in recording["messages"]["system/task_notification"]
+    assert "local_agent" in recording["task_types"]
+    for message, members in READ_MEMBERS.items():
+        assert set(members) <= set(recording["messages"][message]), message
     assert recording["usage"] == ["total_tokens", "tool_uses", "duration_ms"]
+    assert {"task_id", "description", "ambient"} <= set(recording["background_task"])
+    assert recording["task_status"] == ["completed", "failed", "stopped"]
+    assert {"queued", "started", "completed", "cancelled"} <= set(recording["command_states"])
+    assert {
+        "agentId",
+        "index",
+        "label",
+        "phaseTitle",
+        "state",
+        "lastToolName",
+        "tokens",
+        "toolCalls",
+        "durationMs",
+    } <= set(recording["workflow_agent"])
 
 
 def test_tool_progress_patch_interval() -> None:

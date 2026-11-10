@@ -14,11 +14,22 @@ from uuid import UUID
 import pytest
 from bothy_sdk.testing._patience import PATIENCE
 
+from claude_code_runner.heartbeat import (
+    MIN_CLAUDE_CODE_VERSION,
+    PINNED_CLAUDE_CODE_VERSION,
+    raised_minimum,
+)
 from claude_code_runner.recovery import RETRY_HINT
 
 from .conftest import World
 
 pytestmark = pytest.mark.anyio
+
+# The version the API names in the fixture cli_too_old (one past the pin) and a later one.
+REQUIRED = raised_minimum(
+    MIN_CLAUDE_CODE_VERSION, current=PINNED_CLAUDE_CODE_VERSION, required=None
+)
+UPDATED = raised_minimum(MIN_CLAUDE_CODE_VERSION, current=REQUIRED, required=None)
 
 
 @pytest.fixture
@@ -260,7 +271,7 @@ async def test_cli_too_old_for_the_model_degrades_until_updated(world: World) ->
     assert world.fake.run_state(run.run_id).state_reason == "runtime_error"
     [note] = status_steps(world, run.run_id)
     assert note["detail"]["errors"] == [
-        "Claude Code on the runner host is too old for the model: version 2.1.300 or newer "
+        f"Claude Code on the runner host is too old for the model: version {REQUIRED} or newer "
         "is required. Update Claude Code (the runner reports runtime_version_unsupported "
         "until it is updated)."
     ]
@@ -272,14 +283,14 @@ async def test_cli_too_old_for_the_model_degrades_until_updated(world: World) ->
 
     await world.until(degraded)
     assert world.fake.heartbeats[-1]["state"] == "degraded"
-    assert world.fake.heartbeats[-1]["runtime_version"] == "2.1.288"
+    assert world.fake.heartbeats[-1]["runtime_version"] == PINNED_CLAUDE_CODE_VERSION
     # No turn for a model the CLI cannot serve: prepare refuses at once.
     refused = await world.fake.trigger("Again", channel_id=world.forum_a)
     assert await world.ended(refused.run_id) == "failed"
     assert world.fake.run_state(refused.run_id).state_reason == "runtime_error"
     assert len(world.turns()) == 1
     # The operator updates the CLI: the next probe clears the state, runs work again.
-    world.scenario(fixture="plain", version="2.1.300")
+    world.scenario(fixture="plain", version=UPDATED)
     await world.until(
         lambda: (
             world.fake.heartbeats[-1]["details"]["degraded_reasons"] == ["runtime_version_untested"]

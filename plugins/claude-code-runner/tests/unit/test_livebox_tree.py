@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """The agent tree of a turn from a recorded stream (FEAT-topology-agent-tree).
 
-``agent_tree_2.1.288.jsonl`` is one turn of the pinned CLI 2.1.288 as the runner recorded it
-(a workflow with three agents, background and foreground shell tasks, foreground commands of the
-workflow agents, and an Agent tool subagent with its own tool calls), reduced to the messages the
-live box reads; every text, path, ID, agent label, count and time is replaced by a synthetic
-value (counts and times keep their order), field names and structure are unchanged.
+``agent_tree_<pinned version>.jsonl`` is one turn of the pinned CLI against the local stand-in
+for the API (``tests/real_cli/record.py``; no login, no model call): a workflow with three agents,
+a background and a foreground shell task, the foreground commands of the workflow agents, and an
+Agent tool subagent with its own tool calls. Every answer is written in the recording program;
+the lines are as the CLI wrote them, with ``system/init`` reduced to what the runner reads and
+the paths of the recording folder replaced.
 """
 
 from __future__ import annotations
@@ -16,11 +17,17 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
 from claude_code_runner.livebox import WORKFLOW_TASK_TYPE, LiveBox
 
 from .test_livebox import OWN, Patch
 
-RECORDING = Path(__file__).parent.parent / "fixtures" / "recording" / "agent_tree_2.1.288.jsonl"
+RECORDING = (
+    Path(__file__).parent.parent
+    / "fixtures"
+    / "recording"
+    / f"agent_tree_{PINNED_CLAUDE_CODE_VERSION}.jsonl"
+)
 NOW = datetime(2026, 11, 1, 9, 0, tzinfo=UTC)
 
 
@@ -199,6 +206,47 @@ def test_agent_state_tool_and_usage_follow_the_progress() -> None:
     ((_, review),) = _of(patch, title="review")
     assert review["status"] == "failed"
     assert len(_of(patch, name="workflow_agent")) == 2
+
+
+def test_agent_listed_before_its_start_keeps_its_step() -> None:
+    """Agents that start side by side are listed first without ``agentId``, then with one."""
+    live, patch = _box()
+    _workflow_started(live)
+    waiting = {k: v for k, v in _agent(2, "review", "start").items() if k != "agentId"}
+    live.apply(_progress("w1", _agent(1, "build", "start"), waiting))
+    ((_, review),) = _of(patch, title="review")
+    assert review["status"] == "running"
+    live.apply(_progress("w1", _agent(1, "build", "progress"), _agent(2, "review", "start")))
+    live.apply(
+        _progress(
+            "w1",
+            _agent(1, "build", "done"),
+            _agent(2, "review", "done", lastToolName="Bash", tokens=7, toolCalls=1),
+        )
+    )
+    agents = _of(patch, name="workflow_agent")
+    assert [(s["title"], s["status"]) for _, s in agents] == [
+        ("build", "completed"),
+        ("review", "completed"),
+    ]
+    assert agents[1][1]["detail"]["usage"] == {"tokens": 7, "tool_uses": 1}
+
+
+def test_agent_listed_before_its_start_survives_adoption() -> None:
+    live, patch = _box()
+    _workflow_started(live)
+    waiting = {k: v for k, v in _agent(1, "build", "start").items() if k != "agentId"}
+    live.apply(_progress("w1", waiting))
+    ((step_id, _),) = _of(patch, name="workflow_agent")
+    state = live.state()
+    known = {str(k): "running" for k in patch.steps}
+    again, again_patch = _box()
+    again.restore(state, known)
+    for k in patch.steps:
+        again_patch.steps[k] = dict(patch.steps[k])
+    again.apply(_progress("w1", _agent(1, "build", "done")))
+    assert [k for k, _ in _of(again_patch, name="workflow_agent")] == [step_id]
+    assert again_patch.steps[step_id]["status"] == "completed"
 
 
 def test_unchanged_progress_sends_nothing() -> None:

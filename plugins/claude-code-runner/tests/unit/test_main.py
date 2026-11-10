@@ -47,6 +47,32 @@ def test_check_config_prints_codes(tmp_path: Path, capsys: pytest.CaptureFixture
     ]
 
 
+@pytest.mark.parametrize(
+    ("version", "runtime", "code"),
+    [
+        ("2.1.321", "runtime ok", 0),
+        ("2.1.288", "runtime runtime_version_untested", 1),  # the pin before 2026-11-10
+    ],
+)
+def test_check_config_takes_cli_2_1_321_as_tested(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], version: str, runtime: str, code: int
+) -> None:
+    """With Claude Code 2.1.321 on the host ``check-config`` no longer names the version."""
+    key = tmp_path / "missing_key"
+    key.write_text("api-key-canary\n")
+    key.chmod(0o600)
+    helper.install(tmp_path / "bin", {"version": version}, tmp_path / "capture.jsonl")
+    assert main(["check-config", "--config", str(config(tmp_path))]) == code
+    out = capsys.readouterr().out.splitlines()
+    assert out == [
+        "config ok",
+        "runner.agent_token_ref ok",
+        "runner.dpop_key_ref unset",
+        "runner.anthropic_api_key_ref ok",
+        runtime,
+    ]
+
+
 def test_config_error_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     path = config(tmp_path, 'surprise = "secret-value"\n')
     assert main(["check-config", "--config", str(path)]) == 2
