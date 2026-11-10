@@ -16,7 +16,7 @@ const insertMainThread = `-- name: InsertMainThread :one
 INSERT INTO threads (id, channel_id, kind, created_by, created_at, last_activity_at, search_language)
 VALUES ($1, $2, 'main', $3, $4, $4, $5::text::regconfig)
 RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
-    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at, title_version
 `
 
 type InsertMainThreadParams struct {
@@ -49,6 +49,7 @@ type InsertMainThreadRow struct {
 	DeletedAt       pgtype.Timestamptz
 	DeletedBy       pgtype.UUID
 	PurgedAt        pgtype.Timestamptz
+	TitleVersion    int64
 }
 
 // SPDX-License-Identifier: Apache-2.0
@@ -88,6 +89,7 @@ func (q *Queries) InsertMainThread(ctx context.Context, arg InsertMainThreadPara
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PurgedAt,
+		&i.TitleVersion,
 	)
 	return i, err
 }

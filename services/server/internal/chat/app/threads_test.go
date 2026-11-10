@@ -380,6 +380,58 @@ func TestSetTitle_ByOther(t *testing.T) {
 	wantCode(t, err, errs.CodeTitleManual)
 }
 
+// TestSetTitle_IfMatchSinceLastTitleChange (FIX-TITLE-EDIT-412, 06 section 8 point 2): messages
+// raise the version of a thread without a thread event, so the title precondition holds for every
+// version from the last title change on. A version from before another title change, a version
+// the thread never had and a malformed header stay 412; the tags keep the exact match.
+func TestSetTitle_IfMatchSinceLastTitleChange(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := context.Background()
+	sp := e.create(t, "Support", ids.ID{})
+	forum := e.channel(t, sp.ID, "forum", "forum")
+	match := func(v int64) chat.Precondition { return chat.Precondition{Present: true, Valid: true, Version: v} }
+	post, err := e.newThread(e.owner, chat.CreateThreadCmd{ChannelID: forum.ID})
+	if err != nil || post.TitleSource != "auto" {
+		t.Fatalf("post %+v, %v", post, err)
+	}
+	held := post.Version
+	for range 3 {
+		if _, err := e.appendTo(post.ID, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first, err := e.svc.SetTitle(ctx, e.owner, chat.SetTitleCmd{ThreadID: post.ID, Title: "Export fails", IfMatch: match(held)})
+	if err != nil || first.Title != "Export fails" || first.TitleSource != "manual" || first.Version != held+4 {
+		t.Fatalf("title with the version from before the messages: %+v, %v", first, err)
+	}
+	if _, err := e.appendTo(post.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	// The version from before the title change names the old title: refused, the thread stays.
+	for _, stale := range []chat.Precondition{match(held), match(first.Version - 1), match(first.Version + 2), {Present: true}} {
+		_, err = e.svc.SetTitle(ctx, e.owner, chat.SetTitleCmd{ThreadID: post.ID, Title: "Mine", IfMatch: stale})
+		wantCode(t, err, errs.CodeVersionConflict)
+	}
+	if cur, _ := e.svc.Get(ctx, e.owner, post.ID); cur.Title != "Export fails" || cur.Version != first.Version+1 {
+		t.Fatalf("after the refusals %+v", cur)
+	}
+	// The version the title change returned, one message behind, and the current one both hold.
+	second, err := e.svc.SetTitle(ctx, e.owner, chat.SetTitleCmd{ThreadID: post.ID, Title: "Export fails for March", IfMatch: match(first.Version)})
+	if err != nil || second.Version != first.Version+2 {
+		t.Fatalf("title one message behind: %+v, %v", second, err)
+	}
+	if _, err := e.svc.SetTitle(ctx, e.owner, chat.SetTitleCmd{ThreadID: post.ID, Title: "Export", IfMatch: match(second.Version)}); err != nil {
+		t.Fatalf("title with the current version: %v", err)
+	}
+	// setThreadTags keeps the exact match (06 section 8 point 3).
+	if _, err := e.appendTo(post.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	_, err = e.svc.SetTags(ctx, e.owner, chat.SetTagsCmd{ThreadID: post.ID, IfMatch: match(second.Version + 1)})
+	wantCode(t, err, errs.CodeVersionConflict)
+}
+
 // TestSetTitle_AutoFillsOnly (FIX-auto-title-overwrites-agent-title, 09 section 12 point 5): an
 // automatic title (Auto) fills only a thread without a meaningful title. A title the operator agent
 // set on purpose stays when the adapter's automatic title follows the owner's answer; an empty or

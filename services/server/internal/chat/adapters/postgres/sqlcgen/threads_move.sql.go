@@ -27,7 +27,7 @@ UPDATE threads
 SET channel_id = $1, moved_at = $2, version = version + 1
 WHERE id = $3
 RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
-    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at, title_version
 `
 
 type MoveThreadParams struct {
@@ -58,6 +58,7 @@ type MoveThreadRow struct {
 	DeletedAt       pgtype.Timestamptz
 	DeletedBy       pgtype.UUID
 	PurgedAt        pgtype.Timestamptz
+	TitleVersion    int64
 }
 
 // SPDX-License-Identifier: Apache-2.0
@@ -95,6 +96,7 @@ func (q *Queries) MoveThread(ctx context.Context, arg MoveThreadParams) (MoveThr
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PurgedAt,
+		&i.TitleVersion,
 	)
 	return i, err
 }

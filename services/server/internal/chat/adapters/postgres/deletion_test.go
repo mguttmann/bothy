@@ -101,13 +101,14 @@ func TestRepositoryFinishPurge(t *testing.T) {
 		}
 	}
 	var topic, title, source string
-	var version int64
-	if err := e.pool.QueryRow(ctx, `SELECT c.topic, t.title, t.title_source, t.version FROM channels c JOIN threads t ON t.channel_id = c.id
-		WHERE c.id = $1 AND c.purged_at IS NOT NULL`, ch.String()).Scan(&topic, &title, &source, &version); err != nil {
+	var version, titleVersion int64
+	if err := e.pool.QueryRow(ctx, `SELECT c.topic, t.title, t.title_source, t.version, t.title_version FROM channels c JOIN threads t ON t.channel_id = c.id
+		WHERE c.id = $1 AND c.purged_at IS NOT NULL`, ch.String()).Scan(&topic, &title, &source, &version, &titleVersion); err != nil {
 		t.Fatal(err)
 	}
-	if topic != "" || title != "" || source != "manual" || version != 2 {
-		t.Fatalf("after the purge: topic %q title %q source %s version %d", topic, title, source, version)
+	// The cleared title is a title change: its version is the title version (FIX-TITLE-EDIT-412).
+	if topic != "" || title != "" || source != "manual" || version != 2 || titleVersion != 2 {
+		t.Fatalf("after the purge: topic %q title %q source %s version %d title version %d", topic, title, source, version, titleVersion)
 	}
 	if due, err := e.repo.DuePurges(ctx, t0.Add(time.Hour), 10); err != nil || len(due) != 0 {
 		t.Fatalf("due after the purge %+v, %v", due, err)

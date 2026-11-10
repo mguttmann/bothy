@@ -285,7 +285,7 @@ checks under the lock (archive state, If-Match, no-op) and before the operator c
 |---|---|---|
 | `listChannelThreads` | `thread.read` on the channel, then per item in filter mode | |
 | `getThread` | `thread.read` | |
-| `setThreadTitle` | `thread.title.update`, If-Match required | `thread.updated` |
+| `setThreadTitle` | `thread.title.update`, If-Match required: any version since the last title change (`threads.title_version`, 06 section 8 point 2) | `thread.updated` |
 | `closeThread` | `thread.close` | `thread.closed` |
 | `reopenThread` | `thread.reopen` | `thread.reopened` |
 | `setThreadTags` | `thread.tags.set`, If-Match optional; restricted tags with the restricted flag (`manage`) | `thread.updated` |
@@ -306,6 +306,13 @@ checks under the lock (archive state, If-Match, no-op) and before the operator c
   neither empty nor a placeholder creates `manual`, everything else `auto`; `setThreadTitle` by
   the thread's operator agent keeps `auto` and gets `409 title_manual` on a manual one, every
   other principal sets `manual`; a main thread is `400` (`main_thread_has_no_title`).
+- Title precondition (FIX-TITLE-EDIT-412, 03 R-DM-61, 06 section 8 point 2): a message raises
+  `version` without a thread event, so a client in an active chat holds an older version than the
+  stored one. `threads.title_version` is the version of the last change of `title` or
+  `title_source` (`domain.Thread.SetTitle` sets it; the purge and the mirror change of an import
+  write it in their statements, `TestTitleWritesSetTitleVersion`), and `setThreadTitle` accepts an
+  `If-Match` from it up to `version` (`Thread.TitleBasedOn`); anything else is `412
+  version_conflict` with the current thread. `setThreadTags` keeps the exact match.
 - Tags (D5): only a forum post (`not_a_forum_post`), no duplicates (`duplicate`), only live tags of
   the forum (`unknown_tag`), at most `thread.max_tags` (`limit_reached`); the same set answers
   without an event.

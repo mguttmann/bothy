@@ -16,7 +16,7 @@ UPDATE threads
 SET unread_floor_seq = last_message_seq, version = version + 1
 WHERE id = $1
 RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
-    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at, title_version
 `
 
 type FinishImportBatchRow struct {
@@ -41,6 +41,7 @@ type FinishImportBatchRow struct {
 	DeletedAt       pgtype.Timestamptz
 	DeletedBy       pgtype.UUID
 	PurgedAt        pgtype.Timestamptz
+	TitleVersion    int64
 }
 
 // The end of a batch that changed the thread (04 15.8): imported content is unread for nobody, and
@@ -70,6 +71,7 @@ func (q *Queries) FinishImportBatch(ctx context.Context, id pgtype.UUID) (Finish
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PurgedAt,
+		&i.TitleVersion,
 	)
 	return i, err
 }
@@ -81,7 +83,7 @@ INSERT INTO threads (id, channel_id, kind, parent_message_id, title, title_sourc
 VALUES ($1, $2, 'thread', $3, $4, $5, $6, $7,
     $8, $9, $10, $11, $12::text::regconfig)
 RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
-    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at, title_version
 `
 
 type InsertImportedThreadParams struct {
@@ -121,6 +123,7 @@ type InsertImportedThreadRow struct {
 	DeletedAt       pgtype.Timestamptz
 	DeletedBy       pgtype.UUID
 	PurgedAt        pgtype.Timestamptz
+	TitleVersion    int64
 }
 
 // SPDX-License-Identifier: Apache-2.0
@@ -167,6 +170,7 @@ func (q *Queries) InsertImportedThread(ctx context.Context, arg InsertImportedTh
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PurgedAt,
+		&i.TitleVersion,
 	)
 	return i, err
 }
@@ -177,7 +181,7 @@ SET last_message_seq = last_message_seq + $1::bigint, message_count = message_co
     last_activity_at = GREATEST(last_activity_at, $2)
 WHERE id = $3
 RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
-    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at, title_version
 `
 
 type ReserveImportedSeqsParams struct {
@@ -208,6 +212,7 @@ type ReserveImportedSeqsRow struct {
 	DeletedAt       pgtype.Timestamptz
 	DeletedBy       pgtype.UUID
 	PurgedAt        pgtype.Timestamptz
+	TitleVersion    int64
 }
 
 // n thread numbers for imported messages under the row lock (03 section 6.2), without a reopen
@@ -237,6 +242,7 @@ func (q *Queries) ReserveImportedSeqs(ctx context.Context, arg ReserveImportedSe
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PurgedAt,
+		&i.TitleVersion,
 	)
 	return i, err
 }
@@ -244,7 +250,8 @@ func (q *Queries) ReserveImportedSeqs(ctx context.Context, arg ReserveImportedSe
 const saveImportedThread = `-- name: SaveImportedThread :exec
 UPDATE threads
 SET title = $1, state = $2, closed_at = $3, closed_by = $4,
-    last_activity_at = $5
+    last_activity_at = $5,
+    title_version = CASE WHEN title IS DISTINCT FROM $1::text THEN version + 1 ELSE title_version END
 WHERE id = $6
 `
 
@@ -258,7 +265,7 @@ type SaveImportedThreadParams struct {
 }
 
 // The mirror changes of a posted thread (22 12.2 step 3) without the version: the batch raises it
-// once at its end.
+// once at its end, so a changed title sets title_version to that next version (FIX-TITLE-EDIT-412).
 func (q *Queries) SaveImportedThread(ctx context.Context, arg SaveImportedThreadParams) error {
 	_, err := q.db.Exec(ctx, saveImportedThread,
 		arg.Title,

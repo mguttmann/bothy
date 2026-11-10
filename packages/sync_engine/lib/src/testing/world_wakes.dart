@@ -230,7 +230,8 @@ extension WakesWorld on FakeWorld {
     _threadMessages[threadId]!.add(id);
     thread
       ..['last_message_seq'] = seq
-      ..['message_count'] = (thread['message_count']! as int) + 1;
+      ..['message_count'] = (thread['message_count']! as int) + 1
+      ..['version'] = (thread['version']! as int) + 1;
     append(
       'message.created',
       resource: {'kind': 'message', 'id': id, 'version': 1},

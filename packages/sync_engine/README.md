@@ -454,7 +454,10 @@ It binds `127.0.0.1` with port 0, serves REST under `/api/v1/` and the gateway a
 pairings, spaces, channels with the level of each principal, threads, messages with
 `thread_seq`, the event log with a global `seq`, read states, drafts, settings and run
 documents. Every write appends the events of 05 section 6 with a new `seq` and pushes them to
-the connections that may see them. Test controls: `addPerson`, `addSpace`, `addChannel`,
+the connections that may see them. A message raises the `version` of its thread as the server
+does (03 6.2) and writes no thread event, so a client's stored thread is behind after it;
+`setThreadTitle` accepts an `If-Match` from the last title change on (`titleVersions`, 06 8
+item 2, FIX-TITLE-EDIT-412). Test controls: `addPerson`, `addSpace`, `addChannel`,
 `addThread`, `createMessage` (as any author), `setAccess` (writes `access.changed` as 04 8.2),
 `approveDevice`, `expirePendingDevice`, `rejectPendingDevice`, `expirePairing`,
 `revokeSession`, `revokeDevice`, `dropEventsUpTo` (retention), `changeEpoch`, `createRun`,

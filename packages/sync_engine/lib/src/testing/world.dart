@@ -746,6 +746,11 @@ final class FakeWorld {
   /// Threads (API `Thread`) by ID.
   final Map<String, JsonMap> threads = {};
 
+  /// The version of each thread at its last title change (server column
+  /// `threads.title_version`); a thread without an entry never changed its title and has 1.
+  /// `setThreadTitle` accepts an `If-Match` from it on (06 8 item 2).
+  final Map<String, int> titleVersions = {};
+
   /// Messages (API `Message`) by ID.
   final Map<String, JsonMap> messages = {};
 
@@ -1607,9 +1612,11 @@ final class FakeWorld {
     _attach(id, attachments);
     _threadMessages[threadId]!.add(id);
     _clientMsgIds['$authorId|$cmid'] = (id: id, hash: hash);
+    // 03 6.2: every message raises the version of its thread, and no thread event says so.
     thread
       ..['last_message_seq'] = seq
       ..['message_count'] = (thread['message_count']! as int) + 1
+      ..['version'] = (thread['version']! as int) + 1
       ..['last_activity_at'] = message['created_at'];
     for (final check in List.of(triggerChecks)) {
       final state = check(message, author);
@@ -2390,7 +2397,8 @@ final class FakeWorld {
     _threadMessages[threadId]!.add(id);
     thread
       ..['last_message_seq'] = seq
-      ..['message_count'] = (thread['message_count']! as int) + 1;
+      ..['message_count'] = (thread['message_count']! as int) + 1
+      ..['version'] = (thread['version']! as int) + 1;
     append(
       'message.created',
       resource: {'kind': 'message', 'id': id, 'version': 1},
