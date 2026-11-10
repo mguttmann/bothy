@@ -135,7 +135,10 @@ marks a run usage-limited and wakes it at the reset, and every run ends with a `
 
 ## More Information
 
-- The CLI facts behind the decision are read from the pinned CLI 2.1.288 and recorded in 09
-  18.19.12; they are checked again when the pin moves.
+- The CLI facts behind the decision are read from the pinned CLI (2.1.288 when the decision was
+  taken) and recorded in 09 18.19.12; they are checked again when the pin moves. Read again in
+  2.1.321 on 2026-11-10: a background shell now keeps the CLI alive after the end of input
+  (whether a pending loop wake-up alone does is not established), which changes nothing in the
+  decision (D-FIX-RUNNER-CLI-PIN-321-5).
 - Revisit when the CLI offers a durable wake-up of its own, when the runner runs under a service
   manager that kills whole sessions, or when `chat` sessions should ask for wake-ups.

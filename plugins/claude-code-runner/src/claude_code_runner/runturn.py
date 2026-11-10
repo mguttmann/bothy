@@ -207,8 +207,8 @@ _RUNTIME_CURRENCY = "USD"
 COMPACT_IN_PRINT_MODE = True
 """``/compact`` is taken as an input line in print mode by the pinned CLI (design note 8 a):
 the command ``compact`` of Claude Code 2.1.259 has ``supportsNonInteractive: true`` (file of the
-installed pinned CLI; again in 2.1.288, read 2026-10-29) and the Agent SDK page on slash
-commands sends ``/compact`` as a prompt
+installed pinned CLI; again in 2.1.288, read 2026-10-29, and in 2.1.321, read 2026-11-10) and
+the Agent SDK page on slash commands sends ``/compact`` as a prompt
 (https://code.claude.com/docs/en/agent-sdk/slash-commands, retrieved 2026-10-24)."""
 
 
@@ -1398,8 +1398,9 @@ class RunTurn:
             _log("turn_stopped_after_error", background_tasks=lost, **self.ids)
             self._stop_group(process)
         elif decision is Decision.HOLD:
-            # Background work outlives the turn: the CLI stops it when its input ends, so stdin
-            # stays open, and every follow-up becomes a turn of its own (09 18.5).
+            # Background work outlives the turn: once its input ended the CLI takes no line and
+            # stops the work some time after, so stdin stays open, and every follow-up becomes a
+            # turn of its own (09 18.5).
             if self.background.running and self.live is not None:
                 self.live.keepalive()
             if self.ps.last_result_at is not None and not self._held_logged:

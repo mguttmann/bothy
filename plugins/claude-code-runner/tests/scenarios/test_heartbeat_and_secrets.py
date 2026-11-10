@@ -67,6 +67,28 @@ async def test_untested_version_only_warns(world: World) -> None:
     assert await world.ended(run.run_id) == "completed"
 
 
+async def test_cli_2_1_321_is_online_and_runs(world: World) -> None:
+    """A host with Claude Code 2.1.321 reports ``online`` without a reason, and turns run."""
+    world.scenario(version="2.1.321", fixture="plain")
+    await world.start()
+    beat = world.fake.heartbeats[-1]
+    assert beat["state"] == "online"
+    assert beat["runtime_version"] == "2.1.321"
+    assert beat["details"].get("degraded_reasons", []) == []
+    run = await world.fake.trigger("Hello", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "completed"
+
+
+async def test_the_former_pin_2_1_288_only_warns(world: World) -> None:
+    world.scenario(version="2.1.288", fixture="plain")
+    await world.start()
+    beat = world.fake.heartbeats[-1]
+    assert beat["state"] == "degraded"
+    assert beat["details"]["degraded_reasons"] == ["runtime_version_untested"]
+    run = await world.fake.trigger("Hello", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "completed"
+
+
 def _files(root: Path) -> list[Path]:
     return [p for p in root.rglob("*") if p.is_file()]
 

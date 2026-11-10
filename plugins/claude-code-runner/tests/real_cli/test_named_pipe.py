@@ -2,9 +2,9 @@
 """The pinned CLI with a named pipe as stdin (09 18.19.4, 18.19.12, row "Named pipe as stdin").
 
 Collected only with ``CLAUDE_CODE_RUNNER_REAL_CLI=1`` (``tests/conftest.py``); free: no login and no
-model call. The CLI runs against a local stand-in for the API on ``127.0.0.1`` (the method of
-``tests/real_cli/captured``: ``ANTHROPIC_BASE_URL`` on loopback, a dummy key, its own
-``CLAUDE_CONFIG_DIR``).
+model call. The CLI runs against a local stand-in for the API on ``127.0.0.1``
+(``real_cli/stand_in.py``, the method of ``tests/real_cli/captured``: ``ANTHROPIC_BASE_URL`` on
+loopback, a dummy key, its own ``CLAUDE_CONFIG_DIR``).
 
 1. With the named pipe as its stdin directly, the pinned CLI reads and answers every line, also one
    written by a second process that opened the pipe again, but on macOS it does not end when the
@@ -23,132 +23,16 @@ import signal
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 import uuid
-from collections.abc import Iterator
-from contextlib import contextmanager
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from real_cli.stand_in import cli_env, stand_in, user_line
 from real_cli.test_real_cli import claude_bin
 
 WAIT = 120.0
 """The bound of every wait of this test (seconds)."""
-
-
-class _StandIn(BaseHTTPRequestHandler):
-    """A stand-in for the Messages API: every model request gets one short text answer."""
-
-    answers: list[str]
-    paths: list[str]
-
-    def log_message(self, *_: Any) -> None:
-        """Quiet."""
-
-    def do_POST(self) -> None:
-        length = int(self.headers.get("Content-Length") or 0)
-        body = json.loads(self.rfile.read(length) or b"{}")
-        path = self.path.split("?", 1)[0]
-        self.paths.append(path)
-        if path.endswith("/count_tokens"):
-            self._json({"input_tokens": 10})
-            return
-        if not path.endswith("/v1/messages"):
-            self._json({"type": "error"}, status=404)
-            return
-        text = f"ok {len(self.answers) + 1}"
-        self.answers.append(text)
-        message = {
-            "id": f"msg_{uuid.uuid4().hex[:12]}",
-            "type": "message",
-            "role": "assistant",
-            "model": body.get("model", "model-small"),
-            "content": [{"type": "text", "text": text}],
-            "stop_reason": "end_turn",
-            "stop_sequence": None,
-            "usage": {"input_tokens": 10, "output_tokens": 2},
-        }
-        if not body.get("stream"):
-            self._json(message)
-            return
-        self.send_response(200)
-        self.send_header("Content-Type", "text/event-stream")
-        self.end_headers()
-        start = {**message, "content": [], "stop_reason": None}
-        events = [
-            ("message_start", {"type": "message_start", "message": start}),
-            (
-                "content_block_start",
-                {
-                    "type": "content_block_start",
-                    "index": 0,
-                    "content_block": {"type": "text", "text": ""},
-                },
-            ),
-            (
-                "content_block_delta",
-                {
-                    "type": "content_block_delta",
-                    "index": 0,
-                    "delta": {"type": "text_delta", "text": text},
-                },
-            ),
-            ("content_block_stop", {"type": "content_block_stop", "index": 0}),
-            (
-                "message_delta",
-                {
-                    "type": "message_delta",
-                    "delta": {"stop_reason": "end_turn", "stop_sequence": None},
-                    "usage": {"output_tokens": 2},
-                },
-            ),
-            ("message_stop", {"type": "message_stop"}),
-        ]
-        for name, data in events:
-            self.wfile.write(f"event: {name}\ndata: {json.dumps(data)}\n\n".encode())
-        self.wfile.flush()
-
-    def do_GET(self) -> None:
-        self.paths.append(self.path.split("?", 1)[0])
-        self._json({}, status=404)
-
-    def do_HEAD(self) -> None:
-        self.paths.append(self.path.split("?", 1)[0])
-        self.send_response(200)
-        self.end_headers()
-
-    def _json(self, value: Any, status: int = 200) -> None:
-        data = json.dumps(value).encode()
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-
-
-@contextmanager
-def stand_in() -> Iterator[tuple[str, type[_StandIn]]]:
-    handler = type("Handler", (_StandIn,), {"answers": [], "paths": []})
-    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{server.server_address[1]}", handler
-    finally:
-        server.shutdown()
-        server.server_close()
-
-
-def _line(text: str) -> tuple[str, bytes]:
-    line_uuid = str(uuid.uuid4())
-    doc = {
-        "type": "user",
-        "uuid": line_uuid,
-        "message": {"role": "user", "content": [{"type": "text", "text": text}]},
-    }
-    return line_uuid, json.dumps(doc).encode() + b"\n"
 
 
 def _until_results(out: Path, count: int) -> list[dict[str, Any]]:
@@ -159,21 +43,6 @@ def _until_results(out: Path, count: int) -> list[dict[str, Any]]:
             return messages
         time.sleep(0.1)
     raise AssertionError(f"no {count} results; stream: {out.read_text()[-2000:]}")
-
-
-def _env(root: Path, url: str) -> dict[str, str]:
-    (root / "config").mkdir()
-    (root / "home").mkdir()
-    return {
-        "HOME": str(root / "home"),
-        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-        "CLAUDE_CONFIG_DIR": str(root / "config"),
-        "ANTHROPIC_BASE_URL": url,
-        "ANTHROPIC_API_KEY": "sk-ant-stand-in-not-a-key",
-        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-        "DISABLE_TELEMETRY": "1",
-        "DISABLE_AUTOUPDATER": "1",
-    }
 
 
 def _argv() -> list[str]:
@@ -230,7 +99,7 @@ def test_named_pipe_directly_as_stdin() -> None:
         root = Path(tmp)
         fifo = root / "launch.stdin"
         os.mkfifo(fifo, 0o600)
-        env = _env(root, url)
+        env = cli_env(root, url)
         read_end = os.open(fifo, os.O_RDONLY | os.O_NONBLOCK)
         keeper_end = os.open(fifo, os.O_WRONLY)
         os.set_blocking(read_end, True)
@@ -246,12 +115,12 @@ def test_named_pipe_directly_as_stdin() -> None:
             )
         os.close(read_end)
         try:
-            first_uuid, first = _line("Reply with one word.")
+            first_uuid, first = user_line("Reply with one word.")
             writer = os.open(fifo, os.O_WRONLY | os.O_NONBLOCK)
             os.write(writer, first)
             os.close(writer)
             _until_results(out, 1)
-            second_uuid, second = _line("Reply with one more word.")
+            second_uuid, second = user_line("Reply with one more word.")
             _write_from_another_process(fifo, second)
             messages = _until_results(out, 2)
             os.close(keeper_end)  # the last write end of the named pipe
@@ -279,11 +148,11 @@ def test_named_pipe_through_the_keeper() -> None:
     with tempfile.TemporaryDirectory() as tmp, stand_in() as (url, handler):
         root = Path(tmp)
         files = LaunchFiles.of(root / "state", "run", 1, 1)
-        initial_uuid, initial = _line("Reply with one word.")
+        initial_uuid, initial = user_line("Reply with one word.")
         out = root / "stream.jsonl"
         spec = {
             "argv": _argv(),
-            "env": _env(root, url),
+            "env": cli_env(root, url),
             "cwd": str(root),
             "stdout": str(out),
             "stderr": str(root / "stderr.log"),
@@ -299,11 +168,11 @@ def test_named_pipe_through_the_keeper() -> None:
             while not files.fed.exists() and time.monotonic() < deadline:
                 time.sleep(0.05)
             _until_results(out, 1)
-            runner_uuid, runner_line = _line("Reply with one more word.")
+            runner_uuid, runner_line = user_line("Reply with one more word.")
             writer = os.open(files.stdin, os.O_WRONLY | os.O_NONBLOCK)  # the runner's end
             os.write(writer, runner_line)
             _until_results(out, 2)
-            adopter_uuid, adopter_line = _line("And one last word.")
+            adopter_uuid, adopter_line = user_line("And one last word.")
             _write_from_another_process(files.stdin, adopter_line)  # an adopting runner
             messages = _until_results(out, 3)
             os.close(writer)

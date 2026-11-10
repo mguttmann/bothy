@@ -10,7 +10,11 @@ dpop_key_ref = ""
 consumer = "default"
 tool_class = "chat"
 scoped_allowed_tools = []
-default_model = "model-large"
+# A model the API serves; the CLI's notation with a selector such as [1m] is allowed. The runner
+# does not check the name: the API refuses an unknown one, and Claude Code then fails the turn
+# or, with a fallback model in the Claude Code settings the turn loads, answers it with that
+# model without a sign in the thread.
+default_model = "claude-fable-5-2[1m]"
 anthropic_api_key_ref = ""
 allow_personal = false
 forward_ssh_agent = false
