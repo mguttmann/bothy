@@ -2369,6 +2369,19 @@ final class FakeWorld {
   /// [authorId] as its author and appends `message.created` (03: the author of
   /// `thread.reopened` is the person whose message reopened the thread).
   void _systemLine(String threadId, String code, String authorId) {
+    _systemMessage(threadId, authorId, kind: 'system', systemCode: code);
+  }
+
+  /// Writes a silent message with `origin = system` and [kind] into [threadId] as [authorId],
+  /// appends `message.created` and returns the message. Like every message it raises the
+  /// version of its thread, and no thread event says so (03 6.2).
+  JsonMap _systemMessage(
+    String threadId,
+    String authorId, {
+    required String kind,
+    String? systemCode,
+    String text = '',
+  }) {
     final thread = threads[threadId]!;
     final seq = (thread['last_message_seq']! as int) + 1;
     final id = nextId();
@@ -2380,9 +2393,9 @@ final class FakeWorld {
       'author': people[authorId]!.ref,
       'client_msg_id': nextId(),
       'origin': 'system',
-      'kind': 'system',
-      'system_code': code,
-      'content_md': '',
+      'kind': kind,
+      'system_code': ?systemCode,
+      'content_md': text,
       'content_format': 1,
       'silent': true,
       'attachments': <Object?>[],
@@ -2405,6 +2418,7 @@ final class FakeWorld {
       scope: _scopeOf(threadId),
       payload: {'message': message},
     );
+    return message;
   }
 
   /// Opens the closed [threadId] again and appends `thread.reopened` (01 6.1: a new message
