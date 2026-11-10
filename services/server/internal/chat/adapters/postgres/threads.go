@@ -100,7 +100,7 @@ func (r *Repository) SaveThread(ctx context.Context, th domain.Thread) error {
 	err = q.SaveThread(ctx, sqlcgen.SaveThreadParams{
 		ID: uuid(th.ID), Title: th.Title, TitleSource: string(th.TitleSource), State: string(th.State),
 		ClosedAt: optionalTime(th.ClosedAt), ClosedBy: optionalUUID(th.ClosedBy), OperatorAgentID: optionalUUID(th.OperatorAgentID),
-		Version: th.Version,
+		Version: th.Version, TitleVersion: th.TitleVersion,
 	})
 	return mapError(err, "updating a thread")
 }
@@ -300,6 +300,7 @@ type threadRow struct {
 	DeletedAt       pgtype.Timestamptz
 	DeletedBy       pgtype.UUID
 	PurgedAt        pgtype.Timestamptz
+	TitleVersion    int64
 }
 
 // oneThread converts the result of a single-thread query; no rows is found false.
@@ -321,7 +322,7 @@ func toThread(row threadRow) domain.Thread {
 		ClosedAt: timeOf(row.ClosedAt), ClosedBy: idOf(row.ClosedBy), OperatorAgentID: idOf(row.OperatorAgentID),
 		LastMessageSeq: row.LastMessageSeq, UnreadFloorSeq: row.UnreadFloorSeq, MessageCount: int(row.MessageCount),
 		CreatedBy: idOf(row.CreatedBy), CreatedAt: timeOf(row.CreatedAt), LastActivityAt: timeOf(row.LastActivityAt),
-		MovedAt: timeOf(row.MovedAt), Version: row.Version,
+		MovedAt: timeOf(row.MovedAt), Version: row.Version, TitleVersion: row.TitleVersion,
 		Deletion: domain.Deletion{At: timeOf(row.DeletedAt), By: idOf(row.DeletedBy), PurgedAt: timeOf(row.PurgedAt)},
 	}
 }

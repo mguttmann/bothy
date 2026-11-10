@@ -728,6 +728,7 @@ security chapter). The cache is only a copy; the truth lies on the server. Entri
 | Editing a sent message | `PATCH` with `If-Match` (version). If the version does not match: `412 version_conflict` with the current revision (RFC 9110). The client shows both revisions; the person decides. No automatic merge. |
 | Editing a message that has been deleted in the meantime | `410 message_deleted`; the entry is discarded, the text stays available for copying |
 | Deleting a sent message | `DELETE` is idempotent; an already deleted message yields `204` |
+| Changing the title of a thread | `PUT` with `If-Match` (the version of the thread the client holds). Messages since the client's last thread object raise the version without a thread event; the server accepts every version since the last title change ([06](06-api.md) section 8 item 2). An older version means another title change came in between: `412 version_conflict` with the current thread; the entry fails, and sending it again names the version of `current`. |
 | Thread marked done in the meantime | sending reopens it (baseline); no conflict |
 | Thread moved | the ID stays the same; sending works without a change |
 

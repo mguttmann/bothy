@@ -322,9 +322,10 @@ type Threads interface {
 	// 05 section 2.6). Errors: not_found for an unknown thread.
 	View(ctx context.Context, threadID ids.ID) (Thread, error)
 	// SetTitle sets the title (thread.title.update): a person sets the source manual, the operator
-	// agent keeps it auto and gets title_manual for a manual title (09 section 12). Errors:
-	// precondition_required, version_conflict with current, validation_failed on /title,
-	// title_manual.
+	// agent keeps it auto and gets title_manual for a manual title (09 section 12). If-Match names
+	// a version of the thread since its last title change (06 section 8 point 2). Errors:
+	// precondition_required, version_conflict with current for an older or unknown version,
+	// validation_failed on /title, title_manual.
 	SetTitle(ctx context.Context, a actor.Actor, cmd SetTitleCmd) (Thread, error)
 	// Close marks the thread done (thread.close); a closed thread answers without change. Errors:
 	// invalid_state_transition for a main thread.

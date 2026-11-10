@@ -79,6 +79,39 @@ func TestThreadStateTransitions(t *testing.T) {
 	}
 }
 
+// TestThreadTitleVersion (FIX-TITLE-EDIT-412, 06 section 8 point 2): a title change makes the new
+// version the title version; a change of the state or the operator and an unchanged title leave it.
+// An edit is based on the current title from the title version up to the version, not before and
+// not after.
+func TestThreadTitleVersion(t *testing.T) {
+	t.Parallel()
+	at, by := time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC), ids.New()
+	th := domain.Thread{ID: ids.New(), Kind: domain.ThreadKindThread, State: domain.ThreadOpen, TitleSource: domain.TitleAuto,
+		Version: 1, TitleVersion: 1}
+	if _, err := th.Close(by, at); err != nil || !th.Reopen() || !th.RepinOperator(ids.New()) {
+		t.Fatalf("changes without the title: %v %+v", err, th)
+	}
+	if th.Version != 4 || th.TitleVersion != 1 {
+		t.Fatalf("after changes without the title: %+v", th)
+	}
+	if !th.SetTitle("Export", domain.TitleManual) || th.Version != 5 || th.TitleVersion != 5 {
+		t.Fatalf("title change: %+v", th)
+	}
+	if th.SetTitle("Export", domain.TitleManual) || th.Version != 5 || th.TitleVersion != 5 {
+		t.Fatalf("unchanged title: %+v", th)
+	}
+	// Three messages later (03 section 6.2: every message raises the version).
+	th.Version += 3
+	for version, want := range map[int64]bool{4: false, 5: true, 7: true, 8: true, 9: false, 0: false} {
+		if got := th.TitleBasedOn(version); got != want {
+			t.Errorf("based on %d with %+v: %v, want %v", version, th, got, want)
+		}
+	}
+	if main := domain.NewMainThread(ids.New(), ids.New(), by, at); main.TitleVersion != 1 {
+		t.Fatalf("main thread %+v", main)
+	}
+}
+
 // TestTagDiff_RestrictedFlag: the diff names added and removed tags; the restricted flag is set
 // exactly when an added or removed tag is restricted, never for a kept one.
 func TestTagDiff_RestrictedFlag(t *testing.T) {

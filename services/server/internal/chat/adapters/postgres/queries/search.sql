@@ -114,6 +114,6 @@ WHERE t.channel_id = ANY(@channel_ids::uuid[]) AND t.id = ANY(@thread_ids::uuid[
 -- The threads of the hits for HitThreads, the columns of GetThread, in the visible channels.
 SELECT t.id, t.channel_id, t.kind, t.parent_message_id, t.title, t.title_source, t.state, t.closed_at, t.closed_by,
     t.operator_agent_id, t.last_message_seq, t.unread_floor_seq, t.last_activity_at, t.message_count, t.created_by, t.created_at,
-    t.moved_at, t.version, t.deleted_at, t.deleted_by, t.purged_at
+    t.moved_at, t.version, t.deleted_at, t.deleted_by, t.purged_at, t.title_version
 FROM threads t
 WHERE t.channel_id = ANY(@channel_ids::uuid[]) AND t.id = ANY(@thread_ids::uuid[]) AND t.deleted_at IS NULL;

@@ -43,7 +43,8 @@ migration comes with that milestone, the contract already applies now.
 10. **Optimistic locking.** Mutable, synchronized objects have `version bigint`. Every
     change increments it by one. Writing requests carry the expected version as the HTTP
     precondition `If-Match`; if it does not match, the server answers `412 version_conflict`
-    (RFC 9110, [06-api.md](06-api.md)).
+    (RFC 9110, [06-api.md](06-api.md)). For the title of a thread the expected version matches
+    from the last title change on (R-DM-61).
 11. **Isolation level.** Writing transactions run in `READ COMMITTED`. The
     counter patterns from section 6 assume this.
 12. **Access.** Only the module that owns a table writes it. Other modules read through
@@ -1191,7 +1192,8 @@ Purpose: unit of conversation and of agent session with a fixed ID. Module: `cha
 | `created_by` | `uuid` | no | | |
 | `created_at` | `timestamptz` | no | `now()` | on import from the source |
 | `moved_at` | `timestamptz` | yes | | last move |
-| `version` | `bigint` | no | `1` | |
+| `version` | `bigint` | no | `1` | every message raises it too (section 6.2) |
+| `title_version` | `bigint` | no | `1` | the value of `version` at the last change of `title` or `title_source`; `setThreadTitle` accepts an `If-Match` from it on (R-DM-61, addendum of 2026-11-10) |
 | `search_language` | `regconfig` | no | `'simple'` | text search configuration from the creator's language; for the choice see [14-search.md](14-search.md) |
 | `title_search` | `tsvector` | no | generated | see section 5 |
 | `deleted_at` | `timestamptz` | yes | | set by `thread.delete`, cleared by `thread.restore` within `chat.delete_undo_window`; never on a main thread (R-DM-57, addendum of 2026-11-01) |
@@ -2778,6 +2780,11 @@ message_count = message_count + 1, version = version + 1 WHERE id = $1 RETURNING
 last_message_seq`. The row lock on the thread orders all messages of a thread
 strictly. A rolled-back transaction also gives back the number; no gaps arise.
 
+The message is announced by `message.created`; no thread event follows, so the new `version`
+of the thread reaches no client through the event stream. A client that follows the stream
+holds the version of the last thread object it received, which is older than the stored one
+in every thread with a message since then. `title_version` stays as it is (R-DM-61).
+
 ### 6.3 Lock order
 
 Every write transaction takes its locks in this order; otherwise deadlocks can occur:
@@ -2961,6 +2968,7 @@ section 4 applies, and the gate fails.
 | R-DM-58 | `agents.hosted_by` names the Claude Code runner that hosts a built-in agent; it is set exactly when `adapter_kind = 'claude_agent'` (addendum of 2026-11-06, [26-builtin-agents.md](26-builtin-agents.md) 3.1). | The server needs to know which runner may fetch the agent's token and definition; tying the column to the adapter kind keeps every existing agent unchanged (NULL) and makes a hosted agent without a host impossible. |
 | R-DM-59 | Definitions of built-in agents are rows of `agent_definitions`, one per version, never updated; the highest version is the current one (addendum of 2026-11-06, 26 4.1). | Audit and undo need the older versions; `operator_config` stays closed and small (09 2.2), and an insert-only table needs no lock beyond the agent row. |
 | R-DM-60 | A wake-up is a row of `run_wakes` with the person of its source run; a fired wake-up creates a run with `trigger_kind = 'wake'` and `triggering_wake_id`, and the counts of autonomous inputs are rows of `run_autonomy` per thread and person (addendum of 2026-11-06, 09 5.8). | Only the server can start a run and apply the trigger and billing rules at fire time; a count per thread and person keeps another person's message from extending an owner's chain. |
+| R-DM-61 | `threads.title_version` is the value of `version` at the last change of `title` or `title_source` (1 for a new thread and for every thread from before the column); every statement that writes `title` writes it. The precondition of `setThreadTitle` holds for an `If-Match` from `title_version` up to `version` ([06-api.md](06-api.md) section 8 item 2, addendum of 2026-11-10). | Every message raises `version` (section 6.2) without a thread event, so in an active thread no client holds the current version, and an exact match refused the first title edit of every such thread. What the precondition protects is the title: an edit based on a version from `title_version` on saw the current title, an older one did not and still gets `412`. |
 
 ## 9. Configuration values of this chapter
 

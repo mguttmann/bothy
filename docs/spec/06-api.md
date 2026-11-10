@@ -481,6 +481,13 @@ all texts of the YAML files (R-API-15); every response component names its statu
    agents, backend policy, credential holder, templates, components, commands, branding and
    "mark as unread". If `If-Match` is missing: `428 precondition_required`. If it does not match:
    `412 version_conflict` with the current version in `current`.
+   For a thread title the header matches when it names a version the thread had since its
+   title or title source last changed (`threads.title_version` in 03): every message raises
+   the version of its thread without a thread event (03, section 6.2), so a client that follows
+   the event stream holds an older version of an active thread than the server stores, and its
+   edit is still based on the current title. A version from before the last title change, a
+   version the thread never had and a malformed header are `412 version_conflict` as before
+   (R-API-32).
    Branding here means name and accent (`updateBranding`). The logo is replaced or removed as a
    whole with `uploadBrandingLogo` and `deleteBrandingLogo` without `If-Match`: last write wins,
    and the lock on the setting row `branding.logo_file_id` serializes concurrent writes. Every
@@ -1441,6 +1448,7 @@ former block "proposed" in docs/api/redocly.yaml is empty and is dropped.
 | R-API-29 | The operations of built-in agents ([26-builtin-agents.md](26-builtin-agents.md) 9) follow the conventions of this chapter: `issueHostedAgentToken` returns a one-time secret (section 7, repetition `409 conflict` with `one_time_secret`), `putAgentDefinition` uses `If-Match` of the definition version (section 8), and `interviewAgent` waits up to `agents.interview.timeout` under its own deadline, `agents.interview.timeout` plus `http.request_timeout`, instead of `http.request_timeout` (02 14.2) (addendum of 2026-11-06; deadline sum of A1-07). | A token must never be stored for a replay; a definition is edited from several devices; a whole draft from a model takes longer than a normal request. |
 | R-API-30 | The operations of wake-ups ([09-agents.md](09-agents.md) 5.8.2) follow the conventions of this chapter: `run.wake.create` and `run.wake.recover` take an `Idempotency-Key` (section 7), a fresh one per call; a `usage_limit` request carries the outage number in its body, and a call with the outage number of a pending wake-up of that run updates its `not_before` instead of adding one (a later `resetsAt`), so it is no `422 idempotency_key_reuse`; a refusal is `409 conflict` with the reason of 09 5.8 (for example `wake_max_pending`, `autonomous_not_allowed`, `pr_checks_owner_only`), a wrong field `400 validation_failed`; `run.wake.read` pages like every list (section 6) (addendum of 2026-11-06). | One API style for all operations; a retried create after a lost answer must not add a second wake-up. |
 | R-API-31 | `putMySidebarChannel` also archives a channel in the caller's own sidebar and restores it (`hidden: true` or `false`, the state `hidden_at`, [01-product.md](01-product.md) 6.22): every member of `SidebarChannelPut` is optional and an absent one keeps the stored value, a body with no member is `400 validation_failed`, and a write that changes nothing (archiving an archived channel, restoring a shown one, the same order) answers `200` with the stored state, without a new version and without `sidebar_channel.updated`; the same 404 for an unknown and an unreadable channel as before (addendum of 2026-11-08, PROJ-ARCHIVE). | The personal archive is a sidebar state like the order of the posts, so it uses the same write, right and event, and a repeated tap or a retried write must not move the archive time or wake every device. |
+| R-API-32 | `setThreadTitle` accepts an `If-Match` that names any version of the thread since its last title change, not only the newest (section 8 item 2; 03 R-DM-61). The other operations with `If-Match` keep the exact match. | A message raises the thread version without a thread event, so the exact match refused every first title edit in an active chat (`412`, then success with the version of `current`). Each of the other versioned objects announces every version with an event that carries the object, so a client that is caught up holds the newest one. |
 
 ## 20. Configuration values of this chapter
 

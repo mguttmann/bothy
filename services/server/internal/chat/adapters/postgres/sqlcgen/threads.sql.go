@@ -15,19 +15,19 @@ const activeThreads = `-- name: ActiveThreads :many
 WITH pinned AS (
     SELECT p.id, p.channel_id, p.kind, p.parent_message_id, p.title, p.title_source, p.state, p.closed_at, p.closed_by,
         p.operator_agent_id, p.last_message_seq, p.unread_floor_seq, p.last_activity_at, p.message_count, p.created_by,
-        p.created_at, p.moved_at, p.version, p.deleted_at, p.deleted_by, p.purged_at
+        p.created_at, p.moved_at, p.version, p.deleted_at, p.deleted_by, p.purged_at, p.title_version
     FROM threads p
     WHERE p.id = ANY ($2::uuid[]) AND p.channel_id = ANY ($1::uuid[])
       AND p.kind = 'thread' AND p.state = 'open' AND p.deleted_at IS NULL
 ), recent AS (
     SELECT r.id, r.channel_id, r.kind, r.parent_message_id, r.title, r.title_source, r.state, r.closed_at, r.closed_by,
         r.operator_agent_id, r.last_message_seq, r.unread_floor_seq, r.last_activity_at, r.message_count, r.created_by,
-        r.created_at, r.moved_at, r.version, r.deleted_at, r.deleted_by, r.purged_at
+        r.created_at, r.moved_at, r.version, r.deleted_at, r.deleted_by, r.purged_at, r.title_version
     FROM unnest($1::uuid[]) AS ch(id)
     CROSS JOIN LATERAL (
         SELECT w.id, w.channel_id, w.kind, w.parent_message_id, w.title, w.title_source, w.state, w.closed_at, w.closed_by,
             w.operator_agent_id, w.last_message_seq, w.unread_floor_seq, w.last_activity_at, w.message_count, w.created_by,
-            w.created_at, w.moved_at, w.version, w.deleted_at, w.deleted_by, w.purged_at
+            w.created_at, w.moved_at, w.version, w.deleted_at, w.deleted_by, w.purged_at, w.title_version
         FROM threads w
         WHERE w.channel_id = ch.id AND w.state = 'open' AND w.kind = 'thread' AND w.deleted_at IS NULL
           AND w.last_activity_at >= $3::timestamptz
@@ -38,16 +38,16 @@ WITH pinned AS (
 )
 SELECT t.id, t.channel_id, t.kind, t.parent_message_id, t.title, t.title_source, t.state, t.closed_at, t.closed_by,
     t.operator_agent_id, t.last_message_seq, t.unread_floor_seq, t.last_activity_at, t.message_count, t.created_by, t.created_at,
-    t.moved_at, t.version, t.deleted_at, t.deleted_by, t.purged_at
+    t.moved_at, t.version, t.deleted_at, t.deleted_by, t.purged_at, t.title_version
 FROM (
     SELECT pinned.id, pinned.channel_id, pinned.kind, pinned.parent_message_id, pinned.title, pinned.title_source, pinned.state,
         pinned.closed_at, pinned.closed_by, pinned.operator_agent_id, pinned.last_message_seq, pinned.unread_floor_seq,
-        pinned.last_activity_at, pinned.message_count, pinned.created_by, pinned.created_at, pinned.moved_at, pinned.version, pinned.deleted_at, pinned.deleted_by, pinned.purged_at
+        pinned.last_activity_at, pinned.message_count, pinned.created_by, pinned.created_at, pinned.moved_at, pinned.version, pinned.deleted_at, pinned.deleted_by, pinned.purged_at, pinned.title_version
     FROM pinned
     UNION ALL
     SELECT recent.id, recent.channel_id, recent.kind, recent.parent_message_id, recent.title, recent.title_source, recent.state,
         recent.closed_at, recent.closed_by, recent.operator_agent_id, recent.last_message_seq, recent.unread_floor_seq,
-        recent.last_activity_at, recent.message_count, recent.created_by, recent.created_at, recent.moved_at, recent.version, recent.deleted_at, recent.deleted_by, recent.purged_at
+        recent.last_activity_at, recent.message_count, recent.created_by, recent.created_at, recent.moved_at, recent.version, recent.deleted_at, recent.deleted_by, recent.purged_at, recent.title_version
     FROM recent
 ) AS t
 ORDER BY array_position($1::uuid[], t.channel_id), t.last_activity_at DESC, t.id DESC
@@ -82,6 +82,7 @@ type ActiveThreadsRow struct {
 	DeletedAt       pgtype.Timestamptz
 	DeletedBy       pgtype.UUID
 	PurgedAt        pgtype.Timestamptz
+	TitleVersion    int64
 }
 
 // The active threads of the snapshot of sync (M2-52, 04 section 6.3 item 4, R-SY-28) in one
@@ -129,6 +130,7 @@ func (q *Queries) ActiveThreads(ctx context.Context, arg ActiveThreadsParams) ([
 			&i.DeletedAt,
 			&i.DeletedBy,
 			&i.PurgedAt,
+			&i.TitleVersion,
 		); err != nil {
 			return nil, err
 		}
@@ -149,7 +151,7 @@ SET last_message_seq = last_message_seq + 1, last_activity_at = $1, message_coun
     closed_by = CASE WHEN $2::boolean THEN NULL ELSE closed_by END
 WHERE id = $3
 RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
-    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at, title_version
 `
 
 type AppendToThreadParams struct {
@@ -180,6 +182,7 @@ type AppendToThreadRow struct {
 	DeletedAt       pgtype.Timestamptz
 	DeletedBy       pgtype.UUID
 	PurgedAt        pgtype.Timestamptz
+	TitleVersion    int64
 }
 
 // The thread sequence (03 section 6.2): the caller holds the row lock; a rolled back transaction
@@ -209,6 +212,7 @@ func (q *Queries) AppendToThread(ctx context.Context, arg AppendToThreadParams) 
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PurgedAt,
+		&i.TitleVersion,
 	)
 	return i, err
 }
@@ -231,7 +235,7 @@ func (q *Queries) DecrementMessageCount(ctx context.Context, id pgtype.UUID) (in
 const getThread = `-- name: GetThread :one
 
 SELECT id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
-    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at, title_version
 FROM threads WHERE id = $1
 `
 
@@ -257,6 +261,7 @@ type GetThreadRow struct {
 	DeletedAt       pgtype.Timestamptz
 	DeletedBy       pgtype.UUID
 	PurgedAt        pgtype.Timestamptz
+	TitleVersion    int64
 }
 
 // SPDX-License-Identifier: Apache-2.0
@@ -293,13 +298,14 @@ func (q *Queries) GetThread(ctx context.Context, id pgtype.UUID) (GetThreadRow, 
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PurgedAt,
+		&i.TitleVersion,
 	)
 	return i, err
 }
 
 const getThreadByParentMessage = `-- name: GetThreadByParentMessage :one
 SELECT id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
-    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at, title_version
 FROM threads WHERE parent_message_id = $1
 `
 
@@ -325,6 +331,7 @@ type GetThreadByParentMessageRow struct {
 	DeletedAt       pgtype.Timestamptz
 	DeletedBy       pgtype.UUID
 	PurgedAt        pgtype.Timestamptz
+	TitleVersion    int64
 }
 
 // The thread that started from a message of a main thread (03 threads: parent_message_id is unique;
@@ -354,6 +361,7 @@ func (q *Queries) GetThreadByParentMessage(ctx context.Context, parentMessageID 
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PurgedAt,
+		&i.TitleVersion,
 	)
 	return i, err
 }
@@ -364,7 +372,7 @@ INSERT INTO threads (id, channel_id, kind, parent_message_id, title, title_sourc
 VALUES ($1, $2, 'thread', $3, $4, $5, $6, $7,
     $8, $8, $9::text::regconfig)
 RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
-    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at, title_version
 `
 
 type InsertThreadParams struct {
@@ -401,6 +409,7 @@ type InsertThreadRow struct {
 	DeletedAt       pgtype.Timestamptz
 	DeletedBy       pgtype.UUID
 	PurgedAt        pgtype.Timestamptz
+	TitleVersion    int64
 }
 
 // search_language goes in as text and is cast here, so pgx needs no codec for regconfig.
@@ -439,6 +448,7 @@ func (q *Queries) InsertThread(ctx context.Context, arg InsertThreadParams) (Ins
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PurgedAt,
+		&i.TitleVersion,
 	)
 	return i, err
 }
@@ -446,7 +456,7 @@ func (q *Queries) InsertThread(ctx context.Context, arg InsertThreadParams) (Ins
 const listThreadsByActivity = `-- name: ListThreadsByActivity :many
 SELECT t.id, t.channel_id, t.kind, t.parent_message_id, t.title, t.title_source, t.state, t.closed_at, t.closed_by,
     t.operator_agent_id, t.last_message_seq, t.unread_floor_seq, t.last_activity_at, t.message_count, t.created_by, t.created_at,
-    t.moved_at, t.version, t.deleted_at, t.deleted_by, t.purged_at
+    t.moved_at, t.version, t.deleted_at, t.deleted_by, t.purged_at, t.title_version
 FROM threads t
 WHERE t.channel_id = $1 AND t.kind = 'thread' AND t.deleted_at IS NULL
   AND ($2::text IS NULL OR t.state = $2::text)
@@ -489,6 +499,7 @@ type ListThreadsByActivityRow struct {
 	DeletedAt       pgtype.Timestamptz
 	DeletedBy       pgtype.UUID
 	PurgedAt        pgtype.Timestamptz
+	TitleVersion    int64
 }
 
 // listChannelThreads sorted by last_activity (brief D6): the threads of kind thread of a
@@ -532,6 +543,7 @@ func (q *Queries) ListThreadsByActivity(ctx context.Context, arg ListThreadsByAc
 			&i.DeletedAt,
 			&i.DeletedBy,
 			&i.PurgedAt,
+			&i.TitleVersion,
 		); err != nil {
 			return nil, err
 		}
@@ -546,7 +558,7 @@ func (q *Queries) ListThreadsByActivity(ctx context.Context, arg ListThreadsByAc
 const listThreadsByCreated = `-- name: ListThreadsByCreated :many
 SELECT t.id, t.channel_id, t.kind, t.parent_message_id, t.title, t.title_source, t.state, t.closed_at, t.closed_by,
     t.operator_agent_id, t.last_message_seq, t.unread_floor_seq, t.last_activity_at, t.message_count, t.created_by, t.created_at,
-    t.moved_at, t.version, t.deleted_at, t.deleted_by, t.purged_at
+    t.moved_at, t.version, t.deleted_at, t.deleted_by, t.purged_at, t.title_version
 FROM threads t
 WHERE t.channel_id = $1 AND t.kind = 'thread' AND t.deleted_at IS NULL
   AND ($2::text IS NULL OR t.state = $2::text)
@@ -589,6 +601,7 @@ type ListThreadsByCreatedRow struct {
 	DeletedAt       pgtype.Timestamptz
 	DeletedBy       pgtype.UUID
 	PurgedAt        pgtype.Timestamptz
+	TitleVersion    int64
 }
 
 // listChannelThreads sorted by created: keyset (created_at DESC, id DESC).
@@ -631,6 +644,7 @@ func (q *Queries) ListThreadsByCreated(ctx context.Context, arg ListThreadsByCre
 			&i.DeletedAt,
 			&i.DeletedBy,
 			&i.PurgedAt,
+			&i.TitleVersion,
 		); err != nil {
 			return nil, err
 		}
@@ -706,7 +720,7 @@ func (q *Queries) LocateThreads(ctx context.Context, threadIds []pgtype.UUID) ([
 
 const lockThread = `-- name: LockThread :one
 SELECT id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
-    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at, title_version
 FROM threads WHERE id = $1 FOR UPDATE
 `
 
@@ -732,6 +746,7 @@ type LockThreadRow struct {
 	DeletedAt       pgtype.Timestamptz
 	DeletedBy       pgtype.UUID
 	PurgedAt        pgtype.Timestamptz
+	TitleVersion    int64
 }
 
 // The thread locked for a change (03 section 6.3: domain rows before event_seq).
@@ -760,6 +775,7 @@ func (q *Queries) LockThread(ctx context.Context, id pgtype.UUID) (LockThreadRow
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PurgedAt,
+		&i.TitleVersion,
 	)
 	return i, err
 }
@@ -767,8 +783,9 @@ func (q *Queries) LockThread(ctx context.Context, id pgtype.UUID) (LockThreadRow
 const saveThread = `-- name: SaveThread :exec
 UPDATE threads
 SET title = $1, title_source = $2, state = $3, closed_at = $4,
-    closed_by = $5, operator_agent_id = $6, version = $7
-WHERE id = $8
+    closed_by = $5, operator_agent_id = $6, version = $7,
+    title_version = $8
+WHERE id = $9
 `
 
 type SaveThreadParams struct {
@@ -779,11 +796,14 @@ type SaveThreadParams struct {
 	ClosedBy        pgtype.UUID
 	OperatorAgentID pgtype.UUID
 	Version         int64
+	TitleVersion    int64
 	ID              pgtype.UUID
 }
 
 // Writes the columns of thread.title.update, thread.close and thread.reopen, the fixed operator
-// (retriggerMessage, F-PROJEKT-BEREIT) and the version.
+// (retriggerMessage, F-PROJEKT-BEREIT), the version and title_version, the version of the last
+// title change (FIX-TITLE-EDIT-412; TestTitleWritesSetTitleVersion holds it for every statement
+// that writes title).
 func (q *Queries) SaveThread(ctx context.Context, arg SaveThreadParams) error {
 	_, err := q.db.Exec(ctx, saveThread,
 		arg.Title,
@@ -793,6 +813,7 @@ func (q *Queries) SaveThread(ctx context.Context, arg SaveThreadParams) error {
 		arg.ClosedBy,
 		arg.OperatorAgentID,
 		arg.Version,
+		arg.TitleVersion,
 		arg.ID,
 	)
 	return err
@@ -822,7 +843,7 @@ func (q *Queries) SaveThreadDeletion(ctx context.Context, arg SaveThreadDeletion
 
 const shareThread = `-- name: ShareThread :one
 SELECT id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
-    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version, deleted_at, deleted_by, purged_at, title_version
 FROM threads WHERE id = $1 FOR SHARE
 `
 
@@ -848,6 +869,7 @@ type ShareThreadRow struct {
 	DeletedAt       pgtype.Timestamptz
 	DeletedBy       pgtype.UUID
 	PurgedAt        pgtype.Timestamptz
+	TitleVersion    int64
 }
 
 // The thread held against a concurrent move while sync copies its channel (M1-61).
@@ -876,6 +898,7 @@ func (q *Queries) ShareThread(ctx context.Context, id pgtype.UUID) (ShareThreadR
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PurgedAt,
+		&i.TitleVersion,
 	)
 	return i, err
 }

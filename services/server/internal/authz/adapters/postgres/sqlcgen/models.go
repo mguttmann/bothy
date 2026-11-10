@@ -1190,6 +1190,7 @@ type Thread struct {
 	DeletedAt       pgtype.Timestamptz
 	DeletedBy       pgtype.UUID
 	PurgedAt        pgtype.Timestamptz
+	TitleVersion    int64
 }
 
 type ThreadTag struct {

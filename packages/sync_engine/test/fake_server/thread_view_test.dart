@@ -117,6 +117,46 @@ void main() {
     expect(h.server.violations, isEmpty);
   });
 
+  test('a title edit names a version since the last title change', () async {
+    // FIX-TITLE-EDIT-412 (06 8 item 2): the server raises the version of a thread with every
+    // message (03 6.2) and writes no thread event, so a client in an active chat holds an older
+    // version than the stored one.
+    final threads = alex.api.getThreadsApi();
+    final thread = h.seed.releaseNotes;
+    Future<Thread> title(String text, int version) async =>
+        (await threads.setThreadTitle(
+          threadId: thread,
+          ifMatch: '"$version"',
+          threadTitlePut: ThreadTitlePut((b) => b..title = text),
+        )).data!;
+    final held = world.threads[thread]!['version']! as int;
+    final logged = world.log.length;
+    h.seed.post(h.seed.sam, thread, 'one');
+    h.seed.post(h.seed.robin, thread, 'two');
+    expect(world.threads[thread]!['version'], held + 2);
+    expect(
+      world.log.skip(logged).where((e) => e.type.startsWith('thread.')),
+      isEmpty,
+    );
+
+    final titled = await title('Release plan', held);
+    expect(titled.title, 'Release plan');
+    expect(titled.version, held + 3);
+
+    h.seed.post(h.seed.sam, thread, 'three');
+    // Based on the title from before the change, or on a version the thread never had.
+    expect(await status(title('Mine', held)), 412);
+    expect(await status(title('Mine', titled.version - 1)), 412);
+    expect(await status(title('Mine', titled.version + 2)), 412);
+    expect(world.threads[thread]!['title'], 'Release plan');
+    // The version of the title change, one message behind, still names the current title.
+    expect(
+      (await title('Release plan 2', titled.version)).title,
+      'Release plan 2',
+    );
+    expect(h.server.violations, isEmpty);
+  });
+
   test('move only to a channel with the same operator', () async {
     final threads = alex.api.getThreadsApi();
     final other = world.addChannel(h.seed.space, 'ops', {

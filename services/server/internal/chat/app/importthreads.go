@@ -94,7 +94,7 @@ func (p ImportThreadsPort) Create(ctx context.Context, t chat.ImportedThread) (i
 	th := domain.Thread{
 		ID: ids.New(), ChannelID: c.Channel.ID, Kind: domain.ThreadKindThread, State: domain.ThreadOpen, Title: title,
 		TitleSource: domain.TitleManual, OperatorAgentID: t.OperatorAgentID, CreatedBy: a.ID, CreatedAt: t.CreatedAt,
-		LastActivityAt: t.LastActivityAt, Version: 1,
+		LastActivityAt: t.LastActivityAt, Version: 1, TitleVersion: 1,
 	}
 	if s.placeholders.IsPlaceholder(title) {
 		th.TitleSource = domain.TitleAuto

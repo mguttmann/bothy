@@ -343,15 +343,17 @@ func (s *Service) Reopen(ctx context.Context, a actor.Actor, threadID ids.ID) (c
 }
 
 // SetTitle implements chat.Threads (brief D4): thread.title.update decides who may call; If-Match
-// is required; a main thread has no title. Then package title decides the source on the locked
-// row (M2-18): the thread's operator agent keeps auto and gets 409 title_manual on a manual title
-// (09 section 12, AG-19); every other principal sets manual (05 thread.title.update). An automatic
-// title (cmd.Auto) only fills a thread without a meaningful title and otherwise changes nothing,
-// so a title an agent or a person set on purpose stays (09 section 12 point 5).
+// is required and holds for every version of the thread from its last title change on, because
+// the messages since then raised the version without a thread event (03 section 6.2, 06 section 8
+// point 2, FIX-TITLE-EDIT-412); a main thread has no title. Then package title decides the source
+// on the locked row (M2-18): the thread's operator agent keeps auto and gets 409 title_manual on a
+// manual title (09 section 12, AG-19); every other principal sets manual (05 thread.title.update).
+// An automatic title (cmd.Auto) only fills a thread without a meaningful title and otherwise
+// changes nothing, so a title an agent or a person set on purpose stays (09 section 12 point 5).
 func (s *Service) SetTitle(ctx context.Context, a actor.Actor, cmd chat.SetTitleCmd) (chat.Thread, error) {
 	return s.threadUnit(ctx, a, authorize.ActionThreadTitleUpdate, cmd.ThreadID, authorize.EventThreadUpdated,
 		func(ctx context.Context, th *domain.Thread, _ ChannelRow) (bool, error) {
-			if err := s.threadPrecondition(ctx, cmd.IfMatch, *th, true); err != nil {
+			if err := s.threadPrecondition(ctx, cmd.IfMatch, *th, true, th.TitleBasedOn); err != nil {
 				return false, err
 			}
 			if th.Main() {
@@ -385,13 +387,15 @@ func titleBy(a actor.Actor, th domain.Thread) title.By {
 }
 
 // threadPrecondition checks If-Match against the locked thread (06 section 8): without the header
-// it is 428 when required and passes when optional (point 3), a stale or malformed one is 412
-// version_conflict with the current thread.
-func (s *Service) threadPrecondition(ctx context.Context, p chat.Precondition, th domain.Thread, required bool) error {
+// it is 428 when required and passes when optional (point 3), a malformed one and a version that
+// current refuses are 412 version_conflict with the current thread. current reports whether a
+// version still counts as the current one for the change.
+func (s *Service) threadPrecondition(ctx context.Context, p chat.Precondition, th domain.Thread, required bool,
+	current func(version int64) bool) error {
 	switch {
 	case !p.Present && required:
 		return errs.PreconditionRequired()
-	case !p.Present || (p.Valid && p.Version == th.Version):
+	case !p.Present || (p.Valid && current(p.Version)):
 		return nil
 	}
 	v, err := s.threadView(ctx, th)
@@ -414,7 +418,7 @@ func (s *Service) SetTags(ctx context.Context, a actor.Actor, cmd chat.SetTagsCm
 
 // setTags is the change of SetTags on the locked thread th of channel c.
 func (s *Service) setTags(ctx context.Context, a actor.Actor, cmd chat.SetTagsCmd, th *domain.Thread, c ChannelRow) (bool, error) {
-	if err := s.threadPrecondition(ctx, cmd.IfMatch, *th, false); err != nil {
+	if err := s.threadPrecondition(ctx, cmd.IfMatch, *th, false, func(v int64) bool { return v == th.Version }); err != nil {
 		return false, err
 	}
 	if th.Main() || c.Channel.Kind != domain.ChannelForum {
@@ -527,7 +531,7 @@ func (s *Service) searchLanguage(ctx context.Context, a actor.Actor) (string, er
 func (s *Service) newThread(a actor.Actor, c ChannelRow, cmd chat.CreateThreadCmd) (domain.Thread, error) {
 	th := domain.Thread{
 		ID: ids.New(), ChannelID: c.Channel.ID, Kind: domain.ThreadKindThread, State: domain.ThreadOpen,
-		OperatorAgentID: c.Channel.Operator(c.SpaceDefaultOperatorID).EffectiveAgentID, CreatedBy: a.ID, Version: 1,
+		OperatorAgentID: c.Channel.Operator(c.SpaceDefaultOperatorID).EffectiveAgentID, CreatedBy: a.ID, Version: 1, TitleVersion: 1,
 	}
 	if c.Channel.Kind == domain.ChannelForum {
 		if cmd.Parent != nil {

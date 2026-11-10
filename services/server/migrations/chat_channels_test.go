@@ -135,6 +135,8 @@ func TestChatChannelsMigration_Schema(t *testing.T) {
 			{"deleted_at", ts, true, ""},
 			{"deleted_by", "uuid", true, ""},
 			{"purged_at", ts, true, ""},
+			// FIX-TITLE-EDIT-412 (migration 00103): the version of the last title change.
+			{"title_version", "bigint", false, "1"},
 		}, []string{
 			"CHECK (((deleted_at IS NULL) = (deleted_by IS NULL)))",
 			"CHECK (((deleted_at IS NULL) OR (kind <> 'main'::text)))",

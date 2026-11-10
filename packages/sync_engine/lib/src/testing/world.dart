@@ -746,6 +746,11 @@ final class FakeWorld {
   /// Threads (API `Thread`) by ID.
   final Map<String, JsonMap> threads = {};
 
+  /// The version of each thread at its last title change (server column
+  /// `threads.title_version`); a thread without an entry never changed its title and has 1.
+  /// `setThreadTitle` accepts an `If-Match` from it on (06 8 item 2).
+  final Map<String, int> titleVersions = {};
+
   /// Messages (API `Message`) by ID.
   final Map<String, JsonMap> messages = {};
 
@@ -1607,9 +1612,11 @@ final class FakeWorld {
     _attach(id, attachments);
     _threadMessages[threadId]!.add(id);
     _clientMsgIds['$authorId|$cmid'] = (id: id, hash: hash);
+    // 03 6.2: every message raises the version of its thread, and no thread event says so.
     thread
       ..['last_message_seq'] = seq
       ..['message_count'] = (thread['message_count']! as int) + 1
+      ..['version'] = (thread['version']! as int) + 1
       ..['last_activity_at'] = message['created_at'];
     for (final check in List.of(triggerChecks)) {
       final state = check(message, author);
@@ -2362,6 +2369,19 @@ final class FakeWorld {
   /// [authorId] as its author and appends `message.created` (03: the author of
   /// `thread.reopened` is the person whose message reopened the thread).
   void _systemLine(String threadId, String code, String authorId) {
+    _systemMessage(threadId, authorId, kind: 'system', systemCode: code);
+  }
+
+  /// Writes a silent message with `origin = system` and [kind] into [threadId] as [authorId],
+  /// appends `message.created` and returns the message. Like every message it raises the
+  /// version of its thread, and no thread event says so (03 6.2).
+  JsonMap _systemMessage(
+    String threadId,
+    String authorId, {
+    required String kind,
+    String? systemCode,
+    String text = '',
+  }) {
     final thread = threads[threadId]!;
     final seq = (thread['last_message_seq']! as int) + 1;
     final id = nextId();
@@ -2373,9 +2393,9 @@ final class FakeWorld {
       'author': people[authorId]!.ref,
       'client_msg_id': nextId(),
       'origin': 'system',
-      'kind': 'system',
-      'system_code': code,
-      'content_md': '',
+      'kind': kind,
+      'system_code': ?systemCode,
+      'content_md': text,
       'content_format': 1,
       'silent': true,
       'attachments': <Object?>[],
@@ -2390,13 +2410,15 @@ final class FakeWorld {
     _threadMessages[threadId]!.add(id);
     thread
       ..['last_message_seq'] = seq
-      ..['message_count'] = (thread['message_count']! as int) + 1;
+      ..['message_count'] = (thread['message_count']! as int) + 1
+      ..['version'] = (thread['version']! as int) + 1;
     append(
       'message.created',
       resource: {'kind': 'message', 'id': id, 'version': 1},
       scope: _scopeOf(threadId),
       payload: {'message': message},
     );
+    return message;
   }
 
   /// Opens the closed [threadId] again and appends `thread.reopened` (01 6.1: a new message

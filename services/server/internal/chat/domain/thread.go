@@ -89,6 +89,10 @@ type Thread struct {
 	CreatedAt, LastActivityAt, MovedAt time.Time
 	// Version is 1 for a new thread.
 	Version int64
+	// TitleVersion is the Version at which Title or TitleSource last changed, 1 for a new thread.
+	// The precondition of setThreadTitle holds from it on (06 section 8 point 2): the messages
+	// that raise Version since then leave the title alone (FIX-TITLE-EDIT-412).
+	TitleVersion int64
 	// Deletion is the deletion state (03 R-DM-57, D-DEL-3).
 	Deletion Deletion
 	// SearchLanguage is the text search configuration of the title (threads.search_language,
@@ -103,7 +107,7 @@ type Thread struct {
 func NewMainThread(id, channel, by ids.ID, at time.Time) Thread {
 	return Thread{
 		ID: id, ChannelID: channel, Kind: ThreadKindMain, TitleSource: TitleAuto, State: ThreadOpen, CreatedBy: by,
-		CreatedAt: at, LastActivityAt: at, Version: 1,
+		CreatedAt: at, LastActivityAt: at, Version: 1, TitleVersion: 1,
 	}
 }
 
@@ -135,15 +139,23 @@ func (t *Thread) Reopen() bool {
 	return true
 }
 
-// SetTitle sets title and source and bumps the version when either changed; it reports whether
-// it did.
+// SetTitle sets title and source, bumps the version and makes it the title version when either
+// changed; it reports whether it did.
 func (t *Thread) SetTitle(title string, source TitleSource) bool {
 	if t.Title == title && t.TitleSource == source {
 		return false
 	}
 	t.Title, t.TitleSource = title, source
 	t.Version++
+	t.TitleVersion = t.Version
 	return true
+}
+
+// TitleBasedOn reports whether an edit that is based on version saw the current title: version is
+// one the thread had (at most Version) and not older than the last title change (06 section 8
+// point 2, FIX-TITLE-EDIT-412).
+func (t Thread) TitleBasedOn(version int64) bool {
+	return version >= t.TitleVersion && version <= t.Version
 }
 
 // RepinOperator gives a thread of kind thread the fixed operator agent and bumps the version; it

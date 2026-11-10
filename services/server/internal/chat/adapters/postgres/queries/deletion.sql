@@ -63,12 +63,13 @@ LIMIT sqlc.arg(max_rows)::integer;
 -- The end of the purge of a deleted thread: its title goes (title_source stays) and purged_at is
 -- set; a purged thread is left as it is.
 UPDATE threads
-SET title = '', version = version + 1, purged_at = @purged_at
+SET title = '', version = version + 1, title_version = version + 1, purged_at = @purged_at
 WHERE id = @id AND deleted_at IS NOT NULL AND purged_at IS NULL;
 
 -- name: ClearThreadTitlesOfChannels :exec
 -- The titles of every thread of the channels of a purged channel or space (title_source stays).
-UPDATE threads SET title = '', version = version + 1 WHERE channel_id = ANY (@channel_ids::uuid[]) AND title <> '';
+UPDATE threads SET title = '', version = version + 1, title_version = version + 1
+WHERE channel_id = ANY (@channel_ids::uuid[]) AND title <> '';
 
 -- name: PurgeChannel :execrows
 -- The end of the purge of a deleted channel: its topic goes and purged_at is set.

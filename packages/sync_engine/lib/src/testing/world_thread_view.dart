@@ -136,8 +136,10 @@ extension ThreadViewWorld on FakeWorld {
     return threads[threadId]!;
   }
 
-  /// `setThreadTitle`: sets [title] with `title_source = manual` when [expectedVersion] is the
-  /// thread's version, and appends `thread.updated`. Throws `412 version_conflict`.
+  /// `setThreadTitle`: sets [title] with `title_source = manual` when [expectedVersion] is a
+  /// version the thread had since its last title change (06 8 item 2: the messages since then
+  /// raised the version without a thread event), and appends `thread.updated`. Throws
+  /// `412 version_conflict` for a version from before that change or one the thread never had.
   JsonMap setTitle(
     String principalId,
     String threadId,
@@ -145,13 +147,16 @@ extension ThreadViewWorld on FakeWorld {
     String title,
   ) {
     final thread = _writable(principalId, threadId);
-    if (thread['version'] != expectedVersion) {
+    final version = thread['version']! as int;
+    if (expectedVersion < (titleVersions[threadId] ?? 1) ||
+        expectedVersion > version) {
       throw FakeProblem(412, 'version_conflict', current: Map.of(thread));
     }
     thread
       ..['title'] = title
       ..['title_source'] = 'manual'
-      ..['version'] = (thread['version']! as int) + 1;
+      ..['version'] = version + 1;
+    titleVersions[threadId] = version + 1;
     append(
       'thread.updated',
       resource: {

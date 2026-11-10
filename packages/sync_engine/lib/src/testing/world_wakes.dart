@@ -202,41 +202,6 @@ extension WakesWorld on FakeWorld {
 
   /// Writes a note (`origin = system`, `kind = text`, silent) with [text] into [threadId] as
   /// [authorId] and appends `message.created`, as `messaging.AppendSystemNote` does.
-  JsonMap _systemNote(String threadId, String text, String authorId) {
-    final thread = threads[threadId]!;
-    final seq = (thread['last_message_seq']! as int) + 1;
-    final id = nextId();
-    final message = <String, Object?>{
-      'id': id,
-      'thread_id': threadId,
-      'channel_id': thread['channel_id'],
-      'thread_seq': seq,
-      'author': people[authorId]!.ref,
-      'client_msg_id': nextId(),
-      'origin': 'system',
-      'kind': 'text',
-      'content_md': text,
-      'content_format': 1,
-      'silent': true,
-      'attachments': <Object?>[],
-      'mention_ids': <Object?>[],
-      'reactions': <Object?>[],
-      'pinned': false,
-      'components': <Object?>[],
-      'version': 1,
-      'created_at': stamp(),
-    };
-    messages[id] = message;
-    _threadMessages[threadId]!.add(id);
-    thread
-      ..['last_message_seq'] = seq
-      ..['message_count'] = (thread['message_count']! as int) + 1;
-    append(
-      'message.created',
-      resource: {'kind': 'message', 'id': id, 'version': 1},
-      scope: _scopeOf(threadId),
-      payload: {'message': message},
-    );
-    return message;
-  }
+  JsonMap _systemNote(String threadId, String text, String authorId) =>
+      _systemMessage(threadId, authorId, kind: 'text', text: text);
 }

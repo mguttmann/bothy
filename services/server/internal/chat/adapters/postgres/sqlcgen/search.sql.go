@@ -322,7 +322,7 @@ func (q *Queries) ThreadTitleLabels(ctx context.Context, arg ThreadTitleLabelsPa
 const threadsIn = `-- name: ThreadsIn :many
 SELECT t.id, t.channel_id, t.kind, t.parent_message_id, t.title, t.title_source, t.state, t.closed_at, t.closed_by,
     t.operator_agent_id, t.last_message_seq, t.unread_floor_seq, t.last_activity_at, t.message_count, t.created_by, t.created_at,
-    t.moved_at, t.version, t.deleted_at, t.deleted_by, t.purged_at
+    t.moved_at, t.version, t.deleted_at, t.deleted_by, t.purged_at, t.title_version
 FROM threads t
 WHERE t.channel_id = ANY($1::uuid[]) AND t.id = ANY($2::uuid[]) AND t.deleted_at IS NULL
 `
@@ -354,6 +354,7 @@ type ThreadsInRow struct {
 	DeletedAt       pgtype.Timestamptz
 	DeletedBy       pgtype.UUID
 	PurgedAt        pgtype.Timestamptz
+	TitleVersion    int64
 }
 
 // The threads of the hits for HitThreads, the columns of GetThread, in the visible channels.
@@ -388,6 +389,7 @@ func (q *Queries) ThreadsIn(ctx context.Context, arg ThreadsInParams) ([]Threads
 			&i.DeletedAt,
 			&i.DeletedBy,
 			&i.PurgedAt,
+			&i.TitleVersion,
 		); err != nil {
 			return nil, err
 		}

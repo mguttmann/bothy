@@ -42,7 +42,8 @@ func (q *Queries) BindingTrash(ctx context.Context, channelID pgtype.UUID) (Bind
 }
 
 const clearThreadTitlesOfChannels = `-- name: ClearThreadTitlesOfChannels :exec
-UPDATE threads SET title = '', version = version + 1 WHERE channel_id = ANY ($1::uuid[]) AND title <> ''
+UPDATE threads SET title = '', version = version + 1, title_version = version + 1
+WHERE channel_id = ANY ($1::uuid[]) AND title <> ''
 `
 
 // The titles of every thread of the channels of a purged channel or space (title_source stays).
@@ -258,7 +259,7 @@ func (q *Queries) PurgeSpace(ctx context.Context, arg PurgeSpaceParams) (int64, 
 
 const purgeThread = `-- name: PurgeThread :execrows
 UPDATE threads
-SET title = '', version = version + 1, purged_at = $1
+SET title = '', version = version + 1, title_version = version + 1, purged_at = $1
 WHERE id = $2 AND deleted_at IS NOT NULL AND purged_at IS NULL
 `
 
