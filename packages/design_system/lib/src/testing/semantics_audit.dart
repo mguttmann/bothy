@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
+// Test support (tools/arch-check rule 10): only test folders import this library, so its test
+// packages are dev dependencies of the package and never reach an app (pubspec.yaml).
+// ignore_for_file: depend_on_referenced_packages
+
 import 'dart:io' show Platform;
 import 'dart:ui' show CheckedState, Tristate;
 

@@ -11,14 +11,7 @@ environment:
   flutter: 3.47.7
 
 dependencies:
-  # A regular dependency because lib/testing.dart returns its GoldenTestGroup; apps import
-  # testing.dart only from their tests (docs/DECISIONS.md D-M4-04-5).
-  alchemist: ^0.14.1
   flutter:
-    sdk: flutter
-  # lib/testing.dart also exports dsPumpIcons, a PumpAction on WidgetTester; alchemist brings
-  # flutter_test in anyway (docs/DECISIONS.md D-M4-05-5).
-  flutter_test:
     sdk: flutter
   # Every interface text of the components (docs/spec/15-client-architektur.md 3.1).
   l10n:
@@ -29,14 +22,24 @@ dependencies:
   # Renders the compiled Phosphor icons of assets/icons/ (docs/DECISIONS.md D-M4-05-1).
   vector_graphics: ^1.1.19
 
+# alchemist and flutter_test serve lib/testing.dart and lib/src/testing/ (the golden matrix,
+# dsPumpIcons, the accessibility audits) and the tests. That library is test support: only the
+# folders test and integration_test of a member may import it (tools/arch-check rule 10), and
+# the workspace has one resolution, so its imports resolve for every member. As regular
+# dependencies they put the test libraries into the dependency graph of the apps, whose bundles
+# then carried the Roboto files alchemist declares
+# (docs/decisions.d/AUD-pkg-design-system-01.md; test/dependencies_test.dart).
 dev_dependencies:
+  alchemist: ^0.14.1
   crypto: ^3.0.7
   flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
   # Compiles the Phosphor SVGs into assets/icons/ (tools/design-tokens/tokens.py icons).
   vector_graphics_compiler: ^1.1.19
 
 # The variable font files and their OFL texts (fonts/MANIFEST.json, docs/design/typography.md
-# "Integration"). The weight drives the `wght` axis (dsTextStyle).
+# "Integration"). The engine drives the `wght` axis from `fontWeight`.
 flutter:
   uses-material-design: true
   # The OFL texts ship with the fonts in every app bundle (OFL-1.1 condition 2). The compiled
