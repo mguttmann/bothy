@@ -136,7 +136,7 @@ The correlation ID is the trace ID of the server span (16 bytes) written as a lo
 
 ### Client IP
 
-Input `server.trusted_proxies` (CIDR list). Start from the peer address of the connection. If the peer is not trusted, it is the client IP and forwarding headers are ignored. If it is trusted: use `Forwarded` (RFC 7239, `for=` values) when present, else `X-Forwarded-For`, never both; walk the address list from right to left and skip addresses inside `server.trusted_proxies`; the first address outside is the client IP; if all are trusted, the leftmost is the client. A malformed entry stops the walk, and the last trusted hop becomes the client IP (fail closed against spoofing). IPv4-mapped IPv6 addresses are unmapped. Store with `reqmeta.WithClientIP`. Logs never contain the client IP (SEC-LOG-5).
+Input `server.trusted_proxies` (CIDR list). Start from the peer address of the connection. If the peer is not trusted, it is the client IP and forwarding headers are ignored. If it is trusted: use its one forwarding header, `X-Forwarded-For` or `Forwarded` (RFC 7239, `for=` values); a request with both headers names no client and the peer is the client IP (AUD-srv-platform-01: a proxy that sets one passes the other through as the client sent it); walk the address list from right to left and skip addresses inside `server.trusted_proxies`; the first address outside is the client IP; if all are trusted, the leftmost is the client. A malformed entry stops the walk, and the last trusted hop becomes the client IP (fail closed against spoofing). IPv4-mapped IPv6 addresses are unmapped. Store with `reqmeta.WithClientIP`. Logs never contain the client IP (SEC-LOG-5).
 
 ### Headers (SEC-T03)
 
@@ -192,7 +192,7 @@ Package `internal/platform/httpserver` (through `httpservertest`):
 - `TestUnmatched_404Problem`, `TestUnmatched_405ProblemWithAllow`.
 - `TestSECT03_HeadersPerResponseKind`.
 - `TestSECT04_NoCORSHeadersByDefault`, `TestSECT04_DiscoveryWildcardWithoutCredentials`, `TestCORS_AllowedOriginEchoAndPreflight`, `TestCORS_OtherOriginNoHeaders`.
-- `TestClientIP_UntrustedPeerIgnoresForwarding` (ID-T25, header part), `TestClientIP_TrustedChainRightToLeft`, `TestClientIP_ForwardedPreferredOverXFF`, `TestClientIP_MalformedStopsAtLastTrusted`, `TestClientIP_IPv6AndMapped`.
+- `TestClientIP_UntrustedPeerIgnoresForwarding` (ID-T25, header part), `TestClientIP_TrustedChainRightToLeft`, `TestClientIP_ForwardedAlone`, `TestClientIP_BothHeadersCountPeer`, `TestClientIP_MalformedStopsAtLastTrusted`, `TestClientIP_IPv6AndMapped`.
 - `TestSECIN2_DuplicateKeysRejected` (top level and nested), `TestSECIN2_InvalidUTF8Rejected`, `TestSECIN2_DepthLimit`, `TestSECIN3_BodyLimit413NamesKey`, `TestBody_WrongMediaType415`, `FuzzJSONGuard` (seed corpus runs in `go test`).
 - `TestW7_UnknownMemberRejected` (pointer to the member, code `unknown_member`), `TestValidate_ErrorShape` (one case per code family and per pointer form), `TestValidator_Probe_*` (features the spec uses: `additionalProperties: false`, `format: uuid`, enums, `minLength`, `maxItems`, `oneOf` with discriminator, header and path parameters).
 - `TestPreconditions_MissingIfMatch428`, `TestPreconditions_Wildcard428`, `TestIfMatch_ParseAndFormat`, `TestVersionConflict_412WithCurrent`.

@@ -1153,8 +1153,8 @@ documented in this file. The format is based on
   contract with libopenapi-validator (`400 validation_failed` with `errors[]`, unknown members
   refused).
 - `kernel/actor` (Actor, Credentials, Authenticator, `AnonymousOnly`), `kernel/reqmeta`
-  (correlation ID and client IP), client IP from `server.trusted_proxies` (`Forwarded` before
-  `X-Forwarded-For`, right to left, fail closed), CORS per SEC-CORS-1 and SEC-CORS-2 with
+  (correlation ID and client IP), client IP from `server.trusted_proxies` (`X-Forwarded-For` or
+  `Forwarded`, right to left, fail closed), CORS per SEC-CORS-1 and SEC-CORS-2 with
   preflight routes for `api.cors_allowed_origins`, `FormatETag` and `ParseIfMatch`, and the cursor
   codec `EncodeCursor` and `DecodeCursor` (`400 cursor_invalid`).
 - Test harness `internal/platform/httpserver/httpservertest` for the chain, with recorded checks,

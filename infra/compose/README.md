@@ -121,4 +121,6 @@ Checks of the overlay and the example edge (`services/server/test/edge`, needs D
 profiles `direct` and `tailscale`; `TestEdgeExample_Config` runs `edge/nginx.conf` in the pinned
 image and compares its directives and timeouts with the defaults in
 [configuration.md](../../docs/operations/configuration.md); `TestEdgeExample_HashRoutesBothStreamPaths`
-proves that both stream paths of a session reach the same node.
+proves that both stream paths of a session reach the same node; `TestEdgeExample_DropsClientForwarded`
+proves that a `Forwarded` header of the client reaches no api node
+([16-operations.md](../../docs/spec/16-operations.md), section 4.3).

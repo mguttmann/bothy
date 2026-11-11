@@ -174,15 +174,32 @@ func TestClientIP_TrustedChainRightToLeft(t *testing.T) {
 	}
 }
 
-func TestClientIP_ForwardedPreferredOverXFF(t *testing.T) {
+func TestClientIP_ForwardedAlone(t *testing.T) {
 	t.Parallel()
-	got := clientIP("198.18.0.1:5000", "X-Forwarded-For", "203.0.113.5",
-		"Forwarded", `for=198.51.100.7;proto=https, for="198.18.3.4:80";by=198.18.0.1`)
+	got := clientIP("198.18.0.1:5000", "Forwarded", `for=198.51.100.7;proto=https, for="198.18.3.4:80";by=198.18.0.1`)
 	if got != "198.51.100.7" {
 		t.Fatalf("got %s", got)
 	}
 	if got := clientIP("198.18.0.1:5000", "Forwarded", `for="[2001:db8::7]:4711"`); got != "2001:db8::7" {
 		t.Fatalf("quoted IPv6: got %s", got)
+	}
+}
+
+// A proxy that sets one forwarding header passes the other one through as the client sent it,
+// so a request with both names no client: the trusted peer counts (ID-T25).
+func TestClientIP_BothHeadersCountPeer(t *testing.T) {
+	t.Parallel()
+	cases := map[string][]string{
+		"client sent Forwarded past a proxy that sets X-Forwarded-For": {"X-Forwarded-For", "203.0.113.5", "Forwarded", "for=198.51.100.7"},
+		"client sent X-Forwarded-For past a proxy that sets Forwarded": {"Forwarded", "for=203.0.113.5", "X-Forwarded-For", "198.51.100.7"},
+		"both name the same address":                                   {"X-Forwarded-For", "203.0.113.5", "Forwarded", "for=203.0.113.5"},
+		"empty Forwarded":                                              {"X-Forwarded-For", "203.0.113.5", "Forwarded", ""},
+		"empty X-Forwarded-For":                                        {"Forwarded", "for=203.0.113.5", "X-Forwarded-For", ""},
+	}
+	for name, headers := range cases {
+		if got := clientIP("198.18.0.1:5000", headers...); got != "198.18.0.1" {
+			t.Errorf("%s: got %s, want the peer 198.18.0.1", name, got)
+		}
 	}
 }
 

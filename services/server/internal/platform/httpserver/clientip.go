@@ -11,8 +11,10 @@ import (
 
 // ClientIP returns the client IP of r (06 "Basic rules" row Client IP, 08 "Login
 // protection", ID-T25). It starts from the peer of the connection. A peer outside trusted is the
-// client, and forwarding headers are ignored. A trusted peer's headers count: Forwarded (RFC
-// 7239, the for= values) when present, else X-Forwarded-For, never both. The list is walked from
+// client, and forwarding headers are ignored. A trusted peer's one forwarding header counts:
+// X-Forwarded-For or Forwarded (RFC 7239, the for= values). A request with both names no client
+// and the peer is the client: a proxy that sets one of them passes the other through as the
+// client sent it, so the client would choose its address. The list is walked from
 // right to left, skipping addresses inside trusted; the first address outside is the client, and
 // when all are trusted the leftmost is. A malformed or obfuscated entry stops the walk, and the
 // last trusted hop is the client (fail closed against spoofing). IPv4-mapped IPv6 addresses are
@@ -22,13 +24,14 @@ func ClientIP(r *http.Request, trusted []netip.Prefix) netip.Addr {
 	if !ok || !isTrusted(peer, trusted) {
 		return peer
 	}
-	var hops []string
-	if values := r.Header.Values(headerForwarded); len(values) > 0 {
-		hops = forwardedFor(values)
-	} else {
-		for _, v := range r.Header.Values(headerXForwardedFor) {
-			hops = append(hops, strings.Split(v, ",")...)
-		}
+	forwarded, xff := r.Header.Values(headerForwarded), r.Header.Values(headerXForwardedFor)
+	if len(forwarded) > 0 && len(xff) > 0 {
+		return peer
+	}
+	// At most one of the two headers is present here.
+	hops := forwardedFor(forwarded)
+	for _, v := range xff {
+		hops = append(hops, strings.Split(v, ",")...)
 	}
 	client := peer
 	for _, hop := range slices.Backward(hops) {

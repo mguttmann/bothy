@@ -30,6 +30,8 @@ need nothing besides more `worker` containers (level 3).
    node. `infra/compose/edge/nginx.conf` is the example.
 3. Rate limits count per node. With `n` nodes, divide the `ratelimit.*` values by `n`, or let
    the edge keep a client on one node.
+4. The edge sends the address of the client in one forwarding header and removes the other one
+   (16 4.3); the example sets `X-Forwarded-For` and removes `Forwarded`.
 
 ## 4. What crosses the nodes
 

@@ -298,6 +298,18 @@ headers themselves. Tailscale states this explicitly
 (https://tailscale.com/kb/1312/serve, retrieved 2026-10-10) [verified]. Details:
 [tailscale.md](../operations/tailscale.md).
 
+A reverse proxy in `server.trusted_proxies` sends the address of the client in exactly one
+forwarding header, `X-Forwarded-For` or `Forwarded` (RFC 7239), and removes the other one from the
+request. The server reads that header from right to left and skips trusted addresses. A request
+that carries both headers names no client: the server counts the proxy itself as its client for
+`rl.public_auth` and the audit, so such requests share the limit of the proxy
+([08-identity.md](08-identity.md), section 13, ID-T25). Reason: a proxy passes a header it does not
+set through as the client sent it, and the client would choose its address. nginx passes every
+request header field on unless the configuration redefines it, and an empty value removes the field
+(https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_set_header, retrieved 2026-11-11)
+[verified]. The example edge sets `X-Forwarded-For` and removes `Forwarded`
+(`infra/compose/edge/nginx.conf`).
+
 Reverse proxies in front of the public listener redact the path after `/api/v1/hooks/{webhook_id}/`
 in their access logs, because the token of `postIncomingWebhook` is the last path segment (RK-20,
 [webhooks.md](../api/webhooks.md), section 8 point 5). The server itself logs only the route

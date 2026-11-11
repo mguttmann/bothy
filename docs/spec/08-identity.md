@@ -991,8 +991,11 @@ the person knew, rotate secrets in their dev environment.
 
 Rules:
 
-- The client IP comes only from headers of a proxy in `server.trusted_proxies`; otherwise it is the
-  peer of the connection. Reason: a forged `X-Forwarded-For` would bypass IP limits.
+- The client IP comes only from the one forwarding header (`X-Forwarded-For` or `Forwarded`) of a
+  proxy in `server.trusted_proxies`; otherwise it is the peer of the connection, also for a
+  request that carries both headers ([16-operations.md](16-operations.md), section 4.3). Reason:
+  a forged `X-Forwarded-For`, or a `Forwarded` of the client that the proxy passes through, would
+  bypass IP limits and empty the bucket of another address.
 - An account lockout affects only the password path. Passkey, device pairing and OIDC stay open,
   so that an attacker cannot lock anyone out. A step-up with password and TOTP during the
   lockout is refused without counting (section 6.2), so a lockout can never revoke a session
@@ -1127,7 +1130,7 @@ sequenceDiagram
 | ID-T22 | `user.disable`: all steps from section 11 | every step verifiable in the state, last owner rejected |
 | ID-T23 | API token: only hash stored, shown once, wrong checksum, expired, agent token that requires DPoP without proof | rejected as described |
 | ID-T24 | Argon2id parameters below the OWASP lower bound in the configuration | start aborted |
-| ID-T25 | Forged `X-Forwarded-For` from an untrusted peer | rate limit counts the real peer |
+| ID-T25 | Forged `X-Forwarded-For` from an untrusted peer; `Forwarded` of the client passed through by a trusted proxy that sets `X-Forwarded-For` | rate limit counts the real peer; for the request with both headers it counts the proxy, and the bucket of the address named in `Forwarded` stays full |
 | ID-T26 | `device.revoke`: all steps from section 10 | keys, sessions, families, push registrations revoked, connections closed with `4012`, audit |
 | ID-T27 | Random parts of refresh token, console cookie and API token 256 bits each, enrollment code at least 128 bits, all from the cryptographic random number generator; TOTP with a 30-second step and at most one step of tolerance | lengths and source as stated |
 | ID-T28 | Terminal: step-up with password and TOTP, older than `terminal.step_up_max_age`, twice for two openings, in the console with a passkey without `userVerification = required`, reattach in the console within `terminal.quick_reattach_window` without passkey, simultaneous openings with one confirmation | each `401 step_up_required` (in the console with `reason: passkey_required`); for simultaneous openings exactly one session |

@@ -34,6 +34,13 @@ var nodes = []string{"api", "api-2"}
 // nodeHeader names the responder that answered a request.
 const nodeHeader = "X-Test-Node"
 
+// The responder returns the forwarding headers it received in these headers; nginx adds none for
+// a header that did not arrive.
+const (
+	seenForwardedHeader    = "X-Test-Seen-Forwarded"
+	seenForwardedForHeader = "X-Test-Seen-Forwarded-For"
+)
+
 // The port nginx listens on in every container, as in the example edge.
 const nginxPort = "8080/tcp"
 
@@ -49,8 +56,8 @@ const (
 	spreadRequests = 32
 )
 
-// responderConfig is the nginx configuration of a stand-in api node: every request gets 200 and
-// a header naming the node.
+// responderConfig is the nginx configuration of a stand-in api node: every request gets 200, a
+// header naming the node and the forwarding headers the node received.
 func responderConfig(node string) string {
 	return fmt.Sprintf(`pid /tmp/nginx.pid;
 error_log /dev/stderr crit;
@@ -66,11 +73,13 @@ http {
         listen 8080;
         location / {
             add_header %s %s always;
+            add_header %s $http_forwarded always;
+            add_header %s $http_x_forwarded_for always;
             return 200 "ok\n";
         }
     }
 }
-`, nodeHeader, node)
+`, nodeHeader, node, seenForwardedHeader, seenForwardedForHeader)
 }
 
 // edgeWorld is a running example edge in front of two responders.
@@ -206,11 +215,21 @@ func terminateOnCleanup(t *testing.T, ctr *testcontainers.DockerContainer) {
 // node sends GET path through the edge and returns the node that answered.
 func (w *edgeWorld) node(t *testing.T, path string) string {
 	t.Helper()
+	return w.get(t, path).Get(nodeHeader)
+}
+
+// get sends GET path with the headers (name, value, ...) through the edge and returns the
+// response headers of the node that answered.
+func (w *edgeWorld) get(t *testing.T, path string, headers ...string) http.Header {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), requestTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, w.base+path, http.NoBody)
 	if err != nil {
 		t.Fatal(err)
+	}
+	for i := 0; i+1 < len(headers); i += 2 {
+		req.Header.Set(headers[i], headers[i+1])
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -221,11 +240,10 @@ func (w *edgeWorld) node(t *testing.T, path string) string {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("GET %s: status %d, want 200", path, resp.StatusCode)
 	}
-	node := resp.Header.Get(nodeHeader)
-	if !slices.Contains(nodes, node) {
+	if node := resp.Header.Get(nodeHeader); !slices.Contains(nodes, node) {
 		t.Fatalf("GET %s: answered by %q, want one of %v", path, node, nodes)
 	}
-	return node
+	return resp.Header
 }
 
 // exec runs cmd in the edge container and returns its exit code and its standard output and
@@ -272,6 +290,30 @@ func TestEdgeExample_HashRoutesBothStreamPaths(t *testing.T) {
 		}
 		if len(spread) != len(nodes) {
 			t.Errorf("%s is pinned to %v; it may land on any node", path, spread)
+		}
+	}
+}
+
+// TestEdgeExample_DropsClientForwarded proves on every location of the example edge that a
+// Forwarded header of the client does not reach an api node, which gets the client address in
+// X-Forwarded-For alone: the server takes the client IP from one forwarding header and counts
+// the edge itself for a request with both (docs/spec/16-operations.md 4.3, ID-T25).
+func TestEdgeExample_DropsClientForwarded(t *testing.T) {
+	t.Parallel()
+	w := startEdgeWorld(t)
+	paths := []string{
+		"/api/v1/terminal/sessions/" + ids.New().String() + "/stream",
+		"/api/v1/hosts/sessions/" + ids.New().String() + "/stream",
+		interviewLocation,
+		"/api/v1/discovery",
+	}
+	for _, path := range paths {
+		seen := w.get(t, path, "Forwarded", "for=203.0.113.9")
+		if got := seen.Get(seenForwardedHeader); got != "" {
+			t.Errorf("GET %s: the api node received Forwarded %q from the client", path, got)
+		}
+		if _, err := netip.ParseAddr(seen.Get(seenForwardedForHeader)); err != nil {
+			t.Errorf("GET %s: the api node received X-Forwarded-For %q, want the one address the edge saw", path, seen.Get(seenForwardedForHeader))
 		}
 	}
 }
@@ -393,15 +435,17 @@ func checkLocations(t *testing.T, server *directive) {
 		for _, h := range find(loc.block, "proxy_set_header") {
 			headers[arg(t, h, 0)] = arg(t, h, 1)
 		}
+		// The empty value removes Forwarded, which the client could otherwise set.
 		want := map[string]string{
 			"Upgrade":         "$http_upgrade",
 			"Connection":      "$connection_upgrade",
 			"Host":            "$http_host",
 			"X-Forwarded-For": "$proxy_add_x_forwarded_for",
+			"Forwarded":       "",
 		}
 		for name, value := range want {
-			if headers[name] != value {
-				t.Errorf("location %v: proxy_set_header %s %q, want %q", loc.args, name, headers[name], value)
+			if got, ok := headers[name]; !ok || got != value {
+				t.Errorf("location %v: proxy_set_header %s %q (set: %t), want %q", loc.args, name, got, ok, value)
 			}
 		}
 	}
