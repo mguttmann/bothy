@@ -174,15 +174,32 @@ func TestClientIP_TrustedChainRightToLeft(t *testing.T) {
 	}
 }
 
-func TestClientIP_ForwardedPreferredOverXFF(t *testing.T) {
+func TestClientIP_ForwardedAlone(t *testing.T) {
 	t.Parallel()
-	got := clientIP("198.18.0.1:5000", "X-Forwarded-For", "203.0.113.5",
-		"Forwarded", `for=198.51.100.7;proto=https, for="198.18.3.4:80";by=198.18.0.1`)
+	got := clientIP("198.18.0.1:5000", "Forwarded", `for=198.51.100.7;proto=https, for="198.18.3.4:80";by=198.18.0.1`)
 	if got != "198.51.100.7" {
 		t.Fatalf("got %s", got)
 	}
 	if got := clientIP("198.18.0.1:5000", "Forwarded", `for="[2001:db8::7]:4711"`); got != "2001:db8::7" {
 		t.Fatalf("quoted IPv6: got %s", got)
+	}
+}
+
+// A proxy that sets one forwarding header passes the other one through as the client sent it,
+// so a request with both names no client: the trusted peer counts (ID-T25).
+func TestClientIP_BothHeadersCountPeer(t *testing.T) {
+	t.Parallel()
+	cases := map[string][]string{
+		"client sent Forwarded past a proxy that sets X-Forwarded-For": {"X-Forwarded-For", "203.0.113.5", "Forwarded", "for=198.51.100.7"},
+		"client sent X-Forwarded-For past a proxy that sets Forwarded": {"Forwarded", "for=203.0.113.5", "X-Forwarded-For", "198.51.100.7"},
+		"both name the same address":                                   {"X-Forwarded-For", "203.0.113.5", "Forwarded", "for=203.0.113.5"},
+		"empty Forwarded":                                              {"X-Forwarded-For", "203.0.113.5", "Forwarded", ""},
+		"empty X-Forwarded-For":                                        {"Forwarded", "for=203.0.113.5", "X-Forwarded-For", ""},
+	}
+	for name, headers := range cases {
+		if got := clientIP("198.18.0.1:5000", headers...); got != "198.18.0.1" {
+			t.Errorf("%s: got %s, want the peer 198.18.0.1", name, got)
+		}
 	}
 }
 
@@ -201,6 +218,35 @@ func TestClientIP_MalformedStopsAtLastTrusted(t *testing.T) {
 	}
 	if got := clientIP("198.18.0.1:5000", "X-Forwarded-For", "garbage"); got != "198.18.0.1" {
 		t.Errorf("malformed first hop: got %s, want the peer", got)
+	}
+}
+
+// A proxy that sets Forwarded appends its element to the value the client sent. A quoted string
+// of the client must not hide that element: an escaped quote does not end the string (RFC 7230
+// quoted-pair), and a line that ends inside a quoted string is malformed, so the peer counts.
+func TestClientIP_ForwardedQuotedStrings(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		lines []string
+		want  string
+	}{
+		"escaped quote before the element of the proxy": {[]string{`for=192.0.2.66;x="\"", for=198.51.100.7`}, "198.51.100.7"},
+		"escaped backslash ends the string":             {[]string{`for=192.0.2.66;x="\\", for=198.51.100.7`}, "198.51.100.7"},
+		"separators inside a quoted string":             {[]string{`for=192.0.2.66;x="a, for=203.0.113.9;b", for=198.51.100.7`}, "198.51.100.7"},
+		"line ends inside a quoted string":              {[]string{`for=192.0.2.66;x=", for=198.51.100.7`}, "198.18.0.1"},
+		"line ends after an escaped quote":              {[]string{`for="192.0.2.66\", for=198.51.100.7`}, "198.18.0.1"},
+		"line ends with a backslash in a quoted string": {[]string{`for=192.0.2.66;x="\`}, "198.18.0.1"},
+		"open quote in an earlier line":                 {[]string{`for=192.0.2.66;x="`, `for=198.51.100.7`}, "198.51.100.7"},
+		"open quote in the line of a trusted hop":       {[]string{`for=198.51.100.7`, `for=198.18.4.4;x="`}, "198.18.0.1"},
+	}
+	for name, tc := range cases {
+		var headers []string
+		for _, line := range tc.lines {
+			headers = append(headers, "Forwarded", line)
+		}
+		if got := clientIP("198.18.0.1:5000", headers...); got != tc.want {
+			t.Errorf("%s: got %s, want %s", name, got, tc.want)
+		}
 	}
 }
 

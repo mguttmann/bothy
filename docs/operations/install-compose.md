@@ -126,6 +126,13 @@ Without this entry, the server rejects every plaintext connection (SEC-TLS-1), a
 client IP are wrong. Login: OIDC or local accounts; header identity is disabled in this
 profile.
 
+The proxy sends the address of the client in `X-Forwarded-For` and must remove a `Forwarded`
+header from the request, which it would otherwise pass on as the client sent it (nginx:
+`proxy_set_header Forwarded "";` next to the line that sets `X-Forwarded-For`). A proxy that sends
+`Forwarded` (RFC 7239) instead removes `X-Forwarded-For`. The server reads one of the two headers:
+a request that arrives with both counts as a request of the proxy itself, so everyone who sends
+such requests shares one rate limit ([16-operations.md](../spec/16-operations.md), section 4.3).
+
 ### 5.2 Profile `tailscale`
 
 See [tailscale.md](tailscale.md).
@@ -149,8 +156,10 @@ docker compose -f compose.yaml -f compose.multi-node.yaml up -d
    `terminal.open_timeout` with `4102` and counts in `bothy.terminal.relay.unpaired`; check that
    metric after changing the edge.
 4. The server sees the address of `edge`, which appends to `X-Forwarded-For` the address it sees
-   for your proxy, the gateway of the network. `BOTHY_TRUSTED_PROXIES` therefore names the subnet of the network
-   `<project>_default`, not only its gateway:
+   for your proxy, the gateway of the network, and removes `Forwarded` (5.1). In front of `edge`
+   your proxy therefore sends the address of the client in `X-Forwarded-For`, and
+   `BOTHY_TRUSTED_PROXIES` names the subnet of the network `<project>_default`, not only its
+   gateway:
 
    ```
    docker network inspect <project>_default --format '{{(index .IPAM.Config 0).Subnet}}'

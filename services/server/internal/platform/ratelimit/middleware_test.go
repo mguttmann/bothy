@@ -235,6 +235,46 @@ func TestIDT25_SpoofedForwardedForCountsPeer(t *testing.T) {
 	}
 }
 
+// The trusted proxy sets X-Forwarded-For and passes a Forwarded header of the client through, as
+// nginx does. Such requests count against the proxy: changing for= values do not escape
+// rl.public_auth, and naming another client's address does not empty that client's bucket.
+func TestIDT25_PassedThroughForwardedCountsProxy(t *testing.T) {
+	t.Parallel()
+	l, _ := newLimiter(t, config(map[ratelimit.Class]ratelimit.Limits{"rl.public_auth": {PerMinute: 60, Burst: 3}}))
+	var calls atomic.Int64
+	op := getDiscovery()
+	h := harness(t, l, httpservertest.Options{Routes: []httpservertest.Route{{Op: op, Handler: countingHandler(op.Action, &calls)}}})
+	const sender, other = "198.51.100.66", "192.0.2.50"
+	// status sends one request that the proxy forwards for client; sent is the Forwarded header
+	// of the client, "" for none.
+	status := func(client, sent string) int {
+		headers := forwarded(client)
+		if sent != "" {
+			headers = append(headers, "Forwarded", sent)
+		}
+		return h.Do(h.NewRequest(http.MethodGet, "/api/v1/discovery", "", headers...)).StatusCode
+	}
+	var limited int
+	for i := range 6 {
+		if status(sender, "for="+netip.AddrFrom4([4]byte{203, 0, 113, byte(i + 1)}).String()) == http.StatusTooManyRequests {
+			limited++
+		}
+	}
+	if limited != 3 {
+		t.Errorf("%d of 6 requests with changing Forwarded values limited, want 3 after the burst", limited)
+	}
+	for range 3 {
+		if got := status(sender, "for="+other); got != http.StatusTooManyRequests {
+			t.Errorf("request naming another client in Forwarded: status %d, want 429 from the bucket of the proxy", got)
+		}
+	}
+	for i := range 3 {
+		if got := status(other, ""); got != http.StatusOK {
+			t.Errorf("request %d of the other client: status %d, want 200 from its own full bucket", i+1, got)
+		}
+	}
+}
+
 // countingAuth is FakeAuthenticator with a call counter and the 401 codes token_expired and
 // use_dpop_nonce for the tokens "Bearer expired" and "Bearer nonce".
 type countingAuth struct {

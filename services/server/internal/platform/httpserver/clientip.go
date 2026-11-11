@@ -11,8 +11,10 @@ import (
 
 // ClientIP returns the client IP of r (06 "Basic rules" row Client IP, 08 "Login
 // protection", ID-T25). It starts from the peer of the connection. A peer outside trusted is the
-// client, and forwarding headers are ignored. A trusted peer's headers count: Forwarded (RFC
-// 7239, the for= values) when present, else X-Forwarded-For, never both. The list is walked from
+// client, and forwarding headers are ignored. A trusted peer's one forwarding header counts:
+// X-Forwarded-For or Forwarded (RFC 7239, the for= values). A request with both names no client
+// and the peer is the client: a proxy that sets one of them passes the other through as the
+// client sent it, so the client would choose its address. The list is walked from
 // right to left, skipping addresses inside trusted; the first address outside is the client, and
 // when all are trusted the leftmost is. A malformed or obfuscated entry stops the walk, and the
 // last trusted hop is the client (fail closed against spoofing). IPv4-mapped IPv6 addresses are
@@ -22,13 +24,14 @@ func ClientIP(r *http.Request, trusted []netip.Prefix) netip.Addr {
 	if !ok || !isTrusted(peer, trusted) {
 		return peer
 	}
-	var hops []string
-	if values := r.Header.Values(headerForwarded); len(values) > 0 {
-		hops = forwardedFor(values)
-	} else {
-		for _, v := range r.Header.Values(headerXForwardedFor) {
-			hops = append(hops, strings.Split(v, ",")...)
-		}
+	forwarded, xff := r.Header.Values(headerForwarded), r.Header.Values(headerXForwardedFor)
+	if len(forwarded) > 0 && len(xff) > 0 {
+		return peer
+	}
+	// At most one of the two headers is present here.
+	hops := forwardedFor(forwarded)
+	for _, v := range xff {
+		hops = append(hops, strings.Split(v, ",")...)
 	}
 	client := peer
 	for _, hop := range slices.Backward(hops) {
@@ -50,13 +53,22 @@ func isTrusted(addr netip.Addr, trusted []netip.Prefix) bool {
 }
 
 // forwardedFor returns the for= value of every element of the Forwarded header lines, in order.
-// An element without for= yields "" so the walk stops there.
+// An element without for= yields "" so the walk stops there. A line that ends inside a quoted
+// string yields one "" as well: its elements cannot be told apart, and a proxy may have appended
+// its own element to an open quote of the client.
 func forwardedFor(lines []string) []string {
 	var out []string
 	for _, line := range lines {
-		for _, element := range splitOutsideQuotes(line, ',') {
+		elements, closed := splitOutsideQuotes(line, ',')
+		if !closed {
+			out = append(out, "")
+			continue
+		}
+		for _, element := range elements {
 			value := ""
-			for _, pair := range splitOutsideQuotes(element, ';') {
+			// Every element of a closed line is closed.
+			pairs, _ := splitOutsideQuotes(element, ';')
+			for _, pair := range pairs {
 				name, v, ok := strings.Cut(strings.TrimSpace(pair), "=")
 				if ok && strings.EqualFold(strings.TrimSpace(name), "for") {
 					value = strings.Trim(strings.TrimSpace(v), `"`)
@@ -68,12 +80,15 @@ func forwardedFor(lines []string) []string {
 	return out
 }
 
-// splitOutsideQuotes splits s at sep where sep is not inside a quoted string.
-func splitOutsideQuotes(s string, sep byte) []string {
-	var parts []string
+// splitOutsideQuotes splits s at sep where sep is not inside a quoted string. Inside a quoted
+// string a backslash escapes the next byte (RFC 7230 quoted-pair), so an escaped quote does not
+// end the string. closed is false when s ends inside a quoted string.
+func splitOutsideQuotes(s string, sep byte) (parts []string, closed bool) {
 	quoted, start := false, 0
 	for i := 0; i < len(s); i++ {
 		switch {
+		case quoted && s[i] == '\\':
+			i++
 		case s[i] == '"':
 			quoted = !quoted
 		case s[i] == sep && !quoted:
@@ -81,7 +96,7 @@ func splitOutsideQuotes(s string, sep byte) []string {
 			start = i + 1
 		}
 	}
-	return append(parts, s[start:])
+	return append(parts, s[start:]), !quoted
 }
 
 // parseHop parses one address of a peer or forwarding header: an IP, an IP with port, or a
