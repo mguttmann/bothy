@@ -76,6 +76,8 @@ func TestSessionsMigration_Schema(t *testing.T) {
 			},
 			indexes: []string{
 				"CREATE INDEX auth_sessions_device_id_idx ON public.auth_sessions USING btree (device_id)",
+				// The end of a session for the retention job (00104).
+				"CREATE INDEX auth_sessions_end_idx ON public.auth_sessions USING btree (LEAST(expires_at, revoked_at), id)",
 				"CREATE INDEX auth_sessions_expires_at_idx ON public.auth_sessions USING btree (expires_at)",
 				"CREATE INDEX auth_sessions_parent_session_id_idx ON public.auth_sessions USING btree (parent_session_id) WHERE (parent_session_id IS NOT NULL)",
 				"CREATE INDEX auth_sessions_user_id_active_idx ON public.auth_sessions USING btree (user_id) WHERE (revoked_at IS NULL)",
@@ -123,6 +125,8 @@ func TestSessionsMigration_Schema(t *testing.T) {
 				"UNIQUE (token_hash)",
 			},
 			indexes: []string{
+				// The expired tokens for the retention job (00104).
+				"CREATE INDEX refresh_tokens_expires_at_idx ON public.refresh_tokens USING btree (expires_at, id)",
 				"CREATE UNIQUE INDEX refresh_tokens_family_id_generation_key ON public.refresh_tokens USING btree (family_id, generation)",
 				"CREATE UNIQUE INDEX refresh_tokens_pkey ON public.refresh_tokens USING btree (id)",
 				"CREATE UNIQUE INDEX refresh_tokens_token_hash_key ON public.refresh_tokens USING btree (token_hash)",

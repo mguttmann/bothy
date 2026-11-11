@@ -539,8 +539,8 @@ actions:
   effect: write
 - id: local_credential.set
   section: identity
-  description: set a local password and set up TOTP; step-up as soon as a password path with TOTP is set
-    up
+  description: set a local password and set up TOTP; step-up unless the session has nothing to confirm
+    one with (section 2.4)
   resource: user
   right: self
   owner: false
@@ -551,7 +551,7 @@ actions:
   effect: write
 - id: passkey.register
   section: identity
-  description: add a passkey; step-up as soon as an active passkey exists
+  description: add a passkey; step-up unless the session has nothing to confirm one with (section 2.4)
   resource: user
   right: self
   owner: false

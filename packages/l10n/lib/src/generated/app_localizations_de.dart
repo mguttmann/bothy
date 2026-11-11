@@ -4280,6 +4280,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get consoleStepUpConfirm => 'Bestätigen';
 
   @override
+  String get consoleStepUpCodeHint =>
+      'Nimm einen neuen Code. Ein Code, den du schon benutzt hast, zum Beispiel zum Anmelden, gilt kein zweites Mal: warte, bis deine App den nächsten zeigt.';
+
+  @override
   String get consoleStepUpFailed =>
       'Die Bestätigung ist fehlgeschlagen. Versuche es erneut oder wähle einen anderen Weg.';
 

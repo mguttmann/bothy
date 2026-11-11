@@ -44,7 +44,9 @@ type ConsoleLogin struct {
 // Seed prepares the console test (brief M6-03 Design note 7) after `bothy setup bootstrap-owner`:
 // it redeems the enrollment code of setupStdout as a device of the owner, sets a random password,
 // enrolls TOTP and confirms it with the code of the current step. The owner then has a local
-// account with password and TOTP for the console form of loginWithPassword. Errors name the step,
+// account with password and TOTP for the console form of loginWithPassword. The device has no
+// step-up key and the owner no sign-in data yet, so the session has nothing to confirm a step-up
+// with and sets up the first password without one (07 section 4.2 step 8). Errors name the step,
 // never a value.
 func Seed(ctx context.Context, api SeedREST, setupStdout []byte) (ConsoleLogin, error) {
 	code, err := ReadEnrollmentCode(setupStdout)
@@ -55,17 +57,12 @@ func Seed(ctx context.Context, api SeedREST, setupStdout []byte) (ConsoleLogin, 
 	if err != nil {
 		return ConsoleLogin{}, err
 	}
-	stepUp, err := NewKey()
-	if err != nil {
-		return ConsoleLogin{}, err
-	}
 	api.SetCredentials(dpop, "")
 	tr, err := api.RedeemEnrollmentCode(ctx, rest.EnrollRedeemRequest{
 		EnrollmentCode: code,
 		Device: rest.DeviceRegistration{
 			DeviceId: newUUIDv7(), Name: "console e2e seed", Platform: rest.DevicePlatformMacos,
 			Alg: rest.DeviceRegistrationAlgES256, PublicJwk: dpop.PublicJWK(),
-			StepUpKey: &rest.DeviceKeyRegistration{Alg: rest.DeviceKeyRegistrationAlgES256, PublicJwk: stepUp.PublicJWK()},
 		},
 	})
 	if err != nil {

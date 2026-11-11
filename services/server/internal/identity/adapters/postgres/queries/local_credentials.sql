@@ -36,7 +36,7 @@ LIMIT 1;
 
 -- name: HasEstablishedLocalCredential :one
 -- The password path of a person is established once its TOTP enrollment is confirmed (07 section
--- 4.2 step 8, has_credentials of local_credential.set).
+-- 4.2 step 8, can_confirm of the conditional step-up).
 SELECT EXISTS (
     SELECT 1 FROM local_credentials c
     JOIN user_identities i ON i.id = c.identity_id

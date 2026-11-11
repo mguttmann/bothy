@@ -311,6 +311,8 @@ func TestMigration_TerminalSessions_RDM40(t *testing.T) {
 		"CREATE INDEX terminal_sessions_host_open_idx ON public.terminal_sessions USING btree (host_id) WHERE (state <> 'closed'::text)",
 		"CREATE INDEX terminal_sessions_auth_session_open_idx ON public.terminal_sessions USING btree (auth_session_id) WHERE (state <> 'closed'::text)",
 		"CREATE INDEX terminal_sessions_device_open_idx ON public.terminal_sessions USING btree (device_id) WHERE (state <> 'closed'::text)",
+		// The closed sessions for the retention job (00104).
+		"CREATE INDEX terminal_sessions_closed_at_idx ON public.terminal_sessions USING btree (closed_at, id) WHERE (closed_at IS NOT NULL)",
 	} {
 		if !slices.Contains(idx, want) {
 			t.Errorf("index missing: %s", want)

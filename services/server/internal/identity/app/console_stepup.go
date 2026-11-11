@@ -25,6 +25,7 @@ const (
 	causeStepUpKeyPresent              = "step_up_key_present"
 	causeIdentityOther    stepup.Cause = "identity_mismatch"
 	causeAuthTimeTooOld   stepup.Cause = "auth_time_before_challenge"
+	causeAuthTimeMissing  stepup.Cause = "auth_time_missing"
 	causeNoLocalAccount                = "no_local_account"
 	causeReauthFlow                    = "reauth_flow_mismatch"
 	fieldAppRedirectURI                = "/app_redirect_uri"
@@ -232,7 +233,8 @@ func (c *Console) redeemReauth(ctx context.Context, a actor.Actor, loginCode, cl
 
 // reauthCause decides the re-login re on the locked challenge ch: the identity must be one of
 // the person's (same issuer and subject) and auth_time not before the second of the challenge's
-// creation; it returns the cause of a refusal, "" for a confirmation.
+// creation; an ID token without auth_time proves no new sign-in and is refused as well. It
+// returns the cause of a refusal, "" for a confirmation.
 func (c *Console) reauthCause(ctx context.Context, a actor.Actor, re reauth, ch ChallengeRecord) (stepup.Cause, error) {
 	rec, found, err := c.d.Identities.ActiveIdentityBySubject(ctx, re.providerID, re.ext.Subject)
 	if err != nil {
@@ -241,7 +243,10 @@ func (c *Console) reauthCause(ctx context.Context, a actor.Actor, re reauth, ch 
 	if !found || rec.UserID != a.ID || rec.Issuer != re.ext.Issuer {
 		return causeIdentityOther, nil
 	}
-	if re.ext.AuthTime.IsZero() || re.ext.AuthTime.Before(ch.CreatedAt.Truncate(time.Second)) {
+	if re.ext.AuthTime.IsZero() {
+		return causeAuthTimeMissing, nil
+	}
+	if re.ext.AuthTime.Before(ch.CreatedAt.Truncate(time.Second)) {
 		return causeAuthTimeTooOld, nil
 	}
 	return "", nil
@@ -307,7 +312,7 @@ func (l *LocalCredentials) stepUpPassword(ctx context.Context, userID ids.ID, pa
 		return "", notPossible(causeNoLocalAccount, ids.ID{})
 	}
 	nfc := l.d.Normalizer.NFC(password)
-	ok, rehash, err := l.d.Hasher.Verify(rec.PasswordHash, nfc)
+	ok, rehash, err := l.d.Hasher.Verify(ctx, rec.PasswordHash, nfc)
 	if err != nil {
 		return "", errs.Wrap(errs.CodeInternalError, err, "identity: verifying a password")
 	}
@@ -346,7 +351,7 @@ func (l *LocalCredentials) stepUpPasswordLocked(ctx context.Context, v verified,
 	}
 	rec.Lockout = domain.Lockout{}
 	if v.rehash {
-		phc, err := l.d.Hasher.Hash(v.nfc)
+		phc, err := l.d.Hasher.Hash(ctx, v.nfc)
 		if err != nil {
 			return "", errs.Wrap(errs.CodeInternalError, err, "identity: rehashing a password")
 		}

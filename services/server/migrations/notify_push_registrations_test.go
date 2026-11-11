@@ -57,6 +57,8 @@ func TestMigrationPushRegistrations(t *testing.T) {
 	}
 	idx := []string{
 		"CREATE INDEX push_registrations_auth_session_id_idx ON public.push_registrations USING btree (auth_session_id)",
+		// The foreign key to devices (00104).
+		"CREATE INDEX push_registrations_device_id_idx ON public.push_registrations USING btree (device_id)",
 		"CREATE INDEX push_registrations_user_id_active_idx ON public.push_registrations USING btree (user_id) WHERE (disabled_at IS NULL)",
 		"CREATE UNIQUE INDEX push_registrations_pkey ON public.push_registrations USING btree (id)",
 		"CREATE UNIQUE INDEX push_registrations_preview_token_hash_key ON public.push_registrations USING btree (preview_token_hash) WHERE (preview_token_hash IS NOT NULL)",

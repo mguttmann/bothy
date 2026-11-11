@@ -44,7 +44,7 @@ SELECT EXISTS (
 `
 
 // The password path of a person is established once its TOTP enrollment is confirmed (07 section
-// 4.2 step 8, has_credentials of local_credential.set).
+// 4.2 step 8, can_confirm of the conditional step-up).
 func (q *Queries) HasEstablishedLocalCredential(ctx context.Context, userID pgtype.UUID) (bool, error) {
 	row := q.db.QueryRow(ctx, hasEstablishedLocalCredential, userID)
 	var established bool

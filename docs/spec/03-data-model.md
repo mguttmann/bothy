@@ -356,7 +356,8 @@ Module: `identity`.
 PK: `id`. FK: `user_id` -> `users(principal_id)` ON DELETE RESTRICT; `approved_by`,
 `revoked_by` -> `principals(id)` ON DELETE RESTRICT. Unique: no others.
 Indexes: `(user_id, state)` for the device list; `(state) WHERE state = 'pending'` for the
-approval queue of the admin console. Retention: `security`. Checks: `(state = 'revoked') =
+approval queue of the admin console; `(revoked_at, id) WHERE revoked_at IS NOT NULL` for the
+retention job. Retention: `security`. Checks: `(state = 'revoked') =
 (revoked_at IS NOT NULL)`; `revoke_reason IS NULL OR state = 'revoked'`.
 
 #### `device_keys`
@@ -419,7 +420,9 @@ client_component = 'share_ext'`; `(step_up_at IS NULL) = (step_up_method IS
 NULL)`; `step_up_consumed_at IS NULL OR step_up_at IS NOT NULL`; `(view_as_user_id IS NULL) =
 (view_as_started_at IS NULL)`; `view_as_user_id IS NULL OR client_component = 'console'`. Unique: `cookie_hash` as a partial index `WHERE cookie_hash IS NOT NULL`.
 Indexes: `(user_id) WHERE revoked_at IS NULL` for "end all sessions"; `(device_id)`;
-`(parent_session_id) WHERE parent_session_id IS NOT NULL`; `(expires_at)` for the cleanup job.
+`(parent_session_id) WHERE parent_session_id IS NOT NULL`; `(expires_at)` for the cleanup job;
+`(LEAST(expires_at, revoked_at), id)` for the retention job, whose end of a session is its
+revocation or its expiry, whichever came first.
 Retention: `security`.
 
 #### `refresh_token_families`
@@ -457,7 +460,8 @@ Purpose: individual refresh tokens, only as a hash. Module: `identity`.
 | `used_at` | `timestamptz` | yes | | set on rotation |
 
 PK: `id`. FK: `family_id` -> `refresh_token_families(id)` ON DELETE CASCADE.
-Unique: `token_hash`; `(family_id, generation)`. Indexes: via the unique indexes.
+Unique: `token_hash`; `(family_id, generation)`. Indexes: via the unique indexes;
+`(expires_at, id)` for the retention job.
 Retention: `security`.
 Rotation: in one transaction `SELECT ... FOR UPDATE` on the family, with a DPoP proof with
 `dpop_jkt` as a precondition.
@@ -1000,7 +1004,8 @@ across devices. Module: `chat`.
 
 PK: `(user_id, space_id)`. FK: `user_id` -> `users(principal_id)` ON DELETE CASCADE;
 `space_id` -> `spaces(id)` ON DELETE CASCADE; `updated_by_device_id` -> `devices(id)` ON DELETE
-SET NULL. Indexes: covered by the PK. Retention: `personal_sync`.
+SET NULL. Indexes: covered by the PK; `(updated_by_device_id) WHERE updated_by_device_id IS NOT
+NULL` for the foreign key check when a device is deleted. Retention: `personal_sync`.
 
 #### `user_channel_states`
 
@@ -1020,7 +1025,8 @@ addendum of 2026-11-08, PROJ-ARCHIVE). Module: `chat`.
 
 PK: `(user_id, channel_id)`. FK: `user_id` -> `users(principal_id)` ON DELETE CASCADE;
 `channel_id` -> `channels(id)` ON DELETE CASCADE; `updated_by_device_id` -> `devices(id)` ON
-DELETE SET NULL. Indexes: covered by the PK. Retention: `personal_sync`.
+DELETE SET NULL. Indexes: covered by the PK; `(updated_by_device_id) WHERE updated_by_device_id
+IS NOT NULL` for the foreign key check when a device is deleted. Retention: `personal_sync`.
 
 #### `channels`
 
@@ -1343,6 +1349,9 @@ Indexes:
 - `(trigger_state) WHERE trigger_state IN ('received','queued','working')` for resumption
   after a restart and "Running now".
 - GIN `(search_vector)` for full-text search.
+- `(created_at, id) WHERE deleted_at IS NULL AND kind <> 'system'` for the candidates of the job
+  `retention.content` ([20-privacy.md](20-privacy.md), section 4.1): the messages that still hold
+  content, oldest first.
 
 Retention: `content`.
 Deletion empties `content_md`, sets `has_attachments` to `false`, deletes attachments, revisions,
@@ -2052,7 +2061,8 @@ Purpose: read state per person and thread. Module: `sync`.
 PK: `(user_id, thread_id)`. FK: `user_id` -> `users(principal_id)` ON DELETE CASCADE;
 `thread_id` -> `threads(id)` ON DELETE CASCADE; `channel_id` -> `channels(id)` ON DELETE
 CASCADE; `updated_by_device_id` -> `devices(id)` ON DELETE SET NULL.
-Indexes: `(user_id, channel_id)` for unread counters per channel.
+Indexes: `(user_id, channel_id)` for unread counters per channel; `(updated_by_device_id) WHERE
+updated_by_device_id IS NOT NULL` for the foreign key check when a device is deleted.
 Retention: `personal_sync`.
 Unread = `threads.last_message_seq - GREATEST(coalesce(last_read_seq, 0),
 threads.unread_floor_seq)`, only for visible threads. Unread mentions = rows in
@@ -2087,7 +2097,8 @@ PK: `id`. FK: `user_id` -> `users(principal_id)` ON DELETE CASCADE; `thread_id` 
 `reply_to_message_id` -> `messages(id)` ON DELETE SET NULL; `updated_by_device_id` ->
 `devices(id)` ON DELETE SET NULL. Unique: partial index `(user_id, thread_id) WHERE thread_id IS
 NOT NULL`; partial index `(user_id, channel_id) WHERE thread_id IS NULL`. Indexes: covered by the
-unique indexes. Retention: `personal_sync`. An empty draft is deleted.
+unique indexes; `(updated_by_device_id) WHERE updated_by_device_id IS NOT NULL` for the foreign key check when a device is deleted.
+Retention: `personal_sync`. An empty draft is deleted.
 
 #### `user_settings`
 
@@ -2103,7 +2114,8 @@ Purpose: synchronized personal settings, versioned per key. Module: `sync`.
 | `updated_at` | `timestamptz` | no | `now()` | |
 
 PK: `(user_id, key)`. FK: `user_id` -> `users(principal_id)` ON DELETE CASCADE;
-`updated_by_device_id` -> `devices(id)` ON DELETE SET NULL. Indexes: covered by the PK.
+`updated_by_device_id` -> `devices(id)` ON DELETE SET NULL. Indexes: covered by the PK;
+`(updated_by_device_id) WHERE updated_by_device_id IS NOT NULL` for the foreign key check when a device is deleted.
 Retention: `personal_sync`.
 
 #### `notification_preferences`
@@ -2171,7 +2183,8 @@ PK: `id`. FK: `user_id` -> `users(principal_id)` ON DELETE CASCADE; `device_id` 
 `devices(id)` ON DELETE CASCADE; `auth_session_id` -> `auth_sessions(id)` ON DELETE CASCADE.
 Checks: `(disabled_at IS NULL) = (disabled_reason IS NULL)`. Unique: `(provider, token)`;
 `preview_token_hash` as a partial index `WHERE preview_token_hash IS NOT NULL`. Indexes: `(user_id)
-WHERE disabled_at IS NULL` for sending; `(auth_session_id)`. Retention: `security`.
+WHERE disabled_at IS NULL` for sending; `(auth_session_id)`; `(device_id)` for the foreign key check when a device is deleted.
+Retention: `security`.
 
 ### 4.11 Integrations (`apps`, `importer`)
 
@@ -2674,7 +2687,8 @@ NULL)`; `close_detail IS NULL OR state = 'closed'`; `(state = 'detached') = (det
 NULL)`.
 Unique: `token_jti`. Indexes: `(user_id) WHERE state <> 'closed'` for `terminal.max_sessions_per_person`
 and for ending sessions on revocation; `(host_id) WHERE state <> 'closed'`; `(auth_session_id) WHERE state <>
-'closed'`; `(device_id) WHERE state <> 'closed'`; BRIN `(opened_at)` for retention.
+'closed'`; `(device_id) WHERE state <> 'closed'`; BRIN `(opened_at)` for retention; `(closed_at, id) WHERE
+closed_at IS NOT NULL` for the candidates of the retention job.
 Retention: `security` (period `retention.security_after_end` after `closed_at`).
 
 ### 4.15 Statistics (`stats`)

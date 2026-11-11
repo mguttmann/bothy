@@ -407,6 +407,7 @@ func casePasskeyLoginRevokedCredential(t *testing.T, w *sworld) {
 func casePasskeyLoginOnlyWithLocalIdentity(t *testing.T, w *sworld) {
 	sam := w.phone(w.person(w.handle("sam"), false))
 	a := authenticator()
+	sam.stepUp()
 	w.want(sam.register(a, "Laptop"), http.StatusCreated, "")
 	a.Discoverable = true
 	w.want(w.passkeyLogin("", a, w.phoneKeys()), http.StatusUnauthorized, "unauthenticated")
@@ -473,13 +474,19 @@ func caseSignCountRegressionAudited(t *testing.T, w *sworld) {
 }
 
 func casePasskeyRegisterStepUpOnlyWhenOneExists(t *testing.T, w *sworld) {
-	sam := w.phone(w.person(w.handle("sam"), false))
-	m := w.want(sam.register(authenticator(), "Laptop"), http.StatusCreated, "")
+	// A session with nothing to confirm with (no step_up key, no passkey, no password) adds the
+	// first passkey without step-up; from then on the passkey confirms, and every further one
+	// needs it (07 section 4.2 step 8).
+	samID := w.person(w.handle("sam"), false)
+	sam := w.loginDevice(samID, identity.DeviceStateActive, identity.PlatformWindows, false)
+	first := authenticator()
+	m := w.want(sam.register(first, "Laptop"), http.StatusCreated, "")
 	if m["name"] != "Laptop" || m["id"] == nil {
 		t.Fatalf("passkey %v", m)
 	}
 	w.want(sam.call(http.MethodPost, registerBeginPath, ""), http.StatusUnauthorized, "step_up_required")
-	sam.stepUp()
+	r, _ := sam.passkeyStepUp(first)
+	w.want(r, http.StatusOK, "")
 	w.want(sam.register(authenticator(), "Phone"), http.StatusCreated, "")
 	if n := w.passkeys(sam.user, true); n != 2 {
 		t.Fatalf("%d passkeys", n)
@@ -493,39 +500,40 @@ func casePasskeyRegisterStepUpOnlyWhenOneExists(t *testing.T, w *sworld) {
 	if allows != 2 {
 		t.Fatalf("%d allow entries of passkey.register, want 2", allows)
 	}
-	pat := sam.personalToken()
+	phone := w.phone(samID)
+	phone.stepUp()
+	pat := phone.personalToken()
 	w.wantReason(w.withToken(pat, http.MethodPost, registerBeginPath, ""), http.StatusForbidden, "forbidden", "step_up_not_possible")
 }
 
 func casePasskeyRegisterBoundToSession(t *testing.T, w *sworld) {
 	user := w.person(w.handle("sam"), false)
 	one, two := w.phone(user), w.phone(user)
+	one.stepUp()
+	two.stepUp()
 	m := w.want(one.call(http.MethodPost, registerBeginPath, ""), http.StatusOK, "")
 	cred, _ := authenticator().Create(options(t, m, "public_key"))
 	body, _ := json.Marshal(map[string]any{"challenge_id": m["challenge_id"], "credential": json.RawMessage(cred), "name": "Laptop"})
 	w.want(two.call(http.MethodPost, registerCompletePath, string(body)), http.StatusBadRequest, "validation_failed")
 	// The challenge stays usable in its own session.
 	w.want(one.call(http.MethodPost, registerCompletePath, string(body)), http.StatusCreated, "")
-	// Used once: with the step-up a second passkey needs, the same completion is refused.
-	one.stepUp()
+	// Used once: the same completion is refused.
 	w.want(one.call(http.MethodPost, registerCompletePath, string(body)), http.StatusBadRequest, "validation_failed")
 }
 
 func casePasskeyRegisterDuplicate(t *testing.T, w *sworld) {
 	sam := w.phone(w.person(w.handle("sam"), false))
 	a := authenticator()
-	w.want(sam.register(a, "Laptop"), http.StatusCreated, "")
 	sam.stepUp()
+	w.want(sam.register(a, "Laptop"), http.StatusCreated, "")
 	a.Reuse = true
 	w.want(sam.register(a, "Again"), http.StatusConflict, "conflict")
 }
 
 func casePasskeyAlgorithms(t *testing.T, w *sworld) {
 	sam := w.phone(w.person(w.handle("sam"), false))
-	for i, alg := range []virtualauthn.Alg{virtualauthn.ES256, virtualauthn.EdDSA, virtualauthn.RS256} {
-		if i > 0 {
-			sam.stepUp()
-		}
+	for _, alg := range []virtualauthn.Alg{virtualauthn.ES256, virtualauthn.EdDSA, virtualauthn.RS256} {
+		sam.stepUp()
 		a := virtualauthn.New(httpservertest.PublicURL, alg)
 		w.want(sam.register(a, "Key"), http.StatusCreated, "")
 		r, _ := sam.passkeyStepUp(a)
@@ -537,8 +545,8 @@ func casePasskeyAlgorithms(t *testing.T, w *sworld) {
 
 func caseRevokePasskey(t *testing.T, w *sworld) {
 	sam := w.phone(w.person(w.handle("sam"), false))
-	w.want(sam.register(authenticator(), "One"), http.StatusCreated, "")
 	sam.stepUp()
+	w.want(sam.register(authenticator(), "One"), http.StatusCreated, "")
 	w.want(sam.register(authenticator(), "Two"), http.StatusCreated, "")
 	var one, two string
 	w.scalar(&one, `SELECT id::text FROM passkey_credentials WHERE name = 'One'`)
@@ -569,6 +577,7 @@ func caseRevokePasskey(t *testing.T, w *sworld) {
 func caseStepUpWithPasskey(t *testing.T, w *sworld) {
 	sam := w.phone(w.person(w.handle("sam"), false))
 	a := authenticator()
+	sam.stepUp()
 	w.want(sam.register(a, "Laptop"), http.StatusCreated, "")
 	m := w.want(sam.call(http.MethodPost, challengePath, ""), http.StatusOK, "")
 	opts, _ := m["passkey_options"].(map[string]any)
@@ -593,6 +602,7 @@ func caseStepUpWithPasskey(t *testing.T, w *sworld) {
 	// Another person's passkey fails and counts.
 	kim := w.phone(w.person(w.handle("kim"), false))
 	other := authenticator()
+	kim.stepUp()
 	w.want(kim.register(other, "Kim"), http.StatusCreated, "")
 	m = w.want(sam.call(http.MethodPost, challengePath, ""), http.StatusOK, "")
 	cred, _ := other.Get(options(t, m, "passkey_options"))
@@ -636,6 +646,7 @@ func caseUnlinkCountsPasskeysOnlyWithLocalIdentity(t *testing.T, w *sworld) {
 	prov := owner.createProvider("oidc", "Company SSO", oidcConfig)
 	samID := w.person(w.handle("sam"), false)
 	sam := w.phone(samID)
+	sam.stepUp()
 	w.want(sam.register(authenticator(), "Laptop"), http.StatusCreated, "")
 	only := w.link(samID, prov, "https://login.example.com", "sub-"+samID.String())
 	w.noDevices(samID)

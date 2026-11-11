@@ -101,7 +101,8 @@ Flow (diagram in section 14.1):
    `egress.allowed_hosts` ([19-security.md](19-security.md), SEC-NET-2).
 6. The server stores only the checked external identity in the flow (`external_identity`, schema
    `external_identity.v1`: `schema`, `issuer`, `subject`, `display_name`, `preferred_username`,
-   `email_hint`, `auth_time` (Unix seconds), `amr`, with group sync also `groups_state` and
+   `email_hint`, `auth_time` (Unix seconds; left out when the provider sent no `auth_time`,
+   never replaced by `iat`), `amr`, with group sync also `groups_state` and
    `groups`; `preferred_username` serves only the handle of a provisioned person), creates a one-time server code (in the
    API `login_code`, validity `auth.server_code_ttl`), bound to `client_challenge` and the flow,
    and redirects to `app_redirect_uri` with `login_code` and `login_attempt_id`. It changes no
@@ -209,6 +210,13 @@ Password with TOTP (table `local_credentials` in 03):
 - Password hash Argon2id in PHC format. Lower bound per OWASP: 19 MiB memory, 2 iterations,
   parallelism 1 (https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html,
   retrieved 2026-10-10 [verified]). Default values in section 18; a test rejects values below that.
+- One Argon2id computation holds `auth.argon2id_memory_kib` of memory, and the password login
+  computes one for every attempt, also for an unknown name (section 13). At most
+  `auth.argon2id_max_concurrent` computations run at the same time; a further password check
+  waits for a free one and ends with `503 unavailable` when the deadline of its request comes
+  first. The wait is the same for a known and an unknown name. Reason: without the limit,
+  parallel logins from a few addresses within `rl.public_auth` would exhaust the memory of the
+  process.
 - The login name is the `subject` of the local identity (at setup, the handle).
 - Minimum length `auth.password_min_length` (in Unicode characters after NFC); check against a
   local list of common passwords with an allowed license, in the repository only as truncated
@@ -221,8 +229,11 @@ Password with TOTP (table `local_credentials` in 03):
   server stores the last used time step.
 - Setup in two steps: `totp_enroll` returns the new secret once as an otpauth URI
   (the issuer is the host of `server.public_url`); only a valid `totp_code` makes it effective
-  (`totp_enabled_at`). The password method counts as set up as soon as TOTP is confirmed; only
-  then does `local_credential.set` require step-up (05, column "Step-up" `conditional`).
+  (`totp_enabled_at`). The password method counts as set up as soon as TOTP is confirmed.
+  `local_credential.set` requires step-up from every session that can confirm one, also for the
+  first password; only a session with nothing to confirm with sets it up with the session alone
+  (05, column "Step-up" `conditional`; [07-permissions.md](07-permissions.md), section 4.2 step
+  8). `passkey.register` follows the same rule.
 - The TOTP secret is a secret that the server needs for checking. It is stored encrypted
   (AES-256-GCM with the identity as additional data) in the database; the key lies only
   in the secret provider (`auth.totp_key_ref`, noted per row in `totp_key_ref`, so that a new
@@ -575,8 +586,11 @@ origin of `server.public_url`) and `completeStepUpOidcReauth` (`POST
 /api/v1/auth/step-up/oidc/complete`, body `login_code`, `client_verifier`). The flow asks the
 provider for `prompt=login` and `max_age=0`; the identity must be one of the person's linked
 identities (same issuer and subject) and its `auth_time` must not lie before the second in which
-the challenge was created (`auth_time` has whole seconds); then `step_up_method = oidc_reauth`. A
-wrong password, code, identity or `auth_time` fails the challenge and counts toward
+the challenge was created (`auth_time` has whole seconds); then `step_up_method = oidc_reauth`. An
+ID token without `auth_time` proves no new login and is refused the same way; `iat`, the time the
+token was issued, never stands in for it, because a provider that ignores `prompt=login` and
+`max_age=0` issues a new token for an old session (audit cause `auth_time_missing`). A
+wrong password, code or identity and a wrong or missing `auth_time` fail the challenge and count toward
 `auth.step_up_fail_limit`. A locked password path (section 13) answers `401 step_up_required`
 with reason `password_locked`, and a password changed during the attempt with reason
 `password_changed`; both count nothing, neither toward `auth.step_up_fail_limit` nor toward
@@ -641,7 +655,9 @@ step-up the same rule applies as for API tokens (section 12): no step-up on this
    end with `403 forbidden` (audit reason `step_up_not_possible`), as for a principal without a
    session.
 3. The person completes actions with step-up (05, section 2.4) in the app or the web console;
-   from the tool they end with `401 step_up_required`.
+   from the tool they end with `401 step_up_required`. That includes the actions with a
+   `conditional` step-up: a `cli` session sets up no passkey and no password, also not the
+   first one.
 
 Reason: A tool keeps its key in a file or in memory and signs without user
 verification. Without attestation the server cannot tell this apart from a key in secure
@@ -800,7 +816,14 @@ Operations and rules of the console session (M6-01, docs/DECISIONS.md D-M6-01-1 
   `auth.console_session_idle_timeout`; a session is idle from `last_seen_at +
   auth.console_session_idle_timeout` plus that hundredth on. An idle session or one past
   `auth.console_session_max_age` is revoked with `revoke_reason = 'expired'` by the request that
-  finds it or by the job `identity.auth_cleanup`, with one audit entry.
+  finds it or by the job `identity.auth_cleanup`, with one audit entry. Every accepted request
+  counts as activity, also the periodic requests of a page that refreshes itself: the live page
+  and TV mode ([25-visualization.md](25-visualization.md), section 6.6) ask every
+  `viz.live_poll_interval` while their tab is visible, so a console left open on them stays
+  logged in until `auth.console_session_max_age`; the idle end applies once no request arrives
+  any more, for example while the tab is hidden. Reason: TV mode is a screen nobody touches, in the session of a
+  person (R-VZ-09); the session on such a screen reads what the person may read (threat T-VZ-04),
+  and every administration still needs a fresh step-up.
 - "View as person" from the console is stored on the session ([07-permissions.md](07-permissions.md),
   section 9.2); `getConsoleSession` (`GET /api/v1/console/session`) shows it with its end, and
   `endViewAs` (`DELETE /api/v1/console/session/view-as`) ends it.
@@ -1137,6 +1160,9 @@ sequenceDiagram
 | ID-T29 | Registration with `platform = 'cli'` and `step_up_jwk`; challenge and confirmation with device key and with passkey from a `cli` session; action with step-up from a `cli` session | `400 validation_failed`; `403 forbidden` with audit `step_up_not_possible`; `401 step_up_required` |
 | ID-T30 | `stepUpWithPassword` from an `app` session on a device without an active `step_up` key; from a device with one; from a `cli` device | `200`, `step_up_method = password_totp`, audit `auth.step_up` confirm with method `password_totp`, no cookie; `403 forbidden` with `step_up_not_possible` (cause `step_up_key_present`), nothing counted; `403 forbidden` with `step_up_not_possible` |
 | ID-T31 | `stepUpWithPassword` with the right password and code while the password path is locked, more often than `auth.step_up_fail_limit`; then after the lockout; a password changed during the attempt | each `401 step_up_required` with reason `password_locked`, no failed challenge, session not revoked, audit cause `locked`; then `200`; `401 step_up_required` with reason `password_changed`, nothing counted |
+| ID-T32 | `passkey.register` and `local_credential.set` without a step-up: from a device with a `step_up` key; from a device without one for a person without sign-in data; for the first passkey of a person with a password and the first password of a person with a passkey; from a console session whose step-up ran out; from a `cli` device | `401 step_up_required` and nothing stored, except the person without sign-in data on the device without a key, who sets up the first sign-in data with the session alone |
+| ID-T33 | OIDC re-login of a console step-up whose ID token has no `auth_time` | `401 step_up_required`, the challenge fails and counts, audit cause `auth_time_missing`, no step-up |
+| ID-T34 | More password checks at the same time than `auth.argon2id_max_concurrent`; one of them waits past the end of its context | never more computations at once than the limit, all others finish; the waiting one leaves without computing |
 
 ## 16. Decisions of this chapter
 
@@ -1160,6 +1186,8 @@ sequenceDiagram
 | R-ID-16 | Step-up for the terminal only by passkey or step-up device key, recent and consumed per opening. | Owner requirement "renewed passkey confirmation when opening"; a terminal is remote access, not administration. |
 | R-ID-17 | `cli` devices have no step-up key and provide no step-up (6.4). | A key in a tool signs without user confirmation; without attestation, the server cannot tell it apart from a key in secure storage. |
 | R-ID-18 | A native app without an active `step_up` key confirms with password and TOTP; a device with one keeps the device key (6.2, docs/decisions.d/FIX-stepup-macos.md). | Windows has no `step_up` key by design (D-M4-11-2), and the console-only rule left such a device without any step-up method; password and TOTP are the strength the console already accepts, and the terminal still requires `passkey` or `device_key` (6.3). |
+| R-ID-19 | A session that can confirm a step-up needs one to set up a passkey or a password, also the first of its kind; only a session with nothing to confirm with sets up the first sign-in data with the session alone, never a `cli` device (05 2.4, 07 4.2 step 8). | A passkey or a password with TOTP confirms a step-up and signs in to the console; set up unconfirmed, a session would issue the factor of its own step-up. |
+| R-ID-20 | A console step-up by OIDC re-login needs the claim `auth_time`; `iat` never stands in (6.2). | `iat` is the time of the token, which a provider that ignores `prompt=login` and `max_age=0` also renews for an old session. |
 
 ## 17. Alignment with the core contract
 
@@ -1213,6 +1241,7 @@ The additions requested during drafting have been decided (integration of 2026-1
 | `auth.argon2id_memory_kib` | `65536` | Argon2id memory (lower bound 19456) |
 | `auth.argon2id_iterations` | `3` | Argon2id iterations (lower bound 2) |
 | `auth.argon2id_parallelism` | `1` | Argon2id parallelism |
+| `auth.argon2id_max_concurrent` | `4` | Argon2id computations at the same time, each with `auth.argon2id_memory_kib` of memory; further password checks wait |
 | `auth.login_fail_limit` | `10` | Failed attempts per account and window |
 | `auth.login_fail_window` | `15m` | Window for failed attempts |
 | `auth.login_lock_duration` | `15m` | Lockout of the password path |

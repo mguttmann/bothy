@@ -2162,3 +2162,72 @@ def test_console_start_fails_when_the_second_load_does_not_start_either() -> Non
     with pytest.raises(PlaywrightTimeout):
         headless.wait_for_console(page)  # type: ignore[arg-type]
     assert page.calls.count("reload") == 1
+
+
+# ---- the passkey of the owner in headless/admin_suites.py ----------------------------------
+class _LoginPage:
+    """A page whose fetches answer from a script per path; anything else is the passkey."""
+
+    def __init__(self, answers: dict[str, list[dict[str, object]]]) -> None:
+        self.answers = answers
+        self.paths: list[str] = []
+
+    def evaluate(self, script: str, arg: object = None) -> object:
+        if isinstance(arg, list) and len(arg) == 3:
+            path = str(arg[1])
+            self.paths.append(path.removeprefix("/api/v1"))
+            return self.answers[path.removeprefix("/api/v1")].pop(0)
+        return {"id": "credential"}
+
+
+class _Codes:
+    """The local account of a login test: a new code per call, without waiting for a step."""
+
+    name, password = "alex", "EXAMPLE-password"
+
+    def __init__(self) -> None:
+        self.given = 0
+
+    def code(self) -> str:
+        self.given += 1
+        return f"{self.given:06d}"
+
+
+_OK: dict[str, object] = {"status": 200, "json": {}}
+_STEP_UP: dict[str, object] = {"status": 401, "json": {"code": "step_up_required"}}
+_CHALLENGE: dict[str, object] = {"status": 200, "json": {"challenge_id": "c-1"}}
+_OPTIONS: dict[str, object] = {"status": 200, "json": {"challenge_id": "r-1", "public_key": {}}}
+
+
+def test_log_in_confirms_again_when_the_passkey_needs_a_step_up() -> None:
+    # 07 4.2 step 8: the console confirms before it adds a passkey, also the first one. The
+    # step-up of the admin suite lasts 3 s; when it ran out before the registration ended, the
+    # step-up and the registration run once more.
+    page = _LoginPage(
+        {
+            "/auth/password/login": [_OK],
+            "/auth/step-up/challenge": [_CHALLENGE, _CHALLENGE],
+            "/auth/step-up/password": [_OK, _OK],
+            "/me/passkeys/begin": [_OPTIONS, _OPTIONS],
+            "/me/passkeys/complete": [_STEP_UP, {"status": 201, "json": {}}],
+        }
+    )
+    codes = _Codes()
+    admin.log_in(page, codes)  # type: ignore[arg-type]
+    assert page.paths.count("/auth/step-up/password") == 2
+    assert page.paths[-1] == "/me/passkeys/complete"
+    assert codes.given == 3  # the login and two step-ups, each with its own code
+
+
+def test_log_in_fails_when_the_passkey_needs_a_step_up_twice() -> None:
+    page = _LoginPage(
+        {
+            "/auth/password/login": [_OK],
+            "/auth/step-up/challenge": [_CHALLENGE, _CHALLENGE],
+            "/auth/step-up/password": [_OK, _OK],
+            "/me/passkeys/begin": [_STEP_UP, _STEP_UP],
+        }
+    )
+    with pytest.raises(headless.StepUpRequiredError):
+        admin.log_in(page, _Codes())  # type: ignore[arg-type]
+    assert page.paths.count("/me/passkeys/begin") == 2

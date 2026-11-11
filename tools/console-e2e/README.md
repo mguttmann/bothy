@@ -68,6 +68,8 @@ A missing precondition exits with code 2 and a message that names the fix.
    `out/setup.out` (mode 0600, never printed).
 6. Seed (`bothy-smoke seed`): the owner's device redeems the code, sets a random password, enrolls
    TOTP and confirms it; the login goes to `out/console-login.json` (mode 0600, never printed).
+   The device has no step-up key, so its session sets up the first password without a step-up
+   (07 4.2 step 8).
 7. The TLS sidecar `tls` (Caddy) in the network namespace of `api` on port 8443.
 8. The browsers (`console-browser`, also in the namespace of `api`) open `https://localhost:8443/console/`.
 9. The server log must hold the report of the negative test (`csp violation reported` with
@@ -205,7 +207,8 @@ authenticator):
    (billing mode organization, operator of Marketing/Kampagnen and Marketing/Intern);
 4. Sam's waiting device: two devices of Sam call the API without the cookie, with DPoP proofs
    signed by WebCrypto keys of the page that are not extractable. The first redeems the enrollment
-   code, sets a random password and enrolls TOTP; the second logs in with password and TOTP as an
+   code, sets a random password and enrolls TOTP (it has no step-up key, so the first password
+   needs no step-up, 07 4.2 step 8); the second logs in with password and TOTP as an
    app and stays `pending`; its verification code comes from `getDevice` as that device;
 5. the ids and names make the document of `window.__e2eSeed`, a JSON string (`owner`, `sam`, `pendingDevice` with
    `code`, `spaces`, `channels`, `agents`, `group`; every inner object has `id` and `name`), which

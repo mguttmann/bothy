@@ -51,7 +51,7 @@ func (w *peopleWorld) bindLocal(id *wire.Identity) *app.LocalCredentials {
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	h, err := passwordhash.New(passwordhash.Params{MemoryKiB: 19456, Iterations: 2, Parallelism: 1})
+	h, err := passwordhash.New(passwordhash.Params{MemoryKiB: 19456, Iterations: 2, Parallelism: 1}, 4)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -86,9 +86,9 @@ func secretOf(t *testing.T, uri string) []byte {
 
 // TestLocalCredentials_UseCases runs the use cases of app.LocalCredentials directly (the HTTP tests
 // of M1-39 cover the same through the operations; INT-W18/7): the validation, setting the password
-// with a TOTP enrollment, a wrong and a right confirmation, the step-up once the path is
-// established, the login with a pending device, a replayed code, a wrong password and an unknown
-// name, and the credential overview.
+// with a TOTP enrollment, a wrong and a right confirmation, the step-up of a later change, the
+// login with a pending device, a replayed code, a wrong password and an unknown name, and the
+// credential overview.
 func TestLocalCredentials_UseCases(t *testing.T) {
 	t.Parallel()
 	w := newPeopleWorld(t)

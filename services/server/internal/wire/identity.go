@@ -559,9 +559,10 @@ func RegisterTrustedHeaderReadiness(reg *health.Registry, id *Identity) {
 
 // BindLocal builds the local accounts with password and TOTP (M1-39) over the login service of
 // BindSessions and sealer, the TOTP secret box over auth.totp_key_ref: the Argon2id hasher with
-// auth.argon2id_* (its dummy hash is computed here; hasher non-nil replaces it, for tests that
-// count the work), the common password list and the use cases with their handlers. Errors:
-// BindSessions has not run, a parameter below the OWASP floor, a value the use cases refuse.
+// auth.argon2id_* (its dummy hash is computed here, and at most auth.argon2id_max_concurrent
+// computations run at the same time; hasher non-nil replaces it, for tests that count the work),
+// the common password list and the use cases with their handlers. Errors: BindSessions has not
+// run, a parameter below the OWASP floor, a value the use cases refuse.
 func (i *Identity) BindLocal(sealer app.SecretSealer, hasher app.PasswordHasher) error {
 	if i.Logins == nil || sealer == nil {
 		return errors.New("wire: BindLocal needs the login service of BindSessions and the TOTP secret box")
@@ -569,7 +570,7 @@ func (i *Identity) BindLocal(sealer app.SecretSealer, hasher app.PasswordHasher)
 	if hasher == nil {
 		h, err := passwordhash.New(passwordhash.Params{
 			MemoryKiB: i.cfg.Argon2idMemoryKiB, Iterations: i.cfg.Argon2idIterations, Parallelism: i.cfg.Argon2idParallelism,
-		})
+		}, i.cfg.Argon2idMaxConcurrent)
 		if err != nil {
 			return err
 		}

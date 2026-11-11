@@ -43,6 +43,8 @@ func TestSyncPersonalDataMigration_Schema(t *testing.T) {
 				"PRIMARY KEY (user_id, thread_id)",
 			},
 			idx: []string{
+				// The foreign key to devices (00104).
+				"CREATE INDEX read_states_updated_by_device_id_idx ON public.read_states USING btree (updated_by_device_id) WHERE (updated_by_device_id IS NOT NULL)",
 				"CREATE INDEX read_states_user_channel_idx ON public.read_states USING btree (user_id, channel_id)",
 				"CREATE UNIQUE INDEX read_states_pkey ON public.read_states USING btree (user_id, thread_id)",
 			},
@@ -64,6 +66,8 @@ func TestSyncPersonalDataMigration_Schema(t *testing.T) {
 				"PRIMARY KEY (id)",
 			},
 			idx: []string{
+				// The foreign key to devices (00104).
+				"CREATE INDEX drafts_updated_by_device_id_idx ON public.drafts USING btree (updated_by_device_id) WHERE (updated_by_device_id IS NOT NULL)",
 				"CREATE UNIQUE INDEX drafts_pkey ON public.drafts USING btree (id)",
 				"CREATE UNIQUE INDEX drafts_user_channel_key ON public.drafts USING btree (user_id, channel_id) WHERE (thread_id IS NULL)",
 				"CREATE UNIQUE INDEX drafts_user_thread_key ON public.drafts USING btree (user_id, thread_id) WHERE (thread_id IS NOT NULL)",
@@ -80,7 +84,11 @@ func TestSyncPersonalDataMigration_Schema(t *testing.T) {
 				"FOREIGN KEY (user_id) REFERENCES users(principal_id) ON DELETE CASCADE",
 				"PRIMARY KEY (user_id, key)",
 			},
-			idx: []string{"CREATE UNIQUE INDEX user_settings_pkey ON public.user_settings USING btree (user_id, key)"},
+			idx: []string{
+				// The foreign key to devices (00104).
+				"CREATE INDEX user_settings_updated_by_device_id_idx ON public.user_settings USING btree (updated_by_device_id) WHERE (updated_by_device_id IS NOT NULL)",
+				"CREATE UNIQUE INDEX user_settings_pkey ON public.user_settings USING btree (user_id, key)",
+			},
 		},
 	} {
 		if got := principalColumns(t, conn, tc.table); !reflect.DeepEqual(got, tc.cols) {

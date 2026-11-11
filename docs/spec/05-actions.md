@@ -156,11 +156,18 @@ An attached file always follows its message, also after the thread is moved;
   ([08-identity.md](08-identity.md), section 6). Otherwise `401 step_up_required`.
   Only people can perform step-up actions; agent and app tokens and personal tokens
   are rejected (R-AZ-03).
-- **Step-up** `conditional`: like `yes` as soon as the person already has credentials of the kind
-  that the action sets up (the description names the condition); the first setup needs only the
-  session of a person. Reason: the first setup must work without existing credentials, and a
-  stolen session thereby gains only a login path whose new devices stay `pending`
-  ([08-identity.md](08-identity.md), section 5).
+- **Step-up** `conditional`: like `yes` for every session that can confirm a step-up. Only a
+  session with nothing to confirm with sets up the first sign-in data with the session alone: a
+  session outside the console on a device that is not `cli` and has no `step_up` key, of a person
+  without a passkey and without a password path with TOTP ([07-permissions.md](07-permissions.md), section
+  4.2 step 8). A device with a `step_up` key confirms with it, a console session confirms again
+  (it reaches the action only after its first step-up), and existing sign-in data of either kind
+  confirms for both actions; a `cli` device never sets up sign-in data
+  ([08-identity.md](08-identity.md), section 6.4).
+  Reason: the first setup must work without existing credentials, but a passkey or a password
+  with TOTP confirms a step-up and signs in to the console
+  ([08-identity.md](08-identity.md), sections 6.2 and 7.5), so a session that set one up
+  unconfirmed would issue the factor of its own step-up.
 - **Step-up** `fresh`: like `yes`, but the confirmation is younger than `terminal.step_up_max_age`,
   comes from a passkey or a step-up device key (in the web console only a passkey with
   `userVerification = required`) and is not yet consumed; the action consumes it
@@ -342,8 +349,8 @@ section 6.3). A failed check of the credentials of `identify`, `resume` or `reau
 | `identity.read` | read the identities, passkeys and local credentials of a person, without secrets | user | self or owner | no | no | no | no | `rl.read` |
 | `identity.link` | link a further identity | user | self | no | yes | yes | no | `rl.admin` |
 | `identity.unlink` | unlink an identity; rejected if no login path remains | user | self or owner | no | yes | yes | no | `rl.admin` |
-| `local_credential.set` | set a local password and set up TOTP; step-up as soon as a password path with TOTP is set up | user | self | no | conditional | yes | no | `rl.admin` |
-| `passkey.register` | add a passkey; step-up as soon as an active passkey exists | user | self | no | conditional | yes | no | `rl.admin` |
+| `local_credential.set` | set a local password and set up TOTP; step-up unless the session has nothing to confirm one with (section 2.4) | user | self | no | conditional | yes | no | `rl.admin` |
+| `passkey.register` | add a passkey; step-up unless the session has nothing to confirm one with (section 2.4) | user | self | no | conditional | yes | no | `rl.admin` |
 | `passkey.revoke` | revoke a passkey | passkey | self or owner | no | yes | yes | no | `rl.admin` |
 | `device.list` | read devices; a pending device reads itself | user, device | self or owner | no | no | no | no | `rl.read` |
 | `device.approve` | approve a pending device; one's own device from an active own device, with a confirmation code or pairing code ([08-identity.md](08-identity.md), section 5.3) | device | owner or self | no | yes | yes | yes | `rl.admin` |

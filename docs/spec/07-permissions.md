@@ -461,7 +461,7 @@ authorize(p, action, ref) -> Decision:
   if p.view_as and spec.writes: return DENY(forbidden, view_as_read_only)
 
   # 8. Step-up
-  if spec.step_up == yes or (spec.step_up == conditional and has_credentials(p, action)):
+  if spec.step_up == yes or (spec.step_up == conditional and can_confirm(p)):
       if p.kind != user or p.session_id missing: return DENY(forbidden, step_up_not_possible)
       if p.step_up_at missing or t - p.step_up_at > auth.step_up_max_age:
           return DENY(step_up_required)
@@ -540,10 +540,27 @@ startup check rejects every route, op or event type with such an action. The tic
 that delivers the facts replaces the entry in the same change. Reason: the catalogue is closed
 from M1 on (AZ-P3), and a requirement that cannot be checked yet must never allow. `conditional` in
 the column "Step-up" (05, section 2.4) counts as `yes` until the ticket that delivers the condition.
-`has_credentials(p, action)` is a question to `PrincipalSource`: for `passkey.register` a
-passkey of the person with `revoked_at IS NULL`, for `local_credential.set` a row in
-`local_credentials` with `totp_enabled_at IS NOT NULL` (an established password path). The rule
-itself stays in `authz` (B7).
+`can_confirm(p)` says whether the session of `p` has something to confirm a step-up with
+([08-identity.md](08-identity.md), section 6.2). It is true when one of these holds, and false
+only for a session that sets up the first sign-in data of a person:
+
+- the device of the session has an active `step_up` key, or its platform is `cli` (a `cli` device
+  never confirms a step-up and never sets up sign-in data, 08 section 6.4, so its conditional
+  actions end with `401 step_up_required`);
+- the session is a console session (`client_component = 'console'`): it reaches the action only
+  after its first step-up (08 section 7.5) and confirms again;
+- the person has a passkey with `revoked_at IS NULL`, or a row in `local_credentials` with
+  `totp_enabled_at IS NOT NULL` (an established password path). Either one counts for both
+  actions: a password alone never adds the first passkey, which opens the terminal (08 section
+  6.3), and a passkey alone never the first password.
+
+The device facts come from `CredentialSource`, the two facts of the person from
+`PrincipalSource`; stored sign-in data counts whether or not its method is switched on in the
+configuration (fail closed). The rule itself stays in `authz` (B7). Reason: a passkey or a
+password with TOTP confirms a step-up and signs in to the console, so a session that could set
+one up unconfirmed would issue the factor of its own step-up; what remains without a step-up is
+the first sign-in data of a person on a device that has no way to confirm, where the session is
+the only proof there is (docs/decisions.d/AUD-srv-identity-01.md).
 
 Actions with two targets (`thread.move`: thread and target channel, permission "manage on source and
 target"; `agent_session.bind`: thread and the thread in which the reference is current, permission

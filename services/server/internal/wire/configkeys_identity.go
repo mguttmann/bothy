@@ -126,6 +126,13 @@ func identityConfigKeys() []config.Key {
 			Chapter: chapter08,
 		},
 		{
+			// One computation holds auth.argon2id_memory_kib, and a password login computes one for
+			// every attempt, also for an unknown name: the limit bounds the memory of parallel logins.
+			Name: "auth.argon2id_max_concurrent", Kind: config.KindInt, Default: "4", Min: "1", Max: "1024",
+			Doc:     "Argon2id computations at the same time, each with auth.argon2id_memory_kib of memory; further password checks wait.",
+			Chapter: chapter08,
+		},
+		{
 			Name: "auth.password_min_length", Kind: config.KindInt, Default: "12", Min: "1", Max: "1024",
 			Doc:     "Shortest local password in Unicode code points after NFC.",
 			Chapter: chapter08,

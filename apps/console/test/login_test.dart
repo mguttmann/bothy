@@ -488,6 +488,14 @@ void main() {
       expect(find.text('Confirm that it is you'), findsOneWidget);
       await tester.tap(find.text('Confirm with password and one-time code'));
       await tester.pumpAndSettle();
+      // The code of the login is used up (08 2.5): the field says to take the next one, so
+      // nobody sends the code they just typed and collects a failed attempt.
+      expect(
+        find.text(
+          'Use a new code. A code you already used, for example to log in, does not work a second time: wait until your app shows the next one.',
+        ),
+        findsOneWidget,
+      );
       await tester.enterText(
         find.widgetWithText(TextField, 'Password'),
         'secret-1',

@@ -282,9 +282,11 @@ func TestExternalIdentityFromClaims(t *testing.T) {
 	t.Parallel()
 	c, _ := claimsFixture()
 	c.Name, c.PreferredUsername, c.Email, c.AMR = "", "alex@example.com", "alex@example.com", []string{"pwd"}
+	// A token without auth_time gives none: iat is the time of the token, not of the sign-in, so
+	// it never stands in (08 section 6.2).
 	x := oidcflow.ExternalFromClaims(c, "https://idp.example.com")
 	if x.Issuer != "https://idp.example.com" || x.Subject != "s-1" || x.DisplayName != "alex@example.com" || x.EmailHint != "alex@example.com" ||
-		!x.AuthTime.Equal(c.IssuedAt) || len(x.AMR) != 1 || x.PreferredUsername != "alex@example.com" {
+		c.IssuedAt.IsZero() || !x.AuthTime.IsZero() || len(x.AMR) != 1 || x.PreferredUsername != "alex@example.com" {
 		t.Fatalf("%+v", x)
 	}
 	c.Name, c.AuthTime = "Alex", c.IssuedAt.Add(-time.Hour)
@@ -374,6 +376,14 @@ func TestExternalIdentityJSON(t *testing.T) {
 	}
 	if _, err := oidcflow.ParseExternalIdentity([]byte(`{"schema":"other","issuer":"i","subject":"s"}`)); err == nil {
 		t.Fatal("other schema accepted")
+	}
+	// Without auth_time the member stays out and comes back as the zero time.
+	x.AuthTime = time.Time{}
+	if b, err = x.MarshalJSON(); err != nil || strings.Contains(string(b), "auth_time") {
+		t.Fatalf("%s %v", b, err)
+	}
+	if back, err = oidcflow.ParseExternalIdentity(b); err != nil || !back.AuthTime.IsZero() {
+		t.Fatalf("%+v %v", back, err)
 	}
 }
 

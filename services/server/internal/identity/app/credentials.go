@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
+	"github.com/OWNER/bothy/services/server/internal/identity"
 )
 
 // CredentialSource implements authz.CredentialSource over the device, session and API token
@@ -27,7 +28,9 @@ func NewCredentialSource(devices DeviceStore, sessions SessionStore, tokens APIT
 }
 
 // Credentials implements authz.CredentialSource. The device state is unknown for an id that does
-// not exist or belongs to another principal; a zero DeviceID gives zero device facts. A session is
+// not exist or belongs to another principal; a zero DeviceID gives zero device facts. DeviceCLI
+// and DeviceStepUpKey are the platform cli and an active step_up key of a device of the principal
+// (the conditional step-up of 07 section 4.2 step 8). A session is
 // active when it exists, is not revoked and belongs to PrincipalID and DeviceID; SessionExpiresAt
 // is its end, which authz compares with the time of the call. A token is active when it exists,
 // belongs to PrincipalID and has revoked_at IS NULL; TokenExpiresAt is its expires_at. Errors:
@@ -56,6 +59,7 @@ func (s *CredentialSource) Credentials(ctx context.Context, ref authz.Credential
 	f.DeviceState = authz.DeviceUnknown
 	if found && d.UserID == ref.PrincipalID {
 		f.DeviceState = authz.DeviceState(d.State)
+		f.DeviceCLI, f.DeviceStepUpKey = d.Platform == identity.PlatformCLI, d.StepUpKeyThumbprint != ""
 	}
 	return f, nil
 }
