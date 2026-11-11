@@ -349,7 +349,7 @@ def _render(name: str, values: dict[str, Any], *, attribute: bool = False) -> st
 
 
 def _parse(data: bytes, what: str) -> ET.Element:
-    parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))  # noqa: S314
+    parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))  # noqa: S314  # nosec B314
     try:
         return ET.fromstring(data, parser=parser)  # noqa: S314  # nosec B314
     except ET.ParseError as err:

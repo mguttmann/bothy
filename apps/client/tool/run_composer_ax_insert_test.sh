@@ -12,6 +12,7 @@ set -eu
 cd "$(dirname "$0")/.."
 out=$(mktemp -d)
 watcher=
+# shellcheck disable=SC2154 # status is set at the start of the trap text
 trap 'status=$?; if [ -n "$watcher" ]; then kill "$watcher" 2>/dev/null || true; cat "$out/probe.log" 2>/dev/null || true; fi; rm -rf "$out"; exit $status' EXIT
 swiftc -O -o "$out/ax_write_probe" macos/AxWriteProbe/ax_write_probe.swift
 if [ "${BOTHY_AX_CROSS_PROCESS:-}" = 1 ] && "$out/ax_write_probe" check; then

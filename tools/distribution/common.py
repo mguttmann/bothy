@@ -371,7 +371,8 @@ def trial_identity(workdir: Path, subject: str) -> TrialIdentity:
         serialization.PrivateFormat.PKCS12.encryption_builder()
         .kdf_rounds(50000)
         .key_cert_algorithm(pkcs12.PBES.PBESv1SHA1And3KeyTripleDESCBC)
-        .hmac_hash(hashes.SHA1())  # noqa: S303 - the PKCS#12 MAC macOS `security import` reads
+        # The PKCS#12 MAC macOS `security import` reads.
+        .hmac_hash(hashes.SHA1())  # noqa: S303  # nosec B303
         .build(password.encode())
     )
     p12 = workdir / "test-publisher.p12"
@@ -382,5 +383,6 @@ def trial_identity(workdir: Path, subject: str) -> TrialIdentity:
     pem.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
     der = workdir / "test-publisher.cer"
     der.write_bytes(cert.public_bytes(serialization.Encoding.DER))
-    thumbprint = cert.fingerprint(hashes.SHA1()).hex().upper()  # noqa: S303 - Windows' name
+    # Windows names a certificate by its SHA-1 thumbprint.
+    thumbprint = cert.fingerprint(hashes.SHA1()).hex().upper()  # noqa: S303  # nosec B303
     return TrialIdentity(p12=p12, pem=pem, der=der, password=password, thumbprint=thumbprint)

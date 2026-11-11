@@ -202,7 +202,8 @@ def fetch_sparkle(cache: Path = CACHE, download: Any = _download) -> Path:
         shutil.rmtree(target, ignore_errors=True)
         target.mkdir(parents=True)
         with tarfile.open(archive) as tar:
-            tar.extractall(target, filter="tar")
+            # The archive matched its pinned SHA-256 above; the filter refuses paths outside.
+            tar.extractall(target, filter="tar")  # nosec B202
     return target
 
 

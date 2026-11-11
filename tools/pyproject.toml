@@ -103,11 +103,14 @@ max-args = 7
 python_version = "3.12"
 strict = true
 warn_unreachable = true
-# Tool modules only; tests are linted by ruff and executed by pytest.
+# Tool modules only; tests are linted by ruff and executed by pytest. Every folder with tool code
+# but design-tokens, which is no package of this environment (its gate is `make tokens`):
+# ci/tests/test_lint_scope.py holds this list and the bandit list of the Makefile to the folders
+# git tracks.
 files = [
   "api-checks", "arch-check", "bin", "catalog", "ci", "console-e2e", "configdoc", "contract", "denylist", "distribution", "doccheck", "docs", "e2e", "hooks", "lint",
   "load", "observability", "opscheck", "portability", "showcase", "signalcheck", "sonarqube",
-  "templates",
+  "templates", "testing",
 ]
 exclude = ["/tests/"]
 

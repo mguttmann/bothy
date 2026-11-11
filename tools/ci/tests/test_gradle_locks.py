@@ -52,3 +52,20 @@ def test_gradle_build_turns_locking_on(root: Path) -> None:
     assert any("lockAllConfigurations()" in p.read_text(encoding="utf-8") for p in scripts), (
         f"no script under {root.relative_to(REPO)} calls lockAllConfigurations()"
     )
+
+
+def test_the_app_build_without_firebase_locks_no_firebase_or_play_services_package() -> None:
+    """`apps/client/android/osv-scanner.toml` exempts the Play services and Firebase libraries
+    of a build with a Firebase configuration from the license list (ADR 0072). The file applies
+    to both lock files of the folder, so the one of the build without Firebase must name none
+    of them, on any configuration."""
+    android = REPO / "apps" / "client" / "android"
+    names = {
+        line.split(":", 1)[0]
+        for line in (android / "gradle.lockfile").read_text(encoding="utf-8").splitlines()
+        if line and not line.startswith(("#", "empty="))
+    }
+    assert names, "apps/client/android/gradle.lockfile locks no dependency"
+    assert not {n for n in names if n.startswith(("com.google.android.gms", "com.google.firebase"))}
+    firebase = (android / "gradle-firebase.lockfile").read_text(encoding="utf-8")
+    assert "com.google.firebase:firebase-messaging:" in firebase

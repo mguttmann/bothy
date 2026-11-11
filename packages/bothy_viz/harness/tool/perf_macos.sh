@@ -36,6 +36,7 @@ for f in macos test/widget_test.dart pubspec.lock .metadata .gitignore bothy_viz
 done
 options=$(mktemp)
 cp analysis_options.yaml "$options"
+# shellcheck disable=SC2329 # called by the EXIT trap below
 cleanup() {
   for f in $added; do
     rm -rf "./$f"

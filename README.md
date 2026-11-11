@@ -121,8 +121,9 @@ Until the first release Bothy runs from source:
 - **Apps.** Build the desktop app with Flutter and the branding of your instance; the iPhone and
   Android apps likewise ([apps/client: Build and run](apps/client/README.md#build-and-run),
   [iPhone](apps/client/README.md#iphone)).
-- **Your own instance.** The Compose stack with the image of `make image`
-  ([Installation with Docker Compose](docs/operations/install-compose.md)).
+- **Your own instance.** The Compose stack with the images of `make image` and
+  `make postgres-image`, built under a local name
+  ([Installation with Docker Compose: from source](docs/operations/install-compose.md#12-from-source-until-the-first-release)).
 
 ## Quick start (from the first release)
 

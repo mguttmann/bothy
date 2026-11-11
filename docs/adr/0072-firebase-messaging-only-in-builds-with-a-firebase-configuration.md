@@ -18,7 +18,9 @@ retrieved 2026-10-26 [verified]), but it depends on Google Play services client 
 name the "Android Software Development Kit License", https://developer.android.com/studio/terms,
 for example
 https://dl.google.com/android/maven2/com/google/android/gms/play-services-basement/18.9.0/play-services-basement-18.9.0.pom,
-retrieved 2026-10-26 [verified]), which
+retrieved 2026-10-26 [verified]; the POMs of the Firebase client libraries
+`firebase-iid-interop` and `firebase-measurement-connector`, which come with it, name the same
+license, retrieved 2026-11-11 [verified]), which
 `quality/licenses/allowed.txt` does not list; docs/quality/licenses.md allows a proprietary
 dependency only with an ADR. An instance without a Firebase project gets no push on Android
 (15 10.2), and the product repository holds no instance's Firebase project. The question is
@@ -63,7 +65,11 @@ in the manifest: the token is fetched only when the app registers after the perm
 `PushManifestTest` checks on a device that the service is enabled exactly in a build with a
 Firebase configuration; `tool/run_android_tests.sh` runs the push tests in both builds (the
 second with the fake configuration of `android/fixtures/google-services.json`), and the
-`apps-android-26` and `apps-android-36` jobs run that script.
+`apps-android-26` and `apps-android-36` jobs run that script. `make licenses` reads both lock
+files (ruling AUD-ROOT-01/4): `apps/client/android/osv-scanner.toml` exempts the libraries under
+Google's terms per package and version with this ADR as the reason, and
+`tools/ci/tests/test_gradle_locks.py` fails when the lock file of the build without Firebase
+names a Play services or Firebase package.
 
 ## Pros and Cons of the Options
 

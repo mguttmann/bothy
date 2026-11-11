@@ -14,9 +14,9 @@
 #   restore        only `bothy restore finalize` after a restore (`docker compose run --rm restore`).
 # Choose exactly one of `direct` and `tailscale`.
 #
-# Note: the images bothy-server and bothy-postgres are built with the first release
-# (docs/spec/18-release.md). Until then this stack can only be checked as a contract
-# (`docker compose config`), not started.
+# Images: bothy-server and bothy-postgres come from the registry of a release
+# (docs/spec/18-release.md) or, until the first release, from `make image` and
+# `make postgres-image` (docs/operations/install-compose.md, section 1.2).
 #
 # Rules: ports on 127.0.0.1 only. PostgreSQL is attached to the internal network only, never to
 # the host. Secrets never in environment variables; each service sees only its own subdirectory

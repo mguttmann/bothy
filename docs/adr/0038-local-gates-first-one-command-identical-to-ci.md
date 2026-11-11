@@ -37,8 +37,12 @@ over all files, so that no check exists only in the hook.
 
 * Good, because a developer knows exactly one command and CI finds nothing new.
 * Good, because tools are pinned (uv lock, npm lock, sha256 lock for binaries).
-* Bad, because `make check` takes minutes before every push. That is intended: pushes are
-  rare (one pull request per finished feature).
+* Bad, because `make check` takes time before every push. That is intended: pushes are
+  rare (one pull request per finished feature). It took minutes when this was decided; with the
+  product code the full run on one machine takes hours (the Go tests alone are split over
+  several shards in CI, `tools/ci/go_test_timings.json`). The pre-push hook therefore runs it
+  for the parts a push touches, and build branches move the full run to GitHub-hosted runners
+  (docs/quality/push-discipline.md; the short ways are in CONTRIBUTING.md, "The short way").
 * Bad, because components without code skip today. That is visible (`SKIP` line)
   and ends automatically with the first code.
 
