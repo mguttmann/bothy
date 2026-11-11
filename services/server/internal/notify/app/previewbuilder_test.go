@@ -144,14 +144,20 @@ func TestPreviewBuilder_FieldsByMode(t *testing.T) {
 // hint again from a signal: the fields of the recipient's mode without the image; nothing for the
 // mode none, for a kind without a message, for no message ID and for an unknown, deleted, run or
 // system message.
+//
+// Both callers check push.deliver on the thread of the hint, never on the thread of the message
+// (AUD-SG1/9), so the fields belong to the hint only when the message lies in that thread: a hint
+// without a thread and a hint whose thread is not the message's give nothing, in every mode.
 func TestPreviewBuilder_HintFields(t *testing.T) {
 	alex, sam, robin := ids.New(), ids.New(), ids.New()
 	msg, deleted, run, image := ids.New(), ids.New(), ids.New(), ids.New()
+	thread, other := ids.New(), ids.New()
 	b, err := app.NewPreviewBuilder(app.PreviewConfig{DefaultMode: "full", MaxChars: 240}, app.PreviewBuilderDeps{
 		Messages: previewMessages{
-			msg:     {ID: msg, AuthorID: alex, Kind: "text", ContentMD: "**Hi** @sam", HasAttachments: true, MentionIDs: []ids.ID{sam}},
-			deleted: {ID: deleted, AuthorID: alex, Kind: "text", Deleted: true},
-			run:     {ID: run, AuthorID: alex, Kind: "run"},
+			msg: {ID: msg, ThreadID: thread, AuthorID: alex, Kind: "text", ContentMD: "**Hi** @sam", HasAttachments: true,
+				MentionIDs: []ids.ID{sam}},
+			deleted: {ID: deleted, ThreadID: thread, AuthorID: alex, Kind: "text", Deleted: true},
+			run:     {ID: run, ThreadID: thread, AuthorID: alex, Kind: "run"},
 		},
 		Names:       previewNames{SpaceName: "Support", ChannelName: "Allgemein", ThreadTitle: "Export"},
 		Principals:  previewPrincipals{alex: {ID: alex, Handle: "alex", DisplayName: "Alex"}, sam: {ID: sam, Handle: "sam", DisplayName: "Sam"}},
@@ -169,20 +175,25 @@ func TestPreviewBuilder_HintFields(t *testing.T) {
 		name      string
 		recipient ids.ID
 		kind      string
+		thread    ids.ID
 		message   ids.ID
 		want      app.PreviewFields
 	}{
-		{"the default mode full, without the image", alex, "mention", msg, full},
-		{"the stored mode names", sam, "message", msg, names},
-		{"the stored mode none", robin, "message", msg, app.PreviewFields{}},
-		{"a kind without a message", alex, "security", msg, app.PreviewFields{}},
-		{"an unknown kind", alex, "weather", msg, app.PreviewFields{}},
-		{"no message ID", alex, "message", ids.ID{}, app.PreviewFields{}},
-		{"an unknown message", alex, "message", ids.New(), app.PreviewFields{}},
-		{"a deleted message", alex, "message", deleted, app.PreviewFields{}},
-		{"a run message", alex, "run_done", run, app.PreviewFields{}},
+		{"the default mode full, without the image", alex, "mention", thread, msg, full},
+		{"the stored mode names", sam, "message", thread, msg, names},
+		{"the stored mode none", robin, "message", thread, msg, app.PreviewFields{}},
+		{"a kind without a message", alex, "security", thread, msg, app.PreviewFields{}},
+		{"an unknown kind", alex, "weather", thread, msg, app.PreviewFields{}},
+		{"no message ID", alex, "message", thread, ids.ID{}, app.PreviewFields{}},
+		{"an unknown message", alex, "message", thread, ids.New(), app.PreviewFields{}},
+		{"a deleted message", alex, "message", thread, deleted, app.PreviewFields{}},
+		{"a run message", alex, "run_done", thread, run, app.PreviewFields{}},
+		{"no thread ID, the mode full", alex, "message", ids.ID{}, msg, app.PreviewFields{}},
+		{"no thread ID, the mode names", sam, "message", ids.ID{}, msg, app.PreviewFields{}},
+		{"a message of another thread, the mode full", alex, "message", other, msg, app.PreviewFields{}},
+		{"a message of another thread, the mode names", sam, "mention", other, msg, app.PreviewFields{}},
 	} {
-		got, err := b.HintFields(ctx, c.recipient, c.kind, c.message)
+		got, err := b.HintFields(ctx, c.recipient, c.kind, c.thread, c.message)
 		if err != nil || got != c.want {
 			t.Errorf("%s: %+v %v, want %+v", c.name, got, err, c.want)
 		}

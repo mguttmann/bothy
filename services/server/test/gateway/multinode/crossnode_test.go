@@ -297,14 +297,19 @@ func TestDesktopHintWithSeparateWorker(t *testing.T) {
 }
 
 // notifyHint sends a gateway.hint signal for recipient about message in thread on the channel
-// ephemeral, as a worker process does (02 11.6), and returns its notification ID.
+// ephemeral, as a worker process does (02 11.6), and returns its notification ID. An empty thread
+// sends a signal that names none, which no job of the server sends.
 func (c *cluster) notifyHint(recipient, thread, message string) string {
 	c.t.Helper()
 	nid := ids.New()
-	payload, err := gatewaydomain.EncodeSignal(gatewaydomain.Signal{
+	s := gatewaydomain.Signal{
 		Kind: gatewaydomain.SignalHint, Node: ids.New(), RecipientID: ids.MustParse(recipient), NotificationID: nid, HintKind: "message",
-		ThreadID: ids.MustParse(thread), MessageID: ids.MustParse(message), Count: 1,
-	})
+		MessageID: ids.MustParse(message), Count: 1,
+	}
+	if thread != "" {
+		s.ThreadID = ids.MustParse(thread)
+	}
+	payload, err := gatewaydomain.EncodeSignal(s)
 	if err != nil {
 		c.t.Fatal(err)
 	}
@@ -344,6 +349,46 @@ func TestHintSignalWithoutAccessGetsNoEvent(t *testing.T) {
 	}
 	if strings.Contains(string(f.D), "Eskalation") {
 		t.Fatalf("the frame names Eskalation: %s", f.D)
+	}
+}
+
+// TestHintSignalPreviewNeedsTheThreadOfTheMessage (13 6.3, 02 11.6): the hub admits a hint on the
+// thread its signal names, so the receiving node builds a preview only of a message in that
+// thread. Sam reads Support/Allgemein and not Support/Eskalation. Anybody who may connect to the
+// database can send on the channel ephemeral, so the signals here are ones no job of the server
+// sends: both are about a message in Eskalation, the first names no thread and the second the
+// thread of Allgemein. Each reaches Sam's desktop on node b with exactly its IDs: no name of the
+// place, no author and no text.
+func TestHintSignalPreviewNeedsTheThreadOfTheMessage(t *testing.T) {
+	t.Parallel()
+	c := newCluster(t)
+	sam := c.w.People["Sam"]
+	desk := c.connect(nodeB, sam)
+	c.focus(desk, sam.PrincipalID, false)
+	hidden := c.w.Messages["Support/Eskalation"]
+	if len(hidden) == 0 {
+		t.Fatal("the world has no message in Eskalation")
+	}
+	for _, v := range []struct {
+		name, thread string
+		want         []string
+	}{
+		{"a signal without a thread", "", []string{"count", "kind", "message_id", "nid", "quiet"}},
+		{"a signal with a thread that is not the message's", c.w.Threads["Support/Allgemein"],
+			[]string{"count", "kind", "message_id", "nid", "quiet", "thread_id"}},
+	} {
+		nid := c.notifyHint(sam.PrincipalID, v.thread, hidden[0])
+		hint, f := c.waitDispatch(desk, "notification.created", func(d dispatch) bool { return strings.Contains(string(d.Payload), nid) })
+		var members map[string]json.RawMessage
+		if err := json.Unmarshal(hint.Payload, &members); err != nil {
+			t.Fatalf("%s: notification.created on node b: %s %v", v.name, hint.Payload, err)
+		}
+		if got := slices.Sorted(maps.Keys(members)); !slices.Equal(got, v.want) {
+			t.Errorf("%s: members %v of the hint, want exactly its IDs %v: %s", v.name, got, v.want, hint.Payload)
+		}
+		if strings.Contains(string(f.D), "Eskalation") {
+			t.Errorf("%s: the frame names Eskalation: %s", v.name, f.D)
+		}
 	}
 }
 

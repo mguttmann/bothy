@@ -440,6 +440,12 @@ node that holds the recipient's connection calls `HintFields` again through the 
 `HintPreviews` (`internal/wire`), and its hub checks `push.deliver` before the frame leaves
 (13 6.3, 02 11.6).
 
+`HintFields` takes the thread of the hint beside the message and gives no field unless the
+message lies in that thread (AUD-SG1/9): both callers check `push.deliver` on the thread of the
+hint, never on the thread of the message, and the IDs of a signal are no checked pair. A hint
+without a thread, or with a thread that is not the message's, keeps its IDs and gets no name and
+no text.
+
 ### Deactivation
 
 The in-transaction subscribers `Subscribers.OnSessionEnded` and `Subscribers.OnDeviceRevoked`,

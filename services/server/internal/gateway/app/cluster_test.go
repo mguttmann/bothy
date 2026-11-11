@@ -270,8 +270,8 @@ func TestCluster_PublisherSignals(t *testing.T) {
 
 // previewCall is one call of the preview port.
 type previewCall struct {
-	recipient, message ids.ID
-	kind               string
+	recipient, thread, message ids.ID
+	kind                       string
 }
 
 // fakePreviews is the preview port of a node: it records its calls and answers preview or err.
@@ -283,10 +283,10 @@ type fakePreviews struct {
 }
 
 // HintPreview implements app.HintPreviews.
-func (f *fakePreviews) HintPreview(_ context.Context, recipient ids.ID, kind string, message ids.ID) (app.HintPreview, error) {
+func (f *fakePreviews) HintPreview(_ context.Context, recipient ids.ID, kind string, thread, message ids.ID) (app.HintPreview, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.calls = append(f.calls, previewCall{recipient: recipient, message: message, kind: kind})
+	f.calls = append(f.calls, previewCall{recipient: recipient, thread: thread, message: message, kind: kind})
 	return f.preview, f.err
 }
 
@@ -315,8 +315,11 @@ const hintCanary = "Zebrafink"
 // TestCluster_HintFromWorkerCarriesPreview (13 6.3, 02 11.6; audit of 2026-11-11,
 // fn-push-notifications-1): the worker publishes notification.created with the preview fields its
 // job built; the signal carries the IDs only, and the node that holds the recipient's connection
-// builds the preview fields again through its preview port and sends them in the frame. A hint
-// without a message (security) asks the port for nothing and carries exactly its IDs.
+// builds the preview fields again through its preview port and sends them in the frame. The node
+// names the thread of the signal to the port, the one its hub admits the hint on, so the port can
+// refuse a message from elsewhere. A hint without a message (security) asks the port for nothing
+// and carries exactly its IDs, and so does a hint that names a message and no thread, which no
+// job sends: without a thread the hub admits by the recipient alone.
 func TestCluster_HintFromWorkerCarriesPreview(t *testing.T) {
 	t.Parallel()
 	w, b := newFocusWorld(), &bus{}
@@ -363,7 +366,7 @@ func TestCluster_HintFromWorkerCarriesPreview(t *testing.T) {
 	if !maps.Equal(hints[0], want) {
 		t.Fatalf("hint %v, want %v", hints[0], want)
 	}
-	if got := previews.calls; len(got) != 1 || got[0] != (previewCall{recipient: alex.ID, message: msg, kind: "message"}) {
+	if got := previews.calls; len(got) != 1 || got[0] != (previewCall{recipient: alex.ID, thread: th.ID, message: msg, kind: "message"}) {
 		t.Fatalf("preview calls %+v", got)
 	}
 
@@ -376,6 +379,17 @@ func TestCluster_HintFromWorkerCarriesPreview(t *testing.T) {
 	}
 	if n := len(previews.calls); n != 1 {
 		t.Fatalf("%d preview calls after a hint without a message, want 1", n)
+	}
+
+	publish(eventlog.ResourceRef{Kind: "user", ID: alex.ID}, eventlog.Scope{},
+		map[string]any{"nid": nid, "kind": "message", "message_id": msg, "quiet": false, "count": 1})
+	hints = hintsOf(t, conn)
+	if len(hints) != 3 || !maps.Equal(hints[2], map[string]any{"nid": nid.String(), "kind": "message", "message_id": msg.String(),
+		"quiet": false, "count": float64(1)}) {
+		t.Fatalf("hints %v, want a third one with exactly its IDs", hints)
+	}
+	if n := len(previews.calls); n != 1 {
+		t.Fatalf("%d preview calls after a hint with a message and no thread, want 1", n)
 	}
 }
 

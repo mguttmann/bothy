@@ -600,6 +600,11 @@ in its process. The api node that holds a connection of the recipient builds the
 same rule and the same preview builder (the recipient's `notify.preview_mode` of that moment, a
 kind that points at a message, no `image_url`), and its hub checks `push.deliver` for every
 connection before the frame leaves, so a reader who lost access still gets no event and no name.
+The hub makes that check on the thread the signal names, not on the thread of the message, and
+every database role that may connect can send on the channel. So the preview builder gives the
+fields only of a message that lies in the thread of the hint: a hint that names a message and no
+thread, or a thread that is not the message's, goes out with its IDs alone. The job follows the
+same rule with the thread and the message of its own arguments.
 A failed read on that node cannot be run again, because a signal is at most once: the hint goes
 out with its IDs, and one log record names the failure without a name or a text.
 

@@ -11,7 +11,9 @@
   crosses processes: with separate `api` and `worker`, and with several api nodes, the signal
   between the processes carries IDs only, and the node that holds the recipient's connection now
   builds the fields of the recipient's `notify.preview_mode` before its hub checks `push.deliver`.
-  Before, every such hint arrived with its IDs alone.
+  Before, every such hint arrived with its IDs alone. The fields are built only of a message that
+  lies in the thread the hint names; a hint without a thread, or with the thread of another
+  message, keeps its IDs alone.
 - The gateway op `focus` honours `background_thread_ids`: the frame codec dropped the member, so
   a thread named only there got neither the run document nor `run.updated`.
 

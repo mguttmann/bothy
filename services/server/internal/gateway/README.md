@@ -339,6 +339,11 @@ for `validation_failed`, `forbidden`, `not_found`, `conflict`, `base_version_con
   the rule of the job `notify.gateway_send`; 13 6.3), before the hub admits each connection. A
   failed read sends the hint with its IDs and logs `gateway hint sent without its preview` with
   the signal kind and the error kind.
+- The hub admits such a hint on the thread the signal names, or on the recipient alone when it
+  names none, and every database role that may connect can send on the channel. `applyHint`
+  therefore asks the port only for a hint with a thread and a message and passes both; the port
+  gives no field for a message outside that thread (AUD-SG1/9). Such a hint still goes out with
+  its IDs.
 
 ## Several api nodes (M7-17)
 

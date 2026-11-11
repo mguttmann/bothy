@@ -362,7 +362,8 @@ func (c *Cluster) applyAgentPresence(ctx context.Context, s domain.Signal) error
 // admits each connection again (13 4.6 point 1, 6.3). A hint with a thread takes the thread's
 // place now as its scope. The signal carried IDs only, so this node builds the preview fields of
 // a hint with a message again (hintPreview) before the hub checks push.deliver for every
-// connection: a reader who lost access still gets no event and no name.
+// connection: a reader who lost access still gets no event and no name. The hub checks the thread
+// the signal names, so the preview is one of a message in that thread only (hintPreview).
 func (c *Cluster) applyHint(ctx context.Context, s domain.Signal) error {
 	if c.hub == nil || len(c.hub.membersOf(s.RecipientID)) == 0 {
 		return nil
@@ -388,14 +389,18 @@ func (c *Cluster) applyHint(ctx context.Context, s domain.Signal) error {
 }
 
 // hintPreview returns the preview fields of the hint s from the preview port: none without the
-// port and for a hint without a message. A failed read gives none either, with one Warn record
-// that names the signal kind and the error kind only: a signal is at most once (04 9 point 4), so
-// the hint goes out with its IDs instead of being lost.
+// port and for a hint without a message. A hint that names a message and no thread gets none
+// either, and the port gives none for a message outside the thread s names: the hub admits a hint
+// on that thread, or on the recipient alone without one, and a signal can come from any role that
+// may connect to the database, so its thread and its message are not a checked pair. A failed
+// read gives none as well, with one Warn record that names the signal kind and the error kind
+// only: a signal is at most once (04 9 point 4), so the hint goes out with its IDs instead of
+// being lost.
 func (c *Cluster) hintPreview(ctx context.Context, s domain.Signal) hintPreviewBody {
-	if c.d.Previews == nil || s.MessageID.IsZero() {
+	if c.d.Previews == nil || s.ThreadID.IsZero() || s.MessageID.IsZero() {
 		return hintPreviewBody{}
 	}
-	p, err := c.d.Previews.HintPreview(ctx, s.RecipientID, s.HintKind, s.MessageID)
+	p, err := c.d.Previews.HintPreview(ctx, s.RecipientID, s.HintKind, s.ThreadID, s.MessageID)
 	if err != nil {
 		c.d.Log.LogAttrs(ctx, slog.LevelWarn, msgHintNoPreview, slog.String(logKeySignalKind, string(s.Kind)),
 			slog.String(logKeyErrorType, errs.KindOf(err).String()))

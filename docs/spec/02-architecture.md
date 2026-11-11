@@ -1065,7 +1065,8 @@ As built (M7-17, docs/decisions.d/M7-17.md D-M7-17-1 to D-M7-17-5):
 - `notification.created` is rebuilt on the node that holds a connection of the recipient: the
   place of the thread, and the preview fields of the recipient's `notify.preview_mode` from the
   preview builder of `notify`, read from the database on that node (13 6.3). No name and no
-  excerpt goes through `NOTIFY`.
+  excerpt goes through `NOTIFY`. The node reads the fields only of a message that lies in the
+  thread the signal names, the thread its hub checks: the IDs of a signal are no checked pair.
 - Device replacement: every binding of a device's session to a connection gets a UUIDv7; the
   node that holds an older binding of the device under another gateway session closes it with
   `4017`.

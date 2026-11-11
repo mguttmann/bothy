@@ -33,12 +33,18 @@ type HintPreview struct {
 // notification.created shows (13 6.3). internal/wire implements it with the preview builder of
 // notify, the one of the job notify.gateway_send: the fields of the recipient's
 // notify.preview_mode for a kind that points at a message; nothing for the mode none, for an
-// unknown or deleted message and for a message of kind run or system; never an image. It does not
-// authorize: the hub admits every connection with push.deliver before the frame leaves. It is
-// safe for concurrent use. Errors: those of the reads; the cluster then sends the hint with its
-// IDs and logs the failure.
+// unknown or deleted message and for a message of kind run or system; never an image.
+//
+// It does not authorize: the hub admits every connection with push.deliver on thread, the thread
+// the signal names, before the frame leaves. That check covers the fields only of a message in
+// that thread, and a signal is not a trusted pair of IDs (PostgreSQL lets every role that may
+// connect send on the channel). So an implementation returns no field unless message lies in
+// thread, and none for a zero thread.
+//
+// It is safe for concurrent use. Errors: those of the reads; the cluster then sends the hint with
+// its IDs and logs the failure.
 type HintPreviews interface {
-	HintPreview(ctx context.Context, recipient ids.ID, kind string, message ids.ID) (HintPreview, error)
+	HintPreview(ctx context.Context, recipient ids.ID, kind string, thread, message ids.ID) (HintPreview, error)
 }
 
 // PresenceRow is one counted connection of this node for the table gateway_presence (03 4.16,

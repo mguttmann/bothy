@@ -111,12 +111,13 @@ func (s *server) newGatewayCluster(cfg GatewayConfig, threads gatewayapp.Threads
 
 // hintPreviews adapts the preview builder of notify to the preview port of the gateway cluster
 // (13 6.3): a node that builds notification.created again from a signal of another process fills
-// the preview fields with the rule of the job notify.gateway_send (PreviewBuilder.HintFields).
+// the preview fields with the rule of the job notify.gateway_send (PreviewBuilder.HintFields),
+// which gives the fields only of a message in the thread the signal names.
 type hintPreviews struct{ b *notifyapp.PreviewBuilder }
 
 // HintPreview implements gatewayapp.HintPreviews.
-func (h hintPreviews) HintPreview(ctx context.Context, recipient ids.ID, kind string, message ids.ID) (gatewayapp.HintPreview, error) {
-	f, err := h.b.HintFields(ctx, recipient, kind, message)
+func (h hintPreviews) HintPreview(ctx context.Context, recipient ids.ID, kind string, thread, message ids.ID) (gatewayapp.HintPreview, error) {
+	f, err := h.b.HintFields(ctx, recipient, kind, thread, message)
 	if err != nil {
 		return gatewayapp.HintPreview{}, err
 	}
