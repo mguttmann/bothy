@@ -169,7 +169,10 @@ void main() {
       expect(scheme.surface, DsColors.light.surfaceCanvas);
       expect(scheme.onSurface, DsColors.light.textPrimary);
       expect(scheme.error, DsColors.light.dangerBg);
-      expect(scheme.outline, DsColors.light.borderDefault);
+      // The edge of Material controls, not decoration
+      // (test/theme/control_outline_contrast_test.dart).
+      expect(scheme.outline, DsColors.light.borderControl);
+      expect(scheme.outlineVariant, DsColors.light.borderSubtle);
       expect(theme.scaffoldBackgroundColor, DsColors.light.surfaceCanvas);
     });
 

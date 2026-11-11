@@ -156,7 +156,7 @@ void main() {
     },
   );
 
-  test('dsTextStyle keeps the family and adds the package name and the weight axis', () {
+  test('dsTextStyle keeps family and weight and adds the package name', () {
     final style = dsTextStyle(DsType.title);
     expect(style.fontFamily, DsFonts.familySans.first);
     expect(
@@ -164,9 +164,10 @@ void main() {
       'packages/design_system/${DsFonts.familySans.first}',
     );
     expect(style.fontFamilyFallback!.skip(1), DsType.title.fontFamilyFallback);
-    expect(style.fontVariations, [
-      FontVariation.weight(DsType.title.fontWeight!.value.toDouble()),
-    ]);
+    // No `wght` variation: the engine sets the axis from the weight, also from one set later
+    // (test/theme/font_weight_test.dart).
+    expect(style.fontWeight, DsType.title.fontWeight);
+    expect(style.fontVariations, isNull);
     expect(dsTextStyle(const TextStyle()).fontFamilyFallback, isEmpty);
   });
 }

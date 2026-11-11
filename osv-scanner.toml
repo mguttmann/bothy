@@ -82,7 +82,7 @@ name = "alchemist"
 version = "0.14.1"
 ecosystem = "Pub"
 license.override = ["MIT"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Golden test library; a regular dependency of design_system for its testing.dart (docs/DECISIONS.md D-M4-04-5)."
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Golden test library; a dev dependency of design_system and of the members with goldens (docs/decisions.d/AUD-pkg-design-system-01.md AUD-DS1/4)."
 
 [[PackageOverrides]]
 name = "analyzer"

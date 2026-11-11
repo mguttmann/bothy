@@ -28,7 +28,7 @@ class SegmentsText extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.dsColors;
     final base = dsTextStyle(DsType.body).copyWith(color: c.textPrimary);
-    // Through dsTextStyle again, so the weight also drives the `wght` axis of the font.
+    // The role at the bold weight; the engine drives the `wght` axis of the font from it.
     final match = dsTextStyle(DsType.body.copyWith(fontWeight: FontWeight.w700))
         .copyWith(
           color: c.textPrimary,

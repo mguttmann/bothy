@@ -18,25 +18,26 @@ const String _fontPackage = 'design_system';
 ///
 /// `DsType` names the plain family (`Atkinson Hyperlegible Next`), which resolves only in this
 /// package. An app that depends on the package reaches the same font as
-/// `packages/design_system/<family>`, so that name joins the front of the fallback list. The
-/// weight also drives the `wght` axis of the variable font files.
+/// `packages/design_system/<family>`, so that name joins the front of the fallback list.
+///
+/// The style sets no font variation: the engine drives the `wght` axis of the variable font
+/// files from `fontWeight`, so a weight a caller sets later (`copyWith(fontWeight: ...)`, a
+/// bold `Text` below the theme) reaches the glyphs. A `wght` variation on the style would win
+/// over every later `fontWeight` and keep the text at the weight of its role.
 ///
 /// Returns a copy of [role]; size and color stay as they are, so `MediaQuery.textScaler`
 /// scales the result as usual.
 ///
 /// ```dart
 /// Text('Alex', style: dsTextStyle(DsType.label));
+/// Text('Alex', style: dsTextStyle(DsType.body).copyWith(fontWeight: FontWeight.w700));
 /// ```
 TextStyle dsTextStyle(TextStyle role) {
   final family = role.fontFamily;
-  final weight = role.fontWeight;
   return role.copyWith(
     fontFamilyFallback: [
       if (family != null) 'packages/$_fontPackage/$family',
       ...?role.fontFamilyFallback,
-    ],
-    fontVariations: [
-      if (weight != null) FontVariation.weight(weight.value.toDouble()),
     ],
   );
 }
@@ -100,7 +101,11 @@ ThemeData buildDsTheme(DsContext context) {
     surfaceContainer: colors.surfaceRaised,
     surfaceContainerHigh: colors.surfaceRaised,
     surfaceContainerHighest: colors.surfaceOverlay,
-    outline: colors.borderDefault,
+    // Material draws `outline` where an edge carries a control (the ring and thumb of a
+    // switch that is off, the underline or border of a field that is not filled, a segmented
+    // button), so it is the control border with 3:1 on the surfaces (WCAG 1.4.11);
+    // `outlineVariant` stays decoration.
+    outline: colors.borderControl,
     outlineVariant: colors.borderSubtle,
     shadow: colors.shadow,
     scrim: colors.scrim,
