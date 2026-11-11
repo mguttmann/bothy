@@ -8,7 +8,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 
-import 'package:api_client/api_client.dart' show Device;
+import 'package:api_client/api_client.dart' show Device, DeviceStateEnum;
 import 'package:auth/auth.dart';
 import 'package:dio/dio.dart';
 import 'package:domain/domain.dart'
@@ -18,6 +18,7 @@ import 'package:domain/domain.dart'
         ClientVersionBelowMinimum,
         ClientVersionDecision,
         DeviceId;
+import 'package:local_store/local_store.dart' show LocalStoreKeyError;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:sync_engine/sync_engine.dart';
 
@@ -92,6 +93,8 @@ final class OnboardingState {
     this.pairingExpired = false,
     this.cause,
     this.restored = false,
+    this.starting = false,
+    this.wipeIncomplete = false,
   });
 
   /// The screen.
@@ -136,6 +139,14 @@ final class OnboardingState {
   /// Design note 2).
   final bool restored;
 
+  /// Whether the app has not decided its first screen yet: the start screen shows instead of
+  /// E1 while the stored address, the session and the local data are read.
+  final bool starting;
+
+  /// Whether the wipe behind E7 left something on the device; E7 says so instead of "deleted"
+  /// and the app deletes the rest at its next start (R-SY-14).
+  final bool wipeIncomplete;
+
   /// A copy with the given fields; [notice] and [code] are replaced as given (null clears).
   OnboardingState next({
     OnboardingStep? step,
@@ -151,6 +162,8 @@ final class OnboardingState {
     bool? pairingExpired,
     SignOutCause? cause,
     bool restored = false,
+    bool starting = false,
+    bool? wipeIncomplete,
   }) => OnboardingState(
     step: step ?? this.step,
     instance: instance,
@@ -165,6 +178,8 @@ final class OnboardingState {
     pairingExpired: pairingExpired ?? false,
     cause: cause ?? this.cause,
     restored: restored,
+    starting: starting,
+    wipeIncomplete: wipeIncomplete ?? this.wipeIncomplete,
   );
 
   /// The same state for [instance] (a new discovery result).
@@ -182,6 +197,8 @@ final class OnboardingState {
     pairingExpired: pairingExpired,
     cause: cause,
     restored: restored,
+    starting: starting,
+    wipeIncomplete: wipeIncomplete,
   );
 }
 
@@ -190,7 +207,8 @@ final class OnboardingState {
 /// E1 [connect] runs discovery and composes the services of the instance; E2 and E3 run the
 /// login flows; `pending` goes to E4 and polls; `signedIn` starts the engine and shows the main
 /// view; every end of the account ([logout], [cancelPending], a rejected or expired device, a
-/// revoked session, `4012`) runs the one [AccountWiper] and shows E7 with its cause.
+/// revoked session, `4012`) runs the one [AccountWiper] and shows E7 with its cause. A start
+/// with the session of an active device opens its local data before the network is asked.
 @Riverpod(keepAlive: true)
 class OnboardingController extends _$OnboardingController {
   late AppPorts _ports;
@@ -202,6 +220,14 @@ class OnboardingController extends _$OnboardingController {
   bool _flowOwnsSignOut = false;
   bool _ending = false;
   InstanceServices? _open;
+
+  /// The instance of a stored session whose database the stored key did not open; E1 offers
+  /// [resetLocalData] for it.
+  InstanceInfo? _unreadable;
+
+  /// What an incomplete wipe left to delete, once [_unfinishedRead] from the preferences.
+  UnfinishedWipe? _unfinished;
+  bool _unfinishedRead = false;
 
   @override
   OnboardingState build() {
@@ -219,19 +245,186 @@ class OnboardingController extends _$OnboardingController {
       if (open != null) unawaited(open.close());
     });
     scheduleMicrotask(_start);
-    return const OnboardingState(step: OnboardingStep.server);
+    return const OnboardingState(step: OnboardingStep.server, starting: true);
   }
 
   InstanceServices? get _services => state.services;
 
+  /// The start of the app: finishes an incomplete wipe, then shows E1 without a remembered
+  /// address, the local data of a stored session ([_startFromLocalData]) or what "Connect" at
+  /// the remembered address leads to.
   Future<void> _start() async {
-    final remembered = await _prefs.serverAddress();
-    if (remembered == null) {
-      state = state.next(address: _ports.branding.defaultServer);
+    try {
+      await _finishWipe();
+      if (!ref.mounted) return;
+      final remembered = await _prefs.serverAddress();
+      if (remembered == null) {
+        state = state.next(address: _ports.branding.defaultServer);
+        return;
+      }
+      if (await _startFromLocalData(remembered)) return;
+      await connect(remembered.toString());
+    } finally {
+      // Whatever the start ran into, E1 takes over from the start screen.
+      if (ref.mounted && state.starting) state = state.next();
+    }
+  }
+
+  /// A cold start with the stored session of an active device: the local data of the
+  /// remembered instance at [address] open and the main view shows before the network is
+  /// asked, as the start without network does (D-M4-18-13); [_catchUpStart] applies what the
+  /// network answers. Returns false when nothing is stored that the app could open, for a
+  /// waiting device, whose E4 is decided by the server, and for a build an instance refused as
+  /// too old, which asks before it opens anything (18 9 item 2); those go through [connect].
+  Future<bool> _startFromLocalData(Uri address) async {
+    final known = InstanceInfo.fromJson(_decode(await _prefs.instanceJson()));
+    if (known == null || known.address != address) return false;
+    if (await _storedAccount(known) != StoredAccount.signedIn) return false;
+    if (await _prefs.refusedMinVersion() != null) return false;
+    if (!ref.mounted) return true;
+    // E1 shows the address when the local data do not open.
+    state = state.next(address: address.toString(), starting: true);
+    final services = await _openServices(known);
+    if (services == null) return true;
+    state = state
+        .withInstance(known)
+        .next(services: services, serverStatus: ServerStatus.idle);
+    _signedIn(restored: true);
+    unawaited(_catchUpStart(services, known));
+    return true;
+  }
+
+  /// What the network says after a start from the local data, applied when it answers
+  /// ([routeStart] as for every "Connect", D-M4-18-15): a certificate error, `setup_required`
+  /// and a too old app close the services and show E1 with their text; another instance at
+  /// the address and a device the server still holds for confirmation go the way of
+  /// "Connect" (E2 or E4); a found instance refreshes the remembered description and the
+  /// branding. Without a usable answer the main view stays as it is.
+  Future<void> _catchUpStart(
+    InstanceServices services,
+    InstanceInfo known,
+  ) async {
+    bool shown() =>
+        ref.mounted &&
+        !_ending &&
+        _services == services &&
+        state.step == OnboardingStep.signedIn;
+    final outcome = await _ports.discovery.discover(known.address);
+    if (!shown()) return;
+    final route = routeStart(
+      stored: StoredAccount.signedIn,
+      discovery: outcome,
+    );
+    if (route.step == OnboardingStep.server) {
+      _flow++;
+      await _closeServices();
+      if (outcome is DiscoveryAppTooOld) {
+        await _rememberRefusal(outcome.minVersion);
+      }
+      if (!ref.mounted) return;
+      state = state
+          .withInstance(null)
+          .next(
+            step: OnboardingStep.server,
+            clearServices: true,
+            address: known.address.toString(),
+            serverStatus: route.serverStatus,
+            minVersion: route.minVersion,
+          );
       return;
     }
-    await connect(remembered.toString());
+    var instance = known;
+    if (outcome is DiscoveryFound) {
+      instance = outcome.instance;
+      _version = outcome.version;
+      await _prefs.setInstanceJson(jsonEncode(instance.toJson()));
+      if (!shown()) return;
+      if (instance.instanceId != known.instanceId) {
+        // Another instance answers at the address: what "Connect" finds there.
+        await _openInstance(instance, await _storedAccount(instance), outcome);
+        return;
+      }
+      state = state.withInstance(instance);
+    }
+    final device = await _deviceOf(services);
+    if (!shown()) return;
+    if (device?.state == DeviceStateEnum.pending) {
+      // The server's answer about the device wins over what was stored: E4.
+      await _openInstance(instance, StoredAccount.signedIn, outcome);
+    }
   }
+
+  /// Remembers that an instance refused this build as too old ([minVersion]), so the next
+  /// start asks before it opens a stored session ([_startFromLocalData]); null forgets it,
+  /// once discovery finds an instance again. A failure of the store goes to the log: it
+  /// costs or keeps only that shortcut and never holds E1 back.
+  Future<void> _rememberRefusal(String? minVersion) async {
+    try {
+      await _prefs.setRefusedMinVersion(minVersion);
+    } on Object catch (error, stack) {
+      developer.log(
+        'the refused version could not be stored: $error',
+        name: 'onboarding',
+        error: error,
+        stackTrace: stack,
+      );
+    }
+  }
+
+  /// What `getDevice` says about this device, or null without a stored device ID or a usable
+  /// answer.
+  Future<Device?> _deviceOf(InstanceServices services) async {
+    final id = await services.storedDeviceId();
+    if (id == null) return null;
+    try {
+      return (await services.auth.api.getDevicesApi().getDevice(deviceId: id))
+          .data;
+    } on DioException {
+      return null;
+    }
+  }
+
+  /// Deletes what an incomplete wipe left on the device (R-SY-14): at the start and before
+  /// the services of an instance are composed again. A failure goes to the log and the entry
+  /// stays for the next start; it never holds the app back.
+  Future<void> _finishWipe() async {
+    try {
+      if (!_unfinishedRead) {
+        _unfinished = UnfinishedWipe.fromJson(
+          _decode(await _prefs.unfinishedWipe()),
+        );
+        _unfinishedRead = true;
+      }
+      final left = _unfinished;
+      if (left == null) return;
+      final wiper = await InstanceServices.leftoverWiper(
+        _ports,
+        instanceId: left.instanceId,
+        keyScope: left.keyScope,
+      );
+      await wiper.wipe();
+      _unfinished = null;
+      await _prefs.setUnfinishedWipe(null);
+    } on Object catch (error, stack) {
+      _logWipeFailure(error, stack);
+    }
+  }
+
+  /// A session of the instance of [services] exists again: what an incomplete wipe left
+  /// there is in use, so no later start deletes it.
+  void _sessionBegan(InstanceServices services) {
+    if (_unfinished?.instanceId != services.instance.instanceId) return;
+    _unfinished = null;
+    unawaited(_prefs.setUnfinishedWipe(null).catchError(_logWipeFailure));
+  }
+
+  /// Logs why a wipe is incomplete; E7 shows only that it is.
+  static void _logWipeFailure(Object error, StackTrace stack) => developer.log(
+    'the wipe of the local data is incomplete: $error',
+    name: 'onboarding',
+    error: error,
+    stackTrace: stack,
+  );
 
   /// E1 "Connect": discovery at [typed]; on success the address and the instance are
   /// remembered. [routeStart] decides the screen from what is stored for the instance and
@@ -255,6 +448,11 @@ class OnboardingController extends _$OnboardingController {
       busy: true,
     );
     final outcome = await _ports.discovery.discover(address);
+    if (outcome is DiscoveryAppTooOld) {
+      await _rememberRefusal(outcome.minVersion);
+    } else if (outcome is DiscoveryFound) {
+      await _rememberRefusal(null);
+    }
     final InstanceInfo? instance;
     if (outcome is DiscoveryFound) {
       instance = outcome.instance;
@@ -289,22 +487,8 @@ class OnboardingController extends _$OnboardingController {
     StoredAccount stored,
     DiscoveryOutcome outcome,
   ) async {
-    await _closeServices();
-    final InstanceServices services;
-    try {
-      services = await InstanceServices.open(
-        _ports,
-        instance,
-        version: _version,
-      );
-    } on Object catch (error, stack) {
-      _logOpenFailure(error, stack);
-      state = state
-          .withInstance(null)
-          .next(serverStatus: openFailureStatus(error), clearServices: true);
-      return;
-    }
-    _watch(services);
+    final services = await _openServices(instance);
+    if (services == null) return;
     state = state
         .withInstance(instance)
         .next(
@@ -313,6 +497,64 @@ class OnboardingController extends _$OnboardingController {
           serverStatus: ServerStatus.idle,
         );
     if (stored != StoredAccount.none) await _resume(services, stored, outcome);
+  }
+
+  /// Closes the open services, finishes an incomplete wipe and composes the services of
+  /// [instance]. Returns null after a failure, which E1 shows with its text
+  /// ([openFailureStatus]); a database of a stored session that the stored key does not open
+  /// can be reset from there ([resetLocalData]).
+  Future<InstanceServices?> _openServices(InstanceInfo instance) async {
+    await _closeServices();
+    await _finishWipe();
+    try {
+      final services = await InstanceServices.open(
+        _ports,
+        instance,
+        version: _version,
+      );
+      if (!ref.mounted) {
+        // The app quit while the services were composed: nothing shows them any more.
+        unawaited(services.close());
+        return null;
+      }
+      _unreadable = null;
+      _watch(services);
+      return services;
+    } on Object catch (error, stack) {
+      _logOpenFailure(error, stack);
+      if (!ref.mounted) return null;
+      _unreadable = error is LocalStoreKeyError ? instance : null;
+      state = state
+          .withInstance(null)
+          .next(
+            step: OnboardingStep.server,
+            serverStatus: openFailureStatus(error),
+            clearServices: true,
+          );
+      return null;
+    }
+  }
+
+  /// E1 "Reset local data" ([ServerStatus.localDataUnreadable]): deletes the database files
+  /// and the file cache of the instance whose database did not open, keeps its session, device
+  /// keys and secrets, and connects again, so the engine loads everything anew. What only that
+  /// database held (messages and drafts that were not sent yet, the view states of the device,
+  /// the pinned host keys of the terminal) goes with it.
+  Future<void> resetLocalData() async {
+    final instance = _unreadable;
+    if (instance == null) return;
+    _unreadable = null;
+    final address = state.address;
+    state = state.next(serverStatus: ServerStatus.connecting, busy: true);
+    try {
+      await InstanceServices.discardLocalData(_ports, instance);
+    } on Object catch (error, stack) {
+      _logOpenFailure(error, stack);
+      _unreadable = instance;
+      state = state.next(serverStatus: ServerStatus.localDataUnreadable);
+      return;
+    }
+    await connect(address);
   }
 
   /// What is stored for [instance], without opening anything: a refresh token, and whether the
@@ -466,21 +708,38 @@ class OnboardingController extends _$OnboardingController {
   }
 
   /// Logs out (E6 "Log out", the shell): the server session ends, every local datum of the
-  /// account is deleted and E7 shows.
+  /// account is deleted and E7 shows. The instance has [AppPorts.serverLogoutLimit] to answer;
+  /// after it the local data go anyway.
   Future<void> logout() async {
     _flow++;
     final services = _services;
     if (services == null) return;
     await _endAccount(
       SignOutCause.loggedOut,
-      before: () async {
-        // M5-04, M5-05: `unregisterPush` needs the session, so it runs before the server
-        // logout; it is best effort, the logout disables the session's registrations anyway
-        // (13 6.4).
-        await _ports.push?.logout();
-        await services.auth.login.logout();
-      },
+      before: () => _serverLogout(services),
     );
+  }
+
+  /// The server part of [logout], bounded by [AppPorts.serverLogoutLimit]: an instance that
+  /// does not answer must not keep the local data on the device. At the limit the connections
+  /// of the session's REST client are cut, so both calls end at once and nothing of them runs
+  /// after the wipe (the logout clears the stored session when its call ends).
+  Future<void> _serverLogout(InstanceServices services) async {
+    Future<void> calls() async {
+      // M5-04, M5-05: `unregisterPush` needs the session, so it runs before the server
+      // logout; it is best effort, the logout disables the session's registrations anyway
+      // (13 6.4).
+      await _ports.push?.logout();
+      await services.auth.login.logout();
+    }
+
+    final running = calls();
+    try {
+      await running.timeout(_ports.serverLogoutLimit);
+    } on TimeoutException {
+      services.auth.api.dio.close(force: true);
+      await running;
+    }
   }
 
   /// E7 "Log in again": composes the services again (new device keys) and shows E2.
@@ -491,23 +750,9 @@ class OnboardingController extends _$OnboardingController {
       return;
     }
     state = state.next(step: OnboardingStep.signedOut, busy: true);
-    try {
-      final services = await InstanceServices.open(
-        _ports,
-        instance,
-        version: _version,
-      );
-      _watch(services);
-      state = state.next(step: OnboardingStep.login, services: services);
-    } on Object catch (error, stack) {
-      _logOpenFailure(error, stack);
-      state = state
-          .withInstance(null)
-          .next(
-            step: OnboardingStep.server,
-            serverStatus: openFailureStatus(error),
-          );
-    }
+    final services = await _openServices(instance);
+    if (services == null) return;
+    state = state.next(step: OnboardingStep.login, services: services);
   }
 
   /// Logs why `InstanceServices.open` failed; E1 shows only the kind ([openFailureStatus]).
@@ -571,6 +816,7 @@ class OnboardingController extends _$OnboardingController {
     }
     since ??= _ports.clock.now();
     if (flow != _flow) return;
+    _sessionBegan(services);
     await services.secrets.write(
       pendingKey,
       jsonEncode({
@@ -683,6 +929,7 @@ class OnboardingController extends _$OnboardingController {
     final services = _services;
     if (services == null) return;
     state = state.next(step: OnboardingStep.signedIn, restored: restored);
+    _sessionBegan(services);
     unawaited(services.secrets.delete(pendingKey));
     services.engine.start();
   }
@@ -729,6 +976,7 @@ class OnboardingController extends _$OnboardingController {
     _flow++;
     final address = state.instance?.address.toString() ?? state.address;
     await _closeServices();
+    await _rememberRefusal(minVersion);
     if (!ref.mounted) return;
     state = state
         .withInstance(null)
@@ -742,7 +990,9 @@ class OnboardingController extends _$OnboardingController {
   }
 
   /// The one end of an account (Design note 2): [before] (the server logout) runs first, then
-  /// the wiper; E7 shows [cause] even when a step of the wipe failed.
+  /// the wiper; E7 shows [cause] even when a step of the wipe failed. What a failed step left
+  /// is logged and remembered as an [UnfinishedWipe], E7 says that not everything was deleted,
+  /// and [_finishWipe] deletes the rest at the next start (R-SY-14).
   Future<void> _endAccount(
     SignOutCause cause, {
     Future<void> Function()? before,
@@ -766,11 +1016,24 @@ class OnboardingController extends _$OnboardingController {
           // The logout call already tolerates being offline; nothing may stop the wipe.
         }
       }
+      var complete = true;
       try {
         await services.wiper.wipe();
-      } on Object {
-        // E7 still says the data was deleted only as far as the wiper got; the wiper runs
-        // every step regardless of failures, so what is left is reported by its error.
+      } on Object catch (error, stack) {
+        // The wiper ran every step regardless of failures; its error names the failed ones.
+        complete = false;
+        _logWipeFailure(error, stack);
+        final left = UnfinishedWipe(
+          instanceId: services.wiper.instanceId,
+          keyScope: services.wiper.keyScope,
+        );
+        _unfinished = left;
+        _unfinishedRead = true;
+        try {
+          await _prefs.setUnfinishedWipe(jsonEncode(left.toJson()));
+        } on Object catch (error, stack) {
+          _logWipeFailure(error, stack);
+        }
       }
       await services.auth.dispose();
       // The app quit or a test ended while the wipe ran: the data is gone, no state is left.
@@ -779,6 +1042,7 @@ class OnboardingController extends _$OnboardingController {
         step: OnboardingStep.signedOut,
         clearServices: true,
         cause: cause,
+        wipeIncomplete: !complete,
       );
     } finally {
       _ending = false;

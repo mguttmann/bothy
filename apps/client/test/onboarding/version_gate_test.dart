@@ -15,6 +15,7 @@ import 'package:client/app/providers/session.dart';
 import 'package:client/app/update/update_notice.dart';
 import 'package:client/app/update/update_path.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
+import 'package:client/platform/secure_store.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -168,6 +169,70 @@ void main() {
       ),
     );
   });
+
+  test(
+    'a minimum raised while the app was closed: "App too old" once the '
+    'instance answers, and the refused build asks first at every later start',
+    () async {
+      await signIn();
+      final closing = state().services!.close();
+      c.dispose();
+      await closing;
+      rules({'min_version': '1.5.0'});
+
+      // The first start does not know yet: it opens the local data, asks, and closes.
+      c = appContainer(f);
+      c.read(onboardingControllerProvider);
+      await eventually(
+        'E1 shows "App too old"',
+        () =>
+            state().step == OnboardingStep.server &&
+            state().serverStatus == ServerStatus.appTooOld,
+      );
+      expect(state().minVersion, '1.5.0');
+      expect(state().services, isNull);
+      expect(f.instanceFolder.existsSync(), isTrue);
+      expect(await AppPreferences(f.secure).refusedMinVersion(), '1.5.0');
+
+      // Every later start of the refused build asks before it opens anything.
+      c.dispose();
+      final connections = f.server.gateway.connections.length;
+      final before = f.server.requests.length;
+      c = appContainer(f);
+      final steps = <OnboardingStep>[];
+      c.listen(
+        onboardingControllerProvider.select((s) => s.step),
+        (_, step) => steps.add(step),
+        fireImmediately: true,
+      );
+      await eventually(
+        'E1 shows "App too old" again',
+        () =>
+            !state().starting &&
+            !state().busy &&
+            state().serverStatus == ServerStatus.appTooOld,
+      );
+      expect(steps, everyElement(OnboardingStep.server));
+      expect(state().services, isNull);
+      expect(f.server.gateway.connections.length, connections);
+      expect(f.server.requests.skip(before).map((r) => r.operationId).toSet(), {
+        'getDiscovery',
+      });
+      expect(f.server.requests.skip(before).where(authenticated), isEmpty);
+
+      // The update arrives (here: the instance lowers the minimum again): the stored session
+      // resumes and the next start opens the local data at once again.
+      f.server.world.minClientVersions = [];
+      c.dispose();
+      c = appContainer(f);
+      c.read(onboardingControllerProvider);
+      await eventually(
+        'the main view',
+        () => state().step == OnboardingStep.signedIn,
+      );
+      expect(await AppPreferences(f.secure).refusedMinVersion(), isNull);
+    },
+  );
 
   test('below the recommended version the app works and shows a notice, dismissed once per version', () async {
     rules({'min_version': '1.0.0', 'recommended_version': '1.5.0'});

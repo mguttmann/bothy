@@ -49,7 +49,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/main.dart` | starts the app with the ports of the platform |
 | `lib/app/bootstrap.dart` | `AppPorts` and `InstanceServices`: the composition root per server address |
 | `lib/app/app.dart`, `router.dart`, `deep_links.dart` | the app widget, the paths of 15 11, links from outside |
-| `lib/app/account_wiper.dart` | the one wipe of every sign-out cause (R-SY-14) |
+| `lib/app/account_wiper.dart` | the one wipe of every sign-out cause (R-SY-14) and the entry of a wipe that left something |
 | `lib/app/discovery.dart`, `target_resolver.dart` | E1's discovery, "Not found or no access" |
 | `lib/app/providers/` | Riverpod providers (generated `*.g.dart`): ports, session, engine, settings, targets |
 | `lib/app/layout/` | the desktop shell, the four columns and their stored widths |
@@ -69,7 +69,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/mentions/` | the view of the own mentions (M4-23) over `listMyMentions` |
 | `lib/agents/` | the agent interface (M4-21): the pinned live box, the collapsed run line, the mappings of runs, trigger states and components, cards and their interactions, follow-ups, the agent's typing line, slash commands (built-ins, suggestions, options, autocomplete, invocation, loader), the REST reads, and the views of autonomous runs in `wakes/` (AR-08) |
 | `lib/running/` | "Running now" D10 (M4-23): the rows of the active runs, the filters, Stop and the cost sum; the control room cards and the run graph D14 (M4-39); their phone layouts M11 and M12 (M5-14) |
-| `lib/onboarding/` | E1 to E7, the controller of the flow, codes and remaining times |
+| `lib/onboarding/` | the start screen and E1 to E7, the controller of the flow, codes and remaining times |
 | `lib/admin/` | the route of the administration: `AdminRoute`, `adminRepositoryProvider`, the mapping of `AdminLocation` to `/admin/...` |
 | `lib/settings/` | Settings (01 5.1 D8): the sections, the personal settings of 01 11 with their defaults, the profile and the devices section hosting `admin_ui` |
 | `lib/notifications_settings/` | D9 (M4-33): the page inside Settings > Notifications, the tree of levels with inheritance, the quiet hours editor, the effective level of 13 3.1 for display, the providers of the notification settings |
@@ -161,7 +161,9 @@ The app reads `client.min_version.<platform>` and `client.recommended_version.<p
 `getDiscovery` (docs/spec/18-release.md 9; `decideClientVersion` in `packages/domain`, SemVer
 precedence) at the start, on E1 and before every connection attempt (`VersionWatch` in
 `lib/app/update/`, the connect gate of the sync engine). Below the minimum it opens no gateway
-connection, closes the instance without deleting anything and shows E1 "App too old"; below the
+connection, closes the instance without deleting anything and shows E1 "App too old"; a start with
+a stored session shows the main view from the local data before the answer arrives, and a build
+an instance refused before asks first (docs/spec/15-client-architecture.md 9); below the
 recommended version the main view shows a notice, dismissed once per version. The action "Get the
 update" opens the update path of the build (`UpdatePath`, the define `BRANDING_UPDATE_URL`, the
 branding key `update_url` that the release steps write from `distribution.yaml`): the TestFlight

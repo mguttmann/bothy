@@ -913,8 +913,9 @@ final class SecureDatabaseKeySource implements DatabaseKeySource {
   }
 }
 
-/// What the app remembers outside every instance: the server address (01 5.6, B13) and the
-/// public description of its instance (name, accent, login methods), no secret.
+/// What the app remembers outside every instance: the server address (01 5.6, B13), the
+/// public description of its instance (name, accent, login methods), the dismissed update
+/// notice, a version refusal and the entry of an unfinished wipe; no secret.
 final class AppPreferences {
   /// Creates the preferences on [backend].
   AppPreferences(this._backend);
@@ -942,6 +943,29 @@ final class AppPreferences {
   /// Remembers the description of the instance.
   Future<void> setInstanceJson(String json) =>
       _backend.write(_instanceKey, json);
+
+  static const String _refusedMinVersionKey = 'app/refused_min_version';
+
+  /// The minimum version an instance required when it last refused this build as too old
+  /// (18 9 item 2), or null. While it is set the app asks the instance before it opens a
+  /// stored session at its start.
+  Future<String?> refusedMinVersion() => _backend.read(_refusedMinVersionKey);
+
+  /// Remembers [minVersion] of a refusal, or forgets it for null.
+  Future<void> setRefusedMinVersion(String? minVersion) => minVersion == null
+      ? _backend.delete(_refusedMinVersionKey)
+      : _backend.write(_refusedMinVersionKey, minVersion);
+
+  static const String _unfinishedWipeKey = 'app/unfinished_wipe';
+
+  /// What an incomplete wipe left to delete, as JSON (`UnfinishedWipe` of the app), or null.
+  /// Not an instance secret, so the wipe itself never deletes it (R-SY-14).
+  Future<String?> unfinishedWipe() => _backend.read(_unfinishedWipeKey);
+
+  /// Remembers [json] as the unfinished wipe, or forgets the entry for null.
+  Future<void> setUnfinishedWipe(String? json) => json == null
+      ? _backend.delete(_unfinishedWipeKey)
+      : _backend.write(_unfinishedWipeKey, json);
 
   static const String _updateNoticeKey = 'app/update_notice_dismissed';
 

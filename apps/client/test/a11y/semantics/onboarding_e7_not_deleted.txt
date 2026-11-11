@@ -1,0 +1,4 @@
+header, label "You are logged out."
+label "Reason: You logged out."
+label "Not all data of this device could be deleted. The app deletes the rest the next time it starts."
+button, label "Log in again", action tap

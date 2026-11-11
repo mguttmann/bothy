@@ -1342,6 +1342,14 @@ yet" on `setup_required` with a pointer to the setup wizard on the host
 update path ([18-release.md](18-release.md)). The app remembers the address; a second server is
 not planned (B13).
 
+Start (addendum of 2026-11-11, [15-client-architecture.md](15-client-architecture.md) section 9):
+until the app knows its first screen it shows the card with the mark of the product alone, without
+the field and the button of E1. With the stored login of an active device the first screen is the
+main view from the local data, before the instance is asked (3.6); otherwise E1. When the app
+cannot read the local data of a stored login, E1 says so and offers "Reset local data": the app
+deletes the local database and the file cache of this device, keeps the login and loads
+everything again from the instance; messages and drafts that were not sent yet are lost.
+
 ```text
 +--------------------------------------+
 |                                      |
@@ -1495,7 +1503,9 @@ local data. The lock detaches terminal sessions (they keep running on the host, 
 (`auth.session_max_age`), disabling of the person or rejection in E4. The reason appears as text
 (`devices.revoke_reason` or the code of the session, without internal names), together with the
 sentence "The data of this device has been deleted" (04, section 8.5, R-SY-14) and "Log in again"
-(E2). For a disabled person there is no login button, only "Contact the owner".
+(E2). For a disabled person there is no login button, only "Contact the owner". When a part of the
+data could not be deleted, the sentence says so instead and names the next start, at which the
+app deletes the rest (addendum of 2026-11-11, 15 section 9).
 
 ```text
 +--------------------------------------+

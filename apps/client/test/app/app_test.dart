@@ -87,6 +87,29 @@ void main() {
     );
   });
 
+  testWidgets(
+    'until the first screen is decided the start screen shows, not E1',
+    (tester) async {
+      final (control, _) = await pumpApp(
+        tester,
+        initial: const OnboardingState(
+          step: OnboardingStep.server,
+          starting: true,
+        ),
+      );
+      expect(find.byKey(const ValueKey('screen.start')), findsOneWidget);
+      // A screen reader hears the name of the build for the mark.
+      expect(find.bySemanticsLabel(testBranding.appName), findsOneWidget);
+      expect(find.byKey(const ValueKey('screen.e1')), findsNothing);
+      expect(find.byKey(const ValueKey('e1.address')), findsNothing);
+      expect(find.byKey(const ValueKey('e1.connect')), findsNothing);
+      control.show(const OnboardingState(step: OnboardingStep.server));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('screen.start')), findsNothing);
+      expect(find.byKey(const ValueKey('screen.e1')), findsOneWidget);
+    },
+  );
+
   testWidgets('block copies go to the rich clipboard of the runner (M4-48)', (
     tester,
   ) async {

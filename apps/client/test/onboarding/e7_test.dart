@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // E7 Logged out (01 5.6; R-SY-14): the reason text per revoke reason, the deletion sentence,
-// no login button for a disabled person.
+// its honest form after an incomplete wipe, no login button for a disabled person.
 
 import 'package:client/app/account_wiper.dart';
 import 'package:client/onboarding/e7_signed_out.dart';
@@ -36,6 +36,25 @@ void main() {
     }
     expect(texts.keys.toSet(), SignOutCause.values.toSet());
   });
+
+  testWidgets(
+    'after an incomplete wipe the sentence says so instead of "deleted"',
+    (tester) async {
+      desktopWindow(tester);
+      await tester.pumpWidget(
+        hostScreen(
+          SignedOutScreen(
+            cause: SignOutCause.loggedOut,
+            dataDeleted: false,
+            onLoginAgain: () {},
+          ),
+        ),
+      );
+      expect(find.text(en.onboardingDataNotDeleted), findsOneWidget);
+      expect(find.text(en.onboardingDataDeleted), findsNothing);
+      expect(find.byKey(const ValueKey('e7.loginAgain')), findsOneWidget);
+    },
+  );
 
   testWidgets(
     '"Log in again" by button and Enter; a disabled person gets none',

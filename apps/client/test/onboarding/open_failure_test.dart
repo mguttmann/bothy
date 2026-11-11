@@ -19,6 +19,7 @@ import 'package:device_key/device_key.dart' as dk;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:local_store/local_store.dart' show LocalStoreKeyError;
 import 'package:sync_engine/testing.dart';
 
 import '../support/fake_instance.dart';
@@ -118,6 +119,7 @@ void main() {
       PlatformException(code: 'protect_failed'): ServerStatus.openFailed,
       const FileSystemException('denied', '/x'): ServerStatus.openFailed,
       StateError('database'): ServerStatus.openFailed,
+      const LocalStoreKeyError(): ServerStatus.localDataUnreadable,
     };
     for (final MapEntry(key: error, value: status) in cases.entries) {
       expect(openFailureStatus(error), status, reason: '$error');

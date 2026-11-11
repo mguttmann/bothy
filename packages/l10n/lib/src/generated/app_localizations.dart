@@ -2503,6 +2503,18 @@ abstract class AppLocalizations {
   /// **'The app could not open its local data for this instance on this device. Try again.'**
   String get onboardingOpenFailed;
 
+  /// E1 result when the stored key does not open the local database of a stored session; the result line offers the reset (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'The app cannot read its local data for this instance on this device. Try again, or reset the local data: the app then loads everything again from the instance, and messages and drafts that were not sent yet are lost.'**
+  String get onboardingLocalDataUnreadable;
+
+  /// Action of the E1 result line for local data the device cannot read: deletes the local database and the file cache and connects again (01 section 5.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Reset local data'**
+  String get onboardingResetLocalData;
+
   /// E1 result for a TLS error; there is no way to continue (01 section 5.6, R-PR-14).
   ///
   /// In en, this message translates to:
@@ -2832,6 +2844,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The data of this device has been deleted.'**
   String get onboardingDataDeleted;
+
+  /// Sentence of E7 in place of the deletion sentence after a wipe that left something on the device (04 section 8.5, R-SY-14).
+  ///
+  /// In en, this message translates to:
+  /// **'Not all data of this device could be deleted. The app deletes the rest the next time it starts.'**
+  String get onboardingDataNotDeleted;
 
   /// Button of E7 that leads to E2 (01 section 5.6).
   ///

@@ -13,9 +13,10 @@ import 'onboarding_controller.dart';
 /// One field for the address of the instance and "Connect".
 ///
 /// The result line follows [status]: no instance, an invalid certificate (no way on, no
-/// exception button, R-PR-14), not set up yet with the pointer to the setup wizard, or "App too
+/// exception button, R-PR-14), not set up yet with the pointer to the setup wizard, "App too
 /// old" with [minVersion] and, when the build has an update path, the action [onUpdate]
-/// (18 9 item 2). Enter connects.
+/// (18 9 item 2), or local data the device cannot read with the action [onReset]. Enter
+/// connects.
 class ServerAddressScreen extends StatefulWidget {
   /// Creates the screen.
   const ServerAddressScreen({
@@ -25,6 +26,7 @@ class ServerAddressScreen extends StatefulWidget {
     required this.onConnect,
     this.minVersion,
     this.onUpdate,
+    this.onReset,
   });
 
   /// The address to show in the field.
@@ -42,6 +44,10 @@ class ServerAddressScreen extends StatefulWidget {
   /// Opens the update path of the build, or null when it has none; offered with
   /// [ServerStatus.appTooOld] only.
   final VoidCallback? onUpdate;
+
+  /// Resets the local data of the instance, or null; offered with
+  /// [ServerStatus.localDataUnreadable] only.
+  final VoidCallback? onReset;
 
   @override
   State<ServerAddressScreen> createState() => _ServerAddressScreenState();
@@ -86,6 +92,10 @@ class _ServerAddressScreenState extends State<ServerAddressScreen> {
         l.onboardingKeychainUnavailable,
       ),
       ServerStatus.openFailed => (DsTone.danger, l.onboardingOpenFailed),
+      ServerStatus.localDataUnreadable => (
+        DsTone.danger,
+        l.onboardingLocalDataUnreadable,
+      ),
       ServerStatus.certificateInvalid => (
         DsTone.danger,
         l.onboardingCertificateInvalid,
@@ -96,9 +106,15 @@ class _ServerAddressScreenState extends State<ServerAddressScreen> {
         l.onboardingAppTooOld(widget.minVersion ?? ''),
       ),
     };
-    final update = widget.status == ServerStatus.appTooOld
-        ? widget.onUpdate
-        : null;
+    // The one action of the result line: the update path or the reset of the local data.
+    final (action, actionLabel) = switch (widget.status) {
+      ServerStatus.appTooOld => (widget.onUpdate, l.updateGet),
+      ServerStatus.localDataUnreadable => (
+        widget.onReset,
+        l.onboardingResetLocalData,
+      ),
+      _ => (null, null),
+    };
     return OnboardingCard(
       onEnter: _connect,
       children: [
@@ -127,8 +143,8 @@ class _ServerAddressScreenState extends State<ServerAddressScreen> {
             tone: tone,
             text: text,
             liveRegion: true,
-            actionLabel: update == null ? null : l.updateGet,
-            onAction: update,
+            actionLabel: action == null ? null : actionLabel,
+            onAction: action,
           ),
         ],
       ],

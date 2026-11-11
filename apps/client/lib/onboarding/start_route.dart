@@ -8,6 +8,7 @@ library;
 import 'package:api_client/api_client.dart' show DeviceStateEnum;
 import 'package:device_key/device_key.dart' show DeviceKeyException;
 import 'package:flutter/services.dart' show PlatformException;
+import 'package:local_store/local_store.dart' show LocalStoreKeyError;
 
 import '../app/discovery.dart';
 import '../app/router.dart' show OnboardingStep;
@@ -49,6 +50,11 @@ enum ServerStatus {
   /// not keep.
   openFailed,
 
+  /// The stored key does not open the local database of a stored session
+  /// ([LocalStoreKeyError]); E1 offers to reset the local data
+  /// (docs/decisions.d/AUD-client-onboarding-01.md).
+  localDataUnreadable,
+
   /// The TLS handshake failed; no way to continue (R-PR-14).
   certificateInvalid,
 
@@ -62,13 +68,19 @@ enum ServerStatus {
 /// The E1 status of a failure to open the services of an instance: the device keys
 /// ([DeviceKeyException]) and the keychain of the secrets (a [PlatformException] of
 /// `flutter_secure_storage`, code [keychainErrorCode]) are [ServerStatus.keychainUnavailable],
-/// everything else (the instance folder, its file protection, the database)
-/// [ServerStatus.openFailed]. Never [ServerStatus.noInstance]: the address was not the problem.
-ServerStatus openFailureStatus(Object error) =>
-    error is DeviceKeyException ||
-        (error is PlatformException && error.code == keychainErrorCode)
-    ? ServerStatus.keychainUnavailable
-    : ServerStatus.openFailed;
+/// a database the stored key does not open ([LocalStoreKeyError]) is
+/// [ServerStatus.localDataUnreadable], everything else (the instance folder, its file
+/// protection, any other failure of the database) [ServerStatus.openFailed]. Never
+/// [ServerStatus.noInstance]: the address was not the problem.
+ServerStatus openFailureStatus(Object error) {
+  if (error is DeviceKeyException ||
+      (error is PlatformException && error.code == keychainErrorCode)) {
+    return ServerStatus.keychainUnavailable;
+  }
+  return error is LocalStoreKeyError
+      ? ServerStatus.localDataUnreadable
+      : ServerStatus.openFailed;
+}
 
 /// The code of every keychain failure `flutter_secure_storage` reports on iOS and macOS.
 const String keychainErrorCode = 'Unexpected security result code';

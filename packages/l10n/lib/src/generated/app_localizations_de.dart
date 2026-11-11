@@ -1519,6 +1519,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die App konnte ihre lokalen Daten für diese Instanz auf diesem Gerät nicht öffnen. Versuche es erneut.';
 
   @override
+  String get onboardingLocalDataUnreadable =>
+      'Die App kann ihre lokalen Daten für diese Instanz auf diesem Gerät nicht lesen. Versuche es erneut oder setze die lokalen Daten zurück: Die App lädt dann alles neu von der Instanz, und noch nicht gesendete Nachrichten und Entwürfe gehen verloren.';
+
+  @override
+  String get onboardingResetLocalData => 'Lokale Daten zurücksetzen';
+
+  @override
   String get onboardingCertificateInvalid =>
       'Zertifikat ungültig. Die Verbindung ist nicht sicher, deshalb verbindet sich die App nicht. Bitte den Owner der Instanz, das Zertifikat zu erneuern.';
 
@@ -1722,6 +1729,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get onboardingDataDeleted =>
       'Die Daten dieses Geräts wurden gelöscht.';
+
+  @override
+  String get onboardingDataNotDeleted =>
+      'Nicht alle Daten dieses Geräts konnten gelöscht werden. Die App löscht den Rest beim nächsten Start.';
 
   @override
   String get onboardingLogInAgain => 'Erneut anmelden';

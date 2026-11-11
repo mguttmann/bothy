@@ -24,6 +24,7 @@ Future<void> pumpE1(
   ServerStatus status, {
   String? minVersion,
   ValueChanged<String>? onConnect,
+  VoidCallback? onReset,
 }) async {
   desktopWindow(tester);
   await tester.pumpWidget(
@@ -33,6 +34,7 @@ Future<void> pumpE1(
         status: status,
         minVersion: minVersion,
         onConnect: onConnect ?? (_) {},
+        onReset: onReset,
       ),
     ),
   );
@@ -45,6 +47,7 @@ void main() {
       ServerStatus.noInstance: en.onboardingNoInstance,
       ServerStatus.keychainUnavailable: en.onboardingKeychainUnavailable,
       ServerStatus.openFailed: en.onboardingOpenFailed,
+      ServerStatus.localDataUnreadable: en.onboardingLocalDataUnreadable,
       ServerStatus.certificateInvalid: en.onboardingCertificateInvalid,
       ServerStatus.notSetUp: en.onboardingNotSetUp,
       ServerStatus.appTooOld: en.onboardingAppTooOld('2.0.0'),
@@ -56,6 +59,31 @@ void main() {
     await pumpE1(tester, ServerStatus.idle);
     expect(find.byKey(const ValueKey('e1.status.idle')), findsNothing);
     expect(find.text(en.onboardingNoInstance), findsNothing);
+  });
+
+  testWidgets('unreadable local data offer the reset, no other result does', (
+    tester,
+  ) async {
+    var resets = 0;
+    for (final status in ServerStatus.values) {
+      await pumpE1(tester, status, onReset: () => resets++);
+      expect(
+        find.text(en.onboardingResetLocalData),
+        status == ServerStatus.localDataUnreadable
+            ? findsOneWidget
+            : findsNothing,
+        reason: status.name,
+      );
+    }
+    await pumpE1(
+      tester,
+      ServerStatus.localDataUnreadable,
+      onReset: () => resets++,
+    );
+    await tester.tap(find.text(en.onboardingResetLocalData));
+    expect(resets, 1);
+    // Enter still connects: "Try again" stays the main action.
+    expect(find.byKey(const ValueKey('e1.connect')), findsOneWidget);
   });
 
   testWidgets('the setup pointer names the setup wizard on the host', (

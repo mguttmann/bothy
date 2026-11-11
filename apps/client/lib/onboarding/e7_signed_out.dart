@@ -11,6 +11,7 @@ import 'onboarding_card.dart';
 
 /// The reason as text (never an internal name), "The data of this device has been deleted"
 /// and "Log in again"; a disabled person gets "Contact the owner" instead of the button.
+/// After a wipe that left something ([dataDeleted] false) the sentence says so instead.
 class SignedOutScreen extends StatelessWidget {
   /// Creates the screen.
   const SignedOutScreen({
@@ -18,6 +19,7 @@ class SignedOutScreen extends StatelessWidget {
     required this.cause,
     required this.onLoginAgain,
     this.busy = false,
+    this.dataDeleted = true,
   });
 
   /// Why the account ended.
@@ -28,6 +30,10 @@ class SignedOutScreen extends StatelessWidget {
 
   /// Whether the services are composed again.
   final bool busy;
+
+  /// Whether the wipe deleted every local datum; false after an incomplete one, whose rest
+  /// the app deletes at its next start (R-SY-14).
+  final bool dataDeleted;
 
   /// The reason text of [cause].
   static String reasonText(AppLocalizations l, SignOutCause cause) =>
@@ -57,7 +63,13 @@ class SignedOutScreen extends StatelessWidget {
           key: const ValueKey('e7.reason'),
         ),
         cardGap,
-        CardText(l.onboardingDataDeleted, key: const ValueKey('e7.deleted')),
+        if (dataDeleted)
+          CardText(l.onboardingDataDeleted, key: const ValueKey('e7.deleted'))
+        else
+          CardText(
+            l.onboardingDataNotDeleted,
+            key: const ValueKey('e7.notDeleted'),
+          ),
         cardGap,
         if (disabled)
           CardText(

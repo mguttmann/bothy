@@ -2176,6 +2176,14 @@
   "@onboardingOpenFailed": {
     "description": "E1 result when discovery found the instance but its local folder or database could not be opened."
   },
+  "onboardingLocalDataUnreadable": "The app cannot read its local data for this instance on this device. Try again, or reset the local data: the app then loads everything again from the instance, and messages and drafts that were not sent yet are lost.",
+  "@onboardingLocalDataUnreadable": {
+    "description": "E1 result when the stored key does not open the local database of a stored session; the result line offers the reset (01 section 5.6)."
+  },
+  "onboardingResetLocalData": "Reset local data",
+  "@onboardingResetLocalData": {
+    "description": "Action of the E1 result line for local data the device cannot read: deletes the local database and the file cache and connects again (01 section 5.6)."
+  },
   "onboardingCertificateInvalid": "Certificate invalid. The connection is not secure, so the app does not connect. Ask the owner of the instance to renew the certificate.",
   "@onboardingCertificateInvalid": {
     "description": "E1 result for a TLS error; there is no way to continue (01 section 5.6, R-PR-14)."
@@ -2443,6 +2451,10 @@
   "onboardingDataDeleted": "The data of this device has been deleted.",
   "@onboardingDataDeleted": {
     "description": "Sentence of E7 after the wipe (04 section 8.5, R-SY-14)."
+  },
+  "onboardingDataNotDeleted": "Not all data of this device could be deleted. The app deletes the rest the next time it starts.",
+  "@onboardingDataNotDeleted": {
+    "description": "Sentence of E7 in place of the deletion sentence after a wipe that left something on the device (04 section 8.5, R-SY-14)."
   },
   "onboardingLogInAgain": "Log in again",
   "@onboardingLogInAgain": {
