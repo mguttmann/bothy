@@ -597,8 +597,10 @@ on, and unlocks through `local_auth` (iOS `LAPolicy.deviceOwnerAuthentication`, 
 
 Desktop app (M4-18, docs/DECISIONS.md D-M4-18-1): `apps/client/lib/platform/secure_store.dart`
 keeps the refresh token, the device ID and the database key of each instance in
-`flutter_secure_storage`, every key prefixed with `instance/<instance_id>/`; the only key outside
-an instance is the remembered server address (`app/server_address`). On macOS a release build uses
+`flutter_secure_storage`, every key prefixed with `instance/<instance_id>/`; outside an instance
+the app keeps only what `AppPreferences` remembers under `app/`, none of it a secret: the server
+address (`app/server_address`), the public description of its instance, the dismissed update
+notice, a version refusal and the entry of an unfinished wipe. On macOS a release build uses
 the Data Protection keychain, not synchronized, with `first_unlock_this_device` and the keychain
 access group `$(AppIdentifierPrefix)<bundle identifier>`; a debug or profile build keeps the items
 in the login keychain, which has no access group, so every app of the person reaches them (an app
@@ -649,6 +651,31 @@ these keys; an instance copied from a build before this rule keeps its keys unde
 `instance_id`, which the copy records as its scope. The scope is stored with the instance's secrets
 (docs/decisions.d/FIX-app-logout.md FIX-AL/4).
 A wipe (R-SY-14) deletes that folder, both device keys and every secret with the prefix.
+
+Start, unreadable local data and the end of an account (addendum of 2026-11-11,
+docs/decisions.d/AUD-client-onboarding-01.md). The app shows its start screen, the mark alone
+(a screen reader hears the name of the build), until it has read the remembered address and
+what is stored for its instance. With the session
+of an active device it opens the local data and shows the main view before it asks the network;
+what `getDiscovery` and `getDevice` answer afterwards is applied with the routing rule of every
+"Connect" (`routeStart`): a certificate error, `setup_required` and a too old app close the
+instance and show E1 with their text, a device the server still holds for confirmation shows E4,
+and a found instance replaces the remembered description. A waiting device and a build that an
+instance refused as too old (`app/refused_min_version`, until discovery finds an instance again)
+ask before they open anything, as "Connect" does. A database that the stored key does not open
+(`LocalStoreKeyError`: the secret store lost the key and created a new one, or the file is not
+the one of the key) is created anew while no session is stored, so E1 leads on to the login; with
+a stored session nothing is deleted, E1 says that the local data cannot be read and offers "Reset
+local data", which deletes the folder of the instance and keeps the session, the device keys and
+the secrets, so the engine loads everything again; what only the unreadable file held is lost
+with it (the outbox, the drafts, the view states of the device and the pinned host keys of the
+terminal). A wipe step that fails is logged; the app remembers the instance and
+the scope of its device keys outside the instance's secrets (`app/unfinished_wipe`), E7 says
+that not everything was deleted, and the app deletes the rest at its next start and before it
+composes the services of an instance again. The entry goes with the rest, or when a session
+begins on that instance again. A logout waits for the instance (`unregisterPush`, `logout`) at
+most `AppPorts.serverLogoutLimit`, then cuts the connections of the session's REST client and
+deletes the local data.
 
 ## 10. Background behavior and push
 

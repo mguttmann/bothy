@@ -106,6 +106,7 @@ final class AppPorts {
     this.protectFiles = _noProtection,
     this.clock = const SystemClock(),
     this.openDatabase = _openEncrypted,
+    this.serverLogoutLimit = defaultServerLogoutLimit,
     this.allowPlainHttpForTests = false,
     GlobalKey<NavigatorState>? navigatorKey,
     this._stepUpPrompt,
@@ -219,6 +220,14 @@ final class AppPorts {
 
   /// Opens the local database.
   final DatabaseOpener openDatabase;
+
+  /// How long a logout waits for the instance (`unregisterPush` and `logout`) before it cuts
+  /// the connection and deletes the local data anyway; [defaultServerLogoutLimit] unless a
+  /// test shortens it (docs/decisions.d/AUD-client-onboarding-01.md).
+  final Duration serverLogoutLimit;
+
+  /// The [serverLogoutLimit] of a build.
+  static const Duration defaultServerLogoutLimit = Duration(seconds: 10);
 
   /// Whether `http` servers are accepted: only the integration test entry sets it, so no
   /// release build can talk plain HTTP (D-M4-17-6).
@@ -476,12 +485,65 @@ final class InstanceServices {
     };
   }
 
+  /// The folder of the instance with [instanceId]: the database files and the file cache.
+  static Future<Directory> _folderOf(AppPorts ports, String instanceId) async {
+    final root = await ports.dataRoot();
+    return Directory(
+      '${root.path}${Platform.pathSeparator}instances'
+      '${Platform.pathSeparator}$instanceId',
+    );
+  }
+
+  /// Whether a refresh token of [instance] is stored (the key `AuthSession` writes, M4-09).
+  static Future<bool> _sessionStored(
+    InstanceSecrets secrets,
+    InstanceInfo instance,
+  ) async =>
+      await secrets.read('auth/${instance.address.origin}/refresh_token') !=
+      null;
+
+  /// Deletes the folder of [instance], the database files and the file cache, while its
+  /// services are closed; the session, the device keys and the secrets stay, so the next
+  /// [open] creates an empty database and the engine loads everything again. What only the
+  /// deleted database held is lost: the outbox, the drafts, the view states of the device and
+  /// the pinned host keys of the terminal.
+  static Future<void> discardLocalData(
+    AppPorts ports,
+    InstanceInfo instance,
+  ) async {
+    final folder = await _folderOf(ports, instance.instanceId);
+    if (await folder.exists()) await folder.delete(recursive: true);
+  }
+
+  /// The wiper of what an incomplete wipe left of the instance with [instanceId] (R-SY-14):
+  /// its folder, the device keys of [keyScope], the push and share items and every secret.
+  /// Nothing of the instance may be open; the engine and the database of the account that
+  /// ended are gone with the run that started the wipe.
+  static Future<AccountWiper> leftoverWiper(
+    AppPorts ports, {
+    required String instanceId,
+    required String keyScope,
+  }) async => AccountWiper(
+    instanceId: instanceId,
+    folder: await _folderOf(ports, instanceId),
+    stop: () async {},
+    wipeDatabase: () async {},
+    keys: ports.deviceKeys,
+    keyScope: keyScope,
+    secrets: InstanceSecrets(ports.secureBackend, instanceId),
+    forgetPush: ports.push?.forget,
+    forgetShare: ports.appleShare?.forget,
+  );
+
   /// Builds the services of [instance] (Design note 1): the device keys with the scope of
   /// [AppPorts.deviceKeyScopes], the secrets prefixed with the instance ID, the database key
   /// (32 random bytes at the first start, kept in the secret store), the encrypted database in
   /// `<dataRoot>/instances/<instance_id>/local.db`, the auth session with its login flows and
   /// the sync engine (not started), whose every gateway attempt first asks the version gate
   /// ([versions], starting from [version], the decision of E1's discovery; brief M7-13).
+  ///
+  /// A database that the stored key does not open is created anew while no session is stored
+  /// and throws [LocalStoreKeyError] while one is.
   ///
   /// Throws what the device keys or the database throw; the caller shows E1 again.
   static Future<InstanceServices> open(
@@ -492,11 +554,7 @@ final class InstanceServices {
     final secrets = InstanceSecrets(ports.secureBackend, instance.instanceId);
     final keyScope = await ports.deviceKeyScopes.resolve(secrets);
     final keys = await ports.deviceKeys.ensure(keyScope);
-    final root = await ports.dataRoot();
-    final folder = Directory(
-      '${root.path}${Platform.pathSeparator}instances'
-      '${Platform.pathSeparator}${instance.instanceId}',
-    );
+    final folder = await _folderOf(ports, instance.instanceId);
     await folder.create(recursive: true);
     final dbPath = '${folder.path}${Platform.pathSeparator}local.db';
     // 15 6.3 (D-M5-02-7): the folder gets the protection class before the database exists, so
@@ -504,10 +562,24 @@ final class InstanceServices {
     // earlier start get it again here.
     final protected = [folder.path, dbPath, '$dbPath-wal', '$dbPath-shm'];
     await ports.protectFiles(protected);
-    final database = await ports.openDatabase(
-      io.File(dbPath),
-      SecureDatabaseKeySource(secrets),
-    );
+    final databaseKey = SecureDatabaseKeySource(secrets);
+    LocalDatabase database;
+    try {
+      database = await ports.openDatabase(io.File(dbPath), databaseKey);
+    } on LocalStoreKeyError {
+      // The stored key does not open the stored database: the secret store lost the key and
+      // created a new one, or the file is not the one of this key. With a session the caller
+      // offers the reset, because the unsent work of the person goes with the file
+      // ([discardLocalData]). Without one nothing in the folder belongs to an account of this
+      // app identity, so it is created anew and E1 leads on to the login
+      // (docs/decisions.d/AUD-client-onboarding-01.md, AUD-CO1/4, which also names the limit:
+      // app identities that share the data root but not their secrets).
+      if (await _sessionStored(secrets, instance)) rethrow;
+      await discardLocalData(ports, instance);
+      await folder.create(recursive: true);
+      await ports.protectFiles(protected);
+      database = await ports.openDatabase(io.File(dbPath), databaseKey);
+    }
     await ports.protectFiles(protected);
     final random = Random.secure();
     final ids = Uuid7Generator(
@@ -730,9 +802,7 @@ final class InstanceServices {
   /// Whether a refresh token of an earlier login is stored, so the app can start signed in.
   ///
   /// The key is the one `AuthSession` writes (`auth/<origin>/refresh_token`, M4-09).
-  Future<bool> hasStoredSession() async =>
-      await secrets.read('auth/${instance.address.origin}/refresh_token') !=
-      null;
+  Future<bool> hasStoredSession() => _sessionStored(secrets, instance);
 
   /// The ID of this device at the instance, kept by `AuthSession` (`auth/<origin>/device_id`,
   /// M4-09), or null before the first registration.

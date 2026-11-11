@@ -23,6 +23,27 @@ InstanceInfo instance() => InstanceInfo(
 );
 
 void main() {
+  test('an unfinished wipe is stored with its instance and key scope', () {
+    const left = UnfinishedWipe(
+      instanceId: instanceId,
+      keyScope: 'com.example.chat/$instanceId',
+    );
+    final read = UnfinishedWipe.fromJson(left.toJson());
+    expect(read?.instanceId, instanceId);
+    expect(read?.keyScope, 'com.example.chat/$instanceId');
+    // The ID names the folder the wipe deletes: anything but a UUID is no entry.
+    for (final Object? bad in [
+      null,
+      'text',
+      {'instance_id': '..', 'key_scope': 'x'},
+      {'instance_id': '../../other', 'key_scope': 'x'},
+      {'instance_id': instanceId},
+      {'key_scope': instanceId},
+    ]) {
+      expect(UnfinishedWipe.fromJson(bad), isNull, reason: '$bad');
+    }
+  });
+
   late Directory root;
 
   setUp(() async => root = await Directory.systemTemp.createTemp('wiper'));

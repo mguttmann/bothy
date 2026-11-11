@@ -248,7 +248,9 @@ AppPorts testPorts({
   AndroidShare? androidShare,
   TerminalPlatformGuard? terminalGuard,
   UpdateLauncher updateLauncher = const NoUpdateLauncher(),
+  Duration serverLogoutLimit = AppPorts.defaultServerLogoutLimit,
 }) => AppPorts(
+  serverLogoutLimit: serverLogoutLimit,
   terminalGuard: terminalGuard,
   updateLauncher: updateLauncher,
   push: push,

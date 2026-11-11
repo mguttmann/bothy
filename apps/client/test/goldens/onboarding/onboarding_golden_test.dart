@@ -14,6 +14,7 @@ import 'package:client/onboarding/e5_pairing.dart';
 import 'package:client/onboarding/e6_app_lock.dart';
 import 'package:client/onboarding/e7_signed_out.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
+import 'package:client/onboarding/start_screen.dart';
 import 'package:design_system/testing.dart';
 import 'package:flutter/material.dart';
 
@@ -36,6 +37,7 @@ Map<String, Widget Function()> screens() => {
         status: status,
         minVersion: '2.0.0',
         onConnect: (_) {},
+        onReset: noop,
       ),
   'e1_connecting': () => const ServerAddressScreen(
     address: 'https://chat.example.com',
@@ -106,6 +108,12 @@ Map<String, Widget Function()> screens() => {
     cause: SignOutCause.userDisabled,
     onLoginAgain: noop,
   ),
+  'e7_not_deleted': () => const SignedOutScreen(
+    cause: SignOutCause.loggedOut,
+    dataDeleted: false,
+    onLoginAgain: noop,
+  ),
+  'start': () => const StartScreen(appName: 'ExampleChat'),
 };
 
 void _ignore(String _) {}

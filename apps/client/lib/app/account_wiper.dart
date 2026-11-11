@@ -8,6 +8,8 @@ library;
 
 import 'dart:io';
 
+import 'package:domain/domain.dart' show canonicalUuid;
+
 import '../platform/device_key_signer.dart';
 import '../platform/secure_store.dart';
 
@@ -52,6 +54,43 @@ enum SignOutCause {
   };
 }
 
+/// What an incomplete wipe left to delete: the instance and the scope of its device keys. The
+/// app keeps it outside the instance's secrets ([AppPreferences.unfinishedWipe]) and deletes
+/// the rest at its next start (R-SY-14; docs/decisions.d/AUD-client-onboarding-01.md).
+final class UnfinishedWipe {
+  /// Creates the entry.
+  const UnfinishedWipe({required this.instanceId, required this.keyScope});
+
+  /// The instance whose account ended.
+  final String instanceId;
+
+  /// The scope of its device keys ([AccountWiper.keyScope]).
+  final String keyScope;
+
+  /// The stored form.
+  Map<String, Object?> toJson() => {
+    'instance_id': instanceId,
+    'key_scope': keyScope,
+  };
+
+  /// Reads [toJson]; null for anything else. The ID names the folder the wipe deletes, so
+  /// anything but a UUID is no entry (D-M4-18-20).
+  static UnfinishedWipe? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final id = json['instance_id'];
+    final scope = json['key_scope'];
+    if (id is! String || scope is! String) return null;
+    try {
+      return UnfinishedWipe(
+        instanceId: canonicalUuid(id, 'instance ID'),
+        keyScope: scope,
+      );
+    } on FormatException {
+      return null;
+    }
+  }
+}
+
 /// Deletes every local datum of one instance's account, for every sign-out cause: logout, E4
 /// "Cancel", a rejected or expired device, `4012`, `session.revoked` and `401 session_revoked`
 /// (R-SY-14, 04 8.5).
@@ -63,6 +102,9 @@ enum SignOutCause {
 /// deletes every secret of the instance (tokens, database key, device ID).
 /// Only the server address stays, which is not an instance secret ([AppPreferences]). Each
 /// step runs even when an earlier one failed, so a broken database never keeps a key alive.
+///
+/// [wipe] throws a [StateError] that names the failed steps; the caller keeps an
+/// [UnfinishedWipe] then.
 ///
 /// Example: `await wiper.wipe(); showSignedOut(cause);`
 final class AccountWiper {
@@ -82,7 +124,7 @@ final class AccountWiper {
        _forgetShare = forgetShare,
        _wipeDatabase = wipeDatabase,
        _keys = keys,
-       _keyScope = keyScope ?? instanceId,
+       keyScope = keyScope ?? instanceId,
        _secrets = secrets;
 
   /// The instance whose data goes.
@@ -96,7 +138,7 @@ final class AccountWiper {
   final DeviceKeyStore _keys;
 
   /// The scope of the instance's device keys ([DeviceKeyScopes]); the instance ID by default.
-  final String _keyScope;
+  final String keyScope;
   final InstanceSecrets _secrets;
   final Future<void> Function(String instanceId)? _forgetPush;
   final Future<void> Function(String instanceId)? _forgetShare;
@@ -120,7 +162,7 @@ final class AccountWiper {
     await step(() async {
       if (await folder.exists()) await folder.delete(recursive: true);
     });
-    await step(() => _keys.delete(_keyScope));
+    await step(() => _keys.delete(keyScope));
     final forgetPush = _forgetPush;
     if (forgetPush != null) await step(() => forgetPush(instanceId));
     final forgetShare = _forgetShare;

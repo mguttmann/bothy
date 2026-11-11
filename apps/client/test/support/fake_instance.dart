@@ -56,7 +56,8 @@ class FakeInstance {
 
   /// Starts a fake with the standard world and a container over test ports; [discovery]
   /// wraps the discovery client of the app (a network the test switches); [platform],
-  /// [window] and [notifications] are the desktop ports of M4-30.
+  /// [window] and [notifications] are the desktop ports of M4-30; [serverLogoutLimit] is how
+  /// long a logout waits for the instance.
   static Future<FakeInstance> start({
     Map<String, String> config = fastConfig,
     DiscoveryClient Function(DiscoveryClient real)? discovery,
@@ -74,6 +75,7 @@ class FakeInstance {
     DeviceKeyStore? deviceKeys,
     BuildBranding branding = testBranding,
     UpdateLauncher updateLauncher = const NoUpdateLauncher(),
+    Duration serverLogoutLimit = AppPorts.defaultServerLogoutLimit,
   }) async {
     final server = await FakeServer.start(
       options: const FakeServerOptions(
@@ -100,6 +102,7 @@ class FakeInstance {
       deviceKeys: deviceKeys,
       branding: branding,
       updateLauncher: updateLauncher,
+      serverLogoutLimit: serverLogoutLimit,
     );
   }
 
@@ -131,6 +134,7 @@ class FakeInstance {
     DeviceKeyStore? deviceKeys,
     BuildBranding branding = testBranding,
     UpdateLauncher updateLauncher = const NoUpdateLauncher(),
+    Duration serverLogoutLimit = AppPorts.defaultServerLogoutLimit,
   }) async {
     final root = await Directory.systemTemp.createTemp('client-flow');
     final keys = SoftwareKeyStore();
@@ -161,6 +165,7 @@ class FakeInstance {
       androidShare: androidShare,
       branding: branding,
       updateLauncher: updateLauncher,
+      serverLogoutLimit: serverLogoutLimit,
     );
     return FakeInstance._(server, seed, root, ports, keys, secure);
   }

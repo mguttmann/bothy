@@ -94,10 +94,14 @@ class TestApp {
   }
 
   /// Ends the running app and starts it again on the same ports and data (brief M4-30: a
-  /// restart after Quit).
+  /// restart after Quit). The services of the app that ends are closed first, as the process
+  /// of an app that quit is gone: the next start opens the local database at once
+  /// (docs/decisions.d/AUD-client-onboarding-01.md), not after a discovery round trip.
   Future<void> restart() async {
+    final services = state.services;
     await tester.pumpWidget(const SizedBox());
     await tester.pump();
+    await services?.close();
     await pumpApp();
   }
 

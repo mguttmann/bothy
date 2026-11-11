@@ -1,0 +1,5 @@
+header, label "Connect to your instance"
+text field, label "Server address", value "https://chat.example.com", action tap
+button, label "Connect", action tap
+live region, label "The app cannot read its local data for this instance on this device. Try again, or reset the local data: the app then loads everything again from the instance, and messages and drafts that were not sent yet are lost."
+button, label "Reset local data", action tap

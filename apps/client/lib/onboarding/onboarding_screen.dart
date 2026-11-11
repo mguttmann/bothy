@@ -23,6 +23,7 @@ import 'e5_pairing.dart';
 import 'e6_app_lock.dart';
 import 'e7_signed_out.dart';
 import 'onboarding_controller.dart';
+import 'start_screen.dart';
 
 /// Shows the screen of [step] with the state of the [OnboardingController]. The router keeps
 /// [step] equal to the controller's step (`redirectFor`), except for E6, which the app lock
@@ -44,6 +45,13 @@ class OnboardingScreen extends ConsumerWidget {
     DateTime now() => ports.clock.now();
     switch (step) {
       case OnboardingStep.server || OnboardingStep.signedIn:
+        // The start reads what is stored: no form of E1 yet.
+        if (state.starting) {
+          return StartScreen(
+            key: const ValueKey('screen.start'),
+            appName: ports.branding.appName,
+          );
+        }
         return ServerAddressScreen(
           key: const ValueKey('screen.e1'),
           address: state.address,
@@ -54,6 +62,7 @@ class OnboardingScreen extends ConsumerWidget {
           onUpdate: ports.updatePath.available
               ? () => unawaited(openUpdatePath(ref))
               : null,
+          onReset: () => unawaited(control.resetLocalData()),
         );
       case OnboardingStep.login:
         if (instance == null) return const SizedBox.shrink();
@@ -128,6 +137,7 @@ class OnboardingScreen extends ConsumerWidget {
           key: const ValueKey('screen.e7'),
           cause: state.cause ?? SignOutCause.loggedOut,
           busy: state.busy,
+          dataDeleted: !state.wipeIncomplete,
           onLoginAgain: control.loginAgain,
         );
     }
