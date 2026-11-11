@@ -158,6 +158,9 @@ class FakeRuntime:
 
     async def background_work(self, thread_id: UUID, since: float) -> tuple[BackgroundTask, ...]:
         self.background_since.append(since)
+        # The platform reads Hermes' registries in a worker thread, so the caller gives the loop
+        # away here; a fake that answers at once hid a run ended by another task meanwhile.
+        await asyncio.sleep(0)
         return tuple(self.background.get(thread_id, ()))
 
     async def cancel_background(self, thread_id: UUID) -> None:

@@ -610,6 +610,41 @@ async def test_cards_and_interactions(tmp_path: Path) -> None:
             assert comps["sc:once:f1"]["restricted_to"] == "run_starter"
 
 
+@pytest.mark.parametrize("answer", ["click", "text"])
+async def test_an_answered_card_ends_the_run_with_usage_costs_and_title(
+    tmp_path: Path, answer: str
+) -> None:
+    """The run of an answered card ends through its own ``execute`` (AUD-HA1/1).
+
+    The SDK ends a resumed run ``completed`` without metrics and costs as soon as the handler of
+    the answer returns; it must not return before the run's own end went out.
+    """
+    question = CardRequest(CardKind.CLARIFY, "c1", "Which file?", ("a.txt", "b.txt"))
+    asks = card_script(question)
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        rt.events.on_usage(turn.thread_id, Usage("anthropic", "model-small", 11, 7))
+        rt.titles[turn.thread_id] = "The chosen file"
+        return await asks(turn, rt)
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt) as r:
+        r.fake.enable_costs()
+        triggered = await r.fake.trigger("Which file do you mean?", session_mode="new")
+        await r.until(lambda: r.fake.run_state(triggered.run_id).state == "waiting_input")
+        if answer == "click":
+            await r.fake.click(triggered.run_id, "cl:c1:1")
+        else:
+            await r.fake.deliver_followup(triggered.run_id, "b.txt please")
+        await r.until(lambda: r.finished(triggered.run_id))
+        await r.fake.pass_time(0.5)
+    finishes = [q.json for q in r.requests("finishRun") if str(triggered.run_id) in q.path]
+    assert [f["state"] for f in finishes] == ["completed"]
+    assert finishes[0]["metrics"]["tokens_in"] == 11
+    assert [(c["model"], c["tokens_out"]) for c in finishes[0]["costs"]] == [("model-small", 7)]
+    assert r.fake.titles == [{"thread_id": str(triggered.thread_id), "title": "The chosen file"}]
+
+
 async def test_redelivered_interaction_resolves_nothing(tmp_path: Path) -> None:
     request = CardRequest(CardKind.CLARIFY, "c9", "Which one?", ("Red", "Blue"))
     rt = FakeRuntime(script=card_script(request))
@@ -990,7 +1025,9 @@ async def test_followup_answers_each_card_kind(tmp_path: Path, busy: str) -> Non
     """A typed answer resolves a clarify with its text; approval and confirmation are refused.
 
     Only at ``steer`` the text also reaches the running turn; at ``queue`` Hermes would run it as a
-    new turn without a run, so it is not passed.
+    new turn without a run, so it is not passed. A text Hermes took is acknowledged, so the
+    server starts no follow-on run with the same text (AUD-HA1/2); one that was not
+    passed on stays ``queued`` for that run (09 7).
     """
     expected = {
         CardKind.CLARIFY: "b.txt please",
@@ -1005,13 +1042,42 @@ async def test_followup_answers_each_card_kind(tmp_path: Path, busy: str) -> Non
         async with rig(tmp_path / kind.value, runtime=rt, busy_mode=busy) as r:
             triggered = await r.fake.trigger()
             await r.until(lambda: r.fake.run_state(triggered.run_id).state == "waiting_input")
-            await r.fake.deliver_followup(triggered.run_id, "b.txt please")
+            typed = await r.fake.deliver_followup(triggered.run_id, "b.txt please")
             await r.until(lambda: r.finished(triggered.run_id))
+            state = r.fake.followup_state(triggered.run_id, typed)
         assert rt.answered == [answer]
         steered = [text for _, text, _ in rt.steered]
+        taken = busy == "steer" or kind is CardKind.CLARIFY
         assert steered == (
             ["b.txt please"] if busy == "steer" and kind is not CardKind.CLARIFY else []
         )
+        assert state == ("absorbed" if taken else "queued"), kind
+
+
+@pytest.mark.parametrize("kind", [CardKind.CLARIFY, CardKind.APPROVAL])
+async def test_card_answer_with_a_file_is_left_to_the_follow_on_run(
+    tmp_path: Path, kind: CardKind
+) -> None:
+    """A voice message typed at an open card releases the card and stays ``queued``.
+
+    Its audio cannot be handed into the turn, so nothing of it is steered and it is never
+    acknowledged: the server's follow-on run takes it as its triggering message, where the audio
+    is transcribed (AUD-HA1/3; 09 17.6).
+    """
+    request = CardRequest(
+        kind, "c1", "Which?", ("a.txt", "b.txt") if kind is CardKind.CLARIFY else (), "k"
+    )
+    rt = FakeRuntime(script=card_script(request))
+    async with rig(tmp_path, runtime=rt, busy_mode="steer") as r:
+        triggered = await r.fake.trigger()
+        await r.until(lambda: r.fake.run_state(triggered.run_id).state == "waiting_input")
+        audio = r.fake.add_file(b"\x00\x00\x00\x1cftypM4A ", name="note.m4a", mime="audio/mp4")
+        voice = await r.fake.deliver_followup(triggered.run_id, "", files=[audio])
+        await r.until(lambda: r.finished(triggered.run_id))
+        assert r.fake.run_state(triggered.run_id).state == "completed"
+        assert r.fake.followup_state(triggered.run_id, voice) == "queued"
+    assert rt.answered == ["" if kind is CardKind.CLARIFY else "deny"]
+    assert rt.steered == []
 
 
 async def test_no_answer_after_a_mode_abort(tmp_path: Path) -> None:

@@ -325,8 +325,11 @@ files, never as an empty message. An attachment that cannot be passed on reaches
 note with its name, type and reason: the virus scan has not finished, the scan blocked it, it is
 larger than Hermes' `gateway.max_inbound_media_bytes`, Hermes refused the bytes, or the server
 did not hand it out. Attachments of earlier messages stay lines of the context. A follow-up
-with a file other than audio is not steered into the running turn; the server's follow-on run
-takes it, so its files reach Hermes as above.
+with a file of any type, a voice message too, is not passed into the running run: neither steered
+into its turn nor started as a turn of its own while the run holds background work. The server's
+follow-on run takes it as its triggering message, so its files reach Hermes and its audio is
+transcribed as above. Sent as the answer to an open card, such a message only releases the card
+and is left to the follow-on run as well.
 
 ## Inbox, state and restart
 
@@ -347,8 +350,10 @@ connects only after Hermes finished its startup restore.
   `127.0.0.1`, the FakeServer, under the macOS sandbox, an empty managed scope): plugin discovery,
   a full turn, AG-08 and AZ-P6 (no turn without a matching token), AG-11 and the unknown mode,
   the reported mode equals the credential the model endpoint receives, AG-13 (steer, queue,
-  stop), AG-15 (concurrent clicks resolve once), AG-20 (trust marks reach the model as data
-  blocks), BR-13 (no key value in any request, frame, log, output or state file), the installer,
+  stop), AG-15 (concurrent clicks resolve once), a card answered by a click before a delegation
+  (the run holds the work and ends with its costs), a typed answer to a card (absorbed), a voice
+  message sent during a turn (not steered, left `queued`), AG-20 (trust marks reach the model as
+  data blocks), BR-13 (no key value in any request, frame, log, output or state file), the installer,
   the stub contract, the toolset table, the command table and the unchanged pin; files of the
   answer (`MEDIA:` tags for a document, an MP3 voice, a video and an image) arrive as attachments
   with the uploaded bytes, the profile's `.env` stays out, and a voice message reaches Hermes'
@@ -366,9 +371,11 @@ connects only after Hermes finished its startup restore.
   thread answered in the auto thread without a quote, a reply in a thread that quotes its
   trigger, a forum post, reports into a text channel, a fixed thread and a forum (a new post),
   files and an MP3 voice out, a voice message in with its transcript submitted, a control and a
-  skill command, a card answered by a click, a follow-up steered into the running turn (and
-  quoted by the answer), an edited answer and the thread title, cancel, retry of a failed run,
-  and a copy from Hermes' delivery ledger that is not posted again. A request the server refuses or does not serve fails a test there, which the
+  skill command, a card answered by a click (and the run's token counts in its document after
+  it), a typed answer to a card that is absorbed and starts no second run, a follow-up steered
+  into the running turn (and quoted by the answer), a voice message sent during a run that the
+  follow-on run takes and transcribes, an edited answer and the thread title, cancel, retry of a
+  failed run, and a copy from Hermes' delivery ledger that is not posted again. A request the server refuses or does not serve fails a test there, which the
   FakeServer cannot show. They need the Go tool chain and a container runtime and never skip.
 - `tests/unit/test_media.py`: upload in parts, voice kind, size and file type refusals, an
   aborted upload, a refused attachment, the capabilities, transcripts and their submission,

@@ -31,6 +31,7 @@ from bothy_hermes_adapter.runtime import (
     MediaKind,
     TurnOutcome,
     TurnRequest,
+    Usage,
 )
 
 pytestmark = [pytest.mark.anyio, pytest.mark.e2e]
@@ -141,6 +142,43 @@ async def test_report_into_a_forum_opens_a_new_post(real: RealServer, tmp_path: 
 # ---- files out, voice out, voice in -----------------------------------------------------------
 
 
+async def _voice_message(real: RealServer, thread_id: UUID, audio: bytes) -> tuple[UUID, UUID]:
+    """Alex posts a voice message the server accepts; the message and its file.
+
+    A voice message needs a final file (409 file_not_ready before the scan ended) and the
+    effective feature voice_input, which the adapter's heartbeat reports; a voice message posted
+    before that triggers nothing and keeps its file, so the next try uploads a new one.
+    """
+    uploaded: list[UUID] = []
+
+    async def accepted() -> Any:
+        if not uploaded:
+            uploaded.append(
+                await real.upload(real.world.channel_id, "note.m4a", audio, "audio/mp4")
+            )
+        answer = await real.call(
+            "createMessage",
+            path={"thread_id": thread_id},
+            body={
+                "client_msg_id": str(uuid7()),
+                "content_md": "",
+                "kind": "voice",
+                "attachment_file_ids": [str(uploaded[-1])],
+            },
+        )
+        if answer.status != 201:
+            assert answer.member("code") == "file_not_ready", answer.body
+            return None
+        got = ok(await real.call("getMessage", path={"message_id": answer.body["id"]}))
+        if got.get("trigger_state") in (None, "failed"):
+            uploaded.clear()
+            return None
+        return answer.body["id"]
+
+    message = UUID(await until("an accepted voice message", accepted))
+    return message, uploaded[-1]
+
+
 async def test_files_and_voice_go_out_with_the_answer(real: RealServer, tmp_path: Path) -> None:
     report = tmp_path / "report.txt"
     report.write_text("line one\n", encoding="utf-8")
@@ -183,44 +221,14 @@ async def test_voice_message_is_transcribed_and_the_transcript_submitted(
     async with rig(tmp_path, fake=real, consumer=consumer(), runtime=runtime) as r:
         first = await real.trigger("Hello @lotse")
         await ended(real, first.run_id)
-        uploaded: list[UUID] = []
-
-        async def voice_run() -> Any:
-            # A voice message needs a final file (409 file_not_ready before the scan ended) and
-            # the effective feature voice_input, which the adapter's heartbeat reports; a voice
-            # message posted before that triggers nothing and keeps its file, so the next try
-            # uploads a new one.
-            if not uploaded:
-                uploaded.append(
-                    await real.upload(real.world.channel_id, "note.m4a", audio, "audio/mp4")
-                )
-            answer = await real.call(
-                "createMessage",
-                path={"thread_id": first.thread_id},
-                body={
-                    "client_msg_id": str(uuid7()),
-                    "content_md": "",
-                    "kind": "voice",
-                    "attachment_file_ids": [str(uploaded[-1])],
-                },
-            )
-            if answer.status != 201:
-                assert answer.member("code") == "file_not_ready", answer.body
-                return None
-            got = ok(await real.call("getMessage", path={"message_id": answer.body["id"]}))
-            if got.get("trigger_state") in (None, "failed"):
-                uploaded.clear()
-                return None
-            return answer.body["id"]
-
-        message = UUID(await until("an accepted voice message", voice_run))
+        message, file_id = await _voice_message(real, first.thread_id, audio)
         run_id, _ = await real.wait_run(message)
         view = await ended(real, run_id)
     assert view.state == "completed"
     assert [h[1] for h in runtime.heard] == ["note.m4a"]
     assert runtime.heard[0][2].startswith("audio/")
     assert "Please check the export" in r.runtime.turns[-1].user_text
-    file = ok(await real.call("getFile", path={"file_id": uploaded[-1]}))
+    file = ok(await real.call("getFile", path={"file_id": file_id}))
     assert (file["transcript_status"], file["transcript_source"]) == ("done", "agent")
 
 
@@ -297,35 +305,106 @@ async def test_skill_command_runs_a_turn_without_a_quote(real: RealServer, tmp_p
 # ---- cards, follow-ups, edits and the title ---------------------------------------------------
 
 
+QUESTION = CardRequest(CardKind.CLARIFY, "c1", "Which file?", ("a.txt", "b.txt"))
+
+
+async def _waiting_card(real: RealServer, run_id: UUID, thread_id: UUID) -> dict[str, Any]:
+    """The card of the run once it waits for input."""
+
+    async def card() -> Any:
+        for m in agent_texts(await messages(real, thread_id), real.agent_id):
+            if m["kind"] == "card":
+                return m
+        return None
+
+    shown: dict[str, Any] = await until("the card", card)
+
+    async def waiting() -> bool:
+        return (await real.run_state(run_id)).state == "waiting_input"
+
+    await until("the waiting run", waiting)
+    return shown
+
+
+async def _click(real: RealServer, card: dict[str, Any], suffix: str) -> None:
+    button = next(c for c in card["components"] if c["custom_id"].endswith(suffix))
+    ok(
+        await real.call(
+            "createInteraction",
+            path={"component_id": button["id"]},
+            body={"client_interaction_id": str(uuid7()), "values": {}},
+        ),
+        201,
+        202,
+    )
+
+
+async def _thread_runs(real: RealServer, thread_id: UUID) -> list[dict[str, Any]]:
+    page = ok(await real.call("listThreadRuns", path={"thread_id": thread_id}, query={}))
+    items: list[dict[str, Any]] = list(page["items"])
+    return items
+
+
 async def test_card_answered_by_a_click(real: RealServer, tmp_path: Path) -> None:
-    question = CardRequest(CardKind.CLARIFY, "c1", "Which file?", ("a.txt", "b.txt"))
-    runtime = FakeRuntime(script=card_script(question))
+    runtime = FakeRuntime(script=card_script(QUESTION))
     async with rig(tmp_path, fake=real, consumer=consumer(), runtime=runtime):
         first = await real.trigger("Which file do you mean @lotse")
-
-        async def card() -> Any:
-            for m in agent_texts(await messages(real, first.thread_id), real.agent_id):
-                if m["kind"] == "card":
-                    return m
-            return None
-
-        shown = await until("the card", card)
-        assert (await real.run_state(first.run_id)).state == "waiting_input"
-        button = next(c for c in shown["components"] if c["custom_id"].endswith(":1"))
-        ok(
-            await real.call(
-                "createInteraction",
-                path={"component_id": button["id"]},
-                body={"client_interaction_id": str(uuid7()), "values": {}},
-            ),
-            201,
-            202,
-        )
+        shown = await _waiting_card(real, first.run_id, first.thread_id)
+        await _click(real, shown, ":1")
         view = await ended(real, first.run_id)
     assert view.state == "completed"
     assert runtime.resolved == [("cl:c1:1", "b.txt")]
     answers = agent_texts(await messages(real, first.thread_id), real.agent_id)
     assert answers[-1]["content_md"] == "You chose b.txt."
+
+
+async def test_run_of_a_clicked_card_ends_with_its_usage(real: RealServer, tmp_path: Path) -> None:
+    """The run of an answered card ends through the adapter's own end, with its usage (AUD-HA1/1).
+
+    The SDK ends a resumed run without metrics as soon as the handler of the click returns; the
+    token counts in the run document show whose end the server took.
+    """
+    asks = card_script(QUESTION)
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        rt.events.on_usage(turn.thread_id, Usage("anthropic", "model-small", 11, 7))
+        return await asks(turn, rt)
+
+    runtime = FakeRuntime(script=script)
+    async with rig(tmp_path, fake=real, consumer=consumer(), runtime=runtime):
+        first = await real.trigger("Which file do you mean @lotse")
+        shown = await _waiting_card(real, first.run_id, first.thread_id)
+        await _click(real, shown, ":0")
+        view = await ended(real, first.run_id)
+        run = ok(await real.call("getRun", path={"run_id": first.run_id}))
+    assert view.state == "completed"
+    assert runtime.resolved == [("cl:c1:0", "a.txt")]
+    metrics = run["metrics"]
+    assert (metrics.get("tokens_in"), metrics.get("tokens_out")) == (11, 7), metrics
+
+
+async def test_typed_answer_to_a_card_starts_no_second_run(
+    real: RealServer, tmp_path: Path
+) -> None:
+    """A typed answer the turn took is absorbed: one run in the thread (AUD-HA1/2, 09 7).
+
+    The server settles the open follow-ups in the transaction of the run's end: an answer left
+    ``queued`` becomes ``deferred`` there and triggers a follow-on run with the same text.
+    """
+    runtime = FakeRuntime(script=card_script(QUESTION))
+    async with rig(tmp_path, fake=real, consumer=consumer(), runtime=runtime):
+        first = await real.trigger("Which file do you mean @lotse")
+        await _waiting_card(real, first.run_id, first.thread_id)
+        typed = await post(real, first.thread_id, "b.txt please")
+        view = await ended(real, first.run_id)
+        run = ok(await real.call("getRun", path={"run_id": first.run_id}))
+        runs = await _thread_runs(real, first.thread_id)
+    assert view.state == "completed"
+    assert runtime.answered == ["b.txt please"]
+    followups = [(f["message_id"], f["state"]) for f in run["followups"].values()]
+    assert followups == [(str(typed), "absorbed")]
+    assert [r["id"] for r in runs] == [str(first.run_id)]
+    assert len(runtime.turns) == 1
 
 
 async def test_followup_steers_the_running_turn(real: RealServer, tmp_path: Path) -> None:
@@ -359,6 +438,57 @@ async def test_followup_steers_the_running_turn(real: RealServer, tmp_path: Path
     assert [a["content_md"] for a in answers] == ["Both checked."]
     # The steered follow-up lies in the run's thread, so the answer may quote it.
     assert answers[0]["reply_to_message_id"] == str(followup)
+
+
+async def test_voice_followup_is_left_to_the_follow_on_run(
+    real: RealServer, tmp_path: Path
+) -> None:
+    """A voice message sent during a run is not steered as empty text (AUD-HA1/3, 09 17.6).
+
+    It has no text and follow-ups are not transcribed: it stays ``queued``, and the server's
+    follow-on run takes it as its triggering message, where the adapter transcribes it.
+    """
+    audio = m4a()
+    release = asyncio.Event()
+    handled: list[UUID] = []
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        if len(rt.turns) == 1:
+            rt.events.on_model_reply(turn.thread_id, 1)  # a tool call: the turn takes a steer
+            await release.wait()
+        await rt.events.on_answer(turn.thread_id, "Noted.", None)
+        return TurnOutcome.COMPLETED
+
+    runtime = FakeRuntime(script=script, transcripts={audio: "Also check the import"})
+    async with rig(tmp_path, fake=real, consumer=consumer(), runtime=runtime) as r:
+        original = r.handler.on_followup
+
+        async def on_followup(inv: Any, run: Any) -> None:
+            await original(inv, run)
+            handled.append(inv.payload.message_id)
+
+        r.handler.on_followup = on_followup  # type: ignore[method-assign] # wait for its end
+        # The invocation carries the effective features of its time: followups = steer and
+        # voice_input reach the server with the adapter's first heartbeat.
+        await heartbeat(real)
+        first = await real.trigger("Check the export @lotse")
+        await until("the turn in Hermes", _async(lambda: runtime.turns))
+        voice, _ = await _voice_message(real, first.thread_id, audio)
+        await until("the follow-up at the adapter", _async(lambda: voice in handled))
+        release.set()
+        assert (await ended(real, first.run_id)).state == "completed"
+        assert runtime.steered == []
+
+        async def follow_on() -> Any:
+            return [
+                x for x in await _thread_runs(real, first.thread_id) if x["id"] != str(first.run_id)
+            ]
+
+        [second] = await until("the follow-on run", follow_on)
+        assert (await ended(real, UUID(second["id"]))).state == "completed"
+    assert [h[1] for h in runtime.heard] == ["note.m4a"]
+    assert [t.message_id for t in runtime.turns] == [first.message_id, voice]
+    assert "Also check the import" in runtime.turns[-1].user_text
 
 
 async def test_edit_of_the_answer_and_the_title(real: RealServer, tmp_path: Path) -> None:
