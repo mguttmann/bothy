@@ -221,6 +221,35 @@ func TestClientIP_MalformedStopsAtLastTrusted(t *testing.T) {
 	}
 }
 
+// A proxy that sets Forwarded appends its element to the value the client sent. A quoted string
+// of the client must not hide that element: an escaped quote does not end the string (RFC 7230
+// quoted-pair), and a line that ends inside a quoted string is malformed, so the peer counts.
+func TestClientIP_ForwardedQuotedStrings(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		lines []string
+		want  string
+	}{
+		"escaped quote before the element of the proxy": {[]string{`for=192.0.2.66;x="\"", for=198.51.100.7`}, "198.51.100.7"},
+		"escaped backslash ends the string":             {[]string{`for=192.0.2.66;x="\\", for=198.51.100.7`}, "198.51.100.7"},
+		"separators inside a quoted string":             {[]string{`for=192.0.2.66;x="a, for=203.0.113.9;b", for=198.51.100.7`}, "198.51.100.7"},
+		"line ends inside a quoted string":              {[]string{`for=192.0.2.66;x=", for=198.51.100.7`}, "198.18.0.1"},
+		"line ends after an escaped quote":              {[]string{`for="192.0.2.66\", for=198.51.100.7`}, "198.18.0.1"},
+		"line ends with a backslash in a quoted string": {[]string{`for=192.0.2.66;x="\`}, "198.18.0.1"},
+		"open quote in an earlier line":                 {[]string{`for=192.0.2.66;x="`, `for=198.51.100.7`}, "198.51.100.7"},
+		"open quote in the line of a trusted hop":       {[]string{`for=198.51.100.7`, `for=198.18.4.4;x="`}, "198.18.0.1"},
+	}
+	for name, tc := range cases {
+		var headers []string
+		for _, line := range tc.lines {
+			headers = append(headers, "Forwarded", line)
+		}
+		if got := clientIP("198.18.0.1:5000", headers...); got != tc.want {
+			t.Errorf("%s: got %s, want %s", name, got, tc.want)
+		}
+	}
+}
+
 func TestClientIP_IPv6AndMapped(t *testing.T) {
 	t.Parallel()
 	if got := clientIP("[::ffff:192.0.2.1]:4711"); got != "192.0.2.1" {
