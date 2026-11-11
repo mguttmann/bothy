@@ -368,7 +368,10 @@ built on the search of this chapter; a model only chooses among the hits and add
    `assistant_not_configured`; without a live connection at once with `assistant_unavailable`;
    without a valid answer within `search.assist.timeout` with `assistant_timeout`. Open requests
    live in the memory of the api process until `expires_at` plus `search.assist.timeout`, as for
-   autocompletion (09 10.5).
+   autocompletion (09 10.5). With several api nodes the assistant therefore answers only
+   requests that reach the node of its gateway connection, and its answer must reach that node
+   too ([02-architecture.md](02-architecture.md), section 11.6;
+   [multi-node.md](../operations/multi-node.md), sections 4 and 6).
 6. **The answer.** `answerSearchAssist` (`search.assist.respond`, only the addressed agent; every
    other principal and an unknown or forgotten request get `404`): `picks` (`ref`, `reason`),
    `terms`, `costs`. A reference that was not sent (`unknown_ref`), one picked twice

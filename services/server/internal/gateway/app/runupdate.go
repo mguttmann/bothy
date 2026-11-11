@@ -5,7 +5,6 @@ package app
 import (
 	"context"
 	"errors"
-	"strconv"
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -64,7 +63,7 @@ func (g *Gateway) runUpdate(ctx context.Context, c *Connection, d any) error {
 			return err
 		}
 		if !allowed {
-			return &OpError{Code: string(errs.CodeRateLimited), Detail: "retry_after=" + strconv.Itoa(retry), Ref: in.Ref}
+			return &OpError{Code: string(errs.CodeRateLimited), Detail: retryAfter(retry), Ref: in.Ref}
 		}
 	}
 	_, err := g.d.Runs.Patch(ctx, runs.PatchRun{RunID: in.RunID, BaseVersion: in.BaseVersion, Ops: in.Ops})
@@ -88,8 +87,7 @@ var errNoRuns = errors.New("gateway: run.update without the runs module")
 // field error, otherwise the reason; never a value or a document.
 func runUpdateDetail(e *errs.Error) string {
 	if len(e.Fields) > 0 {
-		f := e.Fields[0]
-		return f.Pointer + ": " + f.Code
+		return fieldDetail(e)
 	}
 	return e.Reason
 }

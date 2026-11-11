@@ -1,6 +1,6 @@
 # Threat model
 
-Status: draft M0, as of milestone M0 (planning), terminal addendum of 2026-10-10; as of milestone M2 (terminal across several api nodes, M2-47, 2026-10-20); as of stage A1 (built-in agents, specification A1-01, 2026-11-06); Hermes adapter external jobs (FIX-hermes-external-jobs, 2026-11-07); Hermes adapter session mirror (FEAT-hermes-mirror-sessions, 2026-11-07); client IP from one forwarding header (AUD-srv-platform-01, 2026-11-11). Living document; maintenance rule in section 9.
+Status: draft M0, as of milestone M0 (planning), terminal addendum of 2026-10-10; as of milestone M2 (terminal across several api nodes, M2-47, 2026-10-20); as of stage A1 (built-in agents, specification A1-01, 2026-11-06); Hermes adapter external jobs (FIX-hermes-external-jobs, 2026-11-07); Hermes adapter session mirror (FEAT-hermes-mirror-sessions, 2026-11-07); client IP from one forwarding header (AUD-srv-platform-01, 2026-11-11); failed credentials on the gateway (AUD-srv-gateway-01, 2026-11-11). Living document; maintenance rule in section 9.
 Controls with IDs `SEC-...`: [../spec/19-security.md](../spec/19-security.md). Permissions and
 guard rules `SR1` to `SR12`: [../spec/07-permissions.md](../spec/07-permissions.md). Identity:
 [../spec/08-identity.md](../spec/08-identity.md). Privacy:
@@ -145,7 +145,8 @@ E = Elevation of Privilege. "Register" refers to section 6.
 | T | Replay of `identify` | DPoP with a server nonce from `hello` (04, R-SY-01) | T-TK-01 |
 | I | Delivery after access removal | permissions at delivery time, `access.changed` in log order (07, 8.2) | T-AZ-03 |
 | D | Slow consumer | outbound buffer limit, `4014` (04) | T-DS-01 |
-| D | Connections held open without `identify` until `sync.identify_timeout`, oversized or malformed frames | Close `4003` after `sync.identify_timeout`; the upgrade reads no database; frames above `sync.ws_max_frame_bytes` and frames failing the JSON guard or the schema close with `4002` before any use case runs (M1-64) | T-DS-01 |
+| D | Connections held open without `identify` until `sync.identify_timeout`, oversized or malformed frames | Close `4003` after `sync.identify_timeout`; the upgrade reads no database once the process knows the sync epoch of `hello` (it is read until one read succeeded and then kept); frames above `sync.ws_max_frame_bytes` and frames failing the JSON guard or the schema close with `4002` before any use case runs (M1-64). The number of connections a client address holds without `identify` is not bounded by the server | T-DS-01 |
+| D | Flood of invalid credentials on `identify`, `resume` or `reauth`, each a signature check | A failed check keeps one token of `rl.public_auth` of the client address, reserved before the check; while the bucket is empty, `identify` and `resume` close with `4008` and `reauth` answers `error` with `rate_limited`, without a check (02 9.1, 04 6.3) | T-DS-01 |
 | D | Draining the `rl.gateway_connect` bucket of a foreign device | The bucket counts only after the credentials of `identify` or `resume` are verified, keyed by the verified device or token (05, M1-64) | T-DS-01 |
 | E | Focus on foreign threads | `gateway.focus` checks per thread (05) | T-AZ-01 |
 

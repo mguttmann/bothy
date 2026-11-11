@@ -593,6 +593,16 @@ with a ticket of its own session. Absent members are omitted, never `null` (ADR 
 read while the fields are built fails the job, which the queue runs again; logs and spans of the
 job never carry a name or a text.
 
+As built (AUD-srv-gateway-01): when the hint crosses processes (a separate `worker`, or several
+api nodes; section 12 point 4), the signal on `NOTIFY ephemeral` carries IDs only
+([02-architecture.md](02-architecture.md), section 11.6), so the preview fields the job built stay
+in its process. The api node that holds a connection of the recipient builds them again with the
+same rule and the same preview builder (the recipient's `notify.preview_mode` of that moment, a
+kind that points at a message, no `image_url`), and its hub checks `push.deliver` for every
+connection before the frame leaves, so a reader who lost access still gets no event and no name.
+A failed read on that node cannot be run again, because a signal is at most once: the hint goes
+out with its IDs, and one log record names the failure without a name or a text.
+
 ### 6.4 Preview endpoint and preview token
 
 `GET /api/v1/push/preview?nid=<nid>&message_id=<id>&kind=<kind>`
@@ -1060,9 +1070,10 @@ no person, device or thread IDs.
    | `worker`, any | `gateway_presence` | `notify`'s live routes | `NOTIFY ephemeral` to the api nodes (02 11.6) |
    | `api`, any | not wired (no consumer `push`) | not wired | not wired (no job execution) |
 
-   The node that holds a connection of the recipient sends `notification.created` after its hub
-   admitted the connection again (6.3), so a desktop on any api node gets its hint and the push
-   to the phone is delayed exactly as in role `all`. A desktop whose node stopped refreshing its
+   The node that holds a connection of the recipient builds the preview fields again (6.3) and
+   sends `notification.created` after its hub admitted the connection again, so a desktop on any
+   api node gets its hint with the same content as in role `all`, and the push to the phone is
+   delayed exactly as there. A desktop whose node stopped refreshing its
    rows counts as offline after `cluster.presence_ttl`, so its person gets the push.
 
 5. Per registration one job `notify.push_send` (job catalogue in 02, section 12.3) with

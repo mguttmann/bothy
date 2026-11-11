@@ -878,6 +878,26 @@ func TestLiveBoxPatches(t *testing.T) {
 		noRunUpdated(t, robin, r.id, 2*lbCoalesce, "Robin, who cannot read the thread")
 	})
 
+	// A thread named only in background_thread_ids (a control room card; 04 6.2, R-SY-27, M2-51)
+	// gets the run document once and then run.updated, over the WebSocket and the decoder of
+	// production: the member was dropped between the schema and the handler (audit of 2026-11-11,
+	// srv-gateway-sync-1).
+	t.Run("TestLiveBoxBackgroundFocusGetsRunUpdated", func(t *testing.T) {
+		r := w.running(t, "background")
+		alex, _ := w.ready(t, w.params(w.owner))
+		if err := alex.Send("focus", map[string]any{"thread_ids": []string{}, "background_thread_ids": []string{r.thread}}); err != nil {
+			t.Fatal(err)
+		}
+		snap := mustRunUpdated(t, alex, r.id)
+		if !snap.snapshot() {
+			t.Fatalf("first frame of a background thread %s, want the run document", snap.raw)
+		}
+		v := w.patchOK(t, r.agent, r.id, snap.ev.Payload.Version, op("replace", "/status_line", "Seen on the card"))
+		if next := mustRunUpdated(t, alex, r.id); next.snapshot() || next.ev.Payload.Version != v {
+			t.Fatalf("frame after the patch %s, want the ops up to version %d", next.raw, v)
+		}
+	})
+
 	t.Run("TestLiveBoxStepSummarizationBounded", func(t *testing.T) {
 		r := w.running(t, "summary")
 		alex, _ := w.ready(t, w.params(w.owner))

@@ -270,11 +270,37 @@ its rate-limit class, on `authorize` or on its rules, the server answers with `e
 the problem code from [06-api.md](06-api.md) (for example `rate_limited`, `forbidden`,
 `validation_failed`); the connection stays. The server closes only with the codes from 6.4.
 
+`error` carries the failed `op`, the problem code `code` and, when set, `detail` and `ref` (schema
+`GatewayError`). `ref` echoes the `ref` of the failed frame (`run.update`,
+`command.autocomplete_result`), so a client knows which of its frames failed. `detail` is machine
+data in one of the following forms, never prose and never a value of the request; a client reads
+it by the `code` of the frame:
+
+- `retry_after=<seconds>` with `rate_limited`, the form of the close reason of `4008` (6.4), when
+  the server names the wait: the ops counted by `rl.agent_runtime` (`ack`, the member `agent` of
+  `heartbeat`, `run.update`, `command.autocomplete_result`) and `reauth` (6.3 step 1). `focus`,
+  typing and the stats ops send `rate_limited` without `detail`.
+- `<pointer>: <code>` for the first field error of `run.update` and
+  `command.autocomplete_result`: the JSON Pointer and the field code of the `errors` member of
+  the REST problem (06), for example `/ops/0: patch_path_forbidden`.
+- the `reason` of the REST problem for an error of `run.update` without a field error (for
+  example `run_not_active` with `conflict`).
+- the name of the exceeded limit for a `focus` beyond it: `sync.max_focused_threads`.
+
+Every other `error` has no `detail`.
+
 ### 6.3 Lifecycle
 
 1. **Upgrade.** The client opens the connection. At the upgrade the server checks nothing except
    the origin. The rate-limit class `rl.gateway_connect` counts on `identify` and `resume`
    as soon as the device or the token has been checked (05, section 3); when exhausted: close with `4008`.
+   A failed check of the credentials of `identify`, `resume` or `reauth` consumes one token of
+   `rl.public_auth` of the client address, as a failed one of a REST request does
+   ([02-architecture.md](02-architecture.md), section 9.1): the token is reserved before the check
+   and given back unless the check fails (`token_expired` and `use_dpop_nonce` do not count).
+   While that bucket is empty, `identify` and `resume` close with `4008` before any check, and
+   `reauth` answers `error` with `rate_limited` and keeps the connection; both name the wait as
+   `retry_after=<seconds>`.
 2. **`hello`.** The server immediately sends `{heartbeat_interval_ms, resume_window_ms,
    protocol_versions, dpop_nonce, server_time, sync_epoch}` (schema `GatewayHello`; the values come
    from `sync.heartbeat_interval` and `sync.resume_window`). `dpop_nonce` is fresh and valid for `auth.dpop_nonce_ttl`
@@ -353,7 +379,7 @@ the problem code from [06-api.md](06-api.md) (for example `rate_limited`, `forbi
 | `4005` | already_identified | report the error, reconnect |
 | `4006` | session_invalid | `identify` instead of `resume` |
 | `4007` | protocol_version_unsupported | show an app update, do not reconnect |
-| `4008` | rate_limited | only `rl.gateway_connect` on `identify` and `resume`: wait for the waiting time from the close reason |
+| `4008` | rate_limited | only on `identify` and `resume`, from `rl.gateway_connect` or, after failed credential checks from the client address, from `rl.public_auth` (6.3 step 1): wait for the waiting time from the close reason |
 | `4009` | heartbeat_timeout | reconnect with backoff, try `resume` |
 | `4011` | token_expired | renew the token, then `resume` |
 | `4012` | revoked | session, device or principal revoked: delete local data, log out, do not reconnect |

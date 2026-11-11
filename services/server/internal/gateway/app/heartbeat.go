@@ -5,7 +5,6 @@ package app
 import (
 	"context"
 	"encoding/json"
-	"strconv"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
@@ -61,7 +60,7 @@ func (g *Gateway) agentHeartbeat(ctx context.Context, a actor.Actor, body json.R
 			return &OpError{Code: string(errs.CodeInternalError)}
 		}
 		if !allowed {
-			return &OpError{Code: string(errs.CodeRateLimited), Detail: "retry_after=" + strconv.Itoa(retry)}
+			return &OpError{Code: string(errs.CodeRateLimited), Detail: retryAfter(retry)}
 		}
 	}
 	if _, err := g.d.Presence.Heartbeat(ctx, body); err != nil {

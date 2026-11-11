@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -1037,3 +1038,75 @@ func accessTokenLifetime(t *testing.T, tok string) time.Duration {
 	}
 	return time.Duration(c.Expiry-c.IssuedAt) * time.Second
 }
+
+// stopClock is the system clock until Stop and the instant of Stop from then on. A world's process
+// reads it, so nothing that follows the time (the refill of a rate-limit bucket) moves while a
+// test counts, however slow the host.
+type stopClock struct {
+	mu gosync.Mutex
+	at time.Time
+}
+
+// Now returns the system time, or the instant of Stop after it.
+func (c *stopClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.at.IsZero() {
+		return c.at
+	}
+	return time.Now().UTC()
+}
+
+// Stop holds the clock at this instant.
+func (c *stopClock) Stop() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.at.IsZero() {
+		c.at = time.Now().UTC()
+	}
+}
+
+// TestGatewayFailedCredentialsCountPublicAuth holds the failed-credentials rule of 02 9.1 for the
+// gateway (05 section 3; audit of 2026-11-11, srv-gateway-sync-2) against a started api process
+// whose rl.public_auth holds three tokens for the client address of the test, on a clock that
+// stands still while the test counts, so the bucket never refills: valid credentials cost nothing,
+// every identify with a rejected credential keeps one token, and with the bucket empty identify
+// closes with 4008 and retry_after=<seconds> before any check, even with valid credentials, while
+// reauth on an open connection answers error rate_limited and keeps the connection.
+func TestGatewayFailedCredentialsCountPublicAuth(t *testing.T) {
+	t.Parallel()
+	const burst = 3
+	clk := &stopClock{}
+	w := newGatewayWorldWith(t, wire.Deps{Clock: clk}, "BOTHY_RATELIMIT__RL__PUBLIC_AUTH__BURST="+strconv.Itoa(burst),
+		"BOTHY_RATELIMIT__RL__GATEWAY_CONNECT__BURST=20")
+	alex, sam := w.newPerson("alex", identity.DeviceStateActive), w.newPerson("sam", identity.DeviceStateActive)
+	open, _ := w.ready(t, w.params(sam))
+	clk.Stop()
+	for range burst + 1 {
+		w.ready(t, w.params(alex))
+	}
+	for range burst {
+		w.identifyErr(t, wstest.IdentifyParams{APIToken: "not-a-token"}, 4004)
+	}
+	c := w.dial(t)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
+	defer cancel()
+	_, err := c.Identify(ctx, w.params(alex))
+	var ce *wstest.CloseError
+	if !errors.As(err, &ce) || ce.Code != 4008 || !retryAfterText.MatchString(ce.Reason) {
+		t.Fatalf("identify with the bucket empty: %v, want the close 4008 with retry_after=<seconds>", err)
+	}
+	// The second reauth is answered too: the first one kept the connection.
+	for range 2 {
+		if err := open.Send("reauth", map[string]any{"access_token": sam.access, "dpop": w.proofFor(sam.key, sam.access, gwHTU)(open.Hello().DpopNonce)}); err != nil {
+			t.Fatal(err)
+		}
+		if e := nextError(t, open); e.Op != "reauth" || e.Code != "rate_limited" || !retryAfterText.MatchString(deref(e.Detail)) {
+			t.Fatalf("reauth with the bucket empty: %+v (detail %q)", e, deref(e.Detail))
+		}
+	}
+}
+
+// retryAfterText is the machine text of a wait in a close reason and in the detail of an error
+// frame (04 6.2 and 6.4).
+var retryAfterText = regexp.MustCompile(`^retry_after=[1-9][0-9]*$`)

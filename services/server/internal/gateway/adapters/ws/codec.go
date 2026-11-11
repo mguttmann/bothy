@@ -229,7 +229,8 @@ func decodeRunUpdate(raw json.RawMessage) (app.RunUpdate, error) {
 	return out, nil
 }
 
-// decodeFocus decodes the body of focus strictly into its frame.
+// decodeFocus decodes the body of focus strictly into its frame: thread_ids, idle and the threads
+// of background_thread_ids (M2-51, R-SY-27), nil when the member is absent.
 func decodeFocus(raw json.RawMessage) (app.Focus, error) {
 	var f rest.GatewayFocus
 	if err := strictUnmarshal(raw, &f); err != nil {
@@ -238,6 +239,11 @@ func decodeFocus(raw json.RawMessage) (app.Focus, error) {
 	out := app.Focus{ThreadIDs: make([]ids.ID, 0, len(f.ThreadIds)), Idle: f.Idle != nil && *f.Idle}
 	for _, id := range f.ThreadIds {
 		out.ThreadIDs = append(out.ThreadIDs, ids.ID(id))
+	}
+	if f.BackgroundThreadIds != nil {
+		for _, id := range *f.BackgroundThreadIds {
+			out.BackgroundThreadIDs = append(out.BackgroundThreadIDs, ids.ID(id))
+		}
 	}
 	return out, nil
 }

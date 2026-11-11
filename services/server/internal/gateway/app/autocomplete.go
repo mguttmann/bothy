@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -135,8 +134,9 @@ type AutocompleteResult struct {
 // autocompleteResult is the handler of command.autocomplete_result (brief M2-17 design note 8):
 // rl.agent_runtime keyed by the principal before anything else, then CommandExec.AnswerAutocomplete.
 // Success sends no frame; a failure answers error {op, code, detail, ref} and keeps the
-// connection, where detail names the pointer and the code of the first field error, never a value;
-// a credential revoked since identify closes with 4012.
+// connection, where detail names the pointer and the code of the first field error in the form
+// of run.update ("<pointer>: <code>", 04 6.2), never a value; a credential revoked since identify
+// closes with 4012.
 func (g *Gateway) autocompleteResult(ctx context.Context, c *Connection, d any) error {
 	in, ok := d.(AutocompleteResult)
 	if !ok {
@@ -150,7 +150,7 @@ func (g *Gateway) autocompleteResult(ctx context.Context, c *Connection, d any) 
 			return err
 		}
 		if !allowed {
-			return &OpError{Code: string(errs.CodeRateLimited), Detail: "retry_after=" + strconv.Itoa(retry), Ref: in.Ref}
+			return &OpError{Code: string(errs.CodeRateLimited), Detail: retryAfter(retry), Ref: in.Ref}
 		}
 	}
 	err := g.d.Autocomplete.AnswerAutocomplete(ctx, runs.AutocompleteAnswer{RequestID: in.RequestID, Choices: in.Choices})
@@ -171,12 +171,4 @@ func (g *Gateway) autocompleteResult(ctx context.Context, c *Connection, d any) 
 // and rate_limited); every other error ends the connection with 4000.
 var autocompleteOpErrors = map[errs.Kind]bool{
 	errs.KindBadRequest: true, errs.KindForbidden: true, errs.KindNotFound: true, errs.KindGone: true, errs.KindRateLimited: true,
-}
-
-// fieldDetail is "<pointer> <code>" of the first field error, "" without one; never a value.
-func fieldDetail(e *errs.Error) string {
-	if len(e.Fields) == 0 {
-		return ""
-	}
-	return e.Fields[0].Pointer + " " + e.Fields[0].Code
 }

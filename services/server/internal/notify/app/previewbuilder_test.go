@@ -138,3 +138,53 @@ func TestPreviewBuilder_FieldsByMode(t *testing.T) {
 		}
 	}
 }
+
+// TestPreviewBuilder_HintFields checks the preview fields of notification.created (13 6.3, M3-22
+// design note 9 f), the one rule of the job notify.gateway_send and of an api node that builds a
+// hint again from a signal: the fields of the recipient's mode without the image; nothing for the
+// mode none, for a kind without a message, for no message ID and for an unknown, deleted, run or
+// system message.
+func TestPreviewBuilder_HintFields(t *testing.T) {
+	alex, sam, robin := ids.New(), ids.New(), ids.New()
+	msg, deleted, run, image := ids.New(), ids.New(), ids.New(), ids.New()
+	b, err := app.NewPreviewBuilder(app.PreviewConfig{DefaultMode: "full", MaxChars: 240}, app.PreviewBuilderDeps{
+		Messages: previewMessages{
+			msg:     {ID: msg, AuthorID: alex, Kind: "text", ContentMD: "**Hi** @sam", HasAttachments: true, MentionIDs: []ids.ID{sam}},
+			deleted: {ID: deleted, AuthorID: alex, Kind: "text", Deleted: true},
+			run:     {ID: run, AuthorID: alex, Kind: "run"},
+		},
+		Names:       previewNames{SpaceName: "Support", ChannelName: "Allgemein", ThreadTitle: "Export"},
+		Principals:  previewPrincipals{alex: {ID: alex, Handle: "alex", DisplayName: "Alex"}, sam: {ID: sam, Handle: "sam", DisplayName: "Sam"}},
+		Settings:    previewSettings{sam: `"names"`, robin: `"none"`},
+		Attachments: &previewAttachments{list: map[ids.ID][]files.Attachment{msg: {{Position: 0, File: files.File{ID: image, MIMEType: "image/png"}}}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	full := app.PreviewFields{SpaceName: "Support", ChannelName: "Allgemein", ThreadTitle: "Export", SenderDisplayName: "Alex",
+		Excerpt: "Hi Sam", AttachmentCount: 1}
+	names := app.PreviewFields{SpaceName: "Support", ChannelName: "Allgemein", ThreadTitle: "Export", SenderDisplayName: "Alex"}
+	for _, c := range []struct {
+		name      string
+		recipient ids.ID
+		kind      string
+		message   ids.ID
+		want      app.PreviewFields
+	}{
+		{"the default mode full, without the image", alex, "mention", msg, full},
+		{"the stored mode names", sam, "message", msg, names},
+		{"the stored mode none", robin, "message", msg, app.PreviewFields{}},
+		{"a kind without a message", alex, "security", msg, app.PreviewFields{}},
+		{"an unknown kind", alex, "weather", msg, app.PreviewFields{}},
+		{"no message ID", alex, "message", ids.ID{}, app.PreviewFields{}},
+		{"an unknown message", alex, "message", ids.New(), app.PreviewFields{}},
+		{"a deleted message", alex, "message", deleted, app.PreviewFields{}},
+		{"a run message", alex, "run_done", run, app.PreviewFields{}},
+	} {
+		got, err := b.HintFields(ctx, c.recipient, c.kind, c.message)
+		if err != nil || got != c.want {
+			t.Errorf("%s: %+v %v, want %+v", c.name, got, err, c.want)
+		}
+	}
+}

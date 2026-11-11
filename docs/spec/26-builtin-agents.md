@@ -485,6 +485,12 @@ byte-equal to the fixtures, also for a channel with bindings of both forms (BA-T
 4. Fallbacks: no `agents.builder_agent_id`, no live connection, no valid answer within the
    deadline. The answer then names the reason (`builder_not_configured`, `builder_offline`,
    `builder_timeout`, `builder_invalid`) and the apps offer the templates and the manual form.
+   Request and answer stay in one api process: the event goes to a connection of the builder in
+   the process that took `interviewAgent`, and the open request lives in its memory. With several
+   api nodes ([02-architecture.md](02-architecture.md), section 11.6) a request that reaches a
+   node without the builder's connection falls back with `builder_offline`, and an answer that
+   reaches another node than the one that asked gets `404`, so the request ends with
+   `builder_timeout` ([multi-node.md](../operations/multi-node.md), sections 4 and 6).
 5. Audit and logs: every request writes one audit entry `agent.interview` with the outcome, the
    fallback reason, the number of turns and the cost estimate, never a question, an answer or a
    draft; one log line names the same counts (R-BA-09). Reason: an interview spends money on the
