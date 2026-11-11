@@ -7,7 +7,8 @@ State: in development, no release yet. M0 is done and the milestones M1 to M8 ar
 build tickets are on `main`), and Bothy is in daily use at one self-hosted installation. The
 repository is public; the rest of V1 is open. There are no published server images and no
 distributed apps yet: the server image and the apps are built from source
-([README: Try it today](../README.md#try-it-today)). How a milestone is closed is in
+([README: Try it today](../README.md#try-it-today)). What a built part does not do yet is listed
+under "Known limits" in the [README](../README.md). How a milestone is closed is in
 [PLAN 4](PLAN.md#4-closing-a-milestone). There are deliberately no dates; the order is set by the
 [plan](PLAN.md). What the product will never do is in [chapter 01](spec/01-product.md).
 

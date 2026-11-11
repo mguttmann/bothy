@@ -32,7 +32,9 @@ func PlatformOf(goos string) string {
 // peerCheckProven lists the platforms whose platform run of TM-T26 proved the peer check of the
 // local channel (docs/DECISIONS.md D-M2-42-11 and the ruling on the platform suite). It is empty
 // until a recorded platform run proves a platform; the commit that records the run adds it. Until
-// then HD10 fails with peer_check_unavailable there, and the terminal stays off (RK-23).
+// then HD10 fails with peer_check_unavailable there, and the terminal stays off (RK-23), except
+// in the owner account mode, where the code is a warning (ADR 0073). The "Known limits" of the
+// root README say so while the list is empty (TestKnownLimitNamesThePeerCheck).
 var peerCheckProven = map[string]bool{}
 
 // PlatformSuite is set to "1" only by make -C services/host platform-test (-ldflags -X), so the

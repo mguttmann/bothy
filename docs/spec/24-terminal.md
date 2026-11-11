@@ -611,8 +611,10 @@ The following paragraphs record how `bothy-host` implements this section; the ro
 - **State directory** (D-M2-42-4): besides the keys, the bindings and the API key of
   `organization` (`claude_api_key`, read by the sessions), it holds the pairing record
   (`pairing.json`: server URL, host ID, instance ID, fingerprint) and the last declaration
-  (`declaration.json`), both without secrets and without a subscription login, and on Linux and
-  macOS the admin endpoint `admin.sock`. Every file is written atomically with mode `0600`.
+  (`declaration.json`), both without secrets and without a subscription login, on Linux and
+  macOS the admin endpoint `admin.sock`, and on macOS and Windows the log of the host service
+  (`bothy-host.log` and its predecessor `bothy-host.log.1`; 4.2, AUD-host-01). Every file but the
+  log is written atomically with mode `0600`; the log has the same mode and is appended to.
 - **Declaration from `ready`** (D-M2-42-15): the host service learns `hosts.llm_credentials` only
   from `ready`; the server sends `ready` again on every change of the declaration, and the host
   service treats each `ready` as the current declaration and evaluates HD6 again. Until a `ready`
@@ -1055,6 +1057,9 @@ Files of the state directory (D-M2-42-4): `keys` (both private keys; on Windows 
 `CryptProtectData` without `CRYPTPROTECT_LOCAL_MACHINE`), `pairing.json`, `bindings.json`,
 `declaration.json`, `claude_api_key` (only at `organization`) and on Linux and macOS `admin.sock`.
 `pair` generates both key pairs locally and stores them only after the server accepted them.
+On macOS and Windows, where the service manager keeps no output of a service, the directory also
+holds the log of the host service, `bothy-host.log` and its predecessor `bothy-host.log.1`
+([16-operations.md](16-operations.md) 4.4, AUD-host-01).
 
 
 ### 4.3 Fingerprint

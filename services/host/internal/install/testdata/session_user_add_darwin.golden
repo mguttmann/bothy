@@ -10,6 +10,7 @@ run /usr/sbin/createhomedir -c -u bothy-s-robin
 chmod ~bothy-s-robin 0700 bothy-s-robin
 write /Library/LaunchDaemons/bothy-host.helper.bothy-s-robin.plist 0644 root (1357 bytes)
 run? /bin/launchctl bootout system/bothy-host.helper.bothy-s-robin
+until-gone /bin/launchctl print system/bothy-host.helper.bothy-s-robin
 run /bin/launchctl bootstrap system /Library/LaunchDaemons/bothy-host.helper.bothy-s-robin.plist
 config.add /Library/Application Support/bothy-host/config.yaml bothy-s-robin
 run /bin/launchctl kickstart -k system/bothy-host

@@ -4,10 +4,12 @@ package install
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/OWNER/bothy/services/host/internal/config"
 )
@@ -67,6 +69,8 @@ func apply(ctx context.Context, ops Ops, s Step) error {
 	case KindRunTolerant:
 		_ = ops.Run(ctx, s.Argv) // the label may not be loaded
 		return nil
+	case KindUntilGone:
+		return untilGone(ctx, ops, s.Argv)
 	case KindMkdir:
 		return ops.Mkdir(path, s.Mode, s.Owner)
 	case KindWrite:
@@ -84,4 +88,35 @@ func apply(ctx context.Context, ops Ops, s Step) error {
 	}
 	s.Path = path
 	return ops.Windows(ctx, s)
+}
+
+// The wait of an until-gone step: at most unloadLooks looks, unloadPause apart, which is the
+// time the executor of Windows gives a service to stop (stopService). Protocol constants of the
+// executor, not product windows; the tests shorten the pause.
+const unloadLooks = 300
+
+var unloadPause = 100 * time.Millisecond
+
+// errNotGone is the failure of an until-gone step whose command still succeeded at the last look.
+var errNotGone = errors.New("the service did not unload")
+
+// untilGone runs argv until it fails, which tells that what it looks up is gone: launchd knows
+// the label of a service it unloads until the processes of the service have ended. Errors:
+// errNotGone after unloadLooks looks, and the error of ctx when it ends first.
+func untilGone(ctx context.Context, ops Ops, argv []string) error {
+	for range unloadLooks {
+		err := ops.Run(ctx, argv)
+		if cerr := ctx.Err(); cerr != nil {
+			return cerr
+		}
+		if err != nil {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(unloadPause):
+		}
+	}
+	return errNotGone
 }

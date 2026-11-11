@@ -110,6 +110,13 @@ func runService(ctx context.Context, cfgPath string, once bool, stderr io.Writer
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 	st := state.Open(c.StateDir, sys.protector)
+	// From here on the lines also go to the log file where the service manager keeps none.
+	out, closeLog, err := sys.serviceLog(stderr, st)
+	defer closeLog()
+	log = sys.log(out)
+	if err != nil {
+		log.WarnContext(ctx, "log file unavailable")
+	}
 	admin, err := sys.listenAdmin(st.File(state.AdminSocket))
 	if err != nil {
 		log.ErrorContext(ctx, "admin endpoint unavailable")

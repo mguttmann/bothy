@@ -553,7 +553,18 @@ reasons):
   installs; without a terminal and without the flag the answer is no.
 - Peer check: on a platform whose platform run has not proven the peer check of the local channel,
   HD10 fails with `peer_check_unavailable` and the host gives no terminal (RK-23); the operator
-  waits for a release with the recorded platform run.
+  waits for a release with the recorded platform run. No platform is proven yet, so today only the
+  owner account mode below gives a terminal: there the code is a warning (24, section 2.4).
+- Logs of the host service (AUD-host-01, [decisions.d/AUD-host-01.md](../decisions.d/AUD-host-01.md)):
+  the host service writes its log to standard error. On Linux systemd keeps it in the journal
+  (`journalctl -u bothy-host.service`, in the owner account mode `journalctl --user -u
+  bothy-host.service`). launchd and the Windows service control manager keep no output of a
+  service, so on macOS and Windows the host service writes every line also to `bothy-host.log` in
+  the state folder, readable like that folder; at its size bound the file moves to
+  `bothy-host.log.1`, which replaces the one before.
+- Installing over a running installation on macOS (AUD-host-01): `install` and `session-user add`
+  unload a loaded service, wait until launchd no longer knows it and then load it again; a service
+  that does not unload in time ends the command with an error, and the operator runs it again.
 - Installing from the package (M7-23, [18-release.md](18-release.md) 6.3; `infra/host/README.md`):
   the release of the component `host` has a `.deb` and an `.rpm` per Linux architecture, a signed
   and notarized `.pkg` per macOS architecture and a signed MSI for Windows. Each installs the
@@ -592,7 +603,9 @@ example over ssh), nothing at the keyboard of the machine:
 4. `bothy-host doctor --config <file>` shows the warnings of the mode (HD1 `owner_account_mode`,
    HD2, HD3, HD9 and others) and no failure.
 
-`bothy-host restart` restarts the service as the account. Rollback: the owner ends the
+`bothy-host restart` restarts the service as the account. An update runs step 1 again with the
+newer release binary; it replaces the binary and loads the service again, which ends the running
+sessions like every restart. Rollback: the owner ends the
 assignment (`host.manage`), the operator stops and removes the per-user service (macOS
 `launchctl bootout gui/<uid>/bothy-host` and the plist in `~/Library/LaunchAgents`; Linux
 `systemctl --user disable --now bothy-host.service` and the unit) and the owner retires the host.

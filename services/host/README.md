@@ -160,6 +160,11 @@ and starts a per-user service; nothing needs root:
 | service | LaunchAgent `bothy-host` in `gui/<uid>` (`<home>/Library/LaunchAgents/bothy-host.plist`) | systemd user unit `bothy-host.service` (`Delegate=yes`) |
 | PTY helper | child process `pty-helper --owner-account` on `<state>/run/helper-<name>.sock` (fd 3), ends when its standard input closes | same |
 
+`install --owner-account` with a newer binary over the running installation is the update: it
+replaces the binary and loads the service again (on macOS it waits until launchd has unloaded the
+running one, see "Exit policy and the way per platform"); like every restart this ends the
+running sessions of the host.
+
 Without `--config` the commands find this configuration when the system file does not exist. The
 self-checks pass with warnings where they would refuse the mode by design (HD1
 `owner_account_mode`, HD2, HD3, HD9, the helper part of HD8, the HD10 codes
@@ -243,7 +248,9 @@ State directory (`internal/state`): `keys` (both private keys, mode `0600`, on W
 blob), `pairing.json`, `bindings.json`, `declaration.json`, `server_ca.pem` (the CA of
 `pair --ca-file`, which the control connection trusts besides the system roots, M2-43),
 `claude_api_key` (only at
-`organization`, read for each start of the profile `claude`). Every file is written atomically.
+`organization`, read for each start of the profile `claude`). Every one of these files is written
+atomically. On macOS and Windows the directory also holds the log of the host service,
+`bothy-host.log` and `bothy-host.log.1` (section "Logs").
 
 ## Configuration file
 
@@ -261,6 +268,24 @@ host_service:
 Every key is `host_service.<name>` of [24, section 17](../../docs/spec/24-terminal.md); unknown or
 duplicate keys and wrong types are errors naming the key. The configuration is read at start only.
 
+## Logs
+
+`run` writes its log as JSON lines to standard error. Where the lines are kept:
+
+| | Linux | macOS | Windows |
+|---|---|---|---|
+| host service | the journal (`journalctl -u bothy-host.service`; owner account mode: `journalctl --user -u bothy-host.service`) | `bothy-host.log` in the state directory | `bothy-host.log` in the state directory |
+
+launchd drops the standard error of a job that names no file for it, and a Windows service has
+none, so on macOS and Windows `run` writes every line also to `bothy-host.log` in the state
+directory (mode `0600`; the directory is open only to the service user and administrators, in the
+owner account mode to the account). A line that would grow the file past its bound (`logFileMax`
+in `cmd/bothy-host/logfile.go`) first moves it to `bothy-host.log.1`, replacing that file, and
+starts a new one. The lines before the configuration is read (`config_invalid`) and the lines of
+a PTY helper go to standard error only: systemd keeps them, launchd and Windows do not. When the
+file cannot be opened, `run` logs `log file unavailable` and goes on. `doctor` does not print the
+place; it never prints a path.
+
 ## Doctor
 
 `doctor` prints one line per entry (`HD<n> ok`, `HD<n> WARN <code>`, `HD<n> FAIL <code>` with
@@ -274,13 +299,21 @@ the server carries codes and, by the rule for names, the names of session users 
   a sudo rule); the helper sockets are created by systemd (`SocketUser=root`,
   `SocketGroup=bothy-host`, `SocketMode=0660`).
 - launchd: `KeepAlive` `{Crashed: true}` and `GOTRACEBACK=crash`; the helper gets its listening
-  socket on standard input (`inetdCompatibility`, `Wait = true`).
+  socket on standard input (`inetdCompatibility`, `Wait = true`). `install` and `session-user add`
+  unload a label that is loaded (`launchctl bootout`), wait until `launchctl print` no longer
+  knows it and only then load it (`launchctl bootstrap`): `bootout` returns while launchd still
+  ends the job, and a `bootstrap` in that time fails with exit code 5 and leaves the service
+  unloaded. A service that does not unload within the bound of the executor ends the command with
+  `the service did not unload`.
 - Windows: failure actions on crashes only; a refused start stops with the service-specific code
   `78`; helper pipes are created with `FILE_FLAG_FIRST_PIPE_INSTANCE` and
   `PIPE_REJECT_REMOTE_CLIENTS`; the DACL of a helper service lets its session user only query it.
 - Peer check: the helper passes one end of a `socketpair` (Linux, macOS); the service compares
   uid and PID of that end with the session user and the main PID of the helper service. Until a
-  recorded platform run proves a platform, HD10 fails there with `peer_check_unavailable`.
+  recorded platform run proves a platform, HD10 fails there with `peer_check_unavailable`. No
+  platform is proven yet (`internal/buildinfo`), so a release build gives a terminal only in the
+  owner account mode, where this code is a warning; the builds of the test suites carry the
+  platform-suite mark.
 
 ## Layout
 
@@ -321,6 +354,7 @@ GOTOOLCHAIN=local go test -race ./...
 GOTOOLCHAIN=local go test -run='^$' -fuzz=FuzzDecodeMessage -fuzztime=60s ./internal/localchan
 GOTOOLCHAIN=local go test -run='^$' -fuzz=FuzzDecodeServerFrame -fuzztime=60s ./internal/control
 GOTOOLCHAIN=local go test -run='^$' -fuzz=FuzzVerifySessionToken -fuzztime=60s ./internal/session
+GOTOOLCHAIN=local go test -run TestReloadOverARunningLaunchdJob ./internal/install -launchd  # macOS, see below
 make release-build VERSION=$(cat VERSION) OUT=<dir>   # binaries for five platforms, .deb and .rpm
 make platform-test                                   # only on a disposable machine, see below
 make platform-bundle OUT=<dir> [GOOS=<os> GOARCH=<arch>]  # build a platform run, run nothing
@@ -329,6 +363,11 @@ make platform-bundle OUT=<dir> [GOOS=<os> GOARCH=<arch>]  # build a platform run
 The platform suite needs administrator rights and creates and deletes users, services and ACLs.
 It runs only in the workflow `host-platform.yml` on throwaway GitHub-hosted runners
 (docs/DECISIONS.md D-M2-42-19), never on a workstation.
+
+`TestReloadOverARunningLaunchdJob` (macOS) runs the steps `install` uses to load a service twice
+against the real launchd: it loads a scratch job with a label of its own into the launchd domain
+of the calling account, without administrator rights, and removes it again. It runs only with
+the test flag `-launchd`; `host-platform.yml` runs it on the macOS runner.
 
 Platform bundle (M2-48): `make -C services/host platform-bundle OUT=<dir> [GOOS=<os>
 GOARCH=<arch>]` builds, without running anything, every file a platform run needs: `bothy-host`
