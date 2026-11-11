@@ -106,19 +106,31 @@ void main() {
       expect(keys.inner.scopes, {f.server.world.instanceId});
       expect((await remembered())?.instanceId, f.server.world.instanceId);
       expect((await remembered())?.keyScope, f.server.world.instanceId);
+      final left = (await keys.inner.ensure(f.server.world.instanceId))
+          .dpop
+          .publicJwk;
+      final deletes = keys.inner.deletes;
 
       // The app quits and starts again; the key store lets go now.
       c.dispose();
       keys.refuse = false;
       c = appContainer(f);
       c.read(onboardingControllerProvider);
-      await eventually('the rest is deleted', () => keys.inner.scopes.isEmpty);
       await eventually(
         'the entry is gone',
         () async => await remembered() == null,
       );
       await eventually('E2', () => state().step == OnboardingStep.login);
       expect(state().wipeIncomplete, isFalse);
+      // The rest is deleted. The same start opens the instance again and makes new device
+      // keys for it, so the key store is empty only for a moment and no poll may wait for
+      // that: what holds from here on is that the delete ran and that the keys of the scope
+      // are not the ones the wipe left.
+      expect(keys.inner.deletes, deletes + 1);
+      final now = (await keys.inner.ensure(f.server.world.instanceId))
+          .dpop
+          .publicJwk;
+      expect(now, isNot(left));
     });
 
     test(

@@ -570,9 +570,10 @@ final class InstanceServices {
       // The stored key does not open the stored database: the secret store lost the key and
       // created a new one, or the file is not the one of this key. With a session the caller
       // offers the reset, because the unsent work of the person goes with the file
-      // ([discardLocalData]). Without one nothing in the folder belongs to an account, so it
-      // is created anew and E1 leads on to the login
-      // (docs/decisions.d/AUD-client-onboarding-01.md).
+      // ([discardLocalData]). Without one nothing in the folder belongs to an account of this
+      // app identity, so it is created anew and E1 leads on to the login
+      // (docs/decisions.d/AUD-client-onboarding-01.md, AUD-CO1/4, which also names the limit:
+      // app identities that share the data root but not their secrets).
       if (await _sessionStored(secrets, instance)) rethrow;
       await discardLocalData(ports, instance);
       await folder.create(recursive: true);
