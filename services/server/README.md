@@ -169,7 +169,7 @@ digests, and the golang tag follows the `toolchain` of [go.mod](go.mod)):
 
 | Stage | Tag | Digest (image index) |
 |---|---|---|
-| build, console | `golang:1.27.3-trixie` | `sha256:1896654cfc5c2b5ad74c07f29cb36f5d2d1cbed42e3054070fbfe444e521e83c` |
+| build, console | `golang:1.27.4-trixie` | `sha256:b54b2639de8c1bfe538ec5ffc45f29b1932235ac5f6d63c059853646677112d9` |
 | final; the test targets smoke, e2e-server and fakepush | `gcr.io/distroless/static-debian13:nonroot` | `sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3` |
 
 `make image` builds several platforms at once. Docker Engine with the containerd image store does
