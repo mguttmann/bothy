@@ -172,7 +172,8 @@ func inMemory(b []byte, mimeType string, w, h int) app.CleanedOriginal {
 }
 
 // cleanGIF re-encodes a GIF within the pixel limit in memory (design note 7); the block scan
-// counts the frames first, so a GIF above file.image.max_pixels is never decoded.
+// counts the frames first, so a GIF above file.image.max_pixels is never decoded. Every frame
+// counts gifFrameOverhead on top of its pixels, because the decoder keeps a palette per frame.
 func (c Codec) cleanGIF(ctx context.Context, open app.Opener, size int64, lim app.CleanLimits) (app.CleanedOriginal, error) {
 	data, err := readAll(ctx, open, size)
 	if err != nil {
@@ -182,7 +183,7 @@ func (c Codec) cleanGIF(ctx context.Context, open app.Opener, size int64, lim ap
 	if err != nil {
 		return app.CleanedOriginal{}, err
 	}
-	if err := checkPixels(info.Width, info.Height, max(info.Frames, 1), lim.MaxPixels); err != nil {
+	if err := checkGIFFrames(info, lim.MaxPixels); err != nil {
 		return app.CleanedOriginal{}, err
 	}
 	reencode := c.reencode

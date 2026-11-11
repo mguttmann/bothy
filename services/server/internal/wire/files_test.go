@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -265,6 +266,46 @@ func TestWireBuildsS3Store(t *testing.T) {
 	}
 	if n := len(fake.requests()); n != 1 {
 		t.Errorf("the fake saw %d requests, want 1", n)
+	}
+}
+
+// TestWireS3ReadsObjectAboveMaxUploadBytes (docs/decisions.d/AUD-srv-files-01.md): the store that
+// wire builds for the driver s3 reads an object larger than file.max_upload_bytes completely.
+// The key bounds an upload, not a stored object: an export package has no size limit (20 5.2)
+// and a converted original may be larger than its upload.
+func TestWireS3ReadsObjectAboveMaxUploadBytes(t *testing.T) {
+	t.Parallel()
+	const maxUpload = 4096
+	object := bytes.Repeat([]byte("export "), maxUpload)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", strconv.Itoa(len(object)))
+		_, _ = w.Write(object)
+	}))
+	t.Cleanup(srv.Close)
+	dir, _ := s3Secrets(t)
+	host := strings.TrimPrefix(srv.URL, "http://")
+	v := filesValues(t, s3Env(srv.URL, "BOTHY_SECRETS__DIR="+dir, "BOTHY_EGRESS__ALLOWED_HOSTS="+host+";allow_private",
+		"BOTHY_FILE__MAX_UPLOAD_BYTES="+strconv.Itoa(maxUpload))...)
+	sp, err := wire.NewSecretsProvider(v, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := wire.FilesObjectStore(t.Context(), v, wire.FilesDeps{Secrets: sp})
+	if err != nil {
+		t.Fatalf("FilesObjectStore: %v", err)
+	}
+	key, err := domain.OriginalKey(ids.New(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rc, err := store.Get(t.Context(), key, nil)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	got, err := io.ReadAll(rc)
+	_ = rc.Close()
+	if err != nil || !bytes.Equal(got, object) {
+		t.Errorf("read %d of %d bytes, %v", len(got), len(object), err)
 	}
 }
 

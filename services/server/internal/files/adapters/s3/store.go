@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -37,9 +38,6 @@ type Deps struct {
 	// TransferTimeout is http.transfer_timeout, the time limit of one request including its
 	// body (02 "14.2" row "upload and download").
 	TransferTimeout time.Duration
-	// MaxObjectBytes is file.max_upload_bytes, the largest body the driver reads from one
-	// response; no stored object is larger (03 files.size_bytes, 19 SEC-NET-5).
-	MaxObjectBytes int64
 }
 
 // Store is the S3 driver of app.ObjectStore (docs/spec/12-files.md "4.3"). It holds only the
@@ -58,8 +56,8 @@ var _ app.ObjectStore = (*Store)(nil)
 // New builds the S3 driver (docs/DECISIONS.md M3-02/1 to M3-02/3 and M3-02/6), in this order:
 // cfg.Validate against deps.Egress.AllowedHosts; both secret references resolved once, so a key
 // that cannot be read stops the start; one egress client with purpose objectstore, the host
-// policy of cfg, no redirects, deps.TransferTimeout and deps.MaxObjectBytes; then the SDK client
-// built by hand: region, the credentials of the secret provider, the HTTP client of the egress
+// policy of cfg, no redirects and deps.TransferTimeout, behind the body limits of answerBodies;
+// then the SDK client built by hand: region, the credentials of the secret provider, that HTTP
 // client, no retries, the checksum mode of cfg, no SDK log, tracer or meter, the endpoint of cfg
 // and its path style. It never loads the default configuration of the SDK (environment, shared
 // files, instance metadata) and sends no request.
@@ -74,7 +72,7 @@ var _ app.ObjectStore = (*Store)(nil)
 //		Endpoint: "https://s3.example.com", Region: "us-east-1", Bucket: "bothy-files",
 //		UsePathStyle: true, ChecksumMode: s3.ChecksumWhenRequired,
 //		AccessKeyRef: "file:<secrets.dir>/s3_access_key", SecretKeyRef: "file:<secrets.dir>/s3_secret_key",
-//	}, s3.Deps{Egress: egressCfg, Secrets: provider, TransferTimeout: 10 * time.Minute, MaxObjectBytes: 100 << 20})
+//	}, s3.Deps{Egress: egressCfg, Secrets: provider, TransferTimeout: 10 * time.Minute})
 func New(ctx context.Context, cfg Config, deps Deps) (*Store, error) {
 	return newStore(ctx, cfg, deps, nil)
 }
@@ -91,17 +89,19 @@ func newStore(ctx context.Context, cfg Config, deps Deps, wrap func(httpDoer) ht
 	if err := creds.check(ctx); err != nil {
 		return nil, err
 	}
+	// The egress client bounds no body here: the right bound depends on the answer, and
+	// answerBodies applies it to every one of them.
 	client, err := egress.New(deps.Egress, egress.Options{
 		Purpose:          egressPurpose,
 		Hosts:            cfg.HostPolicy(),
 		Redirects:        egress.RedirectNever,
 		Timeout:          deps.TransferTimeout,
-		MaxResponseBytes: deps.MaxObjectBytes,
+		MaxResponseBytes: math.MaxInt64,
 	}, deps.EgressDeps)
 	if err != nil {
 		return nil, fmt.Errorf("file.s3: egress client: %w", err)
 	}
-	var hc httpDoer = client.HTTPClient()
+	var hc httpDoer = answerBodies{next: client.HTTPClient(), max: deps.Egress.MaxResponseBytes}
 	if wrap != nil {
 		hc = wrap(hc)
 	}
@@ -185,8 +185,9 @@ func (s *Store) body(op, key string, body io.Reader, size int64) (*exactBody, io
 	return eb, nil, nil
 }
 
-// Get opens the object key, the whole object or one byte range, with GetObject. The reader keeps
-// the egress limits: at most MaxObjectBytes and http.transfer_timeout for the whole read.
+// Get opens the object key, the whole object or one byte range, with GetObject. The reader ends
+// at the length the store announced for the object or range, and http.transfer_timeout bounds
+// the whole read; an answer without a length is a storage failure (answerBodies).
 func (s *Store) Get(ctx context.Context, key string, rng *app.ByteRange) (io.ReadCloser, error) {
 	name, err := s.name(opGet, key)
 	if err != nil {

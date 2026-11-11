@@ -5,9 +5,11 @@ package s3
 import (
 	"errors"
 	"io"
+	"net/http"
 	"sync"
 
 	"github.com/OWNER/bothy/services/server/internal/files/app"
+	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 )
 
 // errBodyLength is the read error exactBody returns when the source yields another number of
@@ -136,3 +138,68 @@ func (b *exactBody) sizeError(op, key string) error {
 	}
 	return nil
 }
+
+// errNoObjectLength is the error of an object answer that announces no length.
+var errNoObjectLength = errors.New("object answer without a length")
+
+// answerBodies wraps the HTTP client of the driver and bounds the body of every answer
+// (19 SEC-NET-5, docs/decisions.d/AUD-srv-files-01.md, amending docs/DECISIONS.md M3-02/1):
+//
+//   - The body of a successful GET is the object or the range the caller asked for; the driver
+//     sends no other GET (coreAPI). It is as long as the store announces, and net/http ends the
+//     body at that length. No configuration value bounds it: an export package has no size limit
+//     (20 5.2), a converted original may be larger than its upload, and file.max_upload_bytes
+//     may have been lowered since an object was stored. An answer without a length has no bound
+//     and is refused with errNoObjectLength.
+//   - Every other body (an error document, the result of a multipart call) is read into memory
+//     by the SDK and is at most max bytes; a longer one fails with egress.ErrResponseTooLarge.
+type answerBodies struct {
+	next httpDoer
+	// max is egress.max_response_bytes, the largest body of an answer that is not an object.
+	max int64
+}
+
+// Do implements httpDoer.
+func (a answerBodies) Do(req *http.Request) (*http.Response, error) {
+	resp, err := a.next.Do(req)
+	if err != nil {
+		return resp, err
+	}
+	if req.Method == http.MethodGet && resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
+		if resp.ContentLength < 0 {
+			_ = resp.Body.Close()
+			return nil, errNoObjectLength
+		}
+		return resp, nil
+	}
+	resp.Body = &cappedBody{rc: resp.Body, left: a.max}
+	return resp, nil
+}
+
+// cappedBody fails a body that holds more than left bytes with egress.ErrResponseTooLarge, as
+// the egress client does with its own limit: the bytes up to the limit come with the error, and
+// the error stays.
+type cappedBody struct {
+	rc   io.ReadCloser
+	left int64
+	err  error
+}
+
+// Read implements io.Reader.
+func (b *cappedBody) Read(p []byte) (int, error) {
+	if b.err != nil {
+		return 0, b.err
+	}
+	n, err := b.rc.Read(p)
+	if int64(n) > b.left {
+		n = int(b.left)
+		b.left = 0
+		b.err = egress.ErrResponseTooLarge
+		return n, b.err
+	}
+	b.left -= int64(n)
+	return n, err
+}
+
+// Close implements io.Closer.
+func (b *cappedBody) Close() error { return b.rc.Close() }

@@ -41,6 +41,7 @@ func TestImages(t *testing.T) {
 	t.Run("StillWebPConverted", func(t *testing.T) { testStillWebPConverted(t, e) })
 	t.Run("AnimatedWebPUnchanged", func(t *testing.T) { testAnimatedWebPUnchanged(t, e) })
 	t.Run("ImageOverPixelLimit", func(t *testing.T) { testImageOverPixelLimit(t, e) })
+	t.Run("ImageGuardedBelowPixelLimit", func(t *testing.T) { testGuardedBelowPixelLimit(t, e) })
 	t.Run("SECT08Images", func(t *testing.T) { testSECT08Images(t, e) })
 	t.Run("UnsupportedImagesUnchanged", func(t *testing.T) { testUnsupportedImagesUnchanged(t, e) })
 	t.Run("VideoContainerValues", func(t *testing.T) { testVideoContainerValues(t, e) })
@@ -510,9 +511,9 @@ func testAnimatedWebPUnchanged(t *testing.T, e *env) {
 	}
 }
 
-// checkGuarded checks a file above file.image.max_pixels: complete in revision rev, no
-// thumbnails, and the job logged the class too_many_pixels, so the pixel guard refused before
-// any decode.
+// checkGuarded checks a file the pixel guard refused (above file.image.max_pixels or one of the
+// two memory rules of 12 7.2): complete in revision rev, no thumbnails, and the job logged the
+// class too_many_pixels, so the guard refused before any decode.
 func checkGuarded(t *testing.T, e *env, id, mime string, rev int) {
 	t.Helper()
 	r := e.waitJobDone(t, id)
@@ -533,6 +534,29 @@ func testImageOverPixelLimit(t *testing.T, e *env) {
 	checkGuarded(t, e, e.send(t, "huge.jpg", "", hugeJPEG(t)), mimeJPEG, 2)
 	checkGuarded(t, e, e.send(t, "huge.png", "", hugePNG(t)), mimePNG, 2)
 	checkGuarded(t, e, e.send(t, "huge.gif", "", hugeGIF(t)), mimeGIF, 1)
+}
+
+// testGuardedBelowPixelLimit (12 7.2): two images with far fewer pixels than
+// file.image.max_pixels whose decode would still need memory far beyond it. A PNG of one pixel by
+// tallEdge is cleaned to revision 2 without thumbnails, because its long edge is above the
+// longest edge the server decodes; a GIF of tinyFrames frames of one pixel stays revision 1 byte
+// for byte, because every frame counts the palette the decoder keeps for it.
+func testGuardedBelowPixelLimit(t *testing.T, e *env) {
+	if tallEdge >= maxPixels || tinyFrames >= maxPixels {
+		t.Fatalf("the test images must have fewer pixels than file.image.max_pixels (%d)", maxPixels)
+	}
+	tall := e.send(t, "tall.png", "", tallPNG(t))
+	checkGuarded(t, e, tall, mimePNG, 2)
+	checkSize(t, e.readFile(t, tall), 1, tallEdge)
+	in := tinyFramesGIF()
+	frames := e.send(t, "frames.gif", "", in)
+	checkGuarded(t, e, frames, mimeGIF, 1)
+	if stored := checkStored(t, e, e.readFile(t, frames), 1, in); !bytes.Equal(stored, in) {
+		t.Error("the stored GIF changed")
+	}
+	if got := e.objects(t, frames); !slices.Equal(got, []string{"orig-1"}) {
+		t.Errorf("objects %v", got)
+	}
 }
 
 // testSECT08Images (SEC-T08, image part): the detected type decides, an SVG gets no job, a

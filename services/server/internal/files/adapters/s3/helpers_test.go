@@ -125,13 +125,16 @@ func loopbackRule(t testing.TB, endpoint string) egress.Rule {
 	return r
 }
 
+// testAnswerBytes is egress.max_response_bytes of the test stores: the largest answer that is
+// not an object. The suites store objects several times as large.
+const testAnswerBytes = 1 << 20
+
 // deps returns the dependencies of a store with the given egress entries.
 func (s *testSecrets) deps(rules ...egress.Rule) s3.Deps {
 	return s3.Deps{
-		Egress:          egress.Config{AllowedHosts: rules, Timeout: testTransferTimeout, MaxResponseBytes: 1 << 20},
+		Egress:          egress.Config{AllowedHosts: rules, Timeout: testTransferTimeout, MaxResponseBytes: testAnswerBytes},
 		Secrets:         s.provider,
 		TransferTimeout: testTransferTimeout,
-		MaxObjectBytes:  64 << 20,
 	}
 }
 

@@ -65,9 +65,10 @@ type FilesDeps struct {
 
 // FilesObjectStore opens the object storage of the files module from the loaded values: the
 // driver fs gives the file system driver on file.fs.root (fs.Open checks the root), the driver s3
-// the S3 driver with the keys file.s3.*, egress.* (EgressConfig), http.transfer_timeout,
-// file.max_upload_bytes and deps (docs/DECISIONS.md M3-02/14). Every role opens it in the start
-// step files (M3-03); the server image holds the directory file.fs.root of the driver fs.
+// the S3 driver with the keys file.s3.*, egress.* (EgressConfig), http.transfer_timeout and deps
+// (docs/DECISIONS.md M3-02/14; file.max_upload_bytes bounds an upload and no read of a stored
+// object, docs/decisions.d/AUD-srv-files-01.md). Every role opens it in the start step files
+// (M3-03); the server image holds the directory file.fs.root of the driver fs.
 //
 // The error reports a schema without the keys (config.Bind), a root that fs.Open refuses, or a
 // configuration, secret or egress setting that s3.New refuses (a key file that cannot be read
@@ -101,7 +102,6 @@ func FilesObjectStore(ctx context.Context, v *config.Values, deps FilesDeps) (fi
 		EgressDeps:      deps.Egress,
 		Secrets:         deps.Secrets,
 		TransferTimeout: raw.TransferTimeout,
-		MaxObjectBytes:  raw.MaxUploadBytes,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("config: %w", err)

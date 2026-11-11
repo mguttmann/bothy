@@ -331,8 +331,9 @@ func TestGIFCleanOriginal(t *testing.T) {
 		return reencodeGIF(b)
 	}}
 
-	// Three 6x4 frames are 72 pixels: one below is above the limit.
-	lim := app.CleanLimits{MaxPixels: 71, JPEGQuality: testJPEGQuality}
+	// Three 6x4 frames count their pixels and gifFrameOverhead each: one below is above the limit.
+	const atLimit = 3 * (6*4 + gifFrameOverhead)
+	lim := app.CleanLimits{MaxPixels: atLimit - 1, JPEGQuality: testJPEGQuality}
 	if _, err := c.CleanOriginal(t.Context(), domain.PlanReencodeGIF, openerOf(data), int64(len(data)), lim); !errors.Is(err, app.ErrTooManyPixels) {
 		t.Fatalf("got %v, want ErrTooManyPixels", err)
 	}
@@ -340,7 +341,7 @@ func TestGIFCleanOriginal(t *testing.T) {
 		t.Fatalf("re-encoded %d times above the pixel limit", calls)
 	}
 
-	lim.MaxPixels = 72
+	lim.MaxPixels = atLimit
 	cleaned, err := c.CleanOriginal(t.Context(), domain.PlanReencodeGIF, openerOf(data), int64(len(data)), lim)
 	if err != nil {
 		t.Fatalf("CleanOriginal: %v", err)
