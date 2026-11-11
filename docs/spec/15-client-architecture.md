@@ -1130,8 +1130,8 @@ Default values are in section 22.
 |---|---|---|---|
 | Unit | `domain`, `auth`, `sync_engine` (fake clock, fake transport), `local_store` (SQLite in memory), `bothy_noise` (official Noise test vectors, cross test against recordings of the Go host service, TM-T01, TM-T02) | `dart test` | every run of the gate |
 | Contract | generated `api_client` against OpenAPI; gateway frames against the JSON schemas of the AsyncAPI document; shared example frames with the server tests | `dart test` | every run |
-| Widget | components, states, semantics, guidelines `textContrastGuideline`, `androidTapTargetGuideline`, `iOSTapTargetGuideline`, `labeledTapTargetGuideline` (https://api.flutter.dev/flutter/flutter_test/meetsGuideline.html, retrieved 2026-10-10 [verified]) | `flutter test` | every run |
-| Golden | every core component and every view of `bothy_viz` with its fixtures in light and dark, `comfortable`, `compact`, `touch`, text scaling 1 and 2, de and en | `alchemist` (MIT, betterment.dev): CI goldens with the Ahem font are the same on all machines; platform goldens only on macOS (https://pub.dev/packages/alchemist, retrieved 2026-10-10 [verified]) | every run (CI goldens), macOS runner (platform goldens) |
+| Widget | components, states, semantics, guidelines `textContrastGuideline`, `androidTapTargetGuideline`, `iOSTapTargetGuideline`, `labeledTapTargetGuideline` (https://api.flutter.dev/flutter/flutter_test/meetsGuideline.html, retrieved 2026-10-10 [verified]) | `flutter test` | every run; `textContrastGuideline` of the shared screen audit only on a macOS host (below) |
+| Golden | every core component and every view of `bothy_viz` with its fixtures in light and dark, `comfortable`, `compact`, `touch`, text scaling 1 and 2, de and en | `alchemist` (MIT, betterment.dev): CI goldens with the Ahem font are the same on all machines; platform goldens only on macOS (https://pub.dev/packages/alchemist, retrieved 2026-10-10 [verified]) | every run (CI goldens); platform goldens only on a macOS host (below) |
 | Migration | generated drift migration tests plus "outbox survives" | `drift_dev make-migrations` | every run |
 | Integration | the whole app against a fake server in Dart (gateway and REST, a subset with fault injection: disconnect, duplicate, delay, `resync_required`, `4012`, `409`, `410`). The fake lives in `packages/sync_engine` as the separate library `package:sync_engine/testing.dart` (world, fault plan, DPoP and contract checks, the scenarios of 04 16 as drivers); the headless tests of `sync_engine` run the same scenarios against `SyncEngine` (M4-17) | `integration_test` | desktop runner per platform |
 | E2E on devices | login, push permission, tapping a notification, sharing, offline sending, opening, detaching and reattaching a terminal against a host service in a container, against the real server in the Compose stack; on mobile (`make e2e-mobile`) the stack runs a test build of the server whose push goes to fake APNs and FCM providers in the stack, the runner hands each captured push to the simulator or emulator as the provider would, and the Android service fetches the text from the real server (the simulator's `xcrun simctl push` runs no Notification Service Extension: observed behaviour with Xcode 27.1 and the iOS 27.0 simulator on 2026-10-27, the system log shows the push added without the extension, for which no public Apple source exists; so its text fetch is checked by the ClientKit tests) | `patrol` (Apache-2.0, leancode.co; Android, iOS, macOS, Web; https://pub.dev/packages/patrol, retrieved 2026-10-10 [verified]) for mobile, macOS, console; `integration_test` for Windows, because `patrol` does not support Windows | nightly and before a release |
@@ -1142,6 +1142,28 @@ Rationale: `integration_test` cannot operate system dialogs, notifications and s
 exactly these paths are critical here. `patrol` can do it on mobile devices and runs on all targets
 except Windows. The fake server makes failure cases reproducible that occur only by chance against a
 real server.
+
+Where the platform goldens and the measured text contrast run: a platform golden is recorded on
+a Mac and must match exactly (docs/DECISIONS.md PL/5), so only `flutter test` of a member on a
+macOS host compares it. It shows the bundled fonts in `design_system`; in the tests of the other
+members the text of the design system is drawn in the test font of `flutter test`, as blocks,
+also in a platform golden (docs/decisions.d/AUD-pkg-design-system-01.md AUD-DS1/5), so a weight
+or a glyph is visible only in the goldens of `design_system`. `textContrastGuideline` measures
+the colors of the rendered glyphs, which depend on the anti-aliasing of the host
+(docs/decisions.d/M4-07.md D-M4-07-10): the shared screen audit `dsExpectAccessible`
+(`package:design_system/testing.dart`), the component sheets of `design_system` and the Spaces
+page of the phone measure it only on a macOS host, and a few screen tests call the guideline on
+every host (the host view of the terminal, the status and host pages of `admin_ui`, the views and
+marks of `bothy_viz`). The job `test (apps)` runs the Dart tests on Linux, and the job
+`apps (macOS)` runs only the commands a member lists in `platform-tests.json` (native and
+integration tests), not `flutter test` of the members. So no CI job compares a platform golden,
+and the measured contrast of the screens behind the shared audit is checked only when the tests
+of a member run on a Mac, which is also where the goldens are recorded. On every host the gate
+holds the CI goldens, the contrast of every declared token pair (`tokens.py check` and
+`packages/design_system/test/theme/token_contrast_test.dart`) and the edges Material draws from
+the color scheme (`control_outline_contrast_test.dart` next to it). A screen behind the shared
+audit that pairs two colors no rule declares is therefore found only by a run on a Mac
+(docs/decisions.d/AUD-pkg-design-system-01.md).
 
 Where E2E and performance run on the desktop (M4-34): the E2E level and the performance level
 need the Compose stack of the real server next to the app, so a Docker engine on the same host

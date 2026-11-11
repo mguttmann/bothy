@@ -97,9 +97,12 @@ from `type.body`, so that the iPhone does not read smaller than the system defau
   `Atkinson Hyperlegible Next` and `Atkinson Hyperlegible Mono`. `DsType` (generated, copied into
   `lib/src/generated/` by `tokens.py build`) supplies the `TextStyle` constants; `dsTextStyle`
   adds the package font name `packages/design_system/<family>` in front of the fallback list
-  (apps that depend on the package register the fonts under that name) and drives the `wght`
-  axis from the weight. The theme (`buildDsTheme`) takes its text theme from the roles through
-  `dsTextStyle`; the fallback list of `font.family.*` stays behind it.
+  (apps that depend on the package register the fonts under that name). It sets no font
+  variation: the engine drives the `wght` axis from `fontWeight`, also from a weight set later
+  on the style (unread titles, Markdown bold), which a `wght` variation on the style would
+  override (docs/decisions.d/AUD-pkg-design-system-01.md). The theme (`buildDsTheme`) takes its
+  text theme from the roles through `dsTextStyle`; the fallback list of `font.family.*` stays
+  behind it.
 - Terminal: `packages/terminal_ui` bundles the four static files of JetBrains Mono 2.304
   (regular, bold, italic, bold italic) and its OFL text under `packages/terminal_ui/fonts/`, with
   `fonts/MANIFEST.json` (source, commit, SHA-256, license) checked by

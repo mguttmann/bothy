@@ -113,10 +113,17 @@ accent roles come from `DsAccent` of the context's accent and brightness, all ot
 | `surfaceContainerLow` | `color.surface.list` |
 | `surfaceContainer`, `surfaceContainerHigh` | `color.surface.raised` |
 | `surfaceContainerHighest` | `color.surface.overlay` |
-| `outline` / `outlineVariant` | `color.border.default` / `color.border.subtle` |
+| `outline` / `outlineVariant` | `color.border.control` / `color.border.subtle` |
 | `shadow` / `scrim` | `color.shadow` / `color.scrim` |
 | `inverseSurface` / `onInverseSurface` | `color.text.primary` / `color.surface.canvas` |
 | `inversePrimary` | `color.accent.subtle` |
+
+`outline` is the edge that carries a Material control (the ring and the thumb of a switch that
+is off, the underline or the border of a text field that is not filled, also of a dropdown, and
+the border of a segmented button), so it is the control border with at least 3:1 on the
+surfaces (WCAG 1.4.11); `test/theme/control_outline_contrast_test.dart` measures it on the
+rendered widgets. `outlineVariant` and `dividerColor` stay decoration
+(docs/decisions.d/AUD-pkg-design-system-01.md).
 
 Further theme fields: `scaffoldBackgroundColor` and `canvasColor` `color.surface.canvas`,
 `dividerColor` `color.border.subtle`, `hoverColor` `color.surface.hover`, `focusColor` and the
@@ -139,6 +146,13 @@ SHA-256 and license per file, and `test/fonts_test.dart` checks them (docs/DECIS
 D-M4-04-4, docs/quality/licenses.md "Bundled fonts"). Inside this package the families resolve
 under their plain names; an app that depends on the package registers them as
 `packages/design_system/<family>`, which `dsTextStyle` puts in front of the fallback list.
+
+Weight: the engine drives the `wght` axis from `TextStyle.fontWeight`, so set a weight the usual
+way, also after `dsTextStyle` (`dsTextStyle(DsType.body).copyWith(fontWeight: FontWeight.w700)`)
+or on a `Text` below the theme. Never add `FontVariation.weight` (`fontVariations` with `wght`)
+to a style: it wins over every later `fontWeight` and keeps the text at one weight
+(`test/theme/font_weight_test.dart` measures the laid out glyphs;
+docs/decisions.d/AUD-pkg-design-system-01.md).
 
 To move to a newer upstream state: download the four files from `fonts/variable/` and `OFL.txt`
 of both repositories at the new commit, store them under the names of `fonts/`, update
@@ -178,7 +192,11 @@ differ (docs/DECISIONS.md D-M4-04-1).
 macOS (docs/spec/15-client-architecture.md 20). Golden tests live in `test/goldens/`, their
 images in `test/goldens/ci/` and `test/goldens/macos/`. Another member copies the same
 `flutter_test_config.dart`, keeps `alchemist` as a dev dependency and builds its matrix with
-`dsGoldenMatrix` (docs/DECISIONS.md D-M4-04-5).
+`dsGoldenMatrix` (docs/DECISIONS.md D-M4-04-5). In the tests of another member the text of the
+design system is drawn in the test font of `flutter test`, as blocks, also in its platform
+goldens: the roles name the plain font family, which resolves only in this package
+(docs/decisions.d/AUD-pkg-design-system-01.md AUD-DS1/5). No CI job compares a platform golden
+(docs/spec/15-client-architecture.md 20).
 
 Regenerate goldens after an intended visual change with
 `flutter test --update-goldens` in the package folder. Platform goldens are updated only on
@@ -189,11 +207,18 @@ macOS; on another system the command rewrites only the CI goldens.
 Allowed members (docs/spec/15-client-architecture.md, 3.1; `tools/arch-check/rules.yaml`): `l10n`, `domain` (arrows of the diagram).
 Every other member is out of reach; `make arch` fails on a dependency or an import of it.
 External: `markdown` (BSD-3-Clause) parses message Markdown into an AST, rendered by the own
-widgets of `DsMarkdown` (docs/DECISIONS.md D-M4-07-2); `alchemist` (MIT) as a regular dependency, because `testing.dart` returns its
-`GoldenTestGroup` (docs/DECISIONS.md D-M4-04-5); `flutter_test` (SDK) as a regular dependency
-for `dsPumpIcons`; `vector_graphics` (BSD-3-Clause) renders the icons; `crypto` as a dev
-dependency for the font check; `vector_graphics_compiler` (BSD-3-Clause) as a dev dependency
-that `tokens.py icons` runs from the workspace lock.
+widgets of `DsMarkdown` (docs/DECISIONS.md D-M4-07-2); `vector_graphics` (BSD-3-Clause) renders
+the icons. Dev dependencies: `alchemist` (MIT) and `flutter_test` (SDK) for the tests and for the
+test support library `testing.dart` (`dsGoldenMatrix` returns an alchemist `GoldenTestGroup`,
+`dsPumpIcons` takes a `WidgetTester`); `crypto` for the font check; `vector_graphics_compiler`
+(BSD-3-Clause), which `tokens.py icons` runs from the workspace lock.
+
+`testing.dart` and `lib/src/testing/` import the two test packages although they are dev
+dependencies (the files ignore the lint `depend_on_referenced_packages`): only the folders
+`test` and `integration_test` of a member may import the library (`make arch`, rule 10), the
+workspace has one resolution, so the imports resolve for every member, and an app that depends
+on this package gets no test package into its dependencies and no font of alchemist into its
+bundle (`test/dependencies_test.dart`, docs/decisions.d/AUD-pkg-design-system-01.md).
 
 Further rules checked by `make arch`:
 
