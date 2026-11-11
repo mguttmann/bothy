@@ -379,6 +379,26 @@ One page for the overview, also on mobile:
 | Costs per mode with "estimate" or "information only" | `getCostStats` |
 | SLO traffic light "own measurement" | `getStatsSlo` |
 
+Period: the page names the period of its tiles under its title. It asks the four statistics
+queries in hours on whole UTC hours: the hour that holds the end of the host's range and as many
+hours before it as that range is long (the last 24 hours on the page "Live"). The server widens a
+range to whole buckets and counts hours in UTC, so it answers exactly this period; without a bucket
+size it would take days of `stats.time_zone` and answer every calendar day the range touches.
+
+Values: a count (messages, also by origin; threads; runs by end state and by failure reason;
+refused invocations; scan results) is its sum over the period. A level is the value of its latest
+bucket of a single group and carries the note "Since: ..." with the start of that bucket; levels
+of several groups do not combine and get no tile. A rate (`run_failure_rate`,
+`webhook_failure_rate`, `push_failure_rate_<provider>`) is a level: the server sends it as a share
+from 0 to 1 and the tile shows it in percent. Active people come from a second `getUsageStats`
+query in weeks, because the server counts people per week or month only: the tile shows the
+current week when the answer has one space (a space scope, or an instance with one space) and
+reads "fewer than the minimum group" where the server withheld the number (`below_min_group`);
+with several spaces there is no tile, and the statistics page of the administration lists the
+people per space ([admin-statistics.md](../observability/admin-statistics.md), section 3). When the
+period has costs in several currencies (`currency_required`), the page shows the first currency
+the server names, with a note; the rest of the page is not affected.
+
 Traffic light per SLO from `stats_minutes` over the SLO period (3.3): good share, remaining
 error budget `1 - (1 - share) / (1 - target)`.
 
@@ -521,7 +541,10 @@ check if a view would otherwise become disproportionate.
    file against its schema with its references (JSON Schema 2020-12) and fails on an unknown
    schema name, an invalid file, a file missing from the table of `fixtures/README.md` and a listed
    schema without a file; `test/fixtures_decode_test.dart` decodes every file with the generated
-   serializers.
+   serializers. The schema leaves the metrics of a `StatsSeries` open, so the check also holds a
+   series fixture of a query to the description of its operation: only the metric names it lists,
+   rates as shares from 0 to 1, and `active_people` only in weeks or months
+   (`StatsSeries.usage.week.json`).
 
 ### 7.3 Tests
 

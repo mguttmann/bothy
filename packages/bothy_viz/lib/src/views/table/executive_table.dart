@@ -9,13 +9,16 @@ import '../../model/metric_tile_model.dart';
 import '../../model/traffic_light_model.dart';
 import 'viz_table.dart';
 
-/// The tiles of [tiles] as rows of label, value and note (comparison or cost label), the
-/// texts of the metric tile.
+/// The tiles of [tiles] as rows of label, value and note (comparison, cost label or the
+/// "Since: ..." of a level, formatted with [now] and [timeZone]), the texts of the metric
+/// tile.
 VizTableData tileTable(
   VizTexts texts,
   String caption,
-  List<MetricTileModel> tiles,
-) => VizTableData(
+  List<MetricTileModel> tiles, {
+  DateTime? now,
+  String timeZone = 'UTC',
+}) => VizTableData(
   caption: caption,
   columns: [
     texts.l10n.vizColMetric,
@@ -31,6 +34,12 @@ VizTableData tileTable(
           [
             ?MetricTileMark.comparison(texts, tile),
             ?MetricTileMark.costLabelText(texts, tile),
+            ?MetricTileMark.sinceText(
+              texts,
+              tile,
+              now: now,
+              timeZone: timeZone,
+            ),
           ].join(', '),
         ),
       ],

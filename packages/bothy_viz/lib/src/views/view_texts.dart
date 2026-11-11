@@ -60,21 +60,10 @@ String vizClockTime(VizTexts texts, DateTime at, String timeZone) {
   }
 }
 
-/// The day of [at] relative to [now] and its clock time, for example "Yesterday, 11:58 PM".
-String vizDayTime(VizTexts texts, DateTime at, DateTime now, String timeZone) {
-  final zone = _zone(texts, timeZone);
-  final day = texts.format.relativeDay(at, now: now, timeZone: zone);
-  return '$day, ${texts.format.time(at, timeZone: zone)}';
-}
-
-String _zone(VizTexts texts, String timeZone) {
-  try {
-    texts.format.time(DateTime.utc(2026), timeZone: timeZone);
-    return timeZone;
-  } on ArgumentError {
-    return 'UTC';
-  }
-}
+/// The day of [at] relative to [now] and its clock time, for example "Yesterday, 11:58 PM"
+/// ([VizTexts.dayTime]).
+String vizDayTime(VizTexts texts, DateTime at, DateTime now, String timeZone) =>
+    texts.dayTime(at, now, timeZone);
 
 /// The table cell of the chat of [label]: its main text, a button that opens the chat when the
 /// server named it and [onOpenThread] is given.

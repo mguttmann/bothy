@@ -26,7 +26,8 @@ enum TileUnit {
 /// One large number with its label, an optional comparison and a cost label.
 ///
 /// [value] `null` means the server did not deliver it (no permission): the tile says "not
-/// shown", never zero (25 4 rule 5).
+/// shown", never zero (25 4 rule 5); with [belowMinGroup] it says "fewer than the minimum
+/// group" instead.
 final class MetricTileModel {
   /// Creates a tile; exactly one of [metric], [queryMetric] and [costMode] names it.
   const MetricTileModel({
@@ -38,6 +39,8 @@ final class MetricTileModel {
     this.previous,
     this.currency,
     this.costLabel,
+    this.since,
+    this.belowMinGroup = false,
   });
 
   /// A cost tile of [cost]'s mode: `personal` carries "information only", `organization`
@@ -73,4 +76,13 @@ final class MetricTileModel {
 
   /// Label of a cost tile.
   final CostLabel? costLabel;
+
+  /// Start of the bucket [value] comes from, when it is the level of the latest bucket and
+  /// not a sum over the range of the page (a rate, a percentile, the people of a week); the
+  /// tile then reads "Since: ...". `null` for a sum and for a value without a bucket.
+  final DateTime? since;
+
+  /// The server withheld [value] because it counts fewer people than
+  /// `privacy.stats_min_group_size` (`below_min_group` of the bucket).
+  final bool belowMinGroup;
 }

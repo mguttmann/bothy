@@ -77,9 +77,12 @@ final class FixtureLiveFrameSource extends LiveFrameSourceBase {
 /// the problem instead, as a server would answer with it, and [failOn] does so for single
 /// operations (`slo`, `costs` and so on, the method names). In the state
 /// `no_cost_permission` `getCostStats` answers `forbidden`, as the server does without
-/// `cost.read.aggregate`. `timeline` keeps only the buckets of the requested `metrics`, as the
-/// server filters them; the other filter parameters are accepted and ignored: a fixture is
-/// one answer. [calls] records the name of every call.
+/// `cost.read.aggregate`; with several [costCurrencies] it answers `currency_required` until a
+/// currency is asked for. `timeline` keeps only the buckets of the requested `metrics`, as the
+/// server filters them, and `usage` in weeks or months answers `StatsSeries.usage.week.json`,
+/// the only answer with `active_people`; the other filter parameters are accepted and
+/// ignored: a fixture is one answer. [calls] records the name of every call, [rangeQueries]
+/// the parameters of the queries over a range.
 final class FixtureStatsQuerySource implements StatsQuerySource {
   /// Creates the source on [fixtures].
   FixtureStatsQuerySource(
@@ -106,6 +109,40 @@ final class FixtureStatsQuerySource implements StatsQuerySource {
 
   /// The operation names of every call, in order.
   final List<String> calls = [];
+
+  /// The currencies of the costs of the range. With more than one, `getCostStats` without a
+  /// currency answers `validation_failed` with `currency_required` and names them, as the
+  /// server does for a range with costs in several currencies.
+  List<String> costCurrencies = const [];
+
+  /// The parameters of every `usage`, `runs`, `errors` and `costs` call, in order.
+  final List<
+    ({
+      String operation,
+      DateTime from,
+      DateTime to,
+      api.StatsGranularity? granularity,
+      String? spaceId,
+      String? currency,
+    })
+  >
+  rangeQueries = [];
+
+  void _record(
+    String operation,
+    DateTime from,
+    DateTime to,
+    api.StatsGranularity? granularity,
+    String? spaceId, [
+    String? currency,
+  ]) => rangeQueries.add((
+    operation: operation,
+    from: from,
+    to: to,
+    granularity: granularity,
+    spaceId: spaceId,
+    currency: currency,
+  ));
 
   String _pick(String prefix) {
     final exists =
@@ -158,7 +195,13 @@ final class FixtureStatsQuerySource implements StatsQuerySource {
     required DateTime to,
     api.StatsGranularity? granularity,
     String? spaceId,
-  }) => _series('usage');
+  }) {
+    _record('usage', from, to, granularity, spaceId);
+    final people =
+        granularity == api.StatsGranularity.week ||
+        granularity == api.StatsGranularity.month;
+    return _series('usage', state: people ? 'week' : null);
+  }
 
   @override
   Future<api.StatsSeries> runs({
@@ -167,7 +210,10 @@ final class FixtureStatsQuerySource implements StatsQuerySource {
     api.StatsGranularity? granularity,
     String? spaceId,
     String? agentId,
-  }) => _series('runs');
+  }) {
+    _record('runs', from, to, granularity, spaceId);
+    return _series('runs');
+  }
 
   @override
   Future<api.StatsSeries> errors({
@@ -175,7 +221,10 @@ final class FixtureStatsQuerySource implements StatsQuerySource {
     required DateTime to,
     api.StatsGranularity? granularity,
     String? spaceId,
-  }) => _series('errors');
+  }) {
+    _record('errors', from, to, granularity, spaceId);
+    return _series('errors');
+  }
 
   @override
   Future<api.CostSeries> costs({
@@ -185,12 +234,33 @@ final class FixtureStatsQuerySource implements StatsQuerySource {
     String? groupBy,
     String? spaceId,
     String? agentId,
-  }) => _answer('costs', () {
-    if (state == 'no_cost_permission') {
-      throw const api.ApiProblem(status: 403, code: 'forbidden');
-    }
-    return fixtures.costSeries(_pick('CostSeries'));
-  });
+    String? currency,
+  }) {
+    _record('costs', from, to, granularity, spaceId, currency);
+    return _answer('costs', () {
+      if (state == 'no_cost_permission') {
+        throw const api.ApiProblem(status: 403, code: 'forbidden');
+      }
+      if (currency == null && costCurrencies.length > 1) {
+        final detail =
+            'The range has costs in several currencies: '
+            '${costCurrencies.join(', ')}.';
+        throw api.ApiProblem(
+          status: 400,
+          code: 'validation_failed',
+          detail: detail,
+          errors: [
+            api.ProblemFieldError(
+              pointer: '/currency',
+              code: 'currency_required',
+              detail: detail,
+            ),
+          ],
+        );
+      }
+      return fixtures.costSeries(_pick('CostSeries'));
+    });
+  }
 
   /// The run history answers `RunHistoryPage.<state>.json` for the first page and an empty
   /// last page for a [cursor]; [state] and [spaceId] are recorded in [historyQueries].
@@ -223,10 +293,12 @@ final class FixtureStatsQuerySource implements StatsQuerySource {
   final List<({String? spaceId, String? state, String? cursor})>
   historyQueries = [];
 
-  /// `StatsSeries.<query>.<state>.json`; the state `empty` is shared by every query.
-  Future<api.StatsSeries> _series(String query) => _answer(query, () {
-    if (state == 'empty') return fixtures.series('empty');
-    final pick = _pick('StatsSeries.$query');
-    return fixtures.series(pick, query: query);
-  });
+  /// `StatsSeries.<query>.<state>.json`, with [state] instead of the state of the source when
+  /// given; the state `empty` is shared by every query.
+  Future<api.StatsSeries> _series(String query, {String? state}) =>
+      _answer(query, () {
+        if (this.state == 'empty') return fixtures.series('empty');
+        final pick = state ?? _pick('StatsSeries.$query');
+        return fixtures.series(pick, query: query);
+      });
 }

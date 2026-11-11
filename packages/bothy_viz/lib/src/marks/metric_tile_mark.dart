@@ -10,14 +10,28 @@ import 'package:flutter/material.dart';
 import '../model/metric_tile_model.dart';
 import 'viz_texts.dart';
 
-/// One large number with its label, the comparison with the previous period and the cost
-/// label; a value the server did not deliver reads "not shown", never zero (25 4 rule 5).
+/// One large number with its label, the comparison with the previous period, the cost label
+/// and, for a level of the latest bucket, the start of that bucket ("Since: ..."); a value the
+/// server did not deliver reads "not shown", never zero (25 4 rule 5), and a number of people
+/// below the minimum group "fewer than the minimum group".
 class MetricTileMark extends StatelessWidget {
-  /// Creates the tile of [model].
-  const MetricTileMark({super.key, required this.model});
+  /// Creates the tile of [model]; [now] and [timeZone] format [MetricTileModel.since], which
+  /// is left out without [now].
+  const MetricTileMark({
+    super.key,
+    required this.model,
+    this.now,
+    this.timeZone = 'UTC',
+  });
 
   /// The tile.
   final MetricTileModel model;
+
+  /// The current time, for the relative day of "Since: ..."; `null` leaves the note out.
+  final DateTime? now;
+
+  /// IANA time zone of the clock time of "Since: ...".
+  final String timeZone;
 
   /// The label of the tile.
   static String label(VizTexts texts, MetricTileModel model) {
@@ -29,8 +43,9 @@ class MetricTileMark extends StatelessWidget {
         : '${texts.l10n.vizMetricCost}, ${texts.badge(mode)}';
   }
 
-  /// The formatted value, or "not shown".
+  /// The formatted value, "fewer than the minimum group" or "not shown".
   static String value(VizTexts texts, MetricTileModel model) {
+    if (model.belowMinGroup) return texts.l10n.statsFewerThanMinimum;
     final v = model.value;
     if (v == null) return texts.l10n.vizNotShown;
     return switch (model.unit) {
@@ -56,6 +71,19 @@ class MetricTileMark extends StatelessWidget {
     return texts.l10n.vizTileSame;
   }
 
+  /// "Since: ..." with the start of the bucket of a level ([MetricTileModel.since]) as day
+  /// and time; `null` for a sum and without [now].
+  static String? sinceText(
+    VizTexts texts,
+    MetricTileModel model, {
+    required DateTime? now,
+    String timeZone = 'UTC',
+  }) {
+    final since = model.since;
+    if (since == null || now == null) return null;
+    return texts.l10n.vizTileSince(texts.dayTime(since, now, timeZone));
+  }
+
   /// The cost label text; `null` for a final amount or a tile without cost.
   static String? costLabelText(VizTexts texts, MetricTileModel model) =>
       switch (model.costLabel) {
@@ -73,6 +101,7 @@ class MetricTileMark extends StatelessWidget {
       value(texts, model),
       ?comparison(texts, model),
       ?costLabelText(texts, model),
+      ?sinceText(texts, model, now: now, timeZone: timeZone),
     ];
     final secondary = dsTextStyle(DsType.bodySm)
         .copyWith(color: colors.textSecondary);

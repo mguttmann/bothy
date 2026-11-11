@@ -1,0 +1,47 @@
+{
+  "granularity": "week",
+  "buckets": [
+    {
+      "start": "2026-10-05T00:00:00.000Z",
+      "metrics": {
+        "messages": 61.0,
+        "threads_created": 9.0,
+        "runs": 22.0,
+        "active_people": 7.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000001"
+    },
+    {
+      "start": "2026-10-05T00:00:00.000Z",
+      "metrics": {
+        "messages": 44.0,
+        "threads_created": 6.0,
+        "runs": 31.0,
+        "active_people": 5.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000002"
+    },
+    {
+      "start": "2026-10-12T00:00:00.000Z",
+      "metrics": {
+        "messages": 52.0,
+        "threads_created": 8.0,
+        "runs": 19.0,
+        "active_people": 6.0
+      },
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000001"
+    },
+    {
+      "start": "2026-10-12T00:00:00.000Z",
+      "metrics": {
+        "messages": 12.0,
+        "threads_created": 2.0,
+        "runs": 7.0
+      },
+      "below_min_group": [
+        "active_people"
+      ],
+      "group_key": "0192f4a0-7b1c-7000-8a00-000000000002"
+    }
+  ]
+}

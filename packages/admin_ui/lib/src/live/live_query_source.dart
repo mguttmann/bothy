@@ -156,6 +156,7 @@ final class ApiStatsQuerySource implements StatsQuerySource {
     String? groupBy,
     String? spaceId,
     String? agentId,
+    String? currency,
   }) => _call(
     () => _stats.getCostStats(
       from: from.toUtc(),
@@ -164,6 +165,7 @@ final class ApiStatsQuerySource implements StatsQuerySource {
       groupBy: groupBy,
       spaceId: spaceId,
       agentId: agentId,
+      currency: currency,
     ),
   );
 }

@@ -574,6 +574,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get vizTileSame => 'wie im Vorzeitraum';
 
   @override
+  String vizTileSince(String start) {
+    return 'Seit: $start';
+  }
+
+  @override
   String get vizNotShown => 'nicht angezeigt';
 
   @override

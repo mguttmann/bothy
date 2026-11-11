@@ -77,7 +77,8 @@ abstract interface class StatsQuerySource {
   /// history (25 6.7).
   Future<api.Run> run(String runId);
 
-  /// `getCostStats`.
+  /// `getCostStats`; [currency] picks one currency of a range with several, which the server
+  /// refuses without it (`validation_failed` with `currency_required`).
   Future<api.CostSeries> costs({
     required DateTime from,
     required DateTime to,
@@ -85,5 +86,25 @@ abstract interface class StatsQuerySource {
     String? groupBy,
     String? spaceId,
     String? agentId,
+    String? currency,
   });
+}
+
+/// The currencies a refusal of `getCostStats` names: a `validation_failed` whose
+/// `errors[].code` is `currency_required` lists the currencies of the range in its detail
+/// ("the currencies found in `detail`"); empty for any other error.
+///
+/// ```dart
+/// vizRequiredCurrencies(problem); // ['EUR', 'USD']
+/// ```
+List<String> vizRequiredCurrencies(Object error) {
+  if (error is! api.ApiProblem) return const [];
+  final field = error.errors
+      .where((e) => e.code == 'currency_required')
+      .firstOrNull;
+  if (field == null) return const [];
+  final text = field.detail ?? error.detail ?? '';
+  return <String>{
+    for (final m in RegExp(r'\b[A-Z]{3}\b').allMatches(text)) m.group(0)!,
+  }.toList();
 }

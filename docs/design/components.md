@@ -464,7 +464,7 @@ apps and console; the Grafana panel uses the same roles through the TypeScript o
 |---|---|---|
 | Lane (space) | row with a header on the left (category color and icon of the space), line `color.viz.grid` between lanes | `color.border.*`, `space.*` |
 | Run card | like a collapsed live box: spine on the left in the state color of the run, agent, tool chip (section 3), backend policy badge (section 10), cost in mono | roles of the live box, `type.code` |
-| Metric tile | large number in mono, label above it, comparison with the previous period as text with an icon (never only color) | `type.display`, `type.label` |
+| Metric tile | large number in mono, label above it, comparison with the previous period as text with an icon (never only color); a value that is the level of its latest bucket and no sum over the period of the page carries the line "Since: ..." (25, section 6.4) | `type.display`, `type.label` |
 | Area and bar | series in `color.viz.series.1` to `.8` in a fixed order; axes `color.viz.axis`; fill `color.viz.area-fill`; guide lines `color.viz.grid` | `color.viz.*` |
 | SLO traffic light | dot with icon and text "on target", "budget tight", "target missed", "not enough data" and the label "own measurement" | `color.success.*`, `color.warning.*`, `color.danger.*`, neutral role for "not enough data" |
 | Timeline | playhead as a vertical line, controls with icons from `icon.tokens.json` | `motion.*` |

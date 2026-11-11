@@ -11,7 +11,13 @@ Findings, one line each, `viz-fixtures: <sub-check>: <subject>: <detail>`:
 - `valid`: the file is no JSON or breaks its schema (first error with its JSON pointer);
 - `readme`: a file is missing from the table "Fixtures" of the fixtures README, or a row names
   a file that does not exist;
-- `coverage`: a schema of the table has no fixture file.
+- `coverage`: a schema of the table has no fixture file;
+- `content`: a `StatsSeries.<query>.<state>.json` carries what the server never sends. The schema
+  leaves `metrics` open (a map of names to numbers), so the rule reads the rest from the
+  description of the operation of `<query>` (`usage`, `runs`, `errors`): a metric name the
+  description does not list (`push_failure_rate` without its provider), a rate (`<what>_rate`,
+  `push_failure_rate_<provider>`) outside 0 to 1 (the server sends shares, never percent) and
+  `active_people` in a bucket that is no week or month.
 
 The schema resolves with its references inside the whole document (OpenAPI 3.1 schemas are
 JSON Schema 2020-12) through the validator `jsonschema` of the pinned tools environment.
@@ -41,7 +47,18 @@ OPENAPI_PATH = Path("docs/api/openapi.yaml")
 TABLE_HEADING = "## Fixtures"
 """Heading of the table in the README."""
 
+SERIES_OPERATIONS = {"usage": "getUsageStats", "runs": "getRunStats", "errors": "getErrorStats"}
+"""The operation whose description lists the metric names of `StatsSeries.<query>.*.json`."""
+PEOPLE_METRIC = "active_people"
+"""Counted only per week or month (description of `getUsageStats`)."""
+PEOPLE_GRANULARITIES = ("week", "month")
+"""The bucket sizes that carry `PEOPLE_METRIC`."""
+
 _LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+_CODE = re.compile(r"`([^`]+)`")
+# A count by a code is no rate, also when the code reads like one (`failed_reason_rate_limited`).
+_RATE = re.compile(r"^(?!failed_reason_|messages_).*_rate$|^push_failure_rate_")
+_PLACEHOLDER = re.compile(r"<[^>]+>")
 _ROW = re.compile(r"^\|\s*`([^`]+\.json)`\s*\|\s*`([^`]+)`\s*\|")
 
 
@@ -102,7 +119,8 @@ def check(root: Path) -> list[str]:
         if schema not in schemas:
             found.append(_finding("schema", name, f"no schema {schema} in {OPENAPI_PATH}"))
         else:
-            found += _validate(root / FIXTURES_DIR / name, schema, document)
+            invalid = _validate(root / FIXTURES_DIR / name, schema, document)
+            found += invalid or _content(root / FIXTURES_DIR / name, document)
         if name not in listed:
             found.append(_finding("readme", name, f"not listed in {README_PATH}"))
     for name, (schema, _line) in sorted(listed.items()):
@@ -129,3 +147,54 @@ def _validate(path: Path, schema: str, document: dict[str, Any]) -> list[str]:
         return []
     first = errors[0]
     return [_finding("valid", path.name, f"{_pointer(first.absolute_path)}: {first.message}")]
+
+
+def metric_names(document: dict[str, Any], operation: str) -> re.Pattern[str]:
+    """The metric names the description of `operation` lists, as one pattern.
+
+    Every name in backticks counts; a part in angle brackets stands for any code
+    (`push_failure_rate_<provider>`, `failed_reason_<code>`).
+
+    Raises:
+        ValueError: the document has no such operation.
+    """
+    for item in document["paths"].values():
+        for method in item.values():
+            if isinstance(method, dict) and method.get("operationId") == operation:
+                names = _CODE.findall(method["description"])
+                patterns = (_PLACEHOLDER.sub("[a-z0-9_]+", re.escape(n)) for n in names)
+                return re.compile("|".join(patterns))
+    raise ValueError(f"no operation {operation} in {OPENAPI_PATH}")
+
+
+def _content(path: Path, document: dict[str, Any]) -> list[str]:
+    """The `content` findings of a valid `StatsSeries.<query>.<state>.json`; no other has any."""
+    parts = path.name.split(".")
+    if parts[0] != "StatsSeries" or len(parts) != 4 or parts[1] not in SERIES_OPERATIONS:
+        return []
+    operation = SERIES_OPERATIONS[parts[1]]
+    known = metric_names(document, operation)
+    series = json.loads(path.read_text(encoding="utf-8"))
+    granularity = series["granularity"]
+    found: list[str] = []
+    for index, bucket in enumerate(series["buckets"]):
+        entries = [
+            (f"/buckets/{index}/metrics/{name}", name, value)
+            for name, value in bucket["metrics"].items()
+        ]
+        entries += [
+            (f"/buckets/{index}/below_min_group/{at}", name, None)
+            for at, name in enumerate(bucket.get("below_min_group", []))
+        ]
+        for pointer, name, value in entries:
+            if known.fullmatch(name) is None:
+                detail = f"not a metric of {operation} in {OPENAPI_PATH}"
+            elif name == PEOPLE_METRIC and granularity not in PEOPLE_GRANULARITIES:
+                sizes = " or ".join(PEOPLE_GRANULARITIES)
+                detail = f"only with granularity {sizes}, not {granularity}"
+            elif value is not None and _RATE.search(name) and not 0 <= value <= 1:
+                detail = f"{value} is no share between 0 and 1"
+            else:
+                continue
+            found.append(_finding("content", path.name, f"{pointer}: {detail}"))
+    return found

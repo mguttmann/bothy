@@ -10,6 +10,7 @@ import 'dart:io' as io;
 
 import 'package:admin_ui/admin_ui.dart';
 import 'package:api_client/api_client.dart';
+import 'package:bothy_viz/bothy_viz.dart' show vizRequiredCurrencies;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../access/api_access_repository_test.dart' show RoutingAdapter;
@@ -85,6 +86,46 @@ void main() {
     expect(queries[1]['space_id'], _space);
     expect(queries[1]['metric'], 'runs_started');
     expect(queries[3].containsKey('space_id'), isFalse);
+  });
+
+  test('the cost query passes its currency, and a range with several '
+      'currencies reaches the views with their names', () async {
+    final (source, adapter) = build({
+      'GET /api/v1/stats/costs': (200, _fixture('CostSeries.normal.json')),
+    });
+    final costs = await source.costs(
+      from: from,
+      to: to,
+      granularity: StatsGranularity.hour,
+      currency: 'EUR',
+    );
+    expect(costs.buckets, isNotEmpty);
+    final query = adapter.seen.single.options.uri.queryParameters;
+    expect(query['currency'], 'EUR');
+    expect(query['granularity'], 'hour');
+
+    const detail = 'The range has costs in several currencies: EUR, USD.';
+    final (refusing, _) = build({
+      'GET /api/v1/stats/costs': (
+        400,
+        {
+          ..._problem(400, 'validation_failed'),
+          'detail': detail,
+          'errors': [
+            {
+              'pointer': '/currency',
+              'code': 'currency_required',
+              'detail': detail,
+            },
+          ],
+        },
+      ),
+    });
+    final error = await refusing
+        .costs(from: from, to: to)
+        .then<Object?>((_) => null, onError: (Object e) => e);
+    expect(error, isA<ApiProblem>());
+    expect(vizRequiredCurrencies(error!), ['EUR', 'USD']);
   });
 
   for (final (status, code) in const [
