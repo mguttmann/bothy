@@ -38,6 +38,29 @@ type codec struct {
 	renderedAt []string
 	store      *store
 	info       app.ImageInfo
+	// drain makes Inspect and RenderVariants read the original to its end first, as a codec that
+	// keeps it in memory, and return the read error; drained records the bytes each read yielded.
+	drain   bool
+	drained []int64
+	// inspectSize is the size the last Inspect was given.
+	inspectSize int64
+}
+
+// readOriginal reads the original through open to its end when drain is set.
+func (c *codec) readOriginal(ctx context.Context, open app.Opener) error {
+	if !c.drain {
+		return nil
+	}
+	r, err := open(ctx)
+	if err != nil {
+		return err
+	}
+	n, err := io.Copy(io.Discard, r)
+	_ = r.Close()
+	c.mu.Lock()
+	c.drained = append(c.drained, n)
+	c.mu.Unlock()
+	return err
 }
 
 func (c *codec) CleanOriginal(ctx context.Context, _ domain.OriginalPlan, open app.Opener, _ int64, _ app.CleanLimits) (app.CleanedOriginal, error) {
@@ -66,11 +89,20 @@ func (c *codec) CleanOriginal(ctx context.Context, _ domain.OriginalPlan, open a
 		}}, nil
 }
 
-func (c *codec) Inspect(context.Context, string, app.Opener) (app.ImageInfo, error) {
+func (c *codec) Inspect(ctx context.Context, _ string, open app.Opener, size int64) (app.ImageInfo, error) {
+	c.mu.Lock()
+	c.inspectSize = size
+	c.mu.Unlock()
+	if err := c.readOriginal(ctx, open); err != nil {
+		return app.ImageInfo{}, err
+	}
 	return c.info, nil
 }
 
-func (c *codec) RenderVariants(_ context.Context, _ app.Opener, spec app.RenderSpec) ([]app.RenderedVariant, error) {
+func (c *codec) RenderVariants(ctx context.Context, open app.Opener, spec app.RenderSpec) ([]app.RenderedVariant, error) {
+	if err := c.readOriginal(ctx, open); err != nil {
+		return nil, err
+	}
 	c.mu.Lock()
 	c.store.mu.Lock()
 	for k := range c.store.objects {
@@ -121,10 +153,21 @@ type imageEnv struct {
 
 func newImageEnv(t *testing.T, mv app.MovieReader) *imageEnv {
 	t.Helper()
+	return newImageEnvOn(t, mv, nil)
+}
+
+// newImageEnvOn is newImageEnv with the job reading and writing through wrap of the fake store
+// when wrap is set.
+func newImageEnvOn(t *testing.T, mv app.MovieReader, wrap func(*store) app.ObjectStore) *imageEnv {
+	t.Helper()
 	e := &imageEnv{repo: newRepo(), store: newStore(t), events: &events{}, purges: &purgeQueue{}, hooks: &app.ImageHooks{}}
 	e.codec = &codec{store: e.store}
 	if mv == nil {
 		mv = movies{}
+	}
+	var objects app.ObjectStore = e.store
+	if wrap != nil {
+		objects = wrap(e.store)
 	}
 	u := newUoWWith(t, func(r *txn.Registry) error {
 		return txn.Subscribe(r, func(_ context.Context, ev files.FileFinalized) error {
@@ -135,7 +178,7 @@ func newImageEnv(t *testing.T, mv app.MovieReader) *imageEnv {
 		})
 	})
 	trigger, _, _ := newTestTrigger(t)
-	p, err := app.NewImageProcessor(imageCfg, app.ImageDeps{Repo: e.repo, Store: e.store, UoW: u, Events: e.events, Extracts: trigger,
+	p, err := app.NewImageProcessor(imageCfg, app.ImageDeps{Repo: e.repo, Store: objects, UoW: u, Events: e.events, Extracts: trigger,
 		Channels: channels{space: ids.New()}, Purge: e.purges, Codec: e.codec, Movies: mv, Hooks: e.hooks})
 	if err != nil {
 		t.Fatal(err)

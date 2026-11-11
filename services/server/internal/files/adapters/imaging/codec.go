@@ -246,18 +246,15 @@ const (
 )
 
 // Inspect implements app.ImageCodec: header, size, frames, orientation and profile without
-// decoding pixels.
-func (c Codec) Inspect(ctx context.Context, mimeType string, open app.Opener) (app.ImageInfo, error) {
+// decoding pixels. The chunks of a WebP are scanned in memory, so a WebP is read like the
+// original of convertWebP: at most size bytes, and an object of another length is a read error.
+func (c Codec) Inspect(ctx context.Context, mimeType string, open app.Opener, size int64) (app.ImageInfo, error) {
 	if mimeType == mimeWebP {
-		var info webpInfo
-		err := withSource(ctx, open, func(r io.Reader) error {
-			data, err := io.ReadAll(r)
-			if err != nil {
-				return err
-			}
-			info, err = scanWebP(data)
-			return err
-		})
+		data, err := readAll(ctx, open, size)
+		if err != nil {
+			return app.ImageInfo{}, err
+		}
+		info, err := scanWebP(data)
 		if err != nil {
 			return app.ImageInfo{}, err
 		}

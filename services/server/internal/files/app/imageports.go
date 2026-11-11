@@ -103,8 +103,10 @@ type ImageCodec interface {
 	// above lim.MaxPixels, ErrImageUndecodable, ErrImageAnimated for an animated WebP).
 	CleanOriginal(ctx context.Context, plan domain.OriginalPlan, open Opener, size int64, lim CleanLimits) (CleanedOriginal, error)
 	// Inspect reads header, size, frames, orientation and profile of an image of mimeType
-	// without decoding pixels; ErrImageMalformed when the header cannot be read.
-	Inspect(ctx context.Context, mimeType string, open Opener) (ImageInfo, error)
+	// without decoding pixels; ErrImageMalformed when the header cannot be read. The object has
+	// size bytes: a format that is scanned in memory (WebP) is read up to that size, and an
+	// object of another length is a read error of the store.
+	Inspect(ctx context.Context, mimeType string, open Opener, size int64) (ImageInfo, error)
 	// RenderVariants decodes the original (the first frame of an animation), applies the
 	// orientation and renders spec.Variants. Errors: ErrTooManyPixels before any decode,
 	// ErrImageUndecodable, or a read error of open.

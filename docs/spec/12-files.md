@@ -451,7 +451,11 @@ summary only].
 Port contract (M3-01, `internal/files/app`, docs/DECISIONS.md M3-01/1 to M3-01/6). The port is an
 outgoing port of the application layer; no other module sees it. Every operation takes a context
 first; implementations are safe for concurrent use, and nothing in the port reads a whole object
-into memory (`Get` streams, the caller closes the reader).
+into memory (`Get` streams, the caller closes the reader). The reader of a whole object yields as
+many bytes as the storage answers, on both drivers. A use case that keeps what it reads in memory
+therefore bounds the read itself, with the stored size of its row or a named configuration value,
+and treats an object with more bytes as a read error; a use case that streams needs no bound
+(docs/decisions.d/FIX-S3-READ-BOUND-1111.md).
 
 - Keys: one grammar for all drivers (`domain.ValidateKey`): one or more segments of `[a-z0-9-]`,
   joined by single `/`, without a leading or trailing `/`. It refuses `.`, `..`, absolute paths,
@@ -573,6 +577,13 @@ S3 driver rules (M3-02, `internal/files/adapters/s3`, docs/DECISIONS.md M3-02/1 
   stored object. An object answer without a length is a storage failure. Every other response
   body (an error document, the result of a multipart call) is at most
   `egress.max_response_bytes` (docs/decisions.d/AUD-srv-files-01.md).
+- A `GET` with a range yields only the range asked for: the answer has status `206` and a
+  `Content-Range` in bytes that starts at the first byte asked for, ends at or before the last
+  one and has the length the answer announces. Any other successful answer, such as the whole
+  object with status `200`, is a storage failure, so a ranged read never yields other or more
+  bytes than the caller asked for. S3 answers every valid range this way; an S3-compatible
+  storage, or a proxy in front of it, has to do the same
+  (docs/decisions.d/FIX-S3-READ-BOUND-1111.md).
 - No retries in the SDK ([02-architecture.md](02-architecture.md) 14.3): a failed call is one
   request, and the caller sees a storage failure (`503 unavailable`); jobs retry through River.
 - `Put` and `UploadPart` stream the caller's reader without a buffer and sign it as
@@ -589,7 +600,8 @@ S3 driver rules (M3-02, `internal/files/adapters/s3`, docs/DECISIONS.md M3-02/1 
 - Errors keep the contract of 4.1 and read `files/s3: <operation> <key>: <detail>`; they never
   contain a request URL, a query, a presigned URL, the endpoint or credentials. A `HEAD` answer
   has no body, so `Head` on a missing bucket reads as `ErrNotFound`; `Get` reports `NoSuchBucket`
-  as a storage failure.
+  as a storage failure. An error document above `egress.max_response_bytes` was not read, so it
+  is a storage failure whatever its status.
 
 The second package that may import the AWS SDK (M7-22, docs/DECISIONS.md M7-22/4) is the object
 store sink of the audit checkpoints, `internal/audit/adapters/s3sink`
@@ -836,6 +848,13 @@ above `file.image.max_pixels`:
   pixels of the logical screen plus a fixed overhead for the palette and the frame record the
   decoder keeps per frame (`gifFrameOverhead` in `internal/files/adapters/imaging`). A file of
   many frames of one pixel therefore does not pass the limit, although its pixels are few.
+
+The job also never reads more of an original than its row says. A GIF and a WebP are held in
+memory as a whole, and so is the colour profile of a PNG, so every read of an original ends at
+the stored size (`files.size_bytes`): an object that yields more bytes, because the storage
+answers something else than was stored or the object was replaced behind the server, is a read
+error. The run fails, is retried and writes nothing; the file is neither failed nor stored
+unchanged because of it (docs/decisions.d/FIX-S3-READ-BOUND-1111.md).
 
 ### 7.3 Thumbnails
 
@@ -1354,6 +1373,8 @@ signature names only in the audit log.
 | Image with huge dimensions and a small file size | no decoding, no preview, no rise in peak memory above a test limit |
 | PNG of one pixel by more than 65535, and GIF of many frames of one pixel, both far below `file.image.max_pixels` | no decoding, no preview; the PNG is cleaned, the GIF stays unchanged (7.2) |
 | Object larger than every body limit on the S3 driver (SeaweedFS), whole and by range | read completely (4.3) |
+| Object that yields more bytes than its row says (replaced on the file system driver; a fake storage) | the image job reads at most the stored size, fails with a read error and writes no row, event or object; the retry on the stored object succeeds (7.2) |
+| Ranged `GET` on the S3 driver answered with the whole object and status `200`, with another offset or with a longer range (fake S3) | storage failure, no body (4.3) |
 | HTML and SVG upload | `Content-Disposition: attachment`, `nosniff`, sandbox CSP |
 | File name with U+202E, `../`, control characters | sanitized name, both `filename` parameters correct |
 | Someone else's file ID and a non-existent ID | identical `404` response (B7) |

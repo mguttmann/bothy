@@ -50,6 +50,7 @@ func TestImages(t *testing.T) {
 	t.Run("ImageJobCrashBeforeCommit", func(t *testing.T) { testJobCrashBeforeCommit(t, e) })
 	t.Run("ImageJobRunTwice", func(t *testing.T) { testJobRunTwice(t, e) })
 	t.Run("ImageJobConcurrencyLimit", func(t *testing.T) { testJobConcurrencyLimit(t, e) })
+	t.Run("ImageObjectLongerThanRow", func(t *testing.T) { testObjectLongerThanRow(t, e) })
 	// Last: it reads the logs of the whole flow of every case above.
 	t.Run("ImageJobLogsNoMetadata", func(t *testing.T) { testJobLogsNoMetadata(t, e) })
 }

@@ -5,7 +5,6 @@ package app
 import (
 	"context"
 	"errors"
-	"io"
 	"log/slog"
 	"time"
 
@@ -196,31 +195,14 @@ func (u *ExtractText) extract(ctx context.Context, f FileRecord) (ExtractResult,
 		return ExtractResult{}, err
 	}
 	defer func() { _ = body.Close() }()
-	res, err := u.d.Extractor.Extract(xctx, &inputLimit{r: body, left: u.cfg.MaxInputBytes}, f.MIMEType)
+	// The stored size said the object fits; when the bytes disagree the read fails with
+	// input_too_large.
+	input := limitObject(body, u.cfg.MaxInputBytes, domain.NewExtractError(domain.CodeInputTooLarge))
+	res, err := u.d.Extractor.Extract(xctx, input, f.MIMEType)
 	if err != nil && xctx.Err() != nil {
 		return ExtractResult{}, xctx.Err()
 	}
 	return res, err
-}
-
-// inputLimit reads at most left bytes and fails with input_too_large when the object has more:
-// the stored size said it fits, but the bytes disagree.
-type inputLimit struct {
-	r    io.Reader
-	left int64
-}
-
-// Read implements io.Reader.
-func (l *inputLimit) Read(p []byte) (int, error) {
-	if int64(len(p)) > l.left+1 {
-		p = p[:l.left+1]
-	}
-	n, err := l.r.Read(p)
-	if int64(n) > l.left {
-		return int(l.left), domain.NewExtractError(domain.CodeInputTooLarge)
-	}
-	l.left -= int64(n)
-	return n, err
 }
 
 // fail writes failed with code and logs it.

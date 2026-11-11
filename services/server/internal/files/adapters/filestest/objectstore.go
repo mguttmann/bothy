@@ -172,6 +172,9 @@ func caseGetRange(t *testing.T, s app.ObjectStore, c *caseEnv) {
 		{"beyond the end", app.ByteRange{Offset: 990, Length: 500}, data[990:]},
 		{"first byte", app.ByteRange{Offset: 0, Length: 1}, data[:1]},
 		{"last byte", app.ByteRange{Offset: 999, Length: 1}, data[999:]},
+		// A download with "Range: bytes=0-" asks for the whole object as one range.
+		{"the whole object", app.ByteRange{Offset: 0, Length: 1000}, data},
+		{"from the first byte beyond the end", app.ByteRange{Offset: 0, Length: 5000}, data},
 	}
 	for _, rc := range cases {
 		rng := rc.rng
