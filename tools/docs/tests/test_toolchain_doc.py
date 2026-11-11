@@ -110,6 +110,22 @@ def test_sdk_generators_are_pinned_exactly_in_the_manifests() -> None:
     assert package["devDependencies"]["typedoc"] == pins["typedoc"]
 
 
+def test_node_tool_overrides_are_the_versions_the_lock_resolves() -> None:
+    # OSV-Scanner reads the lock and never the `overrides` entry, so an override that moves
+    # without its lock entry fixes nothing. `npm ci` refuses that mismatch at bootstrap; this
+    # holds it in the test run too, for every copy of the package the lock holds.
+    node = REPO / "tools" / "node"
+    overrides = json.loads((node / "package.json").read_text())["overrides"]
+    packages = json.loads((node / "package-lock.json").read_text())["packages"]
+    for name, version in overrides.items():
+        locked = {
+            meta["version"]
+            for path, meta in packages.items()
+            if path.rpartition("node_modules/")[2] == name
+        }
+        assert locked == {version}, f"{name}: overridden to {version}, the lock has {locked}"
+
+
 def test_codegen_table_of_chapter_06_names_the_pins() -> None:
     text = (REPO / "docs" / "spec" / "06-api.md").read_text(encoding="utf-8")
     part = text.split("## 14. Code generation", 1)[1].split("\n## ", 1)[0]
