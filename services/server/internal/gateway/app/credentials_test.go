@@ -81,14 +81,17 @@ func (e *env) sendFrom(c *app.Connection, op string, d any) {
 }
 
 // TestIdentifyAndResumeCountFailedCredentials: one case per outcome of the credential check of
-// identify and resume. A rejected token or proof, a session the authenticator reports revoked and
-// a device that is not the token's keep the token of rl.public_auth; valid credentials, the
-// normal flows token_expired and use_dpop_nonce and an error that is not the client's give it
-// back, also when authorize refuses the verified principal afterwards.
+// identify and resume. A rejected token or proof, a session the authenticator reports revoked, a
+// credential it reports inactive without an error (actor.Actor.CredentialInactive: a revoked or
+// expired API token, a revoked session, device or device key) and a device that is not the
+// token's keep the token of rl.public_auth; valid credentials, the normal flows token_expired and
+// use_dpop_nonce and an error that is not the client's give it back, also when authorize refuses
+// the verified principal of an active credential afterwards.
 func TestIdentifyAndResumeCountFailedCredentials(t *testing.T) {
 	t.Parallel()
 	type tc struct {
 		authErr  error
+		inactive bool
 		deny     bool
 		frame    func(e *env, m map[string]any)
 		wantKept bool
@@ -99,6 +102,7 @@ func TestIdentifyAndResumeCountFailedCredentials(t *testing.T) {
 		"bad proof":       {authErr: &identity.DPoPError{Code: identity.DPoPInvalidProof}, wantKept: true, want: domain.CloseAuthenticationFailed},
 		"session revoked": {authErr: errs.New(errs.CodeSessionRevoked, ""), wantKept: true, want: domain.CloseRevoked},
 		"device mismatch": {frame: func(_ *env, m map[string]any) { m["device_id"] = ids.New() }, wantKept: true, want: domain.CloseAuthenticationFailed},
+		"inactive":        {inactive: true, wantKept: true, want: domain.CloseRevoked},
 		"wrong nonce":     {authErr: &identity.DPoPError{Code: identity.DPoPUseNonce}, want: domain.CloseAuthenticationFailed},
 		"expired":         {authErr: errs.New(errs.CodeTokenExpired, ""), want: domain.CloseTokenExpired},
 		"unavailable":     {authErr: errs.New(errs.CodeUnavailable, ""), want: domain.CloseUnknownError},
@@ -117,6 +121,14 @@ func TestIdentifyAndResumeCountFailedCredentials(t *testing.T) {
 				e := credEnv(t, l)
 				if c.authErr != nil {
 					e.auth.errs[alexToken] = c.authErr
+				}
+				if c.inactive {
+					// The authenticator rejects no revoked or expired credential itself: it marks
+					// the actor, and authorize refuses it.
+					a := e.alex
+					a.CredentialInactive = true
+					e.auth.actors[alexToken] = a
+					e.authz.set(e.alex.ID, authorize.Decision{Outcome: authorize.OutcomeUnauthenticated, Reason: "session_revoked"})
 				}
 				if c.deny {
 					e.authz.set(e.alex.ID, authorize.Decision{Outcome: authorize.OutcomeUnauthenticated, Reason: "principal_inactive"})
@@ -216,6 +228,30 @@ func TestReauthCountsFailedCredentials(t *testing.T) {
 	}
 	if n := len(e.auth.creds); n != checks {
 		t.Fatalf("%d credential checks with an empty bucket", n-checks)
+	}
+}
+
+// TestReauthCountsAnInactiveCredential: a reauth whose credential the authenticator reports
+// inactive without an error (the session was revoked since identify) keeps the token of
+// rl.public_auth, and authorize then closes the connection with 4012.
+func TestReauthCountsAnInactiveCredential(t *testing.T) {
+	t.Parallel()
+	l := &fakeCredentials{tokens: 2}
+	e := credEnv(t, l)
+	conn, fc := e.open()
+	e.sendFrom(conn, "identify", map[string]any{"protocol_version": 1, "access_token": alexToken, "dpop": "proof", "device_id": e.alex.DeviceID})
+	wantOpen(t, fc)
+
+	a := e.alex
+	a.CredentialInactive = true
+	e.auth.mu.Lock()
+	e.auth.actors[alexToken] = a
+	e.auth.mu.Unlock()
+	e.authz.set(e.alex.ID, authorize.Decision{Outcome: authorize.OutcomeUnauthenticated, Reason: "session_revoked"})
+	e.sendFrom(conn, "reauth", map[string]any{"access_token": alexToken, "dpop": "proof"})
+	wantClosed(t, fc, domain.CloseRevoked)
+	if kept, refunded := l.outcome(); kept != 1 || refunded != 1 {
+		t.Fatalf("kept %d and refunded %d tokens, want 1 (the reauth with the inactive credential) and 1 (identify)", kept, refunded)
 	}
 }
 

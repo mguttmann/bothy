@@ -102,7 +102,9 @@ func newSession(a actor.Actor, in Identify) *Session {
 // instance; the errors are the close codes of the table of 04 section 6.4 (note 10). The
 // credential check runs under the failed-credentials rule of 02 9.1 (reserveCredentials): with
 // rl.public_auth of the client address empty it closes with 4008 before any check, and a check
-// that fails (credentialFailed, or a device that is not the token's) keeps the reserved token.
+// that fails (credentialFailed, a device that is not the token's, or a credential the
+// authenticator reports inactive without an error, actor.Actor.CredentialInactive) keeps the
+// reserved token.
 func (g *Gateway) connect(ctx context.Context, accessToken, apiToken, proof string, matches func(actor.Actor) bool) (actor.Actor, error) {
 	settle, wait, ok := g.reserveCredentials(ctx)
 	if !ok {
@@ -117,7 +119,10 @@ func (g *Gateway) connect(ctx context.Context, accessToken, apiToken, proof stri
 		settle(true)
 		return actor.Actor{}, closeWith(domain.CloseAuthenticationFailed)
 	}
-	settle(false)
+	// A revoked or expired API token and a revoked session, device or device key come back without
+	// an error: authorize refuses and audits them below, but for the failed-credentials rule they
+	// are dead credentials like any other, as in the REST chain (httpserver.authenticateSettled).
+	settle(a.CredentialInactive)
 	allowed, retry, err := g.d.Limiter.AllowConnect(a)
 	if err != nil {
 		return actor.Actor{}, closeWith(domain.CloseAuthenticationFailed)

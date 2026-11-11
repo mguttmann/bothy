@@ -1070,9 +1070,11 @@ func (c *stopClock) Stop() {
 // gateway (05 section 3; audit of 2026-11-11, srv-gateway-sync-2) against a started api process
 // whose rl.public_auth holds three tokens for the client address of the test, on a clock that
 // stands still while the test counts, so the bucket never refills: valid credentials cost nothing,
-// every identify with a rejected credential keeps one token, and with the bucket empty identify
-// closes with 4008 and retry_after=<seconds> before any check, even with valid credentials, while
-// reauth on an open connection answers error rate_limited and keeps the connection.
+// every identify with a rejected credential keeps one token, as does the one with the access token
+// of a revoked session, which the authenticator does not reject itself (it marks the credential
+// inactive and authorize closes with 4012), and with the bucket empty identify closes with 4008
+// and retry_after=<seconds> before any check, even with valid credentials, while reauth on an
+// open connection answers error rate_limited and keeps the connection.
 func TestGatewayFailedCredentialsCountPublicAuth(t *testing.T) {
 	t.Parallel()
 	const burst = 3
@@ -1080,14 +1082,18 @@ func TestGatewayFailedCredentialsCountPublicAuth(t *testing.T) {
 	w := newGatewayWorldWith(t, wire.Deps{Clock: clk}, "BOTHY_RATELIMIT__RL__PUBLIC_AUTH__BURST="+strconv.Itoa(burst),
 		"BOTHY_RATELIMIT__RL__GATEWAY_CONNECT__BURST=20")
 	alex, sam := w.newPerson("alex", identity.DeviceStateActive), w.newPerson("sam", identity.DeviceStateActive)
+	robin := w.newPerson("robin", identity.DeviceStateActive)
+	// Revoked in the table, as in TestClose4012RevokedAtIdentify.
+	w.sql(`UPDATE auth_sessions SET revoked_at = now(), revoke_reason = 'admin' WHERE id = $1`, robin.set.Session.ID.String())
 	open, _ := w.ready(t, w.params(sam))
 	clk.Stop()
 	for range burst + 1 {
 		w.ready(t, w.params(alex))
 	}
-	for range burst {
+	for range burst - 1 {
 		w.identifyErr(t, wstest.IdentifyParams{APIToken: "not-a-token"}, 4004)
 	}
+	w.identifyErr(t, w.params(robin), 4012)
 	c := w.dial(t)
 	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()

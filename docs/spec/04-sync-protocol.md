@@ -297,7 +297,8 @@ Every other `error` has no `detail`.
    A failed check of the credentials of `identify`, `resume` or `reauth` consumes one token of
    `rl.public_auth` of the client address, as a failed one of a REST request does
    ([02-architecture.md](02-architecture.md), section 9.1): the token is reserved before the check
-   and given back unless the check fails (`token_expired` and `use_dpop_nonce` do not count).
+   and given back unless the check fails (`token_expired` and `use_dpop_nonce` do not count; a
+   revoked or expired API token and a revoked session, device or device key do).
    While that bucket is empty, `identify` and `resume` close with `4008` before any check, and
    `reauth` answers `error` with `rate_limited` and keeps the connection; both name the wait as
    `retry_after=<seconds>`.

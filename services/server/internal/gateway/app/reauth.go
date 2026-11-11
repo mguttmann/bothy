@@ -17,9 +17,11 @@ import (
 // gateway.connect is authorized (a revoked session closes with 4012). Success takes over the new
 // expiry, so the next reauth_required and the 4011 follow it. reauth consumes nothing of
 // rl.gateway_connect (05 section 3). Its credential check runs under the failed-credentials rule
-// of 02 9.1 like the one of identify (reserveCredentials): a rejected token or proof and a token
-// that is not the session's keep one token of rl.public_auth of the client address, and with that
-// bucket empty reauth answers error rate_limited with retry_after=<seconds> without a check.
+// of 02 9.1 like the one of identify (reserveCredentials): a rejected token or proof, a token that
+// is not the session's and a credential the authenticator reports inactive without an error (the
+// session, device or device key was revoked since identify) keep one token of rl.public_auth of
+// the client address, and with that bucket empty reauth answers error rate_limited with
+// retry_after=<seconds> without a check.
 func (g *Gateway) reauth(ctx context.Context, c *Connection, d any) error {
 	in, ok := d.(Reauth)
 	if !ok {
@@ -44,7 +46,8 @@ func (g *Gateway) reauth(ctx context.Context, c *Connection, d any) error {
 		settle(true)
 		return closeWith(domain.CloseAuthenticationFailed)
 	}
-	settle(false)
+	// An inactive credential counts as failed, as in connect; authorize closes with 4012 below.
+	settle(a.CredentialInactive)
 	if err := g.authorizeConnect(actor.WithActor(ctx, a), a); err != nil {
 		return err
 	}

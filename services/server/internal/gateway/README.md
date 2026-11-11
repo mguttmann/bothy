@@ -67,7 +67,11 @@ connections.
    rule of 02 9.1 (port `CredentialLimiter`, `app/identify.go`): one token of `rl.public_auth` of
    the client address is reserved before the check and kept when it fails (a rejected token or
    proof, a revoked session, a device or session that is not the token's; not `token_expired`,
-   not `use_dpop_nonce`, not an error of identity). While the bucket is empty no check runs:
+   not `use_dpop_nonce`, not an error of identity). A credential the Authenticator reports
+   inactive without an error (`actor.Actor.CredentialInactive`: a revoked or expired API token,
+   a revoked session, device or device key) is a failed check too, although only `authorize`
+   refuses it afterwards; a refusal of `authorize` for an active credential is not. While the
+   bucket is empty no check runs:
    `identify` and `resume` close with `4008` and `retry_after=<seconds>`, `reauth` answers
    `error` with `rate_limited` and the same text as `detail`.
 4. `ready` with the snapshot of `sync` (delivery is registered before the head is read), or

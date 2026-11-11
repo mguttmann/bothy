@@ -605,8 +605,11 @@ every database role that may connect can send on the channel. So the preview bui
 fields only of a message that lies in the thread of the hint: a hint that names a message and no
 thread, or a thread that is not the message's, goes out with its IDs alone. The job follows the
 same rule with the thread and the message of its own arguments.
-A failed read on that node cannot be run again, because a signal is at most once: the hint goes
-out with its IDs, and one log record names the failure without a name or a text.
+A failed read of the preview fields on that node cannot be run again, because a signal is at most
+once: the hint goes out with its IDs, and one log record names the failure without a name or a
+text. That holds for the preview fields only: when the node cannot read the place of the thread
+for the scope of the event, the hint is lost as before, with the log record
+`gateway signal not applied`.
 
 ### 6.4 Preview endpoint and preview token
 
