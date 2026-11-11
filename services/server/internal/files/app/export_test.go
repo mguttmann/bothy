@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/files/domain"
@@ -26,3 +27,11 @@ func VoiceTranscribable(f FileRecord, authorKind string) bool {
 
 // VoiceMIME exposes the refined type the voice checks and the transcriber read.
 func VoiceMIME(f FileRecord) string { return voiceMIME(f) }
+
+// ErrObjectLonger exposes the error of an object that is longer than the size of its row.
+var ErrObjectLonger = errObjectLonger
+
+// LimitObject exposes the reader between an object and a consumer that keeps it in memory.
+func LimitObject(r io.Reader, limit int64, over error) io.Reader {
+	return limitObject(r, limit, over)
+}

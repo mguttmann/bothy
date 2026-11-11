@@ -331,6 +331,26 @@ func metadataPNG(tb testing.TB) ([]byte, []byte) {
 	return cat(joinPNG(chunks), []byte("trailing bytes from example.com")), profile
 }
 
+// profilePNG is in with an iCCP chunk of profileBytes bytes after IHDR: the chunk the PNG filter
+// holds in memory as a whole. The profile data is not a profile; the filter keeps the chunk
+// without reading it.
+func profilePNG(tb testing.TB, in []byte, profileBytes int) []byte {
+	tb.Helper()
+	plain, _ := parsePNG(tb, in)
+	data := []byte("ICC Profile\x00\x00")
+	for b := byte(1); len(data) < profileBytes; b = b*31 + 7 {
+		data = append(data, b)
+	}
+	var chunks []pngPart
+	for _, c := range plain {
+		chunks = append(chunks, c)
+		if c.Type == chunkIHDR {
+			chunks = append(chunks, pngPart{chunkICCP, data})
+		}
+	}
+	return joinPNG(chunks)
+}
+
 // hugePNG is a tiny PNG whose IHDR declares 100000 x 100000 pixels (CRC recomputed).
 func hugePNG(tb testing.TB) []byte {
 	tb.Helper()

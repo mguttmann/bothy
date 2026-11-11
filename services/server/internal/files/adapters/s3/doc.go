@@ -20,7 +20,10 @@
 //     egress.allowed_hosts with allow_private. No redirects, no SDK retries (02 "14.3") and the
 //     time limit http.transfer_timeout. The body of an object is as long as the store announces;
 //     every other answer is at most egress.max_response_bytes
-//     (docs/decisions.d/AUD-srv-files-01.md).
+//     (docs/decisions.d/AUD-srv-files-01.md). A GET with a range yields only the range asked
+//     for: status 206 with a matching Content-Range, anything else is a storage failure. A
+//     caller that keeps an object in memory bounds its read itself
+//     (docs/decisions.d/FIX-S3-READ-BOUND-1111.md).
 //   - Checksums of the SDK follow file.s3.checksum_mode (default when_required); streamed bodies
 //     are signed as UNSIGNED-PAYLOAD, and the own SHA-256 of 12 "3.4" checks the content.
 //   - Every key passes domain.ValidateKey before any request; file.s3.prefix is joined with "/".

@@ -479,11 +479,36 @@ const smallAnswerBytes = 4096
 
 // oversizedError answers every request with status 500 and an S3 error document of twice
 // smallAnswerBytes.
-func oversizedError(w http.ResponseWriter, _ *http.Request) bool {
-	w.Header().Set("Content-Type", "application/xml")
-	w.WriteHeader(http.StatusInternalServerError)
-	_, _ = io.WriteString(w, "<Error><Code>InternalError</Code><Message>"+strings.Repeat("x", 2*smallAnswerBytes)+"</Message></Error>")
-	return true
+func oversizedError(w http.ResponseWriter, r *http.Request) bool {
+	return oversizedErrorWith(http.StatusInternalServerError, "InternalError")(w, r)
+}
+
+// oversizedErrorWith answers every request with status and an S3 error document with code of
+// twice smallAnswerBytes.
+func oversizedErrorWith(status int, code string) func(http.ResponseWriter, *http.Request) bool {
+	return func(w http.ResponseWriter, _ *http.Request) bool {
+		w.Header().Set("Content-Type", "application/xml")
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, "<Error><Code>"+code+"</Code><Message>"+strings.Repeat("x", 2*smallAnswerBytes)+"</Message></Error>")
+		return true
+	}
+}
+
+// rangeAnswer answers every GET with status, the header Content-Range when contentRange is set
+// and body, whatever the request asks for.
+func rangeAnswer(status int, contentRange, body string) func(http.ResponseWriter, *http.Request) bool {
+	return func(w http.ResponseWriter, r *http.Request) bool {
+		if r.Method != http.MethodGet {
+			return false
+		}
+		if contentRange != "" {
+			w.Header().Set("Content-Range", contentRange)
+		}
+		w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, body)
+		return true
+	}
 }
 
 // chunkedObject answers a GET with status 200 and a body in chunks, without Content-Length.
@@ -552,6 +577,97 @@ func TestObjectWithoutLengthRefused(t *testing.T) {
 	}
 	if isSentinel(err) || !strings.Contains(err.Error(), "no length in the answer") {
 		t.Errorf("Get = %v, want a storage failure that says the answer has no length", err)
+	}
+}
+
+// TestRangedGetNeedsTheRangeAskedFor holds the range rule of docs/decisions.d/FIX-S3-READ-BOUND-1111.md:
+// Get with a range hands out a body only for an answer with status 206 whose Content-Range
+// starts at the offset asked for, is no longer than the length asked for and has the length
+// the answer announces. A storage that ignores the range and answers the whole object with
+// status 200, or answers another or a longer range, is a storage failure: the caller would read
+// other bytes than it asked for, and more of them.
+func TestRangedGetNeedsTheRangeAskedFor(t *testing.T) {
+	t.Parallel()
+	const object = "0123456789"
+	asked := app.ByteRange{Offset: 2, Length: 3} // the bytes 2 to 4
+	for _, c := range []struct {
+		name         string
+		status       int
+		contentRange string
+		body         string
+		want         string // "" when Get must refuse the answer
+	}{
+		{"the range asked for", http.StatusPartialContent, "bytes 2-4/10", "234", "234"},
+		{"a range that ends at the last byte of the object", http.StatusPartialContent, "bytes 2-3/4", "23", "23"},
+		{"a range of an object of unknown size", http.StatusPartialContent, "bytes 2-4/*", "234", "234"},
+		{"the whole object with status 200", http.StatusOK, "", object, ""},
+		{"status 200 with a Content-Range", http.StatusOK, "bytes 2-4/10", "234", ""},
+		{"a range from another offset", http.StatusPartialContent, "bytes 0-2/10", "012", ""},
+		{"a range longer than asked for", http.StatusPartialContent, "bytes 2-9/10", "23456789", ""},
+		{"status 206 without a Content-Range", http.StatusPartialContent, "", "234", ""},
+		{"a Content-Range without a range", http.StatusPartialContent, "bytes */10", "234", ""},
+		{"a Content-Range in another unit", http.StatusPartialContent, "items 2-4/10", "234", ""},
+		{"a body longer than its Content-Range", http.StatusPartialContent, "bytes 2-4/10", object, ""},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			e := newFakeEnv(t, rangeAnswer(c.status, c.contentRange, c.body), nil)
+			key := newKey(t)
+			rng := asked
+			rc, err := e.store.Get(t.Context(), key, &rng)
+			if c.want == "" {
+				if err == nil {
+					got, _ := io.ReadAll(rc)
+					_ = rc.Close()
+					t.Fatalf("Get handed out a body of %d bytes for a range of %d", len(got), asked.Length)
+				}
+				if isSentinel(err) || !strings.Contains(err.Error(), "not the range asked for") {
+					t.Errorf("Get = %v, want a storage failure that says the answer is not the range asked for", err)
+				}
+				checkClean(t, c.name, err, "get", key, forbiddenInErrors(e))
+				return
+			}
+			if err != nil {
+				t.Fatalf("Get: %v", err)
+			}
+			got, err := io.ReadAll(rc)
+			_ = rc.Close()
+			if err != nil || string(got) != c.want {
+				t.Errorf("read %q, %v; want %q", got, err, c.want)
+			}
+		})
+	}
+}
+
+// TestOversizedErrorDocumentIsNoSentinel: an error document above egress.max_response_bytes was
+// not read, so its status alone says nothing about the object. Get reports a storage failure
+// with ErrResponseTooLarge, never ErrNotFound or ErrInvalidRange (the document could have said
+// NoSuchBucket).
+func TestOversizedErrorDocumentIsNoSentinel(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name   string
+		status int
+		code   string
+	}{
+		{"status 404", http.StatusNotFound, "NoSuchBucket"},
+		{"status 416", http.StatusRequestedRangeNotSatisfiable, "InvalidRange"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			e := newFakeEnv(t, oversizedErrorWith(c.status, c.code), func(_ *s3.Config, d *s3.Deps) { d.Egress.MaxResponseBytes = smallAnswerBytes })
+			rc, err := e.store.Get(t.Context(), newKey(t), &app.ByteRange{Offset: 0, Length: 5})
+			if err == nil {
+				_ = rc.Close()
+				t.Fatal("Get returned a body")
+			}
+			if !errors.Is(err, egress.ErrResponseTooLarge) || isSentinel(err) {
+				t.Errorf("Get = %v, want ErrResponseTooLarge and no sentinel", err)
+			}
+			if want := "response too large (status " + strconv.Itoa(c.status) + ")"; !strings.Contains(err.Error(), want) {
+				t.Errorf("Get = %v, want the detail %q", err, want)
+			}
+		})
 	}
 }
 

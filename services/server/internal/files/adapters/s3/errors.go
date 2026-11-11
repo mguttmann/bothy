@@ -107,6 +107,9 @@ func fail(op, key string, err error, m mapping) error {
 	code, status := apiStatus(err)
 	e := &opError{op: op, key: key, cause: err, detail: detail(err, code, status)}
 	switch {
+	case errors.Is(err, egress.ErrResponseTooLarge):
+		// The error document was longer than egress.max_response_bytes and not read: its status
+		// alone does not say what failed (a 404 may be NoSuchBucket), so it is no sentinel.
 	case code == "NoSuchBucket":
 		// A missing bucket is a wrong configuration, not a missing object.
 	case m.notFound && (code == "NoSuchKey" || code == "NotFound" || status == 404):
@@ -123,31 +126,40 @@ func fail(op, key string, err error, m mapping) error {
 
 // detail is the text of a failure: the S3 code, the status, or a fixed text for a known cause.
 // Neither code nor status can carry a URL; a code that is not a plain identifier is replaced.
+// An answer above egress.max_response_bytes was not read to its end, so it is named first, with
+// the status it came with.
 func detail(err error, code string, status int) string {
 	var blocked *egress.BlockedError
 	var cred *credentialError
 	switch {
+	case errors.Is(err, egress.ErrResponseTooLarge):
+		return "response too large" + statusSuffix(status)
 	case code != "" && plainCode(code):
-		if status != 0 {
-			return code + " (status " + strconv.Itoa(status) + ")"
-		}
-		return code
+		return code + statusSuffix(status)
 	case status != 0:
 		return "status " + strconv.Itoa(status)
 	case errors.As(err, &blocked):
 		return "blocked by the egress client (" + string(blocked.Reason) + ")"
 	case errors.As(err, &cred):
 		return "credentials: " + cred.Error()
-	case errors.Is(err, egress.ErrResponseTooLarge):
-		return "response too large"
 	case errors.Is(err, errNoObjectLength):
 		return "no length in the answer"
+	case errors.Is(err, errNotTheRange):
+		return "not the range asked for"
 	case errors.Is(err, context.Canceled):
 		return "transport: context canceled"
 	case errors.Is(err, context.DeadlineExceeded):
 		return "transport: deadline exceeded"
 	}
 	return "transport"
+}
+
+// statusSuffix is " (status <n>)" for an answer with a status, else "".
+func statusSuffix(status int) string {
+	if status == 0 {
+		return ""
+	}
+	return " (status " + strconv.Itoa(status) + ")"
 }
 
 // plainCode reports an S3 error code of letters, digits and ".", at most 64 bytes.

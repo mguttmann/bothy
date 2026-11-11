@@ -46,6 +46,11 @@ const (
 // first: the input changed under the job, so the run fails and River retries (design note 3c).
 var errOriginalChanged = errors.New("files: the cleaned original changed between the two passes")
 
+// errObjectLonger reports an object that yields more bytes than the size of its row: the storage
+// answers something else than was stored. It is a read error of the store, so the run fails,
+// River retries, and nothing is written.
+var errObjectLonger = errors.New("files: the object is longer than the stored size")
+
 // ImageConfig holds the configuration of the job files.thumbnail, bound in internal/wire
 // (wire.ImageConfig). Limits are named keys of docs/operations/configuration.md.
 type ImageConfig struct {
@@ -220,9 +225,25 @@ func revision(f FileRecord) (int, error) {
 	return rev, nil
 }
 
-// opener opens key anew for every pass.
-func (p *ImageProcessor) opener(key string) Opener {
-	return func(ctx context.Context) (io.ReadCloser, error) { return p.d.Store.Get(ctx, key, nil) }
+// opener opens key anew for every pass. The codec holds parts of an image in memory (a whole GIF
+// or WebP, the colour profile of a PNG), so every reader ends at size, the stored size of the
+// row of key (files.size_bytes): an object that yields more bytes fails the read with
+// errObjectLonger, whatever length the storage announces.
+func (p *ImageProcessor) opener(key string, size int64) Opener {
+	return func(ctx context.Context) (io.ReadCloser, error) {
+		rc, err := p.d.Store.Get(ctx, key, nil)
+		if err != nil {
+			return nil, err
+		}
+		return sizedObject{Reader: limitObject(rc, size, errObjectLonger), Closer: rc}, nil
+	}
+}
+
+// sizedObject is the body of an object behind its limit: the limited reader and the Close of the
+// object.
+type sizedObject struct {
+	io.Reader
+	io.Closer
 }
 
 // originalPhase is design note 3c for a pending file: it returns the file after T1, or nil when
@@ -240,7 +261,7 @@ func (p *ImageProcessor) originalPhase(ctx context.Context, f FileRecord) (*File
 	if err != nil {
 		return nil, err
 	}
-	c, err := p.d.Codec.CleanOriginal(ctx, plan, p.opener(f.ObjectKey), f.SizeBytes,
+	c, err := p.d.Codec.CleanOriginal(ctx, plan, p.opener(f.ObjectKey, f.SizeBytes), f.SizeBytes,
 		CleanLimits{MaxPixels: p.cfg.MaxPixels, JPEGQuality: p.cfg.JPEGQuality})
 	switch {
 	case err == nil:
@@ -305,7 +326,7 @@ func (p *ImageProcessor) logAttrs(fileID ids.ID, err error) []any {
 // new object; the size comes from the header when it can be read.
 func (p *ImageProcessor) keepOriginal(ctx context.Context, f FileRecord) (*FileRecord, error) {
 	o := StoredOriginal{ObjectKey: f.ObjectKey, SHA256: f.SHA256, SizeBytes: f.SizeBytes, MIMEType: f.MIMEType}
-	if info, err := p.d.Codec.Inspect(ctx, f.MIMEType, p.opener(f.ObjectKey)); err == nil {
+	if info, err := p.d.Codec.Inspect(ctx, f.MIMEType, p.opener(f.ObjectKey, f.SizeBytes), f.SizeBytes); err == nil {
 		o.Width, o.Height = info.Width, info.Height
 	} else if !permanent(err) {
 		return nil, err
@@ -554,7 +575,7 @@ func (p *ImageProcessor) thumbnailPhase(ctx context.Context, f FileRecord) error
 	if len(specs) == 0 {
 		return nil
 	}
-	out, err := p.d.Codec.RenderVariants(ctx, p.opener(f.ObjectKey), RenderSpec{MIMEType: f.MIMEType, Variants: specs,
+	out, err := p.d.Codec.RenderVariants(ctx, p.opener(f.ObjectKey, f.SizeBytes), RenderSpec{MIMEType: f.MIMEType, Variants: specs,
 		JPEGQuality: p.cfg.ThumbnailJPEGQuality, MaxPixels: p.cfg.MaxPixels})
 	if err != nil {
 		if permanent(err) {

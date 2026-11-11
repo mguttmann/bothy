@@ -23,7 +23,9 @@ import (
 // callers answer with 503 unavailable (02 "14.4"); they wrap their cause, name the operation and
 // the key, and never contain object bytes. No operation panics on a failing storage.
 // Implementations are safe for concurrent use. Nothing in the port reads a whole object into
-// memory.
+// memory. The reader of a whole object yields as many bytes as the storage answers: a use case
+// that keeps what it reads in memory bounds the read itself (limitedObject), a use case that
+// streams needs no bound (docs/decisions.d/FIX-S3-READ-BOUND-1111.md).
 type ObjectStore interface {
 	// Put writes the whole object key from exactly size bytes of body. A body that yields fewer
 	// or more bytes, or size < 0, gives ErrSizeMismatch and stores nothing; a cancelled context
@@ -33,7 +35,8 @@ type ObjectStore interface {
 	Put(ctx context.Context, key string, body io.Reader, size int64) error
 
 	// Get opens the object key for reading; rng nil means the whole object, otherwise exactly
-	// one byte range (12 "9.3"). A range whose end lies beyond the object ends at the last byte.
+	// one byte range (12 "9.3"): the reader starts at rng.Offset and never yields more than
+	// rng.Length bytes. A range whose end lies beyond the object ends at the last byte.
 	// Errors: ErrNotFound for a missing object, ErrInvalidRange for a range outside the rules of
 	// ByteRange. The caller closes the reader.
 	Get(ctx context.Context, key string, rng *ByteRange) (io.ReadCloser, error)

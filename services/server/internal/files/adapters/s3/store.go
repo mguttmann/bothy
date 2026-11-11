@@ -186,8 +186,11 @@ func (s *Store) body(op, key string, body io.Reader, size int64) (*exactBody, io
 }
 
 // Get opens the object key, the whole object or one byte range, with GetObject. The reader ends
-// at the length the store announced for the object or range, and http.transfer_timeout bounds
-// the whole read; an answer without a length is a storage failure (answerBodies).
+// at the length the store announced, and http.transfer_timeout bounds the whole read; an answer
+// without a length is a storage failure. With a range the answer must be that range (status 206
+// and a Content-Range that starts at the offset and is no longer than the length asked for),
+// else Get fails with a storage failure and hands out no body (answerBodies). The length of a
+// whole object is whatever the store answers: a caller that keeps it in memory bounds its read.
 func (s *Store) Get(ctx context.Context, key string, rng *app.ByteRange) (io.ReadCloser, error) {
 	name, err := s.name(opGet, key)
 	if err != nil {

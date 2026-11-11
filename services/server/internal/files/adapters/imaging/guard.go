@@ -133,8 +133,14 @@ func checkGIFFrames(info gifInfo, maxPixels int64) error {
 	return nil
 }
 
-// readAll reads the whole original of size bytes into memory (GIF and WebP are decoded and
-// encoded in memory, design note 3c); a longer object is a read error.
+// errOriginalSize reports an original that holds more or fewer bytes than its row says. It is a
+// read error of the store, never an image error: the job retries and stores nothing.
+var errOriginalSize = errors.New("files/imaging: the original has another size than its row")
+
+// readAll reads the whole original of size bytes into memory (GIF and WebP are decoded, encoded
+// and inspected in memory, design note 3c). The row size is the bound of that memory: at most
+// size bytes and one more are read, whatever the store answers, and an object of another length
+// is errOriginalSize.
 func readAll(ctx context.Context, open app.Opener, size int64) ([]byte, error) {
 	var data []byte
 	err := withSource(ctx, open, func(r io.Reader) error {
@@ -144,7 +150,7 @@ func readAll(ctx context.Context, open app.Opener, size int64) ([]byte, error) {
 			return err
 		}
 		if n != size {
-			return errors.New("files/imaging: the original has another size than its row")
+			return errOriginalSize
 		}
 		data = buf.Bytes()
 		return nil

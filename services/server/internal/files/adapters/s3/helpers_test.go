@@ -257,6 +257,10 @@ func (f *fakeS3) serve(w http.ResponseWriter, r *http.Request) {
 			s3Error(w, http.StatusNotFound, "NoSuchKey")
 			return
 		}
+		if rng := r.Header.Get("Range"); rng != "" && r.Method == http.MethodGet {
+			serveRange(w, rng, data)
+			return
+		}
 		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 		w.WriteHeader(http.StatusOK)
 		if r.Method == http.MethodGet {
@@ -270,6 +274,26 @@ func (f *fakeS3) serve(w http.ResponseWriter, r *http.Request) {
 	default:
 		s3Error(w, http.StatusNotImplemented, "NotImplemented")
 	}
+}
+
+// serveRange answers a GET with the header Range "bytes=<first>-<last>" as S3 does: status 206,
+// Content-Range and the bytes of the range, which ends at the last byte of the object; a range
+// that starts beyond the object is InvalidRange with status 416.
+func serveRange(w http.ResponseWriter, rng string, data []byte) {
+	var first, last int
+	if _, err := fmt.Sscanf(rng, "bytes=%d-%d", &first, &last); err != nil || first < 0 || last < first {
+		s3Error(w, http.StatusBadRequest, "InvalidArgument")
+		return
+	}
+	if first >= len(data) {
+		s3Error(w, http.StatusRequestedRangeNotSatisfiable, "InvalidRange")
+		return
+	}
+	last = min(last, len(data)-1)
+	w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", first, last, len(data)))
+	w.Header().Set("Content-Length", strconv.Itoa(last-first+1))
+	w.WriteHeader(http.StatusPartialContent)
+	_, _ = w.Write(data[first : last+1])
 }
 
 // s3Error writes an S3 error document.

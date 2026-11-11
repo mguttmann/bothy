@@ -5,12 +5,16 @@ package images_test
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 
+	"github.com/OWNER/bothy/services/server/internal/files/domain"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
@@ -80,6 +84,75 @@ func testJobCrashBeforeCommit(t *testing.T, e *env) {
 		t.Errorf("objects %v, want %v", got, processedObjects)
 	}
 	checkImageEvents(t, e, u.FileID)
+}
+
+// testObjectLongerThanRow (docs/decisions.d/FIX-S3-READ-BOUND-1111.md): an object that was
+// replaced behind the server by a longer one is not processed. The replacement is a PNG whose
+// colour profile alone is far longer than the row of the file, the part the filter holds in
+// memory; the run reads no more than the stored size, fails with a read error and leaves the
+// row, the events and the objects as they were. River retries, and with the stored object back
+// in place the retry cleans the original as usual.
+func testObjectLongerThanRow(t *testing.T, e *env) {
+	in := encodePNG(t, twoColour(48, 24, colourFirst, colourSecond))
+	longer := profilePNG(t, in, 200_000)
+	u := e.create(t, "replaced.png", "", in)
+	key, err := domain.OriginalKey(ids.MustParse(u.FileID), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(e.s.FilesRoot, key)
+	// The first run finds the longer object. The second run waits until the test has read what
+	// the first one left behind, then finds the stored object again.
+	var runs atomic.Int32
+	retry, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	defer once.Do(func() { close(release) })
+	e.hooks.beforeRun.Store(u.FileID, func(ctx context.Context) error {
+		switch runs.Add(1) {
+		case 1:
+			return os.WriteFile(path, longer, 0o600)
+		case 2:
+			close(retry)
+			select {
+			case <-release:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+			return os.WriteFile(path, in, 0o600)
+		}
+		return nil
+	})
+	defer e.hooks.beforeRun.Delete(u.FileID)
+	e.complete(t, u)
+	waitClosed(t, retry, "the retry of the run that found the longer object")
+	var failure string
+	if err := e.db.QueryRow(t.Context(), `SELECT COALESCE(errors[1]->>'error', '') FROM jobs.river_job
+		WHERE kind = 'files.thumbnail' AND args->>'file_id' = $1`, u.FileID).Scan(&failure); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(failure, "the object is longer than the stored size") {
+		t.Errorf("the first run ended with %q, want the read error of an object longer than its row", failure)
+	}
+	left := e.take(t, u.FileID)
+	if left.row.UploadState != statePending || left.row.revision() != 1 || left.row.SizeBytes != int64(len(in)) || left.thumbs != 0 ||
+		!slices.Equal(left.objects, []string{"orig-1"}) {
+		t.Errorf("the failed run left %+v", left)
+	}
+	for _, ev := range e.events(t, u.FileID) {
+		if ev.Payload.File.UploadState != statePending {
+			t.Errorf("the failed run wrote the event %s", ev.Raw)
+		}
+	}
+	once.Do(func() { close(release) })
+	r := e.waitJobDone(t, u.FileID)
+	if r.UploadState != stateComplete || r.MIMEType != mimePNG {
+		t.Fatalf("row %+v", r)
+	}
+	if stored := checkStored(t, e, r, 2, in); len(stored) > len(in) {
+		t.Errorf("the stored original has %d bytes, more than the upload of %d", len(stored), len(in))
+	}
+	checkSize(t, r, 48, 24)
+	poll(t, "thumbnails after the retry", func() bool { return e.thumbnails(t, u.FileID) == 3 })
 }
 
 // snapshot is what testJobRunTwice compares before and after the wait.
