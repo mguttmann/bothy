@@ -35,7 +35,7 @@ func TestInstallOwnerAccount(t *testing.T) {
 				}
 			}
 			switch s.Kind {
-			case KindRun, KindRunTolerant:
+			case KindRun, KindRunTolerant, KindUntilGone:
 				if !strings.HasPrefix(s.Argv[0], "/usr/bin/") && !strings.HasPrefix(s.Argv[0], "/bin/") {
 					t.Errorf("%s: program outside the fixed list: %v", goos, s.Argv)
 				}

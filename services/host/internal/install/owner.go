@@ -103,10 +103,8 @@ func OwnerAccount(t OwnerTarget) ([]Step, error) {
 	)
 	if t.GOOS == hostos.Darwin {
 		domain := "gui/" + t.UID
-		return append(steps,
-			Step{Kind: KindRunTolerant, Argv: []string{launchctl, "bootout", domain + "/" + hostLabel}},
-			run(launchctl, "bootstrap", domain, def.Path),
-			run(launchctl, "kickstart", "-k", domain+"/"+hostLabel)), nil
+		steps = append(steps, reload(domain, hostLabel, def.Path)...)
+		return append(steps, run(launchctl, "kickstart", "-k", domain+"/"+hostLabel)), nil
 	}
 	return append(steps,
 		run("/usr/bin/systemctl", "--user", "daemon-reload"),

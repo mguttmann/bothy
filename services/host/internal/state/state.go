@@ -9,11 +9,13 @@
 //   - pairing.json: server URL, host_id, instance_id and fingerprint, no private member;
 //   - bindings.json: session user name to person ID (written by M2-45 at the first session);
 //   - declaration.json: the last llm_credentials learned from a ready message;
-//   - admin.sock (Linux and macOS): the admin endpoint of the running service.
+//   - admin.sock (Linux and macOS): the admin endpoint of the running service;
+//   - bothy-host.log and bothy-host.log.1 (macOS and Windows): the log of the host service and
+//     its predecessor, appended by "bothy-host run" where the service manager keeps no output.
 //
 // The name claude_api_key is reserved for the API key of the organization declaration, which
-// M2-45 reads. Every file is written atomically (temporary file in the directory, fsync, rename,
-// fsync of the directory) with mode 0600.
+// M2-45 reads. Every file but the log is written atomically (temporary file in the directory,
+// fsync, rename, fsync of the directory) with mode 0600.
 package state
 
 import (
@@ -39,6 +41,10 @@ const (
 	AdminSocket  = "admin.sock"
 	// ClaudeAPIKeyFile is reserved for the API key of the declaration organization (M2-45).
 	ClaudeAPIKeyFile = "claude_api_key"
+	// LogFile is the log of the host service on macOS and Windows; at its bound its content
+	// moves to LogFileOld and a new file starts (cmd/bothy-host).
+	LogFile    = "bothy-host.log"
+	LogFileOld = "bothy-host.log.1"
 )
 
 // Declarations of hosts.llm_credentials, plus Unknown for a host that never received one.

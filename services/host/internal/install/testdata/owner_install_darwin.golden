@@ -8,5 +8,6 @@ write /<Users>/alex/Library/Application Support/bothy-host/config.yaml 0600 alex
 mkdir /<Users>/alex/Library/LaunchAgents 0755 alex
 write /<Users>/alex/Library/LaunchAgents/bothy-host.plist 0644 alex (1241 bytes)
 run? /bin/launchctl bootout gui/501/bothy-host
+until-gone /bin/launchctl print gui/501/bothy-host
 run /bin/launchctl bootstrap gui/501 /<Users>/alex/Library/LaunchAgents/bothy-host.plist
 run /bin/launchctl kickstart -k gui/501/bothy-host

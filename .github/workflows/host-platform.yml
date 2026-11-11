@@ -50,6 +50,13 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: cd services/host && go test -count=1 ./internal/session/... ./internal/pty/... ./internal/confirm/...
+      # The steps install uses to load a service, twice against the real launchd with a scratch job
+      # of its own label in the domain of the runner user: the second run meets a running job
+      # (AUD-host-01, docs/decisions.d/AUD-host-01.md). The test runs only with -launchd.
+      - name: Load a service over a running one (macOS, runner user)
+        if: ${{ !cancelled() && runner.os == 'macOS' }}
+        shell: bash
+        run: cd services/host && go test -count=1 -run '^TestReloadOverARunningLaunchdJob$' ./internal/install -launchd
       # TestPlatform_TMT25 traces the file opens and local channels of the service user on Linux.
       - name: Install strace (Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' }}

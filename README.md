@@ -93,6 +93,12 @@ Known limits:
 - **Push needs the operator's own accounts.** Push on iOS and macOS needs an Apple developer
   account (APNs key), push on Android a Firebase project
   ([Configuration](docs/operations/configuration.md), [apps/client](apps/client/README.md#push-on-ios-and-macos)).
+- **Terminal only in the owner account mode.** With a separate session user per person, the
+  normal mode of the host service, `bothy-host` refuses to start with `peer_check_unavailable`:
+  no platform has the recorded platform run yet that proves the peer check between the host
+  service and its helpers. Today a terminal runs only in the owner account mode, on the owner's
+  own machine ([24 Terminal](docs/spec/24-terminal.md) 2.2 and 2.4,
+  [services/host](services/host/README.md)).
 - **Tested in daily use at one installation.** The automated tests run on every change; real
   operation so far is one installation.
 

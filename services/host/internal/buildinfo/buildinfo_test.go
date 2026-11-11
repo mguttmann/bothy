@@ -3,6 +3,8 @@
 package buildinfo
 
 import (
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -32,6 +34,20 @@ func TestPeerCheckProven(t *testing.T) {
 	defer func() { PlatformSuite = "" }()
 	if !PeerCheckProven("linux") {
 		t.Error("platform suite build")
+	}
+}
+
+// TestKnownLimitNamesThePeerCheck: while no platform has a proven peer check, a release build
+// gives a terminal only in the owner account mode, and the "Known limits" of the root README say
+// so. The commit that proves a platform changes that text together with the list.
+func TestKnownLimitNamesThePeerCheck(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	named := strings.Contains(string(b), "- **Terminal only in the owner account mode.**") && strings.Contains(string(b), "`peer_check_unavailable`")
+	if proven := len(peerCheckProven) > 0; named == proven {
+		t.Errorf("README.md names the limit: %v; platforms with a proven peer check: %d", named, len(peerCheckProven))
 	}
 }
 

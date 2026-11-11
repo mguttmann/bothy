@@ -29,6 +29,7 @@ import (
 const (
 	KindRun          = "run"           // Argv
 	KindRunTolerant  = "run?"          // Argv; its failure is ignored (unloading what may not be loaded)
+	KindUntilGone    = "until-gone"    // Argv; run again until it fails: the service it looks up is unloaded
 	KindMkdir        = "mkdir"         // Path, Mode, Owner
 	KindWrite        = "write"         // Path, Mode, Owner, Content
 	KindCopy         = "copy"          // Source -> Path, Mode, Owner
@@ -62,7 +63,7 @@ type Step struct {
 // named by its length only.
 func (s Step) String() string {
 	switch s.Kind {
-	case KindRun, KindRunTolerant:
+	case KindRun, KindRunTolerant, KindUntilGone:
 		return s.Kind + " " + strings.Join(s.Argv, " ")
 	case KindMkdir, KindChmod:
 		return fmt.Sprintf("%s %s %04o %s", s.Kind, s.Path, uint32(s.Mode.Perm()), s.Owner)
@@ -236,12 +237,23 @@ const launchctl = "/bin/launchctl"
 
 func run(argv ...string) Step { return Step{Kind: KindRun, Argv: argv} }
 
-// load bootstraps a LaunchDaemon; a label loaded by an earlier install is unloaded first, so a
-// repeated install does not fail.
-func load(label, plist string) []Step {
-	return []Step{{Kind: KindRunTolerant, Argv: []string{launchctl, "bootout", "system/" + label}},
-		run(launchctl, "bootstrap", "system", plist)}
+// reload returns the steps that load the service label from plist into the launchd domain
+// ("system" for a LaunchDaemon, "gui/<uid>" for the LaunchAgent of an account); a label loaded by
+// an earlier install is unloaded first, so a repeated install does not fail. launchctl bootout
+// returns while launchd still ends the job, and until the job is gone a bootstrap of its label
+// fails with exit code 5 and leaves the service unloaded. The plan therefore waits until
+// launchctl print no longer knows the label (it fails at once for a label that was not loaded).
+func reload(domain, label, plist string) []Step {
+	target := domain + "/" + label
+	return []Step{
+		{Kind: KindRunTolerant, Argv: []string{launchctl, "bootout", target}},
+		{Kind: KindUntilGone, Argv: []string{launchctl, "print", target}},
+		run(launchctl, "bootstrap", domain, plist),
+	}
 }
+
+// load bootstraps a LaunchDaemon (reload in the system domain).
+func load(label, plist string) []Step { return reload("system", label, plist) }
 
 func configStep(t Target, users []string) []Step {
 	if t.ConfigExists {

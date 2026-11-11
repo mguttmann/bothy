@@ -101,9 +101,11 @@ func TestInstallPlan_Darwin(t *testing.T) {
 		if s.Kind == KindRun && strings.Contains(strings.Join(s.Argv, " "), "staff") {
 			t.Errorf("a step names staff: %v", s.Argv)
 		}
-		// A label that is loaded already must not make a repeated install fail.
-		if s.Kind == KindRun && len(s.Argv) > 1 && s.Argv[1] == "bootstrap" && (i == 0 || steps[i-1].Kind != KindRunTolerant) {
-			t.Errorf("bootstrap without a tolerant bootout before it: %v", s.Argv)
+		// A label that is loaded already must not make a repeated install fail: it is unloaded
+		// first, and the plan waits until launchd no longer knows it.
+		if s.Kind == KindRun && len(s.Argv) > 1 && s.Argv[1] == "bootstrap" &&
+			(i < 2 || steps[i-2].Kind != KindRunTolerant || steps[i-2].Argv[1] != "bootout" || steps[i-1].Kind != KindUntilGone || steps[i-1].Argv[2] != steps[i-2].Argv[2]) {
+			t.Errorf("bootstrap without a tolerant bootout and the wait for the unload before it: %v", s.Argv)
 		}
 	}
 }
