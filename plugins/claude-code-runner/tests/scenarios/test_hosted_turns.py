@@ -8,17 +8,21 @@ gone after the turn, never an environment; a definition that fails the runner's 
 ``stdio`` server under a token class below ``host``, ends the run with ``tool_class_mismatch``
 before ``run.start``; a run stopped by the cost cap ends ``runtime_error`` with the cause
 ``cost_cap_reached``; channel skills load only in ``host`` turns of both the runner's own agent
-and a hosted agent, and only with ``runner.channel_skills_dir``.
+and a hosted agent, and only with ``runner.channel_skills_dir``. A hosted turn that a crashed
+runner left behind is stopped by the next start and its record removed (26 3.2 item 5).
 """
 
 from __future__ import annotations
 
 import json
+import os
+import signal
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
 import pytest
+from bothy_sdk.testing._patience import PATIENCE
 from hosting_world import HostedBackend, HostingWorld, hosting_world
 
 from claude_code_runner.causes import cause, definition_refused
@@ -36,6 +40,13 @@ logs = scenarios.logs
 @pytest.fixture
 async def world(tmp_path: Path) -> AsyncIterator[HostingWorld]:
     async with hosting_world(tmp_path / "w") as w:
+        yield w
+
+
+@pytest.fixture
+async def real_time_world(tmp_path: Path) -> AsyncIterator[HostingWorld]:
+    # For a runner process of its own, which uses the system clock.
+    async with hosting_world(tmp_path / "w", real_time=True) as w:
         yield w
 
 
@@ -443,3 +454,53 @@ async def test_a_secret_outside_the_agent_s_scope_ends_the_run_without_a_turn(
     assert world.turns() == []
     turns = world.agents_root / f"{backend.agent_id}.control" / "turns"
     assert not turns.exists() or not any(turns.glob("*.mcp.json"))
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+async def test_a_hosted_turn_left_by_a_crashed_runner_is_stopped_at_the_next_start(
+    real_time_world: HostingWorld, logs: LogLines
+) -> None:
+    # Hosted turns are not adopted. The turn of a runner that was killed ran on in its own
+    # process group: nothing followed it or could stop it, it held the thread's lock, and its
+    # record stayed for good. The next start stops it as in 09 18.6 and removes the record.
+    world = real_time_world
+    backend = await _hosted(world, "scoped", None)
+    backend.fake.set_definition(_definition(world, backend.agent_id), announce=False)
+    gate = world.gate("turn_gate")
+    world.scenario(fixture="plain", turn_gate=str(gate))
+    first = world.spawn()
+    await world.until(lambda: bool(_beats(backend)))
+    run = await backend.fake.trigger("Hello")
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    record = world.state / "hosted" / str(backend.agent_id) / "turns" / f"{run.run_id}.json"
+    await world.until(lambda: record.exists() and "pid" in json.loads(record.read_text()))
+    [turn] = world.turns()
+    first.send_signal(signal.SIGKILL)
+    first.wait(PATIENCE)
+    assert _alive(turn["pid"])
+
+    beats = len(_beats(backend))
+    await world.start()
+    await world.until(lambda: not _alive(turn["pid"]))
+    await world.until(lambda: not record.exists())
+    ends = [c for c in world.calls("turn_end") if c["pid"] == turn["pid"]]
+    assert [e.get("signal") for e in ends] == ["SIGINT"]
+    stopped = [m for m in logs.text.splitlines() if '"turn_adopted"' in m]
+    assert [json.loads(m)["action"] for m in stopped] == ["stop"]
+    assert json.loads(stopped[0])["agent_id"] == str(backend.agent_id)
+    # No finish and no second process for the run: the server ends it (interrupted, 09 5.5).
+    await world.until(lambda: len(_beats(backend)) > beats)
+    assert [r for r in backend.fake.requests if r.operation_id == "finishRun"] == []
+    assert len(world.turns()) == 1
+    # The thread's lock went with the turn: the thread's next run is served.
+    backend.fake.set_run_state(run.run_id, "failed", "interrupted")
+    world.scenario(fixture="plain")
+    again = await backend.fake.trigger("Again", thread_id=run.thread_id)
+    assert await _ended(world, backend, again.run_id) == "completed"

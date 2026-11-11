@@ -3603,6 +3603,12 @@ is stopped by the cancellation in the same way; the runner keeps its handle of t
 the group is gone, and if the cancellation itself is interrupted, the record stays for the next
 start (18.9). Adopted turns keep running (18.9).
 
+Addendum of 2026-11-12 (`docs/decisions.d/AUD-plugin-claude-code-runner-01.md`): a stop
+belongs to the process it stops, not to the run. When the runner stopped a process after a
+`result` with an error (18.5) and the run goes on with a compaction and a retry (18.9), a stop
+request, a run the server ended and a further stop after an error apply to the process that runs
+then, as the paragraph above says for every process of a run.
+
 With `runner.turn_handover` (addendum of 2026-11-06, 18.19.4) the group is the keeper's: keeper and
 CLI share it, SIGINT and SIGTERM reach the CLI and its background tasks (the keeper ignores both),
 SIGKILL ends all of them, and the exit code comes from the keeper or from `<launch>.exit`. Without
@@ -3796,6 +3802,16 @@ with its leader; a job of its group that outlives the leader is stopped as in 18
 matched its record after the restart (its group ID is not given to another process while the
 group exists), and is never signalled otherwise. An orderly stop of the runner keeps the records
 of adopted turns for the next start.
+
+Unexpected error of the runner (addendum of 2026-11-12,
+`docs/decisions.d/AUD-plugin-claude-code-runner-01.md`): an error the runner handles nowhere
+while a run has a live turn process, for example a turn record that cannot be written, stops
+that process as in 18.6 before the run ends `failed` with `adapter_error` and the summary that
+names only the error's kind (log code `run_failed_unexpectedly` with the kind); the turn record
+and the run files go once no process of the group is left, and the locks are released. The run
+of an adopted turn ends the same way, finished by the runner itself, because no run loop of the
+SDK holds it, and the runner logs the error with its traceback. At a handover (18.19.3) the turn
+and its record stay for the next runner.
 
 For records written with `runner.turn_handover` (addendum of 2026-11-06, 18.19.6, 18.19.7) the
 adoption follows 18.19: the record carries the run's phase and `process_start`, the adopter
@@ -4251,7 +4267,9 @@ Details the build settled (A1-04, `docs/decisions.d/A1-04.md`):
    slot like a turn, then runs from the agent's definition as in
    [26-builtin-agents.md](26-builtin-agents.md) 5 (A1-05); an agent without a definition ends
    `failed` with `adapter_error` and the cause `definition_missing` without `run.start`. The
-   agent's turn records, sessions, streams and scratch places live in its state folder.
+   agent's turn records, sessions, streams and scratch places live in its state folder. A hosted
+   turn is not adopted after a crash of the runner: the next start stops it and removes its
+   record ([26-builtin-agents.md](26-builtin-agents.md) 3.2 item 5, addendum of 2026-11-12).
 
 ### 18.19 Wake-ups and turn handover
 

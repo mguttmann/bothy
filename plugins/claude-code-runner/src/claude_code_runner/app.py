@@ -110,7 +110,7 @@ from claude_code_runner.heartbeat import (
     raised_minimum,
     runtime_status,
 )
-from claude_code_runner.hosting import HostedAgents, HostingContext
+from claude_code_runner.hosting import HostedAgents, HostingContext, stop_leftover_turns
 from claude_code_runner.launch import KeeperGroup, LaunchFiles, read_json, remove_launch_files
 from claude_code_runner.locks import LockTimeout, SlotPool, acquire, release
 from claude_code_runner.materialize import sweep_turn_files
@@ -579,13 +579,14 @@ class RunnerHandler(AgentHandler):
     async def adopt_turns(self, adapter: Adapter) -> None:
         """Take over or end the turns of the turn records an earlier runner left behind.
 
+        The turns of hosted agents are never taken over: one that still runs is stopped and its
+        record removed (`claude_code_runner.hosting.stop_leftover_turns`).
+
         Args:
             adapter: The built adapter (its client, inbox and outbox).
         """
         turns = self.config.state_dir / "turns"
-        if not turns.is_dir():
-            return
-        for path in sorted(turns.glob("*.json")):
+        for path in sorted(turns.glob("*.json")) if turns.is_dir() else []:
             try:
                 record = json.loads(path.read_text())
                 run_id, thread_id = UUID(record["run_id"]), UUID(record["thread_id"])
@@ -593,6 +594,13 @@ class RunnerHandler(AgentHandler):
                 warn("turn_record_unreadable", record=path.stem)
                 continue
             await self._adopt(adapter, path, record, run_id, thread_id)
+        await stop_leftover_turns(
+            self.config.state_dir,
+            stop_grace=self.config.stop_grace,
+            kill_grace=self.config.kill_grace,
+            poll=self.config.poll_interval,
+            timeout=self.config.cli_probe_timeout,
+        )
 
     async def _adopt(
         self, adapter: Adapter, path: Path, record: dict[str, Any], run_id: UUID, thread_id: UUID
@@ -701,6 +709,10 @@ class RunnerHandler(AgentHandler):
         try:
             with adapter.client.bind_run(run_id, token):
                 await turn.adopted(record, group, known)
+        except Exception:
+            # The turn is stopped and its run ended (`RunTurn.adopted`); this task is the
+            # follow's only caller, so the error is logged here, as the SDK logs an own run's.
+            _LOG.exception("the follow of the adopted run %s failed", run_id)
         finally:
             self.adopted.pop(run_id, None)
             adapter.client.release_run(run_id)
@@ -790,6 +802,9 @@ class RunnerHandler(AgentHandler):
         try:
             with adapter.client.bind_run(run_id, token):
                 await turn.take_over(record, known)
+        except Exception:
+            # As in `_follow_adopted`: `RunTurn.take_over` stopped the turn and ended the run.
+            _LOG.exception("the takeover of the run %s failed", run_id)
         finally:
             self.adopted.pop(run_id, None)
             turn.state.close()  # the locks an adopter took before a launch

@@ -91,6 +91,19 @@ that this chapter names enter `docs/spec/actions.yaml`, `docs/api/openapi.yaml` 
 4. Without `runner.hosted_agents` the runner reads no hosted list, opens no further connection and
    its command line, heartbeat and served channels are byte-equal to the fixtures of the version
    before this stage (section 11, BA-T20).
+5. Hosted turns are not adopted after a crash of the runner; the adoption of 09 18.9 covers the
+   turns of the runner's own agent (addendum of 2026-11-12,
+   `docs/decisions.d/AUD-plugin-claude-code-runner-01.md`). At every start, before the
+   connection of any hosted agent, the runner reads the turn records under
+   `<runner.state_dir>/hosted/<agent_id>/turns/`. A process that still matches its record (the
+   identity check of 09 18.9) is stopped as in 09 18.6 without a finish, and its record is
+   removed once no process of its group is left. A process that does not match counts as gone:
+   its record is removed when the thread and session locks are free, and stays for the next start
+   while one is held (log code `adoption_lock_busy`). The server ends such a run as 09 5.5 says
+   (`interrupted`, or `stale` while nothing serves the agent), so the next message in the thread
+   starts a new run. At an orderly stop the runner stops the connections of all hosted agents
+   together; each stops its turns as in 09 18.6, so the wait does not grow with the number of
+   agents.
 
 ### 3.3 Tokens of hosted agents
 
@@ -305,7 +318,9 @@ the definition:
 | `<control>/turns/<run_id>.mcp.json` | per turn: `mcp.json` with every `secret_ref` resolved within the agent's scope of 5.1 item 3, mode `0600`, deleted when the turn ends and swept at start; a reference out of scope or unreadable ends the run with the cause `mcp_reference_unavailable` and writes no file |
 
 Secret values reach a turn only through the per-turn MCP file, never through the environment of
-the turn and never through a file in the agent folder or in the turn's `TMPDIR` (T-BA-02).
+the turn and never through a file in the agent folder or in the turn's `TMPDIR` (T-BA-02). After a
+crash of the runner the next start sweeps the per-turn files and stops the turns they belonged to
+(3.2 item 5).
 
 ### 5.3 Command line of a hosted turn
 

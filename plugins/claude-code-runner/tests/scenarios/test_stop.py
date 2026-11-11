@@ -185,3 +185,41 @@ async def test_stop_during_restart_precheck_starts_nothing(world: World) -> None
     assert len(world.turns()) == 1  # no compaction process
     assert world.calls("compact") == []
     assert [f["reason"] for f in finishes(world, run.run_id)] == ["user_cancelled"]
+
+
+@pytest.mark.parametrize("handover", [False, True])
+@pytest.mark.parametrize("later", ["compaction", "retry"])
+async def test_stop_reaches_a_process_after_a_stop_after_an_error(
+    world: World, later: str, handover: bool
+) -> None:
+    # A turn fills the context while its background job runs: the CLI keeps the process for the
+    # job after the error result, so the runner stops it after runner.stop_grace (18.5). The
+    # full context is then compacted and the turn tried again (18.9). A stop of the run applies
+    # to the process that runs (18.6), also to these later ones: the stop state of the first
+    # process once stayed set for the whole run, so no later process of it was ever signalled.
+    job = world.gate("background_gate")  # never opened: the job outlives the failed turn
+    first = {
+        "api_error": "context_full",
+        "api_error_after": 1,
+        "background_gate": str(job),
+        "background_survives_eof": True,
+    }
+    index, key = ("1", "compact_gate") if later == "compaction" else ("2", "turn_gate")
+    world.scenario(fixture="happy", per_process={"0": first, index: {key: str(world.gate(key))}})
+    await world.start(world.config(turn_handover=handover))
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    stopped_after_error, *_, waiting = world.turns()
+    assert len(world.turns()) == int(index) + 1
+    assert signal_of(world, stopped_after_error["pid"]) == "SIGINT"
+    await world.fake.cancel(run.run_id, "user_cancelled")
+    assert await world.ended(run.run_id) == "cancelled"
+    assert signal_of(world, waiting["pid"]) == "SIGINT"
+    assert gone(waiting["pgid"])
+    assert len(world.turns()) == int(index) + 1  # nothing started after the stop
+    assert [f["reason"] for f in finishes(world, run.run_id)] == ["user_cancelled"]
+
+
+def signal_of(world: World, pid: int) -> str | None:
+    """The signal that ended the turn process ``pid``; ``None`` while it runs or without one."""
+    return next((c.get("signal") for c in world.calls("turn_end") if c["pid"] == pid), None)

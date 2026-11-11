@@ -24,9 +24,10 @@ from typing import Any
 from uuid import UUID
 
 import pytest
+from bothy_sdk.adapter import unexpected_error_summary
 from bothy_sdk.testing._patience import PATIENCE
 
-from .conftest import LogLines, World
+from .conftest import LogLines, World, fail_turn_records
 
 pytestmark = pytest.mark.anyio
 
@@ -461,3 +462,31 @@ async def test_key_switched_off_with_a_handed_over_turn_refuses_the_start_until_
 
     # Nothing is left: a runner without the key starts.
     await world.start(world.config())
+
+
+async def test_an_unexpected_error_of_the_adopter_stops_the_turn_and_fails_the_run(
+    world: World, logs: LogLines, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The adopter continues the run outside the SDK's run loop, so nothing else ends a run of
+    # it that an unexpected error left: the turn ran on under its keeper with stdin open, its
+    # run stayed running and its record stayed.
+    first, run_id, _ = await job_turn(world, followup_grace="300ms")
+    [turn] = world.turns()
+    assert await hand_over(world, first) == HANDOVER_EXIT
+    runner = await world.start(world.config(turn_handover=True, followup_grace="300ms"))
+    await world.until(lambda: run_id in runner.handler.adopted)
+
+    fail_turn_records(monkeypatch)
+
+    assert await world.ended(run_id) == "failed"
+    assert group_gone(turn["pgid"])  # stopped before the run ended
+    [finish] = finishes(world, run_id)
+    assert finish == {
+        "state": "failed",
+        "reason": "adapter_error",
+        "summary": unexpected_error_summary(OSError()),
+    }
+    await world.until(lambda: run_id not in runner.handler.adopted)
+    assert not record_path(world, run_id).exists()
+    assert '"run_failed_unexpectedly", "error": "OSError"' in logs.text
+    assert f"the takeover of the run {run_id} failed" in logs.text

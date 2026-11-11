@@ -18,10 +18,11 @@ from typing import Any
 from uuid import UUID
 
 import pytest
+from bothy_sdk.adapter import unexpected_error_summary
 from bothy_sdk.testing._patience import PATIENCE
 from bothy_sdk.testing.faults import Fault
 
-from .conftest import LogLines, World
+from .conftest import LogLines, World, fail_turn_records
 from .test_baseline import _amounts, _bind, _run, _usage
 
 pytestmark = pytest.mark.anyio
@@ -355,3 +356,30 @@ async def test_second_crash_during_an_adopted_compaction_keeps_its_kind(world: W
     assert await world.ended(run.run_id) == "failed"
     assert world.fake.run_state(run.run_id).state_reason == "runtime_error"
     assert world.fake.messages == []
+
+
+async def test_an_unexpected_error_while_following_an_adopted_turn_stops_it_and_fails_the_run(
+    world: World, logs: LogLines, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The follow of an adopted turn is a task of the runner, not of the SDK's run loop: after
+    # an unexpected error nothing followed the turn, finished its run or removed its record.
+    run_id, pid, _ = await crashed_turn(world)
+    runner = await world.start()
+    await world.until(lambda: run_id in runner.handler.adopted)
+
+    fail_turn_records(monkeypatch)
+
+    assert await world.ended(run_id) == "failed"
+    assert not alive(pid)  # stopped before the run ended
+    ends = [c for c in world.calls("turn_end") if c["pid"] == pid]
+    assert [e.get("signal") for e in ends] == ["SIGINT"]
+    [finish] = finishes(world, run_id)
+    assert finish == {
+        "state": "failed",
+        "reason": "adapter_error",
+        "summary": unexpected_error_summary(OSError()),
+    }
+    await world.until(lambda: run_id not in runner.handler.adopted)
+    assert not record_path(world, run_id).exists()
+    assert '"run_failed_unexpectedly", "error": "OSError"' in logs.text
+    assert f"the follow of the adopted run {run_id} failed" in logs.text

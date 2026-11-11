@@ -64,7 +64,7 @@ the title once per new session and reports the cost of the run.
 | `processstate.py` | `ProcessState`: every stream-derived value of the stdin and stop rule, and its replay (09 18.19.7) |
 | `handover.py` | The handover at SIGTERM (exit 75) and `stop --turns` (09 18.19.3) |
 | `tests/unit/test_keeper.py`, `test_launch.py`, `test_processstate.py`, `tests/scenarios/test_handover.py`, `test_launch_crash_points.py` | The keeper, the handshake, the replay with the class test over every Fake-Claude stream and checkpoint, AR-T02, AR-T03 and AR-T04 against real runner processes |
-| `tests/hosting_world.py` | The scenario world of a hosting runner: the runner's FakeServer with the hosting operations and one FakeServer per hosted agent |
+| `tests/hosting_world.py`, `tests/hosting_runner.py` | The scenario world of a hosting runner: the runner's FakeServer with the hosting operations and one FakeServer per hosted agent; the hosting runner as a process of its own, for a scenario that kills it |
 
 ## Configuration
 
@@ -328,7 +328,9 @@ model in `system/init` and `modelUsage` without the selector in square brackets.
   after `runner.stop_grace`, SIGKILL after `runner.kill_grace` (log code `stop_escalated`); the
   run finishes `cancelled` with the request's reason only when no process of the group is left,
   without an answer. A run that has not started is never started. A run the server ended
-  (`409 conflict` on a patch, or `401`) has its turn stopped and is not finished.
+  (`409 conflict` on a patch, or `401`) has its turn stopped and is not finished. A stop applies
+  to the process that runs, also after the runner itself stopped an earlier process of the run
+  after an error `result` and went on with a compaction and a retry.
 - **Error paths** (09 18.9): a full context is compacted once (`/compact` as the only input line
   of a process with `--resume`) and the same prompt runs again, with a retry hint in the runner
   prompt when the turn had worked; a missing session is replaced by a new one and reported (with
@@ -337,7 +339,11 @@ model in `system/init` and `modelUsage` without the selector in square brackets.
   was lost and that the next message continues the same session); a CLI too old for the model ends
   `runtime_error` with the required version in the last step and degrades the runner (see the
   operator rules); an error `result` ends `runtime_error` with its texts in the last step. Box notes are run steps of kind `status` with the codes
-  `context_compacted`, `session_missing` and `runtime_error`.
+  `context_compacted`, `session_missing` and `runtime_error`. An error the runner handles nowhere
+  while a turn runs (for example a turn record that cannot be written) stops the turn like a
+  stop, then the run ends `failed` with `adapter_error` and a summary that names only the kind
+  of the error (log code `run_failed_unexpectedly`); the record and the run files go with the
+  turn. The run of an adopted turn ends the same way.
 - **Crash of the runner**: turns keep running in their own process group with stdout and stderr in
   files. At start, before the first inbox event and heartbeat, the runner reads the turn records
   and, after checking the identity of each process (`ps` start time and session reference),
@@ -348,7 +354,8 @@ model in `system/init` and `modelUsage` without the selector in square brackets.
   runner: the stored offset never passes the run's last `result` before the finish, a reply's
   `client_msg_id` is stored before the send, an input counts as answered by its own `uuid`, the
   decided end is stored before the costs, and a process keeps its kind.
-  `tests/unit/test_crash_points.py` enumerates every first and second crash point.
+  `tests/unit/test_crash_points.py` enumerates every first and second crash point. Turns of
+  hosted agents are not adopted: see "What a crash leaves" under "Hosting built-in agents".
 
 ## Turn handover (09 18.19.3 to 18.19.7, AR-03)
 
@@ -535,6 +542,15 @@ and served channels are byte for byte those of the runner before stage A1 (the f
   `run.start` and without a turn (26 5.6 item 4).
 - **Turning it off** takes the hosted agents offline (their runs end like those of any offline
   agent) and leaves the runner's own agent as before (26 11 item 4).
+- **What a crash leaves.** A hosted turn is not adopted (26 3.2 item 5). When the runner process
+  dies without its orderly stop, the turn runs on in its own process group. The next start, with
+  or without `runner.hosted_agents`, reads the records under
+  `<runner.state_dir>/hosted/<agent_id>/turns/` before any hosted connection: a process that
+  still matches its record is stopped like a stop (log line `turn_adopted` with the action
+  `stop` and the agent) and its record removed, the record of a process that is gone is removed
+  once its locks are free, and nothing is finished. The server ends the run (`interrupted`, or
+  `stale` while nothing serves the agent), and the next message in the thread starts a new run.
+  At an orderly stop the connections of all hosted agents are stopped together.
 
 ## Turns of built-in agents (A1-05)
 
@@ -748,6 +764,7 @@ the runner with Fake-Claude against the server of this tree (`services/server/te
 as Lotse with tool class `chat` and the default workspace `website`: a forum post, a mention in
 the main thread answered in the auto thread, a reply that resumes the session, a follow-up
 into the running turn, an answer attachment, a voice message with a local transcriber, cancel
+(also of the retry after a full context whose first process the runner stopped after its error)
 and retry. It needs the Go tool chain and a container runtime (`make adapters-e2e` from the
 repository root).
 
@@ -760,7 +777,8 @@ the agent ends with `definition_missing`). `tests/unit/test_definition.py` runs 
 `tests/agent-definitions` through the runner's own check; `tests/unit/test_materialize.py`,
 `tests/unit/test_hosted_commandline.py`, `tests/unit/test_channel_skills.py` and
 `tests/scenarios/test_hosted_turns.py` hold the folders, the command line, channel skills and
-hosted turns of A1-05.
+hosted turns of A1-05, and the hosted turn a killed runner left behind (`tests/hosting_runner.py`
+is the hosting runner as a process of its own for it).
 
 Every test uses Fake-Claude through `runner.claude_bin` and a fake `HOME`; no installed CLI and
 no login of the developer is touched. The real CLI runs only behind switches:

@@ -10,8 +10,9 @@ and the counter-check of M2-34 (I3 per process). Follow-ups are written to stdin
 open (`RunTurn.offer_followup`); stdin stays open while the process has background work
 (`claude_code_runner.background`), so a follow-up then becomes a turn of its own and the answer
 of a background task's notification is posted. A stop goes through `RunTurn.request_stop`, and a
-run that the server ended stops its turn without a finish. `RunTurn.adopted` follows a turn that
-outlived an earlier runner (design note 12).
+run that the server ended stops its turn without a finish. An error nothing expects stops the
+live process before the run ends ``failed`` with ``adapter_error`` (`RunTurn._on_error`, 18.9).
+`RunTurn.adopted` follows a turn that outlived an earlier runner (design note 12).
 
 A run of a hosted agent (docs/spec/26-builtin-agents.md 5) carries the parts of its command line
 in `RunState` (``hosted``, ``max_budget_usd``); a run stopped by the cost cap ends
@@ -46,7 +47,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 from uuid import UUID, uuid4
 
 import httpx
-from bothy_sdk.adapter import Invocation, RunRefused
+from bothy_sdk.adapter import Invocation, RunRefused, unexpected_error_summary
 from bothy_sdk.context import render_context
 from bothy_sdk.errors import (
     ConflictError,
@@ -493,6 +494,7 @@ class RunTurn:
         self._replayed_worked = False
         """The replay of an adopted process found such a message before the handover point."""
         self.stopping: asyncio.Task[None] | None = None
+        """The stop of the current process once one began (reset with `ProcessState`)."""
         self.adopted_group: StoppableGroup | None = None
         self.adopted_record: dict[str, Any] | None = None
         self._identity: dict[str, str] = {}
@@ -546,6 +548,9 @@ class RunTurn:
             await self._drive(_Attempt(resume=self.session.resume), precheck=False)
         except asyncio.CancelledError:
             await self._on_cancelled()
+            raise
+        except Exception as exc:
+            await self._on_error(exc)
             raise
         finally:
             self._end()
@@ -671,6 +676,43 @@ class RunTurn:
 
     def _handing_over(self) -> bool:
         return bool(getattr(self.h, "handing_over", False))
+
+    async def _on_error(self, exc: Exception) -> bool:
+        """An unexpected error ends the run: stop its live turn as in 18.6, then fail it once.
+
+        Nothing follows the turn once the run left this runner, and its stop hook no longer
+        finds it, so the process never outlives the error: an own process is ended like at a
+        cancellation, an adopted group only when its identity still matches. The run then ends
+        ``failed`` with ``adapter_error`` and the summary of the SDK that names only the kind
+        of the error (09 18.9); the SDK's run loop does the same for an own run and finds it
+        finished, while a run this runner continues outside that loop (`take_over`, `adopted`)
+        has no other finish. The caller raises the error again and removes the record and the
+        run files once no process is left. At a handover the turn and its record stay for the
+        next runner, as at a cancellation.
+
+        Args:
+            exc: The error (logged by its kind only: its message may hold a path).
+
+        Returns:
+            True once the turn is stopped and the run ended; False at a handover.
+        """
+        if self.handed_over or self._handing_over():
+            return False
+        _warn("run_failed_unexpectedly", error=type(exc).__name__, **self.ids)
+        process = self.process
+        if process is not None:
+            await terminate(
+                process, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval, self.ids
+            )
+            self.process = None
+        elif self.adopted_group is not None and _group_runs(self.adopted_group):
+            await self._stop(self.adopted_group)
+        if not self.server_ended:  # a run the server ended is not finished (D-M2-35-6)
+            with contextlib.suppress(ProblemError, httpx.TransportError):
+                await self.handle.finish(
+                    "failed", reason="adapter_error", summary=unexpected_error_summary(exc)
+                )
+        return True
 
     def _end(self) -> None:
         """The run left this runner: remove its record and files once no process is left."""
@@ -1250,6 +1292,10 @@ class RunTurn:
         """The per-process state of a new turn process (`ProcessState`, 09 18.19.7)."""
         self.ps = ProcessState(has_stdin=True, outage=outage)
         self._held_logged = False
+        # The stop of an earlier process of the run is not the stop of this one: a stop request,
+        # a run the server ended and the stop after an error apply to the process that runs
+        # (18.6), so each process starts without one.
+        self.stopping = None
 
     def _lost_work(self) -> int:
         """The background tasks a process ended with after a failed turn; their steps end."""
@@ -2441,6 +2487,9 @@ class RunTurn:
         except asyncio.CancelledError:
             await self._on_cancelled()
             raise
+        except Exception as exc:
+            await self._on_error(exc)
+            raise
         finally:
             self._end()
 
@@ -2772,6 +2821,10 @@ class RunTurn:
                 await self.h.runtime_too_old(end.required_version)
             await self._end_adopted(end.outcome, end.errors)
             done = True
+        except Exception as exc:
+            # Stopped and ended: nothing is left to adopt, so the record goes too.
+            done = await self._on_error(exc)
+            raise
         finally:
             # An orderly stop of this runner keeps the record for the next start (D-M2-35-20).
             if done:

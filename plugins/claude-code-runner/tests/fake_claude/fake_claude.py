@@ -16,7 +16,8 @@ environment of a turn drops every control variable. Commands:
   ``system/init``, echoes the first stdin line with ``isReplay``, plays the fixture, emits the
   ``result`` and exits after stdin EOF. SIGINT ends it with ``error_during_execution``.
   With ``background_gate`` the turn starts a background job that runs until the test creates
-  the gate file, and the process stays between turns meanwhile (`Fake.background_phase`).
+  the gate file, and the process stays between turns meanwhile (`Fake.background_phase`);
+  together with ``api_error`` the turn fails after it started the job.
   With ``lost_notifications`` the turn first plays the resume after lost background work
   (`Fake.lost_work_turns`).
   ``{{tmpdir}}`` and ``{{add_dir}}`` in a fixture, in ``result_override`` or in
@@ -279,6 +280,13 @@ class Fake:
         if "gate_after_lines" not in self.scenario:
             self.gate("turn_gate")
         if error:
+            if self.scenario.get("background_gate"):
+                # The turn started a background job before the API refused its request: the
+                # error result comes while the job runs and the process stays for it, with
+                # ``background_survives_eof`` also after the end of stdin (`background_phase`).
+                self.start_background()
+                self.emit_api_error(_meta(str(error))["error_text"])
+                return self.background_phase(lines, 0, 1)
             return self.api_error(_meta(str(error))["error_text"], lines)
         if self.scenario.get("hold"):
             self.sleep(600.0)

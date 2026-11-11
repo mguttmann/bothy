@@ -8,10 +8,12 @@ its own and the FakeServer clock follows the real time.
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 from uuid import UUID
 
 import pytest
+from bothy_sdk.adapter import unexpected_error_summary
 from bothy_sdk.testing._patience import PATIENCE
 
 from claude_code_runner.heartbeat import (
@@ -21,7 +23,7 @@ from claude_code_runner.heartbeat import (
 )
 from claude_code_runner.recovery import RETRY_HINT
 
-from .conftest import World
+from .conftest import LogLines, World, fail_turn_records
 
 pytestmark = pytest.mark.anyio
 
@@ -298,3 +300,47 @@ async def test_cli_too_old_for_the_model_degrades_until_updated(world: World) ->
     )
     late = await world.fake.trigger("Once more", channel_id=world.forum_a)
     assert await world.ended(late.run_id) == "completed"
+
+
+def group_gone(pgid: int) -> bool:
+    try:
+        os.killpg(pgid, 0)
+    except (ProcessLookupError, PermissionError):
+        return True  # macOS answers EPERM for a group whose only member is a zombie
+    return False
+
+
+async def test_an_unexpected_error_stops_the_turn_before_the_run_fails(
+    world: World, logs: LogLines, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # An error the runner expects nowhere ends the run failed with adapter_error (18.9). The
+    # turn must end with it: it once ran on with nobody following it, out of reach of a stop,
+    # and kept its record and the thread's lock.
+    gate = world.gate("turn_gate")
+    world.scenario(fixture="plain", turn_gate=str(gate))
+    await world.start()
+    run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    [turn] = world.turns()
+    record = world.state / "turns" / f"{run.run_id}.json"
+    assert record.exists()
+
+    fail_turn_records(monkeypatch)
+
+    assert await world.ended(run.run_id) == "failed"
+    assert group_gone(turn["pid"])  # stopped before the run ended
+    assert [c.get("signal") for c in world.calls("turn_end")] == ["SIGINT"]
+    [finish] = finishes(world, run.run_id)
+    assert finish == {
+        "state": "failed",
+        "reason": "adapter_error",
+        "summary": unexpected_error_summary(OSError()),
+    }
+    await world.until(lambda: not record.exists())
+    logged = [json.loads(m) for m in logs.text.splitlines() if '"run_failed_unexpectedly"' in m]
+    assert [(m["error"], m["run_id"]) for m in logged] == [("OSError", str(run.run_id))]
+    # The thread's lock went with the turn: the thread's next run is served.
+    monkeypatch.undo()
+    world.scenario(fixture="plain")
+    again = await world.fake.trigger("Again", thread_id=run.thread_id)
+    assert await world.ended(again.run_id) == "completed"

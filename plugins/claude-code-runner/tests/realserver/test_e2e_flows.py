@@ -233,6 +233,45 @@ async def test_cancel_stops_the_turn(world: RealWorld) -> None:
     assert await _agent_messages(real, first.thread_id) == []
 
 
+async def test_cancel_reaches_the_retry_after_a_stop_after_an_error(world: RealWorld) -> None:
+    # A turn fills the context while its background job runs: the runner stops that process
+    # after the error result, compacts and tries the turn again (09 18.5, 18.9). A cancel
+    # applies to the process that runs (18.6); the stop of the first process once stayed set
+    # for the whole run, so the retry was never signalled and worked on to its own end.
+    real = world.real
+    job = world.gate("background_gate")  # never opened: the job outlives the failed turn
+    first = {
+        "api_error": "context_full",
+        "api_error_after": 1,
+        "background_gate": str(job),
+        "background_survives_eof": True,
+    }
+    gate = world.gate("turn_gate")
+    world.scenario(fixture="happy", per_process={"0": first, "2": {"turn_gate": str(gate)}})
+    await world.start()
+    run = await real.trigger("Fix the form @lotse")
+
+    async def waiting() -> bool:
+        return len(world.calls("gate_wait")) == 1
+
+    await _until("the retry at its gate", waiting)
+    stopped_after_error, _compaction, retry = world.turns()
+    _ok(await real.call("cancelRun", path={"run_id": run.run_id}, body={"reason": "e2e"}), 202)
+
+    def signal_of(pid: int) -> str | None:
+        return next((c.get("signal") for c in world.calls("turn_end") if c["pid"] == pid), None)
+
+    async def signalled() -> bool:
+        return signal_of(retry["pid"]) == "SIGINT"
+
+    await _until("SIGINT at the retry", signalled)
+    assert signal_of(stopped_after_error["pid"]) == "SIGINT"
+    view = await _ended(real, run.run_id)
+    assert (view.state, view.state_reason) == ("cancelled", "user_cancelled")
+    assert len(world.turns()) == 3  # nothing started after the stop
+    assert await _agent_messages(real, run.thread_id) == []
+
+
 async def test_retry_of_a_failed_run(world: RealWorld) -> None:
     real = world.real
     world.scenario(fixture="error_result")
