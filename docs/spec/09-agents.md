@@ -1511,7 +1511,12 @@ new, unprocessed requests.
 Confirmation to the person: `trigger_state = followup_delivered` at `delivered`, and the box
 shows per follow-up "waiting", "handed over", "absorbed" or "comes in the next run". A
 follow-up to a run in `waiting_input` is the answer to the open question: the adapter
-hands it over and restarts the run with the follow-up's token (`run.start`, 5.1).
+hands it over and restarts the run with the follow-up's token (`run.start`, 5.1). The adapter
+acknowledges such an answer like every other follow-up: `delivered` when it handed the answer to
+the runtime, `absorbed` once the runtime took it. An answer it did not hand over stays `queued`
+and falls under the table above. Without the acknowledgement the end of the run would defer an
+answer the turn took already and start a follow-on run with the same text (addendum of
+2026-11-11, AUD-plugin-hermes-adapter-01).
 
 Control commands (section 10.1) are never follow-ups.
 
@@ -2607,7 +2612,7 @@ pin follows upstream main, the newest release is older than the pin (D-HERMES-PI
 | `_send_exec_approval_prompt(prompt)` | approval card per 11.5, `custom_id` = `appr:<id>:<choice>` |
 | `send_slash_confirm(...)` | card "Once", "Always", "Cancel", `custom_id` = `sc:<choice>:<id>` |
 | `send_model_picker`, `send_choice_picker` | selection component; missing from the base class in `v2026.9.24` and `v0.22.5` (Hermes then falls back to text, which arrives as `send`) |
-| Interaction (`interaction.created`) | the SDK resumes the run with the interaction's token; the adapter passes the callback ID to the Hermes resolver exactly once per prompt (a stored record of resolved IDs, so a redelivery resolves nothing) and answers with `interaction.respond` (`acknowledged`, the chosen label as `response.text`). No `component.update` after an interaction: the server disables the other single-use components of the card in the same transaction (11.3). Every card is a message `kind = card` of the run with `single_use` components, followed by `run.await_input` with the question's first line as status line |
+| Interaction (`interaction.created`) | the SDK resumes the run with the interaction's token; the adapter passes the callback ID to the Hermes resolver exactly once per prompt (a stored record of resolved IDs, so a redelivery resolves nothing) and answers with `interaction.respond` (`acknowledged`, the chosen label as `response.text`). No `component.update` after an interaction: the server disables the other single-use components of the card in the same transaction (11.3). Every card is a message `kind = card` of the run with `single_use` components, followed by `run.await_input` with the question's first line as status line. The SDK ends a resumed run `completed`, without usage, as soon as the adapter's handler of the answer (an interaction or a follow-up, 17.5) returns while the run neither ended nor waits; that handler therefore returns only after the run's own `run.finish` went out or the run waits for its next card, so the title, `costs` and the hold of 17.12 are those of the run's own end (addendum of 2026-11-11, AUD-HA1/1) |
 | `on_processing_start(event)` | no operation (the start is already `run.start`) |
 | Plugin hooks `pre_llm_call` and `on_session_end` | the start and the end of a turn of the thread, also of a turn Hermes starts by itself (17.12); `pre_llm_call` also answers with the turn's user side (17.6) |
 | Plugin hook `pre_tool_call` | refuses every tool call of a session of the platform whose thread has no open run of the adapter, and of a session whose thread cannot be told, with a message that names the reason (17.12, R-AG-44) |
@@ -2697,6 +2702,19 @@ false`, because Hermes would otherwise post notices of its own for steered or qu
 with `busy_mode_invalid` and no follow-up feature. Reason: `interrupt` redirects a
 running turn; that contradicts the contract that a follow-up adds to the run.
 
+The answer to an open card (a follow-up to a run in `waiting_input`, section 7 and 11.6; addendum
+of 2026-11-11, AUD-HA1/2): a clarify gets the text; an approval is denied and a slash
+confirmation cancelled, because a text is no approval, and at `steer` the text reaches the still
+blocked turn first. What Hermes took is acknowledged like a steered follow-up, `delivered` at the
+handover and `absorbed` when the turn completed (when the run completed, for a card of a turn of
+the hold of 17.12): the text that resolved a clarify, and the text steered in front of a refused
+prompt. An answer Hermes did not take stays `queued`, and the
+follow-on run of section 7 takes it: at `queue` the text to an approval or a confirmation (no
+follow-up enters a turn at `queue`), and an answer no prompt of Hermes waited for any more. An
+answer with an attachment only releases the card: its text answers a clarify (an empty text, as
+of a voice message, is Hermes' form of no answer), nothing of it is steered and it is not
+acknowledged, so the follow-on run takes the whole message with its files (17.6).
+
 ### 17.6 Flow of an invocation
 
 ```mermaid
@@ -2782,7 +2800,8 @@ is delivered with `file.transcript.submit` (`If-Match` from `file.get`; a refusa
 changes nothing else). Without a transcript Hermes' own note (the voice message could not be
 transcribed, or speech to text is off, with the cached audio path) goes before the person's
 text, as on its other platforms. Attachments of context messages and of follow-ups are not
-transcribed. The adapter reports `voice_input` while Hermes' speech to text is on and finds a
+transcribed; a follow-up with audio waits for the follow-on run, which transcribes it as its
+triggering message (below). The adapter reports `voice_input` while Hermes' speech to text is on and finds a
 provider (`stt.enabled`, `stt.provider`, read at connect and at every heartbeat).
 
 Other attachments (FIX-hermes-inbound-images): after `run.start` and before the turn, every
@@ -2814,10 +2833,14 @@ Hermes' own limit for incoming media (`gateway.max_inbound_media_bytes`, nothing
 Hermes refused the bytes (an image that is none), or the server did not hand it out. A message
 with attachments and no text is never an empty message: its text is Hermes' Discord wording
 `(The user sent a message with no text content)`. Attachments of context messages are not
-passed on; they stay lines of the context. A follow-up with an attachment that is not `audio/*`
-is not steered into the running turn (Hermes steers text only and gives a message with media a
-turn of its own): it stays `queued`, and the follow-on run of section 7 takes it as its
-triggering message with its files.
+passed on; they stay lines of the context. A follow-up with an attachment of any type, audio
+too, is not passed into a turn of the running run, neither steered nor started as a turn of its
+own while the run holds work (Hermes steers text only and gives a message with media a turn of
+its own, and a voice message has no text at all): it stays `queued`, and the follow-on run of
+section 7 takes it as its triggering message with its files and transcribes its audio as above.
+Until 2026-11-11 a follow-up with audio was steered as its bare text, so a voice message reached
+the turn empty and was acknowledged, and no run carried what the person said (AUD-HA1/3). As the
+answer to an open card such a message only releases the card (17.5).
 
 Elements with `already_delivered` stay in the context with that mark in their header: the
 session holds a steered follow-up only as bare text without author or trust mark, and before
@@ -3016,7 +3039,10 @@ work of the runner (18.5) for Hermes:
    the slot ends on every path (addendum of 2026-11-06, FIX-hermes-result-turn-end).
 4. The run finishes when no unit is open, no turn of the thread runs, and, after the run saw
    background work, `hermes_adapter.background_settle` passed without a turn's start, status
-   sentence or answer; a run that saw none finishes at once, as before. A turn of point 3 that
+   sentence or answer; a run that saw none finishes at once, as before. The answer to a card of
+   one of the run's turns, a click or a typed follow-up, resumes the run and never ends it: the
+   run finishes by this rule alone, also when the card came before the work or during the hold
+   (17.3, AUD-HA1/1). A turn of point 3 that
    failed (it ended without `on_session_end`, or `on_session_end` reports it failed or
    interrupted) ends the run `failed` (`runtime_error`) once `hermes_adapter.background_settle`
    passed after it, so Hermes' error text, which arrives after the turn, is a message of the run;
@@ -3026,14 +3052,16 @@ work of the runner (18.5) for Hermes:
    its answer, or at `queue`, 17.5) once the run holds work, is a turn of its own in the run, one
    after the other: the person's text, the format rules and channel instructions on the user side
    (the run context rode the first turn), `delivered` at its start and `absorbed` when it
-   completed; a failed one ends the run `failed` (`runtime_error`). A follow-up with a file stays
-   `queued` for the follow-on run (17.6), and so does every follow-up of a run without background
-   work, as before.
+   completed; a failed one ends the run `failed` (`runtime_error`). A follow-up with a file, a
+   voice message too, stays `queued` for the follow-on run (17.6), and so does every follow-up of
+   a run without background work, as before.
 6. Stop (section 8) interrupts the thread's turn, interrupts the session's live delegation units
    (`interrupt_for_session`) and kills its running processes with their output consumed, so no
    turn follows a killed process. Every other end before the work is done (a failed turn, an
    abort of 17.8 or of a card) does the same, and the open steps end `cancelled` (after a stop the
-   server takes no patch of the run any more, section 8).
+   server takes no patch of the run any more, section 8). A run that the answer to a card resumed
+   is stopped the same way, during its turn and during the hold, and ends `cancelled` only after
+   its turn is interrupted and its work stopped (AUD-HA1/6).
 7. No tool runs in a thread without an open run: the plugin hook `pre_tool_call` refuses every
    tool call of a session of the platform whose thread has no open run of the adapter, and of a
    session whose thread cannot be told (17.3). This covers the turn Hermes starts after a stop, a

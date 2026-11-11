@@ -245,6 +245,8 @@ class _Turn:
     dropped: bool = False
     interrupted: bool = False
     settled: asyncio.Event = field(default_factory=asyncio.Event)
+    # Set once a stop of the run interrupted its turn and cancelled its work (`_abandon`).
+    abandoned: asyncio.Event = field(default_factory=asyncio.Event)
     ended: bool = False
     # Background work of the run (09 17.12, R-AG-44): the run's start in wall time (the registry
     # filter), whether the first turn ended and the run holds work, the Hermes turns of the run
@@ -592,6 +594,11 @@ class HermesHandler(AgentHandler):
         self._by_run[run.run_id] = turn
         try:
             await self._run_turn(inv, turn)
+            if turn.dropped:
+                # The stop reached the handler of a card answer, the SDK's task of the run since
+                # the resume: that handler ends the run ``cancelled`` once the work is stopped.
+                # Returning before it would let the SDK end the run ``completed`` (AUD-HA1/6).
+                await turn.abandoned.wait()
         except asyncio.CancelledError:
             await self._abandon(turn)
             raise
@@ -799,9 +806,7 @@ class HermesHandler(AgentHandler):
         await self._flush_edits(turn)
         await self._report_session(turn, switched)
         if outcome is TurnOutcome.COMPLETED and turn.abort_reason is None:
-            for message_id in turn.steered:
-                with contextlib.suppress(ValueError):
-                    handle.patch.followup_absorbed(message_id)
+            self._absorb(turn)
             # The run covers the work its turn left running (09 17.12, R-AG-44).
             await self._hold(turn)
             if turn.failed_turn or turn.failed_result:
@@ -826,11 +831,19 @@ class HermesHandler(AgentHandler):
             await handle.finish("failed", reason=turn.abort_reason, metrics=metrics, costs=costs)
             return
         if outcome is TurnOutcome.COMPLETED:
+            self._absorb(turn)  # the answer to a card of a turn the hold ran
             if turn.session_mode == "new":
                 await self._set_title(turn)
             await handle.finish("completed", metrics=metrics, costs=costs)
             return
         await handle.finish("failed", reason="runtime_error", metrics=metrics, costs=costs)
+
+    @staticmethod
+    def _absorb(turn: _Turn) -> None:
+        """Report every follow-up the run's turns took ``absorbed``; a repeat changes nothing."""
+        for message_id in turn.steered:
+            with contextlib.suppress(ValueError):
+                turn.handle.patch.followup_absorbed(message_id)
 
     # ---- background work of the run (09 17.12, R-AG-44) -------------------------------------
 
@@ -846,7 +859,6 @@ class HermesHandler(AgentHandler):
         """
         settings = self.settings
         turn.held = True
-        turn.settled.set()
         turn.last_progress = time.monotonic()
         while not (turn.dropped or turn.abort_reason is not None or turn.failed_turn):
             open_work = await self._poll_work(turn)
@@ -1321,6 +1333,7 @@ class HermesHandler(AgentHandler):
             await self._cancel_work(turn)
         finally:
             self._stopped(turn)
+            turn.abandoned.set()
 
     async def _interrupt(self, turn: _Turn) -> None:
         if turn.interrupted:
@@ -1367,20 +1380,18 @@ class HermesHandler(AgentHandler):
             # The answer to the open card, in both modes: the SDK resumed the run already.
             card = turn.card
             await self._disable_card(turn)
-            text = await self._followup_text(run, message_id)
-            if text is not None and await self.store.claim(_claim_key(turn.run_id, card)):
-                if card.request.kind is not CardKind.CLARIFY:
-                    # Not an approval: the text reaches the still blocked turn first, then the
-                    # prompt is refused, so the turn takes the text before it goes on.
-                    await self._into_turn(turn, text, message_id)
-                await self.runtime.answer_card(card, text)
+            message = await self._followup_message(run, message_id)
+            if message is not None and await self.store.claim(_claim_key(turn.run_id, card)):
+                await self._answer_card(turn, card, message)
             await self._until_settled(turn)
             return
         message = await self._followup_message(run, message_id)
-        if message is None or _has_media(message):
-            # Hermes steers text only and queues a message with media as a turn of its own; left
-            # undelivered, the server's follow-on run takes it as its triggering message, whose
-            # files reach Hermes as media (09 7; D-FIX-HIMG-3).
+        if message is None or message.attachments:
+            # Hermes steers text only and queues a message with media as a turn of its own, and
+            # the audio of a follow-up is not transcribed (a voice message has no text at all).
+            # Left undelivered, the server's follow-on run takes it as its triggering message,
+            # whose files reach Hermes as media and whose audio is transcribed (09 7, 17.6;
+            # D-FIX-HIMG-3, AUD-HA1/3).
             return
         if turn.held:
             # The run holds background work: the follow-up is a turn of its own (09 17.12).
@@ -1416,18 +1427,37 @@ class HermesHandler(AgentHandler):
         await self.runtime.steer(turn.thread_id, text, message_id)
         return True
 
-    async def _followup_text(self, run: RunHandle, message_id: UUID) -> str | None:
-        """The text of a follow-up: its message read with the run's token (``message.read``).
+    async def _answer_card(self, turn: _Turn, card: OpenCard, message: Message) -> None:
+        """Answer the open card with a typed follow-up and acknowledge what Hermes took (09 7).
 
-        The run context holds the messages before the triggering message only (09 4.6
-        ``thread_context``), never a follow-up, which comes after it; transcripts of follow-ups
-        are not made (17.6). A message the server refuses passes nothing.
+        A clarify gets the text; any other prompt is refused, because a text is no approval, and
+        at ``steer`` the text reaches the still blocked turn first, so the turn takes it before
+        it goes on. A text Hermes took is ``delivered`` now and ``absorbed`` when the turn
+        completed, like a steered follow-up: left ``queued``, the server would start a follow-on
+        run with the same text at the end of the run. An answer Hermes did not take (at ``queue``
+        to a prompt that is refused, or when nothing waited for it) stays ``queued`` for that
+        run, and so does one with a file: its text still answers the card, nothing of it is
+        steered, and the follow-on run takes the whole message (17.6).
         """
-        message = await self._followup_message(run, message_id)
-        return None if message is None else _content(message)
+        text = _content(message)
+        whole = not message.attachments
+        if card.request.kind is CardKind.CLARIFY:
+            answered = await self.runtime.answer_card(card, text)
+            taken = whole and answered is not None
+        else:
+            taken = whole and await self._into_turn(turn, text, message.id)
+            await self.runtime.answer_card(card, text)
+        if taken:
+            with contextlib.suppress(ValueError):
+                turn.handle.patch.followup_delivered(message.id)
+            turn.steered.append(message.id)
 
     async def _followup_message(self, run: RunHandle, message_id: UUID) -> Message | None:
-        """A follow-up message read with the run's token, or ``None`` when the server refuses."""
+        """A follow-up message read with the run's token, or ``None`` when the server refuses.
+
+        The run context holds the messages before the triggering message only (09 4.6
+        ``thread_context``), never a follow-up, which comes after it.
+        """
         try:
             message = await run.client.call_as(
                 Message, get_message.asyncio_detailed, message_id=message_id
@@ -1510,12 +1540,16 @@ class HermesHandler(AgentHandler):
             _LOG.info("run %s: interaction answer refused code=%s", run.run_id, exc.code)
 
     async def _until_settled(self, turn: _Turn) -> None:
-        """Wait until the turn ended or waits again, so the SDK does not end the run early.
+        """Wait until the run's ``execute`` returned or the run waits for a card again.
 
-        While the run holds background work the run's ``execute`` keeps it open, so nothing waits.
+        The SDK ends a resumed run ``completed``, without metrics and costs, as soon as the
+        handler of the answer returns while the run neither ended nor waits (the end of handler
+        work in `bothy_sdk.adapter`). So this returns only after ``execute`` sent the run's own
+        end, with usage, costs and title: not when the turn ended (its end follows), and not
+        while the run holds background work (09 17.3, 17.12; R-AG-44, AUD-HA1/1).
         """
         turn.settled.clear()
-        if turn.ended or turn.held or turn.card is not None:
+        if self._by_run.get(turn.run_id) is not turn or turn.card is not None:
             return
         try:
             await turn.settled.wait()
@@ -2080,11 +2114,6 @@ def _utcnow() -> datetime:
 
 def _content(message: Message) -> str:
     return message.content_md if isinstance(message.content_md, str) else ""
-
-
-def _has_media(message: Message) -> bool:
-    """Whether a message carries a file Hermes takes as media (every type but ``audio/*``)."""
-    return any(not str(a.file.mime_type).startswith("audio/") for a in message.attachments)
 
 
 def _log_task_failure(task: asyncio.Task[Any]) -> None:

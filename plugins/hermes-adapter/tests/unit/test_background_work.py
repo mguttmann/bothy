@@ -21,6 +21,8 @@ from adapter_kit import FakeRuntime, Rig, rig
 from bothy_hermes_adapter.runtime import (
     BackgroundKind,
     BackgroundTask,
+    CardKind,
+    CardRequest,
     TurnOutcome,
     TurnRequest,
     Usage,
@@ -260,6 +262,161 @@ async def test_followup_while_held_is_a_turn_of_its_own(tmp_path: Path) -> None:
         ("About: How far is the team?", str(triggered.run_id)),
     ]
     assert r.fake.run_state(triggered.run_id).state == "completed"
+
+
+async def test_voice_followup_while_held_gets_no_turn_of_its_own(tmp_path: Path) -> None:
+    """A voice message has no text: no empty turn, and it stays for the follow-on run.
+
+    Follow-ups are not transcribed (09 17.6); the follow-on run takes the message as its
+    triggering message and transcribes it there (AUD-HA1/3).
+    """
+    rt = FakeRuntime(script=_starting(TEAM))
+    async with rig(tmp_path, runtime=rt, **FAST) as r:
+        triggered = await r.fake.trigger()
+        await r.until(lambda: _steps(r, triggered.run_id, "subagent"), "the subagent step")
+        await r.until(lambda: r.fake.messages, "the first answer")
+        audio = r.fake.add_file(b"\x00\x00\x00\x1cftypM4A ", name="note.m4a", mime="audio/mp4")
+        voice = await r.fake.deliver_followup(triggered.run_id, "", files=[audio])
+        typed = await r.fake.deliver_followup(triggered.run_id, "How far is the team?")
+        await r.until(
+            lambda: r.fake.followup_state(triggered.run_id, typed) == "absorbed",
+            "the absorbed text follow-up",
+        )
+        rt.finish_background(triggered.thread_id, "deleg_1")
+        await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
+        assert r.fake.followup_state(triggered.run_id, voice) == "queued"
+    assert [t.user_text for t in rt.turns[1:]] == ["How far is the team?"]
+
+
+async def test_run_of_an_answered_card_holds_its_background_work(tmp_path: Path) -> None:
+    """A card answered by a click, then a delegation: the run stays open (AUD-HA1/1).
+
+    The SDK ends a resumed run as soon as the handler of the click returns, so that handler
+    waits for the run's own end, also while the run holds background work (09 17.12).
+    """
+    question = CardRequest(CardKind.CLARIFY, "c1", "Which lake?", ("North", "South"))
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        assert await rt.events.on_card(turn.thread_id, question)
+        lake = await rt.answers.get()
+        rt.background[turn.thread_id] = [TEAM]
+        rt.events.on_usage(turn.thread_id, Usage("anthropic", "model-small", 11, 7))
+        await rt.events.on_answer(turn.thread_id, f"Started a team at {lake}.", None)
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt, **FAST) as r:
+        r.fake.enable_costs()
+        triggered = await r.fake.trigger()
+        await r.until(lambda: r.fake.run_state(triggered.run_id).state == "waiting_input")
+        await r.fake.click(triggered.run_id, "cl:c1:0")
+        await r.until(lambda: _steps(r, triggered.run_id, "subagent"), "the subagent step")
+        for _ in range(10):
+            await r.fake.pass_time(0.05)
+            await asyncio.sleep(0.02)
+        assert r.fake.run_state(triggered.run_id).state == "running"
+        assert r.requests("finishRun") == []
+        assert r.handler.tool_allowed(triggered.thread_id) is True
+        rt.finish_background(triggered.thread_id, "deleg_1")
+        await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
+    assert r.fake.run_state(triggered.run_id).state == "completed"
+    [finish] = [q.json for q in r.requests("finishRun")]
+    assert finish["metrics"]["tokens_in"] == 11
+    assert [c["tokens_out"] for c in finish["costs"]] == [7]
+    assert [s["status"] for s in _steps(r, triggered.run_id, "subagent")] == ["completed"]
+
+
+class _SlowStop(FakeRuntime):
+    """Stops the work as the platform may: in a worker thread, longer than a poll of the hold."""
+
+    async def cancel_background(self, thread_id: UUID) -> None:
+        await asyncio.sleep(0.2)
+        await super().cancel_background(thread_id)
+
+
+@pytest.mark.parametrize("held", [True, False])
+async def test_stop_of_a_run_resumed_by_a_card_answer_ends_it_cancelled(
+    tmp_path: Path, held: bool
+) -> None:
+    """The stop of a run that a card answer resumed: ``cancelled``, its work stopped.
+
+    Since the resume the SDK's task of the run is the handler of the answer, so the stop reaches
+    that handler. ``execute`` must not return before that handler ended the run, or the SDK
+    would end the run ``completed`` (AUD-HA1/6): while the run holds work, and while its turn
+    still runs.
+    """
+    question = CardRequest(CardKind.CLARIFY, "c3", "Which lake?", ("North", "South"))
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        assert await rt.events.on_card(turn.thread_id, question)
+        await rt.answers.get()
+        if held:
+            rt.background[turn.thread_id] = [TEAM]
+            await rt.events.on_answer(turn.thread_id, "Started a team.", None)
+            return TurnOutcome.COMPLETED
+        await rt.events.on_answer(turn.thread_id, "Working on it.", None)
+        await rt.stop_event(turn.thread_id).wait()
+        return TurnOutcome.CANCELLED
+
+    rt = _SlowStop(script=script)
+    async with rig(tmp_path, runtime=rt, **FAST) as r:
+        triggered = await r.fake.trigger()
+        await r.until(lambda: r.fake.run_state(triggered.run_id).state == "waiting_input")
+        await r.fake.click(triggered.run_id, "cl:c3:0")
+        await r.until(lambda: len(r.fake.messages) == 2, "the answer after the card")
+        if held:
+            await r.until(lambda: _steps(r, triggered.run_id, "subagent"), "the subagent step")
+        await r.fake.cancel(triggered.run_id)
+        await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
+        assert r.handler.tool_allowed(triggered.thread_id) is False
+    view = r.fake.run_state(triggered.run_id)
+    assert (view.state, view.state_reason) == ("cancelled", "user_cancelled")
+    assert [q.json["state"] for q in r.requests("finishRun")] == ["cancelled"]
+    assert rt.cancelled_background == [triggered.thread_id]
+    assert rt.interrupted == [triggered.thread_id]
+
+
+@pytest.mark.parametrize("answer", ["click", "text"])
+async def test_card_of_a_followup_turn_keeps_the_held_run_open(tmp_path: Path, answer: str) -> None:
+    """A card a turn shows while the run holds work: its answer does not end the run.
+
+    A typed answer the turn took is ``absorbed`` at the end of the run (AUD-HA1/2).
+    """
+    question = CardRequest(CardKind.CLARIFY, "c2", "Which lake?", ("North", "South"))
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        if len(rt.turns) == 1:
+            rt.background[turn.thread_id] = [TEAM]
+            await rt.events.on_answer(turn.thread_id, "Started a team.", str(turn.message_id))
+            return TurnOutcome.COMPLETED
+        assert await rt.events.on_card(turn.thread_id, question)
+        lake = await rt.answers.get()
+        await rt.events.on_answer(turn.thread_id, f"The team counts at {lake}.", None)
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt, **FAST) as r:
+        triggered = await r.fake.trigger()
+        await r.until(lambda: _steps(r, triggered.run_id, "subagent"), "the subagent step")
+        await r.fake.deliver_followup(triggered.run_id, "Which lake is it?")
+        await r.until(lambda: r.fake.run_state(triggered.run_id).state == "waiting_input")
+        typed = None
+        if answer == "click":
+            await r.fake.click(triggered.run_id, "cl:c2:1")
+        else:
+            typed = await r.fake.deliver_followup(triggered.run_id, "South")
+        await r.until(lambda: len(r.fake.messages) == 3, "the answer after the card")
+        for _ in range(10):
+            await r.fake.pass_time(0.05)
+            await asyncio.sleep(0.02)
+        assert r.fake.run_state(triggered.run_id).state == "running"
+        rt.finish_background(triggered.thread_id, "deleg_1")
+        await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
+        if typed is not None:
+            assert r.fake.followup_state(triggered.run_id, typed) == "absorbed"
+    assert r.fake.run_state(triggered.run_id).state == "completed"
+    assert len(r.requests("finishRun")) == 1
+    assert r.fake.messages[-1]["content_md"] == "The team counts at South."
 
 
 async def test_followup_after_the_answer_gets_a_turn_while_the_run_holds(tmp_path: Path) -> None:

@@ -90,6 +90,65 @@ async def test_delegation_keeps_the_run_and_its_result_turn_runs_inside(
         assert len(_steps(rig, triggered.run_id, "tool_call")) >= 2
 
 
+async def test_clicked_card_then_delegation_keeps_the_run_and_ends_with_costs(
+    world: HermesWorld,
+) -> None:
+    """A card answered by a click, then a delegation: the run holds the work (AUD-HA1/1).
+
+    The SDK ends a resumed run ``completed`` without costs as soon as the handler of the click
+    returns, so that handler waits for the run's own end; the platform reads Hermes' registries
+    in a worker thread, which gave the SDK that chance before.
+    """
+    clarify = {
+        "name": "clarify",
+        "arguments": {"questions": [{"question": "Which lake?", "choices": ["North", "South"]}]},
+    }
+    script = [
+        BoundTurn(tool_calls=(clarify,), requires_tool="delegate_task"),
+        BoundTurn(tool_calls=(DELEGATE,), requires_tool="delegate_task"),
+        BoundTurn(text=(STARTED,), paced=True, requires_tool="delegate_task"),
+        BoundTurn(text=("Seven boats.",), hold="child", without_tool="delegate_task"),
+        BoundTurn(tool_calls=(TODO,), requires_tool="delegate_task"),
+        BoundTurn(text=(RESULT,), paced=True, requires_tool="delegate_task"),
+    ]
+    profile = Profile(toolsets=("todo", "delegation", "clarify"))
+    async with hermes_rig(world, script, profile=profile, tool_class="host") as rig:
+        fake = rig.fake
+        fake.enable_costs()
+        triggered = await fake.trigger("Count the boats with a team.", session_mode="new")
+        run_id = triggered.run_id
+        try:
+            await rig.until(lambda: fake.run_state(run_id).state == "waiting_input", "the card")
+            card = next(m for m in fake.messages if m["kind"] == "card")
+            assert await fake.click(run_id, card["components"][0]["custom_id"]) is not None
+            await rig.until(
+                lambda: any(m["content_md"] == STARTED for m in fake.messages), "the first answer"
+            )
+            await asyncio.to_thread(rig.model.wait_held, "child")
+            await rig.until(
+                lambda: _steps(rig, run_id, "subagent") or rig.finished(run_id),
+                "the subagent step",
+            )
+        except AssertionError:
+            raise AssertionError(gateway_log(rig)) from None
+        # The click resumed the run and its turn has ended; the subagent works: the run stays.
+        assert fake.run_state(run_id).state == "running", gateway_log(rig)
+        assert rig.requests("finishRun") == []
+        rig.model.release("child")
+        try:
+            await rig.until(lambda: rig.finished(run_id), "the end of the run")
+        except AssertionError:
+            raise AssertionError(gateway_log(rig)) from None
+        assert fake.run_state(run_id).state == "completed", gateway_log(rig)
+        [finish] = [q.json for q in rig.requests("finishRun")]
+        assert finish["state"] == "completed"
+        assert finish["costs"]
+        assert finish["metrics"]["tokens_in"] > 0
+        texts = [(m["content_md"], m["run_id"]) for m in fake.messages if m["kind"] == "text"]
+        assert texts == [(STARTED, str(run_id)), (RESULT, str(run_id))], gateway_log(rig)
+        assert [s["status"] for s in _steps(rig, run_id, "subagent")] == ["completed"]
+
+
 async def test_stop_interrupts_the_delegation_and_no_tool_runs_without_a_run(
     world: HermesWorld,
 ) -> None:

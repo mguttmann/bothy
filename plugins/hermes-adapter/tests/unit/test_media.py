@@ -439,15 +439,24 @@ async def test_file_hermes_refuses_to_cache_reaches_hermes_as_a_note(tmp_path: P
         assert "could not be read" in turn.user_text
 
 
-@pytest.mark.parametrize("text", ["", "and this one"])
-async def test_followup_with_an_image_is_left_to_the_follow_on_run(
-    tmp_path: Path, text: str
+_SHOT = (b"\xff\xd8\xff\xe0 a pasted screenshot", "shot.jpg", "image/jpeg")
+_VOICE = (b"\x00\x00\x00\x1cftypM4A a voice note", "note.m4a", "audio/mp4")
+
+
+@pytest.mark.parametrize(
+    ("text", "file"),
+    [("", _SHOT), ("and this one", _SHOT), ("", _VOICE), ("listen to this", _VOICE)],
+)
+async def test_followup_with_a_file_is_left_to_the_follow_on_run(
+    tmp_path: Path, text: str, file: tuple[bytes, str, str]
 ) -> None:
-    """A follow-up with a file is never steered as bare text (D-FIX-HIMG-3).
+    """A follow-up with a file is never steered as bare text (D-FIX-HIMG-3, AUD-HA1/3).
 
     Hermes steers text only and queues a message with media as a turn of its own; here the
     follow-up stays ``queued`` so the server's follow-on run takes it as its triggering message,
-    where its file reaches Hermes as media. A text follow-up after it is still steered.
+    where its file reaches Hermes as media and its audio is transcribed. A voice message has no
+    text at all: steered, it reached the turn empty and was acknowledged, so no run carried what
+    the person said. A text follow-up after it is still steered.
     """
 
     async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
@@ -460,17 +469,16 @@ async def test_followup_with_an_image_is_left_to_the_follow_on_run(
     async with rig(tmp_path, runtime=rt, busy_mode="steer") as r:
         triggered = await r.fake.trigger("first")
         await r.until(lambda: r.fake.messages)
-        fid = r.fake.add_file(
-            b"\xff\xd8\xff\xe0 a pasted screenshot", name="shot.jpg", mime="image/jpeg"
-        )
-        image = await r.fake.deliver_followup(triggered.run_id, text, files=[fid])
+        data, name, mime = file
+        fid = r.fake.add_file(data, name=name, mime=mime)
+        with_file = await r.fake.deliver_followup(triggered.run_id, text, files=[fid])
         plain = await r.fake.deliver_followup(triggered.run_id, "only text")
         await r.until(lambda: any(m == plain for _, _, m in rt.steered), "the text follow-up")
         rt.stop_event(triggered.thread_id).set()
         await r.until(lambda: r.finished(triggered.run_id))
         assert [m for _, _, m in rt.steered] == [plain]
         assert r.fake.followup_state(triggered.run_id, plain) == "absorbed"
-        assert r.fake.followup_state(triggered.run_id, image) == "queued"
+        assert r.fake.followup_state(triggered.run_id, with_file) == "queued"
 
 
 # ---- text attachments inline (FIX-hermes-text-attachment-inline) ------------------------------
