@@ -513,7 +513,7 @@ StatsSectionData errorsSection(StatsTexts t, api.StatsSeries errors) {
     final names = b.metrics.keys.toList()..sort();
     for (final (i, name) in names.indexed) {
       final v = b.metrics[name]!;
-      final isRate = name.contains('_rate');
+      final isRate = vizIsRate(name);
       final text = isRate ? t.rate(v) : t.count(v);
       cells.add([
         VizCell(when, sortBy: b.start.microsecondsSinceEpoch),

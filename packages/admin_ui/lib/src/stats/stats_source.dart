@@ -10,6 +10,7 @@
 library;
 
 import 'package:api_client/api_client.dart' as api;
+import 'package:bothy_viz/bothy_viz.dart' show vizRequiredCurrencies;
 
 import '../data/access_repository.dart' show adminCall;
 import '../data/self_repository.dart' show SelfActionFailed;
@@ -271,15 +272,8 @@ final class ApiAdminStatsSource implements AdminStatsSource {
 List<String> requiredCurrencies(Object error) {
   if (error is! SelfActionFailed) return const [];
   final problem = error.problem;
-  if (problem == null) return const [];
-  final field = problem.errors
-      .where((e) => e.code == 'currency_required')
-      .firstOrNull;
-  if (field == null) return const [];
-  final text = field.detail ?? problem.detail ?? '';
-  return <String>{
-    for (final m in RegExp(r'\b[A-Z]{3}\b').allMatches(text)) m.group(0)!,
-  }.toList();
+  // The executive page reads the same refusal: one rule for both ([vizRequiredCurrencies]).
+  return problem == null ? const [] : vizRequiredCurrencies(problem);
 }
 
 /// The metrics of [bucket] as a plain map.

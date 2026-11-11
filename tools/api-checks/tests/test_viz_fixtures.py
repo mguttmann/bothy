@@ -15,6 +15,7 @@ from typing import Any
 import api_checks
 import pytest
 import viz_fixtures
+import yaml
 
 REPO = Path(__file__).resolve().parents[3]
 
@@ -145,6 +146,89 @@ def test_schema_change_makes_the_real_fixture_fail(tree: Path) -> None:
         "StatsBackendReport.normal.json",
         "StatsBackendReport.rate_limits.json",
     }
+
+
+def test_rate_outside_the_share_scale_fails(tree: Path) -> None:
+    """The server sends rates as shares from 0 to 1 (`failed per ended runs`), never as percent."""
+
+    def change(data: dict[str, Any]) -> None:
+        data["buckets"][0]["metrics"]["run_failure_rate"] = 16.0
+
+    rewrite(fixture(tree, "StatsSeries.errors.normal.json"), change)
+    assert viz_fixtures.check(tree) == [
+        "viz-fixtures: content: StatsSeries.errors.normal.json:"
+        " /buckets/0/metrics/run_failure_rate: 16.0 is no share between 0 and 1"
+    ]
+
+
+def test_metric_name_the_operation_does_not_list_fails(tree: Path) -> None:
+    """`getErrorStats` names the push rate per provider, so a name without one is none of its."""
+
+    def change(data: dict[str, Any]) -> None:
+        metrics = data["buckets"][0]["metrics"]
+        metrics["push_failure_rate"] = metrics.pop("push_failure_rate_apns")
+
+    rewrite(fixture(tree, "StatsSeries.errors.normal.json"), change)
+    assert viz_fixtures.check(tree) == [
+        "viz-fixtures: content: StatsSeries.errors.normal.json:"
+        " /buckets/0/metrics/push_failure_rate:"
+        " not a metric of getErrorStats in docs/api/openapi.yaml"
+    ]
+
+
+def test_active_people_in_a_day_bucket_fails(tree: Path) -> None:
+    """`getUsageStats` counts people only per week or month."""
+
+    def change(data: dict[str, Any]) -> None:
+        data["buckets"][0]["metrics"]["active_people"] = 9.0
+        data["buckets"][1]["below_min_group"] = ["active_people"]
+
+    rewrite(fixture(tree, "StatsSeries.usage.normal.json"), change)
+    assert viz_fixtures.check(tree) == [
+        "viz-fixtures: content: StatsSeries.usage.normal.json: /buckets/0/metrics/active_people:"
+        " only with granularity week or month, not day",
+        "viz-fixtures: content: StatsSeries.usage.normal.json: /buckets/1/below_min_group/0:"
+        " only with granularity week or month, not day",
+    ]
+
+
+def test_week_fixture_carries_the_people_metric() -> None:
+    week = json.loads(fixture(REPO, "StatsSeries.usage.week.json").read_text(encoding="utf-8"))
+    assert week["granularity"] == "week"
+    assert any("active_people" in b["metrics"] for b in week["buckets"])
+    assert any("active_people" in b.get("below_min_group", []) for b in week["buckets"])
+
+
+def test_metric_names_come_from_the_description_of_the_operation() -> None:
+    """A part in angle brackets stands for any code; a count by a code is no rate."""
+    document = yaml.safe_load((REPO / viz_fixtures.OPENAPI_PATH).read_text(encoding="utf-8"))
+    runs = viz_fixtures.metric_names(document, "getRunStats")
+    assert runs.fullmatch("duration_ms_p95")
+    assert runs.fullmatch("failed_reason_rate_limited")
+    assert runs.fullmatch("failed_reason_") is None
+    errors = viz_fixtures.metric_names(document, "getErrorStats")
+    assert errors.fullmatch("push_failure_rate_apns")
+    assert errors.fullmatch("push_failure_rate") is None
+    with pytest.raises(ValueError, match="no operation getNothing"):
+        viz_fixtures.metric_names(document, "getNothing")
+
+
+def test_count_by_a_code_that_reads_like_a_rate_is_no_rate(tree: Path) -> None:
+    def change(data: dict[str, Any]) -> None:
+        data["buckets"][0]["metrics"]["failed_reason_rate_limited"] = 3.0
+
+    rewrite(fixture(tree, "StatsSeries.runs.normal.json"), change)
+    assert viz_fixtures.check(tree) == []
+
+
+def test_series_without_a_query_in_its_name_has_no_content_rule(tree: Path) -> None:
+    """`StatsSeries.empty.json` serves every query; a metric in it has no operation to check."""
+
+    def change(data: dict[str, Any]) -> None:
+        data["buckets"].append({"start": "2026-10-09T00:00:00.000Z", "metrics": {"anything": 3.0}})
+
+    rewrite(fixture(tree, "StatsSeries.empty.json"), change)
+    assert viz_fixtures.check(tree) == []
 
 
 def test_rule_runs_through_the_cli(tree: Path, capsys: pytest.CaptureFixture[str]) -> None:

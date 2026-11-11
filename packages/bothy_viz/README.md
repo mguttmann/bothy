@@ -66,7 +66,7 @@ sources (M6-16).
 | `LiveTopologyView` (6.1) | `LiveFrameSource` (without one: `getStatsLive` once) | lanes per space and channel, run cards, rates of the last minute, stale and "More runs than shown"; a card tap calls `onOpenThread` |
 | `BackendView` (6.2) | `getStatsBackends`, the `agents` of every live frame | configured and reported mode with "Reported: ...", supported modes, switches, I2 and I3 denials, costs per mode, rate-limit state |
 | `DeliveryView` (6.3) | `LiveFrameSource`, `getStatsTimeline` for the history | instance scope only; in a space scope "Only for the owner" without calling a source |
-| `ExecutiveView` (6.4) | `getUsageStats`, `getRunStats`, `getErrorStats`, `getCostStats`, `getStatsSlo` | `forbidden` of the traffic light shows "Only for the owner", of the costs leaves them out; `ExecutiveTileGroups` is reused by A7 |
+| `ExecutiveView` (6.4) | `getUsageStats` (in hours, and in weeks for the active people), `getRunStats`, `getErrorStats`, `getCostStats`, `getStatsSlo` | asks in hours on whole UTC hours (`executiveRange`) and names that period; counts are sums over it, levels (rates in percent, percentiles, the active people of the week) carry "Since: ..."; `forbidden` of the traffic light shows "Only for the owner", of the costs leaves them out; costs in several currencies show the first one with a note; `ExecutiveTileGroups` is reused by A7 |
 | `TimelineView` (6.5) | `getStatsTimeline` once | plays locally with `TimelinePlayback` at `viz.timeline_speeds`; the playhead starts at the end |
 | `TvMode` (6.6) | the views it rotates | overlay, dark, `comfortable`, one font step larger, no controls, `viz.tv_rotation_interval`, costs only with `viz.tv_show_costs`, any key or click ends it |
 

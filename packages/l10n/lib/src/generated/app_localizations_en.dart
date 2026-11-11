@@ -565,6 +565,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vizTileSame => 'same as the previous period';
 
   @override
+  String vizTileSince(String start) {
+    return 'Since: $start';
+  }
+
+  @override
   String get vizNotShown => 'not shown';
 
   @override

@@ -749,6 +749,16 @@
   "@vizTileSame": {
     "description": "Comparison of a metric tile with the previous period when the value did not change (components.md section 11)."
   },
+  "vizTileSince": "Since: {start}",
+  "@vizTileSince": {
+    "description": "Note of a metric tile of the executive page whose value is the level of the latest bucket and no sum over the period of the page (a rate, a percentile, the active people of a week): the start of that bucket as day and time (25 section 6.4).",
+    "placeholders": {
+      "start": {
+        "type": "String",
+        "example": "Today, 10:00 AM"
+      }
+    }
+  },
   "vizNotShown": "not shown",
   "@vizNotShown": {
     "description": "Screen reader text for a value the server did not deliver (no permission); never read as zero (25 section 4 rule 5)."

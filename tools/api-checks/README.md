@@ -141,10 +141,20 @@ schema before its first dot, and the schema is resolved with its references insi
 document and checked with the JSON Schema 2020-12 validator `jsonschema` of the pinned tools
 environment (it comes with the pinned `check-jsonschema`). Sub-checks: `schema` (no such schema),
 `valid` (no JSON, or the first schema error with its JSON pointer), `readme` (a file missing from
-the table "Fixtures" of the fixtures README, or a row without a file) and `coverage` (a listed
-schema without a file). A schema change without adjusted fixtures therefore fails the gate; the
-tests in `tests/test_viz_fixtures.py` prove it on a copy of `openapi.yaml` with an added required
-member.
+the table "Fixtures" of the fixtures README, or a row without a file), `coverage` (a listed
+schema without a file) and `content`. A schema change without adjusted fixtures therefore fails
+the gate; the tests in `tests/test_viz_fixtures.py` prove it on a copy of `openapi.yaml` with an
+added required member.
+
+`content` covers what the schema leaves open: `StatsBucket.metrics` is a map of any name to a
+number, and the names and scales stand only in the description of each operation. For a
+`StatsSeries.<query>.<state>.json` with the query `usage`, `runs` or `errors` the rule reads the
+description of `getUsageStats`, `getRunStats` or `getErrorStats` and fails on a metric name it
+does not list in backticks (a part in angle brackets such as `<provider>` stands for any code), on
+a rate (`<what>_rate`, `push_failure_rate_<provider>`) outside 0 to 1, because the server sends
+shares and never percent, and on `active_people` in a series that is not in weeks or months. It checks the
+fixtures against the contract, not against a running server: a fixture can still hold values the
+server would not compute from real rows.
 
 ## Rule `gdpr-export` (20 5.2, M7-06)
 

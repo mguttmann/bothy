@@ -4,6 +4,7 @@ import 'package:api_client/api_client.dart' as api;
 import 'package:bothy_viz/bothy_viz.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:l10n/l10n.dart';
 
 import 'support/views.dart';
 
@@ -174,6 +175,45 @@ void main() {
     await _pumpHistory(tester, world);
     expect(find.text('No finished runs yet.'), findsOneWidget);
     expect(find.text('Load more runs'), findsNothing);
+  });
+
+  testWidgets('a failed "Load more runs" keeps the loaded runs, the filter and '
+      'the table switch, says why and can be asked again', (tester) async {
+    final world = ViewWorld();
+    await _pumpHistory(tester, world);
+    world.queries.failOn['runHistory'] = const api.ApiProblem(
+      status: 429,
+      code: 'rate_limited',
+    );
+    await tester.ensureVisible(find.text('Load more runs'));
+    await tester.tap(find.text('Load more runs'));
+    await settleWorld(tester, world);
+    final refusal = problemText(
+      lookupAppLocalizations(const Locale('en')),
+      'rate_limited',
+    );
+    expect(find.text(refusal), findsOneWidget);
+    expect(find.text('backend / Payment integration'), findsOneWidget);
+    expect(find.byKey(const ValueKey('viz-history-state-all')), findsOneWidget);
+    expect(find.byKey(const ValueKey('viz-as-table')), findsOneWidget);
+    // The table form keeps its rows and names the failure too.
+    await tester.ensureVisible(find.byKey(const ValueKey('viz-as-table')));
+    await tester.tap(find.byKey(const ValueKey('viz-as-table')));
+    await settleWorld(tester, world);
+    expect(find.text(refusal), findsOneWidget);
+    expect(find.text('backend / Payment integration'), findsOneWidget);
+    // The next press asks the same page again.
+    world.queries.failOn.remove('runHistory');
+    await tester.ensureVisible(find.text('Load more runs'));
+    await tester.tap(find.text('Load more runs'));
+    await settleWorld(tester, world);
+    expect(world.queries.historyQueries.last.cursor, isNotNull);
+    expect(find.text(refusal), findsNothing);
+    expect(find.text('Load more runs'), findsNothing);
+    expect(
+      find.text('Start of the history: there are no older runs.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('a refusal shows its text', (tester) async {

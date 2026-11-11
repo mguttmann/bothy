@@ -149,6 +149,7 @@
   "vizTileUp": "{delta} mehr als im Vorzeitraum",
   "vizTileDown": "{delta} weniger als im Vorzeitraum",
   "vizTileSame": "wie im Vorzeitraum",
+  "vizTileSince": "Seit: {start}",
   "vizNotShown": "nicht angezeigt",
   "vizStale": "Keine neuen Daten",
   "vizHarnessTitle": "Testumgebung der Visualisierungen",

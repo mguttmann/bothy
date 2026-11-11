@@ -992,6 +992,12 @@ abstract class AppLocalizations {
   /// **'same as the previous period'**
   String get vizTileSame;
 
+  /// Note of a metric tile of the executive page whose value is the level of the latest bucket and no sum over the period of the page (a rate, a percentile, the active people of a week): the start of that bucket as day and time (25 section 6.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Since: {start}'**
+  String vizTileSince(String start);
+
   /// Screen reader text for a value the server did not deliver (no permission); never read as zero (25 section 4 rule 5).
   ///
   /// In en, this message translates to:

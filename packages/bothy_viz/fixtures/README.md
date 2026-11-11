@@ -34,9 +34,13 @@ harness and the fake server read them instead of a server.
 
 Checks: `make api-checks` (rule `viz-fixtures`, `tools/api-checks/viz_fixtures.py`) validates
 every file against its schema with its references and fails on an unknown schema, an invalid
-file, a file missing from the table below and a listed schema without a file. The Dart test
-`test/fixtures_decode_test.dart` decodes every file with the generated serializers of
-`api_client`.
+file, a file missing from the table below and a listed schema without a file. The schema leaves
+the `metrics` of a `StatsSeries` open, so the rule also holds the series of a query
+(`StatsSeries.<query>.<state>.json`) to what the description of its operation says the server
+sends: only the metric names it lists (the push rate per provider,
+`push_failure_rate_<provider>`), rates as shares from 0 to 1 and never as percent, and
+`active_people` only in week or month buckets. The Dart test `test/fixtures_decode_test.dart`
+decodes every file with the generated serializers of `api_client`.
 
 ## Fixtures
 
@@ -62,6 +66,7 @@ file, a file missing from the table below and a listed schema without a file. Th
 | `StatsBackendReport.empty.json` | `StatsBackendReport` | empty | backend view |
 | `StatsBackendReport.rate_limits.json` | `StatsBackendReport` | rate_limits (every `rate_limit` state, I2 and I3 denials, a mismatch) | backend view |
 | `StatsSeries.usage.normal.json` | `StatsSeries` | normal (`getUsageStats`) | executive page, metric tile mark |
+| `StatsSeries.usage.week.json` | `StatsSeries` | week (`getUsageStats` with granularity `week`: `active_people`, withheld below the minimum group in one space) | executive page (active people) |
 | `StatsSeries.runs.normal.json` | `StatsSeries` | normal (`getRunStats`) | executive page |
 | `StatsSeries.errors.normal.json` | `StatsSeries` | normal (`getErrorStats`) | executive page |
 | `StatsSeries.empty.json` | `StatsSeries` | empty | executive page |

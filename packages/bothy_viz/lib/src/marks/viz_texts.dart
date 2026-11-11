@@ -152,6 +152,19 @@ final class VizTexts {
     };
   }
 
+  /// The day of [at] relative to [now] and its clock time in [timeZone] (the UTC time when
+  /// the zone is unknown), for example "Yesterday, 11:58 PM".
+  String dayTime(DateTime at, DateTime now, String timeZone) {
+    String text(String zone) =>
+        '${format.relativeDay(at, now: now, timeZone: zone)}, '
+        '${format.time(at, timeZone: zone)}';
+    try {
+      return text(timeZone);
+    } on ArgumentError {
+      return text('UTC');
+    }
+  }
+
   /// The main text of a run label: project and chat, the project alone for a main thread, and
   /// the agent when the server named no chat.
   String runTitle(VizRunLabel label) {

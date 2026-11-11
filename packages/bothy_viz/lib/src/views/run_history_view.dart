@@ -39,6 +39,8 @@ const List<api.RunState?> _filterStates = [
 ///
 /// Reads `listRunHistory` for the scope of the host and the chosen end state; "Load more runs"
 /// follows `next_cursor`, and the last page ends with the note that there are no older runs.
+/// A further page that fails keeps the runs already loaded, the filter and the table form: its
+/// problem text stands above "Load more runs", and the next press asks for the same page again.
 /// Above the list a note says how far the history reaches: runs stay as long as their chat
 /// (docs/spec/20-privacy.md 2). Each row names the chat with the shared run label and shows
 /// end state, start, end, duration, cost (as "Estimate", final amount or "information only"),
@@ -80,6 +82,9 @@ class _RunHistoryViewState extends State<RunHistoryView> {
   bool _loaded = false;
   bool _loadingMore = false;
   String? _error;
+
+  /// The problem of a failed further page; the loaded runs stay.
+  String? _moreError;
   api.RunState? _state;
   RunHistoryRow? _selected;
   int _generation = 0;
@@ -106,11 +111,17 @@ class _RunHistoryViewState extends State<RunHistoryView> {
         _loaded = true;
         _loadingMore = false;
         _error = null;
+        _moreError = null;
       });
     } on Object catch (error) {
       if (!mounted || generation != _generation) return;
       setState(() {
-        _error = vizProblemCode(error);
+        // Only a first page that fails has nothing to show.
+        if (reset) {
+          _error = vizProblemCode(error);
+        } else {
+          _moreError = vizProblemCode(error);
+        }
         _loadingMore = false;
       });
     }
@@ -124,6 +135,7 @@ class _RunHistoryViewState extends State<RunHistoryView> {
       _next = null;
       _loaded = false;
       _error = null;
+      _moreError = null;
     });
     unawaited(_load(reset: true));
   }
@@ -132,7 +144,7 @@ class _RunHistoryViewState extends State<RunHistoryView> {
     if (_loadingMore || _next == null) return;
     setState(() {
       _loadingMore = true;
-      _error = null;
+      _moreError = null;
     });
     unawaited(_load(reset: false));
   }
@@ -207,14 +219,24 @@ class _RunHistoryViewState extends State<RunHistoryView> {
       ),
       // Paging below the chart and the table alike.
       footer: _next != null
-          ? Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: OutlinedButton(
-                key: const ValueKey('viz-history-more'),
-                style: vizButtonStyle(context),
-                onPressed: _loadingMore ? null : _more,
-                child: Text(l10n.vizHistoryLoadMore),
-              ),
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_moreError case final code?) ...[
+                  DsBanner(tone: DsTone.danger, text: problemText(l10n, code)),
+                  const SizedBox(height: DsSpace.s8),
+                ],
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: OutlinedButton(
+                    key: const ValueKey('viz-history-more'),
+                    style: vizButtonStyle(context),
+                    onPressed: _loadingMore ? null : _more,
+                    child: Text(l10n.vizHistoryLoadMore),
+                  ),
+                ),
+              ],
             )
           : model.rows.isNotEmpty
           ? Text(
