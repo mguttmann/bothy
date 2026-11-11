@@ -1,13 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
-"""CodeQL guard: the matrix covers every tracked component language CodeQL supports.
+"""CodeQL guard: the matrix covers every tracked language CodeQL supports, but named exceptions.
 
 `.github/workflows/codeql.yml` analyses the repository in the public phase (ADR 0039 rule 1).
 A language the repository ships but the matrix lacks would go unanalysed, and no gate would
 notice. `codeql_findings` compares the workflow with the tracked component manifests (the
-discovery of the root Makefile, docs/spec/23-quality.md "Component contract") and checks
-the build CodeQL needs for Go: Go has no build-free mode, so every tracked Go module (each
-Go pattern of LANGUAGE_SOURCES, today the Makefile pathspec `services/*go.mod`) gets its Go
-toolchain and a manual `go build ./...` between the CodeQL `init` and `analyze` steps.
+discovery of the root Makefile, docs/spec/23-quality.md "Component contract") and with the
+native sources of the apps and plugins (NATIVE_SOURCES), and checks the build CodeQL needs
+for Go: Go has no build-free mode, so every tracked Go module (each Go pattern of
+LANGUAGE_SOURCES, today the Makefile pathspec `services/*go.mod`) gets its Go toolchain and a
+manual `go build ./...` between the CodeQL `init` and `analyze` steps. A language CodeQL can
+analyse only with a build of the apps is listed in NOT_ANALYSED with its reason; the header of
+the workflow names each one, and a test drops an exception that is no longer needed
+(docs/decisions.d/AUD-misc-misc-01.md).
 
 The synthetic tests prove each rule against one compliant fixture, so a negative test cannot
 pass for a wrong reason; the last tests apply the rules to the real workflow, the real
@@ -53,7 +57,34 @@ REPOSITORY_SOURCES: dict[str, str] = {
     ".github/workflows/*.yaml": "actions",
     "tools/pyproject.toml": "python",
 }
-LANGUAGE_SOURCES: dict[str, str] = {**REPOSITORY_SOURCES, **COMPONENT_MANIFESTS}
+# Native code of the apps and plugins has no manifest of its own: a compilation unit or a source
+# file shows the language wherever it lies (headers and Gradle scripts follow them). Objective-C
+# is left out, CodeQL does not analyse it.
+NATIVE_SOURCES: dict[str, str] = {
+    "*.c": "c-cpp",
+    "*.cc": "c-cpp",
+    "*.cpp": "c-cpp",
+    "*.cxx": "c-cpp",
+    "*.swift": "swift",
+    "*.kt": "java-kotlin",
+    "*.java": "java-kotlin",
+}
+LANGUAGE_SOURCES: dict[str, str] = {
+    **REPOSITORY_SOURCES,
+    **COMPONENT_MANIFESTS,
+    **NATIVE_SOURCES,
+}
+# Tracked languages the matrix leaves out on purpose: the name the header of the workflow uses
+# and the reason. CodeQL extracts Swift and Kotlin only while it watches a build (build modes
+# `autobuild` and `manual`, see the link at ALLOWED_BUILD_MODES, retrieved 2026-11-11): Swift
+# through an Xcode build on a macOS runner, Kotlin through the Gradle build of the Android app,
+# each with the Flutter toolchain, in every pull request. Both are analysed by SonarQube Cloud
+# in every pull request (quality/sonar/profiles.json). An entry here ends with the matrix entry
+# of its language, its build steps in this guard and its build mode in ALLOWED_BUILD_MODES.
+NOT_ANALYSED: dict[str, tuple[str, str]] = {
+    "swift": ("Swift", "needs an Xcode build of the apps on a macOS runner"),
+    "java-kotlin": ("Kotlin", "needs the Gradle build of the Android app"),
+}
 # Component discovery variables of the Makefile to the CodeQL language of their manifests;
 # None where CodeQL has none: Dart (`pubspec.yaml`) is covered by flutter analyze and
 # SonarQube Cloud.
@@ -80,8 +111,11 @@ _REDIRECT = re.compile(r"[0-9]*>&?\s*\S*")
 # anything, and then needs `go list ./...` at a root without go.mod; the outcome would depend
 # on fallback heuristics. A manual `go build ./...` per module is deterministic and is the
 # build `make typecheck` runs.
+# C and C++ run without a build: CodeQL infers the compilation units from the source files, and
+# a build of the Windows runner would need Flutter and MSVC steps this guard does not know.
 ALLOWED_BUILD_MODES: dict[str, frozenset[str]] = {
     "actions": frozenset({"none"}),
+    "c-cpp": frozenset({"none"}),
     "python": frozenset({"none"}),
     "javascript-typescript": frozenset({"none"}),
     "go": frozenset({"manual"}),
@@ -214,7 +248,8 @@ def codeql_findings(doc: dict[str, Any], tracked: Iterable[str]) -> list[str]:
     `analyze` and runs on pull requests to main (no filter but `branches`, which names main
     and has no `!` pattern); the job `analyze` keeps the public guard; its matrix is an
     `include` list whose entries name `language` and an allowed `build-mode`, with every
-    required language; `init` passes the matrix language and build mode and runs
+    required language but those of NOT_ANALYSED, none of which the matrix lists; `init`
+    passes the matrix language and build mode and runs
     `security-extended`; `analyze` uploads per language; every tracked Go module gets a
     setup-go step (its go.mod, no cache) before `init` and a `go build ./...` (in the
     module, `CGO_ENABLED` the string "0") between `init` and `analyze`, both only for Go;
@@ -238,7 +273,8 @@ def codeql_findings(doc: dict[str, Any], tracked: Iterable[str]) -> list[str]:
     if not cr.has_public_guard(job.get("if")):
         findings.append("the condition of job 'analyze' is not the public guard (ADR 0039 rule 1)")
     findings += _unknown_options("the analyze job", job, JOB_OPTIONS)
-    findings += _matrix_findings(job, required_languages(paths))
+    findings += _matrix_findings(job, required_languages(paths) - set(NOT_ANALYSED))
+    findings += _exception_findings(job)
     # Every Go pattern counts, so a further Go pathspec of the Makefile brings its modules too.
     go_manifests = [pattern for pattern, language in LANGUAGE_SOURCES.items() if language == "go"]
     modules = sorted(
@@ -372,6 +408,17 @@ def _matrix_findings(job: dict[str, Any], required: set[str]) -> list[str]:
             findings.append(f"{language}: build-mode {mode} is not allowed (allowed: {options})")
     findings += [f"{language} missing from the matrix" for language in sorted(required - present)]
     return findings
+
+
+def _exception_findings(job: dict[str, Any]) -> list[str]:
+    """Findings for a language of NOT_ANALYSED that the matrix lists after all."""
+    include = _mapping(_mapping(job.get("strategy")).get("matrix")).get("include")
+    entries = include if isinstance(include, list) else []
+    present = {str(_mapping(entry).get("language")) for entry in entries}
+    return [
+        f"{language} is in the matrix and in NOT_ANALYSED; remove the exception with its reason"
+        for language in sorted(present & set(NOT_ANALYSED))
+    ]
 
 
 def _step_findings(steps: list[dict[str, Any]], modules: list[str]) -> list[str]:
@@ -725,6 +772,17 @@ def runbook_findings(doc: Any, runbook: str) -> list[str]:
         ("services/go.mod", {"go"}),
         ("plugins/pyproject.toml", {"python"}),
         ("plugins/package.json", {"javascript-typescript"}),
+        # Native code of the apps and plugins (NATIVE_SOURCES): a compilation unit or a source
+        # file shows the language wherever it lies; headers and build scripts follow them.
+        ("apps/client/windows/runner/main.cpp", {"c-cpp"}),
+        ("apps/client/windows/flutter/generated_plugin_registrant.cc", {"c-cpp"}),
+        ("packages/device_key/windows/core/device_key_store.cpp", {"c-cpp"}),
+        ("apps/client/windows/runner/utils.h", set()),
+        ("apps/client/ios/Runner/AppDelegate.swift", {"swift"}),
+        ("packages/device_key/android/src/main/kotlin/DeviceKeyPlugin.kt", {"java-kotlin"}),
+        ("apps/client/android/app/src/main/java/Main.java", {"java-kotlin"}),
+        ("apps/client/android/build.gradle.kts", set()),
+        ("apps/client/windows/runner/Main.CPP", set()),
     ],
 )
 def test_required_languages_mapping(path: str, expected: set[str]) -> None:
@@ -882,7 +940,48 @@ def test_unknown_language_is_rejected() -> None:
     text = workflow(include=INCLUDE + "          - language: ruby\n            build-mode: none\n")
     assert check(text) == [
         "ruby: no build mode is allowed for this language "
-        "(known: actions, go, javascript-typescript, python)"
+        "(known: actions, c-cpp, go, javascript-typescript, python)"
+    ]
+
+
+CPP_ENTRY = "          - language: c-cpp\n            build-mode: none\n"
+NATIVE = [
+    "apps/client/windows/runner/main.cpp",
+    "apps/client/ios/Runner/AppDelegate.swift",
+    "apps/client/android/app/src/main/kotlin/MainActivity.kt",
+]
+
+
+def test_tracked_c_or_cpp_needs_its_matrix_entry() -> None:
+    # The C and C++ of the app runners and plugins is analysed without a build.
+    assert check(workflow(), [*TRACKED, NATIVE[0]]) == ["c-cpp missing from the matrix"]
+    assert check(workflow(include=INCLUDE + CPP_ENTRY), [*TRACKED, NATIVE[0]]) == []
+
+
+@pytest.mark.parametrize("mode", ["manual", "autobuild"])
+def test_c_cpp_runs_only_without_a_build(mode: str) -> None:
+    # A build of the Windows runner would need steps this guard does not know.
+    text = workflow(include=INCLUDE + CPP_ENTRY.replace("none", mode))
+    assert check(text, [*TRACKED, NATIVE[0]]) == [
+        f"c-cpp: build-mode {mode} is not allowed (allowed: none)"
+    ]
+
+
+def test_languages_not_analysed_need_no_matrix_entry() -> None:
+    # Swift and Kotlin have no build-free mode (NOT_ANALYSED names the reason and the gate
+    # that covers them); every other native language still needs its entry.
+    assert check(workflow(include=INCLUDE + CPP_ENTRY), [*TRACKED, *NATIVE]) == []
+    assert check(workflow(), [*TRACKED, *NATIVE]) == ["c-cpp missing from the matrix"]
+
+
+@pytest.mark.parametrize("language", ["swift", "java-kotlin"])
+def test_a_language_in_the_matrix_is_no_exception_any_more(language: str) -> None:
+    # The entry needs a build this guard does not know, and the exception would then lie.
+    entry = f"          - language: {language}\n            build-mode: manual\n"
+    known = ", ".join(sorted(ALLOWED_BUILD_MODES))
+    assert check(workflow(include=INCLUDE + entry)) == [
+        f"{language}: no build mode is allowed for this language (known: {known})",
+        f"{language} is in the matrix and in NOT_ANALYSED; remove the exception with its reason",
     ]
 
 
@@ -1296,6 +1395,32 @@ def test_repository_codeql_workflow_has_no_findings() -> None:
     doc = cr.load_yaml(WORKFLOW.read_text(encoding="utf-8"))
     found = codeql_findings(doc, tracked)
     assert found == [], "codeql.yml:\n" + "\n".join(found)
+
+
+def test_every_language_not_analysed_is_tracked_and_absent_from_the_matrix() -> None:
+    """An exception lives only while the repository ships the language without its entry."""
+    needed = required_languages(tracked_files())
+    doc = cr.load_yaml(WORKFLOW.read_text(encoding="utf-8"))
+    include = doc["jobs"]["analyze"]["strategy"]["matrix"]["include"]
+    present = {entry["language"] for entry in include}
+    for language in NOT_ANALYSED:
+        assert language in needed, f"no tracked source needs {language}; remove the exception"
+        assert language not in present, f"{language} is analysed; remove the exception"
+    assert "c-cpp" in needed
+    assert "c-cpp" in present
+
+
+def test_workflow_header_names_what_the_matrix_leaves_out() -> None:
+    """The header claims no more than the matrix holds: it names every exception."""
+    text = WORKFLOW.read_text(encoding="utf-8")
+    header = " ".join(
+        line.lstrip("# ") for line in text.split("\nname:", 1)[0].splitlines() if line.strip()
+    )
+    for language, (name, _reason) in NOT_ANALYSED.items():
+        assert re.search(rf"\b{re.escape(name)}\b[^.]*\bnot analysed\b", header), (
+            f"the header of codeql.yml does not say that {name} ({language}) is not analysed"
+        )
+    assert "every tracked language CodeQL supports" not in header
 
 
 def test_runbook_step_ends_at_the_next_item_heading_or_blank_line() -> None:

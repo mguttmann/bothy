@@ -220,7 +220,7 @@ func BootstrapDatabase(ctx context.Context, super *pgx.Conn, database string) er
 			return err
 		}
 		for _, s := range stmts {
-			if _, err := tx.Exec(ctx, s, pgx.QueryExecModeSimpleProtocol); err != nil {
+			if _, err := tx.Exec(ctx, s, pgx.QueryExecModeSimpleProtocol); err != nil { // nosemgrep: bothy-go-sql-string-building -- DDL takes no parameters: the database and the roles are sanitized identifiers (pgx.Identifier), never a value
 				return err
 			}
 		}

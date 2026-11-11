@@ -134,3 +134,48 @@ func TestScopeEndsWithTheRun(t *testing.T) {
 		t.Errorf("programs started after the end of the run: %v", r.calls)
 	}
 }
+
+// lstatOnly is a Security that is no OwnerReader.
+type lstatOnly struct{ calls int }
+
+func (l *lstatOnly) Lstat(string) (FileSec, error) {
+	l.calls++
+	return FileSec{OwnerID: "7", ACL: []ACE{{Unmappable: true}}}, nil
+}
+
+// TestLstatOwner: the reader of macOS answers LstatOwner from lstat alone (owner, type and mode
+// of the real file, no ACL and no program), also inside a run; a Security without an own way
+// answers as its Lstat does.
+func TestLstatOwner(t *testing.T) {
+	r := &countRunner{calls: map[string]int{}, acl: "-rw------- 1 root wheel 0 Oct 15 09:00 x\n 0: user:bothy-s-alex allow write\n"}
+	dir := t.TempDir()
+	file := filepath.Join(dir, "f")
+	if err := os.WriteFile(file, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	u := DarwinUsers{Runner: r}
+	_, scoped := Scope(context.Background(), u, DarwinSecurity{Runner: r, Users: u})
+	for name, sec := range map[string]Security{"plain": DarwinSecurity{Runner: r, Users: u}, "in a run": scoped} {
+		want, err := unixSec(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := LstatOwner(sec, file)
+		if err != nil || got.OwnerID != want.OwnerID || got.GroupID != want.GroupID || got.Mode != want.Mode || got.IsDir || got.IsLink || len(got.ACL) != 0 {
+			t.Errorf("%s: %+v %v, want %+v", name, got, err, want)
+		}
+		if d, err := LstatOwner(sec, dir); err != nil || !d.IsDir {
+			t.Errorf("%s: folder %+v %v", name, d, err)
+		}
+		if _, err := LstatOwner(sec, filepath.Join(dir, "none")); !os.IsNotExist(err) {
+			t.Errorf("%s: missing entry: %v", name, err)
+		}
+	}
+	if len(r.calls) != 0 {
+		t.Errorf("LstatOwner started programs: %v", r.calls)
+	}
+	l := &lstatOnly{}
+	if f, err := LstatOwner(l, file); err != nil || l.calls != 1 || f.OwnerID != "7" || len(f.ACL) != 1 {
+		t.Errorf("fallback: %+v %v after %d calls", f, err, l.calls)
+	}
+}

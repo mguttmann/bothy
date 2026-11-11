@@ -74,6 +74,17 @@ jobs:
         shell: pwsh
         run: |
           Set-Content -LiteralPath (Join-Path $env:ProgramData 'termsuite-disposable') -Value 'termsuite - disposable test machine (GitHub-hosted runner)'
+      # The hosted Ubuntu image opens /opt to every user while it is built (mode 0777). bothy-host
+      # refuses to start when a session user can write a folder on the way to its program folder
+      # (HD10 helper_untrusted, HD11 program_location_untrusted), and both /opt/bothy-host/bin and
+      # the folder of the suite lie below /opt, so every test that started the service failed
+      # here (docs/decisions.d/AUD-misc-misc-01.md). A stock system has /opt owned by root with
+      # mode 0755; only the folder itself is reset, the tool cache below keeps its owner.
+      # tools/ci/tests/test_host_platform_workflow.py holds this step to the places in use.
+      - name: Give /opt the owner and mode of a stock system (Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        shell: bash
+        run: sudo chown root:root /opt && sudo chmod 0755 /opt
       # The suite runs even when a unit test failed: both results are kept.
       - name: Platform suite (Linux and macOS, as root)
         if: ${{ !cancelled() && runner.os != 'Windows' }}

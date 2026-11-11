@@ -5,8 +5,9 @@
 // with administrator rights and runs only on a disposable machine: a GitHub-hosted runner
 // (ubuntu-24.04 with systemd, macos-15, windows-2025) through the manual or scheduled
 // workflow host-platform.yml or a host container of the terminal suite (M2-48), never on a
-// workstation or a machine with real users. Every file except doc.go, guard.go and guard_test.go
-// carries the build tag platform, so make check runs only the guard's own test. The test binary
+// workstation or a machine with real users. Every file except doc.go, guard.go, accounts.go and
+// their tests carries the build tag platform, so make check runs only the test of the guard and
+// the test that holds the account names of the suite to the bound of Windows. The test binary
 // refuses to run without the marker file /etc/termsuite-disposable (Windows
 // %ProgramData%\termsuite-disposable) and exits 2 (Guard, brief M2-48 design note 11).
 //

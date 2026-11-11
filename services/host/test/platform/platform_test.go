@@ -98,7 +98,7 @@ func TestPlatform_TMT22(t *testing.T) {
 func TestPlatform_TMT24(t *testing.T) {
 	track(t)
 	installed(t, "", userA, userB)
-	person := "bothy-platform-person"
+	person := personUser
 	createPerson(t, person)
 	openHome(t, home(person))
 	refusedWith(t, "foreign_home_listable")

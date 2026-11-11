@@ -2433,7 +2433,11 @@ real host services `bothy-host` in Linux containers with systemd and a Go test d
 Noise through the host service's own packages. The host-local parts (the `doctor` matrix, the PTY
 and process tree tests and the parts that need macOS, Windows or a case-insensitive file system)
 are the platform suite `services/host/test/platform`: it runs in a Linux container in every
-`make check` and also on disposable macOS, Windows 10 and Windows 11 test machines. TM-T16 runs in
+`make check`, and the workflow `host-platform.yml` runs it on disposable GitHub-hosted Linux,
+macOS and Windows Server runners. No platform has a recorded passing run of that workflow yet,
+and no run on a Windows 10 or Windows 11 machine is recorded, so the parts that need macOS or
+Windows are not proven by a run; plan row V1-13 tracks the open causes
+([decisions.d/AUD-misc-misc-01.md](../decisions.d/AUD-misc-misc-01.md)). TM-T16 runs in
 `make check` and again under load in `make perf` (`services/server/test/chaos`). TM-T01 and TM-T02
 stay the vector and cross tests of M2-38, and the module tests of the implementing tickets stay
 where they are. The catalogue `services/server/test/terminal/catalogue.yaml` is the list of places:

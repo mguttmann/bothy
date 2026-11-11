@@ -468,7 +468,7 @@ func (c *cluster) holdLease(ctx context.Context) (stop func(), err error) {
 		return nil, fmt.Errorf("pgtest: lease connection: %w", err)
 	}
 	mark := "COMMENT ON DATABASE " + pgx.Identifier{superDatabase}.Sanitize() + " IS '" + leaseApp + "'"
-	if _, err := conn.Exec(ctx, mark); err != nil {
+	if _, err := conn.Exec(ctx, mark); err != nil { // nosemgrep: bothy-go-sql-string-building -- COMMENT ON takes no parameters: a sanitized identifier and the constant leaseApp of the test database helper
 		_ = conn.Close(context.WithoutCancel(ctx))
 		return nil, fmt.Errorf("pgtest: mark the lease: %w", err)
 	}
@@ -777,7 +777,7 @@ func (c *cluster) clone(ctx context.Context, name, template string) (err error) 
 	db := pgx.Identifier{name}.Sanitize()
 	stmt := "CREATE DATABASE " + db + " OWNER " + pgx.Identifier{string(pg.RoleOwner)}.Sanitize() +
 		" TEMPLATE " + pgx.Identifier{template}.Sanitize()
-	if _, err := c.admin.PGX().Exec(ctx, stmt); err != nil {
+	if _, err := c.admin.PGX().Exec(ctx, stmt); err != nil { // nosemgrep: bothy-go-sql-string-building -- CREATE DATABASE takes no parameters: sanitized identifiers of the test database helper
 		return fmt.Errorf("pgtest: create database %s: %w", name, err)
 	}
 	defer func() {
@@ -796,7 +796,7 @@ func (c *cluster) clone(ctx context.Context, name, template string) (err error) 
 	}
 	grants := "REVOKE ALL ON DATABASE " + db + " FROM PUBLIC; GRANT CONNECT ON DATABASE " + db + " TO " +
 		strings.Join(connect, ", ")
-	if _, err := c.admin.PGX().Exec(ctx, grants, pgx.QueryExecModeSimpleProtocol); err != nil {
+	if _, err := c.admin.PGX().Exec(ctx, grants, pgx.QueryExecModeSimpleProtocol); err != nil { // nosemgrep: bothy-go-sql-string-building -- REVOKE and GRANT take no parameters: sanitized identifiers of the test database helper
 		return fmt.Errorf("pgtest: grants of %s: %w", name, err)
 	}
 	return nil
@@ -809,7 +809,7 @@ func (c *cluster) clone(ctx context.Context, name, template string) (err error) 
 func (c *cluster) create(ctx context.Context, name string, fsys fs.FS) (err error) {
 	super := c.admin.PGX()
 	stmt := "CREATE DATABASE " + pgx.Identifier{name}.Sanitize() + " OWNER " + pgx.Identifier{string(pg.RoleOwner)}.Sanitize()
-	if _, err := super.Exec(ctx, stmt); err != nil {
+	if _, err := super.Exec(ctx, stmt); err != nil { // nosemgrep: bothy-go-sql-string-building -- CREATE DATABASE takes no parameters: sanitized identifiers of the test database helper
 		return fmt.Errorf("pgtest: create database %s: %w", name, err)
 	}
 	defer func() {
@@ -837,7 +837,7 @@ func (c *cluster) create(ctx context.Context, name string, fsys fs.FS) (err erro
 		return err
 	}
 	closeTemplate := "ALTER DATABASE " + pgx.Identifier{name}.Sanitize() + " WITH ALLOW_CONNECTIONS false"
-	if _, err := super.Exec(ctx, closeTemplate); err != nil {
+	if _, err := super.Exec(ctx, closeTemplate); err != nil { // nosemgrep: bothy-go-sql-string-building -- ALTER DATABASE takes no parameters: a sanitized identifier of the test database helper
 		return fmt.Errorf("pgtest: close template %s: %w", name, err)
 	}
 	return nil
@@ -873,7 +873,7 @@ func (c *cluster) migrate(ctx context.Context, database string, fsys fs.FS) erro
 // dropDatabase drops name, ending its sessions; a database the test dropped already is fine.
 func (c *cluster) dropDatabase(ctx context.Context, name string) error {
 	drop := "DROP DATABASE IF EXISTS " + pgx.Identifier{name}.Sanitize() + " WITH (FORCE)"
-	_, err := c.admin.PGX().Exec(ctx, drop)
+	_, err := c.admin.PGX().Exec(ctx, drop) // nosemgrep: bothy-go-sql-string-building -- DROP DATABASE takes no parameters: a sanitized identifier of the test database helper
 	return err
 }
 

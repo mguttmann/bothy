@@ -22,13 +22,6 @@ import (
 	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
-// The world of the suite: the service user bothy-host and the session users A, B and a third.
-const (
-	userA = "bothy-s-alex"
-	userB = "bothy-s-sam"
-	userC = "bothy-s-robin"
-)
-
 var (
 	hostBin   = os.Getenv("BOTHY_HOST_BIN")
 	fakeBin   = os.Getenv("BOTHY_FAKECLAUDE")

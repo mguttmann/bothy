@@ -1,6 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 rules:
   - id: bothy-go-sql-string-building
+    # Taint mode: a text built with fmt.Sprintf or by joining a string literal is followed
+    # through variables, lists and function literals of the function to the call that runs it.
+    # A pattern on the call alone saw only a statement built inside the argument list
+    # (docs/decisions.d/AUD-misc-misc-01.md). A place that must build its statement, because SQL
+    # takes no parameter there (an identifier, DDL), carries `nosemgrep` with its reason.
+    mode: taint
     languages: [go]
     severity: ERROR
     paths:
@@ -8,11 +14,15 @@ rules:
       exclude: ["*_test.go", "test/", "tests/", "testsuite/"]
     message: >-
       SQL lives in sqlc query files with parameters (ADR 0007). Building a statement
-      at runtime with fmt.Sprintf or string concatenation invites SQL injection.
-    patterns:
-      - pattern-either:
-          - pattern: $DB.$METHOD(..., fmt.Sprintf(...), ...)
-          - pattern: $DB.$METHOD(..., "..." + $X, ...)
-      - metavariable-regex:
-          metavariable: $METHOD
-          regex: '^(Query|QueryRow|Exec|Prepare|QueryContext|QueryRowContext|ExecContext|PrepareContext|SendBatch)$'
+      at runtime with fmt.Sprintf or string concatenation invites SQL injection, also
+      when the built text reaches the call through a variable.
+    pattern-sources:
+      - pattern: fmt.Sprintf(...)
+      - pattern: '"..." + $X'
+      - pattern: '$X + "..."'
+    pattern-sinks:
+      - patterns:
+          - pattern: $DB.$METHOD(...)
+          - metavariable-regex:
+              metavariable: $METHOD
+              regex: '^(Query|QueryRow|Exec|Prepare|QueryContext|QueryRowContext|ExecContext|PrepareContext|SendBatch)$'

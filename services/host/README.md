@@ -186,8 +186,10 @@ the account needs `own = true` (step 10a of 24 5.3). `require_local_confirm` and
   The run file lets the next start end recorded trees also when their leader is gone.
 - Windows: ConPTY; the leader starts suspended, joins a Job Object with
   `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` and without breakaway, then runs; the end terminates the
-  job. Windows is tested only on the hosted runner of `host-platform.yml` (Windows Server); no
-  Windows 10 or 11 desktop run is recorded.
+  job. On Windows only the unit tests of the session, PTY and confirmation packages have
+  passed, on the hosted Windows Server runner of `host-platform.yml`; the platform suite has no
+  recorded passing run there, and no Windows 10 or 11 desktop run is recorded (see "Platform
+  runs" below).
 - Every end kills the tree at once, without a grace period.
 
 ## Commands
@@ -338,7 +340,7 @@ the server carries codes and, by the rule for names, the names of session users 
 | `internal/profiles/` | offered profiles, start specifications and allow-list environments |
 | `internal/confirm/` | confirmation endpoint, peer rule and the agent with its dialogs |
 | `testdata/fakeclaude/` | stand-in for `claude auth status` ([README](testdata/fakeclaude/README.md)) |
-| `test/platform/` | the platform suite (build tag `platform`) and its marker guard (`guard.go`, untagged) |
+| `test/platform/` | the platform suite (build tag `platform`), its marker guard (`guard.go`, untagged) and the accounts it creates (`accounts.go`, untagged) |
 | `test/noisedevice/` | the Noise sidecar of the Go test device of the terminal suite in `services/server/test/terminal` (M2-48): JSON lines on stdin and stdout, `internal/noise` and `internal/frame` unchanged |
 | `.go-arch-lint.yml` | architecture rules, maintained by hand, one component per package |
 
@@ -361,8 +363,19 @@ make platform-bundle OUT=<dir> [GOOS=<os> GOARCH=<arch>]  # build a platform run
 ```
 
 The platform suite needs administrator rights and creates and deletes users, services and ACLs.
-It runs only in the workflow `host-platform.yml` on throwaway GitHub-hosted runners
-(docs/DECISIONS.md D-M2-42-19), never on a workstation.
+It runs only on disposable machines, never on a workstation: as the Linux bundle in a host
+container of the terminal suite in every `make check`, and in the workflow `host-platform.yml`
+on throwaway GitHub-hosted runners (docs/DECISIONS.md D-M2-42-19).
+
+Platform runs: no platform has a recorded passing run of `host-platform.yml` yet, so the list
+of platforms with a proven peer check (`internal/buildinfo`) is empty and the suite proves the
+host-local parts only in the Linux container. Plan row V1-13 tracks the work; the causes found
+so far, what is fixed and what is open per system are in
+[decisions.d/AUD-misc-misc-01.md](../../docs/decisions.d/AUD-misc-misc-01.md). On a Linux
+machine the folders above `/opt/bothy-host/bin` must belong to root and be writable by no one
+else, as on a stock system: the hosted Ubuntu image opens `/opt` to every user, and the service
+then refuses to start with `helper_untrusted` and `program_location_untrusted`, so the workflow
+gives `/opt` back to root before the suite.
 
 `TestReloadOverARunningLaunchdJob` (macOS) runs the steps `install` uses to load a service twice
 against the real launchd: it loads a scratch job with a label of its own into the launchd domain

@@ -20,7 +20,8 @@ The stage A1 "Built-in agents" ([PLAN](../PLAN.md) section 21, P-27) follows the
 briefs A1-02 to A1-10 were written by its specification ticket and carry the same boundary for
 names of merged code (D-W-100). A stage ticket starts only after every milestone ticket is merged,
 so its briefs may use what any milestone ticket created; their column "Depends on" names only
-tickets of the stage. V1-07 to V1-12 run from their plan rows without a brief (P-28).
+tickets of the stage. V1-07 to V1-12 run from their plan rows without a brief (P-28), and so does
+V1-13 (AUD-MISC-MISC-01/5).
 
 The stage AR "Autonomous runs" ([PLAN](../PLAN.md) section 22, P-29) follows in the same way: its
 briefs AR-02 to AR-10 were written by its specification ticket AR-01, carry the same boundary for

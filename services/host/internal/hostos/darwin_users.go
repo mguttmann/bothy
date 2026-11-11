@@ -69,6 +69,9 @@ func (s DarwinSecurity) Lstat(path string) (FileSec, error) {
 	return f, nil
 }
 
+// LstatOwner implements OwnerReader: lstat alone, no program.
+func (s DarwinSecurity) LstatOwner(path string) (FileSec, error) { return unixSec(path) }
+
 func (s DarwinSecurity) groupID(name string) (string, error) {
 	if s.groups != nil {
 		return s.groups.get(name, s.readGroupID)

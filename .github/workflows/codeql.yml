@@ -3,13 +3,17 @@
 # CodeQL code scanning, only while the repository is public (ADR 0039 rule 1): code scanning
 # is free for public repositories. Semgrep, SonarQube, golangci-lint (gosec) and bandit cover
 # static analysis in every pull request and locally.
-# Languages: the matrix lists every tracked language CodeQL supports, found through the
-# workflows, tools/ and the component manifests the root Makefile discovers;
-# tools/ci/tests/test_codeql_workflow.py enforces it. `javascript-typescript` covers the
-# TypeScript SDK (sdk/typescript) and needs no build. Go uses `build-mode: manual` because CodeQL
-# has no `none` mode for Go and its autobuilder would run the root Makefile first; the
-# manual build runs `go build ./...` in the module, as `make typecheck` does. Dart is not
-# supported by CodeQL.
+# Languages: the matrix lists the tracked languages CodeQL analyses without a build of the apps,
+# found through the workflows, tools/, the component manifests the root Makefile discovers and
+# the native sources of the apps and plugins; tools/ci/tests/test_codeql_workflow.py enforces
+# it. `javascript-typescript` covers the TypeScript SDK (sdk/typescript) and needs no build. Go
+# uses `build-mode: manual` because CodeQL has no `none` mode for Go and its autobuilder would
+# run the root Makefile first; the manual build runs `go build ./...` in the module, as
+# `make typecheck` does. `c-cpp` covers the C++ of the Windows runner and of the plugins
+# without a build; on this Linux runner the Windows headers are missing, so the result is less
+# exact than one of a build. Swift and Kotlin are not analysed here: CodeQL extracts them only
+# while it watches the Xcode or Gradle build of the apps; SonarQube Cloud analyses both in every
+# pull request (docs/decisions.d/AUD-misc-misc-01.md). Dart is not supported by CodeQL.
 
 name: codeql
 
@@ -41,6 +45,8 @@ jobs:
       matrix:
         include:
           - language: actions
+            build-mode: none
+          - language: c-cpp
             build-mode: none
           - language: go
             build-mode: manual
