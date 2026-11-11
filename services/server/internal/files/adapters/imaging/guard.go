@@ -102,10 +102,32 @@ func readHeader(ctx context.Context, mimeType string, open app.Opener) (imageHea
 	return h, err
 }
 
-// checkPixels is the pixel guard: ErrTooManyPixels when width times height times frames is above
-// maxPixels (file.image.max_pixels).
+// gifFrameOverhead is what the pixel guard counts for every frame of a GIF on top of its pixels
+// (12 7.2): what image/gif keeps per decoded frame besides the pixels, in bytes, which is the
+// size of as many paletted pixels. That is a palette of up to 256 colours, each an interface
+// value of 16 bytes and a colour of 4 bytes (a frame with a transparency index gets its own
+// copy of the palette, enlarged to the index when the index lies outside it), and 256 bytes
+// for the frame record. Without it a file of many frames of one pixel passes
+// file.image.max_pixels and keeps thousands of times its pixels in memory.
+const gifFrameOverhead = 256*(16+4) + 256
+
+// checkPixels is the pixel guard (12 7.2): ErrTooManyPixels when width times height times frames
+// is above maxPixels (file.image.max_pixels) or an edge is longer than domain.MaxImageEdge.
 func checkPixels(width, height, frames int, maxPixels int64) error {
-	if domain.ExceedsPixelLimit(int64(width), int64(height), int64(frames), maxPixels) {
+	if domain.ExceedsEdgeLimit(int64(width), int64(height)) ||
+		domain.ExceedsPixelLimit(int64(width), int64(height), int64(frames), maxPixels) {
+		return app.ErrTooManyPixels
+	}
+	return nil
+}
+
+// checkGIFFrames is the pixel guard of a GIF that is decoded with all its frames (12 7.2):
+// ErrTooManyPixels when the frames, each counted with the pixels of the logical screen plus
+// gifFrameOverhead, are above maxPixels. The screen of a GIF is at most 65535 pixels wide and
+// high, so the sum of one frame cannot overflow.
+func checkGIFFrames(info gifInfo, maxPixels int64) error {
+	perFrame := int64(info.Width)*int64(info.Height) + gifFrameOverhead
+	if maxPixels < 0 || int64(max(info.Frames, 1)) > maxPixels/perFrame {
 		return app.ErrTooManyPixels
 	}
 	return nil

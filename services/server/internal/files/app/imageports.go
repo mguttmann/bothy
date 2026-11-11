@@ -16,8 +16,9 @@ var (
 	// ErrImageMalformed: the structure of a JPEG or PNG is broken; the file fails with
 	// image_malformed (12 7.1, ADR 0047 point 3).
 	ErrImageMalformed = errors.New("files: malformed image")
-	// ErrTooManyPixels: width times height (times frames) is above file.image.max_pixels; nothing
-	// was decoded (12 7.2, SEC-UP-4).
+	// ErrTooManyPixels: width times height (times frames) is above file.image.max_pixels, an edge
+	// is longer than domain.MaxImageEdge, or the frames of a GIF with their fixed overhead are
+	// above the limit; nothing was decoded (12 7.2, SEC-UP-4).
 	ErrTooManyPixels = errors.New("files: image above the pixel limit")
 	// ErrImageUndecodable: the image could not be decoded, or its colour profile does not fit
 	// into a thumbnail; there are no thumbnails and no retry.

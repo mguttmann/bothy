@@ -444,23 +444,25 @@ func TestErrorsCarryNoURLOrSecret(t *testing.T) {
 		}
 		checkClean(t, "closed port", err, "head", key, forbiddenInErrors(e))
 	})
-	t.Run("oversized body", func(t *testing.T) {
+	t.Run("oversized error document", func(t *testing.T) {
 		t.Parallel()
-		e := newFakeEnv(t, nil, func(_ *s3.Config, d *s3.Deps) { d.MaxObjectBytes = 8 })
+		e := newFakeEnv(t, oversizedError, func(_ *s3.Config, d *s3.Deps) { d.Egress.MaxResponseBytes = smallAnswerBytes })
 		key := newKey(t)
-		if err := e.store.Put(t.Context(), key, strings.NewReader("0123456789"), 10); err != nil {
-			t.Fatal(err)
+		_, err := e.store.Get(t.Context(), key, nil)
+		if !errors.Is(err, egress.ErrResponseTooLarge) || isSentinel(err) {
+			t.Errorf("Get = %v, want ErrResponseTooLarge and no sentinel", err)
 		}
+		checkClean(t, "oversized error document", err, "get", key, forbiddenInErrors(e))
+	})
+	t.Run("object without a length", func(t *testing.T) {
+		t.Parallel()
+		e := newFakeEnv(t, chunkedObject, nil)
+		key := newKey(t)
 		rc, err := e.store.Get(t.Context(), key, nil)
-		if err != nil {
-			t.Fatal(err)
+		if err == nil {
+			_ = rc.Close()
 		}
-		_, err = io.ReadAll(rc)
-		_ = rc.Close()
-		if !errors.Is(err, egress.ErrResponseTooLarge) {
-			t.Errorf("read = %v, want ErrResponseTooLarge", err)
-		}
-		checkClean(t, "oversized body", err, "get", key, forbiddenInErrors(e))
+		checkClean(t, "object without a length", err, "get", key, forbiddenInErrors(e))
 	})
 	t.Run("failed presign", func(t *testing.T) {
 		t.Parallel()
@@ -471,34 +473,85 @@ func TestErrorsCarryNoURLOrSecret(t *testing.T) {
 	})
 }
 
-// TestResponseLimitIsMaxObjectBytes holds docs/DECISIONS.md M3-02/1: a Get body of exactly
-// MaxObjectBytes reads completely; one byte more fails with ErrResponseTooLarge, never a short
-// read without error.
-func TestResponseLimitIsMaxObjectBytes(t *testing.T) {
+// smallAnswerBytes is egress.max_response_bytes of the stores of the body limit tests: enough
+// for the headers of an answer, far below the bodies the tests send.
+const smallAnswerBytes = 4096
+
+// oversizedError answers every request with status 500 and an S3 error document of twice
+// smallAnswerBytes.
+func oversizedError(w http.ResponseWriter, _ *http.Request) bool {
+	w.Header().Set("Content-Type", "application/xml")
+	w.WriteHeader(http.StatusInternalServerError)
+	_, _ = io.WriteString(w, "<Error><Code>InternalError</Code><Message>"+strings.Repeat("x", 2*smallAnswerBytes)+"</Message></Error>")
+	return true
+}
+
+// chunkedObject answers a GET with status 200 and a body in chunks, without Content-Length.
+func chunkedObject(w http.ResponseWriter, r *http.Request) bool {
+	if r.Method != http.MethodGet {
+		return false
+	}
+	w.WriteHeader(http.StatusOK)
+	w.(http.Flusher).Flush() // the header goes out before the length is known
+	_, _ = io.WriteString(w, "an object of unknown length")
+	return true
+}
+
+// TestObjectBodyIsNotCapped holds the body rule of docs/decisions.d/AUD-srv-files-01.md
+// (amending docs/DECISIONS.md M3-02/1): the body of an object is as long as the store announces
+// and is read completely, however small egress.max_response_bytes is. An export package has no
+// size limit (20 5.2), and a converted original may be larger than its upload.
+func TestObjectBodyIsNotCapped(t *testing.T) {
 	t.Parallel()
-	const limit = 64
-	e := newFakeEnv(t, nil, func(_ *s3.Config, d *s3.Deps) { d.MaxObjectBytes = limit })
-	exact, over := newKey(t), newKey(t)
-	data := bytes.Repeat([]byte("a"), limit+1)
-	if err := e.store.Put(t.Context(), exact, bytes.NewReader(data[:limit]), limit); err != nil {
+	e := newFakeEnv(t, nil, func(_ *s3.Config, d *s3.Deps) { d.Egress.MaxResponseBytes = smallAnswerBytes })
+	key := newKey(t)
+	data := bytes.Repeat([]byte("object "), smallAnswerBytes)
+	if err := e.store.Put(t.Context(), key, bytes.NewReader(data), int64(len(data))); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.store.Put(t.Context(), over, bytes.NewReader(data), limit+1); err != nil {
-		t.Fatal(err)
+	rc, err := e.store.Get(t.Context(), key, nil)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
 	}
-	read := func(key string) ([]byte, error) {
-		rc, err := e.store.Get(t.Context(), key, nil)
-		if err != nil {
-			return nil, err
+	got, err := io.ReadAll(rc)
+	_ = rc.Close()
+	if err != nil || !bytes.Equal(got, data) {
+		t.Errorf("read %d of %d bytes, %v", len(got), len(data), err)
+	}
+}
+
+// TestOtherAnswersAreCapped holds 19 SEC-NET-5 for every answer that is not an object (an error
+// document, the result of a multipart call): the SDK reads it into memory, so a body above
+// egress.max_response_bytes fails with ErrResponseTooLarge, for a GET and for every other
+// method.
+func TestOtherAnswersAreCapped(t *testing.T) {
+	t.Parallel()
+	e := newFakeEnv(t, oversizedError, func(_ *s3.Config, d *s3.Deps) { d.Egress.MaxResponseBytes = smallAnswerBytes })
+	s, ctx, key := e.store, t.Context(), newKey(t)
+	for name, call := range map[string]func() error{
+		"get":              func() error { _, err := s.Get(ctx, key, nil); return err },
+		"put":              func() error { return s.Put(ctx, key, strings.NewReader("hello"), 5) },
+		"create multipart": func() error { _, err := s.CreateMultipart(ctx, key); return err },
+		"delete":           func() error { return s.Delete(ctx, key) },
+	} {
+		if err := call(); !errors.Is(err, egress.ErrResponseTooLarge) || isSentinel(err) {
+			t.Errorf("%s: %v, want ErrResponseTooLarge and no sentinel", name, err)
 		}
-		defer func() { _ = rc.Close() }()
-		return io.ReadAll(rc)
 	}
-	if got, err := read(exact); err != nil || len(got) != limit {
-		t.Errorf("Get of exactly the limit = %d bytes, %v", len(got), err)
+}
+
+// TestObjectWithoutLengthRefused: an object answer that announces no length has no bound, so Get
+// refuses it instead of handing out an endless body.
+func TestObjectWithoutLengthRefused(t *testing.T) {
+	t.Parallel()
+	e := newFakeEnv(t, chunkedObject, nil)
+	rc, err := e.store.Get(t.Context(), newKey(t), nil)
+	if err == nil {
+		_ = rc.Close()
+		t.Fatal("Get of an object without Content-Length returned a body")
 	}
-	if got, err := read(over); !errors.Is(err, egress.ErrResponseTooLarge) {
-		t.Errorf("Get of one byte more = %d bytes, %v; want ErrResponseTooLarge", len(got), err)
+	if isSentinel(err) || !strings.Contains(err.Error(), "no length in the answer") {
+		t.Errorf("Get = %v, want a storage failure that says the answer has no length", err)
 	}
 }
 

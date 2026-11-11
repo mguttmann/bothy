@@ -4,6 +4,7 @@ package s3_test
 
 import (
 	"bytes"
+	"crypto/rand"
 	"errors"
 	"io"
 	"net/http"
@@ -51,6 +52,44 @@ func TestS3Conformance(t *testing.T) {
 		store, _ := seaweedStore(t, srv, srv.newBucket(t), nil)
 		return store
 	}, filestest.Options{PartSize: minPartSize})
+}
+
+// TestS3ReadsObjectAboveBodyLimit (docs/decisions.d/AUD-srv-files-01.md): an object larger than
+// the body limit of the store is read completely from SeaweedFS, whole and by range. An export
+// package (20 5.2) has no size limit and a converted original may be larger than its upload, so
+// no limit of an upload or of an answer may cut the read of a stored object.
+func TestS3ReadsObjectAboveBodyLimit(t *testing.T) {
+	t.Parallel()
+	srv := sharedSeaweed(t)
+	store, _ := seaweedStore(t, srv, srv.newBucket(t), nil)
+	key := newKey(t)
+	data := make([]byte, 3*testAnswerBytes+1)
+	if _, err := rand.Read(data); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Put(t.Context(), key, bytes.NewReader(data), int64(len(data))); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	read := func(rng *app.ByteRange) []byte {
+		t.Helper()
+		rc, err := store.Get(t.Context(), key, rng)
+		if err != nil {
+			t.Fatalf("Get %+v: %v", rng, err)
+		}
+		defer func() { _ = rc.Close() }()
+		got, err := io.ReadAll(rc)
+		if err != nil {
+			t.Fatalf("read %+v after %d bytes: %v", rng, len(got), err)
+		}
+		return got
+	}
+	if got := read(nil); !bytes.Equal(got, data) {
+		t.Errorf("the whole object: %d bytes, want the %d bytes stored", len(got), len(data))
+	}
+	rng := &app.ByteRange{Offset: testAnswerBytes - 1, Length: 2*testAnswerBytes + 2}
+	if got := read(rng); !bytes.Equal(got, data[rng.Offset:rng.Offset+rng.Length]) {
+		t.Errorf("the range %+v: %d bytes, want %d", rng, len(got), rng.Length)
+	}
 }
 
 // TestS3RequestsAreCoreS3 holds "nur Kern-S3" (12 "4.3", ADR 0010): during the suite every

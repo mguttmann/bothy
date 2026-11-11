@@ -394,6 +394,34 @@ func hugeGIF(tb testing.TB) []byte {
 	return b
 }
 
+// tallEdge is the long edge of tallPNG: above the longest edge the server decodes (12 7.2).
+const tallEdge = 70000
+
+// tallPNG is a real grey PNG of 1 x tallEdge pixels: far fewer pixels than maxPixels, and an
+// edge that makes the tables of the thumbnail scaler grow with it.
+func tallPNG(tb testing.TB) []byte {
+	tb.Helper()
+	return encodePNG(tb, image.NewGray(image.Rect(0, 0, 1, tallEdge)))
+}
+
+// tinyFrames is the number of frames of tinyFramesGIF: as pixels far below maxPixels, as frames
+// with a palette each far above it.
+const tinyFrames = 400
+
+// tinyFramesGIF is a GIF of tinyFrames frames of 1x1 pixel on a 1x1 screen with a two-colour
+// global table; every frame has a graphic control extension whose transparency index 255 lies
+// outside that table, so the decoder keeps a palette of 256 entries per frame.
+func tinyFramesGIF() []byte {
+	b := cat([]byte("GIF89a"), []byte{1, 0, 1, 0, 0x80, 0, 0}, []byte{0, 0, 0, 255, 255, 255})
+	for range tinyFrames {
+		b = cat(b,
+			[]byte{0x21, 0xF9, 4, 1, 0, 0, 255, 0},  // graphic control: transparency index 255
+			[]byte{0x2C, 0, 0, 0, 0, 1, 0, 1, 0, 0}, // image descriptor: 1x1 at 0,0
+			[]byte{2, 2, 0x44, 0x01, 0})             // code size 2, one sub-block: clear, index 0, end
+	}
+	return append(b, 0x3B)
+}
+
 // gifBlocksStart returns the offset after the header, the logical screen descriptor and the
 // global colour table (GIF89a 18 and 19).
 func gifBlocksStart(b []byte) int {

@@ -88,6 +88,24 @@ func ExceedsPixelLimit(width, height, frames, maxPixels int64) bool {
 	return false
 }
 
+// MaxImageEdge is the longest edge in pixels of an image the server decodes (12 7.2, SEC-UP-4):
+// the longest edge a JPEG or a GIF can store (16 bits). The pixel limit alone does not bound the
+// memory of a decode, because the tables of the thumbnail scaler grow with the edges of the
+// source and not with its pixels: an image of one pixel by many millions passes
+// file.image.max_pixels and still needs gigabytes. Of the types the server decodes, only a PNG
+// and the canvas header of a WebP can declare a longer edge.
+const MaxImageEdge = 1<<16 - 1
+
+// ExceedsEdgeLimit reports whether an edge of an image of width x height is longer than
+// MaxImageEdge; a negative edge counts as exceeding.
+//
+// Example:
+//
+//	domain.ExceedsEdgeLimit(1, 50_000_000) // true
+func ExceedsEdgeLimit(width, height int64) bool {
+	return width < 0 || height < 0 || width > MaxImageEdge || height > MaxImageEdge
+}
+
 // Orientation is the EXIF tag "Orientation" (values 1 to 8): how the stored pixels are turned for
 // display. 0 and values above 8 are invalid and count as 1.
 type Orientation uint8

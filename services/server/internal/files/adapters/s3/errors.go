@@ -140,6 +140,8 @@ func detail(err error, code string, status int) string {
 		return "credentials: " + cred.Error()
 	case errors.Is(err, egress.ErrResponseTooLarge):
 		return "response too large"
+	case errors.Is(err, errNoObjectLength):
+		return "no length in the answer"
 	case errors.Is(err, context.Canceled):
 		return "transport: context canceled"
 	case errors.Is(err, context.DeadlineExceeded):
@@ -162,13 +164,11 @@ func plainCode(code string) bool {
 	return true
 }
 
-// readError is an error while the caller reads a Get body. It keeps wrapping its cause
-// (egress.ErrResponseTooLarge, a broken connection) and follows the text rule of opError.
+// readError is an error while the caller reads a Get body. It keeps wrapping its cause (a broken
+// connection, the time limit) and follows the text rule of opError.
 func readError(key string, err error) error {
 	d := "read: transport"
 	switch {
-	case errors.Is(err, egress.ErrResponseTooLarge):
-		d = "read: response too large"
 	case errors.Is(err, context.Canceled):
 		d = "read: context canceled"
 	case errors.Is(err, context.DeadlineExceeded):

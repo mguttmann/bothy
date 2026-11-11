@@ -75,6 +75,34 @@ func TestExceedsPixelLimit(t *testing.T) {
 	}
 }
 
+// TestExceedsEdgeLimit pins the longest edge the server decodes to 65535 pixels (12 7.2): one
+// pixel more on either edge is refused, whatever the other edge is.
+func TestExceedsEdgeLimit(t *testing.T) {
+	t.Parallel()
+	if domain.MaxImageEdge != 65535 {
+		t.Fatalf("MaxImageEdge = %d, want 65535 (12 7.2)", domain.MaxImageEdge)
+	}
+	cases := []struct {
+		w, h int64
+		want bool
+	}{
+		{1, 1, false},
+		{65535, 65535, false},
+		{65536, 1, true},
+		{1, 65536, true},
+		{1, 50_000_000, true},
+		{50_000_000, 1, true},
+		{0, 0, false},
+		{-1, 10, true},
+		{10, -1, true},
+	}
+	for _, c := range cases {
+		if got := domain.ExceedsEdgeLimit(c.w, c.h); got != c.want {
+			t.Errorf("ExceedsEdgeLimit(%d, %d) = %v, want %v", c.w, c.h, got, c.want)
+		}
+	}
+}
+
 func TestVariantSize(t *testing.T) {
 	t.Parallel()
 	cases := []struct{ w, h, edge, ww, wh int }{

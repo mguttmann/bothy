@@ -17,8 +17,10 @@
 //     chain of the SDK (environment, shared files, instance metadata) are never used.
 //   - Every request goes through one egress client with purpose objectstore whose host policy
 //     names exactly the request host and port; http and private addresses need an entry of
-//     egress.allowed_hosts with allow_private. No redirects, no SDK retries (02 "14.3"), the time
-//     limit http.transfer_timeout and the body limit file.max_upload_bytes.
+//     egress.allowed_hosts with allow_private. No redirects, no SDK retries (02 "14.3") and the
+//     time limit http.transfer_timeout. The body of an object is as long as the store announces;
+//     every other answer is at most egress.max_response_bytes
+//     (docs/decisions.d/AUD-srv-files-01.md).
 //   - Checksums of the SDK follow file.s3.checksum_mode (default when_required); streamed bodies
 //     are signed as UNSIGNED-PAYLOAD, and the own SHA-256 of 12 "3.4" checks the content.
 //   - Every key passes domain.ValidateKey before any request; file.s3.prefix is joined with "/".
@@ -32,6 +34,5 @@
 //		EgressDeps:      egress.Deps{Logger: logger, Metrics: metrics},
 //		Secrets:         provider,           // *secrets.Provider of the process
 //		TransferTimeout: transferTimeout,    // http.transfer_timeout
-//		MaxObjectBytes:  maxUploadBytes,     // file.max_upload_bytes
 //	})
 package s3

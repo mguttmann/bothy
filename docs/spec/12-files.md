@@ -566,8 +566,13 @@ S3 driver rules (M3-02, `internal/files/adapters/s3`, docs/DECISIONS.md M3-02/1 
   one on a private address needs an `egress.allowed_hosts` entry with `allow_private`. For an
   `http` endpoint `bothy config check` fails without it (cross-check `file_s3`); a private
   address behind an `https` endpoint is refused by the egress client when it connects. TLS is always verified. Redirects are never
-  followed; the time limit of a request is `http.transfer_timeout`, the largest response body
-  `file.max_upload_bytes`.
+  followed; the time limit of a request is `http.transfer_timeout`. The body of an object is as
+  long as the storage announces in its answer and has no other limit: an export package
+  ([20-privacy.md](20-privacy.md) 5.2) has no size limit and a converted original (7.1) can be
+  larger than its upload, so `file.max_upload_bytes` bounds an upload and never the read of a
+  stored object. An object answer without a length is a storage failure. Every other response
+  body (an error document, the result of a multipart call) is at most
+  `egress.max_response_bytes` (docs/decisions.d/AUD-srv-files-01.md).
 - No retries in the SDK ([02-architecture.md](02-architecture.md) 14.3): a failed call is one
   request, and the caller sees a storage failure (`503 unavailable`); jobs retry through River.
 - `Put` and `UploadPart` stream the caller's reader without a buffer and sign it as
@@ -818,6 +823,19 @@ decode: no preview, shown as a download card. Every processing step has the time
 `file.image.processing_timeout`; at most `file.image.max_concurrent` image jobs run per
 worker at the same time. JPEG and PNG above the limit are still cleaned, because the filter never
 decodes pixels; a GIF or WebP above it stays unchanged (D-M3-06-5).
+
+The pixel count alone does not bound the memory of a decode, so two more rules belong to the
+limit (docs/decisions.d/AUD-srv-files-01.md); an image they refuse is treated exactly like one
+above `file.image.max_pixels`:
+
+- **Longest edge.** An image with an edge longer than 65535 pixels is not decoded. That is the
+  longest edge a JPEG or a GIF can store and more than a decodable WebP has; in practice only a
+  PNG declares more. The scaler of the thumbnails keeps tables as long as the edges of the
+  source, so an image of one pixel by many millions has few pixels and still needs gigabytes.
+- **Frames of a GIF.** When a GIF is decoded with all its frames (7.1), every frame counts the
+  pixels of the logical screen plus a fixed overhead for the palette and the frame record the
+  decoder keeps per frame (`gifFrameOverhead` in `internal/files/adapters/imaging`). A file of
+  many frames of one pixel therefore does not pass the limit, although its pixels are few.
 
 ### 7.3 Thumbnails
 
@@ -1334,6 +1352,8 @@ signature names only in the audit log.
 | JPEG with GPS EXIF, XMP, `APP2` with Multi-Picture Format, an appended image and orientation 6 | stored original with exactly one `APP1` (only "Orientation" = 6), `APP2` only `ICC_PROFILE`, scan data identical byte for byte, nothing after the end of the image; thumbnails with the orientation applied and the same color profile |
 | truncated JPEG | `upload_state = 'failed'`, no object in storage |
 | Image with huge dimensions and a small file size | no decoding, no preview, no rise in peak memory above a test limit |
+| PNG of one pixel by more than 65535, and GIF of many frames of one pixel, both far below `file.image.max_pixels` | no decoding, no preview; the PNG is cleaned, the GIF stays unchanged (7.2) |
+| Object larger than every body limit on the S3 driver (SeaweedFS), whole and by range | read completely (4.3) |
 | HTML and SVG upload | `Content-Disposition: attachment`, `nosniff`, sandbox CSP |
 | File name with U+202E, `../`, control characters | sanitized name, both `filename` parameters correct |
 | Someone else's file ID and a non-existent ID | identical `404` response (B7) |
