@@ -4,4 +4,5 @@
 # These tools are not shipped. Each entry names the reason and expires, so it is reviewed
 # again; Renovate proposes the fixed version as soon as one exists.
 #
-# None today: node-forge is overridden to a fixed release in package.json (SEC-OSV-2026-10-31).
+# None today: node-forge is overridden to a fixed release in package.json (SEC-OSV-2026-10-31,
+# FIX-MAIN-OSV-1111).

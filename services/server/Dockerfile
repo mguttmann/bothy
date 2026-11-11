@@ -12,7 +12,7 @@
 # the digests, and the golang tag follows the toolchain of services/server/go.mod (a test in
 # tools/ci/tests/test_dockerfile_pins.py holds both).
 
-FROM --platform=$BUILDPLATFORM golang:1.27.3-trixie@sha256:1896654cfc5c2b5ad74c07f29cb36f5d2d1cbed42e3054070fbfe444e521e83c AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.4-trixie@sha256:b54b2639de8c1bfe538ec5ffc45f29b1932235ac5f6d63c059853646677112d9 AS build
 ARG TARGETOS TARGETARCH
 WORKDIR /src/services/server
 COPY services/server/go.mod services/server/go.sum ./
@@ -71,7 +71,7 @@ ENTRYPOINT ["/usr/local/bin/bothy-smoke"]
 # No Flutter image exists for the pinned version, so the stage clones the SDK at the tag and
 # checks the revision; the SDK fetches its Dart SDK and web artifacts by the engine hash of that
 # revision. The base is the pinned builder image of the server.
-FROM --platform=$BUILDPLATFORM golang:1.27.3-trixie@sha256:1896654cfc5c2b5ad74c07f29cb36f5d2d1cbed42e3054070fbfe444e521e83c AS console
+FROM --platform=$BUILDPLATFORM golang:1.27.4-trixie@sha256:b54b2639de8c1bfe538ec5ffc45f29b1932235ac5f6d63c059853646677112d9 AS console
 ARG FLUTTER_VERSION=3.47.7
 ARG FLUTTER_REVISION=abaf9c523780a608bd46686fd5e53740a07077f8
 RUN apt-get update -qq \
