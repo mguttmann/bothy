@@ -23,17 +23,35 @@ import yaml
 REPO = Path(__file__).resolve().parents[3]
 
 # Fake OSV-Scanner: each lock file holds lines "<ecosystem> <name> <version> <id> [uncalled]";
-# a line without an id is a package without a known vulnerability.
+# a line without an id is a package without a known vulnerability. Like the real scanner it picks
+# the parser by the file name (exit 127 for a name it does not know) unless the argument names the
+# format (`gradle.lockfile:<path>`), and it reads a Gradle lock file in Gradle's own format
+# (`group:artifact:version=configurations`), where an artifact named `bad...` is vulnerable.
 FAKE_OSV = r"""
-import json, sys
+import json, os, sys
 args = sys.argv[1:]
 assert args[:2] == ["scan", "source"], args
-locks = [args[i + 1] for i, a in enumerate(args) if a == "-L"]
+KNOWN = {"uv.lock", "package-lock.json", "pubspec.lock", "go.mod", "gradle.lockfile",
+         "buildscript-gradle.lockfile"}
 results, failing = [], False
-for lock in locks:
+for arg in [args[i + 1] for i, a in enumerate(args) if a == "-L"]:
+    form, sep, lock = arg.partition(":")
+    if not sep:
+        form, lock = os.path.basename(arg), arg
+    if form not in KNOWN:
+        sys.stderr.write("could not determine extractor suitable to this file: " + arg + "\n")
+        sys.exit(127)
     pkgs = []
     for line in open(lock).read().splitlines():
-        parts = line.split()
+        if form.endswith(".lockfile"):
+            if line.startswith("#") or line.startswith("empty="):
+                continue
+            group, artifact, version = line.split("=")[0].split(":")
+            if not artifact.startswith("bad"):
+                continue
+            parts = ["Maven", group + ":" + artifact, version, "GHSA-" + artifact]
+        else:
+            parts = line.split()
         if len(parts) < 4:
             continue
         eco, name, version, vid = parts[:4]
@@ -46,7 +64,6 @@ for lock in locks:
             "vulnerabilities": [{"id": vid}],
         })
     if pkgs:
-        import os
         results.append({"source": {"path": os.path.abspath(lock), "type": "lockfile"},
                         "packages": pkgs})
 print(json.dumps({"results": results}))
@@ -102,13 +119,13 @@ class Fixture:
 
     def run(
         self,
-        base: str,
+        base: str | None,
         locks: list[str],
         mods: tuple[str, ...] | list[str] = (),
     ) -> int:
-        argv = ["--repo", str(self.repo), "--base", base]
-        argv += ["--osv-scanner", str(self.osv)]
-        argv += ["--govulncheck", f"{sys.executable} {self.gv}"]
+        argv = ["--repo", str(self.repo), "--osv-scanner", str(self.osv)]
+        if base is not None:
+            argv += ["--base", base, "--govulncheck", f"{sys.executable} {self.gv}"]
         for lock in locks:
             argv += ["--lock", lock]
         for mod in mods:
@@ -240,6 +257,94 @@ def test_a_govulncheck_error_fails(fx: Fixture, monkeypatch: pytest.MonkeyPatch)
 def test_an_unknown_base_fails(fx: Fixture) -> None:
     fx.commit({"a/uv.lock": "PyPI ok 1.0\n"})
     assert fx.run("0" * 40, ["a/uv.lock"]) == 1
+
+
+# Gradle lock files: only what ships counts, in a pull request and in the full scan.
+
+GRADLE_HEAD = "# generated\n"
+SHIPPED = "com.example:bad-lib:1.0=debugRuntimeClasspath,releaseRuntimeClasspath\n"
+BUILD_ONLY = "com.example:bad-tool:2.0=_internal-unified-test-platform-core,debugRuntimeClasspath\n"
+CLEAN = "com.example:fine:3.0=releaseRuntimeClasspath\n"
+LOCK = "app/android/gradle.lockfile"
+
+
+def test_a_vulnerable_package_a_pull_request_adds_to_a_release_classpath_fails(
+    fx: Fixture, capsys: pytest.CaptureFixture[str]
+) -> None:
+    base = fx.commit({LOCK: GRADLE_HEAD + CLEAN})
+    fx.commit({LOCK: GRADLE_HEAD + CLEAN + SHIPPED})
+    assert fx.run(base, [LOCK]) == 1
+    out = capsys.readouterr().out
+    assert f"{LOCK}: Maven com.example:bad-lib 1.0: GHSA-bad-lib" in out
+
+
+def test_a_vulnerable_package_of_a_build_or_test_configuration_does_not_count(
+    fx: Fixture, capsys: pytest.CaptureFixture[str]
+) -> None:
+    base = fx.commit({LOCK: GRADLE_HEAD + CLEAN})
+    fx.commit({LOCK: GRADLE_HEAD + CLEAN + BUILD_ONLY})
+    assert fx.run(base, [LOCK]) == 0
+    out = capsys.readouterr().out
+    assert "::error::" not in out
+    assert f"{LOCK}: 1 package(s) with a known vulnerability" in out
+    assert "do not ship" in out
+
+
+def test_a_shipped_finding_of_the_base_is_a_warning_in_a_pull_request(
+    fx: Fixture, capsys: pytest.CaptureFixture[str]
+) -> None:
+    base = fx.commit({LOCK: GRADLE_HEAD + SHIPPED})
+    fx.commit({LOCK: GRADLE_HEAD + SHIPPED + BUILD_ONLY})
+    assert fx.run(base, [LOCK]) == 0
+    out = capsys.readouterr().out
+    assert "::warning::" in out
+    assert "GHSA-bad-lib" in out
+
+
+def test_a_variant_lock_file_is_scanned_as_a_gradle_lock_file(fx: Fixture) -> None:
+    """The scanner does not know the name `gradle-firebase.lockfile`; the argument names it."""
+    variant = "app/android/gradle-firebase.lockfile"
+    base = fx.commit({variant: GRADLE_HEAD + CLEAN})
+    fx.commit({variant: GRADLE_HEAD + CLEAN + SHIPPED})
+    assert fx.run(base, [variant]) == 1
+    fx.commit({variant: GRADLE_HEAD + CLEAN})
+    assert fx.run(base, [variant]) == 0
+
+
+def test_a_gradle_lock_file_without_a_configuration_that_ships_fails(
+    fx: Fixture, capsys: pytest.CaptureFixture[str]
+) -> None:
+    line = "com.example:bad-lib:1.0=stagingRuntimeClasspath\n"
+    base = fx.commit({LOCK: GRADLE_HEAD + line})
+    fx.commit({LOCK: GRADLE_HEAD + line, "x.txt": "y\n"})
+    assert fx.run(base, [LOCK]) == 1
+    assert "names no configuration that ships" in capsys.readouterr().out
+
+
+def test_the_full_scan_fails_for_every_shipped_finding(
+    fx: Fixture, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Without a base (main, the daily scan, a local run) nothing is excused as old."""
+    fx.commit({LOCK: GRADLE_HEAD + SHIPPED + BUILD_ONLY})
+    assert fx.run(None, [LOCK]) == 1
+    out = capsys.readouterr().out
+    assert f"::error::vulnerable dependency: {LOCK}: Maven com.example:bad-lib 1.0" in out
+    assert "bad-tool" not in out
+    assert "merge base" not in out
+
+
+def test_the_full_scan_passes_when_only_build_and_test_packages_are_vulnerable(
+    fx: Fixture, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fx.commit({LOCK: GRADLE_HEAD + CLEAN + BUILD_ONLY})
+    assert fx.run(None, [LOCK]) == 0
+    assert "::error::" not in capsys.readouterr().out
+
+
+def test_the_full_scan_takes_no_go_module() -> None:
+    """govulncheck needs the base; the full scan of `make osv` runs it in its own step."""
+    with pytest.raises(SystemExit):
+        advisories.main(["--osv-scanner", "x", "--go-module", "m"])
 
 
 # Workflow and Makefile wiring.

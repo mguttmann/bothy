@@ -25,15 +25,30 @@ and a builder that builds several platforms: Docker Engine with the containerd i
 otherwise create one with `docker buildx create --name <name> --driver docker-container` and
 pass `IMAGE_BUILDER=<name>` (services/server/README.md, section "Image").
 
+What each part of the repository needs on top of git, GNU make, uv and Node.js; `make bootstrap`
+checks only uv and Node.js, the gates check the rest when they run:
+
+| Work on | `COMPONENTS` | Needs |
+|---|---|---|
+| documentation, the tools under `tools/`, workflows | | nothing more |
+| server and host service (`services/`) | `server` | Go; a Docker-compatible runtime for every server gate; for the terminal suite in `make test` also buildx, privileged containers and cgroup version 2 ([gates](docs/quality/gates.md#skipping-and-failing)) |
+| apps and Dart packages (`apps/`, `packages/`) | `apps` | Flutter; for `make test` a JDK 17 and the Android SDK (`ANDROID_HOME`) for the JVM tests of the Android code and a C++ compiler (`CXX`, default `c++`) for the tests of the Windows runner code; macOS or Windows for `make apps-platform` |
+| SDKs and plugins (`sdk/`, `plugins/`) | `sdk-python`, `sdk-typescript`, `plugins` | nothing more: uv and npm install their locked dependencies |
+| server image (`make image`, `make image-test`) | | Docker with buildx and a builder for several platforms |
+
 ```sh
 git clone https://github.com/OWNER/bothy.git
 cd bothy
 make bootstrap   # pinned tools, git hooks (pre-commit, commit-msg, pre-push)
+# In a fork, without the maintainers' deny list, a SonarQube and a reviewer ("The gates"):
+export DENYLIST_FLAGS=--allow-missing SONAR_SKIP=1 REVIEW_SKIP=1
 make check       # every gate, exactly as CI runs it
 ```
 
-`make help` lists all targets. Gates of a component that has no code yet print a `SKIP`
-line; a missing tool is an error, never a skip.
+Without the three switches `make check` stops on a fresh clone: the white-label scan fails
+without the deny list and the SonarQube step without `SONAR_TOKEN`. `make help` lists all
+targets. Gates of a component that has no code yet print a `SKIP` line; a missing tool is an
+error, never a skip.
 
 ## The gates
 
@@ -53,6 +68,27 @@ the local SonarQube, also set `export SONAR_SKIP=1`, and without an independent 
 `export REVIEW_SKIP=1`. CI checks fork pull requests the same way; a maintainer runs the full
 scan, SonarQube and the review before merging, and every push to `main` is scanned again
 with the private list (`denylist-main.yml`).
+
+### The short way
+
+A full `make check` runs every test of every component on one machine and takes hours; most of
+that is the Go tests of the server, which CI splits over several shards
+(`tools/ci/go_shards.py`; `tools/ci/go_test_timings.json` holds the measured duration of every
+package). The pre-push hook therefore runs `make check` only for the parts a push touches
+([push discipline](docs/quality/push-discipline.md)). While you work, run less:
+
+- One component: `make check COMPONENTS=server`, with the names of the table under
+  "Development setup" (several in quotes, `COMPONENTS="apps plugins"`); the gates of the other
+  components print `SKIP`.
+- One gate: `make lint`, `make test`, `make docs` and the others `make help` lists.
+- One test: `go test ./internal/<package>/...` in `services/server`, `flutter test test/<file>`
+  in an app or package, `uv run --project tools --locked pytest tools/<tool>/tests/<file>` for
+  a tool.
+- Every gate on GitHub-hosted runners instead of your machine: with push access a build branch
+  (`git push origin <branch>:build/<ticket>`,
+  [build branches](docs/quality/push-discipline.md#build-branches)); from a fork the CI of your
+  pull request, which runs the gates of the changed components
+  ([gates](docs/quality/gates.md#how-a-pull-request-lands)).
 
 ## Database migrations
 

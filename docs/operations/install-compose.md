@@ -3,11 +3,13 @@
 Status: draft M0. Guide for an instance on one host. Rules:
 [16-operations.md](../spec/16-operations.md). Files: [infra/compose/](../../infra/compose/README.md).
 
-Note: The images `bothy-server` and `bothy-postgres` are created with the first release. Until
-then, this guide is the contract that the release and the portability test fulfill.
-
 Two equivalent paths: the setup wizard in one command (section 1.1) or the manual path
 (sections 2 to 4). Both create the same instance.
+
+Until the first release no registry holds the images `bothy-server` and `bothy-postgres` and
+there is no install bundle, so the wizard and the registry of `.env.example` work from the first
+release on. Until then an instance runs on images built from the source (section 1.2) and
+follows the manual path.
 
 ## 1. Prerequisites
 
@@ -57,6 +59,45 @@ signature and checks both like any release artifact ([release.md](release.md), s
 `sh install.sh`. The wizard does not create supplied secrets (push keys, access to the off-site
 target, alert URLs). They go into `secrets/` as in the manual path (section 2, item 3); then
 `docker compose up -d` in the target folder.
+
+### 1.2 From source (until the first release)
+
+The stack reads its two images as `${BOTHY_REGISTRY}/bothy-server:${BOTHY_VERSION}` and
+`${BOTHY_REGISTRY}/bothy-postgres:pg18-${BOTHY_VERSION}`. Until a release publishes them, build
+both on the host of the instance from a checkout of the repository. This needs git, GNU make and
+Docker with the buildx plugin ([CONTRIBUTING.md](../../CONTRIBUTING.md), "Development setup").
+Each image gets a local name and the commit as its tag:
+
+```sh
+git clone https://github.com/OWNER/bothy.git
+cd bothy
+tag="src-$(git rev-parse --short HEAD)"
+make image IMAGE_NAME=localhost/bothy-server IMAGE_TAG="$tag"
+make postgres-image POSTGRES_IMAGE_NAME=localhost/bothy-postgres POSTGRES_IMAGE_TAG="pg18-$tag"
+```
+
+Both targets build for `linux/amd64` and `linux/arm64` and load the image of the host's platform
+into the local image store; that needs a buildx builder that builds several platforms
+(`make image` prints how to create one). `IMAGE_PLATFORMS=linux/arm64` (or `linux/amd64`) on
+both commands builds the host's platform only. The server image also builds the admin console,
+so its first build takes a while.
+
+Then follow the manual path from section 2 in `infra/compose/` of this checkout, with these two
+values in `.env` (the tag as printed by `echo "$tag"`):
+
+```
+BOTHY_REGISTRY=localhost
+BOTHY_VERSION=src-<commit>
+```
+
+`localhost` is no registry that publishes images: Compose takes both images from the local
+store, and a start without them fails instead of fetching something else.
+
+Update to a newer state of the source: check that state out, build both images again (the new
+commit gives a new tag), set `BOTHY_VERSION` to it and follow [upgrade.md](upgrade.md) without
+`docker compose pull`, which has nothing to pull from; `docker compose up -d` replaces the
+containers. The images of the previous tag stay in the local store until someone removes them,
+so the rollback of [upgrade.md](upgrade.md), section 3, is the previous value of `BOTHY_VERSION`.
 
 ## 2. Preparation (manual path)
 

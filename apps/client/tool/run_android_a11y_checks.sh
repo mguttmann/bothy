@@ -17,6 +17,7 @@ fi
 entry="$(pwd)/integration_test/a11y_audit/audit_app.dart"
 app_id=$(sed -n 's/^applicationId=//p' android/branding.properties)
 # Under `set -e` a failing command ends the trap with its status, so each one ignores its own.
+# shellcheck disable=SC2154 # status is set at the start of the trap text
 trap 'status=$?; adb -s "$serial" uninstall "$app_id" >/dev/null 2>&1 || true; adb -s "$serial" uninstall "$app_id.test" >/dev/null 2>&1 || true; exit $status' EXIT
 cd android
 ANDROID_SERIAL="$serial" ./gradlew --no-daemon --console=plain :app:connectedDebugAndroidTest \

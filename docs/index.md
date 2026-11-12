@@ -75,8 +75,9 @@ script; the video shows one flow on the phone:
 Until the first release Bothy runs from source: `make image && make demo` builds the server image
 and starts the demo instance with made-up data ([Run the demo](operations/demo.md)); the desktop
 and phone apps are built from `apps/client` with the branding of your instance; your own instance
-runs on the Compose stack with the image of `make image`
-([Installation with Docker Compose](operations/install-compose.md)).
+runs on the Compose stack with the images of `make image` and `make postgres-image`, built under
+a local name
+([Installation with Docker Compose: from source](operations/install-compose.md#12-from-source-until-the-first-release)).
 
 ## Quick start (from the first release)
 

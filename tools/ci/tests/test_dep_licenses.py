@@ -20,22 +20,38 @@ import pytest
 
 # Fake OSV-Scanner: each lock file holds lines "<name> <version> <license> [vuln <id>]"; a
 # license outside --licenses is a violation. FAKE_OSV_EXIT forces an exit code, FAKE_OSV_RAW
-# replaces the report.
+# replaces the report. Like the real scanner it picks the parser by the file name (exit 127 for
+# a `*.lockfile` name it does not know) unless the argument names the format
+# (`gradle.lockfile:<path>`); a Gradle lock file holds Gradle's own lines
+# (`group:artifact:version=configurations`), and the artifact name is the license.
 FAKE_OSV = r"""
 import json, os, sys
 args = sys.argv[1:]
 assert args[:2] == ["scan", "source"], args
 assert "--format" in args and args[args.index("--format") + 1] == "json", args
 allowed = [a.split("=", 1)[1] for a in args if a.startswith("--licenses=")][0].split(",")
-locks = [args[i + 1] for i, a in enumerate(args) if a == "-L"]
 with open(os.environ["FAKE_OSV_LOG"], "a") as fh:
     fh.write(json.dumps(args) + "\n")
 results, failing = [], False
-for lock in locks:
+for arg in [args[i + 1] for i, a in enumerate(args) if a == "-L"]:
+    form, sep, lock = arg.partition(":")
+    if not sep:
+        form, lock = os.path.basename(arg), arg
+    gradle = form in ("gradle.lockfile", "buildscript-gradle.lockfile")
+    if form.endswith(".lockfile") and not gradle:
+        sys.stderr.write("could not determine extractor suitable to this file: " + arg + "\n")
+        sys.exit(127)
     pkgs = []
     for line in open(lock).read().splitlines():
-        name, version, lic, *rest = line.split()
-        pkg = {"package": {"name": name, "version": version, "ecosystem": "npm"},
+        if gradle:
+            if line.startswith("#") or line.startswith("empty="):
+                continue
+            group, lic, version = line.split("=")[0].split(":")
+            name, rest, eco = group + ":" + lic, [], "Maven"
+        else:
+            name, version, lic, *rest = line.split()
+            eco = "npm"
+        pkg = {"package": {"name": name, "version": version, "ecosystem": eco},
                "licenses": [lic]}
         if lic not in allowed:
             pkg["license_violations"] = [lic]
@@ -142,3 +158,68 @@ def test_an_empty_allowlist_fails(fx: Fixture) -> None:
     lock = fx.lock("a/package-lock.json", ["a 1 GPL-3.0"])
     assert fx.run(lock, allowed="") == 1
     assert not fx.log.exists()
+
+
+# Gradle lock files: the license list applies to what ships (docs/quality/licenses.md).
+
+
+def test_a_license_outside_the_list_on_a_release_classpath_fails(
+    fx: Fixture, capsys: pytest.CaptureFixture[str]
+) -> None:
+    lock = fx.lock(
+        "app/android/gradle.lockfile",
+        [
+            "com.example:MIT:1.0=releaseRuntimeClasspath",
+            "com.example:GPL-2.0-only:2.0=debugRuntimeClasspath,releaseRuntimeClasspath",
+        ],
+    )
+    assert fx.run(lock) == 1
+    out = capsys.readouterr().out
+    assert "Maven com.example:GPL-2.0-only 2.0: GPL-2.0-only" in out
+
+
+def test_the_desugaring_library_counts_as_shipped(fx: Fixture) -> None:
+    lock = fx.lock(
+        "app/android/gradle.lockfile",
+        [
+            "com.example:MIT:1.0=releaseRuntimeClasspath",
+            "com.example:GPL-2.0-only:2.0=coreLibraryDesugaring",
+        ],
+    )
+    assert fx.run(lock) == 1
+
+
+def test_a_license_of_a_build_or_test_package_does_not_count(
+    fx: Fixture, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Build and test tools are not shipped; the scanner still exits 1 for them."""
+    lock = fx.lock(
+        "app/android/gradle.lockfile",
+        [
+            "com.example:MIT:1.0=releaseRuntimeClasspath",
+            "com.example:EPL-1.0:4.13=debugUnitTestRuntimeClasspath,releaseUnitTestRuntimeClasspath",
+            "com.example:LGPL-2.1:2.0=_internal-unified-test-platform-core",
+        ],
+    )
+    assert fx.run(lock) == 0
+    out = capsys.readouterr().out
+    assert "::error::" not in out
+    assert "2 package(s) under a license outside the list do not ship" in out
+
+
+def test_a_variant_gradle_lock_file_is_scanned_as_a_gradle_lock_file(fx: Fixture) -> None:
+    lock = fx.lock(
+        "app/android/gradle-firebase.lockfile",
+        ["com.example:Proprietary:1.0=releaseRuntimeClasspath"],
+    )
+    assert fx.run(lock) == 1
+    [args] = fx.calls()
+    assert [args[i + 1] for i, a in enumerate(args) if a == "-L"] == [f"gradle.lockfile:{lock}"]
+
+
+def test_a_gradle_lock_file_without_a_configuration_that_ships_fails(
+    fx: Fixture, capsys: pytest.CaptureFixture[str]
+) -> None:
+    lock = fx.lock("app/android/gradle.lockfile", ["com.example:MIT:1.0=stagingRuntimeClasspath"])
+    assert fx.run(lock) == 1
+    assert "names no configuration that ships" in capsys.readouterr().out

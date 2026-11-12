@@ -334,7 +334,13 @@ build with a Firebase configuration in `android/gradle-firebase.lockfile` (D-M5-
 change of a dependency or of the Flutter version run
 `./gradlew --write-locks :app:dependencies :app:assembleDebug :app:assembleDebugAndroidTest` in
 `android/`, once without and once with `app/google-services.json` (copy
-`android/fixtures/google-services.json` there and remove it afterwards). A release build runs R8; it is signed with the debug key until the distribution of
+`android/fixtures/google-services.json` there and remove it afterwards). The run also rewrites
+the lock files of the plugin `device_key` under `packages/device_key/android/`, which belong to
+that plugin's own build: restore them with `git checkout -- packages/device_key/android`.
+`make osv` and `make licenses` read both lock files of the app and judge the packages on the
+release runtime classpath and `coreLibraryDesugaring`; a vulnerable one gets a fixed version
+through `constraints` in `android/app/build.gradle.kts`, a license that deps.dev does not know
+an entry in `android/osv-scanner.toml` (docs/quality/gates.md, "Advisories"). A release build runs R8; it is signed with the debug key until the distribution of
 M7.
 
 Tests (D-M5-03-7): the widget and golden tests of `test/phone/` (system back, the channels, the

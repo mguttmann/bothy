@@ -299,10 +299,15 @@ dependencies {
     }
     // Its API returns Guava collections with checker annotations, which it names for the runtime
     // only; the versions the app already resolves.
-    androidTestImplementation("com.google.guava:guava:33.3.1-android")
+    androidTestImplementation("com.google.guava:guava:33.7.2-android")
     androidTestImplementation("org.checkerframework:checker-qual:3.43.0")
 
     constraints {
+        // media3 of video_player brings Guava into the app. Releases before 33.7.2 allocate
+        // whatever size a crafted serialized collection names (GHSA-xxph-c9ww-hj94); the advisory
+        // gate reads the release runtime classpath of the lock files
+        // (docs/decisions.d/AUD-root-01.md).
+        implementation("com.google.guava:guava:33.7.2-android")
         // patrol (the runner of the device tests, brief M5-06) brings OkHttp 2 with Okio 1 into
         // the debug app, and consistent resolution holds the test APK to it, where okhttp-tls of
         // the push tests needs Okio 3. Okio 3 keeps the binary API of Okio 1 for Java callers.

@@ -395,6 +395,8 @@ def test_linkcheck_builds_missing_dart_api_pages_first(repo: Repo) -> None:
 _FETCH = """import os, sys
 print(os.path.join(os.environ["FAKE_BIN"], sys.argv[2]))
 """
+# The license step and the module it reads the Gradle lock files with.
+_LICENSE_TOOLS = ("tools/ci/dep_licenses.py", "tools/ci/gradle_locks.py")
 
 
 @pytest.mark.parametrize("target", ["licenses", "osv"])
@@ -402,7 +404,8 @@ def test_lock_gates_read_the_root_lock_once(repo: Repo, target: str) -> None:
     repo.workspace()
     repo.write("quality/licenses/allowed.txt", "MIT\n")
     repo.write("tools/bin/fetch_tools.py", _FETCH)
-    repo.write("tools/ci/dep_licenses.py", (REPO / "tools/ci/dep_licenses.py").read_text())
+    for tool in _LICENSE_TOOLS:
+        repo.write(tool, (REPO / tool).read_text())
     osv = repo.bin / "osv-scanner"
     shutil.copy(repo.bin / "uv", osv)
     repo.commit()
@@ -436,7 +439,8 @@ def test_licenses_judges_licenses_not_advisories(repo: Repo, report: str, code: 
     repo.workspace()
     repo.write("quality/licenses/allowed.txt", "MIT\n")
     repo.write("tools/bin/fetch_tools.py", _FETCH)
-    repo.write("tools/ci/dep_licenses.py", (REPO / "tools/ci/dep_licenses.py").read_text())
+    for tool in _LICENSE_TOOLS:
+        repo.write(tool, (REPO / tool).read_text())
     osv = repo.bin / "osv-scanner"
     osv.write_text(_OSV_REPORT.format(python=sys.executable), encoding="utf-8")
     osv.chmod(0o755)

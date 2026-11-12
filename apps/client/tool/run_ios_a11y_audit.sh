@@ -25,6 +25,7 @@ if ! xcrun simctl list devices | grep "$udid" | grep -q "(Booted)"; then
   booted=1
 fi
 # Under `set -e` a failing command ends the trap with its status, so the shutdown ignores its own.
+# shellcheck disable=SC2154 # status is set at the start of the trap text
 trap 'status=$?; if [ "$booted" = 1 ]; then xcrun simctl shutdown "$udid" || true; fi; exit $status' EXIT
 xcrun simctl bootstatus "$udid" -b >/dev/null
 # Only the configuration: ios/Flutter/Generated.xcconfig gets the audit entry as FLUTTER_TARGET, so

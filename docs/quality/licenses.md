@@ -48,7 +48,8 @@ planning basis names River (MPL-2.0) for background jobs.
    `package` line; otherwise it is a finding, so that a hand-written file does not drop out of the
    SPDX check, coverage and Sonar by its name alone.
 3. Dependencies of shipped components: OSV-Scanner with `--licenses` and the list
-   above over all lock files of the component (Go, Dart, Python, npm); OSV-Scanner obtains
+   above over all lock files of the component (Go, Dart, Python, npm, and Maven through the
+   Gradle lock files of the Android builds); OSV-Scanner obtains
    license data via deps.dev (https://github.com/google/osv-scanner, retrieved 2026-10-10)
    [verified]. The step judges only license violations of the JSON report
    (`tools/ci/dep_licenses.py`); the vulnerabilities the same scan reports are the business of
@@ -64,6 +65,22 @@ planning basis names River (MPL-2.0) for background jobs.
    packages under a license outside the list that are such tools or reached only through those
    externals (`license.ignore`); a unit test of the plugin fails when another production
    dependency enters (docs/DECISIONS.md D-M7-25-5).
+   The native ecosystems of the apps: the Gradle lock files under `apps/` and `packages/`
+   (`gradle.lockfile`, the variant `gradle-firebase.lockfile` of a build with a Firebase
+   configuration, `buildscript-gradle.lockfile`) list every Maven package a build resolves, also
+   those of the build itself and of its tests, which are development tools. The step judges the
+   packages that ship: the runtime classpath of a release build and `coreLibraryDesugaring`
+   (`tools/ci/gradle_locks.py`; [gates](gates.md#advisories)). deps.dev knows most Maven
+   licenses; an `UNKNOWN` or `non-standard` one is checked against the license element of the
+   POM of that version and recorded in the `osv-scanner.toml` next to the lock files
+   (`apps/client/android/osv-scanner.toml`). That file holds two kinds of entries beyond plain
+   overrides: the Play services and Firebase libraries of a build with a Firebase configuration,
+   which ADR 0072 accepts for such a build alone (a test holds the lock file of the build without
+   Firebase free of them), and `desugar_jdk_libs` (GPL-2.0 with the Classpath Exception), which
+   has no ADR yet: its entry ends on a date, and the question is open as
+   [OQ-27](../OPEN-QUESTIONS.md#oq-27-gpl-with-the-classpath-exception-in-the-android-app).
+   The Swift packages of the Apple apps are not covered: no `Package.resolved` is tracked
+   ([what the gates do not cover](gates.md#what-the-gates-do-not-cover)).
 4. Before every release and before going public: ScanCode over the whole tree
    (license texts and copyright notices in files), result in the release record. ScanCode
    is not a pull request gate, because a run over the whole tree takes a long time. As built

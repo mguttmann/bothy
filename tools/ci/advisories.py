@@ -22,9 +22,17 @@ and the daily schedule (advisories.yml) still fail on them. A scanner error, a f
 without a readable finding and a failed base scan never pass: the head findings then all count
 as new.
 
+Gradle lock files (`*.lockfile`) list every package a build resolves, most of them for the build
+and its tests only. A package of such a file counts only when it ships (tools/ci/gradle_locks.py:
+the runtime classpath of a release build and `coreLibraryDesugaring`); the others are counted in
+one line per lock file. Without `--base` the tool is the full scan of these lock files for
+`make osv` on main, in the daily run and locally: every shipped finding fails, none is excused
+as old.
+
 Usage:
   advisories.py --base REF --osv-scanner PATH --govulncheck CMD
                 [--lock PATH]... [--go-module DIR]... [--repo DIR]
+  advisories.py --osv-scanner PATH --lock PATH [--lock PATH]... [--repo DIR]
 Exit codes: 0 nothing new, 1 a new finding or an error.
 """
 
@@ -39,6 +47,8 @@ import tempfile
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
+
+import gradle_locks
 
 # (lock file relative to the tree, ecosystem, name, version)
 OsvKey = tuple[str, str, str, str]
@@ -102,7 +112,7 @@ def run_osv(cmd: list[str], locks: list[str], cwd: Path) -> tuple[int, dict[str,
     """Run OSV-Scanner in JSON mode; exit code 0 or 1 and the report, else a GateError."""
     args = [*cmd, "scan", "source", "--format", "json"]
     for lock in locks:
-        args += ["-L", lock]
+        args += ["-L", gradle_locks.scan_arg(lock)]
     done = subprocess.run(args, check=False, cwd=cwd, capture_output=True, text=True)
     sys.stderr.write(done.stderr)
     if done.returncode not in (0, 1):
@@ -111,6 +121,34 @@ def run_osv(cmd: list[str], locks: list[str], cwd: Path) -> tuple[int, dict[str,
         return done.returncode, json.loads(done.stdout or "{}")
     except json.JSONDecodeError as err:
         raise GateError(f"osv-scanner printed no JSON: {err}") from err
+
+
+def shipped_findings(
+    report: dict[str, Any], root: Path, *, failing_only: bool
+) -> tuple[dict[OsvKey, list[str]], dict[str, int]]:
+    """The findings of a report that count, and per Gradle lock file the packages that do not.
+
+    A package of a Gradle lock file counts only when it ships (tools/ci/gradle_locks.py); the
+    second value holds, per lock file, how many failing packages the build and its tests alone
+    resolve.
+    """
+    try:
+        kept, dropped = gradle_locks.shipped_only(report)
+    except gradle_locks.LockError as err:
+        raise GateError(str(err)) from err
+    outside: dict[str, int] = {}
+    for src, pkg in dropped:
+        if any(_called(g) for g in pkg.get("groups") or []):
+            outside[_rel(src, root)] = outside.get(_rel(src, root), 0) + 1
+    return osv_findings(kept, root, failing_only=failing_only), outside
+
+
+def _note_outside(outside: dict[str, int]) -> None:
+    for src, count in sorted(outside.items()):
+        print(
+            f"advisories: {src}: {count} package(s) with a known vulnerability do not ship "
+            "(build and test configurations) and do not count"
+        )
 
 
 def base_tree(repo: Path, base: str, locks: Iterable[str], dest: Path) -> Path:
@@ -137,8 +175,11 @@ def osv_gate(repo: Path, base: str, cmd: list[str], locks: list[str]) -> list[st
     rc, report = run_osv(cmd, locks, repo)
     if rc == 0:
         return []
-    head = osv_findings(report, repo, failing_only=True)
+    head, outside = shipped_findings(report, repo, failing_only=True)
+    _note_outside(outside)
     if not head:
+        if outside:
+            return []
         return ["osv-scanner failed, but its report names no failing package"]
     old: set[OsvKey] = set()
     with tempfile.TemporaryDirectory(prefix="osv-base-") as tmp:
@@ -147,7 +188,7 @@ def osv_gate(repo: Path, base: str, cmd: list[str], locks: list[str]) -> list[st
         if present:
             try:
                 _, base_report = run_osv(cmd, [str(tree / p) for p in present], tree)
-                old = set(osv_findings(base_report, tree, failing_only=False))
+                old = set(shipped_findings(base_report, tree, failing_only=False)[0])
             except GateError as err:
                 print(f"::warning::osv base scan failed ({err}); every finding counts as new")
     errors = []
@@ -159,6 +200,23 @@ def osv_gate(repo: Path, base: str, cmd: list[str], locks: list[str]) -> list[st
         else:
             errors.append(f"vulnerable dependency added or changed by this pull request: {line}")
     return errors
+
+
+def osv_full(repo: Path, cmd: list[str], locks: list[str]) -> list[str]:
+    """Return the error lines of every OSV-Scanner finding that counts (the full scan)."""
+    if not locks:
+        return []
+    rc, report = run_osv(cmd, locks, repo)
+    if rc == 0:
+        return []
+    head, outside = shipped_findings(report, repo, failing_only=True)
+    _note_outside(outside)
+    if not head and not outside:
+        return ["osv-scanner failed, but its report names no failing package"]
+    return [
+        f"vulnerable dependency: {src}: {eco} {name} {version}: {', '.join(ids)}"
+        for (src, eco, name, version), ids in sorted(head.items())
+    ]
 
 
 def govulncheck_findings(cmd: list[str], module: Path) -> dict[GoKey, str]:
@@ -229,18 +287,27 @@ def main(argv: list[str] | None = None) -> int:
     """Command line entry; see the module docstring."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--repo", type=Path, default=Path.cwd())
-    parser.add_argument("--base", required=True)
+    parser.add_argument("--base")
     parser.add_argument("--osv-scanner", required=True)
-    parser.add_argument("--govulncheck", required=True)
+    parser.add_argument("--govulncheck")
     parser.add_argument("--lock", action="append", default=[])
     parser.add_argument("--go-module", action="append", default=[])
     args = parser.parse_args(argv)
+    if args.base is None and args.go_module:
+        parser.error("--go-module needs --base; the full scan runs govulncheck in its own step")
+    if args.base is not None and args.govulncheck is None:
+        parser.error("--base needs --govulncheck")
     repo = args.repo.resolve()
     try:
-        merge_base = _git(repo, "merge-base", "HEAD", args.base).strip()
-        print(f"advisories: findings of the merge base {merge_base} do not fail this pull request")
-        errors = osv_gate(repo, merge_base, [args.osv_scanner], args.lock)
-        errors += go_gate(repo, merge_base, shlex.split(args.govulncheck), args.go_module)
+        if args.base is None:
+            errors = osv_full(repo, [args.osv_scanner], args.lock)
+        else:
+            merge_base = _git(repo, "merge-base", "HEAD", args.base).strip()
+            print(
+                f"advisories: findings of the merge base {merge_base} do not fail this pull request"
+            )
+            errors = osv_gate(repo, merge_base, [args.osv_scanner], args.lock)
+            errors += go_gate(repo, merge_base, shlex.split(args.govulncheck), args.go_module)
     except GateError as err:
         errors = [str(err)]
     for line in errors:

@@ -22,6 +22,9 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 | `showcase/` | showcase images and video from the demo instance: capture per platform, metadata strip, manifest and its check (brief M7-28, `showcase/README.md`) | `showcase`, check in `docs` | `showcase/tests/` |
 | `ci/license_check.py` | license text and SPDX headers | `licenses` | `ci/tests/` |
 | `ci/dep_licenses.py` | licenses of the dependencies of shipped components: OSV-Scanner's JSON report, failing only for license violations, never for an advisory (PL/32) | `licenses` | `ci/tests/test_dep_licenses.py` |
+| `ci/advisories.py` | advisory gate: in a pull request only what it adds or changes (PL/25), for the Gradle lock files also the full scan | `osv` | `ci/tests/test_advisories.py`, `ci/tests/test_lock_file_gates.py` |
+| `ci/gradle_locks.py` | which packages of a Gradle lock file ship (release runtime classpath, desugaring library); read by `ci/advisories.py` and `ci/dep_licenses.py` | `osv`, `licenses` | `ci/tests/test_gradle_lock_scope.py` |
+| `ci/shell_scripts.py` | the tracked shell scripts, by suffix or first line, and ShellCheck over all of them | `lint` | `ci/tests/test_lint_scope.py` |
 | `ci/labels.py` | check labels and create them on GitHub | `labels-check`, `labels-sync` | `ci/tests/` |
 | `ci/tracked_tree.py` | copy tracked and non-ignored files into a folder, so that scanners that walk folders see only the repository | `trivy`, test `ci/tests/test_gitleaks_rules.py` | `ci/tests/` |
 | `ci/migrations_lint.py` | migration rules of the Go modules (ADR 0007, chapter 14): consecutive numbers, checksum file `migrations.sha256`, `STORED`, `NO TRANSACTION`; `lock` only adds new checksums | `migrations-lint`, `migrations-lock` | `ci/tests/` |

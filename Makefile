@@ -141,6 +141,14 @@ TS_PROJECTS := $(patsubst %/,%,$(sort $(dir $(shell git ls-files -- 'sdk/typescr
 # Lock files OSV-Scanner reads; named explicitly instead of a directory walk, so that
 # only tracked files count and .gitignore rules of enclosing checkouts cannot hide them.
 LOCK_NAMES := uv.lock package-lock.json pnpm-lock.yaml pubspec.lock go.mod
+# Gradle lock files (gradle.lockfile, a variant such as gradle-firebase.lockfile and
+# buildscript-gradle.lockfile). They also list what only the build and its tests resolve, so
+# `osv` and `licenses` read them through tools/ci/advisories.py and tools/ci/dep_licenses.py,
+# which judge the packages that ship (tools/ci/gradle_locks.py).
+# tools/ci/tests/test_lock_file_gates.py holds every tracked lock file to one of the two lists.
+GRADLE_LOCKS := '*.lockfile'
+# Those of the Dart members (the Android builds of the apps and plugins), for `licenses`.
+DART_GRADLE_LOCKS := 'apps/*.lockfile' 'packages/*.lockfile'
 PRODUCT_SOURCES := $(shell git ls-files -- 'services/*.go' 'apps/*.dart' 'packages/*.dart' 'sdk/*.py' 'sdk/*.ts' 'plugins/*.py' 'plugins/*.ts' 2>/dev/null | head -n 1)
 # Go modules with performance targets (docs/spec/02-architecture.md "Performance targets", R-AR-20);
 # the host service has none (docs/spec/24-terminal.md), so `make perf` skips it
@@ -245,15 +253,15 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-lint); else $(UVRUN) ruff check tools tests/portability; fi
 	@# Every FROM of a tracked Dockerfile is pinned by digest (SEC-SC-4, docs/spec/18-release.md "Server images").
 	$(UVRUN) python tools/ci/dockerfile_pins.py
-	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-bandit); else $(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/console-e2e tools/configdoc tools/contract tools/denylist tools/design-tokens tools/doccheck tools/docs tools/e2e tools/hooks tools/lint tools/observability tools/opscheck tools/portability tools/load tools/showcase tools/signalcheck tools/sonarqube tools/templates; fi
+	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-bandit); else $(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/console-e2e tools/configdoc tools/contract tools/denylist tools/design-tokens tools/distribution tools/doccheck tools/docs tools/e2e tools/hooks tools/lint tools/observability tools/opscheck tools/portability tools/load tools/showcase tools/signalcheck tools/sonarqube tools/templates tools/testing; fi
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
 	$(UVRUN) check-jsonschema --schemafile https://coderabbit.ai/integrations/schema.v2.json .coderabbit.yaml
 	$(call tool,actionlint) -shellcheck= -pyflakes= .github/workflows/*.yml
-	@# Shell scripts of the Compose installation and their tests (brief M7-29) and the host setup of
-	@# the OpenTofu module generic-vm (brief M7-15); each file's shebang selects the dialect.
-	$(call tool,shellcheck) $$(git ls-files -- 'infra/compose/*.sh' 'infra/compose/test/install/*.sh' 'infra/compose/test/install/stubs/*' 'infra/tofu/*.sh')
+	@# Every tracked shell script, by its name (*.sh) or its first line (tools/ci/shell_scripts.py);
+	@# each file's shebang selects the dialect.
+	sc=$(call tool,shellcheck) || exit 1; $(UVRUN) python tools/ci/shell_scripts.py --shellcheck "$$sc"
 	@if [ -n "$${GH_TOKEN:-}" ]; then $(UVRUN) zizmor --min-severity low .github/workflows; \
 	else echo "  zizmor: offline (set GH_TOKEN for the online audits)"; $(UVRUN) zizmor --offline --min-severity low .github/workflows; fi
 	@# Pins are looked up in the repository root: the lookup command uses paths relative to it.
@@ -797,15 +805,21 @@ trivy-image: ## Trivy vulnerability scan of a built image: make trivy-image IMAG
 osv: ## Known vulnerabilities: every lock file (OSV-Scanner), Go call graphs (govulncheck); with OSV_BASE only what HEAD adds (PL/25)
 	@# OSV_BASE (ci.yml sets it to the base of a pull request): the findings of the merge base
 	@# do not fail (tools/ci/advisories.py); without it the full scan, as on main and daily.
-	@locks=$$(git ls-files -- $(foreach n,$(LOCK_NAMES),'*$(n)')); \
+	@# The Gradle lock files go through tools/ci/advisories.py in the full scan too: it fails for
+	@# the vulnerable packages that ship and counts the others (tools/ci/gradle_locks.py).
+	@locks=$$(git ls-files -- $(foreach n,$(LOCK_NAMES),'*$(n)')) || exit 1; \
+	gradle=$$(git ls-files -- $(GRADLE_LOCKS)) || exit 1; \
 	if [ -n "$${OSV_BASE:-}" ]; then osv=$(call tool,osv-scanner) || exit 1; args=(); \
-	  for l in $$locks; do args+=(--lock "$$l"); done; \
+	  for l in $$locks $$gradle; do args+=(--lock "$$l"); done; \
 	  for m in $(if $(GO_ON),$(GO_MODS)); do args+=(--go-module "$$m"); done; \
 	  $(UVRUN) python tools/ci/advisories.py --base "$$OSV_BASE" --osv-scanner "$$osv" \
 	    --govulncheck "go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)" "$${args[@]}"; exit; fi; \
-	if [ -z "$$locks" ]; then $(call skip,osv,no lock file tracked); \
-	else args=(); for l in $$locks; do args+=(-L "$$l"); done; \
-	  $(call tool,osv-scanner) scan source --format table "$${args[@]}"; fi
+	if [ -z "$$locks$$gradle" ]; then $(call skip,osv,no lock file tracked); exit 0; fi; \
+	osv=$(call tool,osv-scanner) || exit 1; \
+	if [ -n "$$locks" ]; then args=(); for l in $$locks; do args+=(-L "$$l"); done; \
+	  "$$osv" scan source --format table "$${args[@]}" || exit 1; fi; \
+	if [ -n "$$gradle" ]; then args=(); for l in $$gradle; do args+=(--lock "$$l"); done; \
+	  $(UVRUN) python tools/ci/advisories.py --osv-scanner "$$osv" "$${args[@]}" || exit 1; fi
 	@if [ -n "$${OSV_BASE:-}" ]; then :; elif [ -z "$(GO_ON)" ]; then $(call skip,govulncheck,no Go module selected); \
 	else for m in $(GO_MODS); do (cd $$m && go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...) || exit 1; done; fi
 
@@ -820,7 +834,7 @@ licenses: ## License gate: LICENSE text, SPDX headers, dependency licenses of sh
 	dirs="$(if $(GO_ON),$(GO_MODS)) $(if $(PY_ON),$(PY_PROJECTS)) $(if $(TS_ON),$(TS_PROJECTS))"; \
 	args=(); for d in $$dirs; do for n in $(LOCK_NAMES); do \
 	  for l in $$(git ls-files -- "$$d/*$$n"); do args+=(-L "$$l"); done; done; done; \
-	if [ -n "$(DART_ON)" ]; then for l in $$(git ls-files -- pubspec.lock); do args+=(-L "$$l"); done; fi; \
+	if [ -n "$(DART_ON)" ]; then for l in $$(git ls-files -- pubspec.lock $(DART_GRADLE_LOCKS)); do args+=(-L "$$l"); done; fi; \
 	if [ $${#args[@]} -eq 0 ]; then $(call skip,dep-licenses,no lock file of a shipped component selected); \
 	else osv=$(call tool,osv-scanner) || exit 1; \
 	  $(UVRUN) python tools/ci/dep_licenses.py --osv-scanner "$$osv" --licenses "$$allowed" "$${args[@]}"; fi

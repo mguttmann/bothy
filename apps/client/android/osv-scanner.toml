@@ -1,0 +1,83 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# OSV-Scanner overrides of the Gradle lock files of the Android app, gradle.lockfile and
+# gradle-firebase.lockfile (docs/quality/licenses.md, "License gate" item 3). `make osv` and
+# `make licenses` judge the packages of these files that ship (tools/ci/gradle_locks.py: the
+# release runtime classpath and coreLibraryDesugaring), so every entry is a package of one of
+# them. One entry per package and version, each checked against the license element of the POM
+# of that version on 2026-11-11 (AUD-root-01); never a blanket override, a new version needs a
+# new check. The file applies to both lock files: tools/ci/tests/test_gradle_locks.py holds the
+# lock file of the build without Firebase free of the packages that only ADR 0072 accepts.
+
+[[PackageOverrides]]
+name = "androidx.media3:media3-common"
+version = "1.9.2"
+ecosystem = "Maven"
+license.override = ["Apache-2.0"]
+reason = "deps.dev knows no license for this version; its POM names The Apache Software License, Version 2.0 (https://dl.google.com/android/maven2/androidx/media3/media3-common/1.9.2/media3-common-1.9.2.pom). Runtime package of video_player_android."
+
+# GPL-2.0 with the Classpath Exception needs an ADR (docs/quality/licenses.md, "Allowed
+# licenses") and none exists: the open owner question OQ-27 (docs/OPEN-QUESTIONS.md). The entry
+# ends on the date below, so the gate turns red if the question is still open then (ruling
+# AUD-ROOT-01/5).
+
+[[PackageOverrides]]
+name = "com.android.tools:desugar_jdk_libs"
+version = "2.1.5"
+ecosystem = "Maven"
+license.ignore = true
+effectiveUntil = 2027-02-28
+reason = "Its POM names the GNU General Public License, version 2, with the Classpath Exception (https://dl.google.com/android/maven2/com/android/tools/desugar_jdk_libs/2.1.5/desugar_jdk_libs-2.1.5.pom), which is not on the list. The build compiles the parts the app uses into it (coreLibraryDesugaring, which flutter_local_notifications requires). Accepted until the date above, while OQ-27 is open."
+
+# Only in a build with a Firebase configuration (gradle-firebase.lockfile): the Play services
+# and Firebase client libraries that firebase-messaging needs are under Google's own terms, and
+# ADR 0072 accepts them for such a build alone.
+
+[[PackageOverrides]]
+name = "com.google.android.gms:play-services-base"
+version = "18.9.0"
+ecosystem = "Maven"
+license.ignore = true
+reason = "Android Software Development Kit License (license element of its POM). Runtime package of firebase-messaging, only in a build with a Firebase configuration (ADR 0072)."
+
+[[PackageOverrides]]
+name = "com.google.android.gms:play-services-basement"
+version = "18.9.0"
+ecosystem = "Maven"
+license.ignore = true
+reason = "Android Software Development Kit License (license element of its POM). Runtime package of firebase-messaging, only in a build with a Firebase configuration (ADR 0072)."
+
+[[PackageOverrides]]
+name = "com.google.android.gms:play-services-cloud-messaging"
+version = "17.4.0"
+ecosystem = "Maven"
+license.ignore = true
+reason = "Android Software Development Kit License (license element of its POM). Runtime package of firebase-messaging, only in a build with a Firebase configuration (ADR 0072)."
+
+[[PackageOverrides]]
+name = "com.google.android.gms:play-services-stats"
+version = "17.0.2"
+ecosystem = "Maven"
+license.ignore = true
+reason = "Android Software Development Kit License (license element of its POM). Runtime package of firebase-messaging, only in a build with a Firebase configuration (ADR 0072)."
+
+[[PackageOverrides]]
+name = "com.google.android.gms:play-services-tasks"
+version = "18.4.0"
+ecosystem = "Maven"
+license.ignore = true
+reason = "Android Software Development Kit License (license element of its POM). Runtime package of firebase-messaging, only in a build with a Firebase configuration (ADR 0072)."
+
+[[PackageOverrides]]
+name = "com.google.firebase:firebase-iid-interop"
+version = "17.1.0"
+ecosystem = "Maven"
+license.ignore = true
+reason = "Android Software Development Kit License (license element of its POM). Runtime package of firebase-messaging, only in a build with a Firebase configuration (ADR 0072)."
+
+[[PackageOverrides]]
+name = "com.google.firebase:firebase-measurement-connector"
+version = "19.0.0"
+ecosystem = "Maven"
+license.ignore = true
+reason = "Android Software Development Kit License (license element of its POM). Runtime package of firebase-messaging, only in a build with a Firebase configuration (ADR 0072)."

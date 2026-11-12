@@ -38,6 +38,7 @@ Sorted by deadline.
 | OQ-06 | No presence and no read receipts for people | leave it as it is | before M4 |
 | OQ-07 | Milestone for multi-node operation | M7 (M7-17); terminal relay already in M2 | before M7-17 |
 | OQ-08 | Publisher accounts for signing and distributing the apps | test publisher until the decision | before M7-12 and M7-13 |
+| OQ-27 | GPL with the Classpath Exception in the Android app (`desugar_jdk_libs`) | the library stays, accepted by the license gate until the date of its entry; recommendation: an ADR that accepts it | before the first distributed Android build |
 | OQ-09 | Live tests in third-party clouds | only `tofu validate` and a local VM | before M7-16 |
 | OQ-10 | Order of migration and publication | migration first | before M8-09 |
 | OQ-11 | External penetration test | commission it before the publication | before V1-02 |
@@ -388,6 +389,27 @@ Sorted by deadline.
 - **What the plan does with it:** V1-10 prepares the script and the checklist; findings of the
   third person become fixes with tests.
 - **Due by:** before V1-10.
+
+### OQ-27: GPL with the Classpath Exception in the Android app
+
+- **Question:** May the Android app contain `com.android.tools:desugar_jdk_libs`, the backport of
+  Java library classes of the Android build tools, whose license is the GNU General Public
+  License, version 2, with the Classpath Exception?
+- **Why only the owner:** The license list allows a GPL license in a shipped part only with an ADR
+  ([licenses](quality/licenses.md)), and accepting a copyleft license for an app the project
+  distributes is a legal decision. The audit of 2026-11-11 found the library in the app without
+  one (ruling AUD-ROOT-01/5).
+- **Default:** The library stays. The build compiles the parts the app uses into it
+  (`coreLibraryDesugaring` in `apps/client/android/app/build.gradle.kts`, which
+  `flutter_local_notifications` needs), and the Classpath Exception permits linking the library
+  with independent code and distributing the result under other terms. `make licenses` accepts
+  this package and version in `apps/client/android/osv-scanner.toml` until the date of that
+  entry and fails after it. Recommendation: accept the library with an ADR for this license and
+  exception; the entry then loses its date.
+- **What the plan does with it:** The next run on the license gate writes the ADR after a yes;
+  after a no it replaces the notification plugin or the Java library calls that need the
+  backport.
+- **Due by:** before the first distributed Android build, at the latest the date of the entry.
 
 ## Decided
 

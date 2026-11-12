@@ -61,6 +61,7 @@ host_name() {
 # the running user.
 write_conf() {
 	local tmp
+	# shellcheck disable=SC2174 # /tmp exists, so the mode is for $conf_store, the only new directory
 	mkdir -p -m 0700 "$conf_store"
 	[[ -d $conf_store && ! -L $conf_store && -O $conf_store ]] || die "$conf_store is not a directory of the running user"
 	tmp=$(mktemp "$conf_dir/.pgbackrest.conf.XXXXXX")
