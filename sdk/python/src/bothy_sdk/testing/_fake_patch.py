@@ -4,7 +4,8 @@
 Static checks run over every op first (all field errors in one ``400 validation_failed``), then
 the ops apply in order on a copy of the live box (the first failure is the only error). Set
 semantics: ``add`` and ``replace`` set a member also when it is absent, ``remove`` of an absent
-member changes nothing. Follow-up ops always miss their target, as in the server until M2-11.
+member changes nothing. A follow-up op moves the row the run keeps for that follow-up, forward
+only; a message without a row is a missing target (the server keeps the rows since M2-11).
 """
 
 from __future__ import annotations

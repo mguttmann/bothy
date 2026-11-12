@@ -65,6 +65,7 @@ import * as fixtures from "./fake/fixtures.js";
 import { Gateway } from "./fake/gateway.js";
 import { Hub } from "./fake/hub.js";
 import { FORGE_VARIANTS } from "./fake/tokens.js";
+import { FakeUploads, type Upload } from "./fake/uploads.js";
 import { consumerOk, World, type RunRecord } from "./fake/world.js";
 import { Fault, FaultKind } from "./faults.js";
 import type {
@@ -102,8 +103,17 @@ const IDEMPOTENT_KEY_OPS = new Set([
   "registerCommand",
   "updateCommand",
   "removeCommand",
+  "reportAgentSession",
+  "createUpload",
+  "completeUpload",
 ]);
-const ROUTES: readonly [string, string, string][] = [
+// The body of these operations is raw bytes, not JSON.
+const BINARY = new Set(["uploadPart"]);
+/**
+ * The operations the FakeServer serves: method, path under `/api/v1` and `operationId`
+ * (`test/fake-contract.test.ts` holds them and their answers equal to docs/api/openapi.yaml).
+ */
+export const ROUTES: readonly (readonly [string, string, string])[] = [
   ["GET", "/instance/discovery", "getDiscovery"],
   ["GET", "/instance/jwks", "getJwks"],
   ["GET", "/instance/webhook-keys", "getWebhookKeys"],
@@ -123,6 +133,12 @@ const ROUTES: readonly [string, string, string][] = [
   ["POST", "/runs/{run_id}/await-input", "awaitRunInput"],
   ["POST", "/runs/{run_id}/finish", "finishRun"],
   ["POST", "/threads/{thread_id}/messages", "createMessage"],
+  ["POST", "/threads/{thread_id}/agent-sessions/report", "reportAgentSession"],
+  ["GET", "/instance", "getInstance"],
+  ["POST", "/channels/{channel_id}/uploads", "createUpload"],
+  ["PUT", "/uploads/{file_id}/parts/{part_number}", "uploadPart"],
+  ["POST", "/uploads/{file_id}/complete", "completeUpload"],
+  ["DELETE", "/uploads/{file_id}", "abortUpload"],
   ["PATCH", "/components/{component_id}", "updateComponent"],
   ["POST", "/interactions/{interaction_id}/respond", "respondToInteraction"],
   ["POST", "/commands", "registerCommand"],
@@ -173,12 +189,32 @@ export interface FakeServerOptions {
   readonly billingMode?: S["BillingMode"];
   /** Lotse's configured tool class. Default `scoped`. */
   readonly toolClass?: S["ToolClass"];
+  /**
+   * Accept `RunFinish.costs`, as the server does since M2-22. Default `false`, which plays a
+   * server without cost booking: `finishRun` with `costs` answers `400 validation_failed`
+   * (`/costs`, `not_enabled`).
+   */
+  readonly costs?: boolean;
 }
 
 /** The options of {@link FakeServer.trigger}. */
 export interface TriggerOptions {
   /** The name of a registered command of Lotse; the run is the run of that model command. */
   readonly command?: string | undefined;
+}
+
+/** An upload session of Lotse as the FakeServer holds it. */
+export interface UploadView {
+  /** The file name the session was created with. */
+  readonly name: string;
+  /** `open`, `complete` or `aborted`. */
+  readonly state: "open" | "complete" | "aborted";
+  /** The message the file is attached to, if any. */
+  readonly attachedTo: string | undefined;
+  /** How many parts the server confirmed. */
+  readonly parts: number;
+  /** The received bytes in part order. */
+  readonly content: Uint8Array;
 }
 
 /** One REST request as the FakeServer received it: method, path (without query) and status. */
@@ -275,6 +311,7 @@ export class FakeServer implements ScenarioServer {
   readonly sdkSettings: SdkSettings;
   /** `http://127.0.0.1:<port>` after the start; empty before. */
   origin = "";
+  private readonly uploads: FakeUploads;
   private readonly hub: Hub;
   private readonly world: World;
   private readonly auth: Authenticator;
@@ -317,7 +354,9 @@ export class FakeServer implements ScenarioServer {
       billingMode: options.billingMode ?? "organization",
       toolClass: options.toolClass ?? "scoped",
       append: (type, envelope) => this.hub.append(type, envelope),
+      costs: options.costs,
     });
+    this.uploads = new FakeUploads(() => this.world.now(), this.world.lotse.id);
     const key = (options.dpop ?? true) ? new FakeDpopKey() : undefined;
     const apiToken = new Secret(
       `bothy_${randomBytes(32).toString("base64url")}`,
@@ -397,6 +436,72 @@ export class FakeServer implements ScenarioServer {
   /** The heartbeat bodies received (REST and the gateway member `agent`), in order. */
   get heartbeats(): readonly Readonly<Record<string, unknown>>[] {
     return this.world.heartbeats;
+  }
+
+  /**
+   * The `InstanceLimits` of `getInstance`, which the upload and message rules follow; a test
+   * may change its members (for example `message_max_content_bytes`).
+   */
+  get limits(): S["InstanceLimits"] {
+    return this.uploads.limits;
+  }
+
+  /** `part_size_bytes` of new upload sessions; a test sets a small one to get several parts. */
+  get uploadPartSize(): number {
+    return this.uploads.partSize;
+  }
+
+  /** Sets `part_size_bytes` of the upload sessions created from now on. */
+  set uploadPartSize(bytes: number) {
+    this.uploads.partSize = bytes;
+  }
+
+  /**
+   * Returns an upload session of Lotse with the bytes received so far.
+   *
+   * @param fileId - The `file_id` of the session.
+   * @returns The session; `undefined` when there is none.
+   */
+  upload(fileId: string): UploadView | undefined {
+    const upload = this.uploads.sessions.get(canonicalUuid(fileId) ?? "");
+    if (upload === undefined) return undefined;
+    return {
+      name: upload.name,
+      state: upload.state,
+      attachedTo: upload.attached,
+      parts: upload.parts.size,
+      content: upload.content(),
+    };
+  }
+
+  /** Accepts `costs` in `finishRun` from now on, as the server does since M2-22. */
+  enableCosts(): void {
+    this.world.costsEnabled = true;
+  }
+
+  /**
+   * Returns the `costs` a run ended with.
+   *
+   * @param runId - The run.
+   * @returns The cost reports of its `finishRun`; `undefined` when it carried none.
+   * @throws `RangeError` on an unknown run.
+   */
+  costs(runId: string): readonly S["CostReport"][] | undefined {
+    return this.runRecord(runId).costs;
+  }
+
+  /**
+   * Returns the `reportAgentSession` bodies stored for a thread, in order.
+   *
+   * @param threadId - The thread.
+   * @returns The bodies (empty without a report).
+   */
+  sessionReports(
+    threadId: string,
+  ): readonly Readonly<Record<string, unknown>>[] {
+    return [
+      ...(this.world.sessionReports.get(canonicalUuid(threadId) ?? "") ?? []),
+    ];
   }
 
   /**
@@ -507,7 +612,7 @@ export class FakeServer implements ScenarioServer {
   }
 
   /**
-   * Lets Alex post a follow-up to the run: `agent.followup`.
+   * Lets Alex post a follow-up to the run: `agent.followup` and a `queued` follow-up row.
    *
    * @param runId - The run.
    * @param text - The message content.
@@ -520,6 +625,22 @@ export class FakeServer implements ScenarioServer {
     const messageId = this.world.followup(runId, text);
     await settle();
     return messageId;
+  }
+
+  /**
+   * Returns the state of a follow-up row of a run.
+   *
+   * @param runId - The run.
+   * @param messageId - The follow-up message.
+   * @returns `queued`, `delivered`, `absorbed`, ...; `undefined` without such a row.
+   * @throws `RangeError` on an unknown run.
+   */
+  followupState(
+    runId: string,
+    messageId: string,
+  ): S["RunFollowup"]["state"] | undefined {
+    const rows = this.runRecord(runId).live.followups ?? {};
+    return rows[canonicalUuid(messageId) ?? ""]?.state;
   }
 
   /**
@@ -936,7 +1057,9 @@ export class FakeServer implements ScenarioServer {
     let answer: Answer;
     try {
       const raw = await readBody(request);
-      if (raw.length) {
+      if (BINARY.has(operationId)) {
+        body = raw;
+      } else if (raw.length) {
         try {
           body = JSON.parse(raw.toString("utf8"));
         } catch {
@@ -1223,15 +1346,31 @@ export class FakeServer implements ScenarioServer {
         return ok(200, world.awaitInput(param("run_id"), body));
       case "finishRun":
         return ok(200, world.finish(param("run_id"), body));
-      case "createMessage": {
-        const [message, created] = world.createMessage(
-          param("thread_id"),
-          body,
-        );
-        return created
-          ? ok(201, message)
-          : ok(200, message, { "Idempotent-Replay": "true" });
+      case "createMessage":
+        return this.createMessage(param("thread_id"), body);
+      case "reportAgentSession": {
+        const row = world.reportSession(param("thread_id"), body, ifMatch);
+        return ok(200, row, { ETag: `"${row.version}"` });
       }
+      case "getInstance":
+        return ok(200, this.uploads.instance(world.instanceId));
+      case "createUpload":
+        return ok(201, this.uploads.create(param("channel_id"), body));
+      case "uploadPart":
+        return ok(
+          200,
+          this.uploads.putPart(
+            param("file_id"),
+            param("part_number"),
+            body as Uint8Array,
+            headerValues(request, "content-digest")[0],
+          ),
+        );
+      case "completeUpload":
+        return ok(200, this.uploads.complete(param("file_id"), body));
+      case "abortUpload":
+        this.uploads.abort(param("file_id"));
+        return ok(204, undefined);
       case "updateComponent": {
         const component = world.updateComponent(
           param("component_id"),
@@ -1258,6 +1397,45 @@ export class FakeServer implements ScenarioServer {
       default:
         return this.answerAutocomplete(param("request_id"), body);
     }
+  }
+
+  /**
+   * `createMessage`; `attachment_file_ids` attach completed own uploads. A voice message with
+   * an upload answers `409 file_not_ready`: uploads are never scanned.
+   */
+  private createMessage(threadId: string, body: unknown): Answer {
+    const world = this.world;
+    const content =
+      isPlainObject(body) && typeof body.content_md === "string"
+        ? body.content_md
+        : "";
+    // The server refuses a content above message.max_content_bytes.
+    if (
+      Buffer.byteLength(content, "utf8") >
+      this.uploads.limits.message_max_content_bytes
+    )
+      throw fieldError("/content_md", "too_long");
+    let uploads: Upload[] = [];
+    const ids = isPlainObject(body) ? body.attachment_file_ids : undefined;
+    const known =
+      isPlainObject(body) &&
+      world.byClientMsgId.has(canonicalUuid(String(body.client_msg_id)) ?? "");
+    if (ids !== undefined && !known) {
+      if (!world.threads.has(canonicalUuid(threadId) ?? ""))
+        throw new FakeProblem("not_found");
+      uploads = this.uploads.checkAttachable(ids, world.channelId);
+      if (uploads.length && isPlainObject(body) && body.kind === "voice")
+        throw new FakeProblem("file_not_ready");
+    }
+    const [message, created] = world.createMessage(threadId, body);
+    if (created && uploads.length) this.uploads.attach(uploads, message);
+    return created
+      ? { status: 201, body: message, headers: {} }
+      : {
+          status: 200,
+          body: message,
+          headers: { "Idempotent-Replay": "true" },
+        };
   }
 
   private cacheControl(): string {

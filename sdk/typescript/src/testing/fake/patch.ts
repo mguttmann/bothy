@@ -6,7 +6,8 @@
  * Static checks run over every op first (all field errors in one `400 validation_failed`),
  * then the ops apply in order on a copy of the live box (the first failure is the only error).
  * Set semantics: `add` and `replace` set a member also when it is absent, `remove` of an absent
- * member changes nothing. Follow-up ops always miss their target, as in the server until M2-11.
+ * member changes nothing. A follow-up op moves the row the run keeps for that follow-up, forward
+ * only; a message without a row is a missing target (the server keeps the rows since M2-11).
  *
  * @module
  */
@@ -47,6 +48,14 @@ const STEP_STATUS = new Set([
   "cancelled",
 ]);
 const PLAN_STATUS = new Set(["pending", "in_progress", "completed"]);
+// The order of the follow-up states; a patch moves a row to a higher rank only.
+const FOLLOWUP_ORDER: Readonly<Record<string, number>> = {
+  queued: 0,
+  delivered: 1,
+  absorbed: 2,
+  deferred: 3,
+  discarded: 3,
+};
 const STEP_MEMBERS = new Set([
   "id",
   "kind",
@@ -500,8 +509,14 @@ export function applyOps(
       if (step === undefined) throw fail("/ops/{i}", "patch_target_missing");
       step[tokens[2] ?? ""] = value;
     } else {
-      // followup: the server has no follow-up rows yet (M2-11)
-      throw fail("/ops/{i}", "patch_target_missing");
+      // followup: only a row the run has, forward only
+      const rows = (box.followups ?? {}) as Record<string, { state: string }>;
+      const row = rows[tokens[1] ?? ""];
+      if (row === undefined) throw fail("/ops/{i}", "patch_target_missing");
+      const rank = FOLLOWUP_ORDER[value as string] ?? 0;
+      if (rank <= (FOLLOWUP_ORDER[row.state] ?? 0))
+        throw fail("/ops/{i}", "invalid_transition");
+      row.state = value as string;
     }
   }
   return box;

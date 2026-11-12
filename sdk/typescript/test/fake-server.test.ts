@@ -804,6 +804,47 @@ describe("run rules (09 4.5 and 4.5.1)", () => {
     expect((await fake.runState(runId)).starts).toBe(2);
   });
 
+  it("books the costs of finishRun once costs are enabled", async () => {
+    const costs = [
+      { provider: "example", model: "model-small", currency: "USD" },
+    ];
+    const [refused, token] = await queuedWithToken(fake, api);
+    await api.post(`/runs/${refused}/start`, startBody(token));
+    // Off by default: the answer of a server without cost booking.
+    const off = await api.post(`/runs/${refused}/finish`, {
+      state: "completed",
+      costs,
+    });
+    expect([off.status, (off.body.errors as Json[])[0]?.code]).toEqual([
+      400,
+      "not_enabled",
+    ]);
+    expect(fake.costs(refused)).toBeUndefined();
+    fake.enableCosts();
+    const on = await api.post(`/runs/${refused}/finish`, {
+      state: "completed",
+      costs,
+    });
+    expect([on.status, on.body.state]).toEqual([200, "completed"]);
+    expect(fake.costs(refused)).toEqual(costs);
+
+    const booking = new FakeServer({ costs: true });
+    await booking.start();
+    try {
+      const other = new Api(booking);
+      const [runId, t] = await queuedWithToken(booking, other);
+      await other.post(`/runs/${runId}/start`, startBody(t));
+      const done = await other.post(`/runs/${runId}/finish`, {
+        state: "completed",
+        costs,
+      });
+      expect(done.status).toBe(200);
+      expect(booking.costs(runId)).toEqual(costs);
+    } finally {
+      await booking.stop();
+    }
+  });
+
   it("lets a refused run finish failed and maps an unknown reason to adapter_error", async () => {
     const [runId] = await queuedWithToken(fake, api);
     const r = await api.post(`/runs/${runId}/finish`, {
@@ -1007,6 +1048,44 @@ describe("patches (09 5.3)", () => {
       "conflict",
       "run_not_active",
     ]);
+  });
+
+  it("keeps a row per follow-up and moves its state forward only", async () => {
+    const [runId, token] = await queuedWithToken(fake, api);
+    await api.post(`/runs/${runId}/start`, startBody(token));
+    expect((await api.get(`/runs/${runId}`)).body.followups).toEqual({});
+    const messageId = await fake.deliverFollowup(runId, "Also the footer");
+    expect(fake.followupState(runId, messageId)).toBe("queued");
+    const run = (await api.get(`/runs/${runId}`)).body as RunDoc;
+    expect(run.followups).toEqual({
+      [messageId]: { message_id: messageId, state: "queued" },
+    });
+    const patch = async (target: string, state: string): Promise<Answer> => {
+      const version = (await api.get(`/runs/${runId}`)).body.version as number;
+      return api.patch(`/runs/${runId}`, {
+        base_version: version,
+        ops: [
+          { op: "replace", path: `/followups/${target}/state`, value: state },
+        ],
+      });
+    };
+    expect((await patch(messageId, "delivered")).status).toBe(200);
+    expect((await patch(messageId, "absorbed")).status).toBe(200);
+    expect(fake.followupState(runId, messageId)).toBe("absorbed");
+    const backward = await patch(messageId, "delivered");
+    expect([backward.status, backward.body.errors]).toEqual([
+      400,
+      [{ pointer: "/ops/0", code: "invalid_transition" }],
+    ]);
+    // A message that is no follow-up of the run has no row.
+    const other = uuidv7();
+    const unknown = await patch(other, "delivered");
+    expect([unknown.status, unknown.body.errors]).toEqual([
+      400,
+      [{ pointer: "/ops/0", code: "patch_target_missing" }],
+    ]);
+    expect(fake.followupState(runId, other)).toBeUndefined();
+    expect(fake.followupState(runId, messageId)).toBe("absorbed");
   });
 
   it("needs an integer base_version and a non-empty ops list", async () => {
@@ -1249,6 +1328,315 @@ describe("Invocation-Token header, messages, commands, interactions, autocomplet
     await expect(fake.requestAutocomplete(commandId)).rejects.toThrow(
       "no live gateway connection",
     );
+  });
+});
+
+describe("instance limits, uploads and agent sessions", () => {
+  const sha256 = (data: Uint8Array): string =>
+    createHash("sha256").update(data).digest("hex");
+  const digest = (data: Uint8Array): string =>
+    `sha-256=:${createHash("sha256").update(data).digest("base64")}:`;
+
+  /** `uploadPart` with raw bytes and the credentials of Lotse. */
+  async function putPart(
+    fileId: string,
+    part: number,
+    data: Uint8Array,
+    contentDigest = digest(data),
+  ): Promise<Answer> {
+    const url = `${fake.baseUrl}/uploads/${fileId}/parts/${part}`;
+    let nonce: string | undefined;
+    for (let attempt = 0; ; attempt++) {
+      const r = await fetch(url, {
+        method: "PUT",
+        headers: {
+          authorization: `DPoP ${fake.credentials.apiToken.reveal()}`,
+          dpop: await proof(fake, "PUT", url, nonce),
+          "content-type": "application/octet-stream",
+          "content-digest": contentDigest,
+        },
+        body: data,
+      });
+      nonce = r.headers.get("dpop-nonce") ?? nonce;
+      const text = await r.text();
+      const body = (text ? JSON.parse(text) : {}) as Json;
+      if (r.status === 401 && body.code === "use_dpop_nonce" && attempt === 0)
+        continue;
+      return { status: r.status, headers: r.headers, body };
+    }
+  }
+
+  async function createUpload(data: Uint8Array, name = "answer.txt") {
+    return api.post(
+      `/channels/${channelId()}/uploads`,
+      { name, size_bytes: data.length, sha256: sha256(data) },
+      { "idempotency-key": uuidv7() },
+    );
+  }
+
+  let channel = "";
+
+  function channelId(): string {
+    return channel;
+  }
+
+  beforeEach(async () => {
+    const channels = await api.get("/agents/me/channels");
+    channel = String((channels.body.items as Json[])[0]?.channel_id);
+  });
+
+  it("answers getInstance with the configured limits", async () => {
+    const info = await api.get("/instance");
+    expect([info.status, info.body.instance_id]).toEqual([
+      200,
+      fake.instanceId,
+    ]);
+    expect(info.body.limits).toEqual({
+      message_max_content_bytes: 262144,
+      message_max_attachments: 10,
+      file_max_upload_bytes: 104857600,
+      thread_title_max_chars: 200,
+      voice_max_duration_ms: 900000,
+    });
+    fake.limits.message_max_content_bytes = 64;
+    const small = await api.get("/instance");
+    expect((small.body.limits as Json).message_max_content_bytes).toBe(64);
+  });
+
+  it("takes an upload in parts, checks each part and completes it once", async () => {
+    fake.uploadPartSize = 4;
+    const data = enc.encode("0123456789");
+    const session = await createUpload(data);
+    expect([
+      session.status,
+      session.body.mode,
+      session.body.part_size_bytes,
+    ]).toEqual([201, "direct", 4]);
+    const fileId = String(session.body.file_id);
+    expect(
+      (session.body.parts as { part_number: number }[]).map(
+        (p) => p.part_number,
+      ),
+    ).toEqual([1, 2, 3]);
+    const wrong = await putPart(fileId, 1, data.subarray(0, 4), digest(data));
+    expect([wrong.status, (wrong.body.errors as Json[])[0]?.code]).toEqual([
+      400,
+      "part_digest_mismatch",
+    ]);
+    const parts: Json[] = [];
+    for (const [i, slice] of [
+      data.subarray(0, 4),
+      data.subarray(4, 8),
+      data.subarray(8),
+    ].entries()) {
+      const stored = await putPart(fileId, i + 1, slice);
+      expect(stored.status).toBe(200);
+      parts.push(stored.body);
+    }
+    // The same part with the same digest answers again; another content is a conflict.
+    const again = await putPart(fileId, 3, data.subarray(8));
+    expect(again.body).toEqual(parts[2]);
+    const short = await putPart(fileId, 3, enc.encode("xy"));
+    expect([short.status, short.body.reason]).toEqual([409, "part_conflict"]);
+    const outside = await putPart(fileId, 4, data.subarray(8));
+    expect(outside.status).toBe(400);
+    const incomplete = await api.post(
+      `/uploads/${fileId}/complete`,
+      { parts: parts.slice(0, 2) },
+      { "idempotency-key": uuidv7() },
+    );
+    expect([incomplete.status, incomplete.body.reason]).toEqual([
+      409,
+      "upload_incomplete",
+    ]);
+    const file = await api.post(
+      `/uploads/${fileId}/complete`,
+      { parts },
+      { "idempotency-key": uuidv7() },
+    );
+    expect([
+      file.status,
+      file.body.id,
+      file.body.upload_state,
+      file.body.size_bytes,
+      file.body.original_name,
+      file.body.uploaded_by,
+    ]).toEqual([200, fileId, "complete", 10, "answer.txt", fake.agentId]);
+    expect(Buffer.from(fake.upload(fileId)?.content ?? []).toString()).toBe(
+      "0123456789",
+    );
+    // A completed session answers the file again and cannot be aborted.
+    const repeated = await api.post(
+      `/uploads/${fileId}/complete`,
+      { parts },
+      { "idempotency-key": uuidv7() },
+    );
+    expect(repeated.body.id).toBe(fileId);
+    expect((await api.delete(`/uploads/${fileId}`)).status).toBe(409);
+  });
+
+  it("aborts an open upload and refuses one above the limit", async () => {
+    const data = enc.encode("abc");
+    const session = await createUpload(data);
+    const fileId = String(session.body.file_id);
+    expect((await api.delete(`/uploads/${fileId}`)).status).toBe(204);
+    expect((await putPart(fileId, 1, data)).status).toBe(410);
+    expect((await api.delete(`/uploads/${uuidv7()}`)).status).toBe(404);
+    fake.limits.file_max_upload_bytes = 2;
+    const big = await createUpload(data);
+    expect([big.status, big.body.code]).toEqual([413, "payload_too_large"]);
+    const bad = await api.post(
+      `/channels/${channelId()}/uploads`,
+      { name: "x", size_bytes: 3, sha256: "nothex" },
+      { "idempotency-key": uuidv7() },
+    );
+    expect((bad.body.errors as Json[])[0]).toEqual({
+      pointer: "/sha256",
+      code: "pattern_mismatch",
+    });
+  });
+
+  it("attaches a completed upload to one message and refuses a too long content", async () => {
+    const triggered = await fake.trigger();
+    const data = enc.encode("the rest of the answer");
+    const session = await createUpload(data);
+    const fileId = String(session.body.file_id);
+    const open = await api.post(`/threads/${triggered.threadId}/messages`, {
+      client_msg_id: uuidv7(),
+      content_md: "early",
+      attachment_file_ids: [fileId],
+    });
+    expect([open.status, open.body.reason]).toEqual([
+      409,
+      "file_not_attachable",
+    ]);
+    const part = await putPart(fileId, 1, data);
+    await api.post(
+      `/uploads/${fileId}/complete`,
+      { parts: [part.body] },
+      { "idempotency-key": uuidv7() },
+    );
+    const voice = await api.post(`/threads/${triggered.threadId}/messages`, {
+      client_msg_id: uuidv7(),
+      kind: "voice",
+      content_md: "",
+      attachment_file_ids: [fileId],
+    });
+    expect([voice.status, voice.body.code]).toEqual([409, "file_not_ready"]);
+    const clientMsgId = uuidv7();
+    const body = {
+      client_msg_id: clientMsgId,
+      content_md: "the head",
+      attachment_file_ids: [fileId],
+    };
+    const posted = await api.post(
+      `/threads/${triggered.threadId}/messages`,
+      body,
+    );
+    expect(posted.status).toBe(201);
+    const attachments = posted.body.attachments as {
+      position: number;
+      file: { id: string };
+    }[];
+    expect(attachments.map((a) => [a.position, a.file.id])).toEqual([
+      [0, fileId],
+    ]);
+    // The same client_msg_id answers the stored message; the file is attached only once.
+    const replay = await api.post(
+      `/threads/${triggered.threadId}/messages`,
+      body,
+    );
+    expect([replay.status, replay.body.id]).toEqual([200, posted.body.id]);
+    const second = await api.post(`/threads/${triggered.threadId}/messages`, {
+      client_msg_id: uuidv7(),
+      content_md: "again",
+      attachment_file_ids: [fileId],
+    });
+    expect(second.body.reason).toBe("file_not_attachable");
+    fake.limits.message_max_content_bytes = 4;
+    const long = await api.post(`/threads/${triggered.threadId}/messages`, {
+      client_msg_id: uuidv7(),
+      content_md: "12345",
+    });
+    expect([long.status, (long.body.errors as Json[])[0]]).toEqual([
+      400,
+      { pointer: "/content_md", code: "too_long" },
+    ]);
+  });
+
+  it("keeps the agent session of a thread with compare-and-swap over its version", async () => {
+    const [runId, token] = await queuedWithToken(fake, api);
+    const threadId = fake.run(runId).thread_id;
+    const path = `/threads/${threadId}/agent-sessions/report`;
+    const report = (body: Json, ifMatch?: string): Promise<Answer> =>
+      api.post(path, body, {
+        "idempotency-key": uuidv7(),
+        ...(ifMatch === undefined ? {} : { "if-match": ifMatch }),
+      });
+    await api.post(`/runs/${runId}/start`, startBody(token));
+    const early = await report({ external_session_ref: "sess-1" }, '"1"');
+    expect([early.status, early.body.code]).toEqual([412, "version_conflict"]);
+    const unbound = await report({
+      external_session_ref: "sess-1",
+      bind_failed: "session_missing",
+    });
+    expect([unbound.status, unbound.body.reason]).toEqual([
+      409,
+      "session_not_bound",
+    ]);
+    const created = await report({ external_session_ref: "sess-1" });
+    expect([
+      created.status,
+      created.headers.get("etag"),
+      created.body.version,
+      created.body.started,
+      created.body.is_current,
+      created.body.thread_id,
+      created.body.agent_id,
+    ]).toEqual([200, '"1"', 1, false, true, threadId, fake.agentId]);
+    // A row exists: a report without its version is refused and names the current row.
+    const blind = await report({ external_session_ref: "sess-2" });
+    expect([blind.status, (blind.body.current as Json).version]).toEqual([
+      412, 1,
+    ]);
+    const confirmed = await report(
+      { external_session_ref: "sess-2", model: "model-large", started: true },
+      '"1"',
+    );
+    expect([
+      confirmed.body.version,
+      confirmed.body.started,
+      confirmed.body.external_session_ref,
+      confirmed.body.model,
+    ]).toEqual([2, true, "sess-2", "model-large"]);
+    // The bound session is gone in the runtime: a new current row takes over.
+    const rebound = await report(
+      { external_session_ref: "sess-3", bind_failed: "session_missing" },
+      '"2"',
+    );
+    expect([rebound.body.version, rebound.body.external_session_ref]).toEqual([
+      1,
+      "sess-3",
+    ]);
+    expect(rebound.body.id).not.toBe(confirmed.body.id);
+    expect(
+      fake.sessionReports(threadId).map((r) => r.external_session_ref),
+    ).toEqual(["sess-1", "sess-2", "sess-3"]);
+    const bad = await report({ external_session_ref: "" }, '"1"');
+    expect((bad.body.errors as Json[])[0]?.pointer).toBe(
+      "/external_session_ref",
+    );
+    expect((await report({ external_session_ref: "x" })).status).toBe(412);
+    await api.post(`/runs/${runId}/finish`, { state: "completed" });
+    const ended = await report({ external_session_ref: "sess-4" }, '"1"');
+    expect([ended.status, ended.body.reason]).toEqual([409, "run_not_active"]);
+    expect((await report({ external_session_ref: "x" })).status).toBe(409);
+    const nowhere = await api.post(
+      `/threads/${uuidv7()}/agent-sessions/report`,
+      { external_session_ref: "x" },
+      { "idempotency-key": uuidv7() },
+    );
+    expect(nowhere.status).toBe(404);
   });
 });
 
