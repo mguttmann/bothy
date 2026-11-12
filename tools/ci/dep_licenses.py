@@ -14,7 +14,9 @@ JSON, and a failing scan whose report names neither a license violation nor a vu
 The license list applies to what ships (docs/quality/licenses.md). A Gradle lock file
 (`*.lockfile`) also lists what only the build and its tests resolve, so a package of such a file
 counts only when it ships (tools/ci/gradle_locks.py: the runtime classpath of a release build
-and `coreLibraryDesugaring`); a lock file that names no such configuration fails.
+and `coreLibraryDesugaring`); a lock file that names no such configuration fails. A package that
+does not ship explains a failing scan only by a violation or a vulnerability of its own: without
+one in the whole report the scan failed for another reason and the step fails.
 
 Usage:
   dep_licenses.py --osv-scanner PATH --licenses LIST -L LOCK [-L LOCK]...
@@ -67,9 +69,14 @@ def judge(rc: int, report: dict[str, Any]) -> list[str]:
     except gradle_locks.LockError as err:
         raise GateError(str(err)) from err
     outside: dict[str, int] = {}
+    # The scanner exits 1 for a finding of any package it read, so a package that does not ship
+    # explains a failing scan by a finding of its own, never by being in the lock file.
+    explained = False
     for src, pkg in dropped:
         if pkg.get("license_violations"):
             outside[src] = outside.get(src, 0) + 1
+        if pkg.get("license_violations") or pkg.get("vulnerabilities"):
+            explained = True
     for src, count in sorted(outside.items()):
         print(
             f"licenses: {src}: {count} package(s) under a license outside the list do not ship "
@@ -87,7 +94,7 @@ def judge(rc: int, report: dict[str, Any]) -> list[str]:
                     f"license not allowed: {src}: {p.get('ecosystem', '')} {p.get('name', '')} "
                     f"{p.get('version', '')}: {', '.join(violations)}"
                 )
-    if rc == 1 and not errors and not vulnerable and not dropped:
+    if rc == 1 and not errors and not vulnerable and not explained:
         errors.append("osv-scanner failed, but its report names no license violation")
     if vulnerable and not errors:
         print(
