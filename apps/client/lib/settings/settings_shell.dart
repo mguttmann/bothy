@@ -17,6 +17,7 @@ import 'keyboard_section.dart';
 import 'language_section.dart';
 import 'notifications_entry.dart';
 import 'privacy_section.dart';
+import 'refused_writes_notice.dart';
 
 /// The sections of D8 in their order, with their path segment.
 enum SettingsSection {
@@ -168,17 +169,26 @@ class SettingsShell extends StatelessWidget {
   }
 }
 
-/// The body of [section].
-Widget sectionBody(SettingsSection section) => switch (section) {
-  SettingsSection.appearance => const AppearanceSection(),
-  SettingsSection.notifications => const NotificationsEntry(),
-  SettingsSection.language => const LanguageSection(),
-  SettingsSection.keyboard => const KeyboardSection(),
-  SettingsSection.devices => const DevicesSection(),
-  SettingsSection.privacy => const PrivacySection(),
-  SettingsSection.security => const AppLockSection(),
-  SettingsSection.about => const AboutSection(),
-};
+/// The body of [section], on the desktop and on the phone: the section below the notice of
+/// the settings the instance refused to store ([RefusedSettingWritesNotice]), which shows on
+/// every section while there is one.
+Widget sectionBody(SettingsSection section) => Column(
+  crossAxisAlignment: CrossAxisAlignment.stretch,
+  mainAxisSize: MainAxisSize.min,
+  children: [
+    const RefusedSettingWritesNotice(),
+    switch (section) {
+      SettingsSection.appearance => const AppearanceSection(),
+      SettingsSection.notifications => const NotificationsEntry(),
+      SettingsSection.language => const LanguageSection(),
+      SettingsSection.keyboard => const KeyboardSection(),
+      SettingsSection.devices => const DevicesSection(),
+      SettingsSection.privacy => const PrivacySection(),
+      SettingsSection.security => const AppLockSection(),
+      SettingsSection.about => const AboutSection(),
+    },
+  ],
+);
 
 /// The frame of a section: its heading and its rows.
 class SectionFrame extends StatelessWidget {

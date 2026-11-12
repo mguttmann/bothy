@@ -241,6 +241,13 @@ Password with TOTP (table `local_credentials` in 03):
 - There are no recovery codes. Recovery runs through a new enrollment code from the
   owner. Reason: a second permanent set of secrets would be a further attack path.
 
+Views (as built, docs/decisions.d/AUD-client-settings-01.md): no app and no console view calls
+`setMyLocalCredential`, `getMyCredentials`, `beginPasskeyRegistration` or `beginIdentityLink`
+(section 3.3). A person sets up a password with TOTP, a further passkey or a further identity
+through the API only; a first passkey also comes into being when an enrollment code is redeemed
+in a phone app whose build names a public domain (section 3.2). The area "Sign-in" of the
+settings and of the console is not built.
+
 ### 2.6 Configuration per driver
 
 `identity_providers.config` follows one schema per kind. Unknown fields, duplicate keys and

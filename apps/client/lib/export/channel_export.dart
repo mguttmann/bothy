@@ -73,9 +73,10 @@ final class ChannelExporter {
 
   final ApiClient _api;
 
-  /// The security requirement of `exportChannel` as the generated client sends it, so the
-  /// auth interceptors sign this request too.
-  static const Map<String, Object?> _secure = {
+  /// The security requirement of an operation as the generated client sends it, so the auth
+  /// interceptors sign a request made on the plain client too: `exportChannel` here, and the
+  /// download of the own data export in the settings.
+  static const Map<String, Object?> secured = {
     'secure': <Map<String, String>>[
       {
         'type': 'apiKey',
@@ -115,7 +116,7 @@ final class ChannelExporter {
         },
         options: Options(
           responseType: ResponseType.stream,
-          extra: {..._secure, stepUpPurposeExtra: purpose},
+          extra: {...secured, stepUpPurposeExtra: purpose},
         ),
         cancelToken: cancel,
       );

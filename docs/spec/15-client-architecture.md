@@ -189,6 +189,7 @@ rejected options: ADR 0029.
 | connection, sync state, login | `Notifier` | `sync_engine`, `auth` |
 | commands of the interface (send, react, close) | methods of a controller | write into the outbox |
 | settings, theme, density, motion | `Provider` | `user_settings` locally plus system values |
+| language and time zone of the profile | `Notifier` | `getMe`; the last answer is remembered with the secrets of the instance and shows at a start without an answer of the instance, and the instance is asked again when the connection is live again (docs/decisions.d/AUD-client-settings-01.md) |
 
 Rules: widgets hold no domain state. Screen providers are `autoDispose`; what a
 thread in focus needs lives only as long as it is visible (matches the focus op of the gateway). Tests
@@ -475,6 +476,13 @@ stays final. `412 version_conflict` ends in `Failed` with the
 person decides, without an automatic merge (04 13.3). The outcome classes of every other status
 are in docs/DECISIONS.md D-M4-15-1.
 
+An entry without a thread has no history that shows its failure. A refused write of a personal
+setting (`putMySetting`, `deleteMySetting`) shows in the settings above every section, with the
+reason, "Send again" (a new ID) and "Discard"; until the person decides, the local row keeps what
+the person chose. "Discard" reads `listMySettings`, removes the entry and puts the local row back
+to the stored value, or removes it when the instance stores none; without an answer nothing
+changes (docs/decisions.d/AUD-client-settings-01.md).
+
 ## 8. Network and login
 
 - **REST:** `api_client` (openapi-generator `dart-dio`, baseline R-Clients) with interceptors for
@@ -625,7 +633,9 @@ on, and unlocks through `local_auth` (iOS `LAPolicy.deviceOwnerAuthentication`, 
 
 Desktop app (M4-18, docs/DECISIONS.md D-M4-18-1): `apps/client/lib/platform/secure_store.dart`
 keeps the refresh token, the device ID and the database key of each instance in
-`flutter_secure_storage`, every key prefixed with `instance/<instance_id>/`; outside an instance
+`flutter_secure_storage`, every key prefixed with `instance/<instance_id>/`, and under the same
+prefix the language and the time zone the instance last named for the person (`profile`, no
+secret; deleted with the others, docs/decisions.d/AUD-client-settings-01.md); outside an instance
 the app keeps only what `AppPreferences` remembers under `app/`, none of it a secret: the server
 address (`app/server_address`), the public description of its instance, the dismissed update
 notice, a version refusal and the entry of an unfinished wipe. On macOS a release build uses

@@ -3565,6 +3565,150 @@ abstract class AppLocalizations {
   /// **'Without content, IDs or names.'**
   String get settingsClientMetricsHint;
 
+  /// Notice in the settings for a write of a setting the instance refused for good (04 section 13.2 item 5); setting is the label of the setting or its key, reason the translated problem.
+  ///
+  /// In en, this message translates to:
+  /// **'The setting \"{setting}\" was not saved: {reason}'**
+  String settingsWriteRefused(String setting, String reason);
+
+  /// Button of the notice of a refused setting: sends the write again under a new ID.
+  ///
+  /// In en, this message translates to:
+  /// **'Send again'**
+  String get settingsWriteSendAgain;
+
+  /// Button of the notice of a refused setting: removes the write and shows the value the instance stores.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get settingsWriteDiscard;
+
+  /// Line of the notice of a refused setting when discarding got no answer of the instance; reason is the translated problem.
+  ///
+  /// In en, this message translates to:
+  /// **'The stored value could not be read: {reason}'**
+  String settingsWriteDiscardFailed(String reason);
+
+  /// Label of the row in the settings section Privacy that requests and downloads the export of the own data (01 section 5.1 D8; 20 section 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Export of your data'**
+  String get settingsDataExport;
+
+  /// Hint of the row that exports the own data (20 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'A ZIP archive with what the instance stores about you: profile, devices, permissions, your messages and files, settings.'**
+  String get settingsDataExportHint;
+
+  /// Button that files the request for the export of the own data.
+  ///
+  /// In en, this message translates to:
+  /// **'Request export'**
+  String get settingsDataExportRequest;
+
+  /// Button that saves the archive of a completed export of the own data.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get settingsDataExportDownload;
+
+  /// Button that reads the state of the export request again.
+  ///
+  /// In en, this message translates to:
+  /// **'Check again'**
+  String get settingsDataExportCheck;
+
+  /// State of an export request that waits for the decision of an owner (20 section 5.1 item 2); date is the day and time of the request.
+  ///
+  /// In en, this message translates to:
+  /// **'Requested {date}. An owner has to approve the export.'**
+  String settingsDataExportWaiting(String date);
+
+  /// State of an approved export request whose archive is not ready yet; date is the day and time of the request.
+  ///
+  /// In en, this message translates to:
+  /// **'Requested {date}. The archive is being prepared.'**
+  String settingsDataExportPreparing(String date);
+
+  /// State of a completed export request; date is the day and time until which the archive is kept (20 section 5.1 item 5).
+  ///
+  /// In en, this message translates to:
+  /// **'The archive is ready. It can be downloaded until {date}.'**
+  String settingsDataExportReady(String date);
+
+  /// State of a completed export request on a phone, which has no dialog to save a file; date is the day and time until which the archive is kept.
+  ///
+  /// In en, this message translates to:
+  /// **'The archive is ready until {date}. Download it in the desktop app.'**
+  String settingsDataExportReadyNoSave(String date);
+
+  /// State of a completed export request whose archive was deleted after its time (20 section 5.1 item 5); date is the day and time of the request.
+  ///
+  /// In en, this message translates to:
+  /// **'The archive of the export requested {date} is no longer available.'**
+  String settingsDataExportExpired(String date);
+
+  /// State of an export request an owner rejected; date is the day and time of the request.
+  ///
+  /// In en, this message translates to:
+  /// **'The export requested {date} was rejected.'**
+  String settingsDataExportRejected(String date);
+
+  /// State of a cancelled export request; date is the day and time of the request.
+  ///
+  /// In en, this message translates to:
+  /// **'The export requested {date} was cancelled.'**
+  String settingsDataExportCancelled(String date);
+
+  /// State of an export request whose job failed; date is the day and time of the request.
+  ///
+  /// In en, this message translates to:
+  /// **'The export requested {date} failed.'**
+  String settingsDataExportFailed(String date);
+
+  /// State while the archive of the export is written to the chosen file.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading the archive'**
+  String get settingsDataExportDownloading;
+
+  /// Message when the export requests could not be read; reason is the translated problem.
+  ///
+  /// In en, this message translates to:
+  /// **'The state of the export could not be read: {reason}'**
+  String settingsDataExportLoadFailed(String reason);
+
+  /// Message when the request for the export was refused or got no answer; reason is the translated problem.
+  ///
+  /// In en, this message translates to:
+  /// **'The export could not be requested: {reason}'**
+  String settingsDataExportRequestFailed(String reason);
+
+  /// Message when the download of the archive was refused or got no answer; reason is the translated problem.
+  ///
+  /// In en, this message translates to:
+  /// **'The archive could not be downloaded: {reason}'**
+  String settingsDataExportDownloadFailed(String reason);
+
+  /// The reason the app sends with the request for the export of the own data; it is stored with the request and in the audit log (20 section 5.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Requested by the person in the app'**
+  String get settingsDataExportReason;
+
+  /// Purpose shown in the step-up dialog before the export of the own data is requested.
+  ///
+  /// In en, this message translates to:
+  /// **'Request the export of your data'**
+  String get stepUpPurposeDataExportRequest;
+
+  /// Purpose shown in the step-up dialog before the archive of the own data is downloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Download the export of your data'**
+  String get stepUpPurposeDataExportDownload;
+
   /// Label of the version of this build.
   ///
   /// In en, this message translates to:

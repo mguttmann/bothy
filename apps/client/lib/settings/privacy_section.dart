@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Privacy: crash reports and performance data (docs/spec/01-product.md 11; 15 16, 17; brief
-/// M4-25 Design note 4). This section only stores the switches; M4-31 sends.
+/// M4-25 Design note 4), and the export of the own data (01 5.1 D8; 20 5.1). This section only
+/// stores the switches; M4-31 sends.
 library;
 
 import 'dart:async';
@@ -11,11 +12,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
 
 import '../app/providers/ports.dart';
+import 'data_export_row.dart';
 import 'settings_providers.dart';
 import 'settings_shell.dart';
 
 /// The Privacy section: `privacy.crash_reports` only where the build names a crash target,
-/// `privacy.client_metrics` always.
+/// `privacy.client_metrics` always, then the export of the own data ([DataExportRow]).
 class PrivacySection extends ConsumerWidget {
   /// Creates the section.
   const PrivacySection({super.key});
@@ -50,6 +52,7 @@ class PrivacySection extends ConsumerWidget {
             onChanged: set(SettingKeys.clientMetrics),
           ),
         ),
+        const DataExportRow(),
       ],
     );
   }

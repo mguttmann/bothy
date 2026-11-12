@@ -390,9 +390,19 @@ How it is built (M7-07, docs/decisions.d/M7-07.md D-M7-07-1 to D-M7-07-10):
    months only with a justification that is communicated to the person within the first month
    (Art. 12(3) GDPR, https://gdpr-info.eu/art-12-gdpr/, retrieved 2026-10-10 [verified]). The
    deadline is not a configuration value because it is statutory.
-4. The console warns before the deadline expires (index `(state, due_at)` from 03). Owners also get the personal event `gdpr.request_due` once per open request (05, R-AZ-35), which becomes a hint of kind `admin` ([13-push-notifications.md](13-push-notifications.md), section 2). The job `privacy.request_reminder` sends it when `due_at` minus `privacy.request_reminder_lead` has passed, to every active owner, once (recorded in `progress`).
+4. Owners get the personal event `gdpr.request_due` once per open request (05, R-AZ-35), which becomes a hint of kind `admin` ([13-push-notifications.md](13-push-notifications.md), section 2). The job `privacy.request_reminder` sends it when `due_at` minus `privacy.request_reminder_lead` has passed, to every active owner, once (recorded in `progress`). A list of the open requests with a warning in the console (index `(state, due_at)` from 03) is not built (see "Views" below).
 5. The package is available for `privacy.export_ttl`; download with step-up (`gdpr.export.download`), then
    deleted by the job `privacy.export_expiry` (file and object; the download answers `410 gone`).
+
+Views (as built, docs/decisions.d/AUD-client-settings-01.md): the apps have one view of this
+flow, the row "Export of your data" under Settings, Privacy ([01-product.md](01-product.md) D8).
+It files the export of the person's own data (item 1), tells where the request stands (waiting
+for an owner, being prepared, ready until the end of `privacy.export_ttl`, expired, rejected,
+failed) and saves the archive on the desktop (item 5); a phone shows the state and names the
+desktop app for the download. Every other step has no view in the apps or the console and is
+reached through the API only: a deletion or a rectification request, a request an owner files for
+another person, the decision of an owner with its reason and the extension (items 2 and 3), the
+download by an owner and the list of the requests with their deadlines.
 
 Calendar month (ruling D-M7-06-1): `due_at` is the receipt in UTC plus one calendar month, the same
 day of the month; a day that does not exist in the target month moves to the last day of that month

@@ -2138,6 +2138,108 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsClientMetricsHint => 'Ohne Inhalte, IDs oder Namen.';
 
   @override
+  String settingsWriteRefused(String setting, String reason) {
+    return 'Die Einstellung „$setting“ wurde nicht gespeichert: $reason';
+  }
+
+  @override
+  String get settingsWriteSendAgain => 'Erneut senden';
+
+  @override
+  String get settingsWriteDiscard => 'Verwerfen';
+
+  @override
+  String settingsWriteDiscardFailed(String reason) {
+    return 'Der gespeicherte Wert konnte nicht gelesen werden: $reason';
+  }
+
+  @override
+  String get settingsDataExport => 'Export deiner Daten';
+
+  @override
+  String get settingsDataExportHint =>
+      'Ein ZIP-Archiv mit dem, was die Instanz über dich speichert: Profil, Geräte, Berechtigungen, deine Nachrichten und Dateien, Einstellungen.';
+
+  @override
+  String get settingsDataExportRequest => 'Export anfordern';
+
+  @override
+  String get settingsDataExportDownload => 'Herunterladen';
+
+  @override
+  String get settingsDataExportCheck => 'Erneut prüfen';
+
+  @override
+  String settingsDataExportWaiting(String date) {
+    return 'Angefordert: $date. Ein Eigentümer muss den Export genehmigen.';
+  }
+
+  @override
+  String settingsDataExportPreparing(String date) {
+    return 'Angefordert: $date. Das Archiv wird erstellt.';
+  }
+
+  @override
+  String settingsDataExportReady(String date) {
+    return 'Das Archiv ist fertig. Es kann bis $date heruntergeladen werden.';
+  }
+
+  @override
+  String settingsDataExportReadyNoSave(String date) {
+    return 'Das Archiv ist bis $date fertig. Lade es in der Desktop-App herunter.';
+  }
+
+  @override
+  String settingsDataExportExpired(String date) {
+    return 'Das Archiv des Exports, angefordert $date, ist nicht mehr verfügbar.';
+  }
+
+  @override
+  String settingsDataExportRejected(String date) {
+    return 'Der Export, angefordert $date, wurde abgelehnt.';
+  }
+
+  @override
+  String settingsDataExportCancelled(String date) {
+    return 'Der Export, angefordert $date, wurde abgebrochen.';
+  }
+
+  @override
+  String settingsDataExportFailed(String date) {
+    return 'Der Export, angefordert $date, ist fehlgeschlagen.';
+  }
+
+  @override
+  String get settingsDataExportDownloading => 'Das Archiv wird heruntergeladen';
+
+  @override
+  String settingsDataExportLoadFailed(String reason) {
+    return 'Der Stand des Exports konnte nicht gelesen werden: $reason';
+  }
+
+  @override
+  String settingsDataExportRequestFailed(String reason) {
+    return 'Der Export konnte nicht angefordert werden: $reason';
+  }
+
+  @override
+  String settingsDataExportDownloadFailed(String reason) {
+    return 'Das Archiv konnte nicht heruntergeladen werden: $reason';
+  }
+
+  @override
+  String get settingsDataExportReason =>
+      'Von der Person in der App angefordert';
+
+  @override
+  String get stepUpPurposeDataExportRequest =>
+      'Den Export deiner Daten anfordern';
+
+  @override
+  String get stepUpPurposeDataExportDownload =>
+      'Den Export deiner Daten herunterladen';
+
+  @override
   String get settingsAboutAppVersion => 'App-Version';
 
   @override

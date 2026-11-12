@@ -3022,6 +3022,184 @@
   "@settingsClientMetricsHint": {
     "description": "Hint of the setting privacy.client_metrics (15 section 17)."
   },
+  "settingsWriteRefused": "The setting \"{setting}\" was not saved: {reason}",
+  "@settingsWriteRefused": {
+    "description": "Notice in the settings for a write of a setting the instance refused for good (04 section 13.2 item 5); setting is the label of the setting or its key, reason the translated problem.",
+    "placeholders": {
+      "setting": {
+        "type": "String",
+        "example": "Theme"
+      },
+      "reason": {
+        "type": "String",
+        "example": "The input is not valid"
+      }
+    }
+  },
+  "settingsWriteSendAgain": "Send again",
+  "@settingsWriteSendAgain": {
+    "description": "Button of the notice of a refused setting: sends the write again under a new ID."
+  },
+  "settingsWriteDiscard": "Discard",
+  "@settingsWriteDiscard": {
+    "description": "Button of the notice of a refused setting: removes the write and shows the value the instance stores."
+  },
+  "settingsWriteDiscardFailed": "The stored value could not be read: {reason}",
+  "@settingsWriteDiscardFailed": {
+    "description": "Line of the notice of a refused setting when discarding got no answer of the instance; reason is the translated problem.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "No connection"
+      }
+    }
+  },
+  "settingsDataExport": "Export of your data",
+  "@settingsDataExport": {
+    "description": "Label of the row in the settings section Privacy that requests and downloads the export of the own data (01 section 5.1 D8; 20 section 5)."
+  },
+  "settingsDataExportHint": "A ZIP archive with what the instance stores about you: profile, devices, permissions, your messages and files, settings.",
+  "@settingsDataExportHint": {
+    "description": "Hint of the row that exports the own data (20 section 5.2)."
+  },
+  "settingsDataExportRequest": "Request export",
+  "@settingsDataExportRequest": {
+    "description": "Button that files the request for the export of the own data."
+  },
+  "settingsDataExportDownload": "Download",
+  "@settingsDataExportDownload": {
+    "description": "Button that saves the archive of a completed export of the own data."
+  },
+  "settingsDataExportCheck": "Check again",
+  "@settingsDataExportCheck": {
+    "description": "Button that reads the state of the export request again."
+  },
+  "settingsDataExportWaiting": "Requested {date}. An owner has to approve the export.",
+  "@settingsDataExportWaiting": {
+    "description": "State of an export request that waits for the decision of an owner (20 section 5.1 item 2); date is the day and time of the request.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "Today 2:05 PM"
+      }
+    }
+  },
+  "settingsDataExportPreparing": "Requested {date}. The archive is being prepared.",
+  "@settingsDataExportPreparing": {
+    "description": "State of an approved export request whose archive is not ready yet; date is the day and time of the request.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "Today 2:05 PM"
+      }
+    }
+  },
+  "settingsDataExportReady": "The archive is ready. It can be downloaded until {date}.",
+  "@settingsDataExportReady": {
+    "description": "State of a completed export request; date is the day and time until which the archive is kept (20 section 5.1 item 5).",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "Today 2:05 PM"
+      }
+    }
+  },
+  "settingsDataExportReadyNoSave": "The archive is ready until {date}. Download it in the desktop app.",
+  "@settingsDataExportReadyNoSave": {
+    "description": "State of a completed export request on a phone, which has no dialog to save a file; date is the day and time until which the archive is kept.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "Today 2:05 PM"
+      }
+    }
+  },
+  "settingsDataExportExpired": "The archive of the export requested {date} is no longer available.",
+  "@settingsDataExportExpired": {
+    "description": "State of a completed export request whose archive was deleted after its time (20 section 5.1 item 5); date is the day and time of the request.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "Today 2:05 PM"
+      }
+    }
+  },
+  "settingsDataExportRejected": "The export requested {date} was rejected.",
+  "@settingsDataExportRejected": {
+    "description": "State of an export request an owner rejected; date is the day and time of the request.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "Today 2:05 PM"
+      }
+    }
+  },
+  "settingsDataExportCancelled": "The export requested {date} was cancelled.",
+  "@settingsDataExportCancelled": {
+    "description": "State of a cancelled export request; date is the day and time of the request.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "Today 2:05 PM"
+      }
+    }
+  },
+  "settingsDataExportFailed": "The export requested {date} failed.",
+  "@settingsDataExportFailed": {
+    "description": "State of an export request whose job failed; date is the day and time of the request.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "Today 2:05 PM"
+      }
+    }
+  },
+  "settingsDataExportDownloading": "Downloading the archive",
+  "@settingsDataExportDownloading": {
+    "description": "State while the archive of the export is written to the chosen file."
+  },
+  "settingsDataExportLoadFailed": "The state of the export could not be read: {reason}",
+  "@settingsDataExportLoadFailed": {
+    "description": "Message when the export requests could not be read; reason is the translated problem.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "No connection"
+      }
+    }
+  },
+  "settingsDataExportRequestFailed": "The export could not be requested: {reason}",
+  "@settingsDataExportRequestFailed": {
+    "description": "Message when the request for the export was refused or got no answer; reason is the translated problem.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "No connection"
+      }
+    }
+  },
+  "settingsDataExportDownloadFailed": "The archive could not be downloaded: {reason}",
+  "@settingsDataExportDownloadFailed": {
+    "description": "Message when the download of the archive was refused or got no answer; reason is the translated problem.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "No connection"
+      }
+    }
+  },
+  "settingsDataExportReason": "Requested by the person in the app",
+  "@settingsDataExportReason": {
+    "description": "The reason the app sends with the request for the export of the own data; it is stored with the request and in the audit log (20 section 5.1)."
+  },
+  "stepUpPurposeDataExportRequest": "Request the export of your data",
+  "@stepUpPurposeDataExportRequest": {
+    "description": "Purpose shown in the step-up dialog before the export of the own data is requested."
+  },
+  "stepUpPurposeDataExportDownload": "Download the export of your data",
+  "@stepUpPurposeDataExportDownload": {
+    "description": "Purpose shown in the step-up dialog before the archive of the own data is downloaded."
+  },
   "settingsAboutAppVersion": "App version",
   "@settingsAboutAppVersion": {
     "description": "Label of the version of this build."
