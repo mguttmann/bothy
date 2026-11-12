@@ -10,10 +10,14 @@ reads it).
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 import shutil
+import socket
+import ssl
 import subprocess
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -274,6 +278,55 @@ def test_leaf_names_localhost_and_loopback(tmp_path: Path) -> None:
         check=False,
     )
     assert verify.returncode == 0, verify.stderr
+
+
+def test_leaf_passes_the_strict_check_of_the_fake_agent(tmp_path: Path) -> None:
+    """The Fake-Agent is a Python client, and Python 3.13 and later verify strictly by default.
+
+    A strict check refuses a leaf without an authority key identifier ("Missing Authority Key
+    Identifier"), which `openssl verify` and the Go client of the world job accept. Whether
+    openssl adds the identifier on its own depends on its version, so the script names it
+    (docs/decisions.d/AUD-misc-testing-01.md): without it the stack ended at the step
+    "Fake-Agent" on a build host with OpenSSL 4.
+    """
+    _, _, root = run_e2e(tmp_path, extra_env={"E2E_KEEP": "1"})
+    certs = next(root.iterdir()) / "certs"
+    server = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    server.load_cert_chain(certs / "leaf.pem", certs / "leaf.key")
+    client = ssl.create_default_context(cafile=str(certs / "ca.pem"))
+    # The default of Python 3.13 and later; named here so that an older interpreter checks too.
+    client.verify_flags |= ssl.VERIFY_X509_STRICT
+
+    def serve(listener: socket.socket) -> None:
+        # A client that refuses the leaf ends the handshake: that is the client's failure.
+        with (
+            contextlib.suppress(OSError),
+            listener.accept()[0] as raw,
+            server.wrap_socket(raw, server_side=True) as tls,
+        ):
+            tls.recv(1)
+
+    with socket.create_server(("127.0.0.1", 0)) as listener:
+        thread = threading.Thread(target=serve, args=(listener,))
+        thread.start()
+        try:
+            with (
+                socket.create_connection(listener.getsockname()) as raw,
+                client.wrap_socket(raw, server_hostname="localhost") as tls,
+            ):
+                assert tls.version() is not None
+        finally:
+            thread.join(timeout=30)
+
+    # The cause by name, whatever the openssl of the host adds on its own.
+    text = subprocess.run(
+        ["openssl", "x509", "-in", str(certs / "leaf.pem"), "-noout", "-text"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "Authority Key Identifier" in text
+    assert "Subject Key Identifier" in text
 
 
 # ---- the overlay --------------------------------------------------------------------------
