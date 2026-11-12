@@ -80,6 +80,10 @@ var (
 	// backupKinds are bothy.backup.kind of the last success: pg_full and pg_diff both record
 	// physical (M7-02).
 	backupKinds = []string{"physical", "logical", "objects"}
+	// backupRunKinds are bothy.backup.kind of bothy.backup.failures: the backup kinds of
+	// backup_runs.kind, pg_full and pg_diff apart, so a failing full backup is not hidden behind
+	// differential backups that succeed (AUD-srv-status-01).
+	backupRunKinds = []string{"pg_full", "pg_diff", "logical", "objects"}
 	// volumes are bothy.volume: the volumes bothy-backupd measures (signals.md 4.6).
 	volumes = []string{"pgdata", "files", "pgbackrest-repo", "backup-scratch"}
 	// pushProviders are bothy.push.provider: the values of push_registrations.provider (03,
@@ -449,6 +453,14 @@ var (
 		Description: "Bytes the last backup run of a kind added to its repository.",
 		Attrs:       []Attr{{Key: keyBackupKind, Values: append(slices.Clone(backupKinds), "restore_test")}},
 	}
+	// BackupFailures is bothy.backup.failures (4.6, AUD-srv-status-01): one per backup run that
+	// failed, by the kind of its backup_runs row; a run the stop of the process canceled does
+	// not count. The alert BothyBackupRunFailed reads it.
+	BackupFailures = Spec{
+		Name: "bothy.backup.failures", Kind: KindCounter, Unit: unitRun,
+		Description: "Backup runs that failed.",
+		Attrs:       []Attr{{Key: keyBackupKind, Values: backupRunKinds}},
+	}
 	// BackupRestoreTestLastSuccess is bothy.backup.restore_test.last_success.timestamp (4.6,
 	// M7-03): the Unix time of the last restore test in which no check failed; the alert
 	// BothyRestoreTestStale reads it.
@@ -673,7 +685,7 @@ func All() []Spec {
 		RunWakePending, RunWakeEnded, RunAutonomyCapReached,
 		StatsFlushDropped, StatsFlushDuration, StatsLiveSubscribers,
 		DBClientOperationDuration, DBPoolConnections,
-		BackupLastSuccess, BackupWALLastArchived, BackupDuration, BackupSize,
+		BackupLastSuccess, BackupWALLastArchived, BackupDuration, BackupSize, BackupFailures,
 		BackupRestoreTestLastSuccess, BackupRestoreTestDuration, BackupRestoreTestFailures,
 		StorageVolumeFree, StorageVolumeSize,
 		AuditVerifyFailures, AuditVerifyLastSuccess, TelemetryDropped, SecretsRefreshFailures,

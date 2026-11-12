@@ -451,6 +451,29 @@ func (d *BackupDaemon) Prime(ctx context.Context) error {
 // Sample records the WAL archive time and the volumes.
 func (d *BackupDaemon) Sample(ctx context.Context) { d.svc.Sample(ctx) }
 
+// ClearDumpDir empties the dump directory of what a run of an earlier process left there; see
+// statusapp.Service.ClearDumpDir. Only the default command of bothy-backupd calls it, at its
+// start. An error is logged and returned.
+func (d *BackupDaemon) ClearDumpDir(ctx context.Context) error {
+	_, err := d.svc.ClearDumpDir(ctx)
+	if err != nil {
+		d.log.WarnContext(ctx, "bothy-backupd: empty the dump directory", slog.String(backupdLogKeyError, err.Error()))
+	}
+	return err
+}
+
+// CloseInterrupted closes as failed with the code interrupted the backup_runs rows that were
+// still running before the given time, the start of the process; see
+// statusapp.Service.CloseInterrupted. Only the default command of bothy-backupd calls it. An
+// error is logged and returned, and the caller tries again.
+func (d *BackupDaemon) CloseInterrupted(ctx context.Context, before time.Time) error {
+	_, err := d.svc.CloseInterrupted(ctx, before)
+	if err != nil {
+		d.log.WarnContext(ctx, "bothy-backupd: close the interrupted runs", slog.String(backupdLogKeyError, err.Error()))
+	}
+	return err
+}
+
 // ExpireOffsite runs the owner's off-site expiry with the key in dir.
 func (d *BackupDaemon) ExpireOffsite(ctx context.Context, dir string) error {
 	return d.svc.ExpireOffsite(ctx, dir)

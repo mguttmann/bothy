@@ -6,7 +6,8 @@
 // kinds pg_full, pg_diff, logical and objects on their backup.* schedules and the automatic
 // restore test on backup.restore_test.schedule (M7-03). The use cases live in the module status
 // (internal/status/app); this command only loads the configuration, starts the metrics and drives
-// them through internal/wire.
+// them through internal/wire. At its start the default command empties the dump directory and
+// closes the backup_runs rows an earlier process left running (schedule).
 //
 // It is a second program of the server module and not a command of the server binary, because the server
 // binary with its API role has no business in the database image (docs/DECISIONS.md
@@ -60,9 +61,12 @@ Without a command it runs the repository host of the container backup: it starts
 "pgbackrest server" (the TLS server that postgres pushes WAL to), runs "pgbackrest
 stanza-create" until it succeeds, runs every backup kind on its schedule (backup.*, five-field
 cron in UTC, at most one run per kind; missed times are not caught up) and the restore test on
-backup.restore_test.schedule, and stops on SIGTERM or SIGINT. pgBackRest reads /etc/pgbackrest/pgbackrest.conf, which the image's entry point writes;
-repo2 (backup.offsite.target) comes from bothy-backupd. With an empty backup.offsite.target the
-start log warns "local backup only".
+backup.restore_test.schedule, and stops on SIGTERM or SIGINT. At its start it empties the
+directory of the pg_dump file and closes the backup_runs rows that a run of an earlier process
+left running as failed with the code interrupted. pgBackRest reads
+/etc/pgbackrest/pgbackrest.conf, which the image's entry point writes; repo2
+(backup.offsite.target) comes from bothy-backupd. With an empty backup.offsite.target the start
+log warns "local backup only".
 
 --pgbackrest PATH   pgBackRest binary (default pgbackrest from PATH)
 --stanza NAME       stanza of the instance (default: the stanza of the image)
@@ -72,7 +76,8 @@ start log warns "local backup only".
 
 backup KIND  runs one kind now and exits 0 when the run succeeded, 1 when it failed or the kind
              runs already. Each run writes one row of backup_runs and, when it succeeds, a
-             manifest.
+             manifest. SIGINT or SIGTERM cancels the run: its row is finished as failed with the
+             code canceled and its files are removed; the same holds for restore-test.
 expire       --offsite --credentials DIR: the owner's expiry of the off-site target with the
              separate key in DIR (files access_key_id, secret_access_key, optional ca.crt):
              pgbackrest expire on repo2 (backup.pg.retention_full) and restic forget --prune
@@ -92,8 +97,8 @@ Exit codes: 0 ok, 1 failure, 2 usage error.
 `
 
 func main() {
-	// Signals reach the default command through its own channel (run); the short commands need
-	// none.
+	// Signals reach the default command through its own channel (run) and the short commands
+	// that run a backup, the expiry or the restore test through their context (interruptible).
 	//nolint:forbidigo // like cmd/bothy, this command reads the environment once and passes it to platform/config.
 	os.Exit(run(context.Background(), os.Args[1:], os.Environ(), os.Stdout, os.Stderr))
 }
@@ -107,11 +112,11 @@ func run(ctx context.Context, args, env []string, stdout, stderr io.Writer) int 
 		case "healthcheck":
 			return healthcheckCommand(ctx, args[1:], stderr)
 		case "backup":
-			return backupCommand(ctx, args[1:], env, stderr)
+			return interruptible(ctx, func(ctx context.Context) int { return backupCommand(ctx, args[1:], env, stderr) })
 		case "expire":
-			return expireCommand(ctx, args[1:], env, stderr)
+			return interruptible(ctx, func(ctx context.Context) int { return expireCommand(ctx, args[1:], env, stderr) })
 		case "restore-test":
-			return restoreTestCommand(ctx, args[1:], env, stderr)
+			return interruptible(ctx, func(ctx context.Context) int { return restoreTestCommand(ctx, args[1:], env, stderr) })
 		case "version":
 			if len(args) > 1 {
 				return usageError(stderr, "version takes no arguments")
@@ -146,6 +151,18 @@ func run(ctx context.Context, args, env []string, stdout, stderr io.Writer) int 
 	opts.env = append(slices.Clone(env), repo2...)
 	opts.loop = func(ctx context.Context) { schedule(ctx, daemonTarget{d.d}, clock.System(), sleepUntil) }
 	return serve(ctx, opts, signals, stderr)
+}
+
+// interruptible runs a short command with a context that SIGTERM or SIGINT ends and returns its
+// exit code. Without it a Ctrl-C would end the process at once: the backup_runs row of the run
+// would stay running, and the dump of the database and the password file of pg_dump would stay
+// in the scratch volume. With it the run ends as canceled: it finishes its row as failed with
+// the code canceled and removes its files, and the command exits 1. A second signal changes
+// nothing; the cleanup of a canceled run is short.
+func interruptible(ctx context.Context, command func(ctx context.Context) int) int {
+	ctx, stop := signal.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+	return command(ctx)
 }
 
 // parseServe parses the flags of the default command. It returns the options and -1, or an

@@ -13,7 +13,9 @@ of migrations (rules in section 4).
 3. Check the signature ([release.md](release.md) 5).
 4. Backup: `migrate` requires a successful backup younger than
    `migrate.recent_backup_max_age` anyway. Before large releases, also trigger a full backup
-   by hand.
+   by hand. Without an off-site target and with the default `backup.pg.local_retention_full`,
+   that full backup removes the one before it: from then on a point-in-time restore reaches back
+   only to this backup ([backup-restore.md](backup-restore.md) 7 item 4).
 5. Check the minimum app versions: if the release raises `client.min_version.<platform>`, distribute
    the apps via the channels first.
 
@@ -52,7 +54,11 @@ whose bundle changed needs manual work, and the section "Upgrade notes" of its r
    stays; the expand/contract rule guarantees that the code of N-1 runs with it. `migrate`
    of version N-1 recognizes the newer but compatible schema and exits without a change.
 2. More than one release back: only by a restore to a point in time before the upgrade
-   ([backup-restore.md](backup-restore.md) 5.2). Data after this point in time is lost.
+   ([backup-restore.md](backup-restore.md) 5.2). Data after this point in time is lost. The
+   point must lie after the oldest full backup the repository still keeps: without an off-site
+   target and with the default `backup.pg.local_retention_full`, the first full backup after the
+   upgrade, scheduled or by hand, ends this way back
+   ([backup-restore.md](backup-restore.md) 7 item 4).
 
 ## 4. Rules for migrations (Expand/Contract)
 

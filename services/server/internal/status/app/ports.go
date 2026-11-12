@@ -159,6 +159,11 @@ type Metrics interface {
 	// when it succeeded, its finish time as the last success. For domain.KindRestoreTest it
 	// records the duration and the last success of the restore test and no size.
 	RunFinished(ctx context.Context, kind domain.Kind, succeeded bool, duration time.Duration, sizeBytes int64, finishedAt time.Time)
+	// RunFailed adds one to bothy.backup.failures for a backup run of kind that failed, under the
+	// kind of its backup_runs row, so pg_full and pg_diff count apart. The service does not call
+	// it for a run the stop of the process canceled, and never for the restore test, whose
+	// failed checks RestoreChecksFailed counts.
+	RunFailed(ctx context.Context, kind domain.Kind)
 	// LastSuccess records the last success of kind read from backup_runs at start.
 	LastSuccess(ctx context.Context, kind domain.Kind, at time.Time)
 	// WALArchived records the time the last WAL segment was archived.

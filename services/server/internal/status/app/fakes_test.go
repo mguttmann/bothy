@@ -210,6 +210,7 @@ type fakeRuns struct {
 	startErr   error
 	finishErr  error
 	lastErr    error
+	failErr    error
 	lastCalls  [][]status.BackupKind
 	states     map[ids.ID][]string
 	finishCtxs []error
@@ -293,6 +294,25 @@ func (r *fakeRuns) LatestSucceeded(_ context.Context, kinds ...status.BackupKind
 	return out, found, nil
 }
 
+// FailRunning closes the running rows started before the given time, as the adapter does.
+func (r *fakeRuns) FailRunning(_ context.Context, before time.Time, code string) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.failErr != nil {
+		return 0, r.failErr
+	}
+	n := 0
+	for _, row := range r.rows {
+		if row.state != "running" || !row.started.Before(before) {
+			continue
+		}
+		row.state, row.finished, row.code = "failed", r.clk.Now(), code
+		r.states[row.id] = append(r.states[row.id], row.state)
+		n++
+	}
+	return n, nil
+}
+
 // snapshot returns copies of the rows.
 func (r *fakeRuns) snapshot() []fakeRow {
 	r.mu.Lock()
@@ -321,6 +341,8 @@ type fakeMetrics struct {
 	wal      []time.Time
 	volumes  map[string]app.VolumeUsage
 	failed   [][]domain.CheckName
+	// runFailed are the kinds of the RunFailed calls in order.
+	runFailed []domain.Kind
 }
 
 func newFakeMetrics() *fakeMetrics {
@@ -355,4 +377,17 @@ func (m *fakeMetrics) RestoreChecksFailed(_ context.Context, checks []domain.Che
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.failed = append(m.failed, slices.Clone(checks))
+}
+
+func (m *fakeMetrics) RunFailed(_ context.Context, kind domain.Kind) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.runFailed = append(m.runFailed, kind)
+}
+
+// failedRuns returns the kinds of the RunFailed calls.
+func (m *fakeMetrics) failedRuns() []domain.Kind {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.runFailed)
 }

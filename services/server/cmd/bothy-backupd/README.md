@@ -12,7 +12,7 @@ the database image (docs/DECISIONS.md D-M7-01-3). Its version is the server vers
 | Command | Does |
 |---|---|
 | `bothy-backupd [--pgbackrest PATH] [--stanza NAME] [--retry DURATION] [--config FILE]` | loads the server configuration (keys `backup.*`, `database.*`, `file.*`, `migrate.bootstrap_*`; docs/operations/configuration.md), starts `pgbackrest server` (the TLS server of the repository host) as a child process, runs `pgbackrest --stanza=<stanza> stanza-create` until it succeeds (pgBackRest completes it without a change when the stanza exists and is valid), runs the scheduler, and stops with `SIGTERM` or `SIGINT`. When the TLS server exits on its own, `bothy-backupd` exits with `1` and the restart policy of the container starts it again. A configuration that does not load is exit code `2`. With an empty `backup.offsite.target` the start log says `warning: local backup only: backup.offsite.target is empty`. |
-| `bothy-backupd backup <pg_full\|pg_diff\|logical\|objects> [--config FILE]` | runs one kind now (runbook, tests): exit `0` when the run succeeded, `1` when it failed or the kind runs already. |
+| `bothy-backupd backup <pg_full\|pg_diff\|logical\|objects> [--config FILE]` | runs one kind now (runbook, tests): exit `0` when the run succeeded, `1` when it failed or the kind runs already. `SIGINT` (Ctrl-C) or `SIGTERM` cancels the run: it finishes its row as `failed` with the code `canceled`, removes its files and exits `1`; the same holds for `restore-test`, and `expire` ends its running step. |
 | `bothy-backupd expire --offsite --credentials DIR [--config FILE]` | the owner's expiry of the off-site target with the separate key in `DIR` ([backup-restore.md](../../../../docs/operations/backup-restore.md) 9). |
 | `bothy-backupd restore-test [--config FILE]` | runs the automatic restore test now (runbook, tests): restores the newest `pg_full` or `pg_diff` into `/var/lib/bothy-backup/restore`, starts PostgreSQL there on a Unix socket only, runs the seven checks of [16-operations.md](../../../../docs/spec/16-operations.md) 8.3, clears the directory and writes a `restore_test` row of `backup_runs`; exit `0` when no check failed, `1` otherwise. The scheduler runs the same test on `backup.restore_test.schedule`. |
 | `bothy-backupd healthcheck [--addr HOST:PORT] [--server-name NAME] [--ca FILE] [--cert FILE] [--key FILE] [--timeout DURATION]` | a TLS handshake with the pgBackRest server, with the client certificate of `backup`, accepting only a server certificate of the stack's CA for the server name; sends no pgBackRest command. The defaults are the TLS server of the container and the files of `pgbackrest_tls/`. |
@@ -37,6 +37,13 @@ variables) and drives the service through `internal/wire` (`wire.NewBackupDaemon
   each in its own goroutine; nothing before the start of the process is caught up. `pg_full` and
   `pg_diff` share one slot, and a full and a differential due together run only the full. After
   each tick it samples `pg_stat_archiver` and the volumes for the metrics.
+- Start (AUD-srv-status-01): before the first tick the default command empties the directory of
+  the `pg_dump` file (`/var/lib/bothy-backup/logical`) and closes every `backup_runs` row that
+  was `running` before its start as `failed` with the code `interrupted`: both are left by a run
+  whose process ended without its cleanup (a kill, an out-of-memory stop, a crash of the host).
+  While the database does not answer, the rows are tried again before every tick. The short
+  commands never do this, because they run next to the service (`docker compose exec`); the
+  step assumes that the default command is the first process of its container.
 - Database: the rows of `backup_runs` are written with `database.user` (the Compose service sets
   `bothy_backup` and `db_backup_password`); the manifest queries, `pg_dump` and
   `pg_stat_archiver` use `migrate.bootstrap_user`.
@@ -68,5 +75,7 @@ variables) and drives the service through `internal/wire` (`wire.NewBackupDaemon
 `stanza-create` is retried until it succeeds, an exiting TLS server fails the command, and
 `healthcheck` fails without an answer, against a server of another CA or with another name; the
 command lines of `backup` and `expire`, the configuration that must load, the variables of the
-image left out of the configuration, and the scheduler loop on a fake clock. The real image is
-tested in `services/server/test/postgresimage` (`TestBackupKinds`).
+image left out of the configuration, the scheduler loop on a fake clock with its start step
+(`TestScheduleClosesInterruptedRunsUntilItSucceeds`) and the signal context of the short commands
+(`TestInterruptibleCancelsOnSignal`). The real image is tested in
+`services/server/test/postgresimage` (`TestBackupKinds`).

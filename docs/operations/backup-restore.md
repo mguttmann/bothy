@@ -12,9 +12,9 @@ the Compose stack; with a managed PostgreSQL service the steps for pgBackRest ar
 | What | How | Where to | Check |
 |---|---|---|---|
 | WAL continuously | pgBackRest `archive-push` from `postgres` to the repository host `backup` | repo1 local, repo2 off-site | `pgbackrest check`, alert `BothyWalArchiveStale` |
-| Full and differential backup | `bothy-backupd` starts `pgbackrest backup` on schedule | repo1, repo2 | checksums per file, `pgbackrest verify` |
-| Logical dump | `pg_dump -Fc` | restic off-site | restore test |
-| Objects | restic (driver `fs`) or mirror (driver `s3`) | off-site | `restic check --read-data-subset`, sample in the test |
+| Full and differential backup | `bothy-backupd` starts `pgbackrest backup` on schedule | repo1, repo2 | repo1: checksums per file on restore and `pgbackrest verify` in the restore test (section 4); repo2: none (section 7 item 5) |
+| Logical dump | `pg_dump -Fc` | restic off-site | none; a restore by hand (5.3) is the only check (section 7 item 5) |
+| Objects | restic (driver `fs`) or mirror (driver `s3`) | off-site | driver `fs`: sample in the restore test; driver `s3`: none (section 7 item 5) |
 | Manifest | per run, JSON | next to the backup | comparison in the test |
 | Secrets | `bothy secrets export` with age | offline with the owner | trial decryption during setup |
 
@@ -33,6 +33,18 @@ As built in M7-02 ([bothy-backupd README](../../services/server/cmd/bothy-backup
 reports the metrics `bothy.backup.*` and `bothy.storage.volume.*`. One kind by hand:
 `docker compose exec backup bothy-backupd backup pg_full` (also `pg_diff`, `logical`,
 `objects`); exit code `0` means the run succeeded.
+
+A failed run has `state = 'failed'` and a code in `error`, and raises the `ticket` alert
+`BothyBackupRunFailed` with its kind ([alerting.md](../observability/alerting.md) 3.2). Two
+codes name no failed step: `canceled` is a run that a stop of `bothy-backupd`, or Ctrl-C or
+`SIGTERM` to a command run by hand, ended; the run still finishes its row and removes its files.
+`interrupted` is a row whose process ended without that step (a kill, an out-of-memory stop, a
+crash of the host): the next start of `bothy-backupd` closes every row that was still `running`
+before it and empties the directory of the logical dump in the volume `backup-scratch`, where
+such a run left its dump and the password file of `pg_dump`. Neither code raises the alert. A
+start of the service treats every run from before it as ended, so run `backup` and
+`restore-test` by hand with `docker compose exec` in the container of the service, not in a
+second container next to it, where a run would outlive a restart of the service.
 
 ## 2. Set up
 
@@ -125,8 +137,11 @@ Procedure in `bothy-backupd` according to `backup.restore_test.schedule`:
 6. Stop PostgreSQL, delete the scratch directory.
 7. Result in `backup_runs` (kind `restore_test`, duration, result per check) and as metrics.
 
-A failure is a `ticket` alert; two failures in a row or an error of the
-audit chain are `page`. The test never writes to the production database.
+A failed check is a `ticket` alert (`BothyRestoreTestFailed`), a failed check of the audit chain
+a `page` (`BothyRestoreTestAuditChainFailed`), and no successful test for longer than
+`backup.restore_test.max_age` a `ticket` (`BothyRestoreTestStale`;
+[alerting.md](../observability/alerting.md) 3.2). Apart from its row in `backup_runs`, the test
+never writes to the production database.
 
 As built (M7-03, [16-operations.md](../spec/16-operations.md) 8.3, docs/decisions.d/M7-03.md D-M7-03-1
 to D-M7-03-9):
@@ -255,6 +270,24 @@ restore of a production-sized database against `dr.rto_target`.
    (`file.delete` of an unattached upload, a replaced avatar or logo), which writes no event; such
    an upload comes back and the cleanup of never attached files removes it after
    `file.unattached_ttl`. The incident report states this.
+4. A point-in-time restore from the local repository reaches back only to the oldest full backup
+   kept there. After every `pg_full` and `pg_diff`, `bothy-backupd` expires repo1 down to
+   `backup.pg.local_retention_full` full backups (default `1`), and pgBackRest removes an expired
+   full backup together with its differential backups and the WAL before the oldest kept one.
+   With the default and without an off-site target ("local backup only") the window of 5.1
+   therefore starts anew with every full backup, the scheduled one and one run by hand: a time
+   before the newest full backup can no longer be restored from repo1, and for such a time only
+   the logical dumps within `backup.logical.retention` remain (5.3), each the state of its run.
+   With an off-site target repo2 keeps the older full backups and their WAL until the owner
+   expires them (section 9). Without one, raise `backup.pg.local_retention_full` for a longer
+   window; every further full backup and its WAL need their space in the volume
+   `pgbackrest-repo`.
+5. The automatic restore test (section 4) proves the local repository only. It restores from
+   repo1 and runs `pgbackrest verify` on repo1; the copy in repo2, the one a lost host is restored
+   from, is never restored or verified. The logical dump is never loaded into a database, and the
+   restic repository is read only for the sampled objects of the driver `fs`; with the driver
+   `s3` the file sample is skipped and the test still passes. Whether these copies restore is
+   known only after a restore by hand (5.3, [disaster-recovery.md](disaster-recovery.md)).
 
 ## 8. Immutable storage of the audit checkpoints
 

@@ -18,6 +18,13 @@ SET state = sqlc.arg(state), finished_at = sqlc.arg(finished_at), size_bytes = s
     manifest = sqlc.arg(manifest), checks = sqlc.arg(checks), error = sqlc.narg(error)
 WHERE id = sqlc.arg(id) AND state = 'running';
 
+-- name: FailRunningBackupRuns :execrows
+-- The rows of runs whose process ended before it finished them (a kill, a crash of the host):
+-- bothy-backupd closes them when it starts. Its own runs start after the given time.
+UPDATE backup_runs
+SET state = 'failed', finished_at = sqlc.arg(finished_at), error = sqlc.narg(error)
+WHERE state = 'running' AND started_at < sqlc.arg(before);
+
 -- name: LastBackupSuccess :one
 -- The index (kind, started_at DESC) serves this per kind.
 SELECT max(started_at)::timestamptz AS last_success

@@ -3,8 +3,9 @@
 // Package otelmetrics is the metrics adapter of bothy-backupd: the instruments bothy.backup.*
 // (with bothy.backup.restore_test.* of M7-03) and bothy.storage.volume.* of
 // docs/observability/signals.md 4.6 through the declarations of the metric registry
-// (platform/otel/metrics). It implements app.Metrics. pg_full and pg_diff record
-// bothy.backup.kind=physical; timestamps are Unix seconds.
+// (platform/otel/metrics). It implements app.Metrics. On the gauges pg_full and pg_diff record
+// bothy.backup.kind=physical; the counter bothy.backup.failures keeps them apart. Timestamps are
+// Unix seconds.
 //
 // Example:
 //
@@ -30,13 +31,18 @@ type Recorder struct {
 	// counter of failed checks (M7-03).
 	restoreLast, restoreDuration *metrics.Gauge
 	restoreFailures              *metrics.Counter
+	// failures counts the failed backup runs by the kind of their row.
+	failures *metrics.Counter
 }
 
 // Compile-time check: Recorder is the outgoing port of app.
 var _ app.Metrics = (*Recorder)(nil)
 
-// New creates the gauges on mp; nil means the global provider. The error is a metrics.ErrSpec
-// or an error of the meter provider.
+// New creates the instruments on mp; nil means the global provider. Every series of the two
+// failure counters starts at 0: a rule sees a failure only as an increase of a series that
+// already exists, so without the zero the first failure after each start of the process would
+// raise no alert (docs/observability/alerting.md, BothyBackupRunFailed, BothyRestoreTestFailed).
+// The error is a metrics.ErrSpec or an error of the meter provider.
 func New(mp metric.MeterProvider) (*Recorder, error) {
 	r := &Recorder{}
 	for _, g := range []struct {
@@ -58,11 +64,26 @@ func New(mp metric.MeterProvider) (*Recorder, error) {
 		}
 		*g.dst = gauge
 	}
-	c, err := metrics.NewCounter(mp, metrics.BackupRestoreTestFailures, nil)
-	if err != nil {
-		return nil, fmt.Errorf("otelmetrics: %w", err)
+	for _, c := range []struct {
+		dst  **metrics.Counter
+		spec metrics.Spec
+	}{
+		{&r.restoreFailures, metrics.BackupRestoreTestFailures},
+		{&r.failures, metrics.BackupFailures},
+	} {
+		counter, err := metrics.NewCounter(mp, c.spec, nil)
+		if err != nil {
+			return nil, fmt.Errorf("otelmetrics: %w", err)
+		}
+		*c.dst = counter
 	}
-	r.restoreFailures = c
+	ctx := context.Background()
+	for _, k := range domain.Kinds() {
+		r.failures.Add(ctx, 0, string(k))
+	}
+	for _, c := range domain.RestoreCheckNames() {
+		r.restoreFailures.Add(ctx, 0, string(c))
+	}
 	return r, nil
 }
 
@@ -95,6 +116,15 @@ func (r *Recorder) RunFinished(ctx context.Context, kind domain.Kind, succeeded 
 	if succeeded {
 		r.lastSuccess.Record(ctx, unixSeconds(finishedAt), v)
 	}
+}
+
+// RunFailed implements app.Metrics: one failed backup run under the kind of its row. The restore
+// test is no backup kind and counts nothing here; its failed checks have their own counter.
+func (r *Recorder) RunFailed(ctx context.Context, kind domain.Kind) {
+	if _, ok := domain.ParseKind(string(kind)); !ok {
+		return
+	}
+	r.failures.Add(ctx, 1, string(kind))
 }
 
 // LastSuccess implements app.Metrics.
