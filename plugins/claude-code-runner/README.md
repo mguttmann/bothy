@@ -343,7 +343,9 @@ model in `system/init` and `modelUsage` without the selector in square brackets.
   while a turn runs (for example a turn record that cannot be written) stops the turn like a
   stop, then the run ends `failed` with `adapter_error` and a summary that names only the kind
   of the error (log code `run_failed_unexpectedly`); the record and the run files go with the
-  turn. The run of an adopted turn ends the same way.
+  turn. The run of an adopted turn ends the same way, unless its follow fails only because the
+  runner itself ends (the runner's client for the server is closed by then): that turn keeps
+  running with its record, and the next start adopts it again.
 - **Crash of the runner**: turns keep running in their own process group with stdout and stderr in
   files. At start, before the first inbox event and heartbeat, the runner reads the turn records
   and, after checking the identity of each process (`ps` start time and session reference),
@@ -777,8 +779,9 @@ the agent ends with `definition_missing`). `tests/unit/test_definition.py` runs 
 `tests/agent-definitions` through the runner's own check; `tests/unit/test_materialize.py`,
 `tests/unit/test_hosted_commandline.py`, `tests/unit/test_channel_skills.py` and
 `tests/scenarios/test_hosted_turns.py` hold the folders, the command line, channel skills and
-hosted turns of A1-05, and the hosted turn a killed runner left behind (`tests/hosting_runner.py`
-is the hosting runner as a process of its own for it).
+hosted turns of A1-05, the hosted turn a killed runner left behind (`tests/hosting_runner.py`
+is the hosting runner as a process of its own for it), and the end of a hosting runner while a
+turn it adopted works.
 
 Every test uses Fake-Claude through `runner.claude_bin` and a fake `HOME`; no installed CLI and
 no login of the developer is touched. The real CLI runs only behind switches:

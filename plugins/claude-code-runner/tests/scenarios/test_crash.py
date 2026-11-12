@@ -22,7 +22,7 @@ from bothy_sdk.adapter import unexpected_error_summary
 from bothy_sdk.testing._patience import PATIENCE
 from bothy_sdk.testing.faults import Fault
 
-from .conftest import LogLines, World, fail_turn_records
+from .conftest import LogLines, World, _group_alive, fail_turn_records
 from .test_baseline import _amounts, _bind, _run, _usage
 
 pytestmark = pytest.mark.anyio
@@ -370,7 +370,9 @@ async def test_an_unexpected_error_while_following_an_adopted_turn_stops_it_and_
     fail_turn_records(monkeypatch)
 
     assert await world.ended(run_id) == "failed"
-    assert not alive(pid)  # stopped before the run ended
+    # Stopped before the run ended. The group is asked, as the stop asks it: on macOS the
+    # ended process itself still answers until it is reaped.
+    assert not _group_alive(pid)
     ends = [c for c in world.calls("turn_end") if c["pid"] == pid]
     assert [e.get("signal") for e in ends] == ["SIGINT"]
     [finish] = finishes(world, run_id)

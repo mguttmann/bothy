@@ -710,9 +710,17 @@ class RunnerHandler(AgentHandler):
             with adapter.client.bind_run(run_id, token):
                 await turn.adopted(record, group, known)
         except Exception:
-            # The turn is stopped and its run ended (`RunTurn.adopted`); this task is the
-            # follow's only caller, so the error is logged here, as the SDK logs an own run's.
-            _LOG.exception("the follow of the adopted run %s failed", run_id)
+            if adapter.client.http.is_closed:
+                # No failure of the turn: the adapter closed under its follow, because the
+                # runner ends. The turn runs on and the next start adopts it again (18.9).
+                _LOG.debug(
+                    "the follow of the adopted run %s ended with the runner", run_id, exc_info=True
+                )
+            else:
+                # The turn is stopped and its run ended (`RunTurn.adopted`); this task is the
+                # follow's only caller, so the error is logged here, as the SDK logs an own
+                # run's.
+                _LOG.exception("the follow of the adopted run %s failed", run_id)
         finally:
             self.adopted.pop(run_id, None)
             adapter.client.release_run(run_id)
@@ -918,6 +926,8 @@ class RunnerHandler(AgentHandler):
         """Stop the hosted agents; cancel the probe, follows, timers, folder creations and moves.
 
         Adopted turns keep running; what a cancelled folder creation made is removed (09 18.12).
+        A follow that fails on the closed adapter before it is cancelled here ends without
+        stopping its turn (`RunTurn._on_error`).
         """
         if self.hosting is not None:
             await self.hosting.close()

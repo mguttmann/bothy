@@ -118,7 +118,9 @@ async def test_a_leftover_hosted_turn_that_runs_is_stopped_and_its_record_remove
     path = _leftover(tmp_path, stray)
     # SIGINT ends it: an escalation would come only after the whole patience.
     await stop_leftover_turns(tmp_path, **{**_GRACE, "stop_grace": PATIENCE})
-    assert not _alive(stray)  # the stop returns only once no process of the group is left
+    # The stop returns only once no process of the group is left. The group is asked, as the
+    # stop asks it: on macOS the ended process itself still answers until it is reaped.
+    assert not scenarios._group_alive(stray)
     assert not path.exists()
     assert _events(logs, "turn_adopted") == [
         {

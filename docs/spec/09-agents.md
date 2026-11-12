@@ -3811,7 +3811,11 @@ names only the error's kind (log code `run_failed_unexpectedly` with the kind); 
 and the run files go once no process of the group is left, and the locks are released. The run
 of an adopted turn ends the same way, finished by the runner itself, because no run loop of the
 SDK holds it, and the runner logs the error with its traceback. At a handover (18.19.3) the turn
-and its record stay for the next runner.
+and its record stay for the next runner. They also stay when the follow of an adopted turn fails
+because the runner itself ends: after an orderly stop, or after the server closed the runner's
+connection for good, the runner has closed its client for the server while the follow still
+runs, and a request of the follow then fails. That is no error of the turn: nothing is stopped
+or finished, and the next start adopts the turn again.
 
 For records written with `runner.turn_handover` (addendum of 2026-11-06, 18.19.6, 18.19.7) the
 adoption follows 18.19: the record carries the run's phase and `process_start`, the adopter

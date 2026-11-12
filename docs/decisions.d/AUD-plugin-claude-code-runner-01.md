@@ -15,6 +15,7 @@ are not built here (AUD-CR1/5). Normative text: 09 18.6 (addendum on the stop of
 | AUD-CR1/4 | 2026-11-12 | `HostedAgents.close` stops the connections of all hosted agents together instead of one after the other. | Each stop waits until the turns of its agent are stopped (up to `runner.stop_grace` plus `runner.kill_grace` for a turn that ignores the signals), so the waits added up over the agents and could pass the stop timeout of a service manager, whose kill then leaves the turns of AUD-CR1/3 behind. |
 | AUD-CR1/5 | 2026-11-12 | Not built here (findings `claude-code-runner-4` and `architecture-2`): cutting `RunTurn` into collaborators with their own state (process supervision, follow-ups, answer delivery, costs, handover), its phases as an enumeration with explicit transitions, a shared base of `RunnerHandler` and `HostedHandler`, `turn_handover` and `handing_over` as members of the protocol `TurnRuntime`, and a lint limit for the size of a class or a module. | It is a redesign, not a fix: it moves nearly every method of the class that carries every run and the state they share, and it has to be carried by the whole scenario suite and a review of its own. `architecture-2` also names classes of the Hermes adapter and of both SDKs, and a size limit would be a gate of the repository root; other work packages of the same audit change those places at the same time. The audit ties no wrong behaviour to the cut itself, which follows D-M2-35-16 and D-M2-35-28; the one fault it had caused, the stop state shared by the processes of a run, is fixed by AUD-CR1/1. Proposed order for a ticket of its own: the process supervisor first (start, stop and record, owning `ProcessState` and the stop state), then follow-ups, then answers and costs, each step behind the unchanged scenario suite. |
 | AUD-CR1/6 | 2026-11-12 | Test stand-ins: Fake-Claude plays a turn that fails after it started a background job (`api_error` together with `background_gate`); `tests/hosting_runner.py` is the hosting runner as a process of its own and `hosting_world` can follow the real time for it. | The fault of AUD-CR1/1 needs a failed turn whose process stays for background work and leaves an input without an answer, so that a retry follows; the fault of AUD-CR1/3 needs a runner that is really killed while a hosted turn runs, which an in-process runner cannot show. |
+| AUD-CR1/7 | 2026-11-12 | AUD-CR1/2 does not apply to the follow of an adopted turn (`RunTurn.adopted`, reading rights only) that fails after the runner's adapter closed its client: the follow ends, nothing is stopped or finished, and the record stays for the next start, as when `RunnerHandler.close` cancels the follow. `RunTurn.adopted` names its kind of run to `RunTurn._on_error` (`followed`), which reads the state of the client the run's handle uses; `RunnerHandler` logs such an end at debug level, not as a failure. An own turn and a turn taken over with `runner.turn_handover` are stopped as before, as their cancellation stops them. | Found by the review of this change and reproduced with a hosting runner. The SDK closes its client when `Adapter.run` returns, and `RunnerHandler.close` cancels the follows only after the hosted agents, the folder creations and the trash timer are stopped. A follow of a turn that works sends its next patch in between and gets the error of the closed client. With AUD-CR1/2 alone that error stopped the turn and left the record of the dead turn, where before the turn ran on; 09 18.9 keeps adopted turns and their records at an orderly stop. The window is as long as the stop of the hosted turns, and it also opens when the adapter ends by itself because the server closed its connection for good. The closed client is the state both ends share, so the rule needs no flag of the stop. |
 
 Evidence. Each test failed against the code before the change, the tests of `stop_leftover_turns`
 because the function did not exist:
@@ -29,6 +30,14 @@ because the function did not exist:
 - AUD-CR1/3: `tests/scenarios/test_hosted_turns.py::test_a_hosted_turn_left_by_a_crashed_runner_is_stopped_at_the_next_start`
   (a runner process killed with SIGKILL) and `tests/unit/test_hosted_leftovers.py`.
 - AUD-CR1/4: `tests/unit/test_hosting.py::test_close_stops_every_connection_together`.
+- AUD-CR1/7: `tests/scenarios/test_hosted_turns.py::test_the_end_of_a_hosting_runner_keeps_an_adopted_turn_that_works`
+  (the runner's own stop, and a connection the server closed for good); it failed against the
+  code with AUD-CR1/2 alone, where the adopted turn got SIGINT.
+
+A test that checks right after a stop returned that the turn is gone asks the turn's group, as
+the stop itself does (`tests/unit/test_hosted_leftovers.py`, `tests/scenarios/test_crash.py`): on
+macOS a process that ended still answers a signal check of its own until it is reaped, while its
+group already counts as gone, so a check of the process failed in some runs there.
 
 ## Limits and open minors
 
@@ -45,3 +54,12 @@ because the function did not exist:
 - A start whose record can be finished from the log runs that finish inside the start itself; an
   unexpected error there still ends the start of the runner. The run is finished and the record
   removed first, so the next start goes on.
+- Read in the code, not run: at its end the SDK closes its inbox and its outbox just before its
+  client. A follow that stores the answer of an adopted turn in exactly that moment fails before
+  the client counts as closed, so its run ends by AUD-CR1/2 instead of at the next start.
+- Not changed here, seen while the scenario of AUD-CR1/7 was built: the patch of a line the
+  follow read is sent by the follow itself when it saves its offset, or before that by the
+  timer of the SDK's run patcher. On the closed client the timer's patch fails in a task of its
+  own, whose error reaches no caller; the follow then runs on until `RunnerHandler.close`
+  cancels it. The scenario sets `agent.run_update_min_interval` to zero, so the follow's own
+  request comes first.

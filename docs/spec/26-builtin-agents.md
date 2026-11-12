@@ -319,8 +319,8 @@ the definition:
 
 Secret values reach a turn only through the per-turn MCP file, never through the environment of
 the turn and never through a file in the agent folder or in the turn's `TMPDIR` (T-BA-02). After a
-crash of the runner the next start sweeps the per-turn files and stops the turns they belonged to
-(3.2 item 5).
+crash of the runner the next start stops the turns the per-turn files belonged to (3.2 item 5)
+and, with `runner.hosted_agents` on, sweeps these files.
 
 ### 5.3 Command line of a hosted turn
 

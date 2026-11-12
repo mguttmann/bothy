@@ -677,7 +677,11 @@ class RunTurn:
     def _handing_over(self) -> bool:
         return bool(getattr(self.h, "handing_over", False))
 
-    async def _on_error(self, exc: Exception) -> bool:
+    def _adapter_closed(self) -> bool:
+        """Whether the adapter that carries this run closed its client: the runner ends."""
+        return self.handle.client.http.is_closed
+
+    async def _on_error(self, exc: Exception, *, followed: bool = False) -> bool:
         """An unexpected error ends the run: stop its live turn as in 18.6, then fail it once.
 
         Nothing follows the turn once the run left this runner, and its stop hook no longer
@@ -690,13 +694,22 @@ class RunTurn:
         run files once no process is left. At a handover the turn and its record stay for the
         next runner, as at a cancellation.
 
+        So does a turn this runner only follows (``followed``) once the runner itself ends:
+        its adapter closes the client under the follow, whose next request then fails, which is
+        no error of the turn. The follow ends like at its cancellation by `RunnerHandler.close`:
+        nothing is stopped or finished, and the record stays for the next start (18.9).
+
         Args:
             exc: The error (logged by its kind only: its message may hold a path).
+            followed: The run is the follow of an adopted turn (`adopted`, reading rights only).
 
         Returns:
-            True once the turn is stopped and the run ended; False at a handover.
+            True once the turn is stopped and the run ended; False at a handover and for a
+            followed turn at the end of the runner.
         """
         if self.handed_over or self._handing_over():
+            return False
+        if followed and self._adapter_closed():
             return False
         _warn("run_failed_unexpectedly", error=type(exc).__name__, **self.ids)
         process = self.process
@@ -2822,8 +2835,9 @@ class RunTurn:
             await self._end_adopted(end.outcome, end.errors)
             done = True
         except Exception as exc:
-            # Stopped and ended: nothing is left to adopt, so the record goes too.
-            done = await self._on_error(exc)
+            # Stopped and ended: nothing is left to adopt, so the record goes too. Not at the
+            # end of the runner: then the turn runs on and its record stays (`_on_error`).
+            done = await self._on_error(exc, followed=True)
             raise
         finally:
             # An orderly stop of this runner keeps the record for the next start (D-M2-35-20).
