@@ -15,11 +15,11 @@ import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
-import 'package:sync_engine/sync_engine.dart';
 
 import '../../app/providers/ports.dart';
 import '../../app/providers/session.dart';
 import '../../settings/settings_providers.dart';
+import '../../sync/outbox_outcome.dart';
 import '../../sync/wake_ops.dart';
 import '../../thread/providers.dart';
 import '../providers.dart';
@@ -143,15 +143,7 @@ class _WakeRow extends ConsumerStatefulWidget {
 
 class _WakeRowState extends ConsumerState<_WakeRow> {
   bool _busy = false;
-  String? _entryId;
   String? _refusal;
-  StreamSubscription<List<OutboxEntryView>>? _watch;
-
-  @override
-  void dispose() {
-    unawaited(_watch?.cancel());
-    super.dispose();
-  }
 
   /// One activation puts one cancel into the outbox; the button stays disabled while it waits
   /// and after the server accepted it (the row then leaves the list). A refusal shows its
@@ -166,26 +158,16 @@ class _WakeRowState extends ConsumerState<_WakeRow> {
       _refusal = null;
     });
     final entry = await enqueueWakeCancel(engine, widget.wake.id);
-    if (!mounted) return;
-    _entryId = entry.id;
-    await _watch?.cancel();
-    _watch = engine.outbox.watchThread(null).listen((views) {
-      for (final v in views) {
-        if (v.id != _entryId || v.stateLabel != OutboxStateLabel.failed) {
-          continue;
-        }
-        _entryId = null;
-        unawaited(engine.outbox.discard(v.id));
-        if (!mounted) return;
-        final reason = v.failureReason;
-        setState(() {
-          _busy = false;
-          _refusal = l.wakesCancelRefused(
-            (reason == null ? null : dsReasonText(l, reason)) ??
-                problemText(l, v.failureCode ?? 'unknown', reason: reason),
-          );
-        });
-      }
+    // The wait ends with the entry, also when this row is gone by then (AUD-CA01/4).
+    final refusal = await outboxOutcome(engine.outbox, entry.id);
+    if (refusal == null || !mounted) return;
+    final reason = refusal.reason;
+    setState(() {
+      _busy = false;
+      _refusal = l.wakesCancelRefused(
+        (reason == null ? null : dsReasonText(l, reason)) ??
+            problemText(l, refusal.code, reason: reason),
+      );
     });
   }
 

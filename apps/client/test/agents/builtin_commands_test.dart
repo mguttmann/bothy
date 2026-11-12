@@ -162,6 +162,69 @@ void main() {
     await host.dispose(tester);
   });
 
+  testWidgets('/resume and /status say that the sessions could not be loaded '
+      'instead of showing none', (tester) async {
+    final (host, reads) = await open(tester);
+    reads.sessionsError = Exception('offline');
+
+    await send(tester, host, '/resume');
+    expect(find.byKey(const ValueKey('command.resume')), findsOneWidget);
+    expect(find.text(en.commandSessionsFailed), findsOneWidget);
+    expect(find.text(en.commandResumeEmpty), findsNothing);
+    await tester.tapAt(const Offset(5, 5));
+    await host.settle(tester);
+    expect(find.byKey(const ValueKey('command.resume')), findsNothing);
+
+    // /status still shows the run this device knows.
+    await send(tester, host, '/status');
+    final status = find.byKey(const ValueKey('command.status'));
+    expect(status, findsOneWidget);
+    expect(
+      find.descendant(of: status, matching: find.byType(DsLiveBox)),
+      findsOneWidget,
+    );
+    expect(find.text(en.commandSessionsFailed), findsOneWidget);
+    await tester.tap(find.text(en.threadCancel));
+    await host.settle(tester);
+
+    // A thread without sessions still reads "No earlier sessions".
+    reads
+      ..sessionsError = null
+      ..sessionsOf[threadId(1)] = const [];
+    await send(tester, host, '/resume');
+    expect(find.text(en.commandResumeEmpty), findsOneWidget);
+    expect(find.text(en.commandSessionsFailed), findsNothing);
+    await tester.tapAt(const Offset(5, 5));
+    await host.settle(tester);
+    await host.dispose(tester);
+  });
+
+  testWidgets('a built-in in another letter case is the built-in, never a '
+      'message', (tester) async {
+    final (host, _) = await open(tester);
+    await send(tester, host, '/Stop');
+    expect(await entriesOf(tester, host, 'createMessage'), isEmpty);
+    expect(
+      await entriesOf(tester, host, AppMessageOps.cancelRun),
+      hasLength(1),
+    );
+    await send(tester, host, '/TITLE Release checklist');
+    final titles = await entriesOf(tester, host, AppMessageOps.setThreadTitle);
+    expect(titles.single.payload, contains('Release checklist'));
+    expect(await entriesOf(tester, host, 'createMessage'), isEmpty);
+    await host.dispose(tester);
+  });
+
+  testWidgets('a built-in in another letter case that is not allowed here is '
+      'never sent as a message', (tester) async {
+    final (host, _) = await open(tester, running: false);
+    await send(tester, host, '/STOP');
+    expect(await entriesOf(tester, host, 'createMessage'), isEmpty);
+    expect(await entriesOf(tester, host, AppMessageOps.cancelRun), isEmpty);
+    expect(find.text(en.commandNotAvailable('/stop')), findsOneWidget);
+    await host.dispose(tester);
+  });
+
   testWidgets(
     'a built-in that is not allowed here is never sent as a message',
     (tester) async {

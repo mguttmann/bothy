@@ -55,13 +55,15 @@ final class AgentReadsProvider
 String _$agentReadsHash() => r'aa4b54cb65194884ce5730c1c4ff23d49ef40c83';
 
 /// The run summaries of [threadId] from the local `runs` table, oldest first (the summary
-/// of `run.state_changed`, 04 11.3).
+/// of `run.state_changed`, 04 11.3, and of [threadRunsBackfill] for the runs that ended before
+/// this device knew them).
 
 @ProviderFor(threadRuns)
 final threadRunsProvider = ThreadRunsFamily._();
 
 /// The run summaries of [threadId] from the local `runs` table, oldest first (the summary
-/// of `run.state_changed`, 04 11.3).
+/// of `run.state_changed`, 04 11.3, and of [threadRunsBackfill] for the runs that ended before
+/// this device knew them).
 
 final class ThreadRunsProvider
     extends
@@ -72,7 +74,8 @@ final class ThreadRunsProvider
         >
     with $FutureModifier<List<RunSummary>>, $StreamProvider<List<RunSummary>> {
   /// The run summaries of [threadId] from the local `runs` table, oldest first (the summary
-  /// of `run.state_changed`, 04 11.3).
+  /// of `run.state_changed`, 04 11.3, and of [threadRunsBackfill] for the runs that ended before
+  /// this device knew them).
   ThreadRunsProvider._({
     required ThreadRunsFamily super.from,
     required String super.argument,
@@ -120,7 +123,8 @@ final class ThreadRunsProvider
 String _$threadRunsHash() => r'0ea2320512a0457db14396508ed6cef6596e2ebf';
 
 /// The run summaries of [threadId] from the local `runs` table, oldest first (the summary
-/// of `run.state_changed`, 04 11.3).
+/// of `run.state_changed`, 04 11.3, and of [threadRunsBackfill] for the runs that ended before
+/// this device knew them).
 
 final class ThreadRunsFamily extends $Family
     with $FunctionalFamilyOverride<Stream<List<RunSummary>>, String> {
@@ -134,13 +138,177 @@ final class ThreadRunsFamily extends $Family
       );
 
   /// The run summaries of [threadId] from the local `runs` table, oldest first (the summary
-  /// of `run.state_changed`, 04 11.3).
+  /// of `run.state_changed`, 04 11.3, and of [threadRunsBackfill] for the runs that ended before
+  /// this device knew them).
 
   ThreadRunsProvider call(String threadId) =>
       ThreadRunsProvider._(argument: threadId, from: this);
 
   @override
   String toString() => r'threadRunsProvider';
+}
+
+/// The loader of a thread's runs for an anchor whose run the local table lacks; tests override
+/// it.
+
+@ProviderFor(threadRunsLoader)
+final threadRunsLoaderProvider = ThreadRunsLoaderProvider._();
+
+/// The loader of a thread's runs for an anchor whose run the local table lacks; tests override
+/// it.
+
+final class ThreadRunsLoaderProvider
+    extends
+        $FunctionalProvider<
+          ThreadRunsLoader,
+          ThreadRunsLoader,
+          ThreadRunsLoader
+        >
+    with $Provider<ThreadRunsLoader> {
+  /// The loader of a thread's runs for an anchor whose run the local table lacks; tests override
+  /// it.
+  ThreadRunsLoaderProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'threadRunsLoaderProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$threadRunsLoaderHash();
+
+  @$internal
+  @override
+  $ProviderElement<ThreadRunsLoader> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  ThreadRunsLoader create(Ref ref) {
+    return threadRunsLoader(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ThreadRunsLoader value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ThreadRunsLoader>(value),
+    );
+  }
+}
+
+String _$threadRunsLoaderHash() => r'e248361b1708d9f3d10fb8ad3233bd08befb2a6a';
+
+/// Loads the runs of [threadId] into the local `runs` table (ruling AUD-CA01/1). The table
+/// knows a run only from the active runs of the snapshot and from `run.state_changed` since
+/// then, so a new device and a device after a resync hold no run that ended before. The anchor
+/// of a run the table lacks watches this provider: one load per thread while such an anchor
+/// shows, none while every anchor on screen has its run. A failed read keeps what the table
+/// holds (the read retry of the API client has run by then); the anchor asks again the next
+/// time it shows.
+
+@ProviderFor(threadRunsBackfill)
+final threadRunsBackfillProvider = ThreadRunsBackfillFamily._();
+
+/// Loads the runs of [threadId] into the local `runs` table (ruling AUD-CA01/1). The table
+/// knows a run only from the active runs of the snapshot and from `run.state_changed` since
+/// then, so a new device and a device after a resync hold no run that ended before. The anchor
+/// of a run the table lacks watches this provider: one load per thread while such an anchor
+/// shows, none while every anchor on screen has its run. A failed read keeps what the table
+/// holds (the read retry of the API client has run by then); the anchor asks again the next
+/// time it shows.
+
+final class ThreadRunsBackfillProvider
+    extends $FunctionalProvider<AsyncValue<void>, void, FutureOr<void>>
+    with $FutureModifier<void>, $FutureProvider<void> {
+  /// Loads the runs of [threadId] into the local `runs` table (ruling AUD-CA01/1). The table
+  /// knows a run only from the active runs of the snapshot and from `run.state_changed` since
+  /// then, so a new device and a device after a resync hold no run that ended before. The anchor
+  /// of a run the table lacks watches this provider: one load per thread while such an anchor
+  /// shows, none while every anchor on screen has its run. A failed read keeps what the table
+  /// holds (the read retry of the API client has run by then); the anchor asks again the next
+  /// time it shows.
+  ThreadRunsBackfillProvider._({
+    required ThreadRunsBackfillFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'threadRunsBackfillProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$threadRunsBackfillHash();
+
+  @override
+  String toString() {
+    return r'threadRunsBackfillProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<void> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<void> create(Ref ref) {
+    final argument = this.argument as String;
+    return threadRunsBackfill(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ThreadRunsBackfillProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$threadRunsBackfillHash() =>
+    r'85535586749b384b2b9a13b9f9558a54a86eb5db';
+
+/// Loads the runs of [threadId] into the local `runs` table (ruling AUD-CA01/1). The table
+/// knows a run only from the active runs of the snapshot and from `run.state_changed` since
+/// then, so a new device and a device after a resync hold no run that ended before. The anchor
+/// of a run the table lacks watches this provider: one load per thread while such an anchor
+/// shows, none while every anchor on screen has its run. A failed read keeps what the table
+/// holds (the read retry of the API client has run by then); the anchor asks again the next
+/// time it shows.
+
+final class ThreadRunsBackfillFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<void>, String> {
+  ThreadRunsBackfillFamily._()
+    : super(
+        retry: null,
+        name: r'threadRunsBackfillProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Loads the runs of [threadId] into the local `runs` table (ruling AUD-CA01/1). The table
+  /// knows a run only from the active runs of the snapshot and from `run.state_changed` since
+  /// then, so a new device and a device after a resync hold no run that ended before. The anchor
+  /// of a run the table lacks watches this provider: one load per thread while such an anchor
+  /// shows, none while every anchor on screen has its run. A failed read keeps what the table
+  /// holds (the read retry of the API client has run by then); the anchor asks again the next
+  /// time it shows.
+
+  ThreadRunsBackfillProvider call(String threadId) =>
+      ThreadRunsBackfillProvider._(argument: threadId, from: this);
+
+  @override
+  String toString() => r'threadRunsBackfillProvider';
 }
 
 /// The wake-ups of [threadId] from the local `run_wakes` table in the order they fire (01 6.21,
@@ -409,13 +577,17 @@ final class RunDocumentFamily extends $Family
 }
 
 /// The document of the ended run [runId], loaded once when its collapsed line is expanded
-/// (`getRun`, 01 6.2; brief M4-21 Design note 1).
+/// (`getRun`, 01 6.2; brief M4-21 Design note 1). A failed read is an error of this provider
+/// and is not repeated by Riverpod ([noProviderRetry]); the line loads again when it is
+/// expanded or built again.
 
 @ProviderFor(endedRunDocument)
 final endedRunDocumentProvider = EndedRunDocumentFamily._();
 
 /// The document of the ended run [runId], loaded once when its collapsed line is expanded
-/// (`getRun`, 01 6.2; brief M4-21 Design note 1).
+/// (`getRun`, 01 6.2; brief M4-21 Design note 1). A failed read is an error of this provider
+/// and is not repeated by Riverpod ([noProviderRetry]); the line loads again when it is
+/// expanded or built again.
 
 final class EndedRunDocumentProvider
     extends
@@ -426,12 +598,14 @@ final class EndedRunDocumentProvider
         >
     with $FutureModifier<RunDocument?>, $FutureProvider<RunDocument?> {
   /// The document of the ended run [runId], loaded once when its collapsed line is expanded
-  /// (`getRun`, 01 6.2; brief M4-21 Design note 1).
+  /// (`getRun`, 01 6.2; brief M4-21 Design note 1). A failed read is an error of this provider
+  /// and is not repeated by Riverpod ([noProviderRetry]); the line loads again when it is
+  /// expanded or built again.
   EndedRunDocumentProvider._({
     required EndedRunDocumentFamily super.from,
     required String super.argument,
   }) : super(
-         retry: null,
+         retry: noProviderRetry,
          name: r'endedRunDocumentProvider',
          isAutoDispose: true,
          dependencies: null,
@@ -471,16 +645,18 @@ final class EndedRunDocumentProvider
   }
 }
 
-String _$endedRunDocumentHash() => r'62c7a4450a6a56225312187d019084b6f2d2e2f4';
+String _$endedRunDocumentHash() => r'559eccc2be7c2015481371a7c367a7a3fab4a4ea';
 
 /// The document of the ended run [runId], loaded once when its collapsed line is expanded
-/// (`getRun`, 01 6.2; brief M4-21 Design note 1).
+/// (`getRun`, 01 6.2; brief M4-21 Design note 1). A failed read is an error of this provider
+/// and is not repeated by Riverpod ([noProviderRetry]); the line loads again when it is
+/// expanded or built again.
 
 final class EndedRunDocumentFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<RunDocument?>, String> {
   EndedRunDocumentFamily._()
     : super(
-        retry: null,
+        retry: noProviderRetry,
         name: r'endedRunDocumentProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
@@ -488,7 +664,9 @@ final class EndedRunDocumentFamily extends $Family
       );
 
   /// The document of the ended run [runId], loaded once when its collapsed line is expanded
-  /// (`getRun`, 01 6.2; brief M4-21 Design note 1).
+  /// (`getRun`, 01 6.2; brief M4-21 Design note 1). A failed read is an error of this provider
+  /// and is not repeated by Riverpod ([noProviderRetry]); the line loads again when it is
+  /// expanded or built again.
 
   EndedRunDocumentProvider call(String runId) =>
       EndedRunDocumentProvider._(argument: runId, from: this);

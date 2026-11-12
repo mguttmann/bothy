@@ -46,8 +46,14 @@ abstract interface class AgentReads {
   /// The agent [agent] (`getAgent`), or null when the reader may not read it.
   Future<AgentInfo?> agent(PrincipalId agent);
 
-  /// The current and earlier sessions of [thread], newest first.
+  /// The current and earlier sessions of [thread], newest first; empty when the read failed.
   Future<List<AgentSessionView>> sessions(ThreadId thread);
+
+  /// The sessions of [thread], newest first, for a command the person just ran (`/status`,
+  /// `/resume`; rulings AUD-CA01/2 and AUD-CA01/3): one attempt without the read retry of the
+  /// API client, so the dialog of the command does not wait for retries, and a failed read
+  /// throws instead of reading as "no sessions".
+  Future<List<AgentSessionView>> sessionsNow(ThreadId thread);
 
   /// The cost totals of [thread], or null when the reader may not read them.
   Future<List<ThreadCost>?> threadCosts(ThreadId thread);
@@ -108,29 +114,41 @@ final class EngineAgentReads implements AgentReads {
   @override
   Future<List<AgentSessionView>> sessions(ThreadId thread) async {
     try {
-      final list = (await _api.getThreadsApi().listAgentSessions(
-        threadId: thread.value,
-      )).data;
-      final items = [
-        for (final s in list?.items ?? const <wire.AgentSession>[])
-          (
-            id: s.id,
-            externalSessionRef: s.externalSessionRef,
-            current: s.isCurrent,
-            model: s.model,
-            cost: Money(
-              amountMicros: s.cost.amountMicros,
-              currency: s.cost.currency,
-              isEstimate: s.cost.isEstimate,
-            ),
-            createdAt: s.createdAt,
-            endedAt: s.endedAt,
-          ),
-      ]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return items;
+      return await _sessions(thread);
     } on Object {
       return const [];
     }
+  }
+
+  @override
+  Future<List<AgentSessionView>> sessionsNow(ThreadId thread) =>
+      _sessions(thread, extra: const {wire.noReadRetryExtra: true});
+
+  /// `listAgentSessions` of [thread], newest first; [extra] are the request options.
+  Future<List<AgentSessionView>> _sessions(
+    ThreadId thread, {
+    Map<String, dynamic>? extra,
+  }) async {
+    final list = (await _api.getThreadsApi().listAgentSessions(
+      threadId: thread.value,
+      extra: extra,
+    )).data;
+    return [
+      for (final s in list?.items ?? const <wire.AgentSession>[])
+        (
+          id: s.id,
+          externalSessionRef: s.externalSessionRef,
+          current: s.isCurrent,
+          model: s.model,
+          cost: Money(
+            amountMicros: s.cost.amountMicros,
+            currency: s.cost.currency,
+            isEstimate: s.cost.isEstimate,
+          ),
+          createdAt: s.createdAt,
+          endedAt: s.endedAt,
+        ),
+    ]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
   @override
@@ -203,6 +221,9 @@ final class NoAgentReads implements AgentReads {
 
   @override
   Future<List<AgentSessionView>> sessions(ThreadId thread) async => const [];
+
+  @override
+  Future<List<AgentSessionView>> sessionsNow(ThreadId thread) async => const [];
 
   @override
   Future<List<ThreadCost>?> threadCosts(ThreadId thread) async => null;

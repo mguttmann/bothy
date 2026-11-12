@@ -667,7 +667,9 @@ change per `agent.run_update_min_interval`.
    `GET /api/v1/runs/{id}` and replaces its document. It always draws only the newest state.
 5. When a thread with an active run is focused, the server sends the whole document once.
 6. After the end the live box collapses to one line. The summary comes from
-   `run.state_changed`; the client loads details via REST when it is expanded.
+   `run.state_changed`; the client loads details via REST when it is expanded. A client that
+   never received the event of a run, because the run ended before its snapshot (a new device,
+   a resync), reads the summaries of the thread with `listThreadRuns`.
 7. Run graph and control room (addendum of 2026-10-24, run visualization,
    [09-agents.md](09-agents.md) section 5.6): both use only this path. The control room puts
    the threads of its visible cards into `background_thread_ids` of `focus` (6.2), within

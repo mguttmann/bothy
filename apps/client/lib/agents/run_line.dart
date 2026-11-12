@@ -3,7 +3,9 @@
 /// The run at its anchor message (`kind = run`, 09 5.4; 01 6.2, D3; components.md 2.2; brief
 /// M4-21 Design note 1): nothing while the run is active (its box is pinned over the history),
 /// then the collapsed line built from the summary of `run.state_changed` and the optional
-/// `summary`, never from a server sentence. Expanding loads the document once (`getRun`).
+/// `summary`, never from a server sentence. A run that ended before this device knew it is not
+/// in the local table: its anchor loads the runs of the thread (`listThreadRuns`, ruling
+/// AUD-CA01/1). Expanding loads the document once (`getRun`).
 /// After `interrupted` or `stale` the line offers "Send again" (09 5.5); the newest run of the
 /// thread that ended `failed` or `cancelled` otherwise offers "Retry" (`retryRun`, 09 5.7).
 library;
@@ -20,6 +22,7 @@ import 'package:sync_engine/sync_engine.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../sync/message_ops_app.dart';
+import '../sync/outbox_outcome.dart';
 import '../thread/providers.dart';
 import '../thread/thread_actions.dart';
 import 'providers.dart';
@@ -41,12 +44,19 @@ class RunLine extends ConsumerWidget {
     final runId = message.runId;
     if (runId == null) return const SizedBox.shrink();
     final thread = message.threadId.value;
-    final runs = ref.watch(threadRunsProvider(thread)).value ?? const [];
+    final stored = ref.watch(threadRunsProvider(thread));
+    final runs = stored.value ?? const [];
     RunSummary? run;
     for (final r in runs) {
       if (r.id == runId) run = r;
     }
-    if (run == null || isActiveRun(run.state)) return const SizedBox.shrink();
+    if (run == null) {
+      // The table lacks a run that ended before this device knew it (a new device, a resync):
+      // the runs of the thread are loaded, and the line shows once its run is stored.
+      if (stored.hasValue) ref.watch(threadRunsBackfillProvider(thread));
+      return const SizedBox.shrink();
+    }
+    if (isActiveRun(run.state)) return const SizedBox.shrink();
     final ended = run;
     final principals = ref.watch(principalsByIdProvider).value ?? const {};
     final config = ref.watch(appConfigProvider);
@@ -194,16 +204,8 @@ class _RetryButton extends ConsumerStatefulWidget {
 
 class _RetryButtonState extends ConsumerState<_RetryButton> {
   bool _busy = false;
-  String? _entryId;
   String? _refusalCode;
   String? _refusalReason;
-  StreamSubscription<List<OutboxEntryView>>? _watch;
-
-  @override
-  void dispose() {
-    unawaited(_watch?.cancel());
-    super.dispose();
-  }
 
   Future<void> _retry() async {
     if (_busy) return;
@@ -219,23 +221,13 @@ class _RetryButtonState extends ConsumerState<_RetryButton> {
         payload: {'run_id': widget.run.id.value},
       ),
     );
-    if (!mounted) return;
-    _entryId = entry.id;
-    await _watch?.cancel();
-    _watch = engine.outbox.watchThread(null).listen((views) {
-      for (final v in views) {
-        if (v.id != _entryId || v.stateLabel != OutboxStateLabel.failed) {
-          continue;
-        }
-        _entryId = null;
-        unawaited(engine.outbox.discard(v.id));
-        if (!mounted) return;
-        setState(() {
-          _busy = false;
-          _refusalCode = v.failureCode ?? 'unknown';
-          _refusalReason = v.failureReason;
-        });
-      }
+    // The wait ends with the entry, also when this line is gone by then (AUD-CA01/4).
+    final refusal = await outboxOutcome(engine.outbox, entry.id);
+    if (refusal == null || !mounted) return;
+    setState(() {
+      _busy = false;
+      _refusalCode = refusal.code;
+      _refusalReason = refusal.reason;
     });
   }
 

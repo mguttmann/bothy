@@ -140,6 +140,9 @@ final class FakeAgentReads implements AgentReads {
   /// `listAgentSessions` answers by thread.
   final Map<ThreadId, List<AgentSessionView>> sessionsOf = {};
 
+  /// What `listAgentSessions` throws instead of answering, when set.
+  Exception? sessionsError;
+
   /// `getThreadCosts` answers by thread.
   final Map<ThreadId, List<ThreadCost>> costs = {};
 
@@ -170,7 +173,14 @@ final class FakeAgentReads implements AgentReads {
 
   @override
   Future<List<AgentSessionView>> sessions(ThreadId thread) async =>
-      sessionsOf[thread] ?? const [];
+      sessionsError != null ? const [] : sessionsOf[thread] ?? const [];
+
+  @override
+  Future<List<AgentSessionView>> sessionsNow(ThreadId thread) async {
+    final error = sessionsError;
+    if (error != null) throw error;
+    return sessionsOf[thread] ?? const [];
+  }
 
   @override
   Future<List<ThreadCost>?> threadCosts(ThreadId thread) async => costs[thread];

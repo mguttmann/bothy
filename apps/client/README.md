@@ -1115,18 +1115,36 @@ the run time counts locally. Stop shows only where the server reported the level
 the person started the run or holds `manage`, and goes through the outbox without a
 confirmation. At the end the box empties and `RunLine` draws the collapsed line at the run's
 anchor message (`kind = run`) from the summary of `run.state_changed`; expanding loads the
-document once with `getRun`; after `interrupted` or `stale` it offers "Send again". The
+document once with `getRun`; after `interrupted` or `stale` it offers "Send again". The local
+`runs` table knows a run only from the active runs of the snapshot and from `run.state_changed`
+since then, so on a new device and after a resync the anchor of a run that ended before finds
+no summary: it then loads the runs of its thread (`ThreadRunsLoader`, every page of
+`listThreadRuns` into the table by the version rule, only while the thread is stored), once per
+thread and only while such an anchor shows (docs/decisions.d/AUD-client-agents-01.md). The
 triggering message shows its trigger state as an icon with a label (`cancelled` neutral). While
 a run is active the composer reads "Follow-up to <agent>", and the agent's line "<agent> is
 working" follows the run state (D-L9). Cards (`kind = card`) draw `DsMessageComponents` with the
 header built only from server fields and the agent's text below the divider (SEC-OUT-4); one
 activation is one `createInteraction` in the outbox. The slash suggestions offer the built-ins
-of 09 10.1, which run their own operations, and the registered commands of the channel, which
+of 09 10.1, which run their own operations and are recognized in any letter case (`/Stop` never
+goes out as a message), and the registered commands of the channel, which
 `command_loader.dart` loads into the local table when the channel opens; option suggestions come
 from `autocompleteCommand` after `ui.autocomplete_debounce`, and a complete command goes through
 `invokeCommand`. The session column's agent part (`session_column/agent_section.dart`) shows the
 agent card, the backend badge with the warning on a mismatch, model, session, project, context,
 thread cost, runs and earlier sessions (docs/decisions.d/M4-21.md).
+
+Who retries a read (docs/decisions.d/AUD-client-agents-01.md): the read retry of the API client
+alone. A provider that passes the failure of a read on (`endedRunDocument`) turns off Riverpod's
+own retry (`noProviderRetry`), which would repeat every attempt of the client. `/status` and
+`/resume` read the sessions with one attempt and without that retry (`AgentReads.sessionsNow`),
+so their dialog opens after that one attempt instead of after every retry and says "The
+sessions could not be loaded" instead of showing none. A one-time action without a thread ("Retry" on a run line, the
+cancel of a wake-up, the channel switch of autonomous runs) waits for its outcome with
+`outboxOutcome` (`lib/sync/outbox_outcome.dart`), which discards a refused entry also when the
+view that sent it is gone. Tests: `test/agents/ended_runs_fake_server_test.dart` and
+`test/agents/read_retry_layers_fake_server_test.dart` against the fake server,
+`test/agents/run_retry_test.dart` and `test/agents/builtin_commands_test.dart`.
 
 ### Autonomous runs (AR-08)
 

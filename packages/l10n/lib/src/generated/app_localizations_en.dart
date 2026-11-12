@@ -8294,6 +8294,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commandResumeEmpty => 'No earlier sessions';
 
   @override
+  String get commandSessionsFailed =>
+      'The sessions could not be loaded. Try again.';
+
+  @override
   String get sessionAgentBackend => 'Backend';
 
   @override

@@ -75,17 +75,27 @@ final class ThreadCommandRunner implements BuiltinCommandRunner {
     if (engine != null && run != null) await stopRun(engine, run);
   }
 
+  /// The sessions of the thread for a command the person just ran, or null when the read
+  /// failed: the dialog then says so instead of showing no session (rulings AUD-CA01/2 and
+  /// AUD-CA01/3).
+  Future<List<AgentSessionView>?> _sessions() async {
+    try {
+      return await ref.read(agentReadsProvider).sessionsNow(thread.id);
+    } on Exception {
+      return null;
+    }
+  }
+
   @override
   Future<void> status() async {
-    final reads = ref.read(agentReadsProvider);
-    final sessions = await reads.sessions(thread.id);
+    final sessions = await _sessions();
     if (!context.mounted) return;
     final run = _activeRun;
     final principals = ref.read(principalsByIdProvider).value ?? const {};
     final config = ref.read(appConfigProvider);
     final now = ref.read(appPortsProvider).clock.now();
     AgentSessionView? current;
-    for (final s in sessions) {
+    for (final s in sessions ?? const <AgentSessionView>[]) {
       if (s.current) current = s;
     }
     final l = AppLocalizations.of(context);
@@ -110,7 +120,10 @@ final class ThreadCommandRunner implements BuiltinCommandRunner {
                 ),
                 announceMinInterval: config.liveAnnounceMinInterval,
               ),
-            if (current != null) ...[
+            if (sessions == null) ...[
+              const SizedBox(height: DsSpace.s8),
+              Text(l.commandSessionsFailed),
+            ] else if (current != null) ...[
               const SizedBox(height: DsSpace.s8),
               Text(
                 '${l.sessionAgentSession}: '
@@ -141,14 +154,14 @@ final class ThreadCommandRunner implements BuiltinCommandRunner {
   Future<void> resume() async {
     final engine = ref.read(syncEngineProvider);
     if (engine == null) return;
-    final sessions = await ref.read(agentReadsProvider).sessions(thread.id);
+    final sessions = await _sessions();
     if (!context.mounted) return;
     String? current;
-    for (final s in sessions) {
+    for (final s in sessions ?? const <AgentSessionView>[]) {
       if (s.current) current = s.id;
     }
     final choices = [
-      for (final s in sessions)
+      for (final s in sessions ?? const <AgentSessionView>[])
         if (!s.current && s.externalSessionRef != null) s,
     ];
     final l = AppLocalizations.of(context);
@@ -158,7 +171,12 @@ final class ThreadCommandRunner implements BuiltinCommandRunner {
         key: const ValueKey('command.resume'),
         title: Text(l.commandResumeTitle),
         children: [
-          if (choices.isEmpty)
+          if (sessions == null)
+            Padding(
+              padding: const EdgeInsets.all(DsSpace.s16),
+              child: Text(l.commandSessionsFailed),
+            )
+          else if (choices.isEmpty)
             Padding(
               padding: const EdgeInsets.all(DsSpace.s16),
               child: Text(l.commandResumeEmpty),
