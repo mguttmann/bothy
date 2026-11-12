@@ -104,13 +104,13 @@ type PrincipalSource interface {
 	// ActiveOwnerIDs returns the users with an active owners row whose principal status is
 	// active, ascending by id. I1 and SR8 (M1-29) need this set.
 	ActiveOwnerIDs(ctx context.Context) ([]ids.ID, error)
-	// HasActivePasskey reports whether the person userID has a passkey with revoked_at IS NULL:
-	// hat_anmeldedaten of passkey.register, whose step-up is conditional (07 section 4.2 step 8,
-	// M1-40). It reads inside the ambient transaction of ctx when there is one.
+	// HasActivePasskey reports whether the person userID has a passkey with revoked_at IS NULL,
+	// one of the facts of can_confirm of the conditional step-up (07 section 4.2 step 8, M1-40).
+	// It reads inside the ambient transaction of ctx when there is one.
 	HasActivePasskey(ctx context.Context, userID ids.ID) (bool, error)
 	// HasEstablishedLocalCredential reports whether the person userID has an established password
 	// path: a local_credentials row with a confirmed TOTP enrollment (07 section 4.2 step 8,
-	// has_credentials of local_credential.set; M1-39). The rule itself stays in authz.
+	// can_confirm; M1-39). The rule itself stays in authz.
 	HasEstablishedLocalCredential(ctx context.Context, userID ids.ID) (bool, error)
 	// Refs returns the public views of the known principals among principals, whatever their status;
 	// an unknown id is absent from the map (M1-48, the members of a group). It reads inside the
@@ -436,6 +436,10 @@ type CredentialFacts struct {
 	// DeviceState is the state of the device; unknown for an id that does not exist or belongs to
 	// someone else.
 	DeviceState DeviceState
+	// DeviceCLI reports a device of platform cli, which never confirms a step-up (08 section 6.4),
+	// and DeviceStepUpKey an active step_up key of the device (08 section 6.1); both are false for
+	// a device that is unknown. The conditional step-up reads them (07 section 4.2 step 8).
+	DeviceCLI, DeviceStepUpKey bool
 	// TokenActive reports a token that exists, belongs to PrincipalID and has revoked_at IS NULL;
 	// TokenExpiresAt is its expiry, zero for none.
 	TokenActive    bool

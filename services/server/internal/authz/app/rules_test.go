@@ -410,34 +410,71 @@ func TestTokenCreateGuard_NotSelf(t *testing.T) {
 	w.expect(t, sam, authorize.ActionTokenCreate, principal(w.lotse), forbidden, "owner_only")
 }
 
-// TestConditionalStepUp: passkey.register needs step-up only once the person has an active
-// passkey (07 section 4.2 step 8, hat_anmeldedaten; M1-40); a human with a session stays required.
+// TestConditionalStepUp (07 section 4.2 step 8, can_confirm; audit finding srv-identity-app-1):
+// passkey.register and local_credential.set need a step-up whenever the session can confirm one,
+// so a session never issues its own step-up factor. The step-up is waived only for a session that
+// has nothing to confirm with: a session outside the console on a device without a step_up key, of
+// a person without a passkey and without an established password. A human with a session stays required.
 func TestConditionalStepUp(t *testing.T) {
 	w := newWorld(t)
 	self := authorize.Resource{Kind: authorize.ResourceUser, ID: w.alex, OwnerID: w.alex}
-	alex := w.user(w.alex)
-	alex.StepUpAt = time.Time{}
-	// First passkey: no step-up.
-	w.allow(t, alex, authorize.ActionPasskeyRegister, self)
-	// A passkey exists: step-up, and a fresh one passes.
+	both := []authorize.Action{authorize.ActionPasskeyRegister, authorize.ActionLocalCredentialSet}
+	// session returns alex in a new session without a step-up on a device with the facts d.
+	session := func(d fake.Device, component string) actor.Actor {
+		s, dev := ids.New(), ids.New()
+		d.PrincipalID, d.State = w.alex, authz.DeviceActive
+		w.creds.PutDevice(dev, d)
+		w.creds.PutSession(s, fake.Session{PrincipalID: w.alex, DeviceID: dev, ExpiresAt: worldStart.Add(365 * 24 * time.Hour)})
+		return actor.Actor{ID: w.alex, Kind: actor.KindUser, SessionID: s, DeviceID: dev, ClientComponent: component}
+	}
+	required := func(a actor.Actor, what string) {
+		t.Helper()
+		for _, act := range both {
+			if d, err := w.az.Authorize(context.Background(), a, act, self); err != nil || d.Outcome != stepUpNeeded || d.Reason != "step_up_required" {
+				t.Fatalf("%s: %s = %+v, %v, want step_up_required", what, act, d, err)
+			}
+		}
+		fresh := a
+		fresh.StepUpAt = w.clk.Now()
+		for _, act := range both {
+			w.allow(t, fresh, act, self)
+		}
+	}
+	keyless := session(fake.Device{}, "app")
+	// Nothing to confirm with: the first set-up of either kind needs only the session.
+	for _, act := range both {
+		w.allow(t, keyless, act, self)
+	}
+	// A device with a step_up key confirms with it, also for the first sign-in data.
+	required(session(fake.Device{StepUpKey: true}, "app"), "device with a step_up key")
+	// A console session reaches these actions only after its first step-up and confirms again.
+	required(session(fake.Device{}, "console"), "console session")
+	// A cli device never confirms a step-up and never sets up sign-in data (08 section 6.4).
+	cli := session(fake.Device{CLI: true}, "app")
+	for _, act := range both {
+		w.expect(t, cli, act, self, stepUpNeeded, "step_up_required")
+	}
+	// Sign-in data of either kind is something to confirm with, for both actions: a password
+	// alone never adds the first passkey, a passkey alone never the first password.
 	w.principals.SetPasskey(w.alex, true)
-	w.expect(t, alex, authorize.ActionPasskeyRegister, self, stepUpNeeded, "step_up_required")
-	alex.StepUpAt = w.clk.Now()
-	w.allow(t, alex, authorize.ActionPasskeyRegister, self)
+	required(keyless, "person with a passkey")
+	w.principals.SetPasskey(w.alex, false)
+	w.principals.SetLocalCredential(w.alex, true)
+	required(keyless, "person with an established password")
+	w.principals.SetLocalCredential(w.alex, false)
 	// Without a session (a personal token) step-up is impossible, with or without a passkey.
 	tok := actor.Actor{ID: w.alex, Kind: actor.KindUser, TokenID: ids.New()}
 	w.creds.PutToken(tok.TokenID, fakeToken(w.alex))
 	w.expect(t, tok, authorize.ActionPasskeyRegister, self, forbidden, "step_up_not_possible")
-	w.principals.SetPasskey(w.alex, false)
+	w.principals.SetPasskey(w.alex, true)
 	w.expect(t, tok, authorize.ActionPasskeyRegister, self, forbidden, "step_up_not_possible")
+	w.principals.SetPasskey(w.alex, false)
 	// passkey.revoke has step-up "ja": always required.
-	stale := w.user(w.alex)
-	stale.StepUpAt = time.Time{}
-	w.expect(t, stale, authorize.ActionPasskeyRevoke, authorize.Resource{Kind: authorize.ResourcePasskey, ID: ids.New(), OwnerID: w.alex},
+	w.expect(t, keyless, authorize.ActionPasskeyRevoke, authorize.Resource{Kind: authorize.ResourcePasskey, ID: ids.New(), OwnerID: w.alex},
 		stepUpNeeded, "step_up_required")
 	// A failing source fails the call, never an allow.
 	w.principals.Fail(true)
-	if _, err := w.az.Authorize(context.Background(), alex, authorize.ActionPasskeyRegister, self); err == nil {
+	if _, err := w.az.Authorize(context.Background(), keyless, authorize.ActionPasskeyRegister, self); err == nil {
 		t.Fatal("source error ignored")
 	}
 }
@@ -517,9 +554,9 @@ func TestAdminScope(t *testing.T) {
 }
 
 // TestLocalCredentialStepUpOnlyWhenEstablished: step-up "conditional" of local_credential.set (05
-// 2.4, 07 section 4.2 step 8, M1-39): without an established password path a session needs no
-// step-up; with one it does; a personal token is never enough; the source is asked for the
-// resource's person; a source error never allows.
+// 2.4, 07 section 4.2 step 8, M1-39): a session on a device without a step_up key, of a person
+// without an established password path, needs no step-up; with one it does; a personal token is
+// never enough; the source is asked for the resource's person; a source error never allows.
 func TestLocalCredentialStepUpOnlyWhenEstablished(t *testing.T) {
 	w := newWorld(t)
 	self := authorize.Resource{Kind: authorize.ResourceUser, ID: w.alex, OwnerID: w.alex}
@@ -536,9 +573,11 @@ func TestLocalCredentialStepUpOnlyWhenEstablished(t *testing.T) {
 	w.expect(t, stale, authorize.ActionLocalCredentialSet, self, stepUpNeeded, "step_up_required")
 	w.allow(t, w.user(w.alex), authorize.ActionLocalCredentialSet, self)
 	w.expect(t, personal, authorize.ActionLocalCredentialSet, self, forbidden, "step_up_not_possible")
-	// passkey.register keeps its own condition (M1-40, INT-W18/2): a password path is no passkey.
-	w.allow(t, stale, authorize.ActionPasskeyRegister, self)
+	// passkey.register asks the same question: the session confirms with the password now, so the
+	// first passkey needs that step-up (07 section 4.2 step 8, can_confirm).
+	w.expect(t, stale, authorize.ActionPasskeyRegister, self, stepUpNeeded, "step_up_required")
 	w.principals.SetLocalCredential(w.alex, false)
+	w.allow(t, stale, authorize.ActionPasskeyRegister, self)
 	// A failing source is an error, never an allow.
 	w.principals.Fail(true)
 	if _, err := w.az.Authorize(context.Background(), stale, authorize.ActionLocalCredentialSet, self); err == nil {

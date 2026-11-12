@@ -338,6 +338,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"auth.argon2id_memory_kib":           {Kind: config.KindInt, Default: "65536", Min: "19456", Max: "4194304", Chapter: "08-identity.md"},
 		"auth.argon2id_iterations":           {Kind: config.KindInt, Default: "3", Min: "2", Max: "1000", Chapter: "08-identity.md"},
 		"auth.argon2id_parallelism":          {Kind: config.KindInt, Default: "1", Min: "1", Max: "255", Chapter: "08-identity.md"},
+		"auth.argon2id_max_concurrent":       {Kind: config.KindInt, Default: "4", Min: "1", Max: "1024", Chapter: "08-identity.md"},
 		"auth.password_min_length":           {Kind: config.KindInt, Default: "12", Min: "1", Max: "1024", Chapter: "08-identity.md"},
 		"auth.login_fail_limit":              {Kind: config.KindInt, Default: "10", Min: "1", Chapter: "08-identity.md"},
 		"auth.login_lock_duration":           {Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: "08-identity.md"},

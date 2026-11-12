@@ -636,10 +636,12 @@ type Session struct {
 	ExpiresAt             time.Time
 }
 
-// Device is a device of the fake.
+// Device is a device of the fake. CLI marks the platform cli and StepUpKey an active step_up key
+// (authz.CredentialFacts.DeviceCLI and DeviceStepUpKey).
 type Device struct {
-	PrincipalID ids.ID
-	State       authz.DeviceState
+	PrincipalID    ids.ID
+	State          authz.DeviceState
+	CLI, StepUpKey bool
 }
 
 // Token is an API token of the fake.
@@ -686,7 +688,7 @@ func (s *Credentials) Credentials(_ context.Context, ref authz.CredentialRef) (a
 	}
 	f.DeviceState = authz.DeviceUnknown
 	if v, ok := s.devices[ref.DeviceID]; ok && !ref.DeviceID.IsZero() && v.PrincipalID == ref.PrincipalID {
-		f.DeviceState = v.State
+		f.DeviceState, f.DeviceCLI, f.DeviceStepUpKey = v.State, v.CLI, v.StepUpKey
 	}
 	if !ref.TokenID.IsZero() {
 		if v, ok := s.tokens[ref.TokenID]; ok && v.PrincipalID == ref.PrincipalID && !v.Revoked {

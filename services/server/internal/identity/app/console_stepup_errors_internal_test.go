@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -356,7 +357,7 @@ func TestConsoleReauthCause(t *testing.T) {
 		{"unknown identity", &fakeIdentities{}, nil, causeIdentityOther},
 		{"other person", &fakeIdentities{bySubject: identity.Identity{UserID: ids.New(), Issuer: re.ext.Issuer}, found: true}, nil, causeIdentityOther},
 		{"other issuer", &fakeIdentities{bySubject: identity.Identity{UserID: a.ID, Issuer: "https://other.example.com"}, found: true}, nil, causeIdentityOther},
-		{"no auth_time", &fakeIdentities{bySubject: mine, found: true}, func(x *oidcflow.ExternalIdentity) { x.AuthTime = time.Time{} }, causeAuthTimeTooOld},
+		{"no auth_time", &fakeIdentities{bySubject: mine, found: true}, func(x *oidcflow.ExternalIdentity) { x.AuthTime = time.Time{} }, causeAuthTimeMissing},
 		{"auth_time too old", &fakeIdentities{bySubject: mine, found: true}, func(x *oidcflow.ExternalIdentity) { x.AuthTime = created.Add(-time.Second) }, causeAuthTimeTooOld},
 	}
 	for _, tc := range cases {
@@ -519,9 +520,13 @@ type fakeHasher struct {
 	phc          string
 }
 
-func (h fakeHasher) Verify(string, string) (bool, bool, error) { return h.ok, h.rehash, h.err }
+func (h fakeHasher) Verify(context.Context, string, string) (bool, bool, error) {
+	return h.ok, h.rehash, h.err
+}
 
-func (h fakeHasher) Hash(string) (string, error) { return h.phc, h.hashErr }
+func (h fakeHasher) Hash(context.Context, string) (string, error) { return h.phc, h.hashErr }
+
+func (h fakeHasher) VerifyDummy(context.Context, string) error { return h.err }
 
 // identityNormalizer leaves a password as it is.
 type identityNormalizer struct{}
@@ -564,6 +569,35 @@ func localForStepUp() (*LocalCredentials, *fakeCredentials) {
 
 // validTOTP is the code of totpSecret at consoleNow.
 func validTOTP() string { return domain.TOTPCode(totpSecret, domain.TOTPStep(consoleNow), 6) }
+
+// TestPasswordCheckKeepsTheErrorOfAWaitThatEnded (auth.argon2id_max_concurrent): a password check
+// that left the wait for a free Argon2id computation because its context ended keeps that error in
+// its chain, for the login of a known and of an unknown name and for the step-up. The HTTP layer
+// answers an internal_error whose chain holds the request's deadline with 503 unavailable (cause
+// deadline_exceeded, httpserver.WriteProblem), not with 500.
+func TestPasswordCheckKeepsTheErrorOfAWaitThatEnded(t *testing.T) {
+	t.Parallel()
+	wait := fmt.Errorf("passwordhash: waiting for a free computation: %w", context.DeadlineExceeded)
+	check := func(t *testing.T, err error) {
+		t.Helper()
+		wantCode(t, err, errs.CodeInternalError)
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("%v lost the error of the context", err)
+		}
+	}
+	l, creds := localForStepUp()
+	l.d.Hasher = fakeHasher{err: wait}
+	l.d.People = &fakePeople{userFound: true}
+	_, err := l.stepUpPassword(context.Background(), ids.New(), "password", validTOTP())
+	check(t, err)
+	known := l.d.Identities.(*fakeIdentities)
+	known.bySubject, known.found = identity.Identity{ID: creds.rec.IdentityID, UserID: ids.New()}, true
+	_, err = l.verify(context.Background(), identity.Provider{}, "alex", "password")
+	check(t, err)
+	known.found = false
+	_, err = l.verify(context.Background(), identity.Provider{}, "nobody", "password")
+	check(t, err)
+}
 
 // TestStepUpPasswordErrors: the password step-up refuses a missing local account and a row without
 // password, hands on the store errors and answers a failing hasher or sealer with internal_error.

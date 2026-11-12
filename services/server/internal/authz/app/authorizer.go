@@ -707,7 +707,7 @@ func (a *Authorizer) decideOn(ctx context.Context, s *actingPrincipal, act autho
 	}
 	in.Preview = preview
 	in.Recheck = authorize.IsRecheck(ctx)
-	if in.StepUpWaived, err = a.stepUpWaived(ctx, spec, act, in.Principal); err != nil {
+	if in.StepUpWaived, err = a.stepUpWaived(ctx, spec, act, s); err != nil {
 		return domain.Decision{}, err
 	}
 	return domain.Decide(in)

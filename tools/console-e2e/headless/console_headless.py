@@ -154,6 +154,10 @@ class CheckError(Exception):
     """A condition of SEC-T05 failed."""
 
 
+class StepUpRequiredError(CheckError):
+    """An operation of the console session answered ``401 step_up_required``."""
+
+
 def totp(secret_b32: str, step: int) -> str:
     """The six-digit TOTP code of ``secret_b32`` (base32, no padding) for ``step`` (RFC 6238)."""
     secret = base64.b32decode(secret_b32 + "=" * (-len(secret_b32) % 8))
@@ -385,14 +389,28 @@ def console_fetch(page: Page, method: str, path: str, body: object | None = None
     return answer
 
 
+def needs_step_up(answer: dict[str, Any]) -> bool:
+    """Whether ``answer`` of console_fetch is the problem ``401 step_up_required``."""
+    body = answer.get("json")
+    return (
+        answer.get("status") == 401
+        and isinstance(body, dict)
+        and body.get("code") == "step_up_required"
+    )
+
+
 def register_passkey(page: Page) -> None:
     """Registers a passkey of the console session with the virtual authenticator (Chromium).
 
     The console has no page for passkeys yet (M6-04); the test drives the two registration
     operations from the page of the console session, so navigator.credentials.create runs under
-    the CSP of the console (docs/DECISIONS.md D-M6-03-6).
+    the CSP of the console (docs/DECISIONS.md D-M6-03-6). A console session needs a step-up for
+    it, also for the first passkey (07 4.2 step 8); when the step-up of the session ran out, the
+    result is StepUpRequiredError.
     """
     begin = console_fetch(page, "POST", "/api/v1/me/passkeys/begin")
+    if needs_step_up(begin):
+        raise StepUpRequiredError("beginPasskeyRegistration needs a step-up")
     if begin["status"] != 200:
         raise CheckError(f"beginPasskeyRegistration answered {begin['status']}")
     data = begin["json"]
@@ -405,6 +423,8 @@ def register_passkey(page: Page) -> None:
         "/api/v1/me/passkeys/complete",
         {"challenge_id": data["challenge_id"], "credential": created, "name": "console e2e"},
     )
+    if needs_step_up(done):
+        raise StepUpRequiredError("completePasskeyRegistration needs a step-up")
     if done["status"] not in (200, 201):
         raise CheckError(f"completePasskeyRegistration answered {done['status']}")
 

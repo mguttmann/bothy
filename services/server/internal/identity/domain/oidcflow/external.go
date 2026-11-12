@@ -28,7 +28,9 @@ type ExternalIdentity struct {
 	PreferredUsername string
 	// EmailHint is the claim email.
 	EmailHint string
-	// AuthTime is auth_time, else iat.
+	// AuthTime is the claim auth_time; zero when the provider sent none. iat never stands in for
+	// it: the time a token was issued says nothing about when the person signed in, so a re-login
+	// without auth_time proves no new sign-in (08 section 6.2).
 	AuthTime time.Time
 	// AMR are the authentication methods the provider names.
 	AMR []string
@@ -48,19 +50,24 @@ type externalJSON struct {
 	DisplayName       string   `json:"display_name,omitempty"`
 	PreferredUsername string   `json:"preferred_username,omitempty"`
 	EmailHint         string   `json:"email_hint,omitempty"`
-	AuthTime          int64    `json:"auth_time"`
+	AuthTime          int64    `json:"auth_time,omitempty"`
 	AMR               []string `json:"amr,omitempty"`
 	GroupsState       string   `json:"groups_state,omitempty"`
 	Groups            []string `json:"groups,omitempty"`
 }
 
-// MarshalJSON writes the schema external_identity.v1 with auth_time in Unix seconds.
+// MarshalJSON writes the schema external_identity.v1 with auth_time in Unix seconds; without an
+// AuthTime the member stays out.
 func (x ExternalIdentity) MarshalJSON() ([]byte, error) {
-	return json.Marshal(externalJSON{
+	j := externalJSON{
 		Schema: SchemaExternalIdentity, Issuer: x.Issuer, Subject: x.Subject, DisplayName: x.DisplayName,
-		PreferredUsername: x.PreferredUsername, EmailHint: x.EmailHint, AuthTime: x.AuthTime.Unix(), AMR: x.AMR,
+		PreferredUsername: x.PreferredUsername, EmailHint: x.EmailHint, AMR: x.AMR,
 		GroupsState: x.GroupsState, Groups: x.Groups,
-	})
+	}
+	if !x.AuthTime.IsZero() {
+		j.AuthTime = x.AuthTime.Unix()
+	}
+	return json.Marshal(j)
 }
 
 // errExternal reports a stored external identity that does not follow the schema.
@@ -68,7 +75,7 @@ var errExternal = errors.New("oidcflow: stored external identity does not follow
 
 // ParseExternalIdentity reads a stored external identity; unknown members, another schema, a
 // missing issuer or subject, an unknown groups_state and groups without groups_state "present"
-// are errors.
+// are errors. A missing auth_time gives the zero AuthTime.
 func ParseExternalIdentity(b []byte) (ExternalIdentity, error) {
 	var j externalJSON
 	dec := json.NewDecoder(bytes.NewReader(b))
@@ -85,10 +92,14 @@ func ParseExternalIdentity(b []byte) (ExternalIdentity, error) {
 	default:
 		return ExternalIdentity{}, errExternal
 	}
-	return ExternalIdentity{
+	x := ExternalIdentity{
 		Issuer: j.Issuer, Subject: j.Subject, DisplayName: j.DisplayName, PreferredUsername: j.PreferredUsername,
-		EmailHint: j.EmailHint, AuthTime: time.Unix(j.AuthTime, 0).UTC(), AMR: j.AMR, GroupsState: j.GroupsState, Groups: j.Groups,
-	}, nil
+		EmailHint: j.EmailHint, AMR: j.AMR, GroupsState: j.GroupsState, Groups: j.Groups,
+	}
+	if j.AuthTime != 0 {
+		x.AuthTime = time.Unix(j.AuthTime, 0).UTC()
+	}
+	return x, nil
 }
 
 // ExternalFromClaims builds the external identity of checked claims c matched against issuer
@@ -100,9 +111,6 @@ func ExternalFromClaims(c Claims, issuer string) ExternalIdentity {
 	}
 	if x.DisplayName == "" {
 		x.DisplayName = c.PreferredUsername
-	}
-	if x.AuthTime.IsZero() {
-		x.AuthTime = c.IssuedAt
 	}
 	return x
 }

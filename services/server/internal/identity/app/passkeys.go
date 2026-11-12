@@ -471,9 +471,9 @@ func (p *Passkeys) enrollFailed(ctx context.Context, err error, opened, matched 
 }
 
 // BeginPasskeyRegistration implements identity.Passkeys (brief M1-40 "Registration"):
-// passkey.register on the caller (self; step-up once an active passkey exists, decided in authz),
-// creation options with the caller's active passkeys excluded, the row bound to the caller's
-// session.
+// passkey.register on the caller (self; step-up unless the session has nothing to confirm one
+// with, decided in authz), creation options with the caller's active passkeys excluded, the row
+// bound to the caller's session.
 func (p *Passkeys) BeginPasskeyRegistration(ctx context.Context, a actor.Actor) (identity.WebAuthnChallenge, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {

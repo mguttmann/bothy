@@ -143,6 +143,9 @@ type Config struct {
 	Argon2idMemoryKiB   int `config:"auth.argon2id_memory_kib"`
 	Argon2idIterations  int `config:"auth.argon2id_iterations"`
 	Argon2idParallelism int `config:"auth.argon2id_parallelism"`
+	// Argon2idMaxConcurrent is auth.argon2id_max_concurrent: the Argon2id computations that run
+	// at the same time, each with Argon2idMemoryKiB of memory; further ones wait (08 section 2.5).
+	Argon2idMaxConcurrent int `config:"auth.argon2id_max_concurrent"`
 	// LoginFailLimit is auth.login_fail_limit: failures of a login name per LoginFailWindow
 	// before the password path is locked.
 	LoginFailLimit int `config:"auth.login_fail_limit"`

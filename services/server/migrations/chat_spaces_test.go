@@ -75,6 +75,8 @@ func TestChatSpacesMigration_Schema(t *testing.T) {
 			"FOREIGN KEY (user_id) REFERENCES users(principal_id) ON DELETE CASCADE",
 			"PRIMARY KEY (user_id, space_id)",
 		}, []string{
+			// The foreign key to devices (00104).
+			"CREATE INDEX user_space_states_updated_by_device_id_idx ON public.user_space_states USING btree (updated_by_device_id) WHERE (updated_by_device_id IS NOT NULL)",
 			"CREATE UNIQUE INDEX user_space_states_pkey ON public.user_space_states USING btree (user_id, space_id)",
 		}},
 	} {

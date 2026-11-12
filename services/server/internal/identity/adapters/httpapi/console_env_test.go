@@ -55,7 +55,7 @@ func newConsoleWorld(t *testing.T) *cworld {
 	w := &cworld{oworld: newOIDCWorld(t, oidcWorldOpts{})}
 	w.alex = w.bootstrap("alex").OwnerID
 	w.phone = w.sworld.phone(w.alex)
-	w.secret = w.establish(w.phone.client)
+	w.secret = w.establish(w.phone)
 	w.passkey = authenticator()
 	w.phone.stepUp()
 	w.want(w.phone.register(w.passkey, "Laptop"), http.StatusCreated, "")
@@ -172,13 +172,20 @@ func (c *consoleClient) passwordStepUp(password string) *httpservertest.Response
 // answer of the completion and the authorization URL.
 func (c *consoleClient) oidcStepUp(authTimeShift time.Duration) (*httpservertest.Response, string) {
 	c.w.t.Helper()
+	return c.oidcReauth(func() { c.w.idp.SetClaim("auth_time", c.w.clk.Now().Add(authTimeShift).Unix()) })
+}
+
+// oidcReauth runs the OIDC re-login with the ID token claims that claims arranges at the fake
+// provider and returns the answer of the completion and the authorization URL.
+func (c *consoleClient) oidcReauth(claims func()) (*httpservertest.Response, string) {
+	c.w.t.Helper()
 	m := c.challenge()
 	verifier := randomText(c.w.t)
 	body, _ := json.Marshal(map[string]any{"challenge_id": m["challenge_id"], "provider_id": c.w.prov.String(),
 		"app_redirect_uri": consoleStepCallback, "client_challenge": oidcflow.S256(verifier)})
 	begun := c.w.want(c.do(http.MethodPost, stepUpOIDCPath, string(body)), http.StatusOK, "")
 	authURL := begun["authorization_url"].(string)
-	c.w.idp.SetClaim("auth_time", c.w.clk.Now().Add(authTimeShift).Unix())
+	claims()
 	defer c.w.idp.Reset()
 	f := &flow{verifier: verifier, attempt: begun["login_attempt_id"].(string), authURL: authURL}
 	c.w.want(c.w.callback(f, oidctest.Login{Subject: "alex-sub", Name: "Alex"}), http.StatusFound, "")
@@ -564,7 +571,7 @@ func TestConsoleRevocation(t *testing.T) {
 	})
 	t.Run("DisableUser", func(t *testing.T) {
 		robin := w.localPerson("robin")
-		secret := w.establish(robin.phone.client)
+		secret := w.establish(robin.phone)
 		c := w.newConsole()
 		w.clk.Advance(30 * time.Second)
 		b, _ := json.Marshal(map[string]any{"client": "console", "login_name": "robin", "password": testPassword, "totp_code": w.code(secret)})
@@ -573,6 +580,37 @@ func TestConsoleRevocation(t *testing.T) {
 		w.want(w.phone.call(http.MethodPost, disablePath(robin.user), reasonJSON("Left")), http.StatusOK, "")
 		w.wantCleared(c.do(http.MethodGet, mePath, ""), "session_revoked")
 	})
+}
+
+// TestConsoleStepUp_OIDCWithoutAuthTime (08 section 6.2): a provider that sends no auth_time gives
+// no proof of a new login, whatever iat says, so the re-login confirms nothing: 401
+// step_up_required, the challenge fails and counts, and the session holds no step-up.
+func TestConsoleStepUp_OIDCWithoutAuthTime(t *testing.T) {
+	t.Parallel()
+	w := newConsoleWorld(t)
+	c := w.newConsole()
+	c.login()
+	r, _ := c.oidcReauth(func() { w.idp.DropClaim("auth_time") })
+	w.want(r, http.StatusUnauthorized, "step_up_required")
+	sid := c.sessionID()
+	if m := w.stepMethod(sid); m != "" {
+		t.Fatalf("step_up_method %q after a re-login without auth_time", m)
+	}
+	if n := w.failedCount(sid); n != 1 {
+		t.Fatalf("failed challenges %d, want 1", n)
+	}
+	var cause string
+	for _, a := range w.audits("auth.step_up") {
+		if a.Decision == "deny" && a.ResourceID == sid.String() {
+			cause, _ = a.Details["cause"].(string)
+		}
+	}
+	if cause != "auth_time_missing" {
+		t.Fatalf("audit cause %q, want auth_time_missing", cause)
+	}
+	// With auth_time the same provider confirms.
+	r, _ = c.oidcStepUp(time.Second)
+	w.want(r, http.StatusOK, "")
 }
 
 // TestConsoleViewAs (07 section 9.2, D-M6-01-7): the stored view with start, end and expiry,

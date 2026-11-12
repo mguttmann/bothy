@@ -55,6 +55,7 @@ from console_headless import (
     CheckError,
     Login,
     Session,
+    StepUpRequiredError,
     add_virtual_authenticator,
     assert_clean,
     console_fetch,
@@ -505,7 +506,9 @@ def log_in(page: Page, login: Login) -> None:
     """Alex's console login with password and TOTP.
 
     Then the step-up with password and TOTP and at once the passkey registration, which needs the
-    step-up of the last 3 s.
+    step-up of the last 3 s (07 4.2 step 8: a console session confirms before it adds a passkey,
+    also the first one). When that window passed between the calls on a slow machine, the step-up
+    and the registration run once more with the next code.
     """
     done = console_fetch(
         page,
@@ -520,25 +523,32 @@ def log_in(page: Page, login: Login) -> None:
     )
     if done["status"] != 200:
         raise CheckError(f"loginWithPassword (console) answered {done['status']}")
-    # The TOTP wait comes before the challenge, so the challenge and the step-up stay within
-    # their windows.
-    code = login.code()
-    challenge = console_fetch(page, "POST", API + "/auth/step-up/challenge")
-    if challenge["status"] != 200 or not isinstance(challenge["json"], dict):
-        raise CheckError(f"createStepUpChallenge answered {challenge['status']}")
-    step = console_fetch(
-        page,
-        "POST",
-        API + "/auth/step-up/password",
-        {
-            "challenge_id": challenge["json"]["challenge_id"],
-            "password": login.password,
-            "totp_code": code,
-        },
-    )
-    if step["status"] != 200:
-        raise CheckError(f"stepUpWithPassword answered {step['status']}")
-    register_passkey(page)
+    for last in (False, True):
+        # The TOTP wait comes before the challenge, so the challenge and the step-up stay within
+        # their windows.
+        code = login.code()
+        challenge = console_fetch(page, "POST", API + "/auth/step-up/challenge")
+        if challenge["status"] != 200 or not isinstance(challenge["json"], dict):
+            raise CheckError(f"createStepUpChallenge answered {challenge['status']}")
+        step = console_fetch(
+            page,
+            "POST",
+            API + "/auth/step-up/password",
+            {
+                "challenge_id": challenge["json"]["challenge_id"],
+                "password": login.password,
+                "totp_code": code,
+            },
+        )
+        if step["status"] != 200:
+            raise CheckError(f"stepUpWithPassword answered {step['status']}")
+        try:
+            register_passkey(page)
+        except StepUpRequiredError:
+            if last:
+                raise
+            continue
+        return
 
 
 @dataclass
@@ -627,19 +637,20 @@ def fresh_code(secret: str, used: int) -> tuple[str, int]:
 def seed_sam_devices(page: Page, enrollment_code: str) -> dict[str, str]:
     """Sam's first device redeems the enrollment code, sets a random password and enrolls TOTP.
 
-    Then Sam logs in as an app with a second device, which waits for approval. Returns the pending
-    device as ``{"id", "name", "code"}`` with its verification code (getDevice as that device, 08
-    5.2).
+    The device has no step-up key and Sam no sign-in data yet, so its session has nothing to
+    confirm a step-up with and sets up the first password without one (07 4.2 step 8); a device
+    with a step-up key would have to confirm with it first. Then Sam logs in as an app with a
+    second device, which waits for approval. Returns the pending device as ``{"id", "name",
+    "code"}`` with its verification code (getDevice as that device, 08 5.2).
     """
     first = PageDevice.create(page, "sam-first")
-    step_up = new_key(page, "sam-first-step-up")
     redeemed = first.call(
         "redeemEnrollmentCode",
         "POST",
         "/auth/enroll/redeem",
         {
             "enrollment_code": enrollment_code,
-            "device": first.registration("Sam phone", step_up),
+            "device": first.registration("Sam phone", None),
         },
         want=201,
     )

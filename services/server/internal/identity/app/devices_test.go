@@ -209,22 +209,41 @@ func TestCredentialSource_Devices(t *testing.T) {
 	// to M1-38 (docs/DECISIONS.md M1-33).
 	expired := reg(identity.DeviceStatePending)
 	f.sql(`UPDATE devices SET created_at = $2 WHERE id = $1`, expired.ID.String(), time.Now().Add(-30*24*time.Hour))
+	// The facts of the conditional step-up (07 section 4.2 step 8): a device without a step_up key
+	// and a cli device, which never has one (08 section 6.4).
+	plain := func(platform identity.Platform) identity.Device {
+		r, _, _ := registration(alex.ID)
+		r.Platform, r.StepUpKey, r.State, r.ApprovedBy = platform, nil, identity.DeviceStateActive, &sam.ID
+		d, err := devs.Register(ctx, r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return d
+	}
+	keyless, cli := plain(identity.PlatformWindows), plain(identity.PlatformCLI)
 	for _, tc := range []struct {
 		name      string
 		principal ids.ID
 		device    ids.ID
 		want      authz.DeviceState
+		stepUp    bool
+		cli       bool
 	}{
-		{"active", alex.ID, active.ID, authz.DeviceActive},
-		{"pending", alex.ID, pending.ID, authz.DevicePending},
-		{"revoked", alex.ID, revoked.ID, authz.DeviceRevoked},
-		{"old pending", alex.ID, expired.ID, authz.DevicePending},
-		{"foreign principal", sam.ID, active.ID, authz.DeviceUnknown},
-		{"unknown device", alex.ID, ids.New(), authz.DeviceUnknown},
+		{"active", alex.ID, active.ID, authz.DeviceActive, true, false},
+		{"pending", alex.ID, pending.ID, authz.DevicePending, true, false},
+		{"revoked", alex.ID, revoked.ID, authz.DeviceRevoked, true, false},
+		{"old pending", alex.ID, expired.ID, authz.DevicePending, true, false},
+		{"without a step_up key", alex.ID, keyless.ID, authz.DeviceActive, false, false},
+		{"cli", alex.ID, cli.ID, authz.DeviceActive, false, true},
+		{"foreign principal", sam.ID, active.ID, authz.DeviceUnknown, false, false},
+		{"unknown device", alex.ID, ids.New(), authz.DeviceUnknown, false, false},
 	} {
 		got, err := src.Credentials(ctx, authz.CredentialRef{PrincipalID: tc.principal, DeviceID: tc.device})
 		if err != nil || got.DeviceState != tc.want || got.SessionActive || got.TokenActive {
 			t.Errorf("%s: %+v, %v; want device %s and no session or token", tc.name, got, err, tc.want)
+		}
+		if got.DeviceStepUpKey != tc.stepUp || got.DeviceCLI != tc.cli {
+			t.Errorf("%s: step_up key %v and cli %v, want %v and %v", tc.name, got.DeviceStepUpKey, got.DeviceCLI, tc.stepUp, tc.cli)
 		}
 	}
 	if got, err := src.Credentials(ctx, authz.CredentialRef{PrincipalID: alex.ID}); err != nil || got != (authz.CredentialFacts{}) {

@@ -421,6 +421,7 @@ Source: [08-identity.md](../spec/08-identity.md), section 18.
 | `auth.argon2id_memory_kib` | `BOTHY_AUTH__ARGON2ID_MEMORY_KIB` | Server | int | `65536` | Argon2id memory (lower bound 19456) | active |
 | `auth.argon2id_iterations` | `BOTHY_AUTH__ARGON2ID_ITERATIONS` | Server | int | `3` | Argon2id iterations (lower bound 2) | active |
 | `auth.argon2id_parallelism` | `BOTHY_AUTH__ARGON2ID_PARALLELISM` | Server | int | `1` | Argon2id parallelism | active |
+| `auth.argon2id_max_concurrent` | `BOTHY_AUTH__ARGON2ID_MAX_CONCURRENT` | Server | int | `4` | Argon2id computations at the same time, each with `auth.argon2id_memory_kib` of memory; further password checks wait | active |
 | `auth.login_fail_limit` | `BOTHY_AUTH__LOGIN_FAIL_LIMIT` | Server | int | `10` | Failed attempts per account and window | active |
 | `auth.login_fail_window` | `BOTHY_AUTH__LOGIN_FAIL_WINDOW` | Server | duration | `15m` | Window for failed attempts | active |
 | `auth.login_lock_duration` | `BOTHY_AUTH__LOGIN_LOCK_DURATION` | Server | duration | `15m` | Lockout of the password path | active |

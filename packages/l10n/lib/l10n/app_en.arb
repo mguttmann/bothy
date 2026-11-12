@@ -6377,6 +6377,10 @@
   "@consoleStepUpConfirm": {
     "description": "Web console step-up after login (08 section 7.5, brief M6-02): button that sends the password step-up."
   },
+  "consoleStepUpCodeHint": "Use a new code. A code you already used, for example to log in, does not work a second time: wait until your app shows the next one.",
+  "@consoleStepUpCodeHint": {
+    "description": "Web console step-up after login (08 sections 2.5 and 7.5): helper text under the field of the TOTP code. A code is accepted once, so the code of the login is refused here and counts as a failed attempt."
+  },
   "consoleStepUpFailed": "The confirmation failed. Try again or choose another way.",
   "@consoleStepUpFailed": {
     "description": "Web console step-up after login (08 section 7.5, brief M6-02): a refused confirmation."

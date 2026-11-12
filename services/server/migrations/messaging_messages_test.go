@@ -94,6 +94,8 @@ func TestMessagingMigration_Schema(t *testing.T) {
 		"CREATE INDEX messages_author_created_idx ON public.messages USING btree (author_principal_id, created_at DESC)",
 		"CREATE INDEX messages_channel_created_idx ON public.messages USING btree (channel_id, created_at DESC)",
 		// Added by 00036 (M3-13).
+		// The candidates of the job retention.content (00104).
+		"CREATE INDEX messages_content_created_idx ON public.messages USING btree (created_at, id) WHERE ((deleted_at IS NULL) AND (kind <> 'system'::text))",
 		"CREATE INDEX messages_search_vector_idx ON public.messages USING gin (search_vector)",
 		"CREATE INDEX messages_trigger_state_idx ON public.messages USING btree (trigger_state) WHERE (trigger_state = ANY (ARRAY['received'::text, 'queued'::text, 'working'::text]))",
 		"CREATE UNIQUE INDEX messages_author_client_msg_id_key ON public.messages USING btree (author_principal_id, client_msg_id)",

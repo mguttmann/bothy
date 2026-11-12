@@ -87,8 +87,8 @@ type Passkeys interface {
 	// Errors: as CompletePasskeyLogin.
 	CompleteEnrollment(ctx context.Context, in PasskeyEnrollment) (RedeemResult, error)
 	// BeginPasskeyRegistration returns creation options for the caller's further passkey
-	// (passkey.register, step-up once an active passkey exists). Errors: the decision of
-	// authorize.
+	// (passkey.register; step-up unless the session has nothing to confirm one with, 07 section
+	// 4.2 step 8). Errors: the decision of authorize.
 	BeginPasskeyRegistration(ctx context.Context, a actor.Actor) (WebAuthnChallenge, error)
 	// CompletePasskeyRegistration stores the passkey of the creation response. Errors: the
 	// decision of authorize; 400 validation_failed for an unknown, used, expired or foreign

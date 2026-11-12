@@ -274,6 +274,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"auth.access_token_ttl = 10m  # default\n" +
 		"auth.api_token_max_ttl = 365d  # default\n" +
 		"auth.argon2id_iterations = 3  # default\n" +
+		"auth.argon2id_max_concurrent = 4  # default\n" +
 		"auth.argon2id_memory_kib = 65536  # default\n" +
 		"auth.argon2id_parallelism = 1  # default\n" +
 		"auth.cleanup_interval = 1h  # default\n" +

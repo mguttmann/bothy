@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/passwordhash"
 	"github.com/OWNER/bothy/services/server/internal/identity/app"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain"
@@ -49,15 +50,15 @@ type countingHasher struct {
 }
 
 // Verify counts one computation.
-func (c *countingHasher) Verify(phc, password string) (bool, bool, error) {
+func (c *countingHasher) Verify(ctx context.Context, phc, password string) (bool, bool, error) {
 	c.n.Add(1)
-	return c.PasswordHasher.Verify(phc, password)
+	return c.PasswordHasher.Verify(ctx, phc, password)
 }
 
 // VerifyDummy counts one computation.
-func (c *countingHasher) VerifyDummy(password string) {
+func (c *countingHasher) VerifyDummy(ctx context.Context, password string) error {
 	c.n.Add(1)
-	c.PasswordHasher.VerifyDummy(password)
+	return c.PasswordHasher.VerifyDummy(ctx, password)
 }
 
 // constantHasher is a hasher of constant, tiny cost for the timing test under the race detector:
@@ -65,24 +66,27 @@ func (c *countingHasher) VerifyDummy(password string) {
 type constantHasher struct{}
 
 // Hash implements app.PasswordHasher.
-func (constantHasher) Hash(password string) (string, error) {
+func (constantHasher) Hash(_ context.Context, password string) (string, error) {
 	sum := sha256.Sum256([]byte(password))
 	return "constant$" + hex.EncodeToString(sum[:]), nil
 }
 
 // Verify implements app.PasswordHasher.
-func (h constantHasher) Verify(phc, password string) (bool, bool, error) {
-	want, _ := h.Hash(password)
+func (h constantHasher) Verify(ctx context.Context, phc, password string) (bool, bool, error) {
+	want, _ := h.Hash(ctx, password)
 	return subtle.ConstantTimeCompare([]byte(want), []byte(phc)) == 1, false, nil
 }
 
 // VerifyDummy implements app.PasswordHasher.
-func (h constantHasher) VerifyDummy(password string) { _, _, _ = h.Verify("constant$", password) }
+func (h constantHasher) VerifyDummy(ctx context.Context, password string) error {
+	_, _, err := h.Verify(ctx, "constant$", password)
+	return err
+}
 
 // newCountingHasher returns a counting hasher with the floor parameters.
 func newCountingHasher(t *testing.T) *countingHasher {
 	t.Helper()
-	h, err := passwordhash.New(passwordhash.Params{MemoryKiB: 19456, Iterations: 2, Parallelism: 1})
+	h, err := passwordhash.New(passwordhash.Params{MemoryKiB: 19456, Iterations: 2, Parallelism: 1}, sessCfg.Argon2idMaxConcurrent)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,10 +158,15 @@ func (w *sworld) code(secret []byte) string {
 	return domain.TOTPCode(secret, domain.TOTPStep(w.clk.Now()), domain.TOTPDigits)
 }
 
-// establish sets the password, enrolls and confirms TOTP through the API without step-up and
-// returns the secret; the clock moves one step on, so the confirmation code is not the next code.
-func (w *sworld) establish(c *client) []byte {
+// establish sets the password, enrolls and confirms TOTP through the API and returns the secret;
+// the clock moves one step on, so the confirmation code is not the next code. A device with a
+// step_up key confirms a step-up first, which the first set-up needs from such a session (07
+// section 4.2 step 8); a device without one has nothing to confirm with and needs none.
+func (w *sworld) establish(c *stepClient) []byte {
 	w.t.Helper()
+	if c.step != nil {
+		c.stepUp()
+	}
 	m := w.want(c.setLocal(`{"password":"`+testPassword+`","totp_enroll":true}`), http.StatusOK, "")
 	if m["password_set"] != true || m["totp_enabled"] != false {
 		w.t.Fatalf("enroll: %v", m)
@@ -246,7 +255,7 @@ func TestLocalAccounts(t *testing.T) {
 
 func casePasswordLoginHappyPath(t *testing.T, w *sworld, _ localAccount, _ *countingHasher) {
 	a := w.localPerson("robin")
-	secret := w.establish(a.phone.client)
+	secret := w.establish(a.phone)
 	p := w.phoneKeys()
 	code := w.code(secret)
 	// The login name is trimmed and lowercased.
@@ -279,7 +288,7 @@ func casePasswordLoginHappyPath(t *testing.T, w *sworld, _ localAccount, _ *coun
 }
 
 func casePasswordLoginKnownDeviceStaysActive(t *testing.T, w *sworld, alex localAccount, _ *countingHasher) {
-	secret := w.establish(alex.phone.client)
+	secret := w.establish(alex.phone)
 	// The phone of the enrollment code is active.
 	p := w.phoneKeys()
 	w.want(w.redeem(p, alex.code, nil), http.StatusCreated, "")
@@ -305,7 +314,7 @@ func casePasswordLoginKnownDeviceStaysActive(t *testing.T, w *sworld, alex local
 
 func caseLockedAccountStillHashes(t *testing.T, w *sworld, _ localAccount, h *countingHasher) {
 	a := w.localPerson("sam")
-	secret := w.establish(a.phone.client)
+	secret := w.establish(a.phone)
 	want := w.unauthenticatedBody()
 	for range sessCfg.LoginFailLimit {
 		w.wantRejected(w.passwordLogin(w.phoneKeys(), "sam", "EXAMPLE-wrong-password", w.code(secret)), want)
@@ -342,7 +351,7 @@ func caseLockedAccountStillHashes(t *testing.T, w *sworld, _ localAccount, h *co
 
 func caseLockoutOnlyPasswordPath(t *testing.T, w *sworld, _ localAccount, _ *countingHasher) {
 	a := w.localPerson("kim")
-	secret := w.establish(a.phone.client)
+	secret := w.establish(a.phone)
 	var code app.IssuedEnrollmentCode
 	err := w.uow.Do(context.Background(), func(ctx context.Context) error {
 		var err error
@@ -374,7 +383,7 @@ func caseLockoutOnlyPasswordPath(t *testing.T, w *sworld, _ localAccount, _ *cou
 
 func casePasswordLoginFailureWindow(t *testing.T, w *sworld, _ localAccount, _ *countingHasher) {
 	a := w.localPerson("lee")
-	secret := w.establish(a.phone.client)
+	secret := w.establish(a.phone)
 	want := w.unauthenticatedBody()
 	// Failures below the limit, then the window ends: the next failure starts a new window and
 	// does not lock.
@@ -399,7 +408,7 @@ func casePasswordLoginFailureWindow(t *testing.T, w *sworld, _ localAccount, _ *
 
 func caseTOTPSecretEncryptedAtRest(t *testing.T, w *sworld, _ localAccount, _ *countingHasher) {
 	a := w.localPerson("ari")
-	secret := w.establish(a.phone.client)
+	secret := w.establish(a.phone)
 	var ct []byte
 	var ref, phc string
 	w.cred(a.user, "totp_secret_ciphertext", &ct)
@@ -418,6 +427,7 @@ func caseTOTPSecretEncryptedAtRest(t *testing.T, w *sworld, _ localAccount, _ *c
 
 func caseTOTPEnrolmentNeedsConfirmation(t *testing.T, w *sworld, _ localAccount, _ *countingHasher) {
 	a := w.localPerson("noa")
+	a.phone.stepUp()
 	m := w.want(a.phone.setLocal(`{"password":"`+testPassword+`","totp_enroll":true}`), http.StatusOK, "")
 	uri := m["totp_secret_uri"].(string)
 	if !strings.HasPrefix(uri, "otpauth://totp/chat.example.com:noa?") {
@@ -437,9 +447,14 @@ func caseTOTPEnrolmentNeedsConfirmation(t *testing.T, w *sworld, _ localAccount,
 
 func caseLocalCredentialStepUpOnlyWhenEstablished(t *testing.T, w *sworld, _ localAccount, _ *countingHasher) {
 	a := w.localPerson("eli")
-	// First set-up and confirmation work without step-up.
-	w.establish(a.phone.client)
-	// Later changes need a fresh step-up.
+	// The first set-up from a session that can confirm a step-up needs one (07 section 4.2 step
+	// 8): the phone has a step_up key.
+	w.want(a.phone.setLocal(`{"password":"`+testPassword+`","totp_enroll":true}`), http.StatusUnauthorized, "step_up_required")
+	// A session with nothing to confirm with sets up and confirms without step-up.
+	win := w.loginDevice(a.user, identity.DeviceStateActive, identity.PlatformWindows, false)
+	w.establish(win)
+	// Later changes need a fresh step-up, from every session.
+	w.want(win.setLocal(`{"password":"EXAMPLE-new-password-2"}`), http.StatusUnauthorized, "step_up_required")
 	w.want(a.phone.setLocal(`{"password":"EXAMPLE-new-password-2"}`), http.StatusUnauthorized, "step_up_required")
 	a.phone.stepUp()
 	w.want(a.phone.setLocal(`{"password":"EXAMPLE-new-password-2"}`), http.StatusOK, "")
@@ -454,6 +469,7 @@ func caseLocalCredentialStepUpOnlyWhenEstablished(t *testing.T, w *sworld, _ loc
 
 func caseSetLocalCredentialValidation(t *testing.T, w *sworld, _ localAccount, _ *countingHasher) {
 	a := w.localPerson("val")
+	a.phone.stepUp()
 	field := func(r *httpservertest.Response, pointer, code string) {
 		t.Helper()
 		m := w.want(r, http.StatusBadRequest, "validation_failed")
@@ -472,11 +488,13 @@ func caseSetLocalCredentialValidation(t *testing.T, w *sworld, _ localAccount, _
 	}
 	// A person without a local identity.
 	other := w.phone(w.person("tay", false))
+	other.stepUp()
 	w.wantReason(other.setLocal(`{"password":"`+testPassword+`"}`), http.StatusConflict, "conflict", "no_local_identity")
 }
 
 func casePasswordAndTOTPNeverLogged(t *testing.T, w *sworld, _ localAccount, _ *countingHasher) {
 	a := w.localPerson("ray")
+	a.phone.stepUp()
 	m := w.want(a.phone.setLocal(`{"password":"`+testPassword+`","totp_enroll":true}`), http.StatusOK, "")
 	uri := m["totp_secret_uri"].(string)
 	secret := totpSecret(t, uri)
@@ -520,6 +538,7 @@ func caseCredentialOverviewFlags(t *testing.T, w *sworld, _ localAccount, _ *cou
 	if p, e := flags(); p != false || e != false {
 		t.Fatalf("before: %v %v", p, e)
 	}
+	a.phone.stepUp()
 	m := w.want(a.phone.setLocal(`{"password":"`+testPassword+`","totp_enroll":true}`), http.StatusOK, "")
 	if p, e := flags(); p != true || e != false {
 		t.Fatalf("enrolled, not confirmed: %v %v", p, e)
@@ -533,7 +552,7 @@ func caseCredentialOverviewFlags(t *testing.T, w *sworld, _ localAccount, _ *cou
 
 func casePasswordLoginWithoutLocalProvider(_ *testing.T, w *sworld, _ localAccount, _ *countingHasher) {
 	a := w.localPerson("ola")
-	w.establish(a.phone.client)
+	w.establish(a.phone)
 	// The established path asks for step-up before the identity is looked up.
 	a.phone.stepUp()
 	w.sql(`UPDATE identity_providers SET enabled = false WHERE kind = 'local'`)
@@ -577,7 +596,7 @@ func TestIDT21_UnknownNameTimingEqualsWrongPassword(t *testing.T) {
 	}
 	// A limit no sample reaches: every wrong password counts and writes the counter.
 	w, alex := newLocalWorld(t, worldOptions{hasher: h, cfg: func(c *app.Config) { c.LoginFailLimit = 1000 }})
-	w.establish(alex.phone.client)
+	w.establish(alex.phone)
 	const samples = 31
 	sample := func(name, pw string) (time.Duration, string) {
 		before := h.n.Load()

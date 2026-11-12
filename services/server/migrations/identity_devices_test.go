@@ -62,6 +62,8 @@ func TestDevicesMigration_Schema(t *testing.T) {
 			},
 			indexes: []string{
 				"CREATE INDEX devices_pending_idx ON public.devices USING btree (state) WHERE (state = 'pending'::text)",
+				// The revoked devices for the retention job (00104).
+				"CREATE INDEX devices_revoked_at_idx ON public.devices USING btree (revoked_at, id) WHERE (revoked_at IS NOT NULL)",
 				"CREATE INDEX devices_user_id_state_idx ON public.devices USING btree (user_id, state)",
 				"CREATE UNIQUE INDEX devices_pkey ON public.devices USING btree (id)",
 			},

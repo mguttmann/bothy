@@ -72,7 +72,7 @@ var sessCfg = app.Config{
 	ConsoleSessionMaxAge: 12 * time.Hour, ConsoleSessionIdleTimeout: 30 * time.Minute, ViewAsMaxDuration: 15 * time.Minute,
 	// Local accounts (M1-39): the Argon2id floor parameters keep the tests fast.
 	LocalPasswordEnabled: true, PasswordMinLength: 12, Argon2idMemoryKiB: 19456, Argon2idIterations: 2, Argon2idParallelism: 1,
-	LoginFailLimit: 3, LoginLockDuration: 10 * time.Minute, TOTPKeyRef: testTOTPKeyRef,
+	LoginFailLimit: 3, LoginLockDuration: 10 * time.Minute, TOTPKeyRef: testTOTPKeyRef, Argon2idMaxConcurrent: 4,
 }
 
 // testTOTPKeyRef is the reference of the TOTP key of the session world.
@@ -95,7 +95,7 @@ func (testTOTPKeys) Resolve(_ context.Context, ref string) ([]byte, error) {
 // sharedHasher is one Argon2id hasher with the floor parameters for every world of the package:
 // its dummy hash is computed once, not per world, which the race detector makes expensive.
 var sharedHasher = sync.OnceValue(func() app.PasswordHasher {
-	h, err := passwordhash.New(passwordhash.Params{MemoryKiB: 19456, Iterations: 2, Parallelism: 1})
+	h, err := passwordhash.New(passwordhash.Params{MemoryKiB: 19456, Iterations: 2, Parallelism: 1}, sessCfg.Argon2idMaxConcurrent)
 	if err != nil {
 		panic(err)
 	}

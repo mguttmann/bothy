@@ -11,40 +11,54 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// stepUpOnlyWithExistingCredential holds the condition of every action whose step-up is
-// conditional ("bedingt" in 05 section 2.4): hat_anmeldedaten(p, action) of 07 section 4.2 step 8,
-// asked through PrincipalSource. A function that returns false waives the step-up, because the
-// person sets up the first sign-in data of that kind; "human with a session" stays required. A
-// conditional action without an entry counts as "ja" (07 section 4.2). The rights logic stays here
-// in authz (B7).
-var stepUpOnlyWithExistingCredential = map[authorize.Action]func(ctx context.Context, src authz.PrincipalSource, userID ids.ID) (bool, error){
-	// passkey.register: step-up once the person has an active passkey (M1-40).
-	authorize.ActionPasskeyRegister: func(ctx context.Context, src authz.PrincipalSource, userID ids.ID) (bool, error) {
+// conditionalStepUp are the actions whose step-up is conditional ("bedingt" in 05 section 2.4):
+// they set up sign-in data that confirms a step-up or signs in to the console. A conditional action
+// without an entry counts as "ja" (07 section 4.2).
+var conditionalStepUp = map[authorize.Action]bool{
+	// passkey.register adds a passkey (M1-40).
+	authorize.ActionPasskeyRegister: true,
+	// local_credential.set sets the password and TOTP of a local account (M1-39).
+	authorize.ActionLocalCredentialSet: true,
+}
+
+// signInData are the facts of the person behind can_confirm of 07 section 4.2 step 8, asked through
+// PrincipalSource: sign-in data that confirms a step-up, whatever kind the action sets up. A
+// password alone must not add the first passkey, which opens the terminal (08 section 6.3), and a
+// passkey alone not the first password.
+var signInData = []func(ctx context.Context, src authz.PrincipalSource, userID ids.ID) (bool, error){
+	func(ctx context.Context, src authz.PrincipalSource, userID ids.ID) (bool, error) {
 		return src.HasActivePasskey(ctx, userID)
 	},
-	// local_credential.set: step-up once the password path is established, TOTP confirmed (M1-39).
-	// The first set-up and its confirmation work without step-up; a stolen session that adds a
-	// password only gains a login whose new devices stay pending (brief M1-39 "Conditional
-	// step-up").
-	authorize.ActionLocalCredentialSet: func(ctx context.Context, src authz.PrincipalSource, userID ids.ID) (bool, error) {
+	func(ctx context.Context, src authz.PrincipalSource, userID ids.ID) (bool, error) {
 		return src.HasEstablishedLocalCredential(ctx, userID)
 	},
 }
 
-// stepUpWaived reports whether the conditional step-up of spec is waived for p: only for a person
-// in a session, only for an action with a condition, and only when the condition is false. An
-// error of the source fails the call (never an allow).
-func (a *Authorizer) stepUpWaived(ctx context.Context, spec domain.ActionSpec, act authorize.Action, p domain.Principal) (bool, error) {
-	if !spec.StepUpConditional || p.Kind != domain.KindUser || !p.HasSession {
+// stepUpWaived reports whether the conditional step-up of spec is waived for s (07 section 4.2
+// step 8, can_confirm): only for a person in a session, only for an action with a condition, and
+// only while the session has nothing to confirm a step-up with. That is a session outside the
+// console on a device that is not cli and has no active step_up key, of a person without an active
+// passkey and without an established password path; such a person sets up the first sign-in data
+// with the session alone. Every other session confirms first, so a session never issues the factor of its own
+// step-up: a device with a step_up key confirms with it, a console session passed its first
+// step-up before it reaches the action (08 section 7.5), and a cli device never confirms and never
+// sets up sign-in data (08 section 6.4). An error of the source fails the call (never an allow).
+// The rights logic stays here in authz (B7).
+func (a *Authorizer) stepUpWaived(ctx context.Context, spec domain.ActionSpec, act authorize.Action, s *actingPrincipal) (bool, error) {
+	if !spec.StepUpConditional || s.kind != domain.KindUser || s.ref.SessionID.IsZero() || !conditionalStepUp[act] {
 		return false, nil
 	}
-	condition, ok := stepUpOnlyWithExistingCredential[act]
-	if !ok {
+	if c := s.entry.creds; c.DeviceCLI || c.DeviceStepUpKey || s.p.ClientComponentName() == consoleComponent {
 		return false, nil
 	}
-	has, err := condition(ctx, a.principal, p.ID)
-	if err != nil {
-		return false, sourceError("principal source", err)
+	for _, has := range signInData {
+		ok, err := has(ctx, a.principal, s.id)
+		if err != nil {
+			return false, sourceError("principal source", err)
+		}
+		if ok {
+			return false, nil
+		}
 	}
-	return !has, nil
+	return true, nil
 }

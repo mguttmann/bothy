@@ -1148,6 +1148,7 @@
   "consoleStepUpOidc": "Erneut mit {provider} anmelden",
   "consoleStepUpPassword": "Mit Passwort und Einmal-Code bestätigen",
   "consoleStepUpConfirm": "Bestätigen",
+  "consoleStepUpCodeHint": "Nimm einen neuen Code. Ein Code, den du schon benutzt hast, zum Beispiel zum Anmelden, gilt kein zweites Mal: warte, bis deine App den nächsten zeigt.",
   "consoleStepUpFailed": "Die Bestätigung ist fehlgeschlagen. Versuche es erneut oder wähle einen anderen Weg.",
   "consoleStepUpNoMethod": "Für dich ist kein Weg zur Bestätigung eingerichtet. Bitte den Eigentümer, dir einen Passkey einzurichten.",
   "consoleLoggedOutTitle": "Du bist abgemeldet.",

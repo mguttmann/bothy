@@ -135,7 +135,9 @@ E = Elevation of Privilege. "Register" refers to section 6.
 | R | Person denies an admin action through the API | audit according to the column "Audit" in 05 | T-AZ-04 |
 | I | IDOR, existence revealed through 403 or timing | one single decision point, 404 instead of 403, equality test (07, AZ-P1, AZ-P4) | T-AZ-01, T-AZ-02 |
 | D | Large bodies, expensive searches | size limits, `rl.search`, page limits | T-DS-01 |
+| D | Parallel password logins, each with one Argon2id computation of `auth.argon2id_memory_kib` | at most `auth.argon2id_max_concurrent` computations at a time, the others wait until the deadline of their request; `rl.public_auth` (08, 2.5 and 13) | T-DS-01 |
 | E | Route without an action, administration without step-up | mandatory registration, step-up (07, SR5) | T-AZ-01 |
+| E | A session sets up the passkey or password that then confirms its own step-up | sign-in data only after a step-up wherever the session can confirm one (07, 4.2 step 8) | T-ID-07 |
 
 ### 5.5 Gateway (WebSocket)
 
@@ -367,6 +369,7 @@ provider into a per-turn file; templates from the repository and a private folde
 | T-ID-04 | **Takeover during the initial installation.** | medium | high | `503 setup_required` until the server command (08, 4) | ID-T06, ID-T07 | low |
 | T-ID-05 | **A foreign device gets approved** (a person blindly presses "Allow"). | medium | high | typed-in confirmation code, step-up when approving (08, 5.2) | ID-T12, ID-T13 | low |
 | T-ID-06 | **Delayed disabling after leaving** (account disabled in the identity provider, the session continues). | medium | medium | `user.disable` immediately; new login at the latest after `auth.idp_recheck_interval` (08, 3.5) | ID-T22 | medium until the planned automatic adoption of disablings (ADR proposal SCIM) |
+| T-ID-07 | **A session issues the factor of its own step-up.** Whoever holds only a session (an unlocked computer, code in the app process) sets up a passkey or a password with TOTP and then confirms a step-up with it, or logs in to the console with it. | medium | high | a `conditional` step-up is waived only for a session with nothing to confirm with (05, 2.4; 07, 4.2 step 8): a device with a `step_up` key confirms with it, a console session confirms again, existing sign-in data of either kind confirms for both actions, a `cli` device sets up none | ID-T32; `TestFirstSignInData_NoSelfIssuedStepUp`, `TestConditionalStepUp` | medium: a person without a passkey and without a password on a device without a `step_up` key (Windows, a Mac without a Secure Enclave; 08, 6.1) still sets up the first sign-in data with the session alone, because nothing else could confirm it; recommendation: set up the sign-in data on a device with a `step_up` key, or right after redeeming the enrollment code |
 
 ### 6.4 Permissions
 

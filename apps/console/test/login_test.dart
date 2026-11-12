@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:auth/auth.dart';
 import 'package:console/console.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fakes.dart';
@@ -488,6 +489,24 @@ void main() {
       expect(find.text('Confirm that it is you'), findsOneWidget);
       await tester.tap(find.text('Confirm with password and one-time code'));
       await tester.pumpAndSettle();
+      // The code of the login is used up (08 2.5): the screen says to take the next one, so
+      // nobody sends the code they just typed and collects a failed attempt.
+      final hint = find.text(
+        'Use a new code. A code you already used, for example to log in, does not work a second time: wait until your app shows the next one.',
+      );
+      expect(hint, findsOneWidget);
+      // The hint is a text of its own below the field. So it shows in full whatever its length
+      // (the helper text of a field is cut off after its lines), and the field ends above it:
+      // the middle of the field is its input line, where the headless test of the console taps.
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: hint, matching: find.byType(RichText)),
+      );
+      expect(paragraph.maxLines, isNull);
+      expect(paragraph.didExceedMaxLines, isFalse);
+      expect(
+        tester.getRect(find.widgetWithText(TextField, 'One-time code')).bottom,
+        lessThanOrEqualTo(tester.getRect(hint).top),
+      );
       await tester.enterText(
         find.widgetWithText(TextField, 'Password'),
         'secret-1',

@@ -40,7 +40,7 @@ func TestIdentityConfigBindsDefaults(t *testing.T) {
 		TrustedProxies:            []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32"), netip.MustParsePrefix("::1/128")},
 		TrustedHeaderBindRequests: true,
 		DeviceInactiveRevokeAfter: 180 * 24 * time.Hour,
-		LocalPasswordEnabled:      true, PasswordMinLength: 12, Argon2idMemoryKiB: 65536, Argon2idIterations: 3, Argon2idParallelism: 1,
+		LocalPasswordEnabled:      true, PasswordMinLength: 12, Argon2idMemoryKiB: 65536, Argon2idIterations: 3, Argon2idParallelism: 1, Argon2idMaxConcurrent: 4,
 		LoginFailLimit: 10, LoginLockDuration: 15 * time.Minute, TOTPKeyRef: "file:/run/bothy/secrets/totp_key",
 		MaintenanceMode: "off",
 	}

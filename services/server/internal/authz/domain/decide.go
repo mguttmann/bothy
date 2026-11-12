@@ -225,9 +225,9 @@ type Input struct {
 	// Now is the time of the call; StepUpMaxAge is auth.step_up_max_age.
 	Now          time.Time
 	StepUpMaxAge time.Duration
-	// StepUpWaived reports a conditional step-up ("bedingt") whose condition is false: the person
-	// has no sign-in data of the kind the action guards yet (hat_anmeldedaten, 07 section 4.2 step
-	// 8; M1-40), so a human session suffices.
+	// StepUpWaived reports a conditional step-up ("bedingt") whose condition is false: the session
+	// has nothing to confirm a step-up with (can_confirm, 07 section 4.2 step 8), so a human
+	// session suffices for the first sign-in data.
 	StepUpWaived bool
 	Principal    Principal
 	Resource     ResourceFacts
@@ -464,7 +464,8 @@ func decidePrincipalRules(in *Input) (Decision, bool) {
 		return decideFresh(in)
 	}
 	if in.StepUpWaived {
-		// The first setup needs only a human with a session (07 section 4.2 step 8).
+		// A session with nothing to confirm with sets up the first sign-in data (07 section 4.2
+		// step 8).
 		return Decision{}, false
 	}
 	if p.StepUpAt.IsZero() || in.Now.Sub(p.StepUpAt) > in.StepUpMaxAge {

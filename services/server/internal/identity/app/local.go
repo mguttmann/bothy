@@ -24,14 +24,16 @@ import (
 
 // PasswordHasher hashes and verifies passwords with Argon2id in PHC format (implemented by
 // adapters/passwordhash with the parameters auth.argon2id_*). The passwords it gets are already
-// normalised to NFC.
+// normalised to NFC. Only auth.argon2id_max_concurrent computations run at the same time; a
+// further one waits for a free one and fails with the error of ctx when ctx ends first, without
+// computing (the end of the request deadline is 503 unavailable for the client).
 type PasswordHasher interface {
 	// Hash returns the PHC string of password with a new random salt.
-	Hash(password string) (phc string, err error)
+	Hash(ctx context.Context, password string) (phc string, err error)
 	// Verify reports a match and whether the stored parameters differ from the configured ones.
-	Verify(phc, password string) (ok bool, needsRehash bool, err error)
+	Verify(ctx context.Context, phc, password string) (ok bool, needsRehash bool, err error)
 	// VerifyDummy spends the same work as Verify for an unknown login name.
-	VerifyDummy(password string)
+	VerifyDummy(ctx context.Context, password string) error
 }
 
 // SecretSealer encrypts the TOTP secret of an identity with a key from the secret provider
@@ -175,8 +177,8 @@ const (
 
 // SetLocalCredential implements identity.LocalCredentials (brief M1-39 "SetLocalCredential"). The
 // switch auth.local_password_enabled is checked first; then, in one unit of work,
-// local_credential.set is authorized on the caller (step-up only once the password path is
-// established, decided in authz), the active local identity at the enabled local provider is
+// local_credential.set is authorized on the caller (step-up unless the session has nothing to
+// confirm one with, decided in authz), the active local identity at the enabled local provider is
 // found, the row is locked and the members are applied in the order password, totp_enroll,
 // totp_code. Any rejected member rolls back the whole request.
 func (l *LocalCredentials) SetLocalCredential(ctx context.Context, a actor.Actor, in identity.SetLocalCredential) (identity.LocalCredentialResult, error) {
@@ -224,7 +226,7 @@ func (l *LocalCredentials) set(ctx context.Context, a actor.Actor, in identity.S
 		return identity.LocalCredentialResult{}, fieldError(fieldPassword, codeRequired, "The first call sets a password.")
 	}
 	rec.IdentityID = local.ID
-	uri, err := l.apply(&rec, in, enroll, local.Subject)
+	uri, err := l.apply(ctx, &rec, in, enroll, local.Subject)
 	if err != nil {
 		return identity.LocalCredentialResult{}, err
 	}
@@ -245,10 +247,10 @@ func (l *LocalCredentials) set(ctx context.Context, a actor.Actor, in identity.S
 
 // apply applies the members of in to rec in the order password, totp_enroll, totp_code and
 // returns the otpauth URI of a new enrollment (the zero Token without one).
-func (l *LocalCredentials) apply(rec *LocalCredentialRecord, in identity.SetLocalCredential, enroll bool, loginName string) (identity.Token, error) {
+func (l *LocalCredentials) apply(ctx context.Context, rec *LocalCredentialRecord, in identity.SetLocalCredential, enroll bool, loginName string) (identity.Token, error) {
 	now := l.d.Clock.Now()
 	if in.Password != nil {
-		if err := l.setPassword(rec, *in.Password, now); err != nil {
+		if err := l.setPassword(ctx, rec, *in.Password, now); err != nil {
 			return identity.Token{}, err
 		}
 	}
@@ -290,7 +292,7 @@ func (l *LocalCredentials) ownLocalIdentity(ctx context.Context, userID ids.ID) 
 }
 
 // setPassword checks the password rules on the NFC form and stores its new hash.
-func (l *LocalCredentials) setPassword(rec *LocalCredentialRecord, password string, now time.Time) error {
+func (l *LocalCredentials) setPassword(ctx context.Context, rec *LocalCredentialRecord, password string, now time.Time) error {
 	nfc := l.d.Normalizer.NFC(password)
 	if code := domain.CheckPassword(nfc, l.minLength, l.d.Common.Contains(nfc)); code != "" {
 		detail := "The password is too short."
@@ -299,7 +301,7 @@ func (l *LocalCredentials) setPassword(rec *LocalCredentialRecord, password stri
 		}
 		return fieldError(fieldPassword, code, detail)
 	}
-	phc, err := l.d.Hasher.Hash(nfc)
+	phc, err := l.d.Hasher.Hash(ctx, nfc)
 	if err != nil {
 		return errs.Wrap(errs.CodeInternalError, err, "identity: hashing a password")
 	}
@@ -444,13 +446,15 @@ func (l *LocalCredentials) verify(ctx context.Context, p identity.Provider, name
 		return verified{}, err
 	}
 	if !found {
-		l.d.Hasher.VerifyDummy(nfc)
+		if err := l.d.Hasher.VerifyDummy(ctx, nfc); err != nil {
+			return verified{}, errs.Wrap(errs.CodeInternalError, err, "identity: verifying a password")
+		}
 		if at.cause == "" {
 			at.cause = causeUnknownLogin
 		}
 		return verified{at: at}, nil
 	}
-	ok, rehash, err := l.d.Hasher.Verify(rec.PasswordHash, nfc)
+	ok, rehash, err := l.d.Hasher.Verify(ctx, rec.PasswordHash, nfc)
 	if err != nil {
 		return verified{}, errs.Wrap(errs.CodeInternalError, err, "identity: verifying a password")
 	}
@@ -585,7 +589,7 @@ func (l *LocalCredentials) succeed(ctx context.Context, at passwordAttempt, rec 
 	in identity.PasswordLogin, jkt string) (passwordAttempt, error) {
 	rec.Lockout = domain.Lockout{}
 	if rehash {
-		phc, err := l.d.Hasher.Hash(nfc)
+		phc, err := l.d.Hasher.Hash(ctx, nfc)
 		if err != nil {
 			return passwordAttempt{}, errs.Wrap(errs.CodeInternalError, err, "identity: rehashing a password")
 		}

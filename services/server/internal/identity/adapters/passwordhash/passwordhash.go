@@ -10,14 +10,21 @@
 // set seen, so rows that still carry the parameters of before a change of auth.argon2id_* cost the
 // same as unknown names until their next login rehashes them.
 //
+// One computation holds auth.argon2id_memory_kib of memory, and the password login computes one
+// for every attempt, also for an unknown name. At most auth.argon2id_max_concurrent computations
+// run at the same time; a further one waits for a free one, and gives up when its context ends
+// (the request deadline answers 503 unavailable), so parallel logins cannot exhaust the memory of
+// the process.
+//
 // Example:
 //
-//	h, err := passwordhash.New(passwordhash.Params{MemoryKiB: 65536, Iterations: 3, Parallelism: 1})
-//	phc, err := h.Hash(nfcPassword)
-//	ok, rehash, err := h.Verify(phc, nfcPassword)
+//	h, err := passwordhash.New(passwordhash.Params{MemoryKiB: 65536, Iterations: 3, Parallelism: 1}, 4)
+//	phc, err := h.Hash(ctx, nfcPassword)
+//	ok, rehash, err := h.Verify(ctx, phc, nfcPassword)
 package passwordhash
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
@@ -67,17 +74,25 @@ type Params struct {
 type Hasher struct {
 	p     Params
 	dummy string
-	mu    sync.Mutex
+	// slots holds one token per running computation (auth.argon2id_max_concurrent).
+	slots chan struct{}
+	// kdf runs Argon2id; derive except in tests.
+	kdf func(password string, salt []byte, p Params, n int) []byte
+	mu  sync.Mutex
 	// cost is the running average duration of one verification per parameter set seen.
 	cost map[Params]time.Duration
 	// sleep waits out the padding; time.Sleep except in tests.
 	sleep func(time.Duration)
 }
 
-// New returns the hasher with p and computes the hash VerifyDummy verifies against. Errors: a
-// parameter below the OWASP floor (the error names the key) or a parallelism above 255.
-func New(p Params) (*Hasher, error) {
+// New returns the hasher with p that runs at most maxConcurrent computations at the same time
+// (auth.argon2id_max_concurrent), and computes the hash VerifyDummy verifies against. Errors: a
+// parameter below the OWASP floor (the error names the key), a parallelism above 255 or a
+// maxConcurrent below 1.
+func New(p Params, maxConcurrent int) (*Hasher, error) {
 	switch {
+	case maxConcurrent < 1:
+		return nil, errors.New("passwordhash: auth.argon2id_max_concurrent must be at least 1")
 	case p.MemoryKiB < FloorMemoryKiB:
 		return nil, fmt.Errorf("passwordhash: auth.argon2id_memory_kib must be at least %d", FloorMemoryKiB)
 	case p.Iterations < FloorIterations:
@@ -85,24 +100,50 @@ func New(p Params) (*Hasher, error) {
 	case p.Parallelism < FloorParallelism || p.Parallelism > maxParallelism:
 		return nil, fmt.Errorf("passwordhash: auth.argon2id_parallelism must be between %d and %d", FloorParallelism, maxParallelism)
 	}
-	h := &Hasher{p: p, cost: map[Params]time.Duration{}, sleep: time.Sleep}
-	dummy, err := h.Hash("dummy password for unknown login names")
+	h := &Hasher{p: p, slots: make(chan struct{}, maxConcurrent), kdf: derive, cost: map[Params]time.Duration{}, sleep: time.Sleep}
+	ctx := context.Background()
+	dummy, err := h.Hash(ctx, "dummy password for unknown login names")
 	if err != nil {
 		return nil, err
 	}
 	h.dummy = dummy
 	// Learn the cost of the configured parameters before the first request.
-	h.VerifyDummy("dummy password for unknown login names")
+	if err := h.VerifyDummy(ctx, "dummy password for unknown login names"); err != nil {
+		return nil, err
+	}
 	return h, nil
 }
 
-// Hash implements app.PasswordHasher. Errors: a failing random source.
-func (h *Hasher) Hash(password string) (string, error) {
+// compute runs one Argon2id computation in a free slot and returns the key and how long the
+// computation itself took, without the wait for the slot. Errors: the end of ctx before a slot
+// was free; nothing is computed then.
+func (h *Hasher) compute(ctx context.Context, password string, salt []byte, p Params, n int) ([]byte, time.Duration, error) {
+	// An ended context never takes a slot, also when one is free.
+	if err := ctx.Err(); err != nil {
+		return nil, 0, fmt.Errorf("passwordhash: waiting for a free computation: %w", err)
+	}
+	select {
+	case h.slots <- struct{}{}:
+	case <-ctx.Done():
+		return nil, 0, fmt.Errorf("passwordhash: waiting for a free computation: %w", ctx.Err())
+	}
+	defer func() { <-h.slots }()
+	start := time.Now()
+	key := h.kdf(password, salt, p, n)
+	return key, time.Since(start), nil
+}
+
+// Hash implements app.PasswordHasher. Errors: a failing random source, the end of ctx while
+// waiting for a free computation.
+func (h *Hasher) Hash(ctx context.Context, password string) (string, error) {
 	salt := make([]byte, saltBytes)
 	if _, err := rand.Read(salt); err != nil {
 		return "", fmt.Errorf("passwordhash: random salt: %w", err)
 	}
-	key := derive(password, salt, h.p, keyBytes)
+	key, _, err := h.compute(ctx, password, salt, h.p, keyBytes)
+	if err != nil {
+		return "", err
+	}
 	return fmt.Sprintf("%sm=%d,t=%d,p=%d$%s$%s", phcPrefix, h.p.MemoryKiB, h.p.Iterations, h.p.Parallelism,
 		b64.EncodeToString(salt), b64.EncodeToString(key)), nil
 }
@@ -112,16 +153,20 @@ func (h *Hasher) Hash(password string) (string, error) {
 // ones. Every verification lasts at least the average cost of the most expensive parameter set
 // seen (pad): after a change of auth.argon2id_* the rows keep their old parameters until the next
 // login rehashes them, and without the padding a wrong password on such a row would take another
-// time than an unknown name, which verifies with the configured parameters (ID-T21). Errors: a
-// string that is not an Argon2id v19 PHC string of this format; never a match.
-func (h *Hasher) Verify(phc, password string) (bool, bool, error) {
-	start := time.Now()
+// time than an unknown name, which verifies with the configured parameters (ID-T21). The wait for
+// a free computation is the same for a known and an unknown name and counts for neither the
+// average nor the padding. Errors: a string that is not an Argon2id v19 PHC string of this format,
+// the end of ctx while waiting for a free computation; never a match.
+func (h *Hasher) Verify(ctx context.Context, phc, password string) (bool, bool, error) {
 	p, salt, key, err := parse(phc)
 	if err != nil {
 		return false, false, err
 	}
-	got := derive(password, salt, p, len(key))
-	h.pad(p, time.Since(start))
+	got, took, err := h.compute(ctx, password, salt, p, len(key))
+	if err != nil {
+		return false, false, err
+	}
+	h.pad(p, took)
 	return subtle.ConstantTimeCompare(got, key) == 1, p != h.p || len(key) != keyBytes, nil
 }
 
@@ -144,9 +189,11 @@ func (h *Hasher) pad(p Params, took time.Duration) {
 	}
 }
 
-// VerifyDummy implements app.PasswordHasher: the work of Verify against the hash of New.
-func (h *Hasher) VerifyDummy(password string) {
-	_, _, _ = h.Verify(h.dummy, password)
+// VerifyDummy implements app.PasswordHasher: the work of Verify against the hash of New. Errors:
+// the end of ctx while waiting for a free computation.
+func (h *Hasher) VerifyDummy(ctx context.Context, password string) error {
+	_, _, err := h.Verify(ctx, h.dummy, password)
+	return err
 }
 
 // derive runs Argon2id; the parameters were checked by New or parse.

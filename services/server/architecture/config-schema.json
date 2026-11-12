@@ -542,6 +542,18 @@
       "doc": "Argon2id passes of new password hashes."
     },
     {
+      "name": "auth.argon2id_max_concurrent",
+      "env": "BOTHY_AUTH__ARGON2ID_MAX_CONCURRENT",
+      "kind": "int",
+      "default": "4",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "1024",
+      "chapter": "08-identity.md",
+      "doc": "Argon2id computations at the same time, each with auth.argon2id_memory_kib of memory; further password checks wait."
+    },
+    {
       "name": "auth.argon2id_memory_kib",
       "env": "BOTHY_AUTH__ARGON2ID_MEMORY_KIB",
       "kind": "int",

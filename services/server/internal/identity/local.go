@@ -54,8 +54,8 @@ type PasswordLogin struct {
 // docs/spec/08-identity.md section 2.5). Errors are kernel/errs errors.
 type LocalCredentials interface {
 	// SetLocalCredential sets the password, starts a TOTP enrollment or confirms it for the
-	// caller's own local identity (local_credential.set, step-up once the password path is
-	// established). Errors: feature_disabled when auth.local_password_enabled is false, the
+	// caller's own local identity (local_credential.set; step-up unless the session has nothing
+	// to confirm one with, 07 section 4.2 step 8). Errors: feature_disabled when auth.local_password_enabled is false, the
 	// decision of authorize, conflict with reason no_local_identity, validation_failed with
 	// errors[] (too_short, common_password, totp_invalid, required).
 	SetLocalCredential(ctx context.Context, a actor.Actor, in SetLocalCredential) (LocalCredentialResult, error)

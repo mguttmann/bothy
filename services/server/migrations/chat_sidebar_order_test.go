@@ -54,7 +54,11 @@ func TestChatSidebarOrderMigration_Schema(t *testing.T) {
 	if got := principalConstraints(t, conn, "user_channel_states"); !reflect.DeepEqual(got, constraints) {
 		t.Errorf("user_channel_states constraints:\n got %q\nwant %q", got, constraints)
 	}
-	idx := []string{"CREATE UNIQUE INDEX user_channel_states_pkey ON public.user_channel_states USING btree (user_id, channel_id)"}
+	idx := []string{
+		// The foreign key to devices (00104).
+		"CREATE INDEX user_channel_states_updated_by_device_id_idx ON public.user_channel_states USING btree (updated_by_device_id) WHERE (updated_by_device_id IS NOT NULL)",
+		"CREATE UNIQUE INDEX user_channel_states_pkey ON public.user_channel_states USING btree (user_id, channel_id)",
+	}
 	if got := indexes(t, conn, "user_channel_states"); !reflect.DeepEqual(got, idx) {
 		t.Errorf("user_channel_states indexes:\n got %q\nwant %q", got, idx)
 	}
