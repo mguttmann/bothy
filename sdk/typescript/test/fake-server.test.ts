@@ -704,6 +704,52 @@ describe("run rules (09 4.5 and 4.5.1)", () => {
     ]);
   });
 
+  it("queues the run of a model command whose payload and token name the command", async () => {
+    await poll(api);
+    const commandId = await fake.registerCommand("recap");
+    const triggered = await fake.trigger("Recap please", { command: "recap" });
+    const event = ((await poll(api)).events as Json[]).find(
+      (e) => e.type === "agent.invocation",
+    );
+    const payload = event?.payload as Json;
+    expect([
+      payload.run_id,
+      payload.trigger_kind,
+      payload.command_id,
+      payload.command_name,
+      payload.options,
+      payload.message_id,
+    ]).toEqual([triggered.runId, "command", commandId, "recap", [], undefined]);
+    expect(payload.command_invocation_id).not.toBe(commandId);
+    const token = String(event?.invocation_token);
+    const c = claims(token);
+    // The token names the command, not the invocation (09 10.4).
+    expect([c.trigger_kind, c.command_id, c.message_id, c.run_id]).toEqual([
+      "command",
+      commandId,
+      undefined,
+      triggered.runId,
+    ]);
+    const started = await api.post(
+      `/runs/${triggered.runId}/start`,
+      startBody(token),
+    );
+    expect([
+      started.status,
+      started.body.state,
+      started.body.trigger_kind,
+    ]).toEqual([200, "running", "command"]);
+    // The server defines the run context for a triggering message only (09 4.6).
+    const context = await api.get(`/runs/${triggered.runId}/context`);
+    expect([context.status, context.body.code]).toEqual([
+      500,
+      "internal_error",
+    ]);
+    await expect(fake.trigger("Nothing", { command: "nope" })).rejects.toThrow(
+      RangeError,
+    );
+  });
+
   it("lets a lower tool class pass", async () => {
     const [runId, token] = await queuedWithToken(fake, api);
     const r = await api.post(

@@ -175,6 +175,12 @@ export interface FakeServerOptions {
   readonly toolClass?: S["ToolClass"];
 }
 
+/** The options of {@link FakeServer.trigger}. */
+export interface TriggerOptions {
+  /** The name of a registered command of Lotse; the run is the run of that model command. */
+  readonly command?: string | undefined;
+}
+
 /** One REST request as the FakeServer received it: method, path (without query) and status. */
 export interface RecordedRequest {
   /** The HTTP method. */
@@ -474,10 +480,24 @@ export class FakeServer implements ScenarioServer {
    * Lets Alex post `text` in a new thread: a queued run and its `agent.invocation`.
    *
    * @param text - The message content.
+   * @param options - `command`, the name of a registered command of Lotse: the run is then the
+   *   run of a model command (`trigger_kind = command`) whose payload and tokens name it.
    * @returns The run, thread and message.
+   * @throws `RangeError` when no command of that name is registered.
    */
-  async trigger(text = "Hello @Lotse"): Promise<Triggered> {
-    const run = this.world.trigger(text);
+  async trigger(
+    text = "Hello @Lotse",
+    options: TriggerOptions = {},
+  ): Promise<Triggered> {
+    let command: S["Command"] | undefined;
+    if (options.command !== undefined) {
+      command = [...this.world.commands.values()].find(
+        (c) => c.name === options.command,
+      );
+      if (command === undefined)
+        throw new RangeError(`no such command: ${options.command}`);
+    }
+    const run = this.world.trigger(text, command);
     await settle();
     return {
       runId: run.id,

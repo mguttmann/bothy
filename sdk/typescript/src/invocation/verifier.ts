@@ -311,9 +311,10 @@ function idOf(
  * `command_id`), `agent.followup` (run, thread, `message_id`), `interaction.created`
  * (`interaction.id`, its `run_id` and `thread_id`), `command.invoked` (`command_id`, `run_id`
  * and `thread_id` when present), `command.autocomplete_requested` (`command_id`, its thread when
- * present, no run). `AgentInvocationPayload` has no `command_id` yet (only
- * `command_invocation_id`), so `trigger_kind = command` has no counterpart and every such token
- * is `invalid`. IDs are compared in their canonical lower-case form.
+ * present, no run). `agent.invocation` with `trigger_kind = command` compares the payload's
+ * `command_id` (M2-16; never `command_invocation_id`, which names the invocation and no token
+ * carries); a payload without one has no counterpart, so its token is `invalid`. IDs are
+ * compared in their canonical lower-case form.
  *
  * @param envelopeType - The envelope `type`.
  * @param event - The event (an envelope or a decoded event with `payload`).
@@ -359,13 +360,13 @@ export function expectationFor(
           triggerClaim: "interaction_id",
           triggerId: idOf(payload, "interaction_id", false),
         };
-      // No command_id in AgentInvocationPayload before M2-16: fail closed.
+      // A payload without command_id has no counterpart: the check fails closed.
       if (kind === "command")
         return {
           threadId,
           runId,
           triggerClaim: "command_id",
-          triggerId: undefined,
+          triggerId: idOf(payload, "command_id", false),
         };
       return { threadId, runId, triggerClaim: "", triggerId: undefined };
     }
