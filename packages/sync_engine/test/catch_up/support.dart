@@ -417,10 +417,12 @@ class RecordingEraser implements FileCacheEraser {
 
 /// The connection, the catch-up listener and the fake REST server.
 class World {
-  /// Builds the world; [sessionId] is the `sid` of this device.
+  /// Builds the world; [sessionId] is the `sid` of this device, [random] draws the jitter of
+  /// the listener's waits (the system source when null).
   World({
     Map<String, String> overrides = const {},
     String? sessionId = 'sid-alex-laptop',
+    RandomSource? random,
   }) {
     h = Harness(
       overrides: overrides,
@@ -437,6 +439,7 @@ class World {
             ),
             adapter: rest,
           ),
+          readTimeout: h.config.syncReadTimeout,
         ),
         config: h.config,
         clock: h.clock,
@@ -448,6 +451,7 @@ class World {
         onRunUpdated: runUpdates.add,
         onLive: () => liveCalls++,
         logHook: log.add,
+        random: random,
       ),
     );
     h.connection; // builds the listener

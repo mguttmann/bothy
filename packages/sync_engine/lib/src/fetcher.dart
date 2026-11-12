@@ -7,6 +7,7 @@ library;
 
 import 'package:api_client/api_client.dart' as api show ForumSort, ThreadState;
 import 'package:api_client/api_client.dart' show ApiClient, standardSerializers;
+import 'package:auth/auth.dart' show requestTimeoutExtra;
 import 'package:built_value/serializer.dart';
 import 'package:dio/dio.dart' show DioException;
 import 'package:domain/domain.dart';
@@ -139,9 +140,19 @@ abstract interface class Fetcher {
 /// ```
 final class ApiFetcher implements Fetcher {
   /// Reads through the [ApiClient], whose interceptors add DPoP, tracing and the read retry.
-  ApiFetcher(this._client);
+  ///
+  /// [readTimeout] is the deadline of every request (`client.sync.read_timeout`, 15 22): it
+  /// goes out as the request option `requestTimeoutExtra` of `package:auth`, which the DPoP
+  /// interceptor of the session's client sets as the connect, send and receive timeout, so a
+  /// read without an answer fails like a network error (and is retried like one) instead of
+  /// waiting for ever. Null sets no deadline.
+  ApiFetcher(this._client, {Duration? readTimeout})
+    : _extra = readTimeout == null ? null : {requestTimeoutExtra: readTimeout};
 
   final ApiClient _client;
+
+  /// The request options of every read: the deadline, when there is one.
+  final Map<String, dynamic>? _extra;
 
   /// The generated model [model] of type [T] in its wire form.
   static Json _json<T extends Object>(T? model) {
@@ -152,8 +163,9 @@ final class ApiFetcher implements Fetcher {
   }
 
   @override
-  Future<SnapshotData> snapshot() async =>
-      snapshotFromJson(_json((await _client.getSyncApi().getSnapshot()).data));
+  Future<SnapshotData> snapshot() async => snapshotFromJson(
+    _json((await _client.getSyncApi().getSnapshot(extra: _extra)).data),
+  );
 
   @override
   Future<MessagePageData> threadPage(
@@ -166,6 +178,7 @@ final class ApiFetcher implements Fetcher {
         threadId: threadId.value,
         beforeSeq: before?.value,
         limit: limit,
+        extra: _extra,
       )).data,
     );
     return MessagePageData(
@@ -188,6 +201,7 @@ final class ApiFetcher implements Fetcher {
           threadId: threadId.value,
           afterSeq: after,
           limit: to.value - after,
+          extra: _extra,
         )).data,
       );
       final items = [
@@ -210,25 +224,41 @@ final class ApiFetcher implements Fetcher {
   @override
   Future<MessageBundle> message(MessageId id) async => messageFromJson(
     _json(
-      (await _client.getMessagesApi().getMessage(messageId: id.value)).data,
+      (await _client.getMessagesApi().getMessage(
+        messageId: id.value,
+        extra: _extra,
+      )).data,
     ),
   );
 
   @override
   Future<Thread> thread(ThreadId id) async => threadFromJson(
-    _json((await _client.getThreadsApi().getThread(threadId: id.value)).data),
+    _json(
+      (await _client.getThreadsApi().getThread(
+        threadId: id.value,
+        extra: _extra,
+      )).data,
+    ),
   );
 
   @override
   Future<ChannelWithAccess> channel(ChannelId id) async => channelViewFromJson(
     _json(
-      (await _client.getChannelsApi().getChannel(channelId: id.value)).data,
+      (await _client.getChannelsApi().getChannel(
+        channelId: id.value,
+        extra: _extra,
+      )).data,
     ),
   );
 
   @override
   Future<SpaceWithAccess> space(SpaceId id) async => spaceViewFromJson(
-    _json((await _client.getSpacesApi().getSpace(spaceId: id.value)).data),
+    _json(
+      (await _client.getSpacesApi().getSpace(
+        spaceId: id.value,
+        extra: _extra,
+      )).data,
+    ),
   );
 
   @override
@@ -247,6 +277,7 @@ final class ApiFetcher implements Fetcher {
           final list = _json(
             (await _client.getChannelsApi().listSpaceChannels(
               spaceId: id.value,
+              extra: _extra,
             )).data,
           );
           channels.addAll([
@@ -264,6 +295,7 @@ final class ApiFetcher implements Fetcher {
       final page = _json(
         (await _client.getThreadsApi().listChannelThreads(
           channelId: c.channel.id.value,
+          extra: _extra,
         )).data,
       );
       threads.addAll([
@@ -293,6 +325,7 @@ final class ApiFetcher implements Fetcher {
             : sort == ForumSort.created
             ? api.ForumSort.created
             : api.ForumSort.lastActivity,
+        extra: _extra,
       )).data,
     );
     return ThreadListPage(
@@ -306,7 +339,9 @@ final class ApiFetcher implements Fetcher {
 
   @override
   Future<List<Draft>> myDrafts() async {
-    final list = _json((await _client.getPreferencesApi().listMyDrafts()).data);
+    final list = _json(
+      (await _client.getPreferencesApi().listMyDrafts(extra: _extra)).data,
+    );
     return [for (final d in objList(list, 'items')) draftFromJson(d)];
   }
 
@@ -315,18 +350,25 @@ final class ApiFetcher implements Fetcher {
     final list = _json(
       (await _client.getPreferencesApi().listMyReadStates(
         channelId: channelId.value,
+        extra: _extra,
       )).data,
     );
     return [for (final r in objList(list, 'items')) readStateFromJson(r)];
   }
 
   @override
-  Future<InstanceInfo> instance() async =>
-      instanceFromJson(_json((await _client.getAdminApi().getInstance()).data));
+  Future<InstanceInfo> instance() async => instanceFromJson(
+    _json((await _client.getAdminApi().getInstance(extra: _extra)).data),
+  );
 
   @override
   Future<AgentCard> agent(PrincipalId id) async => agentFromJson(
-    _json((await _client.getAgentsApi().getAgent(agentId: id.value)).data),
+    _json(
+      (await _client.getAgentsApi().getAgent(
+        agentId: id.value,
+        extra: _extra,
+      )).data,
+    ),
   );
 
   @override
@@ -340,6 +382,7 @@ final class ApiFetcher implements Fetcher {
           (await _client.getRunsApi().listThreadWakes(
             threadId: threadId.value,
             cursor: cursor,
+            extra: _extra,
           )).data,
         );
       } on DioException catch (e) {

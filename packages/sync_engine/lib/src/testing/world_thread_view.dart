@@ -71,7 +71,7 @@ extension ThreadViewWorld on FakeWorld {
     if (version != expectedVersion) {
       throw FakeProblem(412, 'version_conflict', current: current);
     }
-    return putReadState(principalId, threadId, lastRead, deviceId: deviceId);
+    return setReadState(principalId, threadId, lastRead, deviceId: deviceId);
   }
 
   /// `pinMessage` and `unpinMessage`: pins or unpins [messageId] (05 `pin.create`,

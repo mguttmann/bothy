@@ -27,5 +27,6 @@ export 'src/pkce.dart';
 export 'src/ports.dart';
 export 'src/redact.dart';
 export 'src/refresh.dart' show RefreshCoordinator;
+export 'src/session_core.dart' show requestTimeoutExtra;
 export 'src/step_up.dart';
 export 'src/tokens.dart' show SessionInfo, TokenState;

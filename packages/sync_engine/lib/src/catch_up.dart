@@ -52,6 +52,13 @@ import 'wire.dart';
 /// [watchConnection]) and `session.revoked` of this session wipe the database and emit
 /// [SignedOutNotice]; nothing is applied after that.
 ///
+/// A commit that fails (a page, the snapshot of `ready` or of a resync) leaves rows and cursor
+/// as they were; the listener applies nothing more of that session and asks the connection to
+/// reconnect ([SessionControl.reconnect]) after the reconnect backoff, so the next session
+/// repeats the page from the stored cursor. A page that fails again at the same cursor is
+/// passed by a snapshot, reported as [Resynced] with [Resynced.pageFailed]
+/// (docs/decisions.d/AUD-pkg-sync-engine-01.md).
+///
 /// The hooks are no-ops by default; M4-17 wires the outbox ([onEcho]), the run store
 /// ([onRunUpdated]) and the outbox start ([onLive]).
 ///
@@ -73,9 +80,9 @@ final class CatchUpListener implements SessionListener {
   ///
   /// [config] supplies `client.sync.parse_offload_bytes` and `sync.typing_ttl` (D-W-115);
   /// [openThreads] names the threads in focus, reloaded after a resync; [random] draws the
-  /// jitter of the snapshot retries of a resync (`sync.reconnect_backoff_base`,
-  /// `sync.reconnect_backoff_cap`); [logHook] receives one line per notable step, never
-  /// content.
+  /// jitter of the snapshot retries of a resync and of the reconnects after a failed commit
+  /// (`sync.reconnect_backoff_base`, `sync.reconnect_backoff_cap`); [logHook] receives one
+  /// line per notable step, never content.
   CatchUpListener({
     required LocalDatabase db,
     required Fetcher fetcher,
@@ -110,10 +117,16 @@ final class CatchUpListener implements SessionListener {
       onNotification: _hint,
       log: _log,
     );
+    final jitter = random ?? SystemRandomSource();
     _resyncBackoff = ReconnectBackoff(
       base: config.reconnectBackoffBase,
       cap: config.reconnectBackoffCap,
-      random: random ?? SystemRandomSource(),
+      random: jitter,
+    );
+    _failureBackoff = ReconnectBackoff(
+      base: config.reconnectBackoffBase,
+      cap: config.reconnectBackoffCap,
+      random: jitter,
     );
     _dispatcher = Dispatcher(_sync);
     _snapshots = SnapshotApplier(_sync);
@@ -157,6 +170,13 @@ final class CatchUpListener implements SessionListener {
   String _resyncReason = '';
   final List<GatewayFrame> _held = [];
   late final ReconnectBackoff _resyncBackoff;
+
+  /// The waits before the reconnects after failed commits; starts again with a commit.
+  late final ReconnectBackoff _failureBackoff;
+
+  /// The stored cursor at which the last page failed, or null after a commit: a second
+  /// failure at the same cursor is passed by a snapshot.
+  GlobalSeq? _failedCursor;
   bool _wiped = false;
 
   /// The notices to the app: removed targets, an overwritten draft, a resync, a sign-out.
@@ -339,25 +359,43 @@ final class CatchUpListener implements SessionListener {
   Future<void> onReady(GatewayReady ready, SessionControl control) async {
     if (_wiped) return;
     _startSession(control);
+    final session = _session;
     _sync.me = PrincipalId.parse(ready.principal.id);
-    final snapshot = snapshotFromJson(
-      (standardSerializers.serialize(
-        ready.snapshot,
-        specifiedType: const FullType(Snapshot),
-      ) as Map).cast<String, Object?>(),
-    );
-    final stored = (await _db.syncStateDao.read()).cursor;
+    final GlobalSeq? stored;
     final after = AfterCommit();
-    if (stored == null) {
-      // The first connection, or a cursor dropped by a failed resync: whatever the mirror
-      // holds belongs to no known time line, so it is replaced by the snapshot (D-M4-14-2).
-      final head = GlobalSeq(ready.headSeq);
-      await _replaceMirror(
-        snapshot,
-        after,
-        cursor: head,
-        syncEpoch: ready.syncEpoch,
+    final SnapshotData snapshot;
+    try {
+      snapshot = snapshotFromJson(
+        (standardSerializers.serialize(
+          ready.snapshot,
+          specifiedType: const FullType(Snapshot),
+        ) as Map).cast<String, Object?>(),
       );
+      stored = (await _db.syncStateDao.read()).cursor;
+      if (stored == null) {
+        // The first connection: whatever the mirror holds belongs to no known time line, so
+        // it is replaced by the snapshot (D-M4-14-2).
+        await _replaceMirror(
+          snapshot,
+          after,
+          cursor: GlobalSeq(ready.headSeq),
+          syncEpoch: ready.syncEpoch,
+        );
+      } else {
+        // The catch-up from the cursor delivers the events; only what is not an event comes
+        // from the snapshot (Design note 1).
+        await _db.syncStateDao.commitPage(
+          (txn) => _snapshots.applyNonEvent(txn, snapshot, after),
+          cursor: stored,
+        );
+      }
+    } on Object catch (e) {
+      _commitFailed('snapshot of ready failed', e, control, session);
+      return;
+    }
+    if (stored == null) {
+      final head = GlobalSeq(ready.headSeq);
+      _committed();
       gaps.clear();
       await _db.syncStateDao.markSnapshot(_clock.now());
       control.lastProcessedSeq = head;
@@ -367,15 +405,8 @@ final class CatchUpListener implements SessionListener {
       // the session is live right after ready (04 6.3 item 4).
       _goLive(control);
       return;
-    } else {
-      // The catch-up from the cursor delivers the events; only what is not an event comes
-      // from the snapshot (Design note 1).
-      await _db.syncStateDao.commitPage(
-        (txn) => _snapshots.applyNonEvent(txn, snapshot, after),
-        cursor: stored,
-      );
-      control.lastProcessedSeq = stored;
     }
+    control.lastProcessedSeq = stored;
     await _afterCommit(after);
     _liveWithoutCatchUp(ready.headSeq, stored, control);
   }
@@ -439,10 +470,11 @@ final class CatchUpListener implements SessionListener {
         await _commit(_takePage(), model.seq, control);
       case CatchupCompleteFrame(:final model):
         await _commit(_takePage(), model.headSeq, control);
-        if (_wiped || _halted) return;
+        // A page that failed ended the session or started a resync, which goes live itself.
+        if (_wiped || _halted || _resyncing) return;
         _goLive(control);
       case ResyncRequiredFrame(:final model):
-        await _resync(model, control);
+        _resync(model, control);
       case _:
         break;
     }
@@ -478,13 +510,14 @@ final class CatchUpListener implements SessionListener {
 
   /// Applies [envelopes] in one transaction with the cursor [cursorSeq] (never below the
   /// stored one) and the sync epoch (04 7.5 item 2). A failing page leaves rows and cursor as
-  /// they were and halts the listener until the next session, which catches up from the stored
-  /// cursor (D-M4-14-8); `session.revoked` of this session stops the page and wipes.
+  /// they were (D-M4-14-8) and ends the session ([_pageFailed]); `session.revoked` of this
+  /// session stops the page and wipes.
   Future<void> _commit(
     List<Map<String, Object?>> envelopes,
     int cursorSeq,
     SessionControl control,
   ) async {
+    final session = _session;
     final decoded = await decodeEnvelopes(
       envelopes,
       offloadBytes: _offloadBytes,
@@ -515,40 +548,101 @@ final class CatchUpListener implements SessionListener {
       await _wipe();
       return;
     } on Object catch (e) {
-      _halted = true;
-      _log('page failed, halted until the next session: ${e.runtimeType}');
+      _pageFailed(e, stored, control, session);
       return;
     }
+    _committed();
     control.lastProcessedSeq = target;
     await _afterCommit(after);
   }
 
+  /// A commit worked: the next failure is a first one again.
+  void _committed() {
+    _failedCursor = null;
+    _failureBackoff.reset();
+  }
+
+  /// A page failed at the stored cursor [stored]. The first time the session ends and the next
+  /// one repeats the page from the cursor; a failure at the same cursor again means the page
+  /// cannot be applied (an event that breaks its mapping), so the mirror is replaced by the
+  /// snapshot on this connection, which passes the event.
+  void _pageFailed(
+    Object error,
+    GlobalSeq? stored,
+    SessionControl control,
+    int session,
+  ) {
+    if (_wiped || session != _session) return;
+    if (stored != null && stored == _failedCursor) {
+      _failedCursor = null;
+      _log(
+        'page failed again at the same cursor (${error.runtimeType}), '
+        'loading the snapshot',
+      );
+      _startResync(Resynced.pageFailed, control);
+      return;
+    }
+    _failedCursor = stored;
+    _commitFailed('page failed', error, control, session);
+  }
+
+  /// A commit failed ([what], [error]): nothing more of this session is applied, and the
+  /// connection reconnects after the backoff of failed commits, so no failure leaves the sync
+  /// standing still on an open connection. A failure of an ended [session] changes nothing.
+  void _commitFailed(
+    String what,
+    Object error,
+    SessionControl control,
+    int session,
+  ) {
+    if (_wiped || session != _session) return;
+    _halted = true;
+    final wait = _failureBackoff.next();
+    _log(
+      '$what (${error.runtimeType}), '
+      'reconnect in ${wait.inMilliseconds} ms',
+    );
+    control.reconnect(after: wait);
+  }
+
   /// 04 7.3: the connection stays; the mirror is replaced by the snapshot, cursor and epoch
   /// are its values, outbox, drafts and share inbox stay, the focused threads load again.
-  Future<void> _resync(
-    GatewayResyncRequired model,
-    SessionControl control,
-  ) async {
+  void _resync(GatewayResyncRequired model, SessionControl control) =>
+      _startResync(
+        standardSerializers.serialize(
+              model.reason,
+              specifiedType: const FullType(GatewayResyncRequiredReasonEnum),
+            )!
+            as String,
+        control,
+      );
+
+  /// Starts the resync reported as [reason]: the one the server asked for, or the engine's
+  /// own after a page failed twice at the same cursor ([Resynced.pageFailed]). The snapshot
+  /// loads outside the frame queue of the connection, the first attempt like its retries, so
+  /// the frames that arrive meanwhile wait in memory and the close of the socket is handled
+  /// while a read is still on its way.
+  void _startResync(String reason, SessionControl control) {
     control.setPhase(ConnectionPhase.resyncing);
     _page.clear();
     _live = false;
     _resyncing = true;
     _resyncBackoff.reset();
-    _resyncReason =
-        standardSerializers.serialize(
-              model.reason,
-              specifiedType: const FullType(GatewayResyncRequiredReasonEnum),
-            )!
-            as String;
-    await _attemptResync(control, _session);
+    _resyncReason = reason;
+    unawaited(
+      _attemptResync(
+        control,
+        _session,
+      ).catchError((Object e) => _log('resync failed: ${e.runtimeType}')),
+    );
   }
 
   /// Loads the snapshot and replaces the mirror. A failed load is retried after the reconnect
   /// backoff on the same connection while frames wait in memory; mirror and cursor stay until
   /// a snapshot arrives, and a disconnect ends the retries (the next session gets
-  /// `resync_required` again from its stored cursor) (D-M4-14-9). The retry runs outside the
-  /// frame queue of the connection, so it checks its session after its awaits: a new session
-  /// that started meanwhile is never set live or reported as resynced by it, while the
+  /// `resync_required` again from its stored cursor) (D-M4-14-9). Every attempt runs outside
+  /// the frame queue of the connection, so it checks its session after its awaits: a new
+  /// session that started meanwhile is never set live or reported as resynced by it, while the
   /// follow-up steps of a committed snapshot still run.
   Future<void> _attemptResync(SessionControl control, int session) async {
     final SnapshotData snapshot;
@@ -571,12 +665,18 @@ final class CatchUpListener implements SessionListener {
     }
     if (_wiped || session != _session) return;
     final after = AfterCommit();
-    await _replaceMirror(
-      snapshot,
-      after,
-      cursor: snapshot.headSeq,
-      syncEpoch: snapshot.syncEpoch,
-    );
+    try {
+      await _replaceMirror(
+        snapshot,
+        after,
+        cursor: snapshot.headSeq,
+        syncEpoch: snapshot.syncEpoch,
+      );
+    } on Object catch (e) {
+      _commitFailed('resync snapshot not stored', e, control, session);
+      return;
+    }
+    _committed();
     // The steps that belong to the committed snapshot run even when the session ended meanwhile
     // (the instance row and the read states come only from its reads); what the session sees
     // runs only for the session of the retry.

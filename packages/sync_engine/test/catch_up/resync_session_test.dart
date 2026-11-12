@@ -30,6 +30,9 @@ final class _Control implements SessionControl {
 
   @override
   String? get syncEpoch => 'epoch-1';
+
+  @override
+  void reconnect({Duration? after}) {}
 }
 
 GatewayFrame _frame(String op, Map<String, Object?> d) =>

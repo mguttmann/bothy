@@ -287,7 +287,12 @@ class FakeLifecycle implements AppLifecycle {
 /// One REST request as the fake API saw it.
 class SeenRequest {
   /// Records a request.
-  SeenRequest(this.method, this.path, [this.query = const {}]);
+  SeenRequest(
+    this.method,
+    this.path, [
+    this.query = const {},
+    this.extra = const {},
+  ]);
 
   /// HTTP method in upper case.
   final String method;
@@ -297,6 +302,9 @@ class SeenRequest {
 
   /// The query parameters.
   final Map<String, String> query;
+
+  /// The request options the caller passed as `extra` of the generated operation.
+  final Map<String, Object?> extra;
 }
 
 /// A canned answer of the fake API.
@@ -345,6 +353,7 @@ class FakeApi implements HttpClientAdapter {
       options.method.toUpperCase(),
       path,
       options.uri.queryParameters,
+      Map.of(options.extra),
     );
     requests.add(seen);
     final gate = gates['${seen.method} $path'];
