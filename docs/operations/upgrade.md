@@ -1,6 +1,6 @@
 # Upgrade
 
-Status: draft M0. Guide to [16-operations.md](../spec/16-operations.md) 10 and
+Status: built (M1 to M7). Guide to [16-operations.md](../spec/16-operations.md) 10 and
 [18-release.md](../spec/18-release.md). Applies to instance operators (procedure) and to developers
 of migrations (rules in section 4).
 

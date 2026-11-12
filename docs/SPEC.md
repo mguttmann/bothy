@@ -1,9 +1,10 @@
 # Specification: entry point
 
-Status: draft M0, no product code yet. This document is the entry point to
-the specification of Bothy (working name). It says what the product is, which rules must never
-break and where to find what. It does not repeat the chapters; the rules themselves are in the
-chapters under [spec/](spec/00-glossary.md).
+Status: normative, built (M1 to M8). The state of every milestone is in the
+[roadmap](roadmap.md); section 8.1 says what the words of a status line mean. This document is
+the entry point to the specification of Bothy (working name). It says what the product is, which
+rules must never break and where to find what. It does not repeat the chapters; the rules
+themselves are in the chapters under [spec/](spec/00-glossary.md).
 
 ## 1. Purpose and readers
 
@@ -202,6 +203,27 @@ the change that finds it.
 | [24 Terminal](spec/24-terminal.md) | Terminal on connected hosts through the host service `bothy-host` with a Noise-encrypted stream. Plus pairing, sessions, permissions, invariant I6, multi-node operation and tests. | Module `terminal`, host service, terminal views |
 | [25 Visualization](spec/25-visualization.md) | Own measurement of the server, live stream `stats.live`, native views in the package `bothy_viz` and the Grafana panel plugin "Bothy Live". Plus the optional embedding in the web console. | Statistics views and plugin |
 | [26 Built-in agents](spec/26-builtin-agents.md) | Agents created inside Bothy and hosted by a Claude Code runner: hosting and tokens, the versioned definition as closed data, its materialization in the runner, the interview with a builder agent, templates and their gate. Stage A1. | Built-in agents, module `agents` (definitions), runner hosting |
+
+### 8.1 Status lines
+
+Every chapter, and every other page that has one, says what it is in a line `Status:` below its
+title. The line opens with one or more of the words below, separated by commas. `built` and
+`planned` name their milestones or tickets in the same item, for example
+`Status: normative, built (M1 to M8).` or `Status: normative, planned (V2).`.
+
+| Word | Meaning |
+|---|---|
+| `normative` | The page sets rules. Code, tests and the other pages follow it; a difference is a defect of one of them (section 13). |
+| `built` | What the page describes is on `main`, built by the named milestones or tickets. A part that is not built says so where it stands: `later`, `planned`, "not built", or the place `API` in the feature list of [01](spec/01-product.md). |
+| `planned` | What the page describes is not built; the named milestone or ticket builds it. |
+| `design` | A dated design note with the decisions taken before a ticket was built. Where it differs from a chapter, the chapter applies. |
+| `template` | A form that an instance operator fills. It describes no part of the product. |
+
+The [roadmap](roadmap.md) holds the state of every milestone. A test compares every status line
+with it (`tools/docs/tests/test_status_lines.py`): a milestone named as built is done, built or
+in progress there, and a milestone named as planned is not built. The briefs, the decision logs
+and the ADRs are records of their time and keep their own forms; the READMEs of single modules
+and packages name the tickets that built them and are not checked.
 
 ## 9. Where the API is defined normatively
 

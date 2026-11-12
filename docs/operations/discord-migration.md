@@ -1,6 +1,6 @@
 # Migration from Discord
 
-Status: draft M8. Guide to [22-import-migration.md](../spec/22-import-migration.md) 13 for the
+Status: built (M8). Guide to [22-import-migration.md](../spec/22-import-migration.md) 13 for the
 owner of an installation that moves an existing Discord server with agent bots to Bothy, channel
 by channel, without loss, without duplicates and without a big bang. The tool is
 `bothy import` ([importtool README](../../services/server/cmd/bothy/importtool/README.md)); the

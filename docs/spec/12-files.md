@@ -1,6 +1,6 @@
 # 12 Files
 
-Status: draft M0. Normative for the module `files`, the object storage port, the malware scan and
+Status: normative, built (M1 to M8). Normative for the module `files`, the object storage port, the malware scan and
 the file endpoints. Terms: [00-glossary.md](00-glossary.md). Tables:
 [03-data-model.md](03-data-model.md) (4.7). Actions: [05-actions.md](05-actions.md) (4.8).
 Events and sync: [04-sync-protocol.md](04-sync-protocol.md). Permissions:

@@ -1,6 +1,6 @@
 # Embedding a Grafana dashboard in the console
 
-Status: M6-17. Rules: [25-visualization.md](../spec/25-visualization.md) 9.2 (all conditions),
+Status: built (M6-17). Rules: [25-visualization.md](../spec/25-visualization.md) 9.2 (all conditions),
 [19-security.md](../spec/19-security.md) 5 rule 7 and SEC-VZ-2, ADR 0069 item 4, threat T-VZ-01
 of the threat model. The embedding is optional and off by default.
 

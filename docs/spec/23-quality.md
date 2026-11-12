@@ -1,6 +1,6 @@
 # 23 Quality, repository and supply chain
 
-Status: draft M0. This chapter defines which checks every change passes, how
+Status: normative, built (M0 to M8). This chapter defines which checks every change passes, how
 they run locally and in CI and how the repository is published. The guides for this are under [docs/quality/](../quality/README.md).
 Decisions: ADR [0038](../adr/0038-local-gates-first-one-command-identical-to-ci.md),
 [0039](../adr/0039-only-github-hosted-runners-public-from-the-first-push.md),

@@ -1,6 +1,6 @@
 # Plan: milestones and build tickets
 
-Status: draft M0. This plan sets the build order: milestones, their exit criteria,
+Status: normative. This plan sets the build order: milestones, their exit criteria,
 test strategy, red team check and the build tickets. What is built is stated in the chapters of
 the [specification](SPEC.md); in case of a contradiction the chapter applies, and the plan is
 adjusted in the same change. The briefs of the milestones M1 to M8 with waves and dependency graph
@@ -1424,6 +1424,13 @@ in the terminal channel (V3-16).
 | V3-15 | Take over a runner's thread in the terminal | Continue a Claude Code session of a runner thread in the terminal when runner and host service run as the same user in a dev environment (24 "Claude Code sessions", ruling T5). | `plugins/claude-code-runner`, `services/host`, `internal/terminal` | own ADR; the runner's session lock stays effective; test with fake Claude | V2-07 |
 | V3-16 | File transfer and clipboard over the terminal channel | New frame types with their own permission check and limits; OSC 52 stays blocked. | `services/host`, `packages/bothy_noise`, `packages/terminal_ui`, 24 | own ADR; conformance tests in Go and Dart; the canary appears in no telemetry | V1-05 |
 | V3-17 | Sign the Grafana plugin as a community plugin (owner account) | Signature and submission to Grafana's catalogue according to 25 "Distribution", after the final choice of name. | `plugins/grafana-bothy-live`, release workflow | Grafana loads the plugin without allowing unsigned plugins; `allow_loading_unsigned_plugins` is dropped from the Compose stack | V1-06 |
+| V3-18 | Channel settings in the apps | A view for a person with `manage` and for owners that changes what today only the API changes: the tags of a forum and of a post, the behavior of a channel (prompt, skills, mention rules, `auto_thread`), the operator of a channel and the default operator of a space, and the templates of a channel; the templates dialog renames, changes and deletes a template. | `apps/client`, `packages/admin_ui`, `packages/sync_engine`, `packages/l10n`; 01 section 3 (the rows of the place API move to the app) | widget and integration tests per function against the fake server; `tools/docs/tests/test_feature_list_callers.py` passes with the rows moved; rows in the accessibility checklists for the new views | V1-05 |
+| V3-19 | Backup state in the admin console | A read operation for `backup_runs`, a view of the admin console with the runs and the result per check of the restore test, and the warning "local backup only" for owners while `backup.offsite.target` is empty. | `docs/api/openapi.yaml`, `docs/spec/actions.yaml`, `internal/status`, `packages/admin_ui`, `apps/console`; 16 8.2, 03 `backup_runs` | contract test of the operation; a failed run and a missing off-site target show in the view; `tools/docs/tests/test_backup_state_texts.py` passes with the texts changed | V1-05 |
+
+V3-18 and V3-19 come from the audit of 2026-11-11: the server parts are built (M1-53, M1-54,
+M1-55, M1-60, M2-02, M7-02), the views were named in 01 and 16 and never built. Until their
+tickets, 01 section 3 lists the functions of V3-18 with the place API and 16 8.2 says where the
+state of the backups is read ([decisions.d/AUD-docs-spec-01.md](decisions.d/AUD-docs-spec-01.md)).
 
 ## 18. Coverage
 
@@ -1510,6 +1517,7 @@ holds the exclusion, the chapter names it.
 | Structure and conversations | Spaces collapsible, personal order, across devices | M1-52, M1-61, M4-19 |
 | | Text channels with main thread and threads from messages | M1-53, M1-56, M4-20 |
 | | Forum channels with post list, tags, Done section | M1-53, M1-55, M4-19, M4-40 |
+| | Tags of a post after its creation, tags of a forum (place API; view V3-18) | M1-53, M1-55, V3-18 |
 | | Dev forum with project binding and runner agent | M2-03, M2-34, M2-35, M3-12 |
 | | Button "New post" or "New chat" | M1-55, M4-19, M4-41, M5-15 |
 | | Open posts and threads nested under their channel in the sidebar | M2-52, M4-40, M5-15 |
@@ -1518,6 +1526,7 @@ holds the exclusion, the chapter names it.
 | | Move a thread | M1-62, M4-20 |
 | | Direct messages (later) | V3-01 |
 | Agents | Operator in the channel header | M1-54, M4-19, M5-17 |
+| | Default operator of a space, behavior of a channel (place API; view V3-18) | M1-54, M2-02, V3-18 |
 | | Live box running, collapsed, with stop | M2-09, M2-10, M4-21, M5-17 |
 | | Trigger state as icons | M2-05, M4-07, M4-21 |
 | | Follow-ups during a run | M2-11, M4-21 |
@@ -1535,6 +1544,7 @@ holds the exclusion, the chapter names it.
 | | Reply with quote, mentions | M1-56, M1-60, M4-20 |
 | | Reactions, pin | M1-59, M4-20 |
 | | Templates | M1-60, M4-20 |
+| | Templates of a channel, change and delete a template (place API; view V3-18) | M1-60, V3-18 |
 | | Drafts across devices | M1-61, M4-15, M4-20 |
 | | Link preview in the client with opt-in (later) | V3-02 |
 | Files and voice | Files and images with preview | M3-03 to M3-07, M4-22 |

@@ -1,6 +1,6 @@
 # Installation with Docker Compose
 
-Status: draft M0. Guide for an instance on one host. Rules:
+Status: built (M1 to M7). Guide for an instance on one host. Rules:
 [16-operations.md](../spec/16-operations.md). Files: [infra/compose/](../../infra/compose/README.md).
 
 Two equivalent paths: the setup wizard in one command (section 1.1) or the manual path
@@ -159,7 +159,7 @@ people who could also be owners.
 | Services | `docker compose ps` | all `healthy` or `running`; `secrets-init`, `migrate` with exit 0 |
 | Readiness | `docker compose exec api bothy healthcheck --url http://127.0.0.1:8081/readyz` | exit 0 |
 | Secrets | output of `secrets-init` | fingerprints; escrow notice followed |
-| First backup | `docker compose exec backup bothy-backupd backup pg_full` (then `logical` and, with the driver `fs`, `objects`) | exit 0, `bothy-backupd: backup pg_full succeeded`; run `succeeded` in the admin console |
+| First backup | `docker compose exec backup bothy-backupd backup pg_full` (then `logical` and, with the driver `fs`, `objects`) | exit 0, `bothy-backupd: backup pg_full succeeded`; the run is a row with the state `succeeded` in `backup_runs` ([backup-restore.md](backup-restore.md#11-state-of-the-runs)) |
 | First restore test | `docker compose exec backup bothy-backupd restore-test` | exit 0, all checks green |
 | Status page | app, Status section | all components `operational` |
 

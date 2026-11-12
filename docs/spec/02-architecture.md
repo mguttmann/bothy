@@ -1,6 +1,6 @@
 # 02 Architecture
 
-Status: draft M0. Normative for the structure of `services/server/`.
+Status: normative, built (M1 to M8). Normative for the structure of `services/server/`.
 Terms: [00-glossary.md](00-glossary.md). Tables: [03-data-model.md](03-data-model.md).
 Events and sync: [04-sync-protocol.md](04-sync-protocol.md). Actions:
 [05-actions.md](05-actions.md). Decisions: ADR 0004 to 0009, see the

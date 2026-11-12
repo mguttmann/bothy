@@ -1,6 +1,6 @@
 # 18 Release
 
-Status: draft M0. Normative for versioning, tags, changelogs, release channels, signing,
+Status: normative, built (M1 to M8). Normative for versioning, tags, changelogs, release channels, signing,
 SBOM, provenance, server images, app distribution, compatibility between app and server and
 rollback. Flow of a release: [docs/operations/release.md](../operations/release.md).
 Gates and runners: ADR 0038 and 0039 (team H). API versioning: ADR 0014 (team B).

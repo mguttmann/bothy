@@ -1,6 +1,6 @@
 # 11 Extensions: apps, webhooks, SDK
 
-Status: draft M0. Normative for the module `apps`, for integrations and for the SDKs.
+Status: normative, built (M1 to M8). Normative for the module `apps`, for integrations and for the SDKs.
 Terms: [00-glossary.md](00-glossary.md). Tables: [03-data-model.md](03-data-model.md)
 (`apps`, `app_installations`, `webhook_subscriptions`, `webhook_deliveries`, `incoming_webhooks`,
 `commands`). Actions and scopes: [05-actions.md](05-actions.md). Agent contract:

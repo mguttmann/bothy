@@ -1,6 +1,6 @@
 # Disaster recovery
 
-Status: draft M0. Runbook for [16-operations.md](../spec/16-operations.md) 9. Targets:
+Status: built (M1 to M7). Runbook for [16-operations.md](../spec/16-operations.md) 9. Targets:
 `dr.rpo_target` (largest data loss) and `dr.rto_target` (time until operation resumes). The
 automatic restore test measures the duration on every run.
 
@@ -106,7 +106,8 @@ timeline of the database changed without a restore ([16-operations.md](../spec/1
 1. Ask the provider whether the failover can have lost committed transactions. When it cannot
    (synchronous replication, documented by the provider): `docker compose stop api worker`, run
    a backup (`docker compose exec backup bothy-backupd backup logical`), save the manifest of that
-   run (`backup_runs.manifest` of the newest row) as `manifest.json` next to the Compose file and run
+   run (`backup_runs.manifest` of the newest row; the command is in
+   [backup-restore.md](backup-restore.md#11-state-of-the-runs)) as `manifest.json` next to the Compose file and run
    `docker compose run --rm -v ./manifest.json:/tmp/manifest.json:ro restore restore finalize --relocation /tmp/manifest.json`: nothing was
    written since the backup, so the facts match, the new identity is stored and the epoch stays.
    For such a service, `database.restore_guard = off` keeps the server ready across future

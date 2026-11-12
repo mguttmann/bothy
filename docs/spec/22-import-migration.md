@@ -1,6 +1,6 @@
 # 22 Import and migration from Discord
 
-Status: draft M0. Normative for the import tool, the import interface of the server and the
+Status: normative, built (M8). Normative for the import tool, the import interface of the server and the
 migration flow. Terms: [00-glossary.md](00-glossary.md). Tables `import_sources` and
 `import_items`: [03-data-model.md](03-data-model.md), section 4.11. Actions `import.read`
 and `import.manage`: [05-actions.md](05-actions.md), section 4.12. Decision on the design:

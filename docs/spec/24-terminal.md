@@ -1,7 +1,7 @@
 # 24 Terminal
 
-Status: draft M0, addendum of 2026-10-10. Normative for the module `terminal`, the host service
-`bothy-host`, the terminal view of the apps and of the web console and for every check that allows
+Status: normative, built (M2 to M6). Addendum of 2026-10-10. Normative for the module `terminal`,
+the host service `bothy-host`, the terminal view of the apps and of the web console and for every check that allows
 a terminal session.
 Terms: [00-glossary.md](00-glossary.md). Tables: [03-data-model.md](03-data-model.md)
 (`hosts`, `host_session_users`, `terminal_sessions`, `grants`). Events: [04-sync-protocol.md](04-sync-protocol.md).

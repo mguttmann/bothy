@@ -1,6 +1,6 @@
 # Telemetry privacy
 
-Status: draft M0. Rules for [17-observability.md](../spec/17-observability.md) 4. Applies to the
+Status: built (M1 to M7). Rules for [17-observability.md](../spec/17-observability.md) 4. Applies to the
 server, `bothy-backupd`, adapter SDKs and the collector. Privacy in general: chapter 20.
 
 ## 1. What never goes into telemetry
