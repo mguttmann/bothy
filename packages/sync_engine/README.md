@@ -698,7 +698,9 @@ above it (the app under test in the macOS app sandbox, M4-18), it uses the copy 
   plain strings that only the in-process host checks.
 - Search (M4-23, `rest/search_handlers.dart`): `search` matches every word of `q` as a word
   prefix, case-insensitive, in message texts, thread titles, file names and transcripts (a
-  transcript match is a file hit); the score is the number of matched words, ties newest first;
+  transcript match is a file hit; a file hit carries the attached form of the file without
+  `scope_channel_id` and names `thread_id` and `message_id` of the message it is attached to,
+  as the server does); the score is the number of matched words, ties newest first;
   the agent filter uses the thread's operator, else the channel's; the cursor is base64url JSON
   with a hash of person, query, type, sort and filters. `searchThreadTitles`, `listMyMentions`,
   `listActiveRuns` and `listRunHistory` (finished runs, newest end first, with the filters

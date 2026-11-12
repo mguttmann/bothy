@@ -17,6 +17,7 @@ import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 
 import '../app/providers/ports.dart';
+import '../search/search_port.dart' show waitSeconds;
 import '../search/segments_text.dart';
 import '../settings/settings_providers.dart' show personTimeZoneProvider;
 import 'assist_conversation.dart';
@@ -350,7 +351,7 @@ class _ExchangeView extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: DsSpace.s16),
             child: Text(
-              _failureText(l, failure),
+              _failureText(l, failure, exchange.retryAfter),
               key: ValueKey('assist.failure.$index'),
               style: dsTextStyle(DsType.bodySm).copyWith(color: c.dangerFg),
             ),
@@ -463,13 +464,20 @@ class AssistHitTile extends ConsumerWidget {
   }
 }
 
-String _failureText(AppLocalizations l, AssistFailureKind kind) =>
-    switch (kind) {
-      AssistFailureKind.queryEmpty => l.assistQueryEmpty,
-      AssistFailureKind.queryTooLong => l.assistQueryTooLong,
-      AssistFailureKind.offline => l.assistOffline,
-      AssistFailureKind.failed => l.assistFailed,
-    };
+/// The text of a failed question: a timeout and a rate limit share the texts of the search
+/// view, because the same search answers both.
+String _failureText(
+  AppLocalizations l,
+  AssistFailureKind kind,
+  Duration? retryAfter,
+) => switch (kind) {
+  AssistFailureKind.queryEmpty => l.assistQueryEmpty,
+  AssistFailureKind.queryTooLong => l.assistQueryTooLong,
+  AssistFailureKind.offline => l.assistOffline,
+  AssistFailureKind.timeout => l.searchTimeout,
+  AssistFailureKind.rateLimited => l.searchRateLimited(waitSeconds(retryAfter)),
+  AssistFailureKind.failed => l.assistFailed,
+};
 
 String _fallbackText(AppLocalizations l, AssistFallback fallback) =>
     switch (fallback) {

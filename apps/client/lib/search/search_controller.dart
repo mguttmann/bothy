@@ -46,6 +46,8 @@ final class SearchFilters {
     this.spaceId,
     this.channelId,
     this.authorId,
+    this.agentId,
+    this.tagId,
     this.time = SearchTime.any,
     this.status = SearchStatus.all,
     this.hasFile = false,
@@ -63,6 +65,12 @@ final class SearchFilters {
 
   /// The author ("From"), or null for all.
   final PrincipalId? authorId;
+
+  /// The agent whose conversations are searched (`agent_id`, 14 4.4), or null for all.
+  final PrincipalId? agentId;
+
+  /// The forum tag of the chosen channel (`tag_id`, 14 4.4), or null for all.
+  final ForumTagId? tagId;
 
   /// The time window.
   final SearchTime time;
@@ -85,6 +93,10 @@ final class SearchFilters {
     bool clearChannel = false,
     PrincipalId? authorId,
     bool clearAuthor = false,
+    PrincipalId? agentId,
+    bool clearAgent = false,
+    ForumTagId? tagId,
+    bool clearTag = false,
     SearchTime? time,
     SearchStatus? status,
     bool? hasFile,
@@ -94,6 +106,8 @@ final class SearchFilters {
     spaceId: clearSpace ? null : spaceId ?? this.spaceId,
     channelId: clearChannel ? null : channelId ?? this.channelId,
     authorId: clearAuthor ? null : authorId ?? this.authorId,
+    agentId: clearAgent ? null : agentId ?? this.agentId,
+    tagId: clearTag ? null : tagId ?? this.tagId,
     time: time ?? this.time,
     status: status ?? this.status,
     hasFile: hasFile ?? this.hasFile,
@@ -101,13 +115,20 @@ final class SearchFilters {
   );
 }
 
-/// The reason a search shows instead of hits.
+/// The reason a search shows; [timeout] and [rateLimited] show above the local hits, the
+/// others instead of hits.
 enum SearchError {
   /// `400 validation_failed` on `q` with `empty`: `searchQueryEmpty`.
   queryEmpty,
 
   /// `400 validation_failed` on `q` with `too_long`: `searchQueryTooLong`.
   queryTooLong,
+
+  /// `503 unavailable` with `search_timeout`: `searchTimeout`, the hint to narrow (14 7).
+  timeout,
+
+  /// `429 rate_limited`: `searchRateLimited` with the wait of [SearchState.retryAfter].
+  rateLimited,
 
   /// Any other failure: `searchFailed`.
   failed,
@@ -128,6 +149,7 @@ final class SearchState {
     this.nextCursor,
     this.candidatesCapped = false,
     this.error,
+    this.retryAfter,
   });
 
   /// The typed text, notation included.
@@ -161,8 +183,11 @@ final class SearchState {
   /// Whether the server reported `candidates_capped` (14 4.5).
   final bool candidatesCapped;
 
-  /// Why no hits are shown, or null.
+  /// Why the server gave no hits, or null.
   final SearchError? error;
+
+  /// The wait the server named with [SearchError.rateLimited], or null.
+  final Duration? retryAfter;
 
   /// Whether the view shows the note "Messages stored only on this device" (14 6): local hits
   /// are shown, while the server is pending or because it cannot be reached; offline also
@@ -170,7 +195,8 @@ final class SearchState {
   bool get showLocalNote =>
       submitted && localOnly && (items.isNotEmpty || offline);
 
-  /// A copy with the given fields replaced; [clearCursor] and [clearError] reset those.
+  /// A copy with the given fields replaced; [clearCursor] resets the cursor and [clearError]
+  /// the error with its wait.
   SearchState copyWith({
     String? input,
     SearchFilters? filters,
@@ -184,6 +210,7 @@ final class SearchState {
     bool clearCursor = false,
     bool? candidatesCapped,
     SearchError? error,
+    Duration? retryAfter,
     bool clearError = false,
   }) => SearchState(
     input: input ?? this.input,
@@ -197,6 +224,7 @@ final class SearchState {
     nextCursor: clearCursor ? null : nextCursor ?? this.nextCursor,
     candidatesCapped: candidatesCapped ?? this.candidatesCapped,
     error: clearError ? null : error ?? this.error,
+    retryAfter: clearError ? null : retryAfter ?? this.retryAfter,
   );
 }
 
@@ -208,8 +236,11 @@ final class SearchState {
 /// reached; the server's first page replaces them (14 6). Offline means the connection is not
 /// live ([live] is false, no server request is sent) or the request fails with a connection
 /// error; going live again reruns the server query ([reconnected]). A newer submit makes every
-/// answer of an older one void. `400 cursor_invalid` restarts at page one; the reasons of
-/// `400 validation_failed` on `q` and every other failure replace the hits.
+/// answer of an older one void and cancels its request, and so does [dispose]. `400
+/// cursor_invalid` restarts at page one; the reasons of `400 validation_failed` on `q` and
+/// every other failure replace the hits, except a timeout (`503` with `search_timeout`) and a
+/// rate limit (`429`): their reason shows and the local hits stay, because the server said
+/// nothing about the query (docs/decisions.d/AUD-client-search-01.md).
 ///
 /// [scopeChannel] and [scopeThread] make it the in-thread search of M4-24: every request then
 /// carries `channel_id` and `thread_id`, whatever the notation or the filter column says.
@@ -271,6 +302,7 @@ final class SearchSession {
 
   SearchState _state = const SearchState();
   SearchRequest? _request;
+  SearchCancel? _cancel;
   int _generation = 0;
   bool _disposed = false;
 
@@ -300,6 +332,9 @@ final class SearchSession {
   /// submit.
   Future<void> submit() async {
     final generation = ++_generation;
+    // Nobody waits for the answers of the search before this one.
+    _cancel?.cancel();
+    _cancel = SearchCancel();
     final request = buildRequest();
     _request = request;
     final offline = server == null || !live();
@@ -335,7 +370,7 @@ final class SearchSession {
     final generation = _generation;
     _set(_state.copyWith(loadingMore: true));
     try {
-      final page = await port.search(request, cursor: cursor);
+      final page = await port.search(request, cursor: cursor, cancel: _cancel);
       if (generation != _generation) return;
       _set(
         _state.copyWith(
@@ -365,9 +400,13 @@ final class SearchSession {
         _state.copyWith(
           loadingMore: false,
           offline: f.kind == SearchFailureKind.offline,
-          error: f.kind == SearchFailureKind.offline
-              ? null
-              : SearchError.failed,
+          error: switch (f.kind) {
+            SearchFailureKind.offline => null,
+            SearchFailureKind.timeout => SearchError.timeout,
+            SearchFailureKind.rateLimited => SearchError.rateLimited,
+            _ => SearchError.failed,
+          },
+          retryAfter: f.retryAfter,
         ),
       );
     }
@@ -387,14 +426,19 @@ final class SearchSession {
     await _firstPage(generation, request);
   }
 
-  /// Stops emitting states; answers that arrive later are dropped.
-  void dispose() => _disposed = true;
+  /// Stops emitting states and cancels the request that is on its way; answers that arrive
+  /// later are dropped.
+  void dispose() {
+    _disposed = true;
+    _cancel?.cancel();
+  }
 
   /// The request of the typed text and the filter column (docs/decisions.d/M4-23.md): the
   /// notation wins over the filter column for the same parameter; a filter outside its types
-  /// (14 4.4: `author_id` for messages and files, `has_file` for messages, `thread_state` for
-  /// threads and messages) is left out, because the server answers it with `not_applicable`;
-  /// the in-thread scope replaces every place filter.
+  /// (14 4.4: `author_id` for messages and files, `has_file` for messages, `thread_state` and
+  /// `tag_id` for threads and messages) is left out, because the server answers it with
+  /// `not_applicable`; the in-thread scope replaces every place filter and the tag, which
+  /// belongs to a channel of the column.
   SearchRequest buildRequest() {
     final f = _state.filters;
     final n = parseQueryNotation(
@@ -424,6 +468,7 @@ final class SearchSession {
           : [?channel],
       threadId: scopeThread,
       authorId: type == SearchType.threads ? null : n.authorId ?? f.authorId,
+      agentId: f.agentId,
       after: n.after ?? (window == null ? null : now().subtract(window)),
       before: n.before,
       hasFile: type == SearchType.messages
@@ -436,6 +481,7 @@ final class SearchSession {
               SearchStatus.open => ThreadState.open,
               SearchStatus.done => ThreadState.closed,
             },
+      tagIds: scoped || type == SearchType.files ? const [] : [?f.tagId],
     );
   }
 
@@ -458,7 +504,7 @@ final class SearchSession {
     final port = server;
     if (port == null) return;
     try {
-      final page = await port.search(request);
+      final page = await port.search(request, cancel: _cancel);
       if (generation != _generation) return;
       _set(
         _state.copyWith(
@@ -479,6 +525,17 @@ final class SearchSession {
         SearchFailureKind.offline => _state.copyWith(
           offline: true,
           pending: false,
+        ),
+        // 14 7: the same request would time out or be refused again, so the reason shows at
+        // once; the server said nothing about the query, so the local hits stay.
+        SearchFailureKind.timeout => _state.copyWith(
+          pending: false,
+          error: SearchError.timeout,
+        ),
+        SearchFailureKind.rateLimited => _state.copyWith(
+          pending: false,
+          error: SearchError.rateLimited,
+          retryAfter: f.retryAfter,
         ),
         SearchFailureKind.queryEmpty => _failed(SearchError.queryEmpty),
         SearchFailureKind.queryTooLong => _failed(SearchError.queryTooLong),

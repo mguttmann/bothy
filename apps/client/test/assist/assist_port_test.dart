@@ -153,31 +153,49 @@ void main() {
   });
 
   test('the problems of a question map to their kinds', () {
-    DioException problem(int status, String code, [String? field]) =>
-        DioException(
-          requestOptions: RequestOptions(path: '/search/assist'),
-          type: DioExceptionType.badResponse,
-          error: rest.ApiProblem(
-            status: status,
-            code: code,
-            errors: [
-              if (field != null)
-                rest.ProblemFieldError(pointer: '/q', code: field),
-            ],
-          ),
-        );
+    DioException problem(
+      int status,
+      String code, {
+      String? field,
+      String? reason,
+      Duration? retryAfter,
+    }) => DioException(
+      requestOptions: RequestOptions(path: '/search/assist'),
+      type: DioExceptionType.badResponse,
+      error: rest.ApiProblem(
+        status: status,
+        code: code,
+        reason: reason,
+        retryAfter: retryAfter,
+        errors: [
+          if (field != null) rest.ProblemFieldError(pointer: '/q', code: field),
+        ],
+      ),
+    );
     expect(
-      assistFailureOf(problem(400, 'validation_failed', 'empty')).kind,
+      assistFailureOf(problem(400, 'validation_failed', field: 'empty')).kind,
       AssistFailureKind.queryEmpty,
     );
     expect(
-      assistFailureOf(problem(400, 'validation_failed', 'too_long')).kind,
+      assistFailureOf(problem(400, 'validation_failed', field: 'too_long'))
+          .kind,
       AssistFailureKind.queryTooLong,
     );
     expect(
       assistFailureOf(problem(503, 'unavailable')).kind,
       AssistFailureKind.failed,
     );
+    // The full-text pass ran into the statement timeout of the search (14 7).
+    expect(
+      assistFailureOf(problem(503, 'unavailable', reason: 'search_timeout'))
+          .kind,
+      AssistFailureKind.timeout,
+    );
+    final limited = assistFailureOf(
+      problem(429, 'rate_limited', retryAfter: const Duration(seconds: 9)),
+    );
+    expect(limited.kind, AssistFailureKind.rateLimited);
+    expect(limited.retryAfter, const Duration(seconds: 9));
     expect(
       assistFailureOf(
         DioException(

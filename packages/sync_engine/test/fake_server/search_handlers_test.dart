@@ -379,6 +379,18 @@ void main() {
       expect(ids(byName), [report]);
       expect(byName.items.single.kind, SearchHitKind.file);
       expect(byName.items.single.threadTitle, 'Release notes');
+      // As the server (D-M3-07-5, audit finding fn-search-1): the file of a hit is the
+      // attached form without scope_channel_id, and the hit names the message the file is
+      // attached to and its thread.
+      final attachedTo = world.messages.values.singleWhere(
+        (m) => m['content_md'] == 'See the attachment',
+      );
+      expect(byName.items.single.file!.scopeChannelId, isNull);
+      expect(byName.items.single.threadId, w.releaseNotes);
+      expect(byName.items.single.messageId, attachedTo['id']);
+      final message = (await alexSearch.search(q: 'attachment')).data!;
+      expect(message.items.single.threadId, isNull);
+      expect(message.items.single.messageId, isNull);
 
       final seq = world.headSeq;
       world.setTranscript(voice, 'Call the customer tomorrow', language: 'en');

@@ -11,7 +11,9 @@ const _attemptExtra = 'api_client.read_attempt';
 /// The request option that keeps [ReadRetryInterceptor] out of one read: pass
 /// `{noReadRetryExtra: true}` as `extra` of a generated operation whose caller retries by
 /// itself, for example an outbox executor, so a refused read is not retried in two layers
-/// (FIX-upload-retry-storm: the status read of an upload is retried with its entry).
+/// (FIX-upload-retry-storm: the status read of an upload is retried with its entry), or
+/// whose caller shows the failure to a waiting person at once (the search view: a query the
+/// server timed out is narrowed, not repeated).
 const String noReadRetryExtra = 'api_client.no_read_retry';
 
 /// How reads are retried: a full-jitter backoff from the caller's configuration keys.

@@ -7992,6 +7992,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchFilterFrom => 'From';
 
   @override
+  String get searchFilterAgent => 'Agent';
+
+  @override
+  String get searchFilterTag => 'Tag';
+
+  @override
   String get searchFilterAll => 'all';
 
   @override
@@ -8077,6 +8083,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchFailed => 'The search did not work. Try again.';
+
+  @override
+  String get searchPending => 'Searching';
+
+  @override
+  String get searchTimeout =>
+      'The search took too long. Narrow it, for example with more exact words, a channel or a shorter time span.';
+
+  @override
+  String searchRateLimited(int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other:
+          'Too many searches in a short time. Search again in $seconds seconds.',
+      one: 'Too many searches in a short time. Search again in 1 second.',
+      zero: 'Too many searches in a short time. Wait a moment, then search again.',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get searchHitThread => 'Thread';

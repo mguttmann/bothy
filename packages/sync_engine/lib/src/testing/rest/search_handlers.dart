@@ -398,7 +398,12 @@ void registerSearchHandlers(RestFake rest) {
               thread,
               {
                 'kind': 'file',
-                'file': f.json,
+                // As the server: the attached form of the file without scope_channel_id
+                // (D-M3-07-5), and the hit names the message the file is attached to and
+                // its thread, which is where a client opens it.
+                'file': {...f.json}..remove('scope_channel_id'),
+                'thread_id': thread['id'],
+                'message_id': m['id'],
                 // The name, then the transcript when it holds a match (14 2: both are indexed).
                 'segments': [
                   ..._segments(name, query),

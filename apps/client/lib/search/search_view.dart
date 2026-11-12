@@ -2,9 +2,11 @@
 
 /// The search view D7 (docs/spec/01-product.md 5.1 D7, route `/search?q=` of
 /// docs/spec/15-client-architecture.md 11, brief M4-23 Design note 1): the filter column on the
-/// left, the search field with its button, the count line of the loaded hits, the note for
-/// local hits (14 6), and the hits with path, author, time and the highlighted excerpt (14 4.6).
-/// Selecting a message opens it in its thread (`/t/<thread>?m=<message>`, brief M4-20).
+/// left, the search field with its button, the line of a pending search, the count line of the
+/// loaded hits, the note for local hits (14 6), and the hits with path, author, time and the
+/// highlighted excerpt (14 4.6). Selecting a message opens it in its thread
+/// (`/t/<thread>?m=<message>`, brief M4-20), and so does a file: it opens the message it is
+/// attached to.
 library;
 
 import 'dart:async';
@@ -214,9 +216,9 @@ class _SearchViewState extends ConsumerState<SearchView> {
   }
 }
 
-/// The filter column of D7: space, channel, from, type, time, status, "with files only" and
-/// the sort. A filter outside the chosen type (14 4.4) is disabled, because the request leaves
-/// it out.
+/// The filter column of D7: space, channel, the tag of a chosen forum, from, agent, type, time,
+/// status, "with files only" and the sort, so every filter of 14 4.4 can be chosen. A filter
+/// outside the chosen type (14 4.4) is disabled, because the request leaves it out.
 class SearchFilterColumn extends ConsumerWidget {
   /// Creates the column showing [filters].
   const SearchFilterColumn({super.key, required this.filters});
@@ -239,6 +241,16 @@ class SearchFilterColumn extends ConsumerWidget {
     final shownChannels = [
       for (final ch in channels)
         if (f.spaceId == null || ch.spaceId == f.spaceId) ch,
+    ];
+    // Tags belong to one forum (03 `forum_tags`): the menu offers those of the chosen channel.
+    final chosen = f.channelId;
+    final tags = chosen == null
+        ? const <ForumTag>[]
+        : ref.watch(searchChannelTagsProvider(chosen.value)).value ??
+              const <ForumTag>[];
+    final agents = [
+      for (final p in principals)
+        if (p.kind == PrincipalKind.agent) p,
     ];
     return ListView(
       key: const ValueKey('search.filters'),
@@ -265,16 +277,17 @@ class SearchFilterColumn extends ConsumerWidget {
             (null, l.searchFilterAll),
             for (final s in spaces) (s.id, s.name),
           ],
-          onChanged: (v) => set(
-            v == null
-                ? f.copyWith(clearSpace: true)
-                : f.copyWith(
-                    spaceId: v,
-                    clearChannel: !channels.any(
-                      (ch) => ch.id == f.channelId && ch.spaceId == v,
-                    ),
-                  ),
-          ),
+          onChanged: (v) {
+            if (v == null) {
+              set(f.copyWith(clearSpace: true));
+              return;
+            }
+            // A channel of another space goes, and its tag with it.
+            final keeps = channels.any(
+              (ch) => ch.id == f.channelId && ch.spaceId == v,
+            );
+            set(f.copyWith(spaceId: v, clearChannel: !keeps, clearTag: !keeps));
+          },
         ),
         _Filter<ChannelId?>(
           name: 'channel',
@@ -288,9 +301,24 @@ class SearchFilterColumn extends ConsumerWidget {
           ],
           onChanged: (v) => set(
             v == null
-                ? f.copyWith(clearChannel: true)
-                : f.copyWith(channelId: v),
+                ? f.copyWith(clearChannel: true, clearTag: true)
+                : f.copyWith(channelId: v, clearTag: v != f.channelId),
           ),
+        ),
+        _Filter<ForumTagId?>(
+          name: 'tag',
+          label: l.searchFilterTag,
+          value: tags.any((t) => t.id == f.tagId) ? f.tagId : null,
+          options: [
+            (null, l.searchFilterAll),
+            for (final t in tags) (t.id, t.name),
+          ],
+          // tag_id applies to threads and messages (14 4.4).
+          onChanged: type == SearchType.files || tags.isEmpty
+              ? null
+              : (v) => set(
+                  v == null ? f.copyWith(clearTag: true) : f.copyWith(tagId: v),
+                ),
         ),
         _Filter<PrincipalId?>(
           name: 'from',
@@ -308,6 +336,19 @@ class SearchFilterColumn extends ConsumerWidget {
                       ? f.copyWith(clearAuthor: true)
                       : f.copyWith(authorId: v),
                 ),
+        ),
+        _Filter<PrincipalId?>(
+          name: 'agent',
+          label: l.searchFilterAgent,
+          value: agents.any((p) => p.id == f.agentId) ? f.agentId : null,
+          options: [
+            (null, l.searchFilterAll),
+            for (final p in agents) (p.id, p.displayName),
+          ],
+          // agent_id applies to every type (14 4.4): the threads this agent operates.
+          onChanged: (v) => set(
+            v == null ? f.copyWith(clearAgent: true) : f.copyWith(agentId: v),
+          ),
         ),
         _Filter<SearchType>(
           name: 'type',
@@ -435,8 +476,23 @@ class _Filter<T> extends StatelessWidget {
   }
 }
 
-/// The result side of D7: the reason of a failed search, the notes, the count line, the hits
-/// and "Load more".
+/// The text of the reason [state] shows, or null without one: what the server said about the
+/// text, the hint to narrow after a timeout (14 7), the wait after a rate limit, or that the
+/// search did not work.
+String? searchErrorText(AppLocalizations l, SearchState state) =>
+    switch (state.error) {
+      null => null,
+      SearchError.queryEmpty => l.searchQueryEmpty,
+      SearchError.queryTooLong => l.searchQueryTooLong,
+      SearchError.timeout => l.searchTimeout,
+      SearchError.rateLimited => l.searchRateLimited(
+        waitSeconds(state.retryAfter),
+      ),
+      SearchError.failed => l.searchFailed,
+    };
+
+/// The result side of D7: the reason of a failed search, the notes, the line of a pending
+/// search, the count line, the hits and "Load more".
 class SearchResults extends ConsumerWidget {
   /// Creates the results of [state].
   const SearchResults({super.key, required this.state});
@@ -448,7 +504,7 @@ class SearchResults extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
     final c = context.dsColors;
-    final error = state.error;
+    final error = searchErrorText(l, state);
     final note = dsTextStyle(DsType.bodySm).copyWith(color: c.textSecondary);
     final hits = state.items;
     final search = ref.read(searchQueryControllerProvider().notifier);
@@ -463,11 +519,7 @@ class SearchResults extends ConsumerWidget {
               vertical: DsSpace.s4,
             ),
             child: Text(
-              switch (error) {
-                SearchError.queryEmpty => l.searchQueryEmpty,
-                SearchError.queryTooLong => l.searchQueryTooLong,
-                SearchError.failed => l.searchFailed,
-              },
+              error,
               key: const ValueKey('search.error'),
               style: dsTextStyle(DsType.bodySm).copyWith(color: c.dangerFg),
             ),
@@ -494,6 +546,20 @@ class SearchResults extends ConsumerWidget {
               key: const ValueKey('search.capped'),
               tone: DsTone.warning,
               text: l.searchCandidatesCapped,
+            ),
+          ),
+        // While the server has not answered the view says so: without a local hit the area
+        // would be empty and look like a search that found nothing.
+        if (state.pending)
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DsSpace.s12,
+              vertical: DsSpace.s4,
+            ),
+            child: Text(
+              l.searchPending,
+              key: const ValueKey('search.pending'),
+              style: note,
             ),
           ),
         if (state.submitted && error == null && !state.pending)
@@ -542,9 +608,10 @@ class SearchHitTile extends ConsumerWidget {
   /// Opens the hit instead of the router jump, or null for the jump.
   final VoidCallback? onOpen;
 
-  /// Where selecting [hit] leads: a message to its place in the thread, a thread or a
-  /// transcript to the thread, a server file hit to its channel, because the API names no
-  /// message for a file (docs/decisions.d/M4-23.md); null when nothing is known.
+  /// Where selecting [hit] leads: a message to its place in the thread, a file of the server
+  /// to the message it is attached to (`SearchHit.thread_id` and `message_id`,
+  /// docs/decisions.d/AUD-client-search-01.md), a thread or a local transcript to the thread,
+  /// a hit that names only its channel to the channel; null when nothing is known.
   static String? targetOf(SearchResultItem hit) {
     final thread = hit.threadId;
     final message = hit.messageId;
