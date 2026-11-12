@@ -612,6 +612,38 @@ describe("acceptance and start", () => {
   );
 
   it(
+    "starts the run of a model command and hands the handler its payload",
+    async () => {
+      const handler = new RecordingHandler();
+      const adapter = makeAdapter(handler, "model-command");
+      const commandId = await fake.registerCommand("recap");
+      let runId = "";
+      await running(adapter, async () => {
+        runId = (await fake.trigger("Recap please", { command: "recap" }))
+          .runId;
+        await until(fake, async () =>
+          ["completed", "failed"].includes(await stateOf(runId)),
+        );
+      });
+      const view = await fake.runState(runId);
+      expect([view.state, view.stateReason, view.starts]).toEqual([
+        "completed",
+        undefined,
+        1,
+      ]);
+      expect(handler.count("execute", runId)).toBe(1);
+      const inv = handler.invocations[0];
+      expect([
+        inv?.payload.trigger_kind,
+        inv?.payload.command_id,
+        inv?.claims.triggerKind,
+        inv?.claims.commandId,
+      ]).toEqual(["command", commandId, "command", commandId]);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
     "executes only after 200 on startRun",
     async () => {
       const log: Log = [];

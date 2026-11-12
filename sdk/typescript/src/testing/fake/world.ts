@@ -264,6 +264,10 @@ export class RunRecord {
   lastJti: string | undefined;
   /** Whether a cancel waits for the adapter. */
   cancelRequested = false;
+  /** What triggered the run: a message, or a model command (09 10.4). */
+  triggerKind: "message" | "command" = "message";
+  /** The command the tokens of a command run name; `undefined` for a message run. */
+  triggerObject: string | undefined;
 
   /**
    * Creates the row.
@@ -452,7 +456,7 @@ export class World {
       channel_id: this.channelId,
       agent_id: this.lotse.id,
       triggered_by: run.triggeredBy,
-      trigger_kind: "message",
+      trigger_kind: run.triggerKind,
       triggering_message_id: run.triggeringMessageId,
       state: run.state,
       version: run.version,
@@ -638,10 +642,15 @@ export class World {
   /**
    * Creates a new thread with Alex's message, a queued run and its `agent.invocation`.
    *
+   * With `command` the run is the run of a model command (`trigger_kind = command`): the
+   * payload names the command and the invocation instead of the message, and every token of
+   * the run names the command (09 10.4).
+   *
    * @param text - The message content.
+   * @param command - The command of a model command run.
    * @returns The run.
    */
-  trigger(text: string): RunRecord {
+  trigger(text: string, command?: CommandDoc): RunRecord {
     const threadId = uuidv7();
     const message = this.message(threadId, this.alex, text);
     const run = new RunRecord(
@@ -659,11 +668,21 @@ export class World {
       channel_id: this.channelId,
       space_id: this.spaceId,
       trigger_kind: "message",
-      message_id: message.id,
       triggered_by: this.alex.ref(),
       billing_mode: this.billingMode,
       settings_version: this.settingsVersion,
     };
+    if (command === undefined) {
+      payload.message_id = message.id;
+    } else {
+      run.triggerKind = "command";
+      run.triggerObject = command.id;
+      payload.trigger_kind = "command";
+      payload.command_invocation_id = uuidv7();
+      payload.command_id = command.id;
+      payload.command_name = command.name;
+      payload.options = [];
+    }
     const envelope = this.envelope("agent.invocation", payload, {
       resource: { kind: "run", id: run.id },
       threadId,
@@ -817,8 +836,8 @@ export class World {
   invocationClaims(run: RunRecord): InvocationClaims {
     const claims = this.claims(
       run.triggeredBy,
-      "message",
-      run.triggeringMessageId,
+      run.triggerKind,
+      run.triggerObject ?? run.triggeringMessageId,
       run.threadId,
     );
     return { iss: this.instanceId, jti: uuidv7(), ...claims, run_id: run.id };
@@ -850,8 +869,8 @@ export class World {
     let sub: string;
     if (entry.type === "agent.invocation") {
       [kind, obj, sub] = [
-        "message",
-        payload.message_id as string,
+        payload.trigger_kind as "message" | "command",
+        run?.triggerObject ?? (payload.message_id as string),
         run?.triggeredBy ?? this.alex.id,
       ];
     } else if (entry.type === "agent.followup") {
@@ -1255,9 +1274,13 @@ export class World {
    *
    * @param runId - The run.
    * @returns The context.
+   * @throws {@link FakeProblem} `500 internal_error` for the run of a model command.
    */
   context(runId: string): RunContextDoc {
     const run = this.runOr404(runId);
+    // The server defines the context for a triggering message only (09 4.6) and answers a run
+    // of any other trigger kind with 500.
+    if (run.triggerKind !== "message") throw new FakeProblem("internal_error");
     const items = (this.threads.get(run.threadId) ?? []).map((id) =>
       this.contextItem(this.messages.get(id) as MessageDoc, run),
     );
