@@ -41,7 +41,10 @@ Platform runs (V1-13), read from run 42556146760 of 2026-11-09 on commit `7c46cb
   earlier tests stay behind or the system drive of the runner is too small for the suite.
 - macOS: the tests after `TestPlatform_EntryScanMeasurement` have never run on a hosted runner.
 - No run on a Windows 10 or Windows 11 machine is recorded (M2 exit criterion 8, TM-T29 (i)).
-- A failed scheduled run of `host-platform.yml` reports to nobody.
+- Done by AUD-misc-testing-01: a failed scheduled run of `host-platform.yml` reported to nobody;
+  `red-runs.yml` now opens the issue "Red runs of host-platform.yml" for it.
+- More for this row in [AUD-misc-testing-01.md](AUD-misc-testing-01.md), "Open": the unit tests
+  of the other packages on Windows, a run on Windows 11, the suite as a job of pull requests.
 
 Native code:
 

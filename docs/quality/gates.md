@@ -362,7 +362,8 @@ What reruns (`tools/ci/flakes.py`, tests `tools/ci/tests/test_flakes.py`):
   (`test_ci_sets_the_base_of_a_pull_request_and_fetches_it_for_every_go_test`).
 * Not rerun: `perf` (not in CI; a budget miss must not pass on a second try), the platform
   suite of the host service (`make -C services/host platform-test`, it changes the machine), the
-  JVM tests and the Python and TypeScript tests.
+  JVM tests and the Python and TypeScript tests. A job that fails for one of them on `main` or
+  in a scheduled run is listed in the issue of its workflow (section "Red runs").
 
 What still fails:
 
@@ -436,12 +437,53 @@ What tells a maintainer about a red run:
   notifications for GitHub Actions switched on.
 
 The scheduled workflows are `advisories.yml`, `codeql.yml`, `docs.yml`, `e2e-desktop.yml`,
-`e2e-mobile.yml`, `flakes.yml`, `hermes-pin.yml`, `host-platform.yml` and `scorecard.yml`
+`e2e-mobile.yml`, `flakes.yml`, `hermes-pin.yml`, `host-platform.yml`, `red-runs.yml` and
+`scorecard.yml`
 (`tools/docs/tests/test_red_runs_doc.py` holds this list to the workflows with a `schedule`
-trigger). A red run of one of them, or of `ci.yml` on `main`, opens no issue: until a maintainer
-looks at the Actions page it reaches at most that one person. An alert for these runs after the
-pattern of `denylist-main.yml` is not built; ruling AUD-CG1/7 in
-`docs/decisions.d/AUD-misc-ci-gates-01.md` names the open question.
+trigger). A red run of one of them, or of `ci.yml` on `main`, opens no issue today: until a
+maintainer looks at the Actions page it reaches at most that one person.
+
+The alert for these runs is built and switched off. Whether a workflow may write public issues
+for red runs without a person in between is a question for the owner (ruling AUD-CG1/7 in
+`docs/decisions.d/AUD-misc-ci-gates-01.md`; docs/decisions.d/AUD-misc-testing-01.md, ruling 11).
+The scheduled workflow `red-runs.yml` runs `tools/ci/red_runs.py report` every hour (tests
+`tools/ci/tests/test_red_runs.py`). Until the repository variable `BOTHY_RED_RUN_ISSUES` is
+`true` it passes `--dry-run`: the tool reads the runs and the issues, writes nothing, and
+prints to the log of its job the red runs with the `gh` commands it would run. With the
+variable set it does what the rest of this section describes:
+
+* Watched are the scheduled runs of every workflow with a `schedule` trigger and the pushes to
+  `main` of `ci.yml` (`MAIN_PUSH_WORKFLOWS` in `tools/ci/check_runners.py`), the full suite of a
+  change after its merge. The tool reads both sets from `.github/workflows`, so a new scheduled
+  workflow is watched without a change
+  (`test_every_scheduled_workflow_and_the_push_to_main_of_ci_is_watched`). `denylist-main.yml`
+  reports its own failed scan (job `alert`). Runs of a pull request and runs started by hand
+  are not read: the person who started them sees them.
+* Red is a run that ended as `failure`, `timed_out` or `startup_failure`, and a run that GitHub
+  lists as `cancelled` when one of its jobs ran and did not pass. GitHub cancels a job that
+  reaches its `timeout-minutes` and then lists the whole run as cancelled, also when another
+  job of it failed. A run cancelled before a job started (a newer push took the place of a
+  waiting run) is not red.
+* Each workflow has one issue, `Red runs of <file>` with the label `red-run`
+  (`.github/labels.yml`), opened by its first red run. Every red run adds one comment with its
+  jobs that did not pass and their steps that did not pass, linked to the job pages. The tool
+  reads no log: the failed test is on the job page. The issue body lists the jobs, the most
+  frequent first. For `ci.yml` that is the list of the jobs that make `main` red, whatever
+  their tests are written in; the flake list above holds only the Go and Dart tests that passed
+  in a rerun.
+* The workflow closes an issue when the newest watched run of its workflow passed and no run
+  failed for `AGE` of `red_runs.py`. The next red run opens a new issue. An issue closed by hand
+  keeps its runs reported.
+* The workflow reads the runs created in the window its `--hours` names and uses only the
+  `GITHUB_TOKEN` (`actions: read`, `issues: write`; the job holds the second also while the
+  variable is unset, because a permission cannot depend on a variable). Only the comments it
+  wrote itself count as reported, so a comment of someone else hides no run.
+* The issue is the open item of its workflow: a maintainer of the area takes it
+  ([GOVERNANCE.md](../../GOVERNANCE.md)).
+
+Not covered: a red run created before the window when the workflow did not run for longer than
+that; a failed run of `red-runs.yml` itself until a later run of it passes; a workflow whose
+file was removed while its issue was open (close that issue by hand).
 
 ## Advisories
 
@@ -644,7 +686,7 @@ or the pre-push hook:
 | `console-e2e` | SEC-T05: the web console of the server image under its CSP in Chromium, Firefox and WebKit against the Compose smoke stack (`tools/console-e2e`, M6-03) | CI job `console-e2e` of `ci.yml` and `build-verify.yml` when the plan lists it ("Jobs a change needs"), feeding `ci-ok` and `build-verify-ok` |
 | `alert-e2e` | 17 10: the alert path end to end against the Compose smoke stack with the profile `observability` (`tools/observability/alert_e2e.py`, M7-20): Alertmanager refuses to start without its URL files, the owner sets up the channel "Operations", app and incoming webhook with step-up, `alert-setup.sh` writes the URLs, a test rule fires and resolves; the channel shows firing and resolved messages with origin `app`, the external stub gets only the `page` alert, the heartbeat stub the Watchdog | before a release and on a change of `infra/observability/alertmanager`, `infra/compose/alert-setup.sh` or the incoming webhooks; locally, needs `make image`; most of its run time is the `group_interval` of Alertmanager before the resolved message |
 | `showcase` | `make showcase PLATFORM=<platform>[,...]` (`tools/showcase/capture.py`, M7-28): the demo instance of `make demo` started, the apps captured inside the app through Flutter's image API (`apps/client/e2e_test/showcase`, both themes, on Android also the video of one flow with the emulator's screen recorder), the console and the Grafana panel plugin in headless Chromium, every file stripped of metadata and filed with its manifest entry, the demo removed; refuses a working tree with changes outside `docs/assets/showcase` | by hand on a build host with Docker next to the platform (the Windows app on a host that runs it, D-W-128); after a change of a shown view |
-| `e2e-desktop` | 15 20 "E2E on devices": the desktop app against the real server of the Compose stack of `infra/compose/e2e.sh` (installation file, smoke overlay and `test/compose.e2e.yaml` with a TLS front on `127.0.0.1`, the world job and the Fake-Agent), one test per flow of `apps/client/e2e_test` (M4-34): on the host's desktop system through `flutter drive`, headless with `E2E_DEVICE=flutter-tester`; then its terminal part `e2e-desktop-terminal`; the stacks and their temporary data are removed after the run, and the target fails when either part failed | before a release and at the close of M4; locally, needs `make image`, Go, a Docker engine and for the device run a desktop session |
+| `e2e-desktop` | 15 20 "E2E on devices": the desktop app against the real server of the Compose stack of `infra/compose/e2e.sh` (installation file, smoke overlay and `test/compose.e2e.yaml` with a TLS front on `127.0.0.1`, the world job and the Fake-Agent), one test per flow of `apps/client/e2e_test` (M4-34): on the host's desktop system through `flutter drive`, headless with `E2E_DEVICE=flutter-tester`; then its terminal part `e2e-desktop-terminal`; the stacks and their temporary data are removed after the run, and the target fails when either part failed | headless every night on a Linux runner (job `headless` of `.github/workflows/e2e-desktop.yml`, not a pull request check; docs/decisions.d/AUD-misc-testing-01.md); on a desktop before a release and at the close of M4, locally; needs `make image`, Go, a Docker engine and for the device run a desktop session |
 | `e2e-desktop-terminal` | 15 20 and 23.5 row "E2E" (M4-38): `tools/ci/terminal_stack.py --mode e2e` starts the client stack of the terminal (the stack of M2-48 with its TLS front and one host container, installed but not paired; the helper checks that the server knows no host and that only the TLS front publishes a port) and runs `apps/client/e2e_test/terminal_e2e_test.dart`: Alex pairs the host through the administration (the code goes to the helper's loopback endpoint, which runs `bothy-host pair` in the host container of the project), opens a shell with the step-up, runs a command, detaches, reattaches with the scrollback, exits with a code and ends the tab; the canary he typed is in none of the app's paths and none of the stack's logs, database dump, collector export or host journal | with `e2e-desktop`; on its own after a change of the terminal or the client stack |
 | `e2e-mobile` | 15 20 "E2E on devices" for the phone apps (M5-11): `tools/e2e/mobile_e2e.py` starts the Compose stack of `infra/compose/e2e.sh` with the overlay `test/compose.e2e-mobile.yaml` (the E2E server build of the Go build tag `e2e`, whose push goes to the fake APNs and FCM providers of the service `fakepush`; their capture endpoint is the only extra published port, on `127.0.0.1`), an iOS simulator it creates and an Android emulator from an AVD (or the ones named by `MOBILE_E2E_UDID` and `MOBILE_E2E_SERIAL`), and runs the `patrol` suites of `apps/client/e2e_test/phone` per platform: login (address, password and TOTP, the device confirmed by a second session), the push permission dialog, a push from Sam that the runner's relay hands to the device (the Android service fetches its text from the real server; the iOS simulator shows the payload's text, its `simctl push` runs no Notification Service Extension), tapping it to the thread, sharing an image from the system share sheet, sending offline with delivery after the reconnect; then the terminal suite of M5-13 against the terminal stack of `services/server/test/terminal/clientstack` (mode `mobile`: a real host service in a container, paired through the API, needs Go): opening from M9 with the step-up, Ctrl+C from the extra keys bar, the reattach with the scrollback after a network loss, no terminal content in the app switcher picture, the reattach within `terminal.quick_reattach_window` without and after it with the step-up; a platform whose tools are missing prints a SKIP line, the target fails when no platform ran; stacks (the host container among them), devices it started and temporary data are removed after the run, also after a failing suite | nightly for Android (`.github/workflows/e2e-mobile.yml`, not a pull request check), both platforms on a macOS host with Docker, Xcode and the Android SDK before a release and at the close of M5; needs `make image` |
 | `perf-desktop` | 15 19: the desktop targets `client.perf.*` from `AppConfig` measured in a profile build against the same stack (`apps/client/perf_test`, M4-34), then the terminal targets of `perf-desktop-terminal` added to the same summary; writes `apps/client/build/perf/summary.json` with the device (`PERF_DEVICE_LABEL`, `PERF_REFERENCE=1` on a reference device) and fails when a target is missed | before a release and at the close of M4; on a reference device of 15 19 |
