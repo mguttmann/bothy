@@ -517,9 +517,10 @@ all texts of the YAML files (R-API-15); every response component names its statu
    our own ruling [derived].
 3. Exhausted: `429 rate_limited` with `Retry-After` (RFC 9110). Clients wait at least that long
    and add the jitter of their backoff, so clients refused together do not return together
-   (04, 13.2; addendum of 2026-10-30). At the gateway only `rl.gateway_connect` closes
-   with `4008`, on `identify` and `resume`; every other op answers `error` with `rate_limited`,
-   and the connection stays open (04, 6.2 and 6.4).
+   (04, 13.2; addendum of 2026-10-30). At the gateway only `rl.gateway_connect` and, after
+   failed credential checks from the client address, `rl.public_auth` close with `4008`, on
+   `identify` and `resume`; every other op answers `error` with `rate_limited`, and the
+   connection stays open (04, 6.2 to 6.4).
 4. If the headers change when the draft becomes an RFC, the server also sends the new names
    for `api.deprecation_min_notice` (section 13).
 5. Rounding (M1-19): `r` is the number of whole tokens left after the decision, rounded down;

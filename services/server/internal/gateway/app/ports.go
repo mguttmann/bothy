@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"net/netip"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
@@ -54,6 +55,18 @@ type NonceSource interface {
 // an actor with neither device nor token.
 type ConnectLimiter interface {
 	AllowConnect(a actor.Actor) (allowed bool, retryAfterSeconds int, err error)
+}
+
+// CredentialLimiter is the failed-credentials rule of 02 9.1 on the gateway (05 section 3: the
+// class rl.public_auth additionally counts every failed check of presented credentials), keyed by
+// the client address of the upgrade. ReserveCredentials reserves one token before the credentials
+// of identify, resume or reauth are checked. ok false means the bucket is empty: the check must
+// not run, and retryAfterSeconds names the wait. Otherwise settle must be called exactly once:
+// failed true keeps the token, false gives it back, so valid credentials cost nothing. Reserving
+// before the check keeps concurrent connections from all passing on the same token. It is safe
+// for concurrent use.
+type CredentialLimiter interface {
+	ReserveCredentials(ip netip.Addr) (ok bool, retryAfterSeconds int, settle func(failed bool))
 }
 
 // EpochSource reads the current sync epoch of the instance for hello (instance.sync_epoch).

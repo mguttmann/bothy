@@ -16,15 +16,25 @@ import (
 // session, or a credential that is no person's access token, closes with 4004; then
 // gateway.connect is authorized (a revoked session closes with 4012). Success takes over the new
 // expiry, so the next reauth_required and the 4011 follow it. reauth consumes nothing of
-// rl.gateway_connect (05 section 3).
+// rl.gateway_connect (05 section 3). Its credential check runs under the failed-credentials rule
+// of 02 9.1 like the one of identify (reserveCredentials): a rejected token or proof, a token that
+// is not the session's and a credential the authenticator reports inactive without an error (the
+// session, device or device key was revoked since identify) keep one token of rl.public_auth of
+// the client address, and with that bucket empty reauth answers error rate_limited with
+// retry_after=<seconds> without a check.
 func (g *Gateway) reauth(ctx context.Context, c *Connection, d any) error {
 	in, ok := d.(Reauth)
 	if !ok {
 		return closeWith(domain.CloseDecodeError)
 	}
 	s, _ := c.current()
+	settle, wait, ok := g.reserveCredentials(ctx)
+	if !ok {
+		return &OpError{Code: string(errs.CodeRateLimited), Detail: retryAfter(wait)}
+	}
 	a, err := g.authenticate(ctx, in.AccessToken, in.DPoP)
 	if err != nil {
+		settle(credentialFailed(err))
 		if e, ok := errs.As(err); ok && e.Kind() == errs.KindUnauthenticated {
 			return &OpError{Code: string(e.PublicCode())}
 		}
@@ -33,8 +43,11 @@ func (g *Gateway) reauth(ctx context.Context, c *Connection, d any) error {
 	var same bool
 	g.sessions.update(func() { same = a.ID == s.PrincipalID && a.DeviceID == s.DeviceID && a.SessionID == s.AuthSessionID })
 	if a.Kind != actor.KindUser || !a.TokenID.IsZero() || !same {
+		settle(true)
 		return closeWith(domain.CloseAuthenticationFailed)
 	}
+	// An inactive credential counts as failed, as in connect; authorize closes with 4012 below.
+	settle(a.CredentialInactive)
 	if err := g.authorizeConnect(actor.WithActor(ctx, a), a); err != nil {
 		return err
 	}

@@ -765,10 +765,11 @@ func TestCommandAutocomplete(t *testing.T) {
 		}
 		a = w.answer(w.lotse, req, []any{choice("bad\u0007name", "x")})
 		wantProblem(t, a.code, a.body, http.StatusBadRequest, "validation_failed", "", "/choices/0/name", "control_character")
-		// The op variants answer error frames with the same codes and keep the connection.
+		// The op variants answer error frames with the same codes and keep the connection; detail
+		// names the first field error in the one form of 04 6.2, "<pointer>: <code>".
 		sendResult(t, c, req, []any{choice("bad\u0007name", "x")}, "r1")
 		if _, e, ok := w.nextAC(c); !ok || e == nil || e.Code != "validation_failed" || e.Ref != "r1" ||
-			e.Detail != "/choices/0/name control_character" {
+			e.Detail != "/choices/0/name: control_character" {
 			t.Fatalf("op error %+v", e)
 		}
 		if a := w.answer(w.lotse, req, []any{choice("First", "1")}); a.code != http.StatusNoContent {

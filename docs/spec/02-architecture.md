@@ -853,7 +853,10 @@ credentials fails (`401` except `token_expired` and `use_dpop_nonce`, which are 
 the request consumes a token from `rl.public_auth` of the client IP. If this bucket is empty,
 step 7 answers requests with credentials from this client IP with `429`, without checking the
 credentials (05, section 3). Reason: every check costs a signature verification, and without
-this rule it would be unbounded.
+this rule it would be unbounded. The WebSocket channels apply the same rule to the credentials
+presented on the connection, with the same bucket: the gateway to `identify`, `resume` and
+`reauth` ([04-sync-protocol.md](04-sync-protocol.md), section 6.3 step 1), the terminal channels
+to theirs ([24-terminal.md](24-terminal.md), section 6.3).
 
 The internal listener (3.2) serves only the two operations with action `webhook_in.post`, through
 a chain of its own with the same per-route steps: it has no trusted proxies, so the client IP of
@@ -1032,7 +1035,7 @@ Rules of the frame (M2-01, [DECISIONS.md](../DECISIONS.md) D-M2-01-1 to D-M2-01-
 | `agent.presence_changed` | `agents` (heartbeat) | directly to the hub | `NOTIFY ephemeral` with agent ID and state |
 | Replacement of a device connection (`4017`, 04 section 6.1) | `gateway` (`identify`, `resume`) | directly to the older connection | `NOTIFY ephemeral` with device ID and gateway session |
 | `stats.live` | `stats` (builder of the node, one base frame per `stats.live_interval`) | filtered per subscribed connection and offered to that one connection | built on every node from its own subscriptions and the shared tables; no cross-node path (rates come from `stats_minutes`, the member `connections` is left out, 25 section 5.2) |
-| `notification.created` | `notify` (job `notify.gateway_send`) | directly to the hub (role `all`) | `NOTIFY ephemeral` with recipient, notification ID, kind code, `quiet`, `count` and the thread, message and target IDs; the node that holds a connection of the recipient sends the hint. A separate `worker` sends it this way in every `cluster.mode` (M7-17) |
+| `notification.created` | `notify` (job `notify.gateway_send`) | directly to the hub (role `all`) | `NOTIFY ephemeral` with recipient, notification ID, kind code, `quiet`, `count` and the thread, message and target IDs; the node that holds a connection of the recipient builds the preview fields again (13 6.3) and sends the hint. A separate `worker` sends it this way in every `cluster.mode` (M7-17) |
 
 Reason: R-Stack allows `LISTEN/NOTIFY` only as a wake-up signal without content. Run contents
 therefore do not go through `NOTIFY`; the receiving node reads them from the database. A single
@@ -1059,6 +1062,11 @@ As built (M7-17, docs/decisions.d/M7-17.md D-M7-17-1 to D-M7-17-5):
 - `typing.started` is rebuilt on the receiving node with the place of the thread and
   `expires_at` = now plus `sync.typing_ttl`; `run.updated` goes into the coalescer of the
   receiving node, which sends the run document as `snapshot` at the end of its window.
+- `notification.created` is rebuilt on the node that holds a connection of the recipient: the
+  place of the thread, and the preview fields of the recipient's `notify.preview_mode` from the
+  preview builder of `notify`, read from the database on that node (13 6.3). No name and no
+  excerpt goes through `NOTIFY`. The node reads the fields only of a message that lies in the
+  thread the signal names, the thread its hub checks: the IDs of a signal are no checked pair.
 - Device replacement: every binding of a device's session to a connection gets a UUIDv7; the
   node that holds an older binding of the device under another gateway session closes it with
   `4017`.
@@ -1073,6 +1081,13 @@ As built (M7-17, docs/decisions.d/M7-17.md D-M7-17-1 to D-M7-17-5):
   nodes (a second one closes the first with `4015`), so with several api nodes autocomplete
   answers only requests that reach the node of that connection; a design across nodes is open
   (D-M7-17-5).
+- `agent.interview_requested` (26 6.1) and `search.assist_requested` (14 4.10) stay on their
+  node for the same reasons: each goes to one live connection of its agent in the process of the
+  request, the open request lives in the memory of that process, and the agent's answer over REST
+  must reach it. On a node without a connection of the agent the request falls back at once
+  (`builder_offline`, `assistant_unavailable`), and an answer that reaches another node gets
+  `404`. So with several api nodes both features work only for requests and answers that reach
+  the node of the agent's connection.
 
 Terminal signals (M2-47, D-M2-47-3, D-M2-47-4; [24-terminal.md](24-terminal.md), section 9). The
 module `terminal` sends its own internal signals on the channel `ephemeral`: `terminal.session_open`

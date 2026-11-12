@@ -32,8 +32,8 @@ connections.
   `identify`, `resume`, `heartbeat` and `reauth`; the op registry `Dispatcher`
   (`Register(op, action, handler)`), which closes with `4000` and raises the alarm when a successful
   handler did not call `authorize` with its action; the session store `Sessions` with its
-  sweeper; the ports `Conn`, `FrameDecoder`, `NonceSource`, `ConnectLimiter`, `EpochSource`,
-  `ProofAlarm`, `Delivery`, `OpLimiter` and `Threads`; `Hub` (the implementation of `Delivery`:
+  sweeper; the ports `Conn`, `FrameDecoder`, `NonceSource`, `ConnectLimiter`, `CredentialLimiter`,
+  `EpochSource`, `ProofAlarm`, `Delivery`, `OpLimiter` and `Threads`; `Hub` (the implementation of `Delivery`:
   indices, `Dispatch`, `CloseAll`), the catch-up runner (`catchup.go`), revocation
   (`revocation.go`) and shutdown (`shutdown.go`); the handlers of `focus` (`focus.go`),
   `typing.start` and `typing.stop` (`typing.go`), the thread index with focus pruning
@@ -41,8 +41,9 @@ connections.
   (`ephemeral.go`).
 - `adapters/ws/`: the HTTP handler of `GET /api/v1/gateway` with `github.com/coder/websocket`
   (the only package of the server that imports it), one reader, one writer and one deadline
-  goroutine per connection, the frame codec on the generated `Gateway*` types of `api/rest`, the
-  span `gateway.connect`.
+  goroutine per connection, the frame codec on the generated `Gateway*` types of `api/rest`
+  (`TestDecode_EveryPropertyReachesTheFrame` holds that every property of a body schema of an
+  enabled op reaches the frame of `app`), the span `gateway.connect`.
 - `app/metrics.go`, `adapters/otelmetrics/` (M1-68): the outbound port `Metrics` and its
   implementation with the declarations of the metric registry, see "Metrics".
 - `adapters/wstest/`: the gateway test harness, the only WebSocket client of the tests (`Dial`,
@@ -55,10 +56,24 @@ connections.
    forbidden` (SEC-CORS-3), and so does a request with the console cookie
    `__Host-console_session` and no `Origin` (M6-01); nothing else is checked. Compression is off.
 2. `hello` with `heartbeat_interval_ms`, `resume_window_ms`, `protocol_versions`, the current DPoP
-   nonce, `server_time` and `sync_epoch`.
+   nonce, `server_time` and `sync_epoch`. The epoch is read from the instance row until one read
+   succeeded and then kept for the life of the process (`Gateway.syncEpoch`), so a later upgrade
+   reads no database: only `bothy restore finalize` sets a new epoch, and it refuses to run while
+   a server process is connected.
 3. `identify` or `resume` within `sync.identify_timeout`: token and proof are checked by the
    Authenticator of identity with method `GET` and the HTTPS form of the gateway URL as `htu`;
    then `rl.gateway_connect` per device or token, then `authorize(gateway.connect, instance)`.
+   The credential check of `identify`, `resume` and `reauth` runs under the failed-credentials
+   rule of 02 9.1 (port `CredentialLimiter`, `app/identify.go`): one token of `rl.public_auth` of
+   the client address is reserved before the check and kept when it fails (a rejected token or
+   proof, a revoked session, a device or session that is not the token's; not `token_expired`,
+   not `use_dpop_nonce`, not an error of identity). A credential the Authenticator reports
+   inactive without an error (`actor.Actor.CredentialInactive`: a revoked or expired API token,
+   a revoked session, device or device key) is a failed check too, although only `authorize`
+   refuses it afterwards; a refusal of `authorize` for an active credential is not. While the
+   bucket is empty no check runs:
+   `identify` and `resume` close with `4008` and `retry_after=<seconds>`, `reauth` answers
+   `error` with `rate_limited` and the same text as `detail`.
 4. `ready` with the snapshot of `sync` (delivery is registered before the head is read), or
    `resumed`; with a cursor, catch-up decides between delivery from the cursor and
    `resync_required` (the connection stays live from the head).
@@ -322,6 +337,17 @@ for `validation_failed`, `forbidden`, `not_found`, `conflict`, `base_version_con
   `push.deliver`; its candidates are the connections of the audience. `sync.Admit` admits a hint
   with resource `thread` through `push.deliver` on the thread and a hint without a thread
   (resource `user`) only on connections of that person (D-M3-23-6).
+- A hint that reaches this node as a signal (a separate worker, another api node) carries IDs
+  only. `Cluster.applyHint` builds its preview fields again through the port `HintPreviews`, which
+  `internal/wire` implements with the preview builder of `notify` (`PreviewBuilder.HintFields`,
+  the rule of the job `notify.gateway_send`; 13 6.3), before the hub admits each connection. A
+  failed read sends the hint with its IDs and logs `gateway hint sent without its preview` with
+  the signal kind and the error kind.
+- The hub admits such a hint on the thread the signal names, or on the recipient alone when it
+  names none, and every database role that may connect can send on the channel. `applyHint`
+  therefore asks the port only for a hint with a thread and a message and passes both; the port
+  gives no field for a message outside that thread (AUD-SG1/9). Such a hint still goes out with
+  its IDs.
 
 ## Several api nodes (M7-17)
 
@@ -335,8 +361,9 @@ docs/spec/02-architecture.md 11.6 and 16, docs/decisions.d/M7-17.md.
   sender of the device and consumer signals (`app.ClusterSignals`), and the gateway's route of
   the one `LISTEN ephemeral` connection of the process (`platform/pg.EphemeralListener`): it
   ignores its own node and rebuilds each signal for the hub (typing with the place of the thread
-  and `expires_at`, hints with the audience), the coalescer (`run.updated` with snapshot), the
-  sessions (`4017`) or the consumer engine (`4015`).
+  and `expires_at`, hints with the audience, the place of the thread and the preview fields of
+  the port `HintPreviews`), the coalescer (`run.updated` with snapshot), the sessions (`4017`) or
+  the consumer engine (`4015`).
 - Device replacement: `Sessions.bind` gives every binding of a device a UUIDv7 bind ID;
   `Gateway.DeviceTaken` closes the local connection of the device with `4017` when it belongs to
   another session and its binding is older.
@@ -355,7 +382,11 @@ docs/spec/02-architecture.md 11.6 and 16, docs/decisions.d/M7-17.md.
   of it; role `api` always listens and writes presence and sends signals with `multi`; role
   `worker` reads the table and sends hints; role `all` with `multi` does everything.
 - `command.autocomplete_requested` stays on its node (it carries a token); without a connection
-  of the agent on that node the request ends with an empty result.
+  of the agent on that node the request ends with an empty result. `agent.interview_requested`
+  and `search.assist_requested` stay on their node too: the open request lives in the memory of
+  the process that took it, so it falls back at once on a node without a connection of the agent,
+  and an answer that reaches another node gets `404` (02 11.6,
+  [multi-node.md](../../../../docs/operations/multi-node.md) sections 4 and 6).
 
 ## Metrics (M1-68)
 
@@ -442,8 +473,12 @@ connection with `agent.events.consume` on the owner in delivery mode (no audit) 
 The op `command.autocomplete_result` (`app/autocomplete.go`, `Deps.Autocomplete`) counts
 `rl.agent_runtime` for the principal first, then calls `runs.CommandExec.AnswerAutocomplete`. A
 success sends no frame; a failure answers `error {op, code, detail, ref}` and keeps the connection
-(`detail` names pointer and code of the first field error, never a value); a credential revoked
-since identify closes with `4012`. The dispatcher's proof applies only to successful ops.
+(`detail` is `<pointer>: <code>` of the first field error, the form of `run.update`, never a
+value); a credential revoked since identify closes with `4012`. The dispatcher's proof applies
+only to successful ops.
+
+The forms of `detail` of every `error` frame are listed in 04 6.2; `app/errors.go` holds the two
+shared ones (`retryAfter`, `fieldDetail`).
 
 ## Close codes owned
 

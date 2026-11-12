@@ -54,9 +54,9 @@ type hintPayload struct {
 //     for security and admin gives no_access; a kind with a thread reads the thread's current
 //     place for the scope; a kind with a message builds the preview fields of the recipient's
 //     notify.preview_mode (M3-22 design note 9 f: none builds nothing, an unknown, deleted, run or
-//     system message builds nothing and the event still goes out; no message.read, because the
-//     thread was just checked with push.deliver, and no image_url, because a fetch ticket needs a
-//     session);
+//     system message builds nothing and the event still goes out, and so does a message that
+//     does not lie in the thread of the job; no message.read, because the thread was just checked
+//     with push.deliver, and no image_url, because a fetch ticket needs a session);
 //  2. outside any transaction: without a publisher in this process (role worker) the skip
 //     no_registration and one Warn line per process; otherwise notification.created with the
 //     recipient as audience, published once.
@@ -111,24 +111,13 @@ func (p *Push) GatewaySend(ctx context.Context, job GatewayJob) error {
 }
 
 // hintPreview builds the preview fields of a gateway hint (M3-22 design note 9 f) after the
-// push.deliver check of step 1: only for a kind with a message and a set MessageID, by the
-// recipient's notify.preview_mode; none, an unknown, deleted, run or system message and a push
-// path without a builder give no field. The image stays out in every mode.
+// push.deliver check of step 1 with the rule of PreviewBuilder.HintFields; a push path without a
+// builder gives no field.
 func (p *Push) hintPreview(ctx context.Context, job GatewayJob) (PreviewFields, error) {
-	if p.d.Preview == nil || !domain.PreviewKindAllowed(string(job.Kind)) || job.MessageID.IsZero() {
+	if p.d.Preview == nil {
 		return PreviewFields{}, nil
 	}
-	mode, err := p.d.Preview.Mode(ctx, job.RecipientID)
-	if err != nil || !mode.ShowsNames() {
-		return PreviewFields{}, err
-	}
-	m, found, err := p.d.Preview.Message(ctx, job.MessageID)
-	if err != nil || !found {
-		return PreviewFields{}, err
-	}
-	f, err := p.d.Preview.Fields(ctx, mode, m)
-	f.FirstImage = ids.ID{}
-	return f, err
+	return p.d.Preview.HintFields(ctx, job.RecipientID, string(job.Kind), job.ThreadID, job.MessageID)
 }
 
 // jobKindGatewaySend is the value of the log key bothy.job.kind in the Warn line of GatewaySend;

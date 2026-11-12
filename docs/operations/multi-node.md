@@ -25,7 +25,9 @@ need nothing besides more `worker` containers (level 3).
 ## 3. The edge
 
 1. REST and the gateway (`/api/v1/gateway`) need no sticky sessions. A client that reconnects
-   on another node identifies again and catches up from its cursor.
+   on another node identifies again and catches up from its cursor. The exceptions are the
+   three features that work only on the node of their agent's connection (sections 4 and 6): no
+   edge rule covers them.
 2. Terminal streams need the hash rule of 16 4.4: both stream paths of a session go to the same
    node. `infra/compose/edge/nginx.conf` is the example.
 3. Rate limits count per node. With `n` nodes, divide the `ratelimit.*` values by `n`, or let
@@ -42,6 +44,7 @@ need nothing besides more `worker` containers (level 3).
 | A second connection of the same agent consumer | the cursor row (`holder_session_id`) and `NOTIFY ephemeral`; the older connection closes with `4015` | the older connection closes at its next save instead of at once; no event is delivered twice |
 | Desktop hints and the delay of mobile pushes | `gateway_presence`, written by every api node every `cluster.presence_flush_interval`, read by the worker; the hint goes to the node of the connection through `NOTIFY ephemeral` | `gateway presence not written` and `bothy.gateway.presence.write_failures`; after `cluster.presence_ttl` new hints count the desktop as offline; a delayed push keeps its release time |
 | Command autocomplete | stays on the node of the request | the request ends with an empty result when the agent has no connection on that node |
+| Interview of the agent builder, search assistant | stay on the node of the request: it goes to a gateway connection of the agent on that node (an agent consumer holds one connection across all nodes), and the open request lives in the memory of the node that took it | on every other node the interview falls back to the templates and the manual form (`builder_offline`) and the search answers with full text only (`assistant_unavailable`); an answer of the agent that reaches another node gets `404`, and the person's request ends with `builder_timeout` or `assistant_timeout` unless a valid answer still reaches the node that asked within the deadline |
 
 ## 5. Updates and failures
 
@@ -58,3 +61,11 @@ need nothing besides more `worker` containers (level 3).
 
 The integration tests run two api nodes and one worker in one test process behind an in-process
 edge. Behaviour behind a real load balancer and with more than two api nodes is not tested.
+
+Command autocomplete, the interview of the agent builder and the search assistant work only on
+the node that holds the gateway connection of their agent (section 4). No edge rule that keeps a
+person's request, the agent's connection and the agent's answer on one node is provided or
+tested: the gateway upgrade names no principal, so the edge cannot tell the agent's connection
+from any other. With several api nodes these three features answer only the share of requests
+that reaches the agent's node; a design across nodes is open (docs/decisions.d/M7-17.md
+D-M7-17-5).

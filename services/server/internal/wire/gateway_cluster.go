@@ -12,6 +12,7 @@ import (
 	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
@@ -87,15 +88,41 @@ func (s *server) nodeID() ids.ID {
 }
 
 // newGatewayCluster builds the cluster of an api or all process when its plan sends or receives
-// signals; nil otherwise. threads is the chat port of the places of rebuilt events.
+// signals; nil otherwise. threads is the chat port of the places of rebuilt events; the preview
+// fields of a rebuilt notification.created come from the preview builder of notify, which the
+// step sessions built before the routes (startPushRegistrations). Errors: a cluster without that
+// builder.
 func (s *server) newGatewayCluster(cfg GatewayConfig, threads gatewayapp.Threads) (*gatewayapp.Cluster, error) {
 	plan := s.gatewayPlan()
 	if !plan.Signals && !plan.Listener {
 		return nil, nil
 	}
+	s.mu.Lock()
+	regs := s.pushRegs
+	s.mu.Unlock()
+	if regs == nil || regs.Builder == nil {
+		return nil, errors.New("wire: the gateway cluster needs the preview builder of notify")
+	}
 	return gatewayapp.NewCluster(gatewayapp.ClusterConfig{Node: s.nodeID(), TypingTTL: cfg.TypingTTL}, gatewayapp.ClusterDeps{
-		Sender: gatewaypg.NewSignalSender(s.pool), Threads: threads, Clock: s.deps.Clock, Log: s.logger(),
+		Sender: gatewaypg.NewSignalSender(s.pool), Threads: threads, Previews: hintPreviews{b: regs.Builder}, Clock: s.deps.Clock,
+		Log: s.logger(),
 	})
+}
+
+// hintPreviews adapts the preview builder of notify to the preview port of the gateway cluster
+// (13 6.3): a node that builds notification.created again from a signal of another process fills
+// the preview fields with the rule of the job notify.gateway_send (PreviewBuilder.HintFields),
+// which gives the fields only of a message in the thread the signal names.
+type hintPreviews struct{ b *notifyapp.PreviewBuilder }
+
+// HintPreview implements gatewayapp.HintPreviews.
+func (h hintPreviews) HintPreview(ctx context.Context, recipient ids.ID, kind string, thread, message ids.ID) (gatewayapp.HintPreview, error) {
+	f, err := h.b.HintFields(ctx, recipient, kind, thread, message)
+	if err != nil {
+		return gatewayapp.HintPreview{}, err
+	}
+	return gatewayapp.HintPreview{SpaceName: f.SpaceName, ChannelName: f.ChannelName, ThreadTitle: f.ThreadTitle,
+		SenderDisplayName: f.SenderDisplayName, Excerpt: f.Excerpt, AttachmentCount: f.AttachmentCount}, nil
 }
 
 // startPresenceWriter starts the writer of gateway_presence over the hub of gw when the plan

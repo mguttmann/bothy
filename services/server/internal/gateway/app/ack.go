@@ -4,7 +4,6 @@ package app
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -41,7 +40,7 @@ func (g *Gateway) ack(ctx context.Context, c *Connection, d any) error {
 			return err
 		}
 		if !allowed {
-			return &OpError{Code: string(errs.CodeRateLimited), Detail: "retry_after=" + strconv.Itoa(retry)}
+			return &OpError{Code: string(errs.CodeRateLimited), Detail: retryAfter(retry)}
 		}
 	}
 	if err := g.d.Consumers.cursors().AcceptAck(ctx, s.Consumer, in.Seq, g.d.Consumers.AckHead(c)); err != nil {

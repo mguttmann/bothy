@@ -12,6 +12,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/runs"
@@ -29,6 +30,7 @@ const (
 	msgSignalDropped    = "gateway signal dropped"
 	msgSignalNotSent    = "gateway signal not sent"
 	msgSignalUnreadable = "gateway signal not applied"
+	msgHintNoPreview    = "gateway hint sent without its preview"
 	reasonMalformedSig  = "malformed"
 	logKeySignalKind    = "bothy.signal.kind"
 )
@@ -49,6 +51,9 @@ type ClusterDeps struct {
 	// Threads gives the place of a thread for the scope of a rebuilt event (chat); required on a
 	// node that receives (a process with a hub).
 	Threads Threads
+	// Previews builds the preview fields of a rebuilt notification.created (notify, 13 6.3); nil
+	// builds none, and the hint goes out with its IDs.
+	Previews HintPreviews
 	// Clock stamps rebuilt events; nil means clock.System().
 	Clock clock.Clock
 	// Log receives dropped and unsent signals, never a payload; nil means slog.Default().
@@ -178,7 +183,9 @@ type agentPresenceBody struct {
 }
 
 // hintBody is NotificationCreatedPayload as M3-23 fills it (notify): the nid, the kind, the
-// pointers, the quiet flag and the count; absent members are omitted, never null (ADR 0053).
+// pointers, the quiet flag and the count; absent members are omitted, never null (ADR 0053). It
+// names exactly the members a signal carries, so the preview fields of the event never cross
+// nodes (signalOf).
 type hintBody struct {
 	NID       ids.ID `json:"nid"`
 	Kind      string `json:"kind"`
@@ -187,6 +194,24 @@ type hintBody struct {
 	TargetID  ids.ID `json:"target_id,omitzero"`
 	Quiet     bool   `json:"quiet"`
 	Count     int64  `json:"count"`
+}
+
+// hintPreviewBody holds the preview members of NotificationCreatedPayload (13 6.3 and 6.4), each
+// omitted when empty; it is HintPreview with the member names of the payload.
+type hintPreviewBody struct {
+	SpaceName         string `json:"space_name,omitempty"`
+	ChannelName       string `json:"channel_name,omitempty"`
+	ThreadTitle       string `json:"thread_title,omitempty"`
+	SenderDisplayName string `json:"sender_display_name,omitempty"`
+	Excerpt           string `json:"excerpt,omitempty"`
+	AttachmentCount   int    `json:"attachment_count,omitempty"`
+}
+
+// rebuiltHint is the payload of notification.created as a receiving node sends it: the members
+// of the signal and the preview fields this node built.
+type rebuiltHint struct {
+	hintBody
+	hintPreviewBody
 }
 
 // DeviceBound announces that the session of a device is now bound to a connection of this node
@@ -335,15 +360,16 @@ func (c *Cluster) applyAgentPresence(ctx context.Context, s domain.Signal) error
 // applyHint publishes notification.created to the connections of the recipient on this node,
 // when it holds any: the job notify.gateway_send checked the rights after its commit, and the hub
 // admits each connection again (13 4.6 point 1, 6.3). A hint with a thread takes the thread's
-// place now as its scope.
+// place now as its scope. The signal carried IDs only, so this node builds the preview fields of
+// a hint with a message again (hintPreview) before the hub checks push.deliver for every
+// connection: a reader who lost access still gets no event and no name. The hub checks the thread
+// the signal names, so the preview is one of a message in that thread only (hintPreview).
 func (c *Cluster) applyHint(ctx context.Context, s domain.Signal) error {
 	if c.hub == nil || len(c.hub.membersOf(s.RecipientID)) == 0 {
 		return nil
 	}
 	ev := eventlog.EphemeralEvent{
 		Type: eventHint, SchemaVersion: hintSchema, Audience: s.RecipientID,
-		Payload: hintBody{NID: s.NotificationID, Kind: s.HintKind, ThreadID: s.ThreadID, MessageID: s.MessageID, TargetID: s.TargetID,
-			Quiet: s.Quiet, Count: s.Count},
 		Resource: eventlog.ResourceRef{Kind: resourceKindUser, ID: s.RecipientID},
 	}
 	if !s.ThreadID.IsZero() {
@@ -354,5 +380,31 @@ func (c *Cluster) applyHint(ctx context.Context, s domain.Signal) error {
 		ev.Resource = eventlog.ResourceRef{Kind: resourceKindThread, ID: s.ThreadID}
 		ev.Scope = eventlog.Scope{SpaceID: info.SpaceID, ChannelID: info.ChannelID, ThreadID: s.ThreadID}
 	}
+	ev.Payload = rebuiltHint{
+		hintBody: hintBody{NID: s.NotificationID, Kind: s.HintKind, ThreadID: s.ThreadID, MessageID: s.MessageID, TargetID: s.TargetID,
+			Quiet: s.Quiet, Count: s.Count},
+		hintPreviewBody: c.hintPreview(ctx, s),
+	}
 	return c.hub.PublishEphemeral(ctx, ev)
+}
+
+// hintPreview returns the preview fields of the hint s from the preview port: none without the
+// port and for a hint without a message. A hint that names a message and no thread gets none
+// either, and the port gives none for a message outside the thread s names: the hub admits a hint
+// on that thread, or on the recipient alone without one, and a signal can come from any role that
+// may connect to the database, so its thread and its message are not a checked pair. A failed
+// read gives none as well, with one Warn record that names the signal kind and the error kind
+// only: a signal is at most once (04 9 point 4), so the hint goes out with its IDs instead of
+// being lost.
+func (c *Cluster) hintPreview(ctx context.Context, s domain.Signal) hintPreviewBody {
+	if c.d.Previews == nil || s.ThreadID.IsZero() || s.MessageID.IsZero() {
+		return hintPreviewBody{}
+	}
+	p, err := c.d.Previews.HintPreview(ctx, s.RecipientID, s.HintKind, s.ThreadID, s.MessageID)
+	if err != nil {
+		c.d.Log.LogAttrs(ctx, slog.LevelWarn, msgHintNoPreview, slog.String(logKeySignalKind, string(s.Kind)),
+			slog.String(logKeyErrorType, errs.KindOf(err).String()))
+		return hintPreviewBody{}
+	}
+	return hintPreviewBody(p)
 }

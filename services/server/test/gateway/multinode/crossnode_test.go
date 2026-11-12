@@ -6,11 +6,14 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"maps"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	gatewaydomain "github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/harness"
@@ -228,6 +231,12 @@ func (c *cluster) phone(user string) {
 // gateway_presence: Alex's desktop gets notification.created on node b through NOTIFY ephemeral
 // and the phone's push is delayed, exactly as in role all. With the desktop idle, the next hint
 // pushes at once.
+//
+// The signal of the worker carries IDs only (02 11.6), so node b builds the preview fields of
+// Alex's notify.preview_mode again (13 6.3; audit of 2026-11-11, fn-push-notifications-1): the
+// first hint, in the default mode full, names the space, the channel, the thread and the author
+// and carries the excerpt; the second one, after Alex chose none, carries its IDs and nothing
+// else.
 func TestDesktopHintWithSeparateWorker(t *testing.T) {
 	t.Parallel()
 	c := newCluster(t)
@@ -243,10 +252,19 @@ func TestDesktopHintWithSeparateWorker(t *testing.T) {
 	c.post(nodeA, owner, threads[0], "The export is back")
 	hint, _ := c.waitDispatch(desk, "notification.created", nil)
 	var p struct {
-		NID string `json:"nid"`
+		NID               string `json:"nid"`
+		SpaceName         string `json:"space_name"`
+		ChannelName       string `json:"channel_name"`
+		ThreadTitle       string `json:"thread_title"`
+		SenderDisplayName string `json:"sender_display_name"`
+		Excerpt           string `json:"excerpt"`
 	}
 	if err := json.Unmarshal(hint.Payload, &p); err != nil || p.NID == "" {
 		t.Fatalf("notification.created on node b: %s %v", hint.Payload, err)
+	}
+	if p.SpaceName != "Support" || p.ChannelName != "Allgemein" || p.ThreadTitle != "Start Allgemein" || p.SenderDisplayName != "Owner" ||
+		p.Excerpt != "The export is back" {
+		t.Fatalf("notification.created on node b without the preview of the mode full: %s", hint.Payload)
 	}
 	var first []pushJob
 	testkit.Until(t, "the push job of the first hint", func() bool {
@@ -257,8 +275,17 @@ func TestDesktopHintWithSeparateWorker(t *testing.T) {
 		t.Fatalf("push jobs %+v, want one push delayed behind the active desktop for %s", first, p.NID)
 	}
 
+	c.must(nodeA, alex, http.MethodPut, "/me/settings/notify.preview_mode", map[string]any{"value": "none"}, http.StatusOK)
 	c.focus(desk, alex.PrincipalID, true)
 	c.post(nodeA, owner, threads[1], "The import is back")
+	second, _ := c.waitDispatch(desk, "notification.created", func(d dispatch) bool { return d.Scope["thread_id"] == threads[1] })
+	var members map[string]json.RawMessage
+	if err := json.Unmarshal(second.Payload, &members); err != nil {
+		t.Fatalf("notification.created on node b: %s %v", second.Payload, err)
+	}
+	if got, want := slices.Sorted(maps.Keys(members)), []string{"count", "kind", "message_id", "nid", "quiet", "thread_id"}; !slices.Equal(got, want) {
+		t.Fatalf("members %v of the hint in the mode none, want %v: %s", got, want, second.Payload)
+	}
 	var jobs []pushJob
 	testkit.Until(t, "the push job of the second hint", func() bool {
 		jobs = c.pushJobsFor(alex.PrincipalID)
@@ -266,6 +293,102 @@ func TestDesktopHintWithSeparateWorker(t *testing.T) {
 	})
 	if jobs[1].ReleaseSeq != 0 {
 		t.Fatalf("push job %+v with the desktop idle, want an immediate push", jobs[1])
+	}
+}
+
+// notifyHint sends a gateway.hint signal for recipient about message in thread on the channel
+// ephemeral, as a worker process does (02 11.6), and returns its notification ID. An empty thread
+// sends a signal that names none, which no job of the server sends.
+func (c *cluster) notifyHint(recipient, thread, message string) string {
+	c.t.Helper()
+	nid := ids.New()
+	s := gatewaydomain.Signal{
+		Kind: gatewaydomain.SignalHint, Node: ids.New(), RecipientID: ids.MustParse(recipient), NotificationID: nid, HintKind: "message",
+		MessageID: ids.MustParse(message), Count: 1,
+	}
+	if thread != "" {
+		s.ThreadID = ids.MustParse(thread)
+	}
+	payload, err := gatewaydomain.EncodeSignal(s)
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	if _, err := c.nodes[nodeA].AdminDB().Exec(context.Background(), `SELECT pg_notify('ephemeral', $1)`, string(payload)); err != nil {
+		c.t.Fatal(err)
+	}
+	return nid.String()
+}
+
+// TestHintSignalWithoutAccessGetsNoEvent (13 6.3, 02 11.6): the node that builds the preview of a
+// hint again still sends nothing to a reader without access. Sam reads Support/Allgemein and not
+// Support/Eskalation. A signal about a message in Eskalation reaches node b, where Sam's desktop
+// is live, and then one about a message in Allgemein: the first notification.created Sam gets is
+// the second hint, with the names of Allgemein, and no frame names Eskalation or its text.
+func TestHintSignalWithoutAccessGetsNoEvent(t *testing.T) {
+	t.Parallel()
+	c := newCluster(t)
+	sam := c.w.People["Sam"]
+	desk := c.connect(nodeB, sam)
+	c.focus(desk, sam.PrincipalID, false)
+	hidden := c.w.Messages["Support/Eskalation"]
+	open := c.w.Messages["Support/Allgemein"]
+	if len(hidden) == 0 || len(open) == 0 {
+		t.Fatalf("the world has %d messages in Eskalation and %d in Allgemein", len(hidden), len(open))
+	}
+	c.notifyHint(sam.PrincipalID, c.w.Threads["Support/Eskalation"], hidden[0])
+	want := c.notifyHint(sam.PrincipalID, c.w.Threads["Support/Allgemein"], open[0])
+
+	hint, f := c.waitDispatch(desk, "notification.created", nil)
+	var p struct {
+		NID         string `json:"nid"`
+		ChannelName string `json:"channel_name"`
+		Excerpt     string `json:"excerpt"`
+	}
+	if err := json.Unmarshal(hint.Payload, &p); err != nil || p.NID != want || p.ChannelName != "Allgemein" || p.Excerpt == "" {
+		t.Fatalf("the first notification.created of Sam is %s (%v), want the hint %s of Allgemein with its preview", hint.Payload, err, want)
+	}
+	if strings.Contains(string(f.D), "Eskalation") {
+		t.Fatalf("the frame names Eskalation: %s", f.D)
+	}
+}
+
+// TestHintSignalPreviewNeedsTheThreadOfTheMessage (13 6.3, 02 11.6): the hub admits a hint on the
+// thread its signal names, so the receiving node builds a preview only of a message in that
+// thread. Sam reads Support/Allgemein and not Support/Eskalation. Anybody who may connect to the
+// database can send on the channel ephemeral, so the signals here are ones no job of the server
+// sends: both are about a message in Eskalation, the first names no thread and the second the
+// thread of Allgemein. Each reaches Sam's desktop on node b with exactly its IDs: no name of the
+// place, no author and no text.
+func TestHintSignalPreviewNeedsTheThreadOfTheMessage(t *testing.T) {
+	t.Parallel()
+	c := newCluster(t)
+	sam := c.w.People["Sam"]
+	desk := c.connect(nodeB, sam)
+	c.focus(desk, sam.PrincipalID, false)
+	hidden := c.w.Messages["Support/Eskalation"]
+	if len(hidden) == 0 {
+		t.Fatal("the world has no message in Eskalation")
+	}
+	for _, v := range []struct {
+		name, thread string
+		want         []string
+	}{
+		{"a signal without a thread", "", []string{"count", "kind", "message_id", "nid", "quiet"}},
+		{"a signal with a thread that is not the message's", c.w.Threads["Support/Allgemein"],
+			[]string{"count", "kind", "message_id", "nid", "quiet", "thread_id"}},
+	} {
+		nid := c.notifyHint(sam.PrincipalID, v.thread, hidden[0])
+		hint, f := c.waitDispatch(desk, "notification.created", func(d dispatch) bool { return strings.Contains(string(d.Payload), nid) })
+		var members map[string]json.RawMessage
+		if err := json.Unmarshal(hint.Payload, &members); err != nil {
+			t.Fatalf("%s: notification.created on node b: %s %v", v.name, hint.Payload, err)
+		}
+		if got := slices.Sorted(maps.Keys(members)); !slices.Equal(got, v.want) {
+			t.Errorf("%s: members %v of the hint, want exactly its IDs %v: %s", v.name, got, v.want, hint.Payload)
+		}
+		if strings.Contains(string(f.D), "Eskalation") {
+			t.Errorf("%s: the frame names Eskalation: %s", v.name, f.D)
+		}
 	}
 }
 

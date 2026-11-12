@@ -3,9 +3,12 @@
 package app_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
+	"maps"
 	"slices"
 	gosync "sync"
 	"testing"
@@ -63,7 +66,15 @@ func (b *bus) signals(t *testing.T) []domain.Signal {
 // newCluster returns a cluster of a new node on b that listens on b.
 func newCluster(t *testing.T, b *bus, w *focusWorld) *app.Cluster {
 	t.Helper()
-	c, err := app.NewCluster(app.ClusterConfig{Node: ids.New(), TypingTTL: typingTTL}, app.ClusterDeps{Sender: b, Threads: w, Clock: clock.NewFake(t0)})
+	return newClusterWith(t, b, w, nil, nil)
+}
+
+// newClusterWith is newCluster with the preview port and the log of the node (nil: none, the
+// default log).
+func newClusterWith(t *testing.T, b *bus, w *focusWorld, previews app.HintPreviews, log *slog.Logger) *app.Cluster {
+	t.Helper()
+	c, err := app.NewCluster(app.ClusterConfig{Node: ids.New(), TypingTTL: typingTTL},
+		app.ClusterDeps{Sender: b, Threads: w, Clock: clock.NewFake(t0), Previews: previews, Log: log})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,5 +265,180 @@ func TestCluster_PublisherSignals(t *testing.T) {
 	b.mu.Unlock()
 	if err := pub.PublishEphemeral(ctx, evs[0]); err != nil {
 		t.Fatalf("a failed send failed the publish: %v", err)
+	}
+}
+
+// previewCall is one call of the preview port.
+type previewCall struct {
+	recipient, thread, message ids.ID
+	kind                       string
+}
+
+// fakePreviews is the preview port of a node: it records its calls and answers preview or err.
+type fakePreviews struct {
+	mu      gosync.Mutex
+	calls   []previewCall
+	preview app.HintPreview
+	err     error
+}
+
+// HintPreview implements app.HintPreviews.
+func (f *fakePreviews) HintPreview(_ context.Context, recipient ids.ID, kind string, thread, message ids.ID) (app.HintPreview, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, previewCall{recipient: recipient, thread: thread, message: message, kind: kind})
+	return f.preview, f.err
+}
+
+// hintsOf returns the payloads of the notification.created dispatches queued on cl as JSON
+// objects.
+func hintsOf(t *testing.T, cl *client) []map[string]any {
+	t.Helper()
+	var out []map[string]any
+	for _, ev := range cl.events(t) {
+		if ev.D.Type != "notification.created" {
+			continue
+		}
+		var m map[string]any
+		if err := json.Unmarshal(ev.D.Payload, &m); err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+// hintCanary is a word of the message text of the preview tests: it must reach the recipient's
+// frame, never the channel between the nodes or a log record.
+const hintCanary = "Zebrafink"
+
+// TestCluster_HintFromWorkerCarriesPreview (13 6.3, 02 11.6; audit of 2026-11-11,
+// fn-push-notifications-1): the worker publishes notification.created with the preview fields its
+// job built; the signal carries the IDs only, and the node that holds the recipient's connection
+// builds the preview fields again through its preview port and sends them in the frame. The node
+// names the thread of the signal to the port, the one its hub admits the hint on, so the port can
+// refuse a message from elsewhere. A hint without a message (security) asks the port for nothing
+// and carries exactly its IDs, and so does a hint that names a message and no thread, which no
+// job sends: without a thread the hub admits by the recipient alone.
+func TestCluster_HintFromWorkerCarriesPreview(t *testing.T) {
+	t.Parallel()
+	w, b := newFocusWorld(), &bus{}
+	previews := &fakePreviews{preview: app.HintPreview{SpaceName: "Support", ChannelName: "Allgemein", ThreadTitle: "Export",
+		SenderDisplayName: "Sam", Excerpt: "The " + hintCanary + " report is here", AttachmentCount: 2}}
+	node := newFocusEnvOn(t, w, newClusterWith(t, b, w, previews, nil))
+	worker := newCluster(t, b, w)
+	if err := worker.Bind(nil, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	alex := node.newPerson()
+	th := w.thread(node.support)
+	w.grant(alex.ID, th.ChannelID, levelRead)
+	conn := node.join(alex)
+	nid, msg, device := ids.New(), ids.New(), ids.New()
+	publish := func(resource eventlog.ResourceRef, scope eventlog.Scope, payload map[string]any) {
+		t.Helper()
+		err := worker.Publisher(nil).PublishEphemeral(context.Background(), eventlog.EphemeralEvent{
+			Type: "notification.created", SchemaVersion: 1, Audience: alex.ID, Resource: resource, Scope: scope, Payload: payload})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	publish(eventlog.ResourceRef{Kind: "thread", ID: th.ID}, eventlog.Scope{SpaceID: th.SpaceID, ChannelID: th.ChannelID, ThreadID: th.ID},
+		map[string]any{"nid": nid, "kind": "message", "thread_id": th.ID, "message_id": msg, "quiet": false, "count": 1,
+			"space_name": "Support", "channel_name": "Allgemein", "sender_display_name": "Sam", "excerpt": "The " + hintCanary + " report is here"})
+
+	b.mu.Lock()
+	for _, p := range b.sent {
+		for _, text := range []string{hintCanary, "Support", "Allgemein", "Sam"} {
+			if bytes.Contains(p, []byte(text)) {
+				t.Errorf("the signal %s carries %q", p, text)
+			}
+		}
+	}
+	b.mu.Unlock()
+	hints := hintsOf(t, conn)
+	if len(hints) != 1 {
+		t.Fatalf("Alex got %d hints, want 1", len(hints))
+	}
+	want := map[string]any{"nid": nid.String(), "kind": "message", "thread_id": th.ID.String(), "message_id": msg.String(), "quiet": false,
+		"count": float64(1), "space_name": "Support", "channel_name": "Allgemein", "thread_title": "Export", "sender_display_name": "Sam",
+		"excerpt": "The " + hintCanary + " report is here", "attachment_count": float64(2)}
+	if !maps.Equal(hints[0], want) {
+		t.Fatalf("hint %v, want %v", hints[0], want)
+	}
+	if got := previews.calls; len(got) != 1 || got[0] != (previewCall{recipient: alex.ID, thread: th.ID, message: msg, kind: "message"}) {
+		t.Fatalf("preview calls %+v", got)
+	}
+
+	publish(eventlog.ResourceRef{Kind: "user", ID: alex.ID}, eventlog.Scope{},
+		map[string]any{"nid": nid, "kind": "security", "target_id": device, "quiet": false, "count": 1})
+	hints = hintsOf(t, conn)
+	if len(hints) != 2 || !maps.Equal(hints[1], map[string]any{"nid": nid.String(), "kind": "security", "target_id": device.String(),
+		"quiet": false, "count": float64(1)}) {
+		t.Fatalf("hints %v, want a second one with exactly its IDs", hints)
+	}
+	if n := len(previews.calls); n != 1 {
+		t.Fatalf("%d preview calls after a hint without a message, want 1", n)
+	}
+
+	publish(eventlog.ResourceRef{Kind: "user", ID: alex.ID}, eventlog.Scope{},
+		map[string]any{"nid": nid, "kind": "message", "message_id": msg, "quiet": false, "count": 1})
+	hints = hintsOf(t, conn)
+	if len(hints) != 3 || !maps.Equal(hints[2], map[string]any{"nid": nid.String(), "kind": "message", "message_id": msg.String(),
+		"quiet": false, "count": float64(1)}) {
+		t.Fatalf("hints %v, want a third one with exactly its IDs", hints)
+	}
+	if n := len(previews.calls); n != 1 {
+		t.Fatalf("%d preview calls after a hint with a message and no thread, want 1", n)
+	}
+}
+
+// TestCluster_HintPreviewFails: when the preview port fails, the hint still reaches the
+// recipient with exactly its IDs (a signal is at most once, so nothing runs it again), and one
+// Warn record names the signal kind and the error kind, never an ID, a name or a text.
+func TestCluster_HintPreviewFails(t *testing.T) {
+	t.Parallel()
+	w, b := newFocusWorld(), &bus{}
+	var logged bytes.Buffer
+	previews := &fakePreviews{preview: app.HintPreview{Excerpt: hintCanary}, err: errors.New("read of " + hintCanary + " failed")}
+	node := newFocusEnvOn(t, w, newClusterWith(t, b, w, previews, slog.New(slog.NewJSONHandler(&logged, nil))))
+	worker := newCluster(t, b, w)
+	if err := worker.Bind(nil, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	alex := node.newPerson()
+	th := w.thread(node.support)
+	w.grant(alex.ID, th.ChannelID, levelRead)
+	conn := node.join(alex)
+	nid, msg := ids.New(), ids.New()
+	err := worker.Publisher(nil).PublishEphemeral(context.Background(), eventlog.EphemeralEvent{
+		Type: "notification.created", SchemaVersion: 1, Audience: alex.ID, Resource: eventlog.ResourceRef{Kind: "thread", ID: th.ID},
+		Scope:   eventlog.Scope{SpaceID: th.SpaceID, ChannelID: th.ChannelID, ThreadID: th.ID},
+		Payload: map[string]any{"nid": nid, "kind": "mention", "thread_id": th.ID, "message_id": msg, "quiet": true, "count": 3}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hints := hintsOf(t, conn)
+	want := map[string]any{"nid": nid.String(), "kind": "mention", "thread_id": th.ID.String(), "message_id": msg.String(), "quiet": true,
+		"count": float64(3)}
+	if len(hints) != 1 || !maps.Equal(hints[0], want) {
+		t.Fatalf("hints %v, want one with exactly %v", hints, want)
+	}
+	var records []map[string]any
+	for _, line := range bytes.Split(bytes.TrimSpace(logged.Bytes()), []byte("\n")) {
+		var r map[string]any
+		if err := json.Unmarshal(line, &r); err != nil {
+			t.Fatalf("log line %s: %v", line, err)
+		}
+		records = append(records, r)
+	}
+	if len(records) != 1 || records[0]["level"] != "WARN" || records[0]["msg"] != "gateway hint sent without its preview" ||
+		records[0]["bothy.signal.kind"] != "gateway.hint" || records[0]["error.type"] != "internal" {
+		t.Fatalf("log records %v", records)
+	}
+	for _, text := range []string{hintCanary, alex.ID.String(), th.ID.String(), msg.String(), nid.String()} {
+		if bytes.Contains(logged.Bytes(), []byte(text)) {
+			t.Errorf("the log holds %q: %s", text, logged.Bytes())
+		}
 	}
 }

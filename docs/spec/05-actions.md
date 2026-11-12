@@ -277,7 +277,9 @@ Reasons for the keys: IPv6 clients usually get a whole /64 prefix; counted per a
 could fill any number of buckets by changing addresses. `rl.gateway_connect` counts after the
 check of the credentials, so that nobody can drain the bucket of another person's device; before
 `identify`, `sync.identify_timeout` limits an open connection ([04-sync-protocol.md](04-sync-protocol.md),
-section 6.3).
+section 6.3). A failed check of the credentials of `identify`, `resume` or `reauth` counts
+`rl.public_auth` of the client address, like a failed one of a REST request
+([02-architecture.md](02-architecture.md), section 9.1).
 
 ## 4. Actions
 

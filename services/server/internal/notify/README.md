@@ -256,8 +256,9 @@ threads.unread_floor_seq)` and ends with the skip reason `read` when it reached 
 Since M7-17 (13 12 point 4, docs/decisions.d/M7-17.md D-M7-17-7) the worker reads the live
 connections of every api node from `gateway_presence` through the gateway's adapter (the owner of
 the table) and sends `notification.created` to the node that holds the connection, so separate
-roles and several api nodes get desktop hints and the delayed push exactly as role `all`.
-`notify` itself is unchanged: it sees only `presence.View` and an `EphemeralPublisher`.
+roles and several api nodes get desktop hints and the delayed push exactly as role `all`; the
+receiving node builds the preview fields again (see "Preview fields of `notification.created`").
+`notify` itself sees only `presence.View` and an `EphemeralPublisher`.
 
 ### Rulings
 
@@ -432,6 +433,18 @@ rule of R-AZ-30), only for a kind that `domain.PreviewKindAllowed` accepts with 
 event still goes out. There is no `message.read` check here (the job has no request, R-AZ-29) and
 never an `image_url` (a fetch ticket needs a session); `attachment_count` is filled for `full`. A
 failed read fails the job, which the queue runs again.
+
+The rule is `PreviewBuilder.HintFields`. When the event crosses processes (role `worker`, several
+api nodes), the signal carries IDs only, so the fields of the job stay in its process: the api
+node that holds the recipient's connection calls `HintFields` again through the gateway's port
+`HintPreviews` (`internal/wire`), and its hub checks `push.deliver` before the frame leaves
+(13 6.3, 02 11.6).
+
+`HintFields` takes the thread of the hint beside the message and gives no field unless the
+message lies in that thread (AUD-SG1/9): both callers check `push.deliver` on the thread of the
+hint, never on the thread of the message, and the IDs of a signal are no checked pair. A hint
+without a thread, or with a thread that is not the message's, keeps its IDs and gets no name and
+no text.
 
 ### Deactivation
 

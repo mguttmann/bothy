@@ -20,6 +20,33 @@ type SignalSender interface {
 	Send(ctx context.Context, payload []byte) error
 }
 
+// HintPreview holds the preview fields of notification.created (13 6.3 and 6.4, schema
+// NotificationCreatedPayload): the names of the place, the display name of the author, the excerpt
+// and the number of attachments. A zero value is an absent member.
+type HintPreview struct {
+	SpaceName, ChannelName, ThreadTitle, SenderDisplayName, Excerpt string
+	AttachmentCount                                                 int
+}
+
+// HintPreviews builds the preview fields of a hint that reached this node as a signal. A signal
+// carries IDs only (02 11.6), so the node that holds the connection of the recipient builds what
+// notification.created shows (13 6.3). internal/wire implements it with the preview builder of
+// notify, the one of the job notify.gateway_send: the fields of the recipient's
+// notify.preview_mode for a kind that points at a message; nothing for the mode none, for an
+// unknown or deleted message and for a message of kind run or system; never an image.
+//
+// It does not authorize: the hub admits every connection with push.deliver on thread, the thread
+// the signal names, before the frame leaves. That check covers the fields only of a message in
+// that thread, and a signal is not a trusted pair of IDs (PostgreSQL lets every role that may
+// connect send on the channel). So an implementation returns no field unless message lies in
+// thread, and none for a zero thread.
+//
+// It is safe for concurrent use. Errors: those of the reads; the cluster then sends the hint with
+// its IDs and logs the failure.
+type HintPreviews interface {
+	HintPreview(ctx context.Context, recipient ids.ID, kind string, thread, message ids.ID) (HintPreview, error)
+}
+
 // PresenceRow is one counted connection of this node for the table gateway_presence (03 4.16,
 // R-DM-51): a live connection of a human with a device (D-M3-23-2), its gateway session, the
 // focused threads after the checks of the gateway and the idle flag of the last focus op.

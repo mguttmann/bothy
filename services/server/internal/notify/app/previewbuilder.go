@@ -177,3 +177,35 @@ func (b *PreviewBuilder) Fields(ctx context.Context, mode domain.PreviewMode, m 
 	}
 	return out, nil
 }
+
+// HintFields returns the preview fields of notification.created for a hint of kind to recipient
+// about the message messageID in the thread threadID (13 6.3, brief M3-22 design note 9 f): the
+// fields of the recipient's notify.preview_mode, only for a kind that points at a message and a
+// set messageID; the mode none and an unknown, deleted, run or system message give no field. The
+// image stays out in every mode, because a fetch ticket needs a session. The job
+// notify.gateway_send calls it after its push.deliver check, and an api node that builds a hint
+// again from a signal of another process calls it before its hub checks push.deliver for every
+// connection (02 11.6).
+//
+// Both callers check push.deliver on threadID and never on the thread of the message, so a
+// message gives its fields only when it lies in threadID: no thread, or a message of another
+// thread, gives no field. A job or a signal that names a thread the recipient may read and a
+// message from elsewhere therefore shows nothing of that message.
+//
+// Errors: those of the reads.
+func (b *PreviewBuilder) HintFields(ctx context.Context, recipient ids.ID, kind string, threadID, messageID ids.ID) (PreviewFields, error) {
+	if !domain.PreviewKindAllowed(kind) || threadID.IsZero() || messageID.IsZero() {
+		return PreviewFields{}, nil
+	}
+	mode, err := b.Mode(ctx, recipient)
+	if err != nil || !mode.ShowsNames() {
+		return PreviewFields{}, err
+	}
+	m, found, err := b.Message(ctx, messageID)
+	if err != nil || !found || m.ThreadID != threadID {
+		return PreviewFields{}, err
+	}
+	f, err := b.Fields(ctx, mode, m)
+	f.FirstImage = ids.ID{}
+	return f, err
+}

@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"slices"
 	gosync "sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/agents"
@@ -92,6 +93,9 @@ type Deps struct {
 	Nonces NonceSource
 	// Limiter is rl.gateway_connect.
 	Limiter ConnectLimiter
+	// Credentials counts failed credential checks of identify, resume and reauth against
+	// rl.public_auth of the client address (02 9.1); nil counts nothing (tests of the connection).
+	Credentials CredentialLimiter
 	// Snapshot builds the snapshot of ready (sync, M1-63).
 	Snapshot sync.Snapshot
 	// CatchUp checks the cursor of identify and resume (sync, M1-63).
@@ -162,6 +166,9 @@ type Gateway struct {
 	// (M6-15, statsops.go).
 	liveMu   gosync.Mutex
 	liveSubs map[*Connection]*liveSub
+
+	// helloEpoch is the sync epoch of hello once a read of it succeeded (syncEpoch).
+	helloEpoch atomic.Pointer[ids.ID]
 }
 
 // New returns the gateway over d with the configuration cfg. Errors: an invalid value of cfg or
@@ -226,7 +233,7 @@ func (g *Gateway) SessionOf(c *Connection) *Session {
 // (that one and a draining gateway, 4013) are recorded as a connect with outcome server_error and
 // as their close.
 func (g *Gateway) Open(ctx context.Context, conn Conn) (*Connection, error) {
-	epoch, err := g.d.Epoch.SyncEpoch(ctx)
+	epoch, err := g.syncEpoch(ctx)
 	if err != nil {
 		g.refused(ctx, domain.CloseUnknownError)
 		return nil, err
@@ -246,6 +253,23 @@ func (g *Gateway) Open(ctx context.Context, conn Conn) (*Connection, error) {
 		DPoPNonce: g.d.Nonces.CurrentNonce(), ServerTime: now, SyncEpoch: epoch,
 	})
 	return c, err
+}
+
+// syncEpoch returns the sync epoch of hello. It reads the instance row until one read succeeded
+// and keeps that epoch for the life of the process, so an upgrade, which nothing has authenticated
+// yet, reads no database (threat model 5.5). The epoch of a running server cannot change: only
+// bothy restore finalize sets a new one, and it refuses to run while a server process is
+// connected to the database (03 6.7, M7-04). Errors: those of the read.
+func (g *Gateway) syncEpoch(ctx context.Context) (ids.ID, error) {
+	if e := g.helloEpoch.Load(); e != nil {
+		return *e, nil
+	}
+	e, err := g.d.Epoch.SyncEpoch(ctx)
+	if err != nil {
+		return ids.ID{}, err
+	}
+	g.helloEpoch.Store(&e)
+	return e, nil
 }
 
 // Handle dispatches the client op op with the raw body d on c (Dispatcher.Dispatch).

@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"strconv"
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -100,26 +99,68 @@ func newSession(a actor.Actor, in Identify) *Session {
 // connect authenticates token (an access token or an API token) with its proof, requires
 // matches of the verified actor (the device of identify; 4004 otherwise), takes a token of
 // rl.gateway_connect for the verified device or token and authorizes gateway.connect on the
-// instance; the errors are the close codes of the table of 04 section 6.4 (note 10).
+// instance; the errors are the close codes of the table of 04 section 6.4 (note 10). The
+// credential check runs under the failed-credentials rule of 02 9.1 (reserveCredentials): with
+// rl.public_auth of the client address empty it closes with 4008 before any check, and a check
+// that fails (credentialFailed, a device that is not the token's, or a credential the
+// authenticator reports inactive without an error, actor.Actor.CredentialInactive) keeps the
+// reserved token.
 func (g *Gateway) connect(ctx context.Context, accessToken, apiToken, proof string, matches func(actor.Actor) bool) (actor.Actor, error) {
+	settle, wait, ok := g.reserveCredentials(ctx)
+	if !ok {
+		return actor.Actor{}, &CloseError{Code: domain.CloseRateLimited, Reason: retryAfter(wait)}
+	}
 	a, err := g.authenticate(ctx, accessToken+apiToken, proof)
 	if err != nil {
+		settle(credentialFailed(err))
 		return actor.Actor{}, authClose(err)
 	}
 	if !matches(a) {
+		settle(true)
 		return actor.Actor{}, closeWith(domain.CloseAuthenticationFailed)
 	}
+	// A revoked or expired API token and a revoked session, device or device key come back without
+	// an error: authorize refuses and audits them below, but for the failed-credentials rule they
+	// are dead credentials like any other, as in the REST chain (httpserver.authenticateSettled).
+	settle(a.CredentialInactive)
 	allowed, retry, err := g.d.Limiter.AllowConnect(a)
 	if err != nil {
 		return actor.Actor{}, closeWith(domain.CloseAuthenticationFailed)
 	}
 	if !allowed {
-		return actor.Actor{}, &CloseError{Code: domain.CloseRateLimited, Reason: "retry_after=" + strconv.Itoa(retry)}
+		return actor.Actor{}, &CloseError{Code: domain.CloseRateLimited, Reason: retryAfter(retry)}
 	}
 	if err := g.authorizeConnect(actor.WithActor(ctx, a), a); err != nil {
 		return actor.Actor{}, err
 	}
 	return a, nil
+}
+
+// reserveCredentials reserves one token of rl.public_auth for the client address of the upgrade
+// before the credentials of identify, resume or reauth are checked (02 9.1, 05 section 3;
+// CredentialLimiter). ok false means the bucket is empty: the caller refuses without a check and
+// names the wait of retryAfterSeconds. Otherwise the caller calls settle exactly once, with true
+// for a failed check. A gateway without the limiter counts nothing.
+func (g *Gateway) reserveCredentials(ctx context.Context) (settle func(failed bool), retryAfterSeconds int, ok bool) {
+	if g.d.Credentials == nil {
+		return func(bool) {}, 0, true
+	}
+	ip, _ := reqmeta.ClientIP(ctx)
+	ok, retryAfterSeconds, settle = g.d.Credentials.ReserveCredentials(ip)
+	return settle, retryAfterSeconds, ok
+}
+
+// credentialFailed reports whether err of the Authenticator is a failed check of presented
+// credentials by the rule of 02 9.1: unauthenticated other than token_expired and use_dpop_nonce,
+// which are normal flows of a valid client. An error of another kind (identity is not reachable)
+// is not the client's failure.
+func credentialFailed(err error) bool {
+	e, ok := errs.As(err)
+	if !ok || e.Kind() != errs.KindUnauthenticated {
+		return false
+	}
+	code := e.PublicCode()
+	return code != errs.CodeTokenExpired && code != errs.CodeUseDPoPNonce
 }
 
 // authenticate runs the Authenticator on the token and proof of a frame like on a request GET

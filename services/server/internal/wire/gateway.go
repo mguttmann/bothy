@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"slices"
 	stdsync "sync"
 	"time"
@@ -194,7 +195,9 @@ type Gateway struct {
 
 // The rate-limit classes of the client ops the gateway counts itself (x-rate-limit-class of
 // asyncapi.yaml; TestGatewayOpRateClasses): focus is keyed by the principal, typing by the
-// connection. identify and resume count rl.gateway_connect in the handshake.
+// connection. identify and resume count rl.gateway_connect in the handshake. A failed credential
+// check of identify, resume or reauth counts rl.public_auth of the client address besides, like a
+// failed one of a REST request (02 9.1, credentialLimiter).
 const (
 	focusClass  = "rl.read"
 	typingClass = "rl.typing"
@@ -275,7 +278,8 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 		MaxFocusedThreads: cfg.MaxFocusedThreads, TypingMinInterval: cfg.TypingMinInterval, TypingTTL: cfg.TypingTTL,
 	}, gatewayapp.Deps{
 		Authenticator: d.Authenticator, Authorizer: d.Authorizer, Nonces: d.Nonces, Limiter: connectLimiter{l: d.Limiter},
-		Snapshot: d.Reads.Snapshot, CatchUp: d.Reads.CatchUp, Epoch: epochSource{d.Instance}, Delivery: d.Delivery,
+		Credentials: credentialLimiter{l: d.Limiter},
+		Snapshot:    d.Reads.Snapshot, CatchUp: d.Reads.CatchUp, Epoch: epochSource{d.Instance}, Delivery: d.Delivery,
 		Decoder: gatewayws.NewDecoder(schemas, check), Alarm: proofAlarm{alarm}, Clock: d.Clock, Log: orDiscard(d.Log),
 		Threads: d.Threads, OpLimiter: opLimiter{l: d.Limiter}, Publisher: publisher, Metrics: d.Metrics,
 		Consumers: engine, AgentLimiter: agentLimiter{l: d.Limiter}, Presence: d.Presence, Autocomplete: d.Autocomplete, Runs: patcher,
@@ -575,6 +579,29 @@ func (c connectLimiter) AllowConnect(a actor.Actor) (bool, int, error) {
 	return d.Allowed, d.RetryAfterSeconds, nil
 }
 
+// credentialLimiter adapts the limiter to the failed-credentials rule of 02 9.1 for the gateway:
+// rl.public_auth keyed by the client address, the bucket of the REST chain
+// (ratelimit.Limiter.FailedCredentialGuard) and of the terminal channels (terminalLimiter).
+type credentialLimiter struct{ l *ratelimit.Limiter }
+
+// ReserveCredentials implements gatewayapp.CredentialLimiter: one token is reserved and given
+// back unless the check failed. A limiter that cannot decide refuses (fail closed).
+func (c credentialLimiter) ReserveCredentials(ip netip.Addr) (bool, int, func(bool)) {
+	key := ratelimit.KeyForIP(ip)
+	d, err := c.l.Allow(ratelimit.ClassPublicAuth, key)
+	if err != nil {
+		return false, 1, func(bool) {}
+	}
+	if !d.Allowed {
+		return false, d.RetryAfterSeconds, func(bool) {}
+	}
+	return true, 0, func(failed bool) {
+		if !failed {
+			_ = c.l.Refund(ratelimit.ClassPublicAuth, key)
+		}
+	}
+}
+
 // opLimiter adapts the limiter to the classes of focus and typing (GatewayOpClasses).
 type opLimiter struct{ l *ratelimit.Limiter }
 
@@ -643,6 +670,7 @@ func (p proofAlarm) NotChecked(ctx context.Context, _ string, _ authorize.Action
 
 // Compile-time check of the adapters.
 var (
-	_ gatewayapp.ConnectLimiter = connectLimiter{}
-	_ gatewayapp.OpLimiter      = opLimiter{}
+	_ gatewayapp.ConnectLimiter    = connectLimiter{}
+	_ gatewayapp.CredentialLimiter = credentialLimiter{}
+	_ gatewayapp.OpLimiter         = opLimiter{}
 )
