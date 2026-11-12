@@ -107,21 +107,35 @@ func TestSwitchHeldBackExit1(t *testing.T) {
 	}
 }
 
-// TestSwitchNewMessagesExit1 (brief design note 2): messages after the cursor that the settle rule
-// does not hold but the last round did not copy (here a thread whose batch the server refused once)
-// end switch with exit 1 and the hint that the Discord lock of step 1 is evidently not in place.
+// TestSwitchNewMessagesExit1 (brief design note 2): a message written in Discord after the last
+// round read its thread (here: while the round copied another thread) is after the cursor, not
+// held by the settle rule and not copied; switch ends with exit 1 and the hint that the Discord
+// lock of step 1 is evidently not in place. A thread that failed in the round has its own text
+// (TestSwitchFailedThreadIsNoLockProblem).
 func TestSwitchNewMessagesExit1(t *testing.T) {
 	e, _, mapFile := switchEnv(t, "")
-	e.discord.AddMessage(fxThread, newMessage("13009001", e.clk.Now().Add(-time.Hour)))
-	e.bothy.FailBatch("thread:"+fxThread, http.StatusConflict, "item_conflict", 1)
+	old := e.clk.Now().Add(-time.Hour)
+	e.discord.AddMessage(fxThread, newMessage("13009001", old))
+	late := false
+	e.hook = func(int) error {
+		if !late {
+			late = true
+			e.discord.AddMessage(fxGeneral, newMessage("13009002", old))
+		}
+		return nil
+	}
 	if code := e.run(switchArgs(mapFile, "--discord-locked")...); code != ExitAborted {
 		t.Fatalf("exit %d, want 1: %s", code, e.stderr.String())
 	}
-	if !strings.Contains(e.stderr.String(), "run switch again") || !strings.Contains(e.stderr.String(), "not copied") {
-		t.Errorf("stderr lacks the hint:\n%s", e.stderr.String())
+	for _, want := range []string{"1 messages after the cursor were not copied", "written after it", "evidently not read-only", "run switch again"} {
+		if !strings.Contains(e.stderr.String(), want) {
+			t.Errorf("stderr lacks %q:\n%s", want, e.stderr.String())
+		}
 	}
-	if strings.Contains(e.stderr.String(), "Step 3") {
-		t.Errorf("step 3 printed:\n%s", e.stderr.String())
+	for _, not := range []string{"Step 3", "failed"} {
+		if strings.Contains(e.stderr.String(), not) {
+			t.Errorf("stderr says %q:\n%s", not, e.stderr.String())
+		}
 	}
 }
 
@@ -417,10 +431,15 @@ func TestSwitchRefusesForeignThreadOperator(t *testing.T) {
 	if code := e.run(switchArgs(mapFile, "--discord-locked")...); code != ExitUsage {
 		t.Fatalf("exit %d, want 2: %s", code, e.stderr.String())
 	}
-	for _, want := range []string{"1 imported thread", pilot, "--force", "agent:lotse"} {
+	for _, want := range []string{"1 imported thread", pilot, "--force", "agent:lotse", "cannot be changed"} {
 		if !strings.Contains(e.stderr.String(), want) {
 			t.Errorf("stderr lacks %q:\n%s", want, e.stderr.String())
 		}
+	}
+	// The mapping of a source is fixed, so the text must not advise a change of planned_operator:
+	// a file changed that way ends switch with exit 2 (TestSwitchChangedPlannedOperatorExit2).
+	if strings.Contains(e.stderr.String(), "Set planned_operator") {
+		t.Errorf("stderr advises a change of the mapping:\n%s", e.stderr.String())
 	}
 	if w := e.bothy.Writes() - base; w != 0 {
 		t.Errorf("a refused switch wrote %d times", w)
@@ -433,6 +452,26 @@ func TestSwitchRefusesForeignThreadOperator(t *testing.T) {
 		if !strings.Contains(e.stderr.String(), want) {
 			t.Errorf("with --force stderr lacks %q:\n%s", want, e.stderr.String())
 		}
+	}
+}
+
+// TestSwitchChangedPlannedOperatorExit2: the stored mapping of a source cannot be changed
+// (docs/decisions.d/M8-04.md D-M8-04-3), so a mapping file whose planned_operator was set to the
+// agent of the imported threads does not help: switch ends with exit 2 at that member before any
+// write. The refusal of threadOperators therefore names --force as the way on, not such a change.
+func TestSwitchChangedPlannedOperatorExit2(t *testing.T) {
+	e, _, _ := switchEnv(t, "")
+	e.bothy.AddAgent("pilot", "Pilot", true)
+	changed := e.writeMap(strings.Replace(switchMapping, `planned_operator: "agent:lotse"`, `planned_operator: "agent:pilot"`, 1))
+	base := e.bothy.Writes()
+	if code := e.run(switchArgs(changed, "--discord-locked")...); code != ExitUsage {
+		t.Fatalf("exit %d, want 2: %s", code, e.stderr.String())
+	}
+	if want := "differs from the mapping stored in the source at /channels/0/planned_operator"; !strings.Contains(e.stderr.String(), want) {
+		t.Errorf("stderr lacks %q:\n%s", want, e.stderr.String())
+	}
+	if w := e.bothy.Writes() - base; w != 0 {
+		t.Errorf("a refused switch wrote %d times", w)
 	}
 }
 

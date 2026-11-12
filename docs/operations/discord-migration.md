@@ -126,13 +126,14 @@ names of people. A dry run says "would take over":
 | Column | Meaning |
 |---|---|
 | Threads open/done | threads that stay open, and threads that become done (archived in Discord and not active, or a tag of `import.discord.closed_tags`) |
-| Messages | taken over, already present, skipped (by type, empty, a thread starter already in the main thread, an author the mapping skips), failed, held back by the settle rule |
-| Attachments | taken over, too large (above `import.attachment_max_bytes`: the message gets a line with name, size and the jump link to Discord instead), failed |
+| Messages | taken over, already present, skipped (by type, empty, a thread starter already in the main thread, an author the mapping skips), failed, held back by the settle rule. Empty also counts a message that converts to no text and has no attachment, for example an embed that holds only an image (22 6.1) |
+| Attachments | taken over, too large (above `import.attachment_max_bytes`: the message gets a line with name, size and the jump link to Discord instead), failed, of forwarded messages (never loaded: the message gets the same line, 22 6.5) |
 | People | authors mapped to accounts, and placeholders |
 | Sessions | session references of the sessions file taken over, already present, discarded (the agent is not the planned operator), late (the thread had a session since the import) |
-| Pins, Tags | pins and forum tags taken over |
+| Pins | taken over, and not taken over: a thread holds at most `pin.max_per_thread` pins of the server, further pins are counted and their messages are taken over without them (22 6.6). A dry run cannot see that limit and counts every pin as "would take over" |
+| Tags | forum tags taken over |
 | Reactions not taken | reactions are never taken over (22 6.6) |
-| Notes | `permission_overwrites present` (set grants deliberately, section 5), `403` (the bot cannot read a channel), `changed at the source`, `written in Discord after the switch-over` |
+| Notes | `permission_overwrites present` (set grants deliberately, section 5), `403` (the bot cannot read a channel), `changed at the source`, `written in Discord after the switch-over`, a topic or a thread or tag name that held characters Bothy refuses (line breaks, control and bidi characters) or a topic above the limit: taken over without them, the topic cut (22 5.1), the pin limit of a thread, and in the read mirror a thread that failed with its reason |
 
 Going back: nothing was written; delete `mapping.yaml`.
 
@@ -263,16 +264,22 @@ without it the command ends with exit `2` before any call:
 bothy import discord switch --guild <guild_id> --map mapping.yaml --channel <channel_id> --discord-locked
 ```
 
-Exit `2` naming "an operator the channel will not have" means imported threads of the channel carry
-another agent than the planned operator of your mapping (for example after the mapping changed
-since the import): after step 3 the channel would not have their agent, and a message there would
-only get the notice "The agent of this thread no longer works in this channel" instead of an
-answer. Set `planned_operator` to that agent and use it in step 3, or add `--force` to switch
-anyway with a warning.
+Exit `2` naming "an operator the channel will not have" means threads of the channel carry
+another agent than the planned operator of your mapping (for example the earlier threads of a
+channel that the mapping takes with `existing`): after step 3 the channel would not have their
+agent, and a message there would only get the notice "The agent of this thread no longer works in
+this channel" instead of an answer. The mapping of a source cannot be changed after the source was
+created, so do not edit `planned_operator` now: a file that differs from the stored mapping ends
+`switch` with exit `2`. Add `--force` to switch anyway with a warning. Afterwards such a thread
+answers again once its agent is the channel's operator or holds a `write` grant of its own on the
+channel (22 13.3.1).
 
 Exit `1` with counts per reason (busy, unsettled, lookback) means messages are still held back:
-repeat after `import.follow.settle_after`. Exit `1` with "run switch again" means messages arrived
-after the round: the Discord lock of step 1 is not in place yet. Exit `0` prints steps 3 and 4.
+repeat after `import.follow.settle_after`. Exit `1` with "written after it" means messages arrived
+after the round: the Discord lock of step 1 is not in place yet. Exit `1` with "of the channel's
+threads failed" means the round could not copy a thread; the line above it names the thread and
+the reason (section 11), and this says nothing about the Discord lock. Exit `0` prints steps 3
+and 4.
 
 Step 3, web console, owner (step-up): in the channel's row "Lead here", which makes the channel
 writable in the same step; then "Set operator" with the planned operator of the mapping. Another
@@ -338,13 +345,17 @@ a completed source cannot be started again, and nothing mirrors Discord any more
 |---|---|---|
 | exit `2`, preflight note on `MESSAGE_CONTENT` | the intent probe found only empty messages | enable the intent in the developer portal (section 2), run again |
 | exit `2`, mapping error with a line | the file breaks the schema, a handle does not exist, an ID is named twice | correct the line |
-| exit `2` on `--apply`, no running source | no started source of this Discord server, or its stored mapping differs from the file apart from `lead` | start the source in the console, or add a source with the corrected file |
+| exit `2` on `--apply`, no running source | no started source of this Discord server | start the source in the console |
+| exit `2`, "the mapping file differs from the mapping stored in the source at ..." | the file is not the mapping the source was created with; the message names the first differing place. The mapping of a source cannot be changed, only the `lead` in the console (22 5.2) | make the file equal to the stored mapping again. A changed mapping needs a new source, which is a way only before the first `--apply` has written anything: cancel the source and add one with the corrected file. Later a new source knows nothing of what is imported: its run stops at the names the first source created, or copies everything again |
+| exit `1`, `applyImportBatch: status 400 validation_failed` with a pointer, a code and an origin key | the server refused one item of a batch, and with it the batch; the text names the place in the request (`/items/<n>/data/<member>`), the rule (the code) and the item (`channel:<id>`, `thread:<id>`, `message:<id>`, `pin:<id>`). The run stops there every time until the cause is gone | `/data/topic too_long`: the server allows a shorter topic than the default of `channel.topic_max_chars`; raise the key for the import or shorten the topic in Discord. Any other rule: correct the named item in Discord, or report the text; it carries no content |
+| exit `1`, `setImportCursor: status 413` | the cursor of the source, which grows with every thread, is larger than `http.max_json_body_bytes` of the server; the stored cursor stays (22 8) | raise the key on the server, run again; the run resumes at the stored cursor |
 | exit `1`, rate limit | Discord asked for a wait longer than `import.discord.max_rate_wait` | wait, run again; the run resumes. Never use the token of an agent bot (RK-76) |
 | exit `1`, `import_not_running` | the source was paused, cancelled or completed while the run wrote | start a paused source again in the console if the pause was not intended; a cancelled source cannot be started again, add a new one |
 | exit `1`, network or server error | the run stopped; nothing is lost | run again; it resumes at the cursor |
 | exit `3`, lease held | another writing run of this source holds the lease (section 7, "One writing run at a time") | a `--follow` mirror: stop it, run the command, start the mirror again; a scheduled round: run the command again; a run that crashed: wait `import.lease_stale_after` or use `--takeover` |
 | note `403: the channel is not readable` | the bot lacks `VIEW_CHANNEL` or `READ_MESSAGE_HISTORY` there; the run avoids the channel | fix the permission in Discord, run again |
 | note `403 on archived private threads` | the bot lacks `MANAGE_THREADS` | add it if private threads matter |
+| note `a thread failed in this round and is retried in the next: thread <id>: ...` (read mirror), with the same line on standard error | the round could not copy this thread; the other threads were copied. The text after the thread ID is the error: a `403` or `404` of Discord, or the refusal of the server as in the row on `validation_failed` | a refusal of the server repeats every round until its cause is gone: act as in that row |
 | note `written in Discord after the switch-over` | Discord shows new messages in a channel Bothy leads; the read mirror copies nothing | lock the Discord channel (section 8 step 1); transfer the messages by hand. A full `--apply` run without `--follow` or `--once` would append them behind the messages written in Bothy; it never renames, closes or reopens a thread that is already imported there |
 | `status` shows `inconsistent` | lead and read-only flag disagree | set the lead in the console again |
 

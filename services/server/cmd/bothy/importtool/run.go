@@ -527,7 +527,8 @@ func prepare(ctx context.Context, o options, env Env, cfg Config, m *Mapping, sf
 func newWalker(o options, env Env, cfg Config, m *Mapping, gs *guildState, p *plan, s *session, cl clients) (*walker, error) {
 	wk := &walker{cfg: cfg, m: m, gs: gs, p: p, dc: cl.dc, api: cl.api, log: env.logger(), afterBatch: env.AfterBatch,
 		known: map[string]*refInfo{}, targets: map[string]restclient.Uuid{}, skipped: map[string]bool{}, userDone: map[string]bool{},
-		maxContent: s.limits.MessageMaxContentBytes, attachMax: s.limits.FileMaxUploadBytes, batchMax: cfg.BatchMaxItems}
+		pinsFull: map[string]bool{}, maxContent: s.limits.MessageMaxContentBytes, attachMax: s.limits.FileMaxUploadBytes,
+		batchMax: cfg.BatchMaxItems}
 	if cfg.AttachmentMaxBytes > 0 {
 		wk.attachMax = cfg.AttachmentMaxBytes
 		if cfg.AttachmentMaxBytes > s.limits.FileMaxUploadBytes {

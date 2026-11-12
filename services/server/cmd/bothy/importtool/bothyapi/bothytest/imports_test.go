@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -234,6 +235,87 @@ func TestFakeBatchRefusals(t *testing.T) {
 		(*resp.ApplicationproblemJSON400.Errors)[0].Pointer != "/items/0/data/reply_to_origin_key" {
 		t.Errorf("missing reply target = %d %s", resp.StatusCode(), resp.Body)
 	}
+}
+
+// wantField fails unless resp is 400 validation_failed whose first field error is pointer and code.
+func wantField(t *testing.T, what string, resp *restclient.ApplyImportBatchResponse, pointer, code string) {
+	t.Helper()
+	p := resp.ApplicationproblemJSON400
+	if resp.StatusCode() != http.StatusBadRequest || p == nil || p.Errors == nil || len(*p.Errors) == 0 {
+		t.Errorf("%s = %d %s, want 400 with a field error", what, resp.StatusCode(), resp.Body)
+		return
+	}
+	if f := (*p.Errors)[0]; f.Pointer != pointer || f.Code != code {
+		t.Errorf("%s: field error %s %s, want %s %s", what, f.Pointer, f.Code, pointer, code)
+	}
+}
+
+// TestFakeRefusesWhatTheServerRefuses: the fake applies the rules of the server that valid Discord
+// data can break (22 5.1, 5.1.1, 6.3, 6.6): a topic with a control character or above the limit, a
+// thread or tag name with a bidi control, a message without a visible character and without a
+// file, and a pin above the limit of its thread. Each refusal names the item, and the refused
+// batch stores nothing.
+func TestFakeRefusesWhatTheServerRefuses(t *testing.T) {
+	e := newImportEnv(t)
+	e.fake.AddUser("sam", "Sam", true)
+	src := e.fake.AddSource("running", mapping())
+	channel := func(topic string) restclient.ImportBatch {
+		b := structure()
+		b.Items[1].Data["topic"] = topic
+		return b
+	}
+	wantField(t, "a topic with a line break", e.apply(t, src, channel("first\nsecond")), "/items/1/data/topic", "control_character")
+	wantField(t, "a topic above the limit", e.apply(t, src, channel(strings.Repeat("x", bothytest.TopicMaxChars+1))),
+		"/items/1/data/topic", "too_long")
+	if n := len(e.fake.Items(src)); n != 0 {
+		t.Fatalf("a refused structure batch stored %d items", n)
+	}
+	e.mustApply(t, src, channel(strings.Repeat("x", bothytest.TopicMaxChars)))
+
+	thread := func(name string) restclient.ImportObject {
+		return obj(restclient.ImportObjectItemKindThread, "thread:"+threadID, shaA, map[string]any{"channel_origin_key": "channel:" + channelID,
+			"name": name, "closed": false, "created_at": "2025-03-01T08:00:00.000Z", "last_activity_at": "2025-03-01T09:00:00.000Z"})
+	}
+	batch := func(items ...restclient.ImportObject) restclient.ImportBatch {
+		return restclient.ImportBatch{ThreadOriginKey: ptr("thread:" + threadID), Items: items}
+	}
+	wantField(t, "a thread name with a bidi control", e.apply(t, src, batch(thread("Login\u202e fails"))), "/items/0/data/name", "bidi_control")
+	wantField(t, "a tag name with a bidi control", e.apply(t, src, restclient.ImportBatch{Items: []restclient.ImportObject{
+		obj(restclient.ImportObjectItemKindForumTag, "forum_tag:"+channelID+":1029384800", "",
+			map[string]any{"channel_origin_key": "channel:" + channelID, "name": "open\u200f"})}}), "/items/0/data/name", "bidi_control")
+	wantField(t, "a message without content", e.apply(t, src, batch(thread("Login fails"),
+		message("1029384710", samID, map[string]any{"content_md": " \n"}))), "/items/1/data/content_md", "empty")
+
+	e.fake.SetPinLimit(1)
+	pin := func(id string) restclient.ImportObject {
+		return obj(restclient.ImportObjectItemKindPin, "pin:"+id, "", map[string]any{"message_origin_key": "message:" + id})
+	}
+	full := batch(thread("Login fails"), message("1029384710", samID, nil), pin("1029384710"),
+		message("1029384711", samID, nil), pin("1029384711"))
+	wantField(t, "a pin above the limit", e.apply(t, src, full), "/items/4/data/message_origin_key", "limit_reached")
+	if got := e.fake.ThreadMessages(src, "thread:"+threadID); len(got) != 0 || len(e.fake.Pins(src)) != 0 {
+		t.Errorf("a refused thread batch stored messages %v and pins %v", got, e.fake.Pins(src))
+	}
+	e.mustApply(t, src, batch(full.Items[:4]...))
+	wantField(t, "a later pin of the full thread", e.apply(t, src, batch(pin("1029384711"))), "/items/0/data/message_origin_key", "limit_reached")
+	e.mustApply(t, src, batch(full.Items[:3]...))
+	if p := e.fake.Pins(src); len(p) != 1 || p[0] != "message:1029384710" {
+		t.Errorf("Pins = %v, want the one pin within the limit", p)
+	}
+}
+
+// TestFakeRefuseBatch: RefuseBatch answers the next thread batch of its thread with 400
+// validation_failed and the given field error, and the batch after it is served.
+func TestFakeRefuseBatch(t *testing.T) {
+	e := newImportEnv(t)
+	src, _ := e.running(t)
+	main := restclient.ImportBatch{ThreadOriginKey: ptr("channel:" + channelID), Items: []restclient.ImportObject{message("1029384720", samID, nil)}}
+	e.fake.RefuseBatch("channel:"+channelID, 1, "/items/0/data/content_md", "invalid")
+	wantField(t, "the refused batch", e.apply(t, src, main), "/items/0/data/content_md", "invalid")
+	if got := e.fake.ThreadMessages(src, "channel:"+channelID); len(got) != 0 {
+		t.Errorf("the refused batch appended %v", got)
+	}
+	e.mustApply(t, src, main)
 }
 
 // TestFakeThreadBatchAndPins: a thread created by its first item, messages in order with a reply

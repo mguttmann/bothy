@@ -194,7 +194,9 @@ func threadLocal(err error) bool {
 func (m *mirror) round(ctx context.Context) error {
 	m.notes, m.starters = nil, map[string]*discord.Message{}
 	wk := m.wk
-	wk.known, wk.userDone = map[string]*refInfo{}, map[string]bool{}
+	// pinsFull starts empty in every round: a full thread is asked again, so a pin slot freed here
+	// since the last round is used.
+	wk.known, wk.userDone, wk.pinsFull = map[string]*refInfo{}, map[string]bool{}, map[string]bool{}
 	for _, c := range wk.p.channels {
 		c.rep = &channelReport{}
 	}
@@ -339,7 +341,7 @@ func (m *mirror) channel(ctx context.Context, c *channelPlan) error {
 		return nil
 	}
 	if c.kind == kindText && c.selected && newer(c.ch.LastMessageID, m.cur.position(true, c.ch.ID)) {
-		if err := m.local(c, m.thread(ctx, c, nil)); err != nil {
+		if err := m.local(c, c.ch.ID, m.thread(ctx, c, nil)); err != nil {
 			return err
 		}
 	}
@@ -351,7 +353,7 @@ func (m *mirror) channel(ctx context.Context, c *channelPlan) error {
 		if m.wk.halt != nil && m.wk.halt() {
 			return errHalted
 		}
-		if err := m.local(c, m.mirrorThread(ctx, c, t)); err != nil {
+		if err := m.local(c, t.th.ID, m.mirrorThread(ctx, c, t)); err != nil {
 			return err
 		}
 	}
@@ -359,13 +361,18 @@ func (m *mirror) channel(ctx context.Context, c *channelPlan) error {
 }
 
 // local turns an error of one thread into a note of its channel, so the round continues with the
-// next thread (brief design note 3); every other error is returned.
-func (m *mirror) local(c *channelPlan, err error) error {
+// next thread (brief design note 3); every other error is returned. The note and a line on
+// standard error name the thread (id is the Discord ID of the thread, or of the channel for its
+// main thread) and the error, which for a batch the server refused carries the place, the rule and
+// the item (APIError): the owner sees why a thread stays behind round after round. The error texts
+// of the clients carry no content.
+func (m *mirror) local(c *channelPlan, id string, err error) error {
 	if err == nil || !threadLocal(err) {
 		return err
 	}
-	m.wk.log.DebugContext(context.Background(), "mirror: thread failed", slog.String(logKeyError, err.Error()))
-	c.rep.note(noteThreadFailed)
+	_, _ = fmt.Fprintf(m.env.Stderr, "bothy import discord: thread %s of channel %s failed in this round: %s\n", id, c.ch.ID, err.Error())
+	c.rep.note(noteThreadFailed + ": thread " + id + ": " + err.Error())
+	c.rep.threadsFailed++
 	return nil
 }
 
