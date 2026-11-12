@@ -29,6 +29,9 @@ type RetentionConfig struct {
 	SecurityAfterEnd time.Duration `config:"retention.security_after_end"`
 	// Cost is retention.cost.
 	Cost time.Duration `config:"retention.cost"`
+	// ImportAfterCompletion is retention.import_after_completion, the period of the items and the
+	// row of an import source after its completion or cancellation.
+	ImportAfterCompletion time.Duration `config:"retention.import_after_completion"`
 	// WebhookDeliveries is retention.webhook_deliveries.
 	WebhookDeliveries time.Duration `config:"retention.webhook_deliveries"`
 	// Audit is retention.audit, the period of the trim of the audit log.
@@ -143,10 +146,10 @@ func (h retentionHandler[A]) Work(ctx context.Context, _ jobs.Job[A]) error {
 	return err
 }
 
-// registerRetentionJobs registers the seven class jobs (retention.ops since M7-09,
-// retention.privacy_job since M7-06) on queue maintenance, periodic every
-// interval (retention.job_interval); only the roles worker and all run them. r may be nil in the
-// tests of the registration, which only need the kinds. The error is the first rejected registration.
+// registerRetentionJobs registers the class jobs, one per class of retention.JobClasses, on queue
+// maintenance, periodic every interval (retention.job_interval); only the roles worker and all run
+// them. r may be nil in the tests of the registration, which only need the kinds. The error is the
+// first rejected registration.
 func registerRetentionJobs(reg *jobs.Registry, r *RetentionJobs, interval time.Duration) error {
 	if interval <= 0 {
 		return errors.New("wire: retention.job_interval must be positive")
@@ -164,6 +167,9 @@ func registerRetentionJobs(reg *jobs.Registry, r *RetentionJobs, interval time.D
 		return err
 	}
 	if err := registerRetentionJob[retention.CostJob](reg, r, retention.ClassCost, interval); err != nil {
+		return err
+	}
+	if err := registerRetentionJob[retention.ImportJob](reg, r, retention.ClassImport, interval); err != nil {
 		return err
 	}
 	if err := registerRetentionJob[retention.PrivacyJobJob](reg, r, retention.ClassPrivacyJob, interval); err != nil {

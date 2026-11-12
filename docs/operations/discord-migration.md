@@ -315,9 +315,11 @@ read-only; after a restore, lift read-only on the channel):
 
 1. End the read mirror (stop the service, remove the schedule).
 2. Web console, owner: "Complete" (step-up). The confirmation warns: the mapping in
-   `import_items` (retention class `import`) stays until it is deleted after
-   `retention.import_after_completion` or by the owner ([20-privacy.md](../spec/20-privacy.md));
-   after that deletion a repeated import is no longer idempotent and would copy everything again.
+   `import_items` (retention class `import`) stays for `retention.import_after_completion` after
+   the completion; then the job `retention.import` deletes it together with the source
+   ([20-privacy.md](../spec/20-privacy.md) section 4.1). The imported contents stay. There is no
+   step of the owner that deletes it earlier; a shorter period is set with the key. After that
+   deletion a repeated import is no longer idempotent and would copy everything again.
 3. Remove the import bot from the Discord server (section 2) and log the tool out:
    `bothy import logout`.
 
@@ -338,7 +340,7 @@ a completed source cannot be started again, and nothing mirrors Discord any more
 | exit `3`, lease held | another writing run of this source holds the lease (section 7, "One writing run at a time") | a `--follow` mirror: stop it, run the command, start the mirror again; a scheduled round: run the command again; a run that crashed: wait `import.lease_stale_after` or use `--takeover` |
 | note `403: the channel is not readable` | the bot lacks `VIEW_CHANNEL` or `READ_MESSAGE_HISTORY` there; the run avoids the channel | fix the permission in Discord, run again |
 | note `403 on archived private threads` | the bot lacks `MANAGE_THREADS` | add it if private threads matter |
-| note `written in Discord after the switch-over` | Discord shows new messages in a channel Bothy leads; nothing is copied | lock the Discord channel (section 8 step 1); transfer the messages by hand |
+| note `written in Discord after the switch-over` | Discord shows new messages in a channel Bothy leads; the read mirror copies nothing | lock the Discord channel (section 8 step 1); transfer the messages by hand. A full `--apply` run without `--follow` or `--once` would append them behind the messages written in Bothy; it never renames, closes or reopens a thread that is already imported there |
 | `status` shows `inconsistent` | lead and read-only flag disagree | set the lead in the console again |
 
 Risks that the steps contain: a missing intent (preflight abort, RK-73), half-finished agent

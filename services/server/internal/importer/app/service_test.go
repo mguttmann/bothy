@@ -5,6 +5,7 @@ package app_test
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -12,7 +13,9 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/importer/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // mapping is the fixture mapping of the unit tests.
@@ -364,6 +367,87 @@ func TestSetLeadAndCursor(t *testing.T) {
 	}
 	_, err = e.svc.SetLead(ctx, e.owner, s.ID, importer.LeadCmd{SourceChannel: "20", Lead: "discord"})
 	wantErr(t, err, errs.CodeConflict, importer.ReasonImportState)
+}
+
+// progressOf decodes the payload member import of the import.progress event ev.
+func progressOf(t *testing.T, ev eventlog.Event) map[string]json.RawMessage {
+	t.Helper()
+	var body struct {
+		Import map[string]json.RawMessage `json:"import"`
+	}
+	if ev.Type != "import.progress" {
+		t.Fatalf("event %s, want import.progress", ev.Type)
+	}
+	if err := json.Unmarshal(ev.Payload, &body); err != nil {
+		t.Fatal(err)
+	}
+	return body.Import
+}
+
+// TestProgressPayloadBelowLimit (audit finding srv-import-2; 04 payload rule 2): import.progress
+// carries the whole source while its payload is smaller than sync.event_payload_max_bytes; a
+// source whose cursor outgrew the limit gets the reduced payload (no cursor, an empty config,
+// state and counters) with truncated set instead of a refused event, and the stored cursor stays
+// whole. A source whose reduced payload does not fit either is an internal error.
+func TestProgressPayloadBelowLimit(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := context.Background()
+	s := e.running(t)
+	limit := testConfig().EventPayloadMaxBytes
+
+	if _, err := e.svc.SetCursor(ctx, e.owner, s.ID, importer.CursorCmd{Cursor: json.RawMessage(`{"threads":{"1":"2"}}`)}); err != nil {
+		t.Fatal(err)
+	}
+	whole := e.events.evs[len(e.events.evs)-1]
+	if p := progressOf(t, whole); whole.Truncated || string(p["cursor"]) != `{"threads":{"1":"2"}}` || !strings.Contains(string(p["config"]), `"guild_id"`) {
+		t.Fatalf("the event of a small source is not whole: truncated %v, payload %s", whole.Truncated, whole.Payload)
+	}
+
+	threads := map[string]string{}
+	for i := 0; len(threads)*40 < 2*limit; i++ {
+		threads[strconv.Itoa(1100000000000000+i)] = strconv.Itoa(1200000000000000 + i)
+	}
+	big, err := json.Marshal(map[string]any{"version": 1, "threads": threads})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := e.svc.SetCursor(ctx, e.owner, s.ID, importer.CursorCmd{Cursor: big, Stats: json.RawMessage(`{"messages":2}`)})
+	if err != nil {
+		t.Fatalf("a cursor of %d bytes with the limit %d: %v", len(big), limit, err)
+	}
+	if string(out.Cursor) != string(big) {
+		t.Error("the answer does not carry the whole cursor")
+	}
+	if stored, _, _ := e.store.Source(ctx, s.ID); string(stored.Cursor) != string(big) {
+		t.Error("the stored cursor is not whole")
+	}
+	ev := e.events.evs[len(e.events.evs)-1]
+	p := progressOf(t, ev)
+	if !ev.Truncated || len(ev.Payload) >= limit {
+		t.Errorf("truncated %v with %d bytes, want a truncated payload below %d", ev.Truncated, len(ev.Payload), limit)
+	}
+	if _, has := p["cursor"]; has || string(p["config"]) != `{}` {
+		t.Errorf("the reduced payload carries cursor %v or config %s", has, p["config"])
+	}
+	if string(p["id"]) != `"`+s.ID.String()+`"` || string(p["state"]) != `"running"` || !strings.Contains(string(p["stats"]), `"tool":{"messages":2}`) {
+		t.Errorf("reduced payload %s", ev.Payload)
+	}
+	if testkit.HasJSONNull(ev.Payload) {
+		t.Errorf("the reduced payload holds a JSON null: %s", ev.Payload)
+	}
+
+	// Counters the tool sent that do not fit by themselves leave nothing to reduce.
+	huge, _ := json.Marshal(map[string]string{"note": strings.Repeat("x", limit)})
+	events := len(e.events.evs)
+	_, err = e.svc.SetCursor(ctx, e.owner, s.ID, importer.CursorCmd{Cursor: json.RawMessage(`{}`), Stats: huge})
+	wantErr(t, err, errs.CodeInternalError, "")
+	if len(e.events.evs) != events {
+		t.Error("an event was appended for the refused cursor")
+	}
+	if stored, _, _ := e.store.Source(ctx, s.ID); string(stored.Cursor) != string(big) {
+		t.Error("the refused cursor replaced the stored one")
+	}
 }
 
 // TestLists covers the pages of listImports and listImportItems.

@@ -5,12 +5,14 @@ package wire
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/retention"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
+	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics"
 )
 
 // countingParticipant removes left rows in batches and records the cutoffs it saw.
@@ -91,6 +93,17 @@ func TestRetentionJobs(t *testing.T) {
 	}
 	if n := len(jr.Periodic()); n != len(retention.JobClasses()) {
 		t.Errorf("%d periodic jobs, want one per class", n)
+	}
+}
+
+// TestRetentionDeletedCountsImport: the rows the job retention.import removes are counted under
+// their own class in bothy.retention.deleted; a class outside the closed set of the attribute
+// would be recorded as "other".
+func TestRetentionDeletedCountsImport(t *testing.T) {
+	t.Parallel()
+	attrs := metrics.RetentionDeleted.Attrs
+	if len(attrs) != 1 || !slices.Contains(attrs[0].Values, string(retention.ClassImport)) {
+		t.Errorf("bothy.retention.deleted takes %+v, want the class %s among its values", attrs, retention.ClassImport)
 	}
 }
 

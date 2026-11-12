@@ -32,9 +32,13 @@ Import sources, batches with origin key (`import.apply`), ownership list and rea
   `identity.ImportPeople`, then `posted` or `skipped`; an existing key is locked and answered with
   its stored item (with `source_changed` when the hash differs). Only a batch that made a new
   transition writes the counters and `import.progress`, so a repeated batch appends no event.
-- `internal/importer/adapters/postgres`: the sqlc queries over `import_sources` and `import_items`
-  and `Repository`. `adapters/httpapi`: the fourteen operations of the tag Import and the cursor
-  codec.
+  `import.progress` carries the whole source while its payload is smaller than
+  `sync.event_payload_max_bytes`; a larger source (the cursor of the tool grows with every thread)
+  gets the reduced payload without `cursor` and with an empty `config`, and `truncated` in the
+  envelope (`progressPayload`, 04 payload rule 2), so a receiver reads the source with `getImport`.
+- `internal/importer/adapters/postgres`: the sqlc queries over `import_sources` and `import_items`,
+  `Repository` and the participant `Retention` of the job `retention.import` (section "Retention").
+  `adapters/httpapi`: the fourteen operations of the tag Import and the cursor codec.
 
 ## Content items (M8-11)
 
@@ -47,7 +51,9 @@ Import sources, batches with origin key (`import.apply`), ownership list and rea
   thread of a posted text channel (`chat.ImportThreads.MainThread`), a posted thread, or the thread
   its first item creates (`chat.ImportThreads.Create`: planned operator of the mapping, times and
   done state of the source, starter message, posted forum tags) or mirrors
-  (`Lock`, `ApplyMirror`); every message goes through `messaging.ImportMessages.Append` (author of
+  (`Lock`, `ApplyMirror`; only while the stored mapping gives the channel of the thread item the
+  lead `discord`: a thread of a channel led here is answered and never changed, 22 7.2 and 12.1);
+  every message goes through `messaging.ImportMessages.Append` (author of
   the posted user item, else `409 conflict` with reason `author_not_imported`; reply target and files of posted items),
   every pin through `ImportMessages.Pin` with the owner as `pinned_by`. A batch that wrote anything
   ends with `chat.ImportThreads.FinishBatch` (floor, version, one `thread.updated`), the counters
@@ -90,6 +96,23 @@ Checked by go-arch-lint (ADR 0008).
 
 Only this module writes and reads these tables by SQL (03-data-model.md, principle 12).
 
+## Retention
+
+`adapters/postgres.Retention` is the participant of importer in the job `retention.import`
+(docs/spec/20-privacy.md section 4.1, class `import`), registered by `internal/wire` with the
+period `retention.import_after_completion`.
+
+| Table | End time | What the job removes |
+|---|---|---|
+| `import_items` | `finished_at` of its source, when the source is `completed` or `failed` | the items of the source, in batches |
+| `import_sources` | `finished_at`, in the state `completed` or `failed` | the row, once the source has no item left |
+
+A `draft`, `running` or `paused` source has no end time and keeps every row. The imported spaces,
+channels, threads, messages, files and people stay; deleting an item clears
+`messages.import_item_id` (`ON DELETE SET NULL`, served by the index of migration `00105`). After
+the deletion a repeated import of the same Discord server finds no origin key and would copy
+everything again (22 13.5).
+
 ## Actions (05-actions.md)
 
 `import.read`, `import.manage`, `import.apply`.
@@ -116,6 +139,10 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
   is `disabled` without identity, credential or grant (R-IM-06).
 - `import_items` is written `pending` before the target and `posted` in the same transaction
   (03, 4.11); a file item stays `pending` with its reserved file until `completeImportFile`.
+- The item state `failed` and the column `error` are reserved: no code path writes them. A refused
+  item rolls its whole batch back (22 8), and the failures the tool counts (messages, attachments)
+  are in `stats.tool`. Whether single failed items are stored is an open question for the owner
+  (ruling AUD-SIM1/6).
 
 ## Chapters
 
@@ -126,4 +153,4 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 `adapters/postgres.PersonalData` (`NewPersonalData()`) is the participant of importer in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Tables: `import_sources`, `import_items`.
 
 - Export: nothing. The items hold identifiers of the source system (also foreign person IDs in the origin key), not data the person gave this instance; the imports the person managed are in the audit entries of `audit.jsonl`.
-- Erase: nothing in any step; the rows stay in the class `import` until `retention.import_after_completion`, so a resumed import stays idempotent.
+- Erase: nothing in any step; the rows stay in the class `import` until the job `retention.import` removes them `retention.import_after_completion` after the end of their source (section "Retention"), so a resumed import stays idempotent.

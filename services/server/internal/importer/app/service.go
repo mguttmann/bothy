@@ -41,12 +41,15 @@ type Config struct {
 	PageSizeMax int `config:"api.page_size_max"`
 	// ThreadTitleMaxChars is thread.title_max_chars, the cut of an imported thread name (M8-11).
 	ThreadTitleMaxChars int `config:"thread.title_max_chars"`
+	// EventPayloadMaxBytes is sync.event_payload_max_bytes: the payload of import.progress stays
+	// below it (04 payload rule 2).
+	EventPayloadMaxBytes int `config:"sync.event_payload_max_bytes"`
 }
 
 // check refuses limits below 1.
 func (c Config) check() error {
 	if c.SpaceNameMaxChars < 1 || c.ChannelNameMaxChars < 1 || c.HandleMaxChars < 1 || c.DisplayNameMaxChars < 1 ||
-		c.PageSizeDefault < 1 || c.PageSizeMax < 1 || c.ThreadTitleMaxChars < 1 {
+		c.PageSizeDefault < 1 || c.PageSizeMax < 1 || c.ThreadTitleMaxChars < 1 || c.EventPayloadMaxBytes < 1 {
 		return errors.New("importer: every limit must be at least 1")
 	}
 	return nil
@@ -210,7 +213,8 @@ func (s *Service) deny(ctx context.Context, id ids.ID, problem string) {
 // timestampLayout is the form of every API time (06 section 2).
 const timestampLayout = "2006-01-02T15:04:05.000Z"
 
-// sourceJSON is the schema ImportSource, the payload member import of import.progress.
+// sourceJSON is the schema ImportSource, the payload member import of import.progress. Cursor is
+// absent in the reduced payload of progressPayload.
 type sourceJSON struct {
 	ID         string          `json:"id"`
 	Kind       string          `json:"kind"`
@@ -218,7 +222,7 @@ type sourceJSON struct {
 	Config     json.RawMessage `json:"config"`
 	State      string          `json:"state"`
 	Stats      json.RawMessage `json:"stats"`
-	Cursor     json.RawMessage `json:"cursor"`
+	Cursor     json.RawMessage `json:"cursor,omitempty"`
 	CreatedAt  string          `json:"created_at"`
 	StartedAt  string          `json:"started_at,omitempty"`
 	FinishedAt string          `json:"finished_at,omitempty"`
@@ -240,23 +244,59 @@ func object(raw json.RawMessage) json.RawMessage {
 	return raw
 }
 
-// changed appends import.progress for src and publishes importer.SourceChanged (22 14: after
-// every committed change of a source). The event is owner-only by its receive action
-// import.read.
-func (s *Service) changed(ctx context.Context, src importer.Source) error {
-	payload, err := json.Marshal(struct {
+// progressJSON encodes the payload ImportProgressPayload of body.
+func progressJSON(body sourceJSON) ([]byte, error) {
+	p, err := json.Marshal(struct {
 		Import sourceJSON `json:"import"`
-	}{sourceJSON{
+	}{body})
+	if err != nil {
+		return nil, errs.Wrap(errs.CodeInternalError, err, "importer: import.progress payload")
+	}
+	return p, nil
+}
+
+// progressPayload returns the payload of import.progress for src below
+// sync.event_payload_max_bytes (04 payload rule 2): the whole source when that fits; otherwise the
+// reduced payload, which keeps the state, the counters and the times and leaves out the two
+// members that grow with the source (the cursor is absent, config is {}), with truncated reported
+// for the envelope, so a receiver reloads the source with getImport. The tool adds entries per
+// thread to its cursor and never removes one, so a large import always reaches the limit.
+//
+// Errors: internal_error when the reduced payload does not fit either (counters the tool sent
+// that are larger than the limit).
+func (s *Service) progressPayload(src importer.Source) (payload []byte, truncated bool, err error) {
+	body := sourceJSON{
 		ID: src.ID.String(), Kind: src.Kind, Name: src.Name, Config: object(src.Config), State: src.State, Stats: object(src.Stats),
 		Cursor: object(src.Cursor), CreatedAt: stamp(src.CreatedAt), StartedAt: stamp(src.StartedAt), FinishedAt: stamp(src.FinishedAt),
-	}})
+	}
+	whole, err := progressJSON(body)
+	if err != nil || len(whole) < s.cfg.EventPayloadMaxBytes {
+		return whole, false, err
+	}
+	body.Config, body.Cursor = object(nil), nil
+	reduced, err := progressJSON(body)
 	if err != nil {
-		return errs.Wrap(errs.CodeInternalError, err, "importer: import.progress payload")
+		return nil, false, err
+	}
+	if len(reduced) >= s.cfg.EventPayloadMaxBytes {
+		return nil, false, errs.New(errs.CodeInternalError, "importer: an import.progress event does not fit sync.event_payload_max_bytes")
+	}
+	return reduced, true, nil
+}
+
+// changed appends import.progress for src and publishes importer.SourceChanged (22 14: after
+// every committed change of a source). The event is owner-only by its receive action
+// import.read; its payload is that of progressPayload.
+func (s *Service) changed(ctx context.Context, src importer.Source) error {
+	payload, truncated, err := s.progressPayload(src)
+	if err != nil {
+		return err
 	}
 	kind, actorID := eventActor(ctx)
 	if err := s.d.Events.Append(ctx, eventlog.Event{
 		Type: string(authorize.EventImportProgress), SchemaVersion: 1, ActorKind: kind, ActorPrincipalID: actorID,
 		ResourceKind: resourceSource, ResourceID: src.ID, ReceiveAction: string(authorize.ActionImportRead), Payload: payload,
+		Truncated: truncated,
 	}); err != nil {
 		return err
 	}

@@ -15,8 +15,9 @@ import (
 // (retention.import_after_completion). Export writes nothing: the identifiers are those of the
 // source system, not data the person gave this instance, and the created_by of an import is an
 // administrative act that the audit entries of audit.jsonl record. Erase changes nothing: the rows
-// stay with the pseudonymous ID until retention.import_after_completion removes them, because a
-// running or resumed import needs its items to stay idempotent.
+// stay with the pseudonymous ID until the job retention.import removes them
+// retention.import_after_completion after the end of their source (Retention), because a running
+// or resumed import needs its items to stay idempotent.
 type PersonalData struct{}
 
 // Compile-time check: PersonalData is a participant of kernel/personaldata.

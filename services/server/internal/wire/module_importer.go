@@ -5,6 +5,8 @@ package wire
 import (
 	"context"
 	"errors"
+
+	importerpg "github.com/OWNER/bothy/services/server/internal/importer/adapters/postgres"
 )
 
 // importerState is the part of the server state the importer module fills.
@@ -19,8 +21,9 @@ type importerState struct {
 // moduleImporter is the name of the module in architecture/modules.yaml.
 const moduleImporter = "importer"
 
-// importerWiring wires the importer module into the start step chat, after stats. The read-only
-// guard of chat is built in the chat part itself (NewChat), over the importer store alone.
+// importerWiring wires the importer module into the start step chat, after stats, and its
+// participant into the job retention.import. The read-only guard of chat is built in the chat part
+// itself (NewChat), over the importer store alone.
 func importerWiring() moduleWiring {
 	return moduleWiring{
 		module: moduleImporter,
@@ -29,6 +32,9 @@ func importerWiring() moduleWiring {
 			if s.importer != nil {
 				s.importer.fillHandlers(h)
 			}
+		},
+		jobs: func(s *server, m *JobModules) error {
+			return m.registerRetention(importerpg.NewRetention(s.currentPool()), m.RetentionConfig.ImportAfterCompletion)
 		},
 	}
 }

@@ -149,7 +149,7 @@ record (template, section "Activities"):
 | `transient` | `sync.idempotency_key_ttl` (04), `retention.webhook_deliveries` | job |
 | `audit` | `retention.audit` | truncation through the maintenance role with an anchor entry (03, `audit_events`) |
 | `cost` | `retention.cost` | job |
-| `import` | `retention.import_after_completion` after completion of the import | job |
+| `import` | `retention.import_after_completion` after the completion or cancellation of the import source | job `retention.import` |
 | `privacy_job` | `retention.privacy_job`; export packages `privacy.export_ttl` | job `retention.privacy_job` (finished requests, M7-06); packages through `privacy.export_expiry` |
 | `ops` | `retention.ops` | job |
 | `stats` | `retention.stats_minutes` | job `stats.retention` detaches whole daily partitions; never shorter than the longest SLO period ([25-visualization.md](25-visualization.md), section 3.5) |
@@ -180,6 +180,13 @@ How the jobs `retention.<class>` work (M7-05, ruling D-M7-05-1 to D-M7-05-6):
 - `transient`: finished deliveries of outgoing webhooks after `retention.webhook_deliveries`.
 - `audit`: the trim of 4.5 and the destruction of the IP keys.
 - `cost`: cost entries and closed price rows after `retention.cost`.
+- `import`: the items of an import source (`import_items`) and then its row (`import_sources`)
+  after `retention.import_after_completion` from `finished_at`, for a source in the state
+  `completed` or `failed` (a cancelled source is `failed`). A `draft`, `running` or `paused` source
+  has no end time and keeps every row, so a running or resumed import stays idempotent. The
+  imported spaces, channels, threads, messages, files and people stay; a message only loses the
+  reference to its item. After the deletion a repeated import of the same source finds no origin
+  key and would copy everything again ([22-import-migration.md](22-import-migration.md) 13.5).
 - `privacy_job` (M7-06): privacy requests in a final state (`completed`, `failed`, `rejected`,
   `cancelled`) after `retention.privacy_job` from `completed_at`; a completed export stays until
   `privacy.export_expiry` has deleted its package.
@@ -573,7 +580,7 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 | `retention.security_after_end` | `90d` | security data after end, expiry or revocation |
 | `retention.audit` | `365d` | audit log (Study C suggested twelve months) |
 | `retention.cost` | `395d` | costs and prices |
-| `retention.import_after_completion` | `90d` | import state after completion |
+| `retention.import_after_completion` | `90d` | import state (the source and its items) after the completion or cancellation of the source |
 | `retention.privacy_job` | `1095d` | privacy requests (without export packages) |
 | `retention.ops` | `395d` | status page |
 | `retention.stats_minutes` | `90d` | minute aggregates of the own measurement (`stats_minutes`); at least the longest SLO period |

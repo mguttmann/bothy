@@ -146,7 +146,8 @@ func (s *Service) mainThread(ctx context.Context, run *threadRun, tk domain.Thre
 }
 
 // threadItem writes the thread item of a thread: batch (M8-11 design note 3): a new key creates
-// the thread; a posted key is answered and its thread mirrored (22 12.2 step 3).
+// the thread; a posted key is answered and its thread mirrored (22 12.2 step 3) while the source
+// leads its channel.
 func (s *Service) threadItem(ctx context.Context, run *threadRun, x parsed) (importer.Item, error) {
 	row, created, err := s.d.Store.InsertPendingItem(ctx, NewItem{
 		ID: ids.New(), SourceID: run.src.ID, OriginKey: x.obj.OriginKey, ItemKind: x.obj.ItemKind, ContentSHA256: x.sha, At: s.now(),
@@ -229,8 +230,24 @@ func underPointer(err error, prefix string) error {
 	return errs.New(errs.CodeValidationFailed, e.Detail).WithFields(fields...)
 }
 
-// mirror applies the mirror rules to the posted thread of run (M8-11 design note 3 b).
+// ledHere reports that the stored mapping gives the channel of the thread item d the lead `bothy`
+// (22 12.1); a channel the mapping does not name is not led here.
+func ledHere(bt *batch, d domain.ThreadData) bool {
+	k, code := domain.ParseOriginKey(domain.KindChannel, d.ChannelOriginKey)
+	if code != "" {
+		return false
+	}
+	e := bt.m.Channel(k.IDs[0])
+	return e != nil && e.Lead == domain.LeadHere
+}
+
+// mirror applies the mirror rules to the posted thread of run (M8-11 design note 3 b). A thread of
+// a channel this server leads has no mirror (22 12.1): the source no longer decides its title, its
+// state or its last activity, so a full run after the switch-over changes nothing there.
 func (s *Service) mirror(ctx context.Context, run *threadRun, d domain.ThreadData) error {
+	if ledHere(run.batch, d) {
+		return nil
+	}
 	st, err := s.d.Threads.Lock(ctx, run.threadID)
 	if err != nil {
 		return err

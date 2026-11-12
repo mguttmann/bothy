@@ -18,6 +18,7 @@ import (
 	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
 	billingpg "github.com/OWNER/bothy/services/server/internal/billing/adapters/postgres"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
+	importerpg "github.com/OWNER/bothy/services/server/internal/importer/adapters/postgres"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/kernel/retention"
 	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
@@ -27,7 +28,7 @@ import (
 	terminalpg "github.com/OWNER/bothy/services/server/internal/terminal/adapters/postgres"
 )
 
-// timeClasses are the classes of 03 whose rows end by time (20 4.1): the six classes of the jobs
+// timeClasses are the classes of 03 whose rows end by time (20 4.1): the classes of the jobs
 // retention.<class> and the classes whose jobs belong to other tickets or modules. config,
 // account and personal_sync have no time-based job.
 var timeClasses = []string{"security", "content", "transient", "audit", "cost", "privacy_job", "ops", "import", "stats", "event_log"}
@@ -46,8 +47,6 @@ var handledElsewhere = map[string]string{
 	"file_upload_sessions": "job:files.cleanup_pending",
 	"file_upload_parts":    "job:files.cleanup_pending",
 	"gateway_presence":     "module:gateway deletes the rows of ended connections and stale nodes (R-DM-51)",
-	"import_sources":       "ticket:M8",
-	"import_items":         "ticket:M8",
 	"dev_environments":     "ticket:V2",
 }
 
@@ -100,7 +99,7 @@ func retentionParticipants(t *testing.T) []retention.Participant {
 		identitypg.NewRetention(nil), instancepg.NewRepository(nil).Retention(), notifypg.NewRegistrations(nil),
 		terminalpg.NewRetention(nil), appspg.NewRetention(nil), billingpg.NewRetention(nil),
 		new(messagingapp.Service).Retention(), trim, auditapp.NewIPKeys(auditpg.NewRepository(nil), nil),
-		statuspg.NewRetention(nil), privacypg.NewRetention(nil),
+		statuspg.NewRetention(nil), privacypg.NewRetention(nil), importerpg.NewRetention(nil),
 	}
 }
 

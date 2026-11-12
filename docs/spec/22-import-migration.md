@@ -402,11 +402,15 @@ The server executes every item like this ([03-data-model.md](03-data-model.md), 
 4. `content_sha256` stores the hash of the converted content. A later run that sees a
    different hash counts "changed at the source" in the report and changes nothing.
 
-A posted thread applies the changes of section 12.2 step 3; every other posted item answers with
-its target and changes nothing. A posted thread item thus renames the thread only while its
-`title_source` is `auto`, closes it with `closed_at` or reopens it (clearing `closed_at` and
-`closed_by`), and moves `last_activity_at` forward; it never changes the operator, the parent
-message or the tags (M8-11).
+A posted thread applies the changes of section 12.2 step 3 while the source leads its channel
+(`lead = discord`, the channel its `channel_origin_key` names in the stored mapping); every other
+posted item answers with its target and changes nothing. A posted thread item thus renames the
+thread only while its `title_source` is `auto`, closes it with `closed_at` or reopens it (clearing
+`closed_at` and `closed_by`), and moves `last_activity_at` forward; it never changes the operator,
+the parent message or the tags (M8-11). In a channel with `lead = bothy` there is no mirror
+(section 12.1): a posted thread item answers with its target and changes nothing, so a full run
+after the switch-over neither closes a thread that Discord archived meanwhile nor reopens one that
+was closed here. Messages of such a channel that the run finds new are still taken over.
 
 The answer to such a key carries the stored item with the member `source_changed = true`
 (`ImportItem`), and the server raises its counter `server.source_changed` in
@@ -496,6 +500,15 @@ and a content item in a batch without `thread_origin_key`, is `400 validation_fa
 read-only mirror channel, while 05 4.12 puts the files of an import under `import.apply`. `setImportCursor` replaces `cursor` and
 merges the members of `stats` into `stats.tool`; the server's own counters are under
 `stats.server`. `getImport` and `listImports` return the stored `cursor`.
+
+`import.progress` carries the source as `getImport` returns it while that payload is smaller than
+`sync.event_payload_max_bytes`. The cursor grows with every thread of the source and the mapping
+with every channel and person, so a large import passes the limit. Its events then carry the
+reduced payload of [04-sync-protocol.md](04-sync-protocol.md) section 2.2, payload rule 2: `id`,
+`kind`, `name`, `state`, `stats` and the times, with `config` empty (`{}`) and without `cursor`,
+and `truncated: true` in the envelope; a receiver reads the source with `getImport`. The stored
+cursor is bounded only by the body limit of `setImportCursor` (`http.max_json_body_bytes`,
+`413 payload_too_large` above it).
 
 The command line logs in as a device with `platform = cli` through device pairing
 (`bothy import login`, [08-identity.md](08-identity.md) sections 5.3 and 6.4). Such a session
@@ -672,6 +685,12 @@ threads, reactions or interactions in the channel; only `import.apply` writes (`
 nor `failed`, so the ownership list and the flag never disagree. As a result, no agent can be triggered in the mirror, and a
 channel never has two leading places.
 
+The lead decides the mirror, not `import.apply`: a full run (`--apply` without `--follow` or
+`--once`) also reads a channel with `lead = bothy` and takes over the messages it finds new there
+(section 7.2), for example the history of a channel that was imported with `lead = bothy` from the
+start. A thread that is already posted there keeps its title and its state; its last activity
+moves only with a message that is appended to it.
+
 ### 12.2 Round
 
 Every `import.follow.poll_interval`:
@@ -810,8 +829,10 @@ owner in the web console). An imported channel that was deleted, archived or pur
 space was archived) does not block the completion even while its lead is `discord`: its lead can no
 longer change (`setImportLead` answers `404`), and it stays read-only; after a restore the owner
 lifts read-only with `setChannelReadOnly`. The
-mapping `import_items` remains until the owner has the retention class `import` deleted
-([20-privacy.md](20-privacy.md)). After that a repeated import is no longer idempotent;
+source and its mapping `import_items` remain for `retention.import_after_completion` after the
+completion (or the cancellation); then the job `retention.import` deletes the items and the source
+(retention class `import`, [20-privacy.md](20-privacy.md) section 4.1). The imported contents stay.
+After that a repeated import is no longer idempotent;
 the web console warns before this step (in the confirmation of the completion).
 
 ## 14. Security and privacy
@@ -823,7 +844,7 @@ the web console warns before this step (in the confirmation of the completion).
 | Permissions | import and mirror only by owners; start with step-up; new channels without grants |
 | Triggering | `origin = import` never triggers; channels in the mirror are read-only |
 | Placeholders | personal data of third-party Discord users; class `account`; deletion through a privacy request |
-| Origin | `import_items` (class `import`) contains Discord IDs; deletable after completion |
+| Origin | `import_sources` and `import_items` (class `import`) contain Discord IDs; the job `retention.import` deletes them `retention.import_after_completion` after the completion or cancellation of the source |
 | Audit | start, pause, cancellation, completion, ownership list, bindings |
 | Telemetry | counters and durations of the tool, no content, no Discord IDs |
 
@@ -853,6 +874,9 @@ The import interface is source-neutral. A Zulip import would be a further comman
 | Intent probe | a channel with only empty messages by other authors aborts with exit `2` |
 | Invalid selection | an unknown ID in `--only-thread` aborts before any write |
 | Foreign thread operator | imported threads with an operator other than `planned_operator` stop `switch` with exit `2` before any write; `--force` warns and switches (13.3.1) |
+| Progress of a large source | a cursor several times `sync.event_payload_max_bytes` is stored; `import.progress` carries the reduced payload with `truncated`, `getImport` the whole cursor (section 8) |
+| No mirror where Bothy leads | after the switch-over a posted thread item changes neither title nor state of its thread and appends no event; a new message is still taken over (7.2, 12.1) |
+| Import state ends | the job `retention.import` removes the items and the row of a source completed or cancelled before `retention.import_after_completion`, and of no other source; the imported messages stay (13.5) |
 
 ## 17. Decisions of this chapter
 

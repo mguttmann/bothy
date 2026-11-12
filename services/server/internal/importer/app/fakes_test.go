@@ -507,7 +507,7 @@ func newEnvWith(t *testing.T, with func(*app.Deps)) *env {
 
 func testConfig() app.Config {
 	return app.Config{SpaceNameMaxChars: 12, ChannelNameMaxChars: 12, HandleMaxChars: 20, DisplayNameMaxChars: 20, PageSizeDefault: 2, PageSizeMax: 3,
-		ThreadTitleMaxChars: 20}
+		ThreadTitleMaxChars: 20, EventPayloadMaxBytes: 4096}
 }
 
 // wantErr fails unless err has code and (when given) reason.
