@@ -3,6 +3,7 @@
 package domain_test
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -89,6 +90,60 @@ func TestApplyResult(t *testing.T) {
 	bad := domain.ApplyResult(base, domain.SendResult{Class: domain.ResultDisable, DisableReason: domain.DisableLogout}, now, maxFailures)
 	if bad.Changed || bad.Retry || bad.Outcome != domain.OutcomeRejectedOther {
 		t.Errorf("disable with logout: %+v", bad)
+	}
+}
+
+// TestApplyResult_NoLimit (finding srv-notify-1, AUD-SN01/1): with push.max_consecutive_failures
+// 0, the default, a transient failure counts and is retried however many came before; the row is
+// never deactivated. The count stops at the largest value of the column instead of wrapping.
+func TestApplyResult_NoLimit(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC)
+	created := now.Add(-48 * time.Hour)
+	for _, before := range []int{0, 4, 5, 99, 100000} {
+		state := domain.RegistrationState{CreatedAt: created, FailureCount: before}
+		got := domain.ApplyResult(state, domain.SendResult{Class: domain.ResultRetry}, now, 0)
+		want := domain.RegistrationState{CreatedAt: created, FailureCount: before + 1}
+		if got.State != want || !got.Changed || !got.Retry || got.Outcome != domain.OutcomeProviderError {
+			t.Errorf("after %d failures: got %+v; want state %+v, changed, retried, provider_error", before, got, want)
+		}
+	}
+	full := domain.RegistrationState{CreatedAt: created, FailureCount: math.MaxInt32}
+	got := domain.ApplyResult(full, domain.SendResult{Class: domain.ResultRetry}, now, 0)
+	if got.State != full || !got.Retry || got.Outcome != domain.OutcomeProviderError {
+		t.Errorf("at the largest count: got %+v; want the same state and a retry", got)
+	}
+}
+
+// TestApplyResult_DisabledRowStays (finding srv-notify-10, AUD-SN01/2; 13 7.3 "a row that is
+// already disabled keeps its first reason"): a provider answer for a registration that was
+// deactivated while the request ran changes nothing, whatever its class, and is never retried;
+// the outcome still names the answer.
+func TestApplyResult_DisabledRowStays(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC)
+	created, ended := now.Add(-48*time.Hour), now.Add(-time.Second)
+	for _, reason := range []string{domain.DisableLogout, domain.DisableDeviceRevoked, domain.DisableTokenInvalid} {
+		state := domain.RegistrationState{CreatedAt: created, LastSuccessAt: created.Add(time.Hour), FailureCount: 2, DisabledAt: ended, DisabledReason: reason}
+		for _, c := range []struct {
+			res     domain.SendResult
+			outcome string
+		}{
+			{domain.SendResult{Class: domain.ResultAccepted}, domain.OutcomeAccepted},
+			{domain.SendResult{Class: domain.ResultDisable, DisableReason: domain.DisableTokenInvalid}, domain.OutcomeRejectedToken},
+			{domain.SendResult{Class: domain.ResultDisable, DisableReason: domain.DisableSenderMismatch}, domain.OutcomeRejectedToken},
+			{domain.SendResult{Class: domain.ResultRetry}, domain.OutcomeProviderError},
+			{domain.SendResult{Class: domain.ResultThrottled, RetryAfter: time.Minute}, domain.OutcomeThrottled},
+			{domain.SendResult{Class: domain.ResultConfigError}, domain.OutcomeRejectedOther},
+			{domain.SendResult{Class: domain.ResultProgramError}, domain.OutcomeRejectedOther},
+		} {
+			for _, limit := range []int{0, 3} {
+				got := domain.ApplyResult(state, c.res, now, limit)
+				if got.State != state || got.Changed || got.Retry || got.Outcome != c.outcome {
+					t.Errorf("%s, class %s, limit %d: got %+v; want the row unchanged, no retry, outcome %s", reason, c.res.Class, limit, got, c.outcome)
+				}
+			}
+		}
 	}
 }
 

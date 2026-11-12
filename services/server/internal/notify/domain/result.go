@@ -17,8 +17,8 @@ const (
 	ResultAccepted ResultClass = "accepted"
 	// ResultDisable: the token is invalid for good; SendResult.DisableReason says why.
 	ResultDisable ResultClass = "disable"
-	// ResultRetry: a transient failure of the provider or the network; counts towards
-	// push.max_consecutive_failures.
+	// ResultRetry: a transient failure of the provider or the network; it counts in failure_count
+	// and, only when push.max_consecutive_failures is above 0, towards that limit.
 	ResultRetry ResultClass = "retry"
 	// ResultThrottled: the provider limits the server, not the token; retried without counting.
 	ResultThrottled ResultClass = "throttled"
@@ -41,7 +41,8 @@ const (
 	DisableTopicMismatch = "topic_mismatch"
 	// DisableSenderMismatch: the token belongs to another sender (FCM).
 	DisableSenderMismatch = "sender_mismatch"
-	// DisableRepeatedFailures: push.max_consecutive_failures transient failures in a row.
+	// DisableRepeatedFailures: push.max_consecutive_failures transient failures in a row, on an
+	// instance that set the key above 0.
 	DisableRepeatedFailures = "repeated_failures"
 )
 
@@ -100,19 +101,23 @@ type RegistrationChange struct {
 }
 
 // ApplyResult applies the table of 13 7.3 to the registration state of one send (brief M3-19
-// design note 13, D-M3-19-12):
+// design note 13, D-M3-19-12; docs/decisions.d/AUD-srv-notify-01.md AUD-SN01/1 and AUD-SN01/2):
 //
 //   - accepted: last_success_at = now and failure_count = 0; the hint is done;
 //   - disable: disabled_at = now with the reason, unless InvalidSince is set and the row was
 //     created after it (13 7.1 row 410: a newer registration of the same token stays); the hint
 //     is done;
-//   - retry: failure_count + 1 and, at maxFailures, disabled_at = now with repeated_failures; the
-//     hint is retried unless the row was deactivated;
+//   - retry: failure_count + 1 (it stops at the largest value of the column) and the hint is
+//     retried. Only with maxFailures above 0 (push.max_consecutive_failures; 0, the default,
+//     never deactivates): at maxFailures disabled_at = now with repeated_failures, and the hint
+//     is not retried;
 //   - throttled: the row stays (the limit is the server's, not the token's); the hint is retried;
 //   - config_error and program_error: the row stays; the hint is dropped.
 //
-// A disable with another reason and an unknown class count as a program error of the adapter.
-// ApplyResult never mutates state.
+// A row that is already disabled (a session end, a revocation or a newer registration between
+// the read and the answer) keeps its state and its first reason, and the hint is never retried;
+// the outcome still names the answer. A disable with another reason and an unknown class count
+// as a program error of the adapter. ApplyResult never mutates state.
 func ApplyResult(state RegistrationState, res SendResult, now time.Time, maxFailures int) RegistrationChange {
 	out := RegistrationChange{State: state, Outcome: OutcomeRejectedOther}
 	switch res.Class {
@@ -130,16 +135,23 @@ func ApplyResult(state RegistrationState, res SendResult, now time.Time, maxFail
 		out.State.DisabledAt, out.State.DisabledReason = now, res.DisableReason
 		out.Changed = true
 	case ResultRetry:
-		out.State.FailureCount++
-		out.Changed, out.Outcome = true, OutcomeProviderError
-		if out.State.FailureCount >= maxFailures {
+		out.Outcome = OutcomeProviderError
+		if state.FailureCount < math.MaxInt32 {
+			out.State.FailureCount++
+			out.Changed = true
+		}
+		if maxFailures > 0 && out.State.FailureCount >= maxFailures {
 			out.State.DisabledAt, out.State.DisabledReason = now, DisableRepeatedFailures
-			return out
+			out.Changed = true
+			break
 		}
 		out.Retry = true
 	case ResultThrottled:
 		out.Retry, out.Outcome = true, OutcomeThrottled
 	case ResultConfigError, ResultProgramError:
+	}
+	if !state.DisabledAt.IsZero() {
+		return RegistrationChange{State: state, Outcome: out.Outcome}
 	}
 	return out
 }

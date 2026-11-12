@@ -3362,13 +3362,13 @@
       "name": "push.max_consecutive_failures",
       "env": "BOTHY_PUSH__MAX_CONSECUTIVE_FAILURES",
       "kind": "int",
-      "default": "5",
+      "default": "0",
       "required": false,
       "enum": [],
-      "min": "1",
+      "min": "0",
       "max": "100000",
       "chapter": "03-data-model.md",
-      "doc": "Consecutive transient failures after which a push registration is deactivated."
+      "doc": "Consecutive transient failures after which a push registration is deactivated; 0 never deactivates one for them."
     },
     {
       "name": "push.registration_field_max_bytes",

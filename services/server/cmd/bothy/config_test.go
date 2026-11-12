@@ -506,7 +506,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"push.fcm.service_account_ref = file:/run/bothy/secrets/fcm_service_account.json  # default\n" +
 		"push.max_age = 1h  # default\n" +
 		"push.max_concurrent_requests = 32  # default\n" +
-		"push.max_consecutive_failures = 5  # default\n" +
+		"push.max_consecutive_failures = 0  # default\n" +
 		"push.registration_field_max_bytes = 1024  # default\n" +
 		"push.retry_base = 2s  # default\n" +
 		"push.retry_cap = 5m  # default\n" +

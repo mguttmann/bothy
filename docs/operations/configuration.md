@@ -267,7 +267,7 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `run.max_steps_persisted` | `BOTHY_RUN__MAX_STEPS_PERSISTED` | Server | int | `2000` | stored steps per run | active |
 | `run.stall_after` | `BOTHY_RUN__STALL_AFTER` | Server | duration | `10m` | without progress: stall notice | active |
 | `component.default_ttl` | `BOTHY_COMPONENT__DEFAULT_TTL` | Server | duration | `24h` | expiry of a component without its own value | active |
-| `push.max_consecutive_failures` | `BOTHY_PUSH__MAX_CONSECUTIVE_FAILURES` | Server | int | `5` | after that, a push registration is deactivated | active |
+| `push.max_consecutive_failures` | `BOTHY_PUSH__MAX_CONSECUTIVE_FAILURES` | Server | int | `0` | transient failures in a row after which a push registration is deactivated; `0` never deactivates one for them ([13-push-notifications.md](../spec/13-push-notifications.md) 7.3) | active |
 | `webhook.allowed_hosts` | `BOTHY_WEBHOOK__ALLOWED_HOSTS` | Server | list(string) | empty | allowed target hosts for outgoing webhooks | active |
 | `webhook.max_consecutive_failures` | `BOTHY_WEBHOOK__MAX_CONSECUTIVE_FAILURES` | Server | int | `20` | after that, a subscription is deactivated | active |
 | `webhook.retry_backoff_base` | `BOTHY_WEBHOOK__RETRY_BACKOFF_BASE` | Server | duration | `10s` | base of the backoff | active |

@@ -203,6 +203,7 @@ type DeviceSource interface {
 type HistorySource interface {
 	ResourceEvents(ctx context.Context, q sync.ResourceQuery) ([]sync.Event, error)
 	PersonalEvents(ctx context.Context, q sync.PersonalQuery) ([]sync.Event, error)
+	LastPersonalEvent(ctx context.Context, q sync.PersonalResourceQuery) (sync.Event, bool, error)
 }
 
 // ReadPositions is the part of sync.ReadStates the consumer uses: read_states.last_read_seq,

@@ -153,3 +153,95 @@ func TestHistory(t *testing.T) {
 		t.Fatalf("Do = %v, want the rollback", err)
 	}
 }
+
+// readEvent is read_state.updated of person for thread.
+func readEvent(person, thread ids.ID) eventlog.Event {
+	ev := personalEvent("read_state.updated", person)
+	ev.ResourceID = thread
+	return ev
+}
+
+// TestHistory_LastPersonalEvent (finding performance-5, docs/decisions.d/AUD-srv-notify-01.md
+// AUD-SN01/3): among the reads of many people in one thread and the reads of one person in many
+// threads, LastPersonalEvent returns the one newest event of that person and that thread below
+// Before, mapped like the log tail, and nothing when there is none; inside a unit of work it
+// reads its transaction.
+func TestHistory_LastPersonalEvent(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t, envOptions{})
+	ctx := context.Background()
+	var h sync.History = e.repo
+	alex, sam, thread, other := ids.New(), ids.New(), ids.New(), ids.New()
+	events := []eventlog.Event{
+		readEvent(alex, thread), // 1
+		readEvent(sam, thread),  // 2
+		readEvent(alex, other),  // 3
+		readEvent(alex, thread), // 4
+		readEvent(sam, thread),  // 5
+	}
+	// Twenty more readers of the thread and a personal event of another type on the same thread.
+	for range 20 {
+		events = append(events, readEvent(ids.New(), thread)) // 6 to 25
+	}
+	draft := personalEvent("draft.updated", alex)
+	draft.ResourceID = thread
+	events = append(events, draft, readEvent(alex, thread)) // 26, 27
+	if _, err := e.appendUnit(ctx, events...); err != nil {
+		t.Fatal(err)
+	}
+	all, err := e.repo.EventsAfter(ctx, 0, 100)
+	if err != nil || len(all) != len(events) {
+		t.Fatalf("EventsAfter = %d events, %v", len(all), err)
+	}
+	reads := []string{"read_state.updated"}
+	cases := []struct {
+		name string
+		q    sync.PersonalResourceQuery
+		want int64 // the seq of the event, 0 for none
+	}{
+		{"the newest of the person in the thread", sync.PersonalResourceQuery{AudienceID: alex, ResourceKind: "thread", ResourceID: thread, Types: reads, Before: 100}, 27},
+		{"below the bound", sync.PersonalResourceQuery{AudienceID: alex, ResourceKind: "thread", ResourceID: thread, Types: reads, Before: 27}, 4},
+		{"the bound is exclusive", sync.PersonalResourceQuery{AudienceID: alex, ResourceKind: "thread", ResourceID: thread, Types: reads, Before: 4}, 1},
+		{"nothing before the first", sync.PersonalResourceQuery{AudienceID: alex, ResourceKind: "thread", ResourceID: thread, Types: reads, Before: 1}, 0},
+		{"another person", sync.PersonalResourceQuery{AudienceID: sam, ResourceKind: "thread", ResourceID: thread, Types: reads, Before: 100}, 5},
+		{"another thread", sync.PersonalResourceQuery{AudienceID: alex, ResourceKind: "thread", ResourceID: other, Types: reads, Before: 100}, 3},
+		{"another type", sync.PersonalResourceQuery{AudienceID: alex, ResourceKind: "thread", ResourceID: thread, Types: []string{"draft.updated"}, Before: 100}, 26},
+		{"two types", sync.PersonalResourceQuery{AudienceID: alex, ResourceKind: "thread", ResourceID: thread, Types: []string{"draft.updated", "read_state.updated"}, Before: 27}, 26},
+		{"another resource kind", sync.PersonalResourceQuery{AudienceID: alex, ResourceKind: "run", ResourceID: thread, Types: reads, Before: 100}, 0},
+		{"a person without reads", sync.PersonalResourceQuery{AudienceID: ids.New(), ResourceKind: "thread", ResourceID: thread, Types: reads, Before: 100}, 0},
+		{"no types", sync.PersonalResourceQuery{AudienceID: alex, ResourceKind: "thread", ResourceID: thread, Before: 100}, 0},
+	}
+	for _, c := range cases {
+		got, found, err := h.LastPersonalEvent(ctx, c.q)
+		if err != nil {
+			t.Fatalf("LastPersonalEvent %s: %v", c.name, err)
+		}
+		if found != (c.want != 0) || got.Seq != c.want {
+			t.Errorf("LastPersonalEvent %s = seq %d (found %v), want %d", c.name, got.Seq, found, c.want)
+			continue
+		}
+		if found && !reflect.DeepEqual(got, all[c.want-1]) {
+			t.Errorf("LastPersonalEvent %s maps the row differently from EventsAfter:\n got %+v\nwant %+v", c.name, got, all[c.want-1])
+		}
+	}
+
+	rollback := errors.New("roll back")
+	err = e.uow.Do(ctx, func(ctx context.Context) error {
+		p := readEvent(alex, thread)
+		p.ID = ids.New()
+		if err := e.repo.Write(ctx, 28, 0, []app.PendingEvent{{Event: p}}); err != nil {
+			return err
+		}
+		got, found, err := h.LastPersonalEvent(ctx, cases[0].q)
+		if err != nil {
+			return err
+		}
+		if !found || got.Seq != 28 {
+			t.Errorf("inside the unit: seq %d (found %v), want 28", got.Seq, found)
+		}
+		return rollback
+	})
+	if !errors.Is(err, rollback) {
+		t.Fatalf("Do = %v, want the rollback", err)
+	}
+}

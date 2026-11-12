@@ -77,13 +77,17 @@ func (f Facts) LevelFacts(ctx context.Context, threadID ids.ID, userIDs []ids.ID
 
 // LevelFactsOfUser gathers the facts of 13 section 3.1 of one person for many threads (the badge
 // of 13 8, brief M3-19 design note 16 a): one read of the person's own rows, one read of the
-// stored notify.default_level and one path read per thread. A thread that no longer exists is
-// absent from the result. Like LevelFacts it never resolves the level and does not authorize.
+// stored notify.default_level and one path read per channel of the threads, never one per thread
+// (docs/decisions.d/AUD-srv-notify-01.md AUD-SN01/4). The caller names every thread with the
+// channel it lies in (ThreadID and ChannelID of threads; nothing else is read), as
+// chat.Threads.UnreadCandidates and Info return it. The threads of a channel that no longer
+// exists are absent from the result. Like LevelFacts it never resolves the level and does not
+// authorize.
 //
-// Errors: the errors of the reads other than not_found of a thread.
-func (f Facts) LevelFactsOfUser(ctx context.Context, userID ids.ID, threadIDs []ids.ID) (map[ids.ID]domain.LevelFacts, error) {
-	out := make(map[ids.ID]domain.LevelFacts, len(threadIDs))
-	if len(threadIDs) == 0 {
+// Errors: the errors of the reads other than not_found of a channel.
+func (f Facts) LevelFactsOfUser(ctx context.Context, userID ids.ID, threads []chat.ThreadPosition) (map[ids.ID]domain.LevelFacts, error) {
+	out := make(map[ids.ID]domain.LevelFacts, len(threads))
+	if len(threads) == 0 {
 		return out, nil
 	}
 	rows, err := f.d.Store.Preferences(ctx, userID)
@@ -98,14 +102,29 @@ func (f Facts) LevelFactsOfUser(ctx context.Context, userID ids.ID, threadIDs []
 	if !ok {
 		f.d.Log.WarnContext(ctx, "notify: a stored notify.default_level is not a level and counts as unset")
 	}
-	for _, t := range threadIDs {
-		path, err := f.d.Paths.NotificationPath(ctx, chat.TargetThread, t)
-		if err != nil {
-			if errs.KindOf(err) == errs.KindNotFound {
-				continue
+	// channels holds every channel read so far; found is false for one that no longer exists.
+	type channelPath struct {
+		path  chat.NotificationPath
+		found bool
+	}
+	channels := map[ids.ID]channelPath{}
+	for _, t := range threads {
+		c, read := channels[t.ChannelID]
+		if !read {
+			path, err := f.d.Paths.NotificationPath(ctx, chat.TargetChannel, t.ChannelID)
+			switch {
+			case err == nil:
+				c = channelPath{path: path, found: true}
+			case errs.KindOf(err) != errs.KindNotFound:
+				return nil, err
 			}
-			return nil, err
+			channels[t.ChannelID] = c
 		}
+		if !c.found {
+			continue
+		}
+		path := c.path
+		path.ThreadID = t.ThreadID
 		lf := domain.LevelFacts{
 			ChannelDefault: domain.Level(path.DefaultNotificationLevel), DirectMessage: path.ChannelKind == "dm",
 			PersonalDefault: personal, InstanceDefault: domain.Level(f.cfg.UserDefaultLevel),
@@ -113,7 +132,7 @@ func (f Facts) LevelFactsOfUser(ctx context.Context, userID ids.ID, threadIDs []
 		for _, r := range rows {
 			lf = withRow(lf, path, PreferenceRow{UserID: userID, Preference: r})
 		}
-		out[t] = lf
+		out[t.ThreadID] = lf
 	}
 	return out, nil
 }

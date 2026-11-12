@@ -2177,7 +2177,7 @@ Purpose: push target of a device. Push carries no content. Module: `notify`.
 | `preview_token_hash` | `bytea` | yes | | HMAC of the preview token of the Notification Service Extension; rotated with every new registration ([13-push-notifications.md](13-push-notifications.md), section 6.4) |
 | `created_at` | `timestamptz` | no | `now()` | |
 | `last_success_at` | `timestamptz` | yes | | |
-| `failure_count` | `integer` | no | `0` | deactivated from `push.max_consecutive_failures` on |
+| `failure_count` | `integer` | no | `0` | transient failures in a row since the last accepted push; deactivated from `push.max_consecutive_failures` on when that value is above `0` |
 | `disabled_at` | `timestamptz` | yes | | |
 | `disabled_reason` | `text` | yes | | `CHECK (disabled_reason IN ('token_invalid','device_revoked','logout','topic_mismatch','sender_mismatch','repeated_failures'))` |
 
@@ -3036,7 +3036,7 @@ The values are defaults. Other chapters refer only to the name.
 | `run.max_steps_persisted` | `2000` | stored steps per run |
 | `run.stall_after` | `10m` | without progress: stall notice |
 | `component.default_ttl` | `24h` | expiry of a component without its own value |
-| `push.max_consecutive_failures` | `5` | after that, a push registration is deactivated |
+| `push.max_consecutive_failures` | `0` | transient failures in a row after which a push registration is deactivated; `0` never deactivates one for them ([13-push-notifications.md](13-push-notifications.md) 7.3) |
 | `webhook.allowed_hosts` | empty | allowed target hosts for outgoing webhooks |
 | `webhook.max_consecutive_failures` | `20` | after that, a subscription is deactivated |
 | `webhook.retry_backoff_base` | `10s` | base of the backoff |

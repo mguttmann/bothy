@@ -5,6 +5,7 @@ package app_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"slices"
 	"strings"
 	stdsync "sync"
@@ -509,8 +510,9 @@ func TestSend_Steps(t *testing.T) {
 }
 
 // TestSend_Retry: a transient failure raises the count and inserts the next attempt at the
-// retry delay; at the limit the registration is deactivated without retry; a retry past
-// push.max_age is dropped as expired.
+// retry delay; on an instance with push.max_consecutive_failures above 0 (3 in pushConfig) the
+// registration is deactivated at the limit without retry; a retry past push.max_age is dropped
+// as expired.
 func TestSend_Retry(t *testing.T) {
 	t.Parallel()
 	w := newPushWorld(t)
@@ -548,6 +550,102 @@ func TestSend_Retry(t *testing.T) {
 	}
 	if len(e.sched.sends) != 0 || !slices.Equal(e.skips, []string{"expired"}) {
 		t.Fatalf("retry past max age: jobs %d, skips %v", len(e.sched.sends), e.skips)
+	}
+}
+
+// TestSend_NoLimitKeepsRegistration (finding srv-notify-1, AUD-SN01/1): with
+// push.max_consecutive_failures 0, the default, neither a request without an answer (a Go error
+// of the provider call) nor a transient answer ever deactivates the registration: every attempt
+// counts and inserts the next one, and the first accepted push resets the count.
+func TestSend_NoLimitKeepsRegistration(t *testing.T) {
+	t.Parallel()
+	w := newPushWorld(t)
+	w.cfg.MaxConsecutiveFailures = 0
+	prov := &testProvider{name: "apns", err: errors.New("dial tcp: no route to host")}
+	w.providers = []app.PushProvider{prov}
+	p := w.push()
+	job := sendJob(w)
+	const failures = 12
+	for i := 1; i <= failures; i++ {
+		if i > failures/2 {
+			prov.err, prov.result = nil, domain.SendResult{Class: domain.ResultRetry}
+		}
+		if err := p.Send(context.Background(), job); err != nil {
+			t.Fatalf("attempt %d: %v", i, err)
+		}
+		if _, st, _ := w.store.get(job.RegistrationID); st.FailureCount != i || !st.DisabledAt.IsZero() || st.DisabledReason != "" {
+			t.Fatalf("attempt %d: state %+v, want %d failures on an active row", i, st, i)
+		}
+		if len(w.sched.sends) != i || w.sched.sends[i-1].job.Attempt != job.Attempt+1 {
+			t.Fatalf("attempt %d: %d retries, want one per attempt", i, len(w.sched.sends))
+		}
+	}
+	prov.result = domain.SendResult{Class: domain.ResultAccepted}
+	if err := p.Send(context.Background(), job); err != nil {
+		t.Fatal(err)
+	}
+	if _, st, _ := w.store.get(job.RegistrationID); st.FailureCount != 0 || st.LastSuccessAt.IsZero() || !st.DisabledAt.IsZero() {
+		t.Fatalf("state %+v after the accepted push, want no failures and a success", st)
+	}
+	if got := w.sent[len(w.sent)-1]; got != "apns/accepted" || len(w.sent) != failures+1 {
+		t.Fatalf("sent %v", w.sent)
+	}
+}
+
+// TestNewPush_FailureLimit (AUD-SN01/1): push.max_consecutive_failures 0 is the switch that
+// never deactivates; a negative value is refused.
+func TestNewPush_FailureLimit(t *testing.T) {
+	t.Parallel()
+	for limit, ok := range map[int]bool{0: true, 1: true, 5: true, -1: false} {
+		w := newPushWorld(t)
+		w.cfg.MaxConsecutiveFailures = limit
+		if _, err := w.newPush(nil); (err == nil) != ok {
+			t.Errorf("limit %d: error %v, want accepted %v", limit, err, ok)
+		}
+	}
+}
+
+// TestSend_DisabledDuringTheCall (finding srv-notify-10, AUD-SN01/2; 13 7.3): the session of the
+// registration ends while the provider request runs. Whatever the provider answers then, the row
+// keeps logout and its time, no retry is inserted, and bothy.push.sent still names the answer.
+func TestSend_DisabledDuringTheCall(t *testing.T) {
+	t.Parallel()
+	ended := pushStart.Add(-time.Second)
+	for _, c := range []struct {
+		name    string
+		result  domain.SendResult
+		err     error
+		outcome string
+	}{
+		{"token invalid", domain.SendResult{Class: domain.ResultDisable, DisableReason: domain.DisableTokenInvalid}, nil, "rejected_token"},
+		{"transient answer", domain.SendResult{Class: domain.ResultRetry}, nil, "provider_error"},
+		{"no answer", domain.SendResult{}, errors.New("connection reset"), "provider_error"},
+		{"throttled", domain.SendResult{Class: domain.ResultThrottled, RetryAfter: time.Minute}, nil, "throttled"},
+		{"accepted", domain.SendResult{Class: domain.ResultAccepted}, nil, "accepted"},
+	} {
+		w := newPushWorld(t)
+		job := sendJob(w)
+		_, before, _ := w.store.get(job.RegistrationID)
+		want := before
+		want.DisabledAt, want.DisabledReason = ended, domain.DisableLogout
+		prov := &testProvider{name: "apns", result: c.result, err: c.err}
+		prov.during = func() { _ = w.store.Update(context.Background(), job.RegistrationID, want) }
+		w.providers = []app.PushProvider{prov}
+		if err := w.push().Send(context.Background(), job); err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if _, st, _ := w.store.get(job.RegistrationID); st != want {
+			t.Errorf("%s: state %+v, want the row as the session end left it: %+v", c.name, st, want)
+		}
+		if w.store.updates != 1 {
+			t.Errorf("%s: %d writes of the row, want only the one of the session end", c.name, w.store.updates)
+		}
+		if len(w.sched.sends) != 0 {
+			t.Errorf("%s: a deactivated registration was retried: %+v", c.name, w.sched.sends)
+		}
+		if !slices.Equal(w.sent, []string{"apns/" + c.outcome}) || len(w.skips) != 0 {
+			t.Errorf("%s: sent %v, skips %v, want apns/%s", c.name, w.sent, w.skips, c.outcome)
+		}
 	}
 }
 

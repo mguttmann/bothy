@@ -24,6 +24,12 @@ type History interface {
 	//
 	// Errors: those of the read.
 	PersonalEvents(ctx context.Context, q PersonalQuery) ([]Event, error)
+	// LastPersonalEvent returns the newest retained event with audience q.AudienceID on the
+	// resource of q, with one of q.Types and seq below q.Before; found is false when there is
+	// none. It reads one row at most, however many events other audiences have on the resource.
+	//
+	// Errors: those of the read.
+	LastPersonalEvent(ctx context.Context, q PersonalResourceQuery) (ev Event, found bool, err error)
 }
 
 // ResourceQuery selects the events of one resource for History.ResourceEvents.
@@ -45,4 +51,18 @@ type PersonalQuery struct {
 	Types []string
 	// After keeps only seq > After.
 	After int64
+}
+
+// PersonalResourceQuery selects the newest personal event of one principal on one resource for
+// History.LastPersonalEvent.
+type PersonalResourceQuery struct {
+	// AudienceID is event_log.audience_principal_id.
+	AudienceID ids.ID
+	// ResourceKind and ResourceID name the resource (event_log.resource_kind, resource_id).
+	ResourceKind string
+	ResourceID   ids.ID
+	// Types are the event types; empty finds nothing.
+	Types []string
+	// Before keeps only seq < Before.
+	Before int64
 }
