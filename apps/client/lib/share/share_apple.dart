@@ -15,6 +15,7 @@ import 'package:auth/auth.dart' show Clock, SystemClock;
 import 'package:domain/domain.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 
+import '../platform/guarded.dart';
 import '../src/generated/share_apple_api.g.dart';
 import 'share_target.dart';
 
@@ -328,24 +329,13 @@ final class AppleShare {
     _createdFor = account;
   });
 
-  /// Runs [body], the step [what]; a failure is logged without content and swallowed.
-  Future<void> _guard(String what, FutureOr<void> Function() body) async {
-    try {
-      await body();
-    } on Object catch (e) {
-      // Sharing is an addition; the next start tries again (see the class comment).
-      _log('share: $what failed (${e.runtimeType})');
-    }
-  }
+  /// Runs [body], the step [what]; a failure is logged without content and swallowed: sharing
+  /// is an addition, and the next start tries again (see the class comment).
+  Future<void> _guard(String what, FutureOr<void> Function() body) =>
+      guarded(_log, 'share', what, body);
 
   /// The value of [body], the step [what], or null after a failure, which is logged without
   /// content.
-  Future<T?> _guardValue<T>(String what, Future<T> Function() body) async {
-    try {
-      return await body();
-    } on Object catch (e) {
-      _log('share: $what failed (${e.runtimeType})');
-      return null;
-    }
-  }
+  Future<T?> _guardValue<T>(String what, Future<T> Function() body) =>
+      guardedValue(_log, 'share', what, body);
 }

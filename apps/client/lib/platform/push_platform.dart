@@ -11,6 +11,7 @@ import 'dart:developer' as developer;
 import 'package:api_client/api_client.dart';
 
 import '../telemetry/client_metrics.dart' as telemetry;
+import 'guarded.dart';
 import 'secure_store.dart';
 
 /// What `registerPush` returned that the app keeps: the registration ID and the preview token.
@@ -393,24 +394,13 @@ abstract base class NativePush implements PushPlatform {
     });
   }
 
-  /// Runs [body], the step [what]; a failure is logged without content and swallowed.
-  Future<void> _guard(String what, FutureOr<void> Function() body) async {
-    try {
-      await body();
-    } on Object catch (e) {
-      // Push is an addition; the next start tries again (see the class comment).
-      _log('push: $what failed (${e.runtimeType})');
-    }
-  }
+  /// Runs [body], the step [what]; a failure is logged without content and swallowed: push is
+  /// an addition, and the next start tries again (see the class comment).
+  Future<void> _guard(String what, FutureOr<void> Function() body) =>
+      guarded(_log, 'push', what, body);
 
   /// The value of [body], the step [what], or null after a failure, which is logged without
   /// content.
-  Future<T?> _guardValue<T>(String what, Future<T> Function() body) async {
-    try {
-      return await body();
-    } on Object catch (e) {
-      _log('push: $what failed (${e.runtimeType})');
-      return null;
-    }
-  }
+  Future<T?> _guardValue<T>(String what, Future<T> Function() body) =>
+      guardedValue(_log, 'push', what, body);
 }
