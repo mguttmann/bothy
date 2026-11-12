@@ -34,7 +34,7 @@ class PushPreview(
     /** Decoding. */
     companion object {
         /** The kinds of `NotificationKind`. */
-        val KINDS = setOf("message", "mention", "dm", "run_done", "run_failed", "input_needed", "security", "admin")
+        val KINDS = setOf("message", "mention", "dm", "run_done", "run_failed", "input_needed", "security", "admin", "wake_ended")
 
         /**
          * Decodes a response body: a missing or mistyped `kind` or `badge`, an unknown kind or

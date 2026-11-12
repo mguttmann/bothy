@@ -1911,6 +1911,7 @@
   "pushBodyRunDone": "Ein Lauf ist fertig",
   "pushBodyRunFailed": "Ein Lauf ist fehlgeschlagen",
   "pushBodyInputNeeded": "Ein Agent wartet auf deine Antwort",
+  "pushBodyWakeEnded": "Ein Agent hat nicht von selbst weitergemacht",
   "pushMessageNotAvailable": "Nachricht nicht verfügbar",
   "trayOpen": "Öffnen",
   "trayQuit": "Beenden",

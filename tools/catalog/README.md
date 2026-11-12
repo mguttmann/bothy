@@ -227,3 +227,12 @@ placeholders become `%1$s`, `%` becomes `%%` only in a string with placeholders,
 escaped for XML and aapt (docs/decisions.d/M5-05.md D-M5-05-0).
 `make apple-strings` regenerates them; `make codegen-check` fails when one is stale
 (docs/decisions.d/M5-04.md D-M5-04-7). Tests: `tests/test_apple_strings.py`.
+
+The server sends `PUSH_BODY_<KIND>` for every member of `NotificationKind` in
+`docs/api/openapi.yaml`, and a kind without its key shows the raw key on iOS and macOS and the
+text of `message` on Android. So the tests hold to that enum: the `PUSH_BODY_*` keys of
+`NATIVE_KEYS` in its order, and the hand-written lists `PushPreview.kinds`
+(`PreviewClient.swift`), `PushPreview.KINDS` (`PreviewClient.kt`) and `PushTexts.bodies`
+(`PreviewRenderer.kt`). A new kind in the contract therefore needs its ARB text in every
+language, its line in `NATIVE_KEYS` and its entry in these three lists
+(docs/decisions.d/AUD-tools-misc-01.md AUD-TM1/3).

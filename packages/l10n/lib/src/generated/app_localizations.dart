@@ -11569,6 +11569,12 @@ abstract class AppLocalizations {
   /// **'An agent is waiting for your answer'**
   String get pushBodyInputNeeded;
 
+  /// Placeholder text of a push of kind wake_ended (PUSH_BODY_WAKE_ENDED, 13 sections 2 and 6.1): a wake-up of the person ended without firing, or a run of the person ended at the usage limit of the account.
+  ///
+  /// In en, this message translates to:
+  /// **'An agent did not continue on its own'**
+  String get pushBodyWakeEnded;
+
   /// Text of a push whose message was deleted or is no longer visible to the person (13 sections 5.1 and 6.4).
   ///
   /// In en, this message translates to:

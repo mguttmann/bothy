@@ -11,6 +11,7 @@
 "PUSH_BODY_INPUT_NEEDED" = "An agent is waiting for your answer";
 "PUSH_BODY_SECURITY" = "A new device is waiting for your approval.";
 "PUSH_BODY_ADMIN" = "A reminder from the administration is waiting.";
+"PUSH_BODY_WAKE_ENDED" = "An agent did not continue on its own";
 "PUSH_MESSAGE_NOT_AVAILABLE" = "Message not available";
 "PUSH_PREVIEW_TITLE" = "%1$@ · %2$@";
 "PUSH_PREVIEW_TEXT" = "%1$@: %2$@";

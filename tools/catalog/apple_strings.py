@@ -49,7 +49,9 @@ TEMPLATE = "app_en.arb"
 OUTPUT_DIR = Path("apps/client/ios/Localizations")
 ANDROID_DIR = Path("apps/client/android/app/src/main/res")
 
-# Native key to ARB key. The kinds of 13 6.1; PUSH_BODY_MESSAGE, _SECURITY and _ADMIN reuse the
+# Native key to ARB key. The kinds of 13 6.1, one `PUSH_BODY_<KIND>` per member of
+# `NotificationKind` in docs/api/openapi.yaml and in its order (a test holds both equal, because
+# the server sends the key of every kind); PUSH_BODY_MESSAGE, _SECURITY and _ADMIN reuse the
 # texts of the desktop notifications, so both platforms say the same.
 NATIVE_KEYS: dict[str, str] = {
     "PUSH_TITLE": "pushTitle",
@@ -61,6 +63,7 @@ NATIVE_KEYS: dict[str, str] = {
     "PUSH_BODY_INPUT_NEEDED": "pushBodyInputNeeded",
     "PUSH_BODY_SECURITY": "notificationSecurityText",
     "PUSH_BODY_ADMIN": "notificationAdminText",
+    "PUSH_BODY_WAKE_ENDED": "pushBodyWakeEnded",
     "PUSH_MESSAGE_NOT_AVAILABLE": "pushMessageNotAvailable",
     "PUSH_PREVIEW_TITLE": "notificationTitle",
     "PUSH_PREVIEW_TEXT": "notificationText",

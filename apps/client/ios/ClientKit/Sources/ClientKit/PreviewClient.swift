@@ -8,7 +8,7 @@ import Foundation
 /// `description` names no value, so a log line never carries content.
 public struct PushPreview: Equatable, CustomStringConvertible, CustomDebugStringConvertible {
     /// The kinds of `NotificationKind`.
-    public static let kinds: Set<String> = ["message", "mention", "dm", "run_done", "run_failed", "input_needed", "security", "admin"]
+    public static let kinds: Set<String> = ["message", "mention", "dm", "run_done", "run_failed", "input_needed", "security", "admin", "wake_ended"]
 
     /// The kind, echoed from the request.
     public let kind: String
