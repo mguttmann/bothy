@@ -19,6 +19,7 @@ import '../data/self_repository.dart' show SelfActionFailed;
 import '../grants/grant_labels.dart' show AccessNames;
 import '../self/device_tile.dart' show activityText;
 import '../self/self_feedback.dart';
+import 'person_choice.dart';
 
 /// The owners of the instance with "Revoke" each and "Add owner" (any active person who is not
 /// an owner yet, from every page of `listUsers`).
@@ -142,7 +143,7 @@ class _OwnersSectionState extends State<OwnersSection>
         await widget.repository.addOwner(
           person.id,
           reason: reason,
-          purpose: l.stepUpPurposeAddOwner(person.displayName),
+          purpose: l.stepUpPurposeAddOwner(person.nameWithHandle),
         );
       } on SelfActionFailed catch (e) {
         if (e.problem?.code == 'i1_violation') conflicts = e.conflicts;
@@ -178,7 +179,7 @@ class _OwnersSectionState extends State<OwnersSection>
       await widget.repository.addOwner(
         g.person.id,
         reason: g.reason,
-        purpose: l.stepUpPurposeAddOwner(g.person.displayName),
+        purpose: l.stepUpPurposeAddOwner(g.person.nameWithHandle),
         resolveI1: I1Resolution(ids, reason: switchReason),
       );
       return SelfNotice(l.adminOwnersAdded(g.person.displayName));
@@ -329,7 +330,7 @@ class _AddOwnerDialogState extends State<_AddOwnerDialog> {
             DropdownMenuItem(
               key: ValueKey('owners.pick.${p.id}'),
               value: p,
-              child: Text(p.displayName),
+              child: PersonChoice(person: p),
             ),
         ],
         onChanged: (p) => setState(() => _picked = p),

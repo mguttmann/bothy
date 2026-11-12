@@ -12,10 +12,25 @@ import '../data/access_repository.dart';
 import '../data/admin_repository.dart';
 import 'grant_labels.dart';
 
-/// The subject of a grant: a person, a group or an agent from the directory lists, searched by
-/// name. Apps are not offered: the shell has no Apps entry yet (M6-08).
+/// One entry of the list: the ID, the name, what tells it from an entry with the same name (the
+/// handle of a person, the slug of an app; null for a group and an agent) and the name the
+/// step-up of the grant shows.
+typedef _Entry = ({String id, String name, String? detail, String purposeName});
+
+/// The subject of a grant: a person, a group, an agent or an app from the directory lists,
+/// searched by name.
 ///
-/// [onKind] switches the list, [onSelect] picks an entry with its ID and name.
+/// A person shows the handle below the name and is found by it too, because two people can
+/// carry the same display name and only the handle is unique (03 `users`; ruling AUD-AM1/4).
+///
+/// "App" is offered when the directory lists an app (`listApps`: the installed ones, also a
+/// suspended one, whose grants remain, 11 4.3): a second target of an installed app, a target
+/// left out at the installation and a target after an update are created here (11 4.1, 4.2;
+/// ruling AUD-AM1/1). What an app may get is the server's rule (at most `write` and `upload`,
+/// 05), told by the preview like for an agent.
+///
+/// [onKind] switches the list, [onSelect] picks an entry with its ID, its name and the name
+/// for the purpose of the step-up (a person with the handle).
 class SubjectStep extends StatefulWidget {
   /// Creates the step.
   const SubjectStep({
@@ -39,8 +54,8 @@ class SubjectStep extends StatefulWidget {
   /// Switches the kind.
   final ValueChanged<AdminSubjectKind> onKind;
 
-  /// Picks the subject with its ID and display name.
-  final void Function(String id, String name) onSelect;
+  /// Picks the subject with its ID, its display name and the name the step-up shows.
+  final void Function(String id, String name, String purposeName) onSelect;
 
   @override
   State<SubjectStep> createState() => _SubjectStepState();
@@ -61,23 +76,42 @@ class _SubjectStepState extends State<SubjectStep> {
     super.dispose();
   }
 
-  List<(String, String)> _entries() {
+  List<_Entry> _entries() {
     final n = widget.names;
-    final all = switch (widget.kind) {
+    _Entry plain(String id, String name) =>
+        (id: id, name: name, detail: null, purposeName: name);
+    final List<_Entry> all = switch (widget.kind) {
       AdminSubjectKind.user => [
         for (final p in n.people)
-          if (p.status != AdminPersonStatus.deleted) (p.id, p.displayName),
+          if (p.status != AdminPersonStatus.deleted)
+            (
+              id: p.id,
+              name: p.displayName,
+              detail: '@${p.handle}',
+              purposeName: p.nameWithHandle,
+            ),
       ],
-      AdminSubjectKind.group => [for (final g in n.groups) (g.id, g.name)],
+      AdminSubjectKind.group => [for (final g in n.groups) plain(g.id, g.name)],
       AdminSubjectKind.agent => [
-        for (final a in n.agents) (a.id, a.displayName),
+        for (final a in n.agents) plain(a.id, a.displayName),
       ],
-      AdminSubjectKind.app => <(String, String)>[],
+      AdminSubjectKind.app => [
+        for (final a in n.apps)
+          (
+            id: a.id,
+            name: a.displayName,
+            detail: a.slug,
+            purposeName: a.displayName,
+          ),
+      ],
     };
     final q = _search.text.trim().toLowerCase();
     return [
       for (final e in all)
-        if (q.isEmpty || e.$2.toLowerCase().contains(q)) e,
+        if (q.isEmpty ||
+            e.name.toLowerCase().contains(q) ||
+            (e.detail?.toLowerCase().contains(q) ?? false))
+          e,
     ];
   }
 
@@ -97,6 +131,9 @@ class _SubjectStepState extends State<SubjectStep> {
               (AdminSubjectKind.user, l.adminWizardKindPerson),
               (AdminSubjectKind.group, l.adminWizardKindGroup),
               (AdminSubjectKind.agent, l.adminWizardKindAgent),
+              if (widget.names.apps.isNotEmpty ||
+                  widget.kind == AdminSubjectKind.app)
+                (AdminSubjectKind.app, l.adminWizardKindApp),
             ])
               ChoiceChip(
                 key: ValueKey('wizard.kind.${kind.name}'),
@@ -118,14 +155,18 @@ class _SubjectStepState extends State<SubjectStep> {
             style: dsTextStyle(DsType.body)
                 .copyWith(color: colors.textSecondary),
           ),
-        for (final (id, name) in entries)
+        for (final e in entries)
           ListTile(
-            key: ValueKey('subject.$id'),
-            title: Text(name),
-            selected: id == widget.selectedId,
+            key: ValueKey('subject.${e.id}'),
+            title: Text(e.name),
+            subtitle: switch (e.detail) {
+              final detail? => Text(detail),
+              null => null,
+            },
+            selected: e.id == widget.selectedId,
             selectedColor: colors.textPrimary,
             selectedTileColor: colors.accentSubtle,
-            onTap: () => widget.onSelect(id, name),
+            onTap: () => widget.onSelect(e.id, e.name, e.purposeName),
           ),
       ],
     );

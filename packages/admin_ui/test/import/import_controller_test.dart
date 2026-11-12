@@ -3,7 +3,10 @@
 // The import controller of brief M8-08 Design note 1: sequences of ImportSource snapshots (the
 // payload of getImport and of import.progress) replace each other, the newest wins even with
 // lower counters, and a refresh joins the mapping with the posted channel items, the channels
-// and the planned agents into the rows of the channel table.
+// and the planned agents into the rows of the channel table. A refresh reads only the items it
+// shows as far as the contract lets it, and one pass runs at a time (ruling AUD-AM1/5).
+
+import 'dart:async';
 
 import 'package:admin_ui/admin_ui.dart';
 import 'package:api_client/api_client.dart' show ApiProblem;
@@ -24,6 +27,29 @@ Map<String, Object?> _progress(
   'stats': stats,
   'created_at': '2026-10-17T08:00:00.000Z',
 };
+
+/// A repository whose `getImport` waits for [gate] and counts the passes that [started].
+class _GatedRepository extends FakeAdminRepository {
+  _GatedRepository() : super(prompt: RecordingPrompt());
+
+  Completer<void>? gate;
+  int started = 0;
+
+  @override
+  Future<ImportSourceSnapshot> importSource(String id) async {
+    started++;
+    await gate?.future;
+    return super.importSource(id);
+  }
+}
+
+ImportItemEntry _message(int n, {String state = 'posted'}) => ImportItemEntry(
+  id: 'item-m$n',
+  originKey: 'message:9$n:0',
+  itemKind: 'message',
+  state: state,
+  error: state == 'failed' ? 'target_gone' : null,
+);
 
 void main() {
   late FakeAdminRepository repository;
@@ -185,6 +211,113 @@ void main() {
       expect(details.allImportedLedHere, isFalse);
     },
   );
+
+  test('refresh reads the failed items by their state and the posted items '
+      'only until every mapped channel has its item', () async {
+    final id = repository.seedImport('Old', state: 'running');
+    // As the import tool writes them: the channels first, then their content.
+    repository.postChannels(id, ['301', '302', '303']);
+    repository.importItemsById[id]!.addAll([
+      for (var n = 0; n < 7; n++) _message(n),
+      _message(7, state: 'failed'),
+      _message(8, state: 'pending'),
+    ]);
+    repository.importItemPageSize = 2;
+
+    await controller.refresh(id);
+
+    // 3 channel items and 7 messages are posted: five pages of two. The read ends with the
+    // page that holds the last mapped channel.
+    expect(repository.importItemPages, ['failed 1', 'posted 1', 'posted 2']);
+    final details = controller.details(id)!;
+    expect([for (final r in details.rows) r.imported], [true, true, true]);
+    expect([for (final i in details.failedItems) i.id], ['item-m7']);
+  });
+
+  test('while a mapped channel has no posted item the read goes through every '
+      'posted item, never the others', () async {
+    final id = repository.seedImport('Old', state: 'running');
+    repository.postChannels(id, ['301']);
+    repository.importItemsById[id]!.addAll([
+      for (var n = 0; n < 4; n++) _message(n),
+      _message(4, state: 'pending'),
+      _message(5, state: 'pending'),
+    ]);
+    repository.importItemPageSize = 2;
+
+    await controller.refresh(id);
+
+    expect(repository.importItemPages, [
+      'failed 1',
+      'posted 1',
+      'posted 2',
+      'posted 3',
+    ]);
+    expect(
+      [for (final r in controller.details(id)!.rows) r.imported],
+      [true, false, false],
+    );
+  });
+
+  test('a refresh that is asked while one runs waits for it, and one more pass '
+      'serves every such request', () async {
+    final gated = _GatedRepository()..stepUpFresh = true;
+    final c = ImportController(gated);
+    addTearDown(c.dispose);
+    final id = gated.seedImport('Old', state: 'running');
+    final gate = gated.gate = Completer<void>();
+    var done = 0;
+
+    final first = c.refresh(id).then((_) => done++);
+    final second = c.refresh(id).then((_) => done++);
+    final third = c.refresh(id).then((_) => done++);
+    await pumpEventQueue();
+    expect(gated.started, 1, reason: 'one pass runs at a time');
+    expect(done, 0);
+
+    // What changes while the pass runs is what the later requests asked for.
+    gated.importsById[id]!['state'] = 'paused';
+    gated.gate = null;
+    gate.complete();
+    await Future.wait([first, second, third]);
+    expect(done, 3);
+    expect(
+      gated.started,
+      2,
+      reason: 'the running pass and one pass after it, not one per request',
+    );
+    expect(c.source(id)!.state, ImportState.paused);
+
+    await c.refresh(id);
+    expect(gated.started, 3, reason: 'a later request reads again');
+  });
+
+  test('a pass that fails tells every waiting request, and the next request '
+      'reads again', () async {
+    final gated = _GatedRepository()..stepUpFresh = true;
+    final c = ImportController(gated);
+    addTearDown(c.dispose);
+    final id = gated.seedImport('Old', state: 'running');
+    final gate = gated.gate = Completer<void>();
+    gated.refuse['importSource'] = const ApiProblem(
+      status: 503,
+      code: 'unavailable',
+    );
+
+    final results = <Object>[];
+    final first = c.refresh(id).catchError((Object e) => results.add(e));
+    final second = c.refresh(id).catchError((Object e) => results.add(e));
+    await pumpEventQueue();
+    gated.gate = null;
+    gate.complete();
+    await Future.wait([first, second]);
+    expect(results, hasLength(2));
+    expect(results, everyElement(isA<SelfActionFailed>()));
+
+    gated.refuse.remove('importSource');
+    await c.refresh(id);
+    expect(c.source(id)!.state, ImportState.running);
+  });
 
   test('the phase of a channel led here follows its operator', () async {
     final id = repository.seedImport('Old', state: 'running');

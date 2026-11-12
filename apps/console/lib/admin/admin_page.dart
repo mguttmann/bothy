@@ -135,7 +135,7 @@ class ConsoleAdminPage extends StatelessWidget {
       onViewAs: (person) => unawaited(
         admin.startViewAs(
           person,
-          purpose: l.stepUpPurposeViewAs(person.displayName),
+          purpose: l.stepUpPurposeViewAs(person.nameWithHandle),
         ),
       ),
     );

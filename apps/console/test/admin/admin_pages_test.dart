@@ -522,6 +522,16 @@ void main() {
       expect(downloads.saved.last.type, 'application/x-ndjson');
     },
   );
+
+  test('a discarded export offers no download, also not when it is closed '
+      'afterwards', () async {
+    final downloads = FakeDownloads();
+    final file = (await downloadSaveTarget(downloads)('audit.csv'))!;
+    await file.addStream(Stream.value(utf8.encode('occurred_at,action\n')));
+    await file.discard();
+    await file.close();
+    expect(downloads.saved, isEmpty);
+  });
 }
 
 /// The people of the fixtures as admin_ui reads them.

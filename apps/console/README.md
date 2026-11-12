@@ -35,7 +35,8 @@ change), and after it the request repeats once with the same `Idempotency-Key`. 
 (from "Who has access?" or a person's detail) stores the view on the console session; a banner
 with name and remaining time stands on every page until "End view" or the end time, and the page
 `/people/view-as` shows the structure the person sees and the spaces they do not see, never
-content. The audit export goes to a browser download; codes and tokens the server shows once stay
+content. The audit export goes to a browser download when it has ended, and an export that fails
+before the server sent a byte offers none; codes and tokens the server shows once stay
 in the widget state only. Rulings: `D-M6-04-0` to `D-M6-04-8` in `docs/decisions.d/M6-04.md`.
 
 Since M6-07 the groups page has two more tabs next to "Groups" and "Access grants" (01 5.5

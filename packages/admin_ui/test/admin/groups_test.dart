@@ -123,7 +123,7 @@ void main() {
     );
     await tester.pump();
     await tap(tester, 'confirm.submit');
-    await stepUp(tester, 'Add Sam to Support');
+    await stepUp(tester, 'Add Sam (@sam) to Support');
     // 07 2.1: the membership holds through the typed day in the person's time zone
     // (Europe/Berlin), so it ends at the start of 1 January there.
     expect(
