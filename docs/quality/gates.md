@@ -482,7 +482,10 @@ dependency constraint in the build that resolves the package (`constraints` in
 exits 1 for a vulnerability when it checks licenses, so `tools/ci/dep_licenses.py` (tests
 `tools/ci/tests/test_dep_licenses.py`) reads its JSON report and fails only for license
 violations. Otherwise every new public advisory would turn the license step red on every pull
-request after `osv` had let the merge base's finding pass.
+request after `osv` had let the merge base's finding pass. A scan that cannot decide fails the
+step too: an exit code other than 0 or 1, a report that is not JSON, and an exit code 1 that no
+license violation and no vulnerability of the report explains. A package of a Gradle lock file
+that does not ship explains it only by such a finding of its own (ruling FIX-DLF/1).
 
 Trivy runs as `trivy config` with `--skip-check-update` (misconfiguration, no advisory
 database) and is not affected; `trivy-image` of the release scans the built images in full.

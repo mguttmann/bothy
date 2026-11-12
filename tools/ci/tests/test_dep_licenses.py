@@ -23,7 +23,8 @@ import pytest
 # replaces the report. Like the real scanner it picks the parser by the file name (exit 127 for
 # a `*.lockfile` name it does not know) unless the argument names the format
 # (`gradle.lockfile:<path>`); a Gradle lock file holds Gradle's own lines
-# (`group:artifact:version=configurations`), and the artifact name is the license.
+# (`group:artifact:version=configurations`), the artifact name is the license, and a group
+# `vuln.<id>` gives the package that advisory.
 FAKE_OSV = r"""
 import json, os, sys
 args = sys.argv[1:]
@@ -47,7 +48,8 @@ for arg in [args[i + 1] for i, a in enumerate(args) if a == "-L"]:
             if line.startswith("#") or line.startswith("empty="):
                 continue
             group, lic, version = line.split("=")[0].split(":")
-            name, rest, eco = group + ":" + lic, [], "Maven"
+            name, eco = group + ":" + lic, "Maven"
+            rest = ["vuln", group[5:]] if group.startswith("vuln.") else []
         else:
             name, version, lic, *rest = line.split()
             eco = "npm"
@@ -142,6 +144,7 @@ def test_every_lock_goes_to_one_scan_with_the_allowlist(fx: Fixture) -> None:
         ({"FAKE_OSV_EXIT": "128"}, "no package found"),
         ({"FAKE_OSV_EXIT": "1", "FAKE_OSV_RAW": "not json"}, "no JSON"),
         ({"FAKE_OSV_EXIT": "1", "FAKE_OSV_RAW": ""}, "empty report on a failing scan"),
+        ({"FAKE_OSV_EXIT": "1"}, "failing scan whose report names no finding"),
     ],
 )
 def test_a_scan_that_cannot_decide_fails(
@@ -205,6 +208,44 @@ def test_a_license_of_a_build_or_test_package_does_not_count(
     out = capsys.readouterr().out
     assert "::error::" not in out
     assert "2 package(s) under a license outside the list do not ship" in out
+
+
+def test_an_advisory_of_a_build_or_test_package_alone_passes(
+    fx: Fixture, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The scanner exits 1 for the advisory; the package explains the exit code."""
+    lock = fx.lock(
+        "app/android/gradle.lockfile",
+        [
+            "com.example:MIT:1.0=releaseRuntimeClasspath",
+            "vuln.GHSA-z:Apache-2.0:4.1=_internal-unified-test-platform-core",
+        ],
+    )
+    assert fx.run(lock) == 0
+    assert "::error::" not in capsys.readouterr().out
+
+
+def test_a_failing_scan_without_a_finding_fails_next_to_packages_that_do_not_ship(
+    fx: Fixture, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A package that does not ship excuses a failing scan only by a finding of its own.
+
+    Every license is allowed and no package has an advisory, so nothing in the report explains
+    the exit code 1: the scanner failed, and the build and test packages of the lock file must
+    not turn that into a pass.
+    """
+    monkeypatch.setenv("FAKE_OSV_EXIT", "1")
+    lock = fx.lock(
+        "app/android/gradle.lockfile",
+        [
+            "com.example:MIT:1.0=releaseRuntimeClasspath",
+            "com.example:Apache-2.0:4.13=debugUnitTestRuntimeClasspath",
+            "com.example:MIT:2.0=_internal-unified-test-platform-core",
+        ],
+    )
+    assert fx.run(lock) == 1
+    out = capsys.readouterr().out
+    assert "::error::osv-scanner failed, but its report names no license violation" in out
 
 
 def test_a_variant_gradle_lock_file_is_scanned_as_a_gradle_lock_file(fx: Fixture) -> None:
