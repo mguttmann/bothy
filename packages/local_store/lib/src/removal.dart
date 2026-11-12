@@ -12,6 +12,7 @@ import 'cascade.dart';
 import 'daos/upsert.dart';
 import 'database.dart';
 import 'models.dart';
+import 'search_rows.dart';
 
 /// Removal and wipe on the [LocalDatabase].
 extension LocalStoreRemoval on LocalDatabase {
@@ -86,7 +87,7 @@ extension LocalStoreRemoval on LocalDatabase {
     await _deleteWhereIn(channels, 'channel_operators', 'channel_id', {
       channelOperators,
     });
-    await _deleteWhereIn(channels, 'search_index', 'channel_id', {searchIndex});
+    await _deleteSearchRows(channels, 'channel_id');
     await _deleteWhereIn(channels, 'channels', 'id', {this.channels});
     // A removed channel leaves no view state behind (04 8.3; 01 6.8 item 7).
     await _deleteWhereIn(channels, 'channel_view_states', 'channel_id', {
@@ -105,7 +106,7 @@ extension LocalStoreRemoval on LocalDatabase {
     await _deleteWhereIn(spaceIds, 'space_view_states', 'space_id', {
       spaceViewStates,
     });
-    await _deleteWhereIn(spaceIds, 'search_index', 'space_id', {searchIndex});
+    await _deleteSearchRows(spaceIds, 'space_id');
     await _deleteWhereIn(spaceIds, 'spaces', 'id', {spaces});
     // A removed target must not stay in the quick switcher's recent list (01 D6, 04 8.3).
     await _deleteRecent(RecentTargetKind.space, spaceIds);
@@ -139,6 +140,15 @@ extension LocalStoreRemoval on LocalDatabase {
       variables: [Variable<String>(kind.code), ...textVariables(ids)],
       updates: {recentTargets},
       updateKind: UpdateKind.delete,
+    );
+  }
+
+  Future<void> _deleteSearchRows(List<String> ids, String column) async {
+    if (ids.isEmpty) return;
+    await deleteSearchRows(
+      this,
+      '$column IN ${placeholders(ids.length)}',
+      textVariables(ids),
     );
   }
 

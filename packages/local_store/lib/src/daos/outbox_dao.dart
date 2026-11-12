@@ -57,34 +57,6 @@ final class OutboxDao {
     return row == null ? null : _fromRow(row);
   }
 
-  /// The oldest entry of [threadId] (null: writes outside a thread) that is not final, or null
-  /// when there is none or when that entry still waits for its `depends_on` entry (FIFO: a
-  /// later entry never overtakes it).
-  Future<OutboxEntry?> nextForThread(ThreadId? threadId) async {
-    final row =
-        await (_db.select(_db.outbox)
-              ..where(
-                (t) =>
-                    (threadId == null
-                        ? t.threadId.isNull()
-                        : t.threadId.equals(threadId.value)) &
-                    t.state.isNotIn([
-                      OutboxState.failed.code,
-                      OutboxState.confirmed.code,
-                    ]),
-              )
-              ..orderBy(_fifo)
-              ..limit(1))
-            .getSingleOrNull();
-    if (row == null) return null;
-    final dependency = row.dependsOn;
-    if (dependency != null) {
-      final parent = await byId(dependency);
-      if (parent != null && parent.state != OutboxState.confirmed) return null;
-    }
-    return _fromRow(row);
-  }
-
   /// Moves entry [id] to [state]; `sending` counts an attempt, [nextAttemptAt] sets the end of
   /// a backoff in `waiting`.
   Future<void> markState(
@@ -122,7 +94,8 @@ final class OutboxDao {
     );
   }
 
-  /// Deletes entry [id] (discarded by the person).
+  /// Deletes entry [id]: discarded by the person, or confirmed (the echo or the `2xx`), since a
+  /// confirmed entry leaves the outbox.
   Future<void> delete(String id) async {
     await (_db.delete(_db.outbox)..where((t) => t.id.equals(id))).go();
   }
@@ -178,9 +151,6 @@ final class OutboxDao {
   /// [entriesFor] on every change.
   Stream<List<OutboxEntry>> watchEntriesFor(ThreadId? threadId) =>
       _entries(threadId).watch();
-
-  /// Removes entry [id] once the server's message replaced it (the echo or the `2xx`).
-  Future<void> replaceWithServer(String id) => delete(id);
 
   Selectable<OutboxEntry> _entries(ThreadId? threadId) =>
       (_db.select(_db.outbox)

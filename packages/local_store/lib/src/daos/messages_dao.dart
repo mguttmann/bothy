@@ -12,6 +12,7 @@ import '../database.dart';
 import '../mappers/files.dart';
 import '../mappers/threads_messages.dart';
 import '../models.dart';
+import '../search_rows.dart';
 import 'upsert.dart';
 
 /// Data access object of messages; hands out domain types only.
@@ -83,36 +84,27 @@ final class MessagesDao {
     return [for (final row in rows.reversed) messageFromRow(row)];
   }
 
-  /// The newest [limit] messages of [threadId] in ascending `thread_seq`.
-  Stream<List<Message>> watchThread(ThreadId threadId, {required int limit}) =>
-      (_db.select(_db.messages)
-            ..where((t) => t.threadId.equals(threadId.value))
-            ..orderBy([
-              (t) => OrderingTerm(
-                expression: t.threadSeq,
-                mode: OrderingMode.desc,
-              ),
-            ])
-            ..limit(limit))
-          .map(messageFromRow)
-          .watch()
-          .map((page) => List.unmodifiable(page.reversed));
-
   /// The contiguous window of [threadId] (15 7.3 item 4): the newest [limit] messages of the
   /// loaded range that ends at the newest loaded message, the gap before that range and the
   /// gap up to the thread's `last_message_seq`. Messages stored after a gap stay hidden until
   /// their range is loaded.
+  ///
+  /// The window is read again on every write to messages, loaded ranges or threads, of any
+  /// thread (drift knows the tables of a query, not its rows), but a window equal to the last
+  /// one is not emitted again: a write in another thread rebuilds no open history.
   Stream<ContiguousWindow> watchContiguous(
     ThreadId threadId, {
     required int limit,
   }) => _db
       .customSelect(
-        // Its own statement text: drift shares streams of equal SQL (see `watchThread`).
+        // Its own statement text: drift shares streams of equal SQL (see
+        // `ThreadsDao.watchThread`).
         'SELECT 1 AS contiguous_watch',
         readsFrom: {_db.messages, _db.loadedRangesTable, _db.threads},
       )
       .watch()
-      .asyncMap((_) => contiguous(threadId, limit: limit));
+      .asyncMap((_) => contiguous(threadId, limit: limit))
+      .distinct();
 
   /// One value of [watchContiguous].
   Future<ContiguousWindow> contiguous(
@@ -316,12 +308,9 @@ final class MessagesDao {
     await (_db.delete(
       _db.messageAttachments,
     )..where((t) => t.messageId.equals(id))).go();
-    await _db.customUpdate(
-      "DELETE FROM search_index WHERE kind = 'message' AND target_id = ?",
-      variables: [Variable<String>(id)],
-      updates: {_db.searchIndex},
-      updateKind: UpdateKind.delete,
-    );
+    await deleteSearchRows(_db, "kind = 'message' AND target_id = ?", [
+      Variable<String>(id),
+    ]);
     return deleteOrphanFiles(_db, attached);
   });
 

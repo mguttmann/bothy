@@ -1624,6 +1624,11 @@ final class StoredMessageFamily extends $Family
 /// (04 11.3 item 2; brief M4-20 Design note 2): every history column adds its thread while it
 /// shows and removes it when it closes. The state stays empty; the set lives in the notifier
 /// and goes to `EngineFocus.setVisible`.
+///
+/// A thread on screen is also the access the cache cleanup counts (04 13.1, 15 6.3): it is
+/// recorded in the local database when the thread comes on screen and, for every thread still
+/// on screen, each time the window gets the focus back, so a thread that stays open for weeks
+/// keeps its place in the cache as long as the person returns to it.
 
 @ProviderFor(VisibleThreads)
 final visibleThreadsProvider = VisibleThreadsProvider._();
@@ -1632,12 +1637,22 @@ final visibleThreadsProvider = VisibleThreadsProvider._();
 /// (04 11.3 item 2; brief M4-20 Design note 2): every history column adds its thread while it
 /// shows and removes it when it closes. The state stays empty; the set lives in the notifier
 /// and goes to `EngineFocus.setVisible`.
+///
+/// A thread on screen is also the access the cache cleanup counts (04 13.1, 15 6.3): it is
+/// recorded in the local database when the thread comes on screen and, for every thread still
+/// on screen, each time the window gets the focus back, so a thread that stays open for weeks
+/// keeps its place in the cache as long as the person returns to it.
 final class VisibleThreadsProvider
     extends $NotifierProvider<VisibleThreads, Set<ThreadId>> {
   /// The threads on screen and whether the window is idle, sent to the gateway as `focus`
   /// (04 11.3 item 2; brief M4-20 Design note 2): every history column adds its thread while it
   /// shows and removes it when it closes. The state stays empty; the set lives in the notifier
   /// and goes to `EngineFocus.setVisible`.
+  ///
+  /// A thread on screen is also the access the cache cleanup counts (04 13.1, 15 6.3): it is
+  /// recorded in the local database when the thread comes on screen and, for every thread still
+  /// on screen, each time the window gets the focus back, so a thread that stays open for weeks
+  /// keeps its place in the cache as long as the person returns to it.
   VisibleThreadsProvider._()
     : super(
         from: null,
@@ -1665,12 +1680,17 @@ final class VisibleThreadsProvider
   }
 }
 
-String _$visibleThreadsHash() => r'7239d391e5b93be084e3803114590ab4a1db0139';
+String _$visibleThreadsHash() => r'7fe9a52cbf243d6a2a94f21cbc42977c61e344c7';
 
 /// The threads on screen and whether the window is idle, sent to the gateway as `focus`
 /// (04 11.3 item 2; brief M4-20 Design note 2): every history column adds its thread while it
 /// shows and removes it when it closes. The state stays empty; the set lives in the notifier
 /// and goes to `EngineFocus.setVisible`.
+///
+/// A thread on screen is also the access the cache cleanup counts (04 13.1, 15 6.3): it is
+/// recorded in the local database when the thread comes on screen and, for every thread still
+/// on screen, each time the window gets the focus back, so a thread that stays open for weeks
+/// keeps its place in the cache as long as the person returns to it.
 
 abstract class _$VisibleThreads extends $Notifier<Set<ThreadId>> {
   Set<ThreadId> build();

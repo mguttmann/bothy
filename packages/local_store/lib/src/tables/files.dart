@@ -7,8 +7,10 @@ library;
 import 'package:drift/drift.dart';
 
 /// 03 `files` without `object_key`, the scan engine and the transcript text; the thumbnails of
-/// the API `File` as JSON.
+/// the API `File` as JSON. The index serves the removal of a channel (04 8.3), which looks up
+/// the files of its scope (version 16).
 @DataClassName('FileRow')
+@TableIndex(name: 'files_scope_channel', columns: {#scopeChannelId})
 class Files extends Table {
   @override
   String get tableName => 'files';
@@ -71,9 +73,13 @@ class Files extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
-/// 03 `message_attachments`.
+/// 03 `message_attachments`. The indexes on the thread and the channel serve the deletion of
+/// a thread (cleanup, removal), the files of a thread and the removal of a channel (version
+/// 16).
 @DataClassName('MessageAttachmentRow')
 @TableIndex(name: 'message_attachments_file', columns: {#fileId})
+@TableIndex(name: 'message_attachments_thread', columns: {#threadId})
+@TableIndex(name: 'message_attachments_channel', columns: {#channelId})
 class MessageAttachments extends Table {
   @override
   String get tableName => 'message_attachments';

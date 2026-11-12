@@ -106,11 +106,17 @@ final class ThreadsDao {
         return true;
       });
 
-  /// Records that the person opened thread [id] now; the cleanup keeps recently opened threads
-  /// (15 6.3).
+  /// Records that the person has thread [id] on screen now; the cleanup keeps the content of
+  /// a thread accessed within `client.cache_max_age` (15 6.3). A thread that is not stored is
+  /// left alone. The write wakes no watcher of the threads: no value this package hands out
+  /// carries the access time, and the app records it whenever a thread comes on screen.
   Future<void> touch(ThreadId id) async {
-    await (_db.update(_db.threads)..where((t) => t.id.equals(id.value))).write(
-      ThreadsCompanion(lastAccessedAt: Value(toMillis(_db.clock()))),
+    await _db.customUpdate(
+      'UPDATE threads SET last_accessed_at = ? WHERE id = ?',
+      variables: [
+        Variable<int>(toMillis(_db.clock())),
+        Variable<String>(id.value),
+      ],
     );
   }
 

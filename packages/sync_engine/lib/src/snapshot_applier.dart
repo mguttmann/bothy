@@ -21,7 +21,7 @@ import 'wire.dart';
 /// Example:
 /// ```dart
 /// await db.syncStateDao.commitPage((txn) async {
-///   await db.syncStateDao.clearMirror(txn);
+///   await db.syncStateDao.clearMirror(txn, visibleChannels: channelsOf(snapshot));
 ///   await snapshots.applyFull(txn, snapshot, after);
 /// }, cursor: snapshot.headSeq, syncEpoch: snapshot.syncEpoch);
 /// ```

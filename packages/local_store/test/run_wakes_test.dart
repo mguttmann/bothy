@@ -163,7 +163,7 @@ void main() {
   test('a resync clears the wake-ups with the mirror', () async {
     await db.runsDao.upsertWakeIfNewer(wake(1));
     await db.syncStateDao.commitPage(
-      (txn) => db.syncStateDao.clearMirror(txn),
+      (txn) => db.syncStateDao.clearMirror(txn, visibleChannels: const {}),
       cursor: const GlobalSeq(42),
     );
     expect(await db.runsDao.watchWakesForThread(threadId(1)).first, isEmpty);

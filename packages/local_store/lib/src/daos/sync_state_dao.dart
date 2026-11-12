@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Access to the sync state (04 7.1, 7.3, 7.5; 15 7.3): a page and its cursor commit in one
-/// transaction, the session fields of the gateway, and the emptying of the mirror on a resync.
+/// transaction, the session fields of the gateway, and the emptying of the mirror for the
+/// snapshot that replaces it.
 library;
 
 import 'package:domain/domain.dart';
@@ -10,6 +11,8 @@ import 'package:drift/drift.dart';
 import '../database.dart';
 import '../mappers/codec.dart';
 import '../models.dart';
+import '../search_rows.dart';
+import 'upsert.dart';
 
 /// The open transaction of [SyncStateDao.commitPage]: every DAO call inside the `apply`
 /// callback goes through [db] and so into the same transaction.
@@ -78,20 +81,52 @@ final class SyncStateDao {
   Future<void> markSnapshot(DateTime at) =>
       _write(SyncStateTableCompanion(lastSnapshotAt: Value(toMillis(at))));
 
-  /// Removes the cursor and the epoch, so the next connection starts with a resync (15 6.2).
-  Future<void> resetCursor() => _write(
-    const SyncStateTableCompanion(cursor: Value(null), syncEpoch: Value(null)),
-  );
-
   /// Empties every mirror table, `loaded_ranges` and the search index inside [txn] for the
-  /// resync of 04 7.3; keeps `outbox`, `drafts`, `share_inbox`, `sync_state` and the file cache
-  /// rows (drafts are personal data the snapshot does not replace).
-  Future<void> clearMirror(LocalTxn txn) async {
-    for (final table in txn.db.mirrorTables) {
-      await txn.db.delete(table).go();
+  /// snapshot that replaces the mirror (the resync of 04 7.3 and a first connection); keeps
+  /// `outbox`, `drafts`, `share_inbox` and `sync_state` (drafts are personal data the snapshot
+  /// does not replace).
+  ///
+  /// [visibleChannels] are the channels of that snapshot. The file cache rows stay, except
+  /// those of the files of a channel outside [visibleChannels]: a file whose scope is such a
+  /// channel, or that a stored message of such a channel attaches. A snapshot brings no
+  /// `access.changed` for a channel the person lost in the meantime, and after this call
+  /// nothing names the channel of a cached file any more, so its bytes would stay until the
+  /// cleanup by age (04 8.3 item 3). Returns the paths of the deleted file cache rows; the
+  /// caller deletes the bytes after the commit.
+  Future<List<String>> clearMirror(
+    LocalTxn txn, {
+    required Set<ChannelId> visibleChannels,
+  }) async {
+    final db = txn.db;
+    final ids = [for (final c in visibleChannels) c.value];
+    // `NOT IN` of a NULL scope is NULL: a file of no channel (an avatar) stays.
+    final outside = ids.isEmpty
+        ? 'IS NOT NULL'
+        : 'NOT IN ${placeholders(ids.length)}';
+    final gone =
+        'file_id IN (SELECT id FROM files WHERE scope_channel_id $outside '
+        'UNION SELECT file_id FROM message_attachments WHERE channel_id $outside)';
+    final variables = [...textVariables(ids), ...textVariables(ids)];
+    final rows = await db
+        .customSelect(
+          'SELECT path FROM file_cache WHERE $gone',
+          variables: variables,
+        )
+        .get();
+    if (rows.isNotEmpty) {
+      await db.customUpdate(
+        'DELETE FROM file_cache WHERE $gone',
+        variables: variables,
+        updates: {db.fileCache},
+        updateKind: UpdateKind.delete,
+      );
     }
-    await txn.db.delete(txn.db.loadedRangesTable).go();
-    await txn.db.delete(txn.db.searchIndex).go();
+    for (final table in db.mirrorTables) {
+      await db.delete(table).go();
+    }
+    await db.delete(db.loadedRangesTable).go();
+    await clearSearchRows(db);
+    return [for (final r in rows) r.read<String>('path')];
   }
 
   Future<void> _write(SyncStateTableCompanion values) async {

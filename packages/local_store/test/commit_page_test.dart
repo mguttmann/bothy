@@ -81,11 +81,6 @@ void main() {
         lastSnapshotAt: at(6),
       ),
     );
-    await sync.resetCursor();
-    final reset = await sync.read();
-    expect(reset.cursor, isNull);
-    expect(reset.syncEpoch, isNull);
-    expect(reset.gatewaySessionId, 'session-1');
   });
 
   test(
@@ -116,13 +111,15 @@ void main() {
         ),
       );
       await db.syncStateDao.commitPage(
-        (txn) => db.syncStateDao.clearMirror(txn),
+        (txn) =>
+            db.syncStateDao.clearMirror(txn, visibleChannels: {channel(1).id}),
         cursor: const GlobalSeq(42),
       );
       for (final table in [
         ...db.mirrorTables,
         db.loadedRangesTable,
         db.searchIndex,
+        db.searchRows,
       ]) {
         final count = await db
             .customSelect('SELECT count(*) AS n FROM ${table.actualTableName}')
@@ -135,4 +132,99 @@ void main() {
       expect((await db.syncStateDao.read()).cursor, const GlobalSeq(42));
     },
   );
+
+  group('clearMirror and the file cache (04 8.3 item 3)', () {
+    /// Caches the original of file [n] at `cache/file-<n>`.
+    Future<void> cache(int n) => db.fileCacheDao.put(
+      FileCacheEntry(
+        fileId: file(n).id,
+        variant: 'original',
+        path: 'cache/file-$n',
+        sizeBytes: 100,
+        lastAccessedAt: at(0),
+      ),
+    );
+
+    /// Attaches file [n] to message 1 of thread [threadN] in [channelN].
+    Future<void> attach(int n, {required int threadN, required int channelN}) =>
+        db.messagesDao.putAttachments(messageId(threadN, 1), [
+          MessageAttachment(
+            messageId: messageId(threadN, 1),
+            fileId: file(n).id,
+            position: 1,
+            threadId: threadId(threadN),
+            channelId: channel(channelN).id,
+          ),
+        ]);
+
+    Future<List<String>> clear(Set<ChannelId> visible) async {
+      late final List<String> paths;
+      await db.syncStateDao.commitPage(
+        (txn) async => paths = await db.syncStateDao.clearMirror(
+          txn,
+          visibleChannels: visible,
+        ),
+        cursor: const GlobalSeq(42),
+      );
+      return paths;
+    }
+
+    Future<List<String>> cachedPaths() async => [
+      for (final r
+          in await db
+              .customSelect('SELECT path FROM file_cache ORDER BY path')
+              .get())
+        r.read<String>('path'),
+    ];
+
+    test('the cached files of a channel the snapshot no longer lists go, the '
+        'others stay', () async {
+      await db.structureDao.upsertChannelIfNewer(channel(1));
+      await db.structureDao.upsertChannelIfNewer(channel(2));
+      // File 1 belongs to channel 1 and file 2 to channel 2 by their scope; file 3 has no
+      // stored metadata, only the attachment of a message of channel 2; file 4 is an avatar
+      // without a channel.
+      await db.messagesDao.putFile(file(1));
+      await db.messagesDao.putFile(file(2, channelN: 2));
+      await attach(3, threadN: 2, channelN: 2);
+      for (final n in [1, 2, 3, 4]) {
+        await cache(n);
+      }
+      await db.personalDao.upsertDraftIfNewer(
+        draft(1, threadN: 2, channelN: 2),
+      );
+
+      final paths = await clear({channel(1).id});
+
+      expect(paths, unorderedEquals(['cache/file-2', 'cache/file-3']));
+      expect(await cachedPaths(), ['cache/file-1', 'cache/file-4']);
+      expect(
+        await db.personalDao.allDrafts(),
+        hasLength(1),
+        reason: 'drafts stay on a resync (04 7.3)',
+      );
+    });
+
+    test(
+      'a snapshot without channels leaves only the files of no channel',
+      () async {
+        await db.messagesDao.putFile(file(1));
+        await cache(1);
+        await cache(4);
+
+        expect(await clear(const {}), ['cache/file-1']);
+        expect(await cachedPaths(), ['cache/file-4']);
+      },
+    );
+
+    test('nothing goes while every stored channel is still listed', () async {
+      await db.messagesDao.putFile(file(1));
+      await attach(2, threadN: 1, channelN: 1);
+      await cache(1);
+      await cache(2);
+
+      expect(await clear({channel(1).id, channel(2).id}), isEmpty);
+      expect(await cachedPaths(), ['cache/file-1', 'cache/file-2']);
+    });
+  });
 }

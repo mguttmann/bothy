@@ -21376,6 +21376,411 @@ class ThreadSeenStatesCompanion extends UpdateCompanion<ThreadSeenStateRow> {
   }
 }
 
+class $SearchRowsTable extends SearchRows
+    with TableInfo<$SearchRowsTable, SearchRowRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SearchRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _targetIdMeta = const VerificationMeta(
+    'targetId',
+  );
+  @override
+  late final GeneratedColumn<String> targetId = GeneratedColumn<String>(
+    'target_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _threadIdMeta = const VerificationMeta(
+    'threadId',
+  );
+  @override
+  late final GeneratedColumn<String> threadId = GeneratedColumn<String>(
+    'thread_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _channelIdMeta = const VerificationMeta(
+    'channelId',
+  );
+  @override
+  late final GeneratedColumn<String> channelId = GeneratedColumn<String>(
+    'channel_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _spaceIdMeta = const VerificationMeta(
+    'spaceId',
+  );
+  @override
+  late final GeneratedColumn<String> spaceId = GeneratedColumn<String>(
+    'space_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    kind,
+    targetId,
+    threadId,
+    channelId,
+    spaceId,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'search_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SearchRowRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('target_id')) {
+      context.handle(
+        _targetIdMeta,
+        targetId.isAcceptableOrUnknown(data['target_id']!, _targetIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_targetIdMeta);
+    }
+    if (data.containsKey('thread_id')) {
+      context.handle(
+        _threadIdMeta,
+        threadId.isAcceptableOrUnknown(data['thread_id']!, _threadIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_threadIdMeta);
+    }
+    if (data.containsKey('channel_id')) {
+      context.handle(
+        _channelIdMeta,
+        channelId.isAcceptableOrUnknown(data['channel_id']!, _channelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_channelIdMeta);
+    }
+    if (data.containsKey('space_id')) {
+      context.handle(
+        _spaceIdMeta,
+        spaceId.isAcceptableOrUnknown(data['space_id']!, _spaceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_spaceIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SearchRowRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SearchRowRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      targetId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_id'],
+      )!,
+      threadId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}thread_id'],
+      )!,
+      channelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}channel_id'],
+      )!,
+      spaceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}space_id'],
+      )!,
+    );
+  }
+
+  @override
+  $SearchRowsTable createAlias(String alias) {
+    return $SearchRowsTable(attachedDatabase, alias);
+  }
+}
+
+class SearchRowRow extends DataClass implements Insertable<SearchRowRow> {
+  /// The `rowid` of the row in `search_index`.
+  final int id;
+
+  /// `search_index.kind` (`SearchKind.code`).
+  final String kind;
+
+  /// `search_index.target_id`: the message, the thread or the file.
+  final String targetId;
+
+  /// `search_index.thread_id`.
+  final String threadId;
+
+  /// `search_index.channel_id`.
+  final String channelId;
+
+  /// `search_index.space_id`; empty for a row outside a space.
+  final String spaceId;
+  const SearchRowRow({
+    required this.id,
+    required this.kind,
+    required this.targetId,
+    required this.threadId,
+    required this.channelId,
+    required this.spaceId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['kind'] = Variable<String>(kind);
+    map['target_id'] = Variable<String>(targetId);
+    map['thread_id'] = Variable<String>(threadId);
+    map['channel_id'] = Variable<String>(channelId);
+    map['space_id'] = Variable<String>(spaceId);
+    return map;
+  }
+
+  SearchRowsCompanion toCompanion(bool nullToAbsent) {
+    return SearchRowsCompanion(
+      id: Value(id),
+      kind: Value(kind),
+      targetId: Value(targetId),
+      threadId: Value(threadId),
+      channelId: Value(channelId),
+      spaceId: Value(spaceId),
+    );
+  }
+
+  factory SearchRowRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SearchRowRow(
+      id: serializer.fromJson<int>(json['id']),
+      kind: serializer.fromJson<String>(json['kind']),
+      targetId: serializer.fromJson<String>(json['targetId']),
+      threadId: serializer.fromJson<String>(json['threadId']),
+      channelId: serializer.fromJson<String>(json['channelId']),
+      spaceId: serializer.fromJson<String>(json['spaceId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'kind': serializer.toJson<String>(kind),
+      'targetId': serializer.toJson<String>(targetId),
+      'threadId': serializer.toJson<String>(threadId),
+      'channelId': serializer.toJson<String>(channelId),
+      'spaceId': serializer.toJson<String>(spaceId),
+    };
+  }
+
+  SearchRowRow copyWith({
+    int? id,
+    String? kind,
+    String? targetId,
+    String? threadId,
+    String? channelId,
+    String? spaceId,
+  }) => SearchRowRow(
+    id: id ?? this.id,
+    kind: kind ?? this.kind,
+    targetId: targetId ?? this.targetId,
+    threadId: threadId ?? this.threadId,
+    channelId: channelId ?? this.channelId,
+    spaceId: spaceId ?? this.spaceId,
+  );
+  SearchRowRow copyWithCompanion(SearchRowsCompanion data) {
+    return SearchRowRow(
+      id: data.id.present ? data.id.value : this.id,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      targetId: data.targetId.present ? data.targetId.value : this.targetId,
+      threadId: data.threadId.present ? data.threadId.value : this.threadId,
+      channelId: data.channelId.present ? data.channelId.value : this.channelId,
+      spaceId: data.spaceId.present ? data.spaceId.value : this.spaceId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SearchRowRow(')
+          ..write('id: $id, ')
+          ..write('kind: $kind, ')
+          ..write('targetId: $targetId, ')
+          ..write('threadId: $threadId, ')
+          ..write('channelId: $channelId, ')
+          ..write('spaceId: $spaceId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, kind, targetId, threadId, channelId, spaceId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SearchRowRow &&
+          other.id == this.id &&
+          other.kind == this.kind &&
+          other.targetId == this.targetId &&
+          other.threadId == this.threadId &&
+          other.channelId == this.channelId &&
+          other.spaceId == this.spaceId);
+}
+
+class SearchRowsCompanion extends UpdateCompanion<SearchRowRow> {
+  final Value<int> id;
+  final Value<String> kind;
+  final Value<String> targetId;
+  final Value<String> threadId;
+  final Value<String> channelId;
+  final Value<String> spaceId;
+  const SearchRowsCompanion({
+    this.id = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.targetId = const Value.absent(),
+    this.threadId = const Value.absent(),
+    this.channelId = const Value.absent(),
+    this.spaceId = const Value.absent(),
+  });
+  SearchRowsCompanion.insert({
+    this.id = const Value.absent(),
+    required String kind,
+    required String targetId,
+    required String threadId,
+    required String channelId,
+    required String spaceId,
+  }) : kind = Value(kind),
+       targetId = Value(targetId),
+       threadId = Value(threadId),
+       channelId = Value(channelId),
+       spaceId = Value(spaceId);
+  static Insertable<SearchRowRow> custom({
+    Expression<int>? id,
+    Expression<String>? kind,
+    Expression<String>? targetId,
+    Expression<String>? threadId,
+    Expression<String>? channelId,
+    Expression<String>? spaceId,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (kind != null) 'kind': kind,
+      if (targetId != null) 'target_id': targetId,
+      if (threadId != null) 'thread_id': threadId,
+      if (channelId != null) 'channel_id': channelId,
+      if (spaceId != null) 'space_id': spaceId,
+    });
+  }
+
+  SearchRowsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? kind,
+    Value<String>? targetId,
+    Value<String>? threadId,
+    Value<String>? channelId,
+    Value<String>? spaceId,
+  }) {
+    return SearchRowsCompanion(
+      id: id ?? this.id,
+      kind: kind ?? this.kind,
+      targetId: targetId ?? this.targetId,
+      threadId: threadId ?? this.threadId,
+      channelId: channelId ?? this.channelId,
+      spaceId: spaceId ?? this.spaceId,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (targetId.present) {
+      map['target_id'] = Variable<String>(targetId.value);
+    }
+    if (threadId.present) {
+      map['thread_id'] = Variable<String>(threadId.value);
+    }
+    if (channelId.present) {
+      map['channel_id'] = Variable<String>(channelId.value);
+    }
+    if (spaceId.present) {
+      map['space_id'] = Variable<String>(spaceId.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SearchRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('kind: $kind, ')
+          ..write('targetId: $targetId, ')
+          ..write('threadId: $threadId, ')
+          ..write('channelId: $channelId, ')
+          ..write('spaceId: $spaceId')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$LocalDatabase extends GeneratedDatabase {
   _$LocalDatabase(QueryExecutor e) : super(e);
   late final SearchIndex searchIndex = SearchIndex(this);
@@ -21438,6 +21843,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
   late final $ThreadSeenStatesTable threadSeenStates = $ThreadSeenStatesTable(
     this,
   );
+  late final $SearchRowsTable searchRows = $SearchRowsTable(this);
   late final Index channelsSpace = Index(
     'channels_space',
     'CREATE INDEX channels_space ON channels (space_id)',
@@ -21458,6 +21864,14 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     'messages_thread_seq',
     'CREATE INDEX messages_thread_seq ON messages (thread_id, thread_seq)',
   );
+  late final Index messagesClientMsg = Index(
+    'messages_client_msg',
+    'CREATE INDEX messages_client_msg ON messages (client_msg_id)',
+  );
+  late final Index messagesChannel = Index(
+    'messages_channel',
+    'CREATE INDEX messages_channel ON messages (channel_id)',
+  );
   late final Index myMentionsThread = Index(
     'my_mentions_thread',
     'CREATE INDEX my_mentions_thread ON my_mentions (thread_id)',
@@ -21466,13 +21880,29 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     'message_components_message',
     'CREATE INDEX message_components_message ON message_components (message_id)',
   );
+  late final Index filesScopeChannel = Index(
+    'files_scope_channel',
+    'CREATE INDEX files_scope_channel ON files (scope_channel_id)',
+  );
   late final Index messageAttachmentsFile = Index(
     'message_attachments_file',
     'CREATE INDEX message_attachments_file ON message_attachments (file_id)',
   );
+  late final Index messageAttachmentsThread = Index(
+    'message_attachments_thread',
+    'CREATE INDEX message_attachments_thread ON message_attachments (thread_id)',
+  );
+  late final Index messageAttachmentsChannel = Index(
+    'message_attachments_channel',
+    'CREATE INDEX message_attachments_channel ON message_attachments (channel_id)',
+  );
   late final Index runsThread = Index(
     'runs_thread',
     'CREATE INDEX runs_thread ON runs (thread_id)',
+  );
+  late final Index runsChannel = Index(
+    'runs_channel',
+    'CREATE INDEX runs_channel ON runs (channel_id)',
   );
   late final Index runWakesThread = Index(
     'run_wakes_thread',
@@ -21493,6 +21923,22 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
   late final Index fileCacheLastAccessed = Index(
     'file_cache_last_accessed',
     'CREATE INDEX file_cache_last_accessed ON file_cache (last_accessed_at)',
+  );
+  late final Index searchRowsTarget = Index(
+    'search_rows_target',
+    'CREATE INDEX search_rows_target ON search_rows (kind, target_id)',
+  );
+  late final Index searchRowsThread = Index(
+    'search_rows_thread',
+    'CREATE INDEX search_rows_thread ON search_rows (thread_id)',
+  );
+  late final Index searchRowsChannel = Index(
+    'search_rows_channel',
+    'CREATE INDEX search_rows_channel ON search_rows (channel_id)',
+  );
+  late final Index searchRowsSpace = Index(
+    'search_rows_space',
+    'CREATE INDEX search_rows_space ON search_rows (space_id)',
   );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -21537,20 +21983,31 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     shellViewStates,
     spaceViewStates,
     threadSeenStates,
+    searchRows,
     channelsSpace,
     forumTagsChannel,
     threadsChannel,
     threadsLastAccessed,
     messagesThreadSeq,
+    messagesClientMsg,
+    messagesChannel,
     myMentionsThread,
     messageComponentsMessage,
+    filesScopeChannel,
     messageAttachmentsFile,
+    messageAttachmentsThread,
+    messageAttachmentsChannel,
     runsThread,
+    runsChannel,
     runWakesThread,
     readStatesChannel,
     draftsChannel,
     outboxThreadCreated,
     fileCacheLastAccessed,
+    searchRowsTarget,
+    searchRowsThread,
+    searchRowsChannel,
+    searchRowsSpace,
   ];
   @override
   DriftDatabaseOptions get options =>

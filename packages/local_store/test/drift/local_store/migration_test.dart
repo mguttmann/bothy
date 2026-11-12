@@ -15,7 +15,9 @@
 // column `user_space_states.channel_order` and the mirror table `user_channel_states` with a
 // cleared cursor, version 13 (M4-52) the local-only table `thread_seen_states`, version 14 (AR-08) the mirror table
 // `run_wakes` and the column `channels.allow_autonomous_runs` with a cleared cursor, version 15 (PROJ-ARCHIVE) the
-// columns `user_channel_states.hidden_at` and `space_view_states.archived_expanded` with a cleared cursor; each keeps
+// columns `user_channel_states.hidden_at` and `space_view_states.archived_expanded` with a cleared cursor, version 16
+// (AUD-pkg-local-store-01) the local-only table `search_rows`, filled from the rows of `search_index`, and the indexes
+// of lookups by `client_msg_id`, channel and thread, with the cursor kept; each keeps
 // every row of the mirror. The preserved
 // tables are checked by
 // `survival_test.dart`.
@@ -33,6 +35,7 @@ import 'generated/schema_v12.dart' as v12;
 import 'generated/schema_v13.dart' as v13;
 import 'generated/schema_v14.dart' as v14;
 import 'generated/schema_v15.dart' as v15;
+import 'generated/schema_v16.dart' as v16;
 import 'generated/schema_v2.dart' as v2;
 import 'generated/schema_v3.dart' as v3;
 import 'generated/schema_v4.dart' as v4;
@@ -624,4 +627,105 @@ void main() {
       );
     },
   );
+
+  test('the migration 15 to 16 lists every row of the search index in search_rows '
+      'under its rowid, adds the indexes and keeps the cursor', () async {
+    const state = v15.SyncStateData(
+      id: 1,
+      cursor: 900,
+      syncEpoch: 'epoch-4',
+      headSeq: 900,
+      permissionVersion: 8,
+      lastSnapshotAt: 41,
+    );
+    await verifier.testWithDataIntegrity(
+      oldVersion: 15,
+      newVersion: 16,
+      createOld: v15.DatabaseAtV15.new,
+      createNew: v16.DatabaseAtV16.new,
+      openTestedDatabase: LocalDatabase.new,
+      createItems: (batch, oldDb) {
+        batch
+          ..insertAll(oldDb.syncState, [state])
+          ..customStatement(
+            'INSERT INTO search_index '
+            '(rowid, kind, target_id, thread_id, channel_id, space_id, body) VALUES '
+            "(7, 'message', 'm1', 't1', 'c1', 's1', 'Hello from Alex'), "
+            "(9, 'thread_title', 't1', 't1', 'c1', '', 'Release notes'), "
+            // A locating column without a value, which this package never wrote.
+            "(12, 'transcript', 'f1', 't2', 'c2', NULL, 'Sam on the phone')",
+          );
+      },
+      validateItems: (newDb) async {
+        expect(
+          await (newDb.select(
+            newDb.searchRows,
+          )..orderBy([(t) => OrderingTerm(expression: t.id)])).get(),
+          [
+            const v16.SearchRowsData(
+              id: 7,
+              kind: 'message',
+              targetId: 'm1',
+              threadId: 't1',
+              channelId: 'c1',
+              spaceId: 's1',
+            ),
+            const v16.SearchRowsData(
+              id: 9,
+              kind: 'thread_title',
+              targetId: 't1',
+              threadId: 't1',
+              channelId: 'c1',
+              spaceId: '',
+            ),
+            const v16.SearchRowsData(
+              id: 12,
+              kind: 'transcript',
+              targetId: 'f1',
+              threadId: 't2',
+              channelId: 'c2',
+              spaceId: '',
+            ),
+          ],
+        );
+        // The index itself is untouched: the same rows under the same rowids.
+        final indexed = await newDb
+            .customSelect(
+              'SELECT rowid AS id, body FROM search_index ORDER BY rowid',
+            )
+            .get();
+        expect(
+          [
+            for (final r in indexed)
+              (r.read<int>('id'), r.read<String>('body')),
+          ],
+          [
+            (7, 'Hello from Alex'),
+            (9, 'Release notes'),
+            (12, 'Sam on the phone'),
+          ],
+        );
+        final indexes = await newDb
+            .customSelect(
+              "SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ("
+              "'search_rows_target', 'search_rows_thread', 'search_rows_channel', "
+              "'search_rows_space', 'messages_client_msg', 'messages_channel', "
+              "'message_attachments_thread', 'message_attachments_channel', "
+              "'runs_channel', 'files_scope_channel')",
+            )
+            .get();
+        expect(indexes, hasLength(10));
+        expect(await newDb.select(newDb.syncState).get(), [
+          const v16.SyncStateData(
+            id: 1,
+            cursor: 900,
+            syncEpoch: 'epoch-4',
+            headSeq: 900,
+            permissionVersion: 8,
+            lastSnapshotAt: 41,
+          ),
+        ], reason: 'nothing of the mirror changes, so no resync follows');
+      },
+    );
+  });
 }

@@ -1,6 +1,6 @@
 # local_store
 
-The encrypted local database of the apps: drift on SQLite3MultipleCiphers, schema version 15
+The encrypted local database of the apps: drift on SQLite3MultipleCiphers, schema version 16
 with the mirror tables and the local-only tables, data access objects that hand out the domain
 types of `packages/domain`, removal and wipe, the cache cleanup and offline search
 (docs/spec/15-client-architecture.md 6, ADR 0029, R-CL-08). The interface reads only from this
@@ -41,7 +41,7 @@ hooks:
       source: sqlite3mc
 ```
 
-## Tables (schema version 15)
+## Tables (schema version 16)
 
 | Group | File | Tables |
 |---|---|---|
@@ -52,12 +52,29 @@ hooks:
 | Personal | `lib/src/tables/personal.dart` | `read_states`, `drafts`, `user_settings`, `notification_preferences`, `quiet_hours` |
 | Instance | `lib/src/tables/instance.dart` | `instance` (with the app lock policy of `getInstance` in `app_lock` since version 5, M5-08; null in a row of an earlier version until the next `getInstance`), `commands` |
 | Local only | `lib/src/tables/local_only.dart` | `outbox`, `sync_state`, `loaded_ranges`, `file_cache`, `share_inbox`, `forum_view_states` (version 2, M4-19: the Done section per forum), `recent_targets` (version 3, M4-23: the recently visited spaces, channels and threads of the quick switcher, per device, never synchronized), `host_key_pins` (version 4, M4-36: the pinned Noise keys of the hosts, per device, a trust anchor), `channel_view_states` and `shell_view_state` (version 6, M4-40: the collapsed thread group per channel and the one row with the pinned forum overview, per device, never synchronized; 01 6.8 item 7, D-SB-6; version 7, M4-42: `shell_view_state.channel_column_hidden`, whether the channel column next to an open thread is hidden, 01 D1, D2; version 8, M4-45: `shell_view_state.session_column_hidden` and `text_thread_session_shown`, whether the session column is hidden beside a forum post or main history and shown beside a thread of a text channel, 01 D1, D2; version 9, M4-46: `channel_view_states.posts_shown_in_full`, whether a forum group lists every open post after "Show more", 01 6.8 item 3), `space_view_states` (version 10, FIX-device-mirroring-2: whether a space is collapsed in the sidebar, per device, never synchronized, filled once from `user_space_states.collapsed` on the upgrade; 01 6.7, R-PR-24; version 15, PROJ-ARCHIVE: `archived_expanded`, whether the section "Archived (n)" of the space is expanded, 01 6.22); version 11, M4-49: `shell_view_state.code_blocks_unwrapped`, whether the code blocks of messages show one line per line with a horizontal scroll instead of wrapping, 01 6.14; `thread_seen_states` (version 13, M4-52: the run and its state each chat showed when the person last had it open, per device, never synchronized, deleted with its thread; 01 6.17) |
-| Search | `lib/src/search.drift` | `search_index` (FTS5) |
+| Search | `lib/src/search.drift`, `lib/src/tables/local_only.dart` | `search_index` (FTS5) and, since version 16, `search_rows`: one row per row of the index under the same `rowid`, with the locating columns and indexes on them (see "Search index") |
 
 `host_key_pins` of 15 6.1 came with version 4 (M4-36); from there on it is a preserved table of
 `MigrationRules` like `outbox`, `drafts` and `share_inbox` (D-M4-36-2). The
 schema has no foreign keys to server-owned rows; the version rule and the removal keep it
 consistent. `test/schema_test.dart` compares the columns of every mirror table with chapter 03.
+
+Version 16 adds indexes for lookups that read a whole table before: `messages(client_msg_id)`
+(the message an outbox entry sent), `messages(channel_id)`, `message_attachments(thread_id)`,
+`message_attachments(channel_id)`, `runs(channel_id)` and `files(scope_channel_id)` (the deletion
+of a thread, the removal of a channel, the files of a thread, the runs of a post list).
+`test/query_plans_test.dart` records the statements of the real calls and reads their plans, so
+a lookup that falls back to a scan fails there.
+
+## Search index
+
+`search_index` is an FTS5 table. FTS5 reaches a row without a scan only through a match or its
+`rowid`; a condition on a locating column (`kind`, `target_id`, `thread_id`, `channel_id`,
+`space_id`) reads the whole index table. Every write replaces or deletes rows by what they
+index, so each row has a twin in the normal table `search_rows` with the same `rowid`, the same
+locating columns and indexes on them: a write finds its rows there and reaches `search_index`
+by `rowid` (`lib/src/search_rows.dart`, the only place that writes either table). Both change
+in one transaction. The step to version 16 fills `search_rows` from the rows the index holds.
 
 ## Data access objects
 
@@ -69,11 +86,11 @@ whether it applied (04 9); reactions and pins carry absolute values and leave
 
 | DAO | Purpose |
 |---|---|
-| `StructureDao`, `ThreadsDao`, `MessagesDao`, `RunsDao`, `PrincipalsDao`, `CommandsDao`, `InstanceDao` | mirror tables; the personal sidebar orders of `StructureDao` (M4-51): `watchUserSpaceStates`, `upsertUserSpaceStateIfNewer` and `putUserSpaceStateLocally` with the optional `channelOrder` (null keeps the stored list, an empty list clears it to the default order), `watchUserChannelStates`, `upsertUserChannelStateIfNewer` and `putUserChannelStateLocally` (the local write at once keeps the version, a missing row starts at 0, so the server state wins by version); `MessagesDao.watchContiguous` emits only the contiguous range of `loaded_ranges` that ends at the newest loaded message plus the first gap |
+| `StructureDao`, `ThreadsDao`, `MessagesDao`, `RunsDao`, `PrincipalsDao`, `CommandsDao`, `InstanceDao` | mirror tables; the personal sidebar orders of `StructureDao` (M4-51): `watchUserSpaceStates`, `upsertUserSpaceStateIfNewer` and `putUserSpaceStateLocally` with the optional `channelOrder` (null keeps the stored list, an empty list clears it to the default order), `watchUserChannelStates`, `upsertUserChannelStateIfNewer` and `putUserChannelStateLocally` (the local write at once keeps the version, a missing row starts at 0, so the server state wins by version); `MessagesDao.watchContiguous` emits only the contiguous range of `loaded_ranges` that ends at the newest loaded message plus the first gap, and emits it again only when it changed (`ContiguousWindow` has value equality), so a write in another thread rebuilds no open history; `ThreadsDao.touch` records that the person has a thread on screen and wakes no watcher |
 | `RunsDao` (wake-ups, AR-08) | `upsertWakeIfNewer`, `replaceThreadWakes` (the whole list of `listThreadWakes` replaces the thread's rows), `applyWakeState` (the state of `run.wake_changed` before the reload, version kept), `watchWakesForThread` (in the order they fire) |
 | `PersonalDao` | read states through `mergeReadState` (monotonic), drafts, settings, notification preferences, quiet hours |
-| `SyncStateDao` | `commitPage` stores a page and the cursor with the sync epoch in one transaction; `saveSession`, `markDisconnected`, `markSnapshot`, `resetCursor`; `clearMirror` for a resync |
-| `OutboxDao` | FIFO per thread by `created_at`, then `id`; `depends_on`; failures with the `current` revision of a `412` |
+| `SyncStateDao` | `commitPage` stores a page and the cursor with the sync epoch in one transaction; `saveSession`, `markDisconnected`, `markSnapshot`; `clearMirror` for the snapshot that replaces the mirror: it takes the channels of that snapshot, deletes the file cache rows of the files of every other stored channel and returns their paths (04 8.3 item 3), and keeps outbox, drafts and share inbox |
+| `OutboxDao` | the entries in FIFO order per thread by `created_at`, then `id` (`entriesFor`, `allEntries`); `depends_on` is stored and handed out, the outbox of `sync_engine` decides what may be sent; failures with the `current` revision of a `412` |
 | `FileCacheDao`, `ShareInboxDao`, `SearchDao` | file cache metadata, share inbox, offline search; `SearchDao.watchTranscriptsToIndex` lists the done transcripts of attached voice files without an index row (the app fetches the text), `pruneTranscripts` drops the rows of files no stored message attaches any more |
 | `HostKeyPinsDao` | the pin of a host (`read`, `write` replaces, `all`); nothing here deletes a pin (M4-36) |
 | `ForumViewDao`, `RecentTargetsDao` | local view state per device: the Done section of a forum, the collapsed thread groups (`watchCollapsedGroups`, `setGroupCollapsed`; expanded without a row) the pinned forum overview (`watchOverviewPinned`, `overviewPinned`, `setOverviewPinned`; not pinned without the row) and the seen marks of the status dots (`watchSeenStates`, `markSeen`, M4-52); the recently visited targets (`visit` keeps the newest `keep` rows, `watchRecent` newest first) |
@@ -92,9 +109,17 @@ whether it applied (04 9); reactions and pins carry absolute values and leave
   R-SY-14); the app deletes keys and tokens.
 - `CacheCleaner` (limits `client.cache_max_age` and `client.cache_max_bytes` from `AppConfig`)
   deletes threads and file cache rows without access since the maximum age, then the least
-  recently used until the database plus the file cache fit the byte limit. It never touches
-  outbox, drafts, the share inbox or the pinned host keys, and never the structure rows the
-  sidebar needs (15 6.3). Only `wipe()` deletes the pins, with the database.
+  recently used until the database plus the file cache fit the byte limit. A thread is accessed
+  when the person has it on screen (`ThreadsDao.touch`, called by the app) and when its row
+  reaches the device. Without access for the maximum age a done thread goes with everything
+  below it. An open thread loses only its content (messages with their reactions, components,
+  mentions, attachments and files, wake-ups, loaded ranges and their search rows) and keeps its
+  row with what the sidebar reads of it (tags, read state, seen mark, notification preference,
+  runs, the title in the search index), because the sidebar lists the open threads the device
+  holds (01 6.8); its age then starts again. The byte limit removes whole threads, open ones
+  too. The cleaner never
+  touches outbox, drafts, the share inbox or the pinned host keys, and never the structure rows
+  the sidebar needs (15 6.3). Only `wipe()` deletes the pins, with the database.
 
 ## Migrations
 
@@ -109,7 +134,8 @@ Rules for every later version (15 6.2): `onUpgrade` uses `stepByStep` with the s
 `MigrationRules`. A mirror table may be discarded (`MigrationRules.discardCache` drops and
 recreates it and resets the cursor, so the next connection loads a snapshot; a step that adds a
 mirror column only the snapshot fills calls `MigrationRules.resetCursor` alone, as version 6 does
-for `channels.project_bound`); `outbox`, `drafts`
+for `channels.project_bound`; a step that changes nothing of the mirror, such as version 16 with
+its local-only table and its indexes, keeps the cursor); `outbox`, `drafts`
 and `share_inbox` are migrated row by row (`MigrationRules.keepRows`). `test/drift/survival_test.dart`
 migrates every pair of stored versions with fixture rows in those tables and compares them; a new
 version adds its fixture rows there.

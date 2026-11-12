@@ -352,11 +352,9 @@ final class CatchUpListener implements SessionListener {
       // The first connection, or a cursor dropped by a failed resync: whatever the mirror
       // holds belongs to no known time line, so it is replaced by the snapshot (D-M4-14-2).
       final head = GlobalSeq(ready.headSeq);
-      await _db.syncStateDao.commitPage(
-        (txn) async {
-          await _db.syncStateDao.clearMirror(txn);
-          await _snapshots.applyFull(txn, snapshot, after);
-        },
+      await _replaceMirror(
+        snapshot,
+        after,
         cursor: head,
         syncEpoch: ready.syncEpoch,
       );
@@ -573,11 +571,9 @@ final class CatchUpListener implements SessionListener {
     }
     if (_wiped || session != _session) return;
     final after = AfterCommit();
-    await _db.syncStateDao.commitPage(
-      (txn) async {
-        await _db.syncStateDao.clearMirror(txn);
-        await _snapshots.applyFull(txn, snapshot, after);
-      },
+    await _replaceMirror(
+      snapshot,
+      after,
       cursor: snapshot.headSeq,
       syncEpoch: snapshot.syncEpoch,
     );
@@ -597,6 +593,32 @@ final class CatchUpListener implements SessionListener {
     _goLive(control);
     _notify(Resynced(_resyncReason));
     await _drainHeld(control, session);
+  }
+
+  /// Replaces the mirror with the whole [snapshot] in one transaction with [cursor] and
+  /// [syncEpoch] (a first connection and the resync of 04 7.3). A snapshot names what the
+  /// person sees now and brings no `access.changed` for a channel lost in the meantime, so the
+  /// cached files of the stored channels it no longer lists go with the mirror, and their bytes
+  /// with the steps of [after] (04 8.3 item 3). Drafts stay (04 7.3).
+  Future<void> _replaceMirror(
+    SnapshotData snapshot,
+    AfterCommit after, {
+    required GlobalSeq cursor,
+    required String syncEpoch,
+  }) async {
+    var erased = const <String>[];
+    await _db.syncStateDao.commitPage(
+      (txn) async {
+        erased = await _db.syncStateDao.clearMirror(
+          txn,
+          visibleChannels: {for (final v in snapshot.channels) v.channel.id},
+        );
+        await _snapshots.applyFull(txn, snapshot, after);
+      },
+      cursor: cursor,
+      syncEpoch: syncEpoch,
+    );
+    if (erased.isNotEmpty) after.steps.add(() => _sync.eraser.erase(erased));
   }
 
   /// Applies the frames that arrived during a resync, in order, with the duplicate rule (04

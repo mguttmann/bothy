@@ -8,16 +8,26 @@ import 'package:drift/drift.dart';
 
 import 'daos/upsert.dart';
 import 'database.dart';
+import 'models.dart';
+import 'search_rows.dart';
 
 /// Deletes the threads [threadIds] with their messages, reactions, mentions, components,
 /// attachments, runs, wake-ups, tags, read states, seen marks of the status dots, loaded ranges, thread notification preferences and
 /// search rows, the metadata of files no other message attaches, and their file cache rows;
 /// drafts of the threads only with [withDrafts]. Runs in the caller's transaction and returns
 /// the paths of the deleted file cache rows.
+///
+/// With [contentOnly] only the content of the threads goes: the messages with what hangs on
+/// them (reactions, mentions, components, attachments, the files no other message attaches and
+/// their file cache rows), the wake-ups, the loaded ranges and the search rows of messages and
+/// transcripts. The thread rows stay with everything the sidebar reads of a thread (01 6.8):
+/// tags, read state, seen mark, notification preference, runs and the search row of the
+/// title. Drafts stay as well.
 Future<List<String>> deleteThreads(
   LocalDatabase db,
   List<String> threadIds, {
   required bool withDrafts,
+  bool contentOnly = false,
 }) async {
   if (threadIds.isEmpty) return const [];
   final ids = placeholders(threadIds.length);
@@ -52,23 +62,29 @@ Future<List<String>> deleteThreads(
     db.messageAttachments,
   });
   await run('DELETE FROM run_wakes WHERE thread_id IN $ids', {db.runWakes});
-  await run('DELETE FROM runs WHERE thread_id IN $ids', {db.runs});
   await run('DELETE FROM messages WHERE thread_id IN $ids', {db.messages});
+  await run('DELETE FROM loaded_ranges WHERE thread_id IN $ids', {
+    db.loadedRangesTable,
+  });
+  if (contentOnly) {
+    await deleteSearchRows(
+      db,
+      "thread_id IN $ids AND kind <> '${SearchKind.threadTitle.code}'",
+      vars,
+    );
+    return deleteOrphanFiles(db, fileIds);
+  }
+  await run('DELETE FROM runs WHERE thread_id IN $ids', {db.runs});
   await run('DELETE FROM thread_tags WHERE thread_id IN $ids', {db.threadTags});
   await run('DELETE FROM read_states WHERE thread_id IN $ids', {db.readStates});
   await run('DELETE FROM thread_seen_states WHERE thread_id IN $ids', {
     db.threadSeenStates,
   });
-  await run('DELETE FROM loaded_ranges WHERE thread_id IN $ids', {
-    db.loadedRangesTable,
-  });
   await run(
     "DELETE FROM notification_preferences WHERE target_kind = 'thread' AND target_id IN $ids",
     {db.notificationPreferences},
   );
-  await run('DELETE FROM search_index WHERE thread_id IN $ids', {
-    db.searchIndex,
-  });
+  await deleteSearchRows(db, 'thread_id IN $ids', vars);
   if (withDrafts) {
     await run('DELETE FROM drafts WHERE thread_id IN $ids', {db.drafts});
   }

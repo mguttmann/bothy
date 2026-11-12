@@ -466,7 +466,9 @@ The server sends `resync_required {reason, head_seq, sync_epoch}` instead of eve
 
 The client then discards its server state in the cache (the outbox stays), loads
 `GET /api/v1/sync/snapshot`, sets the cursor and the epoch to the returned values and loads threads
-via REST when needed. On the gateway the connection stays open and is live from `head_seq`;
+via REST when needed. The snapshot carries no `access.changed`: for a channel the client held
+and the snapshot no longer lists, the client deletes the cached files with the server state
+(section 8.3, item 3); drafts stay. On the gateway the connection stays open and is live from `head_seq`;
 the client discards events up to the `head_seq` of the new snapshot according to section 9,
 item 2. It does not have to reconnect. Reason: every close code would trigger a wrong reaction,
 and the live delivery from `head_seq` loses nothing.
@@ -723,7 +725,10 @@ change per `agent.run_update_min_interval`.
 The client keeps the structure, recently opened threads, messages, thumbnails, its own
 settings and drafts in a local, encrypted database (protection class per platform: see the
 security chapter). The cache is only a copy; the truth lies on the server. Entries older than
-`client.cache_max_age` without access are removed.
+`client.cache_max_age` without access are removed. A thread is accessed while the person has it
+on screen. Of an open thread without access the client removes the messages and files and keeps
+the entry the sidebar lists ([15-client-architecture.md](15-client-architecture.md), section
+6.3).
 
 ### 13.2 Outbox
 

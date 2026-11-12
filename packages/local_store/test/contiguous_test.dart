@@ -76,7 +76,7 @@ void main() {
   });
 
   test(
-    'nothing loaded gives an empty window; pages and the thread stream',
+    'nothing loaded gives an empty window; pages read the stored messages',
     () async {
       final dao = db.messagesDao;
       expect((await dao.contiguous(threadId(1), limit: 5)).messages, isEmpty);
@@ -100,13 +100,6 @@ void main() {
             m.threadSeq.value,
         ],
         [1, 2, 3, 4],
-      );
-      expect(
-        [
-          for (final m in await dao.watchThread(threadId(1), limit: 3).first)
-            m.threadSeq.value,
-        ],
-        [2, 3, 4],
       );
     },
   );
@@ -137,6 +130,68 @@ void main() {
     await sub.cancel();
     expect(seen.first, [1]);
     expect(seen.last, [1, 2, 3]);
+  });
+
+  test(
+    'watchContiguous emits no new window for a write outside its thread',
+    () async {
+      final dao = db.messagesDao;
+      await db.threadsDao.upsertIfNewer(thread(1, lastSeq: 2));
+      await db.threadsDao.upsertIfNewer(thread(2, lastSeq: 1));
+      for (final seq in [1, 2]) {
+        await dao.upsertIfNewer(message(1, seq));
+      }
+      await dao.addLoadedRange(
+        threadId(1),
+        const ThreadSeq(1),
+        const ThreadSeq(2),
+      );
+      final seen = <ContiguousWindow>[];
+      final sub = dao.watchContiguous(threadId(1), limit: 50).listen(seen.add);
+      await pumpEventQueue();
+      expect(seen, hasLength(1));
+
+      // Thread 2 stores a message, loads a range and moves its activity: each of the three
+      // tables the window reads changes, nothing of thread 1 does.
+      await dao.upsertIfNewer(message(2, 1));
+      await dao.addLoadedRange(
+        threadId(2),
+        const ThreadSeq(1),
+        const ThreadSeq(1),
+      );
+      await db.threadsDao.advanceActivity(threadId(2), at(90));
+      await pumpEventQueue();
+      expect(seen, hasLength(1), reason: 'the window of thread 1 is unchanged');
+
+      // A change of its own thread still arrives.
+      await dao.upsertIfNewer(
+        message(1, 2, version: 2, text: 'Edited by Alex'),
+      );
+      await pumpEventQueue();
+      expect(seen, hasLength(2));
+      expect(seen.last.messages.last.contentMd, 'Edited by Alex');
+      await sub.cancel();
+    },
+  );
+
+  test('two windows with the same messages and gaps are equal', () async {
+    final dao = db.messagesDao;
+    await db.threadsDao.upsertIfNewer(thread(1, lastSeq: 5));
+    for (final seq in [2, 3]) {
+      await dao.upsertIfNewer(message(1, seq));
+    }
+    await dao.addLoadedRange(
+      threadId(1),
+      const ThreadSeq(2),
+      const ThreadSeq(3),
+    );
+    final a = await dao.contiguous(threadId(1), limit: 50);
+    final b = await dao.contiguous(threadId(1), limit: 50);
+    expect(a, b);
+    expect(a.hashCode, b.hashCode);
+    expect(a, isNot(await dao.contiguous(threadId(1), limit: 1)));
+    await dao.applyPin(messageId(1, 3), pinned: true);
+    expect(a, isNot(await dao.contiguous(threadId(1), limit: 50)));
   });
 
   test('watchContiguous keeps its own tables while the thread list of the channel is watched', () async {
