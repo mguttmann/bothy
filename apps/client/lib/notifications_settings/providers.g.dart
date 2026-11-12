@@ -102,21 +102,27 @@ String _$notifyWriterHash() => r'c4ecbf6c278d217f7ae55bae4ecf8a22e1df8484';
 
 /// Loads the levels and quiet hours of the signed-in person once per session (the snapshot
 /// carries neither, 04 6.3); a failed load leaves the stored rows and the events keep them
-/// current.
+/// current. The load runs again when the connection is live again after it failed
+/// ([_askAgainWhenLive]) and after every resync, which empties both tables with the rest of
+/// the mirror (04 7.3; ruling AUD-CM01/4).
 
 @ProviderFor(notifyRefresh)
 final notifyRefreshProvider = NotifyRefreshProvider._();
 
 /// Loads the levels and quiet hours of the signed-in person once per session (the snapshot
 /// carries neither, 04 6.3); a failed load leaves the stored rows and the events keep them
-/// current.
+/// current. The load runs again when the connection is live again after it failed
+/// ([_askAgainWhenLive]) and after every resync, which empties both tables with the rest of
+/// the mirror (04 7.3; ruling AUD-CM01/4).
 
 final class NotifyRefreshProvider
     extends $FunctionalProvider<AsyncValue<void>, void, FutureOr<void>>
     with $FutureModifier<void>, $FutureProvider<void> {
   /// Loads the levels and quiet hours of the signed-in person once per session (the snapshot
   /// carries neither, 04 6.3); a failed load leaves the stored rows and the events keep them
-  /// current.
+  /// current. The load runs again when the connection is live again after it failed
+  /// ([_askAgainWhenLive]) and after every resync, which empties both tables with the rest of
+  /// the mirror (04 7.3; ruling AUD-CM01/4).
   NotifyRefreshProvider._()
     : super(
         from: null,
@@ -142,7 +148,7 @@ final class NotifyRefreshProvider
   }
 }
 
-String _$notifyRefreshHash() => r'dc49236d6a781d440ade2a07953a2ffa98efecf0';
+String _$notifyRefreshHash() => r'643ea79a2ee0f1c85e817eeb0c431de2bf2e619e';
 
 /// The quiet hours rules of the person, by ID.
 
@@ -189,19 +195,25 @@ final class QuietHoursRulesProvider
 String _$quietHoursRulesHash() => r'ef36bb359d63f2982c935efa015cf8e98bb9aa21';
 
 /// Whether the signed-in person is an owner (`getMe`, `is_owner`): only owners see
-/// `notify.admin_enabled` (13 3.3). False while unknown or offline.
+/// `notify.admin_enabled` (13 3.3). False while unknown or offline; a read that failed is asked
+/// again when the connection is live again ([_askAgainWhenLive]), so an owner who started the
+/// app without a network gets the owner's entries once the server answers.
 
 @ProviderFor(isOwner)
 final isOwnerProvider = IsOwnerProvider._();
 
 /// Whether the signed-in person is an owner (`getMe`, `is_owner`): only owners see
-/// `notify.admin_enabled` (13 3.3). False while unknown or offline.
+/// `notify.admin_enabled` (13 3.3). False while unknown or offline; a read that failed is asked
+/// again when the connection is live again ([_askAgainWhenLive]), so an owner who started the
+/// app without a network gets the owner's entries once the server answers.
 
 final class IsOwnerProvider
     extends $FunctionalProvider<AsyncValue<bool>, bool, FutureOr<bool>>
     with $FutureModifier<bool>, $FutureProvider<bool> {
   /// Whether the signed-in person is an owner (`getMe`, `is_owner`): only owners see
-  /// `notify.admin_enabled` (13 3.3). False while unknown or offline.
+  /// `notify.admin_enabled` (13 3.3). False while unknown or offline; a read that failed is asked
+  /// again when the connection is live again ([_askAgainWhenLive]), so an owner who started the
+  /// app without a network gets the owner's entries once the server answers.
   IsOwnerProvider._()
     : super(
         from: null,
@@ -227,7 +239,7 @@ final class IsOwnerProvider
   }
 }
 
-String _$isOwnerHash() => r'4bfc4959b184468599e1bdfc5db7f1441f897fe5';
+String _$isOwnerHash() => r'4f1028f7738f31eb52b264fdd77533ac77c6917d';
 
 /// The [LevelContext] of the signed-in person; reading it starts the one load of
 /// [notifyRefreshProvider].

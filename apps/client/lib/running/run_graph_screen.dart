@@ -23,6 +23,7 @@ import '../app/router.dart';
 import '../thread/providers.dart';
 import 'providers.dart';
 import 'run_api.dart';
+import 'stop_run.dart';
 
 /// The run graph of [location].
 ///
@@ -86,6 +87,9 @@ class RunGraphScreen extends ConsumerWidget {
         summary != null &&
         isActiveRun(summary.state) &&
         mayStop(summary, access, me);
+    // Busy while a Stop of the run is on its way (ruling AUD-CM01/3).
+    final stopping =
+        summary != null && ref.watch(runStopsProvider).contains(summary.id);
     final back = location.fromThread
         ? (label: l.runGraphBackToThread, path: '/t/$threadId')
         : (label: l.runGraphBackToRunning, path: '/running');
@@ -133,7 +137,10 @@ class RunGraphScreen extends ConsumerWidget {
                   DsButton(
                     key: const ValueKey('runGraph.stop'),
                     label: l.runningStop,
-                    onPressed: () => unawaited(stopRun(engine, summary!)),
+                    loading: stopping,
+                    onPressed: stopping
+                        ? null
+                        : () => unawaited(stopRun(context, ref, summary!)),
                   ),
               ],
             ),
@@ -188,7 +195,10 @@ class RunGraphScreen extends ConsumerWidget {
                 key: const ValueKey('runGraph.stop'),
                 label: l.runningStop,
                 expand: true,
-                onPressed: () => unawaited(stopRun(engine, summary!)),
+                loading: stopping,
+                onPressed: stopping
+                    ? null
+                    : () => unawaited(stopRun(context, ref, summary!)),
               ),
             ),
         ],

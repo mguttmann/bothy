@@ -3,14 +3,17 @@
 // The build branding tool (brief M4-18 Design note 7, brief M5-02 Design note 1, brief M5-03
 // Design note 1): the checked-in native files match branding.example.yaml, the defines carry
 // every key, the iOS build gets its name, identifier, scheme, team and associated domain, the
-// Android build its application ID, name, scheme and App Links host, and a bad branding is
-// refused.
+// Android build its application ID, name, scheme and App Links host, a bad branding is
+// refused, and the app reports the build name of its build, never a version of the branding
+// (docs/decisions.d/AUD-client-misc-01.md, ruling AUD-CM01/1).
 
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:client/app/branding.dart';
+import 'package:flutter/services.dart' show appBuildName;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yaml/yaml.dart';
 
 import '../../tool/branding_defines.dart' as tool;
 
@@ -29,7 +32,6 @@ void main() {
   test('the defaults of the build equal the example branding', () {
     final b = tool.Branding.parse(
       File('${app.path}/branding.example.yaml').readAsStringSync(),
-      appVersion: '0.0.0',
     );
     const env = BuildBranding.fromEnvironment;
     expect(env.appName, b.appName);
@@ -40,11 +42,22 @@ void main() {
     expect(Uri.parse(b.defaultServer).host, endsWith('example.com'));
   });
 
+  test('the app reports the build name of its build', () {
+    // Flutter compiles the build name into the Dart code (`--build-name` of a release build,
+    // else `version:` of the pubspec) and hands the same name to the system, so the version
+    // the app reports is the version of its package. A test build has no `--build-name`.
+    const env = BuildBranding.fromEnvironment;
+    expect(env.appVersion, appBuildName);
+    final pubspec = loadYaml(
+      File('${app.path}/pubspec.yaml').readAsStringSync(),
+    ) as YamlMap;
+    expect(env.appVersion, (pubspec['version'] as String).split('+').first);
+  });
+
   test('a run writes the defines and the native files', () async {
     final dir = await Directory.systemTemp.createTemp('branding');
     addTearDown(() => dir.delete(recursive: true));
-    File('${dir.path}/pubspec.yaml')
-        .writeAsStringSync('name: x\nversion: 1.2.3+4\n');
+    // No pubspec in the folder: the tool reads no version, the build name is Flutter's.
     File('${dir.path}/b.yaml').writeAsStringSync(
       'app_name: Team Chat\nurl_scheme: team-chat\nbundle_id: com.example.team\n'
       'default_server: https://team.example.com\n',
@@ -59,7 +72,6 @@ void main() {
       'BRANDING_URL_SCHEME': 'team-chat',
       'BRANDING_BUNDLE_ID': 'com.example.team',
       'BRANDING_DEFAULT_SERVER': 'https://team.example.com',
-      'BRANDING_APP_VERSION': '1.2.3',
       'BRANDING_ASSOCIATED_DOMAIN': '',
       'BRANDING_APPLICATION_ID': 'com.example.team',
       'BRANDING_UPDATE_URL': '',
@@ -88,8 +100,6 @@ void main() {
   test('the iOS build gets name, identifier, scheme, team and domain', () async {
     final dir = await Directory.systemTemp.createTemp('branding');
     addTearDown(() => dir.delete(recursive: true));
-    File('${dir.path}/pubspec.yaml')
-        .writeAsStringSync('name: x\nversion: 1.2.3+4\n');
     const base =
         'app_name: Team Chat\nurl_scheme: team-chat\nbundle_id: com.example.team\n'
         'default_server: https://team.example.com\n';
@@ -219,8 +229,6 @@ void main() {
   test('the Android build gets application ID, name, scheme and App Links host', () async {
     final dir = await Directory.systemTemp.createTemp('branding');
     addTearDown(() => dir.delete(recursive: true));
-    File('${dir.path}/pubspec.yaml')
-        .writeAsStringSync('name: x\nversion: 1.2.3+4\n');
     const base =
         'app_name: Team Chat\nurl_scheme: team-chat\nbundle_id: com.example.team-chat\n'
         'default_server: https://team.example.com\napplication_id: com.example.teamchat\n';
@@ -256,7 +264,6 @@ void main() {
       'app_name: A\nurl_scheme: a-b\nbundle_id: com.example.a\n'
       'default_server: https://a.example.com\n'
       'update_url: https://apps.example.com/a\n',
-      appVersion: '1.0.0',
     );
     expect(b.updateUrl, 'https://apps.example.com/a');
     expect(
@@ -269,7 +276,7 @@ void main() {
   test('a bad branding is refused with its reason', () {
     String? reason(String yaml) {
       try {
-        tool.Branding.parse(yaml, appVersion: '1.0.0');
+        tool.Branding.parse(yaml);
         return null;
       } on FormatException catch (e) {
         return e.message;
@@ -319,6 +326,5 @@ void main() {
       contains('application_id'),
     );
     expect(reason('${ok}application_id: com.example.ab\n'), isNull);
-    expect(() => tool.pubspecVersion('name: x\n'), throwsFormatException);
   });
 }

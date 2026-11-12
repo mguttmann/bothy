@@ -31,7 +31,8 @@ import '../app/router.dart';
 import '../keyboard/app_shortcuts.dart';
 import '../keyboard/intents.dart';
 import '../running/providers.dart'
-    show RunningRow, mayStop, runningRowsProvider, stopRun;
+    show RunningRow, mayStop, runStopsProvider, runningRowsProvider;
+import '../running/stop_run.dart';
 import '../thread/providers.dart';
 import 'followups.dart';
 import 'providers.dart';
@@ -199,8 +200,12 @@ class _LiveBoxSlotState extends ConsumerState<LiveBoxSlot> {
           );
     final expanded = ref.watch(runExpansionProvider)[run.id.value] ?? true;
     final engine = ref.watch(syncEngineProvider);
-    final canStop = engine != null && mayStop(run, access, me);
-    void stop() => unawaited(stopRun(engine!, run));
+    // No second Stop while one is on its way (ruling AUD-CM01/3).
+    final canStop =
+        engine != null &&
+        mayStop(run, access, me) &&
+        !ref.watch(runStopsProvider).contains(run.id);
+    void stop() => unawaited(stopRun(context, ref, run));
     void toggle(bool open) => ref
         .read(runExpansionProvider.notifier)
         .set(run.id.value, expanded: open);
@@ -306,9 +311,11 @@ DsWait? liveBoxWait(
     : null;
 
 /// The view model of the active [run] of [threadId] and its Stop, or null for Stop where the
-/// server's answers do not allow `run.cancel` (shared by the slot and the phone's sheet);
-/// [open] opens the thread of a run that holds a slot of a queued run's agent.
+/// server's answers do not allow `run.cancel` and while a Stop of the run is on its way (shared
+/// by the slot and the phone's sheet); [open] opens the thread of a run that holds a slot of a
+/// queued run's agent. A refused Stop shows on the messenger of [context].
 ({DsRunData data, VoidCallback? stop}) liveBoxView(
+  BuildContext context,
   WidgetRef ref,
   RunSummary run, {
   required ThreadId threadId,
@@ -336,10 +343,13 @@ DsWait? liveBoxWait(
           wait: wait,
         );
   final engine = ref.watch(syncEngineProvider);
-  final canStop = engine != null && mayStop(run, access, me);
+  final canStop =
+      engine != null &&
+      mayStop(run, access, me) &&
+      !ref.watch(runStopsProvider).contains(run.id);
   return (
     data: data,
-    stop: canStop ? () => unawaited(stopRun(engine, run)) : null,
+    stop: canStop ? () => unawaited(stopRun(context, ref, run)) : null,
   );
 }
 
@@ -421,6 +431,7 @@ class _LiveBoxSheetState extends ConsumerState<LiveBoxSheet> {
       _second = null;
     }
     final view = liveBoxView(
+      context,
       ref,
       run,
       threadId: widget.threadId,

@@ -9,6 +9,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+import appdist
 import common
 import pytest
 import yaml
@@ -137,6 +138,28 @@ def test_branded_tree_restores_the_branding_after_a_failure(
     ):
         raise RuntimeError
     assert [c[-1] for c in run.calls] == ["b.yaml", "a.yaml"]
+
+
+def test_the_dart_code_of_a_build_must_report_its_version(tmp_path: Path) -> None:
+    code = tmp_path / "app.so"
+    code.write_bytes(b"\x7fELF\x00\x0a1.2.3\x00client@\x00")
+    common.check_dart_version([code], "1.2.3")
+    # The version of the pubspec, a longer number that only contains the version, and a number
+    # the version only starts or ends: none of them is the version.
+    for other in (b"0.0.0", b"11.2.3", b"1.2.30", b"1.2.3.4", b"0.1.2.3", b"1x2x3"):
+        code.write_bytes(b"\x7fELF\x00" + other + b"\x00")
+        with pytest.raises(
+            common.StepError,
+            match=r"app\.so: the Dart code of the build does not report the version 1\.2\.3",
+        ):
+            common.check_dart_version([code], "1.2.3")
+    with pytest.raises(common.StepError, match="no compiled Dart code at"):
+        common.check_dart_version([tmp_path / "missing"], "1.2.3")
+
+
+def test_the_trial_versions_grow_and_are_app_versions() -> None:
+    old, new = (appdist.app_version(v) for v in common.TRIAL_VERSIONS)
+    assert old.build < new.build
 
 
 def test_branding_inputs_are_relative_to_the_app(

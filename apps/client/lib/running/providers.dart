@@ -19,6 +19,7 @@ import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../sidebar/providers.dart';
 import '../sync/message_ops_app.dart';
+import '../sync/outbox_outcome.dart';
 import '../thread/providers.dart';
 
 part 'providers.g.dart';
@@ -70,8 +71,8 @@ final class RunningRow {
 /// No own derivation from grants (15 1 principle 1): the client reads only what the server
 /// reported for the channel ([access], the `ChannelView` of the snapshot and of
 /// `access.changed`) and the run's `triggered_by`. Stop needs the level `trigger` and either the
-/// person started the run or holds the capability `manage`; the server checks again and a
-/// refusal shows as a failed write.
+/// person started the run or holds the capability `manage`; the server checks again, and the
+/// view that sent the Stop shows a refusal ([RunStops]).
 bool mayStop(RunSummary run, AccessView? access, PrincipalId? me) {
   if (access == null || access.level != AccessLevel.trigger) return false;
   return run.triggeredBy == me ||
@@ -232,15 +233,61 @@ Stream<double?> runContext(Ref ref, String runId) {
       .map((doc) => doc?.metrics.contextPct);
 }
 
-/// Stops [run] through the outbox (`cancelRun`, 15 1 principle 3); the run's lane keeps a
-/// second Stop behind the first.
-Future<void> stopRun(SyncEngine engine, RunSummary run) =>
-    engine.outbox.enqueue(
-      OutboxRequest(
-        kind: AppMessageOps.cancelRun,
-        payload: {'run_id': run.id.value},
-      ),
+/// The runs whose Stop is on its way (01 6.2; docs/decisions.d/AUD-client-misc-01.md, ruling
+/// AUD-CM01/3): from the activation of Stop until the server refused it. A Stop the server
+/// accepted keeps its run here, because that run ends (09 8: the adapter confirms, or the
+/// server ends it after `agent.cancel_grace`). No view offers a second Stop for a run that is
+/// here. The state lasts as long as the session.
+@Riverpod(keepAlive: true)
+class RunStops extends _$RunStops {
+  /// The runs whose Stop is being stored: a second activation in that moment does nothing.
+  final Set<RunId> _storing = {};
+
+  @override
+  Set<RunId> build() {
+    // A new session starts without the Stops of the one before.
+    ref.watch(syncEngineProvider);
+    return const {};
+  }
+
+  /// Stops [run] through the outbox (`cancelRun`, 15 1 principle 3): one activation puts one
+  /// entry into the outbox, and another one while its Stop is on its way does nothing. Returns
+  /// once the entry is stored; the run is held from then on.
+  ///
+  /// The entry has no thread, so no history shows its failure: the wait for its outcome
+  /// (`outboxOutcome`) discards an entry the server refused for good, the run offers Stop
+  /// again, and [onRefused] gets the refusal. Without a connection the entry waits in the
+  /// outbox and the Stop stays on its way.
+  Future<void> stop(
+    RunSummary run, {
+    void Function(OutboxRefusal refusal)? onRefused,
+  }) async {
+    final engine = ref.read(syncEngineProvider);
+    if (engine == null || state.contains(run.id) || !_storing.add(run.id)) {
+      return;
+    }
+    final OutboxEntry entry;
+    try {
+      entry = await engine.outbox.enqueue(
+        OutboxRequest(
+          kind: AppMessageOps.cancelRun,
+          payload: {'run_id': run.id.value},
+        ),
+      );
+    } finally {
+      _storing.remove(run.id);
+    }
+    if (!ref.mounted) return;
+    state = {...state, run.id};
+    unawaited(
+      outboxOutcome(engine.outbox, entry.id).then((refusal) {
+        if (refusal == null) return;
+        if (ref.mounted) state = {...state}..remove(run.id);
+        onRefused?.call(refusal);
+      }),
     );
+  }
+}
 
 /// The two forms of "Running now" (01 D10): the control room cards (the default) and the rows.
 enum RunningForm {

@@ -52,5 +52,20 @@ class FakeRun(common.Runner):
         return [f"{Path(c[0]).name} {c[1]}" if len(c) > 1 else c[0] for c in self.calls]
 
 
+def dart_code(args: list[str]) -> bytes:
+    """The compiled Dart code a `flutter build` call makes of an app that reports its build name.
+
+    Flutter compiles the `--build-name` of the call into the Dart code; like the compiler this
+    holds it as plain bytes between other bytes.
+    """
+    name = next(a for a in args if a.startswith("--build-name=")).split("=", 1)[1]
+    return MACHO + name.encode("ascii") + b"\x00code"
+
+
+# The compiled Dart code of an app that reports the version of the pubspec whatever it was built
+# as: the state before ruling AUD-CM01/1, which no release may leave with.
+STALE_DART_CODE = MACHO + b"0.0.0\x00code"
+
+
 def ok(stdout: str = "", code: int = 0) -> subprocess.CompletedProcess[str]:
     return subprocess.CompletedProcess([], code, stdout, "")

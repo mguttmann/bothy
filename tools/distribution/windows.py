@@ -5,7 +5,8 @@
 
 1. the build branding with the publisher's bundle identifier (`branding_for`), then
    `flutter build windows --release` with the version and build number of
-   `appdist.app_version`;
+   `appdist.app_version`; the Dart code of the build must report that version
+   (`check_dart_version`);
 2. the package directory: the build output, the Visual C++ runtime the app loads (copied next
    to it, so the package needs no framework dependency), `AppxManifest.xml` from
    `appdist.appx_manifest` (identity, toast activator, URL scheme) and the logos taken from
@@ -21,13 +22,13 @@ step stops before the build, and template placeholders stop it too.
 `make -C apps/client trial-windows` runs the same steps with a test publisher (D-W-127, brief
 Design note 1 and 2): a self-signed certificate whose subject is the template's
 `windows.publisher`, trusted in the machine's TrustedPeople and Root stores for the run only,
-and the update host on 127.0.0.1. It builds 0.1.0 and 0.1.1 and then:
+and the update host on 127.0.0.1. It builds the two versions of TRIAL_VERSIONS and then:
 
-- installs 0.1.0 through `beta.appinstaller` (`Add-AppxPackage -AppInstallerFile`);
-- refuses a 0.1.1 MSIX with a changed signature that `beta.appinstaller` points at, and 0.1.0
-  stays;
-- points `beta.appinstaller` at 0.1.1 and runs the same App Installer call, which updates the
-  installed package to 0.1.1;
+- installs the older build through `beta.appinstaller` (`Add-AppxPackage -AppInstallerFile`);
+- refuses an MSIX of the newer build with a changed signature that `beta.appinstaller` points
+  at, and the older build stays;
+- points `beta.appinstaller` at the newer build and runs the same App Installer call, which
+  updates the installed package to it;
 - promotes it (`stable.appinstaller` points at the same MSIX) and installs from there afresh.
 
 The result is written to `<out>/trial-windows.json`; packages and certificates of the run are
@@ -63,10 +64,12 @@ import yaml
 from common import (
     CLIENT,
     DEFAULT_BRANDING,
+    TRIAL_VERSIONS,
     Runner,
     StepError,
     branded_tree,
     branding_for,
+    check_dart_version,
     fail,
     require_env,
     serve,
@@ -74,7 +77,8 @@ from common import (
 )
 
 WINDOWS_SECRETS = ("WINDOWS_SIGNING_PFX", "WINDOWS_SIGNING_PFX_PASSWORD")
-TRIAL_VERSIONS = ("0.1.0", "0.1.1")
+# The compiled Dart code of the app inside the build output.
+DART_CODE = Path("data") / "app.so"
 # The Visual C++ runtime a Flutter Windows app loads; copied into the package (app-local
 # deployment), so the MSIX installs without a framework package.
 VC_RUNTIME = ("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll")
@@ -280,6 +284,7 @@ def release_step(run: Runner, plan: Plan, workdir: Path) -> Release:
     """
     plan.out.mkdir(parents=True, exist_ok=True)
     output, branding = build_app(run, plan.cfg, plan.version, plan.branding, workdir)
+    check_dart_version([output / DART_CODE], plan.version.short)
     package = stage(output, plan.cfg, plan.version, branding, workdir / "package")
     msix = plan.out / appdist.msix_name(plan.cfg, plan.version)
     pack(run, package, msix)

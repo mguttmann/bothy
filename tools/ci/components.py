@@ -295,6 +295,9 @@ DISTRIBUTION_FILES = (
     "apps/client/windows/runner/resources/app_icon.ico",
     "apps/client/tool/branding_defines.dart",
     "apps/client/branding.example.yaml",
+    # The file that names the version the app reports: the trials check it in the built app
+    # (docs/decisions.d/AUD-client-misc-01.md, ruling AUD-CM01/1).
+    "apps/client/lib/app/branding.dart",
     ".github/workflows/release.yml",
 )
 # The trials of the phone distribution (brief M7-13, docs/decisions.d/M7-13.md): the unsigned iOS
@@ -309,6 +312,7 @@ MOBILE_TRIAL_FILES = (
     "apps/client/ios/Runner.xcodeproj/project.pbxproj",
     "apps/client/tool/branding_defines.dart",
     "apps/client/branding.example.yaml",
+    "apps/client/lib/app/branding.dart",
     ".github/workflows/release.yml",
 )
 # The platform trials of the host packages (brief M7-23, docs/decisions.d/M7-23.md): each builds,

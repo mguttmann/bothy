@@ -23,7 +23,7 @@ import apple
 import common
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from fakes import MACHO, FakeRun, ok
+from fakes import MACHO, STALE_DART_CODE, FakeRun, dart_code, ok
 
 
 @pytest.fixture
@@ -258,8 +258,13 @@ def test_assess_reports_the_verdict(tmp_path: Path) -> None:
 # ---- the release step -----------------------------------------------------------------------
 
 
-def fake_tools(tmp_path: Path, client: Path, ed: Ed25519PrivateKey) -> FakeRun:
-    """Handlers that act like flutter, ditto and sign_update on the fake bundle."""
+def fake_tools(
+    tmp_path: Path, client: Path, ed: Ed25519PrivateKey, code: bytes | None = None
+) -> FakeRun:
+    """Handlers that act like flutter, ditto and sign_update on the fake bundle.
+
+    `code` is the compiled Dart code of the build; by default it reports the build name.
+    """
 
     def flutter(args: list[str], kw: dict[str, Any]) -> None:
         build = int(next(a for a in args if a.startswith("--build-number=")).split("=")[1])
@@ -272,6 +277,12 @@ def fake_tools(tmp_path: Path, client: Path, ed: Ed25519PrivateKey) -> FakeRun:
         info = plistlib.loads((app / "Contents" / "Info.plist").read_bytes())
         info["CFBundleShortVersionString"] = short
         (app / "Contents" / "Info.plist").write_bytes(plistlib.dumps(info))
+        # The compiled Dart code, in the framework layout of a macOS build.
+        versions = app / "Contents" / "Frameworks" / "App.framework" / "Versions"
+        (versions / "A").mkdir(parents=True)
+        (versions / "A" / "App").write_bytes(code or dart_code(args))
+        (versions / "Current").symlink_to("A")
+        (versions.parent / "App").symlink_to("Versions/Current/App")
         assert kw["env"]["FLUTTER_XCODE_DEVELOPMENT_TEAM"] == "EXAMPLE000"
 
     def ditto(args: list[str], _: dict[str, Any]) -> None:
@@ -355,6 +366,25 @@ def test_release_step_builds_signs_archives_and_writes_the_appcast(
         "1000",
         "1001",
     ]
+
+
+def test_release_step_refuses_a_build_that_reports_the_version_of_the_pubspec(
+    tmp_path: Path, cfg: dict[str, Any], ed: Ed25519PrivateKey, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # An app that reports the version of the pubspec, 0.0.0, whatever it was built as is
+    # refused by every instance with a minimum version; nothing is signed then (AUD-CM01/1).
+    client = tmp_path / "client"
+    monkeypatch.setattr(apple, "CLIENT", client)
+    monkeypatch.setattr(common, "CLIENT", client)
+    run = fake_tools(tmp_path, client, ed, code=STALE_DART_CODE)
+    work = tmp_path / "work"
+    work.mkdir()
+    with pytest.raises(
+        common.StepError,
+        match=r"App\.framework/App: the Dart code of the build does not report the version 0\.1\.0",
+    ):
+        apple.release_step(run, _plan(cfg, tmp_path, ed, "0.1.0"), tmp_path / "sparkle", work)
+    assert "codesign" not in [Path(c[0]).name for c in run.calls]
 
 
 def test_release_step_with_a_notary_requires_gatekeeper(
@@ -631,7 +661,7 @@ def test_trial_builds_twice_promotes_and_runs_the_update_test(
     monkeypatch.setattr(apple, "update_test", update)
     run = FakeRun({"security": _security})
     assert apple.main(["trial", "--out", str(tmp_path / "out")], run) == 0
-    assert built == [("0.1.0", False), ("0.1.1", True)]
+    assert built == [(apple.TRIAL_VERSIONS[0], False), (apple.TRIAL_VERSIONS[1], True)]
     assert tested == [[None, "beta"]]
     report = json.loads((tmp_path / "out" / "trial-apple.json").read_text("utf-8"))
     assert report["spctl"] == "rejected"

@@ -16,7 +16,7 @@ import 'package:l10n/l10n.dart';
 
 import '../../app/providers/ports.dart';
 import '../../app/providers/session.dart';
-import '../../running/providers.dart' show stopRun;
+import '../../running/stop_run.dart';
 import '../../sync/agent_ops.dart';
 import '../../thread/providers.dart';
 import '../../thread/thread_actions.dart';
@@ -70,9 +70,8 @@ final class ThreadCommandRunner implements BuiltinCommandRunner {
 
   @override
   Future<void> stop() async {
-    final engine = ref.read(syncEngineProvider);
     final run = _activeRun;
-    if (engine != null && run != null) await stopRun(engine, run);
+    if (run != null) await stopRun(context, ref, run);
   }
 
   /// The sessions of the thread for a command the person just ran, or null when the read

@@ -1576,6 +1576,13 @@ app deletes the rest (addendum of 2026-11-11, 15 section 9).
 - Expanding loads the run document; during the run, changes arrive only while the
   thread is visible (focus, [04](04-sync-protocol.md) section 11).
 - Stop asks for no confirmation; it is harmless and must be fast.
+- Stop is one action with an outcome wherever a run offers it (the live box, "Running now" D10
+  and M11, the run graph, `/stop`; addendum of 2026-11-12,
+  docs/decisions.d/AUD-client-misc-01.md, ruling AUD-CM01/3; reason: a refused Stop was shown
+  nowhere and stayed in the outbox): one activation sends one `cancelRun` through the outbox, and
+  no view offers a second Stop while that one is on its way or after it was accepted. A refusal
+  shows its reason and Stop is offered again. Without a connection the Stop waits and goes out
+  when the connection is back.
 - The button "Graph" opens the run graph (D14, M12) with the same document; it follows the same
   focus rule (addendum of 2026-10-24).
 - A stall after `run.stall_after` shows a notice in the live box, no push.

@@ -38,6 +38,10 @@ from cryptography.x509.oid import ExtendedKeyUsageOID
 REPO = Path(__file__).resolve().parents[2]
 CLIENT = REPO / "apps" / "client"
 DEFAULT_BRANDING = CLIENT / "branding.example.yaml"
+# The versions the trials build, the older first (the phone trials build the first): versions
+# that no other text of the app holds, so finding one in the compiled Dart code of a build means
+# that the app reports the version of its package (`dart_code_reports`, ruling AUD-CM01/1).
+TRIAL_VERSIONS = ("0.917.4", "0.917.5")
 # The one upper bound of a wait for an external effect (an installer that replaces a bundle, a
 # package that appears): far above what it takes on a loaded runner, so only a hang reaches it.
 PATIENCE_SECONDS = 600.0
@@ -288,6 +292,44 @@ def _client_input(path: Path) -> str:
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(path, target)
         return target.relative_to(CLIENT).as_posix()
+
+
+def dart_code_reports(name: str, code: bytes, app_version: str) -> None:
+    """Check that the compiled Dart code `code` of a build carries the version `app_version`.
+
+    The app reports its build name (`BuildBranding.appVersion` of apps/client: the minimum
+    version rule of an instance, the device entry, telemetry and crash reports read it), which
+    Flutter compiles into the Dart code from `--build-name`; the system gets the same name. An
+    app that reports another version than its package is refused as too old by every instance
+    that sets a minimum version, so no release leaves with one
+    (docs/decisions.d/AUD-client-misc-01.md, ruling AUD-CM01/1). The compiled Dart code holds
+    its text constants as plain bytes, so it must hold `app_version` as a whole dotted number.
+    A version as short as `1.0.0` can be there by chance; the trials build versions that no
+    other text of the app holds (TRIAL_VERSIONS), so there a pass means the app reports it.
+
+    Raises:
+        StepError: `code` does not hold the version; the message names `name`.
+    """
+    whole = rb"(?<![0-9.])" + re.escape(app_version.encode("ascii")) + rb"(?![0-9.])"
+    if re.search(whole, code) is None:
+        raise StepError(
+            f"{name}: the Dart code of the build does not report the version {app_version} "
+            "of its package (the build name, BuildBranding.appVersion of apps/client)"
+        )
+
+
+def check_dart_version(files: Sequence[Path], app_version: str) -> None:
+    """Check that each compiled Dart code file of `files` carries `app_version`.
+
+    Raises:
+        StepError: a file is missing or does not hold the version (see `dart_code_reports`).
+    """
+    for file in files:
+        try:
+            code = file.read_bytes()
+        except OSError as err:
+            raise StepError(f"the build has no compiled Dart code at {file}") from err
+        dart_code_reports(str(file), code, app_version)
 
 
 def require_env(names: Sequence[str], environ: Mapping[str, str], job: str) -> dict[str, str]:

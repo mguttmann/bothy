@@ -66,11 +66,13 @@ void main() {
         void go(String path) =>
             GoRouter.of(tester.element(find.byType(Navigator).first)).go(path);
 
-        Future<void> tap(String key) async {
+        // [settle] false for a button that starts the steps: they wait for the step-up dialog
+        // behind a spinner, so nothing settles until the test confirms it.
+        Future<void> tap(String key, {bool settle = true}) async {
           await app.waitFor(find.byKey(ValueKey(key)));
           await tester.ensureVisible(find.byKey(ValueKey(key)).first);
           await tester.pumpAndSettle();
-          await app.tap(key);
+          await app.tap(key, settle: settle);
         }
 
         Future<void> type(String key, String text) async {
@@ -80,13 +82,32 @@ void main() {
         }
 
         Future<void> confirmStepUps() async {
-          while (find
+          if (find
               .byKey(const ValueKey('stepUp.dialog'))
               .evaluate()
               .isNotEmpty) {
             await tester.tap(find.byKey(const ValueKey('stepUp.continue')));
-            await tester.pumpAndSettle();
+            await tester.pump(const Duration(milliseconds: 300));
           }
+          await tester.pump();
+        }
+
+        // The dialog opens the new channel after it closed (01 6.20 item 5). The test waits
+        // for that route, so neither its own next route nor the end of the app meets it halfway.
+        Future<void> channelOpen(String name) async {
+          final channel = world.channels.values.singleWhere(
+            (c) => c.json['name'] == name,
+          );
+          await eventually('the channel $name is open', () async {
+            await tester.pump();
+            return GoRouter.of(tester.element(find.byType(Navigator).first))
+                    .routerDelegate
+                    .currentConfiguration
+                    .uri
+                    .path ==
+                '/c/${channel.id}';
+          });
+          await tester.pumpAndSettle();
         }
 
         List<String> steps() => [
@@ -113,7 +134,7 @@ void main() {
         await type('newAgent.channel.name', 'files');
         // The channel goes to the first space, which the preview preselects.
         server.requests.clear();
-        await tap('newAgent.create');
+        await tap('newAgent.create', settle: false);
         await eventually('every step done', () async {
           await confirmStepUps();
           return find
@@ -133,6 +154,7 @@ void main() {
         );
         expect(agent.toolClass, 'host');
         expect(agent.definitions, hasLength(1));
+        await channelOpen('files');
 
         // The second agent: its channel name is taken, so the channel step fails.
         go('/admin/agents');
@@ -143,7 +165,7 @@ void main() {
         await tap('newAgent.channel.wanted');
         await type('newAgent.channel.name', 'files');
         server.requests.clear();
-        await tap('newAgent.create');
+        await tap('newAgent.create', settle: false);
         await eventually('the channel step failed', () async {
           await confirmStepUps();
           return find
@@ -157,7 +179,7 @@ void main() {
         );
         await type('newAgent.channel.name', 'files-2');
         server.requests.clear();
-        await tap('newAgent.retry');
+        await tap('newAgent.retry', settle: false);
         await eventually('every step done', () async {
           await confirmStepUps();
           return find
@@ -166,6 +188,7 @@ void main() {
               .isEmpty;
         });
         expect(steps(), ['createChannel 201', 'setChannelOperator 200']);
+        await channelOpen('files-2');
         expect(
           world.agents.values.where((a) => a.hostedBy == runner.id),
           hasLength(2),

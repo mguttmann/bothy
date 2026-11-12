@@ -21,12 +21,29 @@ import appdist
 import common
 import pytest
 import yaml
-from fakes import FakeRun, ok
+from fakes import STALE_DART_CODE, FakeRun, dart_code, ok
 from test_storeapi import EDITS, FakeHttp, play_routes
 
 KEY_SHA = "ab" * 32
 OTHER_SHA = "cd" * 32
 PACKAGE = "org.acme.chat"
+
+
+def aab(code: bytes, abis: tuple[str, ...] = ("arm64-v8a", "x86_64")) -> bytes:
+    """A stand-in for an App Bundle: the compiled Dart code `code` for each ABI."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as archive:
+        for name in (
+            "base/manifest/AndroidManifest.xml",
+            *(f"base/lib/{a}/libapp.so" for a in abis),
+        ):
+            data = code if name.endswith("libapp.so") else b"manifest"
+            archive.writestr(zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0)), data)
+    return buf.getvalue()
+
+
+# The bundle of a correct build of 1.2.3, the version most tests build.
+AAB = aab(b"\x7fELF code 1.2.3\x00")
 
 
 def colons(hexdigest: str) -> str:
@@ -76,15 +93,20 @@ def tools(
     signer: str = KEY_SHA,
     apk_signer: str = KEY_SHA,
     seen: dict[str, Any] | None = None,
+    code_of_build: bytes | None = None,
 ) -> dict[str, Any]:
-    """Handlers of the Android tools that answer like a correct build of `version`."""
+    """Handlers of the Android tools that answer like a correct build of `version`.
+
+    `code_of_build` is the compiled Dart code of the bundle; by default it reports the build
+    name.
+    """
     record = seen if seen is not None else {}
 
     def flutter(args: list[str], opts: dict[str, Any]) -> None:
         record["flutter"] = (args, opts)
         record["google_services"] = android.GOOGLE_SERVICES.is_file()
         android.BUNDLE.parent.mkdir(parents=True, exist_ok=True)
-        android.BUNDLE.write_bytes(b"AAB")
+        android.BUNDLE.write_bytes(aab(code_of_build or dart_code(args)))
 
     def keytool(args: list[str], opts: dict[str, Any]) -> Any:
         if "-printcert" in args:
@@ -242,7 +264,7 @@ def test_build_signs_with_the_upload_key_and_the_publishers_identity(
     bundle = android.build_bundle(
         run, cfg, appdist.app_version("1.2.3"), common.DEFAULT_BRANDING, key(tmp_path), work
     )
-    assert bundle.read_bytes() == b"AAB"
+    android.check_dart_code(bundle, "1.2.3")
     args, opts = seen["flutter"]
     assert args[1:4] == ["build", "appbundle", "--release"]
     assert "--build-name=1.2.3" in args
@@ -276,7 +298,7 @@ def test_verify_bundle_checks_signer_structure_identity_and_apks(
     seen: dict[str, Any] = {}
     run = FakeRun(tools(seen=seen))
     bundle = tmp_path / "a.aab"
-    bundle.write_bytes(b"AAB")
+    bundle.write_bytes(AAB)
     jar = tmp_path / "bundletool.jar"
     checked = android.verify_bundle(
         run, bundle, key(tmp_path), cfg, appdist.app_version("1.2.3"), tmp_path, jar
@@ -314,7 +336,7 @@ def test_apksigner_of_build_tools_37_names_the_v3_signer(
         "V3.0 Signer: certificate SHA-1 digest: 00\n"
     )
     bundle = tmp_path / "a.aab"
-    bundle.write_bytes(b"AAB")
+    bundle.write_bytes(AAB)
     checked = android.verify_bundle(
         FakeRun(handlers),
         bundle,
@@ -351,6 +373,8 @@ def test_apksigner_of_build_tools_37_names_the_v3_signer(
         (tools(package="com.example.chat"), "names com.example.chat"),
         (tools(version="1.2.4"), "1.2.4, the release builds"),
         (tools(apk_signer=OTHER_SHA), "universal APK is not signed by the upload key"),
+        # The Dart code of the bundle reports 1.2.3, the manifest and the release say 1.2.4.
+        (tools(version="1.2.4", code=1002004), "does not report the version 1.2.4"),
     ],
 )
 def test_verify_bundle_refuses(
@@ -358,11 +382,42 @@ def test_verify_bundle_refuses(
 ) -> None:
     run = FakeRun({**tools(), **handlers})
     bundle = tmp_path / "a.aab"
-    bundle.write_bytes(b"AAB")
+    bundle.write_bytes(AAB)
+    version = "1.2.4" if "report the version" in message else "1.2.3"
     with pytest.raises(common.StepError, match=message):
         android.verify_bundle(
-            run, bundle, key(tmp_path), cfg, appdist.app_version("1.2.3"), tmp_path, tmp_path / "j"
+            run, bundle, key(tmp_path), cfg, appdist.app_version(version), tmp_path, tmp_path / "j"
         )
+
+
+def test_the_dart_code_of_every_abi_reports_the_version(tmp_path: Path) -> None:
+    bundle = tmp_path / "a.aab"
+    bundle.write_bytes(AAB)
+    android.check_dart_code(bundle, "1.2.3")
+    with pytest.raises(common.StepError, match=r"a\.aab:base/lib/arm64-v8a/libapp\.so: the Dart"):
+        android.check_dart_code(bundle, "1.2.4")
+    # One ABI built with another version is enough to stop.
+    with zipfile.ZipFile(bundle, "a") as archive:
+        archive.writestr("base/lib/armeabi-v7a/libapp.so", b"code 0.0.0\x00")
+    with pytest.raises(common.StepError, match=r"armeabi-v7a/libapp\.so: the Dart code"):
+        android.check_dart_code(bundle, "1.2.3")
+    bundle.write_bytes(aab(b"", abis=()))
+    with pytest.raises(common.StepError, match="holds no compiled Dart code"):
+        android.check_dart_code(bundle, "1.2.3")
+
+
+def test_a_build_that_reports_the_version_of_the_pubspec_is_refused(
+    tmp_path: Path, tree: Path, cfg: dict[str, Any]
+) -> None:
+    # An app that reports the version of the pubspec, 0.0.0, whatever it was built as is
+    # refused by every instance with a minimum version (ruling AUD-CM01/1).
+    run = FakeRun(tools(code_of_build=STALE_DART_CODE))
+    work = tmp_path / "work"
+    work.mkdir()
+    version = appdist.app_version("1.2.3")
+    bundle = android.build_bundle(run, cfg, version, common.DEFAULT_BRANDING, key(tmp_path), work)
+    with pytest.raises(common.StepError, match=r"does not report the version 1\.2\.3"):
+        android.verify_bundle(run, bundle, key(tmp_path), cfg, version, work, tmp_path / "j")
 
 
 # ---- release and promotion ------------------------------------------------------------------
@@ -424,13 +479,13 @@ def test_release_builds_checks_and_puts_the_bundle_on_the_internal_track(
         http=http,
     )
     assert target == out / "org.acme.chat-1.2.3.aab"
-    assert target.read_bytes() == b"AAB"
+    android.check_dart_code(target, "1.2.3")
     # The Firebase configuration was there for the build and is gone.
     assert seen["google_services"] is True
     assert not android.GOOGLE_SERVICES.exists()
     uploaded = [c for c in http.calls if "/bundles" in c[1]]
     assert len(uploaded) == 1
-    assert uploaded[0][3] == b"AAB"
+    assert uploaded[0][3] == target.read_bytes()
     track = next(c for c in http.calls if c[0] == "PUT")
     assert track[1] == f"{EDITS}/e1/tracks/{android.BETA_TRACK}"
 
@@ -515,8 +570,9 @@ def test_trial_builds_with_a_throwaway_key_and_probes_a_foreign_one(
 ) -> None:
     monkeypatch.setattr(android, "fetch_bundletool", lambda: tmp_path / "bundletool.jar")
     seen: dict[str, Any] = {}
+    code = appdist.app_version(android.TRIAL_VERSION).build
     handlers = tools(
-        version=android.TRIAL_VERSION, code=1000, package="com.example.chat", seen=seen
+        version=android.TRIAL_VERSION, code=code, package="com.example.chat", seen=seen
     )
     listed = iter([KEY_SHA, OTHER_SHA])
     base_keytool = handlers["keytool"]
@@ -530,7 +586,7 @@ def test_trial_builds_with_a_throwaway_key_and_probes_a_foreign_one(
     handlers["keytool"] = keytool
     run = FakeRun(handlers)
     checked = android.trial(run, out=tmp_path / "out", branding=common.DEFAULT_BRANDING)
-    assert checked.version_code == 1000
+    assert checked.version_code == code
     assert len(seen["genkeypair"]) == 2
     first = seen["genkeypair"][0]
     assert first[first.index("-dname") + 1] == "CN=Test Publisher"
@@ -538,6 +594,7 @@ def test_trial_builds_with_a_throwaway_key_and_probes_a_foreign_one(
     report = json.loads((tmp_path / "out" / "trial-android.json").read_text(encoding="utf-8"))
     assert report["signer_sha256"] == KEY_SHA
     assert "another upload key is refused by the signer check" in report["checks"]
+    assert "the Dart code of every ABI reports the version name" in report["checks"]
     # No Firebase configuration and no upload in a trial.
     assert seen["google_services"] is False
 
@@ -546,7 +603,8 @@ def test_trial_fails_when_the_probe_passes(
     tmp_path: Path, tree: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(android, "fetch_bundletool", lambda: tmp_path / "bundletool.jar")
-    run = FakeRun(tools(version=android.TRIAL_VERSION, code=1000, package="com.example.chat"))
+    code = appdist.app_version(android.TRIAL_VERSION).build
+    run = FakeRun(tools(version=android.TRIAL_VERSION, code=code, package="com.example.chat"))
     with pytest.raises(common.StepError, match="accepted a key that did not sign"):
         android.trial(run, out=tmp_path / "out", branding=common.DEFAULT_BRANDING)
 

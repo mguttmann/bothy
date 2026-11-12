@@ -6,8 +6,11 @@
 /// never query the database themselves (R-CL-03).
 library;
 
+import 'dart:async';
+
 import 'package:domain/domain.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:sync_engine/sync_engine.dart';
 
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
@@ -98,19 +101,56 @@ NotifyWriter? notifyWriter(Ref ref) {
   return NotifyWriter(services.engine, services.database, services.ids.next);
 }
 
+/// Runs [load] for a provider that asks the server once per session, and has the provider of
+/// [ref] built again when the connection of [engine] is live again after [load] failed
+/// (docs/decisions.d/AUD-client-misc-01.md, ruling AUD-CM01/4), so a start without a network
+/// does not leave the answer missing until the app starts again. Returns whether [load]
+/// succeeded.
+///
+/// "Live again" is the next change of the connection to live after the failure: the read retry
+/// of the session has given up by then, and a connection that stayed live brings nothing new.
+Future<bool> _askAgainWhenLive(
+  Ref ref,
+  SyncEngine engine,
+  Future<void> Function() load,
+) async {
+  try {
+    await load();
+    return true;
+  } on Object {
+    // Built again or disposed meanwhile: that build asks for itself.
+    if (!ref.mounted) return false;
+    var live = engine.state.phase == ConnectionPhase.live;
+    final states = engine.states.listen((state) {
+      final now = state.phase == ConnectionPhase.live;
+      if (now && !live) ref.invalidateSelf();
+      live = now;
+    });
+    ref.onDispose(() => unawaited(states.cancel()));
+    return false;
+  }
+}
+
 /// Loads the levels and quiet hours of the signed-in person once per session (the snapshot
 /// carries neither, 04 6.3); a failed load leaves the stored rows and the events keep them
-/// current.
+/// current. The load runs again when the connection is live again after it failed
+/// ([_askAgainWhenLive]) and after every resync, which empties both tables with the rest of
+/// the mirror (04 7.3; ruling AUD-CM01/4).
 @Riverpod(keepAlive: true)
 Future<void> notifyRefresh(Ref ref) async {
   final services = ref.watch(signedInServicesProvider);
   final writer = ref.watch(notifyWriterProvider);
   if (services == null || writer == null) return;
-  try {
-    await writer.refresh(services.auth.api);
-  } on Object {
-    // Offline or refused: the stored rows stand; `notification_pref.updated` follows.
-  }
+  final resyncs = services.engine.notices.listen((notice) {
+    if (notice is Resynced) ref.invalidateSelf();
+  });
+  ref.onDispose(() => unawaited(resyncs.cancel()));
+  // Offline or refused: the stored rows stand; `notification_pref.updated` follows.
+  await _askAgainWhenLive(
+    ref,
+    services.engine,
+    () => writer.refresh(services.auth.api),
+  );
 }
 
 /// The quiet hours rules of the person, by ID.
@@ -121,16 +161,18 @@ Stream<List<QuietHours>> quietHoursRules(Ref ref) {
 }
 
 /// Whether the signed-in person is an owner (`getMe`, `is_owner`): only owners see
-/// `notify.admin_enabled` (13 3.3). False while unknown or offline.
+/// `notify.admin_enabled` (13 3.3). False while unknown or offline; a read that failed is asked
+/// again when the connection is live again ([_askAgainWhenLive]), so an owner who started the
+/// app without a network gets the owner's entries once the server answers.
 @Riverpod(keepAlive: true)
 Future<bool> isOwner(Ref ref) async {
   final services = ref.watch(signedInServicesProvider);
   if (services == null) return false;
-  try {
-    return (await services.auth.api.getMeApi().getMe()).data?.isOwner ?? false;
-  } on Object {
-    return false;
-  }
+  var owner = false;
+  await _askAgainWhenLive(ref, services.engine, () async {
+    owner = (await services.auth.api.getMeApi().getMe()).data?.isOwner ?? false;
+  });
+  return owner;
 }
 
 /// What the effective level of a target needs: the person's own rows, the personal default

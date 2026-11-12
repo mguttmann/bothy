@@ -124,9 +124,11 @@ class TestApp {
     }
   }
 
-  /// Taps the widget with [key] once it is shown and enabled ([tapWhenEnabled]) and settles.
-  Future<void> tap(String key) =>
-      tapWhenEnabled(tester, find.byKey(ValueKey(key)));
+  /// Taps the widget with [key] once it is shown and enabled ([tapWhenEnabled]) and settles;
+  /// with [settle] false it pumps one frame instead (a target that starts work which waits
+  /// for the test never settles).
+  Future<void> tap(String key, {bool settle = true}) =>
+      tapWhenEnabled(tester, find.byKey(ValueKey(key)), settle: settle);
 
   /// E1: types the fake's address and connects; waits for E2.
   Future<void> connect() async {

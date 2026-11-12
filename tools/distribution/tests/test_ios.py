@@ -21,7 +21,7 @@ import pytest
 import yaml
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from fakes import FakeRun, ok
+from fakes import FakeRun, dart_code, ok
 from test_android import cfg as publisher_cfg  # noqa: F401 - the fixture of a real publisher
 from test_storeapi import FakeHttp, answer
 
@@ -40,9 +40,16 @@ def _plist(path: Path, data: dict[str, Any]) -> None:
 
 
 def make_app(
-    root: Path, bundle: str = BUNDLE, version: str = "1.2.3", build: int = 1002003
+    root: Path,
+    bundle: str = BUNDLE,
+    version: str = "1.2.3",
+    build: int = 1002003,
+    code: bytes | None = None,
 ) -> Path:
-    """An iOS app bundle as `flutter build ipa` lays it out, with both extensions."""
+    """An iOS app bundle as `flutter build ipa` lays it out, with both extensions.
+
+    `code` is the compiled Dart code of the app; by default it reports `version`.
+    """
     app = root / "Runner.app"
     _plist(
         app / "Info.plist",
@@ -56,6 +63,7 @@ def make_app(
     (app / "Runner").write_bytes(b"macho")
     for fw in ("Flutter", "App"):
         (app / "Frameworks" / f"{fw}.framework").mkdir(parents=True)
+    (app / ios.DART_CODE).write_bytes(code or b"macho " + version.encode("ascii") + b"\x00")
     for name in ios.EXTENSIONS:
         ext = app / "PlugIns" / f"{name}.appex"
         _plist(
@@ -127,7 +135,8 @@ def test_check_archive_passes_a_correct_build(tmp_path: Path, cfg: dict[str, Any
     archive = ios.Archive(app=make_app(tmp_path), entitlements=built_entitlements())
     checks = ios.check_archive(archive, cfg, appdist.app_version("1.2.3"))
     assert checks[0] == f"{BUNDLE}: identifier, version 1.2.3, build 1002003"
-    assert len(checks) == 6
+    assert checks[-1] == "the Dart code of the app reports the version 1.2.3"
+    assert len(checks) == 7
 
 
 @pytest.mark.parametrize(
@@ -166,6 +175,12 @@ def test_check_archive_passes_a_correct_build(tmp_path: Path, cfg: dict[str, Any
             lambda app, ent: __import__("shutil").rmtree(app / "Frameworks" / "Flutter.framework"),
             "no Flutter",
         ),
+        # The app reports the version of the pubspec, not the one of its bundle.
+        (
+            lambda app, ent: (app / ios.DART_CODE).write_bytes(b"macho 0.0.0\x00"),
+            r"App\.framework/App: the Dart code of the build does not report the version 1\.2\.3",
+        ),
+        (lambda app, ent: (app / ios.DART_CODE).unlink(), "no compiled Dart code at"),
     ],
 )
 def test_check_archive_refuses(
@@ -203,7 +218,7 @@ def build_tools(seen: dict[str, Any]) -> dict[str, Any]:
 
     def flutter(args: list[str], opts: dict[str, Any]) -> None:
         seen["flutter"] = args
-        make_app(ios.ARCHIVE / "Products" / "Applications")
+        make_app(ios.ARCHIVE / "Products" / "Applications", code=dart_code(args))
 
     def ditto(args: list[str], opts: dict[str, Any]) -> None:
         if args[1] == "-c":
@@ -233,6 +248,12 @@ def test_build_archive_with_the_publishers_team_and_update_path(
     assert "development_team" not in seen["brandings"][1]
     assert seen["flutter"][1:5] == ["build", "ipa", "--release", "--no-codesign"]
     assert "--build-number=1002003" in seen["flutter"]
+    # The app reports its build name; the check of the archive holds it to the version of the
+    # bundle (ruling AUD-CM01/1).
+    assert "--build-name=1.2.3" in seen["flutter"]
+    assert ios.check_archive(archive, cfg, appdist.app_version("1.2.3"))[-1] == (
+        "the Dart code of the app reports the version 1.2.3"
+    )
 
 
 def test_build_needs_exactly_one_app(tmp_path: Path, tree: Path, cfg: dict[str, Any]) -> None:
@@ -521,12 +542,14 @@ def test_trial_checks_the_unsigned_archive_of_the_template(
             bundle=template["bundle_id"],
             version=ios.TRIAL_VERSION,
             build=appdist.app_version(ios.TRIAL_VERSION).build,
+            code=dart_code(args),
         )
 
     handlers["flutter"] = flutter
     run = FakeRun(handlers)
     checks = ios.trial(run, out=tmp_path / "out", branding=common.DEFAULT_BRANDING)
-    assert len(checks) == 6
+    assert len(checks) == 7
+    assert checks[-1] == f"the Dart code of the app reports the version {ios.TRIAL_VERSION}"
     report = json.loads((tmp_path / "out" / "trial-ios.json").read_text(encoding="utf-8"))
     team = template["apple"]["team_id"]
     assert report["distribution_entitlements"][""]["application-identifier"] == (

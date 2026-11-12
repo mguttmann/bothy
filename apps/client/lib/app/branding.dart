@@ -4,6 +4,8 @@
 /// D-M4-18-7, docs/decisions.d/M5-02.md D-M5-02-2, ADR 0044).
 library;
 
+import 'package:flutter/services.dart' show appBuildName;
+
 /// What the build knows about its branding: the app name the system shows, the URL scheme of
 /// deep links, the bundle identifier, the Android application ID, the address E1 suggests,
 /// the app version and the update path.
@@ -13,6 +15,11 @@ library;
 /// gets the neutral values of `branding.example.yaml`. The interface shows
 /// `branding.product_name` of the instance after discovery and [appName] only where the system
 /// needs a name before that (01 12, fixed requirement 20).
+///
+/// The app version is no value of the branding: it is the build name Flutter compiles into the
+/// app (`--build-name` of a release build, else `version:` of the pubspec), the same name the
+/// system gets, so the app never reports another version than its package
+/// (docs/decisions.d/AUD-client-misc-01.md, ruling AUD-CM01/1).
 ///
 /// Example: `final branding = BuildBranding.fromEnvironment;`
 final class BuildBranding {
@@ -48,10 +55,7 @@ final class BuildBranding {
       'BRANDING_DEFAULT_SERVER',
       defaultValue: 'https://chat.example.com',
     ),
-    appVersion: String.fromEnvironment(
-      'BRANDING_APP_VERSION',
-      defaultValue: '0.0.0',
-    ),
+    appVersion: appBuildName ?? '0.0.0',
     crashDsn: String.fromEnvironment('CRASH_DSN'),
     crashEnvironment: String.fromEnvironment(
       'CRASH_ENVIRONMENT',
@@ -81,7 +85,8 @@ final class BuildBranding {
   /// The address E1 suggests.
   final String defaultServer;
 
-  /// The version of this build, compared with `min_client_versions` on E1.
+  /// The version of this build, compared with `min_client_versions` on E1: its build name
+  /// (see the class), `0.0.0` for a build without one.
   final String appVersion;
 
   /// The crash report target of the build (the define `CRASH_DSN`), or "" for none. 15 16
