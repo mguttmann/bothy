@@ -22,7 +22,17 @@ from bothy_sdk.adapter import unexpected_error_summary
 from bothy_sdk.testing._patience import PATIENCE
 from bothy_sdk.testing.faults import Fault
 
-from .conftest import LogLines, World, _group_alive, fail_turn_records
+from claude_code_runner.statedir import ensure_private_dir
+
+from .conftest import (
+    ERROR_CANARY,
+    LogLines,
+    World,
+    _group_alive,
+    debug_tracebacks,
+    fail_turn_records,
+    runner_output,
+)
 from .test_baseline import _amounts, _bind, _run, _usage
 
 pytestmark = pytest.mark.anyio
@@ -169,6 +179,63 @@ async def test_crash_identity_mismatch_never_signals(world: World, logs: LogLine
     await world.until(lambda: not alive(pid))
     ends = [c for c in world.calls("turn_end") if c["pid"] == pid]
     assert [e.get("signal") for e in ends] == [None]
+
+
+async def test_a_forged_record_takes_no_lock_outside_the_lock_folder(
+    world: World, logs: LogLines
+) -> None:
+    # A file in the place of a record that no runner wrote. A lock named after its "session
+    # reference" would lie outside the lock folder: the record is unreadable, so the runner
+    # takes no lock for it and leaves it where it is.
+    run_id = "0192f4a0-7b1c-7d07-84b0-000000000001"
+    forged = ensure_private_dir(world.state / "turns") / f"{run_id}.json"
+    forged.write_text(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "thread_id": "0192f4a0-7b1c-7d07-84b0-000000000002",
+                "session_ref": "x/../../escape/evil",
+            }
+        )
+    )
+    await world.start()
+    assert not (world.state / "escape").exists()
+    assert not (world.state / "locks").exists()
+    assert forged.exists()
+    unreadable = [json.loads(m) for m in logs.text.splitlines() if "turn_record_unreadable" in m]
+    assert [m["record"] for m in unreadable] == [run_id]
+
+
+async def test_a_record_with_a_process_id_out_of_range_does_not_stop_the_start(
+    world: World, logs: LogLines
+) -> None:
+    # No process ID of the system is this large (``os.getpgid`` refuses the number): the
+    # record names no process, so it is settled like the record of a turn that is gone.
+    run_id = "0192f4a0-7b1c-7d07-84b0-000000000001"
+    thread_id = "0192f4a0-7b1c-7d07-84b0-000000000002"
+    session = "0192d3a0-0000-4000-8000-0000000000dd"
+    forged = ensure_private_dir(world.state / "turns") / f"{run_id}.json"
+    forged.write_text(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "thread_id": thread_id,
+                "session_ref": session,
+                "pid": 2**40,
+                "pgid": 2**40,
+                "identity": {"lstart": "Thu Jan  1 00:00:00 1970", "command": "claude"},
+            }
+        )
+    )
+    await world.start()
+    assert not forged.exists()
+    adopted = [json.loads(m) for m in logs.text.splitlines() if '"turn_adopted"' in m]
+    assert [(m["action"], m["run_id"]) for m in adopted] == [("leave", run_id)]
+    # Its locks were taken inside the lock folder, under the names of its two UUIDs.
+    assert sorted(p.name for p in (world.state / "locks").iterdir()) == [
+        f"session-{session}.lock",
+        f"thread-{thread_id}.lock",
+    ]
 
 
 async def test_crash_orderly_stop_keeps_adopted_record(world: World) -> None:
@@ -384,4 +451,11 @@ async def test_an_unexpected_error_while_following_an_adopted_turn_stops_it_and_
     await world.until(lambda: run_id not in runner.handler.adopted)
     assert not record_path(world, run_id).exists()
     assert '"run_failed_unexpectedly", "error": "OSError"' in logs.text
-    assert f"the follow of the adopted run {run_id} failed" in logs.text
+    # The follow is logged by the kind of its error only: the message of an error may name a
+    # path or a value. The traceback is a line of level debug.
+    written = runner_output(logs)
+    failed = [json.loads(m) for m in written.splitlines() if '"adopted_follow_failed"' in m]
+    assert failed == [{"event": "adopted_follow_failed", "run_id": str(run_id), "error": "OSError"}]
+    assert ERROR_CANARY not in written
+    assert "Traceback" not in written
+    assert debug_tracebacks(logs) == [f"the follow of the adopted run {run_id} failed"]

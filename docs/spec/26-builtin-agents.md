@@ -104,6 +104,23 @@ that this chapter names enter `docs/spec/actions.yaml`, `docs/api/openapi.yaml` 
    starts a new run. At an orderly stop the runner stops the connections of all hosted agents
    together; each stops its turns as in 09 18.6, so the wait does not grow with the number of
    agents.
+   A record is a file, so the runner takes nothing in it as given (addendum of 2026-11-12,
+   `docs/decisions.d/FIX-RUNNER-HOSTING-REVIEW.md`). (a) It acts on a record only at
+   `<runner.state_dir>/hosted/<agent_id>/turns/<run_id>.json`, where the agent's folder is named
+   by the canonical UUID and both folders are directories themselves with mode `0700`, and only
+   when the record is a regular file as 09 18.9 reads it (a JSON object, the `run_id` of its file
+   name, UUIDs for the thread and the session) whose `pid` and `pgid` are both process IDs or
+   both missing. Any other file is left where it is and logged with `turn_record_unreadable`:
+   nothing is signalled and no lock is taken for it. (b) A process matches its record only when,
+   beyond the identity check of 09 18.9, its command line names the record's session as the
+   whole argument of `--session-id` or `--resume` and names the control folder of that agent
+   (5.1 item 2, the folder of the `--settings` file of every hosted turn, 5.3). The check runs
+   when the record is read and again before every signal. (c) An unexpected error at one record
+   is logged with `turn_record_unreadable` and the kind of the error, the record stays, the
+   locks taken for it are released, and the start goes on with the next record. A stop of one
+   agent's connection that fails at an orderly stop is logged with `hosted_stop_failed`, the
+   agent and the kind of the error; the other connections are still stopped, and so is that
+   agent's own after the wait of `sdk.http_timeout`.
 
 ### 3.3 Tokens of hosted agents
 

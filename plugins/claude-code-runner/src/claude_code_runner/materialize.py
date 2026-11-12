@@ -48,6 +48,7 @@ __all__ = [
     "AgentFolders",
     "MaterializeError",
     "Materialized",
+    "control_name",
     "definition_resolver",
     "frontmatter",
     "loaded_servers",
@@ -107,6 +108,26 @@ class MaterializeError(Exception):
         self.code = code
 
 
+def control_name(agent_id: UUID) -> str:
+    """The name of a hosted agent's control folder under ``runner.hosted_agents_root``.
+
+    The command line of every turn of the agent names a file in this folder (``--settings``,
+    26 5.3), which is how a leftover turn is told from any other process
+    (`claude_code_runner.hosting.stop_leftover_turns`).
+
+    Args:
+        agent_id: The hosted agent.
+
+    Returns:
+        ``<agent_id>.control``.
+
+    Examples:
+        >>> control_name(UUID(int=7))
+        '00000000-0000-0000-0000-000000000007.control'
+    """
+    return f"{agent_id}.control"
+
+
 @dataclass(frozen=True)
 class AgentFolders:
     """The folders of one hosted agent under ``runner.hosted_agents_root`` (26 5.1 item 2).
@@ -127,7 +148,7 @@ class AgentFolders:
     @property
     def control(self) -> Path:
         """``<root>/<agent_id>.control/``: the runner's files for the CLI, outside the agent."""
-        return self.root / f"{self.agent_id}.control"
+        return self.root / control_name(self.agent_id)
 
     @property
     def settings(self) -> Path:

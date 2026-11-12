@@ -68,6 +68,7 @@ from claude_code_runner.adoption import (
     AdoptionAction,
     adoption_decision,
     process_matches,
+    read_turn_record,
 )
 from claude_code_runner.attachments import fetch_attachments
 from claude_code_runner.authcheck import auth_status, decide, evidence
@@ -156,6 +157,24 @@ def warn(event: str, **ids: object) -> None:
         **ids: Run, thread and channel IDs or codes.
     """
     _LOG.warning(json.dumps({"event": event, **{k: str(v) for k, v in ids.items()}}))
+
+
+def _failed(event: str, what: str, run_id: UUID, err: Exception) -> None:
+    """Log an unexpected error of a task the runner itself started for a run.
+
+    The line of level error names only the kind of the error: its message may hold a path or
+    a value, and the traceback ends with that message. Both go to a line of level debug, which
+    the console script does not write (it logs from level info on).
+
+    Args:
+        event: The event code.
+        what: What failed, the start of the debug line.
+        run_id: The run.
+        err: The error.
+    """
+    line = {"event": event, "run_id": str(run_id), "error": type(err).__name__}
+    _LOG.error(json.dumps(line))
+    _LOG.debug("%s %s failed", what, run_id, exc_info=err)
 
 
 def refuse(
@@ -587,12 +606,13 @@ class RunnerHandler(AgentHandler):
         """
         turns = self.config.state_dir / "turns"
         for path in sorted(turns.glob("*.json")) if turns.is_dir() else []:
-            try:
-                record = json.loads(path.read_text())
-                run_id, thread_id = UUID(record["run_id"]), UUID(record["thread_id"])
-            except (OSError, ValueError, KeyError, TypeError):
+            # Checked before anything is built from it: the run of its file name, and UUIDs
+            # for the thread and the session, whose names the locks carry.
+            record = read_turn_record(path)
+            if record is None:
                 warn("turn_record_unreadable", record=path.stem)
                 continue
+            run_id, thread_id = UUID(record["run_id"]), UUID(record["thread_id"])
             await self._adopt(adapter, path, record, run_id, thread_id)
         await stop_leftover_turns(
             self.config.state_dir,
@@ -709,7 +729,7 @@ class RunnerHandler(AgentHandler):
         try:
             with adapter.client.bind_run(run_id, token):
                 await turn.adopted(record, group, known)
-        except Exception:
+        except Exception as err:
             if adapter.client.http.is_closed:
                 # No failure of the turn: the adapter closed under its follow, because the
                 # runner ends. The turn runs on and the next start adopts it again (18.9).
@@ -718,9 +738,8 @@ class RunnerHandler(AgentHandler):
                 )
             else:
                 # The turn is stopped and its run ended (`RunTurn.adopted`); this task is the
-                # follow's only caller, so the error is logged here, as the SDK logs an own
-                # run's.
-                _LOG.exception("the follow of the adopted run %s failed", run_id)
+                # follow's only caller, so the error is logged here.
+                _failed("adopted_follow_failed", "the follow of the adopted run", run_id, err)
         finally:
             self.adopted.pop(run_id, None)
             adapter.client.release_run(run_id)
@@ -810,9 +829,9 @@ class RunnerHandler(AgentHandler):
         try:
             with adapter.client.bind_run(run_id, token):
                 await turn.take_over(record, known)
-        except Exception:
+        except Exception as err:
             # As in `_follow_adopted`: `RunTurn.take_over` stopped the turn and ended the run.
-            _LOG.exception("the takeover of the run %s failed", run_id)
+            _failed("turn_takeover_failed", "the takeover of the run", run_id, err)
         finally:
             self.adopted.pop(run_id, None)
             turn.state.close()  # the locks an adopter took before a launch

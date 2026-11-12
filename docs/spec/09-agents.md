@@ -3787,7 +3787,14 @@ go into the usage file, and a runner that finds it repeats the finish with the s
 process keeps its kind, so an adopted compaction is never posted and never completes the run. A stored
 PID or group is signalled only when `os.getpgid(pid)` equals the stored group and `ps` gives the
 stored start time and a command that contains the session reference; otherwise the process counts
-as gone. At start, before the first event of the inbox and the first heartbeat, the runner checks
+as gone. A record is read only as a regular file (no link is followed) with a JSON object whose
+`run_id` is the UUID the file is named after and whose `thread_id` and `session_ref` are UUIDs
+in their canonical text; any other file is left where it is and logged with
+`turn_record_unreadable`, so no lock name and no path is built from free text. A stored PID or
+group that is not an integer above 1 within the system's type names no process, so that process
+counts as gone, and no stop signals a group ID below 2 (addendum of 2026-11-12,
+`docs/decisions.d/FIX-RUNNER-HOSTING-REVIEW.md`). At
+start, before the first event of the inbox and the first heartbeat, the runner checks
 each record: a live process keeps its locks through its inherited descriptors and the runner takes
 none; for a gone process it takes both locks with one non-blocking attempt (a busy lock is logged
 with `adoption_lock_busy`, and the record stays for the next start). Then `getRun` decides: process
@@ -3810,8 +3817,11 @@ that process as in 18.6 before the run ends `failed` with `adapter_error` and th
 names only the error's kind (log code `run_failed_unexpectedly` with the kind); the turn record
 and the run files go once no process of the group is left, and the locks are released. The run
 of an adopted turn ends the same way, finished by the runner itself, because no run loop of the
-SDK holds it, and the runner logs the error with its traceback. At a handover (18.19.3) the turn
-and its record stay for the next runner. They also stay when the follow of an adopted turn fails
+SDK holds it, and the runner logs the error by its kind only (log codes `adopted_follow_failed`
+and `turn_takeover_failed`; the traceback is a log line of level debug, because the message of
+an error may hold a path or a value, `docs/decisions.d/FIX-RUNNER-HOSTING-REVIEW.md`). At a
+handover (18.19.3) the turn and its record stay for the next runner. They also stay when the
+follow of an adopted turn fails
 because the runner itself ends: after an orderly stop, or after the server closed the runner's
 connection for good, the runner has closed its client for the server while the follow still
 runs, and a request of the follow then fails. That is no error of the turn: nothing is stopped

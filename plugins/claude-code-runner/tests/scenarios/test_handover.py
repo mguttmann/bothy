@@ -27,7 +27,14 @@ import pytest
 from bothy_sdk.adapter import unexpected_error_summary
 from bothy_sdk.testing._patience import PATIENCE
 
-from .conftest import LogLines, World, fail_turn_records
+from .conftest import (
+    ERROR_CANARY,
+    LogLines,
+    World,
+    debug_tracebacks,
+    fail_turn_records,
+    runner_output,
+)
 
 pytestmark = pytest.mark.anyio
 
@@ -489,4 +496,10 @@ async def test_an_unexpected_error_of_the_adopter_stops_the_turn_and_fails_the_r
     await world.until(lambda: run_id not in runner.handler.adopted)
     assert not record_path(world, run_id).exists()
     assert '"run_failed_unexpectedly", "error": "OSError"' in logs.text
-    assert f"the takeover of the run {run_id} failed" in logs.text
+    # Logged by the kind of the error only; the traceback is a line of level debug.
+    written = runner_output(logs)
+    failed = [json.loads(m) for m in written.splitlines() if '"turn_takeover_failed"' in m]
+    assert failed == [{"event": "turn_takeover_failed", "run_id": str(run_id), "error": "OSError"}]
+    assert ERROR_CANARY not in written
+    assert "Traceback" not in written
+    assert debug_tracebacks(logs) == [f"the takeover of the run {run_id} failed"]
