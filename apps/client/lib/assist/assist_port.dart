@@ -129,17 +129,27 @@ enum AssistFailureKind {
   /// No connection: the request did not reach the server.
   offline,
 
-  /// Any other failure (also `503 search_timeout`).
+  /// `503 unavailable` with the reason `search_timeout`: the search behind the question ran
+  /// into `search.statement_timeout` (14 7); the same question would time out again.
+  timeout,
+
+  /// `429 rate_limited`: too many questions of this person.
+  rateLimited,
+
+  /// Any other failure.
   failed,
 }
 
 /// The failure of an [AssistPort] call.
 final class AssistFailure implements Exception {
-  /// Creates the failure of [kind].
-  const AssistFailure(this.kind);
+  /// Creates the failure of [kind]; [retryAfter] is the wait the server named.
+  const AssistFailure(this.kind, {this.retryAfter});
 
   /// Why the question failed.
   final AssistFailureKind kind;
+
+  /// How long the server asks to wait (`Retry-After`), or null when it named no time.
+  final Duration? retryAfter;
 
   @override
   String toString() => 'AssistFailure(${kind.name})';
@@ -192,11 +202,23 @@ final class ApiAssistPort implements AssistPort {
   }
 }
 
-/// The [AssistFailure] of [error], an error of the generated client.
+/// The [AssistFailure] of [error], an error of the generated client: the reasons of
+/// `400 validation_failed` on `/q`, `503 unavailable` with `search_timeout` and `429
+/// rate_limited` with its wait keep their meaning, a request without a response is
+/// [AssistFailureKind.offline], anything else [AssistFailureKind.failed].
 AssistFailure assistFailureOf(Object error) {
   if (error is AssistFailure) return error;
   final problem = rest.ApiProblem.of(error);
   if (problem != null) {
+    if (problem.code == 'unavailable' && problem.reason == 'search_timeout') {
+      return const AssistFailure(AssistFailureKind.timeout);
+    }
+    if (problem.code == 'rate_limited') {
+      return AssistFailure(
+        AssistFailureKind.rateLimited,
+        retryAfter: problem.retryAfter,
+      );
+    }
     if (problem.code == 'validation_failed') {
       for (final e in problem.errors) {
         if (e.pointer != '/q') continue;

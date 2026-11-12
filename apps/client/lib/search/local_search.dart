@@ -25,8 +25,8 @@ final class LocalSearch implements LocalSearchPort {
   /// Up to [limit] index rows for the words of `request.q` (see [localQueryOf]), most relevant
   /// first, kept where they match the filters of [request] that the local database can check:
   /// the type (messages, thread titles, transcripts for files), spaces, channels, thread,
-  /// author, time, attachment and thread state. A row whose object is no longer stored is
-  /// left out.
+  /// author, time, attachment, thread state, the agent that operates the thread and the
+  /// thread's tags. A row whose object is no longer stored is left out.
   @override
   Future<List<SearchResultItem>> search(
     SearchRequest request, {
@@ -34,9 +34,10 @@ final class LocalSearch implements LocalSearchPort {
   }) async {
     final query = localQueryOf(request.q);
     if (query.isEmpty) return const [];
-    // Type and place filter in SQL before the limit; author, time, attachment and thread state
-    // need the stored objects, so the next pages are read until [limit] hits are kept or the
-    // index has no more rows (14 6: a filter never hides a stored hit behind the limit).
+    // Type and place filter in SQL before the limit; author, time, attachment and the facts of
+    // the thread (state, operator, tags) need the stored objects, so the next pages are read
+    // until [limit] hits are kept or the index has no more rows (14 6: a filter never hides a
+    // stored hit behind the limit).
     final items = <SearchResultItem>[];
     var offset = 0;
     while (items.length < limit) {
@@ -96,6 +97,13 @@ final class LocalSearch implements LocalSearchPort {
     final thread = threadId == null ? null : await db.threadsDao.byId(threadId);
     final state = request.threadState;
     if (state != null && thread?.state != state) return null;
+    // 14 4.4 as the server reads them: the thread's own operator, and at least one of the tags.
+    final agent = request.agentId;
+    if (agent != null && thread?.operatorAgentId != agent) return null;
+    if (request.tagIds.isNotEmpty &&
+        !(thread?.tagIds.any(request.tagIds.contains) ?? false)) {
+      return null;
+    }
     final channelId = row.channelId;
     final channel = channelId == null
         ? null

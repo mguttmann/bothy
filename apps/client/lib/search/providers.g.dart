@@ -327,6 +327,95 @@ final class SearchChannelsProvider
 
 String _$searchChannelsHash() => r'1db6ca1d51bddfaa570f5c9b8502d7a7e5ed52b8';
 
+/// The stored tags of the forum [channelId] in their order: the "Tag" menu, which offers the
+/// tags of the channel chosen in the column. Another kind of channel has none.
+
+@ProviderFor(searchChannelTags)
+final searchChannelTagsProvider = SearchChannelTagsFamily._();
+
+/// The stored tags of the forum [channelId] in their order: the "Tag" menu, which offers the
+/// tags of the channel chosen in the column. Another kind of channel has none.
+
+final class SearchChannelTagsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<ForumTag>>,
+          List<ForumTag>,
+          Stream<List<ForumTag>>
+        >
+    with $FutureModifier<List<ForumTag>>, $StreamProvider<List<ForumTag>> {
+  /// The stored tags of the forum [channelId] in their order: the "Tag" menu, which offers the
+  /// tags of the channel chosen in the column. Another kind of channel has none.
+  SearchChannelTagsProvider._({
+    required SearchChannelTagsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'searchChannelTagsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$searchChannelTagsHash();
+
+  @override
+  String toString() {
+    return r'searchChannelTagsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<List<ForumTag>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<List<ForumTag>> create(Ref ref) {
+    final argument = this.argument as String;
+    return searchChannelTags(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is SearchChannelTagsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$searchChannelTagsHash() => r'b1190bf0b6ecdcec999db944ba610afd0049cf5a';
+
+/// The stored tags of the forum [channelId] in their order: the "Tag" menu, which offers the
+/// tags of the channel chosen in the column. Another kind of channel has none.
+
+final class SearchChannelTagsFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<List<ForumTag>>, String> {
+  SearchChannelTagsFamily._()
+    : super(
+        retry: null,
+        name: r'searchChannelTagsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The stored tags of the forum [channelId] in their order: the "Tag" menu, which offers the
+  /// tags of the channel chosen in the column. Another kind of channel has none.
+
+  SearchChannelTagsProvider call(String channelId) =>
+      SearchChannelTagsProvider._(argument: channelId, from: this);
+
+  @override
+  String toString() => r'searchChannelTagsProvider';
+}
+
 /// Whether the engine's connection is live (15 7.2); any other phase counts as offline for the
 /// search (brief M4-23 Design note 1).
 

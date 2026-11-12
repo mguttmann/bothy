@@ -620,7 +620,10 @@ Binding is `docs/api/openapi.yaml` (`search`, `searchThreadTitles`, `assistSearc
 | `POST /api/v1/search-assist-requests/{request_id}/answer` | `search.assist.respond` | `rl.agent_runtime` | answer of the assistant agent (4.10) |
 
 Response per hit: object summary (message, thread or file), thread title, channel
-and space name, `segments`, for `relevance` the score. In addition `next_cursor` and
+and space name, `segments`, for `relevance` the score. A file hit also names `thread_id` and
+`message_id`, the message the file is attached to and its thread: the `File` of a hit is the
+attached form without `scope_channel_id` ([12-files.md](12-files.md) 10), so these two members
+are the place where a client opens the hit. In addition `next_cursor` and
 `candidates_capped`.
 
 ## 12. Tests
@@ -636,6 +639,7 @@ and space name, `segments`, for `relevance` the score. In addition `next_cursor`
 | Revocation, then search | no hits from the revoked channel; the page check catches a race (test with revocation between channel set and query) |
 | Filter on an invisible channel | empty result, same response as for an unknown channel |
 | Deleted message, file `pending` or `infected`, file never attached | no hit |
+| File hit | names `thread_id` and `message_id` of the message the file is attached to, also after `moveThread`; its `File` has no `scope_channel_id` |
 | Content with `<b>` and text that looks like a marker | segments correct, no HTML |
 | Cursor with a changed query | `400 cursor_invalid` |
 | Migration lint | `GENERATED ALWAYS AS` without `STORED` fails |

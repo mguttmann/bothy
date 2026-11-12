@@ -17,9 +17,8 @@ import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 
 import 'providers.dart';
-import 'search_controller.dart';
 import 'search_port.dart' show SearchResultItem;
-import 'search_view.dart' show SearchHitTile;
+import 'search_view.dart' show SearchHitTile, searchErrorText;
 
 /// Opens the search in [threadId] of [channelId] over [context].
 ///
@@ -99,7 +98,7 @@ class _ThreadSearchState extends ConsumerState<ThreadSearch> {
     final l = AppLocalizations.of(context);
     final c = context.dsColors;
     final state = ref.watch(_provider);
-    final error = state.error;
+    final error = searchErrorText(l, state);
     return Padding(
       padding: const EdgeInsets.all(DsSpace.s16),
       child: Column(
@@ -123,11 +122,7 @@ class _ThreadSearchState extends ConsumerState<ThreadSearch> {
             Padding(
               padding: const EdgeInsets.only(top: DsSpace.s8),
               child: Text(
-                switch (error) {
-                  SearchError.queryEmpty => l.searchQueryEmpty,
-                  SearchError.queryTooLong => l.searchQueryTooLong,
-                  SearchError.failed => l.searchFailed,
-                },
+                error,
                 key: const ValueKey('threadSearch.error'),
                 style: dsTextStyle(DsType.bodySm).copyWith(color: c.dangerFg),
               ),
@@ -136,6 +131,16 @@ class _ThreadSearchState extends ConsumerState<ThreadSearch> {
             Padding(
               padding: const EdgeInsets.only(top: DsSpace.s8),
               child: DsBanner(tone: DsTone.info, text: l.searchLocalOnly),
+            ),
+          if (state.pending)
+            Padding(
+              padding: const EdgeInsets.only(top: DsSpace.s8),
+              child: Text(
+                l.searchPending,
+                key: const ValueKey('threadSearch.pending'),
+                style: dsTextStyle(DsType.bodySm)
+                    .copyWith(color: c.textSecondary),
+              ),
             ),
           if (state.submitted && error == null && !state.pending)
             Padding(

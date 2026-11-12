@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Riverpod providers of the search view D7 (brief M4-23 Scope, docs/spec/15-client-architecture.md
-/// 4: one provider per query): the server and the local search port, the principals, spaces and
-/// channels for the notation and the filter menus, the connection, and the controller that holds
-/// one [SearchSession]. Widgets never query the database themselves (R-CL-03).
+/// 4: one provider per query): the server and the local search port, the principals, spaces,
+/// channels and forum tags for the notation and the filter menus, the connection, and the
+/// controller that holds one [SearchSession]. Widgets never query the database themselves
+/// (R-CL-03).
 library;
 
 import 'dart:async';
@@ -73,6 +74,16 @@ List<Channel> searchChannels(Ref ref) {
     for (final s in spaces)
       ...?ref.watch(searchSpaceChannelsProvider(s.id.value)).value,
   ];
+}
+
+/// The stored tags of the forum [channelId] in their order: the "Tag" menu, which offers the
+/// tags of the channel chosen in the column. Another kind of channel has none.
+@riverpod
+Stream<List<ForumTag>> searchChannelTags(Ref ref, String channelId) {
+  final db = ref.watch(localDatabaseProvider);
+  return db == null
+      ? Stream.value(const [])
+      : db.structureDao.watchForumTags(ChannelId.parse(channelId));
 }
 
 /// Whether the engine's connection is live (15 7.2); any other phase counts as offline for the

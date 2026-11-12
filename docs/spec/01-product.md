@@ -467,7 +467,15 @@ conversation; nothing is stored. Rules: [14-search.md](14-search.md) 4.10.
 ```
 
 **D7 Search.** Full text across messages, thread titles, file names and transcripts; filters on
-the left; results with highlighting and path. The result count counts only what is visible.
+the left; results with highlighting and path. The result count counts only what is visible: it
+is the number of loaded hits, because the server returns no totals
+([14-search.md](14-search.md) 4.3). A search shows one type at a time (messages, threads or
+files; a transcript is found as its file), and the filters are those of
+[14-search.md](14-search.md) 4.4: the tag is one of the chosen forum, and the agent keeps the
+conversations with that agent. A message hit opens its message in the thread, a thread hit
+opens the thread, and a file opens the message it is attached to. While the server has not
+answered the view says "Searching"; a search the server ended at its time limit asks to narrow
+it, and a refused one names the wait.
 
 ```text
 +--------------------------+------------------------------------------------------------------------+
@@ -475,13 +483,14 @@ the left; results with highlighting and path. The result count counts only what 
 +--------------------------+------------------------------------------------------------------------+
 | Space    [all v]         | 14 results, only from channels you may see                             |
 | Channel  [all v]         |                                                                        |
-| From     [all v]         | = server > Gateway: resume after network change                        |
-| Type [x] Messages        |   (A) dev-runner 10:14  ... window **resume_window** is measured       |
-|      [x] Threads         |   from the last heartbeat ...                                          |
-|      [x] Files           | # releases > Version 0.4                                               |
-|      [ ] Transcripts     |   (RO) Robin yesterday  ... new **resume_window** ...                  |
-| Time [any v]             | [File] notes-sync.md  ... **resume_window** ...                        |
-| Status [open+done]       | [load more]                                                            |
+| Tag      [all v]         | = server > Gateway: resume after network change                        |
+| From     [all v]         |   (A) dev-runner 10:14  ... window **resume_window** is measured       |
+| Agent    [all v]         |   from the last heartbeat ...                                          |
+| Type     [Messages v]    | # releases > Version 0.4                                               |
+| Time     [any v]         |   (RO) Robin yesterday  ... new **resume_window** ...                  |
+| Status   [open+done v]   | [load more]                                                            |
+| [ ] With files only      |                                                                        |
+| Sort     [Relevance v]   |                                                                        |
 +--------------------------+------------------------------------------------------------------------+
 ```
 

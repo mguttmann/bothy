@@ -140,8 +140,14 @@ class Host {
     await tester.pump();
   }
 
-  Future<void> fail(int i, AssistFailureKind kind) async {
-    assistant.answers[i].completeError(AssistFailure(kind));
+  Future<void> fail(
+    int i,
+    AssistFailureKind kind, {
+    Duration? retryAfter,
+  }) async {
+    assistant.answers[i].completeError(
+      AssistFailure(kind, retryAfter: retryAfter),
+    );
     await tester.pump();
     await tester.pump();
   }
@@ -217,6 +223,27 @@ void main() {
     await tester.tap(find.byKey(ValueKey('assist.hit.1.${threadId(2).value}')));
     await tester.pumpAndSettle();
     expect(h.location, '/t/${threadId(2).value}');
+  });
+
+  testWidgets('a timeout asks to narrow and a rate limit names the wait', (
+    tester,
+  ) async {
+    final h = Host(tester);
+    await h.open();
+    await h.fail(0, AssistFailureKind.timeout);
+    expect(find.text(en.searchTimeout), findsOneWidget);
+    expect(find.text(en.assistFailed), findsNothing);
+
+    await tester.enterText(find.byKey(const ValueKey('assist.field')), 'x y');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump();
+    await h.fail(
+      1,
+      AssistFailureKind.rateLimited,
+      retryAfter: const Duration(seconds: 9),
+    );
+    expect(find.text(en.searchRateLimited(9)), findsOneWidget);
+    expect(find.text(en.assistFailed), findsNothing);
   });
 
   testWidgets('failures and an empty answer have their texts', (tester) async {

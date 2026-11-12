@@ -26,6 +26,9 @@ final class AssistExchange {
   /// The failure, or null.
   AssistFailureKind? failure;
 
+  /// The wait the server named with [AssistFailureKind.rateLimited], or null.
+  Duration? retryAfter;
+
   /// Whether the answer is still awaited.
   bool get pending => answer == null && failure == null;
 }
@@ -78,7 +81,9 @@ class AssistConversation extends ChangeNotifier {
       if (p == null) throw const AssistFailure(AssistFailureKind.failed);
       exchange.answer = await p.ask(q, turns);
     } on AssistFailure catch (f) {
-      exchange.failure = f.kind;
+      exchange
+        ..failure = f.kind
+        ..retryAfter = f.retryAfter;
     } on Object {
       exchange.failure = AssistFailureKind.failed;
     }

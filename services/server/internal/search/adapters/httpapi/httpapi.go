@@ -194,7 +194,8 @@ type segment = struct {
 }
 
 // items renders the hits in page order with the object of each from its module (design note 9);
-// a hit whose object vanished since the query is dropped. Never nil.
+// a hit whose object vanished since the query is dropped. A file hit also names thread_id and
+// message_id of the message the file is attached to. Never nil.
 func (h *Finder) items(ctx context.Context, hits []search.ResultHit) ([]rest.SearchHit, error) {
 	out := make([]rest.SearchHit, 0, len(hits))
 	if len(hits) == 0 {
@@ -216,6 +217,13 @@ func (h *Finder) items(ctx context.Context, hits []search.ResultHit) ([]rest.Sea
 			item.Segments = append(item.Segments, segment{Match: s.Match, Text: s.Text})
 		}
 		item.ThreadTitle, item.ChannelName, item.SpaceName = optString(hit.ThreadTitle), optString(hit.ChannelName), optString(hit.SpaceName)
+		if item.File != nil {
+			// The File of a hit is the attached form without scope_channel_id (D-M3-07-5), so
+			// the hit itself names the place a client opens: the message the file is attached
+			// to and its thread. A message and a thread carry their place themselves.
+			thread, message := rest.Uuid(hit.ThreadID), rest.Uuid(hit.MessageID)
+			item.ThreadId, item.MessageId = &thread, &message
+		}
 		out = append(out, item)
 	}
 	return out, nil

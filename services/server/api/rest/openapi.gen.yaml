@@ -27715,6 +27715,12 @@ components:
           $ref: '#/components/schemas/Thread'
         file:
           $ref: '#/components/schemas/File'
+        thread_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Only with `kind = file`; the thread of the message the file is attached to. The `File` of a hit is the attached form without `scope_channel_id`, so a client opens the hit through this thread and `message_id`.
+        message_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Only with `kind = file`; the message the file is attached to.
         thread_title:
           type: string
         channel_name:

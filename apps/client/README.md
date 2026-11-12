@@ -1060,10 +1060,19 @@ The cross-cutting views of 01 3.5 and 5.1 (M4-23) open from the sidebar head and
 `/search?q=`, `/mentions` and `/running` (15 11); the keyboard bindings follow in M4-24, which
 calls `showQuickSwitcher` and the routes. Search D7 sends `search` with the filters of 14 4.4 as
 parameters (the notation `from:`, `in:`, `has:file`, `before:` and `after:` is translated in the
-app; the server never sees it), pages with the opaque cursor, restarts on `cursor_invalid` and
-renders only the server's `segments`, never HTML. While the server answer is pending, and while
-the app is offline, the local FTS5 index of `local_store` answers with the note "Messages stored
-only on this device"; the server's hits replace them. The index holds the cached messages,
+app; the server never sees it; the column also offers the agent of a conversation and the tag
+of the chosen forum), pages with the opaque cursor, restarts on `cursor_invalid` and
+renders only the server's `segments`, never HTML. A message hit opens
+`/t/<thread>?m=<message>`, a thread hit `/t/<thread>`, and a file hit the message it is
+attached to (`SearchHit.thread_id` and `message_id`). The request
+goes out once, without the read retry of the session: a timeout of the server
+(`503 unavailable` with the reason `search_timeout`) shows the hint to narrow the search,
+`429 rate_limited` the wait, both above the local hits, and a newer search or closing the view
+cancels the request that is on its way
+(docs/decisions.d/AUD-client-search-01.md). While the server answer is pending the view says
+"Searching"; meanwhile, and while the app is offline, the local FTS5 index of `local_store`
+answers with the note "Messages stored only on this device"; the server's hits replace them.
+The index holds the cached messages,
 thread titles and, filled by `SearchIndexFeed`, transcripts; a removed target (04 8.3) and a
 wipe take its rows with them. The quick switcher D6 lists spaces, channels, people, agents and
 commands from the local database and thread titles by prefix, also from `searchThreadTitles`,

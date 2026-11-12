@@ -239,3 +239,66 @@ func TestSearchFiles_FollowsThreadMove(t *testing.T) {
 		t.Fatalf("Sam after the move: %v", got.ids())
 	}
 }
+
+// TestSearch_FileHitNamesItsThreadAndMessage (audit finding fn-search-1): a file hit carries
+// thread_id and message_id of the message the file is attached to, because its File is the
+// attached form without scope_channel_id (D-M3-07-5) and so names no place a client could open;
+// after moveThread the hit still names the same thread and message. A message hit and a thread hit
+// carry neither member: their object names the place.
+func TestSearch_FileHitNamesItsThreadAndMessage(t *testing.T) {
+	t.Parallel()
+	e := start(t)
+	th := e.titledThread(t, e.alex, e.allg, "Otter planning")
+	f := e.clean(t, e.alex, e.allg, "otter plan.txt", []byte("otter"))
+	m := msgOf(t, e.send(t, e.alex, th, "otter with a file", []string{f}, nil), http.StatusCreated)
+
+	// places returns the raw items of a page, so absent members stay absent.
+	places := func(params url.Values) []map[string]any {
+		t.Helper()
+		r := e.alex.Do(t.Context(), harness.Request{Method: http.MethodGet, Path: "/search?" + params.Encode()})
+		if r.Status != http.StatusOK {
+			t.Fatalf("search %v: %d %s", params, r.Status, r.Body)
+		}
+		var p struct {
+			Items []map[string]any `json:"items"`
+		}
+		r.JSON(t, &p)
+		return p.Items
+	}
+	fileHit := func() map[string]any {
+		t.Helper()
+		items := places(sq("otter", "type", "files"))
+		if len(items) != 1 || items[0]["kind"] != "file" {
+			t.Fatalf("file hits %v", jsonOf(items))
+		}
+		return items[0]
+	}
+
+	hit := fileHit()
+	if hit["thread_id"] != th || hit["message_id"] != m.ID {
+		t.Fatalf("file hit names thread %v and message %v, want %s and %s: %s", hit["thread_id"], hit["message_id"], th, m.ID, jsonOf(hit))
+	}
+	if file, _ := hit["file"].(map[string]any); file == nil || file["id"] != f {
+		t.Fatalf("file hit without its file: %s", jsonOf(hit))
+	} else if _, ok := file["scope_channel_id"]; ok {
+		t.Fatalf("the file of a hit carries scope_channel_id: %s", jsonOf(hit))
+	}
+	for _, typ := range []string{"messages", "threads"} {
+		items := places(sq("otter", "type", typ))
+		if len(items) != 1 {
+			t.Fatalf("%s hits %v", typ, jsonOf(items))
+		}
+		for _, member := range []string{"thread_id", "message_id"} {
+			if _, ok := items[0][member]; ok {
+				t.Fatalf("a hit of type %s carries %s: %s", typ, member, jsonOf(items[0]))
+			}
+		}
+	}
+
+	if r := e.move(t, th, e.esk); r.Status != http.StatusOK {
+		t.Fatalf("moveThread: %d %s", r.Status, r.Body)
+	}
+	if moved := fileHit(); moved["thread_id"] != th || moved["message_id"] != m.ID {
+		t.Fatalf("after the move the file hit names thread %v and message %v, want %s and %s", moved["thread_id"], moved["message_id"], th, m.ID)
+	}
+}

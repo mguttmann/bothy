@@ -63,8 +63,9 @@ able to mount them (Colima mounts only the home folder by default, so set `TMPDI
   (not `503 setup_required`), waiting `Retry-After` plus a full-jitter backoff, or the backoff
   alone without the header, from `ReadRetryPolicy.fromBackoff(base, cap)`, which the apps fill
   from `client.outbox_retry_base` and `client.outbox_retry_cap`. A read with the request option
-  `noReadRetryExtra` is never retried here (an outbox executor retries it with its entry). Writes
-  are retried by the outbox, never here.
+  `noReadRetryExtra` is never retried here (an outbox executor retries it with its entry, and
+  the search view shows the failure of its request at once). Writes are retried by the outbox,
+  never here.
 - Problems: every response error reaches the caller as a `DioException` carrying an
   `ApiProblem` (`ApiProblem.of(e)`) with `status`, `code` (or `http_<status>` without a problem
   body), `reason`, `hint`, `errors`, `current`, `correlationId` and `retryAfter`.

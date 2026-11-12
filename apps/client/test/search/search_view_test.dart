@@ -3,7 +3,9 @@
 // The search view D7 (docs/spec/01-product.md 5.1 D7, brief M4-23 Design note 1): the query of
 // the route runs on open, local hits show with the note while the server is pending, the count
 // line counts the loaded hits, the reasons and the capped note show, "Load more" pages, a
-// filter searches again, and selecting a hit navigates to the thread and the message.
+// filter searches again (the agent and the tag of a forum too), selecting a hit navigates to
+// the thread and the message (a file to the message it is attached to), a pending search says
+// so, and a timeout and a rate limit show their own text above the local hits.
 
 import 'dart:async';
 import 'dart:io';
@@ -34,7 +36,11 @@ class FakeServer implements SearchPort {
   final List<Completer<SearchResultPage>> answers = [];
 
   @override
-  Future<SearchResultPage> search(SearchRequest request, {String? cursor}) {
+  Future<SearchResultPage> search(
+    SearchRequest request, {
+    String? cursor,
+    SearchCancel? cancel,
+  }) {
     calls.add((request: request, cursor: cursor));
     final c = Completer<SearchResultPage>();
     answers.add(c);
@@ -83,6 +89,20 @@ final SearchResultItem threadHit = SearchResultItem(
   channelId: channelId(2),
   authorId: robin,
   at: now.subtract(const Duration(days: 1)),
+);
+
+/// A file hit as the server delivers it: no channel of the file, the thread and the message it
+/// is attached to.
+final SearchResultItem fileHit = SearchResultItem(
+  id: uuid(0x901),
+  type: SearchHitType.file,
+  path: const ['Engineering', 'server', 'Gateway: resume'],
+  segments: const [SearchSegment(text: 'notes-sync.md', match: true)],
+  threadId: threadId(1),
+  messageId: MessageId.parse(uuid(0x703)),
+  authorId: sam,
+  title: 'notes-sync.md',
+  at: now.subtract(const Duration(days: 2)),
 );
 
 class Host {
@@ -157,7 +177,18 @@ class Host {
           searchChannelsProvider.overrideWithValue([
             channel(1, name: 'server'),
             channel(2, name: 'releases'),
+            channel(3, name: 'ideas', kind: ChannelKind.forum),
           ]),
+          searchChannelTagsProvider.overrideWith(
+            (ref, channelId) => Stream.value([
+              if (channelId == channelId3)
+                for (final t in [
+                  tag(1, 'bug', channelN: 3),
+                  tag(2, 'idea', channelN: 3),
+                ])
+                  t,
+            ]),
+          ),
         ],
         child: hostRouter(router),
       ),
@@ -172,12 +203,20 @@ class Host {
     await tester.pump();
   }
 
-  Future<void> fail(int i, SearchFailureKind kind) async {
-    server.answers[i].completeError(SearchFailure(kind));
+  Future<void> fail(
+    int i,
+    SearchFailureKind kind, {
+    Duration? retryAfter,
+  }) async {
+    server.answers[i].completeError(
+      SearchFailure(kind, retryAfter: retryAfter),
+    );
     await tester.pump();
     await tester.pump();
   }
 }
+
+final String channelId3 = channelId(3).value;
 
 SearchResultPage page(
   List<SearchResultItem> items, {
@@ -263,6 +302,60 @@ void main() {
     },
   );
 
+  testWidgets('selecting a file hit opens the message it is attached to', (
+    tester,
+  ) async {
+    final h = Host(tester);
+    await h.open();
+    await h.answer(0, page([fileHit]));
+    await tester.tap(find.byKey(ValueKey('search.hit.${fileHit.id}')));
+    await tester.pumpAndSettle();
+    expect(h.location, '/t/${threadId(1).value}?m=${uuid(0x703)}');
+  });
+
+  testWidgets('a pending search says so until the server answered', (
+    tester,
+  ) async {
+    final h = Host(tester);
+    await h.open();
+    expect(find.byKey(const ValueKey('search.pending')), findsOneWidget);
+    expect(find.text(en.searchPending), findsOneWidget);
+    expect(find.byKey(const ValueKey('search.count')), findsNothing);
+
+    await h.answer(0, page([messageHit(message1.value)]));
+    expect(find.byKey(const ValueKey('search.pending')), findsNothing);
+    expect(find.byKey(const ValueKey('search.count')), findsOneWidget);
+  });
+
+  testWidgets(
+    'a timeout asks to narrow, a rate limit names the wait; local hits stay',
+    (tester) async {
+      final h = Host(tester);
+      await h.open();
+      await h.fail(0, SearchFailureKind.timeout);
+      expect(find.byKey(const ValueKey('search.pending')), findsNothing);
+      expect(find.text(en.searchTimeout), findsOneWidget);
+      expect(find.text(en.searchFailed), findsNothing);
+      expect(find.byKey(const ValueKey('search.hit.local-1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('search.localNote')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('search.submit')));
+      await tester.pump();
+      await h.fail(
+        1,
+        SearchFailureKind.rateLimited,
+        retryAfter: const Duration(milliseconds: 6200),
+      );
+      expect(find.text(en.searchRateLimited(7)), findsOneWidget);
+      expect(find.byKey(const ValueKey('search.hit.local-1')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('search.submit')));
+      await tester.pump();
+      await h.fail(2, SearchFailureKind.rateLimited);
+      expect(find.text(en.searchRateLimited(0)), findsOneWidget);
+    },
+  );
+
   testWidgets(
     'typing and the button search again; the reasons and the capped note show',
     (tester) async {
@@ -332,6 +425,62 @@ void main() {
     await tester.tap(find.text('releases').last);
     await tester.pumpAndSettle();
     expect(h.server.calls.last.request.channelIds, [channelId(2)]);
+  });
+
+  testWidgets('the agent and the tag of a forum search again as parameters', (
+    tester,
+  ) async {
+    final h = Host(tester);
+    await h.open();
+    await h.answer(0, page(const []));
+
+    // Only the stored agents are offered, not the people.
+    await tester.tap(find.byKey(const ValueKey('search.filter.agent')));
+    await tester.pumpAndSettle();
+    expect(find.text('Sam'), findsNothing);
+    await tester.tap(find.text('dev-runner').last);
+    await tester.pumpAndSettle();
+    expect(h.server.calls.last.request.agentId, robin);
+
+    // The tags are those of the chosen forum; without one there is nothing to choose.
+    DropdownButton<ForumTagId?> tags() =>
+        tester.widget(find.byKey(const ValueKey('search.filter.tag')));
+    expect(tags().onChanged, isNull);
+    await tester.tap(find.byKey(const ValueKey('search.filter.channel')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ideas').last);
+    await tester.pumpAndSettle();
+    expect(tags().onChanged, isNotNull);
+    await tester.tap(find.byKey(const ValueKey('search.filter.tag')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('idea').last);
+    await tester.pumpAndSettle();
+    final tagged = h.server.calls.last.request;
+    expect(tagged.channelIds, [channelId(3)]);
+    expect(tagged.tagIds, [tagId(2)]);
+    expect(tagged.agentId, robin);
+
+    // tag_id applies to threads and messages (14 4.4): files leave it out.
+    await tester.tap(find.byKey(const ValueKey('search.filter.type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(en.searchTypeFiles).last);
+    await tester.pumpAndSettle();
+    expect(h.server.calls.last.request.tagIds, isEmpty);
+    expect(h.server.calls.last.request.agentId, robin);
+    expect(tags().onChanged, isNull);
+
+    // Another channel has other tags: the chosen tag goes with its forum.
+    await tester.tap(find.byKey(const ValueKey('search.filter.type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(en.searchTypeMessages).last);
+    await tester.pumpAndSettle();
+    expect(h.server.calls.last.request.tagIds, [tagId(2)]);
+    await tester.tap(find.byKey(const ValueKey('search.filter.channel')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('releases').last);
+    await tester.pumpAndSettle();
+    expect(h.server.calls.last.request.channelIds, [channelId(2)]);
+    expect(h.server.calls.last.request.tagIds, isEmpty);
   });
 
   testWidgets('segments with markup stay literal text', (tester) async {

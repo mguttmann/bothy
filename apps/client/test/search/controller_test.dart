@@ -3,8 +3,10 @@
 // The search controller of D7 (brief M4-23 Design note 1, docs/spec/14-search.md 4 and 6):
 // local hits while the server is pending, replaced by the server hits; offline only local hits
 // with the note; cursor_invalid restarts; the reasons of validation_failed; candidates_capped;
-// a newer submit wins; the notation and the filters become parameters; the in-thread scope of
-// M4-24; segments render as text with marked matches and never as HTML.
+// a newer submit wins and cancels the request of the older one; a timeout and a rate limit show
+// their reason and keep the local hits; the notation and the filters (agent and tag too) become
+// parameters; the in-thread scope of M4-24; segments render as text with marked matches and
+// never as HTML.
 
 import 'dart:async';
 import 'dart:io';
@@ -31,15 +33,20 @@ final DateTime now = DateTime.utc(2026, 10, 24, 12);
 
 /// A server port whose answers the test releases one by one.
 class FakeServer implements SearchPort {
-  final List<({SearchRequest request, String? cursor})> calls = [];
+  final List<({SearchRequest request, String? cursor, SearchCancel? cancel})>
+  calls = [];
   final List<Completer<SearchResultPage>> _answers = [];
 
   /// The answer of call [i].
   Completer<SearchResultPage> answer(int i) => _answers[i];
 
   @override
-  Future<SearchResultPage> search(SearchRequest request, {String? cursor}) {
-    calls.add((request: request, cursor: cursor));
+  Future<SearchResultPage> search(
+    SearchRequest request, {
+    String? cursor,
+    SearchCancel? cancel,
+  }) {
+    calls.add((request: request, cursor: cursor, cancel: cancel));
     final c = Completer<SearchResultPage>();
     _answers.add(c);
     return c.future;
@@ -290,6 +297,95 @@ void main() {
     });
   }
 
+  test('a timeout shows the hint to narrow and keeps the local hits', () async {
+    final h = await live();
+    await h.submit('deploy');
+    h.server
+        .answer(0)
+        .completeError(const SearchFailure(SearchFailureKind.timeout));
+    await pumpEventQueue();
+    expect(h.state.error, SearchError.timeout);
+    expect(h.state.pending, isFalse);
+    expect(h.state.items.map((i) => i.local), [true]);
+    expect(h.state.showLocalNote, isTrue);
+    expect(h.server.calls, hasLength(1), reason: 'the same request times out');
+  });
+
+  test('a rate limit names the wait and keeps the local hits', () async {
+    final slow = Completer<void>();
+    final h = await live(
+      localPort: _GatedLocal(slow, [item('late', local: true)]),
+    );
+    await h.submit('deploy');
+    h.server
+        .answer(0)
+        .completeError(
+          const SearchFailure(
+            SearchFailureKind.rateLimited,
+            retryAfter: Duration(seconds: 7),
+          ),
+        );
+    await pumpEventQueue();
+    expect(h.state.error, SearchError.rateLimited);
+    expect(h.state.retryAfter, const Duration(seconds: 7));
+    expect(h.state.pending, isFalse);
+    // The local answer may come after the refusal: it still shows.
+    slow.complete();
+    await pumpEventQueue();
+    expect(h.state.items.map((i) => i.local), [true]);
+    expect(h.state.error, SearchError.rateLimited);
+
+    // The next search starts without the old reason.
+    await h.submit('deploy again');
+    expect(h.state.error, isNull);
+    expect(h.state.retryAfter, isNull);
+  });
+
+  test('a failed further page names a timeout and a rate limit too', () async {
+    final h = await live();
+    await h.submit('deploy');
+    h.server.answer(0).complete(page([item('a')], next: 'c1'));
+    await pumpEventQueue();
+    unawaited(h.controller.loadMore());
+    await pumpEventQueue();
+    h.server
+        .answer(1)
+        .completeError(const SearchFailure(SearchFailureKind.timeout));
+    await pumpEventQueue();
+    expect(h.state.error, SearchError.timeout);
+    expect(h.state.items.map((i) => i.segments.single.text), ['a']);
+    expect(h.state.nextCursor, 'c1');
+  });
+
+  test('a further page that loads drops the reason of a failed one', () async {
+    final h = await live();
+    await h.submit('deploy');
+    h.server.answer(0).complete(page([item('a')], next: 'c1'));
+    await pumpEventQueue();
+    unawaited(h.controller.loadMore());
+    await pumpEventQueue();
+    h.server
+        .answer(1)
+        .completeError(
+          const SearchFailure(
+            SearchFailureKind.rateLimited,
+            retryAfter: Duration(seconds: 7),
+          ),
+        );
+    await pumpEventQueue();
+    expect(h.state.error, SearchError.rateLimited);
+    expect(h.state.retryAfter, const Duration(seconds: 7));
+
+    // The person asks for the page again and the server answers it.
+    unawaited(h.controller.loadMore());
+    await pumpEventQueue();
+    h.server.answer(2).complete(page([item('b')]));
+    await pumpEventQueue();
+    expect(h.state.items.map((i) => i.segments.single.text), ['a', 'b']);
+    expect(h.state.error, isNull);
+    expect(h.state.retryAfter, isNull);
+  });
+
   test('candidates_capped is reported', () async {
     final h = await live();
     await h.submit('deploy');
@@ -315,6 +411,38 @@ void main() {
     h.server.answer(0).complete(page([item('first')]));
     await pumpEventQueue();
     expect(h.state.items.single.segments.single.text, 'second');
+  });
+
+  test('a newer submit cancels the request of the older one', () async {
+    final h = await live();
+    await h.submit('first');
+    final first = h.server.calls.single.cancel!;
+    expect(first.isCancelled, isFalse);
+    await h.submit('second');
+    expect(first.isCancelled, isTrue);
+    final second = h.server.calls.last.cancel!;
+    expect(second.isCancelled, isFalse);
+
+    // A further page belongs to its search: the next submit cancels it as well.
+    h.server.answer(1).complete(page([item('second')], next: 'c1'));
+    await pumpEventQueue();
+    unawaited(h.controller.loadMore());
+    await pumpEventQueue();
+    final more = h.server.calls.last.cancel!;
+    expect(more.isCancelled, isFalse);
+    await h.submit('third');
+    expect(more.isCancelled, isTrue);
+  });
+
+  test('closing the search cancels its request', () async {
+    final h = Harness();
+    h.container.listen(searchPrincipalsProvider, (_, _) {});
+    await h.phase(sync.ConnectionPhase.live);
+    await h.submit('deploy');
+    final cancel = h.server.calls.single.cancel!;
+    expect(cancel.isCancelled, isFalse);
+    await h.dispose();
+    expect(cancel.isCancelled, isTrue);
   });
 
   test(
@@ -369,6 +497,50 @@ void main() {
     },
   );
 
+  test('the agent and the tag filter become agent_id and tag_id', () async {
+    final h = await live();
+    await h.controller.setFilters(
+      const SearchFilters().copyWith(agentId: robin, tagId: tagId(1)),
+    );
+    await h.submit('deploy');
+    final messages = h.server.calls.single.request;
+    expect(messages.agentId, robin);
+    expect(messages.tagIds, [tagId(1)]);
+    expect(h.local.calls.single.request.agentId, robin);
+    expect(h.local.calls.single.request.tagIds, [tagId(1)]);
+
+    unawaited(
+      h.controller.setFilters(h.state.filters.copyWith(type: SearchType.files)),
+    );
+    await pumpEventQueue();
+    final files = h.server.calls.last.request;
+    expect(files.agentId, robin, reason: 'agent_id: all types');
+    expect(files.tagIds, isEmpty, reason: 'tag_id: threads, messages');
+
+    unawaited(
+      h.controller.setFilters(
+        h.state.filters.copyWith(
+          type: SearchType.threads,
+          clearAgent: true,
+          clearTag: true,
+        ),
+      ),
+    );
+    await pumpEventQueue();
+    final threads = h.server.calls.last.request;
+    expect(threads.agentId, isNull);
+    expect(threads.tagIds, isEmpty);
+  });
+
+  test('the in-thread search sends no tag filter of the column', () async {
+    final h = await live(scope: (channel: channelId(4), thread: threadId(9)));
+    await h.controller.setFilters(
+      const SearchFilters().copyWith(tagId: tagId(1)),
+    );
+    await h.submit('deploy');
+    expect(h.server.calls.single.request.tagIds, isEmpty);
+  });
+
   test('the local limit is the named key of AppConfig', () async {
     final h = await live();
     await h.submit('deploy');
@@ -388,25 +560,33 @@ void main() {
   });
 
   test('the API port maps the problems of 14 4 and connection errors', () {
-    DioException problem(int status, String code, [String? field]) =>
-        DioException(
-          requestOptions: RequestOptions(path: '/search'),
-          type: DioExceptionType.badResponse,
-          error: rest.ApiProblem(
-            status: status,
-            code: code,
-            errors: [
-              if (field != null)
-                rest.ProblemFieldError(pointer: '#query/q', code: field),
-            ],
-          ),
-        );
+    DioException problem(
+      int status,
+      String code, {
+      String? field,
+      String? reason,
+      Duration? retryAfter,
+    }) => DioException(
+      requestOptions: RequestOptions(path: '/search'),
+      type: DioExceptionType.badResponse,
+      error: rest.ApiProblem(
+        status: status,
+        code: code,
+        reason: reason,
+        retryAfter: retryAfter,
+        errors: [
+          if (field != null)
+            rest.ProblemFieldError(pointer: '#query/q', code: field),
+        ],
+      ),
+    );
     expect(
-      searchFailureOf(problem(400, 'validation_failed', 'empty')).kind,
+      searchFailureOf(problem(400, 'validation_failed', field: 'empty')).kind,
       SearchFailureKind.queryEmpty,
     );
     expect(
-      searchFailureOf(problem(400, 'validation_failed', 'too_long')).kind,
+      searchFailureOf(problem(400, 'validation_failed', field: 'too_long'))
+          .kind,
       SearchFailureKind.queryTooLong,
     );
     expect(
@@ -421,6 +601,18 @@ void main() {
       searchFailureOf(problem(503, 'unavailable')).kind,
       SearchFailureKind.failed,
     );
+    // 14 7: the statement timeout of the search, with the hint to narrow.
+    expect(
+      searchFailureOf(problem(503, 'unavailable', reason: 'search_timeout'))
+          .kind,
+      SearchFailureKind.timeout,
+    );
+    final limited = searchFailureOf(
+      problem(429, 'rate_limited', retryAfter: const Duration(seconds: 12)),
+    );
+    expect(limited.kind, SearchFailureKind.rateLimited);
+    expect(limited.retryAfter, const Duration(seconds: 12));
+    expect(searchFailureOf(problem(429, 'rate_limited')).retryAfter, isNull);
     expect(
       searchFailureOf(
         DioException(
@@ -460,6 +652,8 @@ void main() {
         {
           'kind': 'file',
           'channel_name': 'server',
+          'thread_id': threadId(3).value,
+          'message_id': uuid(0x703),
           'segments': [
             {'text': 'notes-sync.md', 'match': true},
           ],
@@ -488,8 +682,11 @@ void main() {
     expect(thread.authorId, alex);
     expect(file.type, SearchHitType.file);
     expect(file.title, 'notes-sync.md');
-    expect(file.channelId, channelId(1));
-    expect(file.threadId, isNull);
+    // The file of a hit is the attached form without scope_channel_id (D-M3-07-5); the hit
+    // names the thread and the message the file is attached to.
+    expect(file.channelId, isNull);
+    expect(file.threadId, threadId(3));
+    expect(file.messageId, MessageId.parse(uuid(0x703)));
     expect(file.path, ['server']);
   });
 
@@ -601,7 +798,6 @@ Map<String, Object?> _fileJson() => {
   'original_name': 'notes-sync.md',
   'uploaded_by': robin.value,
   'purpose': 'attachment',
-  'scope_channel_id': channelId(1).value,
   'upload_state': 'complete',
   'scan_status': 'clean',
   'transcript_status': 'none',

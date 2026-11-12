@@ -18,6 +18,10 @@ class _$SearchHit extends SearchHit {
   @override
   final File? file;
   @override
+  final String? threadId;
+  @override
+  final String? messageId;
+  @override
   final String? threadTitle;
   @override
   final String? channelName;
@@ -35,6 +39,8 @@ class _$SearchHit extends SearchHit {
     this.message,
     this.thread,
     this.file,
+    this.threadId,
+    this.messageId,
     this.threadTitle,
     this.channelName,
     this.spaceName,
@@ -56,6 +62,8 @@ class _$SearchHit extends SearchHit {
         message == other.message &&
         thread == other.thread &&
         file == other.file &&
+        threadId == other.threadId &&
+        messageId == other.messageId &&
         threadTitle == other.threadTitle &&
         channelName == other.channelName &&
         spaceName == other.spaceName &&
@@ -70,6 +78,8 @@ class _$SearchHit extends SearchHit {
     _$hash = $jc(_$hash, message.hashCode);
     _$hash = $jc(_$hash, thread.hashCode);
     _$hash = $jc(_$hash, file.hashCode);
+    _$hash = $jc(_$hash, threadId.hashCode);
+    _$hash = $jc(_$hash, messageId.hashCode);
     _$hash = $jc(_$hash, threadTitle.hashCode);
     _$hash = $jc(_$hash, channelName.hashCode);
     _$hash = $jc(_$hash, spaceName.hashCode);
@@ -86,6 +96,8 @@ class _$SearchHit extends SearchHit {
           ..add('message', message)
           ..add('thread', thread)
           ..add('file', file)
+          ..add('threadId', threadId)
+          ..add('messageId', messageId)
           ..add('threadTitle', threadTitle)
           ..add('channelName', channelName)
           ..add('spaceName', spaceName)
@@ -117,6 +129,14 @@ class SearchHitBuilder implements Builder<SearchHit, SearchHitBuilder> {
   FileBuilder get file => _$this._file ??= FileBuilder();
   set file(FileBuilder? file) => _$this._file = file;
 
+  String? _threadId;
+  String? get threadId => _$this._threadId;
+  set threadId(String? threadId) => _$this._threadId = threadId;
+
+  String? _messageId;
+  String? get messageId => _$this._messageId;
+  set messageId(String? messageId) => _$this._messageId = messageId;
+
   String? _threadTitle;
   String? get threadTitle => _$this._threadTitle;
   set threadTitle(String? threadTitle) => _$this._threadTitle = threadTitle;
@@ -147,6 +167,8 @@ class SearchHitBuilder implements Builder<SearchHit, SearchHitBuilder> {
       _message = $v.message?.toBuilder();
       _thread = $v.thread?.toBuilder();
       _file = $v.file?.toBuilder();
+      _threadId = $v.threadId;
+      _messageId = $v.messageId;
       _threadTitle = $v.threadTitle;
       _channelName = $v.channelName;
       _spaceName = $v.spaceName;
@@ -184,6 +206,8 @@ class SearchHitBuilder implements Builder<SearchHit, SearchHitBuilder> {
             message: _message?.build(),
             thread: _thread?.build(),
             file: _file?.build(),
+            threadId: threadId,
+            messageId: messageId,
             threadTitle: threadTitle,
             channelName: channelName,
             spaceName: spaceName,

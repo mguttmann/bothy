@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Self, TypeVar
+from uuid import UUID
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -31,6 +32,8 @@ class SearchHit:
         message (Message | Unset):
         thread (Thread | Unset):
         file (File | Unset):
+        thread_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+        message_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         thread_title (str | Unset):
         channel_name (str | Unset):
         space_name (str | Unset):
@@ -42,6 +45,8 @@ class SearchHit:
     message: Message | Unset = UNSET
     thread: Thread | Unset = UNSET
     file: File | Unset = UNSET
+    thread_id: UUID | Unset = UNSET
+    message_id: UUID | Unset = UNSET
     thread_title: str | Unset = UNSET
     channel_name: str | Unset = UNSET
     space_name: str | Unset = UNSET
@@ -69,6 +74,14 @@ class SearchHit:
         if not isinstance(self.file, Unset):
             file = self.file.to_dict()
 
+        thread_id: str | Unset = UNSET
+        if not isinstance(self.thread_id, Unset):
+            thread_id = str(self.thread_id)
+
+        message_id: str | Unset = UNSET
+        if not isinstance(self.message_id, Unset):
+            message_id = str(self.message_id)
+
         thread_title = self.thread_title
 
         channel_name = self.channel_name
@@ -91,6 +104,10 @@ class SearchHit:
             field_dict["thread"] = thread
         if file is not UNSET:
             field_dict["file"] = file
+        if thread_id is not UNSET:
+            field_dict["thread_id"] = thread_id
+        if message_id is not UNSET:
+            field_dict["message_id"] = message_id
         if thread_title is not UNSET:
             field_dict["thread_title"] = thread_title
         if channel_name is not UNSET:
@@ -140,6 +157,20 @@ class SearchHit:
         else:
             file = File.from_dict(_file)
 
+        _thread_id = d.pop("thread_id", UNSET)
+        thread_id: UUID | Unset
+        if isinstance(_thread_id, Unset):
+            thread_id = UNSET
+        else:
+            thread_id = UUID(_thread_id)
+
+        _message_id = d.pop("message_id", UNSET)
+        message_id: UUID | Unset
+        if isinstance(_message_id, Unset):
+            message_id = UNSET
+        else:
+            message_id = UUID(_message_id)
+
         thread_title = d.pop("thread_title", UNSET)
 
         channel_name = d.pop("channel_name", UNSET)
@@ -153,6 +184,8 @@ class SearchHit:
             message=message,
             thread=thread,
             file=file,
+            thread_id=thread_id,
+            message_id=message_id,
             thread_title=thread_title,
             channel_name=channel_name,
             space_name=space_name,

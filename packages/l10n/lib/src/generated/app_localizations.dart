@@ -12829,6 +12829,18 @@ abstract class AppLocalizations {
   /// **'From'**
   String get searchFilterFrom;
 
+  /// Filter of the search by the agent that operates the thread, the conversations with this agent (14 section 4.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get searchFilterAgent;
+
+  /// Filter of the search by a forum tag of the chosen channel (14 section 4.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Tag'**
+  String get searchFilterTag;
+
   /// Value of a filter that does not restrict the search.
   ///
   /// In en, this message translates to:
@@ -12984,6 +12996,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The search did not work. Try again.'**
   String get searchFailed;
+
+  /// Line of the search view while the answer of the server is pending.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching'**
+  String get searchPending;
+
+  /// The server ended the search at its time limit, 503 with the reason search_timeout; the same search would take too long again (14 section 7).
+  ///
+  /// In en, this message translates to:
+  /// **'The search took too long. Narrow it, for example with more exact words, a channel or a shorter time span.'**
+  String get searchTimeout;
+
+  /// The server refused the search with 429 rate_limited; seconds is the wait it named, 0 when it named none.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds, plural, =0{Too many searches in a short time. Wait a moment, then search again.} =1{Too many searches in a short time. Search again in 1 second.} other{Too many searches in a short time. Search again in {seconds} seconds.}}'**
+  String searchRateLimited(int seconds);
 
   /// Marker of a hit on a thread title.
   ///

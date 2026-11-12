@@ -2,8 +2,9 @@
 
 // The offline search keeps the best hits of the filtered set (14 6; red team M1 of M4-23): the
 // place and type filters run before the limit, and the filters that need the stored objects
-// (author, time, attachment, thread state) read further pages until the limit is reached. Many
-// better ranked rows of another channel or author never hide the stored hits.
+// (author, time, attachment, thread state, the thread's operator and tags) read further pages
+// until the limit is reached. Many better ranked rows of another channel, author, agent or tag
+// never hide the stored hits.
 
 import 'package:client/search/local_search.dart';
 import 'package:client/search/search_port.dart';
@@ -22,7 +23,15 @@ void main() {
     await db.structureDao.upsertSpaceIfNewer(space(1));
     for (final n in [1, 2]) {
       await db.structureDao.upsertChannelIfNewer(channel(n));
-      await db.threadsDao.upsertIfNewer(thread(n, channelN: n));
+      // Thread 2 is a conversation with the agent Robin and carries tag 1.
+      await db.threadsDao.upsertIfNewer(
+        thread(
+          n,
+          channelN: n,
+          operator: n == 2 ? robin : null,
+          tags: n == 2 ? [tagId(1)] : const [],
+        ),
+      );
     }
     // More than [limit] short, better ranked rows by Sam in channel 1 (bm25 favours short
     // texts), then two long rows by Alex in channel 2.
@@ -68,6 +77,38 @@ void main() {
       expect(hits.map((h) => h.authorId).toSet(), {alex});
     },
   );
+
+  test('an agent filter keeps the threads this agent operates', () async {
+    final hits = await LocalSearch(db).search(
+      SearchRequest(q: 'deploy', agentId: robin),
+      limit: limit,
+    );
+    expect(hits, hasLength(2));
+    expect(hits.map((h) => h.threadId).toSet(), {threadId(2)});
+    expect(
+      await LocalSearch(db).search(
+        SearchRequest(q: 'deploy', agentId: sam),
+        limit: limit,
+      ),
+      isEmpty,
+    );
+  });
+
+  test('a tag filter keeps the threads with one of the tags', () async {
+    final hits = await LocalSearch(db).search(
+      SearchRequest(q: 'deploy', tagIds: [tagId(7), tagId(1)]),
+      limit: limit,
+    );
+    expect(hits, hasLength(2));
+    expect(hits.map((h) => h.threadId).toSet(), {threadId(2)});
+    expect(
+      await LocalSearch(db).search(
+        SearchRequest(q: 'deploy', tagIds: [tagId(7)]),
+        limit: limit,
+      ),
+      isEmpty,
+    );
+  });
 
   test('without a filter the limit holds', () async {
     final hits = await LocalSearch(db)
