@@ -85,3 +85,11 @@ ORDER BY id LIMIT 1;
 -- serves it.
 SELECT * FROM import_items WHERE source_id = @source_id AND target_kind = @target_kind AND target_id = @target_id
 ORDER BY id LIMIT 1;
+
+-- name: ItemsOfTarget :many
+-- Every item of one source whose target is the object, oldest first: the channel items that put a
+-- channel under the ownership list of the source (22 12.1). A mapping can name one existing
+-- channel for several Discord channels, so there can be more than one; the index
+-- (target_kind, target_id) serves it.
+SELECT * FROM import_items WHERE source_id = @source_id AND target_kind = @target_kind AND target_id = @target_id
+ORDER BY id;

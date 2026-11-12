@@ -221,6 +221,11 @@ up to `import.follow.max_backoff`. A round does not copy a message that an agent
 on (a reaction of `import.follow.busy_reactions`) or that changed less than
 `import.follow.settle_after` ago; a later round copies it once it is settled (22 12.3).
 
+A thread that is moved into another channel in Bothy follows the channel it lies in from then on
+(22 7.2): in a channel outside the import, or one that Bothy leads, the mirror and a later full
+run no longer rename, close or reopen it; in another channel that Discord leads they do. New
+Discord messages of the thread are still copied into it.
+
 Spot checks during parallel operation, per channel:
 
 - the messages of a channel taken over and skipped, summed over the reports of its runs (pilot,

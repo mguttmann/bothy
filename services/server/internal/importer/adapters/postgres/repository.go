@@ -273,3 +273,9 @@ func (r *Repository) ItemOfTarget(ctx context.Context, source ids.ID, kind strin
 	row, err := r.read(ctx).ItemOfTarget(ctx, sqlcgen.ItemOfTargetParams{SourceID: uuid(source), TargetKind: optionalText(kind), TargetID: uuid(id)})
 	return one(row, err, toItem, "reading the item of a target")
 }
+
+// ItemsOfTarget implements app.Store.
+func (r *Repository) ItemsOfTarget(ctx context.Context, source ids.ID, kind string, id ids.ID) ([]app.ItemRow, error) {
+	rows, err := r.read(ctx).ItemsOfTarget(ctx, sqlcgen.ItemsOfTargetParams{SourceID: uuid(source), TargetKind: optionalText(kind), TargetID: uuid(id)})
+	return items(rows, err, "listing the items of a target")
+}

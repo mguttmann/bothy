@@ -203,8 +203,8 @@ func (p ImportThreadsPort) Lock(ctx context.Context, threadID ids.ID) (chat.Impo
 		return chat.ImportedThreadState{}, invisible()
 	}
 	return chat.ImportedThreadState{
-		ID: th.ID, ChannelID: th.ChannelID, Title: th.Title, TitleSource: string(th.TitleSource), Closed: th.State == domain.ThreadClosed,
-		ClosedAt: th.ClosedAt, LastActivityAt: th.LastActivityAt,
+		ID: th.ID, ChannelID: th.ChannelID, MovedAt: th.MovedAt, Title: th.Title, TitleSource: string(th.TitleSource),
+		Closed: th.State == domain.ThreadClosed, ClosedAt: th.ClosedAt, LastActivityAt: th.LastActivityAt,
 	}, nil
 }
 

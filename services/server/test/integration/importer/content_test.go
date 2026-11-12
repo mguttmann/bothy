@@ -323,6 +323,104 @@ func TestPostedThreadWhereThisServerLeads(t *testing.T) {
 	}
 }
 
+// threadState reads title, state and last activity of a thread on the admin pool.
+func (w *iw) threadState(thread string) (title, st, activity string) {
+	w.t.Helper()
+	if err := w.s.AdminDB().QueryRow(w.ctx, `SELECT title, state, to_char(last_activity_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS')
+		FROM threads WHERE id = $1`, thread).Scan(&title, &st, &activity); err != nil {
+		w.t.Fatal(err)
+	}
+	return
+}
+
+// TestPostedThreadItemOfAnotherChannel (22 7.2 and 12.1): the channel the stored thread lies in
+// decides whether a posted thread follows the source, never the channel_origin_key of the request.
+// A thread item that names another channel than the one its thread lies in is refused with
+// 409 target_outside_source and its batch writes nothing (the denial entry is held by the unit
+// test of the use case). Before, the server read the lead from the request, so an item that named a
+// channel the source leads, or one the mapping does not name, renamed and closed a thread of a
+// channel led here.
+func TestPostedThreadItemOfAnotherChannel(t *testing.T) {
+	t.Parallel()
+	w := newIW(t)
+	id, _ := w.imported()
+	here := w.mustThreadBatch(id, "thread:6801", threadObj("6801", chHere, "Untitled", nil),
+		msgObj("7801", userAlex, "first", tsStart, nil)).Items[0].TargetID
+	mirrored := w.mustThreadBatch(id, "thread:6802", threadObj("6802", chText, "Untitled", nil)).Items[0].TargetID
+	archived := map[string]any{"closed": true, "closed_at": tsClosed, "last_activity_at": tsLater}
+	seq := w.maxSeq()
+
+	for _, channel := range []string{chText, chForum, "399"} {
+		r := w.threadBatch(id, "thread:6801", threadObj("6801", channel, "Renamed there", archived), msgObj("7802", userAlex, "late", tsNext, nil))
+		w.wantProblem(r, http.StatusConflict, "conflict", "target_outside_source")
+	}
+	if title, st, activity := w.threadState(here); title != "Untitled" || st != "open" || activity != "2025-03-01T08:05:00" {
+		t.Errorf("a thread item that names another channel changed a thread led here: %q %s %s", title, st, activity)
+	}
+	// The item of a thread the source leads cannot name a channel led here either.
+	w.wantProblem(w.threadBatch(id, "thread:6802", threadObj("6802", chHere, "Renamed there", archived)), http.StatusConflict, "conflict",
+		"target_outside_source")
+	if title, st, _ := w.threadState(mirrored); title != "Untitled" || st != "open" {
+		t.Errorf("a refused thread item changed its thread: %q %s", title, st)
+	}
+	if ev := w.events(seq); len(ev) != 0 {
+		t.Errorf("refused thread items appended %+v", ev)
+	}
+	if n := w.count(`SELECT count(*) FROM messages WHERE thread_id = $1`, here); n != 1 {
+		t.Errorf("a refused batch wrote messages: %d in the thread, want 1", n)
+	}
+
+	// The items that name the channel of their thread are answered as before: nothing where this
+	// server leads, the mirror where the source leads.
+	if res := w.mustThreadBatch(id, "thread:6801", threadObj("6801", chHere, "Renamed there", archived)); res.Items[0].TargetID != here {
+		t.Errorf("the posted thread item answers %+v", res.Items[0])
+	}
+	if title, st, _ := w.threadState(here); title != "Untitled" || st != "open" {
+		t.Errorf("the thread of a channel led here followed the source: %q %s", title, st)
+	}
+	w.mustThreadBatch(id, "thread:6802", threadObj("6802", chText, "Renamed there", archived))
+	if title, st, _ := w.threadState(mirrored); title != "Renamed there" || st != "closed" {
+		t.Errorf("the thread of a channel the source leads does not follow it: %q %s", title, st)
+	}
+}
+
+// TestPostedThreadMovedHere (22 7.2): a thread that was moved here with thread.move no longer lies
+// in the channel its item names. A later run still gets its answer and its new messages are taken
+// over, but the channel the thread lies in now decides the mirror: none in a channel outside the
+// source, the mirror again in a channel the source leads. Before, the channel named by the request
+// decided, so a thread people had moved out of the mirror was renamed and closed by the source.
+func TestPostedThreadMovedHere(t *testing.T) {
+	t.Parallel()
+	w := newIW(t)
+	id, items := w.imported()
+	thread := w.mustThreadBatch(id, "thread:6901", threadObj("6901", chForum, "Untitled", nil),
+		msgObj("7901", userAlex, "first", tsStart, nil)).Items[0].TargetID
+	move := func(channel string) {
+		t.Helper()
+		w.must(w.robin, http.MethodPost, "/threads/"+thread+"/move", map[string]any{"target_channel_id": channel, "reason": "triage"}, nil,
+			http.StatusOK)
+	}
+	archived := map[string]any{"closed": true, "closed_at": tsClosed, "last_activity_at": tsLater}
+
+	move(w.existingChannel)
+	res := w.mustThreadBatch(id, "thread:6901", threadObj("6901", chForum, "Renamed there", archived), msgObj("7902", userAlex, "late", tsNext, nil))
+	if res.Items[0].TargetID != thread || res.Items[1].State != "posted" {
+		t.Errorf("the batch of a moved thread answers %+v", res.Items)
+	}
+	if title, st, _ := w.threadState(thread); title != "Untitled" || st != "open" {
+		t.Errorf("a thread moved out of the source followed the source: %q %s", title, st)
+	}
+	if n := w.count(`SELECT count(*) FROM messages WHERE thread_id = $1 AND origin = 'import'`, thread); n != 2 {
+		t.Errorf("the late message of a moved thread was not taken over: %d imported messages", n)
+	}
+
+	move(items["channel:"+chText].TargetID)
+	w.mustThreadBatch(id, "thread:6901", threadObj("6901", chForum, "Renamed there", archived))
+	if title, st, _ := w.threadState(thread); title != "Renamed there" || st != "closed" {
+		t.Errorf("a thread moved into a channel the source leads does not follow it: %q %s", title, st)
+	}
+}
+
 // TestRepeatBatchWritesNothing (plan acceptance, 22 7.2 item 1): the same thread batch twice gives
 // the same targets and no event the second time.
 func TestRepeatBatchWritesNothing(t *testing.T) {

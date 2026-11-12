@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"slices"
 
 	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/chat"
@@ -147,7 +148,7 @@ func (s *Service) mainThread(ctx context.Context, run *threadRun, tk domain.Thre
 
 // threadItem writes the thread item of a thread: batch (M8-11 design note 3): a new key creates
 // the thread; a posted key is answered and its thread mirrored (22 12.2 step 3) while the source
-// leads its channel.
+// leads the channel the stored thread lies in (mirror).
 func (s *Service) threadItem(ctx context.Context, run *threadRun, x parsed) (importer.Item, error) {
 	row, created, err := s.d.Store.InsertPendingItem(ctx, NewItem{
 		ID: ids.New(), SourceID: run.src.ID, OriginKey: x.obj.OriginKey, ItemKind: x.obj.ItemKind, ContentSHA256: x.sha, At: s.now(),
@@ -230,27 +231,44 @@ func underPointer(err error, prefix string) error {
 	return errs.New(errs.CodeValidationFailed, e.Detail).WithFields(fields...)
 }
 
-// ledHere reports that the stored mapping gives the channel of the thread item d the lead `bothy`
-// (22 12.1); a channel the mapping does not name is not led here.
-func ledHere(bt *batch, d domain.ThreadData) bool {
-	k, code := domain.ParseOriginKey(domain.KindChannel, d.ChannelOriginKey)
-	if code != "" {
-		return false
+// channelKeys returns the origin keys of the channel items of the source whose target is the
+// channel: the Discord channels the mapping puts onto it, none for a channel outside the source.
+func (s *Service) channelKeys(ctx context.Context, bt *batch, channel ids.ID) ([]string, error) {
+	rows, err := s.d.Store.ItemsOfTarget(ctx, bt.src.ID, targetChannel, channel)
+	if err != nil {
+		return nil, err
 	}
-	e := bt.m.Channel(k.IDs[0])
-	return e != nil && e.Lead == domain.LeadHere
+	keys := make([]string, 0, len(rows))
+	for _, r := range rows {
+		keys = append(keys, r.OriginKey)
+	}
+	return keys, nil
 }
 
-// mirror applies the mirror rules to the posted thread of run (M8-11 design note 3 b). A thread of
-// a channel this server leads has no mirror (22 12.1): the source no longer decides its title, its
-// state or its last activity, so a full run after the switch-over changes nothing there.
+// mirror applies the mirror rules to the posted thread of run (M8-11 design note 3 b) while the
+// source leads the channel the stored thread lies in (22 7.2 and 12.1). That is decided by what is
+// stored alone: the thread under its row lock, the channel items of the source and its mapping.
+// The channel_origin_key of the request decides nothing; it only has to name the channel its
+// thread lies in, and an item that names another channel is refused (409 target_outside_source).
+// A thread that was moved here since (thread.move) no longer lies where its item says: its item
+// is answered, so that a later run goes on, and the channel the thread lies in now decides. Where
+// the source does not lead (the lead `bothy`, a channel the mapping does not name, a channel
+// outside the source) there is no mirror: the source no longer decides title, state or last
+// activity there, so a full run after the switch-over changes nothing.
 func (s *Service) mirror(ctx context.Context, run *threadRun, d domain.ThreadData) error {
-	if ledHere(run.batch, d) {
-		return nil
-	}
 	st, err := s.d.Threads.Lock(ctx, run.threadID)
 	if err != nil {
 		return err
+	}
+	keys, err := s.channelKeys(ctx, run.batch, st.ChannelID)
+	if err != nil {
+		return err
+	}
+	if st.MovedAt.IsZero() && !slices.Contains(keys, d.ChannelOriginKey) {
+		return outside("the thread item names another channel than the one its thread lies in")
+	}
+	if !run.m.SourceLeads(keys) {
+		return nil
 	}
 	m := domain.MirrorChange(domain.StoredThread{Title: st.Title, AutoTitle: st.TitleSource == "auto", Closed: st.Closed,
 		LastActivityAt: st.LastActivityAt}, d, s.cfg.ThreadTitleMaxChars)

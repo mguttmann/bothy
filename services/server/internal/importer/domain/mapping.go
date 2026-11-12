@@ -424,6 +424,35 @@ func (m Mapping) Channel(channel string) *ChannelEntry {
 	return nil
 }
 
+// ChannelOfKey returns the channel entry of the origin key channel:<id>, nil when key is no channel
+// key or the mapping does not name its channel.
+func (m Mapping) ChannelOfKey(key string) *ChannelEntry {
+	k, code := ParseOriginKey(KindChannel, key)
+	if code != "" {
+		return nil
+	}
+	return m.Channel(k.IDs[0])
+}
+
+// SourceLeads reports that the source leads a channel here (22 12.1). channelKeys are the origin
+// keys of the channel items of the source whose target that channel is; a mapping can put several
+// Discord channels onto one existing channel. The source leads only when there is such an item
+// and the mapping gives every one of them the lead discord. Everything else is not led by the
+// source and has no mirror: a channel outside the source (no key), the lead `bothy` of one of
+// them, a channel the mapping does not name.
+//
+// Example:
+//
+//	m.SourceLeads([]string{"channel:300"}) // true while the mapping gives channel 300 the lead discord
+func (m Mapping) SourceLeads(channelKeys []string) bool {
+	for _, key := range channelKeys {
+		if e := m.ChannelOfKey(key); e == nil || e.Lead != LeadDiscord {
+			return false
+		}
+	}
+	return len(channelKeys) > 0
+}
+
 // User returns the user entry of the Discord user, nil when the mapping does not name it.
 func (m Mapping) User(user string) *UserEntry {
 	for i := range m.Users {

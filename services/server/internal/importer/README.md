@@ -51,14 +51,23 @@ Import sources, batches with origin key (`import.apply`), ownership list and rea
   thread of a posted text channel (`chat.ImportThreads.MainThread`), a posted thread, or the thread
   its first item creates (`chat.ImportThreads.Create`: planned operator of the mapping, times and
   done state of the source, starter message, posted forum tags) or mirrors
-  (`Lock`, `ApplyMirror`; only while the stored mapping gives the channel of the thread item the
-  lead `discord`: a thread of a channel led here is answered and never changed, 22 7.2 and 12.1);
+  (`Lock`, `ApplyMirror`; only while the source leads the channel the stored thread lies in: a
+  thread of a channel led here is answered and never changed, 22 7.2 and 12.1);
   every message goes through `messaging.ImportMessages.Append` (author of
   the posted user item, else `409 conflict` with reason `author_not_imported`; reply target and files of posted items),
   every pin through `ImportMessages.Pin` with the owner as `pinned_by`. A batch that wrote anything
   ends with `chat.ImportThreads.FinishBatch` (floor, version, one `thread.updated`), the counters
   and `import.progress`; a replayed batch writes nothing. Imported messages never publish
   `MessagePosted`, so nothing triggers or notifies.
+- The lead of a posted thread (`mirror` in `app/content.go`) is read from what is stored, never
+  from the request: `Lock` returns the channel the thread lies in, `Store.ItemsOfTarget` the
+  channel items of the source with that target, and `domain.Mapping.SourceLeads` answers yes only
+  when there is such an item and the mapping gives every one of them the lead `discord` (a channel
+  the mapping does not name and a channel outside the source have no mirror). The
+  `channel_origin_key` of a posted thread item has to name that channel, else `409 conflict` with
+  reason `target_outside_source`, recorded as a denial. The item of a thread that was moved here
+  (`moved_at` of `Lock`) is answered without that check, and the channel the thread lies in now
+  decides.
 - `app/files.go`: `CreateFile` (the channel of a posted channel item, the author of a posted user
   item, then the `pending` item with the file of `files.ImportFiles.Reserve`; a repeat answers the
   same file ID through `ImportFiles.Slot`), `UploadFilePart` (outside a unit of work) and

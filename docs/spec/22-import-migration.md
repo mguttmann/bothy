@@ -402,21 +402,34 @@ The server executes every item like this ([03-data-model.md](03-data-model.md), 
 4. `content_sha256` stores the hash of the converted content. A later run that sees a
    different hash counts "changed at the source" in the report and changes nothing.
 
-A posted thread applies the changes of section 12.2 step 3 while the source leads its channel
-(`lead = discord`, the channel its `channel_origin_key` names in the stored mapping); every other
-posted item answers with its target and changes nothing. A posted thread item thus renames the
-thread only while its `title_source` is `auto`, closes it with `closed_at` or reopens it (clearing
-`closed_at` and `closed_by`), and moves `last_activity_at` forward; it never changes the operator,
-the parent message or the tags (M8-11). In a channel with `lead = bothy` there is no mirror
-(section 12.1): a posted thread item answers with its target and changes nothing, so a full run
-after the switch-over neither closes a thread that Discord archived meanwhile nor reopens one that
-was closed here. Messages of such a channel that the run finds new are still taken over.
+A posted thread applies the changes of section 12.2 step 3 while the source leads the channel the
+thread lies in here (`lead = discord`); every other posted item answers with its target and
+changes nothing. A posted thread item thus renames the thread only while its `title_source` is
+`auto`, closes it with `closed_at` or reopens it (clearing `closed_at` and `closed_by`), and moves
+`last_activity_at` forward; it never changes the operator, the parent message or the tags (M8-11).
+In a channel with `lead = bothy` there is no mirror (section 12.1): a posted thread item answers
+with its target and changes nothing, so a full run after the switch-over neither closes a thread
+that Discord archived meanwhile nor reopens one that was closed here. Messages of such a channel
+that the run finds new are still taken over.
 
-The answer to such a key carries the stored item with the member `source_changed = true`
-(`ImportItem`), and the server raises its counter `server.source_changed` in
-`import_sources.stats`; nothing else changes and no other event is written (M8-03). A key that
-exists is locked before it is read, so a concurrent batch with the same key waits for the commit of
-the other (section 7.4). A batch whose items all existed already writes no event at all, unless its
+Whether the source leads is decided by what the server has stored, never by the request. The
+server locks the thread, takes the channel the thread lies in and reads the channel items of the
+source whose target that channel is. The source leads only when there is such an item and the
+stored mapping gives the Discord channel of every one of them `lead = discord` (a mapping can name
+one existing channel for several Discord channels; one of them with `lead = bothy` is enough for
+no mirror). A channel the mapping does not name and a channel outside the source have no mirror.
+The `channel_origin_key` of a posted thread item decides nothing: it has to name the channel its
+thread lies in, and an item that names another channel is `409 conflict` with `reason`
+`target_outside_source` (section 8), is recorded as a denial and writes nothing. A thread that was
+moved into another channel here (`thread.move`) no longer lies where its item says: its item is
+still answered and its new messages are still taken over, so a later run goes on, and the channel
+it lies in now decides the mirror.
+
+The answer to a key with a different hash (item 4) carries the stored item with the member
+`source_changed = true` (`ImportItem`), and the server raises its counter
+`server.source_changed` in `import_sources.stats`; nothing else changes and no other event is
+written (M8-03). A key that exists is locked before it is read, so a concurrent batch with the
+same key waits for the commit of the other (section 7.4). A batch whose items all existed already writes no event at all, unless its
 posted thread item applies a mirror change (section 12.2 step 3), which writes one `thread.updated`
 and one `import.progress`.
 
@@ -480,9 +493,10 @@ unchanged without an event; every other transition is `409 conflict` with `reaso
 and `import_state` for a `completed` or `failed` source. `applyImportBatch` and `setImportCursor`
 answer `409 conflict` with `reason` `import_not_running` for a source that is not `running` (also
 `paused`); a batch target outside the channels of the source is `409 conflict` with `reason`
-`target_outside_source`, a new space or channel whose name a live object holds `409 conflict` with
-`reason` `name_collision`. Each refusal of `import.apply` is recorded in the audit log as a denial
-with reason `import_not_running`. The mapping of section 5.2 is the schema
+`target_outside_source`, and so is a posted thread item whose `channel_origin_key` names another
+channel than the one its thread lies in (section 7.2); a new space or channel whose name a live
+object holds is `409 conflict` with `reason` `name_collision`. Each refusal of `import.apply` is
+recorded in the audit log as a denial with reason `import_not_running`. The mapping of section 5.2 is the schema
 `ImportSourceDiscordConfig`; the `data` of the structure items follows `ImportSpaceData`,
 `ImportChannelData`, `ImportForumTagData` and `ImportUserData` (`docs/api/openapi.yaml`).
 
@@ -689,7 +703,8 @@ The lead decides the mirror, not `import.apply`: a full run (`--apply` without `
 `--once`) also reads a channel with `lead = bothy` and takes over the messages it finds new there
 (section 7.2), for example the history of a channel that was imported with `lead = bothy` from the
 start. A thread that is already posted there keeps its title and its state; its last activity
-moves only with a message that is appended to it.
+moves only with a message that is appended to it. The lead that counts is the one of the channel
+the stored thread lies in, not a channel the request names (section 7.2).
 
 ### 12.2 Round
 
@@ -876,6 +891,7 @@ The import interface is source-neutral. A Zulip import would be a further comman
 | Foreign thread operator | imported threads with an operator other than `planned_operator` stop `switch` with exit `2` before any write; `--force` warns and switches (13.3.1) |
 | Progress of a large source | a cursor several times `sync.event_payload_max_bytes` is stored; `import.progress` carries the reduced payload with `truncated`, `getImport` the whole cursor (section 8) |
 | No mirror where Bothy leads | after the switch-over a posted thread item changes neither title nor state of its thread and appends no event; a new message is still taken over (7.2, 12.1) |
+| Lead from the stored thread | a posted thread item that names another channel than the one its thread lies in is refused and changes nothing; a channel the mapping does not name has no mirror; a thread moved here follows the channel it lies in, and its item is still answered (7.2) |
 | Import state ends | the job `retention.import` removes the items and the row of a source completed or cancelled before `retention.import_after_completion`, and of no other source; the imported messages stay (13.5) |
 
 ## 17. Decisions of this chapter
