@@ -287,35 +287,37 @@ notification while its app is closed.
    APNs (iOS and macOS), `fcm_service_account.json` for FCM (Android).
 2. Set the values in `.env`:
 
-   | Variable | Value |
-   |---|---|
-   | `BOTHY_PUSH_APNS_TEAM_ID` | the Apple team ID |
-   | `BOTHY_PUSH_APNS_KEY_ID` | the key ID of `apns_key.p8` |
-   | `BOTHY_PUSH_APNS_TOPICS` | the bundle IDs of the apps, comma-separated |
-   | `BOTHY_PUSH_FCM_PROJECT_ID` | the Firebase project ID |
+    | Variable | Value |
+    |---|---|
+    | `BOTHY_PUSH_APNS_TEAM_ID` | the Apple team ID |
+    | `BOTHY_PUSH_APNS_KEY_ID` | the key ID of `apns_key.p8` |
+    | `BOTHY_PUSH_APNS_TOPICS` | the bundle IDs of the apps, comma-separated |
+    | `BOTHY_PUSH_FCM_PROJECT_ID` | the Firebase project ID |
 
-   The three APNs values go together: with only one or two of them set, the server does not
-   start. One provider without the other is fine.
+    The three APNs values go together: with only one or two of them set, the server does not
+    start. One provider without the other is fine.
+
 3. Apply:
 
-   ```
-   docker compose run --rm secrets-init
-   docker compose up -d
-   ```
+    ```
+    docker compose run --rm secrets-init
+    docker compose up -d
+    ```
 
-   `secrets-init` copies the key files into the volume `secrets`; `up -d` recreates the server
-   services with the new values. `worker` reads both keys at its start and does not start with
-   a key it cannot read.
+    `secrets-init` copies the key files into the volume `secrets`; `up -d` recreates the server
+    services with the new values. `worker` reads both keys at its start and does not start with
+    a key it cannot read.
+
 4. Check (in the profile `tailscale` the service is `api-tailscale`):
 
-   ```
-   docker compose exec api bothy config check --secrets
-   ```
+    ```
+    docker compose exec api bothy config check --secrets
+    ```
 
-   It ends with `configuration ok` and exit 0, and it prints `secret push.apns.private_key_ref: ok`
-   and `secret push.fcm.service_account_ref: ok` for the providers that are on. A provider that is
-   off shows `skipped` there, with `read only with APNs enabled` or
-   `read only with push.fcm.project_id set`.
+    It ends with `configuration ok` and exit 0, and it prints
+    `secret push.apns.private_key_ref: ok` and `secret push.fcm.service_account_ref: ok` for the
+    providers that are on. A provider that is off shows `skipped` there, with
+    `read only with APNs enabled` or `read only with push.fcm.project_id set`.
 
 No egress entry is needed: the server reaches `api.push.apple.com`, `api.sandbox.push.apple.com`,
 `fcm.googleapis.com` and `oauth2.googleapis.com` without one, so the host only needs the way out
