@@ -884,7 +884,7 @@ Source: [20-privacy.md](../spec/20-privacy.md), section 13.
 | `retention.security_after_end` | `BOTHY_RETENTION__SECURITY_AFTER_END` | Server | duration | `90d` | security data after end, expiry or revocation | active |
 | `retention.audit` | `BOTHY_RETENTION__AUDIT` | Server | duration | `365d` | audit log (Study C suggested twelve months) | active |
 | `retention.cost` | `BOTHY_RETENTION__COST` | Server | duration | `395d` | costs and prices | active |
-| `retention.import_after_completion` | `BOTHY_RETENTION__IMPORT_AFTER_COMPLETION` | Server |  | `90d` | import state after completion | planned (M7) |
+| `retention.import_after_completion` | `BOTHY_RETENTION__IMPORT_AFTER_COMPLETION` | Server | duration | `90d` | import state (the source and its items) after the completion or cancellation of the source | active |
 | `retention.privacy_job` | `BOTHY_RETENTION__PRIVACY_JOB` | Server | duration | `1095d` | privacy requests (without export packages) | active |
 | `retention.ops` | `BOTHY_RETENTION__OPS` | Server | duration | `395d` | status page | active |
 | `retention.stats_minutes` | `BOTHY_RETENTION__STATS_MINUTES` | Server | duration | `90d` | minute aggregates of the own measurement (`stats_minutes`); at least the longest SLO period | active |

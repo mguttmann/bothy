@@ -3923,6 +3923,18 @@
       "doc": "How long cost entries and closed price rows are kept."
     },
     {
+      "name": "retention.import_after_completion",
+      "env": "BOTHY_RETENTION__IMPORT_AFTER_COMPLETION",
+      "kind": "duration",
+      "default": "90d",
+      "required": false,
+      "enum": [],
+      "min": "1d",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "How long the items and the row of an import source are kept after its completion or cancellation."
+    },
+    {
       "name": "retention.job_interval",
       "env": "BOTHY_RETENTION__JOB_INTERVAL",
       "kind": "duration",

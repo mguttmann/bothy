@@ -553,6 +553,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"retention.content = none  # default\n" +
 		"retention.content_none_reason =   # default\n" +
 		"retention.cost = 395d  # default\n" +
+		"retention.import_after_completion = 90d  # default\n" +
 		"retention.job_interval = 1h  # default\n" +
 		"retention.ops = 395d  # default\n" +
 		"retention.privacy_job = 1095d  # default\n" +

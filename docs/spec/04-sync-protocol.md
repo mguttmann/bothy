@@ -980,7 +980,9 @@ freshly issued token. Ephemeral events do not exist on this path.
 An import batch (`import.apply`, [22-import-migration.md](22-import-migration.md)) affects
 exactly one thread and is one transaction. Instead of `message.created` per message, it writes
 one `thread.updated` for the thread and one `import.progress`; clients load the thread through
-REST when they display it. At the end of the batch, the server sets `threads.unread_floor_seq` to
+REST when they display it. `import.progress` of a source too large for
+`sync.event_payload_max_bytes` carries the reduced payload of 22 section 8 with `truncated: true`
+(section 2.2, payload rule 2). At the end of the batch, the server sets `threads.unread_floor_seq` to
 the end of the batch; imported content therefore counts as unread for nobody (03, `read_states`). Imported messages have `origin = import`, never trigger agents and create
 no notifications.
 

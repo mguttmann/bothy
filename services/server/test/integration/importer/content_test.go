@@ -263,6 +263,66 @@ func TestMirrorChangesOfPostedThread(t *testing.T) {
 	}
 }
 
+// TestPostedThreadWhereThisServerLeads (audit finding srv-import-1; 22 7.2 and 12.1): after the
+// switch-over of a channel the source no longer decides its threads. A full run that posts the
+// thread item again, as Discord shows it now (renamed, archived because nobody writes there any
+// more, or active while it is closed here), changes nothing and appends no event; a message Discord
+// got after the switch-over is still taken over. With the lead back at the source the mirror rules
+// apply again.
+func TestPostedThreadWhereThisServerLeads(t *testing.T) {
+	t.Parallel()
+	w := newIW(t)
+	id, _ := w.imported()
+	thread := w.mustThreadBatch(id, "thread:6601", threadObj("6601", chText, "Untitled", nil),
+		msgObj("7601", userAlex, "first", tsStart, nil)).Items[0].TargetID
+	lead := func(value string) {
+		t.Helper()
+		w.must(w.robin, http.MethodPut, "/imports/"+id+"/leads", map[string]any{"source_channel": chText, "lead": value}, nil, http.StatusOK)
+	}
+	state := func() (title, st, activity string) {
+		t.Helper()
+		if err := w.s.AdminDB().QueryRow(w.ctx, `SELECT title, state, to_char(last_activity_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS')
+			FROM threads WHERE id = $1`, thread).Scan(&title, &st, &activity); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	archived := map[string]any{"closed": true, "closed_at": tsClosed, "last_activity_at": tsLater}
+	lead("bothy")
+
+	seq := w.maxSeq()
+	res := w.mustThreadBatch(id, "thread:6601", threadObj("6601", chText, "Renamed there", archived))
+	if res.Items[0].TargetID != thread || res.Items[0].State != "posted" {
+		t.Errorf("the posted thread item answers %+v", res.Items[0])
+	}
+	if title, st, activity := state(); title != "Untitled" || st != "open" || activity != "2025-03-01T08:05:00" {
+		t.Errorf("the thread of a channel led here followed the source: %q %s %s", title, st, activity)
+	}
+	if ev := w.events(seq); len(ev) != 0 {
+		t.Errorf("a posted thread item in a channel led here appended %+v", ev)
+	}
+
+	w.must(w.robin, http.MethodPost, "/threads/"+thread+"/close", nil, nil, http.StatusOK)
+	w.mustThreadBatch(id, "thread:6601", threadObj("6601", chText, "Renamed there", map[string]any{"last_activity_at": tsNext}))
+	if title, st, _ := state(); title != "Untitled" || st != "closed" {
+		t.Errorf("a thread closed here was changed by the source: %q %s", title, st)
+	}
+
+	late := w.mustThreadBatch(id, "thread:6601", threadObj("6601", chText, "Renamed there", nil), msgObj("7602", userAlex, "late", tsNext, nil))
+	if late.Items[1].State != "posted" || w.count(`SELECT count(*) FROM messages WHERE thread_id = $1 AND origin = 'import'`, thread) != 2 {
+		t.Errorf("the late message was not taken over: %+v", late.Items)
+	}
+	if title, _, _ := state(); title != "Untitled" {
+		t.Errorf("the batch with a new message renamed the thread: %q", title)
+	}
+
+	lead("discord")
+	w.mustThreadBatch(id, "thread:6601", threadObj("6601", chText, "Renamed there", archived))
+	if title, st, _ := state(); title != "Renamed there" || st != "closed" {
+		t.Errorf("with the lead at the source the thread does not follow it: %q %s", title, st)
+	}
+}
+
 // TestRepeatBatchWritesNothing (plan acceptance, 22 7.2 item 1): the same thread batch twice gives
 // the same targets and no event the second time.
 func TestRepeatBatchWritesNothing(t *testing.T) {

@@ -1352,6 +1352,8 @@ Indexes:
 - `(created_at, id) WHERE deleted_at IS NULL AND kind <> 'system'` for the candidates of the job
   `retention.content` ([20-privacy.md](20-privacy.md), section 4.1): the messages that still hold
   content, oldest first.
+- `(import_item_id) WHERE import_item_id IS NOT NULL` for the foreign key check when the job
+  `retention.import` deletes an import item ([20-privacy.md](20-privacy.md), section 4.1).
 
 Retention: `content`.
 Deletion empties `content_md`, sets `has_attachments` to `false`, deletes attachments, revisions,
@@ -2298,9 +2300,9 @@ Purpose: an imported item with a unique origin key. Module: `importer`.
 | `item_kind` | `text` | no | | `CHECK (item_kind IN ('space','channel','forum_tag','thread','message','file','user','reaction','pin'))` |
 | `target_kind` | `text` | yes | | |
 | `target_id` | `uuid` | yes | | created object |
-| `state` | `text` | no | `'pending'` | `CHECK (state IN ('pending','posted','skipped','failed'))` |
+| `state` | `text` | no | `'pending'` | `CHECK (state IN ('pending','posted','skipped','failed'))`; `failed` is reserved: nothing writes it yet, a refused item rolls its batch back ([22-import-migration.md](22-import-migration.md) section 8) |
 | `content_sha256` | `bytea` | yes | | detects changes at the source |
-| `error` | `text` | yes | | without content or secrets |
+| `error` | `text` | yes | | without content or secrets; reserved with the state `failed`, not written yet |
 | `created_at` | `timestamptz` | no | `now()` | |
 | `updated_at` | `timestamptz` | no | `now()` | |
 
@@ -2309,6 +2311,9 @@ Unique: `(source_id, origin_key)`. Indexes: `(source_id, state)` for resuming;
 `(target_kind, target_id)` for "where does this object come from". Retention: `import`.
 `pending` is written before the object is created, `posted` in the same transaction as the target
 object. This makes a restart without duplicates possible.
+The job `retention.import` deletes the items and then the row of a source
+`retention.import_after_completion` after its `finished_at`, when the source is `completed` or
+`failed` ([20-privacy.md](20-privacy.md), section 4.1).
 
 What the import sets differently from normal writes (only through `import.apply`, only in
 channels of the running source; [22-import-migration.md](22-import-migration.md)):

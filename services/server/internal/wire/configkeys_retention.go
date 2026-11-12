@@ -42,6 +42,8 @@ func retentionConfigKeys() []config.Key {
 			Doc: "How long security data is kept after its expiry, revocation or end."},
 		{Name: "retention.cost", Kind: config.KindDuration, Default: "395d", Min: "1d", Chapter: chapter20,
 			Doc: "How long cost entries and closed price rows are kept."},
+		{Name: "retention.import_after_completion", Kind: config.KindDuration, Default: defaultNinetyDays, Min: "1d", Chapter: chapter20,
+			Doc: "How long the items and the row of an import source are kept after its completion or cancellation."},
 		{Name: "retention.webhook_deliveries", Kind: config.KindDuration, Default: retentionWebhookDefault, Min: "1d", Chapter: chapter20,
 			Doc: "How long finished delivery attempts of outgoing webhooks are kept."},
 		{Name: "retention.job_interval", Kind: config.KindDuration, Default: "1h", Min: "1m", Chapter: chapter20,

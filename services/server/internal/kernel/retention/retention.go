@@ -26,11 +26,10 @@ import (
 // Class is a retention class of 03 section 3 whose period 20 section 4.1 enforces with a job.
 type Class string
 
-// The classes of 20 section 4.1, in the order of that table. Only security, content, transient,
-// audit, cost (M7-05) and ops (M7-09) have a job retention.<class> of this port; privacy_job
-// (M7-06) and import (M8) get theirs with their tickets; event_log and stats have their own jobs
-// (sync.partition_maintenance, stats.retention); config, account and personal_sync have no
-// time-based job.
+// The classes of 20 section 4.1, in the order of that table. security, content, transient, audit,
+// cost (M7-05), import, privacy_job (M7-06) and ops (M7-09) have a job retention.<class> of this
+// port (JobClasses); event_log and stats have their own jobs (sync.partition_maintenance,
+// stats.retention); config, account and personal_sync have no time-based job.
 const (
 	ClassConfig       Class = "config"
 	ClassAccount      Class = "account"
@@ -58,7 +57,7 @@ func Classes() []Class {
 // JobClasses returns the classes that have a job retention.<class> of this port, in the order of
 // Classes.
 func JobClasses() []Class {
-	return []Class{ClassSecurity, ClassContent, ClassTransient, ClassAudit, ClassCost, ClassPrivacyJob, ClassOps}
+	return []Class{ClassSecurity, ClassContent, ClassTransient, ClassAudit, ClassCost, ClassImport, ClassPrivacyJob, ClassOps}
 }
 
 // JobKind returns the kind of the job of class c: retention.<class> (02 section 12.3).
@@ -196,9 +195,9 @@ func runOne(ctx context.Context, reg Registration, c clock.Clock, start time.Tim
 	}
 }
 
-// The job arguments of the seven class jobs (platform/jobs takes any type with Kind). None carries
-// an argument, every run reads the clock (02 "Rules for jobs"); one type per kind, because the job
-// runtime keys the handler by the type.
+// The job arguments of the class jobs, one per class of JobClasses (platform/jobs takes any type
+// with Kind). None carries an argument, every run reads the clock (02 "Rules for jobs"); one type
+// per kind, because the job runtime keys the handler by the type.
 type (
 	// SecurityJob is retention.security.
 	SecurityJob struct{}
@@ -210,6 +209,8 @@ type (
 	AuditJob struct{}
 	// CostJob is retention.cost.
 	CostJob struct{}
+	// ImportJob is retention.import: the items and the rows of ended import sources.
+	ImportJob struct{}
 	// OpsJob is retention.ops (M7-09): the status page and the backup runs.
 	OpsJob struct{}
 	// PrivacyJobJob is retention.privacy_job (M7-06): the privacy requests.
@@ -230,6 +231,9 @@ func (AuditJob) Kind() string { return JobKind(ClassAudit) }
 
 // Kind returns retention.cost.
 func (CostJob) Kind() string { return JobKind(ClassCost) }
+
+// Kind returns retention.import.
+func (ImportJob) Kind() string { return JobKind(ClassImport) }
 
 // Kind returns retention.ops.
 func (OpsJob) Kind() string { return JobKind(ClassOps) }

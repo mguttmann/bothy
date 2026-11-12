@@ -274,6 +274,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"retention.content_none_reason":      {Kind: config.KindString, Default: "", Chapter: "20-privacy.md"},
 		"retention.security_after_end":       {Kind: config.KindDuration, Default: "90d", Min: "1d", Chapter: "20-privacy.md"},
 		"retention.cost":                     {Kind: config.KindDuration, Default: "395d", Min: "1d", Chapter: "20-privacy.md"},
+		"retention.import_after_completion":  {Kind: config.KindDuration, Default: "90d", Min: "1d", Chapter: "20-privacy.md"},
 		"retention.webhook_deliveries":       {Kind: config.KindDuration, Default: "30d", Min: "1d", Chapter: "20-privacy.md"},
 		"retention.job_interval":             {Kind: config.KindDuration, Default: "1h", Min: "1m", Chapter: "20-privacy.md"},
 		"retention.batch_size":               {Kind: config.KindInt, Default: "500", Min: "1", Max: "10000", Chapter: "20-privacy.md"},

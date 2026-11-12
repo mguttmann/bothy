@@ -285,6 +285,9 @@ const (
 	textThread = `{"channel_origin_key":"channel:20","name":"T","created_at":"2025-03-01T08:00:00Z","last_activity_at":"2025-03-01T08:00:00Z",` +
 		`"closed":false}`
 	alexMsg = `{"author_origin_key":"user:30","content_md":"hi","created_at":"2025-03-01T08:00:00Z"}`
+	// activityThen is the member of forumThread and textThread a later run replaces by activityLater.
+	activityThen  = `"last_activity_at":"2025-03-01T08:00:00Z"`
+	activityLater = `"last_activity_at":"2025-03-02T08:00:00Z"`
 )
 
 // TestContentBatches writes main thread, new thread, mirror, message, reply and pin items through
@@ -310,13 +313,20 @@ func TestContentBatches(t *testing.T) {
 	if len(c.threads.created) != 1 || c.threads.created[0].Parent == nil || len(c.threads.created[0].TagIDs) != 1 || len(c.messages.pins) != 1 {
 		t.Errorf("created %+v pins %v", c.threads.created, c.messages.pins)
 	}
-	// A posted thread item mirrors a new name.
-	if _, err := apply(thread("thread:40", o("thread:40", "thread", strings.Replace(forumThread, `"Q"`, `"Renamed"`, 1)))); err != nil {
-		t.Fatal(err)
+	// A posted thread item of channel 21, which this server leads, is answered and never mirrored
+	// (audit finding srv-import-1, 22 12.1).
+	if r, err := apply(thread("thread:40", o("thread:40", "thread", strings.Replace(forumThread, activityThen, activityLater, 1)))); err != nil ||
+		r.Items[0].State != importer.ItemPosted || len(c.threads.mirrors) != 0 {
+		t.Fatalf("posted thread of a channel led here: %+v %v, mirrored %+v", r, err, c.threads.mirrors)
 	}
 	// The planned operator of channel 20 is Lotse.
 	if _, err := apply(thread("thread:41", o("thread:41", "thread", textThread))); err != nil || c.threads.created[1].OperatorAgentID != c.lotse {
 		t.Errorf("planned operator %+v %v", c.threads.created, err)
+	}
+	// A posted thread item of channel 20, which the source leads, mirrors the later activity.
+	if _, err := apply(thread("thread:41", o("thread:41", "thread", strings.Replace(textThread, activityThen, activityLater, 1)))); err != nil ||
+		len(c.threads.mirrors) != 1 || c.threads.mirrors[0].LastActivityAt == nil {
+		t.Fatalf("posted thread of a channel the source leads: %v, mirrored %+v", err, c.threads.mirrors)
 	}
 	// A thread of a skipped channel is skipped; further items of its batch are refused.
 	if r, err := apply(importer.Batch{Items: []importer.BatchObject{o("channel:23", "channel", `{"name":"gone","kind":"forum","sort_key":"a2"}`)}}); err != nil ||
@@ -372,6 +382,10 @@ func TestContentPortErrors(t *testing.T) {
 	if _, err := c.svc.ApplyBatch(ctx, c.owner, c.src.ID, thread("thread:40", o("thread:40", "thread", forumThread))); err != nil {
 		t.Fatal(err)
 	}
+	// The mirror of a posted thread runs only in a channel the source leads (channel 20).
+	if _, err := c.svc.ApplyBatch(ctx, c.owner, c.src.ID, thread("thread:41", o("thread:41", "thread", textThread))); err != nil {
+		t.Fatal(err)
+	}
 	reply := `{"author_origin_key":"user:30","content_md":"x","created_at":"2025-03-01T08:00:00Z","reply_to_origin_key":"message:50"}`
 	cases := []struct {
 		fault string
@@ -387,9 +401,8 @@ func TestContentPortErrors(t *testing.T) {
 		{"Store.FinishItem", thread("thread:40", o("message:70", "message", alexMsg))},
 		{"Threads.Create", thread("thread:44", o("thread:44", "thread", forumThread))},
 		{"Messages.ThreadOf", thread("thread:44", o("thread:44", "thread", forumThread))},
-		{"Threads.Lock", thread("thread:40", o("thread:40", "thread", strings.Replace(forumThread, `"Q"`, `"New"`, 1)))},
-		{"Threads.ApplyMirror", thread("thread:40", o("thread:40", "thread", strings.Replace(forumThread,
-			`"last_activity_at":"2025-03-01T08:00:00Z"`, `"last_activity_at":"2025-03-02T08:00:00Z"`, 1)))},
+		{"Threads.Lock", thread("thread:41", o("thread:41", "thread", strings.Replace(textThread, `"T"`, `"New"`, 1)))},
+		{"Threads.ApplyMirror", thread("thread:41", o("thread:41", "thread", strings.Replace(textThread, activityThen, activityLater, 1)))},
 		{"Threads.FinishBatch", thread("thread:40", o("message:70", "message", alexMsg))},
 		{"Messages.Append", thread("thread:40", o("message:70", "message", alexMsg))},
 		{"Messages.Append", thread("thread:40", o("message:71", "message", reply))},

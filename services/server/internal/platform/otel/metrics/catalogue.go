@@ -317,7 +317,7 @@ var (
 	RetentionDeleted = Spec{
 		Name: "bothy.retention.deleted", Kind: KindCounter, Unit: "{row}",
 		Description: "Rows the retention jobs removed or emptied, by retention class.",
-		Attrs:       []Attr{{Key: "bothy.retention.class", Values: []string{"security", "content", "transient", "audit", "cost"}}},
+		Attrs:       []Attr{{Key: "bothy.retention.class", Values: []string{"security", "content", "transient", "audit", "cost", "import"}}},
 	}
 	// PushSent is bothy.push.sent (4.4, M3-19): one per provider answer of the job
 	// notify.push_send, with the outcome of its result class (13 7.3, D-M3-19-12).

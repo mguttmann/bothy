@@ -75,13 +75,15 @@ func planNodes(t *testing.T, conn *pgx.Conn, stmt string) (nodes, indexes []stri
 	return nodes, indexes
 }
 
-// TestRetentionIndexes (00104, audit finding data-layer-3) holds the plans the retention jobs
-// rely on, against the schema of all migrations and the query files the jobs run:
+// TestRetentionIndexes (00104, audit finding data-layer-3; 00105 for the job retention.import)
+// holds the plans the retention jobs rely on, against the schema of all migrations and the query
+// files the jobs run:
 //
 //   - every candidate query "rows whose end lies before the cutoff, oldest first" reads its index
 //     in order, with no sequential scan and no sort, so a batch costs its rows and not the table;
-//   - every foreign key to devices that 00104 names has an index its check can use, also in the
-//     generic plan a foreign key trigger caches, so deleting a device reads no child table whole.
+//   - every foreign key to devices that 00104 names, and the foreign key of messages to
+//     import_items (00105), has an index its check can use, also in the generic plan a foreign key
+//     trigger caches, so deleting a device or an import item reads no child table whole.
 //
 // The planner may not fall back to a sequential or bitmap scan here: on the empty tables of the
 // test it would otherwise prefer one whatever index exists.
@@ -114,9 +116,10 @@ func TestRetentionIndexes(t *testing.T) {
 		{"user_space_states", "updated_by_device_id", "user_space_states_updated_by_device_id_idx"},
 		{"user_channel_states", "updated_by_device_id", "user_channel_states_updated_by_device_id_idx"},
 		{"push_registrations", "device_id", "push_registrations_device_id_idx"},
+		{"messages", "import_item_id", "messages_import_item_id_idx"},
 	} {
 		name := "fk_check_" + string(rune('a'+i))
-		// The shape of the check a foreign key trigger runs for a deleted device.
+		// The shape of the check a foreign key trigger runs for a deleted parent row.
 		if _, err := conn.Exec(ctx, "PREPARE "+name+"(uuid) AS SELECT 1 FROM ONLY "+tc.table+" WHERE "+tc.column+" = $1"); err != nil {
 			t.Fatal(err)
 		}
