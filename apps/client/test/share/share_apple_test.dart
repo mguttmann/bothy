@@ -206,6 +206,33 @@ void main() {
     expect(takeovers, 0);
   });
 
+  test(
+    'a swallowed failure leaves one line without content in the log',
+    () async {
+      final lines = <String>[];
+      final logged = AppleShare(host: host, clock: clock, log: lines.add);
+      sessions.failure = PlatformException(
+        code: 'network',
+        message: 'child-refresh-1',
+      );
+      await logged.signedIn(account(), afterLogin: true);
+      expect(lines, ['share: session failed (PlatformException)']);
+      expect(lines.single, isNot(contains('child-refresh-1')));
+      expect(host.settings, isNotNull, reason: 'the other steps still run');
+
+      lines.clear();
+      host.failing = true;
+      await logged.forget(shareInstance);
+      expect(lines, isNotEmpty);
+      for (final line in lines) {
+        expect(
+          line,
+          matches(RegExp(r'^share: [a-z ]+ failed \(PlatformException\)$')),
+        );
+      }
+    },
+  );
+
   test('platform and server failures are swallowed', () async {
     host.failing = true;
     await share.signedIn(account(), afterLogin: true);

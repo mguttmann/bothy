@@ -3,15 +3,39 @@
 // Push on iOS and macOS (brief M5-04 Design note 5) against a fake Pigeon host: registration
 // only after the permission, again on a new token, unregistration and keychain deletion on
 // logout, tap routing, the preview mode for the extension and the display counters as client
-// metrics.
+// metrics. A failing call leaves a log line without content.
 
 import 'package:client/platform/push_apple.dart';
 import 'package:client/platform/secure_store.dart';
 import 'package:client/telemetry/client_metrics.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fakes.dart';
 import '../support/push_fakes.dart';
+
+/// A runner whose App Group write and token call fail with a message that must not be logged.
+class _BrokenHost extends FakePushHost {
+  bool failToken = true;
+
+  @override
+  Future<void> writeSettings(
+    String instanceId,
+    String previewMode,
+    int fetchTimeoutMillis,
+  ) async => throw PlatformException(
+    code: 'unavailable',
+    message: 'keychain says no for $instanceId',
+  );
+
+  @override
+  Future<String> deviceToken() async => failToken
+      ? throw PlatformException(
+          code: 'unavailable',
+          message: 'keychain says no',
+        )
+      : token;
+}
 
 void main() {
   late FakePushHost host;
@@ -128,6 +152,34 @@ void main() {
     expect(entries[ClientMetric.pushDisplayDuration]!.buckets, {0.5: 2, 10: 1});
     await push.signedIn(account(), previewMode: 'full');
     expect(metrics.take(), isEmpty);
+  });
+
+  test('a failing runner or server call leaves one line without content in the '
+      'log and stops nothing else', () async {
+    final lines = <String>[];
+    final broken = _BrokenHost()..authorized = true;
+    final logged = ApplePush(host: broken, metrics: metrics, log: lines.add);
+    await logged.signedIn(account(), previewMode: 'full');
+    expect(lines, [
+      'push: settings failed (PlatformException)',
+      'push: registration failed (PlatformException)',
+    ]);
+    expect(registrations.calls, isEmpty, reason: 'no token, no registration');
+    for (final line in lines) {
+      expect(line, isNot(contains(instance)));
+      expect(line, isNot(contains('keychain says no')));
+    }
+
+    lines.clear();
+    broken.failToken = false;
+    registrations.failure = StateError('bothy_pvw_EXAMPLE');
+    await logged.signedIn(account(), previewMode: 'names');
+    expect(lines, [
+      'push: settings failed (PlatformException)',
+      'push: registration failed (StateError)',
+    ]);
+    expect(lines.join(), isNot(contains('bothy_pvw_EXAMPLE')));
+    expect(broken.keychain, isEmpty);
   });
 
   test('a build without the shared groups does nothing', () async {

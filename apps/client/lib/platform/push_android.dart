@@ -34,12 +34,14 @@ export 'push_platform.dart';
 /// await push.signedIn(account, previewMode: 'full');
 /// ```
 final class AndroidPush extends NativePush implements PushAndroidFlutterApi {
-  /// Creates the push over [host]; [metrics] receives the display counters.
+  /// Creates the push over [host]; [metrics] receives the display counters; [log] receives
+  /// one line per swallowed failure, never content (the developer log unless given).
   AndroidPush({
     required PushAndroidHostApi host,
     required ClientMetrics metrics,
+    void Function(String line)? log,
   }) : _host = host, // ignore: prefer_initializing_formals
-       super(metrics);
+       super(metrics, log: log);
 
   /// The secret key of the FCM token last registered for an instance.
   static const String fcmTokenKey = 'push/fcm_token';

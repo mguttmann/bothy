@@ -8,6 +8,7 @@ library;
 
 import 'dart:async';
 
+import 'package:domain/domain.dart';
 import 'package:flutter/widgets.dart';
 import 'package:l10n/l10n.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -44,8 +45,10 @@ InAppBanners? inAppBanners(Ref ref) {
 
 /// Shows `notification.created` of the signed-in engine while the app is connected: as local
 /// notifications on Windows and macOS (13 5.3, D-M4-30-5), as the in-app banner on iOS and
-/// Android ([inAppBanners], with the same rules of the [NotificationRouter]); the app widget
-/// listens to its [DesktopNotifications.targets].
+/// Android ([inAppBanners], with the same rules of the [NotificationRouter]), and removes the
+/// notification or the banner of a thread once the person has read it (01 10.3,
+/// [NotificationRouter.onCountChange]); the app widget listens to its
+/// [DesktopNotifications.targets].
 @Riverpod(keepAlive: true)
 DesktopNotifications desktopNotifications(Ref ref) {
   final ports = ref.watch(appPortsProvider);
@@ -69,6 +72,8 @@ DesktopNotifications desktopNotifications(Ref ref) {
           !engine.focus.idle &&
           engine.focus.threads.contains(thread);
     },
+    unreadOf: (thread) =>
+        ref.read(syncEngineProvider)?.catchUp.countsOf(thread).unread ?? 0,
     navigate: targets.add,
     localChannelName: (thread) async {
       final db = ref.read(localDatabaseProvider);
@@ -79,9 +84,18 @@ DesktopNotifications desktopNotifications(Ref ref) {
   );
   final clicks = router.listen();
   StreamSubscription<NotificationCreated>? events;
+  StreamSubscription<ThreadId>? counts;
   void bind(SyncEngine? engine) {
     unawaited(events?.cancel());
+    unawaited(counts?.cancel());
     events = engine?.notifications.listen((n) => unawaited(router.onEvent(n)));
+    // The counts say when a thread was read, here or on another device (`read_state.updated`,
+    // or the snapshot after a time without a connection): the router then removes its
+    // notification or its banner (01 10.3). They are also reported without a read, so the
+    // router decides.
+    counts = engine?.catchUp.countChanges.listen(
+      (thread) => unawaited(router.onCountChange(thread)),
+    );
     // A banner of the account that ended names its content: it goes with the engine.
     if (engine == null) banners?.clear();
   }
@@ -90,6 +104,7 @@ DesktopNotifications desktopNotifications(Ref ref) {
   bind(ref.read(syncEngineProvider));
   ref.onDispose(() {
     unawaited(events?.cancel());
+    unawaited(counts?.cancel());
     unawaited(clicks.cancel());
     unawaited(targets.close());
   });

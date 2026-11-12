@@ -13,6 +13,7 @@
 library;
 
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:io' show SocketException;
 
 import 'package:api_client/api_client.dart' as rest;
@@ -101,7 +102,7 @@ final class MetricsSender {
   /// Creates the sender over [metrics] and [api]; [interval] is
   /// `client.metrics.flush_interval`, [enabled] reads `privacy.client_metrics`, [attributes]
   /// the platform, version, density and theme at the moment of sending. [log] receives one
-  /// line per failed send, never a value.
+  /// line per failed send, never a value, and is the developer log of the app unless given.
   MetricsSender({
     required this._metrics,
     required this._api,
@@ -109,8 +110,9 @@ final class MetricsSender {
     required this._enabled,
     required this._attributes,
     MetricsTimerFactory? timer,
-    this._log,
-  }) : _timerFactory = timer ?? Timer.periodic;
+    void Function(String line)? log,
+  }) : _timerFactory = timer ?? Timer.periodic,
+       _log = log ?? _developerLog;
 
   final ClientMetrics _metrics;
   final ClientMetricsApi _api;
@@ -118,7 +120,10 @@ final class MetricsSender {
   final bool Function() _enabled;
   final MetricsAttributes Function() _attributes;
   final MetricsTimerFactory _timerFactory;
-  final void Function(String line)? _log;
+  final void Function(String line) _log;
+
+  static void _developerLog(String line) =>
+      developer.log(line, name: 'telemetry');
 
   Timer? _timer;
   MetricsBatch? _pending;
@@ -177,7 +182,7 @@ final class MetricsSender {
           // The rest of this flush would fail the same way: the newest batch waits for the
           // next interval, every older one is dropped (one batch, never more).
           _pending = batches.last;
-          _log?.call('client metrics: network error, one batch kept');
+          _log('client metrics: network error, one batch kept');
           return;
         }
         final problem =
@@ -187,12 +192,12 @@ final class MetricsSender {
                 : rest.ApiProblem.fromResponse(e.response!));
         if (problem?.code == 'feature_disabled') {
           _stoppedByServer = true;
-          _log?.call('client metrics: feature_disabled, stopped');
+          _log('client metrics: feature_disabled, stopped');
           return;
         }
-        _log?.call('client metrics: batch dropped: ${e.type.name}');
+        _log('client metrics: batch dropped: ${e.type.name}');
       } on Object catch (e) {
-        _log?.call('client metrics: batch dropped: ${e.runtimeType}');
+        _log('client metrics: batch dropped: ${e.runtimeType}');
       }
     }
   }

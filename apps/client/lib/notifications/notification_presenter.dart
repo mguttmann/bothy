@@ -11,6 +11,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io' show Platform;
 
 import 'package:crypto/crypto.dart';
@@ -81,13 +82,15 @@ final class NoNotificationPresenter implements NotificationPresenter {
 
 /// [NotificationPresenter] over `flutter_local_notifications` for Windows and macOS.
 ///
-/// It initializes on the first [show] with the app name of the build branding (M4-18) and, on
-/// Windows, with the app user model ID [appUserModelId] and the activation GUID [guid] that an
-/// app without package identity needs (D-M4-30-2). Without package identity (before the MSIX
-/// of M7) Windows offers no `cancel` and no `getActiveNotifications`: [cancelThread] then logs
-/// one line without content and does nothing, and a slot is replaced by showing the
-/// notification again under the same ID. On macOS the permission is asked once at the first
-/// notification, never awaited, so no dialog blocks the gateway path.
+/// It initializes on its first use (the app reads the click that started it when it starts)
+/// with the app name of the build branding (M4-18) and, on Windows, with the app user model ID
+/// [appUserModelId] and the activation GUID [guid] that an app without package identity needs
+/// (D-M4-30-2). Without package identity (before the MSIX of M7) Windows offers no `cancel`
+/// and no `getActiveNotifications`: [cancelThread] then logs one line without content and does
+/// nothing, and a slot is replaced by showing the notification again under the same ID. On
+/// macOS the permission is asked once per run at the first notification, never when the app
+/// starts and so never before the login, and it is never awaited, so no dialog blocks the
+/// gateway path (docs/decisions.d/AUD-client-notifications-01.md AUD-CN1/2).
 ///
 /// Example:
 /// ```dart
@@ -98,9 +101,10 @@ final class NoNotificationPresenter implements NotificationPresenter {
 /// );
 /// ```
 final class LocalNotificationPresenter implements NotificationPresenter {
-  /// Creates the presenter; [log] receives one line per notable step, never content;
-  /// [plugin] replaces the platform plugin in tests; [hasPackageIdentity] overrides the check
-  /// of the Windows package identity.
+  /// Creates the presenter; [log] receives one line per notable step, never content, and is
+  /// the developer log of the app unless given; [plugin] replaces the platform plugin in
+  /// tests; [hasPackageIdentity] overrides the check of the Windows package identity and
+  /// [asksPermission] whether the platform has a permission to ask for (macOS).
   LocalNotificationPresenter({
     required this.appName,
     required this.appUserModelId,
@@ -108,9 +112,11 @@ final class LocalNotificationPresenter implements NotificationPresenter {
     void Function(String line)? log,
     FlutterLocalNotificationsPlugin? plugin,
     bool? hasPackageIdentity,
-  }) : _log = log ?? _noLog,
+    bool? asksPermission,
+  }) : _log = log ?? _developerLog,
        _plugin = plugin ?? FlutterLocalNotificationsPlugin(),
-       _identity = hasPackageIdentity;
+       _identity = hasPackageIdentity,
+       _asksPermission = asksPermission ?? Platform.isMacOS;
 
   /// The app name the notifications carry (`BuildBranding.appName`).
   final String appName;
@@ -124,10 +130,13 @@ final class LocalNotificationPresenter implements NotificationPresenter {
   final void Function(String line) _log;
   final FlutterLocalNotificationsPlugin _plugin;
   final bool? _identity;
+  final bool _asksPermission;
   final StreamController<String> _clicks = StreamController<String>.broadcast();
   Future<bool>? _ready;
+  bool _asked = false;
 
-  static void _noLog(String _) {}
+  static void _developerLog(String line) =>
+      developer.log(line, name: 'notifications');
 
   /// A stable GUID for [bundleId]: the first 16 bytes of its SHA-256 with the version and
   /// variant bits of a name-based UUID, so every build of one branding uses the same
@@ -179,17 +188,6 @@ final class LocalNotificationPresenter implements NotificationPresenter {
           if (payload != null && !_clicks.isClosed) _clicks.add(payload);
         },
       );
-      if (Platform.isMacOS) {
-        // Asked once and never awaited: the answer only decides whether macOS shows them.
-        unawaited(
-          _plugin
-              .resolvePlatformSpecificImplementation<
-                MacOSFlutterLocalNotificationsPlugin
-              >()
-              ?.requestPermissions(alert: true, sound: true)
-              .then<void>((_) {}, onError: (Object _) {}),
-        );
-      }
       if (!_hasIdentity) {
         _log('notifications: no package identity, cancel and history skipped');
       }
@@ -200,6 +198,23 @@ final class LocalNotificationPresenter implements NotificationPresenter {
     }
   }();
 
+  /// Asks the person for the notification permission of macOS, once per run and only when a
+  /// notification is about to show: the app initializes the plugin when it starts, to read
+  /// the click that started it, and must not ask then, before any login. Never awaited: the
+  /// answer only decides whether macOS shows the notifications.
+  void _askOnce() {
+    if (_asked || !_asksPermission) return;
+    _asked = true;
+    unawaited(
+      _plugin
+          .resolvePlatformSpecificImplementation<
+            MacOSFlutterLocalNotificationsPlugin
+          >()
+          ?.requestPermissions(alert: true, sound: true)
+          .then<void>((_) {}, onError: (Object _) {}),
+    );
+  }
+
   @override
   Future<void> show(
     ToastContent content, {
@@ -208,6 +223,7 @@ final class LocalNotificationPresenter implements NotificationPresenter {
     required String payload,
   }) async {
     if (!await _init()) return;
+    _askOnce();
     try {
       await _plugin.show(
         id: idOf(tag),

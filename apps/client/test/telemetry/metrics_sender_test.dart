@@ -179,6 +179,39 @@ void main() {
     expect(api.sent, hasLength(1));
   });
 
+  test('a failed send leaves one line without a value in the log', () async {
+    final lines = <String>[];
+    final logged = MetricsSender(
+      metrics: metrics,
+      api: api,
+      interval: const Duration(minutes: 5),
+      enabled: () => true,
+      attributes: () => const MetricsAttributes(
+        platform: 'macos',
+        appVersion: '1.4.0',
+        density: 'compact',
+        theme: 'light',
+      ),
+      timer: (interval, cb) => ManualTimer(interval, cb),
+      log: lines.add,
+    );
+    api.failures.addAll([
+      networkError(),
+      problem(500, 'internal_error'),
+      problem(403, 'feature_disabled'),
+    ]);
+    for (var i = 0; i < 3; i++) {
+      metrics.record(ClientMetric.frames, 60);
+      await logged.flush();
+    }
+    expect(lines, [
+      'client metrics: network error, one batch kept',
+      'client metrics: batch dropped: badResponse',
+      'client metrics: feature_disabled, stopped',
+    ]);
+    expect(lines.join(), isNot(contains('60')));
+  });
+
   test('stop sends what is left and cancels the timer', () async {
     metrics.record(ClientMetric.outboxDepth, 2);
     await sender.stop();

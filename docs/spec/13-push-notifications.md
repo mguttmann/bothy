@@ -905,7 +905,11 @@ once per `notify.badge_sync_min_interval`: iOS a push with only `badge` (without
 text; the NSE then does not run [Q4, derived]; push type `alert` [assumed, to be confirmed in a
 device test]), Android `k = "sync"` with priority
 `normal`, which removes read threads from the notification drawer. On iOS, displayed
-notifications stay until the next opening of the app; this is a known limitation.
+notifications stay; this is a known limitation.
+As built (AUD-client-notifications-01): the apps of iOS and macOS neither remove a delivered push
+nor set the badge themselves, also not when they open, and a macOS device gets no sync. A
+connected desktop app removes the local notification of a read thread
+([15-client-architecture.md](15-client-architecture.md) 10.3).
 
 Computation (docs/DECISIONS.md D-M3-19-15): the job `notify.push_send` counts the badge of the
 recipient at send time and sets it on every hint and every sync. A thread counts when the person
