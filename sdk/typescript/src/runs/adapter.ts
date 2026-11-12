@@ -1402,12 +1402,13 @@ export class Adapter {
       } catch (error) {
         // Only an end the server did not store is taken up here; it goes out again below.
         if (!handle.finishPending) throw error;
+      }
+      if (handle.finishPending) {
         this.logger.warn(
           `end of run ${state.runId} not stored; sending it again`,
-          { error: errorName(error) },
         );
+        await this.resendEnd(state, token);
       }
-      if (handle.finishPending) await this.resendEnd(state, token);
     } finally {
       if (handle.finished || handle.cancelled.aborted) {
         try {
