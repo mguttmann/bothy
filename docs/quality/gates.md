@@ -363,7 +363,7 @@ What reruns (`tools/ci/flakes.py`, tests `tools/ci/tests/test_flakes.py`):
 * Not rerun: `perf` (not in CI; a budget miss must not pass on a second try), the platform
   suite of the host service (`make -C services/host platform-test`, it changes the machine), the
   JVM tests and the Python and TypeScript tests. A job that fails for one of them on `main` or
-  in a scheduled run is listed in the issue of its workflow (section "Red runs").
+  in a scheduled run is named by the report of section "Red runs".
 
 What still fails:
 

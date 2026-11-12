@@ -4,12 +4,17 @@
 # docs/decisions.d/AUD-misc-testing-01.md). A scheduled run and the run of a push to main show
 # their result to nobody. Every hour this workflow reads the completed runs of the last two days
 # of every workflow with a schedule and of ci.yml on main (tools/ci/red_runs.py reads both sets
-# from this folder), and adds one comment per failed run, with its jobs and steps that did not
-# pass, to the open issue "Red runs of <file>" labelled `red-run` (created when there is none).
-# A run GitHub lists as cancelled counts when one of its jobs ran and did not pass: a job that
-# hits its time limit ends that way. The workflow closes an issue when the newest run of its
-# workflow passed and none failed for 7 days; the next failed run opens a new one.
-# Only the default GITHUB_TOKEN: read the runs and their jobs, write and close the issues.
+# from this folder). A run GitHub lists as cancelled counts when one of its jobs ran and did not
+# pass: a job that hits its time limit ends that way.
+#
+# Switched off until the owner decides (AUD-CG1/7, AUD-MISC-TESTING-01/11): whether a workflow
+# may write public issues for red runs is his question. Unless the repository variable
+# BOTHY_RED_RUN_ISSUES is `true`, the report is a dry run: it reads, writes nothing, and prints
+# the red runs with their jobs and steps to the log of this job. With the variable set it adds
+# one comment per failed run to the open issue "Red runs of <file>" labelled `red-run` (created
+# when there is none) and closes an issue when its workflow passed again and stayed quiet for the
+# time AGE of the tool. Only the default GITHUB_TOKEN; a permission cannot depend on a variable,
+# so the job may write issues in both cases.
 
 name: red-runs
 
@@ -27,7 +32,7 @@ concurrency:
 
 jobs:
   issue:
-    name: red runs (tracking issues)
+    name: red runs (report)
     if: github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -41,10 +46,17 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
-      - name: Add the failed runs to the tracking issues
+      - name: Report the failed runs (a dry run unless BOTHY_RED_RUN_ISSUES is true)
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-        run: uv run --project tools --locked --quiet python tools/ci/red_runs.py report --repo "$REPO" --hours 48
+          WRITE_ISSUES: ${{ vars.BOTHY_RED_RUN_ISSUES }}
+        run: |
+          if [ "$WRITE_ISSUES" = true ]; then
+            uv run --project tools --locked --quiet python tools/ci/red_runs.py report --repo "$REPO" --hours 48
+          else
+            uv run --project tools --locked --quiet python tools/ci/red_runs.py report --repo "$REPO" --hours 48 --dry-run
+          fi

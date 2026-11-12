@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
+import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -602,9 +604,50 @@ def test_the_workflow_may_read_runs_and_write_issues_only() -> None:
     assert cr.check_workflow(WORKFLOW.name, text) == []
 
 
-def test_the_workflow_runs_the_report_for_its_repository() -> None:
+def _report_step() -> dict[str, Any]:
     (job,) = _workflow()["jobs"].values()
     [step] = [s for s in job["steps"] if "red_runs.py" in str(s.get("run", ""))]
-    assert "red_runs.py report --repo" in step["run"]
-    assert "--dry-run" not in step["run"]
+    assert isinstance(step, dict)
+    return step
+
+
+def test_the_workflow_reads_its_switch_from_the_repository_variable() -> None:
+    step = _report_step()
     assert step["env"]["GH_TOKEN"] == "${{ github.token }}"
+    assert step["env"]["REPO"] == "${{ github.repository }}"
+    assert step["env"]["WRITE_ISSUES"] == "${{ vars.BOTHY_RED_RUN_ISSUES }}"
+    # The variable reaches the script through the environment only, never as text of the script.
+    assert "${{" not in step["run"]
+
+
+@pytest.mark.parametrize(
+    ("variable", "writes"),
+    [(None, False), ("", False), ("false", False), ("True", False), ("1", False), ("true", True)],
+)
+def test_the_workflow_writes_issues_only_when_the_owner_switched_it_on(
+    tmp_path: Path, variable: str | None, writes: bool
+) -> None:
+    """Whether a workflow may write public issues for red runs is the owner's question.
+
+    Until the repository variable is exactly `true` the report is a dry run (AUD-CG1/7,
+    AUD-MISC-TESTING-01/11). The step's own script runs here with a stand-in for uv.
+    """
+    seen = tmp_path / "args.txt"
+    uv = tmp_path / "uv"
+    uv.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$@\" > {seen}\n", encoding="utf-8")
+    uv.chmod(0o755)
+    env = {"PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}", "REPO": "o/r"}
+    if variable is not None:
+        env["WRITE_ISSUES"] = variable
+    done = subprocess.run(
+        ["bash", "-e", "-c", _report_step()["run"]],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    args = seen.read_text(encoding="utf-8").split()
+    assert args[args.index("report") - 1].endswith("tools/ci/red_runs.py")
+    assert args[args.index("--repo") + 1] == "o/r"
+    assert ("--dry-run" not in args) is writes
