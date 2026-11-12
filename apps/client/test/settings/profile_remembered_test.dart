@@ -256,4 +256,44 @@ void main() {
     await eventually('E7', () => state().step == OnboardingStep.signedOut);
     expect(await f.wiped(), isTrue);
   });
+
+  test('a read that is under way when the person logs out puts nothing back '
+      'on the device', () async {
+    final control = await connected(c, f);
+    await control.loginWithPassword(
+      WorldSeed.alexLogin,
+      WorldSeed.password,
+      WorldSeed.totp,
+    );
+    await live();
+    // The instance holds its answer to the first read of the profile until the account has
+    // ended on the device.
+    final answered = f.server.requestsOf('getMe').length;
+    f.server.faults.delay(
+      const Duration(milliseconds: 800),
+      operationId: 'getMe',
+    );
+    c.listen(profileControllerProvider, (_, _) {});
+    await eventually(
+      'the read is under way',
+      () => f.server.faults.pending.isEmpty,
+    );
+
+    await control.logout();
+    await eventually('E7', () => state().step == OnboardingStep.signedOut);
+    expect(await f.wiped(), isTrue);
+
+    await eventually(
+      'the late answer',
+      () => f.server.requestsOf('getMe').length > answered,
+    );
+    // The answer had its time to reach the controller.
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    expect(
+      f.secure.values.keys.where((k) => k.contains(f.server.world.instanceId)),
+      isEmpty,
+      reason: 'the late answer wrote a secret of the ended account',
+    );
+    expect(await f.wiped(), isTrue);
+  });
 }

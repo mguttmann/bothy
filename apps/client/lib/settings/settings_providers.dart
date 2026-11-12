@@ -316,10 +316,23 @@ final class SettingsRepository implements RefusedSettingActions {
     ];
   }
 
-  /// Sends the refused write [write] again under a new ID (04 13.2 item 5). Nothing happens
-  /// when its entry is gone or has left the failed state meanwhile.
+  /// Sends the refused write [write] again under a new ID (04 13.2 item 5) and puts the local
+  /// row of its key to what it sends, as [set] and [reset] do: the value of the entry one
+  /// version above the stored one, or no row for a reset. The row may have moved on since the
+  /// refusal (a later write of the key, a discarded one), and the device ignores the echo of
+  /// its own write, so it would show another value than the instance stores otherwise.
+  /// Nothing happens when its entry is gone or has left the failed state meanwhile.
   @override
   Future<void> sendAgain(RefusedSettingWrite write) async {
+    final entry = await _db.outboxDao.byId(write.entryId);
+    if (entry == null || entry.state != OutboxState.failed) return;
+    // The row first, the entry last: an app that ends in between shows the notice again, with
+    // the value the person chose in the row.
+    if (entry.kind == PersonalOps.deleteMySetting) {
+      await _removeLocal(write.key);
+    } else {
+      await _storeLocal(write.key, decodePayload(entry.payload)['value']);
+    }
     try {
       await _engine.outbox.retry(write.entryId);
     } on StateError {
@@ -370,11 +383,11 @@ final class SettingsRepository implements RefusedSettingActions {
     return all.where((s) => s.key == key).firstOrNull;
   }
 
-  /// Stores [value] for [key]; a value equal to its fixed default resets instead.
-  Future<void> set(String key, Object value) async {
-    if (PersonalSettings.fixedDefaults[key] == value) return reset(key);
+  /// Puts the local row of [key] to [value], one version above the stored one; returns false
+  /// and changes nothing when the row holds [value] already.
+  Future<bool> _storeLocal(String key, Object? value) async {
     final stored = await _stored(key);
-    if (stored != null && stored.value == value) return;
+    if (stored != null && stored.value == value) return false;
     await _db.personalDao.upsertSettingIfNewer(
       UserSetting(
         key: key,
@@ -382,6 +395,24 @@ final class SettingsRepository implements RefusedSettingActions {
         version: ResourceVersion((stored?.version.value ?? 0) + 1),
       ),
     );
+    return true;
+  }
+
+  /// Removes the local row of [key]; returns false when there is none.
+  Future<bool> _removeLocal(String key) async {
+    final stored = await _stored(key);
+    if (stored == null) return false;
+    await _db.personalDao.deleteSettingIfNewer(
+      key,
+      ResourceVersion(stored.version.value + 1),
+    );
+    return true;
+  }
+
+  /// Stores [value] for [key]; a value equal to its fixed default resets instead.
+  Future<void> set(String key, Object value) async {
+    if (PersonalSettings.fixedDefaults[key] == value) return reset(key);
+    if (!await _storeLocal(key, value)) return;
     await _engine.outbox.enqueue(
       OutboxRequest(
         kind: PersonalOps.putMySetting,
@@ -392,12 +423,7 @@ final class SettingsRepository implements RefusedSettingActions {
 
   /// Deletes [key], so its default applies again; nothing happens when it is not stored.
   Future<void> reset(String key) async {
-    final stored = await _stored(key);
-    if (stored == null) return;
-    await _db.personalDao.deleteSettingIfNewer(
-      key,
-      ResourceVersion(stored.version.value + 1),
-    );
+    if (!await _removeLocal(key)) return;
     await _engine.outbox.enqueue(
       OutboxRequest(kind: PersonalOps.deleteMySetting, payload: {'key': key}),
     );
@@ -457,7 +483,8 @@ final class Profile {
 /// time the connection is live again without an answer since it was lost; an answer replaces
 /// what is shown and what is remembered, a failed read leaves both
 /// (docs/decisions.d/AUD-client-settings-01.md). The remembered profile is deleted with the
-/// secrets of the account (R-SY-14).
+/// secrets of the account (R-SY-14), and an answer that arrives after the account ended is not
+/// remembered: the secrets of an ended account take no write (`InstanceSecrets.deleteAll`).
 @Riverpod(keepAlive: true)
 class ProfileController extends _$ProfileController {
   /// The name of the remembered profile in the secrets of the instance.

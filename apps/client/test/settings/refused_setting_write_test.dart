@@ -7,6 +7,7 @@
 // database, engine and outbox run against the fake server; the notice is a widget test over
 // the same repository.
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:client/app/providers/ports.dart';
@@ -69,6 +70,17 @@ void main() {
     Future<int> outbox() async =>
         (await c.read(localDatabaseProvider)!.outboxDao.allEntries()).length;
 
+    /// The rows of the personal settings on the device, key to value.
+    Future<Map<String, Object?>> localRows() async => {
+      for (final s
+          in await c
+              .read(localDatabaseProvider)!
+              .personalDao
+              .watchSettings()
+              .first)
+        s.key: s.value,
+    };
+
     /// The instance refuses the next write of [operation] for good.
     void refuseNext(String operation) => f.server.faults.onRequest(
       operation,
@@ -125,6 +137,71 @@ void main() {
       ];
       expect(keys, hasLength(2));
       expect(keys.toSet(), hasLength(2));
+    });
+
+    test('sending an older refused value again shows the value it sends', () async {
+      refuseNext('putMySetting');
+      await writer().set(SettingKeys.theme, 'dark');
+      await eventually('the refused write', () => refused().length == 1);
+      final older = refused().single;
+      // The person chooses another value meanwhile, and the instance stores it.
+      await writer().set(SettingKeys.theme, 'light');
+      await eventually(
+        'the later value is stored',
+        () => onServer(SettingKeys.theme) == 'light',
+      );
+      expect(shown().theme, 'light');
+      expect(refused(), [older]);
+
+      await writer().sendAgain(older);
+
+      expect(await localRows(), {SettingKeys.theme: 'dark'});
+      await stored(SettingKeys.theme, 'dark');
+      await eventually('no refused write', () => refused().isEmpty);
+      await eventually('the theme sent again', () => shown().theme == 'dark');
+    });
+
+    test('sending a refused reset again removes the local row', () async {
+      await writer().set(SettingKeys.theme, 'dark');
+      await stored(SettingKeys.theme, 'dark');
+      refuseNext('putMySetting');
+      await writer().set(SettingKeys.theme, 'light');
+      await eventually('the refused value', () => refused().length == 1);
+      refuseNext('deleteMySetting');
+      await writer().reset(SettingKeys.theme);
+      await eventually('the refused reset', () => refused().length == 2);
+      final [value, reset] = refused();
+      // Without the refused value the device shows what the instance stores.
+      await writer().discard(value);
+      await eventually('the stored theme', () => shown().theme == 'dark');
+      await eventually('the reset alone', () => refused().length == 1);
+      expect(refused(), [reset]);
+
+      await writer().sendAgain(reset);
+
+      expect(await localRows(), isEmpty);
+      await stored(SettingKeys.theme, null);
+      await eventually('no refused write', () => refused().isEmpty);
+      await eventually('the default', () => shown().theme == 'system');
+    });
+
+    test('sending again a write that is gone changes nothing', () async {
+      await writer().set(SettingKeys.theme, 'dark');
+      await stored(SettingKeys.theme, 'dark');
+      refuseNext('putMySetting');
+      await writer().set(SettingKeys.theme, 'light');
+      await eventually('the refused write', () => refused().length == 1);
+      final write = refused().single;
+      await writer().discard(write);
+      await eventually('the stored theme', () => shown().theme == 'dark');
+      final sent = f.server.requestsOf('putMySetting').length;
+
+      // The notice of another view still offered the entry.
+      await writer().sendAgain(write);
+
+      expect(await localRows(), {SettingKeys.theme: 'dark'});
+      expect(await outbox(), 0);
+      expect(f.server.requestsOf('putMySetting'), hasLength(sent));
     });
 
     test('discarding a refused first value removes the local row', () async {
@@ -294,6 +371,27 @@ void main() {
       expect(find.text(en.settingsWriteDiscard), findsOneWidget);
     });
 
+    testWidgets('two refused settings show one notice each', (tester) async {
+      const density = RefusedSettingWrite(
+        entryId: 'e2',
+        key: SettingKeys.density,
+        code: 'validation_failed',
+      );
+      await tester.pumpWidget(host(const [theme, density], _Actions()));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(
+        find.byKey(const ValueKey('settings.refusedWrite.e1')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('settings.refusedWrite.e2')),
+        findsOneWidget,
+      );
+      expect(find.text(en.settingsWriteSendAgain), findsNWidgets(2));
+    });
+
     testWidgets('a setting without a row of its own is named by its key', (
       tester,
     ) async {
@@ -348,6 +446,36 @@ void main() {
       expect(actions.calls, ['sendAgain e1', 'discard e1']);
     });
 
+    testWidgets('an error that is no answer of the instance keeps both '
+        'actions', (tester) async {
+      final actions = _Actions()
+        ..sendAgainFails = StateError('the local database is closed');
+      await tester.pumpWidget(host(const [theme], actions));
+      await tester.pump();
+
+      // The error of the action is nobody's to catch: it reaches the zone of the tap.
+      final uncaught = <Object>[];
+      await runZonedGuarded(
+        () => tester.tap(find.text(en.settingsWriteSendAgain)),
+        (error, _) => uncaught.add(error),
+      );
+      await tester.pump();
+
+      expect(uncaught.single, isStateError);
+      for (final label in [
+        en.settingsWriteSendAgain,
+        en.settingsWriteDiscard,
+      ]) {
+        expect(
+          tester
+              .widget<TextButton>(find.widgetWithText(TextButton, label))
+              .onPressed,
+          isNotNull,
+          reason: label,
+        );
+      }
+    });
+
     testWidgets('a discard without an answer says so and keeps both actions', (
       tester,
     ) async {
@@ -381,11 +509,14 @@ void main() {
 /// Records what the notice asks for.
 class _Actions implements RefusedSettingActions {
   final List<String> calls = [];
+  Object? sendAgainFails;
   Object? discardFails;
 
   @override
-  Future<void> sendAgain(RefusedSettingWrite write) async =>
-      calls.add('sendAgain ${write.entryId}');
+  Future<void> sendAgain(RefusedSettingWrite write) async {
+    calls.add('sendAgain ${write.entryId}');
+    if (sendAgainFails case final Object error) throw error;
+  }
 
   @override
   Future<void> discard(RefusedSettingWrite write) async {

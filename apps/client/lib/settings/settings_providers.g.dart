@@ -333,7 +333,8 @@ String _$settingsRepositoryHash() =>
 /// time the connection is live again without an answer since it was lost; an answer replaces
 /// what is shown and what is remembered, a failed read leaves both
 /// (docs/decisions.d/AUD-client-settings-01.md). The remembered profile is deleted with the
-/// secrets of the account (R-SY-14).
+/// secrets of the account (R-SY-14), and an answer that arrives after the account ended is not
+/// remembered: the secrets of an ended account take no write (`InstanceSecrets.deleteAll`).
 
 @ProviderFor(ProfileController)
 final profileControllerProvider = ProfileControllerProvider._();
@@ -348,7 +349,8 @@ final profileControllerProvider = ProfileControllerProvider._();
 /// time the connection is live again without an answer since it was lost; an answer replaces
 /// what is shown and what is remembered, a failed read leaves both
 /// (docs/decisions.d/AUD-client-settings-01.md). The remembered profile is deleted with the
-/// secrets of the account (R-SY-14).
+/// secrets of the account (R-SY-14), and an answer that arrives after the account ended is not
+/// remembered: the secrets of an ended account take no write (`InstanceSecrets.deleteAll`).
 final class ProfileControllerProvider
     extends $AsyncNotifierProvider<ProfileController, Profile> {
   /// The profile of the signed-in person: read with `getMe`, changed with `updateMyProfile`
@@ -361,7 +363,8 @@ final class ProfileControllerProvider
   /// time the connection is live again without an answer since it was lost; an answer replaces
   /// what is shown and what is remembered, a failed read leaves both
   /// (docs/decisions.d/AUD-client-settings-01.md). The remembered profile is deleted with the
-  /// secrets of the account (R-SY-14).
+  /// secrets of the account (R-SY-14), and an answer that arrives after the account ended is not
+  /// remembered: the secrets of an ended account take no write (`InstanceSecrets.deleteAll`).
   ProfileControllerProvider._()
     : super(
         from: null,
@@ -393,7 +396,8 @@ String _$profileControllerHash() => r'e9e3b4bca6e58d5f2dfc40efc898ab2c9bcc7824';
 /// time the connection is live again without an answer since it was lost; an answer replaces
 /// what is shown and what is remembered, a failed read leaves both
 /// (docs/decisions.d/AUD-client-settings-01.md). The remembered profile is deleted with the
-/// secrets of the account (R-SY-14).
+/// secrets of the account (R-SY-14), and an answer that arrives after the account ended is not
+/// remembered: the secrets of an ended account take no write (`InstanceSecrets.deleteAll`).
 
 abstract class _$ProfileController extends $AsyncNotifier<Profile> {
   FutureOr<Profile> build();

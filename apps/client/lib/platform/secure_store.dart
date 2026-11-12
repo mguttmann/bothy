@@ -850,6 +850,11 @@ final class MethodChannelLegacyKeychain implements LegacyKeychain {
 /// secrets of an instance can be deleted together ([deleteAll]) and two instances never share
 /// a key.
 ///
+/// [deleteAll] ends the store: the account ended on the device, and a [write] after it stores
+/// nothing. The services of an account hold one store, so the answer of a request that was
+/// under way when the account ended (a profile, a refreshed token) cannot put an item back
+/// (R-SY-14). The next login composes its services, and with them its store, anew.
+///
 /// Example:
 /// ```dart
 /// final secrets = InstanceSecrets(backend, instanceId);
@@ -864,14 +869,29 @@ final class InstanceSecrets implements SecretStore {
   /// The `instance_id` of discovery.
   final String instanceId;
 
+  /// Whether [deleteAll] began.
+  bool _ended = false;
+
+  /// The writes the backend has not answered yet.
+  final Set<Future<void>> _writing = {};
+
   String get _prefix => 'instance/$instanceId/';
 
   @override
   Future<String?> read(String key) => _backend.read('$_prefix$key');
 
+  /// Stores [value] under [key]; nothing once [deleteAll] began.
   @override
-  Future<void> write(String key, String value) =>
-      _backend.write('$_prefix$key', value);
+  Future<void> write(String key, String value) async {
+    if (_ended) return;
+    final writing = _backend.write('$_prefix$key', value);
+    _writing.add(writing);
+    try {
+      await writing;
+    } finally {
+      _writing.remove(writing);
+    }
+  }
 
   @override
   Future<void> delete(String key) => _backend.delete('$_prefix$key');
@@ -881,7 +901,17 @@ final class InstanceSecrets implements SecretStore {
       !(await _backend.keys()).any((key) => key.startsWith(_prefix));
 
   /// Deletes every secret of this instance: tokens, device ID and database key (R-SY-14).
+  /// From this call on [write] stores nothing; a write the backend has not answered yet is
+  /// waited for, so its item is deleted with the others.
   Future<void> deleteAll() async {
+    _ended = true;
+    for (final writing in _writing.toList()) {
+      try {
+        await writing;
+      } on Object {
+        // The caller of the write gets its failure.
+      }
+    }
     for (final key in await _backend.keys()) {
       if (key.startsWith(_prefix)) await _backend.delete(key);
     }

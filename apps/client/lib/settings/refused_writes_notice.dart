@@ -75,12 +75,16 @@ class _RefusedSettingWritesNoticeState
             ? l.selfOffline
             : problemText(l, problem.code, reason: problem.reason),
       );
+    } finally {
+      // Also after an error that is no answer of the instance: the entry keeps both actions.
+      final text = failed;
+      if (mounted) {
+        setState(() {
+          _busy.remove(write.entryId);
+          if (text != null) _discardFailed[write.entryId] = text;
+        });
+      }
     }
-    if (!mounted) return;
-    setState(() {
-      _busy.remove(write.entryId);
-      if (failed != null) _discardFailed[write.entryId] = failed;
-    });
   }
 
   @override
@@ -92,12 +96,13 @@ class _RefusedSettingWritesNoticeState
         const <RefusedSettingWrite>[];
     if (writes.isEmpty) return const SizedBox.shrink();
     return Column(
+      key: const ValueKey('settings.refusedWrite'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
         for (final write in writes)
           Padding(
-            key: const ValueKey('settings.refusedWrite'),
+            key: ValueKey('settings.refusedWrite.${write.entryId}'),
             padding: const EdgeInsets.only(bottom: DsSpace.s16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

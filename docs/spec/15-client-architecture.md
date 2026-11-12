@@ -479,8 +479,10 @@ are in docs/DECISIONS.md D-M4-15-1.
 An entry without a thread has no history that shows its failure. A refused write of a personal
 setting (`putMySetting`, `deleteMySetting`) shows in the settings above every section, with the
 reason, "Send again" (a new ID) and "Discard"; until the person decides, the local row keeps what
-the person chose. "Discard" reads `listMySettings`, removes the entry and puts the local row back
-to the stored value, or removes it when the instance stores none; without an answer nothing
+the person chose. "Send again" first puts the local row to what its entry sends (the value, or no
+row for a reset), because the row may have moved on since the refusal and the device ignores the
+echo of its own write. "Discard" reads `listMySettings`, removes the entry and puts the local row
+back to the stored value, or removes it when the instance stores none; without an answer nothing
 changes (docs/decisions.d/AUD-client-settings-01.md).
 
 ## 8. Network and login
@@ -688,7 +690,10 @@ the key storage of the Windows user), a new enrollment uses the scope
 these keys; an instance copied from a build before this rule keeps its keys under the
 `instance_id`, which the copy records as its scope. The scope is stored with the instance's secrets
 (docs/decisions.d/FIX-app-logout.md FIX-AL/4).
-A wipe (R-SY-14) deletes that folder, both device keys and every secret with the prefix.
+A wipe (R-SY-14) deletes that folder, both device keys and every secret with the prefix. From the
+wipe on the secret store of the ended account takes no write, so the answer of a request that was
+under way when the account ended (the profile, a refreshed token) puts no item back; the next
+login composes its store anew (docs/decisions.d/AUD-client-settings-01.md).
 
 Registered device keys (addendum of 2026-11-12, docs/decisions.d/AUD-pkg-device-key-01.md;
 [08](08-identity.md) 5.4). The plugin creates a key that is missing, and a system deletes keys

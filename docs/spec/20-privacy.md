@@ -399,7 +399,10 @@ flow, the row "Export of your data" under Settings, Privacy ([01-product.md](01-
 It files the export of the person's own data (item 1), tells where the request stands (waiting
 for an owner, being prepared, ready until the end of `privacy.export_ttl`, expired, rejected,
 failed) and saves the archive on the desktop (item 5); a phone shows the state and names the
-desktop app for the download. Every other step has no view in the apps or the console and is
+desktop app for the download. Both steps need a step-up, so a person whose desktop device has no
+step-up key (Windows) and who has no password with TOTP, which no view sets up
+([08-identity.md](08-identity.md) 2.5), can file the request on a phone but has no view that
+saves the archive. Every other step has no view in the apps or the console and is
 reached through the API only: a deletion or a rectification request, a request an owner files for
 another person, the decision of an owner with its reason and the extension (items 2 and 3), the
 download by an owner and the list of the requests with their deadlines.
