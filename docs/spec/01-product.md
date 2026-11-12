@@ -266,6 +266,9 @@ and between the main history of a text channel and a thread open beside it (D2);
 stored as the setting `layout.column_widths` (names `sidebar`, `post_list`, `main_history`,
 `session`; the history, or the thread beside a main history, takes the rest). No column becomes
 narrower than `DsLayout.columnMin` by a drag; a stored width wider than the window shrinks to fit.
+A border also moves without a pointer (section 8, addendum of 2026-11-12): Tab reaches it, Arrow
+left and Arrow right move it while it has the keyboard focus, and for a screen reader it is a
+slider whose "increase" and "decrease" make its column wider and narrower.
 Below `ui.desktop_min_width_four_columns` the session column collapses, below
 `ui.desktop_min_width_three_columns` a pinned overview column returns to the content column
 (navigation stack as on the phone). Addendum of 2026-10-27 (R-PR-17, replaces the four fixed
@@ -2324,7 +2327,7 @@ and console, checked by tests, not by intention.
 | Screen reader | VoiceOver, TalkBack, Narrator; in the console NVDA and VoiceOver. Every component has a role and a label; live box as a container with a summary; trigger state as its own label | Widget tests with `labeledTapTargetGuideline`; semantics snapshots per component |
 | Live content | Only state changes and questions are announced, at most once per `a11y.live_announce_min_interval`; patches never | Test with a simulated patch stream |
 | Font size | System scaling up to 200 percent without loss (SC 1.4.4); the layout wraps into the stack | Golden tests with text scaling 1 and 2 |
-| Focus | Order per column (sidebar, pinned overview, history, input, session); F6 switches columns; focus ring always visible; in the sidebar tree, arrow keys reach thread rows (6.8) | Integration test of a keyboard pass |
+| Focus | Order per column (sidebar, pinned overview, history, input, session); F6 switches columns; focus ring always visible; in the sidebar tree, arrow keys reach thread rows (6.8); a column border is a stop between its columns, moved with Arrow left and Arrow right (5.1, addendum of 2026-11-12) | Integration test of a keyboard pass; widget test of the borders |
 | Targets | Touch target at least `density.target-min` (desktop SC 2.5.8, touch platform value) | `androidTapTargetGuideline`, `iOSTapTargetGuideline` |
 | Motion | The system setting "Reduce motion" and the own setting switch to `motion.reduced` | Golden test in the context `reduced` |
 | Color | States never only through color; icons differ in shape | Review list in components.md |
@@ -2443,6 +2446,7 @@ names in its shared container would be content outside it (docs/decisions.d/M5-0
 | iOS, macOS | Grouping per thread; tapping opens the thread at the message; badge = unread mentions plus questions |
 | Android | Notification channels "Mentions", "Questions", "All messages", "Runs", changeable in the system settings; grouping per thread |
 | Windows | The app in the notification area keeps the connection and shows local notifications; a closed app gets no notifications (Baseline R-Push) |
+| iOS, Android, app in front | The notification shows as a banner inside the app, at the top of the screen, instead of a notification of the system: tapping opens the thread at the message, it leaves by itself after a moment or with its close button, and it never shows behind the app lock (addendum of 2026-11-12, [15](15-client-architecture.md) 10) |
 | all | If the thread is currently open and the app is in the foreground, there is no notification, only the history |
 
 Reading on one device removes notifications on the others as soon as that app is active the next

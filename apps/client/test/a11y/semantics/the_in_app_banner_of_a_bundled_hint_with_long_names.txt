@@ -1,0 +1,2 @@
+button, live region, label "customer-support-escalations · Printer on the third floor prints only every second page since the update\n12 new messages\nSam: The service partner answered and wants the serial number, the firmware version and a photo of the test page", action tap
+button, label "Dismiss", action tap

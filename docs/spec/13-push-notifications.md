@@ -306,6 +306,12 @@ For every active device of r (`devices.state = 'active'`):
    publishes `notification.created` once to every live connection of the recipient. A connection
    that ended in between gets nothing and no fallback push (at most once; docs/DECISIONS.md
    D-M3-23-3).
+   As built (AUD-client-app-01): the desktop shows the event as a local notification (5.3). A
+   phone is connected only while its app is in front
+   ([15-client-architecture.md](15-client-architecture.md) 7.2), so it shows the event as a banner
+   inside the app, with the rules of the local notifications (nothing for the thread that is on
+   screen, the content of 6.3, a tap opens the thread at the message), and posts no notification
+   of the system for it (15 10, docs/decisions.d/AUD-client-app-01.md).
 2. Otherwise a push goes to every active push registration of the device (`disabled_at IS NULL`).
 3. If the device has neither a connection nor a registration (for example the Windows app is closed),
    nothing is created. Unread counters show it on the next opening.

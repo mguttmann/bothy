@@ -55,11 +55,11 @@ Duration? _idle(LockInstant since, LockInstant now) {
 
 /// Whether the time since [lastActivity] reached [after] at [now].
 ///
-/// [lastActivity] is the last pointer or key event of the person (or the unlock); an incoming
-/// message or a running upload is not activity. The same rule holds in the foreground and
-/// since the app went to the background: the background does not reset the time. A wall clock
-/// set back before [lastActivity] counts as reached, so changing the time never keeps the lock
-/// open.
+/// [lastActivity] is the last pointer event, key event or screen reader action of the person
+/// (or the unlock); an incoming message or a running upload is not activity. The same rule
+/// holds in the foreground and since the app went to the background: the background does not
+/// reset the time. A wall clock set back before [lastActivity] counts as reached, so changing
+/// the time never keeps the lock open.
 bool idleReached({
   required LockInstant lastActivity,
   required LockInstant now,

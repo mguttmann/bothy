@@ -11533,6 +11533,12 @@ abstract class AppLocalizations {
   /// **'A reminder from the administration is waiting.'**
   String get notificationAdminText;
 
+  /// Label of the close button of the banner that shows a notification inside the phone app while it is in front (13 section 4.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get notificationBannerDismiss;
+
   /// Title of a push notification on iOS and macOS before the app loaded its text (PUSH_TITLE, 13 section 6.1).
   ///
   /// In en, this message translates to:

@@ -12,13 +12,16 @@ import 'package:client/app/providers/session.dart';
 import 'package:client/app/providers/settings.dart';
 import 'package:client/settings/settings_providers.dart';
 import 'package:design_system/design_system.dart';
+import 'package:design_system/testing.dart' show dsSemanticsProblems;
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:l10n/l10n.dart';
 import 'package:local_store/local_store.dart';
-import 'package:sync_engine/sync_engine.dart';
+import 'package:sync_engine/sync_engine.dart' hide FocusManager;
 
 import '../support/engine.dart';
 
@@ -244,6 +247,144 @@ void main() {
         );
         await tester.pump();
         expect(tester.getSize(column('session')).width, greaterThan(session));
+      },
+    );
+
+    testWidgets(
+      'the arrow keys move the border that has the keyboard focus; one '
+      'key press is one report',
+      (tester) async {
+        wide(tester);
+        final reported = <ColumnWidths>[];
+        await tester.pumpWidget(
+          host(
+            layout(onChanged: reported.add),
+            config.desktopMinWidthFourColumns.toDouble(),
+          ),
+        );
+        double width(String name) => tester.getSize(column(name)).width;
+        bool focused(String name) {
+          final focus = FocusManager.instance.primaryFocus?.context;
+          final handle = tester.element(
+            find.byKey(ValueKey('column.handle.$name')),
+          );
+          var inside = false;
+          focus?.visitAncestorElements((e) {
+            inside = e == handle;
+            return !inside;
+          });
+          return inside;
+        }
+
+        // The columns of this layout are empty, so Tab stops only at the three borders.
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        expect(focused('sidebar'), isTrue);
+        final sidebar = width('sidebar');
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pump();
+        expect(width('sidebar'), sidebar + ColumnDragHandle.step);
+        expect(reported, isEmpty, reason: 'the key is still down');
+        await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pump();
+        expect(width('sidebar'), sidebar + 2 * ColumnDragHandle.step);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pump();
+        expect(reported, hasLength(1));
+        expect(
+          reported.single.of(AppColumn.sidebar),
+          sidebar + 2 * ColumnDragHandle.step,
+        );
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+        await tester.pump();
+        expect(width('sidebar'), sidebar + ColumnDragHandle.step);
+        expect(reported, hasLength(2));
+
+        // With a modifier the key is not the border's: shortcuts of the app keep it.
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.alt);
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.alt);
+        await tester.pump();
+        expect(width('sidebar'), sidebar + ColumnDragHandle.step);
+        expect(reported, hasLength(2));
+
+        // The border of the session column lies before its column: Arrow left widens it.
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        expect(focused('session'), isTrue);
+        final session = width('session');
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+        await tester.pump();
+        expect(width('session'), session + ColumnDragHandle.step);
+        expect(reported, hasLength(3));
+      },
+    );
+
+    testWidgets(
+      'a border is a slider for a screen reader: increase and decrease '
+      'change the width of its column',
+      (tester) async {
+        wide(tester);
+        final semantics = tester.ensureSemantics();
+        final reported = <ColumnWidths>[];
+        await tester.pumpWidget(
+          host(
+            layout(onChanged: reported.add),
+            config.desktopMinWidthFourColumns.toDouble(),
+          ),
+        );
+        final l = lookupAppLocalizations(const Locale('en'));
+        double width(String name) => tester.getSize(column(name)).width;
+        Finder handle(String name) =>
+            find.byKey(ValueKey('column.handle.$name'));
+        FinderBase<SemanticsNode> node(String name) => find.semantics
+            .byPredicate((n) => n.id == tester.getSemantics(handle(name)).id);
+
+        for (final name in ['sidebar', 'post_list', 'session']) {
+          expect(
+            tester.getSemantics(handle(name)),
+            isSemantics(
+              isSlider: true,
+              isFocusable: true,
+              label: l.shellResizeColumn,
+              value: '${width(name).round()}',
+              hasIncreaseAction: true,
+              hasDecreaseAction: true,
+              hasFocusAction: true,
+            ),
+            reason: name,
+          );
+        }
+        // The audit of 01 8 finds nothing at the borders (the empty columns of this layout
+        // are no screen of the app).
+        final borders = {
+          for (final name in ['sidebar', 'post_list', 'session'])
+            tester.getSemantics(handle(name)).id,
+        };
+        final problems = [
+          for (final p in dsSemanticsProblems(tester))
+            if (borders.contains(p.nodeId)) p,
+        ];
+        expect(problems, isEmpty, reason: problems.join('\n'));
+
+        final sidebar = width('sidebar');
+        tester.semantics.increase(node('sidebar'));
+        await tester.pump();
+        expect(width('sidebar'), sidebar + ColumnDragHandle.step);
+        expect(reported, hasLength(1), reason: 'one action is one report');
+        tester.semantics.decrease(node('sidebar'));
+        tester.semantics.decrease(node('sidebar'));
+        await tester.pump();
+        expect(width('sidebar'), sidebar - ColumnDragHandle.step);
+        expect(reported, hasLength(3));
+
+        // "Increase" widens the column the border sizes, also the one that lies after it.
+        final session = width('session');
+        tester.semantics.increase(node('session'));
+        await tester.pump();
+        expect(width('session'), session + ColumnDragHandle.step);
+        semantics.dispose();
       },
     );
 

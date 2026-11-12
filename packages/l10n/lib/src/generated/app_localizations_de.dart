@@ -7240,6 +7240,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get notificationAdminText => 'Eine Erinnerung der Verwaltung wartet.';
 
   @override
+  String get notificationBannerDismiss => 'Ausblenden';
+
+  @override
   String get pushTitle => 'Neue Benachrichtigung';
 
   @override

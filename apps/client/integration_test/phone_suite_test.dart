@@ -13,6 +13,7 @@ import 'phone/background_test.dart' as background;
 import 'phone/dictation_test.dart' as dictation;
 import 'phone/edit_agent_test.dart' as edit_agent;
 import 'phone/emergency_test.dart' as emergency;
+import 'phone/in_app_banner_test.dart' as in_app_banner;
 import 'phone/login_flow_test.dart' as login_flow;
 import 'phone/mobile_run_graph_test.dart' as mobile_run_graph;
 import 'phone/navigation_flow_test.dart' as navigation_flow;
@@ -41,4 +42,5 @@ void main() {
   group('new agent', new_agent.main);
   group('autonomous runs', autonomous_runs.main);
   group('edit agent', edit_agent.main);
+  group('in-app banner', in_app_banner.main);
 }

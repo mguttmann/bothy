@@ -2,7 +2,7 @@
 
 /// The wiring of push on iOS, macOS and Android (briefs M5-04 Design note 5 and M5-05 Design
 /// note 4): the signed-in account and its `notify.preview_mode` go to the [PushPlatform] of the
-/// build; the app widget listens to its taps and tells it when a thread opens.
+/// build; the app widget listens to its taps and tells it when a history opens.
 library;
 
 import 'dart:async';

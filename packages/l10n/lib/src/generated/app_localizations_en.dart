@@ -7209,6 +7209,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'A reminder from the administration is waiting.';
 
   @override
+  String get notificationBannerDismiss => 'Dismiss';
+
+  @override
   String get pushTitle => 'New notification';
 
   @override

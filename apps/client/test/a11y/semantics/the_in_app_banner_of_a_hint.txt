@@ -1,0 +1,2 @@
+button, live region, label "general · Release notes\nSam: Build is green", action tap
+button, label "Dismiss", action tap
