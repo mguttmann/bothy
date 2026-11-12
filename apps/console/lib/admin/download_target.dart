@@ -9,14 +9,15 @@ import '../platform/browser.dart';
 
 /// The save target of the audit export in the console (A6 of 01 5.2, brief M6-04 Design note
 /// 4): the bytes of the export are collected in memory and offered as one browser download when
-/// the export closes the sink. The media type follows the file name (`.csv` or `.ndjson`).
+/// the export closes the file; an export that discards it offers no download. The media type
+/// follows the file name (`.csv` or `.ndjson`).
 ///
 /// Example: `AuditLogView(saveTarget: downloadSaveTarget(environment.downloads!), ...)`.
 AuditSaveTarget downloadSaveTarget(FileDownloads downloads) =>
     (name) async => _DownloadSink(name, downloads);
 
-/// Collects the chunks of the export and saves them once on [close].
-class _DownloadSink implements StreamConsumer<List<int>> {
+/// Collects the chunks of the export and saves them once on [close]; [discard] forgets them.
+class _DownloadSink implements AuditSaveFile {
   _DownloadSink(this.name, this.downloads);
 
   final String name;
@@ -38,5 +39,11 @@ class _DownloadSink implements StreamConsumer<List<int>> {
         ? 'application/x-ndjson'
         : 'application/octet-stream';
     downloads.save(name, type, _bytes.takeBytes());
+  }
+
+  @override
+  Future<void> discard() async {
+    _closed = true;
+    _bytes.clear();
   }
 }

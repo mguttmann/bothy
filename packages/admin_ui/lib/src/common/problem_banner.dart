@@ -13,6 +13,7 @@ import 'package:l10n/l10n.dart';
 
 import '../data/self_repository.dart';
 import '../self/self_feedback.dart';
+import 'app_fault.dart';
 
 /// The text of a refused or failed administration call [error], or null when the person
 /// cancelled the step-up (nothing to say).
@@ -48,8 +49,10 @@ SelfFailure? adminFailure(AppLocalizations l, Object error) {
 }
 
 /// The banner of a section whose list the server refused (`403`) or could not answer: the
-/// translated reason of [problem], or the offline text without an answer. The section shows
-/// nothing else, so no control appears that the server did not offer (fixed requirement 9).
+/// translated reason of [problem] (with the correlation ID where [serverProblemText] shows it),
+/// or the offline text without an answer; a load that failed in the app ([appFaultCode]) says
+/// so. The section shows nothing else, so no control appears that the server did not offer
+/// (fixed requirement 9).
 class ProblemBanner extends StatelessWidget {
   /// Creates the banner for [problem] (null: no answer); [onRetry] offers "Try again".
   const ProblemBanner({super.key, required this.problem, this.onRetry});
@@ -70,7 +73,9 @@ class ProblemBanner extends StatelessWidget {
       tone: denied ? DsTone.info : DsTone.warning,
       text: p == null
           ? l.selfOffline
-          : problemText(l, p.code, reason: p.reason),
+          : p.code == appFaultCode
+          ? l.selfAppFault
+          : serverProblemText(l, p),
       actionLabel: denied || onRetry == null ? null : l.selfRetry,
       onAction: denied ? null : onRetry,
       liveRegion: true,
@@ -78,10 +83,19 @@ class ProblemBanner extends StatelessWidget {
   }
 }
 
+/// The code of the problem that stands for a fault of the app in a failed load. It is never a
+/// code of the server (`x-problem-codes`), and [ProblemBanner] reads it as
+/// [AppLocalizations.selfAppFault].
+const String appFaultCode = 'app_fault';
+
 /// The problem of a failed load [error]: the server's answer, or null without one (a session
 /// without any step-up method reads as `403 forbidden` with reason `step_up_not_possible`, a
 /// refresh that got no answer as no answer, another error of the login layer as a revoked
 /// session; the same reading as `selfFailure`).
+///
+/// Any other error is a fault of the app, not of the server: it goes to the reporter of the
+/// package ([reportAppFault], once per error, so a screen may read a kept error at every build)
+/// and reads as the problem with [appFaultCode] (ruling AUD-AM1/3).
 ApiProblem? loadProblem(Object error) => switch (error) {
   SelfActionFailed(:final problem) => problem,
   StepUpUnavailable() => const ApiProblem(
@@ -91,5 +105,10 @@ ApiProblem? loadProblem(Object error) => switch (error) {
   ),
   RefreshUnavailable() => null,
   AuthException() => const ApiProblem(status: 401, code: 'session_revoked'),
-  _ => const ApiProblem(status: 500, code: 'internal_error'),
+  _ => _appFault(error),
 };
+
+ApiProblem _appFault(Object error) {
+  reportAppFault(error);
+  return const ApiProblem(status: 0, code: appFaultCode);
+}

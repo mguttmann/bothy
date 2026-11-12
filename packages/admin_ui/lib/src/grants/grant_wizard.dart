@@ -163,6 +163,10 @@ class _GrantWizardState extends State<GrantWizard>
   AdminSubjectKind _kind = AdminSubjectKind.user;
   String? _subjectId;
   String _subjectName = '';
+
+  /// The subject as the purpose of the step-up names it: a person picked from the list with
+  /// the handle (ruling AUD-AM1/4), everything else by its name.
+  String _subjectPurposeName = '';
   AdminTarget? _target;
   AccessLevel? _level;
   final Set<AccessCapability> _capabilities = {};
@@ -204,6 +208,7 @@ class _GrantWizardState extends State<GrantWizard>
       _kind = subject.kind;
       _subjectId = subject.id;
       _subjectName = subject.name;
+      _subjectPurposeName = subject.name;
     }
     _until.addListener(_changed);
     _reason.addListener(_changed);
@@ -352,7 +357,7 @@ class _GrantWizardState extends State<GrantWizard>
       created = await widget.repository.createGrant(
         request,
         purpose: l.stepUpPurposeCreateGrant(
-          _subjectName,
+          _subjectPurposeName,
           targetLabel(l, request.target),
         ),
       );
@@ -381,7 +386,7 @@ class _GrantWizardState extends State<GrantWizard>
         created = await widget.repository.createGrant(
           request,
           purpose: l.stepUpPurposeCreateGrant(
-            _subjectName,
+            _subjectPurposeName,
             targetLabel(l, request.target),
           ),
           resolveI1: I1Resolution(ids, reason: reason),
@@ -422,9 +427,10 @@ class _GrantWizardState extends State<GrantWizard>
         _subjectId = null;
         _changed();
       },
-      onSelect: (id, name) {
+      onSelect: (id, name, purposeName) {
         _subjectId = id;
         _subjectName = name;
+        _subjectPurposeName = purposeName;
         _changed();
       },
     ),

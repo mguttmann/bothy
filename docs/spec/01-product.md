@@ -778,7 +778,11 @@ the origin of the login.
 
 **A2 Create grant with plain-language preview.** Three steps (who, where, level and capabilities).
 The preview states the effect in sentences, names newly visible channels and checks I1 before
-submitting; a violation is explained, not just rejected ("switch to organization first").
+submitting; a violation is explained, not just rejected ("switch to organization first"). "Who" is
+a person, a group, an agent or, while one is installed, an app ([11-extensions.md](11-extensions.md)
+section 4). Wherever the administration lets a person be picked, the handle stands next to the
+display name, because only the handle is unique, and the step-up of what follows names both
+(docs/decisions.d/AUD-adminui-misc-01.md AUD-AM1/1 and AUD-AM1/4).
 
 ```text
 +----------------------------------------------------------------------------------------------+
@@ -875,7 +879,10 @@ the page hides them.
 
 **A6 Audit.** Filterable by action, person, result, resource, time range; check of the hash chain.
 Export of a time range as the server's NDJSON with hashes (verifiable offline) and as CSV, which
-the device converts from the same stream.
+the device converts from the same stream. An export that fails before the server sent a byte (a
+cancelled step-up, a refusal, no connection) saves no file and says the reason; an export that
+breaks off later keeps what arrived and says that the file is incomplete
+(docs/decisions.d/AUD-adminui-misc-01.md AUD-AM1/2).
 
 ```text
 +----------------------------------------------------------------------------------------------------+
@@ -2392,6 +2399,11 @@ macOS release (ticket in 15-client-architecture.md).
 - A test over the ARB files rejects en and em dashes (U+2013, U+2014) and emoji.
 - Errors come from the server as a code (RFC 9457, [06-api.md](06-api.md)); the app translates the
   code. Unknown codes show a generic text plus the code.
+- In the administration a server error (a status of 500 and above) and an unknown code also show
+  the correlation ID of the request, which finds it in the server's log
+  ([06-api.md](06-api.md) section 2). An error of the app itself is not shown as an error of the
+  server: the screen says that the app failed, and the error goes to the error handler of the app
+  (docs/decisions.d/AUD-adminui-misc-01.md AUD-AM1/3).
 - Agent content is not translated.
 - Numbers, dates and currencies follow the locale of the app (for example "1,84 USD" (de) or
   "USD 1.84" (en)).

@@ -10,6 +10,7 @@ import 'package:l10n/l10n.dart';
 
 import '../common/confirm_change.dart';
 import '../data/admin_repository.dart';
+import '../people/person_choice.dart';
 
 /// What [MemberEditor] asks for: the person and, optionally, the day the membership ends.
 final class MemberRequest {
@@ -138,7 +139,7 @@ class _MemberEditorState extends State<MemberEditor> {
                 DropdownMenuItem(
                   key: ValueKey('member.person.${p.id}'),
                   value: p,
-                  child: Text(p.displayName),
+                  child: PersonChoice(person: p),
                 ),
             ],
             onChanged: (p) => setState(() => _person = p),

@@ -102,6 +102,13 @@ mixin FakeImport {
   /// The channels the import created, by ID.
   final Map<String, ImportChannelState> importChannelsById = {};
 
+  /// Items per page of `listImportItems`.
+  int importItemPageSize = 200;
+
+  /// The pages of `listImportItems` that were read: the state filter and the page number,
+  /// for example `posted 1`.
+  final List<String> importItemPages = [];
+
   int _imports = 0;
 
   /// Adds a source named [name] in [state] with [config] (default [fakeMapping]) and [stats];
@@ -370,14 +377,27 @@ mixin FakeImport {
     return importSnapshot(id);
   }
 
-  /// Every item of the source in [state].
-  Future<List<ImportItemEntry>> importItems(String id, {String? state}) async {
+  /// The items of the source in [state], oldest first, page by page until [enough] says so.
+  Future<List<ImportItemEntry>> importItems(
+    String id, {
+    String? state,
+    bool Function(List<ImportItemEntry> page)? enough,
+  }) async {
     refused('importItems');
     _source(id);
-    return [
+    final all = [
       for (final i in importItemsById[id]!)
         if (state == null || i.state == state) i,
     ];
+    final out = <ImportItemEntry>[];
+    var page = 0;
+    do {
+      importItemPages.add('${state ?? 'all'} ${++page}');
+      final items = all.skip(out.length).take(importItemPageSize).toList();
+      out.addAll(items);
+      if (enough?.call(items) ?? false) break;
+    } while (out.length < all.length);
+    return out;
   }
 
   /// One channel.

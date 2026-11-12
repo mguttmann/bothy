@@ -171,7 +171,10 @@ class _GroupDetailState extends State<GroupDetail>
           group.id,
           request.person.id,
           expiresAt: request.expiresAt,
-          purpose: l.stepUpPurposeAddMember(name, group.name),
+          purpose: l.stepUpPurposeAddMember(
+            request.person.nameWithHandle,
+            group.name,
+          ),
         );
       } on SelfActionFailed catch (e) {
         if (e.problem?.code == 'i1_violation') conflicts = e.conflicts;
@@ -207,7 +210,10 @@ class _GroupDetailState extends State<GroupDetail>
         g.group.id,
         g.request.person.id,
         expiresAt: g.request.expiresAt,
-        purpose: l.stepUpPurposeAddMember(name, g.group.name),
+        purpose: l.stepUpPurposeAddMember(
+          g.request.person.nameWithHandle,
+          g.group.name,
+        ),
         resolveI1: I1Resolution(ids, reason: reason),
       );
       return SelfNotice(l.adminMemberAdded(name, g.group.name));

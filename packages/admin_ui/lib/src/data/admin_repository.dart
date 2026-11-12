@@ -61,6 +61,11 @@ final class AdminPerson {
   /// The display name.
   final String displayName;
 
+  /// The display name with the handle, for example `Sam (@sam)`: the text that names a person
+  /// where it must be the right one of two with the same display name, such as the purpose of
+  /// a step-up (only the handle is unique, 03 `users`; ruling AUD-AM1/4).
+  String get nameWithHandle => '$displayName (@$handle)';
+
   /// The state.
   final AdminPersonStatus status;
 
@@ -633,8 +638,11 @@ final class ApiAdminRepository implements AdminRepository {
   );
 
   @override
-  Future<List<ImportItemEntry>> importItems(String id, {String? state}) =>
-      _imports.importItems(id, state: state);
+  Future<List<ImportItemEntry>> importItems(
+    String id, {
+    String? state,
+    bool Function(List<ImportItemEntry> page)? enough,
+  }) => _imports.importItems(id, state: state, enough: enough);
 
   @override
   Future<ImportChannelState> importChannel(String channelId) =>
