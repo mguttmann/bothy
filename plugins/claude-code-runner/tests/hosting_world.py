@@ -14,6 +14,10 @@ test (``tests/realserver``) runs the same path against one server.
 A backend (`HostedFake`) also serves ``getAgentDefinition`` for its agent (A1-02): the current
 definition with its version, ``404`` without one, and `HostedFake.set_definition` appends the
 durable event ``agent.definition_changed`` (26 4.1 item 2, A1-05).
+
+`HostingWorld.spawn` starts the hosting runner as a process of its own (``hosting_runner.py``), for
+a scenario that kills it; such a world follows the real time (``real_time``), because that process
+uses the system clock.
 """
 
 from __future__ import annotations
@@ -21,7 +25,10 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import dataclasses
+import json
 import secrets
+import subprocess
+import sys
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -366,6 +373,18 @@ class HostingWorld(World):
         )
         return runner
 
+    def spawn(self, **runner: Any) -> subprocess.Popen[bytes]:
+        """Start the hosting runner as a process of its own (``hosting_runner.py``).
+
+        It reads the configuration file `config` writes with ``runner`` and reaches the
+        FakeServer of every backend added so far.
+        """
+        self.config(**runner)
+        origins = {str(agent): b.fake.origin for agent, b in self.server.backends.items()}
+        program = Path(__file__).with_name("hosting_runner.py")
+        config_file = str(self.root / "runner.toml")
+        return self.spawn_command([sys.executable, str(program), config_file, json.dumps(origins)])
+
     def all_files(self) -> list[tuple[Path, bytes]]:
         """Every file under the world's folder (state, projects, home), with its content."""
         return scenarios.live_files(self.root.rglob("*"))
@@ -377,9 +396,13 @@ class HostingWorld(World):
 
 @contextlib.asynccontextmanager
 async def hosting_world(
-    root: Path, timings: dict[str, float] | None = None
+    root: Path, timings: dict[str, float] | None = None, *, real_time: bool = False
 ) -> AsyncIterator[HostingWorld]:
-    """Build a `HostingWorld` in ``root`` (like the scenario world, with the runner's key)."""
+    """Build a `HostingWorld` in ``root`` (like the scenario world, with the runner's key).
+
+    With ``real_time`` the shared clock starts at the real time and follows it, as a runner
+    process of its own needs (`HostingWorld.spawn`); else it starts in the past and runs fast.
+    """
     root.mkdir(mode=0o700)
     (root / "hosted-secrets").mkdir(mode=0o700)
     projects = root / "projects"
@@ -394,7 +417,8 @@ async def hosting_world(
     key_file.chmod(0o600)
     dpop_file = root / "dpop.pem"
     key = FileDpopKey.generate(dpop_file)
-    server = HostingServer(jkt=key.jkt, costs=True, timings=timings, clock=FakeClock())
+    clock = FakeClock(datetime.now(UTC)) if real_time else FakeClock()
+    server = HostingServer(jkt=key.jkt, costs=True, timings=timings, clock=clock)
     await server.start()
     token_file = root / "agent_token"
     token_file.write_text(server.credentials.api_token.reveal())
@@ -415,7 +439,9 @@ async def hosting_world(
         claude=claude,
         dpop_file=dpop_file,
     )
-    pump = asyncio.ensure_future(scenarios._pump(server))
+    pump = asyncio.ensure_future(
+        scenarios._real_pump(server) if real_time else scenarios._pump(server)
+    )
     try:
         yield w
     finally:
@@ -423,6 +449,10 @@ async def hosting_world(
             await runner.stop()
             with contextlib.suppress(Exception):
                 await asyncio.wait_for(task, PATIENCE)
+        for process in w.processes:
+            scenarios._kill_group(process.pid)
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                process.wait(PATIENCE)
         pump.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await pump

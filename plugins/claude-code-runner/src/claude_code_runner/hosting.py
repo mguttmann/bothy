@@ -23,6 +23,10 @@ before ``run.start``; an agent without a definition ends ``adapter_error`` with 
 ``definition_missing`` (26 5.6). The folders are also written once the agent's connection is
 ready and on ``agent.definition_changed``.
 
+Hosted turns are not adopted after a crash of the runner (decisions.d/A1-05.md D-A1-05-9): the
+next start stops the ones that still run and removes their records (`stop_leftover_turns`,
+26 3.2 item 5).
+
 Log lines name agent IDs and problem codes, never a token or content: ``hosted_agent_joined``,
 ``hosted_agent_left`` (with ``reason`` ``unlisted``, ``revoked`` or ``closed``),
 ``hosted_token_refreshed``, ``hosted_token_issue_failed`` (with ``code``),
@@ -81,6 +85,7 @@ from bothy_sdk.settings import SdkSettings
 from bothy_sdk.sources import Envelope
 
 from claude_code_runner import ADAPTER_NAME, RUNTIME_NAME, __version__
+from claude_code_runner.adoption import AdoptedGroup, process_matches
 from claude_code_runner.attachments import fetch_attachments
 from claude_code_runner.causes import TOOL_CLASS_MISMATCH, cause, definition_refused
 from claude_code_runner.channel_skills import resolve_channel_skills
@@ -96,7 +101,7 @@ from claude_code_runner.commandline import (
 from claude_code_runner.config import RunnerConfig, own_credential_files
 from claude_code_runner.definition import Definition, Limits, intersect, parse
 from claude_code_runner.heartbeat import WAIT_SLOTS_FULL, WAIT_THREAD_BUSY, Probe, runtime_status
-from claude_code_runner.locks import LockTimeout, SlotPool, acquire
+from claude_code_runner.locks import LockTimeout, SlotPool, acquire, release
 from claude_code_runner.materialize import (
     AgentFolders,
     Materialized,
@@ -109,8 +114,10 @@ from claude_code_runner.materialize import (
 from claude_code_runner.reply_upload import remove_run_files
 from claude_code_runner.runturn import RunState, RunTurn
 from claude_code_runner.statedir import hosted_dir, sweep
+from claude_code_runner.stop import stop_group
 from claude_code_runner.toolclass import ORDER, lower
 from claude_code_runner.transcribe import Transcriber
+from claude_code_runner.turn import remove_turn_record
 
 __all__ = [
     "DEFINITION_CHANGED",
@@ -126,6 +133,7 @@ __all__ = [
     "RunnerParts",
     "issue_token",
     "refresh_at",
+    "stop_leftover_turns",
 ]
 
 _LOG = logging.getLogger("claude_code_runner")
@@ -179,6 +187,66 @@ def refresh_at(created_at: datetime, expires_at: datetime) -> datetime:
         The point in time, between both.
     """
     return expires_at - (expires_at - created_at) * TOKEN_REFRESH_FRACTION
+
+
+async def stop_leftover_turns(
+    state_dir: Path, *, stop_grace: float, kill_grace: float, poll: float, timeout: float
+) -> None:
+    """Stop the hosted turns an earlier runner left behind and remove their records.
+
+    Hosted turns are not adopted (26 3.2 item 5). A runner that crashed leaves the turn of a
+    hosted run running in its own process group with the record
+    ``hosted/<agent_id>/turns/<run_id>.json``; nothing follows that turn or can stop it, and it
+    holds the thread's lock. So at its start, before any connection of a hosted agent, the
+    runner reads these records: a process that still matches its record is stopped as in
+    09 18.6 without a finish, and the record goes once no process of its group is left. A
+    process that does not match counts as gone (09 18.9): its record goes when the thread and
+    session locks are free, which a turn that lives on holds through its inherited
+    descriptors; with a busy lock the record stays for the next start (``adoption_lock_busy``).
+    The server ends such a run as 09 5.5 says (``interrupted``, or ``stale`` while nothing
+    serves the agent), as it does for a turn that died.
+
+    Args:
+        state_dir: ``runner.state_dir``.
+        stop_grace: ``runner.stop_grace``.
+        kill_grace: ``runner.kill_grace``.
+        poll: ``runner.poll_interval``.
+        timeout: ``runner.cli_probe_timeout``, the bound of the identity check.
+    """
+    hosted = state_dir / "hosted"
+    for path in sorted(hosted.glob("*/turns/*.json")) if hosted.is_dir() else []:
+        agent_dir = path.parent.parent
+        try:
+            record = json.loads(path.read_text())
+            ids = {
+                "agent_id": UUID(agent_dir.name),
+                "run_id": UUID(record["run_id"]),
+                "thread_id": UUID(record["thread_id"]),
+            }
+        except (OSError, ValueError, KeyError, TypeError):
+            _warn("turn_record_unreadable", record=path.stem)
+            continue
+        alive = process_matches(record, timeout)
+        held: list[int] = []
+        if not alive:
+            names = (f"thread-{ids['thread_id']}", f"session-{record.get('session_ref')}")
+            try:
+                for name in names:
+                    held.append(await acquire(agent_dir / "locks" / f"{name}.lock", 0, poll))
+            except LockTimeout:
+                for fd in held:
+                    release(fd)
+                _log("adoption_lock_busy", **ids)
+                continue
+        try:
+            _log("turn_adopted", action="stop" if alive else "leave", **ids)
+            if alive:
+                group = AdoptedGroup(record, timeout, verified=True)
+                await stop_group(group, stop_grace, kill_grace, poll, ids)
+            remove_turn_record(path)
+        finally:
+            for fd in reversed(held):
+                release(fd)
 
 
 @dataclass(frozen=True)
@@ -1207,6 +1275,7 @@ class HostedAgents:
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await task
         async with self._lock:
-            for connection in list(self._connections.values()):
-                await connection.stop()
+            # Together: every stop waits until the turns of its agent are stopped (09 18.6),
+            # and one after the other these waits would add up over the agents.
+            await asyncio.gather(*(c.stop() for c in self._connections.values()))
             self._connections.clear()

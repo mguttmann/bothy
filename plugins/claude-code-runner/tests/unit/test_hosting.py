@@ -4,7 +4,8 @@
 The set follows ``listHostedAgents`` at start, ``agent.hosting_changed`` and the timer of
 ``runner.channels_resync_interval``; a hosted token lives in memory only and is fetched again
 before its ``expires_at``; a connection closed with ``4012`` drops the agent until the next list
-names it again. The world is `hosting_world.HostingWorld`.
+names it again. The world is `hosting_world.HostingWorld`. Closing the set stops every connection
+together (26 3.2 item 5).
 """
 
 from __future__ import annotations
@@ -326,3 +327,27 @@ async def test_hosting_changed_does_not_hold_up_the_runner_s_events(
     envelope = SimpleNamespace(type="agent.hosting_changed")
     assert await asyncio.wait_for(hosting.on_event(envelope), 1.0)  # type: ignore[arg-type]
     release.set()
+
+
+async def test_close_stops_every_connection_together() -> None:
+    # Each stop waits until the turns of its agent are stopped (09 18.6): one after the other
+    # these waits add up over the agents.
+    order: list[str] = []
+
+    class Connection:
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+        async def stop(self) -> None:
+            order.append(f"{self.name} begins")
+            await asyncio.sleep(0)  # a stop waits; the other stops go on meanwhile
+            order.append(f"{self.name} ends")
+
+    hosting = HostedAgents(SimpleNamespace())  # type: ignore[arg-type]
+    hosting._connections = {  # type: ignore[assignment]
+        UUID(int=1): Connection("first"),
+        UUID(int=2): Connection("second"),
+    }
+    await hosting.close()
+    assert order == ["first begins", "second begins", "first ends", "second ends"]
+    assert hosting.agent_ids == []

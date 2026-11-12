@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import dataclasses
+import errno
 import json
 import logging
 import os
@@ -40,6 +41,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fake_claude"))
 import helper
 
 API_KEY = "sk-ant-canary-0123456789"
+
+
+def fail_turn_records(monkeypatch: pytest.MonkeyPatch) -> None:
+    """From now on no turn record can be written, as in a state folder without space left.
+
+    The next write raises `OSError` inside the run that makes it, at a place where the runner
+    expects no error: the run ends by an unexpected error (09 18.9).
+    """
+
+    def no_space(*_: Any) -> None:
+        raise OSError(errno.ENOSPC, os.strerror(errno.ENOSPC))
+
+    monkeypatch.setattr("claude_code_runner.runturn.write_turn_record", no_space)
 
 
 def live_entries(paths: Iterable[Path]) -> Iterator[tuple[Path, os.stat_result]]:
