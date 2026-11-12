@@ -1,6 +1,6 @@
 # 08 Identity, devices and sessions
 
-Status: draft M0. Normative for the module `identity`, the login endpoints, the clients and the
+Status: normative, built (M1 to M8). Normative for the module `identity`, the login endpoints, the clients and the
 admin console.
 Terms: [00-glossary.md](00-glossary.md). Tables: [03-data-model.md](03-data-model.md),
 section 4.2. Gateway and DPoP in the WebSocket: [04-sync-protocol.md](04-sync-protocol.md),

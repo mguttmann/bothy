@@ -1,6 +1,6 @@
 # Moving to another target
 
-Status: draft M0. Runbook for [16-operations.md](../spec/16-operations.md) 11. Applies to every move:
+Status: built (M1 to M7). Runbook for [16-operations.md](../spec/16-operations.md) 11. Applies to every move:
 Mac to Linux VM, VM to cloud, cloud to cloud, container database to managed service.
 
 ![Move](diagrams/cloud-migration.svg)
@@ -82,7 +82,8 @@ is handled like a restore with a new epoch ([16-operations.md](../spec/16-operat
 4. Target: restore of the logical dump and of the objects; compare the manifest (row counts,
    `head_seq`, audit head, file count). A difference means: abort, make the old instance writable again.
    Then save the manifest of the final backup (`backup_runs.manifest` of that run on the old
-   instance) as `manifest.json` next to the Compose file and run
+   instance; the command is in [backup-restore.md](backup-restore.md#11-state-of-the-runs)) as
+   `manifest.json` next to the Compose file and run
    `docker compose run --rm -v ./manifest.json:/tmp/manifest.json:ro restore restore finalize --relocation /tmp/manifest.json`
    (the `restore` container is read-only, so the file is mounted): it first applies the deletion
    journal ([backup-restore.md](backup-restore.md) 5.2 step 6; after a relocation without loss it

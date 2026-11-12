@@ -1,6 +1,6 @@
 # Webhooks
 
-Status: draft M0. Normative are the section `webhooks:` in [openapi.yaml](openapi.yaml) (one
+Status: normative, built (M2). Normative are the section `webhooks:` in [openapi.yaml](openapi.yaml) (one
 entry per event type with a schema) and this document (delivery rules). Decision: ADR 0016.
 Conventions of the API: [docs/spec/06-api.md](../spec/06-api.md). Events and receive actions:
 [docs/spec/05-actions.md](../spec/05-actions.md), section 6.

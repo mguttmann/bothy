@@ -5,7 +5,7 @@ Server code and the host service of the terminal.
 | Folder | Content | Chapter |
 |---|---|---|
 | `server/` | The Go server as a modular monolith: one binary with the roles `api` and `worker` | [02 Architecture](../docs/spec/02-architecture.md) |
-| `host/` | Host service `bothy-host` for the terminal on connected hosts; today the Noise core (handshake, transport, frames, fingerprint) and the binary without commands | [24 Terminal](../docs/spec/24-terminal.md) |
+| `host/` | Host service `bothy-host` for the terminal on connected hosts: one binary that is installed on a host and paired with a server, runs the terminal sessions and checks itself (`install`, `pair`, `run`, `doctor`); its state is in its [README](host/README.md) | [24 Terminal](../docs/spec/24-terminal.md) |
 
 For the gates, every tracked `go.mod` under `services/` is a Go module (format, lint,
 build, tests with coverage, vulnerabilities, licenses); details in

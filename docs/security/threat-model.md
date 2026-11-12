@@ -1,6 +1,6 @@
 # Threat model
 
-Status: draft M0, as of milestone M0 (planning), terminal addendum of 2026-10-10; as of milestone M2 (terminal across several api nodes, M2-47, 2026-10-20); as of stage A1 (built-in agents, specification A1-01, 2026-11-06); Hermes adapter external jobs (FIX-hermes-external-jobs, 2026-11-07); Hermes adapter session mirror (FEAT-hermes-mirror-sessions, 2026-11-07); client IP from one forwarding header (AUD-srv-platform-01, 2026-11-11); failed credentials on the gateway (AUD-srv-gateway-01, 2026-11-11). Living document; maintenance rule in section 9.
+Status: normative. As of milestone M0 (planning), terminal addendum of 2026-10-10; as of milestone M2 (terminal across several api nodes, M2-47, 2026-10-20); as of stage A1 (built-in agents, specification A1-01, 2026-11-06); Hermes adapter external jobs (FIX-hermes-external-jobs, 2026-11-07); Hermes adapter session mirror (FEAT-hermes-mirror-sessions, 2026-11-07); client IP from one forwarding header (AUD-srv-platform-01, 2026-11-11); failed credentials on the gateway (AUD-srv-gateway-01, 2026-11-11). Living document; maintenance rule in section 9.
 Controls with IDs `SEC-...`: [../spec/19-security.md](../spec/19-security.md). Permissions and
 guard rules `SR1` to `SR12`: [../spec/07-permissions.md](../spec/07-permissions.md). Identity:
 [../spec/08-identity.md](../spec/08-identity.md). Privacy:

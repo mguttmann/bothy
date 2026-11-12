@@ -1,6 +1,6 @@
 # 15 Client architecture
 
-Status: draft M0. Applies to `apps/client` (iOS, Android, macOS, Windows), `apps/console` (web)
+Status: normative, built (M4 to M6). Applies to `apps/client` (iOS, Android, macOS, Windows), `apps/console` (web)
 and `packages/`. Terminal: [24-terminal.md](24-terminal.md) (normative for protocol and permissions),
 here section 23. Visualizations: [25-visualization.md](25-visualization.md). Terms: [00-glossary.md](00-glossary.md). Sync: [04-sync-protocol.md](04-sync-protocol.md)
 (normative for everything stated here about events, cursors and the outbox). Usage:

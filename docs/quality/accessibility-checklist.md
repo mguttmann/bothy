@@ -1,6 +1,6 @@
 # Accessibility checklist of the desktop app
 
-Status: M4-32 and M4-37 filled. The build tickets of milestone M4 fill this page (D-W-116): M4-32 writes the
+Status: built (M4-32, M4-36, M4-37). The build tickets of milestone M4 fill this page (D-W-116): M4-32 writes the
 sections for the chat, settings and administration screens A1 to A6 and the notification area,
 M4-36 the section for the terminal view, and M4-37 the section for screen A8. The phone apps have
 their own page, [accessibility-mobile.md](accessibility-mobile.md) (M5-10). The rules come from [01 Product, section 8](../spec/01-product.md#8-accessibility);

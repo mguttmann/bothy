@@ -1,6 +1,6 @@
 # 21 Multi-user dev environment and isolation
 
-Status: draft M0. Later milestone (Baseline section 6: "Multi-user dev environment (isolation)
+Status: normative, planned (V2). Later milestone (Baseline section 6: "Multi-user dev environment (isolation)
 as a later milestone"). Until this milestone is complete, the following applies: in dev projects
 only owners trigger (07, SR2 and SR3). This chapter defines what must apply before enabling for
 additional people, and is already normative now for the guard rule and the record `dev_environments`.

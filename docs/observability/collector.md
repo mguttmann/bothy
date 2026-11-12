@@ -1,6 +1,6 @@
 # OpenTelemetry Collector
 
-Status: draft M0. Explains [infra/otel/collector.yaml](../../infra/otel/collector.yaml) and the
+Status: built (M1 to M7). Explains [infra/otel/collector.yaml](../../infra/otel/collector.yaml) and the
 overlays under [infra/otel/exporters/](../../infra/otel/exporters/). Decision: ADR 0034.
 
 ![Telemetry pipeline](diagrams/telemetry-pipeline.svg)

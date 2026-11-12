@@ -1,6 +1,6 @@
 # 06 Public API
 
-Status: draft M0. Normative are [docs/api/openapi.yaml](../api/openapi.yaml) (REST, OpenAPI 3.1),
+Status: normative, built (M1 to M8). Normative are [docs/api/openapi.yaml](../api/openapi.yaml) (REST, OpenAPI 3.1),
 [docs/api/asyncapi.yaml](../api/asyncapi.yaml) (gateway, AsyncAPI 3.0) and this chapter
 (conventions). Webhooks: [docs/api/webhooks.md](../api/webhooks.md). Terms:
 [00-glossary.md](00-glossary.md). Tables: [03-data-model.md](03-data-model.md). Sync:

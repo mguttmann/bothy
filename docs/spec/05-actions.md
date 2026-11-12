@@ -1,6 +1,6 @@
 # 05 Authorization action catalogue
 
-Status: draft M0, integrated after the feedback of all chapters. Normative. This list is the
+Status: normative, built (M1 to M8). This list is the
 complete set of actions that `authorize(principal, action, resource) -> Decision` in the
 module `authz` knows (B7).
 Terms: [00-glossary.md](00-glossary.md). Tables: [03-data-model.md](03-data-model.md).

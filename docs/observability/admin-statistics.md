@@ -1,6 +1,6 @@
 # Statistics in the admin console
 
-Status: draft M0. Rules: [17-observability.md](../spec/17-observability.md) 8. Presentation in
+Status: built (M1 to M7). Rules: [17-observability.md](../spec/17-observability.md) 8. Presentation in
 the console: [01-product.md](../spec/01-product.md); visualizations, own measurement and live stream:
 [25-visualization.md](../spec/25-visualization.md). Permissions: `stats.read` and `cost.read.aggregate`
 ([05-actions.md](../spec/05-actions.md) 4.2, 4.12).

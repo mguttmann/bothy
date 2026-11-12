@@ -1,6 +1,6 @@
 # Service Level Objectives
 
-Status: draft M0. Decision: ADR 0035. The source of all numbers is the Sloth files under
+Status: built (M1 to M7). Decision: ADR 0035. The source of all numbers is the Sloth files under
 [infra/observability/slo/](../../infra/observability/slo/); the table below reproduces them.
 `make ops-check` compares table and files (check `slo-docs`).
 

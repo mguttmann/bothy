@@ -1,7 +1,7 @@
 # 25 Visualization
 
-Status: draft M0, addendum of 2026-10-10. Normative for the own measurement of the server
-(minute aggregates and SLI counters), the live stream `stats.live`, the package
+Status: normative, built (M6, M7). Addendum of 2026-10-10. Normative for the own measurement of
+the server (minute aggregates and SLI counters), the live stream `stats.live`, the package
 `packages/bothy_viz`, the visualizations in apps and web console, the Grafana panel plugin
 `plugins/grafana-bothy-live` and the optional embedding of Grafana in the web console.
 Terms: [00-glossary.md](00-glossary.md). Table: [03-data-model.md](03-data-model.md)

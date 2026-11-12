@@ -1,6 +1,6 @@
 # Operations with Tailscale
 
-Status: draft M0. Tailscale is a documented option, not a requirement (B9). Rules:
+Status: built (M1 to M7). Tailscale is a documented option, not a requirement (B9). Rules:
 [16-operations.md](../spec/16-operations.md) 4.3. Identity provider `trusted_header`: chapter 08.
 
 ## 1. When to use this option

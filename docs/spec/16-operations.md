@@ -1,6 +1,6 @@
 # 16 Operations
 
-Status: draft M0. Normative for deployment, configuration, secrets, backup,
+Status: normative, built (M1 to M8). Normative for deployment, configuration, secrets, backup,
 restore, upgrade, environments, feature flags, status page and capacity.
 Terms: [00-glossary.md](00-glossary.md). Tables: [03-data-model.md](03-data-model.md).
 Sync: [04-sync-protocol.md](04-sync-protocol.md). Actions: [05-actions.md](05-actions.md).
@@ -955,7 +955,15 @@ Rationale:
    append-only access. Only a separate account may delete after the retention period. Reason:
    whoever takes over the server must not be able to delete the backups (ransomware).
 4. Every run writes a row into `backup_runs` (03, module `status`) and reports
-   metrics (chapter 17). The admin console and the status page read the table.
+   metrics (chapter 17). No operation of the API and no view of the admin console reads
+   `backup_runs` yet, and the status page does not show it ([PLAN](../PLAN.md) V3-19). Until
+   then the state of a run is in four places: the exit code and the last line of
+   `bothy-backupd backup <kind>` and `bothy-backupd restore-test`; the log of the container
+   `backup`, one line per run; the metrics and alerts of chapter 17, which need the profile
+   `observability` or another telemetry backend; and the table itself, read with `psql` in the
+   database container ([backup-restore.md](../operations/backup-restore.md#11-state-of-the-runs)).
+   `bothy migrate up` reads the last success for `migrate.require_recent_backup` (section 10).
+   Without a telemetry backend nothing reports a failed scheduled run by itself.
 
 As built (M7-02, [bothy-backupd README](../../services/server/cmd/bothy-backupd/README.md),
 docs/decisions.d/M7-02.md D-M7-02-1 to D-M7-02-12):
@@ -1456,7 +1464,8 @@ docs/decisions.d/M7-14.md D-M7-14-1 to D-M7-14-9):
 | `agent.presence` | State `online` of the agent of the component |
 
 Backup and restore test are not components of the status page, because all people see the
-status page. Their state is in the admin console (`backup_runs`) and in the alerts.
+status page. Their state is in the table `backup_runs` and in the alerts; no view of the admin
+console shows it yet (section 8.2 item 4).
 
 As built (M7-09, [status README](../../services/server/internal/status/README.md),
 [docs/decisions.d/M7-09.md](../decisions.d/M7-09.md) D-M7-09-1 to D-M7-09-10):
@@ -1633,7 +1642,7 @@ Column "Place": Server = configuration reference of the server; Installation scr
 | `backup.logical.retention` | Server | `30d` | retention of the logical backup |
 | `backup.objects.schedule` | Server | `30 3 * * *` | schedule of the object backup (cron) |
 | `backup.objects.retention` | Server | `90d` | retention of the object snapshots |
-| `backup.offsite.target` | Server | empty | off-site target; empty means local only (warning in console and status) |
+| `backup.offsite.target` | Server | empty | off-site target; empty means local only (warning "local backup only" of `bothy config check` and in the start log of `bothy-backupd`) |
 | `backup.offsite.region` | Server | `us-east-1` | region of the off-site bucket (signing of S3 requests) |
 | `backup.offsite.use_path_style` | Server | `true` | path-style addressing of the off-site bucket (`https://<host>/<bucket>`); `false` uses virtual hosts |
 | `backup.max_age` | Server | `26h` | no successful backup for longer than this: alert |
