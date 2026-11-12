@@ -22,6 +22,8 @@ part 'search_hit.g.dart';
 /// * [message]
 /// * [thread]
 /// * [file]
+/// * [threadId] - Only with `kind = file`; the thread of the message the file is attached to. The `File` of a hit is the attached form without `scope_channel_id`, so a client opens the hit through this thread and `message_id`.
+/// * [messageId] - Only with `kind = file`; the message the file is attached to.
 /// * [threadTitle]
 /// * [channelName]
 /// * [spaceName]
@@ -44,6 +46,14 @@ abstract class SearchHit implements Built<SearchHit, SearchHitBuilder> {
 
   @BuiltValueField(wireName: r'file')
   File? get file;
+
+  /// Only with `kind = file`; the thread of the message the file is attached to. The `File` of a hit is the attached form without `scope_channel_id`, so a client opens the hit through this thread and `message_id`.
+  @BuiltValueField(wireName: r'thread_id')
+  String? get threadId;
+
+  /// Only with `kind = file`; the message the file is attached to.
+  @BuiltValueField(wireName: r'message_id')
+  String? get messageId;
 
   @BuiltValueField(wireName: r'thread_title')
   String? get threadTitle;
@@ -112,6 +122,20 @@ class _$SearchHitSerializer implements PrimitiveSerializer<SearchHit> {
       yield serializers.serialize(
         object.file,
         specifiedType: const FullType(File),
+      );
+    }
+    if (object.threadId != null) {
+      yield r'thread_id';
+      yield serializers.serialize(
+        object.threadId,
+        specifiedType: const FullType(String),
+      );
+    }
+    if (object.messageId != null) {
+      yield r'message_id';
+      yield serializers.serialize(
+        object.messageId,
+        specifiedType: const FullType(String),
       );
     }
     if (object.threadTitle != null) {
@@ -207,6 +231,22 @@ class _$SearchHitSerializer implements PrimitiveSerializer<SearchHit> {
           ) as File?;
           if (valueDes == null) continue;
           result.file.replace(valueDes);
+          break;
+        case r'thread_id':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.threadId = valueDes;
+          break;
+        case r'message_id':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.messageId = valueDes;
           break;
         case r'thread_title':
           final valueDes = serializers.deserialize(

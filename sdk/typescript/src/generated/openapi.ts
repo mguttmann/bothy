@@ -8455,6 +8455,10 @@ export interface components {
             message?: components["schemas"]["Message"];
             thread?: components["schemas"]["Thread"];
             file?: components["schemas"]["File"];
+            /** @description Only with `kind = file`; the thread of the message the file is attached to. The `File` of a hit is the attached form without `scope_channel_id`, so a client opens the hit through this thread and `message_id`. */
+            thread_id?: components["schemas"]["Uuid"];
+            /** @description Only with `kind = file`; the message the file is attached to. */
+            message_id?: components["schemas"]["Uuid"];
             thread_title?: string;
             channel_name?: string;
             space_name?: string;

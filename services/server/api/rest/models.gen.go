@@ -16371,6 +16371,9 @@ type SearchHit struct {
 	Kind        SearchHitKind `json:"kind"`
 	Message     *Message      `json:"message,omitempty"`
 
+	// MessageId Only with `kind = file`; the message the file is attached to.
+	MessageId *Uuid `json:"message_id,omitempty"`
+
 	// Score Only with `sort = relevance`.
 	Score *float64 `json:"score,omitempty"`
 
@@ -16379,8 +16382,11 @@ type SearchHit struct {
 		Match bool   `json:"match"`
 		Text  string `json:"text"`
 	} `json:"segments"`
-	SpaceName   *string `json:"space_name,omitempty"`
-	Thread      *Thread `json:"thread,omitempty"`
+	SpaceName *string `json:"space_name,omitempty"`
+	Thread    *Thread `json:"thread,omitempty"`
+
+	// ThreadId Only with `kind = file`; the thread of the message the file is attached to. The `File` of a hit is the attached form without `scope_channel_id`, so a client opens the hit through this thread and `message_id`.
+	ThreadId    *Uuid   `json:"thread_id,omitempty"`
 	ThreadTitle *string `json:"thread_title,omitempty"`
 }
 
