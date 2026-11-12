@@ -208,6 +208,11 @@ void main() {
       c = null;
       await closing;
     });
+    // The REST calls of the first run live in the fake time of the test, and the app does not
+    // wait for them when it quits: the answer to a call of the thread opened last may arrive
+    // as late as during the second start, which lets real IO run. The test ends in the fake
+    // time, so the idle timer of that connection runs out before the test is over.
+    await tester.pump(const Duration(minutes: 5));
     expect(f.server.violations, isEmpty);
   });
 }
