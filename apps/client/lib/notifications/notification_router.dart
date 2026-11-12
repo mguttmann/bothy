@@ -5,6 +5,7 @@
 library;
 
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:domain/domain.dart';
 import 'package:l10n/l10n.dart';
@@ -21,7 +22,8 @@ import 'toast_content.dart';
 /// normally sends nothing then (13 4.4), so this guards the race between a focus change and an
 /// event already on its way (D-M4-30-1). A thread's notifications share one slot (13 4.5);
 /// `security` and `admin` have one fixed slot per kind and open the devices settings and the
-/// administration.
+/// administration. A thread the person read, on this device or another one, loses the
+/// notification this router showed for it ([onRead], 01 10.3).
 ///
 /// Example:
 /// ```dart
@@ -33,6 +35,9 @@ import 'toast_content.dart';
 ///   navigate: goRouter.go,
 /// );
 /// engine.notifications.listen(router.onEvent);
+/// engine.catchUp.countChanges.listen((thread) {
+///   if (engine.catchUp.countsOf(thread).unread == 0) router.onRead(thread);
+/// });
 /// final clicks = router.listen();
 /// ```
 final class NotificationRouter {
@@ -42,7 +47,8 @@ final class NotificationRouter {
   /// [appName] is the title when no channel name is known; [isOpenAndFocused] says whether a
   /// thread is open in the focused window that is not idle; [navigate] opens an app path;
   /// [localChannelName] reads the channel name of a thread from the local database for the
-  /// placeholder (01 10.2); [log] receives one line per notable step, never content.
+  /// placeholder (01 10.2); [log] receives one line per notable step, never content, and is
+  /// the developer log of the app unless given.
   NotificationRouter({
     required this.presenter,
     required this.texts,
@@ -52,7 +58,7 @@ final class NotificationRouter {
     Future<String?> Function(ThreadId thread)? localChannelName,
     void Function(String line)? log,
   }) : _localChannelName = localChannelName ?? _noChannel,
-       _log = log ?? _noLog;
+       _log = log ?? _developerLog;
 
   /// Shows the toasts.
   final NotificationPresenter presenter;
@@ -72,8 +78,12 @@ final class NotificationRouter {
   final Future<String?> Function(ThreadId thread) _localChannelName;
   final void Function(String line) _log;
 
+  /// The slots of threads this router filled and has not removed since.
+  final Set<String> _shown = {};
+
   static Future<String?> _noChannel(ThreadId _) async => null;
-  static void _noLog(String _) {}
+  static void _developerLog(String line) =>
+      developer.log(line, name: 'notifications');
 
   /// The app path a click on [n] opens (15 11): `/t/<thread>?m=<message>` for a thread,
   /// `/settings/devices` for `security`, `/admin` for `admin`; null for an unknown kind
@@ -96,8 +106,10 @@ final class NotificationRouter {
   /// The slot of [n]: one per thread, one per kind without a thread (13 4.5).
   static String tagOf(NotificationCreated n) {
     final thread = n.threadId;
-    return thread == null ? 'kind:${n.kind.code}' : 'thread:${thread.value}';
+    return thread == null ? 'kind:${n.kind.code}' : _threadTag(thread);
   }
+
+  static String _threadTag(ThreadId thread) => 'thread:${thread.value}';
 
   /// Shows the toast of [n], or nothing for the thread that is open in the focused window.
   Future<void> onEvent(NotificationCreated n) async {
@@ -121,6 +133,8 @@ final class NotificationRouter {
         _log('notification ${n.nid}: no local channel name (${e.runtimeType})');
       }
     }
+    final tag = tagOf(n);
+    if (thread != null) _shown.add(tag);
     await presenter.show(
       toastContentFor(
         n,
@@ -128,10 +142,20 @@ final class NotificationRouter {
         appName: appName(),
         localChannelName: local,
       ),
-      tag: tagOf(n),
+      tag: tag,
       silent: n.quiet,
       payload: target,
     );
+  }
+
+  /// The person has nothing unread in [thread] any more, read on this device or on another
+  /// one: removes the notification of its slot where the platform allows it (01 10.3,
+  /// [NotificationPresenter.cancelThread]). Only a slot this router filled since the app
+  /// started is removed, and each once; `security` and `admin` have no thread and stay.
+  Future<void> onRead(ThreadId thread) async {
+    final tag = _threadTag(thread);
+    if (!_shown.remove(tag)) return;
+    await presenter.cancelThread(tag);
   }
 
   /// Opens [payload] when it is an app path; anything else is ignored.

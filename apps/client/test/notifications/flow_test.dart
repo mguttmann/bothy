@@ -4,8 +4,9 @@
 // the app's providers against the fake server with a Windows window that hides to the
 // notification area. With the window hidden, a message from Sam makes the fake send
 // `notification.created` and the presenter shows one toast; a click opens the thread at the
-// message; after Quit the device has no connection and the fake creates nothing; after a restart
-// the counters show the messages.
+// message; a read on another device removes the toast of that thread (01 10.3); after Quit the
+// device has no connection and the fake creates nothing; after a restart the counters show the
+// messages.
 
 import 'dart:io';
 
@@ -23,6 +24,9 @@ import 'package:sync_engine/testing.dart';
 
 import '../support/desktop_fakes.dart';
 import '../support/fake_instance.dart';
+
+/// Another device of Alex, the one a read comes from.
+const String otherDevice = '01890a5d-ac96-774b-bcce-b302099a8d01';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -92,6 +96,37 @@ void main() {
       await sub.cancel();
     },
   );
+
+  test('read on another device: the notification of the thread is removed, no '
+      'other', () async {
+    c.read(desktopNotificationsProvider);
+    final world = fake.server.world;
+    final seed = fake.seed;
+    world
+      ..notifyOnMessages = true
+      ..setNotificationPref(seed.alex.id, 'channel', seed.general, 'all');
+
+    window.send(DesktopWindowEvent.close);
+    await eventually('hidden', () => window.calls.contains('hide'));
+    final message = seed.post(seed.sam, seed.releaseNotes, 'Build is green');
+    await eventually('a toast', () => presenter.shown.isNotEmpty);
+    final tag = presenter.shown.single.tag;
+    expect(tag, 'thread:${seed.releaseNotes}');
+    expect(presenter.cancelled, isEmpty, reason: 'unread: it stays');
+
+    // Alex reads another thread on the phone: the notification of this one stays.
+    world.putReadState(seed.alex.id, seed.printer, 0, deviceId: otherDevice);
+    // Then the thread of the notification, up to the message: `read_state.updated` reaches
+    // this app through the gateway, and the notification goes (01 10.3).
+    world.putReadState(
+      seed.alex.id,
+      seed.releaseNotes,
+      message['thread_seq']! as int,
+      deviceId: otherDevice,
+    );
+    await eventually('the removal', () => presenter.cancelled.isNotEmpty);
+    expect(presenter.cancelled, [tag]);
+  });
 
   test('after Quit: no connection of the device and no notification', () async {
     final world = fake.server.world;

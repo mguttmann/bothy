@@ -103,6 +103,9 @@ class FakeRegistrations implements PushRegistrations {
   final List<String> calls = [];
   int next = 0;
 
+  /// What `registerPush` throws when set.
+  Object? failure;
+
   @override
   Future<RegisteredPush> register({
     required String provider,
@@ -110,6 +113,8 @@ class FakeRegistrations implements PushRegistrations {
     required String appId,
     String? environment,
   }) async {
+    final failure = this.failure;
+    if (failure != null) throw failure;
     next++;
     calls.add(
       provider == 'apns'

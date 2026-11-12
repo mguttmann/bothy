@@ -24,6 +24,9 @@ import 'package:sync_engine/testing.dart';
 import '../phone/support/phone_device.dart';
 import '../support/fake_instance.dart';
 
+/// Another device of Alex, the one a read comes from.
+const String _desktop = '01890a5d-ac96-774b-bcce-b302099a8d01';
+
 void main() {
   HttpOverrides? saved;
   FakeInstance? fake;
@@ -128,6 +131,39 @@ void main() {
 
     await control.logout();
     // Nothing of the account that ended is kept for the next one of this app.
+    await eventually('no banner', () => banners.current.value == null);
+  });
+
+  test('the banner of a thread goes when the thread is read on another '
+      'device', () async {
+    final instance = fake = await start('ios');
+    final seed = instance.seed;
+    final c = appContainer(instance);
+    addTearDown(c.dispose);
+    final hints = c.listen(desktopNotificationsProvider, (_, _) {});
+    addTearDown(hints.close);
+    final banners = c.read(inAppBannersProvider)!;
+    final control = await connected(c, instance);
+    await control.loginWithPassword(
+      WorldSeed.alexLogin,
+      WorldSeed.password,
+      WorldSeed.totp,
+    );
+    await eventually(
+      'live',
+      () => c.read(syncEngineProvider)?.state.phase == ConnectionPhase.live,
+    );
+    final message = seed.post(seed.sam, seed.releaseNotes, 'Build is green');
+    await eventually('the banner', () => banners.current.value != null);
+
+    // Alex reads the thread on the desktop: `read_state.updated` reaches the phone through
+    // the gateway, and the banner goes (01 10.3).
+    instance.server.world.putReadState(
+      seed.alex.id,
+      seed.releaseNotes,
+      message['thread_seq']! as int,
+      deviceId: _desktop,
+    );
     await eventually('no banner', () => banners.current.value == null);
   });
 

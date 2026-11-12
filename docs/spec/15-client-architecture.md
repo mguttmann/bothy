@@ -909,6 +909,20 @@ as a login item", macOS 13.0 and later,
 https://developer.apple.com/documentation/servicemanagement/smappservice/mainapp, retrieved
 2026-10-23 [verified]), kept only by the system and off until the person turns it on (D-M4-30-4).
 
+**Read threads (01 10.3).** A connected desktop app, Windows or macOS, removes the local
+notification of a thread as soon as the person has nothing unread in it, read on this device or
+on another one (`read_state.updated`): the router remembers the slots it filled since the app
+started and calls `cancel` for the slot of the thread, once. Without package identity on Windows
+`cancel` does nothing, as above. A phone in front has the same router: the banner of a read
+thread leaves the screen. Not removed: a notification of an earlier run of the app, the slots
+of `security` and `admin`, and a push of APNs
+(docs/decisions.d/AUD-client-notifications-01.md AUD-CN1/3).
+
+**Permission for local notifications on macOS.** The app asks for the permission (alert and
+sound) once per run when its first local notification is about to show, so never before the
+login; the start of the app only reads the click that started it. The request is not awaited
+(D-M4-30-2, AUD-CN1/2).
+
 ## 11. Deep links and navigation
 
 Router: `go_router` (flutter.dev). One path per target, the same for push, sharing, console and links in

@@ -3,12 +3,37 @@
 // The `flutter_local_notifications` presenter of M4-30 over a recording plugin (brief M4-30
 // Design note 2, D-M4-30-2): one initialization with the app name, the AUMID and the GUID; a
 // slot per tag; quiet without sound; a click delivers the payload; without package identity no
-// cancel; a failing plugin logs one line without content and shows nothing.
+// cancel; a failing plugin logs one line without content and shows nothing. On macOS the
+// permission is asked at the first notification, not when the click that started the app is
+// read (docs/decisions.d/AUD-client-notifications-01.md AUD-CN1/2).
 
 import 'package:client/notifications/notification_presenter.dart';
+import 'package:client/notifications/notification_router.dart';
 import 'package:client/notifications/toast_content.dart';
+import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:l10n/l10n.dart';
+
+/// The macOS side of the plugin: records every permission request.
+class RecordingMacOS extends MacOSFlutterLocalNotificationsPlugin {
+  final List<({bool alert, bool sound, bool badge})> requests = [];
+  bool fail = false;
+
+  @override
+  Future<bool?> requestPermissions({
+    bool sound = false,
+    bool alert = false,
+    bool badge = false,
+    bool provisional = false,
+    bool critical = false,
+    bool providesAppNotificationSettings = false,
+  }) async {
+    requests.add((alert: alert, sound: sound, badge: badge));
+    if (fail) throw StateError('no answer');
+    return true;
+  }
+}
 
 /// A plugin that records the calls the presenter makes.
 class RecordingPlugin implements FlutterLocalNotificationsPlugin {
@@ -28,6 +53,9 @@ class RecordingPlugin implements FlutterLocalNotificationsPlugin {
   NotificationAppLaunchDetails? launch;
   bool failInit = false;
   bool failCalls = false;
+
+  /// The macOS implementation the plugin resolves, or null on another platform.
+  RecordingMacOS? macOS;
 
   @override
   Future<bool?> initialize({
@@ -79,7 +107,10 @@ class RecordingPlugin implements FlutterLocalNotificationsPlugin {
   @override
   T? resolvePlatformSpecificImplementation<
     T extends FlutterLocalNotificationsPlatform
-  >() => null;
+  >() {
+    final Object? implementation = macOS;
+    return implementation is T ? implementation : null;
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) =>
@@ -95,15 +126,18 @@ void main() {
   late RecordingPlugin plugin;
   late List<String> logs;
 
-  LocalNotificationPresenter presenter({bool identity = true}) =>
-      LocalNotificationPresenter(
-        appName: 'ExampleChat',
-        appUserModelId: 'com.example.chat',
-        guid: LocalNotificationPresenter.guidFor('com.example.chat'),
-        log: logs.add,
-        plugin: plugin,
-        hasPackageIdentity: identity,
-      );
+  LocalNotificationPresenter presenter({
+    bool identity = true,
+    bool asksPermission = false,
+  }) => LocalNotificationPresenter(
+    appName: 'ExampleChat',
+    appUserModelId: 'com.example.chat',
+    guid: LocalNotificationPresenter.guidFor('com.example.chat'),
+    log: logs.add,
+    plugin: plugin,
+    hasPackageIdentity: identity,
+    asksPermission: asksPermission,
+  );
 
   setUp(() {
     plugin = RecordingPlugin();
@@ -181,6 +215,61 @@ void main() {
     },
   );
 
+  test('macOS: the click that started the app is read without asking for the '
+      'permission; the first notification asks once', () async {
+    final macOS = plugin.macOS = RecordingMacOS();
+    final p = presenter(asksPermission: true);
+    // What the app does when it starts, before any login (`desktopNotificationsProvider`).
+    final router = NotificationRouter(
+      presenter: p,
+      texts: () => lookupAppLocalizations(const Locale('en')),
+      appName: () => 'ExampleChat',
+      isOpenAndFocused: (_) => false,
+      navigate: (_) {},
+    );
+    final clicks = router.listen();
+    await pumpEventQueue();
+    expect(plugin.calls, ['initialize', 'launch']);
+    expect(
+      macOS.requests,
+      isEmpty,
+      reason: 'no dialog at the start of the app',
+    );
+
+    await p.cancelThread('thread:t1');
+    expect(macOS.requests, isEmpty, reason: 'removing asks nothing either');
+
+    await p.show(toast, tag: 'thread:t1', silent: false, payload: '/t/t1');
+    expect(macOS.requests, [(alert: true, sound: true, badge: false)]);
+    await p.show(toast, tag: 'thread:t2', silent: false, payload: '/t/t2');
+    expect(macOS.requests, hasLength(1), reason: 'asked once per run');
+    expect(plugin.shown, hasLength(2));
+    await clicks.cancel();
+    await p.dispose();
+  });
+
+  test(
+    'macOS: a failed permission request does not stop the notification',
+    () async {
+      final macOS = plugin.macOS = RecordingMacOS()..fail = true;
+      final p = presenter(asksPermission: true);
+      await p.show(toast, tag: 'thread:t1', silent: false, payload: '/t/t1');
+      await pumpEventQueue();
+      expect(macOS.requests, hasLength(1));
+      expect(plugin.shown, hasLength(1));
+      await p.dispose();
+    },
+  );
+
+  test('a platform without the question never asks', () async {
+    final macOS = plugin.macOS = RecordingMacOS();
+    final p = presenter();
+    expect(await p.launchPayload(), isNull);
+    await p.show(toast, tag: 'thread:t1', silent: false, payload: '/t/t1');
+    expect(macOS.requests, isEmpty);
+    await p.dispose();
+  });
+
   test('cancel only with package identity', () async {
     final with_ = presenter();
     await with_.cancelThread('thread:t1');
@@ -231,6 +320,22 @@ void main() {
       expect(line, isNot(contains('Build is green')));
     }
     await failing.dispose();
+  });
+
+  test('without a sink the lines go to the developer log of the app', () async {
+    plugin.failInit = true;
+    final p = LocalNotificationPresenter(
+      appName: 'ExampleChat',
+      appUserModelId: 'com.example.chat',
+      guid: LocalNotificationPresenter.guidFor('com.example.chat'),
+      plugin: plugin,
+      hasPackageIdentity: true,
+      asksPermission: false,
+    );
+    await p.show(toast, tag: 'thread:t1', silent: false, payload: '/t/t1');
+    expect(plugin.shown, isEmpty);
+    expect(logs, isEmpty, reason: 'no sink of the test was given');
+    await p.dispose();
   });
 
   test('the no-op presenter does nothing', () async {

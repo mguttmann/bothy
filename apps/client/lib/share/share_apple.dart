@@ -7,6 +7,7 @@
 library;
 
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:api_client/api_client.dart' show ApiClient;
 import 'package:api_client/api_client.dart' as api;
@@ -149,8 +150,9 @@ final class ShareAccount {
 /// - [forget] deletes the child session and the shared data on every end of the account.
 ///
 /// Every platform failure is swallowed: sharing is an addition, the app works without it and
-/// the next start tries again. A build without the App Group ([ShareAppleHostApi.isAvailable]
-/// false) does nothing.
+/// the next start tries again. Each swallowed failure leaves one line in the log that names
+/// the step and the type of the error, never a token, an ID or a text of the error. A build
+/// without the App Group ([ShareAppleHostApi.isAvailable] false) does nothing.
 ///
 /// Example:
 /// ```dart
@@ -158,15 +160,24 @@ final class ShareAccount {
 /// await share.signedIn(account, afterLogin: true);
 /// ```
 final class AppleShare {
-  /// Creates the glue over [host]; [clock] dates the expiry of the access token.
-  AppleShare({required this.host, Clock clock = const SystemClock()})
-    : _clock = clock; // ignore: prefer_initializing_formals
+  /// Creates the glue over [host]; [clock] dates the expiry of the access token; [log]
+  /// receives one line per swallowed failure, never content, and is the developer log of the
+  /// app unless given.
+  AppleShare({
+    required this.host,
+    Clock clock = const SystemClock(),
+    void Function(String line)? log,
+  }) : _clock = clock, // ignore: prefer_initializing_formals
+       _log = log ?? _developerLog;
 
   /// The runner's side: the shared keychain, the App Group values and the share inbox.
   final ShareAppleHostApi host;
 
   ShareAppleHostApi get _host => host;
   final Clock _clock;
+  final void Function(String line) _log;
+
+  static void _developerLog(String line) => developer.log(line, name: 'share');
   Future<void> _targets = Future<void>.value();
   ShareAccount? _account;
   InstanceLimits? _limits;
@@ -190,9 +201,9 @@ final class AppleShare {
       _written = null;
     }
     if (!await _available()) return;
-    await _guard(_writeSettings);
+    await _guard('settings', _writeSettings);
     await _ensureSession(account, afterLogin: afterLogin);
-    await _guard(account.takeOver);
+    await _guard('inbox takeover', account.takeOver);
     await refreshTargets();
   }
 
@@ -202,7 +213,7 @@ final class AppleShare {
     final account = _account;
     if (account == null || !await _available()) return;
     await _ensureSession(account, afterLogin: false);
-    await _guard(account.takeOver);
+    await _guard('inbox takeover', account.takeOver);
   }
 
   /// The instance limits changed (read from `getInstance`); writes the settings again.
@@ -210,7 +221,7 @@ final class AppleShare {
     if (_account == null || limits == _limits) return;
     _limits = limits;
     if (!await _available()) return;
-    await _guard(_writeSettings);
+    await _guard('settings', _writeSettings);
   }
 
   /// Reads the recent targets of the account and writes them when they differ from the ones
@@ -220,10 +231,10 @@ final class AppleShare {
   Future<void> _refresh() async {
     final account = _account;
     if (account == null || !await _available()) return;
-    final targets = await _guardValue(account.recentTargets);
+    final targets = await _guardValue('recent targets', account.recentTargets);
     if (targets == null || !identical(_account, account)) return;
     if (_written != null && listEquals(_written, targets)) return;
-    await _guard(() async {
+    await _guard('recent targets write', () async {
       await _host.writeRecentTargets([for (final t in targets) t.toRecord()]);
       _written = List.of(targets);
     });
@@ -240,12 +251,15 @@ final class AppleShare {
       _createdFor = null;
     }
     if (!await _available()) return;
-    await _guard(() => _host.deleteExtensionSession(instanceId));
-    await _guard(_host.clearShareData);
+    await _guard(
+      'session removal',
+      () => _host.deleteExtensionSession(instanceId),
+    );
+    await _guard('data removal', _host.clearShareData);
   }
 
   Future<bool> _available() async =>
-      await _guardValue(_host.isAvailable) ?? false;
+      await _guardValue('availability', _host.isAvailable) ?? false;
 
   Future<void> _writeSettings() async {
     final account = _account;
@@ -286,7 +300,7 @@ final class AppleShare {
   Future<void> _createOnce(
     ShareAccount account, {
     required bool force,
-  }) => _guard(() async {
+  }) => _guard('session', () async {
     final now = _clock.now();
     if (!force &&
         await _host.hasExtensionSession(
@@ -314,18 +328,23 @@ final class AppleShare {
     _createdFor = account;
   });
 
-  static Future<void> _guard(FutureOr<void> Function() body) async {
+  /// Runs [body], the step [what]; a failure is logged without content and swallowed.
+  Future<void> _guard(String what, FutureOr<void> Function() body) async {
     try {
       await body();
-    } on Object {
+    } on Object catch (e) {
       // Sharing is an addition; the next start tries again (see the class comment).
+      _log('share: $what failed (${e.runtimeType})');
     }
   }
 
-  static Future<T?> _guardValue<T>(Future<T> Function() body) async {
+  /// The value of [body], the step [what], or null after a failure, which is logged without
+  /// content.
+  Future<T?> _guardValue<T>(String what, Future<T> Function() body) async {
     try {
       return await body();
-    } on Object {
+    } on Object catch (e) {
+      _log('share: $what failed (${e.runtimeType})');
       return null;
     }
   }

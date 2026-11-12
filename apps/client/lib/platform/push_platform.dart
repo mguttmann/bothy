@@ -6,6 +6,7 @@
 library;
 
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:api_client/api_client.dart';
 
@@ -191,13 +192,20 @@ void recordPushCounters(
 /// - [targets] gives the app path of every tapped notification ([tapped]).
 ///
 /// Every platform failure is swallowed: push is an addition, the app works without it, and the
-/// next start tries again.
+/// next start tries again. Each swallowed failure leaves one line in the log that names the
+/// step and the type of the error, never a token, an ID or a text of the error.
 abstract base class NativePush implements PushPlatform {
-  /// Creates the flow; [metrics] receives the display counters.
-  NativePush(this.metrics);
+  /// Creates the flow; [metrics] receives the display counters; [log] receives one line per
+  /// swallowed failure, never content, and is the developer log of the app unless given.
+  NativePush(this.metrics, {void Function(String line)? log})
+    : _log = log ?? _developerLog;
 
   /// The collector of the client metrics.
   final telemetry.ClientMetrics metrics;
+
+  final void Function(String line) _log;
+
+  static void _developerLog(String line) => developer.log(line, name: 'push');
 
   final StreamController<String> _targets = StreamController<String>();
   PushAccount? _account;
@@ -261,8 +269,9 @@ abstract base class NativePush implements PushPlatform {
       for (final (thread, message) in await connectHost()) {
         tapped(thread, message);
       }
-    } on Object {
+    } on Object catch (e) {
       // A host without the runner's channel (widget tests): no taps.
+      _log('push: connect failed (${e.runtimeType})');
     }
   }
 
@@ -287,8 +296,8 @@ abstract base class NativePush implements PushPlatform {
     _account = account;
     _previewMode = previewMode;
     if (!await _available()) return;
-    await _guard(_writeSettings);
-    await _guard(takeCounters);
+    await _guard('settings', _writeSettings);
+    await _guard('counters', takeCounters);
     await _registerIfAuthorized();
   }
 
@@ -297,8 +306,9 @@ abstract base class NativePush implements PushPlatform {
     if (_account == null || _asked) return;
     _asked = true;
     if (!await _available()) return;
-    if (await _guardValue(hostAuthorized) ?? false) return;
-    if (await _guardValue(hostRequestAuthorization) ?? false) {
+    if (await _guardValue('authorization', hostAuthorized) ?? false) return;
+    if (await _guardValue('permission request', hostRequestAuthorization) ??
+        false) {
       await _register();
     }
   }
@@ -308,7 +318,7 @@ abstract base class NativePush implements PushPlatform {
     if (previewMode == _previewMode) return;
     _previewMode = previewMode;
     if (_account == null || !await _available()) return;
-    await _guard(_writeSettings);
+    await _guard('settings', _writeSettings);
   }
 
   @override
@@ -316,9 +326,15 @@ abstract base class NativePush implements PushPlatform {
     final account = _account;
     if (account == null) return;
     if (!await _available()) return;
-    final id = await _guardValue(() => hostRegistrationId(account.instanceId));
+    final id = await _guardValue(
+      'registration lookup',
+      () => hostRegistrationId(account.instanceId),
+    );
     if (id != null) {
-      await _guard(() => account.registrations.unregister(id));
+      await _guard(
+        'unregistration',
+        () => account.registrations.unregister(id),
+      );
     }
     await forget(account.instanceId);
   }
@@ -329,13 +345,17 @@ abstract base class NativePush implements PushPlatform {
     if (account?.instanceId == instanceId) {
       _account = null;
       _asked = false;
-      await _guard(() => account!.secrets.delete(tokenKey));
+      await _guard('token removal', () => account!.secrets.delete(tokenKey));
     }
     if (!await _available()) return;
-    await _guard(() => hostDeleteRegistration(instanceId));
+    await _guard(
+      'registration removal',
+      () => hostDeleteRegistration(instanceId),
+    );
   }
 
-  Future<bool> _available() async => await _guardValue(hostAvailable) ?? false;
+  Future<bool> _available() async =>
+      await _guardValue('availability', hostAvailable) ?? false;
 
   Future<void> _writeSettings() async {
     final account = _account;
@@ -349,7 +369,7 @@ abstract base class NativePush implements PushPlatform {
 
   Future<void> _registerIfAuthorized() async {
     if (!await _available()) return;
-    if (await _guardValue(hostAuthorized) ?? false) {
+    if (await _guardValue('authorization', hostAuthorized) ?? false) {
       await _register();
     }
   }
@@ -360,7 +380,7 @@ abstract base class NativePush implements PushPlatform {
   Future<void> _registerOnce() async {
     final account = _account;
     if (account == null) return;
-    await _guard(() async {
+    await _guard('registration', () async {
       final token = await hostToken();
       final known = await account.secrets.read(tokenKey);
       final stored = await hostRegistrationId(account.instanceId);
@@ -373,18 +393,23 @@ abstract base class NativePush implements PushPlatform {
     });
   }
 
-  static Future<void> _guard(FutureOr<void> Function() body) async {
+  /// Runs [body], the step [what]; a failure is logged without content and swallowed.
+  Future<void> _guard(String what, FutureOr<void> Function() body) async {
     try {
       await body();
-    } on Object {
+    } on Object catch (e) {
       // Push is an addition; the next start tries again (see the class comment).
+      _log('push: $what failed (${e.runtimeType})');
     }
   }
 
-  static Future<T?> _guardValue<T>(Future<T> Function() body) async {
+  /// The value of [body], the step [what], or null after a failure, which is logged without
+  /// content.
+  Future<T?> _guardValue<T>(String what, Future<T> Function() body) async {
     try {
       return await body();
-    } on Object {
+    } on Object catch (e) {
+      _log('push: $what failed (${e.runtimeType})');
       return null;
     }
   }

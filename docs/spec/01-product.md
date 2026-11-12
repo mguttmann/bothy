@@ -2459,8 +2459,13 @@ names in its shared container would be content outside it (docs/decisions.d/M5-0
 | iOS, Android, app in front | The notification shows as a banner inside the app, at the top of the screen, instead of a notification of the system: tapping opens the thread at the message, it leaves by itself after a moment or with its close button, and it never shows behind the app lock (addendum of 2026-11-12, [15](15-client-architecture.md) 10) |
 | all | If the thread is currently open and the app is in the foreground, there is no notification, only the history |
 
-Reading on one device removes notifications on the others as soon as that app is active the next
-time; a separate push only for cleanup is to be checked later.
+Reading on one device removes the notifications of that thread on the others where the app can
+do it (addendum of 2026-11-12, docs/decisions.d/AUD-client-notifications-01.md): a connected
+desktop app removes its local notification when the read arrives (on Windows only as an
+installed package, [15](15-client-architecture.md) 10.3), a phone in front takes the banner of
+that thread away, and Android removes its pushes with the sync push of
+[13](13-push-notifications.md) section 8. The apps of iOS and macOS do not remove a push that
+the system already shows, also not when they open.
 
 ## 11. Personal settings
 

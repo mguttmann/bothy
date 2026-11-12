@@ -2,9 +2,11 @@
 
 // From `notification.created` to a toast or nothing (brief M4-30 Tests and Design note 1): the
 // thread that is open in the focused window gets no toast, a quiet notification is silent, the
-// same thread replaces its slot, the kinds without a thread use a fixed slot per kind, and a
-// click navigates to the thread at the message.
+// same thread replaces its slot, the kinds without a thread use a fixed slot per kind, a click
+// navigates to the thread at the message, and a thread the person read loses its notification
+// (01 10.3; docs/decisions.d/AUD-client-notifications-01.md AUD-CN1/3).
 
+import 'package:client/notifications/in_app_banner.dart';
 import 'package:client/notifications/notification_router.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/widgets.dart';
@@ -87,6 +89,57 @@ void main() {
     expect(presenter.shown[1].content.body, startsWith('2 new messages'));
   });
 
+  test('a read thread loses its notification, once; a thread without one asks '
+      'nothing', () async {
+    await router.onEvent(hint());
+    await router.onRead(ThreadId.parse(t2));
+    expect(presenter.cancelled, isEmpty, reason: 'nothing shown for it');
+    await router.onRead(ThreadId.parse(t1));
+    expect(presenter.cancelled, ['thread:$t1']);
+    await router.onRead(ThreadId.parse(t1));
+    expect(presenter.cancelled, hasLength(1), reason: 'the slot is empty');
+
+    await router.onEvent(hint());
+    await router.onRead(ThreadId.parse(t1));
+    expect(presenter.cancelled, hasLength(2), reason: 'a new notification');
+  });
+
+  test('on a phone the banner of a read thread goes; the banner of another '
+      'thread stays', () async {
+    final banners = InAppBanners();
+    final phone = NotificationRouter(
+      presenter: banners,
+      texts: () => en,
+      appName: () => 'ExampleChat',
+      isOpenAndFocused: openFocused.contains,
+      navigate: paths.add,
+    );
+    await phone.onEvent(hint());
+    expect(banners.current.value?.tag, 'thread:$t1');
+    await phone.onRead(ThreadId.parse(t1));
+    expect(banners.current.value, isNull);
+
+    await phone.onEvent(hint());
+    await phone.onEvent(hint(thread: t2));
+    await phone.onRead(ThreadId.parse(t1));
+    expect(
+      banners.current.value?.tag,
+      'thread:$t2',
+      reason: 'the banner on screen is of another thread',
+    );
+    await banners.dispose();
+  });
+
+  test(
+    'the thread open in the focused window has no notification to remove',
+    () async {
+      openFocused.add(ThreadId.parse(t1));
+      await router.onEvent(hint());
+      await router.onRead(ThreadId.parse(t1));
+      expect(presenter.cancelled, isEmpty);
+    },
+  );
+
   test(
     'kinds without a thread use a fixed slot and open their screen',
     () async {
@@ -146,6 +199,21 @@ void main() {
       expect(line, isNot(contains('Build')));
       expect(line, isNot(contains('general')));
     }
+  });
+
+  test('without a sink the lines go to the developer log of the app', () async {
+    final plain = NotificationRouter(
+      presenter: presenter,
+      texts: () => en,
+      appName: () => 'ExampleChat',
+      isOpenAndFocused: (_) => true,
+      navigate: paths.add,
+    );
+    await plain.onEvent(hint());
+    plain.onClick('https://example.com/');
+    expect(presenter.shown, isEmpty);
+    expect(paths, isEmpty);
+    expect(logs, isEmpty, reason: 'no sink of the test was given');
   });
 
   test('a failed lookup of the local channel name still shows the placeholder toast', () async {

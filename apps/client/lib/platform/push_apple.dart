@@ -30,10 +30,14 @@ export 'push_platform.dart';
 /// await push.signedIn(account, previewMode: 'full');
 /// ```
 final class ApplePush extends NativePush implements PushAppleFlutterApi {
-  /// Creates the push over [host]; [metrics] receives the display counters.
-  ApplePush({required PushAppleHostApi host, required ClientMetrics metrics})
-    : _host = host, // ignore: prefer_initializing_formals
-      super(metrics);
+  /// Creates the push over [host]; [metrics] receives the display counters; [log] receives
+  /// one line per swallowed failure, never content (the developer log unless given).
+  ApplePush({
+    required PushAppleHostApi host,
+    required ClientMetrics metrics,
+    void Function(String line)? log,
+  }) : _host = host, // ignore: prefer_initializing_formals
+       super(metrics, log: log);
 
   /// The secret key of the APNs token last registered for an instance.
   static const String apnsTokenKey = 'push/apns_token';
