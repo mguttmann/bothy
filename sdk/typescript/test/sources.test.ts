@@ -85,7 +85,8 @@ class Responder {
   readonly acks: number[] = [];
   readonly heartbeats: number[] = [];
   readonly answers: Json[] = [];
-  intervalsMs: number[] = [3000];
+  // `undefined` leaves `interval_ms` out of the answer.
+  intervalsMs: (number | undefined)[] = [3000];
 
   constructor(
     readonly clock: FakeClock,
@@ -109,15 +110,15 @@ class Responder {
       // Each answer takes the next interval; the last one repeats.
       const interval =
         this.intervalsMs.length > 1
-          ? (this.intervalsMs.shift() ?? 0)
-          : (this.intervalsMs[0] ?? 0);
+          ? this.intervalsMs.shift()
+          : this.intervalsMs[0];
       return json(200, {
         presence: {
           state: "online",
           last_heartbeat_at: "2026-01-01T00:00:00Z",
           billing_mode_matches: true,
         },
-        interval_ms: interval,
+        ...(interval === undefined ? {} : { interval_ms: interval }),
       });
     }
     if (request.method === "POST" && path.startsWith(AUTOCOMPLETE_PATH)) {
@@ -487,6 +488,40 @@ describe("PollingSource", () => {
     expect(responder.heartbeats).toEqual([0, 3000, 8000]);
     await running.stop(clock);
   });
+
+  it.each([0, -1, undefined])(
+    "keeps its interval when the answer names the interval %s",
+    async (senseless) => {
+      const clock = new FakeClock();
+      const responder = new Responder(clock, []);
+      responder.intervalsMs = [3000, senseless];
+      const settings = { pollIntervalMs: 1_000_000 };
+      const beat: Heartbeat = { state: "online" };
+      const running = new Running(
+        new PollingSource(client(clock, responder, settings), CONSUMER, {
+          settings,
+          clock,
+          heartbeat: () => beat,
+        }),
+      );
+      await until(
+        () => responder.heartbeats.length === 1 && clock.sleepers === 2,
+      );
+      await clock.advance(3000);
+      await until(() => responder.heartbeats.length >= 2);
+      // The second answer names no usable interval: the loop must not send at once again.
+      await turns();
+      expect(responder.heartbeats).toEqual([0, 3000]);
+      await clock.advance(3000 - EPS);
+      await turns();
+      expect(responder.heartbeats).toEqual([0, 3000]);
+      await clock.advance(EPS);
+      await until(() => responder.heartbeats.length >= 3);
+      await turns();
+      expect(responder.heartbeats).toEqual([0, 3000, 6000]);
+      await running.stop(clock);
+    },
+  );
 
   it("sends no heartbeat without a heartbeat source", async () => {
     const clock = new FakeClock();
