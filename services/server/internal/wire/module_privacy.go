@@ -13,6 +13,7 @@ import (
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	billingpg "github.com/OWNER/bothy/services/server/internal/billing/adapters/postgres"
 	chatpg "github.com/OWNER/bothy/services/server/internal/chat/adapters/postgres"
+	gatewaypg "github.com/OWNER/bothy/services/server/internal/gateway/adapters/postgres"
 	importerpg "github.com/OWNER/bothy/services/server/internal/importer/adapters/postgres"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
@@ -208,6 +209,6 @@ func personalDataList(m personalDataModules) ([]personaldata.Participant, error)
 		notify, personal, chatpg.NewPersonalData(m.pool), messages, uploads, access, runspg.NewPersonalData(m.pool),
 		billingpg.NewPersonalData(), agentspg.NewPersonalData(m.pool), terminalpg.NewPersonalData(m.pool),
 		appspg.NewPersonalData(m.pool), importerpg.NewPersonalData(), instancepg.NewPersonalData(), auditpg.NewPersonalData(m.pool),
-		privacypg.NewPersonalData(m.pool), people,
+		gatewaypg.NewPersonalData(), privacypg.NewPersonalData(m.pool), people,
 	}, nil
 }

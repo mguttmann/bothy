@@ -113,6 +113,11 @@ process against a disposable PostgreSQL 18 from `internal/platform/pg/pgtest`.
   `JobModules` hook still sees the real use case (`test/status` runs the rounds itself);
   `Options.StatusProbe` runs the real job as in production.
 
+- `Options.NotReady` (AUD-srv-wire-01) starts a node of `StartNode` that a readiness check keeps
+  not ready for good, the start lock of R-DM-50 on a restored database: the start waits for the
+  log line of a start that ended not ready instead of `/readyz` 200, and `InternalURL` names the
+  internal listener of that node.
+
 - The jobs `files.purge_objects` and `files.cleanup_pending` run with their real use cases (ruling
   PL/54): either removes the row of a deleted file at any moment after the delete (the purge job
   right after it, the catch-up of the cleanup on its start and every `file.gc_interval`), and some

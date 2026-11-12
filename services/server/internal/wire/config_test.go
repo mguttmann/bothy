@@ -552,6 +552,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"privacy.account_deletion_content": {Kind: config.KindEnum, Default: "keep_pseudonymized", Enum: []string{"keep_pseudonymized", "delete"}, Chapter: "20-privacy.md"},
 		"privacy.request_reminder_lead":    {Kind: config.KindDuration, Default: "7d", Min: "1h", Max: "27d", Chapter: "20-privacy.md"},
 		"retention.privacy_job":            {Kind: config.KindDuration, Default: "1095d", Min: "1d", Chapter: "20-privacy.md"},
+		// AUD-srv-wire-01: the working directory of the export packages (20 section 13).
+		"privacy.export_work_dir": {Kind: config.KindString, Default: "", Chapter: "20-privacy.md"},
 		// M7-07: the retention of the deletion journal (20 section 13).
 		"privacy.deletion_journal_retention": {Kind: config.KindDuration, Default: "400d", Min: "1d", Chapter: "20-privacy.md"},
 	}
@@ -1536,6 +1538,25 @@ func TestConfigCheckBackupOffsiteTarget(t *testing.T) {
 		if msg := got[0].String(); !strings.Contains(msg, "backup.offsite.target") || strings.Contains(msg, "s3.example.com") {
 			t.Errorf("target %q: the problem does not name the key or names the value: %q", target, msg)
 		}
+	}
+}
+
+// TestConfigCheckExportWorkDir: privacy.export_work_dir is empty (the temporary directory of the
+// system) or an absolute clean path; a relative or unclean path fails the load with the key in the
+// message and without the value.
+func TestConfigCheckExportWorkDir(t *testing.T) {
+	t.Parallel()
+	for _, dir := range []string{"", "/var/lib/bothy/export-work"} {
+		if got := load(t, "BOTHY_PRIVACY__EXPORT_WORK_DIR="+dir); len(got) != 0 {
+			t.Errorf("directory %q: problems %v, want none", dir, got)
+		}
+	}
+	for _, dir := range []string{"export-work", "./export-work", "/var/../export-work", "/var/lib/export-work/"} {
+		got := load(t, "BOTHY_PRIVACY__EXPORT_WORK_DIR="+dir)
+		if len(got) != 1 || !strings.Contains(got[0].String(), "export_work_dir_absolute: privacy.export_work_dir must be empty or an absolute path") {
+			t.Errorf("directory %q: problems %v, want the one of export_work_dir_absolute", dir, got)
+		}
+		noValues(t, got, dir)
 	}
 }
 

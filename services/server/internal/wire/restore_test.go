@@ -250,7 +250,9 @@ func (failingCursors) MoveCursorsTo(context.Context, int64) error { return errIn
 // restore_not_finalized, serving and processing nothing (no public listener, log tail or worker
 // consumers), and logs the runbook step; with database.restore_guard = off the server
 // becomes ready; after bothy restore finalize it becomes ready with the guard on (R-DM-50,
-// brief M7-04 requirement 14).
+// brief M7-04 requirement 14). That the internal listener serves no incoming webhook under the
+// lock is held with a valid token in test/integrations
+// (TestInternalListener_NoIncomingWebhookBeforeRestoreFinalize).
 func TestStart_RestoreNotFinalized_NotReady(t *testing.T) {
 	t.Parallel()
 	db := newServeDB(t)

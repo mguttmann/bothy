@@ -139,6 +139,10 @@ type Options struct {
 	PublicURL string
 	// Role is the role of the process (wire.RoleAll when empty); a worker has no public listener.
 	Role wire.Role
+	// NotReady marks a process that a readiness check keeps not ready for good (the start lock of
+	// R-DM-50 on a restored database, 16 section 8.4): the start waits for the log line of a start
+	// that ended not ready instead of /readyz 200. Only for StartNode, which enrolls nobody.
+	NotReady bool
 	// TerminalSignals and TerminalListenerGate are the test seams of the terminal across nodes
 	// (wire.Deps.TerminalSignals and wire.Deps.TerminalListenerGate, M2-47).
 	TerminalSignals      func(terminalapp.Signals) terminalapp.Signals
@@ -487,7 +491,7 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 	go func() { done <- runner.Run(context.Background()) }()
 	stopGen := sync.OnceFunc(func() { stop(tb, sigs, done, logs) })
 	tb.Cleanup(stopGen)
-	internal, err := waitReady(done, logs)
+	internal, err := waitReady(done, logs, opts.NotReady)
 	if err != nil {
 		// The runner logs a failed start without its error; the bind error of a taken public
 		// port is only in runner.Err.
@@ -671,9 +675,11 @@ func bootstrapOwner(tb testing.TB, values *config.Values, env []string) (string,
 	return res.Code.Code, nil
 }
 
-// waitReady waits for the internal listener and /readyz 200 and returns the internal origin.
-// A process that exits first is an error with its log.
-func waitReady(done chan int, logs *logBuffer) (string, error) {
+// waitReady waits for the internal listener and /readyz 200 and returns the internal origin; with
+// notReady (Options.NotReady) it waits for the log line of a start that ended not ready instead,
+// which the server writes once every start step ran. A process that exits first is an error with
+// its log.
+func waitReady(done chan int, logs *logBuffer, notReady bool) (string, error) {
 	deadline := time.Now().Add(readyWait)
 	client := &http.Client{Timeout: 2 * time.Second}
 	for time.Now().Before(deadline) {
@@ -685,6 +691,13 @@ func waitReady(done chan int, logs *logBuffer) (string, error) {
 		}
 		if port := logs.port("internal listener started"); port != 0 {
 			origin := "http://127.0.0.1:" + strconv.Itoa(port)
+			if notReady {
+				if strings.Contains(logs.String(), `"msg":"server started, not ready"`) {
+					return origin, nil
+				}
+				time.Sleep(50 * time.Millisecond)
+				continue
+			}
 			req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, origin+"/readyz", nil)
 			if resp, err := client.Do(req); err == nil {
 				_ = resp.Body.Close()

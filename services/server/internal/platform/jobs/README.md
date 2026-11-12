@@ -57,6 +57,16 @@ delivers an error and `internal/wire` ends the process with exit code 1 (02 "Hea
 
 `HandlerOptions.Queue` empty means `default`; any other name fails `Register`.
 
+The queues of a process share its connection pool (`database.max_conns`). A handler holds a
+connection only inside its units of work, River one for `LISTEN` and others for the moment it
+fetches and completes jobs, so the sum of the `max_workers` values may be larger than the pool,
+and no cross-check compares the two: it would refuse configurations that work. When more units
+of work run at once than the pool has connections, the others wait up to
+`database.acquire_timeout`; a unit that gets none fails its attempt, and River retries the job.
+A pool that stays exhausted shows in `bothy.db.pool.connections` (state `acquired` at `max`):
+raise `database.max_conns` of that process or lower the workers of the busiest queue
+(docs/spec/16-operations.md section 13).
+
 ## Maintenance mode (M7-08)
 
 `Config.Maintenance` (`internal/wire.MaintenanceJobs` with `server.maintenance_mode = read_only`,

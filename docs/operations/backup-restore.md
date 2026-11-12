@@ -183,6 +183,17 @@ restore of a production-sized database against `dr.rto_target`.
 | Host lost | latest state in the off-site repository (`--type=default`) |
 | Logical error, time unclear | try in scratch first (section 4 by hand) and search for the point in time |
 
+How far back the point in time may lie depends on the repository. repo1 keeps
+`backup.pg.local_retention_full` full backups and the WAL since the oldest of them. repo2, with an
+off-site target, keeps every backup until the owner expires it, and `backup.pg.retention_full`
+full backups after that (section 9). With the defaults and without an off-site target ("local
+backup only") the window therefore starts at the newest full backup: every full backup, also one
+run by hand before an upgrade ([upgrade.md](upgrade.md) 1), removes the one before it together
+with its WAL. A state before that exists only as a logical backup (5.3), one per run of
+`backup.logical.schedule` within `backup.logical.retention`, without the changes between two
+runs. For a longer window set an off-site target or raise `backup.pg.local_retention_full`; each
+further full backup needs its space and that of its WAL in the volume `pgbackrest-repo`.
+
 ### 5.2 PITR procedure in the Compose stack
 
 1. Status page: create an incident; maintenance mode `server.maintenance_mode = read_only` does not help,

@@ -488,6 +488,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"privacy.deletion_journal_retention = 400d  # default\n" +
 		"privacy.export_requires_approval = false  # default\n" +
 		"privacy.export_ttl = 7d  # default\n" +
+		"privacy.export_work_dir =   # default\n" +
 		"privacy.object_delete_delay = 1d  # default\n" +
 		"privacy.per_person_stats_enabled = false  # default\n" +
 		"privacy.request_reminder_lead = 7d  # default\n" +

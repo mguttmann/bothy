@@ -283,9 +283,13 @@ services:
     healthcheck: *server-healthcheck
     environment:
       <<: *server-env
+      # The export packages of privacy requests are built on a volume, not in the tmpfs /tmp: the
+      # package of a large account holds a copy of every own upload and the archive (20 5.2).
+      BOTHY_PRIVACY__EXPORT_WORK_DIR: /var/lib/bothy/export-work
     volumes:
       - files:/var/lib/bothy/files
       - signing-keys:/var/lib/bothy/signing-keys
+      - export-work:/var/lib/bothy/export-work
       - type: volume
         source: secrets
         target: /run/bothy/secrets
@@ -571,6 +575,7 @@ volumes:
   pgbackrest-repo: {}
   backup-scratch: {}
   files: {}
+  export-work: {}
   clamav-db: {}
   clamav-socket: {}
   seaweedfs-data: {}

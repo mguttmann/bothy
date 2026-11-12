@@ -531,7 +531,8 @@ func processWiring() moduleWiring {
 // holds (restore_not_finalized, M7-04): a restored database whose restore was not finalized must
 // neither take writes on the public listener nor deliver from the log tail, River or the worker
 // consumers, because they would mix the old and the new timeline. Only the internal listener
-// stays, so /readyz names the reason; the stop steps handle the parts that never started.
+// stays, with the health checks alone (mountRoutes mounts no incoming webhook there), so /readyz
+// names the reason; the stop steps handle the parts that never started.
 func whileFinalized(start func(s *server, ctx context.Context) error) func(s *server, ctx context.Context) error {
 	return func(s *server, ctx context.Context) error {
 		if !s.finalized() {
@@ -542,8 +543,9 @@ func whileFinalized(start func(s *server, ctx context.Context) error) func(s *se
 }
 
 // finalized reports whether the start lock of R-DM-50 is free. Work inside a start step that
-// writes (the terminal reconcile of mountTerminalStreams) asks it, like whileFinalized does for a
-// whole step.
+// writes or opens a way to write (the terminal reconcile of mountTerminalStreams, the incoming
+// webhooks of the internal listener in mountRoutes) asks it, like whileFinalized does for a whole
+// step.
 func (s *server) finalized() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -800,7 +802,12 @@ func (s *server) mountRoutes(ctx context.Context) error {
 	if err := startRoutes(bindings, BuildRegistry(s.deps.Registrations), cat, log, mount); err != nil {
 		return err
 	}
-	// Every role serves the incoming webhooks on the internal listener (M2-27 design note 12).
+	// Every role serves the incoming webhooks on the internal listener (M2-27 design note 12),
+	// unless the start lock of R-DM-50 holds: a post writes a message, events and audit entries,
+	// and the internal listener stays open under the lock.
+	if !s.finalized() {
+		return nil
+	}
 	return s.mountInternalHooks(cat, log)
 }
 

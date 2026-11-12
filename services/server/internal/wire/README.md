@@ -48,7 +48,7 @@ components, in start order:
 | `audit` | resolves `privacy.audit_ip_kek_ref` once (fail fast), builds the audit module with the unit of work of the role (`NewAudit`) and starts the aggregator of denials (`Audit.Start`), registering the stop step `audit_denials` (M1-24) | all |
 | `identity` | after `audit`, `sync` and `authz`: resolves `auth.token_pepper_ref` once (32 bytes as hex, fail fast), builds `Identity` over the unit of work of `audit` and the Authorizer, starts the sweeper of the jti store with the stop step `dpop_replay_sweeper` in `PhaseHTTP`; `routes` mounts its device handlers unless `Deps.Handlers` names one (M1-33) | all |
 | `agents` | after `identity`: builds `Agents` (`NewAgents`) over the unit of work, recorder and rights hook of `audit`, the appender of `sync`, the Authorizer and the principal writer, directory and token revocation of identity; `routes` mounts its handlers unless `Deps.Handlers` names one (M1-51) | all |
-| `routes` | catalogue check of route bindings and registrations (all roles, M1-25); then `NewChain` (validator over `api/rest.Spec`, the Authenticator of identity from the step `sessions`, `actor.AnonymousOnly` without it), `InstallRateLimits` (start check of the classes, limiter in `StageRateLimit`, sweeper with the stop step `ratelimit_sweeper` in `PhaseHTTP`, M1-19), `InstallWebhookToken` (M2-27) and `MountRoutes` on the public mux with the `authz` catalogue and `WebhookBodyLimit`; then, in every role, `mountInternalHooks` (M2-27, below) | api, all (check and internal webhook routes: every role) |
+| `routes` | catalogue check of route bindings and registrations (all roles, M1-25); then `NewChain` (validator over `api/rest.Spec`, the Authenticator of identity from the step `sessions`, `actor.AnonymousOnly` without it), `InstallRateLimits` (start check of the classes, limiter in `StageRateLimit`, sweeper with the stop step `ratelimit_sweeper` in `PhaseHTTP`, M1-19), `InstallWebhookToken` (M2-27) and `MountRoutes` on the public mux with the `authz` catalogue and `WebhookBodyLimit`; then, in every role, `mountInternalHooks` (M2-27, below; not under the start lock of R-DM-50) | api, all (check and internal webhook routes: every role) |
 | `jobs` | `jobs.ValidateMigrations` (missing River migrations abort with the hint to run `bothy migrate up`), `jobs.New` for the role, `Start` of River (02 "Start" step 8; no-op for api and while no kind is registered), `Runner.FailOn` on `Failed` | all |
 | `event_consumers` | after `jobs`: registers the handlers of `consumerHandlers` (`webhooks`, `push`, `privacy.journal` since M7-07), inserts their cursor rows at the head (`Ensure`), registers the stop step `event_consumers` in `PhaseConsumers` and starts the runner with its own `LISTEN` connection; an unexpected end of the runner calls `Runner.FailOn` (M2-01) | worker, all |
 | `public_listener` | opens `server.listen_addr`, logs `public listener started` | api, all |
@@ -119,6 +119,10 @@ transaction (docs/DECISIONS.md D-M2-27-21).
   only these two operations (so `rl.webhook_in` and `rl.public_auth` count per listener; its
   sweeper registers a second stop step `ratelimit_sweeper`), `InstallWebhookToken` and
   `WebhookBodyLimit`. Nothing else of the API is mounted there (docs/DECISIONS.md D-M2-27-18).
+  While the start lock of R-DM-50 holds (`restore_not_finalized`, `server.finalized`), the step
+  mounts none of it: a post would write on the restored timeline, so both paths answer `404` on
+  the internal listener until the start after `bothy restore finalize`
+  (docs/decisions.d/AUD-srv-wire-01.md).
 
 ## Instance and counters
 

@@ -111,8 +111,9 @@ func TestPersonalDataExport(t *testing.T) {
 }
 
 // TestPersonalDataErase (M7-06, 20 sections 2 and 4.4): agents stay ("stays"; the credential
-// holder becomes pseudonymous with the principal) and agent sessions go with their thread, so no
-// step changes a row of the module, in both content modes and on the repeated run after a crash.
+// holder becomes pseudonymous with the principal), the versions of their definitions stay too and
+// agent sessions go with their thread, so no step changes a row of the module, in both content
+// modes and on the repeated run after a crash.
 func TestPersonalDataErase(t *testing.T) {
 	t.Parallel()
 	db := pgtest.New(t)
@@ -132,7 +133,7 @@ func TestPersonalDataErase(t *testing.T) {
 	if after := pdSnapshot(t, owner, p.Tables()); !slices.Equal(after, before) {
 		t.Errorf("erase changed the tables of agents:\nbefore %v\nafter  %v", before, after)
 	}
-	if want := []string{"agents", "agent_sessions"}; !slices.Equal(p.Tables(), want) || p.Module() != "agents" {
+	if want := []string{"agents", "agent_definitions", "agent_sessions"}; !slices.Equal(p.Tables(), want) || p.Module() != "agents" {
 		t.Errorf("module %s, tables %v", p.Module(), p.Tables())
 	}
 }

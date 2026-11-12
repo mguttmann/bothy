@@ -720,7 +720,7 @@ stats (`getStatsBackends`) is its only user.
 
 ## Personal data (M7-06)
 
-`adapters/postgres.PersonalData` (`NewPersonalData(pool)`) is the participant of agents in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Tables: `agents`, `agent_sessions`; `dev_environments` does not exist yet and is not listed.
+`adapters/postgres.PersonalData` (`NewPersonalData(pool)`) is the participant of agents in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Tables: `agents`, `agent_definitions`, `agent_sessions`; `dev_environments` does not exist yet and is not listed.
 
 - Export: the section `agents_held` of `access.json`, the agents whose credentials the person holds (`credential_holder_id`), each with its `agent_id` only: the table records no time from which the person holds them (`docs/api/gdpr-export/v1/sections/access.agents_held.schema.json`).
-- Erase: nothing in any step. Agents stay (20 section 2), the holder ID becomes pseudonymous with the principal; agent sessions go with their thread.
+- Erase: nothing in any step. Agents stay (20 section 2), the holder ID becomes pseudonymous with the principal; agent sessions go with their thread; the versions of a built-in agent's definition (`agent_definitions`) stay as configuration of the instance and are never changed (R-DM-59), `created_by` becomes pseudonymous with the principal. They are not part of the export: the package has no section for configuration of the instance that a person wrote, as for the spaces and channels a person created.

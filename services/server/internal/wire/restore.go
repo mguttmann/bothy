@@ -47,7 +47,8 @@ type restoreGuard struct {
 // with the current one, and a mismatch logs once, registers the readiness check
 // restore_not_finalized, which fails for good, for every role, and holds the steps that serve or
 // process (whileFinalized: log tail, presence tracker, jobs, worker consumers, public listener;
-// the terminal reconcile asks finalized). An empty stored identity never blocks. The error is a failed read; it ends the start.
+// the terminal reconcile and the incoming webhooks of the internal listener ask finalized). An
+// empty stored identity never blocks. The error is a failed read; it ends the start.
 func (s *server) checkRestoreGuard(ctx context.Context, st instance.State) error {
 	if s.role == roleRestore {
 		// bothy restore finalize builds the modules on the restored database to end the lock.
