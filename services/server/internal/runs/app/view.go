@@ -172,7 +172,8 @@ func encode(v any) ([]byte, error) {
 // the payload with the triggering message and the trigger state this change set (absent when it
 // set none).
 func (s *Service) emitStateChanged(ctx context.Context, spaceID ids.ID, sum runs.RunSummary, triggering ids.ID, trigger domain.TriggerState) error {
-	p, err := encode(stateChangedJSON{Run: summaryBody(sum), TriggeringMessageID: optionalID(triggering), TriggerState: string(trigger)})
+	p, truncated, err := s.stateChangedPayload(stateChangedJSON{Run: summaryBody(sum), TriggeringMessageID: optionalID(triggering),
+		TriggerState: string(trigger)})
 	if err != nil {
 		return err
 	}
@@ -180,8 +181,24 @@ func (s *Service) emitStateChanged(ctx context.Context, spaceID ids.ID, sum runs
 	return s.d.Events.Append(ctx, eventlog.Event{
 		Type: string(authorize.EventRunStateChanged), SchemaVersion: 1, ActorKind: kind, ActorPrincipalID: actorID,
 		SpaceID: spaceID, ChannelID: sum.ChannelID, ThreadID: sum.ThreadID, ResourceKind: resourceRun, ResourceID: sum.ID,
-		ResourceVersion: sum.Version, ReceiveAction: receiveRunRead, Payload: p,
+		ResourceVersion: sum.Version, ReceiveAction: receiveRunRead, Payload: p, Truncated: truncated,
 	})
+}
+
+// stateChangedPayload encodes the payload of run.state_changed below sync.event_payload_max_bytes
+// (04 section 2.2 rule 2): whole when it fits, otherwise without the two texts of the adapter,
+// status_line and summary, and with truncated reported for the envelope; the reader loads them
+// with getRun. A stored text is within run.status_line_max_chars and run.summary_max_chars, so
+// only a row from before these limits, or a bound set below what they need, takes the reduced
+// form. No transition fails because of the length of a text (AUD-srv-runs-01).
+func (s *Service) stateChangedPayload(body stateChangedJSON) ([]byte, bool, error) {
+	p, err := encode(body)
+	if err != nil || len(p) < s.cfg.EventPayloadMaxBytes {
+		return p, false, err
+	}
+	body.Run.StatusLine, body.Run.Summary = "", ""
+	p, err = encode(body)
+	return p, true, err
 }
 
 // eventActor returns the actor of the request in ctx; none outside a request (a job).

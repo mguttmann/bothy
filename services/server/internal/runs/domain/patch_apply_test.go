@@ -36,7 +36,7 @@ func testEnv(first int) domain.Env {
 }
 
 // testLimits are generous limits for tests that do not test the limits.
-var testLimits = domain.Limits{ExcerptMaxChars: 100, StepDetailMaxBytes: 1000, MaxStepsPersisted: 100}
+var testLimits = domain.Limits{ExcerptMaxChars: 100, StatusLineMaxChars: 100, StepDetailMaxBytes: 1000, MaxStepsPersisted: 100}
 
 // baseState is a small run: one running step, one follow-up.
 func baseState() domain.DocumentState {
@@ -228,6 +228,19 @@ func TestSetSemantics(t *testing.T) {
 		sameNorm(t, "excerpt", norm, []domain.NormOp{nop(domain.OpAdd, "/last_text_excerpt", `"def"`)})
 		if ch.LastTextExcerpt != (domain.TextColumn{Set: true, Value: "def"}) {
 			t.Errorf("excerpt = %+v", ch.LastTextExcerpt)
+		}
+	})
+
+	t.Run("status line is cut before it is stored", func(t *testing.T) {
+		lim := testLimits
+		lim.StatusLineMaxChars = 3
+		ch, norm, err := mustApply(t, baseState(), lim, rawOp("replace", "/status_line", `"éñç and more"`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		sameNorm(t, "status line", norm, []domain.NormOp{nop(domain.OpReplace, "/status_line", `"éñç"`)})
+		if ch.StatusLine != (domain.TextColumn{Set: true, Value: "éñç"}) {
+			t.Errorf("status line = %+v", ch.StatusLine)
 		}
 	})
 
@@ -569,6 +582,9 @@ func checkProperty(t testing.TB, base domain.DocumentState, ops []domain.Op, ch 
 	if utf8Len(ch.After.LastTextExcerpt) > lim.ExcerptMaxChars && ch.LastTextExcerpt.Set {
 		t.Errorf("excerpt longer than the limit")
 	}
+	if utf8Len(ch.After.StatusLine) > lim.StatusLineMaxChars && ch.StatusLine.Set {
+		t.Errorf("status line longer than the limit")
+	}
 }
 
 // utf8Len counts runes.
@@ -791,6 +807,8 @@ func TestNormalizedOpsApplyToBase(t *testing.T) {
 				StepDetailMaxBytes: 18 + g.r.IntN(60),
 				MaxStepsPersisted:  2 + g.r.IntN(7),
 			}
+			// Not drawn from g, so the generated patches stay the ones of the fixed seeds.
+			lim.StatusLineMaxChars = 1 + i%10
 			ops, fieldErrs := domain.ParseOps(raws)
 			if len(fieldErrs) != 0 {
 				t.Fatalf("seed %d round %d: generated patch invalid: %v", seed, i, fieldErrs)

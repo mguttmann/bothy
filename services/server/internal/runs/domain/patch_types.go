@@ -79,7 +79,8 @@ type Op struct {
 	// ID is the step of TargetStep and TargetStepMember, the message of TargetFollowupState.
 	ID ids.ID
 	// Value is the checked value; nil for remove. Its concrete type per target:
-	//   TargetStatusLine, TargetLastTextExcerpt, TargetModel: string (the excerpt not cut yet)
+	//   TargetStatusLine, TargetLastTextExcerpt, TargetModel: string (the status line and the
+	//     excerpt not cut yet)
 	//   TargetMetric: int64, or float64 for context_pct
 	//   TargetLastAPIRetry: APIRetry
 	//   TargetCost: Money
@@ -169,6 +170,8 @@ type DocumentState struct {
 type Limits struct {
 	// ExcerptMaxChars is run.excerpt_max_chars: last_text_excerpt keeps that many runes.
 	ExcerptMaxChars int
+	// StatusLineMaxChars is run.status_line_max_chars: status_line keeps its first runes up to it.
+	StatusLineMaxChars int
 	// StepDetailMaxBytes is run.step_detail_max_bytes: the canonical JSON of a stored detail is
 	// at most that long.
 	StepDetailMaxBytes int

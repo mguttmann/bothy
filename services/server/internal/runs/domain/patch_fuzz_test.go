@@ -58,7 +58,7 @@ func FuzzParseAndApply(f *testing.F) {
 	for _, s := range seeds {
 		f.Add(s)
 	}
-	lim := domain.Limits{ExcerptMaxChars: 8, StepDetailMaxBytes: 48, MaxStepsPersisted: 4}
+	lim := domain.Limits{ExcerptMaxChars: 8, StatusLineMaxChars: 8, StepDetailMaxBytes: 48, MaxStepsPersisted: 4}
 	f.Fuzz(func(t *testing.T, patch string) {
 		var in []fuzzOp
 		if json.Unmarshal([]byte(patch), &in) != nil || len(in) > 64 {

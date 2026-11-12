@@ -657,7 +657,7 @@ triggering person ([07-permissions.md](07-permissions.md), SR9; [06-api.md](06-a
 | Change live box | `run.update` | `base_version` | allowed paths in 5.3; throttle `agent.run_update_min_interval` |
 | Report step | `run.update` on `/steps/<id>` | step ID (UUIDv7) from the adapter | the server assigns `ordinal` |
 | Acknowledge follow-up | `run.update` on `/followups/<message_id>/state` | state only forward | `delivered`, then `absorbed` |
-| Finish run | `run.finish` | same end state repeated = `200` | Body: `state`, `reason`, `summary`, `costs` (4.10) |
+| Finish run | `run.finish` | same end state repeated = `200` | Body: `state`, `reason`, `summary` (cut to `run.summary_max_chars`, 5.3), `costs` (4.10) |
 | Send reply | `message.create` | `client_msg_id` | `origin = agent`; the adapter stores the ID before sending. Optional `run_id`, only for an active run (`queued`, `running`, `waiting_input`) of the agent itself in the target thread; otherwise `400 validation_failed` with `errors[].code` `run_mismatch` (also for a person or app, an unknown run, a run of another thread or agent, one body for all), or for an own ended run `409 conflict` with `reason` `run_not_active`. `run_id` is checked, not stored, and not part of the canonical request of `client_msg_id`. The adapter sends its replies before `run.finish` (04 16.5); a reply refused after the end of the run it sends again without `run_id`, with the same `client_msg_id` (M2-19). |
 | Send file | `file.upload`, then `message.create` | upload session, `client_msg_id` | needs `+upload` and the feature `files_out` |
 | Question, approval | `message.create` with `kind = card` and components | `client_msg_id` | then `run.finish` with `waiting_input` (section 11) |
@@ -1037,7 +1037,7 @@ adapter changes it only through RFC 6902 patches with `add`, `replace`, `remove`
 | Path | Type | Adapter may | Stored in |
 |---|---|---|---|
 | `/state`, `/version`, `/billing_mode_expected`, times | | never (own endpoints) | `runs` |
-| `/status_line` | Text | `add`, `replace`, `remove` | `runs.status_line` |
+| `/status_line` | Text, truncated to `run.status_line_max_chars` | `add`, `replace`, `remove` | `runs.status_line` |
 | `/last_text_excerpt` | Text, truncated to `run.excerpt_max_chars` | `add`, `replace` | `runs.last_text_excerpt` |
 | `/model` | Text | `replace` | `runs.model` |
 | `/metrics/<field>` | Number | `add`, `replace` | `runs.metrics` (`run_metrics.v1`) |
@@ -1085,7 +1085,12 @@ Rules of `patchRun` and the gateway op `run.update` (both call the same use case
   `invalid_type`, an unknown member `unknown_member`; `is_estimate` must be `true` and plan item
   ids must be unique (`invalid`).
 - Cutting: `last_text_excerpt` keeps its last `run.excerpt_max_chars` runes, because a draft grows
-  at the end. A `detail` above `run.step_detail_max_bytes` gets its string values shortened, the
+  at the end. `status_line` keeps its first `run.status_line_max_chars` runes, in a patch and in
+  `awaitRunInput`, and `finishRun` keeps the first `run.summary_max_chars` runes of `summary`: a
+  longer text is shortened, never refused. Both texts travel in every `run.state_changed`
+  (04 section 11.3 item 1), so no text of an adapter keeps a run from changing its state
+  (`docs/decisions.d/AUD-srv-runs-01.md` AUD-RUN1/1 and AUD-RUN1/2). A `detail` above
+  `run.step_detail_max_bytes` gets its string values shortened, the
   longest first, at a rune boundary, and the top-level member `truncated: true`; if it still does
   not fit, the stored value is `{"truncated": true}`. Numbers in a `detail` are stored and
   measured in plain decimal form without exponent (`1.5e-3` becomes `0.0015`), the form the
@@ -5046,6 +5051,7 @@ configuration of the respective program outside the server.
 Existing values from 03 and 04 that this chapter refers to: `agent.invocation_token_ttl`,
 `agent.ack_timeout`, `agent.max_inflight_events`, `agent.run_update_min_interval`,
 `agent.presence_timeout`, `agent.cancel_grace`, `run.stall_after`, `run.excerpt_max_chars`,
-`run.step_detail_max_bytes`, `run.max_steps_persisted`, `component.default_ttl`,
+`run.status_line_max_chars`, `run.summary_max_chars`, `run.step_detail_max_bytes`,
+`run.max_steps_persisted`, `component.default_ttl`,
 `channel.history_backfill_limit_default`, `message.max_content_bytes`, `message.max_attachments`,
 `file.max_upload_bytes`, `sync.event_payload_max_bytes`.

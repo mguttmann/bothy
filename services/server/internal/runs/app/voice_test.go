@@ -198,7 +198,7 @@ func TestVoice_ConfigNeedsTranscriptHoldMax(t *testing.T) {
 	_, err := app.New(app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: queuedMaxAge,
 		ClockLeeway: 0, CancelGrace: 1, PresenceTimeout: 1, OrphanTimeout: 1, ReasonMaxChars: 1, ComponentDefaultTTL: 1,
 		ComponentMaxPerMessage: 1, ComponentCustomIDMaxChars: 1, ComponentFormMaxFields: 1, MaxContentBytes: 1,
-		ExcerptMaxChars: 1, MaxStepsPersisted: 1, EventPayloadMaxBytes: 1, InvocationHoldMax: holdMax}, w.deps())
+		ExcerptMaxChars: 1, MaxStepsPersisted: 1, StatusLineMaxChars: 1, SummaryMaxChars: 1, EventPayloadMaxBytes: 1, InvocationHoldMax: holdMax}, w.deps())
 	if err == nil || !strings.Contains(err.Error(), "voice.transcript_hold_max") {
 		t.Fatalf("New without voice.transcript_hold_max: %v", err)
 	}

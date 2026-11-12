@@ -57,7 +57,7 @@ func summariesByParent(t *testing.T, st domain.DocumentState) map[ids.ID]domain.
 // per removed step and the add of each summary step.
 func TestSummary_PerParent(t *testing.T) {
 	t.Parallel()
-	lim := domain.Limits{ExcerptMaxChars: 10, StepDetailMaxBytes: 200, MaxStepsPersisted: 7}
+	lim := domain.Limits{ExcerptMaxChars: 10, StatusLineMaxChars: 10, StepDetailMaxBytes: 200, MaxStepsPersisted: 7}
 	base := baseState()
 	base.Steps = []domain.DocStep{
 		mkStep(1, 1, "tool_call", "running", 0),
@@ -123,7 +123,7 @@ func TestSummary_PerParent(t *testing.T) {
 // as it is when the later merges happen under another parent; a later root merge grows it.
 func TestSummary_OldRootSummaryStays(t *testing.T) {
 	t.Parallel()
-	lim := domain.Limits{ExcerptMaxChars: 10, StepDetailMaxBytes: 200, MaxStepsPersisted: 4}
+	lim := domain.Limits{ExcerptMaxChars: 10, StatusLineMaxChars: 10, StepDetailMaxBytes: 200, MaxStepsPersisted: 4}
 	base := baseState()
 	root := domain.DocStep{ID: tid(1), Ordinal: 1, Kind: "status", Name: domain.SummaryStepName, Status: "completed",
 		Detail: json.RawMessage(`{"summarized":{"by_kind":{"tool_call":5},"count":5}}`), StartedAt: testNow}
@@ -173,7 +173,7 @@ func TestSummary_OldRootSummaryStays(t *testing.T) {
 func TestSummary_FinishedSubtreesCollapse(t *testing.T) {
 	t.Parallel()
 	const bound = 30
-	lim := domain.Limits{ExcerptMaxChars: 10, StepDetailMaxBytes: 200, MaxStepsPersisted: bound}
+	lim := domain.Limits{ExcerptMaxChars: 10, StatusLineMaxChars: 10, StepDetailMaxBytes: 200, MaxStepsPersisted: bound}
 	st := baseState()
 	st.Steps = nil
 	next := 100

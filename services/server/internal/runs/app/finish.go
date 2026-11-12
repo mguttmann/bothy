@@ -28,12 +28,14 @@ const (
 )
 
 // AwaitInput implements runs.Runs (awaitRunInput, run.finish; M2-09 design note 6 a): running ->
-// waiting_input with the status line; waiting_input again answers the run without change (06
-// section 2 "No effect"); every other state gives 409 invalid_state_transition.
+// waiting_input with the status line, cut to run.status_line_max_chars; waiting_input again
+// answers the run without change (06 section 2 "No effect"); every other state gives 409
+// invalid_state_transition.
 func (s *Service) AwaitInput(ctx context.Context, cmd runs.AwaitInput) (runs.Run, error) {
 	if textcheck.DisplayText(cmd.StatusLine) != nil {
 		return runs.Run{}, fieldError("/status_line", "invalid", "the status line contains characters that are not allowed")
 	}
+	cmd.StatusLine = domain.CutText(cmd.StatusLine, s.cfg.StatusLineMaxChars)
 	a := caller(ctx)
 	var doc runs.Run
 	err := s.d.UoW.Do(ctx, func(ctx context.Context) error {
@@ -68,7 +70,8 @@ func (s *Service) AwaitInput(ctx context.Context, cmd runs.AwaitInput) (runs.Run
 
 // Finish implements runs.Runs (finishRun, run.finish; M2-09 design note 6 b to e, M2-22 design
 // note 5): the reason rules of FinishDecision and the cost reports are checked before the run is
-// read (billing.Costs.ValidateReports, pointers under /costs); the same end state again answers
+// read (billing.Costs.ValidateReports, pointers under /costs) and the summary is cut to
+// run.summary_max_chars, so no summary keeps a run from ending; the same end state again answers
 // without change and books nothing (06 section 2 "No effect"), otherwise one unit of work ends the
 // run through endRun with the metrics, the summary and, for a non-empty costs, the booking: one
 // clock reading is finished_at and occurred_at of every entry, billing books one entry per report
@@ -87,6 +90,7 @@ func (s *Service) Finish(ctx context.Context, cmd runs.FinishRun) (runs.Run, err
 	if textcheck.DisplayText(cmd.Summary) != nil {
 		return runs.Run{}, fieldError("/summary", "invalid", "the summary contains characters that are not allowed")
 	}
+	cmd.Summary = domain.CutText(cmd.Summary, s.cfg.SummaryMaxChars)
 	metrics, err := metricsJSON(cmd.Metrics)
 	if err != nil {
 		return runs.Run{}, err

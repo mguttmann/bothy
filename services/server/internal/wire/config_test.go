@@ -517,6 +517,9 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"run.excerpt_max_chars":            {Kind: config.KindInt, Default: "500", Min: "1", Max: "100000", Chapter: "03-data-model.md"},
 		"run.max_steps_persisted":          {Kind: config.KindInt, Default: "2000", Min: "1", Max: "100000", Chapter: "03-data-model.md"},
 		"sync.run_patch_coalesce_interval": {Kind: config.KindDuration, Default: "250ms", Min: "1ms", Chapter: "04-sync-protocol.md"},
+		// AUD-srv-runs-01
+		"run.status_line_max_chars": {Kind: config.KindInt, Default: "500", Min: "1", Max: "2000", Chapter: "03-data-model.md"},
+		"run.summary_max_chars":     {Kind: config.KindInt, Default: "2000", Min: "1", Max: "8000", Chapter: "03-data-model.md"},
 		// M6-13
 		"stats.flush_interval":       {Kind: config.KindDuration, Default: "10s", Min: "1s", Chapter: "25-visualization.md"},
 		"stats.flush_queue_max":      {Kind: config.KindInt, Default: "20000", Min: "1", Max: "10000000", Chapter: "25-visualization.md"},

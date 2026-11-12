@@ -4091,6 +4091,18 @@
       "doc": "Without progress (a start or a stored patch) for this long, a running run gets the stall notice."
     },
     {
+      "name": "run.status_line_max_chars",
+      "env": "BOTHY_RUN__STATUS_LINE_MAX_CHARS",
+      "kind": "int",
+      "default": "500",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "2000",
+      "chapter": "03-data-model.md",
+      "doc": "Runes of status_line a patch or awaitRunInput keeps; a longer text keeps its start."
+    },
+    {
       "name": "run.step_detail_max_bytes",
       "env": "BOTHY_RUN__STEP_DETAIL_MAX_BYTES",
       "kind": "int",
@@ -4101,6 +4113,18 @@
       "max": "1048576",
       "chapter": "03-data-model.md",
       "doc": "Largest encoded run_steps.detail in bytes; a longer detail is cut."
+    },
+    {
+      "name": "run.summary_max_chars",
+      "env": "BOTHY_RUN__SUMMARY_MAX_CHARS",
+      "kind": "int",
+      "default": "2000",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "8000",
+      "chapter": "03-data-model.md",
+      "doc": "Runes of the summary finishRun keeps; a longer text keeps its start."
     },
     {
       "name": "run.usage_wake_max",

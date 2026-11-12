@@ -43,7 +43,7 @@ func summaryOf(t *testing.T, st domain.DocumentState) domain.DocStep {
 // steps and parents kept, and limit_reached without a candidate.
 func TestSummarizeSteps(t *testing.T) {
 	t.Parallel()
-	lim := domain.Limits{ExcerptMaxChars: 10, StepDetailMaxBytes: 200, MaxStepsPersisted: 3}
+	lim := domain.Limits{ExcerptMaxChars: 10, StatusLineMaxChars: 10, StepDetailMaxBytes: 200, MaxStepsPersisted: 3}
 	base := baseState()
 	base.Steps = []domain.DocStep{
 		mkStep(11, 1, "tool_call", "completed", 0),
@@ -140,7 +140,7 @@ func TestSummarizeSteps(t *testing.T) {
 	}
 
 	// Without a step add the patch never summarizes, even above the limit.
-	ch, _, err = mustApply(t, st4, domain.Limits{ExcerptMaxChars: 10, StepDetailMaxBytes: 200, MaxStepsPersisted: 1},
+	ch, _, err = mustApply(t, st4, domain.Limits{ExcerptMaxChars: 10, StatusLineMaxChars: 10, StepDetailMaxBytes: 200, MaxStepsPersisted: 1},
 		rawOp("replace", "/steps/"+sid(32)+"/status", `"completed"`))
 	if err != nil || len(ch.DeleteSteps) != 0 {
 		t.Errorf("err %v, deletes %v", err, ch.DeleteSteps)
