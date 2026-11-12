@@ -54,7 +54,7 @@ class _TerminalSessionScreenState extends ConsumerState<TerminalSessionScreen>
   late final TerminalPlatformGuard _guard;
   late final HardwareKeyboardWatch _keyboard;
   TerminalTabs? _registered;
-  // The coordinator [_registered] is registered with.
+  // The coordinator that knows this screen shows [_registered].
   PhoneTerminalCoordinator? _coordinator;
   // Whether the screen was left; it happens once, by the pop or by the dispose.
   bool _left = false;
@@ -96,7 +96,8 @@ class _TerminalSessionScreenState extends ConsumerState<TerminalSessionScreen>
   void _register(TerminalTabs tabs) {
     if (_left || identical(_registered, tabs)) return;
     _registered = tabs;
-    _coordinator = ref.read(phoneTerminalCoordinatorProvider)?..register(tabs);
+    _coordinator = ref.read(phoneTerminalCoordinatorProvider)
+      ?..screenShown(tabs);
     unawaited(tabs.refresh());
   }
 
@@ -118,7 +119,7 @@ class _TerminalSessionScreenState extends ConsumerState<TerminalSessionScreen>
           break;
       }
     }
-    _coordinator?.unregister(tabs);
+    _coordinator?.screenGone(tabs);
   }
 
   @override

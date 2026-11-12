@@ -10,7 +10,9 @@
 // The session detaches in the background. A push tapped then opens its thread, which replaces
 // M8: the session stays detached and the server sees no attach, whether the push arrives right
 // after the app is in front (the order of iOS and Android) or before it. E6 replaces M8 too, but
-// after the unlock M8 is back and the session attaches.
+// after the unlock M8 is back and the session attaches. A session whose stream dropped is
+// attached again by the reconnector of D-TSL-5 also after M8 was left: it detaches in the
+// background like every other, and no return attaches it again.
 
 import 'dart:async';
 import 'dart:io';
@@ -333,6 +335,65 @@ void main() {
 
     await _settle(tester);
     expectLeftDetached(tab);
+    await end(tester);
+  });
+
+  testWidgets('a session the reconnector attaches after M8 was left detaches '
+      'in the background and stays detached', (tester) async {
+    final tab = await shellInM8(tester);
+    final thread = '/t/${fake.seed.releaseNotes}';
+    final server = fake.server;
+
+    // The server ends the stream while M8 shows: a cause the reconnector attaches again.
+    await tester.runAsync(server.terminalStreams.close);
+    await _until(
+      tester,
+      'the stream dropped',
+      () => tab.state.phase == TerminalPhase.detached,
+    );
+    expect(tab.state.detachCause, DetachCause.serverRestart);
+    await _until(
+      tester,
+      'detached on the server',
+      () => onServer(tab).state == 'detached',
+    );
+
+    // A tapped push replaces M8.
+    push.tap(thread);
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(TerminalSessionScreen), findsNothing);
+    expect(location(tester), thread);
+
+    // The app leaves and returns: the reconnector attaches the session, without its view.
+    lifecycle.set(AppActivity.background);
+    await tester.pump();
+    lifecycle.set(AppActivity.foreground);
+    await _until(
+      tester,
+      'the session attached again',
+      () => tab.state.phase == TerminalPhase.connected,
+    );
+    await _until(
+      tester,
+      'active on the server',
+      () => onServer(tab).state == 'active',
+    );
+    expect(find.byType(TerminalSessionScreen), findsNothing);
+    expect(server.requestsOf('attachTerminalSession'), hasLength(1));
+
+    // R-PR-12: the background detaches it, here and on the server.
+    await background(tester, tab);
+    expect(tab.state.detachCause, DetachCause.person);
+
+    // No return attaches it again: its screen does not show.
+    lifecycle.set(AppActivity.foreground);
+    await _settle(tester);
+    expect(tab.state.phase, TerminalPhase.detached);
+    expect(server.requestsOf('attachTerminalSession'), hasLength(1));
+    expect(onServer(tab).state, 'detached');
+    expect(location(tester), thread);
+    expect(server.violations, isEmpty);
     await end(tester);
   });
 

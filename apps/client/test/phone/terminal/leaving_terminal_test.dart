@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// A terminal session of the phone is live only while its screen M8 shows, the app is in front
-// and the app lock is open (01 5.3 M8, 5.4, 5.6 E6, R-PR-12; D-M5-12-4, D-M5-12-5;
-// docs/decisions.d/AUD-client-phone-01.md): a push or a link that replaces M8 ends the
-// reattaching of the coordinator, an opening or an attach on its way is stopped when M8 goes,
-// and one that lands while the app is in the background or behind the lock is detached and
-// attaches on the return. E6 replaces M8 too, but that is no leave: with the lock open and M8
-// back the session attaches.
+// The coordinator attaches a terminal session of the phone again only while its screen M8
+// shows, the app is in front and the app lock is open (01 5.3 M8, 5.4, 5.6 E6, R-PR-12;
+// D-M5-12-4, D-M5-12-5; docs/decisions.d/AUD-client-phone-01.md): a push or a link that
+// replaces M8 ends the reattaching of the coordinator, an opening or an attach on its way is
+// stopped when M8 goes, and one that lands while the app is in the background or behind the
+// lock is detached and attaches on the return. E6 replaces M8 too, but that is no leave: with
+// the lock open and M8 back the session attaches. A session that turns live after M8 was left
+// (the reconnector of D-TSL-5 attaches one whose stream dropped) still detaches in the
+// background and at the lock, and nothing attaches it again.
 
 import 'dart:async';
 
@@ -110,6 +112,34 @@ Future<void> _startShell(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(find.text(en.terminalOpenConfirm));
   await tester.pump();
+}
+
+/// M8 with a connected shell whose stream drops while the engine is offline, then left by
+/// system back. The last value is the engine's connection: `true` lets the reconnector of
+/// D-TSL-5 attach the session again, without its view (AUD-CP1/7 (a)).
+Future<
+  (PhoneTerminalHarness, _Gated, TerminalController, StreamController<bool>)
+>
+_lostAndLeft(WidgetTester tester) async {
+  final world = await TerminalWorld.create(tester, api: _Gated.new);
+  final online = StreamController<bool>();
+  addTearDown(online.close);
+  final h = await PhoneTerminalHarness.pump(
+    tester,
+    world: world,
+    services: (w) => w.services(online: online.stream),
+  );
+  final c = await h.openShell(tester);
+  online.add(false);
+  await world.host.close(1006);
+  await pumpUntil(tester, () => c.state.phase == TerminalPhase.detached);
+  expect(c.state.detachCause, DetachCause.connectionLost);
+
+  await tester.binding.handlePopRoute();
+  await tester.pumpAndSettle();
+  expect(find.byType(TerminalSessionScreen), findsNothing);
+  expect(find.byKey(const ValueKey('below')), findsOneWidget);
+  return (h, world.api as _Gated, c, online);
 }
 
 void main() {
@@ -333,6 +363,80 @@ void main() {
       expect(h.world.api.closes, [FakeHostsApi.sessionId(1)]);
       expect(c.state.phase, TerminalPhase.idle);
       expect(h.world.host.connections, 0);
+      await h.close(tester);
+    });
+  });
+
+  group('a session that turns live after M8 was left', () {
+    testWidgets('the background detaches it, and the return attaches nothing', (
+      tester,
+    ) async {
+      final (h, api, c, online) = await _lostAndLeft(tester);
+      online.add(true);
+      await pumpUntil(tester, () => c.state.phase == TerminalPhase.connected);
+      expect(h.world.host.openStreams, 1);
+
+      h.lifecycle.set(AppActivity.background);
+      await _settle(tester);
+      expect(c.state.phase, TerminalPhase.detached, reason: 'R-PR-12');
+      expect(c.state.detachCause, DetachCause.person);
+      await pumpUntil(tester, () => h.world.host.openStreams == 0);
+      expect(h.world.host.deviceCloseCodes, [1000]);
+      expect(h.world.api.closes, isEmpty, reason: 'the session keeps running');
+      expect(h.coordinator.detached, isEmpty);
+
+      h.lifecycle.set(AppActivity.foreground);
+      await _settle(tester);
+      expect(c.state.phase, TerminalPhase.detached);
+      expect(api.attaches, 1);
+      await h.close(tester);
+    });
+
+    testWidgets('the app lock detaches it, and the unlock attaches nothing', (
+      tester,
+    ) async {
+      final (h, api, c, online) = await _lostAndLeft(tester);
+      online.add(true);
+      await pumpUntil(tester, () => c.state.phase == TerminalPhase.connected);
+      expect(h.world.host.openStreams, 1);
+
+      h.gate.lock();
+      await _settle(tester);
+      expect(c.state.phase, TerminalPhase.detached, reason: '01 5.6 E6');
+      expect(c.state.detachCause, DetachCause.person);
+      await pumpUntil(tester, () => h.world.host.openStreams == 0);
+      expect(h.world.host.deviceCloseCodes, [1000]);
+      expect(h.coordinator.detached, isEmpty);
+
+      h.gate.unlock();
+      await _settle(tester);
+      expect(c.state.phase, TerminalPhase.detached);
+      expect(api.attaches, 1);
+      await h.close(tester);
+    });
+
+    testWidgets('an attach of it that completes in the background is detached '
+        'at once and stays detached', (tester) async {
+      final (h, api, c, online) = await _lostAndLeft(tester);
+      final gate = api.attachGate = Completer<void>();
+      online.add(true);
+      await pumpUntil(tester, () => api.attaches == 1);
+      expect(_onItsWay(c), isTrue);
+
+      h.lifecycle.set(AppActivity.background);
+      gate.complete();
+      await pumpUntil(tester, () => !_onItsWay(c));
+      await _settle(tester);
+      expect(c.state.phase, TerminalPhase.detached, reason: 'R-PR-12');
+      expect(c.state.detachCause, DetachCause.person);
+      expect(h.world.host.openStreams, 0);
+      expect(h.coordinator.detached, isEmpty);
+
+      api.attachGate = null;
+      h.lifecycle.set(AppActivity.foreground);
+      await _settle(tester);
+      expect(c.state.phase, TerminalPhase.detached);
+      expect(api.attaches, 1);
       await h.close(tester);
     });
   });
