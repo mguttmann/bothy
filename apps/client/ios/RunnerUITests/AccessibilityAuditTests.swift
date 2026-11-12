@@ -6,9 +6,38 @@
 // audit type on the iOS simulator. An issue the audit reports fails the test, unless it is a
 // known limitation of the Flutter engine listed in `knownLimitations` with its reason (and in
 // docs/quality/accessibility-mobile.md); a listed limitation is never ignored silently, the
-// test prints every issue it lets pass.
+// test prints every issue it lets pass. An audit that XCTest ends at its own time limit has
+// no verdict about the screen: the screen starts again and is audited once more
+// (`AuditTimeLimit`, docs/decisions.d/FIX-MAIN-RED-1705.md).
 
 import XCTest
+
+/// The time limit XCTest gives one audit. It ends a longer audit with the error "Audit failed
+/// to complete in time" and reports neither that the screen is clean nor that it is not. The
+/// first start of the freshly installed app on a loaded runner can take that long.
+enum AuditTimeLimit {
+  /// Domain and code of that error.
+  static let domain = "com.apple.xcode.xctest.accessibilityAudit"
+  static let code = -56
+
+  /// Whether [error] is the error of XCTest for an audit it ended at its time limit.
+  static func ended(_ error: Error) -> Bool {
+    let error = error as NSError
+    return error.domain == domain && error.code == code
+  }
+
+  /// Runs [audit] and, when XCTest ended it at its time limit, once more. Only an audit
+  /// without a verdict is repeated: every other error and a second time limit are thrown, and
+  /// an audit that completed is never run again.
+  static func completing(_ screen: String, _ audit: () throws -> Void) throws {
+    do {
+      try audit()
+    } catch let error where ended(error) {
+      print("\(screen): XCTest ended the audit at its time limit; the screen is audited once more")
+      try audit()
+    }
+  }
+}
 
 final class AccessibilityAuditTests: XCTestCase {
   /// The upper bound for the first frame of a screen: the debug build of the audit entry
@@ -48,30 +77,34 @@ final class AccessibilityAuditTests: XCTestCase {
       XCTFail("performAccessibilityAudit needs an iOS 17 simulator or later")
       return []
     }
-    let app = XCUIApplication()
-    // The engine reads its initial route from the process arguments.
-    app.launchArguments = ["--route=/\(screen)"]
-    app.launch()
-    defer { app.terminate() }
-    let shown = app.descendants(matching: .any)
-      .matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
-    XCTAssertTrue(
-      shown.waitForExistence(timeout: Self.patience),
-      "\(screen): \"\(text)\" did not appear"
-    )
+    // The issues of every audit of the screen count, also those an audit reported before
+    // XCTest ended it at its time limit.
     var issues: [String] = []
-    try app.performAccessibilityAudit(for: .all) { issue in
-      let element = issue.element.map { "\($0.elementType) \"\($0.label)\" at \($0.frame)" } ?? "no element"
-      let line = "\(screen): \(issue.compactDescription) (\(element)): \(issue.detailedDescription)"
-      if let known = Self.knownLimitations.first(where: {
-        $0.type == issue.auditType && $0.matches(issue.element)
-      }) {
-        print("\(line): known limitation: \(known.reason)")
-      } else {
-        issues.append(line)
+    try AuditTimeLimit.completing(screen) {
+      let app = XCUIApplication()
+      // The engine reads its initial route from the process arguments.
+      app.launchArguments = ["--route=/\(screen)"]
+      app.launch()
+      defer { app.terminate() }
+      let shown = app.descendants(matching: .any)
+        .matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+      XCTAssertTrue(
+        shown.waitForExistence(timeout: Self.patience),
+        "\(screen): \"\(text)\" did not appear"
+      )
+      try app.performAccessibilityAudit(for: .all) { issue in
+        let element = issue.element.map { "\($0.elementType) \"\($0.label)\" at \($0.frame)" } ?? "no element"
+        let line = "\(screen): \(issue.compactDescription) (\(element)): \(issue.detailedDescription)"
+        if let known = Self.knownLimitations.first(where: {
+          $0.type == issue.auditType && $0.matches(issue.element)
+        }) {
+          print("\(line): known limitation: \(known.reason)")
+        } else if !issues.contains(line) {
+          issues.append(line)
+        }
+        // Every issue is handled here: the test decides with the list.
+        return true
       }
-      // Every issue is handled here: the test decides with the list.
-      return true
     }
     return issues
   }
@@ -88,6 +121,52 @@ final class AccessibilityAuditTests: XCTestCase {
       issues.contains { $0.contains("Element has no description") },
       "no issue on the screen with known gaps"
     )
+  }
+
+  /// The error of XCTest for an audit it ended at its time limit, as the log of the CI run
+  /// shows it in which the first audit of the job did not complete.
+  private static let timeLimit = NSError(
+    domain: "com.apple.xcode.xctest.accessibilityAudit",
+    code: -56,
+    userInfo: [NSLocalizedDescriptionKey: "Audit failed to complete in time"]
+  )
+
+  func testAnAuditEndedAtTheTimeLimitRunsOnceMore() throws {
+    var audits = 0
+    try AuditTimeLimit.completing("screen") {
+      audits += 1
+      if audits == 1 { throw Self.timeLimit }
+    }
+    XCTAssertEqual(audits, 2)
+  }
+
+  func testASecondTimeLimitFailsTheAudit() {
+    var audits = 0
+    XCTAssertThrowsError(
+      try AuditTimeLimit.completing("screen") {
+        audits += 1
+        throw Self.timeLimit
+      }
+    ) { XCTAssertTrue(AuditTimeLimit.ended($0)) }
+    XCTAssertEqual(audits, 2)
+  }
+
+  func testAnotherErrorOfAnAuditFailsWithoutASecondAudit() {
+    var audits = 0
+    let other = NSError(domain: "com.apple.xcode.xctest.accessibilityAudit", code: -1)
+    XCTAssertThrowsError(
+      try AuditTimeLimit.completing("screen") {
+        audits += 1
+        throw other
+      }
+    ) { XCTAssertFalse(AuditTimeLimit.ended($0)) }
+    XCTAssertEqual(audits, 1)
+  }
+
+  func testACompletedAuditRunsOnce() throws {
+    var audits = 0
+    try AuditTimeLimit.completing("screen") { audits += 1 }
+    XCTAssertEqual(audits, 1)
   }
 
   func testM1Spaces() throws { try audit("m1_spaces", showing: "Jump to") }

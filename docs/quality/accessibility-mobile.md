@@ -58,7 +58,10 @@ The platform audits check what VoiceOver and TalkBack receive from the same scre
 - **iOS**: `AccessibilityAuditTests.swift` runs `performAccessibilityAudit` with every audit type
   (contrast, element detection, hit region, sufficient element description, Dynamic Type, text
   clipped, traits, actions) on the iOS simulator (`tool/run_ios_a11y_audit.sh`); it starts each
-  screen with the launch argument `--route=/<screen>`.
+  screen with the launch argument `--route=/<screen>`. XCTest ends an audit that outlasts its
+  own time limit with an error and without a verdict; the test then starts the screen again and
+  audits it once more. A second time limit fails the test, and so does every issue that any of
+  the audits reported (docs/decisions.d/FIX-MAIN-RED-1705.md).
 - **Android**: `AccessibilityChecksTest.kt` runs every check of the latest preset of the
   Accessibility Test Framework (touch target size, text and image contrast with a screenshot,
   speakable text, duplicate descriptions, clickable spans, traversal order, redundant

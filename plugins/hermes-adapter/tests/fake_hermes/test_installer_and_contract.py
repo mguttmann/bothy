@@ -20,6 +20,7 @@ from typing import Any
 import pytest
 import yaml
 from fake_hermes_kit import (
+    _TOOL_IMPORT_FAILED,
     ADDED,
     COMPONENT,
     HermesWorld,
@@ -190,6 +191,29 @@ def test_adapter_admits_every_python_of_pinned_hermes(world: HermesWorld) -> Non
     adapter = tomllib.loads((COMPONENT / "pyproject.toml").read_text(encoding="utf-8"))
     oldest = _lowest_python(hermes["project"]["requires-python"])
     assert _lowest_python(adapter["project"]["requires-python"]) <= oldest
+
+
+def test_pinned_hermes_names_a_tool_module_it_could_not_import(world: HermesWorld) -> None:
+    # The start loop of the kit reads this line (`_TOOL_IMPORT_FAILED`): the pinned Hermes logs
+    # a tool module whose import failed and goes on with the others, it does not exit.
+    folder = world.root / "lost-tool"
+    folder.mkdir()
+    (folder / "lost_tool.py").write_text(
+        'from tools.registry import registry\nregistry.register(name="lost")\n', encoding="utf-8"
+    )
+    seen = _run(
+        world,
+        "import io, json, logging\n"
+        "from tools.registry import discover_builtin_tools\n"
+        "out = io.StringIO()\n"
+        "handler = logging.StreamHandler(out)\n"
+        "handler.setFormatter(logging.Formatter('%(levelname)s %(name)s: %(message)s'))\n"
+        "logging.getLogger().addHandler(handler)\n"
+        f"found = discover_builtin_tools({str(folder)!r})\n"
+        "print(json.dumps({'found': found, 'log': out.getvalue()}))",
+    )
+    assert seen["found"] == []
+    assert f"WARNING tools.registry: {_TOOL_IMPORT_FAILED} tools.lost_tool:" in seen["log"]
 
 
 async def test_installer_busy_mode_and_switch(world: HermesWorld) -> None:
