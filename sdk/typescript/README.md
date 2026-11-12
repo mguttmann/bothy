@@ -48,9 +48,9 @@ ESM only; `engines.node = ">=24"` (on 2026-10-12 Node.js 24 is the only line in 
 | `client` | `createApiClient` with `Bearer` or DPoP, `DPoP-Nonce` and one nonce retry, `sdk.http_timeout`, retries of idempotent requests, one deprecation warning per operation, `bindRun` for `Invocation-Token` (07 SR9). |
 | `auth` | `Secret`, `DpopKey`, `loadDpopKey`, `createDpopProof`, `dpopThumbprint`. |
 | `retry` | `IDEMPOTENT_EXEMPT_OPERATIONS` (held equal to `openapi.yaml`), classification and backoff. |
-| `gateway` | `Gateway` (hello, identify, resume, heartbeat, close codes, reconnect with full jitter), `GatewaySource` and `PollingSource` with the acknowledgement window `AckWindow`. |
-| `invocation` | `InvocationVerifier` (09 4.5 with its JWKS cache), `MemoryInboxStore` and `FileInboxStore`. |
-| `runs` | `Adapter` (09 4.9: acknowledgement after the inbox, start only after `200`), `RunHandle`, `RunPatcher`, `renderContext`. |
+| `gateway` | `Gateway` (hello, identify, resume, heartbeat, close codes, reconnect with full jitter), `GatewaySource` and `PollingSource` with the acknowledgement window `AckWindow`. `PollingSource` sends the heartbeat every `HeartbeatAck.interval_ms` and keeps its interval when an answer names none above zero. |
+| `invocation` | `InvocationVerifier` (09 4.5 with its JWKS cache; a run from a model command compares the payload's `command_id`), `MemoryInboxStore` and `FileInboxStore` with the retention of "Adapter state" below. |
+| `runs` | `Adapter` (09 4.9: acknowledgement after the inbox, start only after `200`), `RunHandle`, `RunPatcher`, `renderContext`. An end the server did not store is sent again ("The end of a run" below). |
 | `components` | Builders, `approvalCard`, `questionCard`, `respond`, `update`. |
 | `commands` | `reconcileCommands`, `guardedAutocomplete`; an autocomplete handler never calls a model. |
 | `outbox` | `Outbox` with `MemoryOutboxStore` and `FileOutboxStore`; `sendMessage` takes `attachmentFileIds`. `sendLongMessage` keeps a long answer one message: the head as its text and the rest above `message_max_content_bytes` as one attachment `answer.txt` (`splitForLimit`, `uploadText`; M4-47). |
@@ -86,6 +86,36 @@ key list, never because of a request. The SDK stores no `webhook-id`: an app kee
 has seen for `webhook.retry_max_age` in its own storage and answers a repeated one with `2xx`
 without doing the work again (docs/api/webhooks.md 3 point 4).
 
+## The end of a run
+
+`RunHandle.finish` counts as done once the server answered. When `finishRun` gets no answer, or a
+`5xx`, `401` or `429`, after the retries of the client, the server still holds the run as
+running: `finish` throws, `finished` stays `false` and `finishPending` is `true`. The first end
+asked for stays the run's end, so a later `finish` sends that end again, whatever it asks for.
+The `Adapter` keeps such a run in `active_runs` of its heartbeat, so the server does not end it
+as `interrupted` (09 5.5), and sends the end again with waits that double from
+`sync.reconnect_backoff_base` up to `sync.reconnect_backoff_cap`, until the server stores or
+refuses it. A run of an adapter that stops meanwhile is left to the server, like every run a
+stopped adapter holds (09 4.9); the pending end is not written to disk.
+
+## Adapter state
+
+With `stateDir` the adapter keeps its inbox in `inbox/` (one file per accepted event with its
+newest token, and `jti.json`) and its outbox in `outbox.json`. What leaves them:
+
+- An inbox entry leaves a day after it was closed (`CLOSED_ENTRY_RETENTION_MS`, an option of the
+  stores). `InboxStore.prune` drops it: the first prune that finds an entry closed starts its
+  time, a redelivery of the event starts it again. An entry that is not closed stays.
+- A `jti` row leaves with the same prune once its token cannot pass anymore (`exp` plus
+  `adapter.invocation_token_leeway`).
+- The adapter prunes at its start and every hour (`INBOX_PRUNE_INTERVAL_MS`). A new process does
+  not know since when an entry is closed and counts from its own first prune.
+- A sent outbox entry is deleted at once; a failed one stays until the caller deals with it
+  (04 13.2 point 5: nothing is dropped silently).
+- In memory the adapter keeps the token of a run only while it holds the run; a reply of an ended
+  run is bound with the token of the inbox, or fails with `run_token_unavailable` once that
+  entry has left.
+
 ## FakeServer and live runs
 
 `FakeServer` (`bothy-sdk/testing`) listens on `127.0.0.1` port 0 for REST and the gateway and
@@ -95,7 +125,30 @@ models the server rules the SDK depends on, with the faults `stored_then_502`, `
 `test/live/scenarios.live.test.ts` against the real server: the Vitest project `live` builds
 `services/server/test/sdkserver` once (`go test -c -tags sdkserver`) and drives it over its stdin
 protocol. The live files are part of `npm test`; without the Go tool chain or a Docker-compatible
-runtime they fail and never skip.
+runtime they fail and never skip. `test/live/model-command.live.test.ts` runs a model command
+against the real server: the adapter registers the command, Alex invokes it, and the run starts
+and completes.
+
+What the FakeServer plays beyond the run rules:
+
+- `trigger(text, { command })` queues the run of a model command of Lotse
+  (`trigger_kind = command`); its payload and tokens name the command.
+- A follow-up (`deliverFollowup`) gets a row of the run, and a patch of
+  `/followups/<message_id>/state` moves it forward only (`followupState`).
+- `finishRun` with `costs` answers `400 validation_failed` (`/costs`, `not_enabled`) by default,
+  the answer of a server without cost booking. `new FakeServer({ costs: true })` or
+  `enableCosts()` accepts them as the server does since M2-22; `costs(runId)` returns them.
+- `reportAgentSession` with the compare-and-swap over the session row (`sessionReports`),
+  `getInstance` with `limits`, and the upload session of mode `direct` (`createUpload`,
+  `uploadPart`, `completeUpload`, `abortUpload`; `uploadPartSize`, `upload(fileId)`), so
+  `RunHandle.reportSession` and `sendLongMessage` run against it. `createMessage` refuses a
+  content above `limits.message_max_content_bytes` and attaches completed uploads.
+
+`test/fake-contract.test.ts` holds the FakeServer equal to `docs/api/openapi.yaml`: every route
+is an operation of the contract with that method, path and `operationId`, and every answer of a
+run over all routes has the form the contract gives for the operation and status (types,
+required and unknown members, enums, patterns, bounds, UUIDs and timestamps). A new route fails
+the test until a request of that file exercises it.
 
 ## Regenerate
 
