@@ -126,14 +126,18 @@ class _StepUpViewState extends State<StepUpView> {
             enabled: enabled,
             autofillHints: const [AutofillHints.oneTimeCode],
             keyboardType: TextInputType.number,
-            // A code is accepted once (08 2.5): the one of the login is used up, and sending
-            // it again counts as a failed attempt, so the field says to take the next one.
-            decoration: InputDecoration(
-              labelText: l.consoleLoginOneTimeCode,
-              helperText: l.consoleStepUpCodeHint,
-              helperMaxLines: 3,
-            ),
+            decoration: InputDecoration(labelText: l.consoleLoginOneTimeCode),
             onSubmitted: enabled ? (_) => _submit() : null,
+          ),
+          const SizedBox(height: DsSpace.s4),
+          // A code is accepted once (08 2.5): the one of the login is used up, and sending
+          // it again counts as a failed attempt, so the screen says to take the next one. A
+          // text of its own, not the helper text of the field: it wraps to as many lines as it
+          // needs at any width and text size, and the field stays as high as its input line.
+          Text(
+            l.consoleStepUpCodeHint,
+            style: dsTextStyle(DsType.bodySm)
+                .copyWith(color: context.dsColors.textSecondary),
           ),
           const SizedBox(height: DsSpace.s8),
           FilledButton(
