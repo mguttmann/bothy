@@ -7,11 +7,20 @@
 
 import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, readdir, rename, unlink } from "node:fs/promises";
+import {
+  lstat,
+  mkdir,
+  open,
+  readdir,
+  rename,
+  rm,
+  unlink,
+} from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import { Secret } from "../auth/secret.js";
 import {
+  ClosedEntries,
   EntryState,
   InboxEntry,
   afterGrant,
@@ -21,6 +30,7 @@ import {
   notStored,
   replaced,
   type InboxStore,
+  type InboxStoreOptions,
 } from "./inbox.js";
 
 const ENTRY_FILE = /^entry-([0-9a-fA-F-]{36})\.json$/;
@@ -130,6 +140,10 @@ function entryFile(eventId: string): string {
  * never logged. One store object owns a directory: it reads the files once and keeps them in
  * memory, and every write is durable when its promise resolves.
  *
+ * `prune` deletes the file of a closed entry whose retention ended and rewrites the `jti` file
+ * without its expired rows, so the directory holds the open entries, about one retention of
+ * closed ones and the `jti` values of tokens that can still pass.
+ *
  * The directory is created on first use; an existing directory or file that group or others
  * can access, or a symbolic link in its place, is refused.
  *
@@ -147,14 +161,17 @@ export class FileInboxStore implements InboxStore {
   private ready: Promise<void> | undefined;
   private tail: Promise<unknown> = Promise.resolve();
   private closed = false;
+  private readonly closedEntries: ClosedEntries;
 
   /**
    * Creates the store; the directory is opened on the first call.
    *
    * @param directory - The inbox directory, usually `inbox` in the adapter's state directory.
+   * @param options - The retention of closed entries.
    */
-  constructor(directory: string) {
+  constructor(directory: string, options: InboxStoreOptions = {}) {
     this.directory = resolve(directory);
+    this.closedEntries = new ClosedEntries(options);
   }
 
   /**
@@ -239,7 +256,10 @@ export class FileInboxStore implements InboxStore {
     iat: number | undefined,
     jti: string | undefined,
   ): Promise<InboxEntry> {
-    return this.update(eventId, (e) => afterRedelivery(e, token, iat, jti));
+    return this.update(eventId, (e) => {
+      this.closedEntries.touch(eventId);
+      return afterRedelivery(e, token, iat, jti);
+    });
   }
 
   /**
@@ -301,16 +321,24 @@ export class FileInboxStore implements InboxStore {
   }
 
   /**
-   * Drops the `jti` rows that expired at `nowMs`; inbox entries stay.
+   * Drops the `jti` rows that expired at `nowMs` and deletes the files of the closed entries
+   * whose retention ended; see {@link InboxStore.prune}.
    *
    * @param nowMs - The current wall time.
    * @returns A promise that resolves when written.
-   * @throws `Error` when the write fails or the store is closed.
+   * @throws `Error` when a write fails or the store is closed.
    */
   prune(nowMs: number): Promise<void> {
     return this.run(async () => {
       const next = new Map([...this.jti].filter(([, until]) => nowMs < until));
       if (next.size !== this.jti.size) await this.writeJti(next);
+      const entries = [...this.entries.values()].map((h) => h.entry);
+      const due = this.closedEntries.due(entries, nowMs);
+      for (const eventId of due) {
+        await rm(join(this.directory, entryFile(eventId)), { force: true });
+        this.entries.delete(eventId);
+      }
+      if (due.length > 0) await this.syncDirectory();
     });
   }
 

@@ -12,7 +12,8 @@
  *   points 8 and 10 with the runtime's actual state.
  * - {@link MemoryInboxStore} and {@link FileInboxStore}: the inbox with the entry states of
  *   {@link EntryState} and the redelivery rule (a newer token replaces the stored one while the
- *   run has not started); both are the `jti` store as well.
+ *   run has not started); both are the `jti` store as well. `prune` drops expired `jti` rows
+ *   and the entries closed for {@link CLOSED_ENTRY_RETENTION_MS}.
  *
  * @example
  * ```ts
@@ -28,11 +29,13 @@
 
 export { FileInboxStore } from "./file-store.js";
 export {
+  CLOSED_ENTRY_RETENTION_MS,
   EntryState,
   InboxEntry,
   MemoryInboxStore,
   type InboxEntryFields,
   type InboxStore,
+  type InboxStoreOptions,
 } from "./inbox.js";
 export {
   InvocationVerifier,
