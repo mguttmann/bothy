@@ -11015,6 +11015,10 @@
   "@notificationAdminText": {
     "description": "Text of the local notification of kind admin (13 section 2)."
   },
+  "notificationBannerDismiss": "Dismiss",
+  "@notificationBannerDismiss": {
+    "description": "Label of the close button of the banner that shows a notification inside the phone app while it is in front (13 section 4.6)."
+  },
   "pushTitle": "New notification",
   "@pushTitle": {
     "description": "Title of a push notification on iOS and macOS before the app loaded its text (PUSH_TITLE, 13 section 6.1)."

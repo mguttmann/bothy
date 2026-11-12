@@ -315,7 +315,8 @@ final class AppLockController extends ChangeNotifier {
     unawaited(check(returning: true));
   }
 
-  /// Records a pointer or key event of the person; ignored while the lock is closed.
+  /// Records a pointer event, a key event or an action of a screen reader or switch control
+  /// (a semantics action) of the person; ignored while the lock is closed.
   void recordActivity() {
     if (_status != AppLockStatus.unlocked) return;
     _lastActivity = _now();

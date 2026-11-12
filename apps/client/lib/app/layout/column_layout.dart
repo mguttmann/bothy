@@ -5,8 +5,11 @@
 /// forum overview as the optional fourth.
 library;
 
+import 'dart:math' show max;
+
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:l10n/l10n.dart';
 
 import '../../keyboard/app_shortcuts.dart';
@@ -155,6 +158,8 @@ class _ColumnLayoutState extends State<ColumnLayout> {
             key: ValueKey('column.handle.$column'),
             onDrag: (dx) => _drag(column, growsLeft ? -dx : dx),
             onEnd: _end,
+            growsLeft: growsLeft,
+            width: widths.of(column),
           );
       final middle = list && !column
           ? (widget.stackShowsHistory
@@ -282,13 +287,25 @@ class _SessionRail extends StatelessWidget {
 /// The draggable border between two columns: [onDrag] gets the horizontal movement of each
 /// update, [onEnd] is called once when the drag ends (01 5.1 D1: every column border can be
 /// dragged; M4-42 uses it between the main history and the thread too).
-class ColumnDragHandle extends StatelessWidget {
+///
+/// The border also moves without a pointer (WCAG 2.1.1 and 2.5.7; docs/decisions.d/
+/// AUD-client-app-01.md): Tab reaches it, and while it has the keyboard focus Arrow left and
+/// Arrow right move it by [step] per key press and repeat, with [onEnd] when the key is
+/// released; a key with Ctrl, Alt or Cmd is not its own. For a screen reader it is a slider
+/// with the name "Resize column" and [width] as its value, whose "increase" and "decrease"
+/// make the column it sizes wider and narrower by [step], each one move with its [onEnd].
+class ColumnDragHandle extends StatefulWidget {
   /// Creates the handle.
   const ColumnDragHandle({
     super.key,
     required this.onDrag,
     required this.onEnd,
+    this.growsLeft = false,
+    this.width,
   });
+
+  /// The movement of one key press and of one screen reader action.
+  static const double step = DsSpace.s16;
 
   /// Called with the horizontal movement of a drag update.
   final ValueChanged<double> onDrag;
@@ -296,28 +313,101 @@ class ColumnDragHandle extends StatelessWidget {
   /// Called when the drag ends.
   final VoidCallback onEnd;
 
+  /// Whether the column this border sizes lies after it, so that the column grows when the
+  /// border moves to the left (the session column).
+  final bool growsLeft;
+
+  /// The width of the column this border sizes, the value a screen reader reads; null where
+  /// the caller does not know it.
+  final double? width;
+
   @override
-  Widget build(BuildContext context) => Semantics(
-    label: AppLocalizations.of(context).shellResizeColumn,
-    child: MouseRegion(
-      cursor: SystemMouseCursors.resizeColumn,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onHorizontalDragUpdate: (d) => onDrag(d.delta.dx),
-        onHorizontalDragEnd: (_) => onEnd(),
-        child: SizedBox(
-          width: DsSpace.s4,
-          child: Center(
-            child: VerticalDivider(
-              width: DsBorderWidth.hairline,
-              thickness: DsBorderWidth.hairline,
-              color: context.dsColors.borderSubtle,
+  State<ColumnDragHandle> createState() => _ColumnDragHandleState();
+}
+
+class _ColumnDragHandleState extends State<ColumnDragHandle> {
+  /// Whether a key moved the border since the last [ColumnDragHandle.onEnd].
+  bool _moved = false;
+
+  void _endKeys() {
+    if (!_moved) return;
+    _moved = false;
+    widget.onEnd();
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    final dx = switch (event.logicalKey) {
+      LogicalKeyboardKey.arrowLeft => -ColumnDragHandle.step,
+      LogicalKeyboardKey.arrowRight => ColumnDragHandle.step,
+      _ => null,
+    };
+    if (dx == null) return KeyEventResult.ignored;
+    if (event is KeyUpEvent) {
+      _endKeys();
+      return KeyEventResult.handled;
+    }
+    final keys = HardwareKeyboard.instance;
+    if (keys.isControlPressed || keys.isAltPressed || keys.isMetaPressed) {
+      return KeyEventResult.ignored;
+    }
+    widget.onDrag(dx);
+    _moved = true;
+    return KeyEventResult.handled;
+  }
+
+  /// One step of a screen reader: wider or narrower for the column this border sizes.
+  void _resize({required bool wider}) {
+    final towardsColumn = widget.growsLeft ? -1 : 1;
+    widget.onDrag(
+      ColumnDragHandle.step * (wider ? towardsColumn : -towardsColumn),
+    );
+    widget.onEnd();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = widget.width;
+    return Semantics(
+      container: true,
+      slider: true,
+      label: AppLocalizations.of(context).shellResizeColumn,
+      // The values after one step, as far as the border knows them: the column never goes
+      // below `DsLayout.columnMin`, and the room of the window bounds it above.
+      value: width == null ? null : '${width.round()}',
+      increasedValue: width == null
+          ? null
+          : '${(width + ColumnDragHandle.step).round()}',
+      decreasedValue: width == null
+          ? null
+          : '${max(width - ColumnDragHandle.step, DsLayout.columnMin).round()}',
+      onIncrease: () => _resize(wider: true),
+      onDecrease: () => _resize(wider: false),
+      child: Focus(
+        onKeyEvent: _onKey,
+        onFocusChange: (focused) {
+          if (!focused) _endKeys();
+        },
+        child: MouseRegion(
+          cursor: SystemMouseCursors.resizeColumn,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragUpdate: (d) => widget.onDrag(d.delta.dx),
+            onHorizontalDragEnd: (_) => widget.onEnd(),
+            child: SizedBox(
+              width: DsSpace.s4,
+              child: Center(
+                child: VerticalDivider(
+                  width: DsBorderWidth.hairline,
+                  thickness: DsBorderWidth.hairline,
+                  color: context.dsColors.borderSubtle,
+                ),
+              ),
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 /// [widths] fitted to a window of [total] pixels: when the [sized] columns, their handles and

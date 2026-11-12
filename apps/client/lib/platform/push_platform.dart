@@ -132,7 +132,8 @@ abstract interface class PushPlatform {
   /// The account signed in (at start or after a login) with [previewMode] of its settings.
   Future<void> signedIn(PushAccount account, {required String previewMode});
 
-  /// The person opened a thread: the moment to ask for the permission.
+  /// The person opened a history (a thread, or the main history of a text channel): the
+  /// moment to ask for the permission.
   Future<void> threadOpened();
 
   /// `notify.preview_mode` changed in the synced settings.
@@ -177,8 +178,8 @@ void recordPushCounters(
 /// and M5-05 Design note 4); a subclass connects it to its runner's Pigeon host.
 ///
 /// - Permission: [threadOpened] asks once per run, after the login, when the person opens a
-///   thread, the first moment they can understand why; never before the login. Without the
-///   permission nothing registers.
+///   history (a thread, or the main history of a text channel), the first moment they can
+///   understand why; never before the login. Without the permission nothing registers.
 /// - Registration: with the permission the provider's token is registered with `registerPush`
 ///   ([registerToken]); the runner keeps the preview token and the registration ID at once
 ///   ([saveRegistration]), Dart never persists them. A token that differs from the one last

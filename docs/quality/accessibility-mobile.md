@@ -82,6 +82,13 @@ phone, in German and English, light and dark:
 | High contrast | Increase Contrast on | High contrast text on |
 | Switch and keyboard | Full Keyboard Access with a Bluetooth keyboard | Switch Access with a Bluetooth keyboard |
 
+High contrast is not supported by the app yet: it has one set of color roles per theme and does
+not change it for this setting (no high-contrast theme, and it does not read the setting of the
+system), and "High contrast text" of Android reaches only text that the system draws. The row
+therefore checks that every screen stays readable with the setting on, with the contrast the
+token gate holds, not that the contrast rises. A high-contrast variant of the color roles is
+deferred (docs/decisions.d/AUD-client-app-01.md, AUD-CA1/7).
+
 Steps for every screen: swipe through the screen from the first to the last element and check
 that every element is read once, with its role, its name and its state, in the order of the
 screen; activate every control with a double tap; check that the live content of the screen is
@@ -268,6 +275,22 @@ forum row; the rows below the rule table cover them.
 | Color | states are words and icon shapes, never only a color | iOS, Android | `apps/client/test/a11y/phone/lock_a11y_test.dart`: "the app lock on the phone: roles, labels and states for screen readers"; "the app lock after a failed unlock on the phone: roles, labels and states for screen readers"; "the app lock without a screen lock of the device on the phone: roles, labels and states for screen readers" | automated (states in the labels of the snapshot) | VoiceOver, TalkBack |
 | Language | the app's language in the semantics tree; agent text without a language tag keeps it | iOS, Android | `apps/client/test/a11y/phone/lock_a11y_test.dart`: "the app lock on the phone: the semantics tree speaks the language of the app in de and en"; "the app lock after a failed unlock on the phone: the semantics tree speaks the language of the app in de and en"; "the app lock without a screen lock of the device on the phone: the semantics tree speaks the language of the app in de and en" | automated | VoiceOver, TalkBack |
 | Screen reader: the system prompt | Face ID, Touch ID, the fingerprint or the screen lock of the system | iOS, Android |  | manual before release: the prompt is the system's; the person unlocks with VoiceOver and TalkBack on and checks that the app's screen is read again after it | VoiceOver, TalkBack |
+
+## In-app banner of a hint (AUD-client-app-01)
+
+13 4.6 item 1 on the phone in front: the banner over the content with the title and the text of a hint and its close button; a hint of one message and a bundled hint with long names.
+
+| Rule of 01 section 8 | Where | Platform | Automated evidence | State | Manual pass |
+|---|---|---|---|---|---|
+| Contrast (text 4.5:1, controls 3:1) | the banner in light and dark | iOS, Android | `apps/client/test/a11y/phone/in_app_banner_a11y_test.dart`: "the in-app banner of a hint on the phone: contrast, labelled targets and touch targets in light and dark"; "the in-app banner of a bundled hint with long names on the phone: contrast, labelled targets and touch targets in light and dark" | automated; manual before release | by sight |
+| Screen reader: role and name | the banner is one button that reads title and text, and a close button "Dismiss" | iOS, Android | `apps/client/test/a11y/phone/in_app_banner_a11y_test.dart`: "the in-app banner of a hint on the phone: roles, labels and states for screen readers"; "the in-app banner of a bundled hint with long names on the phone: roles, labels and states for screen readers" | automated; manual before release | VoiceOver, TalkBack |
+| Live content | the banner is announced once when it appears; with a screen reader or a switch control active it stays until the person opens or dismisses it or the next hint replaces it | iOS, Android | `apps/client/test/a11y/phone/in_app_banner_a11y_test.dart`: "the in-app banner of a hint on the phone: roles, labels and states for screen readers"; `apps/client/test/notifications/in_app_banner_test.dart`: "with a screen reader the banner stays until it is dismissed" | automated; manual before release | VoiceOver, TalkBack |
+| Font size to 200 percent | the banner at text scale 2 in German and English: the title in one line, the text in two | iOS, Android | `apps/client/test/a11y/phone/in_app_banner_a11y_test.dart`: "the in-app banner of a hint on the phone at text scale 2 in de and en: no overflow, every control reachable"; "the in-app banner of a bundled hint with long names on the phone at text scale 2 in de and en: no overflow, every control reachable" | automated; manual before release | by sight at the largest text |
+| Focus order | the banner first, then its close button | iOS, Android | `apps/client/test/a11y/phone/in_app_banner_a11y_test.dart`: "the in-app banner of a hint on the phone: roles, labels and states for screen readers"; "the in-app banner of a bundled hint with long names on the phone: roles, labels and states for screen readers" | automated (reading order in the snapshot); manual before release | VoiceOver, TalkBack, Full Keyboard Access, Switch Access |
+| Targets (`density.target-min` of `touch`) | the banner and its close button | iOS, Android | `apps/client/test/a11y/phone/in_app_banner_a11y_test.dart`: "the in-app banner of a hint on the phone: contrast, labelled targets and touch targets in light and dark"; "the in-app banner of a bundled hint with long names on the phone: contrast, labelled targets and touch targets in light and dark" | automated | |
+| Motion | the banner appears and leaves without an animation | iOS, Android | `apps/client/test/a11y/phone/in_app_banner_a11y_test.dart`: "the in-app banner of a hint on the phone with reduced motion: no animation runs"; "the in-app banner of a bundled hint with long names on the phone with reduced motion: no animation runs" | automated | |
+| Color | the banner says what it is in words; no state is a color alone | iOS, Android | `apps/client/test/a11y/phone/in_app_banner_a11y_test.dart`: "the in-app banner of a hint on the phone: roles, labels and states for screen readers"; "the in-app banner of a bundled hint with long names on the phone: roles, labels and states for screen readers" | automated | |
+| Language | the app's language in the semantics tree; the names and the text of the hint keep theirs | iOS, Android | `apps/client/test/a11y/phone/in_app_banner_a11y_test.dart`: "the in-app banner of a hint on the phone: the semantics tree speaks the language of the app in de and en"; "the in-app banner of a bundled hint with long names on the phone: the semantics tree speaks the language of the app in de and en" | automated | |
 
 ## M13 Emergency
 

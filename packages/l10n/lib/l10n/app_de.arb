@@ -1907,6 +1907,7 @@
   "notificationSecurityText": "Ein neues Gerät wartet auf deine Bestätigung.",
   "notificationAdminTitle": "Verwaltung",
   "notificationAdminText": "Eine Erinnerung der Verwaltung wartet.",
+  "notificationBannerDismiss": "Ausblenden",
   "pushTitle": "Neue Benachrichtigung",
   "pushBodyMention": "Du wurdest erwähnt",
   "pushBodyDm": "Neue Direktnachricht",

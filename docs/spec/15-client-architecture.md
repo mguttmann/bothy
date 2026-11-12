@@ -747,6 +747,22 @@ idle time of the system: the window state alone decides (docs/DECISIONS.md D-M4-
 in `focus` of a connection with `idle: true` counts for live box patches and typing, not as
 "Active in the thread".
 
+**In front on a phone (13 4.6 item 1).** While the app of a phone is in front it is connected,
+so the server sends it `notification.created` and no push. The app shows the event as a banner
+over its content, at the top inside the safe area (`InAppBannerHost` of
+`apps/client/lib/notifications/in_app_banner.dart`): title and text as 01 10.2 says, with the
+rules of the local notifications of the desktop (no banner for the thread that is on screen;
+`security` leads to the devices settings and `admin` to the administration). A tap opens the
+target like a tapped push (section 11), the close button takes the banner away, and it leaves by
+itself after `InAppBannerHost.stay`, unless a screen reader or a switch control is active: then
+it stays until the person acts or the next event replaces it. One banner shows at a time; a
+later event replaces it, and the counters keep the rest. An event that is not quiet gives one
+haptic tap; a banner has no sound. Signed out and behind the app lock (E6) no banner shows; an
+event that arrived behind the lock shows after the unlock. Nothing of a banner is stored, and it
+goes when the account ends. The event is delivered at most once (13 4.6): after the banner left,
+the counters show it, and no push follows when the person locks the phone afterwards
+(docs/decisions.d/AUD-client-app-01.md).
+
 ### 10.1 iOS and macOS: Notification Service Extension
 
 The NSE runs only for pushes with `mutable-content: 1` and a visible `alert` and has about 30
@@ -865,7 +881,8 @@ As built (M5-05, docs/decisions.d/M5-05.md, ADR 0072):
   without push and the service stays disabled in the merged manifest (ADR 0072). Automatic
   token creation and analytics collection are off; the app asks for the token when it registers.
 - **Permission.** From API 33 the app asks for `POST_NOTIFICATIONS` at the same moment as on
-  iOS: once per run after the login, when the person first opens a thread.
+  iOS: once per run after the login, when the person first opens a history, that is a thread or
+  the main history of a text channel (AUD-client-app-01; the post list of a forum is none).
 
 ### 10.3 Windows
 

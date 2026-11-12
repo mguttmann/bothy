@@ -248,7 +248,9 @@ final class AppPorts {
   /// The file picker, clipboard, opener, microphone and media players (brief M4-22).
   final FilePorts files;
 
-  /// The local notifications of `notification.created` (brief M4-30).
+  /// The local notifications of `notification.created` on the desktop (brief M4-30). A phone
+  /// build does not use it: it shows the hints as a banner inside the app
+  /// (`inAppBannersProvider`, docs/decisions.d/AUD-client-app-01.md).
   final NotificationPresenter notifications;
 
   /// The app window: hidden to the notification area on Windows, its state decides `idle`
@@ -423,6 +425,8 @@ AppPorts productionPorts({
     network: LifecycleNetworkStatus(lifecycle),
     ticker: SchedulerFrameTicker(),
     deepLinks: MethodChannelDeepLinks(),
+    // A phone shows `notification.created` as a banner inside the app, not through this port
+    // (`inAppBannersProvider`): it is connected only while it is in front.
     notifications: phone
         ? const NoNotificationPresenter()
         : LocalNotificationPresenter(

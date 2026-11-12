@@ -6,6 +6,7 @@
 /// [NotificationPresenter] is the port the router uses; [LocalNotificationPresenter] shows
 /// toasts on Windows and notifications on macOS through `flutter_local_notifications`, and
 /// [NoNotificationPresenter] shows nothing (tests and hosts without a notification service).
+/// The phones show the same hints inside the app (`InAppBanners` of `in_app_banner.dart`).
 library;
 
 import 'dart:async';

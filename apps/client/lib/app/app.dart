@@ -5,10 +5,12 @@
 library;
 
 import 'dart:async';
-import 'dart:ui' show AppExitResponse;
+import 'dart:ui' show AppExitResponse, SemanticsActionEvent;
 
 import 'package:design_system/design_system.dart';
+import 'package:domain/domain.dart' show ChannelId, ChannelKind;
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,6 +22,7 @@ import '../keyboard/menu_bar.dart';
 import '../lock/app_lock_controller.dart';
 import '../lock/lock_screen.dart';
 import '../lock/providers.dart';
+import '../notifications/in_app_banner.dart';
 import '../notifications/providers.dart';
 import '../notifications/push_provider.dart';
 import '../onboarding/onboarding_controller.dart';
@@ -52,8 +55,9 @@ import 'router.dart';
 /// layout by the form factor of the build; brief M5-02 Design note 2). Links of the URL scheme
 /// from the runner ([DeepLinkSource]) go to the router. The window title is the product name of
 /// the instance after discovery and the build's app name before (fixed requirement 20). On the
-/// phone the privacy cover hides the content while the app is not in front (01 5.6 E6), and
-/// the app lock of M5-08 sends every route to E6 while it is closed.
+/// phone the privacy cover hides the content while the app is not in front (01 5.6 E6), the
+/// app lock of M5-08 sends every route to E6 while it is closed, and a hint of the gateway
+/// shows as a banner over the content (13 4.6 item 1, `InAppBannerHost`).
 class ClientApp extends ConsumerStatefulWidget {
   /// Creates the app.
   const ClientApp({super.key});
@@ -95,6 +99,8 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     _syncStep(rebuild: false);
     ref.listenManual(appLockProvider, (_, _) => _syncStep());
     HardwareKeyboard.instance.addHandler(_onKey);
+    SemanticsBinding.instance.addSemanticsActionListener(_onSemanticsAction);
+    ServicesBinding.instance.accessibilityFocus.addListener(_onAssistiveUse);
     _router = GoRouter(
       // The navigator of the ports: the step-up dialog of the auth session opens over it.
       navigatorKey: ref.read(appPortsProvider).navigatorKey,
@@ -120,8 +126,8 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     );
     _exit;
     _cover;
-    // A clicked notification opens its thread at the message through the router (15 11,
-    // brief M4-30 Design note 2).
+    // A clicked notification, on the phone a tapped banner, opens its thread at the message
+    // through the router (15 11, brief M4-30 Design note 2).
     _notificationTargets = ref
         .read(desktopNotificationsProvider)
         .targets
@@ -132,7 +138,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
           _router.go(path, extra: const ExternalLink());
         });
     // iOS, macOS (M5-04) and Android (M5-05): a tapped push opens its thread at the message
-    // (15 11); the first thread the person opens is the moment to ask for the notification
+    // (15 11); the first history the person opens is the moment to ask for the notification
     // permission.
     final push = ref.read(pushPlatformProvider);
     if (push != null) {
@@ -266,11 +272,26 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   Widget _shell(BuildContext context, GoRouterState state) =>
       DesktopShell(location: state.uri);
 
+  /// The person opened a history, the moment to ask for the notification permission: a thread
+  /// under `/t/<id>`, and the main history a text channel shows under `/c/<id>` (the post list
+  /// of a forum is none; docs/decisions.d/AUD-client-app-01.md).
   void _onRoute() {
-    final path = _router.routerDelegate.currentConfiguration.uri.path;
-    if (path.startsWith('/t/')) {
+    final uri = _router.routerDelegate.currentConfiguration.uri;
+    if (uri.path.startsWith('/t/')) {
       unawaited(ref.read(pushPlatformProvider)?.threadOpened());
+    } else if (parseLocation(uri) case ChannelLocation(:final channelId)) {
+      unawaited(_textChannelOpened(channelId));
     }
+  }
+
+  Future<void> _textChannelOpened(ChannelId channelId) async {
+    final db = ref.read(localDatabaseProvider);
+    final channel = await db?.structureDao.channelById(channelId);
+    if (!mounted || channel == null) return;
+    if (channel.kind == ChannelKind.forum || channel.mainThreadId == null) {
+      return;
+    }
+    await ref.read(pushPlatformProvider)?.threadOpened();
   }
 
   /// The onboarding step for the router: E6 while the lock of the signed-in phone is closed
@@ -299,6 +320,14 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     return false;
   }
 
+  /// What a person does through a screen reader or a switch control is activity as well and
+  /// never arrives as a pointer event (docs/decisions.d/AUD-client-app-01.md): an action for a
+  /// node (a double tap, a swipe that scrolls) is a semantics action, and the focus of the
+  /// screen reader moving to another node changes `ServicesBinding.accessibilityFocus`.
+  void _onSemanticsAction(SemanticsActionEvent event) => _onAssistiveUse();
+
+  void _onAssistiveUse() => _lock?.recordActivity();
+
   void _open(Uri link) {
     final ports = ref.read(appPortsProvider);
     final path = pathOfExternalLink(
@@ -320,6 +349,8 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     unawaited(_shares?.cancel());
     if (_pushTargets != null) _router.routerDelegate.removeListener(_onRoute);
     HardwareKeyboard.instance.removeHandler(_onKey);
+    SemanticsBinding.instance.removeSemanticsActionListener(_onSemanticsAction);
+    ServicesBinding.instance.accessibilityFocus.removeListener(_onAssistiveUse);
     _lock?.removeListener(_onLock);
     _exit.dispose();
     _cover?.dispose();
@@ -342,6 +373,8 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     ref.watch(pushPlatformProvider);
     // Sharing on iOS and macOS follows the signed-in account (M5-06).
     ref.watch(appleShareProvider);
+    // The phone shows the hints of the gateway as a banner over its content (13 4.6 item 1).
+    final banners = ref.watch(inAppBannersProvider);
     final instance = ref.watch(currentInstanceProvider);
     final branding = ref.watch(appPortsProvider).branding;
     final media = MediaQuery.maybeOf(context);
@@ -369,11 +402,24 @@ class _ClientAppState extends ConsumerState<ClientApp> {
       builder: (context, child) {
         // One visible focus ring for every control at one place (01 8, WCAG 2.4.7), and the
         // keyboard closes on a tap outside a text field on every screen, dialogs included.
+        final page = child ?? const SizedBox.shrink();
         final content = DsFocusRing(
           child: DsKeyboardDismiss(
             child: AppMenuBar(
               appName: instance?.productName ?? branding.appName,
-              child: child ?? const SizedBox.shrink(),
+              // No banner while signed out or behind the closed app lock (E6): its title and
+              // text are content. The step is the one the router's redirect follows.
+              child: banners == null
+                  ? page
+                  : ValueListenableBuilder<OnboardingStep>(
+                      valueListenable: _step,
+                      child: page,
+                      builder: (context, step, page) => InAppBannerHost(
+                        banners: banners,
+                        visible: step == OnboardingStep.signedIn,
+                        child: page!,
+                      ),
+                    ),
             ),
           ),
         );

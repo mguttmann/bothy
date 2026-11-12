@@ -215,6 +215,7 @@ class _BesideMainHistoryState extends ConsumerState<BesideMainHistory> {
                 key: const ValueKey('column.handle.${AppColumn.mainHistory}'),
                 onDrag: _drag,
                 onEnd: _end,
+                width: _width,
               ),
             ],
             Expanded(

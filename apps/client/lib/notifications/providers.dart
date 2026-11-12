@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The wiring of the local notifications (brief M4-30; docs/spec/13-push-notifications.md
-/// 5.3): the events of the signed-in engine go through the [NotificationRouter] to the
-/// presenter of the ports, and the targets of clicked notifications go to the app's router.
+/// 4.6 and 5.3): the events of the signed-in engine go through the [NotificationRouter] to the
+/// presenter of the ports on the desktop and to the in-app banner on the phone, and the
+/// targets of clicked notifications go to the app's router.
 library;
 
 import 'dart:async';
@@ -15,11 +16,12 @@ import 'package:sync_engine/sync_engine.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../settings/settings_providers.dart';
+import 'in_app_banner.dart';
 import 'notification_router.dart';
 
 part 'providers.g.dart';
 
-/// The app paths of clicked notifications, for the app's router.
+/// The app paths of clicked notifications and tapped banners, for the app's router.
 final class DesktopNotifications {
   /// Creates the value over [targets].
   const DesktopNotifications(this.targets);
@@ -28,15 +30,29 @@ final class DesktopNotifications {
   final Stream<String> targets;
 }
 
-/// Shows `notification.created` of the signed-in engine as local notifications, on Windows and
-/// on macOS while the app is connected (13 5.3, D-M4-30-5); the app widget listens to its
-/// [DesktopNotifications.targets].
+/// The banners of the phone app, or null on the desktop: a phone is connected only while it is
+/// in front, so it shows the hints of the gateway inside the app instead of as notifications
+/// of the system (13 4.6 item 1; docs/decisions.d/AUD-client-app-01.md). The app widget lays
+/// them over its content with an `InAppBannerHost`.
+@Riverpod(keepAlive: true)
+InAppBanners? inAppBanners(Ref ref) {
+  if (!ref.watch(appPortsProvider).formFactor.isPhone) return null;
+  final banners = InAppBanners();
+  ref.onDispose(() => unawaited(banners.dispose()));
+  return banners;
+}
+
+/// Shows `notification.created` of the signed-in engine while the app is connected: as local
+/// notifications on Windows and macOS (13 5.3, D-M4-30-5), as the in-app banner on iOS and
+/// Android ([inAppBanners], with the same rules of the [NotificationRouter]); the app widget
+/// listens to its [DesktopNotifications.targets].
 @Riverpod(keepAlive: true)
 DesktopNotifications desktopNotifications(Ref ref) {
   final ports = ref.watch(appPortsProvider);
+  final banners = ref.watch(inAppBannersProvider);
   final targets = StreamController<String>.broadcast();
   final router = NotificationRouter(
-    presenter: ports.notifications,
+    presenter: banners ?? ports.notifications,
     texts: () => lookupAppLocalizations(
       resolveAppLocale(
         userLocale: ref.read(profileControllerProvider).value?.locale,
@@ -66,6 +82,8 @@ DesktopNotifications desktopNotifications(Ref ref) {
   void bind(SyncEngine? engine) {
     unawaited(events?.cancel());
     events = engine?.notifications.listen((n) => unawaited(router.onEvent(n)));
+    // A banner of the account that ended names its content: it goes with the engine.
+    if (engine == null) banners?.clear();
   }
 
   ref.listen(syncEngineProvider, (_, engine) => bind(engine));

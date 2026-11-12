@@ -76,7 +76,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/terminal/` | the terminal (M4-36): the group "Hosts" of the sidebar, the view of a host with its tabs, the ports of `terminal_ui` (WebSocket transport with DPoP `identify`, pins in `host_key_pins`, host events of the engine, the REST adapter), the table "In the terminal" and the providers |
 | `lib/menus/` | the menus of a space, a channel and a thread (M4-33): level, "Mute until", "Export history" |
 | `lib/export/` | the channel export (M4-33): range dialog, save dialog, the stream into the file with progress and cancel |
-| `lib/notifications/` | local notifications (M4-30): the content of a toast, the router from `notification.created` to a toast or nothing, the presenter over `flutter_local_notifications` and their providers |
+| `lib/notifications/` | local notifications (M4-30): the content of a toast, the router from `notification.created` to a toast or nothing, the presenter over `flutter_local_notifications` and their providers; the in-app banner of the phone (`in_app_banner.dart`, AUD-client-app-01) |
 | `lib/desktop/` | the desktop window (M4-30): close to the notification area on Windows, Quit, the window part of `idle`, the tray icon with Open and Quit, "Start at login" |
 | `lib/telemetry/` | app metrics and crash reports (M4-31): the collector, the measurement points, the sender, the scrubbed crash path and their providers |
 | `lib/platform/` | secure storage, device key signers, loopback redirect, browser, lifecycle, the phone's privacy cover and background mapping (`lifecycle.dart`), the iOS adapters of login, passkeys and file protection (`ios_platform.dart`), the Android adapters of login and passkeys (`android_platform.dart`) on the shared browser session (`browser_session.dart`), the notification channels (`notification_channels.dart`), the terminal's platform guard (`terminal_guard.dart`: `FLAG_SECURE` on Android, the screen capture of iOS, the hardware keyboard; M5-12), network, frames |
@@ -265,7 +265,9 @@ row of `local_store` (`instance.app_lock`, schema version 5), so the lock works 
 cold start; the person's switch (Settings, Security on the phone) is device-local in the
 instance's secrets and goes with the wipe. A cold start with a stored session hides the content
 behind the privacy cover until the lock decided and then shows E6 when the lock applies; after
-`client.app_lock_after` without a pointer or key event, in front or since the move to the
+`client.app_lock_after` without a pointer event, a key event or an action through a screen
+reader or switch control (a semantics action, or the screen reader's focus moving to another
+node; AUD-CA1/3), in front or since the move to the
 background, the lock closes; the time counts on the wall clock and on a monotonic clock that
 includes sleep (the runners' time since boot through Pigeon), the larger of both, so setting the
 device's clock back does not keep the lock open (D-M5-08-8). While it is
@@ -369,7 +371,7 @@ refreshes a token. With `notify.preview_mode = none` it fetches nothing; on `404
 "Message not available"; without network or when the time runs out the placeholder stays.
 
 The app (`lib/platform/push_apple.dart`) asks for the notification permission when the person
-first opens a thread after the login, registers the APNs token with `registerPush` (provider
+first opens a history after the login (a thread, or the main history of a text channel), registers the APNs token with `registerPush` (provider
 `apns`, the environment of the build, the bundle identifier), and the runner stores the preview
 token and the registration ID at once in the shared keychain (never in Dart). A new token
 registers again; logout calls `unregisterPush` and every end of the account deletes the items.
@@ -426,7 +428,8 @@ push of the thread arrived meanwhile. A `k = "sync"` message removes the notific
 
 The app (`lib/platform/push_android.dart`, sharing `PushPlatform` of `push_platform.dart` with
 iOS and macOS) asks for the notification permission (`POST_NOTIFICATIONS` from API 33) when the
-person first opens a thread after the login, registers the FCM token with `registerPush`
+person first opens a history after the login (a thread, or the main history of a text channel),
+registers the FCM token with `registerPush`
 (provider `fcm`, the package name), and the runner keeps the preview token and the registration
 ID in its own store (`PushStore`: values sealed with an AES-GCM key of the Android Keystore,
 never in Dart). A new token, also one FCM rotates while the app runs, registers again; logout
@@ -758,7 +761,12 @@ Every column border can be dragged (`ColumnDragHandle` of `lib/app/layout/column
 sidebar, pinned overview and session column as before, and the border between the main history of
 a text channel and the thread open beside it (`BesideMainHistory` in
 `lib/thread/history_area.dart`), whose width is `main_history` in `layout.column_widths`; the
-thread takes the rest, and no side becomes narrower than `DsLayout.columnMin`. When a thread or a
+thread takes the rest, and no side becomes narrower than `DsLayout.columnMin`. A border also
+moves without a pointer (01 5.1 and 8; docs/decisions.d/AUD-client-app-01.md): Tab reaches it,
+Arrow left and Arrow right move it by `ColumnDragHandle.step` while it has the keyboard focus
+(one write when the key is released), and for a screen reader it is a slider named "Resize
+column" with the width as its value, whose "increase" and "decrease" make its column wider and
+narrower. When a thread or a
 forum post is open next to its channel column (the main history, or the pinned overview of a
 forum), "Hide channel" in the thread header, Cmd+Shift+H (Ctrl+Shift+H) and the Thread menu hide
 that column so the thread takes the whole content width; "Show channel" brings it back. The
@@ -1322,6 +1330,22 @@ the message through the router (15 11) and brings a hidden window back. A closed
 notifications; Settings > Notifications says so and holds "Start at login", a device setting
 kept by the system (the run key of the current user on Windows, the login item on macOS 13 and
 later), off by default.
+
+On iOS and Android the same event shows inside the app (13 4.6 item 1; docs/decisions.d/
+AUD-client-app-01.md): a phone is connected only while it is in front, so the server sends it
+the event instead of a push, and the app lays a banner over its content (`InAppBanners`, the
+presenter of a phone build behind the same router, and `InAppBannerHost` in the app widget). It
+has the title and the text of the desktop notification and the same rules (nothing for the
+thread on screen), a tap opens the thread at the message, the close button takes it away, and it
+leaves by itself after `InAppBannerHost.stay` unless a screen reader or switch control is
+active. One banner shows at a time, a hint that is not quiet gives one haptic tap, and no banner
+shows while signed out or behind the app lock. It is no notification of the system: when the
+banner has left, the counters show the hint, and no push follows for it. Tests:
+`test/notifications/in_app_banner_flow_test.dart` (the phone app of an iOS and an Android build
+over the real services against the fake server, from the frame of the gateway to the banner and
+the tap), `test/notifications/in_app_banner_test.dart` (the presenter, the host, the app lock),
+`test/a11y/phone/in_app_banner_a11y_test.dart` and, on the simulator and the emulator,
+`integration_test/phone/in_app_banner_test.dart` in the phone suite.
 
 The MSIX of `make release-windows` gives the app package identity, with the toast activator
 CLSID the app derives from its bundle identifier, so `cancel` and `getActiveNotifications` work in
