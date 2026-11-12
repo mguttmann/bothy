@@ -57,14 +57,16 @@ permissions:
 env:
   FLAKE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || '' }}
 
-# A new commit of a pull request cancels its older run. A push to main never cancels the run
-# in progress: merges come faster than one full run, and SonarQube needs a finished analysis of
-# main. The newer push waits; GitHub keeps at most one pending run per group.
-# A merge group has a ref of its own (gh-readonly-queue/main/...), so its run never cancels
-# another one; the queue itself drops a group that it rebuilds.
+# Only a new commit of a pull request cancels a run in progress, the older run of that pull
+# request. A run of main is never cancelled once it started, neither by the next push nor by a
+# manual run of main (both share the group of the ref): merges come faster than one full run,
+# and SonarQube needs a finished analysis of main. The newer run waits; GitHub keeps at most one
+# pending run per group, so it replaces a run of main that still waits.
+# A merge group has a ref of its own (gh-readonly-queue/main/...), so its run shares its group
+# with no other one; the queue itself drops a group that it rebuilds.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name != 'push' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   plan:
@@ -109,6 +111,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The components and the conditional jobs this change needs (tools/ci/components.py
       # ci-plan, docs/quality/gates.md "Jobs a change needs"): a pull request by its diff (the
@@ -174,6 +177,7 @@ jobs:
         run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -240,6 +244,7 @@ jobs:
         run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -300,14 +305,18 @@ jobs:
       # (tools/ci/free_disk.sh).
       - name: Free disk space
         run: sh tools/ci/free_disk.sh --keep-android
-      # Every tracked gradle-wrapper.jar must match a checksum that Gradle publishes, before any
-      # step can run it; the count is the number of tracked wrappers, so none drops out unseen
+      # Every tracked gradle-wrapper.jar must match a checksum that Gradle publishes; the count is
+      # the number of tracked wrappers, so none drops out unseen. A gate of the merge through
+      # ci-ok, not of the run: the jobs that call ./gradlew (test-apps, the Android jobs) do not
+      # wait for this step, and a pull request runs its own build scripts in them anyway. The
+      # release build that holds a signing key waits for this workflow as its gate stage
       # (tools/ci/tests/test_gradle_wrapper_validation.py; docs/decisions.d/SEC-ALERTS-2026-10-31.md).
       - uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           min-wrapper-count: 2
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -374,6 +383,7 @@ jobs:
         run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -451,6 +461,7 @@ jobs:
         run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -541,6 +552,7 @@ jobs:
         run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -615,6 +627,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - if: hashFiles('services/*/go.mod') != ''
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -697,6 +710,7 @@ jobs:
         run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -809,6 +823,7 @@ jobs:
         run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -921,6 +936,7 @@ jobs:
         run: sh tools/ci/free_disk.sh
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: plugins/*/uv.lock
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -944,6 +960,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - name: make denylist
         env:
@@ -976,6 +993,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - name: make denylist (generic rules only)
         env:
@@ -1009,6 +1027,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -1081,6 +1100,7 @@ jobs:
         run: sh tools/ci/free_disk.sh
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -1120,6 +1140,7 @@ jobs:
         run: sh tools/ci/free_disk.sh
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -1168,6 +1189,7 @@ jobs:
         run: sh tools/ci/free_disk.sh
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -1212,6 +1234,7 @@ jobs:
           cache: true
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The binary targets of the Swift packages (sentry-cocoa) are GitHub release downloads; a
       # failed one fails the run ("already exists in file system", main run 42044761383). The
@@ -1249,6 +1272,7 @@ jobs:
           cache: true
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The binary targets of the Swift packages (sentry-cocoa) are GitHub release downloads; a
       # failed one fails the run ("already exists in file system", main run 42044761383). The
@@ -1290,6 +1314,7 @@ jobs:
           cache: true
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - name: make apps-platform
         shell: bash
@@ -1318,6 +1343,7 @@ jobs:
           cache: true
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - name: make -C apps/client trial-apple
         shell: bash
@@ -1351,6 +1377,7 @@ jobs:
           cache: true
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # make -C apps/client trial-windows; Git Bash on the runner has no make.
       - name: trial-windows
@@ -1381,6 +1408,7 @@ jobs:
           cache: true
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - name: make -C apps/client trial-ios
         shell: bash
@@ -1413,6 +1441,7 @@ jobs:
           cache: true
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - name: make -C apps/client trial-android
         shell: bash
@@ -1441,6 +1470,7 @@ jobs:
           cache: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - name: make -C services/host trial-apple
         shell: bash
@@ -1464,6 +1494,7 @@ jobs:
           cache: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # Git Bash on the runner has no make: the step of the trial directly.
       - name: host trial (Windows)
@@ -1503,6 +1534,7 @@ jobs:
           java-version: "17"
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The client app's Android tests build the app (brief M5-03, apps/client/tool/
       # run_android_tests.sh).
@@ -1557,6 +1589,7 @@ jobs:
           java-version: "17"
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The client app's Android tests build the app (brief M5-03, apps/client/tool/
       # run_android_tests.sh).
@@ -1599,6 +1632,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - id: check
         name: Every job the plan needs passed

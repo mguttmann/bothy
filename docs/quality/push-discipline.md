@@ -63,7 +63,10 @@ for this public repository (ADR 0039):
 2. **Wait.** The push starts `.github/workflows/build-verify.yml`: every target of
    `make gates` and the platform jobs of `ci.yml` (postgres image on both architectures,
    apps on macOS, Windows and the Android emulators), split into parallel jobs, with the
-   Go, pub, npm and uv caches. The job `build-verify-ok` sums them up; wait for it, for
+   Go, pub, npm and uv caches. A job that `ci.yml` has too keeps its time limit, its runner
+   and its make commands, and the supply chain job validates the Gradle wrappers as in
+   `ci.yml` (`tools/ci/tests/test_build_verify_workflow.py`,
+   `tools/ci/tests/test_gradle_wrapper_validation.py`). The job `build-verify-ok` sums them up; wait for it, for
    example with `gh run watch <run-id> --exit-status` (the id from
    `gh run list --workflow build-verify.yml --branch build/<ticket> --limit 1`). A newer push
    to the same build branch cancels the older run.

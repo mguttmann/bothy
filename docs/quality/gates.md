@@ -12,8 +12,8 @@ analysis must not block `main`). When a test job fails,
 `sonar` is skipped and `ci-ok` fails through that job. ci.yml also runs on every
 push to `main`, so SonarQube keeps an analysis of `main` (its overall state and the reference for
 new code; on `main` only with the repository variable `SONAR_MAIN_ANALYSIS`, sonarqube-local.md
-section 6); a running analysis of `main` is never cancelled by the next merge, the newest
-push waits for it; a push event only comes from this repository's own branch, so fork code never runs
+section 6); a running analysis of `main` is never cancelled by the next merge or by a manual run
+of `main`, the newer run waits for it; a push event only comes from this repository's own branch, so fork code never runs
 with the secrets (fork pull requests keep the rules of push-discipline.md). Thresholds appear as names; their default values appear only in
 chapter 23, section 11.
 
@@ -31,7 +31,7 @@ once for the components of the plan, the tests split by component
 |---|---|---|
 | `gates` | `fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint fragments-check runners-check labels-check release-pins install-options templates-check` | always |
 | `gates (docs and contracts)` | `docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check api-clients tokens` | always |
-| `gates (security and supply chain)` | `gitleaks semgrep trivy osv licenses`, after `gradle/actions/wrapper-validation` checks every tracked `gradle-wrapper.jar` | always |
+| `gates (security and supply chain)` | `gitleaks semgrep trivy osv licenses`, after `gradle/actions/wrapper-validation` checks every tracked `gradle-wrapper.jar` (a gate of the merge through `ci-ok`: the jobs of the run that call `./gradlew` do not wait for it; the release build with a signing key waits for the whole workflow as its gate stage) | always |
 | `test (tools)` | `test coverage` with no component (the Python tools) | always |
 | `test (server, shard I of N)` | `test COMPONENTS=server AREAS=none GO_TEST_SHARD=I/N`, one job per shard of a matrix | when the plan needs it |
 | `test (server coverage)` | `-o test coverage COMPONENTS=server AREAS=none` on the merged profiles of the shards | when the plan needs it |
@@ -147,7 +147,9 @@ the secrets and after a failed or cancelled test job, which fails `ci-ok` throug
 
 A new commit of a pull request cancels the run of the older commit, and so does an edit of title or
 body, which starts a new run (the `concurrency` group of `ci.yml` per pull request); a newer push
-to a build branch cancels its older `build-verify` run.
+to a build branch cancels its older `build-verify` run. `ci.yml` cancels no other run in
+progress: a push and a manual run of the same branch share one group and wait for the run before
+them (`tools/ci/tests/test_ci_ok.py` evaluates the group and `cancel-in-progress` per event).
 
 ## How a pull request lands
 
@@ -185,7 +187,8 @@ D-CSMQ-7), and a maintainer squashes it by hand.
    from the queue and rebuilds the groups behind it without that pull request; the group in
    front of it, built at the same time with the earlier pull requests alone, can still land.
 3. **Main.** The queue squashes the group into `main`; the push runs the full suite once more,
-   as every push to `main` does (the run the watcher reads), and `denylist-main.yml`.
+   as every push to `main` does (the run the maintainers read, section "Red runs"), and
+   `denylist-main.yml`.
 
 `ci-ok` stays the only required check (branch protection of `main`) and applies to both events:
 the pull request's run and the merge group's run each end with their own `ci-ok`. GitHub offers
@@ -413,6 +416,33 @@ Where the list is:
   Tests: `test_a_rerun_of_a_reported_run_with_a_new_flake_artifact_is_seen_again`,
   `test_the_attempts_of_one_run_count_once_with_the_flakes_of_each`.
 
+## Red runs
+
+Keeping `main` green is a duty of the maintainers (GOVERNANCE.md, "Roles"): they read the runs of
+`main` and of the scheduled workflows and act on a red one. Older rulings name two parts of that
+duty: "the watcher" reads the run of `ci.yml` on `main` (D-CSMQ-1), and "the keeper" opens the
+update pull request after a new advisory (PL/25). Both are duties of the maintainers;
+GOVERNANCE.md knows no further role.
+
+What tells a maintainer about a red run:
+
+* `denylist-main.yml` opens or updates an issue with the label `denylist-main`
+  (push-discipline.md, "Deny-list hit on `main`"). It is the only workflow that reports its own
+  red run.
+* For every other run GitHub alone notifies, by its own rules ([Notifications for workflow
+  runs](https://docs.github.com/en/actions/concepts/workflows-and-actions/notifications-for-workflow-runs),
+  retrieved 2026-11-12): the person whose push started a run on `main`, and for a scheduled run
+  one person, the one who created the workflow or last changed its `cron` line, each only with
+  notifications for GitHub Actions switched on.
+
+The scheduled workflows are `advisories.yml`, `codeql.yml`, `docs.yml`, `e2e-desktop.yml`,
+`e2e-mobile.yml`, `flakes.yml`, `hermes-pin.yml`, `host-platform.yml` and `scorecard.yml`
+(`tools/docs/tests/test_red_runs_doc.py` holds this list to the workflows with a `schedule`
+trigger). A red run of one of them, or of `ci.yml` on `main`, opens no issue: until a maintainer
+looks at the Actions page it reaches at most that one person. An alert for these runs after the
+pattern of `denylist-main.yml` is not built; ruling AUD-CG1/7 in
+`docs/decisions.d/AUD-misc-ci-gates-01.md` names the open question.
+
 ## Advisories
 
 A new public advisory makes a dependency vulnerable that `main` and every open pull request
@@ -434,8 +464,8 @@ request fails only for vulnerable dependencies the pull request itself adds or c
 * Findings the merge base has too are printed as warnings. A scanner error, a failing scan
   without a readable finding and a failed scan of the base fail the gate.
 * A push to `main` (`ci.yml`) and the daily workflow `advisories.yml` run the full scan without
-  `OSV_BASE`; local runs scan in full too. When either fails on a new advisory, the keeper opens
-  the update pull request at once.
+  `OSV_BASE`; local runs scan in full too. When either fails on a new advisory, a maintainer
+  opens the update pull request at once (section "Red runs" says how a red run reaches one).
 * For a `go.mod`, OSV-Scanner runs its own call analysis whenever `go` is on `PATH` (as in CI
   and in local runs) and then neither reports nor fails for a vulnerability that the module's
   code does not call; only `--all-vulns` lists such findings, under "Uncalled vulnerabilities",

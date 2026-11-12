@@ -37,6 +37,34 @@ PLATFORM_JOBS = (
     "host-trial-windows",
 )
 _MAKE = re.compile(r"(?:^|[;&|]\s*|\n\s*)make\s+([^\n]*)")
+CI = REPO / ".github" / "workflows" / "ci.yml"
+# Jobs with one id in both workflows that differ on purpose: the plan of a build branch measures
+# from its build base, and the deny-list job scans with the generic rules, without the secret.
+DIFFERENT_ON_PURPOSE = frozenset({"plan", "denylist"})
+
+
+def _ci_jobs() -> dict[str, Any]:
+    data = check_runners.load_yaml(CI.read_text(encoding="utf-8"))
+    assert isinstance(data, dict)
+    jobs = data["jobs"]
+    assert isinstance(jobs, dict)
+    return jobs
+
+
+def _shared_jobs() -> list[str]:
+    mine = check_runners.load_yaml(WORKFLOW.read_text(encoding="utf-8"))
+    assert isinstance(mine, dict)
+    return sorted((set(mine["jobs"]) & set(_ci_jobs())) - DIFFERENT_ON_PURPOSE)
+
+
+def _make_lines(job: dict[str, Any]) -> list[str]:
+    """Every line of the job's steps that calls make, with its arguments."""
+    lines: list[str] = []
+    for step in job["steps"]:
+        lines += [
+            ln.strip() for ln in str(step.get("run", "")).splitlines() if ln.strip()[:5] == "make "
+        ]
+    return lines
 
 
 def _workflow() -> dict[str, Any]:
@@ -124,6 +152,27 @@ def test_the_platform_jobs_of_ci_run_too(job: str) -> None:
     assert [s.get("with", {}).get("script") for s in mine["steps"]] == [
         s.get("with", {}).get("script") for s in theirs["steps"]
     ]
+
+
+def test_the_shared_jobs_cover_the_test_and_platform_jobs() -> None:
+    shared = set(_shared_jobs())
+    assert set(PLATFORM_JOBS) <= shared
+    assert {"test-tools", "test-server", "test-server-coverage", "test-server-contract"} <= shared
+    assert {"test-apps", "test-sdk-plugins", "test-adapters-e2e"} <= shared
+
+
+@pytest.mark.parametrize("job", _shared_jobs())
+def test_a_job_of_both_workflows_keeps_the_limits_and_make_commands_of_ci(job: str) -> None:
+    """A job that ci.yml and this workflow both have is a copy, and the copies drifted (AUD-CG1/2).
+
+    The time limit, the runner, the condition, the matrix and every make command with its
+    arguments equal those of ci.yml; steps only ci.yml has (flake and coverage artifacts) add
+    no make command.
+    """
+    mine, theirs = _jobs()[job], _ci_jobs()[job]
+    for key in ("timeout-minutes", "runs-on", "if", "strategy"):
+        assert mine.get(key) == theirs.get(key), key
+    assert _make_lines(mine) == _make_lines(theirs)
 
 
 @pytest.mark.parametrize("job", ["static", "test-tools", "test-server", "test-apps", "docs"])

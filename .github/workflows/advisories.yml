@@ -4,7 +4,8 @@
 # request fails `osv` only for vulnerable dependencies it adds or changes, so a new public
 # advisory for a dependency that main already has no longer stops every landing at once. This
 # run and the push to main (ci.yml) scan every lock file and Go module in full; when either
-# fails, the keeper opens the update pull request.
+# fails, a maintainer opens the update pull request (docs/quality/gates.md, "Red runs", says how
+# a red run reaches one: this workflow reports nothing itself).
 
 name: advisories
 
@@ -32,6 +33,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - if: hashFiles('services/*/go.mod') != ''

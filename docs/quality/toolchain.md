@@ -14,7 +14,7 @@ same make target in GitHub Actions. All gate tools run in both places.
 
 | Tool | Version | Purpose | License | Why this one |
 |---|---|---|---|---|
-| `uv` | system tool | Python environment and lock for all Python tools | MIT OR Apache-2.0 | one lock with hashes for all Python tools; downloads the Python version itself |
+| `uv` | `0.13.7` | Python environment and lock for all Python tools; the version is the one CI installs (input `version` of every `astral-sh/setup-uv` step, held by `tools/ci/tests/test_ci_toolchains.py`), a developer's host brings its own uv | MIT OR Apache-2.0 | one lock with hashes for all Python tools; downloads the Python version itself, from the list of versions that is frozen in each uv release ([Python versions](https://docs.astral.sh/uv/concepts/python-versions/), retrieved 2026-11-12), so the uv version also decides which patch release `--python 3.14` means |
 | `pyyaml` | `6.0.3` | reading YAML in the check scripts | MIT | standard for YAML in Python; `on:` is deliberately not read as a boolean |
 | `ruff` | `0.17.0` | format and lint for Python | MIT | replaces several linters, fast |
 | `mypy` | `2.4.0` | type checking (strict) | MIT | reference type checker for Python |
@@ -122,7 +122,7 @@ tags, the commit SHA behind the tag).
 | `actions/checkout` | `v7.0.1` | checkout without stored credentials |
 | `actions/setup-node` | `v7.1.0` | Node for the Node tools, with npm cache |
 | `actions/setup-go` | `v7.0.0` | one Go for all modules under `services/`, from the `go.mod` of the server (otherwise of the host service) |
-| `astral-sh/setup-uv` | `v10.3.0` | uv, with cache over `tools/uv.lock` |
+| `astral-sh/setup-uv` | `v10.3.0` | uv in the exact version of the table above (`version`), with cache over `tools/uv.lock` |
 | `actions/cache` | `v6.1.0` | binary cache, pre-commit environments, Swift packages of the Mac app jobs |
 | `actions/upload-artifact` | `v7.0.2` | release artifacts, Scorecard result |
 | `actions/download-artifact` | `v8.0.2` | collecting release artifacts |
@@ -134,7 +134,7 @@ tags, the commit SHA behind the tag).
 | `subosito/flutter-action` | `v2.23.0` | Flutter for every Dart package (jobs `gates`, `sonar`, `apps (macOS)`, `apps (iOS)`, `apps (Windows)` and the Pages build), from `environment.flutter` of the root `pubspec.yaml` |
 | `actions/setup-java` | `v6.1.0` | Temurin 17 for the Gradle builds of the Android code (jobs `gates`, `sonar`, `apps (Android API 26)`, `apps (Android API 36)`, brief M5-01) |
 | `android-actions/setup-android` | `v4.0.4` | Android SDK for the JVM tests of the Android core in `make test` (jobs `gates`, `sonar`) |
-| `gradle/actions` | `v6.4.1` | `wrapper-validation` checks every tracked `gradle-wrapper.jar` against the checksums Gradle publishes (job `gates (security and supply chain)`) |
+| `gradle/actions` | `v6.4.1` | `wrapper-validation` checks every tracked `gradle-wrapper.jar` against the checksums Gradle publishes (job `gates (security and supply chain)` of `ci.yml`, job `security and supply chain` of `build-verify.yml`) |
 | `reactivecircus/android-emulator-runner` | `v2.38.0` | Android emulators with API 26 and 36 for the instrumented tests (jobs `apps (Android API 26)` and `apps (Android API 36)`) |
 | `github/codeql-action` | `v4.38.3` | CodeQL and SARIF upload (public) |
 | `ossf/scorecard-action` | `v2.4.4` | OpenSSF Scorecard (public) |

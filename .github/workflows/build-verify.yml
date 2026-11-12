@@ -6,7 +6,9 @@
 # build-verify-ok sums them up. No secrets: the private deny list and SonarQube stay in the
 # pull request CI (ci.yml), this workflow scans with the generic deny rules. It is no required
 # check of main; ci-ok of the pull request stays the merge gate.
-# tools/ci/tests/test_build_verify_workflow.py keeps the target set equal to `make gates`.
+# tools/ci/tests/test_build_verify_workflow.py keeps the target set equal to `make gates` and,
+# for every job that ci.yml has too, the time limit, the runner and the make commands equal to
+# ci.yml.
 #
 # Runners (ADR 0039): every job runs on a GitHub-hosted runner with a fixed label;
 # tools/ci/check_runners.py enforces it and limits the trigger to exactly build/**.
@@ -46,6 +48,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The pushed diff is measured from the merge base with build-base/<ticket> when the build
       # team pushed that ref before the build branch (the integration head it built on), else from
@@ -88,6 +91,7 @@ jobs:
         run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -146,6 +150,7 @@ jobs:
         run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -192,7 +197,7 @@ jobs:
     needs: plan
     if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-server ')
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -208,6 +213,7 @@ jobs:
         run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -278,6 +284,7 @@ jobs:
         run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -328,6 +335,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - if: hashFiles('services/*/go.mod') != ''
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -356,12 +364,13 @@ jobs:
         run: make -o test coverage COMPONENTS="$COMPONENTS" AREAS=none
 
   # Dart tests of the workspace, the JVM tests of the Android code and their coverage threshold.
+  # AREAS=none here and in test-sdk-plugins, as in ci.yml: test-tools runs the tools suite.
   test-apps:
     name: test (apps)
     needs: plan
     if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-apps ')
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -373,6 +382,7 @@ jobs:
         run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -409,7 +419,7 @@ jobs:
       - name: make test coverage
         env:
           COMPONENTS: apps
-        run: make test coverage COMPONENTS="$COMPONENTS"
+        run: make test coverage COMPONENTS="$COMPONENTS" AREAS=none
 
   # The SDK and plugin test suites, each with its own threshold.
   test-sdk-plugins:
@@ -429,6 +439,7 @@ jobs:
         run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -474,7 +485,7 @@ jobs:
               sdk-python|sdk-typescript|plugins) selected="$selected $c" ;;
             esac
           done
-          make test coverage COMPONENTS="${selected# }"
+          make test coverage COMPONENTS="${selected# }" AREAS=none
 
   # The end-to-end suites of the Python adapters against the server of this tree (make
   # adapters-e2e, HERMES-E2E-REAL-SERVER): the Hermes adapter with its fake Hermes runtime and the
@@ -498,6 +509,7 @@ jobs:
         run: sh tools/ci/free_disk.sh
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: plugins/*/uv.lock
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -524,6 +536,7 @@ jobs:
         run: sh tools/ci/free_disk.sh --keep-android
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -577,8 +590,14 @@ jobs:
       # (tools/ci/free_disk.sh).
       - name: Free disk space
         run: sh tools/ci/free_disk.sh --keep-android
+      # Every tracked gradle-wrapper.jar against the checksums Gradle publishes, as in the job
+      # gates-security of ci.yml (tools/ci/tests/test_gradle_wrapper_validation.py).
+      - uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          min-wrapper-count: 2
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -631,6 +650,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - name: make denylist (generic rules only)
@@ -656,6 +676,7 @@ jobs:
         run: sh tools/ci/free_disk.sh
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -692,6 +713,7 @@ jobs:
         run: sh tools/ci/free_disk.sh
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -729,6 +751,7 @@ jobs:
         run: sh tools/ci/free_disk.sh
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: tools/uv.lock
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -764,6 +787,7 @@ jobs:
           cache: true
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # As in ci.yml: the Swift package cache, so the binary targets are not downloaded again.
       - name: Restore the Swift package cache
@@ -782,8 +806,9 @@ jobs:
     runs-on: macos-15
     # The iOS simulator entries of platform-tests.json (--system ios, PL/44): one build and run of
     # the phone tests and the native simulator tests; a command that stalls is stopped by
-    # tools/ci/apps_platform.py (SILENCE_SECONDS) and runs once more.
-    timeout-minutes: 60
+    # tools/ci/apps_platform.py (SILENCE_SECONDS, APP_START_SILENCE_SECONDS while the app starts)
+    # and runs once more. The limit holds a stalled start and its second run (PL/57).
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -795,6 +820,7 @@ jobs:
           cache: true
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # As in ci.yml: the Swift package cache, so the binary targets are not downloaded again.
       - name: Restore the Swift package cache
@@ -832,6 +858,7 @@ jobs:
           cache: true
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - name: make apps-platform
         shell: bash
@@ -858,6 +885,7 @@ jobs:
           cache: true
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - name: make -C apps/client trial-apple
         shell: bash
@@ -889,6 +917,7 @@ jobs:
           cache: true
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # make -C apps/client trial-windows; Git Bash on the runner has no make.
       - name: trial-windows
@@ -917,6 +946,7 @@ jobs:
           cache: true
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - name: make -C apps/client trial-ios
         shell: bash
@@ -947,6 +977,7 @@ jobs:
           cache: true
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - name: make -C apps/client trial-android
         shell: bash
@@ -973,6 +1004,7 @@ jobs:
           cache: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - name: make -C services/host trial-apple
         shell: bash
@@ -994,6 +1026,7 @@ jobs:
           cache: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # Git Bash on the runner has no make: the step of the trial directly.
       - name: host trial (Windows)
@@ -1025,6 +1058,7 @@ jobs:
           java-version: "17"
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The client app's Android tests build the app (brief M5-03).
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
@@ -1071,6 +1105,7 @@ jobs:
           java-version: "17"
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The client app's Android tests build the app (brief M5-03).
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
@@ -1107,6 +1142,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - name: Every job the plan needs passed
         env:

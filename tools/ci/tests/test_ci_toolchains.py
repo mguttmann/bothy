@@ -62,6 +62,31 @@ def _uses(step: dict[str, Any], action: str) -> bool:
     return str(step.get("uses", "")).startswith(action + "@")
 
 
+def test_every_job_installs_the_same_exact_uv() -> None:
+    """uv installs every hash-locked Python tool, also in the jobs with a release environment.
+
+    Without `version` the action installs the newest release of the hour, before any cooldown
+    (AUD-CG1/4): every step names one exact version, the same in every workflow, and Renovate
+    moves it (the `with` input of its github-actions manager).
+    """
+    found: dict[str, set[object]] = {}
+    for workflow in sorted((REPO / ".github" / "workflows").glob("*.yml")):
+        for job_id, job in _jobs(workflow).items():
+            for step in job.get("steps", []):
+                if _uses(step, "astral-sh/setup-uv"):
+                    version = (step.get("with") or {}).get("version")
+                    found.setdefault(f"{workflow.name}: {job_id}", set()).add(version)
+    assert found, "no workflow installs uv: drop this test"
+    versions = set().union(*found.values())
+    floating = sorted(
+        place
+        for place, seen in found.items()
+        if not all(isinstance(v, str) and re.fullmatch(r"\d+\.\d+\.\d+", v) for v in seen)
+    )
+    assert floating == [], f"setup-uv without an exact `version`: {floating}"
+    assert len(versions) == 1, f"one uv for every job, found {sorted(map(str, versions))}"
+
+
 @pytest.mark.parametrize("job", ["gates", "sonar"])
 def test_setup_go_covers_every_go_module(job: str) -> None:
     [step] = [s for s in _steps(job) if _uses(s, "actions/setup-go")]
