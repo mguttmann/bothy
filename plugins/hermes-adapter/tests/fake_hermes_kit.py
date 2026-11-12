@@ -9,8 +9,10 @@ integrity snapshots after that. `HermesRig` gives one test a throwaway Hermes ho
 by the adapter's own installer, the fake model of M2-32 with fake credentials, the egress
 recorder, the SDK's FakeServer on ``127.0.0.1`` with a wall clock, and the gateway process group
 under the macOS sandbox, started through a launcher that runs Hermes' plugin discovery on the
-main thread (`write_gateway_launcher`); it stops the group by its ID and moves the coverage data
-of the subprocess next to the main data file, so ``platform.py`` and ``hermes_config.py`` count.
+main thread (`write_gateway_launcher`) and started again when Hermes came up without the
+adapter's platform or reported a tool module it could not import (`_start_gateway`); it stops
+the group by its ID and moves the coverage data of the subprocess next to the main data file,
+so ``platform.py`` and ``hermes_config.py`` count.
 
 Without the pinned Hermes the tests fail, they never skip (P-09 applied).
 """
@@ -64,11 +66,20 @@ ADAPTER_SRC = COMPONENT / "src"
 PLATFORM_KEY = "bothy"
 #: Distributions the adapter adds to the Hermes environment (11 11.3): nothing else may change.
 ADDED = ("attrs", "coverage")
-#: Gateway starts before a run gives up: Hermes can start without the adapter's platform or exit
-#: early on a loaded machine (D-M2-33-14, D-HERMES-COMPAT-7). The import race of Hermes' own
-#: modules at start is gone with the gateway launcher (FIX-FH22/1).
+#: Gateway starts before a run gives up: Hermes can start without the adapter's platform, exit
+#: early or fail an import of a tool module on a loaded machine (D-M2-33-14, D-HERMES-COMPAT-7,
+#: FMR1705/3). The import race of Hermes' plugin discovery at start is gone with the gateway
+#: launcher (FIX-FH22/1).
 _START_ATTEMPTS = 5
 _NO_PLATFORM = "No messaging platforms enabled."
+#: Hermes' log line for a tool module whose import failed while it collected its tools
+#: (``discover_builtin_tools``), after which it goes on. Hermes collects them on a thread of its
+#: start while the main thread imports the platform adapters, and one of the overlapping first
+#: imports can fail. Every Fake-Hermes test that failed on main after such a start had this line
+#: in its gateway log; how the failed import leads to the failed test is not shown, so the line
+#: is the sign the start loop goes by (docs/decisions.d/FIX-MAIN-RED-1705.md). The Fake-Hermes
+#: test ``test_pinned_hermes_names_a_tool_module_it_could_not_import`` holds the line to the pin.
+_TOOL_IMPORT_FAILED = "Could not import tool module"
 #: The first number of a date tag of Hermes (``v2026.9.24``) is a year; a version tag's
 #: (``v0.22.5``) is a major version far below it.
 _FIRST_CALENDAR_YEAR = 2000
@@ -683,30 +694,44 @@ async def _start_gateway(rig: HermesRig) -> None:
         frames = sum(1 for f in rig.fake.frames if f.get("op") == "heartbeat")
         return len(rig.fake.heartbeats) + frames
 
-    # A restart reuses the FakeServer: only frames of this start count.
-    before, beats = identifies(), heartbeats()
+    def output() -> str:
+        return log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+
     for attempt in range(1, _START_ATTEMPTS + 1):
+        # A restart reuses the FakeServer, and so does the start after a discarded one: only
+        # frames of this start count.
+        before, beats = identifies(), heartbeats()
         rig.gateway = HermesGateway(command, env=rig.env, cwd=rig.homes.work, log=log)
         rig.gateway.start()
 
-        def started(gateway: HermesGateway = rig.gateway) -> bool:
-            text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
-            return identifies() > before or _NO_PLATFORM in text or not gateway.running()
+        def started(gateway: HermesGateway = rig.gateway, before: int = before) -> bool:
+            text = output()
+            return (
+                identifies() > before
+                or _NO_PLATFORM in text
+                or _TOOL_IMPORT_FAILED in text
+                or not gateway.running()
+            )
 
         try:
             # Not rig.until: its step fails on an exited gateway, which here means start again.
             await eventually(started, "the adapter's identify", step=_pause)
         except AssertionError as exc:
             raise AssertionError(f"{exc}\n{gateway_log(rig)}") from None
-        if identifies() > before:
+        if identifies() > before and _TOOL_IMPORT_FAILED not in output():
             break
-        # Hermes started without the plugin's platform or exited early; neither start connects,
-        # so start again.
+        # Hermes started without the plugin's platform, exited early or reported a tool module
+        # it could not import at its start. The first two never connect; the third logs the
+        # module before Hermes opens its inbound gate, which the adapter waits for, so it is
+        # seen here before the adapter connects unless this loop was held up. Start again.
         failed = gateway_log(rig)
         rig.gateway.stop()
         log.write_text("", encoding="utf-8")
         if attempt == _START_ATTEMPTS:
-            raise AssertionError(f"Hermes never started with the adapter's platform:\n{failed}")
+            raise AssertionError(
+                "Hermes never started with the adapter's platform and every tool module "
+                f"imported:\n{failed}"
+            )
     await rig.until(lambda: heartbeats() > beats, "the first heartbeat")
 
 
