@@ -3,7 +3,6 @@
 package app_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"strconv"
@@ -16,6 +15,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // mapping is the fixture mapping of the unit tests.
@@ -433,7 +433,7 @@ func TestProgressPayloadBelowLimit(t *testing.T) {
 	if string(p["id"]) != `"`+s.ID.String()+`"` || string(p["state"]) != `"running"` || !strings.Contains(string(p["stats"]), `"tool":{"messages":2}`) {
 		t.Errorf("reduced payload %s", ev.Payload)
 	}
-	if bytes.Contains(ev.Payload, []byte("null")) {
+	if testkit.HasJSONNull(ev.Payload) {
 		t.Errorf("the reduced payload holds a JSON null: %s", ev.Payload)
 	}
 
