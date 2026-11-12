@@ -15,7 +15,14 @@ library;
 
 import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart'
-    show AuthException, StepUpUnavailable, stepUpPurposeExtra;
+    show
+        AuthException,
+        NotSignedIn,
+        RefreshUnavailable,
+        SessionEnded,
+        StepUpCancelled,
+        StepUpUnavailable,
+        stepUpPurposeExtra;
 import 'package:built_collection/built_collection.dart';
 import 'package:dio/dio.dart';
 
@@ -950,19 +957,26 @@ final class ApiNewAgentPort implements NewAgentPort {
 
 /// The [NewAgentFailure] of [error] of a port call, or null for an error that is no answer of
 /// the server or the login layer: a session without any step-up method ([StepUpUnavailable])
-/// is the server's `403 forbidden` with reason `step_up_not_possible`; another error of the
-/// login layer (a cancelled step-up) is a cancel; a `DioException` without an answer is
-/// offline; otherwise the server's problem with its code, reason and field errors.
+/// is the server's `403 forbidden` with reason `step_up_not_possible`; a cancelled step-up
+/// ([StepUpCancelled]) is a cancel; a refresh that got no answer ([RefreshUnavailable]) is
+/// offline like a `DioException` without an answer; a session that is gone ([SessionEnded],
+/// [NotSignedIn]) is the problem `session_revoked`, the reading of `selfFailure` (ruling
+/// AUD-AA1/4); otherwise the server's problem with its code, reason and field errors.
 NewAgentFailure? newAgentFailureOf(Object error) {
   if (error is NewAgentFailure) return error;
   final own = error is DioException ? error.error : error;
-  if (own is StepUpUnavailable) {
-    return const NewAgentFailure.problem(
-      'forbidden',
-      reason: 'step_up_not_possible',
-    );
+  if (own is AuthException) {
+    return switch (own) {
+      StepUpUnavailable() => const NewAgentFailure.problem(
+        'forbidden',
+        reason: 'step_up_not_possible',
+      ),
+      StepUpCancelled() => const NewAgentFailure.stepUpCancelled(),
+      RefreshUnavailable() => const NewAgentFailure.offline(),
+      SessionEnded() ||
+      NotSignedIn() => const NewAgentFailure.problem('session_revoked'),
+    };
   }
-  if (own is AuthException) return const NewAgentFailure.stepUpCancelled();
   if (error is! DioException) return null;
   final response = error.response;
   if (response == null) return const NewAgentFailure.offline();

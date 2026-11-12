@@ -763,8 +763,11 @@ Outline for the developer guide of the docs site. The guide is
 [docs/guides/connect-agent.md](../guides/connect-agent.md); it runs as a test against a fresh
 server (`services/server/test/guide`, M2-37), which fails when a step differs from the text.
 
-1. **Create the agent.** The owner creates the agent (administration in the app or console or
-   operation `createAgent`; handle, name, `adapter_kind`, backend policy).
+1. **Create the agent.** The owner creates the agent ("Add adapter agent" in the agent list of
+   the administration in the app or console, or operation `createAgent`; handle, name,
+   `adapter_kind`). It starts with the backend `organization` and the tool class `chat`; the
+   backend policy, the tool class and the features are set on the agent's page
+   ([01-product.md](01-product.md) 5.2 A5).
 2. **Create a token.** Have the agent token shown once, bound to an adapter key (DPoP), required
    while `agent` is in `auth.dpop_required_for` (default,
    [08-identity.md](08-identity.md) section 12).

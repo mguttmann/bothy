@@ -171,6 +171,7 @@ milestones from the [plan](../PLAN.md).
 | "Who has access?" with origin | core | D, W | `access.explain` | |
 | "View as person" (read only) | core | D, W | `access.view_as` | logged |
 | Agents: backend switch, costs, tokens, commands | core | D, W | `agent.billing_mode.set`, `cost.read.aggregate`, `token.create` | |
+| Agents of an adapter: create, tool class, features, disable and enable | core | D, W | `agent.create`, `agent.tool_class.set`, `agent.update`, `agent.disable`, `agent.enable` | section 5.2 A5; a built-in agent is created and edited as in 6.20 |
 | Filter the audit, verify the chain | core | D, W | `audit.read`, `audit.verify` | |
 | Statistics | core | D, W | `stats.read` | |
 | Live topology of the agent runs, backend view, delivery and sync live, playable daily timeline | core | D, M, W | `stats.read`, `cost.read.aggregate` | own measurement, no values per person; [25-visualization.md](25-visualization.md); mobile screen M10; build: visualization track after the early M4 tickets against fixtures, server and apps M6 |
@@ -836,6 +837,18 @@ the console has no content routes (ADR 0028); the desktop app keeps showing cont
 **A5 Agents with backend switch and costs.** Reported mode from the heartbeat next to the
 configured mode; switching with reason and step-up; explanation of why Personal is not possible
 right now (I1).
+
+The agent list has "Add adapter agent" for the agent of a runner, of Hermes or of an adapter of
+one's own: name, handle, adapter kind and an optional description. The agent starts with the
+backend Organization and the tool class Chat, and its page opens, where its token is created. The
+page of such an agent shows its tool class with what the runtime may do
+([07-permissions.md](07-permissions.md) 2.11) and "Change tool class" (a reason is required), its
+features with "Edit features" (the switches and the default model of `agent_operator_config.v1`,
+[09-agents.md](09-agents.md) 2.2), and its status with "Disable" (the confirmation says that its
+tokens, connections and runs end) and "Enable" (its tokens stay revoked; a refusal by I1 is
+explained). A built-in agent keeps the actions of 6.20 item 6 and has "Enable" once it is
+disabled. All of these are owner actions with step-up; when the server refuses one with `403`,
+the page hides them.
 
 ```text
 +--------------------------------+----------------------------------------------------------------+
@@ -2201,7 +2214,9 @@ console.
 2. **Start.** Three ways: "From a template" (the list of 26 7 with name, description and the
    secrets each needs), "Interview" (the builder asks one or two questions at a time; the person
    answers in their own words; "Use what we have" asks for the draft early) and "Empty form". Without
-   a builder, or when it does not answer, the interview says why and offers the other two.
+   a builder, or when it does not answer, the interview says why and offers the other two. An
+   interview that reaches the server's limit of turns ends with the draft
+   ([26-builtin-agents.md](26-builtin-agents.md) 6.1 item 1), never with an error.
 3. **Preview.** One editable page with everything that will be created: name, handle,
    description, avatar, instructions, each skill, each MCP server with the secret names to add on
    the runner host, the hosting runner, the tool class with what it does and does not load, the

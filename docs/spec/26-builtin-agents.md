@@ -478,7 +478,12 @@ byte-equal to the fixtures, also for a channel with bindings of both forms (BA-T
    `agents.interview.timeout` plus `http.request_timeout` instead of `http.request_timeout`
    (02 14.2), so the wait ends before the request does. An interview that does not fit
    `sync.event_payload_max_bytes` is `400 validation_failed` with `too_large` on `/turns`
-   (decisions.d/A1-07.md).
+   (decisions.d/A1-07.md). The client keeps every question and every answer as a turn of its
+   own, so a builder that keeps asking reaches `agents.interview.max_turns`. The apps then end
+   the interview instead of showing the refusal: the request that got `too_many_items` on
+   `/turns` is sent once more with `want_draft` and as many turns as the server took before,
+   leaving out first the builder's questions that nobody answered, then its oldest questions,
+   and the person's answers last (decisions.d/AUD-adminui-agents-01.md, AUD-AA1/1).
 2. The builder answers once with `answerAgentInterview` (action `agent.interview.respond`,
    agent-self, only the builder the request was sent to, `rl.agent_runtime`): either
    `{"kind": "questions", "questions": [...]}` with one or two questions, or

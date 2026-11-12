@@ -11357,4 +11357,158 @@ class AppLocalizationsDe extends AppLocalizations {
   String sidebarArchived(int count) {
     return 'Archiviert ($count)';
   }
+
+  @override
+  String get adminAgentsAdd => 'Adapter-Agent anlegen';
+
+  @override
+  String get adminAddAgentBody =>
+      'Der Agent ist das Konto eines Adapters. Er startet mit dem Backend Organisation und der Werkzeugklasse Chat. Danach öffnet sich seine Seite: Lege dort sein Token an.';
+
+  @override
+  String get adminAddAgentKind => 'Adapter';
+
+  @override
+  String get adminAddAgentKindRunner => 'Claude-Code-Runner';
+
+  @override
+  String get adminAddAgentKindHermes => 'Hermes';
+
+  @override
+  String get adminAddAgentKindCustom => 'Eigener Adapter';
+
+  @override
+  String get adminAddAgentSubmit => 'Agent anlegen';
+
+  @override
+  String get adminAgentStatus => 'Status';
+
+  @override
+  String get adminAgentStatusActive => 'Aktiv';
+
+  @override
+  String get adminAgentEnable => 'Aktivieren';
+
+  @override
+  String adminAgentDisableBody(String name) {
+    return '$name antwortet nicht mehr: Seine Tokens werden widerrufen, seine Verbindungen schließen und jeder Lauf von ihm wird abgebrochen. Ein späteres Aktivieren bringt die Tokens nicht zurück.';
+  }
+
+  @override
+  String adminAgentEnableTitle(String name) {
+    return '$name aktivieren?';
+  }
+
+  @override
+  String adminAgentEnableBody(String name) {
+    return '$name kann sich wieder verbinden. Seine früheren Tokens bleiben widerrufen: Lege für seinen Adapter ein neues Token an.';
+  }
+
+  @override
+  String adminAgentEnabled(String name) {
+    return '$name ist aktiviert.';
+  }
+
+  @override
+  String stepUpPurposeEnableAgent(String name) {
+    return 'Agent $name aktivieren';
+  }
+
+  @override
+  String get adminAgentClassChatExplain =>
+      'Antwortet und liest den Thread. Nichts davon wirkt über den Thread hinaus.';
+
+  @override
+  String get adminAgentClassScopedExplain =>
+      'Nutzt benannte Werkzeuge mit eigenen, minimalen Zugangsdaten. Eine Wirkung außerhalb des Threads braucht eine Freigabe.';
+
+  @override
+  String get adminAgentClassHostExplain =>
+      'Shell, Dateien und Netz mit den Rechten des Benutzers der Laufzeit. Nur Owner und Personen mit einer eigenen bereiten Entwicklungsumgebung können ihn starten.';
+
+  @override
+  String get adminAgentClassChange => 'Werkzeugklasse ändern';
+
+  @override
+  String adminAgentClassTitle(String name) {
+    return 'Werkzeugklasse von $name';
+  }
+
+  @override
+  String get adminAgentClassBody =>
+      'Die Werkzeugklasse ist das Höchste, was die Laufzeit des Agenten tun darf. Ein Adapter, der eine höhere Klasse meldet als die hier gesetzte, startet nichts.';
+
+  @override
+  String adminAgentClassChanged(String name, String toolClass) {
+    return '$name hat jetzt die Werkzeugklasse $toolClass.';
+  }
+
+  @override
+  String stepUpPurposeToolClass(String name) {
+    return 'Werkzeugklasse von $name setzen';
+  }
+
+  @override
+  String get adminAgentFeatures => 'Funktionen';
+
+  @override
+  String get adminAgentFeaturesExplain =>
+      'Eine Funktion wirkt, wenn sie hier erlaubt ist und der Adapter sie meldet. Ausschalten beendet sie; nichts hier schaltet ein, was dem Adapter fehlt.';
+
+  @override
+  String get adminAgentFeatureFollowups => 'Nachrichten als Nachtrag';
+
+  @override
+  String get adminAgentFeatureComponents => 'Komponenten';
+
+  @override
+  String get adminAgentFeatureVoice => 'Spracheingabe';
+
+  @override
+  String get adminAgentFeatureTitle => 'Titelvorschläge';
+
+  @override
+  String get adminAgentFeatureFilesOut => 'Dateien senden';
+
+  @override
+  String get adminAgentFeaturesAll =>
+      'Alles, was der Adapter meldet, ist erlaubt.';
+
+  @override
+  String adminAgentFeaturesOff(String features) {
+    return 'Ausgeschaltet: $features';
+  }
+
+  @override
+  String get adminAgentDefaultModel => 'Standardmodell';
+
+  @override
+  String adminAgentDefaultModelValue(String model) {
+    return 'Standardmodell: $model';
+  }
+
+  @override
+  String get adminAgentDefaultModelHint => 'Leer: Der Adapter wählt';
+
+  @override
+  String get adminAgentDefaultModelInvalid =>
+      'Verwende nur Buchstaben, Ziffern und die Zeichen . _ : / @ -.';
+
+  @override
+  String get adminAgentFeaturesEdit => 'Funktionen bearbeiten';
+
+  @override
+  String adminAgentFeaturesTitle(String name) {
+    return 'Funktionen von $name';
+  }
+
+  @override
+  String adminAgentFeaturesSaved(String name) {
+    return 'Die Funktionen von $name sind gespeichert.';
+  }
+
+  @override
+  String stepUpPurposeAgentFeatures(String name) {
+    return 'Funktionen von $name ändern';
+  }
 }

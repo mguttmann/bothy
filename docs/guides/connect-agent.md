@@ -29,8 +29,11 @@ use it.
 Requests are shown as HTTP. The client adds the authentication of the caller (a DPoP-bound
 session token), the DPoP proof and an `Idempotency-Key` where the API asks for one. The owner's
 requests are administrative: the owner confirms them with a fresh step-up, as the admin screens
-of the app and the console do before an admin action. Those screens call the same operations, so
-the owner can follow every owner step there as well.
+of the app and the console do before an admin action. Those screens call the same operations for
+the agent and for access: "Add adapter agent" in the agent list creates the agent of step 1, its
+page creates the token of step 2 (and holds its tool class, its features, "Disable" and
+"Enable"), and the grant dialog gives the grants. The space, the channel, its operator and its
+switches have no screen of their own; the owner sends those requests as shown.
 
 ## Prerequisites
 

@@ -2,9 +2,10 @@
 
 // Goldens of screen A5 (brief M4-28 Tests): the agent list, the agent page with the server's
 // warnings, the switch dialogs of one agent and of several agents, and the guided flow (the
-// preview with the I1 conflict and its offer, and the result); light and dark, two densities,
-// text scaling 1 and 2, German and English. One file per view keeps each file below
-// repo.max_file_kb.
+// preview with the I1 conflict and its offer, and the result); and of the administration of an
+// adapter agent (AUD-adminui-agents-01): "Add adapter agent", the tool class and the features;
+// light and dark, two densities, text scaling 1 and 2, German and English. One file per view
+// keeps each file below repo.max_file_kb.
 
 import 'package:admin_ui/admin_ui.dart';
 import 'package:alchemist/alchemist.dart';
@@ -32,6 +33,11 @@ FakeAdminRepository _repository() {
     name: 'Support',
     reported: AgentBillingMode.personal,
     keyType: 'unknown',
+    toolClass: 'scoped',
+    operatorConfig: const {
+      'default_model': 'model-medium',
+      'supports_voice': false,
+    },
   );
   r.agentRecordsById['desk'] = fakeAgentRecord(
     'desk',
@@ -132,6 +138,11 @@ final Map<String, Widget Function()> views = {
   },
   'guided_result': () =>
       GuidedResult(repository: _repository(), agentIds: const ['support']),
+  'add': () => const AddAgentDialog(),
+  'tool_class': () =>
+      ToolClassDialog(agent: _repository().agentRecordsById['support']!),
+  'features': () =>
+      AgentFeaturesDialog(agent: _repository().agentRecordsById['support']!),
 };
 
 void main() {

@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The agents of screen A5 with "Switch all agents" (docs/spec/01-product.md 5.2 A5; 10 9.1,
-/// 13; brief M4-28 fixed requirement 11, Design note 3).
+/// 13; brief M4-28 fixed requirement 11, Design note 3) and "Add adapter agent" (11 13 step 1;
+/// ruling AUD-AA1/5).
 library;
 
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
+import '../common/admin_action.dart';
 import '../common/problem_banner.dart';
 import '../data/admin_repository.dart';
 import '../data/agents_repository.dart';
+import '../data/self_repository.dart';
 import '../hosts/host_labels.dart' show personName;
 import '../self/self_feedback.dart';
+import 'add_agent_dialog.dart';
 import 'agent_labels.dart';
 import 'new_agent/new_agent_dialog.dart';
 import 'new_agent/new_agent_flow.dart' show NewAgentResult;
@@ -27,6 +31,11 @@ import 'switch_all_dialog.dart';
 /// how many agents changed and [onChanged] runs. The warnings are the server's codes only: the
 /// list never compares the configured with the reported mode (15 1 principle 1). A list the
 /// server refuses shows its reason and nothing else.
+///
+/// "Add adapter agent" opens the [AddAgentDialog] and creates the agent of a runner, of Hermes
+/// or of an adapter of one's own (`createAgent`, step-up); the list then loads again and
+/// [onOpen] opens the new agent, whose page creates its token. A taken handle says so, and a
+/// `403` hides the button (15 1 principle 1).
 ///
 /// With [newAgent] the list offers "New agent" to owners when the server answers
 /// `listAgentTemplates` and an active runner reports `hosts_agents` (26 8.1; the server shows
@@ -61,13 +70,16 @@ class AgentsList extends StatefulWidget {
   State<AgentsList> createState() => _AgentsListState();
 }
 
-class _AgentsListState extends State<AgentsList> {
+/// The key under which a refused "Add adapter agent" hides its button.
+const String _add = 'add';
+
+class _AgentsListState extends State<AgentsList>
+    with AdminActionState<AgentsList> {
   List<AgentRecord>? _agents;
   List<AdminPerson> _people = const [];
   NewAgentOffer? _offer;
   Set<String> _notSetUp = const {};
   Object? _error;
-  SelfNotice? _notice;
 
   @override
   void initState() {
@@ -132,12 +144,46 @@ class _AgentsListState extends State<AgentsList> {
     );
     if (result == null || !mounted) return;
     setState(
-      () => _notice = SelfNotice(
+      () => notice = SelfNotice(
         l.adminSwitchAllDone(result.changedAgentIds.length),
       ),
     );
     await _load();
     widget.onChanged?.call();
+  }
+
+  Future<void> _addAgent() async {
+    final l = AppLocalizations.of(context);
+    final request = await AddAgentDialog.show(context);
+    if (request == null || !mounted) return;
+    AgentRecord? created;
+    final ok = await runChange(_add, () async {
+      try {
+        created = await widget.repository.createAgent(
+          handle: request.handle,
+          displayName: request.displayName,
+          adapterKind: request.adapterKind,
+          description: request.description,
+          purpose: l.stepUpPurposeNewAgent(request.displayName),
+        );
+      } on SelfActionFailed catch (e) {
+        // `409 conflict` with `taken` on `/handle`: said in words, not as a conflict.
+        final taken =
+            e.problem?.errors.any(
+              (f) => f.pointer == '/handle' && f.code == 'taken',
+            ) ??
+            false;
+        if (!taken) rethrow;
+        return SelfNotice(l.newAgentErrHandleTaken, tone: DsTone.danger);
+      }
+      return null;
+    });
+    final agent = created;
+    if (!ok || agent == null || !mounted) return;
+    await _load();
+    widget.onChanged?.call();
+    // Its page comes next: the token of the adapter is created there.
+    widget.onOpen(agent.id);
   }
 
   Future<void> _newAgent(NewAgentHost host, NewAgentOffer offer) async {
@@ -173,35 +219,49 @@ class _AgentsListState extends State<AgentsList> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
+          // The title and the actions share a line while both fit; at a larger text size or
+          // on a narrow screen the actions move below the title and wrap among themselves.
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: DsSpace.s8,
+            runSpacing: DsSpace.s8,
             children: [
-              Expanded(
-                child: Semantics(
-                  header: true,
-                  child: Text(
-                    l.adminAgentsTitle,
-                    style: dsTextStyle(DsType.title)
-                        .copyWith(color: colors.textPrimary),
-                  ),
+              Semantics(
+                header: true,
+                child: Text(
+                  l.adminAgentsTitle,
+                  style: dsTextStyle(DsType.title)
+                      .copyWith(color: colors.textPrimary),
                 ),
               ),
-              if (host != null && offer != null) ...[
-                FilledButton(
-                  key: const ValueKey('agents.new'),
-                  onPressed: () => _newAgent(host, offer),
-                  child: Text(l.newAgentEntry),
-                ),
-                const SizedBox(width: DsSpace.s8),
-              ],
-              OutlinedButton(
-                key: const ValueKey('agents.switchAll'),
-                onPressed: () => _switchAll(agents),
-                child: Text(l.adminAgentsSwitchAll),
+              Wrap(
+                spacing: DsSpace.s8,
+                runSpacing: DsSpace.s8,
+                children: [
+                  if (host != null && offer != null)
+                    FilledButton(
+                      key: const ValueKey('agents.new'),
+                      onPressed: () => _newAgent(host, offer),
+                      child: Text(l.newAgentEntry),
+                    ),
+                  if (!denied.contains(_add))
+                    OutlinedButton(
+                      key: const ValueKey('agents.add'),
+                      onPressed: busy ? null : _addAgent,
+                      child: Text(l.adminAgentsAdd),
+                    ),
+                  OutlinedButton(
+                    key: const ValueKey('agents.switchAll'),
+                    onPressed: () => _switchAll(agents),
+                    child: Text(l.adminAgentsSwitchAll),
+                  ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: DsSpace.s12),
-          if (_notice case final n?) selfNoticeBanner(n),
+          noticeBanner(),
           if (agents.isEmpty)
             Text(
               l.adminAgentsEmpty,

@@ -949,6 +949,50 @@ final class ApiAdminRepository implements AdminRepository {
       _agents.lastGlobalSwitch(purpose: purpose);
 
   @override
+  Future<AgentRecord> createAgent({
+    required String handle,
+    required String displayName,
+    required String adapterKind,
+    String description = '',
+    required String purpose,
+  }) => _agents.createAgent(
+    handle: handle,
+    displayName: displayName,
+    adapterKind: adapterKind,
+    description: description,
+    purpose: purpose,
+  );
+
+  @override
+  Future<AgentRecord> setActive(
+    AgentRecord agent, {
+    required bool active,
+    required String reason,
+    required String purpose,
+  }) => _agents.setActive(
+    agent,
+    active: active,
+    reason: reason,
+    purpose: purpose,
+  );
+
+  @override
+  Future<AgentRecord> setToolClass(
+    AgentRecord agent,
+    String toolClass, {
+    required String reason,
+    required String purpose,
+  }) =>
+      _agents.setToolClass(agent, toolClass, reason: reason, purpose: purpose);
+
+  @override
+  Future<AgentRecord> setOperatorConfig(
+    AgentRecord agent,
+    Map<String, Object?> config, {
+    required String purpose,
+  }) => _agents.setOperatorConfig(agent, config, purpose: purpose);
+
+  @override
   Future<List<AgentToken>> tokens(String principalId) =>
       _agents.tokens(principalId);
 

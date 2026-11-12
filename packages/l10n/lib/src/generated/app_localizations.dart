@@ -18009,6 +18009,246 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Archived ({count})'**
   String sidebarArchived(int count);
+
+  /// Button of the agent list and title of its dialog: creates the agent of an adapter (a runner, Hermes or an adapter of one's own). Built-in agents use "New agent".
+  ///
+  /// In en, this message translates to:
+  /// **'Add adapter agent'**
+  String get adminAgentsAdd;
+
+  /// Text of the dialog "Add adapter agent": what is created and what comes next.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent is the account of an adapter. It starts with the backend Organization and the tool class Chat. Its page opens next: create its token there.'**
+  String get adminAddAgentBody;
+
+  /// Label of the adapter kind choice in the dialog "Add adapter agent".
+  ///
+  /// In en, this message translates to:
+  /// **'Adapter'**
+  String get adminAddAgentKind;
+
+  /// Adapter kind `code_runner` in the dialog "Add adapter agent".
+  ///
+  /// In en, this message translates to:
+  /// **'Claude Code runner'**
+  String get adminAddAgentKindRunner;
+
+  /// Adapter kind `hermes` in the dialog "Add adapter agent".
+  ///
+  /// In en, this message translates to:
+  /// **'Hermes'**
+  String get adminAddAgentKindHermes;
+
+  /// Adapter kind `custom` in the dialog "Add adapter agent": an adapter the operator built with the SDK.
+  ///
+  /// In en, this message translates to:
+  /// **'Own adapter'**
+  String get adminAddAgentKindCustom;
+
+  /// Confirming button of the dialog "Add adapter agent".
+  ///
+  /// In en, this message translates to:
+  /// **'Create agent'**
+  String get adminAddAgentSubmit;
+
+  /// Heading on the agent page above the state active or disabled and its buttons.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get adminAgentStatus;
+
+  /// State of an agent on its page: not disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get adminAgentStatusActive;
+
+  /// Button on the page of a disabled agent and confirming button of its dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get adminAgentEnable;
+
+  /// Text of the confirmation before an adapter agent is disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} stops answering: its tokens are revoked, its connections close and its runs are cancelled. Enabling it later does not bring the tokens back.'**
+  String adminAgentDisableBody(String name);
+
+  /// Title of the confirmation before a disabled agent is enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable {name}?'**
+  String adminAgentEnableTitle(String name);
+
+  /// Text of the confirmation before a disabled agent is enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} can connect again. Its earlier tokens stay revoked: create a new token for its adapter.'**
+  String adminAgentEnableBody(String name);
+
+  /// Message after an agent was enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is enabled.'**
+  String adminAgentEnabled(String name);
+
+  /// Purpose shown in the step-up dialog before an agent is enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable the agent {name}'**
+  String stepUpPurposeEnableAgent(String name);
+
+  /// What the runtime of an adapter agent with the tool class Chat may do (07 section 2.11).
+  ///
+  /// In en, this message translates to:
+  /// **'Replies and reads the thread. Nothing it does reaches beyond the thread.'**
+  String get adminAgentClassChatExplain;
+
+  /// What the runtime of an adapter agent with the tool class Scoped may do (07 section 2.11).
+  ///
+  /// In en, this message translates to:
+  /// **'Uses named tools with minimal credentials of their own. An effect outside the thread needs an approval.'**
+  String get adminAgentClassScopedExplain;
+
+  /// What the runtime of an adapter agent with the highest tool class may do and who may start it (07 section 2.11, rule SR2).
+  ///
+  /// In en, this message translates to:
+  /// **'Shell, files and network with the rights of the user of the runtime. Only owners and people with a ready development environment of their own can start it.'**
+  String get adminAgentClassHostExplain;
+
+  /// Button on the page of an adapter agent and confirming button of its dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Change tool class'**
+  String get adminAgentClassChange;
+
+  /// Title of the dialog that sets the tool class of an adapter agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool class of {name}'**
+  String adminAgentClassTitle(String name);
+
+  /// Text of the dialog that sets the tool class of an adapter agent.
+  ///
+  /// In en, this message translates to:
+  /// **'The tool class is the most the runtime of the agent may do. An adapter that reports a higher class than the one set here starts nothing.'**
+  String get adminAgentClassBody;
+
+  /// Message after the tool class of an agent was set.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} now has the tool class {toolClass}.'**
+  String adminAgentClassChanged(String name, String toolClass);
+
+  /// Purpose shown in the step-up dialog before the tool class of an agent is set.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the tool class of {name}'**
+  String stepUpPurposeToolClass(String name);
+
+  /// Heading on the page of an adapter agent above what the owner allows its adapter (09 section 2.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Features'**
+  String get adminAgentFeatures;
+
+  /// Text of the dialog that edits the features of an adapter agent.
+  ///
+  /// In en, this message translates to:
+  /// **'A feature works when it is allowed here and the adapter reports it. Switching one off stops it; nothing here switches on what the adapter lacks.'**
+  String get adminAgentFeaturesExplain;
+
+  /// Feature switch `supports_followups` of an agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Messages as a follow-up'**
+  String get adminAgentFeatureFollowups;
+
+  /// Feature switch `supports_components` of an agent: cards and other components in messages.
+  ///
+  /// In en, this message translates to:
+  /// **'Components'**
+  String get adminAgentFeatureComponents;
+
+  /// Feature switch `supports_voice` of an agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice input'**
+  String get adminAgentFeatureVoice;
+
+  /// Feature switch `supports_title` of an agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Title suggestions'**
+  String get adminAgentFeatureTitle;
+
+  /// Feature switch `supports_files_out` of an agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending files'**
+  String get adminAgentFeatureFilesOut;
+
+  /// Line on the page of an adapter agent whose owner switched no feature off.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything the adapter reports is allowed.'**
+  String get adminAgentFeaturesAll;
+
+  /// Line on the page of an adapter agent that lists the features the owner switched off.
+  ///
+  /// In en, this message translates to:
+  /// **'Switched off: {features}'**
+  String adminAgentFeaturesOff(String features);
+
+  /// Label of the field `default_model` in the features dialog of an adapter agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Default model'**
+  String get adminAgentDefaultModel;
+
+  /// Line on the page of an adapter agent with a default model.
+  ///
+  /// In en, this message translates to:
+  /// **'Default model: {model}'**
+  String adminAgentDefaultModelValue(String model);
+
+  /// Helper text of the field for the default model.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty: the adapter chooses'**
+  String get adminAgentDefaultModelHint;
+
+  /// Error of the field for the default model: a character outside the allowed set.
+  ///
+  /// In en, this message translates to:
+  /// **'Use letters, digits and the characters . _ : / @ - only.'**
+  String get adminAgentDefaultModelInvalid;
+
+  /// Button on the page of an adapter agent that opens the features dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit features'**
+  String get adminAgentFeaturesEdit;
+
+  /// Title of the features dialog of an adapter agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Features of {name}'**
+  String adminAgentFeaturesTitle(String name);
+
+  /// Message after the features of an agent were saved.
+  ///
+  /// In en, this message translates to:
+  /// **'The features of {name} are saved.'**
+  String adminAgentFeaturesSaved(String name);
+
+  /// Purpose shown in the step-up dialog before the features of an agent are saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the features of {name}'**
+  String stepUpPurposeAgentFeatures(String name);
 }
 
 class _AppLocalizationsDelegate
