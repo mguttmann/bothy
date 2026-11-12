@@ -16,8 +16,9 @@ import (
 // PersonalData is the participant of agents in the privacy requests (M7-06,
 // docs/spec/20-privacy.md sections 2, 4.4 and 5.2). It exports the agents whose credentials the
 // person holds into the section agents_held of access.json. It erases nothing: agents stay (20
-// section 2), the holder ID becomes pseudonymous with the principal in step 6, and agent sessions
-// go with their thread.
+// section 2), the holder ID becomes pseudonymous with the principal in step 6, agent sessions
+// go with their thread, and the versions of a built-in agent's definition stay as the instance's
+// configuration, never changed (R-DM-59), with the ID of the owner who wrote them.
 type PersonalData struct {
 	pool *pg.Pool
 }
@@ -33,7 +34,9 @@ func (*PersonalData) Module() string { return "agents" }
 
 // Tables returns the tables of agents with personal data of 20 section 2. dev_environments is
 // not listed: the table does not exist yet (milestone of 21).
-func (*PersonalData) Tables() []string { return []string{"agents", "agent_sessions"} }
+func (*PersonalData) Tables() []string {
+	return []string{"agents", "agent_definitions", "agent_sessions"}
+}
 
 // heldAgent is one entry of agents_held (docs/api/gdpr-export/v1/sections/access.agents_held.schema.json).
 // The table records no time from which the person holds the credentials
@@ -62,8 +65,8 @@ func (p *PersonalData) Export(ctx context.Context, e personaldata.Export, w pers
 }
 
 // Erase implements personaldata.Participant and changes nothing in any step: 20 section 2 keeps
-// agents (the agent stays usable for the others; the owner chooses a new holder) and deletes
-// agent sessions with their thread, never with the account.
+// agents (the agent stays usable for the others; the owner chooses a new holder) and the versions
+// of their definitions, and deletes agent sessions with their thread, never with the account.
 func (*PersonalData) Erase(context.Context, personaldata.Step, personaldata.Erasure) error {
 	return nil
 }

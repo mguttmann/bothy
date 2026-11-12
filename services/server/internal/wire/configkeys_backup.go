@@ -41,7 +41,7 @@ func backupConfigKeys() []config.Key {
 		{Name: "backup.pg.retention_full", Kind: config.KindInt, Default: "4", Min: "1", Chapter: chapter16,
 			Doc: "Number of full backups kept in the off-site repository repo2."},
 		{Name: "backup.pg.local_retention_full", Kind: config.KindInt, Default: "1", Min: "1", Chapter: chapter16,
-			Doc: "Number of full backups kept in the local repository repo1."},
+			Doc: "Number of full backups kept in the local repository repo1; a point-in-time restore from repo1 reaches back to the oldest of them."},
 		{Name: keyBackupLogicalSchedule, Kind: config.KindString, Default: "0 3 * * *", Chapter: chapter16,
 			Doc: "Five-field cron schedule in UTC of the logical backup with pg_dump."},
 		{Name: "backup.logical.retention", Kind: config.KindDuration, Default: backupLogicalRetentionDefault, Min: "1d", Chapter: chapter16,

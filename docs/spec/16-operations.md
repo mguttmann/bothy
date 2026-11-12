@@ -16,7 +16,9 @@ section 14 and collected in the [configuration reference](../operations/configur
    and starts it (setup wizard, section 3.1).
 2. Mac, Linux VM and cloud use the same images. Differences are only in the configuration.
 3. Data loss stays below `dr.rpo_target`, restore below `dr.rto_target`. An
-   automatic restore test measures both regularly.
+   automatic restore test measures the duration of a restore from the local repository regularly
+   (8.3). No test measures the data loss: the alert on WAL archiving watches it
+   (`BothyWalArchiveStale`, [alerting.md](../observability/alerting.md)).
 4. An upgrade needs no manual work on data. Going back one version is always possible.
 5. Secrets are never in images, environment variables, logs, telemetry or OpenTofu state.
 
@@ -270,7 +272,9 @@ own: the client IP is the peer address and forwarded headers are never read
 ([19-security.md](19-security.md), R-SE-09), and a rate limiter of its own counts
 `rl.webhook_in` and `rl.public_auth` per listener. Senders inside the stack (Alertmanager) use
 the URL of `createIncomingWebhook` with the host and port of `server.internal_listen_addr`
-([webhooks.md](../api/webhooks.md), section 8).
+([webhooks.md](../api/webhooks.md), section 8). A process that the start lock of 8.4 keeps not
+ready (`restore_not_finalized`) does not serve them: both paths answer `404` there, because a post
+would write on the restored timeline before `bothy restore finalize`.
 
 `/healthz` only reports that the process is alive. `/readyz` reports ready when the startup
 has completed, the database answers, the binary version matches the schema (section 10), an active
@@ -965,7 +969,14 @@ docs/decisions.d/M7-02.md D-M7-02-1 to D-M7-02-12):
 2. `pg_full` and `pg_diff`: `pgbackrest backup` into repo1 and, with an off-site target, into
    repo2; then `pgbackrest expire` on repo1 only, keeping `backup.pg.local_retention_full` full
    backups. Automatic expiry after a backup is off (`expire-auto=n`), so the service never deletes
-   in repo2. `logical`: `pg_dump -Fc` as `migrate.bootstrap_user` into the volume
+   in repo2. The expiry removes a full backup together with its differential backups and the WAL
+   before the oldest kept full backup (options `repo-retention-full` and `repo-retention-archive`,
+   https://pgbackrest.org/configuration.html, retrieved 2026-11-12 [verified]), so repo1 restores
+   to a point in time only from that backup on: with the default and without an off-site target
+   the window starts anew with every full backup, also with one run by hand before an upgrade, and
+   an older state exists only as a logical backup within `backup.logical.retention`
+   ([backup-restore.md](../operations/backup-restore.md) 5.1).
+   `logical`: `pg_dump -Fc` as `migrate.bootstrap_user` into the volume
    `backup-scratch`, stored as a restic snapshot and removed. `objects`: driver `fs` restic over
    the read-only volume `files`; driver `s3` a mirror into the off-site bucket that copies new
    objects and never deletes or overwrites.
@@ -1097,8 +1108,10 @@ at start: a point-in-time restore raises the timeline, a logical restore into a 
 changes the system identifier, and unless `database.restore_guard` is `off` (managed failover, below) either mismatch keeps the process running but not ready, with
 the readiness reason `restore_not_finalized` and one log line naming the runbook step, until
 `bothy restore finalize` has run. Such a process serves and processes nothing: it opens no public
-listener and starts no log tail, no presence tracker, no terminal reconcile, no River jobs and no worker consumers, so it neither takes writes
-nor delivers events of a mixed timeline; only the internal listener answers. An empty stored identity never blocks. `bothy restore finalize`
+listener, serves no incoming webhook on the internal listener (4.2) and starts no log tail, no
+presence tracker, no terminal reconcile, no River jobs and no worker consumers, so it neither takes
+writes nor delivers events of a mixed timeline; the internal listener answers only the health
+checks. An empty stored identity never blocks. `bothy restore finalize`
 needs no running `api` or `worker`; it refuses (exit `1`) while another session of the role
 `bothy_app` is connected to the database, so a running stack cannot see half a change. It runs as
 the schema owner, like `bothy migrate`, with the configuration, volumes and secrets of the server,
@@ -1542,6 +1555,16 @@ was 399 messages per second; at 600 the api pool reached `database.max_conns` an
 behind, while the api process used at most 2.2 of its 4 vCPU and PostgreSQL 2.6 of its 4. Every
 message is one event; each reached the 20 people of its space.
 
+The job queues of a process share its pool ([02-architecture.md](02-architecture.md) 12.2). A job
+holds a connection only inside its units of work, so the sum of `jobs.queue.<queue>.max_workers`
+may be larger than `database.max_conns`, and the configuration check does not compare the two.
+When more units of work run at once than the pool has connections, the others wait up to
+`database.acquire_timeout`; a unit that gets none fails its attempt, and the job is retried. A
+`worker` whose pool stays exhausted (`bothy.db.pool.connections`) gets a larger
+`database.max_conns`, within `max_connections` of PostgreSQL, or fewer workers in its busiest
+queue. In role `all` the API requests use the same pool as the jobs; the Compose stack runs `api`
+and `worker` as separate processes, each with a pool of its own.
+
 The instance operator estimates the disk space needed with:
 
 ```
@@ -1605,7 +1628,7 @@ Column "Place": Server = configuration reference of the server; Installation scr
 | `backup.pg.diff_schedule` | Server | `0 2 * * 1-6` | schedule of the differential backup (cron) |
 | `backup.pg.archive_timeout` | Server | `60s` | a WAL segment is archived at the latest after this time |
 | `backup.pg.retention_full` | Server | `4` | full backups kept in repo2 |
-| `backup.pg.local_retention_full` | Server | `1` | full backups kept in repo1 |
+| `backup.pg.local_retention_full` | Server | `1` | full backups kept in repo1; a point-in-time restore from repo1 reaches back to the oldest of them (8.2) |
 | `backup.logical.schedule` | Server | `0 3 * * *` | schedule of `pg_dump` (cron) |
 | `backup.logical.retention` | Server | `30d` | retention of the logical backup |
 | `backup.objects.schedule` | Server | `30 3 * * *` | schedule of the object backup (cron) |

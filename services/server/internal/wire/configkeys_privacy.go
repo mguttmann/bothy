@@ -4,6 +4,7 @@ package wire
 
 import (
 	"errors"
+	"path/filepath"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/personaldata"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
@@ -20,6 +21,9 @@ const (
 	keyBackupPGLocalRetention   = "backup.pg.local_retention_full"
 )
 
+// keyExportWorkDir is the key of the cross-check export_work_dir_absolute.
+const keyExportWorkDir = "privacy.export_work_dir"
+
 // deletionJournalRetentionKeys are the keys the cross-check reads.
 var deletionJournalRetentionKeys = []string{keyDeletionJournalRetention, keyBackupLogicalRetention, keyBackupObjectsRetention,
 	keyBackupPGRetentionFull, keyBackupPGLocalRetention, keyBackupPGFullSchedule}
@@ -32,6 +36,8 @@ func privacyConfigKeys() []config.Key {
 			Doc: "How long an export package can be downloaded before it is deleted."},
 		{Name: "privacy.export_requires_approval", Kind: config.KindBool, Default: "false", Chapter: chapter20,
 			Doc: "Whether the export of one's own data needs the approval of an owner."},
+		{Name: keyExportWorkDir, Kind: config.KindString, Default: "", Chapter: chapter20,
+			Doc: "Directory in which the worker builds an export package before it is stored; empty means the temporary directory of the system."},
 		{Name: "privacy.account_deletion_content", Kind: config.KindEnum, Default: string(personaldata.KeepPseudonymized),
 			Enum: []string{string(personaldata.KeepPseudonymized), string(personaldata.DeleteContent)}, Chapter: chapter20,
 			Doc: "Contents of a deleted account: keep them under the pseudonym, or delete own messages and files."},
@@ -74,6 +80,18 @@ func deletionJournalRetention(v *config.Values) error {
 		return errors.New(keyDeletionJournalRetention + " must be at least the longest backup period: " + keyBackupLogicalRetention +
 			", " + keyBackupObjectsRetention + " and the larger of " + keyBackupPGRetentionFull + " and " + keyBackupPGLocalRetention +
 			" times the interval of " + keyBackupPGFullSchedule)
+	}
+	return nil
+}
+
+// exportWorkDirAbsolute is the cross-check export_work_dir_absolute: privacy.export_work_dir is
+// empty (the temporary directory of the system) or an absolute clean path, because a relative one
+// would depend on the working directory of the process. The package of a large account holds a
+// copy of every own upload and the archive, so the directory belongs on a disk, not in memory.
+func exportWorkDirAbsolute(v *config.Values) error {
+	dir := v.String(keyExportWorkDir)
+	if dir != "" && (!filepath.IsAbs(dir) || filepath.Clean(dir) != dir) {
+		return errors.New(keyExportWorkDir + " must be empty or an absolute path without . or .. elements and without a trailing slash")
 	}
 	return nil
 }

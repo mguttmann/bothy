@@ -223,3 +223,69 @@ func TestComposePushPassthrough(t *testing.T) {
 		t.Errorf("with only the APNs team ID set: error %v, want the start refused naming the APNs keys", err)
 	}
 }
+
+// TestComposeExportWorkDirOnVolume: the worker of infra/compose/compose.yaml, which runs the job
+// privacy.export, builds the export packages on a named volume (privacy.export_work_dir), not
+// below /tmp: the hardening anchor makes /tmp a tmpfs, so the package of a large account, a copy
+// of every own upload plus the archive, would be built in memory. The value loads as the key and
+// is the target of a writable named volume of the service.
+func TestComposeExportWorkDirOnVolume(t *testing.T) {
+	t.Parallel()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "infra", "compose", "compose.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Hardening struct {
+			Tmpfs []string `yaml:"tmpfs"`
+		} `yaml:"x-hardening"`
+		Services map[string]struct {
+			Environment map[string]string `yaml:"environment"`
+			Volumes     []any             `yaml:"volumes"`
+		} `yaml:"services"`
+		Volumes map[string]any `yaml:"volumes"`
+	}
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	const key = "BOTHY_PRIVACY__EXPORT_WORK_DIR"
+	worker, ok := doc.Services["worker"]
+	dir := worker.Environment[key]
+	if !ok || dir == "" {
+		t.Fatalf("service worker does not set %s", key)
+	}
+	v, err := config.Load(schema(t), config.Sources{Env: append(testEnv(), key+"="+dir)})
+	if err != nil {
+		t.Fatalf("%s of service worker does not load: %v", key, err)
+	}
+	if got := v.String("privacy.export_work_dir"); got != dir {
+		t.Fatalf("privacy.export_work_dir loads to %q, want %q", got, dir)
+	}
+	if len(doc.Hardening.Tmpfs) == 0 {
+		t.Fatal("x-hardening names no tmpfs; the test no longer reads the file it should")
+	}
+	for _, tmp := range doc.Hardening.Tmpfs {
+		if dir == tmp || strings.HasPrefix(dir, strings.TrimSuffix(tmp, "/")+"/") {
+			t.Errorf("%s lies in the tmpfs %s", key, tmp)
+		}
+	}
+	mounted := false
+	for _, entry := range worker.Volumes {
+		// The short form "<volume>:<target>[:<mode>]"; the long form mounts the secrets only.
+		s, ok := entry.(string)
+		if !ok {
+			continue
+		}
+		parts := strings.Split(s, ":")
+		if len(parts) < 2 || parts[1] != dir {
+			continue
+		}
+		if _, named := doc.Volumes[parts[0]]; !named || len(parts) != 2 {
+			t.Errorf("service worker mounts %q at %s, want a writable named volume", s, key)
+		}
+		mounted = true
+	}
+	if !mounted {
+		t.Errorf("service worker mounts no volume at %s (%s)", dir, key)
+	}
+}

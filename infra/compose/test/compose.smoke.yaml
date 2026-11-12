@@ -88,6 +88,7 @@ services:
     pull_policy: never
     environment: !override
       <<: *smoke-env
+      BOTHY_PRIVACY__EXPORT_WORK_DIR: /var/lib/bothy/export-work
 
   backup:
     profiles: [smoke-disabled]

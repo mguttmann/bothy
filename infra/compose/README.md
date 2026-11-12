@@ -108,6 +108,11 @@ them. Rules ([16-operations.md](../../docs/spec/16-operations.md) 4.4,
    `clamav` publishes no port, exposes none and has no `TCPSocket` in
    [clamav/clamd.conf](clamav/clamd.conf), which also sets the mandatory options of
    [12-files.md](../../docs/spec/12-files.md) 5.4. Its health check pings over the socket.
+7. `/tmp` of `api`, `worker`, `migrate` and `restore` is a tmpfs, so what is written there uses
+   memory.
+   `worker` therefore builds the export packages of privacy requests in the volume `export-work`
+   (`privacy.export_work_dir`, [20-privacy.md](../../docs/spec/20-privacy.md) 5.2): the package
+   of a large account holds a copy of every own upload and the archive until it is stored.
 
 ## Checked
 

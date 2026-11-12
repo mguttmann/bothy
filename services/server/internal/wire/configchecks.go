@@ -74,6 +74,7 @@ var configChecks = []configCheck{
 	{name: "presence_timeout_above_heartbeat_interval", keys: []string{keyPresenceTimeout, keyHeartbeatInterval}, fn: presenceTimeoutAboveHeartbeatInterval},
 	{name: "backup_schedules", keys: backupScheduleKeys, fn: backupSchedules},
 	{name: "backup_offsite_target", keys: []string{keyBackupOffsiteTarget}, fn: backupOffsiteTarget},
+	{name: "export_work_dir_absolute", keys: []string{keyExportWorkDir}, fn: exportWorkDirAbsolute},
 	{name: "webhook_in_formats", keys: []string{keyWebhookInFormatsEnabled}, fn: webhookInFormats},
 	{name: "heartbeat_persist_below_orphan_timeout", keys: []string{keyHeartbeatPersistInterval, keyOrphanTimeout}, fn: heartbeatPersistBelowOrphanTimeout},
 	{name: "autocomplete_below_request_timeout", keys: []string{keyAutocompleteTimeout, keyHTTPRequestTimeout}, fn: autocompleteBelowRequestTimeout},

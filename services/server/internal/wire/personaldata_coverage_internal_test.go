@@ -5,6 +5,7 @@ package wire
 import (
 	"bufio"
 	"context"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -33,15 +34,16 @@ var personalDataExceptions = map[string]string{
 // tableCell matches the table names of the first cell of a row of 20 section 2.
 var tableCell = regexp.MustCompile("`([a-z_]+)`")
 
-// personalTables reads 20 section 2: every table whose personal reference is not "no".
-func personalTables(t *testing.T) []string {
+// inventory reads 20 section 2: every table of the first cell of a row with the personal reference
+// of the row ("no", "direct", "indirect" or "content").
+func inventory(t *testing.T) map[string]string {
 	t.Helper()
 	f, err := os.Open(filepath.Join("..", "..", "..", "..", "docs", "spec", "20-privacy.md")) // #nosec G304 -- a fixed path of the repository
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = f.Close() }()
-	var out []string
+	out := map[string]string{}
 	in := false
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
@@ -54,16 +56,30 @@ func personalTables(t *testing.T) []string {
 			continue
 		}
 		cells := strings.Split(line, "|")
-		if len(cells) < 4 || strings.TrimSpace(cells[2]) == "no" {
+		if len(cells) < 4 {
 			continue
 		}
 		for _, m := range tableCell.FindAllStringSubmatch(cells[1], -1) {
-			out = append(out, m[1])
+			out[m[1]] = strings.TrimSpace(cells[2])
 		}
 	}
 	if err := sc.Err(); err != nil {
 		t.Fatal(err)
 	}
+	return out
+}
+
+// personalTables returns the tables of the inventory whose personal reference is not "no", in
+// name order.
+func personalTables(t *testing.T, listed map[string]string) []string {
+	t.Helper()
+	var out []string
+	for table, reference := range listed {
+		if reference != "no" {
+			out = append(out, table)
+		}
+	}
+	slices.Sort(out)
 	if len(out) < 40 {
 		t.Fatalf("20 section 2 lists only %d tables with personal data", len(out))
 	}
@@ -101,10 +117,12 @@ type (
 func (noUnit) Do(context.Context, func(context.Context) error, ...txn.Option) error { return nil }
 func (noEvents) Append(context.Context, ...eventlog.Event) error                    { return nil }
 
-// TestEveryPersonalTableHasAParticipant (brief M7-06 item 17): every table of 20 section 2 with
-// personal data is named by exactly one participant that internal/wire registers, or listed once
-// in personalDataExceptions with its reason; every table a participant names is a table of its own
-// module in architecture/modules.yaml and has personal data in 20 section 2.
+// TestEveryPersonalTableHasAParticipant (brief M7-06 item 17): every table of a module in
+// architecture/modules.yaml stands in 20 section 2, with "no" or its personal reference, so a new
+// table cannot stay out of the inventory and with it out of this test; every table of 20 section 2
+// with personal data is named by exactly one participant that internal/wire registers, or listed
+// once in personalDataExceptions with its reason; every table a participant names is a table of
+// its own module in architecture/modules.yaml and has personal data in 20 section 2.
 func TestEveryPersonalTableHasAParticipant(t *testing.T) {
 	t.Parallel()
 	list, err := personalDataList(personalDataModules{
@@ -121,8 +139,16 @@ func TestEveryPersonalTableHasAParticipant(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	personal := personalTables(t)
+	listed := inventory(t)
+	personal := personalTables(t, listed)
 	owned := moduleTables(t)
+	for _, module := range slices.Sorted(maps.Keys(owned)) {
+		for _, table := range owned[module] {
+			if _, ok := listed[table]; !ok {
+				t.Errorf("%s of module %s is missing in 20 section 2: list it with its personal reference or \"no\"", table, module)
+			}
+		}
+	}
 	covered := map[string]string{}
 	for _, p := range reg.All() {
 		for _, table := range p.Tables() {

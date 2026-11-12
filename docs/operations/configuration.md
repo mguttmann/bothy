@@ -795,7 +795,7 @@ Source: [16-operations.md](../spec/16-operations.md), section 14.
 | `backup.pg.diff_schedule` | `BOTHY_BACKUP__PG__DIFF_SCHEDULE` | Server | string | `0 2 * * 1-6` | schedule of the differential backup (cron) | active |
 | `backup.pg.archive_timeout` | `BOTHY_BACKUP__PG__ARCHIVE_TIMEOUT` | Server |  | `60s` | a WAL segment is archived at the latest after this time | planned (M7) |
 | `backup.pg.retention_full` | `BOTHY_BACKUP__PG__RETENTION_FULL` | Server | int | `4` | full backups kept in repo2 | active |
-| `backup.pg.local_retention_full` | `BOTHY_BACKUP__PG__LOCAL_RETENTION_FULL` | Server | int | `1` | full backups kept in repo1 | active |
+| `backup.pg.local_retention_full` | `BOTHY_BACKUP__PG__LOCAL_RETENTION_FULL` | Server | int | `1` | full backups kept in repo1; a point-in-time restore from repo1 reaches back to the oldest of them (8.2) | active |
 | `backup.logical.schedule` | `BOTHY_BACKUP__LOGICAL__SCHEDULE` | Server | string | `0 3 * * *` | schedule of `pg_dump` (cron) | active |
 | `backup.logical.retention` | `BOTHY_BACKUP__LOGICAL__RETENTION` | Server | duration | `30d` | retention of the logical backup | active |
 | `backup.objects.schedule` | `BOTHY_BACKUP__OBJECTS__SCHEDULE` | Server | string | `30 3 * * *` | schedule of the object backup (cron) | active |
@@ -895,6 +895,7 @@ Source: [20-privacy.md](../spec/20-privacy.md), section 13.
 | `retention.batch_size` | `BOTHY_RETENTION__BATCH_SIZE` | Server | int | `500` | rows a retention job removes per table and transaction | active |
 | `privacy.export_ttl` | `BOTHY_PRIVACY__EXPORT_TTL` | Server | duration | `7d` | availability of an export package | active |
 | `privacy.export_requires_approval` | `BOTHY_PRIVACY__EXPORT_REQUIRES_APPROVAL` | Server | bool | `false` | export of one's own data needs the approval of the owner | active |
+| `privacy.export_work_dir` | `BOTHY_PRIVACY__EXPORT_WORK_DIR` | Server | string | empty | directory in which the worker builds an export package before it is stored (5.2), an absolute path; empty means the temporary directory of the system | active |
 | `privacy.account_deletion_content` | `BOTHY_PRIVACY__ACCOUNT_DELETION_CONTENT` | Server | enum(keep_pseudonymized, delete) | `keep_pseudonymized` | contents of deleted accounts: `keep_pseudonymized` or `delete` | active |
 | `privacy.request_reminder_lead` | `BOTHY_PRIVACY__REQUEST_REMINDER_LEAD` | Server | duration | `7d` | how long before `due_at` of an open privacy request the owners get `gdpr.request_due`; less than one month | active |
 | `privacy.object_delete_delay` | `BOTHY_PRIVACY__OBJECT_DELETE_DELAY` | Server | duration | `24h` | maximum time until deleted objects are removed | active |

@@ -1199,7 +1199,7 @@
       "min": "1",
       "max": "",
       "chapter": "16-operations.md",
-      "doc": "Number of full backups kept in the local repository repo1."
+      "doc": "Number of full backups kept in the local repository repo1; a point-in-time restore from repo1 reaches back to the oldest of them."
     },
     {
       "name": "backup.pg.retention_full",
@@ -3141,6 +3141,18 @@
       "max": "",
       "chapter": "20-privacy.md",
       "doc": "How long an export package can be downloaded before it is deleted."
+    },
+    {
+      "name": "privacy.export_work_dir",
+      "env": "BOTHY_PRIVACY__EXPORT_WORK_DIR",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "Directory in which the worker builds an export package before it is stored; empty means the temporary directory of the system."
     },
     {
       "name": "privacy.object_delete_delay",

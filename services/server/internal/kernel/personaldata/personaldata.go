@@ -202,6 +202,17 @@ type Participant interface {
 	Erase(ctx context.Context, step Step, e Erasure) error
 }
 
+// NoOp implements Export and Erase of a participant whose tables hold nothing that a privacy
+// request exports or erases. A participant embeds it and adds Module and Tables; its own comment
+// says why its tables need neither (20 section 2).
+type NoOp struct{}
+
+// Export writes nothing.
+func (NoOp) Export(context.Context, Export, Writer) error { return nil }
+
+// Erase changes nothing in any step.
+func (NoOp) Erase(context.Context, Step, Erasure) error { return nil }
+
 // tableName is the form of a table name of 03.
 var tableName = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 

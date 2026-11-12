@@ -74,6 +74,8 @@ var internalHooksValidator = stdsync.OnceValues(func() (*httpserver.Validator, e
 // listener with the stages of the public one: the trusted proxies are empty, so the client IP is
 // the peer address and forwarded headers are never read (R-SE-09); its own rate limiter counts
 // rl.webhook_in and rl.public_auth for this listener. Nothing else of the API is mounted there.
+// mountRoutes does not call it while the start lock of R-DM-50 holds (restore_not_finalized): the
+// listener then answers these routes with the 404 of an unknown path.
 func (s *server) mountInternalHooks(cat routes.Catalog, log *slog.Logger) error {
 	s.mu.Lock()
 	ap, mux := s.apps, s.internalMux

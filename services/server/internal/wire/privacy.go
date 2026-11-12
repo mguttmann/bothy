@@ -37,6 +37,9 @@ type PrivacyConfig struct {
 	ExportRequiresApproval bool          `config:"privacy.export_requires_approval"`
 	DeletionContent        string        `config:"privacy.account_deletion_content"`
 	ReminderLead           time.Duration `config:"privacy.request_reminder_lead"`
+	// ExportWorkDir is privacy.export_work_dir, the parent of the directories in which the export
+	// packages are built; "" means the temporary directory of the system.
+	ExportWorkDir string `config:"privacy.export_work_dir"`
 	// RetentionPrivacyJob is retention.privacy_job, the period of the job retention.privacy_job.
 	RetentionPrivacyJob time.Duration `config:"retention.privacy_job"`
 	// DeletionJournalRetention is privacy.deletion_journal_retention, the period of the journal
@@ -92,8 +95,6 @@ type PrivacyDeps struct {
 	KeptBackups status.KeptBackups
 	// InstanceID is instance.id for manifest.json.
 	InstanceID ids.ID
-	// TempDir is the parent of the temporary package directories; "" means os.TempDir().
-	TempDir string
 	// Clock nil means clock.System().
 	Clock clock.Clock
 }
@@ -122,7 +123,7 @@ func NewPrivacy(cfg PrivacyConfig, pool *pg.Pool, d PrivacyDeps) (*Privacy, erro
 		Store: privacypg.NewRequests(pool), UoW: d.UoW, Authorizer: d.Authorizer, Audit: d.Audit, Events: d.Events, People: d.People,
 		Packages: d.Packages, Participants: d.Participants,
 		InstanceID: func(context.Context) (ids.ID, error) { return d.InstanceID, nil },
-		Archives:   archive.New(d.TempDir), Jobs: q, Cursors: privacyhttp.Cursors{}, Clock: d.Clock,
+		Archives:   archive.New(cfg.ExportWorkDir), Jobs: q, Cursors: privacyhttp.Cursors{}, Clock: d.Clock,
 	})
 	if err != nil {
 		return nil, err

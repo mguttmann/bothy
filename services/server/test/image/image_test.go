@@ -42,6 +42,8 @@ const (
 	keyDir = "var/lib/bothy/signing-keys"
 	// filesDir is the default file.fs.root of the file system driver (M3-03).
 	filesDir = "var/lib/bothy/files"
+	// exportWorkDir is privacy.export_work_dir of the worker in the Compose stack.
+	exportWorkDir = "var/lib/bothy/export-work"
 	// nonroot is uid and gid of the distroless user nonroot (18 "Server images" rule 3).
 	nonroot = 65532
 	// dockerTimeout bounds one Docker CLI call; an export of the small image takes seconds.
@@ -385,12 +387,13 @@ func TestImageHasNoShell(t *testing.T) {
 	}
 }
 
-// TestSigningKeyDir checks the empty key store of secrets.signing_key_dir and the empty root of
-// the file system driver (file.fs.root, M3-03): a named volume mounted there takes owner and mode
-// from the image (18 "Server images" rule 3, ADR 0066).
+// TestSigningKeyDir checks the empty key store of secrets.signing_key_dir, the empty root of
+// the file system driver (file.fs.root, M3-03) and the empty working directory of the export
+// packages (privacy.export_work_dir): a named volume mounted there takes owner and mode from the
+// image (18 "Server images" rule 3, ADR 0066).
 func TestSigningKeyDir(t *testing.T) {
 	fs := exportFS(t, env(t, "BOTHY_TEST_IMAGE"))
-	for _, dir := range []string{keyDir, filesDir} {
+	for _, dir := range []string{keyDir, filesDir, exportWorkDir} {
 		e, ok := fs[dir]
 		if !ok {
 			t.Fatalf("%s is missing", dir)

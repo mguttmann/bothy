@@ -29,7 +29,7 @@ restore applies so deleted data stays deleted (R-DP-04, SEC-BAK-3).
   consumer), `JournalState` (`deletion_journal_state`), `Retention` (the participant of
   `retention.privacy_job`; it keeps an account deletion until it is journaled) and `PersonalData`
   (the participant of privacy itself: the person's requests in `access.json`).
-- `adapters/archive`: the package under construction in a temporary directory and the ZIP.
+- `adapters/archive`: the package under construction in a directory of its own below `privacy.export_work_dir` (empty: the temporary directory of the system; `internal/wire` passes the key) and the ZIP.
 - `adapters/jobs`: the four jobs and the queue that inserts `privacy.export` and `privacy.erase`.
 - `adapters/httpapi`: the REST handlers.
 
@@ -135,7 +135,8 @@ Each module with tables of 20 section 2 registers one participant in
 `privacy.export_ttl`, `privacy.export_requires_approval`, `privacy.account_deletion_content`,
 `privacy.request_reminder_lead`, `retention.privacy_job`, `privacy.deletion_journal_retention`
 (20 section 13; the cross-check `deletion_journal_retention` holds it at least the longest backup
-period, DP-T08); the maintenance jobs
+period, DP-T08) and `privacy.export_work_dir` (empty or an absolute path, cross-check
+`export_work_dir_absolute`); the maintenance jobs
 use `retention.job_interval` and `retention.batch_size`. The statutory deadline is no
 configuration value (R-DP-05).
 

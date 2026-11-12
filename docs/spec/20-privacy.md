@@ -50,6 +50,7 @@ personal data, also of third parties and also special categories under Art. 9),
 | `group_memberships` | indirect | membership, times | `account` | removed on account deletion, row with a pseudonymous ID |
 | `grants` | indirect | who has access to what, reason (free text) | `account` | stays with a pseudonymous ID (evidence) |
 | `agents` | indirect | `credential_holder_id`, reported state | `account` | stays |
+| `agent_definitions` | content | versions of the definition of a built-in agent: instructions and skills as free text, MCP servers, settings; written by | `config` | stays, a version is never changed (03, R-DM-59); the writer with a pseudonymous ID |
 | `agent_consumer_cursors` | no | read position | `security` | with the agent |
 | `apps`, `app_installations` | indirect | manifest, installed by | `account` / `config` | stays |
 | `commands`, `channel_skill_bindings`, `project_bindings`, `forum_tags` | no | configuration | `config` / `content` | on change |
@@ -93,7 +94,9 @@ personal data, also of third parties and also special categories under Art. 9),
 | `import_sources`, `import_items` | indirect | identifiers of the source (also foreign person IDs in the origin key) | `import` | `retention.import_after_completion` |
 | `audit_events` | indirect | actor, action, decision, resource, pseudonymized IP | `audit` | `retention.audit`, truncation with an anchor (03) |
 | `audit_checkpoints` | no | sequence, hash, signature | `audit` | like `audit_events` |
+| `audit_ip_keys` | no | keys of the IP pseudonyms in the audit log, stored encrypted (4.5) | `audit` | the key is destroyed after `privacy.audit_ip_key_retention`; the row stays as a record |
 | `gdpr_requests` | direct | data subject, kind, reason, state | `privacy_job` | `retention.privacy_job` |
+| `deletion_journal_state` | no | numbering of the deletion journal (4.6) | `config` | none |
 | `status_components`, `status_incidents`, `status_incident_updates`, `status_incident_components`, `backup_runs` | no | operational status, backup runs | `ops` | `retention.ops` |
 | `local_credentials` (03, 08) | indirect | password hash, encrypted TOTP secret | `security` | immediately on account deletion |
 | `enrollment_codes` (03, 08) | indirect | hash, times | `security` | `retention.security_after_end` |
@@ -105,6 +108,7 @@ personal data, also of third parties and also special categories under Art. 9),
 | `host_session_users` (03, 24) | indirect | which person has or had which session user on which host, who assigned and ended it | `security` | after `retired` of the host plus `retention.security_after_end`; never deleted before that, so that no name becomes free again (24, section 2.2); on account deletion with a pseudonymous ID |
 | `terminal_sessions` (03, 24) | indirect | who worked when from which device on which host with which profile, duration, bytes per direction, reason for the end; never contents | `security` | after `closed_at` plus `retention.security_after_end`; on account deletion with a pseudonymous ID |
 | `stats_minutes` (03, 25) | no | minute aggregates per channel, agent and code (count, sum, good events); no column for people, no contents. In channels with a single person indirectly relatable to that person (section 9) | `stats` | detaching the daily partitions after `retention.stats_minutes` |
+| `gateway_presence` (03) | indirect | which device of a person holds a live connection right now, the threads in focus there, idle; only the routing of notifications reads it (section 9) | `transient` | deleted when the connection ends; the rows of a node that stopped are ignored after `cluster.presence_ttl` and deleted |
 
 Data outside the database:
 
@@ -469,7 +473,12 @@ Rules:
 
 How the job `privacy.export` builds it (M7-06, ruling D-M7-06-2): each participant writes the
 sections of the JSON files and the lines of the JSON Lines files of its own tables into a package in
-a temporary directory; every file of the list above is present (an empty object or an empty file
+a directory of its own below `privacy.export_work_dir` (empty: the temporary directory of the
+system), which is removed when the package is stored and when an attempt fails. The package of a
+large account holds a copy of every own upload and, next to it, the archive, so that directory
+belongs on a disk: the Compose stack puts it on the volume `export-work` of `worker`, because
+`/tmp` is memory there (`infra/compose/README.md`). Every file of the list above is present (an
+empty object or an empty file
 when there is nothing), the uploads are under `files/<file_id>`, `README.txt` is in German for a
 person whose `users.locale` is German and in English otherwise, and `manifest.json` is written last
 with the SHA-256 of every other file. The ZIP is stored as a file with `purpose = 'gdpr_export'`
@@ -540,7 +549,7 @@ defaults:
 | Function | Default |
 |---|---|
 | Read state | only for the person themselves; no read receipts for others, not even for the owner |
-| Presence | only agents have presence; people do not (04, section 12) |
+| Presence | only agents have presence; people do not (04, section 12). Which devices of a person are connected and which threads they focus is known only to the server, for the routing of notifications ([13-push-notifications.md](13-push-notifications.md), section 12; `gateway_presence`, 03): no operation shows it to a person, an owner, an agent or an app, and it ends with the connection |
 | Last activity | only for the person and in the security view of the owner |
 | Statistics per person | off (`privacy.per_person_stats_enabled`); evaluations by groups of persons only from `privacy.stats_min_group_size` persons |
 | Costs per person | owners only; in threads one sees costs per run |
@@ -610,6 +619,7 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 | `retention.batch_size` | `500` | rows a retention job removes per table and transaction |
 | `privacy.export_ttl` | `7d` | availability of an export package |
 | `privacy.export_requires_approval` | `false` | export of one's own data needs the approval of the owner |
+| `privacy.export_work_dir` | empty | directory in which the worker builds an export package before it is stored (5.2), an absolute path; empty means the temporary directory of the system |
 | `privacy.account_deletion_content` | `keep_pseudonymized` | contents of deleted accounts: `keep_pseudonymized` or `delete` |
 | `privacy.request_reminder_lead` | `7d` | how long before `due_at` of an open privacy request the owners get `gdpr.request_due`; less than one month |
 | `privacy.object_delete_delay` | `24h` | maximum time until deleted objects are removed |
