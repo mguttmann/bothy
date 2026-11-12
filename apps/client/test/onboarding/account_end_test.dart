@@ -9,7 +9,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:auth/auth.dart' show DeviceKeys;
+import 'package:auth/auth.dart' show DeviceKeySigner, DeviceKeys;
 import 'package:client/app/account_wiper.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:client/platform/device_key_signer.dart';
@@ -31,6 +31,10 @@ class _StubbornKeys implements DeviceKeyStore {
 
   @override
   Future<DeviceKeys> ensure(String scope) => inner.ensure(scope);
+
+  @override
+  Future<DeviceKeySigner?> existing(String scope, {required bool stepUp}) =>
+      inner.existing(scope, stepUp: stepUp);
 
   @override
   Future<void> delete(String scope) async {

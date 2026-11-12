@@ -11,7 +11,12 @@ import 'dart:io';
 
 import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart'
-    show DeviceKeys, StepUpCredentials, StepUpPrompt, stepUpPurposeExtra;
+    show
+        DeviceKeySigner,
+        DeviceKeys,
+        StepUpCredentials,
+        StepUpPrompt,
+        stepUpPurposeExtra;
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:client/onboarding/start_route.dart';
 import 'package:client/platform/device_key_signer.dart';
@@ -30,6 +35,12 @@ class _RefusedKeys implements DeviceKeyStore {
   @override
   Future<DeviceKeys> ensure(String scope) async =>
       throw const dk.DeviceKeyException(dk.DeviceKeyError.notAvailable);
+
+  @override
+  Future<DeviceKeySigner?> existing(
+    String scope, {
+    required bool stepUp,
+  }) async => throw const dk.DeviceKeyException(dk.DeviceKeyError.notAvailable);
 
   @override
   Future<void> delete(String scope) async {}
@@ -65,15 +76,19 @@ class _WindowsLikeClient implements dk.DeviceKeyClient {
     String scope,
     dk.KeyPurpose purpose,
     Uint8List data, {
-    dk.StepUpPrompt? prompt,
+    dk.StepUpPromptTexts? prompt,
   }) => _key(scope).sign(data);
 
   @override
   Future<void> delete(String scope) async => _dpop.remove(scope);
 
   @override
-  Future<dk.DeviceKeyInfo?> keyInfo(String scope, dk.KeyPurpose purpose) =>
-      throw UnimplementedError();
+  Future<dk.DeviceKeyInfo?> keyInfo(
+    String scope,
+    dk.KeyPurpose purpose,
+  ) async => purpose == dk.KeyPurpose.dpop && _dpop.containsKey(scope)
+      ? ensure(scope, purpose)
+      : null;
 
   @override
   Future<Uint8List?> attestation(
@@ -169,8 +184,10 @@ void main() {
         stepUpPrompt: prompt,
         deviceKeys: PlatformDeviceKeyStore(
           _WindowsLikeClient(),
-          () =>
-              const dk.StepUpPrompt(title: 'Confirm', negativeButton: 'Cancel'),
+          () => const dk.StepUpPromptTexts(
+            title: 'Confirm',
+            negativeButton: 'Cancel',
+          ),
         ),
       );
       c = appContainer(f);

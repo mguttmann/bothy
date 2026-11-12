@@ -32,7 +32,19 @@ class AndroidKeyStoreAccess(
 ) : KeyStoreAccess {
     private val keyStore: KeyStore by lazy { KeyStore.getInstance(PROVIDER).apply { load(null) } }
 
-    override fun publicKey(alias: String): ECPublicKey? = keyStore.getCertificate(alias)?.publicKey as ECPublicKey?
+    /**
+     * The public key of [alias], or null when the Keystore holds no such key.
+     *
+     * `getCertificate` also answers null when the Keystore itself failed (it logs the failure and
+     * returns nothing), and a caller that takes that for a missing key would create a key over a
+     * registered one or count the registration as lost. `getKey` tells the two apart from API 31:
+     * null only for a missing key, an exception for a failure. Below API 31 both answer null.
+     */
+    override fun publicKey(alias: String): ECPublicKey? {
+        keyStore.getCertificate(alias)?.let { return it.publicKey as ECPublicKey }
+        if (keyStore.getKey(alias, null) != null) throw DeviceKeyException(DeviceKeyErrorCode.INTERNAL)
+        return null
+    }
 
     override fun generate(request: KeyRequest): ECPublicKey {
         // Below API 28 setIsStrongBoxBacked does not exist: an SDK check, never a caught

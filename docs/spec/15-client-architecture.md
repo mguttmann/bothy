@@ -554,7 +554,11 @@ Pigeon (flutter.dev) interface as its boundary, not a set of federated packages 
 D-M4-10-1). It offers: create a key, return the public JWK and thumbprint, sign, return an
 attestation (if the platform has it), delete the keys of a server. The JWK and the RFC 7638
 thumbprint are computed in Dart for every platform; signatures leave the native side in the JOSE
-form `R || S` (D-M4-10-2). The Swift and Kotlin parts use the same implementation as the
+form `R || S` (D-M4-10-2). No call of the plugin works on the platform thread: every method of
+the channel is asynchronous, creating, reading and deleting keys run on one worker in the order
+of the calls, and on iOS and macOS a step-up signature that waits for the person holds neither
+the DPoP signatures nor those calls (addendum of 2026-11-12,
+docs/decisions.d/AUD-pkg-device-key-01.md). The Swift and Kotlin parts use the same implementation as the
 extensions: on iOS and macOS that is the Swift package `DeviceKeyCore`
 (`packages/device_key/darwin/device_key/DeviceKeyCore`, CryptoKit, Security and LocalAuthentication), which the
 plugin package and the Notification Service and Share Extensions depend on (D-M4-10-4). Every key
@@ -651,6 +655,28 @@ these keys; an instance copied from a build before this rule keeps its keys unde
 `instance_id`, which the copy records as its scope. The scope is stored with the instance's secrets
 (docs/decisions.d/FIX-app-logout.md FIX-AL/4).
 A wipe (R-SY-14) deletes that folder, both device keys and every secret with the prefix.
+
+Registered device keys (addendum of 2026-11-12, docs/decisions.d/AUD-pkg-device-key-01.md;
+[08](08-identity.md) 5.4). The plugin creates a key that is missing, and a system deletes keys
+behind the app: the step-up item when the device passcode is turned off, every key at a restore
+onto another device, a TPM key when the TPM is cleared. A key created in the place of a
+registered one is another key, whose DPoP proofs the server answers with `invalid_dpop_proof`
+for good and whose step-up confirmations it counts as wrong. So the app creates device keys
+only while no session is stored for the instance, and records their RFC 7638 thumbprints with
+the instance's secrets (`device_keys`, `RegisteredDeviceKeys`). With a stored session it only
+reads the key storage and compares: a missing DPoP key, a missing recorded step-up key, another
+thumbprint and `key_invalidated` end the account on the device, with the wipe of R-SY-14 and E7
+with the reason "The key of this device can no longer be used", from where "Log in again"
+creates new keys and registers a new device; the person revokes the old entry. A signature that
+answers `key_invalidated` while the app runs (Android after new biometrics were enrolled) ends
+the account the same way. A key storage that cannot answer right now (a locked device) ends
+nothing: without the DPoP key E1 shows its keychain text, without the step-up key this run has
+none. A session of a build before the record keeps the keys the storage holds and gets its
+record at the next start; a device recorded without a step-up key has none, whatever the
+storage holds. Without a session, what a lost key left behind (on Windows a marker whose key is
+gone) is deleted and new keys are created, so E1 leads on to the login. Not covered: a session
+whose key was already replaced before the record existed keeps failing as before, until the
+person logs out or the server ends the session.
 
 Start, unreadable local data and the end of an account (addendum of 2026-11-11,
 docs/decisions.d/AUD-client-onboarding-01.md). The app shows its start screen, the mark alone

@@ -103,31 +103,56 @@ void DeviceKeyPlugin::RunWorker() {
   }
 }
 
-ErrorOr<DeviceKeyInfoMessage> DeviceKeyPlugin::EnsureKey(const std::string& scope,
-                                                         const KeyPurposeMessage& purpose) {
-  device_key::KeyInfo info;
-  Status status = store_.Ensure(scope, ToPurpose(purpose), &info);
-  if (!status.ok()) return ToError(status);
-  return ToMessage(info);
+void DeviceKeyPlugin::Enqueue(std::function<void()> job) {
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    jobs_.push_back(std::move(job));
+  }
+  wake_.notify_one();
 }
 
-ErrorOr<std::optional<DeviceKeyInfoMessage>> DeviceKeyPlugin::KeyInfo(
-    const std::string& scope, const KeyPurposeMessage& purpose) {
-  std::optional<device_key::KeyInfo> info;
-  Status status = store_.Info(scope, ToPurpose(purpose), &info);
-  if (!status.ok()) return ToError(status);
-  if (!info.has_value()) return std::optional<DeviceKeyInfoMessage>();
-  return std::optional<DeviceKeyInfoMessage>(ToMessage(*info));
+// Every call below runs its store operation on the worker, because TPM operations block for up to
+// seconds; the reply goes back to the platform thread, where Flutter expects channel replies.
+
+void DeviceKeyPlugin::EnsureKey(const std::string& scope, const KeyPurposeMessage& purpose,
+                                std::function<void(ErrorOr<DeviceKeyInfoMessage> reply)> result) {
+  Enqueue([this, scope, key_purpose = ToPurpose(purpose), result = std::move(result)]() mutable {
+    device_key::KeyInfo info;
+    Status status = store_.Ensure(scope, key_purpose, &info);
+    runner_.Post([status, info = std::move(info), result = std::move(result)]() {
+      if (status.ok()) {
+        result(ToMessage(info));
+      } else {
+        result(ToError(status));
+      }
+    });
+  });
+}
+
+void DeviceKeyPlugin::KeyInfo(
+    const std::string& scope, const KeyPurposeMessage& purpose,
+    std::function<void(ErrorOr<std::optional<DeviceKeyInfoMessage>> reply)> result) {
+  Enqueue([this, scope, key_purpose = ToPurpose(purpose), result = std::move(result)]() mutable {
+    std::optional<device_key::KeyInfo> info;
+    Status status = store_.Info(scope, key_purpose, &info);
+    runner_.Post([status, info = std::move(info), result = std::move(result)]() {
+      if (!status.ok()) {
+        result(ToError(status));
+      } else if (info.has_value()) {
+        result(std::optional<DeviceKeyInfoMessage>(ToMessage(*info)));
+      } else {
+        result(std::optional<DeviceKeyInfoMessage>());
+      }
+    });
+  });
 }
 
 void DeviceKeyPlugin::Sign(const std::string& scope, const KeyPurposeMessage& purpose,
                            const std::vector<uint8_t>& data,
                            const PromptTextsMessage* /*prompt*/,
                            std::function<void(ErrorOr<std::vector<uint8_t>> reply)> result) {
-  // TPM operations block for up to seconds, so they run on the worker; the reply goes back to
-  // the platform thread, where Flutter expects channel replies.
-  auto job = [this, scope, key_purpose = ToPurpose(purpose), data,
-              result = std::move(result)]() mutable {
+  Enqueue([this, scope, key_purpose = ToPurpose(purpose), data,
+           result = std::move(result)]() mutable {
     Bytes signature;
     Status status = store_.Sign(scope, key_purpose, data, &signature);
     runner_.Post([status, signature = std::move(signature), result = std::move(result)]() {
@@ -137,27 +162,39 @@ void DeviceKeyPlugin::Sign(const std::string& scope, const KeyPurposeMessage& pu
         result(ToError(status));
       }
     });
-  };
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    jobs_.push_back(std::move(job));
-  }
-  wake_.notify_one();
+  });
 }
 
-ErrorOr<std::optional<std::vector<uint8_t>>> DeviceKeyPlugin::Attestation(
+void DeviceKeyPlugin::Attestation(
     const std::string& scope, const KeyPurposeMessage& purpose,
-    const std::vector<uint8_t>& challenge) {
-  std::optional<Bytes> attestation;
-  Status status = store_.Attestation(scope, ToPurpose(purpose), challenge, &attestation);
-  if (!status.ok()) return ToError(status);
-  return attestation;
+    const std::vector<uint8_t>& challenge,
+    std::function<void(ErrorOr<std::optional<std::vector<uint8_t>>> reply)> result) {
+  Enqueue([this, scope, key_purpose = ToPurpose(purpose), challenge,
+           result = std::move(result)]() mutable {
+    std::optional<Bytes> attestation;
+    Status status = store_.Attestation(scope, key_purpose, challenge, &attestation);
+    runner_.Post([status, attestation = std::move(attestation), result = std::move(result)]() {
+      if (status.ok()) {
+        result(attestation);
+      } else {
+        result(ToError(status));
+      }
+    });
+  });
 }
 
-std::optional<FlutterError> DeviceKeyPlugin::DeleteKeys(const std::string& scope) {
-  Status status = store_.Delete(scope);
-  if (!status.ok()) return ToError(status);
-  return std::nullopt;
+void DeviceKeyPlugin::DeleteKeys(const std::string& scope,
+                                 std::function<void(std::optional<FlutterError> reply)> result) {
+  Enqueue([this, scope, result = std::move(result)]() mutable {
+    Status status = store_.Delete(scope);
+    runner_.Post([status, result = std::move(result)]() {
+      if (status.ok()) {
+        result(std::nullopt);
+      } else {
+        result(std::optional<FlutterError>(ToError(status)));
+      }
+    });
+  });
 }
 
 }  // namespace device_key

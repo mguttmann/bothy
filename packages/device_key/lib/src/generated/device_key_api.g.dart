@@ -339,10 +339,9 @@ class DeviceKeyHostApi {
     return pigeonVar_replyValue as DeviceKeyInfoMessage?;
   }
 
-  /// Signs [data] with ES256 and returns `R || S` (64 bytes); asynchronous,
-  /// because the step-up key shows the system prompt. [prompt] carries the
-  /// prompt texts for Android; the step-up key there fails with `internal`
-  /// without them.
+  /// Signs [data] with ES256 and returns `R || S` (64 bytes); the step-up key
+  /// shows the system prompt first. [prompt] carries the prompt texts for
+  /// Android; the step-up key there fails with `internal` without them.
   Future<Uint8List> sign(
     String scope,
     KeyPurposeMessage purpose,

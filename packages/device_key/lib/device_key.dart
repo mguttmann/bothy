@@ -28,4 +28,4 @@ export 'src/device_key.dart'
         DeviceKeyException,
         DeviceKeyInfo,
         KeyPurpose,
-        StepUpPrompt;
+        StepUpPromptTexts;

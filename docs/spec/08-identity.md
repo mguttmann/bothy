@@ -490,7 +490,15 @@ foreign code never binds a foreign device without the person's step-up.
   invalidate the step-up key, section 6.1), the app logs in as a new device
   (waiting, approval or pairing), and the person revokes the old one. Reason: A change with only
   the DPoP key would let malicious code in the app register its own step-up key; with the old
-  step-up key it would not work in precisely the most common case (R-ID-11).
+  step-up key it would not work in precisely the most common case (R-ID-11). The app notices
+  the loss itself and never creates a key in the place of a registered one: it keeps the
+  thumbprints of the keys it registered with, compares them at every start with what the key
+  storage holds, and counts a missing or different key and a key the system reports as
+  invalidated as lost. It then deletes the local data of the account like every end of an
+  account ([04](04-sync-protocol.md), section 8.5, R-SY-14) and shows the reason on the
+  logged-out screen ([15](15-client-architecture.md), section 9; addendum of 2026-11-12,
+  docs/decisions.d/AUD-pkg-device-key-01.md; reason: a key store creates a missing key without a
+  word, so the app kept a session whose proofs the server refused for good).
 
 ## 6. Device keys and step-up
 

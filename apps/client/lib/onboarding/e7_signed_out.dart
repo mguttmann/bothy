@@ -47,6 +47,7 @@ class SignedOutScreen extends StatelessWidget {
         SignOutCause.pendingExpired => l.onboardingReasonPendingExpired,
         SignOutCause.sessionRevoked => l.onboardingReasonSessionRevoked,
         SignOutCause.sessionExpired => l.onboardingReasonSessionExpired,
+        SignOutCause.deviceKeyLost => l.onboardingReasonDeviceKeyLost,
       };
 
   @override

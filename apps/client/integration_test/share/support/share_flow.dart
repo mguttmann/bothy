@@ -55,7 +55,10 @@ Future<TestApp> startShareApp(WidgetTester tester) {
       appleShare: AppleShare(host: ShareAppleHostApi()),
       deviceKeys: PlatformDeviceKeyStore(
         dk.DeviceKeyClient(),
-        () => const dk.StepUpPrompt(title: 'Confirm', negativeButton: 'Cancel'),
+        () => const dk.StepUpPromptTexts(
+          title: 'Confirm',
+          negativeButton: 'Cancel',
+        ),
       ),
     );
   }

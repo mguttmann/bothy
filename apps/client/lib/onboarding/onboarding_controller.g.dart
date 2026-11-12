@@ -13,8 +13,9 @@ part of 'onboarding_controller.dart';
 /// E1 [connect] runs discovery and composes the services of the instance; E2 and E3 run the
 /// login flows; `pending` goes to E4 and polls; `signedIn` starts the engine and shows the main
 /// view; every end of the account ([logout], [cancelPending], a rejected or expired device, a
-/// revoked session, `4012`) runs the one [AccountWiper] and shows E7 with its cause. A start
-/// with the session of an active device opens its local data before the network is asked.
+/// revoked session, `4012`, a lost device key) runs the one [AccountWiper] and shows E7 with
+/// its cause. A start with the session of an active device opens its local data before the
+/// network is asked.
 
 @ProviderFor(OnboardingController)
 final onboardingControllerProvider = OnboardingControllerProvider._();
@@ -24,8 +25,9 @@ final onboardingControllerProvider = OnboardingControllerProvider._();
 /// E1 [connect] runs discovery and composes the services of the instance; E2 and E3 run the
 /// login flows; `pending` goes to E4 and polls; `signedIn` starts the engine and shows the main
 /// view; every end of the account ([logout], [cancelPending], a rejected or expired device, a
-/// revoked session, `4012`) runs the one [AccountWiper] and shows E7 with its cause. A start
-/// with the session of an active device opens its local data before the network is asked.
+/// revoked session, `4012`, a lost device key) runs the one [AccountWiper] and shows E7 with
+/// its cause. A start with the session of an active device opens its local data before the
+/// network is asked.
 final class OnboardingControllerProvider
     extends $NotifierProvider<OnboardingController, OnboardingState> {
   /// Drives E1 to E7 from the outcomes of `LoginService` (Design note 3).
@@ -33,8 +35,9 @@ final class OnboardingControllerProvider
   /// E1 [connect] runs discovery and composes the services of the instance; E2 and E3 run the
   /// login flows; `pending` goes to E4 and polls; `signedIn` starts the engine and shows the main
   /// view; every end of the account ([logout], [cancelPending], a rejected or expired device, a
-  /// revoked session, `4012`) runs the one [AccountWiper] and shows E7 with its cause. A start
-  /// with the session of an active device opens its local data before the network is asked.
+  /// revoked session, `4012`, a lost device key) runs the one [AccountWiper] and shows E7 with
+  /// its cause. A start with the session of an active device opens its local data before the
+  /// network is asked.
   OnboardingControllerProvider._()
     : super(
         from: null,
@@ -63,15 +66,16 @@ final class OnboardingControllerProvider
 }
 
 String _$onboardingControllerHash() =>
-    r'63f74dc09c89625dc5d84f4f7d4d57d5c9e123f5';
+    r'8c84e44b5370cb1e868ab64ccbfccf25c16a682c';
 
 /// Drives E1 to E7 from the outcomes of `LoginService` (Design note 3).
 ///
 /// E1 [connect] runs discovery and composes the services of the instance; E2 and E3 run the
 /// login flows; `pending` goes to E4 and polls; `signedIn` starts the engine and shows the main
 /// view; every end of the account ([logout], [cancelPending], a rejected or expired device, a
-/// revoked session, `4012`) runs the one [AccountWiper] and shows E7 with its cause. A start
-/// with the session of an active device opens its local data before the network is asked.
+/// revoked session, `4012`, a lost device key) runs the one [AccountWiper] and shows E7 with
+/// its cause. A start with the session of an active device opens its local data before the
+/// network is asked.
 
 abstract class _$OnboardingController extends $Notifier<OnboardingState> {
   OnboardingState build();

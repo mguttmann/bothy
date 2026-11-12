@@ -2458,6 +2458,10 @@
   "@onboardingReasonSessionExpired": {
     "description": "E7 reason when the server no longer accepts the refresh token (auth.session_max_age)."
   },
+  "onboardingReasonDeviceKeyLost": "The key of this device can no longer be used, for example because its screen lock or biometrics changed. Log in again to register this device anew, then remove its old entry under Devices.",
+  "@onboardingReasonDeviceKeyLost": {
+    "description": "E7 reason when a device key of the registration is gone, was replaced or was invalidated by the system (08 section 5.4): the app registers as a new device at the next login and the person revokes the old entry."
+  },
   "onboardingDataDeleted": "The data of this device has been deleted.",
   "@onboardingDataDeleted": {
     "description": "Sentence of E7 after the wipe (04 section 8.5, R-SY-14)."

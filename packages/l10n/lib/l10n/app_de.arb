@@ -457,6 +457,7 @@
   "onboardingReasonPendingExpired": "Dieses Gerät wurde nicht rechtzeitig bestätigt.",
   "onboardingReasonSessionRevoked": "Deine Sitzung wurde auf dem Server beendet.",
   "onboardingReasonSessionExpired": "Deine Sitzung ist abgelaufen.",
+  "onboardingReasonDeviceKeyLost": "Der Schlüssel dieses Geräts ist nicht mehr nutzbar, zum Beispiel weil sich die Bildschirmsperre oder die Biometrie geändert hat. Melde dich erneut an, um dieses Gerät neu zu registrieren, und entferne danach den alten Eintrag unter Geräte.",
   "onboardingDataDeleted": "Die Daten dieses Geräts wurden gelöscht.",
   "onboardingDataNotDeleted": "Nicht alle Daten dieses Geräts konnten gelöscht werden. Die App löscht den Rest beim nächsten Start.",
   "onboardingLogInAgain": "Erneut anmelden",

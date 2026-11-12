@@ -134,11 +134,13 @@ String _base64Url(List<int> bytes) =>
 /// The texts of the step-up prompt on Android (brief M5-01, Design note 1).
 ///
 /// They come from `packages/l10n`, never from native code. iOS and macOS
-/// ignore them, because the system shows its own text there.
+/// ignore them, because the system shows its own text there. The name says
+/// what the type holds: `StepUpPrompt` is the port of `packages/auth` that
+/// asks the person.
 @immutable
-class StepUpPrompt {
+class StepUpPromptTexts {
   /// Creates the texts; [subtitle] is optional.
-  const StepUpPrompt({
+  const StepUpPromptTexts({
     required this.title,
     this.subtitle,
     required this.negativeButton,
@@ -162,6 +164,18 @@ class StepUpPrompt {
 /// the native side hashes it into the key label. There is no operation that
 /// replaces a key of an existing registration (08 5.4): [delete] removes both
 /// keys, and the app registers as a new device.
+///
+/// [ensure] creates a key that is missing, and a system can delete a key
+/// behind the app (the step-up key when the device passcode is turned off, a
+/// cleared TPM). A key created in the place of a registered one is another
+/// key, which the server refuses. So only a caller without a registration
+/// calls [ensure]; a caller with one reads its keys with [keyInfo], compares
+/// [DeviceKeyInfo.thumbprint] with the thumbprint it registered, and treats a
+/// missing or different key and [DeviceKeyError.keyInvalidated] as the loss
+/// of the registration.
+///
+/// No call works on the platform thread: the native side runs each on a
+/// worker of its own.
 class DeviceKeyClient {
   /// Creates a client; [api] replaces the generated host API in tests.
   DeviceKeyClient({DeviceKeyHostApi? api}) : _api = api ?? DeviceKeyHostApi();
@@ -170,13 +184,20 @@ class DeviceKeyClient {
 
   /// Returns the key of [purpose] for [scope], creating it if it is missing.
   ///
+  /// For a device that is not registered yet; see the class comment.
+  ///
   /// Throws a [DeviceKeyException] on failure.
   Future<DeviceKeyInfo> ensure(String scope, KeyPurpose purpose) =>
       _guard(() async => _info(await _api.ensureKey(scope, purpose._message)));
 
   /// Returns the key of [purpose] for [scope], or null; never creates one.
   ///
-  /// Throws a [DeviceKeyException] on failure.
+  /// Null means the storage holds no such key. A storage that cannot answer
+  /// right now (a locked device) throws instead, so null is never a guess.
+  ///
+  /// Throws a [DeviceKeyException] on failure, with
+  /// [DeviceKeyError.keyInvalidated] for a key that is gone for good (Windows:
+  /// a key the plugin created and can no longer open).
   Future<DeviceKeyInfo?> keyInfo(String scope, KeyPurpose purpose) =>
       _guard(() async {
         final message = await _api.keyInfo(scope, purpose._message);
@@ -195,7 +216,7 @@ class DeviceKeyClient {
     String scope,
     KeyPurpose purpose,
     Uint8List data, {
-    StepUpPrompt? prompt,
+    StepUpPromptTexts? prompt,
   }) => _guard(() async {
     final signature = await _api.sign(
       scope,

@@ -74,7 +74,7 @@ final class MobilePerfApp {
     final DeviceKeyStore keys = phone
         ? PlatformDeviceKeyStore(
             dk.DeviceKeyClient(),
-            () => const dk.StepUpPrompt(
+            () => const dk.StepUpPromptTexts(
               title: 'Confirm',
               negativeButton: 'Cancel',
             ),

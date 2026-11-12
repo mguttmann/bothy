@@ -32,7 +32,7 @@ final class LoginSignedIn extends LoginOutcome {
   /// Creates the outcome.
   const LoginSignedIn(this.tokens);
 
-  /// The new tokens; the refresh token is already stored.
+  /// The new access token and its session; the refresh token is in the `SecretStore` only.
   final TokenState tokens;
 
   @override

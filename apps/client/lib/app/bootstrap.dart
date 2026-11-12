@@ -399,7 +399,7 @@ AppPorts productionPorts({
     ),
     deviceKeys: PlatformDeviceKeyStore(
       dk.DeviceKeyClient(),
-      () => dk.StepUpPrompt(
+      () => dk.StepUpPromptTexts(
         title: texts().shellStepUpTitle,
         negativeButton: texts().onboardingCancel,
       ),
@@ -466,9 +466,11 @@ final class InstanceServices {
     required this.terminalApi,
     required this.versions,
     required this._stopWatching,
+    required this._keyLost,
   });
 
   final Future<void> Function() _stopWatching;
+  final StreamController<void> _keyLost;
 
   /// The instance IDs with a folder under [root] (the `dataRoot`): the instances whose old
   /// secrets in a shared store are this app's own ([FlutterSecureBackend],
@@ -536,7 +538,9 @@ final class InstanceServices {
   );
 
   /// Builds the services of [instance] (Design note 1): the device keys with the scope of
-  /// [AppPorts.deviceKeyScopes], the secrets prefixed with the instance ID, the database key
+  /// [AppPorts.deviceKeyScopes] ([RegisteredDeviceKeys]: created and recorded while no session
+  /// is stored, only read and compared with the record while one is), the secrets prefixed
+  /// with the instance ID, the database key
   /// (32 random bytes at the first start, kept in the secret store), the encrypted database in
   /// `<dataRoot>/instances/<instance_id>/local.db`, the auth session with its login flows and
   /// the sync engine (not started), whose every gateway attempt first asks the version gate
@@ -545,7 +549,10 @@ final class InstanceServices {
   /// A database that the stored key does not open is created anew while no session is stored
   /// and throws [LocalStoreKeyError] while one is.
   ///
-  /// Throws what the device keys or the database throw; the caller shows E1 again.
+  /// Throws [DeviceKeyLost], before anything of the instance is open, when the stored session
+  /// belongs to device keys this device no longer has (08 5.4); the caller ends the account
+  /// on the device. Throws what the device keys or the database throw otherwise; the caller
+  /// shows E1 again.
   static Future<InstanceServices> open(
     AppPorts ports,
     InstanceInfo instance, {
@@ -553,7 +560,20 @@ final class InstanceServices {
   }) async {
     final secrets = InstanceSecrets(ports.secureBackend, instance.instanceId);
     final keyScope = await ports.deviceKeyScopes.resolve(secrets);
-    final keys = await ports.deviceKeys.ensure(keyScope);
+    final registered = RegisteredDeviceKeys(
+      ports.deviceKeys,
+      secrets,
+      keyScope,
+    );
+    final stored = await _sessionStored(secrets, instance)
+        ? await registered.ofSession()
+        : await registered.forLogin();
+    // A key that stops signing while the app runs (`key_invalidated`) ends the account as a
+    // key that was gone at the start does ([deviceKeyLost]).
+    final keyLost = StreamController<void>.broadcast();
+    final keys = watchInvalidation(stored, () {
+      if (!keyLost.isClosed) keyLost.add(null);
+    });
     final folder = await _folderOf(ports, instance.instanceId);
     await folder.create(recursive: true);
     final dbPath = '${folder.path}${Platform.pathSeparator}local.db';
@@ -754,6 +774,7 @@ final class InstanceServices {
       terminalApi: terminalApi,
       versions: versions,
       stopWatching: stopWatching,
+      keyLost: keyLost,
     );
   }
 
@@ -799,6 +820,11 @@ final class InstanceServices {
   /// (18 9 item 2; brief M7-13).
   final VersionWatch versions;
 
+  /// An event when a device key of the session answered a signature with `key_invalidated`
+  /// (the system no longer accepts it, for example after new biometrics on Android): the
+  /// session cannot go on, and the app ends the account on the device (08 5.4).
+  Stream<void> get deviceKeyLost => _keyLost.stream;
+
   /// Whether a refresh token of an earlier login is stored, so the app can start signed in.
   ///
   /// The key is the one `AuthSession` writes (`auth/<origin>/refresh_token`, M4-09).
@@ -822,6 +848,7 @@ final class InstanceServices {
     await database.close();
     await auth.dispose();
     await versions.dispose();
+    await _keyLost.close();
   }
 
   static int _bits(Random random, int bits) {

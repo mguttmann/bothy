@@ -3,6 +3,9 @@
 #ifndef DEVICE_KEY_CORE_DEVICE_KEY_STORE_H_
 #define DEVICE_KEY_CORE_DEVICE_KEY_STORE_H_
 
+#include <map>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 
@@ -91,8 +94,18 @@ struct KeyInfo {
 ///     KeyInfo info;
 ///     Status status = store.Ensure("https://chat.example.com", KeyPurpose::kDpop, &info);
 ///
-/// There is no operation that replaces a key (08 5.4): Delete removes both keys of a scope. The
-/// store holds no state besides its references, so it may be used from several threads.
+/// There is no operation that replaces a key (08 5.4): Delete removes both keys of a scope.
+///
+/// A key found under its name without a marker (the plugin stopped between `NCryptFinalizeKey` and
+/// writing the marker) is taken over only with the export policy the plugin sets; a key that
+/// allows export, or whose policy cannot be read, was put there by someone else, who may hold a
+/// copy of it, so it is deleted and treated as missing.
+///
+/// Sign keeps the opened provider and key of a name, because every request of the app needs a
+/// signature and opening them costs a marker read and, for a TPM key, a load into the TPM. A kept
+/// key is dropped by Delete and whenever a signature with it fails; that signature is then tried
+/// once more with a fresh lookup, so its answer is the one of a store that keeps nothing. Ensure,
+/// Info and Attestation always look the key up. The store may be used from several threads.
 class DeviceKeyStore {
  public:
   /// The name prefix of the app's keys.
@@ -136,7 +149,8 @@ class DeviceKeyStore {
 
   /// Signs [data] with ES256: SHA-256 with BCrypt, then `NCryptSignHash`.
   ///
-  /// The `dpop` key signs with `NCRYPT_SILENT_FLAG`, so it can never show a dialog.
+  /// The `dpop` key signs with `NCRYPT_SILENT_FLAG`, so it can never show a dialog. The opened
+  /// key is kept for the next signature of the same name.
   ///
   /// @param scope separates the keys per server.
   /// @param purpose the key's purpose.
@@ -164,6 +178,11 @@ class DeviceKeyStore {
  private:
   struct OpenedKey;
   Status Locate(const std::wstring& name, std::optional<OpenedKey>* key);
+  /// The kept key of [name], or the result of Locate, which is then kept; [key] stays null when
+  /// there is no key, and [was_kept] tells whether the key was opened by an earlier call.
+  Status Opened(const std::wstring& name, std::shared_ptr<OpenedKey>* key, bool* was_kept);
+  /// Drops the kept key of [name]; its handles close when the last signature with it ends.
+  void Forget(const std::wstring& name);
   Status Create(const std::wstring& name, KeyInfo* info);
   Status DescribeKey(NCRYPT_KEY_HANDLE key, bool hardware_bound, KeyPurpose purpose,
                      KeyInfo* info);
@@ -171,6 +190,8 @@ class DeviceKeyStore {
   KeyProvider& provider_;
   MarkerStore& markers_;
   std::wstring prefix_;
+  std::mutex kept_mutex_;
+  std::map<std::wstring, std::shared_ptr<OpenedKey>> kept_;
 };
 
 /// Whether [status] means "no such key" (`NTE_BAD_KEYSET`, `NTE_NO_KEY`, `NTE_NOT_FOUND`).

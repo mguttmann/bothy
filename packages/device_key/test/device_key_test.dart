@@ -185,7 +185,7 @@ void main() {
         scope,
         KeyPurpose.stepUp,
         Uint8List(1),
-        prompt: const StepUpPrompt(
+        prompt: const StepUpPromptTexts(
           title: 'Confirm as Alex',
           subtitle: 'chat.example.com',
           negativeButton: 'Cancel',
@@ -198,7 +198,10 @@ void main() {
         scope,
         KeyPurpose.stepUp,
         Uint8List(1),
-        prompt: const StepUpPrompt(title: 'Confirm', negativeButton: 'Cancel'),
+        prompt: const StepUpPromptTexts(
+          title: 'Confirm',
+          negativeButton: 'Cancel',
+        ),
       );
       expect(api.lastPrompt!.subtitle, isNull);
       await client.sign(scope, KeyPurpose.dpop, Uint8List(1));

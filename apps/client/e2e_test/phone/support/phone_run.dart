@@ -12,7 +12,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:auth/auth.dart' show DeviceKeys, LoginFailed;
+import 'package:auth/auth.dart' show DeviceKeySigner, DeviceKeys, LoginFailed;
 import 'package:client/platform/app_lifecycle.dart';
 import 'package:client/platform/device_key_signer.dart';
 import 'package:client/platform/network_status.dart';
@@ -159,6 +159,18 @@ final class NativeDpopKeyStore implements DeviceKeyStore {
       dpop: DeviceKeySignerAdapter(_client, scope, dk.KeyPurpose.dpop, dpop),
       stepUp: keysFor('$_nonce/$scope').stepUp,
     );
+  }
+
+  @override
+  Future<DeviceKeySigner?> existing(
+    String scope, {
+    required bool stepUp,
+  }) async {
+    if (stepUp) return keysFor('$_nonce/$scope').stepUp;
+    final dpop = await _client.keyInfo(scope, dk.KeyPurpose.dpop);
+    return dpop == null
+        ? null
+        : DeviceKeySignerAdapter(_client, scope, dk.KeyPurpose.dpop, dpop);
   }
 
   @override

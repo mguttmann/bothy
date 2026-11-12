@@ -39,6 +39,16 @@ std::wstring NameOf(dk::DeviceKeyStore& store, const char* scope, KeyPurpose pur
 
 bool SameKey(const KeyInfo& a, const KeyInfo& b) { return a.x == b.x && a.y == b.y; }
 
+/// Whether [blob] (`BCRYPT_ECCPUBLIC_BLOB`: the header, then X and Y) is the public key of [info].
+bool IsPublicKeyOf(const dk::Bytes& blob, const KeyInfo& info) {
+  dk::Bytes expected(sizeof(BCRYPT_ECCKEY_BLOB), 0);
+  if (blob.size() < expected.size()) return false;
+  std::memcpy(expected.data(), blob.data(), expected.size());
+  expected.insert(expected.end(), info.x.begin(), info.x.end());
+  expected.insert(expected.end(), info.y.begin(), info.y.end());
+  return blob == expected;
+}
+
 }  // namespace
 
 TEST(creates_two_distinct_keys_per_scope) {
@@ -244,6 +254,111 @@ TEST(marker_without_key_is_invalidated) {
   REQUIRE(f.store.Delete(kScopeA).ok());
   REQUIRE(f.store.Ensure(kScopeA, KeyPurpose::kDpop, &info).ok());  // a new registration
   CHECK(fake.creates.size() == 2);
+}
+
+TEST(foreign_exportable_key_is_not_taken_over) {
+  // Without a marker a key under the plugin's name is taken over only with the plugin's export
+  // policy. An exportable key was put there by someone else, who may hold a copy of it: it is
+  // deleted, and the registration gets a key of the plugin's own.
+  dkt::FakeKeyProvider fake(dkt::PlatformMode::kMissing);
+  Fixture f(fake);
+  dk::CngKeyProvider cng;
+  std::wstring name = NameOf(f.store, kScopeA, KeyPurpose::kDpop);
+  dk::Bytes planted;
+  REQUIRE(dkt::CreateExportableKey(name, &planted));
+  KeyInfo info;
+  REQUIRE(f.store.Ensure(kScopeA, KeyPurpose::kDpop, &info).ok());
+  CHECK(!IsPublicKeyOf(planted, info));
+  CHECK(fake.creates.size() == 1);
+  dk::NcryptHandle key;
+  REQUIRE(dkt::OpenRealKey(ProviderKind::kSoftware, name, &key) == ERROR_SUCCESS);
+  DWORD policy = 0xFFFFFFFF;
+  REQUIRE(cng.GetDwordProperty(key.get(), NCRYPT_EXPORT_POLICY_PROPERTY, &policy) ==
+          ERROR_SUCCESS);
+  CHECK(policy == 0);
+  dk::Bytes blob;
+  REQUIRE(cng.ExportKey(key.get(), BCRYPT_ECCPUBLIC_BLOB, &blob) == ERROR_SUCCESS);
+  CHECK(IsPublicKeyOf(blob, info));
+  std::optional<ProviderKind> marker;
+  REQUIRE(f.markers.Read(name, &marker) == ERROR_SUCCESS);
+  CHECK(marker == ProviderKind::kSoftware);
+
+  // The calls that never create a key do not take it over either: there is no key then.
+  std::wstring other = NameOf(f.store, kScopeB, KeyPurpose::kDpop);
+  REQUIRE(dkt::CreateExportableKey(other, &planted));
+  std::optional<KeyInfo> found;
+  REQUIRE(f.store.Info(kScopeB, KeyPurpose::kDpop, &found).ok());
+  CHECK(!found.has_value());
+  dk::NcryptHandle gone;
+  CHECK(dk::IsMissingKey(dkt::OpenRealKey(ProviderKind::kSoftware, other, &gone)));
+  REQUIRE(f.markers.Read(other, &marker) == ERROR_SUCCESS);
+  CHECK(!marker.has_value());
+  REQUIRE(dkt::CreateExportableKey(other, &planted));
+  dk::Bytes signature;
+  CHECK(f.store.Sign(kScopeB, KeyPurpose::kDpop, dkt::ToBytes("x"), &signature).code ==
+        ErrorCode::kNotAvailable);
+  CHECK(fake.creates.size() == 1);
+}
+
+TEST(sign_keeps_the_opened_key) {
+  // Every request of the app needs a signature: the marker is read and the provider and key are
+  // opened once, not per signature.
+  dkt::FakeKeyProvider fake(dkt::PlatformMode::kMissing);
+  Fixture f(fake);
+  KeyInfo info;
+  REQUIRE(f.store.Ensure(kScopeA, KeyPurpose::kDpop, &info).ok());
+  fake.key_opens = 0;
+  for (const char* text : {"first", "second", "third"}) {
+    dk::Bytes data = dkt::ToBytes(text);
+    dk::Bytes signature;
+    REQUIRE(f.store.Sign(kScopeA, KeyPurpose::kDpop, data, &signature).ok());
+    CHECK(dkt::Verifies(info, data, signature));
+  }
+  CHECK(fake.key_opens == 1);
+  CHECK(fake.sign_flags.size() == 3);
+
+  // The key is lost behind the store and the kept handle stops working: the signature is tried
+  // once more with a fresh lookup, which reports the lost key, as a store that keeps nothing.
+  dk::NcryptHandle key;
+  REQUIRE(dkt::OpenRealKey(ProviderKind::kSoftware, NameOf(f.store, kScopeA, KeyPurpose::kDpop),
+                           &key) == ERROR_SUCCESS);
+  dk::CngKeyProvider cng;
+  REQUIRE(cng.DeleteKey(&key) == ERROR_SUCCESS);
+  fake.sign_failure_once = NTE_INVALID_HANDLE;
+  dk::Bytes signature;
+  CHECK(f.store.Sign(kScopeA, KeyPurpose::kDpop, dkt::ToBytes("x"), &signature).code ==
+        ErrorCode::kKeyInvalidated);
+  CHECK(signature.empty());
+  CHECK(fake.creates.size() == 1);  // never recreated silently
+}
+
+TEST(kept_key_goes_with_delete_and_after_a_failed_signature) {
+  dkt::FakeKeyProvider fake(dkt::PlatformMode::kMissing);
+  Fixture f(fake);
+  KeyInfo first;
+  REQUIRE(f.store.Ensure(kScopeA, KeyPurpose::kDpop, &first).ok());
+  dk::Bytes data = dkt::ToBytes("payload");
+  dk::Bytes signature;
+  REQUIRE(f.store.Sign(kScopeA, KeyPurpose::kDpop, data, &signature).ok());
+
+  // A kept handle that fails once is replaced by a fresh one, and the signature succeeds.
+  fake.key_opens = 0;
+  fake.sign_failure_once = NTE_INVALID_HANDLE;
+  REQUIRE(f.store.Sign(kScopeA, KeyPurpose::kDpop, data, &signature).ok());
+  CHECK(dkt::Verifies(first, data, signature));
+  CHECK(fake.key_opens == 1);
+
+  // Delete drops the kept key: no signature with the deleted key, and a new registration signs
+  // with its new key.
+  REQUIRE(f.store.Delete(kScopeA).ok());
+  CHECK(f.store.Sign(kScopeA, KeyPurpose::kDpop, data, &signature).code ==
+        ErrorCode::kNotAvailable);
+  KeyInfo second;
+  REQUIRE(f.store.Ensure(kScopeA, KeyPurpose::kDpop, &second).ok());
+  CHECK(!SameKey(first, second));
+  REQUIRE(f.store.Sign(kScopeA, KeyPurpose::kDpop, data, &signature).ok());
+  CHECK(dkt::Verifies(second, data, signature));
+  CHECK(!dkt::Verifies(first, data, signature));
 }
 
 TEST(delete_removes_both_keys) {

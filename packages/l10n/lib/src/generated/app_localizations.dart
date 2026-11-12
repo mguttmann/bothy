@@ -2845,6 +2845,12 @@ abstract class AppLocalizations {
   /// **'Your session has expired.'**
   String get onboardingReasonSessionExpired;
 
+  /// E7 reason when a device key of the registration is gone, was replaced or was invalidated by the system (08 section 5.4): the app registers as a new device at the next login and the person revokes the old entry.
+  ///
+  /// In en, this message translates to:
+  /// **'The key of this device can no longer be used, for example because its screen lock or biometrics changed. Log in again to register this device anew, then remove its old entry under Devices.'**
+  String get onboardingReasonDeviceKeyLost;
+
   /// Sentence of E7 after the wipe (04 section 8.5, R-SY-14).
   ///
   /// In en, this message translates to:

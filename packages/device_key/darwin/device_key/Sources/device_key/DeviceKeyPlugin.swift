@@ -40,21 +40,31 @@ public final class DeviceKeyPlugin: NSObject, FlutterPlugin {
 }
 
 /// The host side of the Pigeon interface; every error leaves as a `PigeonError` with a stable code.
+///
+/// No call works on the platform thread: each runs on the queue `DeviceKeyQueues` gives its kind,
+/// so a step-up signature that waits for the person holds neither the DPoP signatures nor the
+/// calls that read or create keys.
 final class DeviceKeyHostApiImpl: DeviceKeyHostApi {
-    private let manager: DeviceKeyManager
-    /// Signatures wait for the user's confirmation, so they run off the platform thread.
-    private let queue = DispatchQueue(label: "device_key.sign")
+    private let queues: DeviceKeyQueues
 
     init(manager: DeviceKeyManager) {
-        self.manager = manager
+        queues = DeviceKeyQueues(manager: manager)
     }
 
-    func ensureKey(scope: String, purpose: KeyPurposeMessage) throws -> DeviceKeyInfoMessage {
-        try Self.bridged { Self.message(try manager.ensureKey(scope: scope, purpose: purpose.core)) }
+    func ensureKey(scope: String, purpose: KeyPurposeMessage) async throws -> DeviceKeyInfoMessage {
+        do {
+            return Self.message(try await queues.ensureKey(scope: scope, purpose: purpose.core))
+        } catch {
+            throw Self.bridged(error)
+        }
     }
 
-    func keyInfo(scope: String, purpose: KeyPurposeMessage) throws -> DeviceKeyInfoMessage? {
-        try Self.bridged { try manager.keyInfo(scope: scope, purpose: purpose.core).map(Self.message) }
+    func keyInfo(scope: String, purpose: KeyPurposeMessage) async throws -> DeviceKeyInfoMessage? {
+        do {
+            return try await queues.keyInfo(scope: scope, purpose: purpose.core).map(Self.message)
+        } catch {
+            throw Self.bridged(error)
+        }
     }
 
     /// Signs `data`; `prompt` is ignored here, because iOS and macOS show the system's own text
@@ -62,32 +72,31 @@ final class DeviceKeyHostApiImpl: DeviceKeyHostApi {
     func sign(
         scope: String, purpose: KeyPurposeMessage, data: FlutterStandardTypedData, prompt: PromptTextsMessage?
     ) async throws -> FlutterStandardTypedData {
-        let box = ManagerBox(manager: manager)
-        let bytes = data.data
-        let core = purpose.core
-        return try await withCheckedThrowingContinuation { continuation in
-            queue.async {
-                do {
-                    let signature = try Self.bridged { try box.manager.sign(scope: scope, purpose: core, data: bytes) }
-                    continuation.resume(returning: FlutterStandardTypedData(bytes: signature))
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
+        do {
+            let signature = try await queues.sign(scope: scope, purpose: purpose.core, data: data.data)
+            return FlutterStandardTypedData(bytes: signature)
+        } catch {
+            throw Self.bridged(error)
         }
     }
 
-    func attestation(scope: String, purpose: KeyPurposeMessage, challenge: FlutterStandardTypedData) throws
+    func attestation(scope: String, purpose: KeyPurposeMessage, challenge: FlutterStandardTypedData) async throws
         -> FlutterStandardTypedData?
     {
-        try Self.bridged {
-            try manager.attestation(scope: scope, purpose: purpose.core, challenge: challenge.data)
+        do {
+            return try await queues.attestation(scope: scope, purpose: purpose.core, challenge: challenge.data)
                 .map { FlutterStandardTypedData(bytes: $0) }
+        } catch {
+            throw Self.bridged(error)
         }
     }
 
-    func deleteKeys(scope: String) throws {
-        try Self.bridged { try manager.deleteKeys(scope: scope) }
+    func deleteKeys(scope: String) async throws {
+        do {
+            try await queues.deleteKeys(scope: scope)
+        } catch {
+            throw Self.bridged(error)
+        }
     }
 
     private static func message(_ info: DeviceKeyInfo) -> DeviceKeyInfoMessage {
@@ -98,21 +107,11 @@ final class DeviceKeyHostApiImpl: DeviceKeyHostApi {
             requiresUserPresence: info.requiresUserPresence)
     }
 
-    /// Runs `body` and turns its error into a `PigeonError` with the fixed code and text only.
-    private static func bridged<T>(_ body: () throws -> T) throws -> T {
-        do {
-            return try body()
-        } catch {
-            let mapped = DeviceKeyError.classify(error)
-            throw PigeonError(code: mapped.code, message: mapped.message, details: nil)
-        }
+    /// The `PigeonError` of `error`, with the fixed code and text only.
+    private static func bridged(_ error: Error) -> PigeonError {
+        let mapped = DeviceKeyError.classify(error)
+        return PigeonError(code: mapped.code, message: mapped.message, details: nil)
     }
-}
-
-/// Carries the manager onto the signing queue. The manager's fields never change and the
-/// keychain calls behind it are thread-safe, so handing it to another thread is sound.
-private struct ManagerBox: @unchecked Sendable {
-    let manager: DeviceKeyManager
 }
 
 extension KeyPurposeMessage {

@@ -77,6 +77,27 @@ inline SECURITY_STATUS OpenRealKey(ProviderKind kind, const std::wstring& name,
   return cng.OpenKey(provider.get(), name.c_str(), key);
 }
 
+/// Creates the software key [name] with a policy that allows its export, as a process other than
+/// the plugin can do under the plugin's key name; [public_blob] receives its public key
+/// (`BCRYPT_ECCPUBLIC_BLOB`). Returns whether every step succeeded.
+inline bool CreateExportableKey(const std::wstring& name, Bytes* public_blob) {
+  CngKeyProvider cng;
+  NcryptHandle provider;
+  if (cng.OpenProvider(ProviderKind::kSoftware, &provider) != ERROR_SUCCESS) return false;
+  NcryptHandle key;
+  if (cng.CreatePersistedKey(provider.get(), BCRYPT_ECDSA_P256_ALGORITHM, name.c_str(), &key) !=
+      ERROR_SUCCESS) {
+    return false;
+  }
+  if (cng.SetDwordProperty(key.get(), NCRYPT_EXPORT_POLICY_PROPERTY,
+                           NCRYPT_ALLOW_EXPORT_FLAG | NCRYPT_ALLOW_PLAINTEXT_EXPORT_FLAG) !=
+      ERROR_SUCCESS) {
+    return false;
+  }
+  if (cng.FinalizeKey(key.get()) != ERROR_SUCCESS) return false;
+  return cng.ExportKey(key.get(), BCRYPT_ECCPUBLIC_BLOB, public_blob) == ERROR_SUCCESS;
+}
+
 /// Whether the real Platform Crypto Provider opens and supports ECDSA P-256 on this host.
 inline bool PlatformAvailable() {
   CngKeyProvider cng;

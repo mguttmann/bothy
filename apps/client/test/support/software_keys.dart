@@ -78,6 +78,12 @@ class SoftwareKeyStore implements DeviceKeyStore {
   }();
 
   @override
+  Future<DeviceKeySigner?> existing(
+    String scope, {
+    required bool stepUp,
+  }) async => stepUp ? _keys[scope]?.stepUp : _keys[scope]?.dpop;
+
+  @override
   Future<void> delete(String scope) async {
     deletes++;
     _keys.remove(scope);

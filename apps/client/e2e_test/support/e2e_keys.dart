@@ -7,7 +7,7 @@
 
 import 'dart:math';
 
-import 'package:auth/auth.dart' show DeviceKeys;
+import 'package:auth/auth.dart' show DeviceKeySigner, DeviceKeys;
 import 'package:client/platform/device_key_signer.dart';
 
 import '../../test/support/software_keys.dart';
@@ -34,6 +34,12 @@ final class E2eKeyStore implements DeviceKeyStore {
   @override
   Future<DeviceKeys> ensure(String scope) async =>
       _keys[scope] ??= keysFor('$_nonce/$scope/${_generation++}');
+
+  @override
+  Future<DeviceKeySigner?> existing(
+    String scope, {
+    required bool stepUp,
+  }) async => stepUp ? _keys[scope]?.stepUp : _keys[scope]?.dpop;
 
   @override
   Future<void> delete(String scope) async => _keys.remove(scope);
