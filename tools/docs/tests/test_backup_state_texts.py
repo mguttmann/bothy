@@ -59,7 +59,8 @@ _PATH = re.compile(r"^ {2}(?P<path>/[^\s:]*):\s*$")
 # What marks a block as one about the state of the backups.
 _BACKUP = re.compile(r"backup_runs|bothy-backupd|off-site target|restore test", re.IGNORECASE)
 _CONSOLE = re.compile(r"\bconsole\b", re.IGNORECASE)
-_NEGATION = re.compile(r"\b(?:no|not|neither|nor|never|without)\b", re.IGNORECASE)
+# "without" is no negation: "the console warns without an off-site target" is a claim.
+_NEGATION = re.compile(r"\b(?:no|not|neither|nor|never)\b", re.IGNORECASE)
 _BLOCK_START = re.compile(r"\s*(?:\||#|\d+\.\s|[-*]\s)")
 _SENTENCE_END = re.compile(r"(?<=[.;?!])\s+|\s\|\s")
 _PSQL = re.compile(
@@ -187,6 +188,7 @@ def test_blocks_are_paragraphs_items_and_rows() -> None:
         "| `backup.offsite.target` | off-site target; empty: local only (warning in console) |",
         "| First backup | `bothy-backupd backup pg_full` | run `succeeded` in the admin console |",
         "### bothybackupstale\n`backup_runs` in the admin console; off-site target reachable?\n",
+        "The admin console warns without an off-site target.\n",
     ],
 )
 def test_a_console_claim_is_found(text: str) -> None:
@@ -213,14 +215,14 @@ def test_a_wrapped_sentence_is_found() -> None:
 
 def test_psql_calls_and_columns_are_read() -> None:
     text = (
-        "Run `docker compose exec -T postgres psql -U postgres -d bothy -Atc\n"
+        "Run `docker compose exec -T postgres psql -U postgres -d app -Atc\n"
         '"SELECT state, error FROM backup_runs ORDER BY started_at DESC LIMIT 1"`.\n'
     )
     assert psql_calls(text) == [
         {
             "service": "postgres",
             "user": "postgres",
-            "database": "bothy",
+            "database": "app",
             "sql": "SELECT state, error FROM backup_runs ORDER BY started_at DESC LIMIT 1",
         }
     ]

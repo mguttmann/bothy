@@ -10,8 +10,8 @@
 - A status line of a document opens with a word of a fixed list (`normative`, `built`,
   `planned`, and `design` or `template` for these two kinds of page), defined in `docs/SPEC.md`
   section 8.1; a test holds every status line to the list and to the roadmap. The chapters and
-  guides no longer say "draft M0", and the READMEs of `services/server`, `apps`, `packages` and
-  `infra` describe what exists.
+  guides no longer say "draft M0", and the READMEs of `services`, `services/server`, `apps`,
+  `packages` and `infra` describe what exists.
 - The feature list of the specification has the place `API` for a function the server offers
   and no app yet: changing the tags of a post, managing the tags of a forum, the default
   operator of a space, the behavior of a channel, templates of a channel, and changing or

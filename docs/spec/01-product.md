@@ -60,10 +60,11 @@ wanted, but after the core milestones, **never** = deliberately excluded, with a
 "Where": D = desktop (macOS, Windows), M = mobile (iOS, Android), W = web console, API = the
 public API alone: the server has the function and no app offers it yet. A row of an app names
 only what that app can do, and a row of the place API names its operations; a test holds both
-against the sources of the apps (`tools/docs/tests/test_feature_list_callers.py`), and the
-ticket that builds a view moves its row to the app ([PLAN](../PLAN.md) V3-18). Where a feature
-of the addendum of 2026-10-10 is built in several milestones, the remark names the build
-milestones from the [plan](../PLAN.md).
+against the sources of all apps together, not per app
+(`tools/docs/tests/test_feature_list_callers.py`), and the ticket that builds a view moves its
+row to the app ([PLAN](../PLAN.md) V3-18). Where a feature of the addendum of 2026-10-10 is
+built in several milestones, the remark names the build milestones from the
+[plan](../PLAN.md).
 
 ### 3.1 Structure and conversations
 
@@ -2362,7 +2363,8 @@ Goal: WCAG 2.2 level AA (https://www.w3.org/TR/WCAG22/, retrieved 2026-10-10 [ve
 and console, checked by tests, not by intention. The table below maps the goal to rules by
 topic. What holds each success criterion of the levels A and AA today, and what is open, is
 listed per criterion in [wcag-criteria.md](../quality/wcag-criteria.md). The goal is reached
-when every row there is `tested` or `not applicable`; until then the page is the work list.
+when every row there is `tested` or `not applicable` and no row of the state `tested` names a
+part its tests do not reach; until then the page is the work list.
 
 | Topic | Rule | Check |
 |---|---|---|
