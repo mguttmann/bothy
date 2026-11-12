@@ -53,7 +53,15 @@ Exactly one of `direct` and `tailscale`.
 
 The profile `scan` belongs to the default `file.scan.mode = required`: without it, completed
 uploads stay pending until clamd answers ([12-files.md](../../docs/spec/12-files.md) 5.3, fail
-closed). An installation without a virus scanner sets `file.scan.mode` to `off`.
+closed). An installation without a virus scanner sets `file.scan.mode` to `off` with
+`BOTHY_SCAN_MODE=off` in `.env`; uploads are then delivered unscanned. The two lines go
+together: `scan` in `COMPOSE_PROFILES` with `BOTHY_SCAN_MODE=required`, or neither. `install.sh`
+writes both from its answer for the virus scan.
+
+Push is off until its variables in `.env` are set (`BOTHY_PUSH_APNS_TEAM_ID`,
+`BOTHY_PUSH_APNS_KEY_ID` and `BOTHY_PUSH_APNS_TOPICS` for APNs, `BOTHY_PUSH_FCM_PROJECT_ID` for
+FCM) and the key files lie in `secrets/`
+([install-compose.md](../../docs/operations/install-compose.md), section 9).
 
 ## Several api nodes
 

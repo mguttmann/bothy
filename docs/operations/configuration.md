@@ -1179,7 +1179,12 @@ These variables are not server configuration; Compose derives values of the serv
 | `BOTHY_S3_ENDPOINT` | `http://seaweedfs:8333` | sets `file.s3.endpoint` with driver s3 |
 | `BOTHY_S3_BUCKET` | `bothy-files` | sets `file.s3.bucket` with driver s3 |
 | `BOTHY_EGRESS_ALLOWED_HOSTS` | `seaweedfs:8333;allow_private` | sets `egress.allowed_hosts`; an `http` endpoint of `BOTHY_S3_ENDPOINT` needs its entry with `allow_private` (cross-check `file_s3`), so a changed endpoint changes this value too |
+| `BOTHY_SCAN_MODE` | `required` | sets `file.scan.mode` (chapter 12): `required` needs the profile `scan` in `COMPOSE_PROFILES`, without clamd every completed upload stays pending; `off` for an installation without that profile, uploads are then delivered unscanned; `install.sh` writes it together with the profile ([install-compose.md](install-compose.md) 1.1) |
 | `BOTHY_CLAMD_ADDRESS` | `unix:///run/clamav/clamd.sock` | sets `file.scan.clamd_address` (chapter 12); the socket lies in the volume `clamav-socket` |
+| `BOTHY_PUSH_APNS_TEAM_ID` | empty | sets `push.apns.team_id` (chapter 13); APNs is on when this, `BOTHY_PUSH_APNS_KEY_ID` and `BOTHY_PUSH_APNS_TOPICS` are all set, and the start fails when only some are ([install-compose.md](install-compose.md) 9) |
+| `BOTHY_PUSH_APNS_KEY_ID` | empty | sets `push.apns.key_id`: the key ID of the supplied file `secrets/apns_key.p8`, which `compose.yaml` names as `push.apns.private_key_ref` |
+| `BOTHY_PUSH_APNS_TOPICS` | empty | sets `push.apns.topics`: the bundle IDs of the apps, comma-separated |
+| `BOTHY_PUSH_FCM_PROJECT_ID` | empty | sets `push.fcm.project_id` (chapter 13); FCM is on when it is set and reads the supplied file `secrets/fcm_service_account.json` ([install-compose.md](install-compose.md) 9) |
 | `BOTHY_PG_SHM_SIZE` | `256m` | shared memory of the database container |
 | `BOTHY_PG_ARCHIVE_TIMEOUT` | `60s` | sets `archive_timeout` in PostgreSQL; equal to `backup.pg.archive_timeout` |
 | `BOTHY_BACKUP_OFFSITE_TARGET` | empty | sets `backup.offsite.target` (`s3:https://<host>[:<port>]/<bucket>[/<prefix>]`) and `BOTHY_PGBACKREST_REPO2` of `postgres` |

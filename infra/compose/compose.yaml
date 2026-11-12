@@ -54,8 +54,21 @@ x-server-env: &server-env
   # An http S3 endpoint (the SeaweedFS of the profile s3 on the internal network) needs an egress
   # entry with allow_private, or the start fails the cross-check file_s3 (12 "S3 driver", M7-14).
   BOTHY_EGRESS__ALLOWED_HOSTS: ${BOTHY_EGRESS_ALLOWED_HOSTS:-seaweedfs:8333;allow_private}
+  # required needs the profile scan: without clamd every completed upload stays pending (12 5.3,
+  # fail closed). An installation without that profile sets BOTHY_SCAN_MODE=off in .env, which
+  # install.sh does when the virus scan is off.
+  BOTHY_FILE__SCAN__MODE: ${BOTHY_SCAN_MODE:-required}
   # clamd only over its Unix socket in the volume clamav-socket (19 SEC-TLS-5, M3-04).
   BOTHY_FILE__SCAN__CLAMD_ADDRESS: ${BOTHY_CLAMD_ADDRESS:-unix:///run/clamav/clamd.sock}
+  # Push (13 section 11, docs/operations/install-compose.md section 9): APNs is on when team ID,
+  # key ID and topics are all set, FCM when the project is set; empty leaves a provider off. The
+  # keys are the supplied files apns_key.p8 and fcm_service_account.json of ./secrets; the FCM
+  # reference is the default of the server, the APNs reference has none.
+  BOTHY_PUSH__APNS__TEAM_ID: ${BOTHY_PUSH_APNS_TEAM_ID:-}
+  BOTHY_PUSH__APNS__KEY_ID: ${BOTHY_PUSH_APNS_KEY_ID:-}
+  BOTHY_PUSH__APNS__TOPICS: ${BOTHY_PUSH_APNS_TOPICS:-}
+  BOTHY_PUSH__APNS__PRIVATE_KEY_REF: file:/run/bothy/secrets/apns_key.p8
+  BOTHY_PUSH__FCM__PROJECT_ID: ${BOTHY_PUSH_FCM_PROJECT_ID:-}
   OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
   OTEL_EXPORTER_OTLP_PROTOCOL: grpc
   OTEL_METRIC_EXPORT_INTERVAL: ${BOTHY_OTEL_METRIC_EXPORT_INTERVAL_MS:-15000}

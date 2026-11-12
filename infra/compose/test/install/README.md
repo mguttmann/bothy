@@ -46,6 +46,11 @@ one.
 
 Every stub appends its arguments to the log of the test, which a failed test prints.
 
+The stubs have one more user: `TestInstallWithoutVirusScan` of `services/server/test/scan` runs
+`install.sh` with them, renders the real `compose.yaml` with the `.env` it wrote through the real
+Docker CLI and follows the answer for the virus scan to an upload on a real server. A call the
+script makes must stay answered by the stubs for that test too.
+
 ## What the tests cover
 
 | Area | Tests |
@@ -55,7 +60,7 @@ Every stub appends its arguments to the log of the test, which a failed test pri
 | Preflight | docker missing, Engine 25, Compose 2.25 (with `v` and suffix): abort with `install.sh: preflight:` and nothing written; a foreign non-empty target folder is refused |
 | Bundle | download address exactly `<base address>bothy-compose-<version>.tar.gz`; wrong checksum on the download and with `--bundle`; `--bundle` without download; cosign called with the identity of the release workflow, a failing signature aborts, without cosign or with a key-signed signature of the private phase the command is named; a member outside the top directory is refused; the unrendered source aborts in step `bundle` |
 | Prompts | without a terminal a missing `--public-url`, `--owner-handle`, `--owner-name` or `TS_AUTHKEY` aborts naming it; with a terminal (pseudo terminal of `script`) the answers reach `.env` |
-| Write | `.env` mode `0600`, `secrets/` mode `0700`, no line but the answers changed (no secret except `TS_AUTHKEY`), `BOTHY_VERSION` and `BOTHY_REGISTRY` from the bundle, `--storage s3`, scan default by memory and the memory note |
+| Write | `.env` mode `0600`, `secrets/` mode `0700`, no line but the answers changed (no secret except `TS_AUTHKEY`), `BOTHY_VERSION` and `BOTHY_REGISTRY` from the bundle, `--storage s3`, scan default by memory and the memory note, the virus scan off sets `BOTHY_SCAN_MODE=off` with the note that uploads are delivered unscanned and on keeps `required` |
 | Start | order of the Compose calls in the compose folder without a project option; `BOTHY_TRUSTED_PROXIES` from the gateway of the network named by `docker compose config --format json` (IPv4, IPv4 and IPv6, none); discovery not `200` aborts naming `BOTHY_TRUSTED_PROXIES`; readiness bounded by `--ready-timeout` |
 | Owner and finish | the enrollment code is shown once on the output and is in no file of the target folder; an existing owner is skipped; next steps and the warning `local backup only`; edge tailscale clears `TS_AUTHKEY` after the login or warns |
 | Second run | `.env` and `secrets/` unchanged (content and mode), an operator value of `BOTHY_TRUSTED_PROXIES` stays, the default value is replaced by the gateway |

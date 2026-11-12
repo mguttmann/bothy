@@ -81,6 +81,7 @@ answer=
 IW_KEY=
 IW_VALUE=
 IW_PROFILES=
+IW_SCAN_MODE=
 IW_URL=
 IW_DRIVER=
 IW_OFFSITE=
@@ -103,7 +104,8 @@ Options (--opt value or --opt=value):
   --yes                       take the default of every value that has one, without a prompt
   --public-url <url>          public address of the server (BOTHY_PUBLIC_URL), https://...
   --edge direct|tailscale     edge of the server (default direct)
-  --scan on|off               virus scan (default on with at least 4 GiB of Docker memory)
+  --scan on|off               virus scan (default on with at least 4 GiB of Docker memory);
+                              off delivers uploads unscanned (BOTHY_SCAN_MODE=off)
   --storage fs|s3             file storage (default fs)
   --observability on|off      local observability stack (default off)
   --offsite <target>          off-site backup target (BOTHY_BACKUP_OFFSITE_TARGET, default empty)
@@ -720,7 +722,7 @@ step_prompts() {
 		else
 			sp_scan_default=off
 		fi
-		choose "$opt_scan" "Virus scan (needs at least 3 GiB, better 4 GiB of Docker memory): on or off" \
+		choose "$opt_scan" "Virus scan (needs at least 3 GiB, better 4 GiB of Docker memory; off delivers uploads unscanned): on or off" \
 			"$sp_scan_default" valid_on_off "Answer on or off."
 		scan=$answer
 		if [ "$scan" = on ] && [ "$docker_mem" -lt 3221225472 ]; then
@@ -768,7 +770,7 @@ env_get() {
 write_env_file() {
 	env_tmp=$compose_dir/.env.install-tmp
 	rm -f -- "$env_tmp"
-	if ! (umask 077 && export IW_KEY IW_VALUE IW_PROFILES IW_URL IW_DRIVER IW_OFFSITE IW_TSKEY IW_SET_TSKEY &&
+	if ! (umask 077 && export IW_KEY IW_VALUE IW_PROFILES IW_SCAN_MODE IW_URL IW_DRIVER IW_OFFSITE IW_TSKEY IW_SET_TSKEY &&
 		awk "$2" "$1" >"$env_tmp"); then
 		return 1
 	fi
@@ -793,6 +795,9 @@ env_set() {
 # step_write writes .env from the .env.example of the bundle and creates secrets/ (16 section
 # 3.1, step 4); only the answers change, BOTHY_VERSION and BOTHY_REGISTRY stay those of the
 # bundle. No secret except TS_AUTHKEY goes into .env. A second run leaves both as they are.
+# The virus scan is two lines that go together: the profile scan starts clamd, and
+# BOTHY_SCAN_MODE (file.scan.mode) says whether the server waits for it. With the scan off the
+# mode is off, because required without clamd leaves every upload pending (12-files.md 5.3).
 # Arguments: none. Exit code: 1 (die write).
 step_write() {
 	if [ "$first_run" = 0 ]; then
@@ -800,8 +805,10 @@ step_write() {
 	fi
 	[ -f "$compose_dir/.env.example" ] || die write "the bundle has no infra/compose/.env.example"
 	sw_profiles=$edge
+	sw_scan_mode=off
 	if [ "$scan" = on ]; then
 		sw_profiles=$sw_profiles,scan
+		sw_scan_mode=required
 	fi
 	if [ "$storage" = s3 ]; then
 		sw_profiles=$sw_profiles,s3
@@ -814,6 +821,7 @@ step_write() {
 		sw_set_key=1
 	fi
 	IW_PROFILES=$sw_profiles
+	IW_SCAN_MODE=$sw_scan_mode
 	IW_URL=$opt_public_url
 	IW_DRIVER=$storage
 	IW_OFFSITE=$offsite
@@ -823,6 +831,7 @@ step_write() {
 	write_env_file "$compose_dir/.env.example" '
 		BEGIN {
 			want["COMPOSE_PROFILES"] = ENVIRON["IW_PROFILES"]
+			want["BOTHY_SCAN_MODE"] = ENVIRON["IW_SCAN_MODE"]
 			want["BOTHY_PUBLIC_URL"] = ENVIRON["IW_URL"]
 			want["BOTHY_STORAGE_DRIVER"] = ENVIRON["IW_DRIVER"]
 			want["BOTHY_BACKUP_OFFSITE_TARGET"] = ENVIRON["IW_OFFSITE"]
@@ -846,6 +855,9 @@ step_write() {
 	fi
 	chmod 700 "$compose_dir/secrets" || die write "cannot set the mode of $compose_dir/secrets"
 	say "wrote $env_file and $compose_dir/secrets/"
+	if [ "$scan" = off ]; then
+		say "note: the virus scan is off (BOTHY_SCAN_MODE=off in $env_file): uploads are delivered unscanned; to switch it on later see docs/operations/install-compose.md, section 1.1"
+	fi
 }
 
 # ---- step 5: start --------------------------------------------------------------------------

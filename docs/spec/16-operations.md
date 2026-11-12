@@ -173,7 +173,11 @@ Steps:
    the defaults; if a required value (public address, handle and display name of the owner) is
    missing without a terminal, it aborts instead of guessing.
 4. **Write.** `.env` from `.env.example` of the bundle with the answers, mode `0600`;
-   `secrets/` with mode `0700`. It takes `BOTHY_VERSION` and `BOTHY_REGISTRY` unchanged
+   `secrets/` with mode `0700`. The answer for the virus scan writes two lines that go together:
+   on is the profile `scan` with `BOTHY_SCAN_MODE=required`; off is no profile with
+   `BOTHY_SCAN_MODE=off` (`file.scan.mode`), because `required` without clamd leaves every
+   completed upload pending ([12-files.md](12-files.md), section 5.3), and the script then says
+   that uploads are delivered unscanned. It takes `BOTHY_VERSION` and `BOTHY_REGISTRY` unchanged
    from the bundle. `BOTHY_VERSION` is the server version, not the script's own version: product and
    server have separate versions ([18-release.md](18-release.md), section 1). The product release
    writes both values into the bundle; no bundle with a placeholder is produced there

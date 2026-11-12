@@ -46,6 +46,17 @@ curl -fsSL https://github.com/OWNER/bothy/releases/download/v0.0.0/install.sh \
       --owner-handle alex --owner-name Alex
 ```
 
+The virus scan is two settings that go together: the profile `scan` in `COMPOSE_PROFILES` starts
+ClamAV, and `BOTHY_SCAN_MODE` (`file.scan.mode`) says whether the server waits for it. Its default
+is on only with at least 4 GiB of Docker memory (the memory ClamAV needs: section 1). With the
+scan off (the default below that, or `--scan off`) the wizard leaves the profile out and writes
+`BOTHY_SCAN_MODE=off`: uploads are delivered unscanned, with `scan_status` `skipped`, and the
+worker logs `virus scan is off (file.scan.mode = off)`
+([12-files.md](../spec/12-files.md), section 5.3). The wizard says so when it writes `.env`. To
+switch the scan on later, add `scan` to `COMPOSE_PROFILES`, set `BOTHY_SCAN_MODE=required` in
+`.env` and run `docker compose up -d`; files uploaded before stay `skipped`. Never leave
+`required` without the profile: no ClamAV answers then, and every completed upload stays pending.
+
 `TS_AUTHKEY` for the edge `tailscale` comes from a hidden prompt or, without a terminal, from the
 environment, never from an option. The target folder is `--dir` (default `./bothy`); the stack
 then runs in `bothy/infra/compose` (`cd bothy/infra/compose && docker compose ps`). The wizard
@@ -58,7 +69,7 @@ Whoever wants to check the script before running it downloads it with `SHA256SUM
 signature and checks both like any release artifact ([release.md](release.md), section 5); then
 `sh install.sh`. The wizard does not create supplied secrets (push keys, access to the off-site
 target, alert URLs). They go into `secrets/` as in the manual path (section 2, item 3); then
-`docker compose up -d` in the target folder.
+`docker compose up -d` in the target folder. Push also needs its values in `.env` (section 9).
 
 ### 1.2 From source (until the first release)
 
@@ -104,11 +115,13 @@ so the rollback of [upgrade.md](upgrade.md), section 3, is the previous value of
 1. Get the repository state of the desired version (tag `server/vX.Y.Z`) and change into
    `infra/compose/`.
 2. Copy `.env.example` to `.env` and set: `BOTHY_REGISTRY`, `BOTHY_VERSION`,
-   `BOTHY_PUBLIC_URL`, `COMPOSE_PROFILES`, `BOTHY_BACKUP_OFFSITE_TARGET`.
+   `BOTHY_PUBLIC_URL`, `COMPOSE_PROFILES`, `BOTHY_BACKUP_OFFSITE_TARGET`. Without the profile
+   `scan` in `COMPOSE_PROFILES` also set `BOTHY_SCAN_MODE=off`, otherwise every completed upload
+   stays pending (section 1.1).
 3. Create the directory `secrets/` (`chmod 700`) and place the supplied secrets there
    ([configuration.md](configuration.md) 5): at least `offsite/`, for push `apns_key.p8` and
-   `fcm_service_account.json`, for alerts the three webhook URLs, for telemetry the keys
-   of the chosen overlay.
+   `fcm_service_account.json` (with their values in `.env`, section 9), for alerts the three
+   webhook URLs, for telemetry the keys of the chosen overlay.
 4. Check: `docker compose config --quiet`.
 5. Profile `direct` only: `docker compose up --no-start` (creates networks and containers, starts
    nothing), read the gateway according to section 5.1 and set
@@ -234,7 +247,9 @@ dashboard `bothy-live` ("Bothy / Live"); nothing else is to switch on
 
 1. The plugin build comes with the bundle in
    `infra/observability/grafana/plugins/bothy-live-panel/`; Compose mounts it read-only into
-   Grafana. An upgrade of the product brings the plugin version of that release.
+   Grafana. The plugin version is the one of the installed bundle: the upgrade procedure of today
+   replaces the images and leaves the files of the bundle, this folder among them
+   ([upgrade.md](upgrade.md), section 2).
 2. The plugin is unsigned until V1 (ruling T11). Grafana loads it only because
    `GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS` in `compose.yaml` names exactly its ID. Do not
    widen this setting (no `*`, no further IDs, no override file): `make ops-check` rejects it
@@ -267,3 +282,52 @@ because afterwards the database, files and local backups are gone.
 An installation that takes over an existing Discord server with agent bots follows
 [discord-migration.md](discord-migration.md): dry run, pilot, parallel operation and switch-over
 channel by channel.
+
+## 9. Push
+
+Push is off after an installation. An instance can push only to apps whose keys it has
+([13-push-notifications.md](../spec/13-push-notifications.md), section 11): the APNs key of the
+Apple team that owns the bundle IDs of the apps, and the service account of the Firebase project
+of the Android app. While a provider is off, the server answers the push registration of such an
+app with `403 feature_disabled` and the reason `push_provider_disabled`, and a phone gets no
+notification while its app is closed.
+
+1. Put the key files into `secrets/` ([configuration.md](configuration.md) 5): `apns_key.p8` for
+   APNs (iOS and macOS), `fcm_service_account.json` for FCM (Android).
+2. Set the values in `.env`:
+
+    | Variable | Value |
+    |---|---|
+    | `BOTHY_PUSH_APNS_TEAM_ID` | the Apple team ID |
+    | `BOTHY_PUSH_APNS_KEY_ID` | the key ID of `apns_key.p8` |
+    | `BOTHY_PUSH_APNS_TOPICS` | the bundle IDs of the apps, comma-separated |
+    | `BOTHY_PUSH_FCM_PROJECT_ID` | the Firebase project ID |
+
+    The three APNs values go together: with only one or two of them set, the server does not
+    start. One provider without the other is fine.
+
+3. Apply:
+
+    ```
+    docker compose run --rm secrets-init
+    docker compose up -d
+    ```
+
+    `secrets-init` copies the key files into the volume `secrets`; `up -d` recreates the server
+    services with the new values. `worker` reads both keys at its start and does not start with
+    a key it cannot read.
+
+4. Check (in the profile `tailscale` the service is `api-tailscale`):
+
+    ```
+    docker compose exec api bothy config check --secrets
+    ```
+
+    It ends with `configuration ok` and exit 0, and it prints
+    `secret push.apns.private_key_ref: ok` and `secret push.fcm.service_account_ref: ok` for the
+    providers that are on. A provider that is off shows `skipped` there, with
+    `read only with APNs enabled` or `read only with push.fcm.project_id set`.
+
+No egress entry is needed: the server reaches `api.push.apple.com`, `api.sandbox.push.apple.com`,
+`fcm.googleapis.com` and `oauth2.googleapis.com` without one, so the host only needs the way out
+(section 1, row "Network").
