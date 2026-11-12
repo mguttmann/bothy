@@ -1059,8 +1059,9 @@ of the chosen forum), pages with the opaque cursor, restarts on `cursor_invalid`
 renders only the server's `segments`, never HTML. A hit opens `/t/<thread>?m=<message>`; a file
 hit opens the message it is attached to (`SearchHit.thread_id` and `message_id`). The request
 goes out once, without the read retry of the session: a timeout of the server
-(`503 search_timeout`) shows the hint to narrow the search, `429` the wait, both above the
-local hits, and a newer search or closing the view cancels the request that is on its way
+(`503 unavailable` with the reason `search_timeout`) shows the hint to narrow the search,
+`429 rate_limited` the wait, both above the local hits, and a newer search or closing the view
+cancels the request that is on its way
 (docs/decisions.d/AUD-client-search-01.md). While the server answer is pending the view says
 "Searching"; meanwhile, and while the app is offline, the local FTS5 index of `local_store`
 answers with the note "Messages stored only on this device"; the server's hits replace them.
