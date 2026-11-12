@@ -75,4 +75,8 @@ type Store interface {
 	// ItemOfTarget returns the oldest item of source whose target is kind/id, in any state; found
 	// is false for none (M8-11).
 	ItemOfTarget(ctx context.Context, source ids.ID, kind string, id ids.ID) (row ItemRow, found bool, err error)
+	// ItemsOfTarget returns every item of source whose target is kind/id, oldest first, in any
+	// state: the channel items that put a channel under the ownership list of the source. A mapping
+	// can name one existing channel for several Discord channels, so there can be more than one.
+	ItemsOfTarget(ctx context.Context, source ids.ID, kind string, id ids.ID) ([]ItemRow, error)
 }

@@ -38,7 +38,11 @@ type ImportedThread struct {
 // ImportedThreadState is the stored state of an imported thread that the mirror rules compare
 // with the source (22 12.2 step 3).
 type ImportedThreadState struct {
+	// ChannelID is the channel the thread lies in now; MovedAt is the time of its last move into
+	// another channel (thread.move), zero for a thread that still lies where it was created. The
+	// importer decides the lead of a posted thread from them, never from its request (22 7.2).
 	ID, ChannelID ids.ID
+	MovedAt       time.Time
 	// Title and TitleSource (auto or manual) are the stored title.
 	Title, TitleSource string
 	// Closed reports state closed; ClosedAt is its time.

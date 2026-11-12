@@ -3,9 +3,11 @@
 package postgres_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -140,5 +142,74 @@ func TestRepository(t *testing.T) {
 	})
 	if c, err := r.ControlledChannel(ctx, channel); err != nil || c {
 		t.Errorf("a completed source controls nothing: %v %v", c, err)
+	}
+}
+
+// TestItemsOfTarget: every item of one source whose target is the object, ascending, and nothing of
+// another source, another target or another target kind. A mapping can put two Discord channels
+// onto one existing channel, so one channel can have two channel items (22 5.2, 12.1).
+func TestItemsOfTarget(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := pgtest.New(t)
+	pool := db.Pool(t, pg.RoleApp)
+	reg := txn.NewRegistry()
+	reg.Seal()
+	uow := pg.NewUnitOfWork(pool, pg.UnitConfig{StatementTimeout: 30 * time.Second, LockTimeout: 10 * time.Second, IdleInTxTimeout: time.Minute}, reg)
+	owner := ids.New()
+	if _, err := db.SuperConn(t).Exec(ctx, `INSERT INTO principals (id, kind, handle, display_name) VALUES ($1, 'user', 'robin', 'Robin')`, owner); err != nil {
+		t.Fatal(err)
+	}
+	r := postgres.NewRepository(pool)
+	at := time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
+	shared, other := ids.New(), ids.New()
+	var src, foreign ids.ID
+	post := func(ctx context.Context, source ids.ID, key, kind, targetKind string, target ids.ID) error {
+		row, _, err := r.InsertPendingItem(ctx, app.NewItem{ID: ids.New(), SourceID: source, OriginKey: key, ItemKind: kind, At: at})
+		if err != nil {
+			return err
+		}
+		_, err = r.FinishItem(ctx, row.ID, "posted", targetKind, target, at)
+		return err
+	}
+	if err := uow.Do(ctx, func(ctx context.Context) error {
+		for _, id := range []*ids.ID{&src, &foreign} {
+			s, err := r.InsertSource(ctx, importer.Source{ID: ids.New(), Kind: "discord", Name: "Old", Config: json.RawMessage(`{"version":1}`),
+				CreatedBy: owner, CreatedAt: at})
+			if err != nil {
+				return err
+			}
+			*id = s.ID
+		}
+		for _, it := range []struct {
+			source            ids.ID
+			key, kind, target string
+			id                ids.ID
+		}{
+			{src, "channel:1", "channel", "channel", shared},
+			{src, "channel:2", "channel", "channel", shared},
+			{src, "channel:3", "channel", "channel", other},
+			{src, "file:4", "file", "file", shared},
+			{foreign, "channel:1", "channel", "channel", shared},
+		} {
+			if err := post(ctx, it.source, it.key, it.kind, it.target, it.id); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := r.ItemsOfTarget(ctx, src, "channel", shared)
+	if err != nil || len(rows) != 2 {
+		t.Fatalf("items of the shared channel %+v %v, want 2", rows, err)
+	}
+	keys := []string{rows[0].OriginKey, rows[1].OriginKey}
+	slices.Sort(keys)
+	if !slices.Equal(keys, []string{"channel:1", "channel:2"}) || bytes.Compare(rows[0].ID[:], rows[1].ID[:]) >= 0 {
+		t.Errorf("items of the shared channel %+v, want channel:1 and channel:2 ascending by id", rows)
+	}
+	if rows, err := r.ItemsOfTarget(ctx, src, "channel", ids.New()); err != nil || len(rows) != 0 {
+		t.Errorf("items of a channel outside the source %+v %v", rows, err)
 	}
 }

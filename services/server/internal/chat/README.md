@@ -624,7 +624,9 @@ canary scenario `test/canary/scenario_project.go`.
   started no thread yet, the live tags of the forum and the instance search language, without
   `thread.created`. `MainThread` answers the main thread of a text channel (a forum is
   `validation_failed` with `no_main_thread`). `Lock` and `ApplyMirror` apply the mirror rules of 22
-  12.2 step 3 without a version change; `Reserve` hands out the numbers of imported messages under
+  12.2 step 3 without a version change; `Lock` also returns the channel the thread lies in and the
+  time of its last move (`moved_at`), from which the importer decides the lead of a posted thread
+  (22 7.2); `Reserve` hands out the numbers of imported messages under
   the row lock without reopening; `FinishBatch` sets `unread_floor_seq = last_message_seq`, raises
   the version once and appends one `thread.updated` (04 15.8). The writes are the queries of
   `queries/import_threads.sql` behind the store port `app.ImportThreadStore`

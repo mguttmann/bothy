@@ -91,6 +91,13 @@ func (s faultyStore) ItemOfTarget(ctx context.Context, source ids.ID, kind strin
 	return s.store.ItemOfTarget(ctx, source, kind, id)
 }
 
+func (s faultyStore) ItemsOfTarget(ctx context.Context, source ids.ID, kind string, id ids.ID) ([]app.ItemRow, error) {
+	if err := s.f.err("Store.ItemsOfTarget"); err != nil {
+		return nil, err
+	}
+	return s.store.ItemsOfTarget(ctx, source, kind, id)
+}
+
 // threads fakes chat.ImportThreads.
 type threads struct {
 	f       *faults
@@ -134,6 +141,15 @@ func (t *threads) Lock(_ context.Context, id ids.ID) (chat.ImportedThreadState, 
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.state[id], nil
+}
+
+// move puts the thread into another channel, as thread.move of chat does.
+func (t *threads) move(id, channel ids.ID) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	st := t.state[id]
+	st.ChannelID, st.MovedAt = channel, start
+	t.state[id] = st
 }
 
 func (t *threads) ApplyMirror(_ context.Context, _ ids.ID, c chat.MirrorChange) error {
@@ -402,6 +418,7 @@ func TestContentPortErrors(t *testing.T) {
 		{"Threads.Create", thread("thread:44", o("thread:44", "thread", forumThread))},
 		{"Messages.ThreadOf", thread("thread:44", o("thread:44", "thread", forumThread))},
 		{"Threads.Lock", thread("thread:41", o("thread:41", "thread", strings.Replace(textThread, `"T"`, `"New"`, 1)))},
+		{"Store.ItemsOfTarget", thread("thread:41", o("thread:41", "thread", strings.Replace(textThread, `"T"`, `"New"`, 1)))},
 		{"Threads.ApplyMirror", thread("thread:41", o("thread:41", "thread", strings.Replace(textThread, activityThen, activityLater, 1)))},
 		{"Threads.FinishBatch", thread("thread:40", o("message:70", "message", alexMsg))},
 		{"Messages.Append", thread("thread:40", o("message:70", "message", alexMsg))},

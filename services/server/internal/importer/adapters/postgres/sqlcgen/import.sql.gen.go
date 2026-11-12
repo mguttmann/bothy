@@ -287,6 +287,53 @@ func (q *Queries) ItemsOfKind(ctx context.Context, arg ItemsOfKindParams) ([]Imp
 	return items, nil
 }
 
+const itemsOfTarget = `-- name: ItemsOfTarget :many
+SELECT id, source_id, origin_key, item_kind, target_kind, target_id, state, content_sha256, error, created_at, updated_at FROM import_items WHERE source_id = $1 AND target_kind = $2 AND target_id = $3
+ORDER BY id
+`
+
+type ItemsOfTargetParams struct {
+	SourceID   pgtype.UUID
+	TargetKind pgtype.Text
+	TargetID   pgtype.UUID
+}
+
+// Every item of one source whose target is the object, oldest first: the channel items that put a
+// channel under the ownership list of the source (22 12.1). A mapping can name one existing
+// channel for several Discord channels, so there can be more than one; the index
+// (target_kind, target_id) serves it.
+func (q *Queries) ItemsOfTarget(ctx context.Context, arg ItemsOfTargetParams) ([]ImportItem, error) {
+	rows, err := q.db.Query(ctx, itemsOfTarget, arg.SourceID, arg.TargetKind, arg.TargetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ImportItem
+	for rows.Next() {
+		var i ImportItem
+		if err := rows.Scan(
+			&i.ID,
+			&i.SourceID,
+			&i.OriginKey,
+			&i.ItemKind,
+			&i.TargetKind,
+			&i.TargetID,
+			&i.State,
+			&i.ContentSha256,
+			&i.Error,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listItems = `-- name: ListItems :many
 SELECT id, source_id, origin_key, item_kind, target_kind, target_id, state, content_sha256, error, created_at, updated_at FROM import_items
 WHERE source_id = $1

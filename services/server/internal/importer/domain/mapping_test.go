@@ -166,3 +166,40 @@ func TestResolveUser(t *testing.T) {
 		t.Error("SetLead")
 	}
 }
+
+// TestSourceLeads (22 7.2 and 12.1): the source leads a channel here only when the channel has a
+// channel item of the source and the mapping gives every one of them the lead discord. Everything
+// else has no mirror: a channel outside the source, the lead `bothy`, a channel the mapping does
+// not name, a key that is no channel key.
+func TestSourceLeads(t *testing.T) {
+	t.Parallel()
+	m, _, fields := parse(t, valid)
+	if len(fields) != 0 {
+		t.Fatalf("fields %+v", fields)
+	}
+	cases := []struct {
+		name string
+		keys []string
+		want bool
+	}{
+		{"a channel outside the source", nil, false},
+		{"a channel the source leads", []string{"channel:300"}, true},
+		{"a channel led here", []string{"channel:301"}, false},
+		{"two Discord channels onto one channel, one led here", []string{"channel:300", "channel:301"}, false},
+		{"a channel the mapping does not name", []string{"channel:999"}, false},
+		{"a mapped channel and one the mapping does not name", []string{"channel:300", "channel:999"}, false},
+		{"a key of another kind", []string{"thread:300"}, false},
+		{"a key that is no origin key", []string{"300"}, false},
+	}
+	for _, c := range cases {
+		if got := m.SourceLeads(c.keys); got != c.want {
+			t.Errorf("%s: SourceLeads(%v) = %v, want %v", c.name, c.keys, got, c.want)
+		}
+	}
+	if e := m.ChannelOfKey("channel:300"); e == nil || e.Channel != "300" {
+		t.Errorf("ChannelOfKey(channel:300) = %+v", e)
+	}
+	if !m.SetLead("301", domain.LeadDiscord) || !m.SourceLeads([]string{"channel:300", "channel:301"}) {
+		t.Error("two Discord channels onto one channel, both led by the source: no lead of the source")
+	}
+}

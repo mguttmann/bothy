@@ -183,6 +183,18 @@ func (s *store) ItemOfTarget(_ context.Context, source ids.ID, kind string, id i
 	return app.ItemRow{}, false, nil
 }
 
+func (s *store) ItemsOfTarget(_ context.Context, source ids.ID, kind string, id ids.ID) ([]app.ItemRow, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []app.ItemRow
+	for _, r := range s.items {
+		if r.SourceID == source && r.TargetKind == kind && r.TargetID == id {
+			out = append(out, r)
+		}
+	}
+	return out, nil
+}
+
 // uow runs fn inside a unit of a sealed registry and rolls the store back on an error, like the
 // transaction of the real unit of work.
 type uow struct {
