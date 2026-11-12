@@ -8,19 +8,26 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/textcheck"
 )
 
 // The import interface of the fake (M8-04 design note 11): an in-memory model of the routes the
 // import tool calls, with the answers, problem codes and reasons of the server's importer
-// (internal/importer/app, M8-03 and M8-11). It is only for unit tests of the tool; the guarantees
-// that need the real server run in test/importtool.
+// (internal/importer/app, M8-03 and M8-11). It applies the rules of the server that valid Discord
+// data breaks (the display text rule for a topic, a thread name and a tag name, the length of a
+// topic, the content of a message without a file, and the pin limit of a thread when SetPinLimit
+// set one), so a tool that sends such a value fails its unit tests too. It is only for unit tests of the tool; the guarantees that need the real server
+// run in test/importtool.
 
 // The item kinds, states and reasons of the import interface (docs/api/openapi.yaml, tag Import).
 const (
@@ -88,6 +95,19 @@ const (
 	sessionTTL = time.Hour
 )
 
+// TopicMaxChars stands for channel.topic_max_chars of the server: the longest topic of a new
+// channel the fake accepts. A test of the import tool holds it equal to the length the tool cuts a
+// topic to, which a test against the real server holds equal to the default of the server.
+const TopicMaxChars = 1024
+
+// The field codes of the rules the server applies to imported values like to any other input:
+// display texts (SEC-IN-4), the content of a message without a file and the pins of a thread.
+const (
+	codeTooLong      = "too_long"
+	codeEmpty        = "empty"
+	codeLimitReached = "limit_reached"
+)
+
 // Item is one import item of a source, in insertion order.
 type Item struct {
 	// OriginKey and ItemKind name the item; State is pending, posted or skipped.
@@ -126,15 +146,18 @@ type imports struct {
 	spaces      []*space
 	sources     []*source
 	partSize    int64
+	pinLimit    int
 	afterStore  []*afterFault
 	batchFaults map[string]*batchFault
 }
 
-// batchFault refuses the next times thread batches of one thread with status and reason.
+// batchFault refuses the next times thread batches of one thread: with status and reason, or,
+// with fields, as 400 validation_failed with these field errors.
 type batchFault struct {
 	status int
 	reason string
 	times  int
+	fields []fieldError
 }
 
 // person is a user or an agent of the directory.
@@ -175,6 +198,7 @@ type source struct {
 	batches   []Batch
 	threads   map[string][]string
 	pins      []string
+	pinsOf    map[string]int // pins per thread_origin_key, for the pin limit
 	files     []*file
 	// earlier are the earlier sessions written per thread key (M8-06); late marks threads that
 	// have had a current session, so their earlier sessions are dropped_late.
@@ -351,7 +375,7 @@ func (s *Server) AddSource(state string, config map[string]any) string {
 	defer s.mu.Unlock()
 	src := &source{id: newID(), state: state, config: copyObject(config), cursor: map[string]any{}, stats: map[string]any{},
 		created: s.clk.Now(), byKey: map[string]*item{}, threads: map[string][]string{}, earlier: map[string][]EarlierSession{},
-		late: map[string]bool{}}
+		late: map[string]bool{}, pinsOf: map[string]int{}}
 	s.imp.sources = append(s.imp.sources, src)
 	return src.id
 }
@@ -384,6 +408,26 @@ func (s *Server) FailBatch(threadKey string, status int, reason string, times in
 		s.imp.batchFaults = map[string]*batchFault{}
 	}
 	s.imp.batchFaults[threadKey] = &batchFault{status: status, reason: reason, times: times}
+}
+
+// RefuseBatch refuses the next times thread batches with thread_origin_key threadKey with 400
+// validation_failed and one field error (pointer and code, as the server names a rule an item
+// breaks) before anything is stored; other threads are served.
+func (s *Server) RefuseBatch(threadKey string, times int, pointer, code string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.imp.batchFaults == nil {
+		s.imp.batchFaults = map[string]*batchFault{}
+	}
+	s.imp.batchFaults[threadKey] = &batchFault{times: times, fields: []fieldError{{Pointer: pointer, Code: code}}}
+}
+
+// SetPinLimit sets the pins a thread may hold (pin.max_per_thread of the server); without it the
+// fake has no limit.
+func (s *Server) SetPinLimit(n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.imp.pinLimit = n
 }
 
 // SetState changes the state of the source, as the web console would.
@@ -1050,6 +1094,7 @@ func (t *tx) commit(b Batch) {
 		t.src.threads[t.threadKey] = append(t.src.threads[t.threadKey], t.appended...)
 	}
 	t.src.pins = append(t.src.pins, t.pins...)
+	t.src.pinsOf[t.threadKey] += len(t.pins)
 	if len(t.earlier) > 0 {
 		t.src.earlier[t.earlierKey] = append(t.src.earlier[t.earlierKey], t.earlier...)
 	}
@@ -1085,6 +1130,9 @@ func (s *Server) applyBatch(_ *http.Request, body []byte, params []string) (int,
 	if in.ThreadOriginKey != nil {
 		if f := s.imp.batchFaults[*in.ThreadOriginKey]; f != nil && f.times > 0 {
 			f.times--
+			if len(f.fields) > 0 {
+				return 0, nil, invalid(f.fields...)
+			}
 			return 0, nil, &apiError{status: f.status, code: codeConflict, reason: f.reason}
 		}
 	}
@@ -1228,9 +1276,27 @@ func (t *tx) structureTarget(o objectIn) (string, string, *apiError) {
 		if t.posted(kindChannel+":"+strings.Split(keyID(o.OriginKey, kindForumTag), ":")[0]) == nil {
 			return "", "", conflict(reasonOutside)
 		}
+		if e := displayText("/"+memberName, str(o.Data, memberName)); e != nil {
+			return "", "", e
+		}
 		return kindForumTag, newID(), nil
 	}
 	return t.userTarget(o)
+}
+
+// displayText refuses a display text with a control or bidi character like the server (SEC-IN-4,
+// kernel/textcheck): 400 validation_failed at pointer with the rule as the field code.
+func displayText(pointer, s string) *apiError {
+	err := textcheck.DisplayText(s)
+	if err == nil {
+		return nil
+	}
+	code := codeInvalid
+	var te *textcheck.Error
+	if errors.As(err, &te) {
+		code = string(te.Rule)
+	}
+	return invalid(fieldError{Pointer: pointer, Code: code})
 }
 
 // entry returns the member of the list of the stored mapping whose member idKey is id.
@@ -1318,6 +1384,13 @@ func (t *tx) channelTarget(o objectIn) (string, string, *apiError) {
 	kind := str(o.Data, "kind")
 	if kind == "" {
 		kind = "text"
+	}
+	// The topic of a new channel follows the rules of channel.create (22 5.1).
+	if e := displayText("/topic", str(o.Data, "topic")); e != nil {
+		return "", "", e
+	}
+	if utf8.RuneCountInString(str(o.Data, "topic")) > TopicMaxChars {
+		return "", "", invalid(fieldError{Pointer: "/topic", Code: codeTooLong})
 	}
 	ch := &channel{id: newID(), name: name, kind: kind, sortKey: str(o.Data, "sort_key"), topic: str(o.Data, "topic"),
 		readOnly: str(e, "lead") != "bothy", created: t.now}
@@ -1444,6 +1517,10 @@ func (t *tx) threadTarget(o objectIn) (string, string, *apiError) {
 	if t.posted(chKey) == nil {
 		return "", "", conflict(reasonOutside)
 	}
+	// The name is checked like a title of thread.create (22 5.1.1).
+	if e := displayText("/"+memberName, str(o.Data, memberName)); e != nil {
+		return "", "", e
+	}
 	return kindThread, newID(), nil
 }
 
@@ -1477,6 +1554,10 @@ func (t *tx) messageTarget(o objectIn) (string, string, *apiError) {
 	if len(f) > 0 {
 		return "", "", invalid(f...)
 	}
+	// A message without a file needs a visible character (22 6.3, messaging.CheckNewContent).
+	if len(list) == 0 && strings.IndexFunc(str(o.Data, "content_md"), func(r rune) bool { return !unicode.IsSpace(r) }) < 0 {
+		return "", "", invalid(fieldError{Pointer: "/content_md", Code: codeEmpty})
+	}
 	t.appended = append(t.appended, o.OriginKey)
 	return kindMessage, newID(), nil
 }
@@ -1487,6 +1568,10 @@ func (t *tx) pinTarget(o objectIn) (string, string, *apiError) {
 	m := t.posted(key)
 	if m == nil {
 		return "", "", invalid(fieldError{Pointer: "/message_origin_key", Code: codeNotImported})
+	}
+	// pin.max_per_thread holds for imported pins too (22 6.6).
+	if limit := t.im.pinLimit; limit > 0 && t.src.pinsOf[t.threadKey]+len(t.pins) >= limit {
+		return "", "", invalid(fieldError{Pointer: "/message_origin_key", Code: codeLimitReached})
 	}
 	t.pins = append(t.pins, key)
 	return kindMessage, m.targetID, nil

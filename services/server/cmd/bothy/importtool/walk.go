@@ -55,6 +55,7 @@ type walker struct {
 	targets  map[string]restclient.Uuid // origin key to the target of a posted item (structure and users)
 	skipped  map[string]bool            // origin keys the server skipped
 	userDone map[string]bool            // user keys posted (or counted in a dry run) in this run
+	pinsFull map[string]bool            // thread origin keys whose thread holds pin.max_per_thread pins
 	present  time.Time
 
 	// halt reports a stop request (SIGINT, SIGTERM) of the read mirror; the walker checks it after
@@ -160,12 +161,17 @@ func (wk *walker) channelItems() ([]restclient.ImportObject, error) {
 		if err != nil {
 			return nil, err
 		}
+		// An existing channel keeps its own topic: the server ignores the one of the item.
+		if _, changed := fitTopic(c.ch.Topic); changed && c.entry.Target.Existing == "" {
+			c.rep.note(noteTopicFitted)
+		}
 		items = append(items, o)
 	}
 	return items, nil
 }
 
-// tagItems returns the forum tag items of the forums in scope (22 6.6).
+// tagItems returns the forum tag items of the forums in scope (22 6.6); a tag name is fitted to the
+// display text rule of the server.
 func (wk *walker) tagItems() ([]restclient.ImportObject, error) {
 	var items []restclient.ImportObject
 	for _, c := range wk.p.channels {
@@ -173,7 +179,11 @@ func (wk *walker) tagItems() ([]restclient.ImportObject, error) {
 			continue
 		}
 		for _, t := range c.ch.AvailableTags {
-			o, err := object(keyForumTag+c.ch.ID+":"+t.ID, "forum_tag", map[string]any{"channel_origin_key": c.key(), "name": t.Name}, "")
+			name, changed := displayText(t.Name)
+			if changed {
+				c.rep.note(noteNameFitted)
+			}
+			o, err := object(keyForumTag+c.ch.ID+":"+t.ID, "forum_tag", map[string]any{"channel_origin_key": c.key(), "name": name}, "")
 			if err != nil {
 				return nil, err
 			}
@@ -229,7 +239,8 @@ func spaceObject(s spacePlan) (restclient.ImportObject, error) {
 	return object(keySpace+s.cat.ID, "space", data, "")
 }
 
-// channelObject is the channel item of a taken channel (ImportChannelData).
+// channelObject is the channel item of a taken channel (ImportChannelData); its topic is the
+// Discord topic fitted to the rules of the server (fitTopic).
 func channelObject(c *channelPlan) (restclient.ImportObject, error) {
 	data := map[string]any{"kind": c.kind, "sort_key": c.sortKey}
 	if c.entry.Target.Existing != "" {
@@ -240,7 +251,7 @@ func channelObject(c *channelPlan) (restclient.ImportObject, error) {
 			data["space_origin_key"] = c.spaceKey
 		}
 	}
-	if t := strings.TrimSpace(c.ch.Topic); t != "" {
+	if t, _ := fitTopic(c.ch.Topic); t != "" {
 		data["topic"] = t
 	}
 	return object(c.key(), "channel", data, "")
@@ -351,14 +362,19 @@ func (wk *walker) readError(c *channelPlan, err error) error {
 	return err
 }
 
-// threadObject is the thread item of a thread (ImportThreadData, 22 5.1.1).
+// threadObject is the thread item of a thread (ImportThreadData, 22 5.1.1); its name is the Discord
+// name fitted to the display text rule of the server.
 func (wk *walker) threadObject(c *channelPlan, t *threadPlan) (restclient.ImportObject, error) {
 	created := SnowflakeTime(t.th.ID)
 	last := created
 	if t.th.LastMessageID != "" {
 		last = SnowflakeTime(t.th.LastMessageID)
 	}
-	data := map[string]any{"channel_origin_key": c.key(), "name": t.th.Name, "created_at": stamp(created),
+	name, changed := displayText(t.th.Name)
+	if changed {
+		c.rep.note(noteNameFitted)
+	}
+	data := map[string]any{"channel_origin_key": c.key(), "name": name, "created_at": stamp(created),
 		"last_activity_at": stamp(last), "closed": t.closed}
 	if t.closed {
 		data["closed_at"] = stamp(t.closedAt)
@@ -388,13 +404,17 @@ func (wk *walker) threadObject(c *channelPlan, t *threadPlan) (restclient.Import
 // stamp formats a time for the API (RFC 3339 in UTC with milliseconds).
 func stamp(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05.000Z07:00") }
 
-// consume decides one message and adds it to the batch; a full batch is flushed first.
+// consume decides one message and adds it to the batch; a full batch is flushed first. A message
+// that converts to nothing (hollow) is skipped as empty, in a dry run too.
 func (wk *walker) consume(ctx context.Context, c *channelPlan, pd *pending, msg discord.Message) error {
 	reason, err := wk.verdict(ctx, c, pd, msg)
 	if err != nil {
 		return err
 	}
 	info, text := wk.remember(pd.readID, msg)
+	if reason == "" && hollow(msg, text) {
+		reason = SkipEmpty
+	}
 	if reason != "" {
 		c.rep.skipMessage(reason)
 		pd.consumed = msg.ID
@@ -484,7 +504,7 @@ func (wk *walker) lookup(ctx context.Context, ref *discord.MessageRef) (*refInfo
 		}
 		info, text := wk.remember(ref.ChannelID, m)
 		ok, _ := TakeOver(m)
-		info.taken = ok && !wk.m.ResolveUser(m.Author.ID, authorKind(m)).Skip && int64(len(text)) <= wk.maxContent
+		info.taken = ok && !wk.m.ResolveUser(m.Author.ID, authorKind(m)).Skip && int64(len(text)) <= wk.maxContent && !hollow(m, text)
 		return info, nil
 	}
 	return nil, nil
@@ -528,6 +548,15 @@ func (wk *walker) flush(ctx context.Context, c *channelPlan, pd *pending, end bo
 		return wk.w.advance(ctx, pd.main, pd.readID, pd.consumed, wk.stats())
 	}
 	got, err := wk.send(ctx, b)
+	if n := dropPinsAtLimit(err, &b); n > 0 {
+		// The thread holds pin.max_per_thread pins (22 6.6). Only the server knows that limit and
+		// the pins the thread has, so its refusal decides: the batch goes again without the pins
+		// from the refused one on, and the thread gets no further pin item in this run.
+		wk.pinsFull[pd.threadKey] = true
+		c.rep.PinsNotTaken += n
+		c.rep.note(notePinLimit)
+		got, err = wk.send(ctx, b)
+	}
 	if err != nil {
 		return err
 	}
@@ -569,6 +598,7 @@ func (wk *walker) count(c *channelPlan, pd *pending) {
 				c.rep.AttachmentsTaken++
 			}
 		}
+		c.rep.AttachmentsForwarded += len(forwardedAttachments(msg))
 		if msg.Pinned {
 			c.rep.PinsTaken++
 		}
@@ -631,7 +661,8 @@ func (wk *walker) users(ctx context.Context, msgs []discord.Message) error {
 
 // messageItems builds the message and pin items of the pending messages: attachments first
 // (createImportFile and its upload), then the content with the reply quote and the lines of the
-// attachments that were not taken over (22 6.3, 6.5).
+// attachments that were not taken over (22 6.3, 6.5). A pinned message of a thread the server
+// reported full gets no pin item; the pin is counted as not taken over (22 6.6).
 func (wk *walker) messageItems(ctx context.Context, c *channelPlan, pd *pending) ([]restclient.ImportObject, error) {
 	var out []restclient.ImportObject
 	dropped := map[string]bool{}
@@ -647,6 +678,10 @@ func (wk *walker) messageItems(ctx context.Context, c *channelPlan, pd *pending)
 		}
 		wk.countMessage(c, msg)
 		out = append(out, o)
+		if msg.Pinned && wk.pinsFull[pd.threadKey] {
+			c.rep.PinsNotTaken++
+			continue
+		}
 		if msg.Pinned {
 			p, err := object(keyPin+msg.ID, "pin", map[string]any{"message_origin_key": keyMessage + msg.ID}, "")
 			if err != nil {
@@ -730,7 +765,7 @@ func (wk *walker) reply(ctx context.Context, pd *pending, msg discord.Message, d
 }
 
 // attachments takes the attachments of msg over and returns the posted files and the lines of
-// those that were not taken over.
+// those that were not taken over, the attachments of a forwarded message among them.
 func (wk *walker) attachments(ctx context.Context, c *channelPlan, pd *pending, msg discord.Message) ([]string, []string, error) {
 	var files, lines []string
 	channel := wk.targets[c.key()]
@@ -751,6 +786,12 @@ func (wk *walker) attachments(ctx context.Context, c *channelPlan, pd *pending, 
 		}
 		c.rep.AttachmentsTaken++
 		files = append(files, res.file.String())
+	}
+	// The attachments of a forwarded message are not loaded (22 6.5 item 7): each gets its line,
+	// so the message says what it carried, and the report counts it.
+	for _, a := range forwardedAttachments(msg) {
+		c.rep.AttachmentsForwarded++
+		lines = append(lines, AttachmentLine(a, reasonForwarded, wk.m.GuildID, pd.readID, msg.ID))
 	}
 	return files, lines, nil
 }

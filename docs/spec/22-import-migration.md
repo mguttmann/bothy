@@ -189,6 +189,17 @@ Rules:
    integer key of the fractional index after the previous one
    ([03-data-model.md](03-data-model.md), principle 5). An item that is already posted keeps its
    key, so a later run never reorders what an earlier run placed.
+5. The server checks an imported value like any other input, and a name or a topic of Discord
+   need not fit the display text rule of Bothy (SEC-IN-4, [19-security.md](19-security.md))
+   [derived: Discord has its own rules for these texts; not measured against the real Discord].
+   The tool therefore fits a channel topic, a thread name and a forum tag name before it
+   sends them: every control character (line breaks and tabs included) becomes a space, bidi
+   control characters are dropped. A topic is also cut to the default of
+   `channel.topic_max_chars`; the tool cannot read the effective value (`getInstance` does not
+   carry it), so a server that allows less refuses the channel, and the run ends with exit `1`
+   and names the topic (section 10.3). The report notes every channel with a fitted value, in
+   the dry run too. Names of spaces and channels come from the mapping file and are checked when
+   the source is created; names of people are fitted by the server (5.3).
 
 #### 5.1.1 Threads
 
@@ -196,7 +207,8 @@ Rules:
   [R3, verified]. In Bothy it becomes a thread with `parent_message_id` equal to the imported
   starter message in the main thread. If that message is missing, `parent_message_id` stays empty.
 - A forum post becomes a thread in the forum channel; its start message is the first message.
-- The title is the thread name, shortened to `thread.title_max_chars`. If the name is a placeholder
+- The title is the thread name without control and bidi characters (5.1 rule 5), shortened to
+  `thread.title_max_chars`. If the name is a placeholder
   according to the auto-title rule (REUSE.md, section 5.1), `title_source = auto`, otherwise `manual`.
 - `threads.created_at` and `last_activity_at` come from the source (time in the snowflake of the
   thread ID or of the last message, respectively) (03, section 4.11).
@@ -245,6 +257,14 @@ Channels that are not named are skipped and counted in the report. An error in t
 (unknown field, unknown handle, duplicate Discord ID) ends the run before any call with
 exit code `2`.
 
+The mapping of a source is fixed when the source is created: no operation changes it afterwards,
+except the `lead` of a channel (section 12.1). Every `--apply` run (the full run and the read
+mirror) and `switch` end with exit code `2` before any write when the file differs from the stored
+mapping in anything but `lead`, and name the first differing place. A mapping that has to change
+needs a new source after the old one was cancelled; that is a way only before the first run has
+written, because a new source knows none of the items of the old one (section 7): its run would
+stop at the names the old one created, or copy everything again.
+
 ### 5.3 People and placeholders
 
 Every author becomes a principal in Bothy:
@@ -279,7 +299,11 @@ The Discord types `DEFAULT` (0), `REPLY` (19), `CHAT_INPUT_COMMAND` (20),
 `THREAD_STARTER_MESSAGE` (21) and `CONTEXT_MENU_COMMAND` (23) are taken over [R4, verified]. All
 others (system messages such as a pin notice or "thread created") are counted and skipped. Type 21
 is dropped if its starter message is already in the main thread. Empty messages without attachment,
-embed, sticker and poll are counted and skipped.
+embed, sticker and poll are counted and skipped. So is a message whose parts convert to no visible
+text (6.3) and that carries no attachment, its own or one of a forwarded message: for example an
+embed that holds only an image. The server refuses a message without a visible character and
+without a file, so the tool counts it under the same reason `empty`, in the dry run too; a reply
+to such a message gets the quote line of 6.2.
 
 ### 6.2 Fields
 
@@ -312,10 +336,10 @@ readable text.
 | `<#CHANNEL_ID>` | `[#name](/c/<channel_id>)` with the in-app path of [15-client-architecture.md](15-client-architecture.md) section 11 when the channel is posted in this source (`channel_id` of Bothy), otherwise `#name` |
 | `<:NAME:ID>`, `<a:NAME:ID>` | `:NAME:` |
 | `<t:TIMESTAMP:STYLE>` (seconds) | time as ISO 8601 text in UTC |
-| Embeds | quote block with title, link and description; images in embeds are not loaded |
+| Embeds | quote block with the name of the author, title, link, description, one line `<name>: <value>` per field and the footer text; images in embeds are not loaded |
 | Sticker | `[Sticker: name]` |
 | Poll | question and answers as a list with the note "Poll" |
-| Forwarded message (`message_snapshots`) | quote block with the content of the snapshot |
+| Forwarded message (`message_snapshots`) | quote block with the content of the snapshot; its attachments get a line each (6.5 item 7) |
 | Small-text prefix `-# ` at the start of a line | removed |
 
 The length of a Discord message is far below `message.max_content_bytes`. A message is
@@ -356,11 +380,26 @@ For every attachment:
    size, reason and jump link `https://discord.com/channels/{guild_id}/{channel_id}/{message_id}`.
    The jump link does not expire [derived: it contains no signature]. The report counts the
    case.
+7. The attachments of a forwarded message (`message_snapshots`) are not loaded. The message gets
+   the same line for each of them, with the reason "of a forwarded message" and the jump link of
+   the forwarding message, and the report counts them (`attachments_forwarded`). Reason: a
+   forward carries the attachment objects of the message it copies, the origin key of a file is
+   `file:<attachment_id>` (7.1), and a file hangs on exactly one message, of the author who
+   uploaded it and in the channel it was uploaded for ([12-files.md](12-files.md) section 10).
+   Nothing the tool reads tells the attachment of a forward from the attachment of its original
+   [derived: not measured against the real Discord]; with the same ID both messages would name
+   one file, and the batch of the second of them would be refused. A key per forwarding message
+   would be a change of the import interface.
 
 ### 6.6 Pins, tags, reactions
 
 - Pins: messages with `pinned = true` [R4, verified] are pinned in Bothy; `pinned_by` is
-  the importing owner.
+  the importing owner. `pin.max_per_thread` holds for them too: the server refuses the pin above
+  it, with the whole batch. Only the server knows the limit and the pins a thread already has, so
+  the tool follows that answer: it sends the batch again without the refused pin and the pins
+  after it, sends no further pin for that thread in the run, and counts them as not taken over
+  (`pins_not_taken`, with a note). The messages are taken over. A dry run cannot see the limit
+  and counts every pin as "would take over".
 - Forum tags: `available_tags` become `forum_tags` of the channel (matched by name, without duplicates);
   `applied_tags` become `thread_tags`.
 - Reactions are not taken over. Discord delivers only counters on the message object; who
@@ -646,6 +685,13 @@ output, log line or error carries a token, the key or the content of the file.
 | `2` | invocation, mapping file or preflight check faulty; nothing written |
 | `3` | another run holds the lease of the source (without `--takeover`, section 7.4); with `--once` the normal case for scheduled calls |
 
+A batch the server refuses ends a full run with exit `1`. The message names the operation, the
+status and the problem code, the `thread_origin_key` of the batch and, for every field error of
+the answer, its JSON pointer, its code and the origin key of the item the pointer names, for
+example `/items/1/data/topic too_long of channel:<channel_id>`. It repeats no other part of the
+answer and no content (10.2 rule 4). The read mirror turns such an error of one thread into a
+note (12.2 item 5).
+
 ## 11. Check report
 
 One row per channel, a total at the end. No content, no names of people. A dry run says "would
@@ -656,12 +702,13 @@ take over" where an `--apply` run says "taken over".
 | Channel | Discord name and target in Bothy |
 | Threads | open, done |
 | Messages | taken over, already present, skipped by reason (type, empty) |
-| Attachments | taken over, too large, failed |
+| Attachments | taken over, too large, failed, of forwarded messages (not loaded, 6.5 item 7) |
 | People | mapped, placeholders |
 | Sessions | references taken over, already present, discarded (agent does not match), late (the thread has had a session since the import) |
-| Pins, tags | taken over |
+| Pins | taken over, not taken over (above `pin.max_per_thread`, 6.6) |
+| Tags | taken over |
 | Reactions | not taken over (number) |
-| Notes | `403`, Discord permissions restricted, changed at the source, written in Discord after the switch-over |
+| Notes | `403`, Discord permissions restricted, changed at the source, written in Discord after the switch-over, a topic or a name fitted to the rules of the server (5.1 rule 5), the pin limit reached (6.6), a thread that failed in a mirror round with its reason (12.2 item 5) |
 
 The report is also stored in `import_sources.stats` and can be retrieved with `import.read`: the
 totals as counters under `stats.tool`, written with the last `setImportCursor` of an `--apply` run
@@ -674,12 +721,13 @@ totals as counters under `stats.tool`, written with the last `setImportCursor` o
 `threads_open`, `threads_done`, `messages_taken`, `messages_present`, `messages_skipped` (by
 reason: `type`, `empty`, `starter_in_main`, `author`), `messages_failed`, `messages_held` (held back
 by the settle rule of a read mirror round, 12.3; `0` in a full run), `attachments_taken`,
-`attachments_too_large`, `attachments_failed`, `people_mapped`, `people_placeholders`,
-`sessions_taken`, `sessions_present`, `sessions_discarded`, `sessions_late`, `pins_taken`,
-`tags_taken`, `reactions_not_taken` and `source_changed`. A dry run counts an accepted line of a
-thread in scope under `sessions_taken` ("would take over"); lines of the sessions file whose thread
-is not part of the run appear as one note with their count. The server keeps its own counters
-`server.sessions_taken_over`, `server.sessions_already_present` and `server.sessions_dropped_late`.
+`attachments_too_large`, `attachments_failed`, `attachments_forwarded`, `people_mapped`,
+`people_placeholders`, `sessions_taken`, `sessions_present`, `sessions_discarded`, `sessions_late`,
+`pins_taken`, `pins_not_taken`, `tags_taken`, `reactions_not_taken` and `source_changed`. A dry run
+counts an accepted line of a thread in scope under `sessions_taken` ("would take over"); lines of
+the sessions file whose thread is not part of the run appear as one note with their count. The
+server keeps its own counters `server.sessions_taken_over`, `server.sessions_already_present` and
+`server.sessions_dropped_late`.
 
 ## 12. Read mirror (parallel operation)
 
@@ -720,7 +768,9 @@ Every `import.follow.poll_interval`:
    warning in the report. Nothing is copied.
 5. Errors of a round (network, `5xx`, rate limit above the limit) do not end the mirror; the
    next round waits with backoff up to `import.follow.max_backoff`. Errors of one thread do not hold
-   up other threads.
+   up other threads: the thread stays behind and is tried again in the next round, and the note
+   of its channel and a line on standard error name the thread and the error, for a batch the
+   server refused with the place, the rule and the item (10.3).
 
 ### 12.3 Settle rule
 
@@ -800,7 +850,9 @@ flag `--discord-locked` stands for it: the owner confirms with it that the Disco
 read-only and the agent removed there; without it `switch` ends with exit `2` before any call.
 After the round `switch` reads the channel once more: messages after the cursor that the settle
 rule does not hold but the round did not copy (written after it) also end with exit `1`, because
-the lock of step 1 is evidently not in place yet.
+the lock of step 1 is evidently not in place yet. When a thread of the channel failed in the round
+(12.2 item 5), `switch` says that instead and names the thread and the reason: such messages stay
+behind until the cause is removed, and they say nothing about the lock.
 
 #### 13.3.1 Operator of the imported threads (addendum of 2026-10-30)
 
@@ -812,10 +864,11 @@ close this (R-IM-13):
 1. `switch` reads the threads of the channel (`listChannelThreads`) after its preconditions and
    before the round. When threads carry an operator other than the agent of `planned_operator`
    (or any operator while the mapping plans none), it ends with exit `2` before any write and
-   names their count per agent ID, the operator the channel will get, and the two ways on: set
-   `planned_operator` to that agent and make it the channel's operator in step 3, or run
-   `switch --force`, which prints the same text as a warning and goes on. The text names IDs and
-   counts only (10.2 rule 4).
+   names their count per agent ID, the operator the channel will get, and the way on:
+   `switch --force`, which prints the same text as a warning and goes on. A change of
+   `planned_operator` is no way: the mapping of a source is fixed (5.2). After a forced
+   switch-over such a thread starts a run once rule 2 allows its agent in the channel. The text
+   names IDs and counts only (10.2 rule 4).
 2. The server starts no run for a fixed thread operator that is no longer allowed in the channel
    (not the effective operator, no `write` of its own on the channel, no active run in the thread,
    no completed run there); the message
@@ -888,6 +941,8 @@ The import interface is source-neutral. A Zulip import would be a further comman
 | Rate limit | `X-RateLimit-Remaining: 0` waits; a wait time above the limit aborts with exit `1`, the state remains |
 | Intent probe | a channel with only empty messages by other authors aborts with exit `2` |
 | Invalid selection | an unknown ID in `--only-thread` aborts before any write |
+| Discord values the server refuses | against the real server: a topic with line breaks or above the limit, a thread and a tag name with a bidi control, a message that converts to nothing and more pins than `pin.max_per_thread` end neither the dry run nor the import; the values arrive fitted, the messages and pins are counted (5.1 rule 5, 6.1, 6.6) |
+| Refused batch names its rule | a batch the real server refuses ends the run with exit `1` and names the pointer, the field code and the origin key of the item, no content (10.3) |
 | Foreign thread operator | imported threads with an operator other than `planned_operator` stop `switch` with exit `2` before any write; `--force` warns and switches (13.3.1) |
 | Progress of a large source | a cursor several times `sync.event_payload_max_bytes` is stored; `import.progress` carries the reduced payload with `truncated`, `getImport` the whole cursor (section 8) |
 | No mirror where Bothy leads | after the switch-over a posted thread item changes neither title nor state of its thread and appends no event; a new message is still taken over (7.2, 12.1) |
