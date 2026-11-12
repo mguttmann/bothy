@@ -1,0 +1,66 @@
+# Unit tests of the long windows of the hand-written alerts (promtool test rules), checked by
+# `make ops-check` (check `prometheus-rule-tests`) next to bothy-alerts.test.yaml, which explains
+# the cases. BothyBackupStale and BothyRestoreTestStale also fire when no value of their gauge
+# was reported for as long as their threshold (26 hours, 8 days). This file evaluates every 15
+# minutes instead of every minute, so these cases stay cheap; a window that is 15 minutes longer
+# or shorter breaks a case.
+# In every case the value stops at 0m. A window `[w]` at the time t covers the samples after
+# t - w up to t, so from the evaluation at w on no value lies in it; the alert fires once its
+# `for` has run out and is quiet one evaluation earlier.
+
+rule_files:
+  - ../rules/bothy-alerts.yaml
+
+evaluation_interval: 15m
+
+tests:
+  # The kind logical reported its last value at 0m (bothy-backupd no longer reports one, or the
+  # value came from a run by hand); the other kinds keep reporting. Pending from 26h, firing
+  # after `for: 15m`.
+  - name: BothyBackupStale fires 26 h after the last value of a kind
+    interval: 15m
+    input_series:
+      - series: 'bothy_backup_last_success_timestamp_seconds{job="bothy/bothy-backupd", bothy_backup_kind="physical"}'
+        values: '0+900x106'
+      - series: 'bothy_backup_last_success_timestamp_seconds{job="bothy/bothy-backupd", bothy_backup_kind="logical"}'
+        values: '0'
+      - series: 'bothy_backup_last_success_timestamp_seconds{job="bothy/bothy-backupd", bothy_backup_kind="objects"}'
+        values: '0+900x106'
+    alert_rule_test:
+      - eval_time: 1h
+        alertname: BothyBackupStale
+        exp_alerts: []
+      - eval_time: 26h
+        alertname: BothyBackupStale
+        exp_alerts: []
+      - eval_time: 26h15m
+        alertname: BothyBackupStale
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              bothy_backup_kind: logical
+            exp_annotations:
+              summary: "No successful logical backup for more than 26 hours."
+              runbook_url: "docs/observability/alerting.md#bothybackupstale"
+
+  # Pending from 8d (192h), firing after `for: 1h`.
+  - name: BothyRestoreTestStale fires 8 days after the last value
+    interval: 15m
+    input_series:
+      - series: 'bothy_backup_restore_test_last_success_timestamp_seconds{job="bothy/bothy-backupd"}'
+        values: '0'
+    alert_rule_test:
+      - eval_time: 1h
+        alertname: BothyRestoreTestStale
+        exp_alerts: []
+      - eval_time: 192h45m
+        alertname: BothyRestoreTestStale
+        exp_alerts: []
+      - eval_time: 193h
+        alertname: BothyRestoreTestStale
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: "No successful automatic restore test for more than 8 days."
+              runbook_url: "docs/observability/alerting.md#bothyrestoreteststale"

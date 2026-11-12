@@ -150,6 +150,15 @@ people who could also be owners.
 | First restore test | `docker compose exec backup bothy-backupd restore-test` | exit 0, all checks green |
 | Status page | app, Status section | all components `operational` |
 
+With the profile `observability` the alerts `BothyBackupStale` and `BothyRestoreTestStale` fire
+while a backup kind (`physical` for `pg_full` and `pg_diff`, `logical`, `objects`) or the restore
+test has not succeeded yet: they treat a missing last success like one that is too old
+([alerting.md](../observability/alerting.md) 3.2). The first backup of every kind and the first
+restore test end them. With the driver `s3` the kind `objects` mirrors the file bucket into the
+off-site bucket: with an off-site target run it by hand as well; without one every run of it
+fails with `s3_mirror_not_configured` (docs/decisions.d/M7-02.md D-M7-02-5), so the alert stays
+for `objects` until a target is set or the alert is silenced for that kind in Alertmanager.
+
 ## 5. Edge
 
 ### 5.1 Profile `direct`

@@ -75,7 +75,8 @@ subdirectory of the volume `secrets`. Environment variables carry only endpoints
 2. APM statistics at Datadog are based on the sample, because sampling runs before the
    overlay.
 3. If the collector fails, the server discards once its buffer is full; the message path stays
-   unaffected. The alert `BothyServerTelemetryMissing` reports this.
+   unaffected. The alerts `BothyServerTelemetryMissing` and `BothyBackupTelemetryMissing` report
+   this.
 4. Adapters on the same host send to `127.0.0.1:BOTHY_OTLP_PUBLISH_PORT`; adapters on other
    hosts run their own collector with the same files (base plus overlay).
 
