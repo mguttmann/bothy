@@ -1301,7 +1301,9 @@ targets `make e2e-desktop` and `make perf-desktop` on such a host, run before a 
 the close of a milestone; the stack is started by `infra/compose/e2e.sh` and removed after the
 run. The scheduled workflow `e2e-desktop` compiles both suites on macOS and Windows so they cannot
 rot. On a host without a desktop session `make e2e-desktop` runs the suite headless with
-`E2E_DEVICE=flutter-tester` against the same stack. The performance level measures on the device
+`E2E_DEVICE=flutter-tester` against the same stack; the same workflow does that every night on a
+Linux runner, which has a Docker engine, so the app meets the real server in CI between releases
+(docs/decisions.d/AUD-misc-testing-01.md). The performance level measures on the device
 it runs on and marks in its summary whether that is a reference device of section 19.
 
 ## 21. Decisions of this chapter

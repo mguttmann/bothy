@@ -192,8 +192,9 @@ Future<void> _flow(
   await app.waitFor(find.byKey(const ValueKey('phone.shell')));
   await app.waitLive();
 
-  // M9 under Me: "Build host", online.
+  // M9 under Me: "Build host", online. "Hosts" lies below the end of a small screen.
   await app.tap('phone.tab.me');
+  await app.scrollTo('phone.me', 'phone.me.hosts');
   await app.tapSettled(find.byKey(const ValueKey('phone.me.hosts')));
   final row = find.byKey(ValueKey('phone.hosts.$hostId'));
   // The name is shown isolated (dsIsolate), so it is found as a part of the text.

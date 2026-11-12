@@ -384,6 +384,23 @@ final class E2eApp {
     await tester.pump();
   }
 
+  /// Scrolls the list with the key [list] until the widget with [key] is built and in view. A
+  /// list builds its entries as they come into view, so an entry below the end of a small
+  /// screen is not in the tree before, and a tap would wait for it in vain: the Android
+  /// emulator of the hosted runner shows 320 x 640 logical pixels (docs/decisions.d/
+  /// AUD-misc-testing-01.md).
+  Future<void> scrollTo(String list, String key) async {
+    final view = find.byKey(ValueKey(list));
+    await waitFor(view);
+    await tester.scrollUntilVisible(
+      find.byKey(ValueKey(key)),
+      100,
+      scrollable: find
+          .descendant(of: view, matching: find.byType(Scrollable))
+          .first,
+    );
+  }
+
   /// E1: types the server address and connects; waits for E2.
   Future<void> connect() async {
     await waitFor(find.byKey(const ValueKey('e1.address')));

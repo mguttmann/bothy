@@ -277,6 +277,8 @@ test_ca() {
 		keyUsage = critical, digitalSignature
 		extendedKeyUsage = serverAuth
 		subjectAltName = DNS:localhost, IP:127.0.0.1
+		subjectKeyIdentifier = hash
+		authorityKeyIdentifier = keyid
 	CNF
 	openssl ecparam -name prime256v1 -genkey -noout -out "$d/ca.key" 2>/dev/null
 	openssl req -x509 -new -key "$d/ca.key" -sha256 -days 2 -config "$d/openssl.cnf" -extensions v3_ca -out "$d/ca.pem"

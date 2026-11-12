@@ -2,9 +2,10 @@
 #
 # Platform suite of the host service (brief M2-42 design note 19, docs/DECISIONS.md D-M2-42-19).
 # It creates and deletes operating system users, services and ACLs with administrator rights, so
-# it runs only on throwaway GitHub-hosted runners: Linux with systemd, macOS and Windows 11 (Windows
-# 10 has no hosted runner and stays unmeasured). Manual or scheduled; a required gate before
-# M2-48. The result file of each platform is kept as an artifact.
+# it runs only on throwaway GitHub-hosted runners: Linux with systemd, macOS and Windows Server
+# 2025 (the label `windows-2025`). No job runs on Windows 10 or Windows 11, so both stay
+# unmeasured (docs/decisions.d/AUD-misc-testing-01.md, "Open"). Manual or scheduled; a required
+# gate before M2-48. The result file of each platform is kept as an artifact.
 
 name: host-platform
 
@@ -45,7 +46,8 @@ jobs:
         shell: bash
         run: cd services/host && go test -race -count=1 ./...
       # The packages of the terminal sessions (M2-45) whose tests run on Windows; the tests of the
-      # M2-42 packages and of internal/profiles simulate Unix paths and do not run on Windows yet.
+      # M2-42 packages and of internal/profiles simulate Unix paths and do not run on Windows yet
+      # (open with plan row V1-13: docs/decisions.d/AUD-misc-testing-01.md, "Open").
       - name: Unit tests (Windows, runner user)
         if: runner.os == 'Windows'
         shell: bash

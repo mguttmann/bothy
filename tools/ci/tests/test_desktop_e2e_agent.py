@@ -159,6 +159,47 @@ def test_a_refused_invocation_or_patch_ends_the_run() -> None:
         asyncio.run(agent.stream_run(patch, no_sleep))
 
 
+def test_a_patch_the_fake_agent_rebased_is_no_failure() -> None:
+    """A run that changed since the agent read it answers `409 base_version_conflict` (06 5).
+
+    The Fake-Agent then sends the patch again on the current version, as an adapter must, and
+    reports the first answer with the outcome of that rebase in `rebased`. A rebase that went
+    through is a patch that went through: read as a failure, it ended the Fake-Agent of the
+    desktop E2E stack in the middle of a run whenever the server was a moment faster
+    (docs/decisions.d/AUD-misc-testing-01.md).
+    """
+    conflict = {"status": 409, "code": "base_version_conflict"}
+    script = Script(
+        {
+            "receive": [
+                INVOCATION,
+                ok(event="agent.followup", message_id="m-2"),
+                ok(event="interaction.created", interaction_id="ix-1"),
+            ],
+            "patch": [
+                ok(**conflict, rebased={"status": 200, "current_version": 7}),
+                ok(status=200),
+            ],
+            "post": [ok(status=201)],
+        }
+    )
+    assert asyncio.run(agent.support_run(script, no_sleep)) == "run-1"
+    # The rebase was the Fake-Agent's: the driver sends no patch a second time.
+    assert script.ops().count("patch") == 5
+    assert script.calls[-1] == ("finish", {"run": "run-1", "state": "completed"})
+
+    # A rebase that was refused, and a conflict without a rebase, still end the run.
+    refused = Script({"receive": [INVOCATION], "patch": [ok(**conflict, rebased=conflict)]})
+    with pytest.raises(
+        agent.AgentError,
+        match="patch: status 409 base_version_conflict, rebase status 409 base_version_conflict",
+    ):
+        asyncio.run(agent.stream_run(refused, no_sleep))
+    alone = Script({"receive": [INVOCATION], "patch": [ok(**conflict)]})
+    with pytest.raises(agent.AgentError, match=r"patch: status 409 base_version_conflict$"):
+        asyncio.run(agent.stream_run(alone, no_sleep))
+
+
 def test_stream_run_streams_the_status_line() -> None:
     slept: list[float] = []
 

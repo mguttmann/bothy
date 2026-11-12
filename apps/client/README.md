@@ -557,7 +557,9 @@ prepares the world and runs `tool/e2e_suite.sh`, which hands the world (`e2e.jso
 CA to the build as `--dart-define` values: a desktop app runs in its sandbox and cannot read the
 files of the stack. The suite runs on a device through `flutter drive` with
 `test_driver/e2e_driver.dart` (`flutter test` would run a file outside `integration_test/` on
-flutter-tester whatever device it names) and headless through `flutter test`.
+flutter-tester whatever device it names) and headless through `flutter test`. The headless form
+runs every night on a Linux runner (job `headless` of `.github/workflows/e2e-desktop.yml`), with
+the terminal part of the section "The terminal parts" below.
 
 Each flow starts a fresh app with its own data folder, memory secrets and software device keys
 (no test touches the keychain of the machine that runs it) and the discovery of a real build,

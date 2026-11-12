@@ -197,8 +197,25 @@ async def connect(call: Call, *, base_url: str, instance_id: str, agent: dict[st
 
 
 async def _patch(call: Call, sleep: Sleep, run: str, ops: list[dict[str, Any]]) -> None:
-    """One patch of the run document, then the throttle of the adapter."""
-    _ok(await call("patch", {"run": run, "ops": ops}), "patch", status=200)
+    """One patch of the run document, then the throttle of the adapter.
+
+    A run that changed since the Fake-Agent read it answers `409 base_version_conflict`; the
+    Fake-Agent then sends the patch again on the current version (the rebase of 06 5) and
+    reports that first answer with the outcome of the rebase in `rebased`. A rebase that went
+    through is a patch that went through.
+
+    Raises:
+        AgentError: the patch was refused, or its rebase was.
+    """
+    result = _ok(await call("patch", {"run": run, "ops": ops}), "patch")
+    rebased = result.get("rebased")
+    rebase = rebased if isinstance(rebased, dict) else None
+    conflict = result.get("status") == 409 and result.get("code") == "base_version_conflict"
+    if result.get("status") != 200 and not (conflict and rebase and rebase.get("status") == 200):
+        text = f"patch: status {result.get('status')} {result.get('code', '')}".strip()
+        if rebase is not None:
+            text += f", rebase status {rebase.get('status')} {rebase.get('code', '')}".rstrip()
+        raise AgentError(text)
     await sleep(PATCH_INTERVAL_S)
 
 

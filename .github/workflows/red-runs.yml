@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The failed runs that no pull request shows (docs/quality/gates.md, section "Red runs";
+# docs/decisions.d/AUD-misc-testing-01.md). A scheduled run and the run of a push to main show
+# their result to nobody. Every hour this workflow reads the completed runs of the last two days
+# of every workflow with a schedule and of ci.yml on main (tools/ci/red_runs.py reads both sets
+# from this folder). A run GitHub lists as cancelled counts when one of its jobs ran and did not
+# pass: a job that hits its time limit ends that way.
+#
+# Switched off until the owner decides (AUD-CG1/7, AUD-MISC-TESTING-01/11): whether a workflow
+# may write public issues for red runs is his question. Unless the repository variable
+# BOTHY_RED_RUN_ISSUES is `true`, the report is a dry run: it reads, writes nothing, and prints
+# the red runs with their jobs and steps to the log of this job. With the variable set it adds
+# one comment per failed run to the open issue "Red runs of <file>" labelled `red-run` (created
+# when there is none) and closes an issue when its workflow passed again and stayed quiet for the
+# time AGE of the tool. Only the default GITHUB_TOKEN; a permission cannot depend on a variable,
+# so the job may write issues in both cases.
+
+name: red-runs
+
+on:
+  schedule:
+    - cron: "11 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: red-runs
+  cancel-in-progress: false
+
+jobs:
+  issue:
+    name: red runs (report)
+    if: github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read # the runs of the watched workflows and their jobs
+      issues: write # the tracking issues, their comments, their label and their closing
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.13.7"
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - name: Report the failed runs (a dry run unless BOTHY_RED_RUN_ISSUES is true)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          WRITE_ISSUES: ${{ vars.BOTHY_RED_RUN_ISSUES }}
+        run: |
+          if [ "$WRITE_ISSUES" = true ]; then
+            uv run --project tools --locked --quiet python tools/ci/red_runs.py report --repo "$REPO" --hours 48
+          else
+            uv run --project tools --locked --quiet python tools/ci/red_runs.py report --repo "$REPO" --hours 48 --dry-run
+          fi
