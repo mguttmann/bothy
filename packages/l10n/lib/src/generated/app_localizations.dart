@@ -13734,6 +13734,24 @@ abstract class AppLocalizations {
   /// **'{count, plural, =0{Offline} =1{Offline. 1 change waiting} other{Offline. {count} changes waiting}}'**
   String phoneOfflineWaiting(int count);
 
+  /// Phone: title of the confirmation that the button Log out of the Me tab asks once before it logs out (01 section 5.6 E7).
+  ///
+  /// In en, this message translates to:
+  /// **'Log out?'**
+  String get phoneLogoutTitle;
+
+  /// Phone: text of the confirmation before a logout, naming what is deleted (01 section 5.6 E7; 04 section 8.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Logging out deletes the data of this device and its device keys. You then log in again as on a new device.'**
+  String get phoneLogoutBody;
+
+  /// Phone: line of the confirmation before a logout while outbox entries wait to be sent; it is shown only for a count above zero.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 change that still waits to be sent is lost.} other{{count} changes that still wait to be sent are lost.}}'**
+  String phoneLogoutWaiting(int count);
+
   /// Phone: the button that opens the search filters as a sheet.
   ///
   /// In en, this message translates to:

@@ -2,7 +2,7 @@
 
 // Login on the phone (brief M5-02 Tests; 01 5.6; 08 5.2; R-SY-14): E1 with the fake's discovery,
 // E2 with password and TOTP, E4 waiting until the other device confirms, the phone shell; logout
-// from the Me tab leads to E7 and deletes the local data.
+// from the Me tab, confirmed once, leads to E7 and deletes the local data.
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -45,6 +45,9 @@ void main() {
       await tester.ensureVisible(logout);
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('shell.logout')));
+      // The button asks once before it deletes the data of the device (AUD-client-phone-01).
+      await app.waitFor(find.byKey(const ValueKey('logout.dialog')));
+      await tester.tap(find.byKey(const ValueKey('logout.confirm')));
       await app.waitFor(find.byKey(const ValueKey('screen.e7')));
       await eventually('local data deleted', app.fake.wiped);
       expect(app.fake.server.violations, isEmpty);

@@ -252,6 +252,26 @@ class FakeMediaPort implements MediaPickerPort {
   /// The limit of every library call, in order.
   final List<int?> limits = [];
 
+  /// The files of a pick during which the system ended the app; [takeLost] hands them out
+  /// once.
+  List<RawMedia> lost = [];
+
+  /// When set, [takeLost] throws it (the platform cannot be asked).
+  Object? lostError;
+
+  /// How often [takeLost] was called.
+  int lostTaken = 0;
+
+  @override
+  Future<List<RawMedia>> takeLost() async {
+    lostTaken++;
+    final e = lostError;
+    if (e != null) throw e;
+    final out = lost;
+    lost = [];
+    return out;
+  }
+
   @override
   Future<RawMedia?> camera() async {
     asked.add(MediaSource.camera);

@@ -2,13 +2,20 @@
 
 /// Detaching and reattaching the phone terminal with the app's life cycle and the app lock
 /// (docs/spec/01-product.md 5.3 M8, 5.6 E6, R-PR-12; docs/spec/15-client-architecture.md 23.2
-/// item 7; brief M5-12 Design note 5; docs/decisions.d/M5-12.md D-M5-12-4).
+/// item 7; brief M5-12 Design note 5; docs/decisions.d/M5-12.md D-M5-12-4;
+/// docs/decisions.d/AUD-client-phone-01.md).
+///
+/// A session of the phone is live only while M8 of its host shows, the app is in front and the
+/// lock is open:
 ///
 /// | Event | What happens |
 /// |---|---|
-/// | the app moves to the background (`hidden`, `paused`) | every live session detaches (`1000`), it keeps running on the host |
+/// | the app moves to the background (`hidden`, `paused`) | every live session of a shown M8 detaches (`1000`), it keeps running on the host |
 /// | the app lock closes (`AppLockEvent.locked`) | the same |
-/// | the app is in front again and the lock is open | the sessions detached here attach again (`attachTerminalSession`) |
+/// | an opening or an attach lands while the app is in the background or the lock holds the content | the session detaches at once, as above |
+/// | the app is in front again, the lock is open and M8 of the host shows | the sessions detached here attach again (`attachTerminalSession`) |
+/// | M8 goes while the lock holds the content (E6 replaced it) | its sessions stay remembered and attach when M8 shows again |
+/// | M8 goes any other way (back, a tapped push, a link, a share) | its sessions are forgotten: they stay detached until the person attaches them |
 ///
 /// The client never decides the reattach window: within `terminal.quick_reattach_window` the
 /// server accepts the attach without a step-up, after it it answers `401 step_up_required` and
@@ -58,9 +65,9 @@ final class TerminalAppLockGate implements TerminalLockGate {
   void removeListener(VoidCallback listener) => _lock.removeListener(listener);
 }
 
-/// Detaches every live session of the registered tabs when the app leaves the foreground or
-/// the lock closes, and attaches the same sessions again once the app is in front and the lock
-/// is open.
+/// Detaches every live session of the tabs whose M8 shows when the app leaves the foreground or
+/// the lock closes, and attaches the same sessions again once the app is in front, the lock is
+/// open and their M8 shows.
 ///
 /// ```dart
 /// final coordinator = PhoneTerminalCoordinator(lifecycle: ports.lifecycle, lock: gate);
@@ -82,22 +89,40 @@ final class PhoneTerminalCoordinator {
   final TerminalLockGate? _lock;
   late final StreamSubscription<AppActivity> _activity;
   StreamSubscription<AppLockEvent>? _lockEvents;
+  // The tabs whose M8 shows now.
   final Set<TerminalTabs> _tabs = {};
-  final Set<TerminalController> _detached = {};
+  // The sessions this coordinator detached, each with the tabs of its host.
+  final Map<TerminalController, TerminalTabs> _detached = {};
   bool _disposed = false;
 
-  /// The tabs whose sessions follow the life cycle; registering twice changes nothing.
-  void register(TerminalTabs tabs) => _tabs.add(tabs);
+  /// M8 of [tabs] shows: its sessions follow the life cycle, and the ones this coordinator
+  /// detached before attach again. Registering twice changes nothing.
+  void register(TerminalTabs tabs) {
+    if (_disposed || !_tabs.add(tabs)) return;
+    tabs.addListener(_onTabs);
+    // After the build that registers: an attach notifies the listeners of its tab at once.
+    scheduleMicrotask(_evaluate);
+  }
 
-  /// Forgets [tabs] (the login ended and disposed them).
+  /// M8 of [tabs] no longer shows. While the lock holds the content the screen only went
+  /// behind E6, so its sessions stay remembered for its return; in every other case the person
+  /// left it (back, a tapped push, a link, a share), and its sessions are forgotten: nothing
+  /// attaches without the view (D-M5-12-5).
   void unregister(TerminalTabs tabs) {
-    _tabs.remove(tabs);
-    _detached.removeWhere((c) => !_alive(c));
+    if (!_tabs.remove(tabs)) return;
+    tabs.removeListener(_onTabs);
+    if (_lock?.holdsContent ?? false) return;
+    _detached.removeWhere((_, t) => identical(t, tabs));
   }
 
   /// The sessions this coordinator detached and will attach again.
   @visibleForTesting
-  Set<TerminalController> get detached => Set.unmodifiable(_detached);
+  Set<TerminalController> get detached => Set.unmodifiable(_detached.keys);
+
+  // Whether no session may be live now.
+  bool get _held =>
+      _lifecycle.current != AppActivity.foreground ||
+      (_lock?.holdsContent ?? false);
 
   void _onActivity(AppActivity activity) {
     if (activity == AppActivity.background) {
@@ -117,12 +142,18 @@ final class PhoneTerminalCoordinator {
     }
   }
 
+  // An opening or an attach that was on its way when the app left the foreground or the lock
+  // closed lands later: the session it made live detaches at once and attaches on the return.
+  void _onTabs() {
+    if (_held) _detachAll();
+  }
+
   void _detachAll() {
     for (final tabs in _tabs) {
       for (final c in tabs.tabs) {
         final phase = c.state.phase;
         if (phase == TerminalPhase.connected || phase == TerminalPhase.exited) {
-          _detached.add(c);
+          _detached[c] = tabs;
           unawaited(c.detach());
         }
       }
@@ -130,15 +161,14 @@ final class PhoneTerminalCoordinator {
   }
 
   void _evaluate() {
-    if (_disposed || _detached.isEmpty) return;
-    if (_lifecycle.current != AppActivity.foreground) return;
-    if (_lock?.holdsContent ?? false) return;
-    final again = List.of(_detached);
-    _detached.clear();
-    for (final c in again) {
+    if (_disposed || _detached.isEmpty || _held) return;
+    for (final MapEntry(key: c, value: tabs) in _detached.entries.toList()) {
+      // Only while M8 of the host shows; until then the session stays remembered.
+      if (!_tabs.contains(tabs)) continue;
+      _detached.remove(c);
       // Only a session that is still detached the way this coordinator left it: "End", a
       // revocation or another device changed it meanwhile.
-      if (!_alive(c) ||
+      if (!tabs.tabs.contains(c) ||
           c.state.phase != TerminalPhase.detached ||
           c.state.detachCause != DetachCause.person) {
         continue;
@@ -147,14 +177,15 @@ final class PhoneTerminalCoordinator {
     }
   }
 
-  bool _alive(TerminalController c) => _tabs.any((t) => t.tabs.contains(c));
-
   /// Stops listening.
   void dispose() {
     _disposed = true;
     unawaited(_activity.cancel());
     unawaited(_lockEvents?.cancel());
     _lock?.removeListener(_evaluate);
+    for (final tabs in _tabs) {
+      tabs.removeListener(_onTabs);
+    }
     _tabs.clear();
     _detached.clear();
   }
