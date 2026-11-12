@@ -100,7 +100,6 @@ final class SessionCore {
     );
     final state = TokenState(
       accessToken: response.accessToken,
-      refreshToken: response.refreshToken,
       session: session,
     );
     if (generation != generationAtStart) return null;

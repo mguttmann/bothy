@@ -1718,6 +1718,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingReasonSessionExpired => 'Your session has expired.';
 
   @override
+  String get onboardingReasonDeviceKeyLost =>
+      'The key of this device can no longer be used, for example because its screen lock or biometrics changed. Log in again to register this device anew, then remove its old entry under Devices.';
+
+  @override
   String get onboardingDataDeleted =>
       'The data of this device has been deleted.';
 

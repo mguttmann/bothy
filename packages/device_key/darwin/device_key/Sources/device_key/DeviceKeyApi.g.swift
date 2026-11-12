@@ -360,19 +360,18 @@ class DeviceKeyApiPigeonCodec: FlutterStandardMessageCodec, @unchecked Sendable 
 /// Generated protocol from Pigeon that represents a handler of messages from Flutter.
 protocol DeviceKeyHostApi {
   /// Returns the key of [purpose] for [scope], creating it if it is missing.
-  func ensureKey(scope: String, purpose: KeyPurposeMessage) throws -> DeviceKeyInfoMessage
+  func ensureKey(scope: String, purpose: KeyPurposeMessage) async throws -> DeviceKeyInfoMessage
   /// Returns the key of [purpose] for [scope], or null; never creates one.
-  func keyInfo(scope: String, purpose: KeyPurposeMessage) throws -> DeviceKeyInfoMessage?
-  /// Signs [data] with ES256 and returns `R || S` (64 bytes); asynchronous,
-  /// because the step-up key shows the system prompt. [prompt] carries the
-  /// prompt texts for Android; the step-up key there fails with `internal`
-  /// without them.
+  func keyInfo(scope: String, purpose: KeyPurposeMessage) async throws -> DeviceKeyInfoMessage?
+  /// Signs [data] with ES256 and returns `R || S` (64 bytes); the step-up key
+  /// shows the system prompt first. [prompt] carries the prompt texts for
+  /// Android; the step-up key there fails with `internal` without them.
   func sign(scope: String, purpose: KeyPurposeMessage, data: FlutterStandardTypedData, prompt: PromptTextsMessage?) async throws -> FlutterStandardTypedData
   /// Returns an attestation of the key over [challenge], or null where the
   /// platform has none.
-  func attestation(scope: String, purpose: KeyPurposeMessage, challenge: FlutterStandardTypedData) throws -> FlutterStandardTypedData?
+  func attestation(scope: String, purpose: KeyPurposeMessage, challenge: FlutterStandardTypedData) async throws -> FlutterStandardTypedData?
   /// Deletes both keys of [scope].
-  func deleteKeys(scope: String) throws
+  func deleteKeys(scope: String) async throws
 }
 
 /// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
@@ -388,11 +387,13 @@ class DeviceKeyHostApiSetup {
         let args = message as! [Any?]
         let scopeArg = args[0] as! String
         let purposeArg = args[1] as! KeyPurposeMessage
-        do {
-          let result = try api.ensureKey(scope: scopeArg, purpose: purposeArg)
-          reply(wrapResult(result))
-        } catch {
-          reply(wrapError(error))
+        Task { @MainActor in
+          do {
+            let result = try await api.ensureKey(scope: scopeArg, purpose: purposeArg)
+            reply(wrapResult(result))
+          } catch {
+            reply(wrapError(error))
+          }
         }
       }
     } else {
@@ -405,20 +406,21 @@ class DeviceKeyHostApiSetup {
         let args = message as! [Any?]
         let scopeArg = args[0] as! String
         let purposeArg = args[1] as! KeyPurposeMessage
-        do {
-          let result = try api.keyInfo(scope: scopeArg, purpose: purposeArg)
-          reply(wrapResult(result))
-        } catch {
-          reply(wrapError(error))
+        Task { @MainActor in
+          do {
+            let result = try await api.keyInfo(scope: scopeArg, purpose: purposeArg)
+            reply(wrapResult(result))
+          } catch {
+            reply(wrapError(error))
+          }
         }
       }
     } else {
       keyInfoChannel.setMessageHandler(nil)
     }
-    /// Signs [data] with ES256 and returns `R || S` (64 bytes); asynchronous,
-    /// because the step-up key shows the system prompt. [prompt] carries the
-    /// prompt texts for Android; the step-up key there fails with `internal`
-    /// without them.
+    /// Signs [data] with ES256 and returns `R || S` (64 bytes); the step-up key
+    /// shows the system prompt first. [prompt] carries the prompt texts for
+    /// Android; the step-up key there fails with `internal` without them.
     let signChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.device_key.DeviceKeyHostApi.sign\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       signChannel.setMessageHandler { message, reply in
@@ -448,11 +450,13 @@ class DeviceKeyHostApiSetup {
         let scopeArg = args[0] as! String
         let purposeArg = args[1] as! KeyPurposeMessage
         let challengeArg = args[2] as! FlutterStandardTypedData
-        do {
-          let result = try api.attestation(scope: scopeArg, purpose: purposeArg, challenge: challengeArg)
-          reply(wrapResult(result))
-        } catch {
-          reply(wrapError(error))
+        Task { @MainActor in
+          do {
+            let result = try await api.attestation(scope: scopeArg, purpose: purposeArg, challenge: challengeArg)
+            reply(wrapResult(result))
+          } catch {
+            reply(wrapError(error))
+          }
         }
       }
     } else {
@@ -464,11 +468,13 @@ class DeviceKeyHostApiSetup {
       deleteKeysChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
         let scopeArg = args[0] as! String
-        do {
-          try api.deleteKeys(scope: scopeArg)
-          reply(wrapResult(nil))
-        } catch {
-          reply(wrapError(error))
+        Task { @MainActor in
+          do {
+            try await api.deleteKeys(scope: scopeArg)
+            reply(wrapResult(nil))
+          } catch {
+            reply(wrapError(error))
+          }
         }
       }
     } else {

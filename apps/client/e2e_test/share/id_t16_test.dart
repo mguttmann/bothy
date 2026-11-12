@@ -74,8 +74,10 @@ void main() {
         platform: 'ios',
         deviceKeys: PlatformDeviceKeyStore(
           dk.DeviceKeyClient(),
-          () =>
-              const dk.StepUpPrompt(title: 'Confirm', negativeButton: 'Cancel'),
+          () => const dk.StepUpPromptTexts(
+            title: 'Confirm',
+            negativeButton: 'Cancel',
+          ),
         ),
         appleShare: AppleShare(host: ShareAppleHostApi()),
       );

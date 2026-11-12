@@ -25,7 +25,10 @@ void main() {
       final client = dk.DeviceKeyClient();
       final keys = PlatformDeviceKeyStore(
         client,
-        () => const dk.StepUpPrompt(title: 'Confirm', negativeButton: 'Cancel'),
+        () => const dk.StepUpPromptTexts(
+          title: 'Confirm',
+          negativeButton: 'Cancel',
+        ),
       );
       final app = await TestApp.start(
         tester,

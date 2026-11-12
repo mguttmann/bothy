@@ -1732,6 +1732,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get onboardingReasonSessionExpired => 'Deine Sitzung ist abgelaufen.';
 
   @override
+  String get onboardingReasonDeviceKeyLost =>
+      'Der Schlüssel dieses Geräts ist nicht mehr nutzbar, zum Beispiel weil sich die Bildschirmsperre oder die Biometrie geändert hat. Melde dich erneut an, um dieses Gerät neu zu registrieren, und entferne danach den alten Eintrag unter Geräte.';
+
+  @override
   String get onboardingDataDeleted =>
       'Die Daten dieses Geräts wurden gelöscht.';
 

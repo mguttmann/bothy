@@ -33,24 +33,21 @@ final class SessionInfo {
       'access expires: ${accessExpiresAt.toIso8601String()})';
 }
 
-/// A token pair as the server issued it (`TokenResponse`) and the session it belongs to.
+/// The access token the server issued (`TokenResponse`) and the session it belongs to.
 ///
-/// [toString] prints the kind and length of the tokens only (Design note 7).
+/// The refresh token of the response is not part of it: the session writes it to the
+/// `SecretStore` and reads it from there for every refresh, so it stays out of the memory of
+/// the app and of what a login hands to the caller (`LoginSignedIn.tokens`).
+///
+/// [toString] prints the kind and length of the token only (Design note 7).
 final class TokenState {
   /// Creates the state.
-  const TokenState({
-    required this.accessToken,
-    required this.refreshToken,
-    required this.session,
-  });
+  const TokenState({required this.accessToken, required this.session});
 
   /// The DPoP-bound access token (`Authorization: DPoP <token>`); kept in memory only.
   final String accessToken;
 
-  /// The refresh token of the family; persisted in the `SecretStore` before use.
-  final String refreshToken;
-
-  /// The session the tokens belong to.
+  /// The session the token belongs to.
   final SessionInfo session;
 
   /// Whether the access token has expired at [now].
@@ -59,7 +56,7 @@ final class TokenState {
   @override
   String toString() =>
       'TokenState(access: ${redacted('access token', accessToken)}, '
-      'refresh: ${redacted('refresh token', refreshToken)}, session: $session)';
+      'session: $session)';
 }
 
 /// Reads the `exp` claim (seconds) of a JWS access token without checking it; the client only

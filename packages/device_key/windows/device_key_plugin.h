@@ -45,9 +45,12 @@ class PlatformThreadRunner {
 /// The device_key plugin on Windows: connects the Pigeon interface to DeviceKeyStore
 /// (brief M4-11, Design note 1).
 ///
-/// EnsureKey, KeyInfo, Attestation and DeleteKeys answer on the platform thread; Sign runs on a
-/// worker thread of the plugin, because TPM operations can block for seconds, and answers through
-/// PlatformThreadRunner. Every error leaves as a FlutterError with a stable code and a fixed text.
+/// No call works on the platform thread: creating a key in the TPM and signing with it can block
+/// for seconds, and every other call opens providers and keys as well. Each call becomes a job of
+/// the plugin's one worker thread, in the order of the calls, and answers through
+/// PlatformThreadRunner on the platform thread, where Flutter expects channel replies
+/// (docs/decisions.d/AUD-pkg-device-key-01.md). Every error leaves as a FlutterError with a stable
+/// code and a fixed text.
 class DeviceKeyPlugin : public flutter::Plugin, public DeviceKeyHostApi {
  public:
   /// Creates the plugin and registers it on [registrar]'s messenger.
@@ -57,31 +60,37 @@ class DeviceKeyPlugin : public flutter::Plugin, public DeviceKeyHostApi {
 
   /// Creates a plugin over the CNG providers and the Credential Manager markers.
   DeviceKeyPlugin();
-  /// Waits for a running signature, then stops the worker thread.
+  /// Waits for the running job, then stops the worker thread; jobs not started are dropped.
   ~DeviceKeyPlugin() override;
   DeviceKeyPlugin(const DeviceKeyPlugin&) = delete;
   DeviceKeyPlugin& operator=(const DeviceKeyPlugin&) = delete;
 
-  /// See DeviceKeyHostApi::EnsureKey.
-  ErrorOr<DeviceKeyInfoMessage> EnsureKey(const std::string& scope,
-                                          const KeyPurposeMessage& purpose) override;
-  /// See DeviceKeyHostApi::KeyInfo.
-  ErrorOr<std::optional<DeviceKeyInfoMessage>> KeyInfo(const std::string& scope,
-                                                       const KeyPurposeMessage& purpose) override;
+  /// See DeviceKeyHostApi::EnsureKey; the reply arrives on the platform thread.
+  void EnsureKey(const std::string& scope, const KeyPurposeMessage& purpose,
+                 std::function<void(ErrorOr<DeviceKeyInfoMessage> reply)> result) override;
+  /// See DeviceKeyHostApi::KeyInfo; the reply arrives on the platform thread.
+  void KeyInfo(
+      const std::string& scope, const KeyPurposeMessage& purpose,
+      std::function<void(ErrorOr<std::optional<DeviceKeyInfoMessage>> reply)> result) override;
   /// See DeviceKeyHostApi::Sign; the reply arrives on the platform thread. Windows ignores
   /// prompt, the texts of the Android step-up prompt: it has no step-up key (D-M4-11-2).
   void Sign(const std::string& scope, const KeyPurposeMessage& purpose,
             const std::vector<uint8_t>& data, const PromptTextsMessage* prompt,
             std::function<void(ErrorOr<std::vector<uint8_t>> reply)> result) override;
-  /// See DeviceKeyHostApi::Attestation; Windows returns none in this version.
-  ErrorOr<std::optional<std::vector<uint8_t>>> Attestation(
+  /// See DeviceKeyHostApi::Attestation; Windows returns none in this version. The reply arrives
+  /// on the platform thread.
+  void Attestation(
       const std::string& scope, const KeyPurposeMessage& purpose,
-      const std::vector<uint8_t>& challenge) override;
-  /// See DeviceKeyHostApi::DeleteKeys.
-  std::optional<FlutterError> DeleteKeys(const std::string& scope) override;
+      const std::vector<uint8_t>& challenge,
+      std::function<void(ErrorOr<std::optional<std::vector<uint8_t>>> reply)> result) override;
+  /// See DeviceKeyHostApi::DeleteKeys; the reply arrives on the platform thread.
+  void DeleteKeys(const std::string& scope,
+                  std::function<void(std::optional<FlutterError> reply)> result) override;
 
  private:
   void RunWorker();
+  /// Queues [job] for the worker thread.
+  void Enqueue(std::function<void()> job);
 
   CngKeyProvider provider_;
   CredentialMarkerStore markers_;

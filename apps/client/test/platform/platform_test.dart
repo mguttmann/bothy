@@ -28,7 +28,7 @@ import '../support/fakes.dart';
 /// A device key client without a platform: keys are fixed bytes, signatures echo a marker.
 class FakeDeviceKeyClient implements dk.DeviceKeyClient {
   final List<String> calls = [];
-  dk.StepUpPrompt? lastPrompt;
+  dk.StepUpPromptTexts? lastPrompt;
 
   /// Thrown by `ensure` of the step-up key, as the Windows plugin does with `not_available`
   /// (D-M4-11-2); `null` creates the key.
@@ -54,7 +54,7 @@ class FakeDeviceKeyClient implements dk.DeviceKeyClient {
     String scope,
     dk.KeyPurpose purpose,
     Uint8List data, {
-    dk.StepUpPrompt? prompt,
+    dk.StepUpPromptTexts? prompt,
   }) async {
     calls.add('sign $scope ${purpose.name}');
     lastPrompt = prompt;
@@ -150,8 +150,10 @@ void main() {
         final client = FakeDeviceKeyClient();
         final store = PlatformDeviceKeyStore(
           client,
-          () =>
-              const dk.StepUpPrompt(title: 'Confirm', negativeButton: 'Cancel'),
+          () => const dk.StepUpPromptTexts(
+            title: 'Confirm',
+            negativeButton: 'Cancel',
+          ),
         );
         final keys = await store.ensure('instance-1');
         expect(client.calls, [
@@ -177,7 +179,10 @@ void main() {
         );
       final store = PlatformDeviceKeyStore(
         client,
-        () => const dk.StepUpPrompt(title: 'Confirm', negativeButton: 'Cancel'),
+        () => const dk.StepUpPromptTexts(
+          title: 'Confirm',
+          negativeButton: 'Cancel',
+        ),
       );
       final keys = await store.ensure('instance-1');
       expect(client.calls, [
@@ -201,7 +206,7 @@ void main() {
             ..stepUpError = dk.DeviceKeyException(code);
           final store = PlatformDeviceKeyStore(
             client,
-            () => const dk.StepUpPrompt(
+            () => const dk.StepUpPromptTexts(
               title: 'Confirm',
               negativeButton: 'Cancel',
             ),

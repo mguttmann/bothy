@@ -27,6 +27,7 @@ import '../app/bootstrap.dart';
 import '../app/discovery.dart';
 import '../app/providers/ports.dart';
 import '../app/router.dart';
+import '../platform/device_key_signer.dart' show DeviceKeyLost;
 import '../platform/secure_store.dart';
 import 'start_route.dart';
 
@@ -207,8 +208,9 @@ final class OnboardingState {
 /// E1 [connect] runs discovery and composes the services of the instance; E2 and E3 run the
 /// login flows; `pending` goes to E4 and polls; `signedIn` starts the engine and shows the main
 /// view; every end of the account ([logout], [cancelPending], a rejected or expired device, a
-/// revoked session, `4012`) runs the one [AccountWiper] and shows E7 with its cause. A start
-/// with the session of an active device opens its local data before the network is asked.
+/// revoked session, `4012`, a lost device key) runs the one [AccountWiper] and shows E7 with
+/// its cause. A start with the session of an active device opens its local data before the
+/// network is asked.
 @Riverpod(keepAlive: true)
 class OnboardingController extends _$OnboardingController {
   late AppPorts _ports;
@@ -216,6 +218,7 @@ class OnboardingController extends _$OnboardingController {
   StreamSubscription<AuthEvent>? _authEvents;
   StreamSubscription<SyncNotice>? _notices;
   StreamSubscription<ClientVersionDecision>? _versions;
+  StreamSubscription<void>? _keyLost;
   int _flow = 0;
   bool _flowOwnsSignOut = false;
   bool _ending = false;
@@ -237,6 +240,7 @@ class OnboardingController extends _$OnboardingController {
       unawaited(_authEvents?.cancel());
       unawaited(_notices?.cancel());
       unawaited(_versions?.cancel());
+      unawaited(_keyLost?.cancel());
       // The app quits (or a test ends): the running polls stop, the engine stops and the
       // database closes; nothing is deleted.
       _flow++;
@@ -502,7 +506,8 @@ class OnboardingController extends _$OnboardingController {
   /// Closes the open services, finishes an incomplete wipe and composes the services of
   /// [instance]. Returns null after a failure, which E1 shows with its text
   /// ([openFailureStatus]); a database of a stored session that the stored key does not open
-  /// can be reset from there ([resetLocalData]).
+  /// can be reset from there ([resetLocalData]). A stored session whose device keys are gone
+  /// ends on E7 instead ([_endForLostKeys]).
   Future<InstanceServices?> _openServices(InstanceInfo instance) async {
     await _closeServices();
     await _finishWipe();
@@ -520,6 +525,10 @@ class OnboardingController extends _$OnboardingController {
       _unreadable = null;
       _watch(services);
       return services;
+    } on DeviceKeyLost catch (lost, stack) {
+      _logOpenFailure(lost, stack);
+      await _endForLostKeys(instance, lost);
+      return null;
     } on Object catch (error, stack) {
       _logOpenFailure(error, stack);
       if (!ref.mounted) return null;
@@ -532,6 +541,64 @@ class OnboardingController extends _$OnboardingController {
             clearServices: true,
           );
       return null;
+    }
+  }
+
+  /// The stored session of [instance] belongs to device keys this device no longer has
+  /// (08 5.4): no key is created in their place. What the session left on the device goes
+  /// (nothing of the instance is open yet, so [InstanceServices.leftoverWiper] deletes the
+  /// folder, the keys, the push and share items and every secret, R-SY-14), and E7 shows
+  /// [SignOutCause.deviceKeyLost]; "Log in again" then creates new keys and registers the
+  /// device anew. The server is not asked: without the keys the session cannot prove itself.
+  Future<void> _endForLostKeys(
+    InstanceInfo instance,
+    DeviceKeyLost lost,
+  ) async {
+    var complete = true;
+    try {
+      final wiper = await InstanceServices.leftoverWiper(
+        _ports,
+        instanceId: instance.instanceId,
+        keyScope: lost.keyScope,
+      );
+      await wiper.wipe();
+    } on Object catch (error, stack) {
+      complete = false;
+      await _rememberUnfinished(
+        UnfinishedWipe(
+          instanceId: instance.instanceId,
+          keyScope: lost.keyScope,
+        ),
+        error,
+        stack,
+      );
+    }
+    if (!ref.mounted) return;
+    _unreadable = null;
+    state = state
+        .withInstance(instance)
+        .next(
+          step: OnboardingStep.signedOut,
+          clearServices: true,
+          serverStatus: ServerStatus.idle,
+          cause: SignOutCause.deviceKeyLost,
+          wipeIncomplete: !complete,
+        );
+  }
+
+  /// Logs why a wipe is incomplete and remembers [left] for the next start ([_finishWipe]).
+  Future<void> _rememberUnfinished(
+    UnfinishedWipe left,
+    Object error,
+    StackTrace stack,
+  ) async {
+    _logWipeFailure(error, stack);
+    _unfinished = left;
+    _unfinishedRead = true;
+    try {
+      await _prefs.setUnfinishedWipe(jsonEncode(left.toJson()));
+    } on Object catch (error, stack) {
+      _logWipeFailure(error, stack);
     }
   }
 
@@ -961,6 +1028,11 @@ class OnboardingController extends _$OnboardingController {
         unawaited(_endAccount(SignOutCause.sessionRevoked));
       }
     });
+    unawaited(_keyLost?.cancel());
+    // A device key the system no longer accepts (`key_invalidated` at a signature, 08 5.4).
+    _keyLost = services.deviceKeyLost.listen((_) {
+      unawaited(_endAccount(SignOutCause.deviceKeyLost));
+    });
   }
 
   /// The instance raised `client.min_version.<platform>` above this build while it ran (the
@@ -1006,9 +1078,11 @@ class OnboardingController extends _$OnboardingController {
       await _authEvents?.cancel();
       await _notices?.cancel();
       await _versions?.cancel();
+      await _keyLost?.cancel();
       _authEvents = null;
       _notices = null;
       _versions = null;
+      _keyLost = null;
       if (before != null) {
         try {
           await before();
@@ -1022,18 +1096,14 @@ class OnboardingController extends _$OnboardingController {
       } on Object catch (error, stack) {
         // The wiper ran every step regardless of failures; its error names the failed ones.
         complete = false;
-        _logWipeFailure(error, stack);
-        final left = UnfinishedWipe(
-          instanceId: services.wiper.instanceId,
-          keyScope: services.wiper.keyScope,
+        await _rememberUnfinished(
+          UnfinishedWipe(
+            instanceId: services.wiper.instanceId,
+            keyScope: services.wiper.keyScope,
+          ),
+          error,
+          stack,
         );
-        _unfinished = left;
-        _unfinishedRead = true;
-        try {
-          await _prefs.setUnfinishedWipe(jsonEncode(left.toJson()));
-        } on Object catch (error, stack) {
-          _logWipeFailure(error, stack);
-        }
       }
       await services.auth.dispose();
       // The app quit or a test ended while the wipe ran: the data is gone, no state is left.
@@ -1056,9 +1126,11 @@ class OnboardingController extends _$OnboardingController {
     await _authEvents?.cancel();
     await _notices?.cancel();
     await _versions?.cancel();
+    await _keyLost?.cancel();
     _authEvents = null;
     _notices = null;
     _versions = null;
+    _keyLost = null;
     await services.close();
   }
 }

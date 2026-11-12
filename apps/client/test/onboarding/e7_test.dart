@@ -26,6 +26,7 @@ void main() {
       SignOutCause.pendingExpired: en.onboardingReasonPendingExpired,
       SignOutCause.sessionRevoked: en.onboardingReasonSessionRevoked,
       SignOutCause.sessionExpired: en.onboardingReasonSessionExpired,
+      SignOutCause.deviceKeyLost: en.onboardingReasonDeviceKeyLost,
     };
     for (final MapEntry(key: cause, value: reason) in texts.entries) {
       await tester.pumpWidget(

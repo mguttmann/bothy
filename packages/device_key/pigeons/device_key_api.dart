@@ -84,16 +84,22 @@ class PromptTextsMessage {
 )
 @HostApi()
 abstract class DeviceKeyHostApi {
+  // Every method is asynchronous, so no call works on the platform thread:
+  // creating a key talks to StrongBox, the Secure Enclave or the TPM, the
+  // other calls read or change the key storage, and a step-up signature
+  // waits for the person (docs/decisions.d/AUD-pkg-device-key-01.md).
+
   /// Returns the key of [purpose] for [scope], creating it if it is missing.
+  @async
   DeviceKeyInfoMessage ensureKey(String scope, KeyPurposeMessage purpose);
 
   /// Returns the key of [purpose] for [scope], or null; never creates one.
+  @async
   DeviceKeyInfoMessage? keyInfo(String scope, KeyPurposeMessage purpose);
 
-  /// Signs [data] with ES256 and returns `R || S` (64 bytes); asynchronous,
-  /// because the step-up key shows the system prompt. [prompt] carries the
-  /// prompt texts for Android; the step-up key there fails with `internal`
-  /// without them.
+  /// Signs [data] with ES256 and returns `R || S` (64 bytes); the step-up key
+  /// shows the system prompt first. [prompt] carries the prompt texts for
+  /// Android; the step-up key there fails with `internal` without them.
   @async
   Uint8List sign(
     String scope,
@@ -104,6 +110,7 @@ abstract class DeviceKeyHostApi {
 
   /// Returns an attestation of the key over [challenge], or null where the
   /// platform has none.
+  @async
   Uint8List? attestation(
     String scope,
     KeyPurposeMessage purpose,
@@ -111,5 +118,6 @@ abstract class DeviceKeyHostApi {
   );
 
   /// Deletes both keys of [scope].
+  @async
   void deleteKeys(String scope);
 }

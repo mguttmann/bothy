@@ -40,7 +40,12 @@ enum SignOutCause {
   sessionRevoked,
 
   /// The server no longer accepts the refresh token (`auth.session_max_age`).
-  sessionExpired;
+  sessionExpired,
+
+  /// A device key of the registration is gone, was replaced or no longer signs (08 5.4): the
+  /// session cannot be used any more, and the next login registers this device anew
+  /// ([RegisteredDeviceKeys]).
+  deviceKeyLost;
 
   /// The cause of a `devices.revoke_reason` code, or [sessionRevoked] for an unknown one.
   static SignOutCause ofRevokeReason(String? reason) => switch (reason) {

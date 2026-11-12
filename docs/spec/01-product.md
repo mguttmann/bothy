@@ -1500,7 +1500,8 @@ local data. The lock detaches terminal sessions (they keep running on the host, 
 ```
 
 **E7 Logged out.** After logout, revocation of the device, expiry of the session
-(`auth.session_max_age`), disabling of the person or rejection in E4. The reason appears as text
+(`auth.session_max_age`), disabling of the person, rejection in E4 or the loss of a device key
+(08, section 5.4). The reason appears as text
 (`devices.revoke_reason` or the code of the session, without internal names), together with the
 sentence "The data of this device has been deleted" (04, section 8.5, R-SY-14) and "Log in again"
 (E2). For a disabled person there is no login button, only "Contact the owner". When a part of the

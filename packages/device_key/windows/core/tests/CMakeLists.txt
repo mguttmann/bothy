@@ -19,6 +19,9 @@ foreach(test_name IN ITEMS
     step_up_binding
     existing_key_is_not_recreated_in_other_provider
     marker_without_key_is_invalidated
+    foreign_exportable_key_is_not_taken_over
+    sign_keeps_the_opened_key
+    kept_key_goes_with_delete_and_after_a_failed_signature
     delete_removes_both_keys
     errors_carry_no_key_material)
   add_test(NAME ${test_name} COMMAND device_key_core_tests ${test_name})

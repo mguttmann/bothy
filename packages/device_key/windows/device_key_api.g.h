@@ -190,17 +190,18 @@ class DeviceKeyHostApi {
   DeviceKeyHostApi& operator=(const DeviceKeyHostApi&) = delete;
   virtual ~DeviceKeyHostApi() {}
   // Returns the key of [purpose] for [scope], creating it if it is missing.
-  virtual ErrorOr<DeviceKeyInfoMessage> EnsureKey(
+  virtual void EnsureKey(
     const std::string& scope,
-    const KeyPurposeMessage& purpose) = 0;
+    const KeyPurposeMessage& purpose,
+    std::function<void(ErrorOr<DeviceKeyInfoMessage> reply)> result) = 0;
   // Returns the key of [purpose] for [scope], or null; never creates one.
-  virtual ErrorOr<std::optional<DeviceKeyInfoMessage>> KeyInfo(
+  virtual void KeyInfo(
     const std::string& scope,
-    const KeyPurposeMessage& purpose) = 0;
-  // Signs [data] with ES256 and returns `R || S` (64 bytes); asynchronous,
-  // because the step-up key shows the system prompt. [prompt] carries the
-  // prompt texts for Android; the step-up key there fails with `internal`
-  // without them.
+    const KeyPurposeMessage& purpose,
+    std::function<void(ErrorOr<std::optional<DeviceKeyInfoMessage>> reply)> result) = 0;
+  // Signs [data] with ES256 and returns `R || S` (64 bytes); the step-up key
+  // shows the system prompt first. [prompt] carries the prompt texts for
+  // Android; the step-up key there fails with `internal` without them.
   virtual void Sign(
     const std::string& scope,
     const KeyPurposeMessage& purpose,
@@ -209,12 +210,15 @@ class DeviceKeyHostApi {
     std::function<void(ErrorOr<std::vector<uint8_t>> reply)> result) = 0;
   // Returns an attestation of the key over [challenge], or null where the
   // platform has none.
-  virtual ErrorOr<std::optional<std::vector<uint8_t>>> Attestation(
+  virtual void Attestation(
     const std::string& scope,
     const KeyPurposeMessage& purpose,
-    const std::vector<uint8_t>& challenge) = 0;
+    const std::vector<uint8_t>& challenge,
+    std::function<void(ErrorOr<std::optional<std::vector<uint8_t>>> reply)> result) = 0;
   // Deletes both keys of [scope].
-  virtual std::optional<FlutterError> DeleteKeys(const std::string& scope) = 0;
+  virtual void DeleteKeys(
+    const std::string& scope,
+    std::function<void(std::optional<FlutterError> reply)> result) = 0;
 
   // The codec used by DeviceKeyHostApi.
   static const ::flutter::StandardMessageCodec& GetCodec();

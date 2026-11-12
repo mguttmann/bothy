@@ -3,6 +3,7 @@
 package devicekey.flutter
 
 import androidx.fragment.app.FragmentActivity
+import devicekey.core.DeviceKeyCalls
 import devicekey.core.DeviceKeyCore
 import devicekey.core.DeviceKeyErrorCode
 import devicekey.core.DeviceKeyException
@@ -66,14 +67,20 @@ class DeviceKeyPlugin : FlutterPlugin, ActivityAware {
 /**
  * The host side of the Pigeon interface over [core].
  *
+ * Pigeon calls every method on the platform thread; none works there. Creating, reading and
+ * deleting keys run on the thread of [DeviceKeyCalls], the DPoP signature on a worker, and the
+ * step-up signature only starts its prompt here.
+ *
  * @param core the key code shared with the push service and the share activity.
  */
 internal class HostApi(private val core: DeviceKeyCore) : DeviceKeyHostApi {
-    override fun ensureKey(scope: String, purpose: KeyPurposeMessage): DeviceKeyInfoMessage =
-        bridged { message(core.ensureKey(scope, purpose.core)) }
+    private val calls = DeviceKeyCalls(core)
 
-    override fun keyInfo(scope: String, purpose: KeyPurposeMessage): DeviceKeyInfoMessage? =
-        bridged { core.keyInfo(scope, purpose.core)?.let(::message) }
+    override suspend fun ensureKey(scope: String, purpose: KeyPurposeMessage): DeviceKeyInfoMessage =
+        bridged { message(answered { calls.ensureKey(scope, purpose.core, it) }) }
+
+    override suspend fun keyInfo(scope: String, purpose: KeyPurposeMessage): DeviceKeyInfoMessage? =
+        bridged { answered { calls.keyInfo(scope, purpose.core, it) }?.let(::message) }
 
     override suspend fun sign(
         scope: String,
@@ -87,18 +94,20 @@ internal class HostApi(private val core: DeviceKeyCore) : DeviceKeyHostApi {
                 KeyPurposeMessage.DPOP -> withContext(Dispatchers.Default) { core.signDpop(scope, data) }
                 // The prompt starts on the main thread, where Pigeon calls this method.
                 KeyPurposeMessage.STEP_UP ->
-                    suspendCancellableCoroutine { continuation ->
-                        core.sign(scope, KeyPurpose.STEP_UP, data, prompt?.let(::texts)) { continuation.resumeWith(it) }
-                    }
+                    answered { core.sign(scope, KeyPurpose.STEP_UP, data, prompt?.let(::texts), it) }
             }
         }
 
-    override fun attestation(scope: String, purpose: KeyPurposeMessage, challenge: ByteArray): ByteArray? =
-        bridged { core.attestation(scope, purpose.core, challenge) }
+    override suspend fun attestation(scope: String, purpose: KeyPurposeMessage, challenge: ByteArray): ByteArray? =
+        bridged { answered { calls.attestation(scope, purpose.core, challenge, it) } }
 
-    override fun deleteKeys(scope: String) {
-        bridged { core.deleteKeys(scope) }
+    override suspend fun deleteKeys(scope: String) {
+        bridged { answered { calls.deleteKeys(scope, it) } }
     }
+
+    /** Waits for the one answer [start] hands to its callback, without blocking the thread. */
+    private suspend fun <T> answered(start: ((Result<T>) -> Unit) -> Unit): T =
+        suspendCancellableCoroutine { continuation -> start { continuation.resumeWith(it) } }
 
     private fun message(info: DeviceKeyInfo) =
         DeviceKeyInfoMessage(

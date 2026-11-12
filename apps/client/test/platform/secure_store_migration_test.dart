@@ -197,6 +197,12 @@ void main() {
         );
         expect(old.legacyItems, contains(token));
         c.dispose();
+        // A build before the app scope kept no record of its registered device keys; the app
+        // of this test wrote one, so it goes. The update then records the keys it finds
+        // (docs/decisions.d/AUD-pkg-device-key-01.md).
+        await old.delete(
+          'instance/$instanceId/${RegisteredDeviceKeys.keyName}',
+        );
 
         // The update starts on the same platform store and data root.
         final logs = <String>[];

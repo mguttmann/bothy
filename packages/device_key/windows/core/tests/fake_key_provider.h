@@ -35,6 +35,11 @@ class FakeKeyProvider : public KeyProvider {
   std::vector<DWORD> sign_flags;
   /// When not 0, SignHash returns this status instead of signing.
   SECURITY_STATUS sign_failure = 0;
+  /// When not 0, the next SignHash returns this status instead of signing, the ones after it
+  /// sign again: a handle that stopped working.
+  SECURITY_STATUS sign_failure_once = 0;
+  /// How often OpenKey was called.
+  int key_opens = 0;
   /// When not 0, ExportKey returns this status instead of exporting.
   SECURITY_STATUS export_failure = 0;
 
@@ -77,6 +82,7 @@ class FakeKeyProvider : public KeyProvider {
   SECURITY_STATUS FinalizeKey(NCRYPT_KEY_HANDLE key) override { return real_.FinalizeKey(key); }
 
   SECURITY_STATUS OpenKey(NCRYPT_PROV_HANDLE provider, LPCWSTR name, NcryptHandle* key) override {
+    ++key_opens;
     if (mode_ == PlatformMode::kWithoutP256 && KindOf(provider) == ProviderKind::kPlatform) {
       // The simulated TPM holds no keys; its handle must not reach the software keys.
       return NTE_BAD_KEYSET;
@@ -92,6 +98,11 @@ class FakeKeyProvider : public KeyProvider {
   SECURITY_STATUS SignHash(NCRYPT_KEY_HANDLE key, const Bytes& hash, DWORD flags,
                            Bytes* signature) override {
     sign_flags.push_back(flags);
+    if (sign_failure_once != 0) {
+      SECURITY_STATUS once = sign_failure_once;
+      sign_failure_once = 0;
+      return once;
+    }
     if (sign_failure != 0) return sign_failure;
     return real_.SignHash(key, hash, flags, signature);
   }

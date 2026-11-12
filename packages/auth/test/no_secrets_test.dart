@@ -39,11 +39,7 @@ void main() {
       deviceId: DeviceId.parse('0192f4a0-7b1c-7000-8000-0000000000d1'),
       accessExpiresAt: DateTime.utc(2026),
     );
-    final state = TokenState(
-      accessToken: 'CANARY-ACCESS',
-      refreshToken: 'CANARY-REFRESH',
-      session: session,
-    );
+    final state = TokenState(accessToken: 'CANARY-ACCESS', session: session);
     _clean(state);
     expect('$state', contains('13'));
     _clean(session);

@@ -374,23 +374,22 @@ private open class DeviceKeyApiPigeonCodec : StandardMessageCodec() {
  */
 interface DeviceKeyHostApi {
   /** Returns the key of [purpose] for [scope], creating it if it is missing. */
-  fun ensureKey(scope: String, purpose: KeyPurposeMessage): DeviceKeyInfoMessage
+  suspend fun ensureKey(scope: String, purpose: KeyPurposeMessage): DeviceKeyInfoMessage
   /** Returns the key of [purpose] for [scope], or null; never creates one. */
-  fun keyInfo(scope: String, purpose: KeyPurposeMessage): DeviceKeyInfoMessage?
+  suspend fun keyInfo(scope: String, purpose: KeyPurposeMessage): DeviceKeyInfoMessage?
   /**
-   * Signs [data] with ES256 and returns `R || S` (64 bytes); asynchronous,
-   * because the step-up key shows the system prompt. [prompt] carries the
-   * prompt texts for Android; the step-up key there fails with `internal`
-   * without them.
+   * Signs [data] with ES256 and returns `R || S` (64 bytes); the step-up key
+   * shows the system prompt first. [prompt] carries the prompt texts for
+   * Android; the step-up key there fails with `internal` without them.
    */
   suspend fun sign(scope: String, purpose: KeyPurposeMessage, data: ByteArray, prompt: PromptTextsMessage?): ByteArray
   /**
    * Returns an attestation of the key over [challenge], or null where the
    * platform has none.
    */
-  fun attestation(scope: String, purpose: KeyPurposeMessage, challenge: ByteArray): ByteArray?
+  suspend fun attestation(scope: String, purpose: KeyPurposeMessage, challenge: ByteArray): ByteArray?
   /** Deletes both keys of [scope]. */
-  fun deleteKeys(scope: String)
+  suspend fun deleteKeys(scope: String)
 
   companion object {
     /** The codec used by DeviceKeyHostApi. */
@@ -408,12 +407,14 @@ interface DeviceKeyHostApi {
             val args = message as List<Any?>
             val scopeArg = args[0] as String
             val purposeArg = args[1] as KeyPurposeMessage
-            val wrapped: List<Any?> = try {
-              listOf(api.ensureKey(scopeArg, purposeArg))
-            } catch (exception: Throwable) {
-              DeviceKeyApiPigeonUtils.wrapError(exception)
+            CoroutineScope(Dispatchers.Main).launch {
+              val wrapped: List<Any?> = try {
+                listOf(api.ensureKey(scopeArg, purposeArg))
+              } catch (exception: Throwable) {
+                DeviceKeyApiPigeonUtils.wrapError(exception)
+              }
+              reply.reply(wrapped)
             }
-            reply.reply(wrapped)
           }
         } else {
           channel.setMessageHandler(null)
@@ -426,12 +427,14 @@ interface DeviceKeyHostApi {
             val args = message as List<Any?>
             val scopeArg = args[0] as String
             val purposeArg = args[1] as KeyPurposeMessage
-            val wrapped: List<Any?> = try {
-              listOf(api.keyInfo(scopeArg, purposeArg))
-            } catch (exception: Throwable) {
-              DeviceKeyApiPigeonUtils.wrapError(exception)
+            CoroutineScope(Dispatchers.Main).launch {
+              val wrapped: List<Any?> = try {
+                listOf(api.keyInfo(scopeArg, purposeArg))
+              } catch (exception: Throwable) {
+                DeviceKeyApiPigeonUtils.wrapError(exception)
+              }
+              reply.reply(wrapped)
             }
-            reply.reply(wrapped)
           }
         } else {
           channel.setMessageHandler(null)
@@ -467,12 +470,14 @@ interface DeviceKeyHostApi {
             val scopeArg = args[0] as String
             val purposeArg = args[1] as KeyPurposeMessage
             val challengeArg = args[2] as ByteArray
-            val wrapped: List<Any?> = try {
-              listOf(api.attestation(scopeArg, purposeArg, challengeArg))
-            } catch (exception: Throwable) {
-              DeviceKeyApiPigeonUtils.wrapError(exception)
+            CoroutineScope(Dispatchers.Main).launch {
+              val wrapped: List<Any?> = try {
+                listOf(api.attestation(scopeArg, purposeArg, challengeArg))
+              } catch (exception: Throwable) {
+                DeviceKeyApiPigeonUtils.wrapError(exception)
+              }
+              reply.reply(wrapped)
             }
-            reply.reply(wrapped)
           }
         } else {
           channel.setMessageHandler(null)
@@ -484,13 +489,15 @@ interface DeviceKeyHostApi {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
             val scopeArg = args[0] as String
-            val wrapped: List<Any?> = try {
-              api.deleteKeys(scopeArg)
-              listOf(null)
-            } catch (exception: Throwable) {
-              DeviceKeyApiPigeonUtils.wrapError(exception)
+            CoroutineScope(Dispatchers.Main).launch {
+              val wrapped: List<Any?> = try {
+                api.deleteKeys(scopeArg)
+                listOf(null)
+              } catch (exception: Throwable) {
+                DeviceKeyApiPigeonUtils.wrapError(exception)
+              }
+              reply.reply(wrapped)
             }
-            reply.reply(wrapped)
           }
         } else {
           channel.setMessageHandler(null)

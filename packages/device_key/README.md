@@ -29,8 +29,9 @@ final confirmation = await keys.sign(
   scope,
   KeyPurpose.stepUp,
   challengeInput,
-  prompt: StepUpPrompt(title: l10n.stepUpTitle, negativeButton: l10n.cancel), // Android only
+  prompt: StepUpPromptTexts(title: l10n.stepUpTitle, negativeButton: l10n.cancel), // Android only
 );
+final registered = await keys.keyInfo(scope, KeyPurpose.dpop); // null: no such key; never creates one
 await keys.delete(scope); // removes both keys; there is no key change (08 5.4)
 ```
 
@@ -39,8 +40,43 @@ await keys.delete(scope); // removes both keys; there is no key change (08 5.4)
 | `DeviceKeyClient` | `ensure`, `keyInfo`, `sign`, `attestation`, `delete`; `api:` takes a fake host API in tests |
 | `DeviceKeyInfo` | `x`, `y`, `hardwareBound`, `requiresUserPresence`; `publicJwk` and `thumbprint` computed in Dart for every platform |
 | `KeyPurpose` | `dpop`, `stepUp` |
-| `StepUpPrompt` | `title`, `subtitle`, `negativeButton` of the Android prompt, from `packages/l10n`; iOS and macOS ignore it |
+| `StepUpPromptTexts` | `title`, `subtitle`, `negativeButton` of the Android prompt, from `packages/l10n`; iOS and macOS ignore it (not the `StepUpPrompt` port of `packages/auth`, which asks the person) |
 | `DeviceKeyException`, `DeviceKeyError` | `userCancelled`, `keyInvalidated` (register as a new device), `notAvailable`, `internal`; never a platform message or key material |
+
+## A device with a registration
+
+`ensure` creates a key that is missing, and a system deletes keys behind the app: the step-up
+item when the device passcode is turned off (`WhenPasscodeSetThisDeviceOnly`), every key at a
+restore onto another device, a TPM key when the TPM is cleared. A key created in the place of a
+registered one is another key: the server answers its DPoP proofs with `invalid_dpop_proof` for
+good and counts its step-up confirmations as wrong (08 6.2, 7.4). So:
+
+- Only a caller without a registration calls `ensure`.
+- A caller with a registration reads its keys with `keyInfo`, which never creates one, and
+  compares `DeviceKeyInfo.thumbprint` with the thumbprint it registered. Null is a definite
+  "no such key"; a storage that cannot answer right now (a locked device) throws
+  `notAvailable` or `internal` instead.
+- A missing key, another thumbprint and `keyInvalidated` (from `keyInfo`, `ensure` or `sign`)
+  mean the registration is lost: the caller deletes the keys (`delete`) and registers as a new
+  device (08 5.4).
+
+The app does this in `RegisteredDeviceKeys` (`apps/client/lib/platform/device_key_signer.dart`):
+it records the thumbprints with the secrets of the instance when it creates the keys, compares
+at every start with a stored session, and ends the account on the device with the reason "The
+key of this device can no longer be used" (docs/decisions.d/AUD-pkg-device-key-01.md).
+
+## Threads
+
+No call works on the platform thread, which draws the app; every method of the channel is
+asynchronous:
+
+| Platform | Creating, reading, deleting keys | `sign` with `dpop` | `sign` with `step_up` |
+|---|---|---|---|
+| iOS, macOS (`DeviceKeyQueues`) | a serial queue, in the order of the calls | a concurrent queue | a serial queue of its own, so an open system prompt holds nothing else |
+| Android (`DeviceKeyCalls`, `HostApi`) | one thread of the plugin, in the order of the calls | `Dispatchers.Default` | the prompt starts on the main thread, the call waits without blocking it |
+| Windows (`DeviceKeyPlugin`) | the plugin's worker thread, in the order of the calls | the same worker | no step-up key |
+
+Replies reach Dart on the platform thread.
 
 `attestation` returns null on iOS, macOS and Windows (App Attest and TPM key attestation are
 planned with `auth.require_key_attestation`). On Android it returns the key's certificate chain
@@ -77,9 +113,12 @@ again without it. `hardwareBound` reports the real level: `KeyInfo.securityLevel
 `isInsideSecureHardware` before it. A new fingerprint or face makes the Keystore drop the step-up
 key's authorisation for good; the next `sign` fails with `DeviceKeyError.keyInvalidated`, and the
 app registers as a new device. The Android alias is `<prefix>.<sha256(scope)>.<purpose>`.
+`KeyStore.getCertificate` answers null for a missing key and for a Keystore that failed alike, so
+the lookup asks `getKey` as well, which from API 31 throws for a failure: a failed Keystore is an
+error there (`internal`), never "no key".
 
 The step-up prompt needs the app's activity to be a `FragmentActivity` (`FlutterFragmentActivity`
-in `MainActivity`) and the texts of `StepUpPrompt`; without either `sign` fails with
+in `MainActivity`) and the texts of `StepUpPromptTexts`; without either `sign` fails with
 `notAvailable` or `internal`. The app needs `minSdk` 26.
 
 A macOS app without the keychain entitlements (an ad-hoc signature without a team and a
@@ -106,6 +145,16 @@ material): a marker without an openable key (for example after a TPM clear) repo
 `keyInvalidated` and the key is never recreated silently; the app registers as a new device
 (08 5.4). The `dpop` key signs with `NCRYPT_SILENT_FLAG`, so it can never show a dialog.
 
+A key under the plugin's name without a marker is what a stop between `NCryptFinalizeKey` and
+the marker leaves. It is taken over only with the export policy the plugin sets (`0`): a key
+that allows export, or whose policy cannot be read, was put there by another process of the
+user, which may hold a copy, so it is deleted and counts as missing. `Sign` keeps the opened
+provider and key of a name, because every request needs a signature and opening them costs a
+marker read and, for a TPM key, a load into the TPM. `Delete` drops a kept key, and a signature
+that fails with a kept key is tried once more with a fresh lookup, so a key lost behind the
+plugin is still reported as `keyInvalidated`. The signature time on a TPM is not measured: the
+CI runners have no TPM (`tpm_path_when_available` skips there), so no perf run has a value for it.
+
 ### Step-up key on Windows
 
 08 6.1 requires a confirmation per use that comes from the person, not from code in the process.
@@ -120,16 +169,17 @@ instance falls back to the other methods of 08 6 (D-M4-11-2).
 | Path | Content |
 |---|---|
 | `lib/device_key.dart`, `lib/src/device_key.dart` | the Dart API |
+| `lib/testing.dart` | test support: `FakeDeviceKeyHost`, the native side in memory behind a real `DeviceKeyClient` and the codec of the channel (only `test/` and `integration_test/` import it) |
 | `pigeons/device_key_api.dart` | the Pigeon source of the channel |
 | `lib/src/generated/`, `darwin/device_key/Sources/device_key/DeviceKeyApi.g.swift`, `android/src/main/kotlin/devicekey/flutter/DeviceKeyApi.g.kt`, `windows/device_key_api.g.*` | generated by Pigeon, checked in |
 | `darwin/device_key/` | the Swift package of the plugin (Swift Package Manager; `sharedDarwinSource` for iOS and macOS), `DeviceKeyPlugin.swift` connects the channel to the core |
-| `darwin/device_key/DeviceKeyCore/` | the Swift package `DeviceKeyCore` with the key code and its tests |
+| `darwin/device_key/DeviceKeyCore/` | the Swift package `DeviceKeyCore` with the key code (`DeviceKeyManager`), the queues of the channel (`DeviceKeyQueues`) and its tests |
 | `android/` | the Gradle project of the plugin (`build.gradle.kts`, Gradle wrapper), `DeviceKeyPlugin.kt` connects the channel to the core |
-| `android/devicekeycore/` | the Kotlin core module `DeviceKeyCore` with its JVM tests (`src/test`) and instrumented tests (`src/androidTest`) |
+| `android/devicekeycore/` | the Kotlin core module: `DeviceKeyCore`, the thread of the channel's key calls (`DeviceKeyCalls`), its JVM tests (`src/test`) and instrumented tests (`src/androidTest`) |
 | `windows/` | the CMake project of the Windows plugin; `device_key_plugin.cpp` connects the channel to the core |
 | `windows/core/` | the static library `device_key_core` (CNG, no Flutter dependency) and its CTest suite in `tests/` |
 | `darwin/run_core_tests.sh`, `darwin/run_ios_sim_tests.sh`, `android/run_instrumented_tests.sh`, `platform-tests.json` | the native tests (`make apps-platform`) |
-| `test/` | Dart tests against a fake host API |
+| `test/` | Dart tests against a fake host API and of `FakeDeviceKeyHost` |
 
 ## Reuse in the app extensions
 

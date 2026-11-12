@@ -124,6 +124,16 @@ Status DeviceKeyStore::Locate(const std::wstring& name, std::optional<OpenedKey>
     SECURITY_STATUS status = provider_.OpenKey(opened.provider.get(), name.c_str(), &opened.key);
     if (IsMissingKey(status)) continue;
     if (status != ERROR_SUCCESS) return Status::Fail(ErrorCode::kInternal, status);
+    // The plugin sets export policy 0 before NCryptFinalizeKey. A key under this name that allows
+    // export, or whose policy cannot be read, is not one the plugin created: whoever put it there
+    // may hold a copy, so it is deleted and counts as missing.
+    DWORD policy = 0;
+    status = provider_.GetDwordProperty(opened.key.get(), NCRYPT_EXPORT_POLICY_PROPERTY, &policy);
+    if (status != ERROR_SUCCESS || policy != 0) {
+      status = provider_.DeleteKey(&opened.key);
+      if (status != ERROR_SUCCESS) return Status::Fail(ErrorCode::kInternal, status);
+      continue;
+    }
     DWORD written = markers_.Write(name, kind);
     if (written != ERROR_SUCCESS) {
       return Status::Fail(ErrorCode::kInternal, HRESULT_FROM_WIN32(written));
@@ -132,6 +142,33 @@ Status DeviceKeyStore::Locate(const std::wstring& name, std::optional<OpenedKey>
     return Status::Ok();
   }
   return Status::Ok();
+}
+
+Status DeviceKeyStore::Opened(const std::wstring& name, std::shared_ptr<OpenedKey>* key,
+                              bool* was_kept) {
+  key->reset();
+  *was_kept = false;
+  {
+    std::lock_guard<std::mutex> lock(kept_mutex_);
+    auto it = kept_.find(name);
+    if (it != kept_.end()) {
+      *key = it->second;
+      *was_kept = true;
+      return Status::Ok();
+    }
+  }
+  std::optional<OpenedKey> found;
+  Status status = Locate(name, &found);
+  if (!status.ok() || !found.has_value()) return status;
+  *key = std::make_shared<OpenedKey>(std::move(*found));
+  std::lock_guard<std::mutex> lock(kept_mutex_);
+  kept_[name] = *key;
+  return Status::Ok();
+}
+
+void DeviceKeyStore::Forget(const std::wstring& name) {
+  std::lock_guard<std::mutex> lock(kept_mutex_);
+  kept_.erase(name);
 }
 
 Status DeviceKeyStore::DescribeKey(NCRYPT_KEY_HANDLE key, bool hardware_bound, KeyPurpose purpose,
@@ -234,10 +271,11 @@ Status DeviceKeyStore::Sign(const std::string& scope, KeyPurpose purpose, const 
   std::wstring name;
   Status status = KeyName(scope, purpose, &name);
   if (!status.ok()) return status;
-  std::optional<OpenedKey> found;
-  status = Locate(name, &found);
+  std::shared_ptr<OpenedKey> key;
+  bool was_kept = false;
+  status = Opened(name, &key, &was_kept);
   if (!status.ok()) return status;
-  if (!found.has_value()) return Status::Fail(ErrorCode::kNotAvailable);
+  if (key == nullptr) return Status::Fail(ErrorCode::kNotAvailable);
   Bytes digest;
   SECURITY_STATUS result = provider_.Sha256(data, &digest);
   if (result != 0) return Status::Fail(ErrorCode::kInternal, result);
@@ -245,7 +283,20 @@ Status DeviceKeyStore::Sign(const std::string& scope, KeyPurpose purpose, const 
   // a dialog fails the call instead.
   DWORD flags = purpose == KeyPurpose::kDpop ? NCRYPT_SILENT_FLAG : 0;
   Bytes raw;
-  result = provider_.SignHash(found->key.get(), digest, flags, &raw);
+  result = provider_.SignHash(key->key.get(), digest, flags, &raw);
+  if (result != ERROR_SUCCESS && result != NTE_USER_CANCELLED) {
+    // A key that failed is not kept. When it was opened by an earlier call, the key behind it may
+    // be gone or replaced since (a TPM clear, a delete by another process): the signature is
+    // tried once more with a fresh lookup, which also reports a lost key as kKeyInvalidated.
+    Forget(name);
+    if (was_kept) {
+      status = Opened(name, &key, &was_kept);
+      if (!status.ok()) return status;
+      if (key == nullptr) return Status::Fail(ErrorCode::kNotAvailable);
+      result = provider_.SignHash(key->key.get(), digest, flags, &raw);
+      if (result != ERROR_SUCCESS && result != NTE_USER_CANCELLED) Forget(name);
+    }
+  }
   if (result == NTE_USER_CANCELLED) return Status::Fail(ErrorCode::kUserCancelled, result);
   if (result != ERROR_SUCCESS) return Status::Fail(ErrorCode::kInternal, result);
   if (raw.size() != kSignatureSize) return Status::Fail(ErrorCode::kInternal, NTE_BAD_SIGNATURE);
@@ -271,6 +322,7 @@ Status DeviceKeyStore::Delete(const std::string& scope) {
     std::wstring name;
     Status status = KeyName(scope, purpose, &name);
     if (!status.ok()) return status;
+    Forget(name);
     // Both providers, whatever the marker says, so no key of the scope survives.
     for (ProviderKind kind : {ProviderKind::kPlatform, ProviderKind::kSoftware}) {
       NcryptHandle provider;

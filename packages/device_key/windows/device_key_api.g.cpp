@@ -612,14 +612,15 @@ void DeviceKeyHostApi::SetUp(
             return;
           }
           const auto& purpose_arg = std::any_cast<const KeyPurposeMessage&>(std::get<CustomEncodableValue>(encodable_purpose_arg));
-          ErrorOr<DeviceKeyInfoMessage> output = api->EnsureKey(scope_arg, purpose_arg);
-          if (output.has_error()) {
-            reply(WrapError(output.error()));
-            return;
-          }
-          EncodableList wrapped;
-          wrapped.push_back(CustomEncodableValue(std::move(output).TakeValue()));
-          reply(EncodableValue(std::move(wrapped)));
+          api->EnsureKey(scope_arg, purpose_arg, [reply](ErrorOr<DeviceKeyInfoMessage>&& output) {
+            if (output.has_error()) {
+              reply(WrapError(output.error()));
+              return;
+            }
+            EncodableList wrapped;
+            wrapped.push_back(CustomEncodableValue(std::move(output).TakeValue()));
+            reply(EncodableValue(std::move(wrapped)));
+          });
         } catch (const std::exception& exception) {
           reply(WrapError(exception.what()));
         }
@@ -646,19 +647,20 @@ void DeviceKeyHostApi::SetUp(
             return;
           }
           const auto& purpose_arg = std::any_cast<const KeyPurposeMessage&>(std::get<CustomEncodableValue>(encodable_purpose_arg));
-          ErrorOr<std::optional<DeviceKeyInfoMessage>> output = api->KeyInfo(scope_arg, purpose_arg);
-          if (output.has_error()) {
-            reply(WrapError(output.error()));
-            return;
-          }
-          EncodableList wrapped;
-          auto output_optional = std::move(output).TakeValue();
-          if (output_optional) {
-            wrapped.push_back(CustomEncodableValue(std::move(output_optional).value()));
-          } else {
-            wrapped.push_back(EncodableValue());
-          }
-          reply(EncodableValue(std::move(wrapped)));
+          api->KeyInfo(scope_arg, purpose_arg, [reply](ErrorOr<std::optional<DeviceKeyInfoMessage>>&& output) {
+            if (output.has_error()) {
+              reply(WrapError(output.error()));
+              return;
+            }
+            EncodableList wrapped;
+            auto output_optional = std::move(output).TakeValue();
+            if (output_optional) {
+              wrapped.push_back(CustomEncodableValue(std::move(output_optional).value()));
+            } else {
+              wrapped.push_back(EncodableValue());
+            }
+            reply(EncodableValue(std::move(wrapped)));
+          });
         } catch (const std::exception& exception) {
           reply(WrapError(exception.what()));
         }
@@ -734,19 +736,20 @@ void DeviceKeyHostApi::SetUp(
             return;
           }
           const auto& challenge_arg = std::get<std::vector<uint8_t>>(encodable_challenge_arg);
-          ErrorOr<std::optional<std::vector<uint8_t>>> output = api->Attestation(scope_arg, purpose_arg, challenge_arg);
-          if (output.has_error()) {
-            reply(WrapError(output.error()));
-            return;
-          }
-          EncodableList wrapped;
-          auto output_optional = std::move(output).TakeValue();
-          if (output_optional) {
-            wrapped.push_back(EncodableValue(std::move(output_optional).value()));
-          } else {
-            wrapped.push_back(EncodableValue());
-          }
-          reply(EncodableValue(std::move(wrapped)));
+          api->Attestation(scope_arg, purpose_arg, challenge_arg, [reply](ErrorOr<std::optional<std::vector<uint8_t>>>&& output) {
+            if (output.has_error()) {
+              reply(WrapError(output.error()));
+              return;
+            }
+            EncodableList wrapped;
+            auto output_optional = std::move(output).TakeValue();
+            if (output_optional) {
+              wrapped.push_back(EncodableValue(std::move(output_optional).value()));
+            } else {
+              wrapped.push_back(EncodableValue());
+            }
+            reply(EncodableValue(std::move(wrapped)));
+          });
         } catch (const std::exception& exception) {
           reply(WrapError(exception.what()));
         }
@@ -767,14 +770,15 @@ void DeviceKeyHostApi::SetUp(
             return;
           }
           const auto& scope_arg = std::get<std::string>(encodable_scope_arg);
-          std::optional<FlutterError> output = api->DeleteKeys(scope_arg);
-          if (output.has_value()) {
-            reply(WrapError(output.value()));
-            return;
-          }
-          EncodableList wrapped;
-          wrapped.push_back(EncodableValue());
-          reply(EncodableValue(std::move(wrapped)));
+          api->DeleteKeys(scope_arg, [reply](std::optional<FlutterError>&& output) {
+            if (output.has_value()) {
+              reply(WrapError(output.value()));
+              return;
+            }
+            EncodableList wrapped;
+            wrapped.push_back(EncodableValue());
+            reply(EncodableValue(std::move(wrapped)));
+          });
         } catch (const std::exception& exception) {
           reply(WrapError(exception.what()));
         }
