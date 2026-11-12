@@ -1,7 +1,7 @@
 # Accessibility checklist of the phone apps
 
-Status: M5-10 filled, M5-13 added the rows of M8 and M9. This page is the checklist of exit
-criterion 3 of milestone M5 (PLAN 11): every rule of
+Status: built (M5-10, M5-13). M5-13 added the rows of the screens M8 and M9. This page is the
+checklist of exit criterion 3 of milestone M5 (PLAN 11): every rule of
 [01 Product, section 8](../spec/01-product.md#8-accessibility) (WCAG 2.2 level AA) for every
 phone screen of M5 on iOS with VoiceOver and on Android with TalkBack, each with how it is
 checked. The desktop app has its own page,

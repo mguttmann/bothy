@@ -1,6 +1,6 @@
 # 01 Product
 
-Status: draft M0. Terms: [00-glossary.md](00-glossary.md). Data: [03-data-model.md](03-data-model.md).
+Status: normative, built (M1 to M8). Terms: [00-glossary.md](00-glossary.md). Data: [03-data-model.md](03-data-model.md).
 Sync and offline: [04-sync-protocol.md](04-sync-protocol.md). Permissions and actions:
 [05-actions.md](05-actions.md), [07-permissions.md](07-permissions.md). Agents: [09-agents.md](09-agents.md),
 [10-backend-policy.md](10-backend-policy.md). Push: [13-push-notifications.md](13-push-notifications.md).
@@ -57,7 +57,11 @@ kind of permission (Baseline section 3).
 
 Column "Milestone": **core** = content of a build milestone (the plan defines the order), **later** =
 wanted, but after the core milestones, **never** = deliberately excluded, with a reason. Column
-"Where": D = desktop (macOS, Windows), M = mobile (iOS, Android), W = web console. Where a feature
+"Where": D = desktop (macOS, Windows), M = mobile (iOS, Android), W = web console, API = the
+public API alone: the server has the function and no app offers it yet. A row of an app names
+only what that app can do, and a row of the place API names its operations; a test holds both
+against the sources of the apps (`tools/docs/tests/test_feature_list_callers.py`), and the
+ticket that builds a view moves its row to the app ([PLAN](../PLAN.md) V3-18). Where a feature
 of the addendum of 2026-10-10 is built in several milestones, the remark names the build
 milestones from the [plan](../PLAN.md).
 
@@ -67,7 +71,8 @@ milestones from the [plan](../PLAN.md).
 |---|---|---|---|---|
 | Spaces collapsible per device, personal order across devices | core | D, M | `sidebar.update` | global order only through administration (`space.reorder`) |
 | Text channels with main thread and threads from messages | core | D, M | `thread.create`, `message.create` | |
-| Forum channels with a dense post list, tags, Done section | core | D, M | `thread.create`, `thread.tags.set` | list instead of cards (study B); on desktop in the forum overview D15, pinnable as a column (R-PR-17) |
+| Forum channels with a dense post list, tags, Done section | core | D, M | `thread.create` | list instead of cards (study B); on desktop in the forum overview D15, pinnable as a column (R-PR-17); the tags of a post are chosen when it is created and shown and filtered in the list |
+| Change the tags of a post; create, rename, order and delete the tags of a forum | core | API | `thread.tags.set` (`setThreadTags`), `forum_tag.manage` (`createForumTag`, `updateForumTag`, `moveForumTag`, `deleteForumTag`) | no app offers it yet: the tags of a forum come from an import or the API, and a post keeps the tags of its creation (V3-18) |
 | Open posts and threads nested under their channel in the sidebar | core | D, M | `thread.read` | as in Discord; selection, order and markers in 6.8 (addendum of 2026-10-27) |
 | Dev forum with project binding and runner agent | core | D, M | `channel.project.bind` | triggering only with `project_bindings.ready` |
 | Button "New post" or "New chat" | core | D, M | `thread.create` | replaces the detour through a helper channel; also as "+" at the forum row in the sidebar, without a dialog (6.8) |
@@ -86,6 +91,7 @@ milestones from the [plan](../PLAN.md).
 | Feature | Milestone | Where | Action(s) | Remark |
 |---|---|---|---|---|
 | Operator per channel visible in the channel header | core | D, M | `channel.read` | without an operator it says "No agent answers here" |
+| Default operator of a space; behavior of a channel (prompt, skills, mention rules, `auto_thread`) | core | API | `space.operator.set` (`setSpaceOperator`), `channel.behavior.update` (`putChannelBehavior`) | no app offers it yet (V3-18). The operator of one channel is set in the apps only inside a flow: "New project" with its banner "Project not ready" (6.9), "Add forums for existing folders" (6.10), "New agent" (6.20) and the switch of an imported channel ([22](22-import-migration.md) 13.3); no view sets it for any other channel |
 | Live box running, pinned, with stop | core | D, M | `run.read`, `run.cancel` | section 6.2 |
 | Live box collapsed after the end, expandable | core | D, M | `run.read` | |
 | Retry a failed or cancelled run on its line | core | D, M | `agent.invoke` (`retryRun`) | section 6.2, addendum of 2026-10-30 |
@@ -116,7 +122,8 @@ milestones from the [plan](../PLAN.md).
 | Mentions of people and agents | core | D, M | `message.create` | suggestions only from what is visible |
 | @everyone, @here, role mention | never | | | noise; notification per channel is enough |
 | Pin (moderation) | core | D, M | `pin.create` | needs `manage` |
-| Templates (personal and per channel) | core | D, M | `template.read`, `template.manage` | |
+| Templates: insert a personal template or one of the channel, save a text as a personal template | core | D, M | `template.read`, `template.manage` (`createPersonalTemplate`) | |
+| Create a template of a channel; change and delete a template | core | API | `template.manage` (`createChannelTemplate`, `updateTemplate`, `deleteTemplate`) | no app offers it yet: a saved template cannot be changed or deleted in an app (V3-18) |
 | Drafts across devices | core | D, M | `draft.write` | notice when a newer, different draft of another device was overwritten (04 14) |
 | Read receipts of other people | never | | | performance monitoring; the read state stays personal (ruling R-PR-03) |
 | Polls, widgets, to-do lists in text | never | | | agents deliver forms through components |
@@ -2269,9 +2276,10 @@ notice are derived from the stored run and its wake-ups, not stored as messages 
    18.19.10) are shown as notes of the thread, never as messages of a person.
 4. **Wake runs.** A run started by a wake-up shows "Woke up: <label>" instead of a triggering
    message; a recovery run shows "Continued after lost work".
-5. **Channel switch.** The channel settings have "Let agents continue on their own" (`allow_autonomous_runs`),
-   shown to persons with `manage`, with the sentence that owners always may and that every other
-   person's wake-ups need this switch.
+5. **Channel switch.** The channel menu has the entry "Let agents continue on their own"
+   (`allow_autonomous_runs`), shown to persons with `manage`; it opens the switch with the
+   sentence that owners always may and that every other person's wake-ups need this switch. The
+   apps have no channel settings view (3.2, D-AR-08-9), so the menu is where the switch lives.
 
 ### 6.22 Archiving a channel or project for oneself
 
@@ -2351,7 +2359,10 @@ shortcut must not swallow any input (R-PR-10).
 ## 8. Accessibility
 
 Goal: WCAG 2.2 level AA (https://www.w3.org/TR/WCAG22/, retrieved 2026-10-10 [verified]) in apps
-and console, checked by tests, not by intention.
+and console, checked by tests, not by intention. The table below maps the goal to rules by
+topic. What holds each success criterion of the levels A and AA today, and what is open, is
+listed per criterion in [wcag-criteria.md](../quality/wcag-criteria.md). The goal is reached
+when every row there is `tested` or `not applicable`; until then the page is the work list.
 
 | Topic | Rule | Check |
 |---|---|---|

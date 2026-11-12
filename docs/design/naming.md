@@ -1,6 +1,6 @@
 # Product name
 
-Status: draft M0. **No legal advice.** This page summarizes a web search. It does not replace a
+Status: planned (V1-06). **No legal advice.** This page summarizes a web search. It does not replace a
 trademark search by an expert in the registers (DPMA, EUIPO, TMview, USPTO) for Nice classes 9
 (software) and 42 (software as a service). The owner makes the final choice
 (OPEN-QUESTIONS).

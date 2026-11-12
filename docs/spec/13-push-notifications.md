@@ -1,6 +1,6 @@
 # 13 Push and notifications
 
-Status: draft M0. Normative for the module `notify`, the push adapters and the
+Status: normative, built (M1 to M8). Normative for the module `notify`, the push adapters and the
 notification rules of all clients. Terms: [00-glossary.md](00-glossary.md). Tables:
 [03-data-model.md](03-data-model.md) (`notification_preferences`, `quiet_hours`,
 `push_registrations`, `read_states`). Actions: [05-actions.md](05-actions.md) (4.9).

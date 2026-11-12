@@ -1,6 +1,6 @@
 # 20 Privacy
 
-Status: draft M0. Normative for retention, deletion, export and telemetry. Not legal advice:
+Status: normative, built (M1 to M8). Normative for retention, deletion, export and telemetry. Not legal advice:
 the instance operator decides legal bases, periods with legal effect and balancing of interests; the
 product supplies mechanisms, defaults and templates.
 Tables and retention classes: [03-data-model.md](03-data-model.md), sections 3 and 4.

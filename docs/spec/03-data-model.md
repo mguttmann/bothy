@@ -1,6 +1,6 @@
 # 03 Data model (PostgreSQL)
 
-Status: draft M0, integrated after the feedback from all chapters. Normative for migrations,
+Status: normative, built (M1 to M8). Normative for migrations,
 sqlc queries and repository ports.
 Terms: see [00-glossary.md](00-glossary.md). Sync and events: see
 [04-sync-protocol.md](04-sync-protocol.md). Actions: see [05-actions.md](05-actions.md).
@@ -2520,9 +2520,12 @@ CASCADE; `component_id` -> `status_components(id)` ON DELETE CASCADE. Indexes:
 #### `backup_runs`
 
 Purpose: runs of the backup and of the automatic restore test, with the result per check
-([16-operations.md](16-operations.md), section 8). The admin console, the status page and alerts read
-them. Module: `status`. Written by the program `bothy-backupd` through the port of the module
-`status` with a separate database role that may write only this table.
+([16-operations.md](16-operations.md), section 8). `bothy migrate up` reads the last success
+(16 10), and the job `retention.ops` deletes old rows. No operation of the API reads them yet, so
+no view of the admin console and no status page shows them (16 8.2 item 4); the alerts read the
+metrics of the runs, not the table. Module: `status`. Written by the program `bothy-backupd`
+through the port of the module `status` with a separate database role that may write only this
+table.
 
 | Field | Type | Null | Default | Rules / notes |
 |---|---|---|---|---|

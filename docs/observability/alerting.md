@@ -1,6 +1,6 @@
 # Alerts
 
-Status: draft M0. Rules: [infra/observability/prometheus/rules/](../../infra/observability/prometheus/rules/)
+Status: built (M1 to M7). Rules: [infra/observability/prometheus/rules/](../../infra/observability/prometheus/rules/)
 (SLO rules generated, `bothy-alerts.yaml` by hand). Routes:
 [infra/observability/alertmanager/alertmanager.yaml](../../infra/observability/alertmanager/alertmanager.yaml).
 
@@ -188,7 +188,9 @@ or `0600`, owned by the service user (SEC-SEC-1). Until this is fixed, a rotatio
 state `pending` and are not served.
 
 ### bothybackupstale
-`backup_runs` in the admin console; off-site target reachable? Space in the repository?
+The newest rows of `backup_runs` and `docker compose logs backup`
+([backup-restore.md](../operations/backup-restore.md#11-state-of-the-runs); no view of the admin
+console shows the runs yet); off-site target reachable? Space in the repository?
 The alert also fires for a kind without a reported last success in the last 26 hours. Then its
 runs have failed since the first one (the newest row of the kind in `backup_runs` holds the code
 in `error`; with the driver `s3` the kind `objects` needs an off-site target and fails with
@@ -219,7 +221,9 @@ PostgreSQL has archived none since its statistics were reset (`pg_stat_archiver`
 reports nothing (`BothyBackupTelemetryMissing`).
 
 ### bothyrestoreteststale
-Look at the last test run in `backup_runs`; which check fails?
+Look at the last test run in `backup_runs`
+([backup-restore.md](../operations/backup-restore.md#4-automatic-restore-test)); which check
+fails?
 The alert also fires when no last successful test was reported for 8 days, for example because
 no test has succeeded since the installation; run one by hand
 (`docker compose exec backup bothy-backupd restore-test`).

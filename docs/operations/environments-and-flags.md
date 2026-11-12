@@ -1,6 +1,6 @@
 # Environments and feature flags
 
-Status: draft M0. Guide to [16-operations.md](../spec/16-operations.md) 6.
+Status: built (M1 to M7). Guide to [16-operations.md](../spec/16-operations.md) 6.
 
 ## 1. Environments
 
@@ -23,8 +23,12 @@ are the same.
 | HTTP without TLS on loopback for clients | allowed | no | no |
 | Banner in the apps | "Dev" | "Staging" | none |
 | `deployment.environment.name` in telemetry | `dev` | `staging` | `prod` |
-| Warning without an off-site target | notice | warning in the admin console | warning in the admin console at every login of the owner |
 | Seed commands (`bothy dev seed`) | allowed | no | no |
+
+A missing off-site target is reported the same way in every environment: `bothy config check`
+and the start log of `bothy-backupd` warn "local backup only"
+([16-operations.md](../spec/16-operations.md) 8.2). No view of the admin console shows the
+warning yet.
 
 ### 1.3 Promotion
 

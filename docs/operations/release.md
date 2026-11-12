@@ -1,6 +1,6 @@
 # Making a release
 
-Status: draft M0. Procedure for [18-release.md](../spec/18-release.md). ADR 0038 and 0039 define
+Status: built (M1 to M7). Procedure for [18-release.md](../spec/18-release.md). ADR 0038 and 0039 define
 gates and runners (team H); this procedure names only the steps that belong to the release.
 
 ![Release pipeline](diagrams/release-pipeline.svg)

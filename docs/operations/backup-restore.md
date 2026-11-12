@@ -1,6 +1,6 @@
 # Backup and restore
 
-Status: draft M0. Guide to [16-operations.md](../spec/16-operations.md) 8
+Status: built (M1 to M7). Guide to [16-operations.md](../spec/16-operations.md) 8
 ([ADR 0058](../adr/0058-backup-with-pgbackrest-object-backup-and-restore-test.md)). Applies to
 the Compose stack; with a managed PostgreSQL service the steps for pgBackRest are dropped
 (section 6).
@@ -45,6 +45,33 @@ such a run left its dump and the password file of `pg_dump`. Neither code raises
 start of the service treats every run from before it as ended, so run `backup` and
 `restore-test` by hand with `docker compose exec` in the container of the service, not in a
 second container next to it, where a run would outlive a restart of the service.
+
+### 1.1 State of the runs
+
+No operation of the API and no view of the admin console shows the runs yet
+([16-operations.md](../spec/16-operations.md) 8.2 item 4, [PLAN](../PLAN.md) V3-19). The state of
+a run is in four places:
+
+| Place | What it says |
+|---|---|
+| Exit code and last line of a run by hand | `0` and `bothy-backupd: backup <kind> succeeded`, or `1` and `bothy-backupd: backup <kind>:` with the error |
+| `docker compose logs backup` | one line `backup run finished` per run with its kind, state and error code; at the start `local backup only` when `backup.offsite.target` is empty |
+| Metrics and alerts | `bothy.backup.*` and the alerts `BothyBackupStale`, `BothyBackupRunFailed`, `BothyWalArchiveStale`, `BothyRestoreTestStale`, `BothyRestoreTestFailed` and `BothyRestoreTestAuditChainFailed` ([alerting.md](../observability/alerting.md)); they need the profile `observability` or another telemetry backend, and without one nothing reports a failed scheduled run by itself |
+| Table `backup_runs` | every run with kind, state, times, error code, manifest and, for the restore test, the result per check |
+
+The newest runs, read in the database container:
+
+```sh
+docker compose exec -T postgres psql -U postgres -d bothy -Atc "SELECT kind, state, started_at, finished_at, error FROM backup_runs ORDER BY started_at DESC LIMIT 10"
+```
+
+The manifest of the newest successful run of a kind as a file, here of `logical`, as
+`bothy restore finalize --relocation` reads it ([disaster-recovery.md](disaster-recovery.md)
+case G, [cloud-migration.md](cloud-migration.md)):
+
+```sh
+docker compose exec -T postgres psql -U postgres -d bothy -Atc "SELECT manifest FROM backup_runs WHERE kind = 'logical' AND state = 'succeeded' ORDER BY started_at DESC LIMIT 1" > manifest.json
+```
 
 ## 2. Set up
 
@@ -169,9 +196,14 @@ to D-M7-03-9):
 By hand: `docker compose exec backup bothy-backupd restore-test` (exit `0` when no check failed),
 outside the time of `backup.restore_test.schedule`: both use the same scratch directory, and only
 one test per process is excluded.
-The result is in the newest row `SELECT state, error, checks FROM backup_runs WHERE kind =
-'restore_test' ORDER BY started_at DESC LIMIT 1`. Not proven by this build: the duration of a
-restore of a production-sized database against `dr.rto_target`.
+The result is in the newest row of the kind `restore_test`:
+
+```sh
+docker compose exec -T postgres psql -U postgres -d bothy -Atc "SELECT state, error, checks FROM backup_runs WHERE kind = 'restore_test' ORDER BY started_at DESC LIMIT 1"
+```
+
+Not proven by this build: the duration of a restore of a production-sized database against
+`dr.rto_target`.
 
 ## 5. Restore
 

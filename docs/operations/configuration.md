@@ -1,6 +1,6 @@
 # Configuration reference
 
-Status: draft M0. Collection of all named configuration values with environment name, type,
+Status: built (M1 to M8). Collection of all named configuration values with environment name, type,
 default and meaning. Rules: [16-operations.md](../spec/16-operations.md) 5 and ADR 0011.
 
 The source is the schema in the code (ruling L4): every key the server reads stands with kind,
@@ -800,7 +800,7 @@ Source: [16-operations.md](../spec/16-operations.md), section 14.
 | `backup.logical.retention` | `BOTHY_BACKUP__LOGICAL__RETENTION` | Server | duration | `30d` | retention of the logical backup | active |
 | `backup.objects.schedule` | `BOTHY_BACKUP__OBJECTS__SCHEDULE` | Server | string | `30 3 * * *` | schedule of the object backup (cron) | active |
 | `backup.objects.retention` | `BOTHY_BACKUP__OBJECTS__RETENTION` | Server | duration | `90d` | retention of the object snapshots | active |
-| `backup.offsite.target` | `BOTHY_BACKUP__OFFSITE__TARGET` | Server | string | empty | off-site target; empty means local only (warning in console and status) | active |
+| `backup.offsite.target` | `BOTHY_BACKUP__OFFSITE__TARGET` | Server | string | empty | off-site target; empty means local only (warning "local backup only" of `bothy config check` and in the start log of `bothy-backupd`) | active |
 | `backup.offsite.region` | `BOTHY_BACKUP__OFFSITE__REGION` | Server | string | `us-east-1` | region of the off-site bucket (signing of S3 requests) | active |
 | `backup.offsite.use_path_style` | `BOTHY_BACKUP__OFFSITE__USE_PATH_STYLE` | Server | bool | `true` | path-style addressing of the off-site bucket (`https://<host>/<bucket>`); `false` uses virtual hosts | active |
 | `backup.max_age` | `BOTHY_BACKUP__MAX_AGE` | Server |  | `26h` | no successful backup for longer than this: alert | planned (M7) |

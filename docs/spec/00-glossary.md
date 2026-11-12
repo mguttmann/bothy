@@ -1,6 +1,6 @@
 # 00 Glossary
 
-Status: draft M0, integrated after the feedback of all chapters. Binding for all
+Status: normative. Binding for all
 specifications. The terms from the planning basis (section 3) are adopted and extended by all
 further terms of chapters 03, 04 and 05. Sorted by term.
 Code names are English and apply in API, database and code.

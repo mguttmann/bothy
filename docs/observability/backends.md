@@ -1,6 +1,6 @@
 # Telemetry backends
 
-Status: draft M0. Every backend is an overlay of the collector ([collector.md](collector.md));
+Status: built (M1 to M7). Every backend is an overlay of the collector ([collector.md](collector.md));
 a switch is configuration, not code. All sources retrieved on 2026-10-10.
 
 ## 1. Overview

@@ -1,6 +1,6 @@
 # 19 Security
 
-Status: draft M0. Normative for server, clients, admin console and operations.
+Status: normative, built (M1 to M8). Normative for server, clients, admin console and operations.
 The analysis (system boundaries, assets, attackers, STRIDE, threat register with residual risk) is in
 [../security/threat-model.md](../security/threat-model.md). This chapter defines the controls that
 the threat model refers to. Every control has an ID (`SEC-...`) and at least one

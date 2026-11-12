@@ -1,6 +1,6 @@
 # 17 Observability
 
-Status: draft M0. Normative for telemetry (traces, metrics, logs), privacy of the
+Status: normative, built (M1 to M8). Normative for telemetry (traces, metrics, logs), privacy of the
 telemetry, collector, dashboards, SLOs, alerts, in-app statistics and the boundary to the
 audit log. This chapter summarizes the rules; the details are under
 [docs/observability/](../observability/signals.md).

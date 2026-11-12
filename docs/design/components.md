@@ -1,6 +1,6 @@
 # Components
 
-Status: draft M0. Specification of the core components for `packages/design_system`. Sizes and
+Status: normative, built (M4 to M6). Specification of the core components for `packages/design_system`. Sizes and
 colors only as token names; numbers in [tokens.md](tokens.md) and [palette.md](palette.md). Every
 text or icon color on a surface is listed as a pairing in `design/design-rules.json` and checked in
 [contrast.md](contrast.md) for light and dark. Images:

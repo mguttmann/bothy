@@ -1,10 +1,8 @@
 # services/server
 
-Status: skeleton (M1-05) with configuration (M1-07) and secret provider (M1-09). The Go module
-builds; every module of 02 exists as a port package, the kernel packages `ids`, `clock` and
-`errs`, the platform package `config` with `bothy config check|print` and the platform package
-[`secrets`](internal/platform/secrets/README.md) with `bothy secrets init|export` are complete,
-and `make arch` enforces the module boundaries from the register.
+Status: built (M1 to M8). The Go module holds the server of the milestones M1 to M8: every
+module of 02 is built, and the README of a module says which tickets built it and what it holds.
+`make arch` enforces the module boundaries from the register.
 Since M1-11 `bothy serve` starts every role with the internal listener, health, the database
 and schema check and the public listener, shuts down within `shutdown.total_timeout`, and
 `bothy healthcheck` probes a loopback health endpoint.

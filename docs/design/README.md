@@ -1,6 +1,6 @@
 # Design system
 
-Status: draft M0. Source of all values: `design/tokens/` (W3C DTCG format 2025.10). Generated with
+Status: normative, built (M0, M4). Source of all values: `design/tokens/` (W3C DTCG format 2025.10). Generated with
 `uv run tools/design-tokens/tokens.py build`; checked with `... check`. Decision: ADR 0030.
 Components: [components.md](components.md). Product view: [01-product.md](../spec/01-product.md).
 

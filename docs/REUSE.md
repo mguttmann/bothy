@@ -1,6 +1,6 @@
 # Reuse: lessons from three predecessors
 
-Status: draft M0. This document records what Bothy adopts from three predecessor projects:
+Status: normative. This document records what Bothy adopts from three predecessor projects:
 concepts, test patterns and at most three small code pieces to rewrite. It adopts no code by
 copying. The predecessors, their files and evidence are only in the private ops repo; here they
 are called neutrally V1, V2 and V3.
