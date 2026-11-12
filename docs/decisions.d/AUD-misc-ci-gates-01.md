@@ -54,6 +54,11 @@ Red runs (ruling 7):
   in each workflow (the guard tests of `codeql.yml` and of the platform workflows fix their job
   lists) or one workflow on `workflow_run` that reads only the conclusion, the name and the link
   of the finished run and checks out nothing of it.
+- Built since then and switched off (AUD-MISC-TESTING-01/11 in
+  docs/decisions.d/AUD-misc-testing-01.md): `red-runs.yml` with `tools/ci/red_runs.py`, one
+  polling workflow that reports as a dry run until the repository variable
+  `BOTHY_RED_RUN_ISSUES` is `true`. Left of the question is whether the owner sets the variable;
+  it switches the scheduled workflows and `ci.yml` on `main` together.
 
 Tool versions (ruling 4):
 
