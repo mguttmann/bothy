@@ -279,7 +279,7 @@ Local only:
 | `loaded_ranges` | loaded ranges of `thread_seq` per thread; detects gaps ([04](04-sync-protocol.md) section 4) |
 | `file_cache` | path, size, last access per file and thumbnail |
 | `search_index` | FTS5 index over cached messages for offline search |
-| `search_rows` | the rows of `search_index` by what they index (kind, target, thread, channel, space) under the same `rowid`, with indexes; FTS5 finds a row without a scan only by a match or its `rowid`, so every write of the index looks its rows up here (schema version 16) |
+| `search_rows` | the rows of `search_index` by what they index (kind, target, thread, channel, space) under the same `rowid`, with indexes; FTS5 finds a row without a scan only by a match or its `rowid` (the constraints its query planner uses are listed in the comment above `fts5BestIndexMethod`, https://github.com/sqlite/sqlite/blob/master/ext/fts5/fts5_main.c, retrieved 2026-11-12 [verified]), so every write of the index looks its rows up here (schema version 16) |
 | `share_inbox` | share entries taken over from extensions |
 | `recent_targets` | recently visited spaces, channels and threads of the quick switcher, per device, never synchronized ([01](01-product.md) D6) |
 | `host_key_pins` | pinned Noise keys of the hosts per device (section 23.3); never covered by the cleanup after `client.cache_max_age`, because a lost pin would prevent a warning on a key change |
