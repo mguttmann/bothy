@@ -12,6 +12,7 @@
     <string name="push_body_input_needed">Ein Agent wartet auf deine Antwort</string>
     <string name="push_body_security">Ein neues Gerät wartet auf deine Bestätigung.</string>
     <string name="push_body_admin">Eine Erinnerung der Verwaltung wartet.</string>
+    <string name="push_body_wake_ended">Ein Agent hat nicht von selbst weitergemacht</string>
     <string name="push_message_not_available">Nachricht nicht verfügbar</string>
     <string name="push_preview_title">%1$s · %2$s</string>
     <string name="push_preview_text">%1$s: %2$s</string>

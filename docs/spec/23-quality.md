@@ -134,7 +134,9 @@ rule. Details: [push-discipline.md](../quality/push-discipline.md).
 
 The product repository contains nothing instance-specific. The deny-list scanner
 (`tools/denylist/`) checks tracked content, file names, commit messages,
-commit identities, branch and tag names; `--history` checks every object ever
+commit identities, branch and tag names, and for every commit of the checked range the content
+and name of the files it adds or changes, because a later commit does not take an earlier one
+back from the public repository; `--history` checks every object ever
 stored. The private list lives outside the repository; without it, the scan fails.
 Public, generic rules (`tools/denylist/generic.rules`) always run, also for
 fork contributions without access to the list. The output names only the location and the rule line,

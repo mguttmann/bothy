@@ -7258,6 +7258,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get pushBodyInputNeeded => 'Ein Agent wartet auf deine Antwort';
 
   @override
+  String get pushBodyWakeEnded =>
+      'Ein Agent hat nicht von selbst weitergemacht';
+
+  @override
   String get pushMessageNotAvailable => 'Nachricht nicht verfügbar';
 
   @override

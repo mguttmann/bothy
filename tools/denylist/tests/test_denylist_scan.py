@@ -319,12 +319,223 @@ def test_range_limits_commit_checks(repo: Path) -> None:
     assert len(run(repo).findings) == 1
 
 
+# --- files of the commits in the range (a later commit does not unpublish an earlier one) ---
+
+
+def _short(repo: Path, rev: str = "HEAD") -> str:
+    return git(repo, "rev-parse", rev).strip()[:12]
+
+
+def test_range_finds_content_a_later_commit_removed(repo: Path) -> None:
+    """A term that one commit adds and the next one removes is public once both are pushed."""
+    base = git(repo, "rev-parse", "HEAD").strip()
+    (repo / "notes.md").write_text("line one\nabout Project Falcon here\n")
+    commit(repo, "docs: notes")
+    added = _short(repo)
+    (repo / "notes.md").write_text("line one\nabout the project here\n")
+    commit(repo, "docs: reword the notes")
+    [f] = run(repo, "--range", f"{base}..HEAD").findings
+    assert (f.kind, f.location, f.rule.source, f.rule.lineno) == (
+        "commit-content",
+        f"commit {added} notes.md:2:7",
+        "private",
+        7,
+    )
+
+
+def test_range_finds_a_file_a_later_commit_deleted(repo: Path) -> None:
+    base = git(repo, "rev-parse", "HEAD").strip()
+    (repo / "old-acme-widgets.txt").write_text("project falcon\n")
+    commit(repo, "docs: temp")
+    added = _short(repo)
+    (repo / "old-acme-widgets.txt").unlink()
+    commit(repo, "docs: remove temp")
+    findings = run(repo, "--range", f"{base}..HEAD").findings
+    assert sorted((f.kind, f.location) for f in findings) == [
+        ("commit-content", f"commit {added} old-acme-widgets.txt:1:1"),
+        ("commit-path", f"commit {added} path old-acme-widgets.txt"),
+    ]
+
+
+def test_range_finds_a_name_a_later_commit_renamed(repo: Path) -> None:
+    """The content is unchanged and still tracked; only the earlier name carries the term."""
+    base = git(repo, "rev-parse", "HEAD").strip()
+    (repo / "acme-widgets-notes.md").write_text("clean\n")
+    commit(repo, "docs: notes")
+    added = _short(repo)
+    git(repo, "mv", "acme-widgets-notes.md", "notes.md")
+    commit(repo, "docs: rename the notes")
+    [f] = run(repo, "--range", f"{base}..HEAD").findings
+    assert (f.kind, f.location) == ("commit-path", f"commit {added} path acme-widgets-notes.md")
+
+
+def test_range_generic_rules_check_the_files_of_commits(repo: Path) -> None:
+    """Fork pull requests: the generic rules alone still read the files of every commit."""
+    base = git(repo, "rev-parse", "HEAD").strip()
+    (repo / "notes.md").write_text("see " + "/" + "Users/sam/notes\n")
+    commit(repo, "docs: notes")
+    (repo / "notes.md").write_text("see the notes\n")
+    commit(repo, "docs: reword the notes")
+    report = run(repo, "--allow-missing", "--range", f"{base}..HEAD", list_path=None)
+    assert [(f.kind, f.rule.source) for f in report.findings] == [("commit-content", "generic")]
+
+
+def test_range_reports_a_file_of_the_current_state_once(repo: Path) -> None:
+    """What the scan of the tracked files reads is not reported a second time for its commit."""
+    base = git(repo, "rev-parse", "HEAD").strip()
+    (repo / "acme-widgets-notes.md").write_text("about globex.test\n")
+    commit(repo, "docs: notes")
+    findings = run(repo, "--range", f"{base}..HEAD").findings
+    assert sorted(f.kind for f in findings) == ["content", "path"]
+
+
+def test_range_reads_the_commit_when_the_working_file_differs(repo: Path) -> None:
+    """An uncommitted edit does not hide what the commit that is pushed holds."""
+    base = git(repo, "rev-parse", "HEAD").strip()
+    (repo / "notes.md").write_text("about globex.test\n")
+    commit(repo, "docs: notes")
+    (repo / "notes.md").write_text("about nothing\n")
+    [f] = run(repo, "--range", f"{base}..HEAD").findings
+    assert (f.kind, f.location) == ("commit-content", f"commit {_short(repo)} notes.md:1:7")
+
+
+def test_range_skips_files_of_commits_outside_the_range(repo: Path) -> None:
+    (repo / "notes.md").write_text("about globex.test\n")
+    commit(repo, "docs: notes")
+    (repo / "notes.md").write_text("about nothing\n")
+    commit(repo, "docs: reword the notes")
+    base = git(repo, "rev-parse", "HEAD").strip()
+    (repo / "more.md").write_text("clean\n")
+    commit(repo, "docs: more")
+    assert run(repo, "--range", f"{base}..HEAD").findings == []
+
+
+def test_range_skips_what_a_merge_takes_from_outside_the_range(repo: Path) -> None:
+    """A merge of the base branch brings no file of its own: its files are that branch's.
+
+    `main` once held a term and removed it again; a branch that merged `main` in between has
+    the term in the tree of its merge commit, but no commit of the branch added it.
+    """
+    git(repo, "checkout", "-q", "-b", "topic")
+    (repo / "topic.md").write_text("clean\n")
+    commit(repo, "docs: topic")
+    git(repo, "checkout", "-q", "main")
+    (repo / "notes.md").write_text("about globex.test\n")
+    commit(repo, "docs: notes")
+    git(repo, "checkout", "-q", "topic")
+    git(repo, "merge", "-q", "--no-ff", "-m", "chore: merge main", "main")
+    git(repo, "checkout", "-q", "main")
+    (repo / "notes.md").write_text("about nothing\n")
+    commit(repo, "docs: reword the notes")
+    git(repo, "checkout", "-q", "topic")
+    git(repo, "merge", "-q", "--no-ff", "-m", "chore: merge main again", "main")
+    assert run(repo, "--range", "main..topic").findings == []
+
+
+def test_range_finds_what_a_merge_commit_adds_itself(repo: Path) -> None:
+    git(repo, "checkout", "-q", "-b", "topic")
+    (repo / "topic.md").write_text("clean\n")
+    commit(repo, "docs: topic")
+    git(repo, "checkout", "-q", "main")
+    (repo / "main.md").write_text("clean\n")
+    commit(repo, "docs: main")
+    git(repo, "checkout", "-q", "topic")
+    git(repo, "merge", "-q", "--no-ff", "--no-commit", "main")
+    (repo / "merged.md").write_text("about globex.test\n")
+    commit(repo, "chore: merge main")
+    merge = _short(repo)
+    (repo / "merged.md").unlink()
+    commit(repo, "docs: remove the note")
+    [f] = run(repo, "--range", "main..topic").findings
+    assert (f.kind, f.location) == ("commit-content", f"commit {merge} merged.md:1:7")
+
+
+def test_range_finds_binary_content_a_later_commit_removed(repo: Path) -> None:
+    base = git(repo, "rev-parse", "HEAD").strip()
+    (repo / "image.png").write_bytes(_png(IHDR, (b"tEXt", b"Author\x00globex.test"), IEND))
+    commit(repo, "docs: image")
+    added = _short(repo)
+    (repo / "image.png").write_bytes(_png(IHDR, IEND))
+    commit(repo, "docs: image without the author")
+    [f] = run(repo, "--range", f"{base}..HEAD").findings
+    assert f.kind == "commit-content"
+    assert f.location.startswith(f"commit {added} image.png@")
+
+
+def test_range_output_masks_terms_in_the_path_of_a_commit(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (repo / "acme-widgets-notes.md").write_text("clean\n")
+    commit(repo, "docs: notes")
+    added = _short(repo)
+    git(repo, "mv", "acme-widgets-notes.md", "notes.md")
+    commit(repo, "docs: rename the notes")
+    rc = ds.main(["--repo", str(repo), "--list", str(EXAMPLE_LIST), "--generic", str(GENERIC)])
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert f"commit {added} path ************-notes.md: commit-path matches private rule" in out
+    assert "acme" not in out.lower()
+
+
+def test_range_with_a_missing_file_object_fails_closed(repo: Path) -> None:
+    """A clone that lacks a file of a commit cannot call that commit clean."""
+    base = git(repo, "rev-parse", "HEAD").strip()
+    (repo / "notes.md").write_text("first wording\n")
+    commit(repo, "docs: notes")
+    blob = git(repo, "rev-parse", "HEAD:notes.md").strip()
+    (repo / "notes.md").write_text("second wording\n")
+    commit(repo, "docs: reword the notes")
+    (repo / ".git" / "objects" / blob[:2] / blob[2:]).unlink()
+    with pytest.raises(ds.ConfigError, match="cat-file"):
+        run(repo, "--range", f"{base}..HEAD")
+
+
+@pytest.mark.parametrize(
+    "listing",
+    [
+        "not-a-commit\0",
+        ":100644 100644 " + "a" * 40 + " " + "b" * 40 + " M\0notes.md\0",
+        "c" * 40 + "\0:100644 100644 " + "a" * 40 + " M\0notes.md\0",
+        "c" * 40 + "\0:100644 100644 " + "a" * 40 + " " + "b" * 40 + " M\0",
+    ],
+    ids=["no-commit-id", "file-before-a-commit", "short-record", "no-path"],
+)
+def test_commit_files_refuses_another_output_form(listing: str) -> None:
+    with pytest.raises(ds.ConfigError, match="diff-tree"):
+        list(ds.commit_files(listing))
+
+
+def test_commit_files_reads_merges_and_skips_deletions_and_submodules() -> None:
+    one, two, three = "a" * 40, "b" * 40, "c" * 40
+    zero = "0" * 40
+    listing = "\0".join(
+        [
+            one,
+            f":000000 100644 {zero} {two} A",
+            "added.md",
+            f":100644 000000 {two} {zero} D",
+            "deleted.md",
+            f":000000 160000 {zero} {three} A",
+            "vendor/module",
+            two,
+            f"::100644 100644 100755 {one} {two} {three} MM",
+            "merged file.sh",
+            "",
+        ]
+    )
+    assert list(ds.commit_files(listing)) == [
+        (one, "added.md", two),
+        (two, "merged file.sh", three),
+    ]
+
+
 def test_history_finds_deleted_content_and_names(repo: Path) -> None:
     (repo / "old-acme-widgets.txt").write_text("project falcon\n")
     commit(repo, "docs: temp")
     (repo / "old-acme-widgets.txt").unlink()
     commit(repo, "docs: remove temp")
-    assert run(repo).findings == []
+    # Without a range every commit of HEAD is checked, and so are the files each of them adds.
+    assert sorted(f.kind for f in run(repo).findings) == ["commit-content", "commit-path"]
     kinds = sorted(f.kind for f in run(repo, "--history").findings)
     assert kinds == ["history-content", "history-path"]
 

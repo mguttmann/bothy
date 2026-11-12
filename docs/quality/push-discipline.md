@@ -287,7 +287,8 @@ issue --dry-run` (with `SUMMARY`, `RUN_URL`, `REPO`, `EVENT_NAME` and `SHA` set)
 What a run scans (`tools/denylist/main_range.py`, DENYLIST_RANGE of `make denylist`): every
 run scans the tree of `main`, the refs and their names. A push adds its commits
 `before..after`, or every commit reachable from `main` when `before` is missing or unknown
-(the first push). A manual run ("Run workflow", `workflow_dispatch`) scans what a push run
+(the first push). Of a commit the run reads the message, the identities and the files the
+commit adds or changes. A manual run ("Run workflow", `workflow_dispatch`) scans what a push run
 scans and no older history: without input it checks no commit at all, and with the input
 `range` (`BASE..TIP`, two commit ids, nothing else is accepted) it checks exactly those
 commits. Old commits on `main` are public and accepted (the earlier commit identity and two

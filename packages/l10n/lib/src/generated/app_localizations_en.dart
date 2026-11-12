@@ -7227,6 +7227,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pushBodyInputNeeded => 'An agent is waiting for your answer';
 
   @override
+  String get pushBodyWakeEnded => 'An agent did not continue on its own';
+
+  @override
   String get pushMessageNotAvailable => 'Message not available';
 
   @override

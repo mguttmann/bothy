@@ -5,8 +5,11 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
+
+import yaml
 
 _SPEC = importlib.util.spec_from_file_location(
     "apple_strings_tool", Path(__file__).resolve().parents[1] / "apple_strings.py"
@@ -18,6 +21,9 @@ sys.modules[_SPEC.name] = gen
 _SPEC.loader.exec_module(gen)
 
 REPO = Path(__file__).resolve().parents[3]
+_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+_CLIENT_KIT = "apps/client/ios/ClientKit/Sources/ClientKit"
+_ANDROID_PUSH = "apps/client/android/app/src/main/kotlin/com/example/client/push"
 
 
 # The placeholders the template declares, in the order that gives their positions.
@@ -108,13 +114,53 @@ def test_repository_files_are_current() -> None:
     assert gen.main(["--root", str(REPO), "--check"]) == 0
 
 
+def _contract_kinds() -> list[str]:
+    """The members of `NotificationKind` in the contract, in its order."""
+    text = (REPO / "docs/api/openapi.yaml").read_text(encoding="utf-8")
+    api = yaml.load(text, Loader=_LOADER)  # noqa: S506 (safe loader)
+    kinds = api["components"]["schemas"]["NotificationKind"]["enum"]
+    assert kinds
+    return [str(kind) for kind in kinds]
+
+
+def _quoted(source: str, pattern: str) -> list[str]:
+    """The string literals of the one place in `source` that `pattern` finds (group 1)."""
+    [found] = re.findall(pattern, source, flags=re.DOTALL)
+    return re.findall(r'"([^"]*)"', found)
+
+
+def test_every_notification_kind_of_the_contract_has_a_push_text() -> None:
+    """The server sends `PUSH_BODY_<KIND>` for every kind (13 6.1); the apps must hold each.
+
+    A kind without its key shows the raw key on iOS and macOS and the text of `message` on
+    Android. `test_repository_files_are_current` holds the files to the generator, and the
+    generator fails for a language without the text.
+    """
+    bodies = [key for key in gen.NATIVE_KEYS if key.startswith("PUSH_BODY_")]
+    assert bodies == [f"PUSH_BODY_{kind.upper()}" for kind in _contract_kinds()]
+    assert set(bodies) <= set(gen.ANDROID_KEYS)
+
+
+def test_native_kind_lists_equal_the_contract() -> None:
+    """The hand-written lists of the kinds in Swift and Kotlin follow `NotificationKind`."""
+    kinds = _contract_kinds()
+    swift = (REPO / _CLIENT_KIT / "PreviewClient.swift").read_text(encoding="utf-8")
+    assert sorted(_quoted(swift, r"static let kinds: Set<String> = \[(.*?)\]")) == sorted(kinds)
+    kotlin = (REPO / _ANDROID_PUSH / "PreviewClient.kt").read_text(encoding="utf-8")
+    assert sorted(_quoted(kotlin, r"val KINDS = setOf\((.*?)\)")) == sorted(kinds)
+    texts = (REPO / _ANDROID_PUSH / "PreviewRenderer.kt").read_text(encoding="utf-8")
+    [bodies] = re.findall(r"bodies =\s*mapOf\((.*?)\n\s*\),", texts, flags=re.DOTALL)
+    entries = re.findall(r'"([a-z_]+)" to r\.getString\(R\.string\.([a-z_]+)\)', bodies)
+    assert entries == [(kind, f"push_body_{kind}") for kind in kinds]
+
+
 def test_android_output_has_every_key_with_positional_arguments(tmp_path: Path) -> None:
     root = _repo(tmp_path)
     assert gen.main(["--root", str(root)]) == 0
     en = (root / gen.ANDROID_DIR / "values/strings.xml").read_text(encoding="utf-8")
     for native in gen.ANDROID_KEYS:
         assert f'<string name="{native.lower()}">' in en
-    assert len(gen.ANDROID_KEYS) == 12
+    assert len(gen.ANDROID_KEYS) == 13
     assert "share_send" not in en
     assert '<string name="push_preview_title">%1$s · %2$s</string>' in en
     # The format strings escape a literal percent; quotes and apostrophes are escaped for aapt.
@@ -139,7 +185,7 @@ def test_android_escaping_of_xml_and_resource_syntax(tmp_path: Path) -> None:
 
 def test_share_keys_follow_the_push_keys_with_positional_arguments(tmp_path: Path) -> None:
     natives = list(gen.NATIVE_KEYS)
-    assert natives[:12] == [
+    assert natives[:13] == [
         "PUSH_TITLE",
         "PUSH_BODY_MESSAGE",
         "PUSH_BODY_MENTION",
@@ -149,12 +195,13 @@ def test_share_keys_follow_the_push_keys_with_positional_arguments(tmp_path: Pat
         "PUSH_BODY_INPUT_NEEDED",
         "PUSH_BODY_SECURITY",
         "PUSH_BODY_ADMIN",
+        "PUSH_BODY_WAKE_ENDED",
         "PUSH_MESSAGE_NOT_AVAILABLE",
         "PUSH_PREVIEW_TITLE",
         "PUSH_PREVIEW_TEXT",
     ]
-    assert all(native.startswith("SHARE_") for native in natives[12:])
-    assert len(natives) == 34
+    assert all(native.startswith("SHARE_") for native in natives[13:])
+    assert len(natives) == 35
     root = _repo(tmp_path)
     assert gen.main(["--root", str(root)]) == 0
     en = (root / gen.OUTPUT_DIR / "en.lproj/Localizable.strings").read_text(encoding="utf-8")

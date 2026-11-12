@@ -46,6 +46,11 @@ and masks hits.
 * Checked: content and name of every tracked file (including binaries), commit messages
   and identities, branch and tag names, tag messages; `--history` additionally every
   object on every ref.
+* Amended 2026-11-12 (docs/decisions.d/AUD-tools-misc-01.md AUD-TM1/1): for the commits of the
+  range the scan also reads content and name of every file such a commit adds or changes, from
+  the commit itself. Before, a term that one commit added and a later commit of the same push
+  removed passed every run except `--history`, although the repository is public from the first
+  push (ADR 0039) and the earlier commit stays readable there.
 * `--allow-missing` only for fork pull requests: then only the public rules
   from `tools/denylist/generic.rules` run (home paths, tailnet names, email addresses outside
   the example domains, private IPv4 ranges, Discord IDs). The full list runs locally at the
@@ -66,7 +71,8 @@ and masks hits.
 
 ### Confirmation
 
-`tools/denylist/tests/test_denylist_scan.py` checks every leak location, the failure without a
+`tools/denylist/tests/test_denylist_scan.py` checks every leak location (among them the files
+of a commit that a later commit of the range changed, deleted or renamed), the failure without a
 list, `--allow-missing`, allowed identities, masking and the generic rules
 against the repository itself. Gate `denylist` in `make check` and as a separate CI job,
 plus the run after the merge (`denylist-main.yml`); `make denylist-history` in the

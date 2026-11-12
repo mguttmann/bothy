@@ -24,12 +24,15 @@ other text, and every other trailer, is message text and gets all rules.
 
 Scanned by default: content and path of every tracked file (working tree), the current
 branch name and all local branch and tag names, annotated tag messages, message plus
-identities of every commit in --range (default: all commits reachable from HEAD), and the
-pull request title and body from PR_TITLE, PR_BODY and PR_BODY_FILE when set. The body is
-checked like a commit message; a Signed-off-by trailer in it is allowed when it names a full
-identity from the allow list, because the squash commit has no author to compare it with yet.
-With --history additionally every blob and path ever committed on any ref, and every
-commit on any ref.
+identities of every commit in --range (default: all commits reachable from HEAD), content and
+path of every file such a commit adds or changes, and the pull request title and body from
+PR_TITLE, PR_BODY and PR_BODY_FILE when set. A commit stays readable on the remote after a
+later commit removed what it added, so the files of the commits are read from the commits and
+not from the working tree; a merge commit counts for what differs from all of its parents.
+The body is checked like a commit message; a Signed-off-by trailer in it is allowed when it
+names a full identity from the allow list, because the squash commit has no author to compare
+it with yet. With --history additionally every blob and path ever committed on any ref, and
+every commit on any ref.
 
 Output names the location and the rule's line number, never the matched text, so that
 CI logs do not reveal the list. --reveal prints the match (local use only). --summary
@@ -50,7 +53,7 @@ import struct
 import subprocess
 import sys
 import zlib
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -78,6 +81,9 @@ _IDENTITY_TRAILER = re.compile(
     re.IGNORECASE,
 )
 _SHA = re.compile(r"^[0-9a-f]{40}$")
+# The mode of a submodule entry in a tree: it names a commit of another repository, no file.
+_GITLINK = "160000"
+_UNEXPECTED = "unexpected git {} output; refusing to report a clean scan"
 _EMAIL = re.compile(r"<([^>]+)>")
 _COLUMN = re.compile(r":([0-9]+):[0-9]+$")
 
@@ -271,6 +277,41 @@ def _text(repo: Path, *args: str) -> str:
     return _git_bytes(repo, *args).decode("utf-8", errors="replace")
 
 
+def commit_files(listing: str) -> Iterator[tuple[str, str, str]]:
+    """Yield (commit id, path, blob id) of the files in the output of `git diff-tree --stdin -z`.
+
+    The output holds, separated by NUL, the id of a commit and then one record and one path for
+    every file the commit changed: `:<mode> <mode> <id> <id> <status>` against its parent, or
+    with one colon, one mode and one id more per further parent for a merge commit (combined
+    form, only files that differ from all parents). The last mode and id are those of the
+    commit itself. A file the commit deleted and a submodule entry have no content and are
+    left out.
+
+    Raises:
+        ConfigError: the output has another form, so nothing can be said about the commits.
+    """
+    commit = ""
+    fields = iter(listing.split("\0"))
+    for record in fields:
+        if not record:
+            continue
+        if not record.startswith(":"):
+            if not _SHA.match(record):
+                raise ConfigError(_UNEXPECTED.format("diff-tree"))
+            commit = record
+            continue
+        path = next(fields, "")
+        parents = len(record) - len(record.lstrip(":"))
+        meta = record[parents:].split(" ")
+        if not commit or not path or len(meta) != 2 * parents + 3:
+            raise ConfigError(_UNEXPECTED.format("diff-tree"))
+        mode, blob = meta[parents], meta[2 * parents + 1]
+        if not _SHA.match(blob):
+            raise ConfigError(_UNEXPECTED.format("diff-tree"))
+        if blob.strip("0") and mode != _GITLINK:
+            yield commit, path, blob
+
+
 def resolve_list_path(repo: Path, explicit: Path | None) -> Path | None:
     """Return the list path from --list, BOTHY_DENYLIST_FILE or `.denylist-path`, else None."""
     if explicit is not None:
@@ -326,6 +367,8 @@ class Scanner:
     private: RuleSet | None
     allowed: tuple[set[str], set[str]]
     findings: list[Finding] = field(default_factory=list)
+    # The paths scan_tracked_files read, so that scan_commit_files reports none of them twice.
+    tracked: set[str] = field(default_factory=set)
 
     def _scan(
         self,
@@ -358,6 +401,7 @@ class Scanner:
         for name in raw.decode("utf-8").split("\0"):
             if not name:
                 continue
+            self.tracked.add(name)
             self._scan("path", name, f"path {name}", path=name)
             file = self.repo / name
             if not file.is_file():
@@ -450,7 +494,7 @@ class Scanner:
                 continue
             sha, author, committer, body = record.split("\x1f", 3)
             if not _SHA.match(sha):
-                raise ConfigError("unexpected git log output; refusing to report a clean scan")
+                raise ConfigError(_UNEXPECTED.format("log"))
             short = sha[:12]
             for role, identity in (("author", author), ("committer", committer)):
                 if self.private and not _is_allowed(identity, self.allowed):
@@ -461,6 +505,80 @@ class Scanner:
             self._message(
                 body, "commit-message", f"commit {short} message", f"commit {short} trailer", own
             )
+
+    def scan_commit_files(self, rev_args: list[str]) -> None:
+        """Scan path and content of every file a commit selected by `rev_args` adds or changes.
+
+        A commit stays readable on the remote after a later commit removed what it added, so
+        the working tree alone says nothing about the commits before the last one. A merge
+        commit counts only for what differs from all of its parents: a file it takes from one
+        of them is that parent's, in the range or already published. A path and a content that
+        scan_tracked_files read are not reported a second time; a finding names the first
+        commit of the range that holds the file under that path.
+        """
+        # Parents before children, so that the first commit seen for a file is the one to fix.
+        commits = _git_bytes(self.repo, "rev-list", "--topo-order", "--reverse", *rev_args, "--")
+        if not commits.strip():
+            return
+        diff_tree = ["diff-tree", "--stdin", "-r", "-c", "--root", "--no-renames", "--no-abbrev"]
+        listing = subprocess.run(
+            ["git", "-C", str(self.repo), *diff_tree, "-z"],
+            input=commits,
+            capture_output=True,
+            check=True,
+        ).stdout.decode("utf-8", errors="replace")
+        # Blob id to the paths it has in the commits, each with the first commit that holds it.
+        files: dict[str, dict[str, str]] = {}
+        paths: set[str] = set(self.tracked)
+        for commit, path, blob in commit_files(listing):
+            short = commit[:12]
+            if path not in paths:
+                paths.add(path)
+                self._scan("commit-path", path, f"commit {short} path {path}", path=path)
+            files.setdefault(blob, {}).setdefault(path, short)
+        for blob, otype, body in self._objects(files):
+            if otype != "blob":
+                raise ConfigError(_UNEXPECTED.format("cat-file"))
+            unread = [(p, c) for p, c in files[blob].items() if not self._read_as_tracked(p, body)]
+            if not unread:
+                continue
+            text, binary = _content_text(body)
+            for path, short in unread:
+                self._scan(
+                    "commit-content",
+                    text,
+                    f"commit {short} {path}",
+                    path=path,
+                    position="offset" if binary else "lines",
+                )
+
+    def _read_as_tracked(self, path: str, body: bytes) -> bool:
+        """Report whether scan_tracked_files read exactly `body` under `path`."""
+        file = self.repo / path
+        return path in self.tracked and file.is_file() and file.read_bytes() == body
+
+    def _objects(self, ids: Iterable[str]) -> Iterator[tuple[str, str, bytes]]:
+        """Yield (id, type, content) of the objects `ids`, read by one `git cat-file --batch`."""
+        batch = "\n".join(ids)
+        if not batch:
+            return
+        proc = subprocess.run(
+            ["git", "-C", str(self.repo), "cat-file", "--batch"],
+            input=(batch + "\n").encode(),
+            capture_output=True,
+            check=True,
+        )
+        data = proc.stdout
+        pos = 0
+        while pos < len(data):
+            header_end = data.index(b"\n", pos)
+            header = data[pos:header_end].decode().split()
+            if len(header) != 3:
+                # `<id> missing`: an object of the commits is not in this clone.
+                raise ConfigError(_UNEXPECTED.format("cat-file"))
+            sha, otype, size = header
+            yield sha, otype, data[header_end + 1 : header_end + 1 + int(size)]
+            pos = header_end + 1 + int(size) + 1
 
     def scan_history_objects(self) -> None:
         """Scan every path and every blob ever committed on any ref that is not in the index."""
@@ -474,24 +592,9 @@ class Scanner:
                 if path not in seen_paths:
                     seen_paths.add(path)
                     self._scan("history-path", path, f"history-path {path}", path=path)
-        if not paths:
-            return
-        batch = "\n".join(paths) + "\n"
-        proc = subprocess.run(
-            ["git", "-C", str(self.repo), "cat-file", "--batch"],
-            input=batch.encode(),
-            capture_output=True,
-            check=True,
-        )
-        data = proc.stdout
-        pos = 0
         current = _text(self.repo, "ls-files", "-s")
         current_blobs = {ln.split()[1] for ln in current.splitlines() if ln}
-        while pos < len(data):
-            header_end = data.index(b"\n", pos)
-            sha, otype, size = data[pos:header_end].decode().split()
-            body = data[header_end + 1 : header_end + 1 + int(size)]
-            pos = header_end + 1 + int(size) + 1
+        for sha, otype, body in self._objects(paths):
             if otype != "blob" or sha in current_blobs:
                 continue
             path = paths[sha]
@@ -578,7 +681,9 @@ def scan(args: argparse.Namespace) -> Report:
         scanner.scan_commits(["--all"])
         scanner.scan_history_objects()
     else:
-        scanner.scan_commits([args.rev_range] if args.rev_range else ["HEAD"])
+        rev_args = [args.rev_range] if args.rev_range else ["HEAD"]
+        scanner.scan_commits(rev_args)
+        scanner.scan_commit_files(rev_args)
     scanner.scan_pull_request(os.environ.get(ENV_PR_TITLE, ""), bodies)
     return Report(scanner.findings, private is not None, scanner.rulesets)
 

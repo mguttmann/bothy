@@ -43,6 +43,7 @@ data class PushTexts(
                         "input_needed" to r.getString(R.string.push_body_input_needed),
                         "security" to r.getString(R.string.push_body_security),
                         "admin" to r.getString(R.string.push_body_admin),
+                        "wake_ended" to r.getString(R.string.push_body_wake_ended),
                     ),
                 notAvailable = r.getString(R.string.push_message_not_available),
                 titleFormat = r.getString(R.string.push_preview_title),
