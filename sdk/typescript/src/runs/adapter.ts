@@ -1360,6 +1360,38 @@ export class Adapter {
   ): Promise<void> {
     const handle = state.handle;
     try {
+      try {
+        await this.workAndEnd(state, token, work, inv);
+      } catch (error) {
+        // Only an end the server did not store is taken up here; it goes out again below.
+        if (!handle.finishPending) throw error;
+        this.logger.warn(
+          `end of run ${state.runId} not stored; sending it again`,
+          { error: errorName(error) },
+        );
+      }
+      if (handle.finishPending) await this.resendEnd(state, token);
+    } finally {
+      if (handle.finished || handle.cancelled.aborted) {
+        try {
+          await this.inbox.setState(state.eventId, EntryState.CLOSED);
+        } catch {
+          // The store may be closed already when the adapter stops.
+        }
+        this.runs.delete(state.runId);
+      }
+    }
+  }
+
+  /** The handler work of {@link Adapter.executeRun} and the end that follows from it. */
+  private async workAndEnd(
+    state: RunState,
+    token: Secret,
+    work: (inv: Invocation, run: RunHandle) => Promise<void>,
+    inv: Invocation,
+  ): Promise<void> {
+    const handle = state.handle;
+    try {
       await this.client.bindRun(state.runId, token, async () => {
         const outcome = await this.interruptible(state, () =>
           work(inv, handle),
@@ -1379,6 +1411,9 @@ export class Adapter {
           await handle.finish("completed");
       });
     } catch (error) {
+      // The end was asked for and the server did not store it: that is no failure of the
+      // handler, and the end asked for stays the run's end.
+      if (handle.finishPending) throw error;
       const failure = error instanceof RuntimeFailure;
       if (!failure)
         this.logger.error(`handler failed for run ${state.runId}`, {
@@ -1391,14 +1426,41 @@ export class Adapter {
           }),
         ),
       );
-    } finally {
-      if (handle.finished || handle.cancelled.aborted) {
-        try {
-          await this.inbox.setState(state.eventId, EntryState.CLOSED);
-        } catch {
-          // The store may be closed already when the adapter stops.
-        }
-        this.runs.delete(state.runId);
+    }
+  }
+
+  /**
+   * Sends the end of a run again until the server stored or refused it, or the adapter stops.
+   *
+   * The run stays in `active_runs` of the heartbeat meanwhile, so the server does not end it as
+   * interrupted (09 5.5). The waits double from `sync.reconnect_backoff_base` up to
+   * `sync.reconnect_backoff_cap`. After a stop the run is left to the server, like every run a
+   * stopped adapter still holds (09 4.9).
+   */
+  private async resendEnd(state: RunState, token: Secret): Promise<void> {
+    const handle = state.handle;
+    for (let attempt = 0; handle.finishPending; attempt++) {
+      const wait = Math.min(
+        this.settings.reconnectBackoffCapMs,
+        this.settings.reconnectBackoffBaseMs * 2 ** attempt,
+      );
+      try {
+        await this.clock.sleep(wait, this.stopper.signal);
+      } catch {
+        return; // stopped
+      }
+      try {
+        await this.client.bindRun(
+          state.runId,
+          this.runTokens.get(state.runId) ?? token,
+          () => handle.retryFinish(),
+        );
+      } catch (error) {
+        if (!(error instanceof ProblemError || error instanceof TransportError))
+          throw error;
+        this.logger.info(`end of run ${state.runId} not sent`, {
+          error: error.name,
+        });
       }
     }
   }
@@ -1490,7 +1552,8 @@ export class Adapter {
       }
       return;
     }
-    if (runningHere && !state.handle.finished) {
+    // A run whose end only waits to be sent again takes no more work.
+    if (runningHere && !state.handle.finished && !state.handle.finishPending) {
       const bound = this.runTokens.get(state.runId) ?? entry.token;
       await this.client.bindRun(state.runId, bound, () =>
         this.interruptible(undefined, () => work(inv, state.handle)),
