@@ -4,8 +4,14 @@
 # (docs/decisions.d/HERMES-PIN-MAIN.md, D-HERMES-PIN-1 and D-HERMES-PIN-2). Two jobs:
 # "record" may only read; it rewrites plugins/hermes-adapter/tests/hermes_pin.toml and the
 # "Current pin" line of spec 09 17.10, records again and runs the component's tests against the
-# new pin. That runs unreviewed upstream code without a cooldown, so no token with write access
-# and no cache that other workflows restore is ever in reach of it. "propose" runs no upstream
+# new pin. That runs unreviewed upstream code without a cooldown, in a run on main, whose cache
+# the other workflows restore. A step of a job runs as the user that owns the runner's files,
+# with sudo, so it can reach the credentials of the run. The upstream code therefore runs in
+# the container of tools/ci/sandbox.sh (docs/decisions.d/AUD-misc-ci-gates-01.md): no root, no
+# capability, no process and no file of the runner in sight, the checkout read-only except the
+# component's folder. No token of the run is in its reach, neither for the repository nor for
+# the cache. What it leaves in that folder is untrusted: the job copies only regular fixture
+# JSON files out of it and runs nothing from it. "propose" runs no upstream
 # code: it rewrites pin and line again with the repository's own follow_main.py, takes only the
 # fixture JSON files from the first job, commits without hooks and force-pushes one bundled
 # proposal branch with one pull request. It never replaces a proposal that a maintainer has
@@ -48,10 +54,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      # No cache: this job runs upstream code, and a cache saved here would be restored by
-      # the other workflows of main.
+      # No cache: a cache saved here would be restored by the other workflows of main.
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - id: proposal
         name: Fetch the open proposal
@@ -67,22 +73,50 @@ jobs:
         run: |
           uv run --no-project --python 3.14 plugins/hermes-adapter/tests/follow_main.py \
             bump --root . ${PROPOSAL:+--proposal "$PROPOSAL"} --github-output "$GITHUB_OUTPUT"
+      # Upstream code from here on, only inside the sandbox; the second call finds the uv
+      # cache and the Python of the first in the shared home.
       - id: record
         name: make -C plugins/hermes-adapter record
         if: steps.bump.outputs.propose == 'true'
         continue-on-error: true
-        run: make -C plugins/hermes-adapter record
+        env:
+          SANDBOX_HOME: ${{ runner.temp }}/sandbox-home
+        run: sh tools/ci/sandbox.sh --write plugins/hermes-adapter -- make -C plugins/hermes-adapter record
       - id: test
         name: make -C plugins/hermes-adapter test
         if: steps.bump.outputs.propose == 'true'
         continue-on-error: true
-        run: make -C plugins/hermes-adapter test
+        env:
+          SANDBOX_HOME: ${{ runner.temp }}/sandbox-home
+        run: sh tools/ci/sandbox.sh --write plugins/hermes-adapter -- make -C plugins/hermes-adapter test
+      # The folder the sandbox wrote is untrusted: only regular files with a fixture name leave
+      # it, from the fixture folder of the checkout itself (no link on the way), as a copy.
+      - name: Take only the fixture JSON files of the recording
+        if: steps.bump.outputs.propose == 'true'
+        env:
+          SOURCE: plugins/hermes-adapter/tests/fixtures/recording
+          TARGET: ${{ runner.temp }}/hermes-pin-recording
+        run: |
+          if [ "$(realpath -- "$SOURCE")" != "$(realpath -- "$GITHUB_WORKSPACE")/$SOURCE" ]; then
+            echo "::error::$SOURCE is not the fixture folder of the checkout"
+            exit 1
+          fi
+          mkdir -- "$TARGET"
+          find "$SOURCE" -mindepth 1 -maxdepth 1 -name '*.json' | while IFS= read -r path; do
+            name=${path#"$SOURCE"/}
+            if [ -f "$path" ] && [ ! -L "$path" ] && printf '%s\n' "$name" | grep -qxE '[a-z0-9_]+\.json'; then
+              cp -- "$path" "$TARGET/$name"
+            else
+              echo "::error::the recording left $name, which is not a fixture JSON file"
+              exit 1
+            fi
+          done
       - name: Hand the fixtures to the proposing job
         if: steps.bump.outputs.propose == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hermes-pin-recording
-          path: plugins/hermes-adapter/tests/fixtures/recording/*.json
+          path: ${{ runner.temp }}/hermes-pin-recording/*.json
           if-no-files-found: error
           retention-days: 1
 
@@ -102,6 +136,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - id: proposal
         name: Fetch the open proposal

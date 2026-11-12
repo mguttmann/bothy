@@ -170,9 +170,10 @@ def test_pack_step_skips_reports_the_job_did_not_write(tmp_path: Path, job: str)
 def test_a_push_to_main_is_never_cancelled_by_the_next_merge() -> None:
     # Merges come faster than one full run; with cancel-in-progress every main run was
     # cancelled by the next merge, and SonarQube never got an analysis of main. A newer push
-    # waits instead (GitHub keeps at most one pending run per group).
+    # waits instead (GitHub keeps at most one pending run per group). Only a pull request run
+    # is cancelled in progress; tools/ci/tests/test_ci_ok.py evaluates the group per event.
     concurrency = _workflow()["concurrency"]
-    assert concurrency["cancel-in-progress"] == "${{ github.event_name != 'push' }}"
+    assert concurrency["cancel-in-progress"] == "${{ github.event_name == 'pull_request' }}"
 
 
 def test_main_analysis_waits_for_the_main_branch_switch() -> None:

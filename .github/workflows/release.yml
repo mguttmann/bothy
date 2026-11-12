@@ -66,6 +66,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       - id: info
         env:
@@ -104,6 +105,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The resolve job has no release environment. Its outputs may steer control flow
       # (`if:`), but no value from it reaches a shell or an action here: this job resolves
@@ -213,6 +215,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The resolve job has no release environment. Its outputs may steer control flow
       # (`if:`), but no value from it reaches a shell or an action here: this job resolves
@@ -300,6 +303,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The resolve job has no release environment. Its outputs may steer control flow
       # (`if:`), but no value from it reaches a shell or an action here: this job resolves
@@ -387,6 +391,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The resolve job has no release environment. Its outputs may steer control flow
       # (`if:`), but no value from it reaches a shell or an action here: this job resolves
@@ -447,6 +452,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The resolve job has no release environment. Its outputs may steer control flow
       # (`if:`), but no value from it reaches a shell or an action here: this job resolves
@@ -629,6 +635,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The resolve job has no release environment. Its outputs may steer control flow
       # (`if:`), but no value from it reaches a shell or an action here: this job resolves
@@ -717,6 +724,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The resolve job has no release environment. Its outputs may steer control flow
       # (`if:`), but no value from it reaches a shell or an action here: this job resolves
@@ -810,6 +818,7 @@ jobs:
           cache: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The resolve job has no release environment. Its outputs may steer control flow
       # (`if:`), but no value from it reaches a shell or an action here: this job resolves
@@ -944,6 +953,7 @@ jobs:
           cache: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The resolve job has no release environment. Its outputs may steer control flow
       # (`if:`), but no value from it reaches a shell or an action here: this job resolves
@@ -1029,6 +1039,7 @@ jobs:
           flutter-version-file: apps/client/pubspec.yaml
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The resolve job has no release environment. Its outputs may steer control flow
       # (`if:`), but no value from it reaches a shell or an action here: this job resolves
@@ -1094,6 +1105,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The resolve job has no release environment. Its outputs may steer control flow
       # (`if:`), but no value from it reaches a shell or an action here: this job resolves
@@ -1211,6 +1223,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          version: "0.13.7"
           enable-cache: false
       # The resolve job has no release environment. Its outputs may steer control flow
       # (`if:`), but no value from it reaches a shell or an action here: this job resolves

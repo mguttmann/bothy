@@ -146,6 +146,24 @@ def test_codegen_table_of_chapter_06_names_the_pins() -> None:
     ]
 
 
+_UV_STEP = re.compile(
+    r"uses: astral-sh/setup-uv@[0-9a-f]{40}[^\n]*\n\s+with:\n\s+version: \"(?P<version>[^\"]+)\""
+)
+
+
+def ci_uv_version() -> str:
+    """The uv that CI installs: the `version` input of every `astral-sh/setup-uv` step.
+
+    tools/ci/tests/test_ci_toolchains.py holds that every step names it; a developer's host
+    brings its own uv.
+    """
+    found = set()
+    for wf in (REPO / ".github" / "workflows").glob("*.yml"):
+        found |= {m.group("version") for m in _UV_STEP.finditer(wf.read_text())}
+    assert len(found) == 1, f"one uv version in the workflows, found {sorted(found)}"
+    return next(iter(found))
+
+
 def pinned_tools() -> dict[str, str]:
     pins: dict[str, str] = dict(go_tools())
     lock = tomllib.loads((REPO / "tools" / "uv.lock").read_text())
@@ -184,7 +202,7 @@ def pinned_tools() -> dict[str, str]:
     m = re.search(r"^ARG SCANCODE_VERSION=(\S+)$", scancode, re.MULTILINE)
     assert m, "ScanCode version"
     pins["scancode-toolkit"] = m.group(1)
-    pins["uv"] = "system tool"
+    pins["uv"] = ci_uv_version()
     pins.update({k: v for k, v in sdk_pins().items() if k in SDK_GENERATORS})
     return pins
 

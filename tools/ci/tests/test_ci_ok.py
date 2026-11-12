@@ -12,6 +12,7 @@ body is still going; ci-ok completes that check run with its own conclusion.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -398,7 +399,87 @@ def test_build_verify_plans_with_the_same_command() -> None:
     )
 
 
-def test_superseded_pull_request_runs_are_cancelled() -> None:
+# --- concurrency --------------------------------------------------------------------
+
+_EXPRESSION = re.compile(r"\$\{\{(.*?)\}\}")
+
+
+def _term(text: str, github: dict[str, Any]) -> Any:
+    """A string literal or a path into the `github` context; a missing property is empty."""
+    text = text.strip()
+    if text.startswith("'"):
+        assert text.endswith("'"), text
+        return text[1:-1]
+    root, *path = text.split(".")
+    assert root == "github", text
+    value: Any = github
+    for key in path:
+        value = value.get(key, "") if isinstance(value, dict) else ""
+    return value
+
+
+def _evaluate(expression: str, github: dict[str, Any]) -> Any:
+    """The value of an expression of `concurrency`: terms joined by `==`, `!=` and `||`."""
+    value: Any = ""
+    for operand in expression.split("||"):
+        if "==" in operand:
+            left, right = operand.split("==")
+            value = _term(left, github) == _term(right, github)
+        elif "!=" in operand:
+            left, right = operand.split("!=")
+            value = _term(left, github) != _term(right, github)
+        else:
+            value = _term(operand, github)
+        if value:
+            return value
+    return value
+
+
+def _run(event: str, ref: str, pull_request: int | None = None) -> dict[str, Any]:
+    payload = {} if pull_request is None else {"pull_request": {"number": pull_request}}
+    return {"workflow": "ci", "event_name": event, "ref": ref, "event": payload}
+
+
+def _cancels(later: dict[str, Any], earlier: dict[str, Any]) -> bool:
+    """Whether the start of `later` cancels `earlier` while it is in progress.
+
+    GitHub cancels the run in progress of a concurrency group when the run that joins the group
+    has a true `cancel-in-progress`; the expression is the one of the joining run.
+    """
     concurrency = _load(CI)["concurrency"]
-    assert "github.event.pull_request.number" in concurrency["group"]
-    assert concurrency["cancel-in-progress"] == "${{ github.event_name != 'push' }}"
+
+    def group(run: dict[str, Any]) -> str:
+        return _EXPRESSION.sub(lambda m: str(_evaluate(m.group(1), run)), concurrency["group"])
+
+    [cancel] = _EXPRESSION.fullmatch(concurrency["cancel-in-progress"]).groups()
+    return group(later) == group(earlier) and _evaluate(cancel, later) is True
+
+
+PUSH_TO_MAIN = _run("push", "refs/heads/main")
+MANUAL_ON_MAIN = _run("workflow_dispatch", "refs/heads/main")
+MERGE_GROUP = _run("merge_group", "refs/heads/gh-readonly-queue/main/pr-7-0123456789abcdef")
+
+
+def test_superseded_pull_request_runs_are_cancelled() -> None:
+    older = _run("pull_request", "refs/pull/7/merge", 7)
+    assert _cancels(_run("pull_request", "refs/pull/7/merge", 7), older)
+    assert not _cancels(_run("pull_request", "refs/pull/8/merge", 8), older)
+
+
+@pytest.mark.parametrize("later", [PUSH_TO_MAIN, MANUAL_ON_MAIN])
+@pytest.mark.parametrize("earlier", [PUSH_TO_MAIN, MANUAL_ON_MAIN])
+def test_a_run_of_main_in_progress_is_never_cancelled(
+    later: dict[str, Any], earlier: dict[str, Any]
+) -> None:
+    """Neither the next push nor a manual run of main cancels a run of main (AUD-CG1/1).
+
+    Before, a manual run joined the group of the push run with a true `cancel-in-progress`
+    and cancelled it, and SonarQube lost the analysis of that commit.
+    """
+    assert not _cancels(later, earlier)
+
+
+@pytest.mark.parametrize("other", [_run("pull_request", "refs/pull/7/merge", 7), MERGE_GROUP])
+@pytest.mark.parametrize("main", [PUSH_TO_MAIN, MANUAL_ON_MAIN])
+def test_no_other_run_shares_the_group_of_main(other: dict[str, Any], main: dict[str, Any]) -> None:
+    assert not _cancels(other, main)
