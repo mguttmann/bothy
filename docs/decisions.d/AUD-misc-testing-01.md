@@ -38,10 +38,11 @@ Red runs:
 
 E2E in CI:
 
-- The first hosted runs of this package's changes exist only after the merge: the phone terminal
-  suite behind its first tap (ruling 5, proven on a local emulator of the same screen) and the
-  job `headless` (ruling 6), which has no run on a Linux runner yet. `testing-4` is closed by
-  the first night in which that job passes.
+- The first hosted runs of this package's changes exist only after a push, as a manual run of
+  `e2e-mobile.yml` and of `e2e-desktop.yml` on the branch or as the first night after the
+  merge: the phone terminal suite behind its first tap (ruling 5, proven on a local emulator of
+  the same screen) and the job `headless` (ruling 6), which has no run on a Linux runner yet.
+  `testing-4` is closed by the first run in which that job passes.
 - The driver of the Fake-Agent prints nothing when it accepts a rebased patch (ruling 12), so a
   log cannot show that a conflict happened and was survived.
 - The desktop E2E suites as a job of the plan for changes of the apps, the packages and the
