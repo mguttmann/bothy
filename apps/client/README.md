@@ -1056,8 +1056,9 @@ calls `showQuickSwitcher` and the routes. Search D7 sends `search` with the filt
 parameters (the notation `from:`, `in:`, `has:file`, `before:` and `after:` is translated in the
 app; the server never sees it; the column also offers the agent of a conversation and the tag
 of the chosen forum), pages with the opaque cursor, restarts on `cursor_invalid` and
-renders only the server's `segments`, never HTML. A hit opens `/t/<thread>?m=<message>`; a file
-hit opens the message it is attached to (`SearchHit.thread_id` and `message_id`). The request
+renders only the server's `segments`, never HTML. A message hit opens
+`/t/<thread>?m=<message>`, a thread hit `/t/<thread>`, and a file hit the message it is
+attached to (`SearchHit.thread_id` and `message_id`). The request
 goes out once, without the read retry of the session: a timeout of the server
 (`503 unavailable` with the reason `search_timeout`) shows the hint to narrow the search,
 `429 rate_limited` the wait, both above the local hits, and a newer search or closing the view

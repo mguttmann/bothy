@@ -357,6 +357,35 @@ void main() {
     expect(h.state.nextCursor, 'c1');
   });
 
+  test('a further page that loads drops the reason of a failed one', () async {
+    final h = await live();
+    await h.submit('deploy');
+    h.server.answer(0).complete(page([item('a')], next: 'c1'));
+    await pumpEventQueue();
+    unawaited(h.controller.loadMore());
+    await pumpEventQueue();
+    h.server
+        .answer(1)
+        .completeError(
+          const SearchFailure(
+            SearchFailureKind.rateLimited,
+            retryAfter: Duration(seconds: 7),
+          ),
+        );
+    await pumpEventQueue();
+    expect(h.state.error, SearchError.rateLimited);
+    expect(h.state.retryAfter, const Duration(seconds: 7));
+
+    // The person asks for the page again and the server answers it.
+    unawaited(h.controller.loadMore());
+    await pumpEventQueue();
+    h.server.answer(2).complete(page([item('b')]));
+    await pumpEventQueue();
+    expect(h.state.items.map((i) => i.segments.single.text), ['a', 'b']);
+    expect(h.state.error, isNull);
+    expect(h.state.retryAfter, isNull);
+  });
+
   test('candidates_capped is reported', () async {
     final h = await live();
     await h.submit('deploy');

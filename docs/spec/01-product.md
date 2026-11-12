@@ -472,9 +472,10 @@ is the number of loaded hits, because the server returns no totals
 ([14-search.md](14-search.md) 4.3). A search shows one type at a time (messages, threads or
 files; a transcript is found as its file), and the filters are those of
 [14-search.md](14-search.md) 4.4: the tag is one of the chosen forum, and the agent keeps the
-conversations with that agent. A hit opens its message in the thread; a file opens the message
-it is attached to. While the server has not answered the view says "Searching"; a search the
-server ended at its time limit asks to narrow it, and a refused one names the wait.
+conversations with that agent. A message hit opens its message in the thread, a thread hit
+opens the thread, and a file opens the message it is attached to. While the server has not
+answered the view says "Searching"; a search the server ended at its time limit asks to narrow
+it, and a refused one names the wait.
 
 ```text
 +--------------------------+------------------------------------------------------------------------+

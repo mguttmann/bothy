@@ -379,6 +379,8 @@ final class SearchSession {
           nextCursor: page.nextCursor,
           clearCursor: page.nextCursor == null,
           candidatesCapped: _state.candidatesCapped || page.candidatesCapped,
+          // The page came: the reason of a failed attempt before it no longer holds.
+          clearError: true,
         ),
       );
     } on SearchFailure catch (f) {

@@ -13,3 +13,5 @@
 - The search view says "Searching" while it waits for the server, shows a failure at once
   instead of repeating the request for minutes, and stops the request of an earlier search when
   a new one starts.
+- When "Load more" failed and a later attempt loads the page, the search view no longer keeps
+  the text of the failure above the hits.
