@@ -66,8 +66,9 @@ String _$inAppBannersHash() => r'cf6fed55545da86e5216bd7ca697ba12245a1094';
 /// Shows `notification.created` of the signed-in engine while the app is connected: as local
 /// notifications on Windows and macOS (13 5.3, D-M4-30-5), as the in-app banner on iOS and
 /// Android ([inAppBanners], with the same rules of the [NotificationRouter]), and removes the
-/// notification or the banner of a thread once the person has read it (01 10.3); the app
-/// widget listens to its [DesktopNotifications.targets].
+/// notification or the banner of a thread once the person has read it (01 10.3,
+/// [NotificationRouter.onCountChange]); the app widget listens to its
+/// [DesktopNotifications.targets].
 
 @ProviderFor(desktopNotifications)
 final desktopNotificationsProvider = DesktopNotificationsProvider._();
@@ -75,8 +76,9 @@ final desktopNotificationsProvider = DesktopNotificationsProvider._();
 /// Shows `notification.created` of the signed-in engine while the app is connected: as local
 /// notifications on Windows and macOS (13 5.3, D-M4-30-5), as the in-app banner on iOS and
 /// Android ([inAppBanners], with the same rules of the [NotificationRouter]), and removes the
-/// notification or the banner of a thread once the person has read it (01 10.3); the app
-/// widget listens to its [DesktopNotifications.targets].
+/// notification or the banner of a thread once the person has read it (01 10.3,
+/// [NotificationRouter.onCountChange]); the app widget listens to its
+/// [DesktopNotifications.targets].
 
 final class DesktopNotificationsProvider
     extends
@@ -89,8 +91,9 @@ final class DesktopNotificationsProvider
   /// Shows `notification.created` of the signed-in engine while the app is connected: as local
   /// notifications on Windows and macOS (13 5.3, D-M4-30-5), as the in-app banner on iOS and
   /// Android ([inAppBanners], with the same rules of the [NotificationRouter]), and removes the
-  /// notification or the banner of a thread once the person has read it (01 10.3); the app
-  /// widget listens to its [DesktopNotifications.targets].
+  /// notification or the banner of a thread once the person has read it (01 10.3,
+  /// [NotificationRouter.onCountChange]); the app widget listens to its
+  /// [DesktopNotifications.targets].
   DesktopNotificationsProvider._()
     : super(
         from: null,
@@ -126,4 +129,4 @@ final class DesktopNotificationsProvider
 }
 
 String _$desktopNotificationsHash() =>
-    r'c8c93437571c6253ddee2352a5f01a6bf3732368';
+    r'29642e5c2d96a7915f6ad2ab299b3f6bc7772723';

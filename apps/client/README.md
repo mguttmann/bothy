@@ -1373,11 +1373,15 @@ decides `idle` in the focus: hidden, minimized or behind another window is idle 
 D-M4-30-3).
 
 A thread the person has read loses its local notification (01 10.3;
-docs/decisions.d/AUD-client-notifications-01.md): when the engine reports a thread without
-anything unread (the person read it here, or `read_state.updated` of another device arrived),
-`NotificationRouter.onRead` removes the slot it filled for that thread, once, through
-`NotificationPresenter.cancelThread`; on a phone that takes the banner of the thread off the
-screen. On macOS the presenter asks for the permission of local
+docs/decisions.d/AUD-client-notifications-01.md): `NotificationRouter.onCountChange` receives
+every report of the counts of the engine and removes the slot it filled for a thread, once,
+through `NotificationPresenter.cancelThread`, when the unread count of that thread falls to zero
+after the thread had an unread message while the slot was filled (the person read it here, or
+the read of another device arrived). The engine reports the counts also without a read (an edit
+by another person, the snapshot of every new identify), so a notification that showed while
+nothing was unread, as that of a run that waits for the person before its agent wrote a
+message, stays. On a phone the removal takes the banner of the thread off the screen. On macOS
+the presenter asks for the permission of local
 notifications when the first one is about to show, not when the app starts: the start only
 reads the click that started the app. The router, the presenter, push
 (`lib/platform/push_platform.dart`), the sharing glue of iOS and macOS and the sender of the app

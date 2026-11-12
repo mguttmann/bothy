@@ -23,7 +23,7 @@ import 'toast_content.dart';
 /// event already on its way (D-M4-30-1). A thread's notifications share one slot (13 4.5);
 /// `security` and `admin` have one fixed slot per kind and open the devices settings and the
 /// administration. A thread the person read, on this device or another one, loses the
-/// notification this router showed for it ([onRead], 01 10.3).
+/// notification this router showed for it ([onCountChange], 01 10.3).
 ///
 /// Example:
 /// ```dart
@@ -32,12 +32,11 @@ import 'toast_content.dart';
 ///   texts: () => l,
 ///   appName: () => 'ExampleChat',
 ///   isOpenAndFocused: (t) => engine.focus.threads.contains(t) && !engine.focus.idle,
+///   unreadOf: (t) => engine.catchUp.countsOf(t).unread,
 ///   navigate: goRouter.go,
 /// );
 /// engine.notifications.listen(router.onEvent);
-/// engine.catchUp.countChanges.listen((thread) {
-///   if (engine.catchUp.countsOf(thread).unread == 0) router.onRead(thread);
-/// });
+/// engine.catchUp.countChanges.listen(router.onCountChange);
 /// final clicks = router.listen();
 /// ```
 final class NotificationRouter {
@@ -45,7 +44,8 @@ final class NotificationRouter {
   ///
   /// [presenter] shows the toasts; [texts] gives the interface texts of the current language;
   /// [appName] is the title when no channel name is known; [isOpenAndFocused] says whether a
-  /// thread is open in the focused window that is not idle; [navigate] opens an app path;
+  /// thread is open in the focused window that is not idle; [unreadOf] gives the unread
+  /// messages of a thread as the engine counts them now; [navigate] opens an app path;
   /// [localChannelName] reads the channel name of a thread from the local database for the
   /// placeholder (01 10.2); [log] receives one line per notable step, never content, and is
   /// the developer log of the app unless given.
@@ -54,6 +54,7 @@ final class NotificationRouter {
     required this.texts,
     required this.appName,
     required this.isOpenAndFocused,
+    required this.unreadOf,
     required this.navigate,
     Future<String?> Function(ThreadId thread)? localChannelName,
     void Function(String line)? log,
@@ -72,14 +73,19 @@ final class NotificationRouter {
   /// Whether a thread is open in the focused window that is not idle.
   final bool Function(ThreadId thread) isOpenAndFocused;
 
+  /// The unread messages of a thread as the engine counts them now (04 14).
+  final int Function(ThreadId thread) unreadOf;
+
   /// Opens an app path, for example `/t/<thread>?m=<message>`.
   final void Function(String path) navigate;
 
   final Future<String?> Function(ThreadId thread) _localChannelName;
   final void Function(String line) _log;
 
-  /// The slots of threads this router filled and has not removed since.
-  final Set<String> _shown = {};
+  /// The slots of threads this router filled and has not removed since, each with whether
+  /// its thread had an unread message while the slot was filled: only then a count of zero
+  /// says that the person read the thread ([onCountChange]).
+  final Map<String, bool> _shown = {};
 
   static Future<String?> _noChannel(ThreadId _) async => null;
   static void _developerLog(String line) =>
@@ -134,7 +140,7 @@ final class NotificationRouter {
       }
     }
     final tag = tagOf(n);
-    if (thread != null) _shown.add(tag);
+    if (thread != null) _shown[tag] = unreadOf(thread) > 0;
     await presenter.show(
       toastContentFor(
         n,
@@ -148,13 +154,28 @@ final class NotificationRouter {
     );
   }
 
-  /// The person has nothing unread in [thread] any more, read on this device or on another
-  /// one: removes the notification of its slot where the platform allows it (01 10.3,
-  /// [NotificationPresenter.cancelThread]). Only a slot this router filled since the app
-  /// started is removed, and each once; `security` and `admin` have no thread and stay.
-  Future<void> onRead(ThreadId thread) async {
+  /// The engine reported the counts of [thread]: removes the notification of its slot where
+  /// the platform allows it ([NotificationPresenter.cancelThread]) once the person has read
+  /// the thread, on this device or on another one (01 10.3).
+  ///
+  /// The read is the unread count that falls to zero after the thread had an unread message
+  /// while its slot was filled; the deletion of its last unread messages lowers the count the
+  /// same way and removes the notification too. A report of the counts alone is no read: an
+  /// edit by another person and every snapshot of `ready` report them too. So a notification
+  /// that showed while nothing was unread, as that of a run that waits for the person before
+  /// its agent wrote a message (13 2.1), stays until the thread gets an unread message and
+  /// loses it again. Only a slot this router filled since the app started is removed, and
+  /// each once; `security` and `admin` have no thread and stay.
+  Future<void> onCountChange(ThreadId thread) async {
     final tag = _threadTag(thread);
-    if (!_shown.remove(tag)) return;
+    final hadUnread = _shown[tag];
+    if (hadUnread == null) return;
+    if (unreadOf(thread) > 0) {
+      _shown[tag] = true;
+      return;
+    }
+    if (!hadUnread) return;
+    _shown.remove(tag);
     await presenter.cancelThread(tag);
   }
 
