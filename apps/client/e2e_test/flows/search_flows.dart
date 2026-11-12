@@ -97,8 +97,10 @@ void searchFlows(E2eContext c) {
       await app.tap('search.filter.type');
       await app.tapSettled(find.text(_en.searchTypeFiles).last);
       final hit = find.byKey(ValueKey('search.hit.$fileId'));
-      // The server indexes asynchronously (14 4): ask again, every half second, until the
-      // answer holds the hit.
+      final pending = find.byKey(const ValueKey('search.pending'));
+      // The server indexes asynchronously (14 4): ask again until the answer holds the hit.
+      // Each round waits for its answer first (the line "Searching" goes), because a newer
+      // search cancels the request of the one before it.
       final watch = Stopwatch()..start();
       while (hit.evaluate().isEmpty) {
         if (watch.elapsed >= patience) {
@@ -110,7 +112,14 @@ void searchFlows(E2eContext c) {
         );
         await tester.pump();
         await app.tap('search.submit');
-        await tester.pump(const Duration(milliseconds: 500));
+        await app.until(
+          'the answer of the search',
+          () => pending.evaluate().isEmpty,
+        );
+        await app.untilOr(
+          () => hit.evaluate().isNotEmpty,
+          const Duration(milliseconds: 500),
+        );
       }
 
       await app.tapFinder(hit);
