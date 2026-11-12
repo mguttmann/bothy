@@ -1278,6 +1278,152 @@ describe("runs in progress", () => {
   );
 });
 
+describe("an end the server did not store", () => {
+  /** The runs the adapter reports as active in its heartbeat. */
+  function activeRuns(adapter: Adapter): unknown {
+    return adapter.heartbeat().details?.active_runs;
+  }
+
+  /** The answered statuses of every `finishRun`, `0` for a dropped connection. */
+  function finishes(): number[] {
+    return fake
+      .requests()
+      .filter((r) => r.path.endsWith("/finish"))
+      .map((r) => r.status);
+  }
+
+  it(
+    "keeps the run active and sends the handler's end again after finishRun got no answer",
+    async () => {
+      class Summarising extends RecordingHandler {
+        override async execute(inv: Invocation, run: RunHandle): Promise<void> {
+          await super.execute(inv, run);
+          await run.finish("completed", { summary: "Answered" });
+        }
+      }
+      const handler = new Summarising();
+      const adapter = makeAdapter(handler, "lost-finish");
+      // Every attempt of the first two finishRun calls and one of the third are dropped.
+      const attempts = fake.sdkSettings.retryMaxAttempts;
+      const dropped = 2 * attempts + 1;
+      fake.inject("finishRun", Fault.disconnect(), dropped);
+      let runId = "";
+      await running(adapter, async () => {
+        runId = (await fake.trigger()).runId;
+        await until(
+          fake,
+          async () =>
+            finishes().length > attempts || (await closed(adapter, runId)),
+        );
+        // The server holds the run as running: the adapter still reports it and has not closed
+        // its entry, so the server does not end it as interrupted (09 5.5).
+        expect(finishes().every((status) => status === 0)).toBe(true);
+        expect(await closed(adapter, runId)).toBe(false);
+        expect(activeRuns(adapter)).toEqual([runId]);
+        expect(await stateOf(runId)).toBe("running");
+        await until(fake, () => closed(adapter, runId));
+      });
+      const view = await fake.runState(runId);
+      // The end the handler asked for arrived, not a failure of the handler.
+      expect([view.state, view.stateReason, fake.run(runId).summary]).toEqual([
+        "completed",
+        undefined,
+        "Answered",
+      ]);
+      expect(finishes()).toEqual([...Array<number>(dropped).fill(0), 200]);
+      expect(activeRuns(adapter)).toEqual([]);
+      expect(handler.count("execute", runId)).toBe(1);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "sends the adapter's own end again after the server answered 503",
+    async () => {
+      const handler = new RecordingHandler();
+      const recording = new RecordingFetch();
+      recording.override = answerFirst(
+        "/finish",
+        () => problem(503, "unavailable"),
+        2,
+      );
+      const adapter = makeAdapter(
+        handler,
+        "finish-503",
+        { settings: { ...fake.sdkSettings, retryMaxAttempts: 1 } },
+        { fetch: recording.fetch },
+      );
+      let runId = "";
+      await running(adapter, async () => {
+        runId = (await fake.trigger()).runId;
+        await until(
+          fake,
+          async () =>
+            recording.count("POST", "/finish") > 1 ||
+            (await closed(adapter, runId)),
+        );
+        expect(await closed(adapter, runId)).toBe(false);
+        expect(activeRuns(adapter)).toEqual([runId]);
+        expect(await stateOf(runId)).toBe("running");
+        await until(fake, () => closed(adapter, runId));
+      });
+      expect((await fake.runState(runId)).state).toBe("completed");
+      expect(
+        recording.seen
+          .filter((r) => r.path.endsWith("/finish"))
+          .map((r) => r.status),
+      ).toEqual([503, 503, 200]);
+      expect(activeRuns(adapter)).toEqual([]);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "leaves the run to the server when the adapter stops while the end waits",
+    async () => {
+      const handler = new RecordingHandler();
+      const adapter = makeAdapter(handler, "finish-stop", {
+        settings: { ...fake.sdkSettings, retryMaxAttempts: 1 },
+      });
+      fake.inject("finishRun", Fault.disconnect(), 2);
+      let runId = "";
+      await running(adapter, async () => {
+        runId = (await fake.trigger()).runId;
+        await until(fake, () => finishes().length === 2);
+      });
+      // The stop ended the wait: nothing more was sent, and the entry stays started for the
+      // next process, which closes it (09 4.9).
+      expect(finishes()).toEqual([0, 0]);
+      expect(await stateOf(runId)).toBe("running");
+      expect(handler.handles.get(runId)?.finishPending).toBe(true);
+      expect(await closed(adapter, runId)).toBe(false);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "hands no follow-up to the handler while the end waits to be sent again",
+    async () => {
+      const handler = new RecordingHandler();
+      const adapter = makeAdapter(handler, "finish-followup", {
+        settings: { ...fake.sdkSettings, retryMaxAttempts: 1 },
+      });
+      fake.inject("finishRun", Fault.disconnect(), 3);
+      let runId = "";
+      await running(adapter, async ({ source }) => {
+        runId = (await fake.trigger()).runId;
+        await until(fake, () => finishes().length > 0);
+        await fake.deliverFollowup(runId);
+        await until(fake, () => closed(adapter, runId));
+        expect(source.envelopes("agent.followup")).toHaveLength(1);
+      });
+      expect((await fake.runState(runId)).state).toBe("completed");
+      expect(handler.count("onFollowup")).toBe(0);
+    },
+    TEST_TIMEOUT,
+  );
+});
+
 describe("renewal and superseded tokens", () => {
   it(
     "waits on superseded and closes the entry when the run started elsewhere",

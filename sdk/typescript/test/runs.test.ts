@@ -20,6 +20,7 @@ import {
   InvocationTokenInvalid,
   ProblemError,
   RateLimitedError,
+  TransportError,
   ValidationFailed,
 } from "../src/errors.js";
 import type { components } from "../src/generated/openapi.js";
@@ -881,6 +882,56 @@ describe("RunHandle", () => {
     await expect(handle.finish("cancelled")).rejects.toBeInstanceOf(
       ValidationFailed,
     );
+    // The server answered: the handle is done, nothing is sent again.
+    expect([handle.finished, handle.finishPending]).toEqual([true, false]);
+  });
+
+  it("stays unfinished when finishRun got no answer and sends the first end again", async () => {
+    const api = fakeClient(fake, sent, { retryMaxAttempts: 1 });
+    const { runId, threadId, run } = await startRun(api, fake);
+    const handle = new RunHandle(api, runId, threadId);
+    handle.started(run, "jti-1");
+    fake.inject("finishRun", Fault.disconnect());
+    await expect(
+      handle.finish("completed", { summary: "Answered" }),
+    ).rejects.toBeInstanceOf(TransportError);
+    expect([handle.finished, handle.finishPending]).toEqual([false, true]);
+    expect((await fake.runState(runId)).state).toBe("running");
+    // The first end asked for is the run's end: a later call sends it again, whatever it asks.
+    await handle.finish("failed", { reason: "adapter_error" });
+    expect([handle.finished, handle.finishPending]).toEqual([true, false]);
+    expect([
+      (await fake.runState(runId)).state,
+      fake.run(runId).summary,
+    ]).toEqual(["completed", "Answered"]);
+    const finishes = sent.filter((r) => r.path.endsWith("/finish"));
+    expect(finishes.map((r) => r.body)).toEqual([
+      { state: "completed", summary: "Answered" },
+      { state: "completed", summary: "Answered" },
+    ]);
+    await handle.finish("completed"); // once only
+    expect(sent.filter((r) => r.path.endsWith("/finish"))).toHaveLength(2);
+  });
+
+  it("keeps the end pending after a 5xx and after a 429, and retryFinish sends it", async () => {
+    const api = fakeClient(fake, sent, { retryMaxAttempts: 1 });
+    const { runId, threadId, run } = await startRun(api, fake);
+    const handle = new RunHandle(api, runId, threadId);
+    handle.started(run, "jti-1");
+    await handle.retryFinish(); // nothing asked for yet: nothing sent
+    expect(sent.filter((r) => r.path.endsWith("/finish"))).toHaveLength(0);
+    fake.inject("finishRun", Fault.rateLimited(0));
+    await expect(handle.finish("completed")).rejects.toBeInstanceOf(
+      RateLimitedError,
+    );
+    expect([handle.finished, handle.finishPending]).toEqual([false, true]);
+    // The server stored the end and answered 502: the repeated equal end answers 200.
+    fake.inject("finishRun", Fault.storedThen502());
+    await expect(handle.retryFinish()).rejects.toBeInstanceOf(ProblemError);
+    expect([handle.finished, handle.finishPending]).toEqual([false, true]);
+    expect((await fake.runState(runId)).state).toBe("completed");
+    await handle.retryFinish();
+    expect([handle.finished, handle.finishPending]).toEqual([true, false]);
   });
 
   it("finish drops a flush that finds the run ended", async () => {
