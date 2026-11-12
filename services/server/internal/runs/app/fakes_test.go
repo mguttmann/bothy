@@ -1156,7 +1156,8 @@ func (w *world) config() app.Config {
 	return app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: queuedMaxAge,
 		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second, OrphanTimeout: 15 * time.Minute, StallAfter: 10 * time.Minute, ReasonMaxChars: 500,
 		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10, MaxContentBytes: 4096,
-		ExcerptMaxChars: 20, MaxStepsPersisted: 4, EventPayloadMaxBytes: w.payloadMax, InvocationHoldMax: holdMax,
+		ExcerptMaxChars: 20, MaxStepsPersisted: 4, StatusLineMaxChars: statusLineMaxChars, SummaryMaxChars: summaryMaxChars,
+		EventPayloadMaxBytes: w.payloadMax, InvocationHoldMax: holdMax,
 		TranscriptHoldMax: transcriptHoldMax, MaintenanceMode: map[bool]string{true: "read_only"}[w.maintenance]}
 }
 
@@ -1221,6 +1222,13 @@ func (w *world) triggers() []messaging.SetTriggerStateCmd {
 
 // errVeto is the error a vetoing step of a test returns.
 var errVeto = errors.New("veto")
+
+// statusLineMaxChars and summaryMaxChars are run.status_line_max_chars and run.summary_max_chars
+// of the world: longer than every text the other tests send, short enough for the cut tests.
+const (
+	statusLineMaxChars = 200
+	summaryMaxChars    = 300
+)
 
 // queuedMaxAge is run.queued_max_age of the unit tests.
 const queuedMaxAge = 48 * time.Hour

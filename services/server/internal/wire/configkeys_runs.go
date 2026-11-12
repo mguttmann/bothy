@@ -9,8 +9,8 @@ import "github.com/OWNER/bothy/services/server/internal/platform/config"
 // detail of the adapter_reason step is cut (D-M2-05-8); and from 09 section 21 the largest age of
 // a queued run (M2-08) and the window of a run without heartbeat (M2-09); the limits of the
 // components of cards from 03 and 09 section 21 (M2-15); the length of last_text_excerpt and the
-// number of stored steps of a live-box patch (M2-10); the byte bounds of the run
-// context (M2-13).
+// number of stored steps of a live-box patch (M2-10); the lengths of the status line and the
+// summary (AUD-srv-runs-01); the byte bounds of the run context (M2-13).
 func runsConfigKeys() []config.Key {
 	return []config.Key{
 		{Name: "run.step_detail_max_bytes", Kind: config.KindInt, Default: "16384", Min: "64", Max: "1048576", Chapter: chapter03,
@@ -21,6 +21,13 @@ func runsConfigKeys() []config.Key {
 			Doc: "Runes of last_text_excerpt a patch keeps; a longer text keeps its end."},
 		{Name: "run.max_steps_persisted", Kind: config.KindInt, Default: "2000", Min: "1", Max: "100000", Chapter: chapter03,
 			Doc: "Stored steps per run; above it older finished steps merge into one summary step."},
+		// AUD-srv-runs-01: the two texts of an adapter that every run.state_changed carries. An
+		// event they still overfill (a lower sync.event_payload_max_bytes, a row from before the
+		// limits) goes out without them and marked truncated (04 2.2 rule 2).
+		{Name: "run.status_line_max_chars", Kind: config.KindInt, Default: "500", Min: "1", Max: "2000", Chapter: chapter03,
+			Doc: "Runes of status_line a patch or awaitRunInput keeps; a longer text keeps its start."},
+		{Name: "run.summary_max_chars", Kind: config.KindInt, Default: "2000", Min: "1", Max: "8000", Chapter: chapter03,
+			Doc: "Runes of the summary finishRun keeps; a longer text keeps its start."},
 		// M2-08: a run nobody starts within this age fails with agent_unavailable (09 5.5, D-AG-16).
 		{Name: "run.queued_max_age", Kind: config.KindDuration, Default: "48h", Min: "1s", Chapter: chapter09,
 			Doc: "How old a run that was not started may become; then it fails with agent_unavailable."},

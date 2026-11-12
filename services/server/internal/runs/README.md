@@ -103,7 +103,7 @@ This package never yields `queued`, `working`, `done`, `cancelled` or `followup_
 - `Open` (inside the caller's unit of work): `INSERT ... ON CONFLICT` on the partial unique index of the active run of a thread `DO NOTHING` (R-DM-14; `ActiveRunExistsError` otherwise, nothing written), the anchor through `messaging.CreateRunAnchor`, `run.state_changed`, then `trigger_state = received`.
 - `Transition`: the pair must be one of 03 `runs` (`409 invalid_state_transition` otherwise), the reason one of 09 5.2 for its setter (an unknown adapter reason becomes `adapter_error` with a status step `adapter_reason`), one compare-and-swap `UPDATE` on `state` and `version` (`ConcurrentChangeError` with the current run when it lost, `not_found` for an unknown run), `run.state_changed`, then `trigger_state` per 09 6 through `messaging.SetTriggerState`. The metrics are recorded after the commit (`txn.AfterCommit`).
 - Lock order: `runs` before `messages`; the acceptance holds the thread row of the message.
-- Every state change, the creation included, appends `run.state_changed`: resource `run` with the version of the run row, the receive action of reading a run, payload `RunStateChangedPayload` (the summary, the triggering message and the trigger state this change set).
+- Every state change, the creation included, appends `run.state_changed`: resource `run` with the version of the run row, the receive action of reading a run, payload `RunStateChangedPayload` (the summary, the triggering message and the trigger state this change set). A payload that does not fit `sync.event_payload_max_bytes` goes out without `status_line` and `summary` and with `truncated` in the envelope (04 2.2 rule 2, `app.stateChangedPayload`), so the length of a stored text never fails a state change (AUD-srv-runs-01, ruling AUD-RUN1/2).
 - Acceptance (`Acceptor.OnMessagePosted`): only `origin = human`, `kind = text`, no DM; facts through the ports; `Decide`; a candidate without mention is checked in filter mode first (no trigger right: nothing written, no audit); then `agent.invoke` in request mode, which audits denials; the auto thread only after `allow`; a disagreement of `Decide` and `authorize` fails closed. Until `Bind` the acceptor writes nothing (D-M2-05-19).
 
 ## Delivery (M2-08)
@@ -432,7 +432,10 @@ document at `base_version` they give the document at the new version. One stored
 version step even when every op is a no-op.
 
 **Cutting** (`domain/truncate.go`, D-M2-10-6): `CutExcerpt` keeps the last `run.excerpt_max_chars`
-runes of `last_text_excerpt`. `CutDetail` returns the canonical JSON of a detail when it fits
+runes of `last_text_excerpt`. `CutText` keeps the first runes of the two texts that every
+`run.state_changed` carries: `status_line` up to `run.status_line_max_chars` (a patch and
+`awaitRunInput`) and the `summary` of `finishRun` up to `run.summary_max_chars`; a longer text is
+shortened, never refused (AUD-srv-runs-01, ruling AUD-RUN1/1). `CutDetail` returns the canonical JSON of a detail when it fits
 `run.step_detail_max_bytes`; otherwise it sets the top-level member `truncated: true` and shortens
 the string leaves, the longest first, at a rune boundary; if it still does not fit, the stored
 value is `{"truncated":true}`. Equal input gives equal output.
@@ -479,8 +482,9 @@ one unit of work, so a document is never torn by a concurrent patch.
 `run_followups` (M2-11, see "Follow-ups" below); `NoFollowups` remains only for a service without
 a follow-up repository, where every follow-up op gives `patch_target_missing`.
 
-**Configuration keys:** `run.excerpt_max_chars`, `run.step_detail_max_bytes` and
-`run.max_steps_persisted` (registered in `internal/wire/configkeys_runs.go`),
+**Configuration keys:** `run.excerpt_max_chars`, `run.status_line_max_chars`,
+`run.summary_max_chars`, `run.step_detail_max_bytes` and `run.max_steps_persisted` (registered in
+`internal/wire/configkeys_runs.go`),
 `sync.event_payload_max_bytes`, `database.tx_retry_max` (the unit of work retries `40P01` and
 `55P03`), and through the transports `http.max_json_body_bytes`, `sync.ws_max_frame_bytes` and
 `ratelimit.rl.agent_runtime.per_minute` and `.burst`.

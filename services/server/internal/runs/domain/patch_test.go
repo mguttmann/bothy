@@ -481,7 +481,7 @@ func TestParseOps_AutonomyLast(t *testing.T) {
 		t.Fatal(fields)
 	}
 	ch, _, err := domain.Apply(domain.DocumentState{Metrics: json.RawMessage(`{}`), Followups: map[ids.ID]string{}}, ops,
-		domain.Limits{ExcerptMaxChars: 10, MaxStepsPersisted: 10, StepDetailMaxBytes: 1000}, domain.Env{Now: time.Now(), NewID: ids.New})
+		domain.Limits{ExcerptMaxChars: 10, StatusLineMaxChars: 10, MaxStepsPersisted: 10, StepDetailMaxBytes: 1000}, domain.Env{Now: time.Now(), NewID: ids.New})
 	if err != nil {
 		t.Fatal(err)
 	}

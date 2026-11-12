@@ -72,8 +72,9 @@ type applier struct {
 // known parent; a step member replace and a follow-up replace need an existing target. After the
 // step adds, the summarization of steps_summary.go keeps at most lim.MaxStepsPersisted
 // (run.max_steps_persisted) steps. Excerpts are cut to lim.ExcerptMaxChars
-// (run.excerpt_max_chars) and details to lim.StepDetailMaxBytes (run.step_detail_max_bytes)
-// before they are stored or sent.
+// (run.excerpt_max_chars), the status line to lim.StatusLineMaxChars (run.status_line_max_chars)
+// and details to lim.StepDetailMaxBytes (run.step_detail_max_bytes) before they are stored or
+// sent.
 //
 // It returns the Change to store and the normalized operations: one per effective change,
 // computed against the state just before the operation, with the stored value encoded as the run
@@ -253,12 +254,9 @@ func fail(index int, suffix, code, detail string) error {
 func (a *applier) apply(op Op) error {
 	switch op.Target {
 	case TargetStatusLine:
-		a.setText(&a.statusLine, "/status_line", op)
+		a.setText(&a.statusLine, "/status_line", cutValue(op, CutText, a.lim.StatusLineMaxChars))
 	case TargetLastTextExcerpt:
-		if s, ok := op.Value.(string); ok {
-			op.Value = CutExcerpt(s, a.lim.ExcerptMaxChars)
-		}
-		a.setText(&a.excerpt, "/last_text_excerpt", op)
+		a.setText(&a.excerpt, "/last_text_excerpt", cutValue(op, CutExcerpt, a.lim.ExcerptMaxChars))
 	case TargetModel:
 		a.setText(&a.model, "/model", op)
 	case TargetMetric:
@@ -297,6 +295,15 @@ func (a *applier) apply(op Op) error {
 		return a.setFollowup(op)
 	}
 	return nil
+}
+
+// cutValue returns op with its text value cut by cut to maxRunes; an op without a text value (a
+// remove) is returned as it is.
+func cutValue(op Op, cut func(string, int) string, maxRunes int) Op {
+	if s, ok := op.Value.(string); ok {
+		op.Value = cut(s, maxRunes)
+	}
+	return op
 }
 
 // setAutonomyLast stores the object of /metrics/autonomy_last (09 5.8.6).

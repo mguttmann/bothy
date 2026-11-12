@@ -66,6 +66,11 @@ type Config struct {
 	// MaxStepsPersisted is run.max_steps_persisted: above it a patch merges older finished steps
 	// into the summary step (M2-10, 03 run_steps).
 	MaxStepsPersisted int `config:"run.max_steps_persisted"`
+	// StatusLineMaxChars is run.status_line_max_chars and SummaryMaxChars run.summary_max_chars:
+	// the status line of a patch or of awaitRunInput and the summary of finishRun keep their first
+	// runes up to it, so the summary of a run fits run.state_changed (AUD-srv-runs-01).
+	StatusLineMaxChars int `config:"run.status_line_max_chars"`
+	SummaryMaxChars    int `config:"run.summary_max_chars"`
 	// ReasonMaxChars is audit.reason_max_chars, the longest reason of cancelRun in Unicode
 	// characters (D-M2-09-11).
 	ReasonMaxChars int `config:"audit.reason_max_chars"`
@@ -109,6 +114,9 @@ func (c Config) check() error {
 	}
 	if c.ExcerptMaxChars < 1 || c.MaxStepsPersisted < 1 {
 		return errors.New("runs: run.excerpt_max_chars and run.max_steps_persisted must be at least 1")
+	}
+	if c.StatusLineMaxChars < 1 || c.SummaryMaxChars < 1 {
+		return errors.New("runs: run.status_line_max_chars and run.summary_max_chars must be at least 1")
 	}
 	if c.QueuedMaxAge <= 0 {
 		return errors.New("runs: run.queued_max_age must be positive")

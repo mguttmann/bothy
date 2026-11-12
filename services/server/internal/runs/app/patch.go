@@ -253,8 +253,8 @@ func (s *Service) afterPatch(ctx context.Context, out patchOutcome) {
 
 // limits returns the limits of the patch rules from the configuration.
 func (s *Service) limits() domain.Limits {
-	return domain.Limits{ExcerptMaxChars: s.cfg.ExcerptMaxChars, StepDetailMaxBytes: s.cfg.StepDetailMaxBytes,
-		MaxStepsPersisted: s.cfg.MaxStepsPersisted}
+	return domain.Limits{ExcerptMaxChars: s.cfg.ExcerptMaxChars, StatusLineMaxChars: s.cfg.StatusLineMaxChars,
+		StepDetailMaxBytes: s.cfg.StepDetailMaxBytes, MaxStepsPersisted: s.cfg.MaxStepsPersisted}
 }
 
 // followups returns the follow-up port of a patch: Deps.Followups when set, else the Followups

@@ -21,7 +21,8 @@ func TestNew_RefusesMissingCollaboratorsAndBadLimits(t *testing.T) {
 	good := app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: time.Hour, EventPayloadMaxBytes: 65536,
 		CancelGrace: time.Second, PresenceTimeout: time.Second, OrphanTimeout: time.Minute, StallAfter: time.Minute, ReasonMaxChars: 10,
 		ComponentDefaultTTL: time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10,
-		MaxContentBytes: 4096, ExcerptMaxChars: 8, MaxStepsPersisted: 4, InvocationHoldMax: time.Minute, TranscriptHoldMax: time.Minute}
+		MaxContentBytes: 4096, ExcerptMaxChars: 8, MaxStepsPersisted: 4, StatusLineMaxChars: 8, SummaryMaxChars: 8,
+		InvocationHoldMax: time.Minute, TranscriptHoldMax: time.Minute}
 	if _, err := app.New(good, app.Deps{}); err == nil {
 		t.Fatal("New without collaborators: no error")
 	}
@@ -40,6 +41,7 @@ func TestNew_RefusesMissingCollaboratorsAndBadLimits(t *testing.T) {
 		cfg.CancelGrace, cfg.PresenceTimeout, cfg.OrphanTimeout, cfg.ReasonMaxChars = good.CancelGrace, good.PresenceTimeout, good.OrphanTimeout, good.ReasonMaxChars
 		cfg.ExcerptMaxChars, cfg.MaxStepsPersisted, cfg.InvocationHoldMax = good.ExcerptMaxChars, good.MaxStepsPersisted, good.InvocationHoldMax
 		cfg.TranscriptHoldMax = good.TranscriptHoldMax
+		cfg.StatusLineMaxChars, cfg.SummaryMaxChars = good.StatusLineMaxChars, good.SummaryMaxChars
 		if _, err := app.New(cfg, full); err == nil {
 			t.Errorf("%s: no error", name)
 		}
@@ -54,6 +56,9 @@ func TestNew_RefusesMissingCollaboratorsAndBadLimits(t *testing.T) {
 		// M2-10: the limits of patchRun.
 		"excerpt length zero": func(c *app.Config) { c.ExcerptMaxChars = 0 },
 		"max steps zero":      func(c *app.Config) { c.MaxStepsPersisted = 0 },
+		// AUD-srv-runs-01: the lengths of the texts in run.state_changed.
+		"status line length zero": func(c *app.Config) { c.StatusLineMaxChars = 0 },
+		"summary length zero":     func(c *app.Config) { c.SummaryMaxChars = 0 },
 		// M3-07: the release time of a held invocation.
 		"hold max zero": func(c *app.Config) { c.InvocationHoldMax = 0 },
 		// M3-09: the release time of an invocation held for its transcript.

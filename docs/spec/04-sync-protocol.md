@@ -651,7 +651,11 @@ change per `agent.run_update_min_interval`.
    `run.state_changed` with a summary (state, duration, cost, number of steps). The sidebar and
    "Running now" are fed from them. A change of the wait reason of a `queued` run
    ([09-agents.md](09-agents.md) 5.2.1) is one too, without a trigger state (addendum of
-   2026-11-04).
+   2026-11-04). The summary carries the two texts of the adapter, `status_line` and `summary`,
+   within `run.status_line_max_chars` and `run.summary_max_chars` (09 5.3). A summary that still
+   does not fit `sync.event_payload_max_bytes` (a lower bound, a row stored before the limits)
+   goes out without the two texts and with `truncated` (2.2 rule 2); `getRun` returns them. No
+   state change fails because of the length of a text.
 2. Content changes are the ephemeral event `run.updated {run_id, base_version,
    version, ops}`. It goes only to connections that have the thread in `focus` and
    may perform `run.read`; a thread in `background_thread_ids` (6.2) counts as in focus for

@@ -261,6 +261,8 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `template.max_per_scope` | `BOTHY_TEMPLATE__MAX_PER_SCOPE` | Server | int | `100` | templates per person or per channel; `listTemplates` is not paginated | active |
 | `file.max_upload_bytes` | `BOTHY_FILE__MAX_UPLOAD_BYTES` | Server | int | `104857600` | size of a file | active |
 | `run.excerpt_max_chars` | `BOTHY_RUN__EXCERPT_MAX_CHARS` | Server | int | `500` | length of `last_text_excerpt` | active |
+| `run.status_line_max_chars` | `BOTHY_RUN__STATUS_LINE_MAX_CHARS` | Server | int | `500` | length of `status_line` | active |
+| `run.summary_max_chars` | `BOTHY_RUN__SUMMARY_MAX_CHARS` | Server | int | `2000` | length of `summary` | active |
 | `run.step_detail_max_bytes` | `BOTHY_RUN__STEP_DETAIL_MAX_BYTES` | Server | int | `16384` | size of `run_steps.detail` | active |
 | `run.max_steps_persisted` | `BOTHY_RUN__MAX_STEPS_PERSISTED` | Server | int | `2000` | stored steps per run | active |
 | `run.stall_after` | `BOTHY_RUN__STALL_AFTER` | Server | duration | `10m` | without progress: stall notice | active |

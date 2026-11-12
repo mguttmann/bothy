@@ -567,7 +567,9 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"run.orphan_timeout = 15m  # default\n" +
 		"run.queued_max_age = 2d  # default\n" +
 		"run.stall_after = 10m  # default\n" +
+		"run.status_line_max_chars = 500  # default\n" +
 		"run.step_detail_max_bytes = 16384  # default\n" +
+		"run.summary_max_chars = 2000  # default\n" +
 		"run.usage_wake_max = 20  # default\n" +
 		"run.wake_label_max_chars = 120  # default\n" +
 		"run.wake_max_pending = 5  # default\n" +

@@ -40,7 +40,8 @@ import (
 // RunsConfig binds the keys of the runs use cases (api.page_size_default, api.page_size_max,
 // run.step_detail_max_bytes, run.queued_max_age, and for M2-09 auth.clock_leeway,
 // agent.cancel_grace, agent.presence_timeout, run.orphan_timeout, audit.reason_max_chars, and for
-// M2-10 run.excerpt_max_chars, run.max_steps_persisted, sync.event_payload_max_bytes, for M3-07
+// M2-10 run.excerpt_max_chars, run.max_steps_persisted, sync.event_payload_max_bytes, for
+// AUD-srv-runs-01 run.status_line_max_chars and run.summary_max_chars, for M3-07
 // file.invocation_hold_max, for M2-13 agent.context_max_bytes and agent.context_message_max_bytes,
 // and for M3-09 voice.transcript_hold_max). The error names the key whose binding failed, never a
 // value.

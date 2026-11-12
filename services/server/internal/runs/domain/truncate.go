@@ -3,8 +3,9 @@
 package domain
 
 // The cuts of agent output before it is stored (09 5.3): the text excerpt to
-// run.excerpt_max_chars runes and a step detail to run.step_detail_max_bytes bytes of canonical
-// JSON.
+// run.excerpt_max_chars runes, a step detail to run.step_detail_max_bytes bytes of canonical
+// JSON, and the two texts every run.state_changed carries, the status line and the summary, to
+// run.status_line_max_chars and run.summary_max_chars runes.
 
 import (
 	"encoding/json"
@@ -35,6 +36,27 @@ func CutExcerpt(s string, maxRunes int) string {
 		i += size
 	}
 	return s[i:]
+}
+
+// CutText returns the first maxRunes runes of s (all of s when it is shorter). It keeps the
+// start, because a status line and a summary are read from their first word. maxRunes is
+// run.status_line_max_chars or run.summary_max_chars; 0 or less gives "".
+//
+// Example:
+//
+//	domain.CutText("Reading the export", 7) // "Reading"
+func CutText(s string, maxRunes int) string {
+	if maxRunes <= 0 {
+		return ""
+	}
+	n := 0
+	for i := range s {
+		if n == maxRunes {
+			return s[:i]
+		}
+		n++
+	}
+	return s
 }
 
 // leaf is one string value inside a detail, addressable for the cut.

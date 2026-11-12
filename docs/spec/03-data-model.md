@@ -1674,14 +1674,14 @@ Purpose: one agent turn; at the same time the live box. Module: `runs`.
 | `renewed_from_jti` | `uuid` | yes | | `jti` of the token that the last `run.token.renew` replaced; a repetition with it issues again (lost response). Every delivery that replaces `invocation_jti` and every successful `run.start` set `NULL` ([09-agents.md](09-agents.md), section 4.5.1) |
 | `dev_environment_id` | `uuid` | yes | | dev environment of the run (milestone, SR3); also stands in the token |
 | `model` | `text` | yes | | |
-| `status_line` | `text` | yes | | current status line |
+| `status_line` | `text` | yes | | current status line, shortened to `run.status_line_max_chars` |
 | `last_text_excerpt` | `text` | yes | | last text of the agent, shortened to `run.excerpt_max_chars` |
 | `plan` | `jsonb` | no | `'{}'` | schema `run_plan.v1`: `items` (`id`, `text`, `status`) for the live box |
 | `metrics` | `jsonb` | no | `'{}'` | schema `run_metrics.v1`: `context_pct`, `tokens_in`, `tokens_out`, `tokens_cache_read`, `tokens_cache_write`, `tokens_cache_write_1h`, `subagents`, `background_jobs`, `api_retries`, `last_api_retry` (`attempt`, `max_retries`, `retry_delay_ms`, `error`), `progress_events` (count of runtime progress messages without a visible change, addendum of 2026-10-24), `autonomy_last` (`input`, `idle`: the idle flag of the last autonomous input or notification turn, 09 5.8.6), `end_state` (`done`, `waiting` or `blocked`) and `wake_pending_until` (time of the next pending wake-up of the thread at the run's end) (09 18.19.11; addendum of 2026-11-06) |
 | `cost_micros` | `bigint` | no | `0` | |
 | `currency` | `text` | no | `'USD'` | |
 | `cost_is_estimate` | `boolean` | no | `true` | |
-| `summary` | `text` | yes | | collapsed line after the end |
+| `summary` | `text` | yes | | collapsed line after the end, shortened to `run.summary_max_chars` |
 | `stall_warned_at` | `timestamptz` | yes | | stall notice after `run.stall_after` |
 | `last_progress_at` | `timestamptz` | yes | | server time of the last successful `run.start` or stored patch; `runs.stall_check` compares it with `run.stall_after` ([09-agents.md](09-agents.md), section 5.5; addendum of 2026-10-24, run visualization, R-DM-53) |
 | `queued_at` | `timestamptz` | no | `now()` | |
@@ -3030,6 +3030,8 @@ The values are defaults. Other chapters refer only to the name.
 | `template.max_per_scope` | `100` | templates per person or per channel; `listTemplates` is not paginated |
 | `file.max_upload_bytes` | `104857600` | size of a file |
 | `run.excerpt_max_chars` | `500` | length of `last_text_excerpt` |
+| `run.status_line_max_chars` | `500` | length of `status_line` |
+| `run.summary_max_chars` | `2000` | length of `summary` |
 | `run.step_detail_max_bytes` | `16384` | size of `run_steps.detail` |
 | `run.max_steps_persisted` | `2000` | stored steps per run |
 | `run.stall_after` | `10m` | without progress: stall notice |

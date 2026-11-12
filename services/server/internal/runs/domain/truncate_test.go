@@ -2,7 +2,8 @@
 
 package domain_test
 
-// Tests of the cuts of agent output: the excerpt keeps its tail, a detail fits its byte limit.
+// Tests of the cuts of agent output: the excerpt keeps its tail, the status line and the summary
+// keep their start, a detail fits its byte limit.
 
 import (
 	"encoding/json"
@@ -38,6 +39,38 @@ func TestCutExcerptKeepsTail(t *testing.T) {
 		}
 		if want := min(utf8.RuneCountInString(c.in), max(c.max, 0)); utf8.RuneCountInString(got) != want {
 			t.Errorf("CutExcerpt(%q, %d) kept %d runes, want %d", c.in, c.max, utf8.RuneCountInString(got), want)
+		}
+	}
+}
+
+// TestCutTextKeepsStart checks that the status line and the summary keep their first runes, cut
+// at a rune boundary.
+func TestCutTextKeepsStart(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		in   string
+		max  int
+		want string
+	}{
+		{"abcdef", 3, "abc"},
+		{"éñç🙂x", 3, "éñç"},
+		{"🙂🙂 Hello Alex", 2, "🙂🙂"},
+		{"éñç", 3, "éñç"},
+		{"ab", 3, "ab"},
+		{"", 3, ""},
+		{"abc", 0, ""},
+		{"abc", -1, ""},
+	}
+	for _, c := range cases {
+		got := domain.CutText(c.in, c.max)
+		if got != c.want {
+			t.Errorf("CutText(%q, %d) = %q, want %q", c.in, c.max, got, c.want)
+		}
+		if want := min(utf8.RuneCountInString(c.in), max(c.max, 0)); utf8.RuneCountInString(got) != want {
+			t.Errorf("CutText(%q, %d) kept %d runes, want %d", c.in, c.max, utf8.RuneCountInString(got), want)
+		}
+		if !utf8.ValidString(got) {
+			t.Errorf("CutText(%q, %d) is not valid UTF-8", c.in, c.max)
 		}
 	}
 }

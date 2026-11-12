@@ -237,6 +237,14 @@ transaction, and a run that stops anywhere is resumed by the next.
 - Not covered by the purge: the stored payloads of `thread.created` and `thread.updated` keep the
   former title until `sync.event_retention`, and drafts of the item stay until their owner
   deletes them or the account is erased (recorded in the decisions of the ticket).
+- Not covered by any deletion path: the texts of a run. `runs.status_line`, `last_text_excerpt`,
+  `summary` and `plan`, the titles and details of `run_steps` and the label, condition and
+  result of `run_wakes` stay in their rows after this purge, after a content period (4.1), after
+  the deletion of the answer message (4.2) and after an account deletion in the mode `delete`
+  (4.4), because the rows stay with their thread and a thread is never removed (03 principle 7).
+  A run of a deleted chat is no longer readable (`404`); a run of a live chat still answers its
+  texts with `getRun`. Whether these texts get a tombstone is open
+  (`docs/decisions.d/M7-05.md` D-M7-05-7, `docs/decisions.d/AUD-srv-runs-01.md` AUD-RUN1/4).
 - A project folder is never removed: on request the serving runner moves it to the trash of its
   host once the deletion is final ([09-agents.md](09-agents.md) 18.15).
 
