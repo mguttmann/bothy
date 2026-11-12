@@ -19,8 +19,10 @@ A record is a file an earlier process wrote, so nothing in it is taken as given
 (docs/decisions.d/FIX-RUNNER-HOSTING-REVIEW.md): `read_turn_record` returns a record only when it
 is a regular file with a JSON object whose ``run_id`` is the UUID the file is named after and
 whose ``thread_id`` and ``session_ref`` are UUIDs, so no name of a lock and no path is built from
-free text; `process_id` takes a ``pid`` or ``pgid`` only as an integer above 1 that fits the
-system's type, so a value outside it counts as no process instead of an error of the start.
+free text; only the record of a run before ``run.start`` carries no ``session_ref``
+(`PHASES_BEFORE_START`). `process_id` takes a ``pid`` or ``pgid`` only as an integer above 1 that
+fits the system's type, so a value outside it counts as no process instead of an error of the
+start.
 
 Examples:
     >>> adoption_decision(alive=True, run_state="running", result_in_log=False).value
@@ -44,6 +46,7 @@ from uuid import UUID
 
 __all__ = [
     "MAX_PROCESS_ID",
+    "PHASES_BEFORE_START",
     "AdoptedGroup",
     "AdoptionAction",
     "ProcessIdentity",
@@ -59,6 +62,12 @@ __all__ = [
 MAX_PROCESS_ID = 2**31 - 1
 """The largest process or group ID a record may name: the system's type is a signed 32-bit
 integer on Linux and macOS, and ``os.getpgid`` raises ``OverflowError`` above it."""
+
+PHASES_BEFORE_START = ("preparing", "waiting_lock")
+"""The phases of a record that lie before ``run.start`` (09 18.19.6). With
+``runner.turn_handover`` the runner writes such a record when it accepts a run, with the run, its
+thread and channel and the phase; the session is stored from the phase ``transcribing`` on. A
+next runner removes the record and the inbox restart prepares the run again."""
 
 _SESSION_FLAGS = frozenset({"--session-id", "--resume"})
 """The flags of the CLI whose argument is the session reference (09 18.2)."""
@@ -153,6 +162,14 @@ def _is_uuid(value: object, *, any_case: bool = False) -> bool:
         return False
 
 
+def _session_checked(record: Mapping[str, Any]) -> bool:
+    """Whether the session of a record is a UUID, or the record is one that carries none."""
+    if "session_ref" not in record:
+        # A tuple, so a phase of any JSON type is compared and never hashed.
+        return record.get("phase") in PHASES_BEFORE_START
+    return _is_uuid(record["session_ref"], any_case=True)
+
+
 def read_turn_record(path: Path) -> dict[str, Any] | None:
     """Read a turn record and check what the runner builds names and paths from.
 
@@ -166,7 +183,10 @@ def read_turn_record(path: Path) -> dict[str, Any] | None:
         The record, or ``None`` when it is unreadable: no regular file, no JSON object, a
         ``run_id`` that is not the UUID the file is named after, or a ``thread_id`` or
         ``session_ref`` that is no UUID in its canonical text (a reference in upper case is one,
-        as `claude_code_runner.commandline.choose_session` takes it).
+        as `claude_code_runner.commandline.choose_session` takes it). A record without the
+        member ``session_ref`` is returned only with a phase before ``run.start``
+        (`PHASES_BEFORE_START`), as the runner writes it: a next runner removes it by its
+        phase, and no lock and no path is built from it.
     """
     try:
         fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
@@ -186,7 +206,7 @@ def read_turn_record(path: Path) -> dict[str, Any] | None:
     run_id = record.get("run_id")
     if run_id != path.stem or not _is_uuid(run_id) or not _is_uuid(record.get("thread_id")):
         return None
-    return record if _is_uuid(record.get("session_ref"), any_case=True) else None
+    return record if _session_checked(record) else None
 
 
 def matching_command(record: Mapping[str, Any], timeout: float) -> str | None:

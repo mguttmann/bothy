@@ -29,7 +29,10 @@ import pytest
 from bothy_sdk.testing._patience import PATIENCE
 from bothy_sdk.testing.faults import Fault
 
+from claude_code_runner.app import Runner, StartError
+from claude_code_runner.handover import handover_records
 from claude_code_runner.statedir import ensure_private_dir
+from claude_code_runner.turn import write_turn_record
 
 from .conftest import LogLines, World
 
@@ -98,6 +101,14 @@ def check_inputs(world: World) -> None:
     for turn in world.turns():
         uuids = [json.loads(line).get("uuid") for line in turn["stdin"]]
         assert len(uuids) == len(set(uuids)), turn["stdin"]
+
+
+def records_settled(logs: LogLines) -> list[tuple[str, str | None]]:
+    """What a start logged of the records it found: the event and, for a record it took, the
+    action. A record it could not read shows as ``turn_record_unreadable``."""
+    events = ('"turn_adopted"', '"turn_record_unreadable"')
+    lines = [json.loads(m) for m in logs.text.splitlines() if any(e in m for e in events)]
+    return [(line["event"], line.get("action")) for line in lines]
 
 
 async def crash_and_continue(
@@ -206,7 +217,9 @@ async def test_new_session_attempt(world: World, point: str) -> None:
 # ---- phases before run.start and the launch check ------------------------------------------------
 
 
-async def test_handover_while_preparing_restarts_through_the_inbox(world: World) -> None:
+async def test_handover_while_preparing_restarts_through_the_inbox(
+    world: World, logs: LogLines
+) -> None:
     # preparing: the pre-check waits on its gate; the handover leaves the record, the next
     # runner removes it and the inbox restart calls run.start exactly once, no launch check.
     gate = world.gate("auth_gate")
@@ -218,15 +231,21 @@ async def test_handover_while_preparing_restarts_through_the_inbox(world: World)
     await world.until(lambda: len(world.calls("auth_status")) == 1)
     first.send_signal(signal.SIGTERM)
     assert await asyncio.to_thread(first.wait, PATIENCE) == 0  # no turn was handed over
+    # The record the first runner left, as it wrote it: no session is stored before run.start.
+    left = record(world, run.run_id)
+    assert left.get("phase") == "preparing"
+    assert "session_ref" not in left
     world.release(gate)
     await world.start(world.config(turn_handover=True))
     assert await world.ended(run.run_id) == "completed"
     assert len(world.requests("startRun")) == 1
     assert world.requests("checkRunLaunch") == []
     assert len(world.turns()) == 1
+    # The next runner read that record and removed it by its phase (09 18.19.6).
+    assert records_settled(logs) == [("turn_adopted", "restart_from_inbox")]
 
 
-async def test_handover_while_waiting_for_the_thread_lock(world: World) -> None:
+async def test_handover_while_waiting_for_the_thread_lock(world: World, logs: LogLines) -> None:
     # waiting_lock: another process holds the thread lock; the run waits thread_busy.
     lock = ensure_private_dir(world.state / "locks")
     world.scenario(fixture="plain")
@@ -253,6 +272,73 @@ async def test_handover_while_waiting_for_the_thread_lock(world: World) -> None:
     assert await world.ended(run.run_id) == "completed"
     assert len(world.requests("startRun")) == 1
     assert world.requests("checkRunLaunch") == []
+    assert records_settled(logs) == [("turn_adopted", "restart_from_inbox")]
+
+
+def _in_prepare(world: World, phase: str) -> Path:
+    """The record of a run before ``run.start``, with the members `RunnerHandler._phase`
+    writes: the run, its thread and channel and the phase, no session."""
+    run_id = "0192f4a0-7b1c-7d07-84b0-000000000001"
+    path = world.state / "turns" / f"{run_id}.json"
+    write_turn_record(
+        path,
+        {
+            "run_id": run_id,
+            "thread_id": "0192f4a0-7b1c-7d07-84b0-000000000002",
+            "channel_id": str(world.forum_a),
+            "phase": phase,
+        },
+    )
+    return path
+
+
+@pytest.mark.parametrize("phase", ["preparing", "waiting_lock"])
+async def test_the_record_of_a_run_in_prepare_is_removed_at_the_next_start(
+    world: World, logs: LogLines, phase: str
+) -> None:
+    # 09 18.19.6: the record is removed and never used to start the run. It names no session,
+    # and it still is a record of the runner: read, listed as a record of a handover, removed.
+    path = _in_prepare(world, phase)
+    assert handover_records(world.state) == [path]
+    await world.start(world.config(turn_handover=True))
+    assert not path.exists()
+    assert records_settled(logs) == [("turn_adopted", "restart_from_inbox")]
+    assert not (world.state / "locks").exists()  # no lock is taken for it
+
+
+@pytest.mark.parametrize("phase", ["preparing", "waiting_lock"])
+async def test_without_the_key_the_record_of_a_run_in_prepare_refuses_the_start(
+    world: World, logs: LogLines, phase: str
+) -> None:
+    # Issue 567 item 3 holds for a run in prepare too: a runner without the key does not
+    # start while a record with a phase is left, and it touches nothing. The way out is the
+    # one of every such record: stop --turns settles it, also with the key off.
+    path = _in_prepare(world, phase)
+    before = path.read_bytes()
+    runner = Runner(world.config(), world.environ(), clock=world.fake.clock)
+    start = asyncio.ensure_future(runner.run())
+    await world.until(lambda: start.done() or world.fake.heartbeats)
+    if not start.done():
+        world.runners.append((runner, start))  # it serves: stopped together with the world
+    assert start.done(), "the runner started without the key"
+    with pytest.raises(StartError, match="turn_handover_records_left"):
+        start.result()
+    assert path.read_bytes() == before
+    assert records_settled(logs) == []
+    assert not (world.state / "locks").exists()
+
+    command = await asyncio.to_thread(
+        subprocess.run,
+        [*world.cli_command(), "stop", "--turns", "--config", str(world.root / "runner.toml")],
+        env=world.cli_env(),
+        capture_output=True,
+        timeout=PATIENCE,
+        check=False,
+    )
+    assert command.returncode == 0, command.stderr
+    assert not path.exists()
+    # Nothing is left: a runner without the key starts.
+    await world.start(world.config())
 
 
 async def _crashed_before_go(world: World) -> UUID:

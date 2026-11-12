@@ -3789,10 +3789,12 @@ PID or group is signalled only when `os.getpgid(pid)` equals the stored group an
 stored start time and a command that contains the session reference; otherwise the process counts
 as gone. A record is read only as a regular file (no link is followed) with a JSON object whose
 `run_id` is the UUID the file is named after and whose `thread_id` and `session_ref` are UUIDs
-in their canonical text; any other file is left where it is and logged with
-`turn_record_unreadable`, so no lock name and no path is built from free text. A stored PID or
-group that is not an integer above 1 within the system's type names no process, so that process
-counts as gone, and no stop signals a group ID below 2 (addendum of 2026-11-12,
+in their canonical text. Only a record of phase `preparing` or `waiting_lock` carries no
+`session_ref`, because the runner stores the session of a run from the phase `transcribing` on;
+it is read without one and removed by its phase (18.19.6). Any other file is left where it is and
+logged with `turn_record_unreadable`, so no lock name and no path is built from free text. A
+stored PID or group that is not an integer above 1 within the system's type names no process, so
+that process counts as gone, and no stop signals a group ID below 2 (addendum of 2026-11-12,
 `docs/decisions.d/FIX-RUNNER-HOSTING-REVIEW.md`). At
 start, before the first event of the inbox and the first heartbeat, the runner checks
 each record: a live process keeps its locks through its inherited descriptors and the runner takes

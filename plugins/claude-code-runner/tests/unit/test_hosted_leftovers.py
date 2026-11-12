@@ -359,6 +359,23 @@ async def test_a_record_that_no_runner_wrote_is_unreadable_and_the_start_goes_on
     assert [e["agent_id"] for e in _events(logs, "turn_adopted")] == [OTHER_AGENT]
 
 
+@pytest.mark.parametrize("phase", ["preparing", "waiting_lock"])
+async def test_a_hosted_record_without_a_session_is_unreadable(
+    tmp_path: Path, logs: LogLines, phase: str
+) -> None:
+    # Only the runner's own agent writes a record before the session of a run is stored, with
+    # `runner.turn_handover` (09 18.19.6). A hosted turn always writes its session, so such a
+    # file in the folder of a hosted agent is none of its records: left, and no lock for it.
+    path = _forged(tmp_path, {"run_id": RUN, "thread_id": THREAD, "phase": phase})
+    before = _tree(tmp_path)
+    await stop_leftover_turns(tmp_path, **_GRACE)
+    assert _tree(tmp_path) == before
+    assert _events(logs, "turn_record_unreadable") == [
+        {"event": "turn_record_unreadable", "record": path.stem}
+    ]
+    assert _events(logs, "turn_adopted") == []
+
+
 @pytest.mark.parametrize(
     "content",
     ["[]", '"text"', "7", "null", "[" * 100_000],

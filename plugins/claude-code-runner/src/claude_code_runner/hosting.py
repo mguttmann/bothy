@@ -247,14 +247,17 @@ def _leftover_record(path: Path) -> dict[str, Any] | None:
 
     Returns:
         The record, or ``None`` when it is unreadable: its folder or the agent's folder is not
-        a private folder of its own (mode ``0700``, no link, 26 3.2 item 2), the file is no turn
-        record (`claude_code_runner.adoption.read_turn_record`), or of ``pid`` and ``pgid`` one
-        is no process ID. Both are missing in a record written before its process started.
+        a private folder of its own (no link, no permission for group or others, 26 3.2 item
+        2), the file is no turn record (`claude_code_runner.adoption.read_turn_record`), it
+        carries no session, or of ``pid`` and ``pgid`` one is no process ID. Both are missing
+        in a record written before its process started.
     """
     if not (is_private_dir(path.parent) and is_private_dir(path.parent.parent)):
         return None
     record = read_turn_record(path)
-    if record is None:
+    # A hosted turn stores its session with its first record; only the runner's own agent
+    # writes a record before ``run.start``, which carries none (09 18.19.6).
+    if record is None or "session_ref" not in record:
         return None
     pid, pgid = record.get("pid"), record.get("pgid")
     if (pid, pgid) != (None, None) and (process_id(pid) is None or process_id(pgid) is None):

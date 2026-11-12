@@ -107,9 +107,11 @@ that this chapter names enter `docs/spec/actions.yaml`, `docs/api/openapi.yaml` 
    A record is a file, so the runner takes nothing in it as given (addendum of 2026-11-12,
    `docs/decisions.d/FIX-RUNNER-HOSTING-REVIEW.md`). (a) It acts on a record only at
    `<runner.state_dir>/hosted/<agent_id>/turns/<run_id>.json`, where the agent's folder is named
-   by the canonical UUID and both folders are directories themselves with mode `0700`, and only
-   when the record is a regular file as 09 18.9 reads it (a JSON object, the `run_id` of its file
-   name, UUIDs for the thread and the session) whose `pid` and `pgid` are both process IDs or
+   by the canonical UUID and both folders are directories themselves that group and others have
+   no permission on (the runner creates them with mode `0700`), and only when the record is a
+   regular file as 09 18.9 reads it (a JSON object, the `run_id` of its file name, UUIDs for the
+   thread and the session, which the record of a hosted turn always carries) whose `pid` and
+   `pgid` are both process IDs or
    both missing. Any other file is left where it is and logged with `turn_record_unreadable`:
    nothing is signalled and no lock is taken for it. (b) A process matches its record only when,
    beyond the identity check of 09 18.9, its command line names the record's session as the

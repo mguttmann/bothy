@@ -29,6 +29,7 @@ from claude_code_runner.handover import handover_records
 REF = "0192d3a0-0000-4000-8000-0000000000dd"
 RUN = "0192f4a0-7b1c-7d07-84b0-000000000001"
 THREAD = "0192f4a0-7b1c-7d07-84b0-000000000002"
+CHANNEL = "0192f4a0-7b1c-7d07-84b0-00000000000c"
 
 
 def test_adoption_decision() -> None:
@@ -150,6 +151,41 @@ def test_a_turn_record_is_read_with_its_ids_checked(tmp_path: Path) -> None:
     assert read_turn_record(_record_file(tmp_path, upper)) == upper
 
 
+@pytest.mark.parametrize("phase", ["preparing", "waiting_lock"])
+def test_the_record_of_a_run_in_prepare_carries_no_session(tmp_path: Path, phase: str) -> None:
+    # Exactly the members `RunnerHandler._phase` writes with `runner.turn_handover` before
+    # `run.start`: the session is stored only from the phase `transcribing` on. A next runner
+    # removes this record (09 18.19.6), so it has to be one the reader takes.
+    record = {"run_id": RUN, "thread_id": THREAD, "channel_id": CHANNEL, "phase": phase}
+    assert read_turn_record(_record_file(tmp_path, record)) == record
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {},  # written without the key
+        {"phase": "transcribing"},
+        {"phase": "launching"},
+        {"phase": "process"},
+        {"phase": "compaction_retry"},
+        {"phase": "PREPARING"},
+        {"phase": None},
+        {"phase": ["preparing"]},
+        {"phase": {"preparing": 1}},
+        {"phase": "preparing", "session_ref": None},
+        {"phase": "preparing", "session_ref": ""},
+        {"phase": "waiting_lock", "session_ref": "x/../../escape/evil"},
+    ],
+)
+def test_only_the_record_of_a_run_in_prepare_may_carry_no_session(
+    tmp_path: Path, changes: dict[str, Any]
+) -> None:
+    # Every later phase has a session, whose name a lock carries; and a session reference
+    # that is there is checked, whatever the phase.
+    record = {"run_id": RUN, "thread_id": THREAD, "channel_id": CHANNEL, **changes}
+    assert read_turn_record(_record_file(tmp_path, record)) is None
+
+
 @pytest.mark.parametrize(
     "changes",
     [
@@ -209,9 +245,14 @@ def test_the_records_of_a_handover_are_listed_by_the_same_reader(tmp_path: Path)
     turns.mkdir()
     record = {"run_id": RUN, "thread_id": THREAD, "session_ref": REF, "phase": "process"}
     second = "0192f4a0-7b1c-7d07-84b0-000000000005"
+    # A run in prepare has a record without a session (`RunnerHandler._phase`); it is a record
+    # of a handover like the others, so a start without the key refuses while it is left.
+    prepare = "0192f4a0-7b1c-7d07-84b0-000000000007"
+    in_prepare = {"run_id": prepare, "thread_id": THREAD, "channel_id": CHANNEL}
     listed = [
         _record_file(turns, record),
         _record_file(turns, {**record, "run_id": second}, second),
+        _record_file(turns, {**in_prepare, "phase": "waiting_lock"}, prepare),
     ]
     _record_file(turns, record, "0192f4a0-7b1c-7d07-84b0-000000000003")  # the run of another file
     without = {"run_id": RUN, "thread_id": THREAD, "session_ref": REF}

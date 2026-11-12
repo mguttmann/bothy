@@ -64,6 +64,7 @@ from bothy_sdk.sources import Envelope
 
 from claude_code_runner import ADAPTER_NAME, RUNTIME_NAME, __version__
 from claude_code_runner.adoption import (
+    PHASES_BEFORE_START,
     AdoptedGroup,
     AdoptionAction,
     adoption_decision,
@@ -607,7 +608,9 @@ class RunnerHandler(AgentHandler):
         turns = self.config.state_dir / "turns"
         for path in sorted(turns.glob("*.json")) if turns.is_dir() else []:
             # Checked before anything is built from it: the run of its file name, and UUIDs
-            # for the thread and the session, whose names the locks carry.
+            # for the thread and the session, whose names the locks carry. Only the record of
+            # a run before ``run.start`` carries no session: it is removed by its phase, and
+            # without the key the start is refused while one is left (`Runner.run`).
             record = read_turn_record(path)
             if record is None:
                 warn("turn_record_unreadable", record=path.stem)
@@ -756,7 +759,7 @@ class RunnerHandler(AgentHandler):
         """
         ids = {"run_id": run_id, "thread_id": thread_id}
         phase = str(record.get("phase"))
-        if phase in ("preparing", "waiting_lock"):
+        if phase in PHASES_BEFORE_START:
             remove_turn_record(path)
             log("turn_adopted", action="restart_from_inbox", phase=phase, **ids)
             return

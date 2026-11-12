@@ -11,7 +11,8 @@
 ### Security
 
 - The runner no longer acts on a file in the place of a turn record that it did not write. A
-  record must be a regular file named after its run, with UUIDs for the thread and the session;
+  record must be a regular file named after its run, with UUIDs for the thread and the session
+  (with `runner.turn_handover` the record of a run that has not started yet carries no session);
   before, a session reference with path characters made the runner create a lock file and
   folders outside its lock folder at the next start.
 - At its start the runner stops a leftover turn of a built-in agent only when the command line

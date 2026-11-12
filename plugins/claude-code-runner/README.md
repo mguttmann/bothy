@@ -361,7 +361,9 @@ model in `system/init` and `modelUsage` without the selector in square brackets.
   `tests/unit/test_crash_points.py` enumerates every first and second crash point. A file in
   `turns/` that is no record the runner wrote (no regular file, not named after its run, or
   without UUIDs for the thread and the session) is logged with `turn_record_unreadable` and
-  left where it is; a process ID the system cannot hold names no process. Turns of
+  left where it is; a process ID the system cannot hold names no process. With
+  `runner.turn_handover` the record of a run in `preparing` or `waiting_lock` carries no session
+  yet; the next runner reads it and removes it ("Phases" below). Turns of
   hosted agents are not adopted: see "What a crash leaves" under "Hosting built-in agents".
 
 ## Turn handover (09 18.19.3 to 18.19.7, AR-03)
@@ -562,8 +564,9 @@ and served channels are byte for byte those of the runner before stage A1 (the f
   others are still stopped.
 - **What counts as a record.** A record is a file, so nothing in it is taken as given
   (FIX-RUNNER-HOSTING-REVIEW). The runner acts only on a regular file in the agent's own
-  `turns` folder (mode `0700`, no link) that is named after its run and carries UUIDs for the
-  thread and the session and process IDs the system can hold; it signals a process only when
+  `turns` folder (no link, no permission for group or others) that is named after its run and
+  carries UUIDs for the thread and the session and process IDs the system can hold; it signals
+  a process only when
   its command line names that session as the argument of `--session-id` or `--resume` and the
   agent's control folder (the `--settings` file of every hosted turn). Any other file is
   logged with `turn_record_unreadable` and left where it is: remove it by hand once you know
