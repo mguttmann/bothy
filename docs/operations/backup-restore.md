@@ -140,8 +140,8 @@ Procedure in `bothy-backupd` according to `backup.restore_test.schedule`:
 A failed check is a `ticket` alert (`BothyRestoreTestFailed`), a failed check of the audit chain
 a `page` (`BothyRestoreTestAuditChainFailed`), and no successful test for longer than
 `backup.restore_test.max_age` a `ticket` (`BothyRestoreTestStale`;
-[alerting.md](../observability/alerting.md) 3.2). The test never writes to the production
-database.
+[alerting.md](../observability/alerting.md) 3.2). Apart from its row in `backup_runs`, the test
+never writes to the production database.
 
 As built (M7-03, [16-operations.md](../spec/16-operations.md) 8.3, docs/decisions.d/M7-03.md D-M7-03-1
 to D-M7-03-9):

@@ -204,7 +204,10 @@ the code of the failed step in `error`, for example `pgbackrest_exit_82`; the lo
 `backup` holds the output of the tool. After the fix, run the kind by hand
 (`docker compose exec backup bothy-backupd backup <kind>`). The alert ends 24 hours after the
 last failed run of the kind. A run that the stop of `bothy-backupd` canceled raises no alert, and
-neither does a row closed as `interrupted` at its next start.
+neither does a row closed as `interrupted` at its next start. A run that fails before the first
+metric export of its process raises none either, here and for the two alerts of the restore
+test: a scheduled run right after a start of the service, or a command run by hand that fails at
+once. Its row and the exit code of the command still report it.
 
 ### bothywalarchivestale
 pgBackRest `check` in the container `backup`; TLS between `postgres` and `backup`; space in `pg_wal`.
@@ -230,9 +233,13 @@ and the reason code of every check in `checks`
 ### bothyrestoretestauditchainfailed
 The audit chain of the restored copy does not verify; `checks` of the newest `restore_test` row
 holds the reason code of the check `audit_chain`. If `BothyAuditChainBroken` fires as well, the
-chain of the running database is broken: follow its steps. If it is quiet, the backup or the
-repository is damaged: `docker compose exec backup pgbackrest --stanza=bothy verify`, then a new
-full backup and the test again.
+chain of the running database is broken: follow its steps. If it is quiet, check the chain of
+the running database first (`audit.verify`: "Check chain" in the audit log of the admin
+console), because that alert reports a periodic check that failed, not one that did not run, and
+a new full backup of a broken chain copies the break. If the chain is broken, follow the steps
+of `BothyAuditChainBroken`. If it verifies, the backup or the repository is damaged:
+`docker compose exec backup pgbackrest --stanza=bothy verify`, then a new full backup and the test
+again.
 
 ### bothyauditchainbroken
 Treat as a security incident: who had write access to the database? Determine the last good point

@@ -1430,7 +1430,7 @@ docs/decisions.d/M7-14.md D-M7-14-1 to D-M7-14-9):
 | Incidents | If `major_outage` lasts longer than `status.incident_after`, the `worker` creates an incident (`created_by` NULL). After recovery and `status.resolve_after`, it sets it to `resolved`. The owner can add texts at any time (`status.manage`) |
 | Agents | State from `agents.reported_runtime_state` (heartbeat). People see only agents with `agent.read` |
 | Visibility | `status.read` for logged-in principals; without login only with `status.public_enabled` |
-| Limit | The status page runs in the server. If the whole server fails, the app shows "Server unreachable"; the owner is then reached only via the external alert path (chapter 17, watchdog). The automatic states are as fresh as the last round of `status.probe`: while no `worker` runs the job, or the own measurement is not written, every component keeps its last state, and the page carries no time of the last round |
+| Limit | The status page runs in the server. If the whole server fails, the app shows "Server unreachable"; the owner is then reached only via the external alert path (chapter 17, watchdog). The automatic states are as fresh as the last round of `status.probe`: while no `worker` runs the job, every component keeps its last state. While the own measurement is not written, the measured checks (`api.http`, `sync.fanout`, `push.apns`, `push.fcm`) have no evidence and change nothing, so a component of these checks keeps its last state; the other checks still run. The page carries no time of the last round |
 
 | `health_source` | Check |
 |---|---|

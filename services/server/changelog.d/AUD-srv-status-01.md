@@ -16,4 +16,6 @@
   run finishes its row as `failed` with the code `canceled` and removes its files. Before, the
   process ended at once and left both behind.
 - The series of `bothy.backup.failures` and `bothy.backup.restore_test.failures` exist with the
-  value 0 from the start of the process, so an alert rule sees the first failure after a start.
+  value 0 from the start of the process, so an alert rule sees the first failure after a start
+  as an increase. One window stays: a failure before the first metric export of the process is
+  the first value of its series and raises no alert.
