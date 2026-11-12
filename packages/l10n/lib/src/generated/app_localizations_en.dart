@@ -2122,6 +2122,107 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsClientMetricsHint => 'Without content, IDs or names.';
 
   @override
+  String settingsWriteRefused(String setting, String reason) {
+    return 'The setting \"$setting\" was not saved: $reason';
+  }
+
+  @override
+  String get settingsWriteSendAgain => 'Send again';
+
+  @override
+  String get settingsWriteDiscard => 'Discard';
+
+  @override
+  String settingsWriteDiscardFailed(String reason) {
+    return 'The stored value could not be read: $reason';
+  }
+
+  @override
+  String get settingsDataExport => 'Export of your data';
+
+  @override
+  String get settingsDataExportHint =>
+      'A ZIP archive with what the instance stores about you: profile, devices, permissions, your messages and files, settings.';
+
+  @override
+  String get settingsDataExportRequest => 'Request export';
+
+  @override
+  String get settingsDataExportDownload => 'Download';
+
+  @override
+  String get settingsDataExportCheck => 'Check again';
+
+  @override
+  String settingsDataExportWaiting(String date) {
+    return 'Requested $date. An owner has to approve the export.';
+  }
+
+  @override
+  String settingsDataExportPreparing(String date) {
+    return 'Requested $date. The archive is being prepared.';
+  }
+
+  @override
+  String settingsDataExportReady(String date) {
+    return 'The archive is ready. It can be downloaded until $date.';
+  }
+
+  @override
+  String settingsDataExportReadyNoSave(String date) {
+    return 'The archive is ready until $date. Download it in the desktop app.';
+  }
+
+  @override
+  String settingsDataExportExpired(String date) {
+    return 'The archive of the export requested $date is no longer available.';
+  }
+
+  @override
+  String settingsDataExportRejected(String date) {
+    return 'The export requested $date was rejected.';
+  }
+
+  @override
+  String settingsDataExportCancelled(String date) {
+    return 'The export requested $date was cancelled.';
+  }
+
+  @override
+  String settingsDataExportFailed(String date) {
+    return 'The export requested $date failed.';
+  }
+
+  @override
+  String get settingsDataExportDownloading => 'Downloading the archive';
+
+  @override
+  String settingsDataExportLoadFailed(String reason) {
+    return 'The state of the export could not be read: $reason';
+  }
+
+  @override
+  String settingsDataExportRequestFailed(String reason) {
+    return 'The export could not be requested: $reason';
+  }
+
+  @override
+  String settingsDataExportDownloadFailed(String reason) {
+    return 'The archive could not be downloaded: $reason';
+  }
+
+  @override
+  String get settingsDataExportReason => 'Requested by the person in the app';
+
+  @override
+  String get stepUpPurposeDataExportRequest =>
+      'Request the export of your data';
+
+  @override
+  String get stepUpPurposeDataExportDownload =>
+      'Download the export of your data';
+
+  @override
   String get settingsAboutAppVersion => 'App version';
 
   @override

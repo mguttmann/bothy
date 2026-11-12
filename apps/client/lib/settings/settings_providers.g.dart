@@ -167,6 +167,109 @@ final class ShowProjectStatusProvider
 
 String _$showProjectStatusHash() => r'cdf1d631bd926a76c904abff4295e0d3b34f6c04';
 
+/// The writes of personal settings the instance refused for good and the person has not
+/// decided about yet, oldest first; empty before the login.
+
+@ProviderFor(refusedSettingWrites)
+final refusedSettingWritesProvider = RefusedSettingWritesProvider._();
+
+/// The writes of personal settings the instance refused for good and the person has not
+/// decided about yet, oldest first; empty before the login.
+
+final class RefusedSettingWritesProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<RefusedSettingWrite>>,
+          List<RefusedSettingWrite>,
+          Stream<List<RefusedSettingWrite>>
+        >
+    with
+        $FutureModifier<List<RefusedSettingWrite>>,
+        $StreamProvider<List<RefusedSettingWrite>> {
+  /// The writes of personal settings the instance refused for good and the person has not
+  /// decided about yet, oldest first; empty before the login.
+  RefusedSettingWritesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'refusedSettingWritesProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$refusedSettingWritesHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<List<RefusedSettingWrite>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<List<RefusedSettingWrite>> create(Ref ref) {
+    return refusedSettingWrites(ref);
+  }
+}
+
+String _$refusedSettingWritesHash() =>
+    r'e072b0c5450e439e3ef5215c97f47298f5a71673';
+
+/// The actions on refused writes of the signed-in instance, or null before the login.
+
+@ProviderFor(refusedSettingActions)
+final refusedSettingActionsProvider = RefusedSettingActionsProvider._();
+
+/// The actions on refused writes of the signed-in instance, or null before the login.
+
+final class RefusedSettingActionsProvider
+    extends
+        $FunctionalProvider<
+          RefusedSettingActions?,
+          RefusedSettingActions?,
+          RefusedSettingActions?
+        >
+    with $Provider<RefusedSettingActions?> {
+  /// The actions on refused writes of the signed-in instance, or null before the login.
+  RefusedSettingActionsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'refusedSettingActionsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$refusedSettingActionsHash();
+
+  @$internal
+  @override
+  $ProviderElement<RefusedSettingActions?> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  RefusedSettingActions? create(Ref ref) {
+    return refusedSettingActions(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(RefusedSettingActions? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<RefusedSettingActions?>(value),
+    );
+  }
+}
+
+String _$refusedSettingActionsHash() =>
+    r'19f4f73d46f6063e269b988208a17d63af237a32';
+
 /// The settings writer of the signed-in instance, or null before the login.
 
 @ProviderFor(settingsRepository)
@@ -222,16 +325,46 @@ String _$settingsRepositoryHash() =>
 
 /// The profile of the signed-in person: read with `getMe`, changed with `updateMyProfile`
 /// (01 9: the app language follows `users.locale`).
+///
+/// The device remembers what the instance last said, with the secrets of the instance (the
+/// local database has no row for the own profile), so a start without an answer of the
+/// instance shows the language and the time zone of the last start at once (01 3.6). The
+/// instance is asked at every start, with the read retry of the session, and once more each
+/// time the connection is live again without an answer since it was lost; an answer replaces
+/// what is shown and what is remembered, a failed read leaves both
+/// (docs/decisions.d/AUD-client-settings-01.md). The remembered profile is deleted with the
+/// secrets of the account (R-SY-14), and an answer that arrives after the account ended is not
+/// remembered: the secrets of an ended account take no write (`InstanceSecrets.deleteAll`).
 
 @ProviderFor(ProfileController)
 final profileControllerProvider = ProfileControllerProvider._();
 
 /// The profile of the signed-in person: read with `getMe`, changed with `updateMyProfile`
 /// (01 9: the app language follows `users.locale`).
+///
+/// The device remembers what the instance last said, with the secrets of the instance (the
+/// local database has no row for the own profile), so a start without an answer of the
+/// instance shows the language and the time zone of the last start at once (01 3.6). The
+/// instance is asked at every start, with the read retry of the session, and once more each
+/// time the connection is live again without an answer since it was lost; an answer replaces
+/// what is shown and what is remembered, a failed read leaves both
+/// (docs/decisions.d/AUD-client-settings-01.md). The remembered profile is deleted with the
+/// secrets of the account (R-SY-14), and an answer that arrives after the account ended is not
+/// remembered: the secrets of an ended account take no write (`InstanceSecrets.deleteAll`).
 final class ProfileControllerProvider
     extends $AsyncNotifierProvider<ProfileController, Profile> {
   /// The profile of the signed-in person: read with `getMe`, changed with `updateMyProfile`
   /// (01 9: the app language follows `users.locale`).
+  ///
+  /// The device remembers what the instance last said, with the secrets of the instance (the
+  /// local database has no row for the own profile), so a start without an answer of the
+  /// instance shows the language and the time zone of the last start at once (01 3.6). The
+  /// instance is asked at every start, with the read retry of the session, and once more each
+  /// time the connection is live again without an answer since it was lost; an answer replaces
+  /// what is shown and what is remembered, a failed read leaves both
+  /// (docs/decisions.d/AUD-client-settings-01.md). The remembered profile is deleted with the
+  /// secrets of the account (R-SY-14), and an answer that arrives after the account ended is not
+  /// remembered: the secrets of an ended account take no write (`InstanceSecrets.deleteAll`).
   ProfileControllerProvider._()
     : super(
         from: null,
@@ -251,10 +384,20 @@ final class ProfileControllerProvider
   ProfileController create() => ProfileController();
 }
 
-String _$profileControllerHash() => r'e1ef47ff8d3ec733475fff03b335f039730334df';
+String _$profileControllerHash() => r'e9e3b4bca6e58d5f2dfc40efc898ab2c9bcc7824';
 
 /// The profile of the signed-in person: read with `getMe`, changed with `updateMyProfile`
 /// (01 9: the app language follows `users.locale`).
+///
+/// The device remembers what the instance last said, with the secrets of the instance (the
+/// local database has no row for the own profile), so a start without an answer of the
+/// instance shows the language and the time zone of the last start at once (01 3.6). The
+/// instance is asked at every start, with the read retry of the session, and once more each
+/// time the connection is live again without an answer since it was lost; an answer replaces
+/// what is shown and what is remembered, a failed read leaves both
+/// (docs/decisions.d/AUD-client-settings-01.md). The remembered profile is deleted with the
+/// secrets of the account (R-SY-14), and an answer that arrives after the account ended is not
+/// remembered: the secrets of an ended account take no write (`InstanceSecrets.deleteAll`).
 
 abstract class _$ProfileController extends $AsyncNotifier<Profile> {
   FutureOr<Profile> build();

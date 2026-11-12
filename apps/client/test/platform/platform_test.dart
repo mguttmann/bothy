@@ -25,6 +25,17 @@ import 'package:sync_engine/sync_engine.dart';
 
 import '../support/fakes.dart';
 
+/// A secure storage whose writes wait for [release], as a keychain that answers late.
+class _HeldWrites extends MemorySecureBackend {
+  final Completer<void> release = Completer<void>();
+
+  @override
+  Future<void> write(String key, String value) async {
+    await release.future;
+    await super.write(key, value);
+  }
+}
+
 /// A device key client without a platform: keys are fixed bytes, signatures echo a marker.
 class FakeDeviceKeyClient implements dk.DeviceKeyClient {
   final List<String> calls = [];
@@ -119,6 +130,56 @@ void main() {
       await b.delete('device_id');
       expect(await b.read('device_id'), isNull);
     });
+
+    test('the secrets of an ended account take no later write', () async {
+      final backend = MemorySecureBackend();
+      final secrets = InstanceSecrets(backend, 'a');
+      await secrets.write('device_id', '1');
+      await secrets.deleteAll();
+
+      // The answer of a request that was under way when the account ended.
+      await secrets.write('profile', '{"locale":"de"}');
+
+      expect(await secrets.read('profile'), isNull);
+      expect(await secrets.isEmpty(), isTrue);
+      expect(backend.values, isEmpty);
+      // The next login composes its own store of the instance.
+      final next = InstanceSecrets(backend, 'a');
+      await next.write('device_id', '2');
+      expect(await next.read('device_id'), '2');
+    });
+
+    test('a write the store has not answered when the account ends goes with '
+        'the others', () async {
+      final backend = _HeldWrites();
+      final secrets = InstanceSecrets(backend, 'a');
+      final writing = secrets.write('profile', '{"locale":"de"}');
+      final deleting = secrets.deleteAll();
+      await Future<void>.delayed(Duration.zero);
+
+      backend.release.complete();
+      await writing;
+      await deleting;
+
+      expect(backend.values, isEmpty);
+    });
+
+    test(
+      'a failed write does not keep the secrets of an ended account',
+      () async {
+        final backend = _HeldWrites();
+        final secrets = InstanceSecrets(backend, 'a');
+        backend.values['instance/a/device_id'] = '1';
+        final writing = secrets.write('profile', '{"locale":"de"}');
+        final deleting = secrets.deleteAll();
+
+        backend.release.completeError(StateError('the store is locked'));
+        await expectLater(writing, throwsStateError);
+        await deleting;
+
+        expect(backend.values, isEmpty);
+      },
+    );
 
     test(
       'the database key is 32 random bytes created once and then reused',

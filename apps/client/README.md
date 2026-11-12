@@ -71,7 +71,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/running/` | "Running now" D10 (M4-23): the rows of the active runs, the filters, Stop and the cost sum; the control room cards and the run graph D14 (M4-39); their phone layouts M11 and M12 (M5-14) |
 | `lib/onboarding/` | the start screen and E1 to E7, the controller of the flow, codes and remaining times |
 | `lib/admin/` | the route of the administration: `AdminRoute`, `adminRepositoryProvider`, the mapping of `AdminLocation` to `/admin/...` |
-| `lib/settings/` | Settings (01 5.1 D8): the sections, the personal settings of 01 11 with their defaults, the profile and the devices section hosting `admin_ui` |
+| `lib/settings/` | Settings (01 5.1 D8): the sections, the personal settings of 01 11 with their defaults and the notice of a setting the instance refused, the profile (remembered for a start without network), the devices section hosting `admin_ui` and the export of the own data under Privacy (20 5.1) |
 | `lib/notifications_settings/` | D9 (M4-33): the page inside Settings > Notifications, the tree of levels with inheritance, the quiet hours editor, the effective level of 13 3.1 for display, the providers of the notification settings |
 | `lib/terminal/` | the terminal (M4-36): the group "Hosts" of the sidebar, the view of a host with its tabs, the ports of `terminal_ui` (WebSocket transport with DPoP `identify`, pins in `host_key_pins`, host events of the engine, the REST adapter), the table "In the terminal" and the providers |
 | `lib/menus/` | the menus of a space, a channel and a thread (M4-33): level, "Mute until", "Export history" |

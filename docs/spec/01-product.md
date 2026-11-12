@@ -159,6 +159,7 @@ milestones from the [plan](../PLAN.md).
 | Send offline with a queue, states visible | core | D, M | | section 6.6 |
 | Read state, drafts, settings, sidebar in sync | core | D, M | | |
 | Approve, revoke a device; end sessions | core | D, M, W | `device.approve`, `device.revoke`, `session.revoke` | new devices wait |
+| Export of the own data: request, state, archive | core | D, M | `gdpr.request.create`, `gdpr.request.read`, `gdpr.export.download` | step-up; Settings, Privacy (D8); the archive is saved on the desktop, a phone shows the state; a deletion or rectification request and the decision of an owner have no view and stay with the API ([20-privacy.md](20-privacy.md) 5.1) |
 | End-to-end encryption of chat content | never | | | agents must read (Baseline 4); the terminal stream, by contrast, is end-to-end encrypted (3.8) |
 | Chat in the browser | never | | | web only for the console (ADR 0028) |
 
@@ -497,7 +498,13 @@ it, and a refused one names the wait.
 
 **D8 Settings.** Appearance, notifications, language, keyboard, devices and sessions, privacy,
 about (version, licenses). Under "Devices and sessions" the person confirms a waiting device with
-its code (E4) and adds a device with a pairing code (E5), both with step-up.
+its code (E4) and adds a device with a pairing code (E5), both with step-up. Under "Privacy" the
+person requests the export of their own data, reads where the request stands and saves the
+archive of a completed one, both with step-up ([20-privacy.md](20-privacy.md) 5.1); a phone has
+no dialog to save a file, so it shows the state and names the desktop app for the download. A
+setting the instance refused to store shows above every section with the reason, "Send again"
+and "Discard"; discarding shows the stored value again
+([04-sync-protocol.md](04-sync-protocol.md) 13.2 item 5).
 
 ```text
 +--------------------------+------------------------------------------------------------------------+
@@ -2369,7 +2376,9 @@ macOS release (ticket in 15-client-architecture.md).
 ## 9. Languages
 
 - German (default) and English. The language follows `users.locale`; the app starts in the
-  system language as long as the person has not chosen one.
+  system language as long as the person has not chosen one. The app remembers the language and
+  the time zone the instance last named for the person, so a start without an answer of the
+  instance keeps both ([15-client-architecture.md](15-client-architecture.md) section 4).
 - Texts in ARB files in `packages/l10n` (`app_de.arb`, `app_en.arb`), generated with
   `flutter gen-l10n`; plurals and select through ICU messages. A missing translation breaks the
   build.
