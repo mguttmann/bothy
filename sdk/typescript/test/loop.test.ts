@@ -25,11 +25,13 @@ import {
 } from "../src/gateway/index.js";
 import type { components } from "../src/generated/openapi.js";
 import {
+  CLOSED_ENTRY_RETENTION_MS,
   EntryState,
+  InboxEntry,
   MemoryInboxStore,
-  type InboxEntry,
 } from "../src/invocation/index.js";
 import { silentLogger } from "../src/logger.js";
+import { INBOX_PRUNE_INTERVAL_MS } from "../src/runs/adapter.js";
 import {
   Adapter,
   AgentHandler,
@@ -551,6 +553,7 @@ async function running<T>(
 /** The adapter's private run table, read the way the Python tests read `_runs`. */
 interface Internals {
   readonly runs: Map<string, { readonly waitingForToken: boolean }>;
+  readonly runTokens: Map<string, Secret>;
   renew(state: unknown, token: Secret): Promise<Secret>;
 }
 
@@ -1419,6 +1422,150 @@ describe("an end the server did not store", () => {
       });
       expect((await fake.runState(runId)).state).toBe("completed");
       expect(handler.count("onFollowup")).toBe(0);
+    },
+    TEST_TIMEOUT,
+  );
+});
+
+describe("what the adapter keeps of ended runs", () => {
+  /** A source that is ready and then delivers nothing until it is closed. */
+  class IdleSource implements EventSource {
+    readonly closeReason = undefined;
+    private readonly closing = new Gate();
+
+    async *[Symbol.asyncIterator](): AsyncGenerator<Delivery, void, undefined> {
+      yield new SourceReady();
+      await this.closing.opened;
+    }
+
+    settle(): Promise<void> {
+      return Promise.resolve();
+    }
+
+    advance(): Promise<void> {
+      return Promise.resolve();
+    }
+
+    ack(): Promise<void> {
+      return Promise.resolve();
+    }
+
+    answerAutocomplete(): Promise<void> {
+      return Promise.resolve();
+    }
+
+    close(): Promise<void> {
+      this.closing.open();
+      return Promise.resolve();
+    }
+  }
+
+  /** Records the time of every prune. */
+  class PrunedInbox extends MemoryInboxStore {
+    readonly prunes: number[] = [];
+
+    override async prune(nowMs: number): Promise<void> {
+      await super.prune(nowMs);
+      this.prunes.push(nowMs);
+    }
+  }
+
+  it(
+    "prunes its inbox at the start and every hour, so closed entries and jti rows go",
+    async () => {
+      const inbox = new PrunedInbox();
+      const eventId = "01900000-0000-7000-8000-00000000c105";
+      await inbox.add(
+        new InboxEntry({
+          eventId,
+          seq: 1,
+          type: "command.invoked",
+          runId: undefined,
+          envelope: { id: eventId, seq: 1 },
+          token: new Secret("an-old-token"),
+          tokenIat: 1,
+          tokenJti: "jti-old",
+          state: EntryState.CLOSED,
+          deliveries: 1,
+        }),
+      );
+      const start = fake.clock.now();
+      await inbox.rememberJti("jti-old", start + STEP_MS);
+      const adapter = makeAdapter(
+        new RecordingHandler(),
+        "prune",
+        {},
+        { inbox, source: new IdleSource() },
+      );
+      const done = adapter.run();
+      done.catch(() => undefined);
+      try {
+        await patiently(() => inbox.prunes.length === 1, "the first prune");
+        expect(inbox.prunes).toEqual([start]);
+        expect(await inbox.jtiSeen("jti-old", start)).toBe(true);
+        await fake.passTime(INBOX_PRUNE_INTERVAL_MS);
+        await patiently(() => inbox.prunes.length === 2, "the second prune");
+        // The token of the row cannot pass anymore: the row is gone, the entry is still kept.
+        expect(await inbox.jtiSeen("jti-old", start)).toBe(false);
+        expect(await inbox.get(eventId)).toBeDefined();
+        await fake.passTime(CLOSED_ENTRY_RETENTION_MS);
+        await patiently(
+          async () => (await inbox.get(eventId)) === undefined,
+          "the end of the closed entry",
+        );
+        expect(inbox.prunes.at(-1)).toBe(
+          start + INBOX_PRUNE_INTERVAL_MS + CLOSED_ENTRY_RETENTION_MS,
+        );
+      } finally {
+        await adapter.stop();
+        await withinPatience(
+          done.catch(() => undefined),
+          "the end of the adapter loop",
+        );
+      }
+      // The stop ended the prune loop: no prune waits on the clock.
+      const pruned = inbox.prunes.length;
+      await fake.passTime(INBOX_PRUNE_INTERVAL_MS);
+      expect(inbox.prunes).toHaveLength(pruned);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "forgets the token of an ended run and still binds a late reply with the inbox's token",
+    async () => {
+      const handler = new RecordingHandler();
+      const recording = new RecordingFetch();
+      const adapter = makeAdapter(
+        handler,
+        "late-reply",
+        {},
+        { fetch: recording.fetch },
+      );
+      await running(adapter, async ({ source }) => {
+        const { runId, threadId } = await fake.trigger();
+        await until(fake, async () => (await stateOf(runId)) === "completed");
+        await until(fake, () => closed(adapter, runId));
+        expect(internals(adapter).runs.size).toBe(0);
+        expect(internals(adapter).runTokens.size).toBe(0);
+        // A reply of the ended run goes out bound to the run, and the server refuses it for
+        // good as run_inactive instead of posting it outside a run (07 SR9).
+        const delivered = source.envelopes("agent.invocation")[0]?.token;
+        const entry = await adapter.outbox.sendMessage(threadId, "Too late", {
+          runId,
+        });
+        expect([entry.state, entry.problemCode]).toEqual([
+          "failed",
+          "invocation_token_invalid",
+        ]);
+        const sent = recording.seen.at(-1);
+        expect([sent?.path.endsWith("/messages"), sent?.status]).toEqual([
+          true,
+          403,
+        ]);
+        expect(sent?.bound).toBe(fingerprint(delivered as Secret));
+        expect(fake.messages).toHaveLength(0);
+      });
     },
     TEST_TIMEOUT,
   );
