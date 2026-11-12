@@ -117,3 +117,35 @@ func TestMemoryWriter(t *testing.T) {
 		t.Fatal("stored values are wrong")
 	}
 }
+
+// noRows is a participant whose table holds nothing to export or erase: it embeds NoOp and adds
+// only its module and its table.
+type noRows struct{ personaldata.NoOp }
+
+func (noRows) Module() string   { return "gateway" }
+func (noRows) Tables() []string { return []string{"gateway_presence"} }
+
+// TestNoOp: a type that embeds NoOp is a Participant the registry takes; its export writes
+// nothing, and no step of an erasure fails, in both content modes.
+func TestNoOp(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	var p personaldata.Participant = noRows{}
+	if err := personaldata.NewRegistry().Register(p); err != nil {
+		t.Fatal(err)
+	}
+	w := personaldata.NewMemoryWriter()
+	if err := p.Export(ctx, personaldata.Export{Subject: ids.New()}, w); err != nil {
+		t.Fatal(err)
+	}
+	if len(w.Sections) != 0 || len(w.Lines) != 0 || len(w.Contents) != 0 {
+		t.Errorf("exported %v %v %d", w.Sections, w.Lines, len(w.Contents))
+	}
+	for _, mode := range []personaldata.ContentMode{personaldata.KeepPseudonymized, personaldata.DeleteContent} {
+		for _, step := range personaldata.ParticipantSteps() {
+			if err := p.Erase(ctx, step, personaldata.Erasure{Subject: ids.New(), RequestID: ids.New(), Content: mode}); err != nil {
+				t.Errorf("%s %s: %v", mode, step, err)
+			}
+		}
+	}
+}

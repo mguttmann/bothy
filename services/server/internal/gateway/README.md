@@ -531,7 +531,7 @@ Only this module writes and reads this table via SQL (03-data-model.md, principl
 
 ## Personal data
 
-`adapters/postgres.PersonalData` (`NewPersonalData()`) is the participant of the gateway in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Table: `gateway_presence`, the live connections of people for the routing of notifications.
+`adapters/postgres.PersonalData` (`NewPersonalData()`) is the participant of the gateway in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Table: `gateway_presence`, the live connections of people for the routing of notifications. It embeds `personaldata.NoOp`, which exports and erases nothing.
 
 - Export: nothing. A row is no stored record: it says which device is connected right now and ends with the connection.
 - Erase: nothing in any step. The revocation of the person's login sessions by identity closes their connections (`session.revoked`, "Revocation and shutdown"), the node deletes the rows of ended connections with its next flush, and the rows of a node that stopped are ignored and deleted after `cluster.presence_ttl`.

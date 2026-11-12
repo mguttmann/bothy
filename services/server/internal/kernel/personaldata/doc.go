@@ -18,6 +18,9 @@
 // nil for a step it has nothing to do in. Every call is idempotent: run again after a crash it
 // finishes the step without repeating an effect that is already there.
 //
+// A participant whose tables hold nothing to export and nothing to erase embeds NoOp and declares
+// only its module and its tables.
+//
 // Example:
 //
 //	reg := personaldata.NewRegistry()
