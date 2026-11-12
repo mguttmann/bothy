@@ -272,19 +272,24 @@ final class TerminalWorld {
     context: () => null,
   );
 
-  TerminalServices services({Clock clock = const SystemClock()}) =>
-      TerminalServices(
-        api: api,
-        pins: pins,
-        events: events,
-        engineEvents: const Stream.empty(),
-        stepUp: ({required purposeText}) async => stepUps.add(purposeText),
-        newTransport: () => transport,
-        links: SystemLinkOpener(launch: (_) async => true),
-        clock: clock,
-        config: AppConfig.defaults(),
-        context: () => navigatorKey.currentContext,
-      );
+  /// The ports over the fakes; [online] is the engine's connection as the reconnector of
+  /// D-TSL-5 watches it (empty: it never changes).
+  TerminalServices services({
+    Clock clock = const SystemClock(),
+    Stream<bool> online = const Stream.empty(),
+  }) => TerminalServices(
+    api: api,
+    pins: pins,
+    events: events,
+    engineEvents: const Stream.empty(),
+    stepUp: ({required purposeText}) async => stepUps.add(purposeText),
+    newTransport: () => transport,
+    links: SystemLinkOpener(launch: (_) async => true),
+    clock: clock,
+    config: AppConfig.defaults(),
+    context: () => navigatorKey.currentContext,
+    online: online,
+  );
 
   /// Pumps the view of the host in a desktop window with the keyboard layer of the shell.
   Future<ProviderContainer> pump(

@@ -6,11 +6,14 @@
 /// and the extra keys bar above the soft keyboard, hidden while a hardware keyboard is
 /// connected.
 ///
-/// Leaving the screen (the back button, the edge swipe, Android's system back) detaches the
-/// sessions of the host: they keep running and M9 offers them again; only "End" or the server
-/// ends one (01 5.4, D-M5-12-5). While the screen shows, Android keeps the window out of
-/// screenshots, recordings and the recent apps (`FLAG_SECURE`), and iOS hides the terminal while
-/// the screen is recorded or mirrored (D-M5-12-3). Terminal content stays in memory (R-CL-17).
+/// Leaving the screen (the back button, the edge swipe, Android's system back, or a tapped push,
+/// a link or a share that opens another page) detaches the sessions of the host and stops an
+/// opening or an attach that is still on its way: the sessions keep running and M9 offers them
+/// again; only "End" or the server ends one (01 5.4, D-M5-12-5;
+/// docs/decisions.d/AUD-client-phone-01.md). While the screen shows, Android keeps the window
+/// out of screenshots, recordings and the recent apps (`FLAG_SECURE`), and iOS hides the
+/// terminal while the screen is recorded or mirrored (D-M5-12-3). Terminal content stays in
+/// memory (R-CL-17).
 library;
 
 import 'dart:async';
@@ -27,6 +30,7 @@ import '../../platform/terminal_guard.dart';
 import '../../terminal/providers.dart';
 import '../../terminal/tabs_pane.dart';
 import 'providers.dart';
+import 'terminal_lifecycle.dart';
 
 /// M8 of [hostId].
 class TerminalSessionScreen extends ConsumerStatefulWidget {
@@ -50,6 +54,10 @@ class _TerminalSessionScreenState extends ConsumerState<TerminalSessionScreen>
   late final TerminalPlatformGuard _guard;
   late final HardwareKeyboardWatch _keyboard;
   TerminalTabs? _registered;
+  // The coordinator that knows this screen shows [_registered].
+  PhoneTerminalCoordinator? _coordinator;
+  // Whether the screen was left; it happens once, by the pop or by the dispose.
+  bool _left = false;
 
   @override
   void initState() {
@@ -66,7 +74,7 @@ class _TerminalSessionScreenState extends ConsumerState<TerminalSessionScreen>
   @override
   void dispose() {
     // M8 also leaves without a pop (a link replaces the stack): its sessions detach then too.
-    _detachAll();
+    _leave();
     WidgetsBinding.instance.removeObserver(this);
     _guard.keyboardChanges.removeListener(_refreshKeyboard);
     if (--_screens == 0) unawaited(_guard.setSecure(false));
@@ -86,20 +94,32 @@ class _TerminalSessionScreenState extends ConsumerState<TerminalSessionScreen>
   }
 
   void _register(TerminalTabs tabs) {
-    if (identical(_registered, tabs)) return;
+    if (_left || identical(_registered, tabs)) return;
     _registered = tabs;
-    ref.read(phoneTerminalCoordinatorProvider)?.register(tabs);
+    _coordinator = ref.read(phoneTerminalCoordinatorProvider)
+      ?..screenShown(tabs);
     unawaited(tabs.refresh());
   }
 
-  /// Leaving M8 detaches the live sessions of the host (01 5.4).
-  void _detachAll() {
-    for (final c in _registered?.tabs ?? const <TerminalController>[]) {
-      final phase = c.state.phase;
-      if (phase == TerminalPhase.connected || phase == TerminalPhase.exited) {
-        unawaited(c.detach());
+  /// Leaving M8 detaches the live sessions of the host (01 5.4), stops an opening or an attach
+  /// that is still on its way, so no session turns live without this view, and ends the
+  /// reattaching by the coordinator.
+  void _leave() {
+    if (_left) return;
+    _left = true;
+    final tabs = _registered;
+    if (tabs == null) return;
+    for (final c in tabs.tabs) {
+      switch (c.state.phase) {
+        case TerminalPhase.connected || TerminalPhase.exited:
+          unawaited(c.detach());
+        case TerminalPhase.preparing || TerminalPhase.connecting:
+          unawaited(c.stopPending());
+        case _:
+          break;
       }
     }
+    _coordinator?.screenGone(tabs);
   }
 
   @override
@@ -133,7 +153,7 @@ class _TerminalSessionScreenState extends ConsumerState<TerminalSessionScreen>
     }
     return PopScope(
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop) _detachAll();
+        if (didPop) _leave();
       },
       child: ColoredBox(
         key: ValueKey('phone.terminal.${widget.hostId}'),

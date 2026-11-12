@@ -6,7 +6,9 @@
 /// turns the result into JPEG files in the app's temporary folder, which [attachPhoto] hands to
 /// the composer's attachments in one call: the size and count checks against
 /// `file_max_upload_bytes` and `message_max_attachments`, the upload entries in the outbox before
-/// the message, and the local preview before sending all come from there.
+/// the message, and the local preview before sending all come from there. Android may end the app
+/// while the camera or the picker is in front; the photos of such a pick are deleted at the next
+/// start ([MediaPicker.discardLost]).
 ///
 /// Why JPEG: the server removes the metadata of JPEG and PNG losslessly but not of HEIC, so a
 /// photo reaches it as JPEG and HEIC only as a deliberately sent file (12 7.1).
@@ -73,6 +75,12 @@ abstract interface class MediaPickerPort {
   /// Throws [MediaAccessDenied] when the system refuses the library, and other exceptions when
   /// the picker fails.
   Future<List<RawMedia>> library({int? limit});
+
+  /// The files of a pick whose result never reached the app: Android may end the app while the
+  /// camera or the photo picker is in front and hands the result to the next start. Taking
+  /// them clears them, so a second call returns nothing; empty without such a pick and on
+  /// every other platform. Throws when the platform cannot be asked.
+  Future<List<RawMedia>> takeLost();
 }
 
 /// The JPEG quality of a photo the app encodes (D-M5-07-4): high enough that a photo looks
@@ -115,6 +123,18 @@ final class ImagePickerPort implements MediaPickerPort {
         );
         return [for (final f in files) RawMedia(path: f.path, name: f.name)];
       });
+
+  @override
+  Future<List<RawMedia>> takeLost() async {
+    // Only the Android implementation keeps the result of an ended app (`retrieveLostData`);
+    // the others throw `UnimplementedError`.
+    if (ImagePickerPlatform.instance is! ImagePickerAndroid) return const [];
+    final lost = await _picker.retrieveLostData();
+    return [
+      for (final f in lost.files ?? [?lost.file])
+        RawMedia(path: f.path, name: f.name),
+    ];
+  }
 
   static Future<T> _denied<T>(
     MediaSource source,
@@ -194,7 +214,8 @@ final class PhotoNoRoom extends PhotoOutcome {
 /// convert) is refused with [PhotoUnsupported]. Several photos of the library are converted in
 /// the picker's order and kept all or none: one that cannot be converted refuses the whole
 /// pick and deletes the JPEGs already written. The picker's own files are deleted in every
-/// case, so no photo stays outside the app's outgoing folder (requirement 16).
+/// case, so no photo stays outside the app's outgoing folder (requirement 16); that includes
+/// the files of a pick during which Android ended the app ([discardLost]).
 ///
 /// Example:
 /// ```dart
@@ -261,6 +282,22 @@ final class MediaPicker {
           await _delete(path);
         }
       }
+    }
+  }
+
+  /// Deletes the files of a pick during which Android ended the app
+  /// ([MediaPickerPort.takeLost]). The composer that asked for them went with the app, so they
+  /// cannot be attached any more, and no photo may stay in the picker's cache (requirement 16).
+  /// Never throws: a platform that cannot be asked leaves everything as it is.
+  Future<void> discardLost() async {
+    final List<RawMedia> lost;
+    try {
+      lost = await _port.takeLost();
+    } on Object {
+      return;
+    }
+    for (final raw in lost) {
+      await _delete(raw.path);
     }
   }
 

@@ -111,7 +111,10 @@ final class TerminalController extends ChangeNotifier {
   // the pump or the key, so a flow that resumes after an await never overwrites what the
   // person or the server decided meanwhile.
   int _generation = 0;
-  bool _busy = false;
+  // The generation of the opening or attach that runs, null without one. A flow that
+  // [stopPending] stopped no longer counts: the next one starts while it still unwinds.
+  int? _flow;
+  bool get _busy => _flow != null;
   bool _disposed = false;
   BytesBuilder? _replay;
 
@@ -142,8 +145,7 @@ final class TerminalController extends ChangeNotifier {
     required int rows,
   }) async {
     if (_busy || _state.sessionId != null || _disposed) return;
-    _busy = true;
-    final epoch = _supersede();
+    final epoch = _flow = _supersede();
     try {
       _cols = cols;
       _rows = rows;
@@ -210,7 +212,7 @@ final class TerminalController extends ChangeNotifier {
       if (_owns(epoch)) _dropKey();
       _failed(epoch, e);
     } finally {
-      _busy = false;
+      if (_flow == epoch) _flow = null;
     }
   }
 
@@ -274,9 +276,8 @@ final class TerminalController extends ChangeNotifier {
     final host = _host;
     if (_busy || sessionId == null || host == null || _disposed) return;
     if (_state.phase != TerminalPhase.detached) return;
-    _busy = true;
     final before = _state;
-    final epoch = _supersede();
+    final epoch = _flow = _supersede();
     try {
       _set(
         epoch,
@@ -334,8 +335,41 @@ final class TerminalController extends ChangeNotifier {
         ),
       );
     } finally {
-      _busy = false;
+      if (_flow == epoch) _flow = null;
     }
+  }
+
+  /// Stops an opening or an attach that is on its way ([TerminalPhase.preparing] and
+  /// [TerminalPhase.connecting]): the phone calls it when its terminal screen goes, so nothing
+  /// of that flow follows without a view, no request, no step-up and no stream, and the answer
+  /// to a prompt that is still open changes nothing.
+  ///
+  /// A tab with a session is detached as [detach] leaves it and "Reattach" reaches it; a tab
+  /// without one is idle again, and a session the server opens for it meanwhile is closed right
+  /// away. Does nothing in any other phase.
+  Future<void> stopPending() async {
+    final phase = _state.phase;
+    if (_disposed ||
+        (phase != TerminalPhase.preparing &&
+            phase != TerminalPhase.connecting)) {
+      return;
+    }
+    final epoch = _supersede();
+    _flow = null;
+    if (_state.sessionId == null) {
+      _dropKey();
+      return _set(epoch, TerminalTabState.initial);
+    }
+    _set(
+      epoch,
+      _state.copyWith(
+        phase: TerminalPhase.detached,
+        detachCause: DetachCause.person,
+        detachedAt: _state.detachedAt ?? _clock.now(),
+        replaying: false,
+      ),
+    );
+    await _closeStream();
   }
 
   /// Detaches: closes the stream, the session keeps running on the host (15 23.2 item 6).

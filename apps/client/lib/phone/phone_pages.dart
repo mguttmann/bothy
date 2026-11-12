@@ -13,7 +13,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
+import 'package:sync_engine/sync_engine.dart' show ConnectionPhase;
 
+import '../app/providers/session.dart';
 import '../app/providers/target.dart';
 import '../app/router.dart';
 import '../app/target_resolver.dart';
@@ -30,9 +32,12 @@ import '../sidebar/providers.dart';
 import '../sidebar/sidebar_column.dart';
 import '../status/status_route.dart';
 import '../thread/history_column.dart';
+import '../thread/providers.dart' show threadReadsProvider;
 import '../viz/live_page.dart';
 import 'me/emergency_entry.dart';
+import 'me/logout_confirm.dart';
 import 'phone_navigation.dart';
+import 'providers.dart';
 import 'terminal/hosts_screen.dart';
 import 'terminal/terminal_session_screen.dart';
 
@@ -123,8 +128,39 @@ class PhoneNotFound extends StatelessWidget {
   );
 }
 
+/// The mark of a page whose target this device does not hold while the server could not be
+/// asked ([TargetStatus.unknown], for example a push tapped without a network): the page waits
+/// and asks again when the connection is live ([_askAgainWhenLive]).
+class PhoneTargetWaiting extends StatelessWidget {
+  /// Creates the mark.
+  const PhoneTargetWaiting({super.key});
+
+  @override
+  Widget build(BuildContext context) => const Center(
+    key: ValueKey('target.waiting'),
+    child: CircularProgressIndicator(),
+  );
+}
+
+/// Asks the target check of [path] again when the connection turns live while the check could
+/// not ask the server (15 11: a link waits until its target is loaded; `TargetStatus.unknown`
+/// "waits and tries again later"); [again] runs with it.
+void _askAgainWhenLive(WidgetRef ref, String path, {VoidCallback? again}) {
+  ref.listen(connectionStateProvider, (before, now) {
+    if (now.value?.phase != ConnectionPhase.live ||
+        before?.value?.phase == ConnectionPhase.live) {
+      return;
+    }
+    final status = ref.read(targetStatusProvider(path)).value;
+    if (status != TargetStatus.unknown) return;
+    ref.invalidate(targetStatusProvider(path));
+    again?.call();
+  });
+}
+
 /// A channel on the phone: the post list of a forum (M2) or the main history of a text
-/// channel; "Not found or no access" for an invisible one.
+/// channel; "Not found or no access" for an invisible one, and [PhoneTargetWaiting] for one
+/// this device does not hold while the server cannot be asked.
 class PhoneChannelPage extends ConsumerWidget {
   /// Creates the page.
   const PhoneChannelPage({super.key, required this.channelId});
@@ -134,14 +170,19 @@ class PhoneChannelPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final status = ref
-        .watch(targetStatusProvider('/c/${channelId.value}'))
-        .value;
+    final path = '/c/${channelId.value}';
+    final status = ref.watch(targetStatusProvider(path)).value;
     if (status == TargetStatus.notFound) return const PhoneNotFound();
+    // The channel itself comes with the sync once the connection is live.
+    _askAgainWhenLive(ref, path);
     final channel = ref
         .watch(storedChannelOfRouteProvider(channelId.value))
         .value;
-    if (channel == null) return const SizedBox.expand();
+    if (channel == null) {
+      return status == TargetStatus.unknown
+          ? const PhoneTargetWaiting()
+          : const SizedBox.expand();
+    }
     if (channel.kind == ChannelKind.forum) {
       return PostListColumn(
         key: ValueKey('postList.${channelId.value}'),
@@ -158,7 +199,9 @@ class PhoneChannelPage extends ConsumerWidget {
 }
 
 /// A thread on the phone (M3, M4, M7): the history with its compact live box, cards and
-/// outbox rows; [location] may name a message to jump to (`/t/{id}?m={id}`, 15 11).
+/// outbox rows; [location] may name a message to jump to (`/t/{id}?m={id}`, 15 11). A thread
+/// this device does not hold while the server cannot be asked shows [PhoneTargetWaiting] over
+/// the empty history until the thread is stored.
 class PhoneThreadPage extends ConsumerWidget {
   /// Creates the page.
   const PhoneThreadPage({super.key, required this.location});
@@ -170,14 +213,38 @@ class PhoneThreadPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final parsed = parseLocation(location);
     if (parsed is! ThreadLocation) return const PhoneNotFound();
-    final status = ref.watch(targetStatusProvider(location.toString())).value;
+    final path = location.toString();
+    final thread = parsed.threadId;
+    final status = ref.watch(targetStatusProvider(path)).value;
     if (status == TargetStatus.notFound) return const PhoneNotFound();
-    return HistoryColumn(
-      key: ValueKey(
-        'historyColumn.${parsed.threadId.value}.${parsed.messageId?.value}',
+    // The history loads a thread it does not hold once (15 11); that read failed with the
+    // check, so it is asked again with it.
+    _askAgainWhenLive(
+      ref,
+      path,
+      again: () => unawaited(
+        ref
+            .read(threadReadsProvider)
+            .loadThread(thread)
+            .then<void>((_) {}, onError: (Object _) {}),
       ),
-      threadId: parsed.threadId,
-      jumpTo: parsed.messageId,
+    );
+    final waiting =
+        status == TargetStatus.unknown &&
+        ref.watch(storedThreadProvider(thread.value)).value == null;
+    // Always the same tree, so the history keeps its state when the mark goes.
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        HistoryColumn(
+          key: ValueKey(
+            'historyColumn.${thread.value}.${parsed.messageId?.value}',
+          ),
+          threadId: thread,
+          jumpTo: parsed.messageId,
+        ),
+        if (waiting) const PhoneTargetWaiting(),
+      ],
     );
   }
 }
@@ -197,10 +264,19 @@ const List<SettingsSection> phoneSettingsSections = [
 /// The Me tab: the signed-in person, the settings sections (devices and sessions among them,
 /// M4-25), "Live" (M10, M6-16), the status page (M7-21), "Built-in agents" for an owner with
 /// built-in agents ([BuiltinAgentsEntry], A1-09), "Emergency" for an owner or a manager of a
-/// space ([EmergencyEntry], M5-09) and "Log out" (E7).
+/// space ([EmergencyEntry], M5-09) and "Log out" (E7), which asks once ([confirmLogout]).
 class PhoneMePage extends ConsumerWidget {
   /// Creates the page.
   const PhoneMePage({super.key});
+
+  /// "Log out": asks once, naming the outbox entries that still wait, then logs out.
+  static Future<void> _logOut(BuildContext context, WidgetRef ref) async {
+    // Read before the dialog: the page may be gone when it closes.
+    final control = ref.read(onboardingControllerProvider.notifier);
+    final waiting = ref.read(outboxWaitingProvider).value ?? 0;
+    if (!await confirmLogout(context, waiting: waiting)) return;
+    await control.logout();
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -286,9 +362,7 @@ class PhoneMePage extends ConsumerWidget {
             label: l.onboardingLogOut,
             style: DsButtonStyle.danger,
             expand: true,
-            onPressed: () => unawaited(
-              ref.read(onboardingControllerProvider.notifier).logout(),
-            ),
+            onPressed: () => unawaited(_logOut(context, ref)),
           ),
         ),
       ],

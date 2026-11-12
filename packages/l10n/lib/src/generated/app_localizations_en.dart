@@ -8534,6 +8534,24 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get phoneLogoutTitle => 'Log out?';
+
+  @override
+  String get phoneLogoutBody =>
+      'Logging out deletes the data of this device and its device keys. You then log in again as on a new device.';
+
+  @override
+  String phoneLogoutWaiting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count changes that still wait to be sent are lost.',
+      one: '1 change that still waits to be sent is lost.',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get phoneSearchFilters => 'Filters';
 
   @override

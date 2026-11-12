@@ -1386,7 +1386,17 @@ itself (D-M4-36-5); the step-up is `session.stepUp.confirm` with the step-up dev
    returns to the front (D-TSL-5 of FIX-terminal-session-lifecycle), and not before the app lock
    is open; a detach by the person stays.
 7. On mobile the app detaches when it moves to the background and covers the view in the
-   app switcher (R-PR-12 in 01); in the foreground it reattaches.
+   app switcher (R-PR-12 in 01); in the foreground it reattaches. No session stays live in the
+   background or behind the app lock, whether or not the terminal screen of its host shows:
+   every live session detaches there, and an opening or an attach that completes there detaches
+   at once. A session detached that way attaches again only while the terminal screen of its
+   host shows: leaving the screen stops an opening or an attach that is on its way, and a
+   session whose screen was left meanwhile (back, a tapped push, a link, a share) stays detached
+   until the person attaches it. The app lock is no leave: after the unlock the screen is back
+   and the session attaches (rulings AUD-CP1/1 to AUD-CP1/3 of AUD-client-phone-01). The
+   reconnect of item 6 is not bound to the screen: it attaches a session whose stream dropped
+   also after its screen was left; that session detaches in the background and behind the app
+   lock like every other and is then not attached again (AUD-CP1/7).
 8. The view shows close codes of the stream (asyncapi.yaml, channel `terminalStream`) with a reason:
    `4100` session ended, with `close_reason` from the close reason (for example `access_revoked`), no
    new attempt; `4101` token expired or already used, open or attach again with a new step-up;

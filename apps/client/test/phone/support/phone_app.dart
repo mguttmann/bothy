@@ -7,6 +7,8 @@ import 'dart:io';
 
 import 'package:client/app/app.dart';
 import 'package:client/app/providers/ports.dart';
+import 'package:client/app/providers/target.dart';
+import 'package:client/app/target_resolver.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:client/phone/phone_shell.dart';
 import 'package:flutter/material.dart';
@@ -78,6 +80,11 @@ class PhoneApp {
             testPorts(dataRoot: root, deepLinks: links, platform: platform),
           ),
           onboardingControllerProvider.overrideWith(() => control),
+          // The scripted app is signed in without the services of an instance, so the target
+          // check of the app could never ask a server; here every target is visible.
+          targetStatusProvider.overrideWith(
+            (ref, path) async => TargetStatus.visible,
+          ),
           ...overrides,
         ],
         child: const ClientApp(),

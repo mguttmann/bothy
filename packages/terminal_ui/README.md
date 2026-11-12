@@ -64,7 +64,9 @@ app implements them its own way:
    `401 step_up_required` (or before the request after `4101`). The replay between
    `replay_begin` and `replay_end` replaces the screen in a fresh terminal model.
 7. Item 7 (mobile background) is the app's part: it calls `detach` and `attach`; the package
-   has no lifecycle hook.
+   has no lifecycle hook. `stopPending` ends an opening or an attach that is on its way when the
+   phone leaves its terminal screen: a tab with a session is detached, one without is idle and
+   a session the server opens for it meanwhile is closed; the next `attach` starts at once.
    `adopt` (M4-36) shows a session the server already lists as a detached tab with "Reattach",
    without a request, so an app keeps one tab per own session; `attach` then runs as above.
 8. Close codes (`closeReactionFor`): `4100` ends the tab with the `close_reason`, a revocation

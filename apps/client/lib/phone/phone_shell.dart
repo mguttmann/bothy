@@ -90,6 +90,8 @@ class PhoneShellState extends ConsumerState<PhoneShell> {
     super.initState();
     _tab = PhoneTab.spaces;
     _visit(widget.location, external: widget.external);
+    // Android: the photos of a pick during which the system ended the app go, once per start.
+    ref.read(lostPhotosDiscardedProvider);
   }
 
   @override

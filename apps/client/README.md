@@ -81,7 +81,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/telemetry/` | app metrics and crash reports (M4-31): the collector, the measurement points, the sender, the scrubbed crash path and their providers |
 | `lib/platform/` | secure storage, device key signers, loopback redirect, browser, lifecycle, the phone's privacy cover and background mapping (`lifecycle.dart`), the iOS adapters of login, passkeys and file protection (`ios_platform.dart`), the Android adapters of login and passkeys (`android_platform.dart`) on the shared browser session (`browser_session.dart`), the notification channels (`notification_channels.dart`), the terminal's platform guard (`terminal_guard.dart`: `FLAG_SECURE` on Android, the screen capture of iOS, the hardware keyboard; M5-12), network, frames |
 | `lib/viz/` | "Live" (M6-16): `LivePage` (D12 with TV mode on the desktop, M10 under Me on the phone) over `LiveScreen` of `admin_ui`, and `EngineLiveFrameSource`, the `LiveFrameSource` of `bothy_viz` over the `stats.subscribe` subscription of the sync engine |
-| `lib/phone/` | the phone (M5-02): the shell with tabs and one stack per tab (`phone_shell.dart`), the tab and stack rules of the paths (`phone_navigation.dart`), the pages (`phone_pages.dart`), the privacy cover; `terminal/` the terminal of the phone (M5-12): M9 `HostsScreen` (`/hosts` under Me), M8 `TerminalSessionScreen` (`/hosts/<host>`) and `PhoneTerminalCoordinator`, which detaches the sessions in the background and on the app lock and attaches them again after the lock |
+| `lib/phone/` | the phone (M5-02): the shell with tabs and one stack per tab (`phone_shell.dart`), the tab and stack rules of the paths (`phone_navigation.dart`), the pages (`phone_pages.dart`), the privacy cover; `terminal/` the terminal of the phone (M5-12): M9 `HostsScreen` (`/hosts` under Me), M8 `TerminalSessionScreen` (`/hosts/<host>`) and `PhoneTerminalCoordinator`, which detaches every live session in the background and on the app lock, whether or not M8 of its host shows, and attaches the ones it detached under a shown M8 again while M8 of their host shows, the app is in front and the lock is open; leaving M8 any other way than behind E6 ends that reattaching, and stops an opening or an attach on its way (docs/decisions.d/AUD-client-phone-01.md) |
 | `lib/src/generated/` | the Pigeon channels of the iOS and Android runners, of push on iOS, macOS and Android and of sharing, generated from `pigeons/ios_platform_api.dart`, `pigeons/android_platform_api.dart`, `pigeons/push_apple.dart`, `pigeons/push_android.dart`, `pigeons/share_apple.dart` and `pigeons/share_android.dart` |
 | `macos/`, `windows/`, `ios/`, `android/` | the runners (`flutter create`), URL scheme registration and the deep link channel; `ios/Runner/IosPlatform.swift` holds the iOS glue (`ASWebAuthenticationSession`, passkeys, file protection), `ios/Runner/PushApple.swift` the push glue that the macOS runner compiles too |
 | `ios/ClientKit/` | the Swift package the native extensions share (M5-04): shared keychain, App Group state, DPoP, preview fetch, the Notification Service Extension's logic, with its tests |
@@ -237,8 +237,11 @@ The phone shows the same paths as the desktop in its own layout (D-M5-02-3): tab
 Mentions, Running and Me, one stack per tab built from the path, the edge swipe back, links of the
 URL scheme in Spaces with the whole stack. Density `touch` and `composer.enter_sends` `false` by
 default. In the background the gateway closes with `1000` and the privacy cover hides the content;
-the foreground removes it and resumes (D-M5-02-6). The database files get
-`NSFileProtectionComplete` before the first open (D-M5-02-7). The Swift glue is
+the foreground removes it and resumes (D-M5-02-6). A thread or a channel of a tapped push or a
+link that the device does not hold while the server cannot be asked shows a progress mark and is
+asked again when the connection is live (`PhoneTargetWaiting` in `phone_pages.dart`). "Log out"
+of the Me tab asks once and names what the logout deletes (`me/logout_confirm.dart`). The
+database files get `NSFileProtectionComplete` before the first open (D-M5-02-7). The Swift glue is
 `ios/Runner/IosPlatform.swift` with the Pigeon interface `pigeons/ios_platform_api.dart`
 (regenerate with `dart run pigeon --input pigeons/ios_platform_api.dart`, then
 `dart format lib/src/generated`).
@@ -1006,7 +1009,10 @@ photo library or file; the camera takes one photo, the photo library several at 
 free slots of `message_max_attachments` (with none free the picker does not open). `media_picker.dart`
 turns each photo into a JPEG, all of one pick or none, and the composer attaches them to one
 message in the picker's order (M5-16). Recordings and photos lie in the app's temporary folder until the outbox moves them into
-the outgoing folder.
+the outgoing folder. Android may end the app while the camera or the photo picker is in front and
+hands the result to the next start: the phone shell of an Android build deletes those files when
+it first shows (`lostPhotosDiscardedProvider`, `MediaPicker.discardLost`); they are not attached,
+because the composer that asked went with the app.
 
 Media permissions: iOS asks for the microphone and the camera at their first use with
 `NSMicrophoneUsageDescription` and `NSCameraUsageDescription`; their texts per language are in

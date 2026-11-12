@@ -8573,6 +8573,25 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get phoneLogoutTitle => 'Abmelden?';
+
+  @override
+  String get phoneLogoutBody =>
+      'Beim Abmelden werden die Daten dieses Geräts und seine Geräteschlüssel gelöscht. Danach meldest du dich wie auf einem neuen Gerät wieder an.';
+
+  @override
+  String phoneLogoutWaiting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count Änderungen, die noch auf das Senden warten, gehen verloren.',
+      one: '1 Änderung, die noch auf das Senden wartet, geht verloren.',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get phoneSearchFilters => 'Filter';
 
   @override
