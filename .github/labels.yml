@@ -82,3 +82,9 @@
 - name: "flake"
   color: "d93f0b"
   description: "A test that failed in CI and passed in a rerun"
+
+# The tracking issues of the failed runs no pull request shows: scheduled runs and pushes to
+# main (workflow red-runs.yml, docs/quality/gates.md "Red runs").
+- name: "red-run"
+  color: "b60205"
+  description: "A scheduled run or a run on main that failed"
