@@ -125,7 +125,10 @@ same limit after the visible ones) and
 - `resync_required` (any reason) keeps the connection: `getSnapshot`, then in one transaction
   `clearMirror` (outbox, drafts and share inbox stay) and the snapshot with its cursor and epoch;
   the threads in focus load their newest page and each forum its open posts, as on the first
-  connection; phase `live`, notice `Resynced`. Frames that
+  connection; phase `live`, notice `Resynced`. A snapshot brings no `access.changed`: here and
+  on a `ready` without a stored cursor, `clearMirror` gets the channels of the snapshot, deletes
+  the file cache rows of the files of every other stored channel, and their bytes go through
+  `FileCacheEraser` after the commit (04 8.3 item 3). Frames that
   arrive meanwhile wait and pass the duplicate rule afterwards. When the snapshot cannot be
   loaded, mirror and cursor stay and the snapshot is retried after the reconnect backoff on the
   same connection. The retry runs outside the frame queue and checks its session after its

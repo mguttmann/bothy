@@ -279,6 +279,7 @@ Local only:
 | `loaded_ranges` | loaded ranges of `thread_seq` per thread; detects gaps ([04](04-sync-protocol.md) section 4) |
 | `file_cache` | path, size, last access per file and thumbnail |
 | `search_index` | FTS5 index over cached messages for offline search |
+| `search_rows` | the rows of `search_index` by what they index (kind, target, thread, channel, space) under the same `rowid`, with indexes; FTS5 finds a row without a scan only by a match or its `rowid` (the constraints its query planner uses are listed in the comment above `fts5BestIndexMethod`, https://github.com/sqlite/sqlite/blob/master/ext/fts5/fts5_main.c, retrieved 2026-11-12 [verified]), so every write of the index looks its rows up here (schema version 16) |
 | `share_inbox` | share entries taken over from extensions |
 | `recent_targets` | recently visited spaces, channels and threads of the quick switcher, per device, never synchronized ([01](01-product.md) D6) |
 | `host_key_pins` | pinned Noise keys of the hosts per device (section 23.3); never covered by the cleanup after `client.cache_max_age`, because a lost pin would prevent a warning on a key change |
@@ -313,6 +314,17 @@ work; `host_key_pins` likewise, because they are trust anchors. A test checks th
   As built (M4-12): `CacheCleaner` removes threads (with everything below them) and file cache
   rows by `last_accessed_at`; it never touches `outbox`, `drafts` and `share_inbox`, and never
   the structure rows (spaces, channels, principals, commands, instance) the sidebar needs.
+  The access of a thread (AUD-pkg-local-store-01): the app records it while the thread is on
+  screen, when its view opens and each time the app window gets the focus back with the view
+  still open; a row that reaches the device starts with the time it arrived. The row of an
+  open thread is such a structure row too, because the sidebar lists the open threads the
+  device holds ([01](01-product.md) 6.8) and a connection that continues from a cursor brings
+  none of them back: without access for `client.cache_max_age` an open thread loses its content
+  (messages with their reactions, components, mentions, attachments and files, wake-ups, loaded
+  ranges and their search rows) and keeps its row with what the sidebar reads of it (tags, read
+  state, seen mark, notification preference, runs, the title in the search index), and its age
+  starts again; a done thread goes as a whole. The limit `client.cache_max_bytes` removes whole
+  threads, open ones included.
 - Access removal ([04](04-sync-protocol.md) section 8.3): on `access.changed` with `removed` the
   dispatcher deletes, in one transaction, all rows of the targets, their files in the cache and their entries in the
   search index. On `4012` the app deletes the database, file cache, keys and tokens.
@@ -402,7 +414,13 @@ connected as long as the app runs.
    or that the client does not know advances the cursor and is skipped (04 6.1).
 2. On `resync_required`: empty the mirror tables (not the outbox, drafts, share inbox),
    `GET /api/v1/sync/snapshot`, cursor to `head_seq`, reload open threads. The connection
-   stays open and is live from `head_seq`; no reconnect (04, 7.3).
+   stays open and is live from `head_seq`; no reconnect (04, 7.3). A snapshot that replaces the
+   mirror (here and on a `ready` without a stored cursor) names what the person sees now and
+   brings no `access.changed` for a channel lost in the meantime: in the same transaction the
+   file cache rows of the files of every stored channel the snapshot no longer lists go (a
+   file by its scope channel or by the channel of a message that attaches it), and their bytes
+   after the commit (04 8.3 item 3); the cached files of the listed channels stay
+   (AUD-pkg-local-store-01).
 3. After `catchup.complete` the outbox sends in order.
 4. Gaps in `thread_seq` (an event does not fit the loaded ranges) are loaded by the fetcher through REST
    before it shows the message.

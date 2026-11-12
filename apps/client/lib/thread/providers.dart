@@ -331,6 +331,11 @@ Future<Message?> storedMessage(Ref ref, String messageId) async {
 /// (04 11.3 item 2; brief M4-20 Design note 2): every history column adds its thread while it
 /// shows and removes it when it closes. The state stays empty; the set lives in the notifier
 /// and goes to `EngineFocus.setVisible`.
+///
+/// A thread on screen is also the access the cache cleanup counts (04 13.1, 15 6.3): it is
+/// recorded in the local database when the thread comes on screen and, for every thread still
+/// on screen, each time the window gets the focus back, so a thread that stays open for weeks
+/// keeps its place in the cache as long as the person returns to it.
 @Riverpod(keepAlive: true)
 class VisibleThreads extends _$VisibleThreads {
   final Map<ThreadId, int> _shown = {};
@@ -340,7 +345,9 @@ class VisibleThreads extends _$VisibleThreads {
     final engine = ref.watch(syncEngineProvider);
     ref.listen(windowFocusedProvider, (_, next) {
       final focused = next.value;
-      if (focused != null) _push(engine, idle: !focused);
+      if (focused == null) return;
+      _push(engine, idle: !focused);
+      if (focused) _shown.keys.forEach(_recordAccess);
     });
     return const {};
   }
@@ -348,6 +355,7 @@ class VisibleThreads extends _$VisibleThreads {
   /// [thread] is on screen.
   void add(ThreadId thread) {
     _shown.update(thread, (n) => n + 1, ifAbsent: () => 1);
+    _recordAccess(thread);
     _changed();
   }
 
@@ -372,6 +380,12 @@ class VisibleThreads extends _$VisibleThreads {
 
   void _push(SyncEngine? engine, {required bool idle}) =>
       engine?.focus.setVisible(Set.of(_shown.keys), idle: idle);
+
+  /// Writes the access time of [thread]; a thread the device does not hold yet has no row and
+  /// gets its time when it is stored. A failed write (the database closed meanwhile) costs
+  /// only this one record.
+  void _recordAccess(ThreadId thread) =>
+      ref.read(localDatabaseProvider)?.threadsDao.touch(thread).ignore();
 }
 
 /// Reads that answer nothing (no signed-in engine).

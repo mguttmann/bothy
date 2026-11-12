@@ -2,7 +2,7 @@
 
 /// Local-only tables (15 6.1): `outbox`, `sync_state`, `loaded_ranges`, `file_cache`,
 /// `share_inbox`, `forum_view_states`, `recent_targets`, `host_key_pins`, `channel_view_states`,
-/// `space_view_states`, `shell_view_state` and `thread_seen_states`. Times are milliseconds since the epoch in UTC, so ordering and the
+/// `space_view_states`, `shell_view_state`, `thread_seen_states` and `search_rows`. Times are milliseconds since the epoch in UTC, so ordering and the
 /// cleanup compare plain integers.
 library;
 
@@ -349,4 +349,43 @@ class HostKeyPins extends Table {
 
   @override
   Set<Column<Object>> get primaryKey => {hostId};
+}
+
+/// The rows of the search index by what they index (15 6.1 `search_rows`, version 16): one row
+/// per row of `search_index`, with the same `rowid` as [id] and the same locating columns.
+///
+/// FTS5 finds a row without a scan only by a match or by its `rowid`, and the locating columns
+/// of `search_index` are not part of its index. Every write of the index replaces or deletes
+/// rows by what they index (a message, a thread, a channel, a space), so those lookups go
+/// through the indexes of this table and reach `search_index` by `rowid`. Both tables change
+/// in the same transaction (`search_rows.dart`).
+@DataClassName('SearchRowRow')
+@TableIndex(name: 'search_rows_target', columns: {#kind, #targetId})
+@TableIndex(name: 'search_rows_thread', columns: {#threadId})
+@TableIndex(name: 'search_rows_channel', columns: {#channelId})
+@TableIndex(name: 'search_rows_space', columns: {#spaceId})
+class SearchRows extends Table {
+  @override
+  String get tableName => 'search_rows';
+
+  /// The `rowid` of the row in `search_index`.
+  IntColumn get id => integer()();
+
+  /// `search_index.kind` (`SearchKind.code`).
+  TextColumn get kind => text()();
+
+  /// `search_index.target_id`: the message, the thread or the file.
+  TextColumn get targetId => text()();
+
+  /// `search_index.thread_id`.
+  TextColumn get threadId => text()();
+
+  /// `search_index.channel_id`.
+  TextColumn get channelId => text()();
+
+  /// `search_index.space_id`; empty for a row outside a space.
+  TextColumn get spaceId => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
 }

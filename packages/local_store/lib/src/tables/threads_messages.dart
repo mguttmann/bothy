@@ -95,9 +95,12 @@ class ThreadTags extends Table {
 }
 
 /// 03 `messages` without `client_payload_sha256` (15 6.1), with `trigger_state`; a tombstone
-/// keeps its `thread_seq` (03 6.5).
+/// keeps its `thread_seq` (03 6.5). The indexes on `client_msg_id` and on the channel serve
+/// the lookup of the message an outbox entry sent and the removal of a channel (version 16).
 @DataClassName('MessageRow')
 @TableIndex(name: 'messages_thread_seq', columns: {#threadId, #threadSeq})
+@TableIndex(name: 'messages_client_msg', columns: {#clientMsgId})
+@TableIndex(name: 'messages_channel', columns: {#channelId})
 class Messages extends Table {
   @override
   String get tableName => 'messages';

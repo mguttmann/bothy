@@ -670,6 +670,9 @@ abstract final class SearchDaoMarks {
 
 /// The contiguous window of a thread (15 7.3 item 4): the messages of the loaded range that ends
 /// at the newest loaded message, and the gaps next to it, where M4-14 shows a loading row.
+///
+/// Two windows with equal messages in the same order and equal gaps are equal, so a watcher
+/// can tell a window that changed from one that was only read again.
 final class ContiguousWindow {
   /// Creates a [ContiguousWindow].
   const ContiguousWindow({
@@ -686,6 +689,25 @@ final class ContiguousWindow {
 
   /// Missing positions between the window and the thread's `last_message_seq`, if any.
   final SeqRange? gapAfter;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! ContiguousWindow ||
+        other.gapBefore != gapBefore ||
+        other.gapAfter != gapAfter ||
+        other.messages.length != messages.length) {
+      return false;
+    }
+    for (var i = 0; i < messages.length; i++) {
+      if (other.messages[i] != messages[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(Object.hashAll(messages), gapBefore, gapAfter);
 }
 
 /// The key of the key source does not open the database file. The message never contains the

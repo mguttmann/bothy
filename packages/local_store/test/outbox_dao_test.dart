@@ -32,24 +32,25 @@ void main() {
     clock.advance(const Duration(seconds: 1));
   }
 
+  /// The IDs of the entries of [thread] in the order the DAO hands them out.
+  Future<List<String>> ids(ThreadId? thread) async => [
+    for (final e in await db.outboxDao.entriesFor(thread)) e.id,
+  ];
+
   test('FIFO per thread across interleaved threads', () async {
     final dao = db.outboxDao;
     await add(uuid(1), threadId(1));
     await add(uuid(2), threadId(2));
     await add(uuid(3), threadId(1));
     await add(uuid(4), threadId(2));
-    expect((await dao.nextForThread(threadId(1)))!.id, uuid(1));
-    expect((await dao.nextForThread(threadId(2)))!.id, uuid(2));
+    expect(await ids(threadId(1)), [uuid(1), uuid(3)]);
+    expect(await ids(threadId(2)), [uuid(2), uuid(4)]);
     expect(await dao.pendingThreads(), [threadId(1), threadId(2)]);
     await dao.markState(uuid(1), OutboxState.sending);
-    expect((await dao.nextForThread(threadId(1)))!.attempts, 1);
-    await dao.markState(uuid(1), OutboxState.confirmed);
-    expect((await dao.nextForThread(threadId(1)))!.id, uuid(3));
-    await dao.replaceWithServer(uuid(1));
-    expect(
-      [for (final e in await dao.entriesFor(threadId(1))) e.id],
-      [uuid(3)],
-    );
+    expect((await dao.byId(uuid(1)))!.attempts, 1);
+    // A confirmed entry leaves the outbox (04 13.2 item 6).
+    await dao.delete(uuid(1));
+    expect(await ids(threadId(1)), [uuid(3)]);
   });
 
   test('equal creation times fall back to the ID', () async {
@@ -65,17 +66,17 @@ void main() {
       payload: '{}',
       threadId: threadId(1),
     );
-    expect((await db.outboxDao.nextForThread(threadId(1)))!.id, uuid(8));
+    expect(await ids(threadId(1)), [uuid(8), uuid(9)]);
   });
 
-  test('a message waits for the upload it depends on', () async {
+  test('an entry keeps the IDs it waits for, and writes outside a thread have their own lane', () async {
     final dao = db.outboxDao;
     await add(uuid(1), null);
     await add(uuid(2), threadId(1), dependsOn: uuid(1));
-    expect(await dao.nextForThread(threadId(1)), isNull);
-    expect((await dao.nextForThread(null))!.id, uuid(1));
-    await dao.markState(uuid(1), OutboxState.confirmed);
-    expect((await dao.nextForThread(threadId(1)))!.id, uuid(2));
+    expect(await ids(null), [uuid(1)]);
+    expect((await dao.byId(uuid(2)))!.dependsOn, uuid(1));
+    expect(await dao.pendingThreads(), [null, threadId(1)]);
+    await dao.delete(uuid(1));
     expect(await dao.pendingThreads(), [threadId(1)]);
   });
 
@@ -100,7 +101,11 @@ void main() {
     expect(entry.lastErrorCode, 'precondition_failed');
     expect(entry.lastErrorReason, 'version');
     expect(entry.conflictCurrent, '{"version":4}');
-    expect(await dao.nextForThread(threadId(1)), isNull);
+    expect(
+      await dao.pendingThreads(),
+      isEmpty,
+      reason: 'a failed entry is final',
+    );
     await dao.delete(uuid(1));
     expect(await dao.byId(uuid(1)), isNull);
   });

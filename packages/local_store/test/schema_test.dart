@@ -290,6 +290,16 @@ const Map<String, List<String>> expected = {
     'space_id',
     'body',
   ],
+  // Local only (version 16): the rows of `search_index` by what they index, with indexes
+  // (`id` is the rowid of the row there).
+  'search_rows': [
+    'id',
+    'kind',
+    'target_id',
+    'thread_id',
+    'channel_id',
+    'space_id',
+  ],
   'share_inbox': [
     'id',
     'target_thread_id',
@@ -344,8 +354,8 @@ void main() {
     return [for (final r in rows) r.read<String>('name')];
   }
 
-  test('schema version 15 has exactly the tables of 15 6.1', () async {
-    expect(db.schemaVersion, 15);
+  test('schema version 16 has exactly the tables of 15 6.1', () async {
+    expect(db.schemaVersion, 16);
     final rows = await db
         .customSelect(
           "SELECT name FROM sqlite_master WHERE type = 'table' "

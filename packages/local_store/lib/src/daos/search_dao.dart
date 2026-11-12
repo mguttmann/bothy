@@ -2,7 +2,8 @@
 
 /// Offline search over the cached messages, thread titles and transcripts (14 6, FTS5 in
 /// `search.drift`, Design note 5). The index holds only what the cache holds; removal deletes
-/// its rows with the targets (04 8.3).
+/// its rows with the targets (04 8.3). Rows are replaced and deleted through `search_rows`,
+/// so storing a message costs no scan of the index (`search_rows.dart`).
 library;
 
 import 'package:domain/domain.dart';
@@ -11,6 +12,7 @@ import 'package:drift/drift.dart';
 import '../database.dart';
 import '../mappers/codec.dart';
 import '../models.dart';
+import '../search_rows.dart';
 import 'upsert.dart';
 
 /// Data access object of `search_index`.
@@ -57,29 +59,6 @@ final class SearchDao {
     body: text,
   );
 
-  /// Deletes every row that belongs to one of [targets]: a space, channel or thread with
-  /// everything below it. Host targets have no rows.
-  Future<void> removeForTargets(List<TargetRef> targets) async {
-    final columns = {
-      RemovedTargetKind.space: 'space_id',
-      RemovedTargetKind.channel: 'channel_id',
-      RemovedTargetKind.thread: 'thread_id',
-    };
-    for (final entry in columns.entries) {
-      final ids = [
-        for (final t in targets)
-          if (t.kind == entry.key) t.id,
-      ];
-      if (ids.isEmpty) continue;
-      await _db.customUpdate(
-        'DELETE FROM search_index WHERE ${entry.value} IN ${placeholders(ids.length)}',
-        variables: textVariables(ids),
-        updates: {_db.searchIndex},
-        updateKind: UpdateKind.delete,
-      );
-    }
-  }
-
   /// The voice files with a done transcript that a stored, non-deleted message attaches and
   /// that have no transcript row yet, on every change of the files, attachments, messages,
   /// channels or the index (14 6: the index covers the transcripts in the cache). The text is
@@ -94,14 +73,14 @@ final class SearchDao {
         'JOIN messages m ON m.id = a.message_id AND m.deleted_at IS NULL '
         'LEFT JOIN channels c ON c.id = m.channel_id '
         "WHERE f.transcript_status = 'done' AND NOT EXISTS ("
-        "SELECT 1 FROM search_index s WHERE s.kind = 'transcript' AND s.target_id = f.id) "
+        "SELECT 1 FROM search_rows s WHERE s.kind = 'transcript' AND s.target_id = f.id) "
         'ORDER BY f.id, m.id',
         readsFrom: {
           _db.files,
           _db.messageAttachments,
           _db.messages,
           _db.channels,
-          _db.searchIndex,
+          _db.searchRows,
         },
       )
       .watch()
@@ -129,7 +108,7 @@ final class SearchDao {
   Future<int> pruneTranscripts() => _db.transaction(() async {
     final stale = await _db
         .customSelect(
-          "SELECT DISTINCT target_id FROM search_index WHERE kind = 'transcript' "
+          "SELECT DISTINCT target_id FROM search_rows WHERE kind = 'transcript' "
           'AND target_id NOT IN ('
           'SELECT f.id FROM files f '
           'JOIN message_attachments a ON a.file_id = f.id '
@@ -139,12 +118,10 @@ final class SearchDao {
         .get();
     final ids = [for (final r in stale) r.read<String>('target_id')];
     if (ids.isEmpty) return 0;
-    return _db.customUpdate(
-      "DELETE FROM search_index WHERE kind = 'transcript' "
-      'AND target_id IN ${placeholders(ids.length)}',
-      variables: textVariables(ids),
-      updates: {_db.searchIndex},
-      updateKind: UpdateKind.delete,
+    return deleteSearchRows(
+      _db,
+      "kind = 'transcript' AND target_id IN ${placeholders(ids.length)}",
+      textVariables(ids),
     );
   });
 
@@ -235,26 +212,21 @@ final class SearchDao {
     required String? spaceId,
     required String body,
   }) => _db.transaction(() async {
-    await _db.customUpdate(
-      'DELETE FROM search_index WHERE kind = ? AND target_id = ?',
-      variables: [Variable<String>(kind.code), Variable<String>(targetId)],
-      updates: {_db.searchIndex},
-      updateKind: UpdateKind.delete,
-    );
+    await deleteSearchRows(_db, 'kind = ? AND target_id = ?', [
+      Variable<String>(kind.code),
+      Variable<String>(targetId),
+    ]);
     if (body.isEmpty) return;
-    await _db
-        .into(_db.searchIndex)
-        .insert(
-          SearchIndexCompanion.insert(
-            kind: kind.code,
-            targetId: targetId,
-            threadId: threadId,
-            channelId: channelId,
-            // FTS5 columns are text; an absent space is stored as an empty text.
-            spaceId: spaceId ?? '',
-            body: body,
-          ),
-        );
+    await insertSearchRow(
+      _db,
+      kind: kind.code,
+      targetId: targetId,
+      threadId: threadId,
+      channelId: channelId,
+      // FTS5 columns are text; an absent space is stored as an empty text.
+      spaceId: spaceId ?? '',
+      body: body,
+    );
   });
 
   static String? _orNull(String text) => text.isEmpty ? null : text;

@@ -5,7 +5,10 @@
 /// cache fit into `client.cache_max_bytes`. Outbox, drafts, share inbox and the pinned host keys
 /// (`host_key_pins`, M4-36: a lost pin would prevent the warning on a changed key) are never
 /// touched; structure rows (spaces, channels, principals, commands, instance) stay for the
-/// sidebar.
+/// sidebar, and so does an open thread without access for `client.cache_max_age` with what the
+/// sidebar reads of it; only its content goes: the sidebar lists the open threads the device
+/// holds (01 6.8 item 2), and a connection that continues from a cursor brings none of them
+/// back.
 library;
 
 import 'package:domain/domain.dart';
@@ -50,17 +53,31 @@ final class CacheCleaner {
   /// Runs the cleanup and returns the paths of the deleted file cache rows; the caller deletes
   /// the bytes (M4-22). Each deletion is its own transaction, so a long cleanup never blocks the
   /// sync for long.
+  ///
+  /// A thread counts as accessed while the person has it on screen (`ThreadsDao.touch`) and
+  /// when its row reaches the device. Without access for [maxAge] a done thread goes with
+  /// everything below it. An open thread loses its content (messages with their reactions,
+  /// components, mentions, attachments and files, wake-ups, loaded ranges and their search
+  /// rows) and keeps its row with what the sidebar reads of it (tags, read state, seen mark,
+  /// notification preference, runs, the title in the search index); its age then starts
+  /// again, like that of a row that just reached the device. The byte limit afterwards
+  /// removes whole threads, open ones too.
   Future<List<String>> run() async {
     final paths = <String>[];
     final cutoff = toMillis(_now().subtract(maxAge));
     final old = await _db
         .customSelect(
-          'SELECT id FROM threads WHERE last_accessed_at < ?',
+          'SELECT id, state FROM threads WHERE last_accessed_at < ?',
           variables: [Variable<int>(cutoff)],
         )
         .get();
     for (final row in old) {
-      paths.addAll(await _deleteThread(row.read<String>('id')));
+      final id = row.read<String>('id');
+      paths.addAll(
+        row.read<String>('state') == ThreadState.open.code
+            ? await _emptyThread(id)
+            : await _deleteThread(id),
+      );
     }
     paths.addAll(
       await _db.transaction(() async {
@@ -104,6 +121,22 @@ final class CacheCleaner {
 
   Future<List<String>> _deleteThread(String id) =>
       _db.transaction(() => deleteThreads(_db, [id], withDrafts: false));
+
+  /// Deletes the content of thread [id], keeps its row and starts its age again.
+  Future<List<String>> _emptyThread(String id) => _db.transaction(() async {
+    final paths = await deleteThreads(
+      _db,
+      [id],
+      withDrafts: false,
+      contentOnly: true,
+    );
+    // No watcher of the threads is woken: the access time is in no value they hand out.
+    await _db.customUpdate(
+      'UPDATE threads SET last_accessed_at = ? WHERE id = ?',
+      variables: [Variable<int>(toMillis(_now())), Variable<String>(id)],
+    );
+    return paths;
+  });
 
   /// Used pages of the database plus the sum of the file cache rows.
   Future<int> _usedBytes() async {

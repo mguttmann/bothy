@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The drift database of the apps, schema version 14 (docs/spec/15-client-architecture.md 6, ADR
+/// The drift database of the apps, schema version 16 (docs/spec/15-client-architecture.md 6, ADR
 /// 0029): the mirror tables of 15 6.1 and the local-only tables, `host_key_pins` (M4-36) and
 /// the sidebar view state `channel_view_states`, `shell_view_state` (M4-40, M4-42) and
 /// `space_view_states` (FIX-device-mirroring-2) included; version 11 adds the code block wrap
 /// choice of `shell_view_state` (M4-49), version 12 the personal channel and thread orders of
 /// the sidebar (`user_space_states.channel_order`, `user_channel_states`, M4-51), version 13 the
 /// seen marks of the sidebar status dots (`thread_seen_states`, M4-52), version 14 the wake-ups
-/// of threads (`run_wakes`) and the channel switch `channels.allow_autonomous_runs` (AR-08).
+/// of threads (`run_wakes`) and the channel switch `channels.allow_autonomous_runs` (AR-08),
+/// version 15 the personal archive of a channel (PROJ-ARCHIVE), version 16 the companion table
+/// of the search index (`search_rows`) and the indexes of the lookups by `client_msg_id`,
+/// channel and thread (AUD-pkg-local-store-01).
 library;
 
 import 'dart:io';
@@ -82,6 +85,7 @@ part 'database.g.dart';
     ShellViewStates,
     SpaceViewStates,
     ThreadSeenStates,
+    SearchRows,
   ],
   include: {'search.drift'},
 )
@@ -98,7 +102,7 @@ class LocalDatabase extends _$LocalDatabase {
   final DateTime Function() clock;
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   /// Closes the database and releases its file, also while watched queries come and go.
   ///
@@ -232,6 +236,33 @@ class LocalDatabase extends _$LocalDatabase {
           schema.spaceViewStates.archivedExpanded,
         );
         await MigrationRules.resetCursor(m);
+      },
+      // Version 16 (AUD-pkg-local-store-01): the local-only table `search_rows` with its
+      // indexes, filled from the rows `search_index` holds (one read of the index, once), and
+      // the indexes of `messages`, `message_attachments`, `runs` and `files` for lookups that
+      // read the whole table before; no row moves and the cursor stays, because nothing of the
+      // mirror changes.
+      from15To16: (m, schema) async {
+        await m.createTable(schema.searchRows);
+        // The package always wrote text into the locating columns; COALESCE only keeps a
+        // row it did not write from failing the step.
+        await m.database.customStatement(
+          'INSERT INTO search_rows '
+          '(id, kind, target_id, thread_id, channel_id, space_id) '
+          "SELECT rowid, COALESCE(kind, ''), COALESCE(target_id, ''), "
+          "COALESCE(thread_id, ''), COALESCE(channel_id, ''), "
+          "COALESCE(space_id, '') FROM search_index",
+        );
+        await m.createIndex(schema.searchRowsTarget);
+        await m.createIndex(schema.searchRowsThread);
+        await m.createIndex(schema.searchRowsChannel);
+        await m.createIndex(schema.searchRowsSpace);
+        await m.createIndex(schema.messagesClientMsg);
+        await m.createIndex(schema.messagesChannel);
+        await m.createIndex(schema.messageAttachmentsThread);
+        await m.createIndex(schema.messageAttachmentsChannel);
+        await m.createIndex(schema.runsChannel);
+        await m.createIndex(schema.filesScopeChannel);
       },
     ),
   );

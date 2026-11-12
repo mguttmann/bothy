@@ -6,8 +6,11 @@ library;
 import 'package:drift/drift.dart';
 
 /// 03 `runs`, only the summary of `run.state_changed`; the run document stays in memory (M4-16).
+/// The index on the channel serves the runs of a post list and the removal of a channel
+/// (version 16).
 @DataClassName('RunRow')
 @TableIndex(name: 'runs_thread', columns: {#threadId})
+@TableIndex(name: 'runs_channel', columns: {#channelId})
 class Runs extends Table {
   @override
   String get tableName => 'runs';
