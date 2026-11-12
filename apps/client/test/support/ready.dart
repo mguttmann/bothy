@@ -17,6 +17,10 @@ import 'until.dart';
 /// until it stands still on the screen ([untilStill]), taps it and settles; fails after
 /// [timeout] of pumping.
 ///
+/// With [settle] false it pumps one frame after the tap instead of settling: a target that
+/// starts work shows a spinner until that work ends, and when the work waits for the test
+/// (a step-up dialog to confirm) nothing ever settles.
+///
 /// The button is the first [ButtonStyleButton], [IconButton] or [InkResponse] at or below the
 /// found widget; a widget without one counts as enabled once it is shown. The wait counts the
 /// pumped time, so a headless test with fake time and a live test on a device wait alike.
@@ -24,6 +28,7 @@ Future<void> tapWhenEnabled(
   WidgetTester tester,
   Finder finder, {
   Duration timeout = testPatience,
+  bool settle = true,
 }) async {
   const step = Duration(milliseconds: 50);
   var waited = Duration.zero;
@@ -37,7 +42,11 @@ Future<void> tapWhenEnabled(
   await tester.ensureVisible(finder.first);
   await untilStill(tester, finder.first, timeout: timeout);
   await tester.tap(finder.first);
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
 }
 
 /// Pumps until [finder]'s widget stands still with its centre on the screen, so a tap or a

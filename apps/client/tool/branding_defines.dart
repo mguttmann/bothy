@@ -10,6 +10,10 @@
 /// flutter build macos --dart-define-from-file=build/branding/dart_defines.json
 /// ```
 ///
+/// The defines carry no app version: the app reports the build name Flutter compiles into it
+/// (`--build-name` of a release build, else `version:` of the pubspec), the same name the
+/// system gets (docs/decisions.d/AUD-client-misc-01.md, ruling AUD-CM01/1).
+///
 /// It writes `build/branding/dart_defines.json` (read by `BuildBranding.fromEnvironment`),
 /// `macos/Runner/Configs/Branding.xcconfig` (name, bundle identifier and URL scheme of the
 /// macOS bundle), `windows/runner/branding.h` (window title and URL scheme of the Windows
@@ -60,14 +64,13 @@ final class Branding {
     required this.urlScheme,
     required this.bundleId,
     required this.defaultServer,
-    required this.appVersion,
     this.associatedDomain = '',
     this.developmentTeam = '',
     this.updateUrl = '',
     String? applicationId,
   }) : applicationId = applicationId ?? bundleId;
 
-  /// Parses [yamlText] and takes [appVersion] from the app's pubspec.
+  /// Parses [yamlText].
   ///
   /// Throws a [FormatException] for a missing key, an app name with characters other than
   /// letters, digits and spaces, a URL scheme that is not RFC 3986 (lower case only), a bundle
@@ -76,7 +79,7 @@ final class Branding {
   /// letters or digits, or an application ID (given, or else the bundle identifier) that is
   /// not lower-case letters and digits in dot-separated segments that start with a letter, or
   /// an update URL that is not an `https` address with a host.
-  factory Branding.parse(String yamlText, {required String appVersion}) {
+  factory Branding.parse(String yamlText) {
     final doc = loadYaml(yamlText);
     if (doc is! YamlMap) throw const FormatException('the branding is no map');
     String value(String key) {
@@ -99,7 +102,6 @@ final class Branding {
       urlScheme: value('url_scheme'),
       bundleId: value('bundle_id'),
       defaultServer: value('default_server'),
-      appVersion: appVersion,
       associatedDomain: optional('associated_domain'),
       developmentTeam: optional('development_team'),
       updateUrl: optional('update_url'),
@@ -162,9 +164,6 @@ final class Branding {
   /// The address E1 suggests.
   final String defaultServer;
 
-  /// The app version, from `version:` of the pubspec without the build number.
-  final String appVersion;
-
   /// The domain of the `webcredentials` entitlement on iOS (passkeys, 15 8), or "".
   final String associatedDomain;
 
@@ -184,7 +183,6 @@ final class Branding {
     'BRANDING_URL_SCHEME': urlScheme,
     'BRANDING_BUNDLE_ID': bundleId,
     'BRANDING_DEFAULT_SERVER': defaultServer,
-    'BRANDING_APP_VERSION': appVersion,
     'BRANDING_ASSOCIATED_DOMAIN': associatedDomain,
     'BRANDING_APPLICATION_ID': applicationId,
     'BRANDING_UPDATE_URL': updateUrl,
@@ -331,17 +329,6 @@ final class Branding {
       '#endif  // RUNNER_BRANDING_H_\n';
 }
 
-/// The `version:` of [pubspecText] without a `+build` suffix.
-///
-/// Throws a [FormatException] when the pubspec has no version.
-String pubspecVersion(String pubspecText) {
-  final version = (loadYaml(pubspecText) as YamlMap)['version'];
-  if (version is! String) {
-    throw const FormatException('pubspec without version');
-  }
-  return version.split('+').first;
-}
-
 /// Runs the tool in [appDir]; returns the exit code. [out] receives the messages.
 int run(
   List<String> args, {
@@ -363,12 +350,7 @@ int run(
   }
   final Branding branding;
   try {
-    branding = Branding.parse(
-      File('${appDir.path}/$input').readAsStringSync(),
-      appVersion: pubspecVersion(
-        File('${appDir.path}/pubspec.yaml').readAsStringSync(),
-      ),
-    );
+    branding = Branding.parse(File('${appDir.path}/$input').readAsStringSync());
   } on FormatException catch (e) {
     out.writeln('branding_defines: ${e.message}');
     return 1;

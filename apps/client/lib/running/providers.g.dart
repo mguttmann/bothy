@@ -381,6 +381,79 @@ final class RunContextFamily extends $Family
   String toString() => r'runContextProvider';
 }
 
+/// The runs whose Stop is on its way (01 6.2; docs/decisions.d/AUD-client-misc-01.md, ruling
+/// AUD-CM01/3): from the activation of Stop until the server refused it. A Stop the server
+/// accepted keeps its run here, because that run ends (09 8: the adapter confirms, or the
+/// server ends it after `agent.cancel_grace`). No view offers a second Stop for a run that is
+/// here. The state lasts as long as the session.
+
+@ProviderFor(RunStops)
+final runStopsProvider = RunStopsProvider._();
+
+/// The runs whose Stop is on its way (01 6.2; docs/decisions.d/AUD-client-misc-01.md, ruling
+/// AUD-CM01/3): from the activation of Stop until the server refused it. A Stop the server
+/// accepted keeps its run here, because that run ends (09 8: the adapter confirms, or the
+/// server ends it after `agent.cancel_grace`). No view offers a second Stop for a run that is
+/// here. The state lasts as long as the session.
+final class RunStopsProvider extends $NotifierProvider<RunStops, Set<RunId>> {
+  /// The runs whose Stop is on its way (01 6.2; docs/decisions.d/AUD-client-misc-01.md, ruling
+  /// AUD-CM01/3): from the activation of Stop until the server refused it. A Stop the server
+  /// accepted keeps its run here, because that run ends (09 8: the adapter confirms, or the
+  /// server ends it after `agent.cancel_grace`). No view offers a second Stop for a run that is
+  /// here. The state lasts as long as the session.
+  RunStopsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'runStopsProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$runStopsHash();
+
+  @$internal
+  @override
+  RunStops create() => RunStops();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Set<RunId> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Set<RunId>>(value),
+    );
+  }
+}
+
+String _$runStopsHash() => r'1fb08a88c16cd9a93f705cf4508ea5a4aa6444b2';
+
+/// The runs whose Stop is on its way (01 6.2; docs/decisions.d/AUD-client-misc-01.md, ruling
+/// AUD-CM01/3): from the activation of Stop until the server refused it. A Stop the server
+/// accepted keeps its run here, because that run ends (09 8: the adapter confirms, or the
+/// server ends it after `agent.cancel_grace`). No view offers a second Stop for a run that is
+/// here. The state lasts as long as the session.
+
+abstract class _$RunStops extends $Notifier<Set<RunId>> {
+  Set<RunId> build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<Set<RunId>, Set<RunId>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<Set<RunId>, Set<RunId>>,
+              Set<RunId>,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
 /// The form of "Running now" the person chose; cards by default (D-RV-7). It lasts while the
 /// app runs.
 

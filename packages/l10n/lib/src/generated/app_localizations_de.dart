@@ -8349,6 +8349,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get runningStop => 'Stoppen';
 
   @override
+  String runningStopRefused(String reason) {
+    return 'Der Lauf wurde nicht gestoppt: $reason';
+  }
+
+  @override
   String get runningOpen => 'Öffnen';
 
   @override

@@ -20,12 +20,12 @@ import 'package:l10n/l10n.dart';
 import '../agents/providers.dart' show agentInfoProvider, agentPresenceProvider;
 import '../agents/run_mapping.dart' show queuedWait;
 import '../app/providers/ports.dart';
-import '../app/providers/session.dart';
 import '../forum/post_list_header.dart' show FilterChipButton;
 import '../sidebar/providers.dart';
 import 'control_room.dart';
 import 'providers.dart';
 import 'running_sum.dart';
+import 'stop_run.dart';
 
 /// The view D10.
 ///
@@ -398,6 +398,7 @@ class RunningRowTile extends ConsumerWidget {
       isEstimate: run.cost.isEstimate,
     );
     final path = row.path.map(dsIsolate).join(' > ');
+    final stopping = ref.watch(runStopsProvider).contains(run.id);
     void open() => context.go('/t/${run.threadId.value}');
     return Semantics(
       container: true,
@@ -484,10 +485,11 @@ class RunningRowTile extends ConsumerWidget {
                 key: ValueKey('running.stop.${run.id.value}'),
                 label: l.runningStop,
                 style: DsButtonStyle.secondary,
-                onPressed: () {
-                  final engine = ref.read(syncEngineProvider);
-                  if (engine != null) stopRun(engine, run);
-                },
+                // Busy while its Stop is on its way (ruling AUD-CM01/3).
+                loading: stopping,
+                onPressed: stopping
+                    ? null
+                    : () => unawaited(stopRun(context, ref, run)),
               ),
             DsButton(
               key: ValueKey('running.open.${run.id.value}'),

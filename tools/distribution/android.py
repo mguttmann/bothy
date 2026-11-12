@@ -16,8 +16,9 @@
    `uploadKeyPassword` of android/app/build.gradle.kts);
 4. the checks (`verify_bundle`): `jarsigner -verify` passes and the bundle's signer is the upload
    key (SHA-256 of the certificate), `bundletool validate`, the manifest names the application ID,
-   version code and version name, and the universal APK that `bundletool build-apks` makes from
-   the bundle with the same key passes `apksigner verify` with the same certificate;
+   version code and version name, the Dart code of every ABI reports the version name, and the
+   universal APK that `bundletool build-apks` makes from the bundle with the same key passes
+   `apksigner verify` with the same certificate;
 5. the bundle `<application ID>-<version>.aab` in OUT, and its release on the internal test track
    of Google Play (the channel beta, 18 5) through the service account
    (`storeapi.PlayPublisher`).
@@ -64,10 +65,12 @@ from common import (
     CLIENT,
     DEFAULT_BRANDING,
     REPO,
+    TRIAL_VERSIONS,
     Runner,
     StepError,
     branded_tree,
     branding_for,
+    dart_code_reports,
     fail,
     require_env,
 )
@@ -91,9 +94,11 @@ ANDROID_SECRETS = (
 )
 # The Play track of the channel beta (18 5); stable is `android.stable_track`.
 BETA_TRACK = "internal"
-TRIAL_VERSION = "0.1.0"
+TRIAL_VERSION = TRIAL_VERSIONS[0]
 GOOGLE_SERVICES = CLIENT / "android" / "app" / "google-services.json"
 BUNDLE = CLIENT / "build" / "app" / "outputs" / "bundle" / "release" / "app-release.aab"
+# The compiled Dart code of the app inside the bundle, one file for each ABI.
+DART_CODE = re.compile(r"base/lib/[^/]+/libapp\.so")
 
 
 @dataclass(frozen=True)
@@ -325,6 +330,21 @@ def verify_signer(run: Runner, bundle: Path, key: UploadKey) -> str:
     return want
 
 
+def check_dart_code(bundle: Path, app_version: str) -> None:
+    """Check that the Dart code of every ABI in `bundle` reports `app_version`.
+
+    Raises:
+        StepError: the bundle holds no compiled Dart code, or one does not report the version
+            (`common.dart_code_reports`).
+    """
+    with zipfile.ZipFile(bundle) as archive:
+        names = [n for n in archive.namelist() if DART_CODE.fullmatch(n)]
+        if not names:
+            raise StepError(f"{bundle.name} holds no compiled Dart code (base/lib/*/libapp.so)")
+        for name in names:
+            dart_code_reports(f"{bundle.name}:{name}", archive.read(name), app_version)
+
+
 def verify_bundle(
     run: Runner,
     bundle: Path,
@@ -350,6 +370,7 @@ def verify_bundle(
         raise StepError(
             f"{bundle.name} names {package} {code} {name}, the release builds " + " ".join(expected)
         )
+    check_dart_code(bundle, version.short)
     passwords = workdir / "apks-passwords"
     passwords.mkdir(exist_ok=True)
     (passwords / "store").write_text(key.store_password, encoding="utf-8")
@@ -544,6 +565,7 @@ def trial(run: Runner, *, out: Path, branding: Path) -> Checked:
             "another upload key is refused by the signer check",
             "bundletool validate passes",
             "the manifest names the application ID, version code and version name",
+            "the Dart code of every ABI reports the version name",
             "the universal APK of bundletool build-apks passes apksigner verify with the key",
         ],
         "not_proven": "the upload to Google Play needs the publisher's account (OQ-08)",

@@ -5,7 +5,8 @@
 
 1. the build branding with the publisher's bundle identifier (`branding_for`), then
    `flutter build macos --release` with the version and build number of `appdist.app_version`
-   and the team of `apple.team_id` (so the App Group and keychain groups carry its prefix);
+   and the team of `apple.team_id` (so the App Group and keychain groups carry its prefix); the
+   Dart code of the build must report that version (`check_dart_version`);
 2. Sparkle.framework of the pinned release (SPARKLE_VERSION, checked against SPARKLE_SHA256)
    into `Contents/Frameworks`, the Sparkle keys into `Info.plist` (`appdist.sparkle_info_plist`);
 3. the provisioning profiles, then a signature of every nested code item from the inside out
@@ -26,14 +27,14 @@ distribution stop it too.
 owner's accounts (D-W-127, brief Design note 1 and 2): a self-signed code signing identity in a
 temporary keychain (trusted for code signing for the run only), a throwaway EdDSA key, the
 update addresses on 127.0.0.1; no notarization, and `spctl --assess` runs and its expected
-rejection is recorded. It builds 0.1.0 and 0.1.1, promotes 0.1.0 to stable, and then drives
-Sparkle's own updater (tools/distribution/macos/update_harness.swift, built against the pinned
-framework) against an installed 0.1.0:
+rejection is recorded. It builds the two versions of TRIAL_VERSIONS, promotes the older to
+stable, and then drives Sparkle's own updater (tools/distribution/macos/update_harness.swift,
+built against the pinned framework) against an installed older build:
 
-- the default channel offers nothing (0.1.1 is beta only);
-- a changed 0.1.1 archive is refused and 0.1.0 stays;
-- the channel beta replaces 0.1.0 with 0.1.1, whose signature verifies;
-- after promoting 0.1.1, the default channel replaces a fresh 0.1.0 with the same build.
+- the default channel offers nothing (the newer build is beta only);
+- a changed archive of the newer build is refused and the older stays;
+- the channel beta replaces the older build with the newer, whose signature verifies;
+- after promoting the newer build, the default channel replaces a fresh older build with it.
 
 The result is written to `<out>/trial-apple.json`.
 
@@ -70,10 +71,12 @@ from common import (
     CLIENT,
     DEFAULT_BRANDING,
     REPO,
+    TRIAL_VERSIONS,
     Runner,
     StepError,
     branded_tree,
     branding_for,
+    check_dart_version,
     fail,
     require_env,
     serve,
@@ -104,7 +107,8 @@ APPLE_SECRETS = (
     "SPARKLE_ED_PRIVATE_KEY",
 )
 # Versions of the trial: an older build and the one that replaces it.
-TRIAL_VERSIONS = ("0.1.0", "0.1.1")
+# The compiled Dart code of the app inside its bundle.
+DART_CODE = Path("Contents") / "Frameworks" / "App.framework" / "App"
 # The bound of the removal of the test certificate's trust (it can wait for a dialog).
 REMOVE_TRUST_PATIENCE_SECONDS = 60.0
 # Exit codes of update_harness.swift.
@@ -519,6 +523,7 @@ def release_step(run: Runner, plan: Plan, sparkle: Path, workdir: Path) -> Relea
     key = appdist.private_key(plan.ed_key)
     appdist.check_key_pair(plan.cfg, key)
     app = build_app(run, plan.cfg, plan.version, plan.branding, workdir)
+    check_dart_version([app / DART_CODE], plan.version.short)
     embed_sparkle(run, app, sparkle)
     configure_info_plist(app, plan.cfg, plan.version)
     sign_app(run, app, plan.cfg, plan.signer, workdir, plan.profiles)

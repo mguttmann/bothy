@@ -59,11 +59,13 @@ void main() {
       void go(String path) =>
           GoRouter.of(tester.element(find.byType(Navigator).first)).go(path);
 
-      Future<void> tap(String key) async {
+      // [settle] false for a button that starts a change: it waits for the step-up dialog
+      // behind a spinner, so nothing settles until the test confirms it.
+      Future<void> tap(String key, {bool settle = true}) async {
         await app.waitFor(find.byKey(ValueKey(key)));
         await tester.ensureVisible(find.byKey(ValueKey(key)).first);
         await tester.pumpAndSettle();
-        await app.tap(key);
+        await app.tap(key, settle: settle);
       }
 
       Future<void> type(String key, String text) async {
@@ -73,13 +75,11 @@ void main() {
       }
 
       Future<void> confirmStepUps() async {
-        while (find
-            .byKey(const ValueKey('stepUp.dialog'))
-            .evaluate()
-            .isNotEmpty) {
+        if (find.byKey(const ValueKey('stepUp.dialog')).evaluate().isNotEmpty) {
           await tester.tap(find.byKey(const ValueKey('stepUp.continue')));
-          await tester.pumpAndSettle();
+          await tester.pump(const Duration(milliseconds: 300));
         }
+        await tester.pump();
       }
 
       Future<void> until(String what, Finder gone) =>
@@ -111,7 +111,7 @@ void main() {
       await type('newAgent.server.0.package', '@example/mcp-files@1.4.2');
       await tap('newAgent.class.host');
       server.requests.clear();
-      await tap('agentEdit.save');
+      await tap('agentEdit.save', settle: false);
       await until('the edit saved', dialog);
       expect(steps(), ['setAgentToolClass 200', 'putAgentDefinition 200']);
       expect(notes.toolClass, 'host');
@@ -121,7 +121,7 @@ void main() {
       await tap('agentVersions.restore.1');
       await tap('newAgent.class.chat');
       server.requests.clear();
-      await tap('agentEdit.save');
+      await tap('agentEdit.save', settle: false);
       await until('the restore saved', dialog);
       expect(steps(), ['putAgentDefinition 200', 'setAgentToolClass 200']);
       expect(notes.definitions.last['mcp_servers'], isEmpty);
@@ -130,7 +130,7 @@ void main() {
       await tap('builtinAgent.changeRunner');
       await tap('agentHost.runner.${build.id}');
       server.requests.clear();
-      await tap('agentHost.confirm');
+      await tap('agentHost.confirm', settle: false);
       await until(
         'the agent moved',
         find.byKey(const ValueKey('agentHost.dialog')),
@@ -144,11 +144,16 @@ void main() {
         'Not needed any more',
       );
       server.requests.clear();
-      await tap('confirm.submit');
+      await tap('confirm.submit', settle: false);
       await eventually('the agent disabled', () async {
         await confirmStepUps();
         return world.people[notes.id]!.status == 'disabled';
       });
+      // The app closes the confirmation when the answer is there; the test ends after that.
+      await until(
+        'the confirmation closed',
+        find.byKey(const ValueKey('confirm.submit')),
+      );
       expect(steps(), ['disableAgent 200']);
       expect(server.violations, isEmpty);
     } finally {

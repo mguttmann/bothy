@@ -2207,6 +2207,7 @@
   "runningFilterAll": "alle",
   "runningMineOnly": "nur meine",
   "runningStop": "Stoppen",
+  "runningStopRefused": "Der Lauf wurde nicht gestoppt: {reason}",
   "runningOpen": "Öffnen",
   "runningEmpty": "Kein Lauf ist aktiv.",
   "runningSumOrganization": "Organisation: Summe der aktiven Läufe {amount} ({estimate}).",

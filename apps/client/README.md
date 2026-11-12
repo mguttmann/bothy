@@ -160,7 +160,10 @@ signed with the debug key, so `flutter build apk --release` works on a developer
 The app reads `client.min_version.<platform>` and `client.recommended_version.<platform>` from
 `getDiscovery` (docs/spec/18-release.md 9; `decideClientVersion` in `packages/domain`, SemVer
 precedence) at the start, on E1 and before every connection attempt (`VersionWatch` in
-`lib/app/update/`, the connect gate of the sync engine). Below the minimum it opens no gateway
+`lib/app/update/`, the connect gate of the sync engine). Its own version is its build name
+(`BuildBranding.appVersion`, Flutter's `appBuildName`): `--build-name` of a release build, which
+the system gets too, else `version:` of the pubspec; the build branding carries no version
+(ruling AUD-CM01/1). Below the minimum it opens no gateway
 connection, closes the instance without deleting anything and shows E1 "App too old"; a start with
 a stored session shows the main view from the local data before the answer arrives, and a build
 an instance refused before asks first (docs/spec/15-client-architecture.md 9); below the
@@ -191,8 +194,13 @@ Crash reports need a target in the build configuration (docs/spec/15-client-arch
 - Providers: after changing a file with `@riverpod`, run `dart run build_runner build` and
   `dart format lib`; `make codegen-check` fails on a stale `*.g.dart`.
 - Integration tests: `make apps-platform` runs `platform-tests.json` on macOS and Windows, one
-  `flutter test integration_test/<file> -d macos` (or `-d windows`) per file, so a new file
-  needs its line there (D-M4-18-19); elsewhere it prints its SKIP line.
+  `flutter test integration_test/<file> -d macos` (or `-d windows`) per file (D-M4-18-19);
+  elsewhere it prints its SKIP line. Every such call builds the app once, so the files that
+  need no process of their own run together in `integration_test/desktop_suite_test.dart`, one
+  build on each system. A new file needs its group there or its own line:
+  `tools/ci/tests/test_integration_tests_run.py` fails for a test file under
+  `integration_test/` that no command of `platform-tests.json` reaches
+  (docs/decisions.d/AUD-client-misc-01.md, ruling AUD-CM01/2).
   They start the app from `integration_test/support/test_app.dart`, the only entry that allows
   plain HTTP, with secrets in memory and software device keys, against `FakeServer` on
   `127.0.0.1`.
@@ -934,7 +942,11 @@ shows "Following" (13 3.1, 3.2). Settings > Notifications holds D9: the personal
 `notify.*` of 13 3.3, the quiet hours rules and the tree of levels. The effective level is
 computed for display only; the server decides every notification. Writes change the local row
 at once and go through the outbox; the lists of the server are loaded once per session because
-the snapshot does not carry them. "Export history" appears only with the capability `export`;
+the snapshot does not carry them, again when the connection is live again after that load
+failed, and after every resync, which empties them with the rest of the mirror; the owner
+flag of `getMe` is asked again the same way after a failed read (ruling AUD-CM01/4,
+`test/notifications_settings/ask_again_when_live_test.dart`). "Export history" appears only with
+the capability `export`;
 the step-up is the server's demand, and the stream goes unchanged into the chosen file
 (docs/DECISIONS.md D-M4-33-1 to D-M4-33-7).
 
@@ -1084,6 +1096,15 @@ level `trigger` and the person started the run or holds `manage`, and goes throu
 the footer sums the organization's runs as an estimate and notes that personal runs are
 information only (01 6.7; docs/DECISIONS.md D-M4-23-1 onwards).
 
+Stop is one action for every view of a run (`stopRun` of `lib/running/stop_run.dart`: the live
+box, the rows and cards of "Running now", the run graph and `/stop`; 01 6.2; ruling AUD-CM01/3).
+One activation puts one `cancelRun` into the outbox, and `RunStops` holds the run while that
+Stop is on its way and after the server accepted it: the Stop of a row and of the run graph is
+busy, the live box and a card offer none. A Stop the server refuses for good is discarded from
+the outbox, a notice says "The run was not stopped" with the reason, and Stop is offered again;
+without a connection the entry waits. Tests: `test/running/stop_run_test.dart` and, against the
+fake server with 403, 409 and no connection, `test/running/stop_run_fake_server_test.dart`.
+
 ## Control room and run graph
 
 "Running now" shows the control room cards by default and the rows of M4-23 under "List" (01 D10;
@@ -1163,9 +1184,9 @@ own retry (`noProviderRetry`), which would repeat every attempt of the client. `
 `/resume` read the sessions with one attempt and without that retry (`AgentReads.sessionsNow`),
 so their dialog opens after that one attempt instead of after every retry and says "The
 sessions could not be loaded" instead of showing none. A one-time action without a thread ("Retry" on a run line, the
-cancel of a wake-up, the channel switch of autonomous runs) waits for its outcome with
-`outboxOutcome` (`lib/sync/outbox_outcome.dart`), which discards a refused entry also when the
-view that sent it is gone. Tests: `test/agents/ended_runs_fake_server_test.dart` and
+cancel of a wake-up, the channel switch of autonomous runs, Stop of a run) waits for its outcome
+with `outboxOutcome` (`lib/sync/outbox_outcome.dart`), which discards a refused entry also when
+the view that sent it is gone. Tests: `test/agents/ended_runs_fake_server_test.dart` and
 `test/agents/read_retry_layers_fake_server_test.dart` against the fake server,
 `test/agents/run_retry_test.dart` and `test/agents/builtin_commands_test.dart`.
 

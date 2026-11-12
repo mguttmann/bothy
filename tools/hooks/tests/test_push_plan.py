@@ -266,8 +266,11 @@ def test_the_tools_tests_of_component_sources_exist() -> None:
     repo = Path(__file__).resolve().parents[3]
     text = (repo / "Makefile").read_text(encoding="utf-8")
     start = text.index("TOOLS_SOURCE_TESTS := ")
-    end = text.index("\n", text.index("\\\n", start) + 2)
+    end = start
+    while text[text.index("\n", end) - 1] == "\\":
+        end = text.index("\n", end) + 1
+    end = text.index("\n", end)
     names = text[start:end].removeprefix("TOOLS_SOURCE_TESTS := ").replace("\\\n", " ").split()
-    assert len(names) == 4
+    assert len(names) == 5
     for name in names:
         assert (repo / "tools" / name).is_file(), name

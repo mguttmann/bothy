@@ -1218,9 +1218,11 @@ jobs:
     needs: plan
     if: contains(format(' {0} ', needs.plan.outputs.jobs), ' apps-macos ')
     runs-on: macos-15
-    # The desktop integration tests (one app build per file) and the native tests of the Mac;
-    # the iOS simulator entries run in apps-ios (PL/44).
-    timeout-minutes: 60
+    # The desktop integration tests (one app build per file, and one for the files of
+    # integration_test/desktop_suite_test.dart) and the native tests of the Mac; the iOS
+    # simulator entries run in apps-ios (PL/44). The limit holds the job as measured for
+    # docs/decisions.d/AUD-client-misc-01.md (ruling AUD-CM01/2) with the suite added.
+    timeout-minutes: 75
     permissions:
       contents: read
     steps:
@@ -1291,7 +1293,8 @@ jobs:
     needs: plan
     if: contains(format(' {0} ', needs.plan.outputs.jobs), ' apps-windows ')
     runs-on: windows-2025
-    timeout-minutes: 45
+    # As apps-macos: the limit holds the job with the desktop suite added (ruling AUD-CM01/2).
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import re
+import shutil
 import subprocess
 import xml.etree.ElementTree as ET
 import zipfile
@@ -20,7 +21,7 @@ import appdist
 import common
 import pytest
 import windows
-from fakes import FakeRun, ok
+from fakes import STALE_DART_CODE, FakeRun, dart_code, ok
 
 NS = {"m": "http://schemas.microsoft.com/appx/manifest/foundation/windows10"}
 
@@ -132,12 +133,16 @@ def test_release_step(
         (system32 / dll).write_bytes(b"dll")
     monkeypatch.setattr(windows, "SYSTEM32", system32)
 
-    def flutter(args: list[str], _: dict[str, Any]) -> None:
-        _build_output(client / "build" / "windows" / "x64" / "runner", "client.exe")
+    def flutter(args: list[str], opts: dict[str, Any]) -> None:
+        runner = client / "build" / "windows" / "x64" / "runner"
+        shutil.rmtree(runner, ignore_errors=True)
+        output = _build_output(runner, "client.exe")
+        (output / windows.DART_CODE).write_bytes(code or dart_code(args))
 
     def makeappx(args: list[str], _: dict[str, Any]) -> None:
         Path(args[-1]).write_bytes(b"msix")
 
+    code: bytes | None = None
     run = FakeRun({"flutter": flutter, "makeappx.exe": makeappx})
     branding = tmp_path / "branding.yaml"
     branding.write_text(
@@ -166,6 +171,15 @@ def test_release_step(
         "signtool.exe",
         "signtool.exe",
     ]
+    assert "--build-name=0.1.1" in run.calls[1]
+
+    # An app that reports the version of the pubspec whatever it was built as stops the step
+    # before anything is packed (ruling AUD-CM01/1).
+    packed = len(run.calls)
+    code = STALE_DART_CODE
+    with pytest.raises(common.StepError, match=r"app\.so: the Dart code of the build does not"):
+        windows.release_step(run, plan, work)
+    assert [Path(c[0]).name for c in run.calls[packed:]] == ["dart", "flutter", "dart"]
 
 
 def test_build_without_output_fails(
@@ -313,9 +327,9 @@ def test_update_test_installs_updates_refuses_and_promotes(
     run = AppInstaller(www)
     checks = windows.update_test(run, cfg, old, new, www, "http://127.0.0.1:4711/")
     assert len(checks) == 4
-    assert run.installed == "0.1.1.0"
+    assert run.installed == new.version.msix
     stable = appdist.appinstaller_target((www / "stable.appinstaller").read_text("utf-8"))
-    assert stable.msix_uri.endswith("com.example.chat_0.1.1.0_x64.msix")
+    assert stable.msix_uri.endswith(f"com.example.chat_{new.version.msix}_x64.msix")
     installs = re.findall(r"-AppInstallerFile '([^']+)'", "\n".join(run.scripts))
     assert installs == [
         "http://127.0.0.1:4711/beta.appinstaller",
@@ -362,6 +376,6 @@ def test_trial_runs_two_builds_and_the_update_test(
     monkeypatch.setattr(windows, "update_test", lambda *a: ["updated"])
     run = AppInstaller(tmp_path)
     assert windows.main(["trial", "--out", str(tmp_path / "out")], run) == 0
-    assert built == ["0.1.0", "0.1.1"]
+    assert built == list(windows.TRIAL_VERSIONS)
     assert "updated" in (tmp_path / "out" / "trial-windows.json").read_text("utf-8")
     assert any("Remove-AppxPackage" in s for s in run.scripts)

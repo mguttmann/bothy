@@ -14,10 +14,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../app/providers/ports.dart';
-import '../app/providers/session.dart';
 import '../app/router.dart';
 import 'providers.dart';
 import 'run_api.dart';
+import 'stop_run.dart';
 
 /// The cards of [rows] in a wrapping grid; on the phone in one column at full width (01 5.3
 /// M11).
@@ -147,7 +147,8 @@ class RunningCard extends ConsumerWidget {
       now: now,
       agentName: dsIsolate(row.agentName),
       path: [for (final p in row.path) dsIsolate(p)],
-      canStop: row.canStop,
+      // No second Stop while one is on its way (ruling AUD-CM01/3).
+      canStop: row.canStop && !ref.watch(runStopsProvider).contains(run.id),
     );
     return RunControlCard(
       key: ValueKey('running.card.${run.id.value}'),
@@ -155,10 +156,7 @@ class RunningCard extends ConsumerWidget {
       expand: expand,
       onOpenGraph: () =>
           context.go(RunGraphLocation(run.id, run.threadId).path),
-      onStop: () {
-        final engine = ref.read(syncEngineProvider);
-        if (engine != null) unawaited(stopRun(engine, run));
-      },
+      onStop: () => unawaited(stopRun(context, ref, run)),
       onOpen: () => context.go('/t/${run.threadId.value}'),
     );
   }

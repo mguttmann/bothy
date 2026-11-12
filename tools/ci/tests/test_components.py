@@ -404,6 +404,9 @@ def test_every_conditional_job_is_triggered_by_a_change_of_its_component() -> No
         (["apps/distribution/distribution.yaml"], {"test-apps"} | PLATFORM | TRIALS | MOBILE),
         (["apps/client/Makefile"], {"test-apps"} | PLATFORM | TRIALS | MOBILE),
         (["apps/client/macos/Runner/AppDelegate.swift"], {"test-apps"} | PLATFORM | TRIALS),
+        # The file that names the version the app reports: every trial checks it in its build
+        # (AUD-CM01/1).
+        (["apps/client/lib/app/branding.dart"], {"test-apps"} | PLATFORM | TRIALS | MOBILE),
         ([".github/workflows/release.yml"], EVERY_JOB | TRIALS | MOBILE | HOST_TRIALS),
         # The phone builds (M7-13): the release steps of iOS and Android, the Gradle build and
         # the Xcode project run the phone trials only.

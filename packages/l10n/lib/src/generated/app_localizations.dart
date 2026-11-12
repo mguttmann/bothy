@@ -13345,6 +13345,12 @@ abstract class AppLocalizations {
   /// **'Stop'**
   String get runningStop;
 
+  /// Notice after the server refused to stop a run for good; reason is the translated reason or problem text (docs/spec/01 section 6.2).
+  ///
+  /// In en, this message translates to:
+  /// **'The run was not stopped: {reason}'**
+  String runningStopRefused(String reason);
+
   /// Button that opens the thread of a run.
   ///
   /// In en, this message translates to:

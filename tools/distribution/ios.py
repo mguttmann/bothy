@@ -11,7 +11,8 @@
    `flutter build ipa --release --no-codesign`: the archive of the app and its two extensions
    (Notification Service, Share), unsigned;
 3. the checks of the archive (`check_archive`): bundle identifiers, version and build number of
-   the app and its extensions, and the entitlements the build gives them;
+   the app and its extensions, the entitlements the build gives them, and the Dart code of the
+   app reports that version;
 4. the signature for the App Store: the Apple Distribution identity in a keychain of this run,
    the App Store provisioning profiles of the app and its extensions embedded, every nested
    framework signed, then the extensions and the app with the entitlements of
@@ -59,10 +60,12 @@ from apple import Signer, import_identity, temporary_keychain
 from common import (
     CLIENT,
     DEFAULT_BRANDING,
+    TRIAL_VERSIONS,
     Runner,
     StepError,
     branded_tree,
     branding_for,
+    check_dart_version,
     fail,
     require_env,
 )
@@ -80,11 +83,13 @@ IOS_SECRETS = (
 # The TestFlight groups of the channels (18 5).
 BETA_GROUP = "beta"
 STABLE_GROUP = "stable"
-TRIAL_VERSION = "0.1.0"
+TRIAL_VERSION = TRIAL_VERSIONS[0]
 # The app extensions of the iOS app: the folder of their sources (with their entitlements) and
 # the suffix of their bundle identifier (ios/<name>/<name>.xcconfig).
 EXTENSIONS = ("NotificationService", "ShareExtension")
 ARCHIVE = CLIENT / "build" / "ios" / "archive" / "Runner.xcarchive"
+# The compiled Dart code of the app inside its bundle.
+DART_CODE = Path("Frameworks") / "App.framework" / "App"
 # The secret of each provisioning profile, by the bundle path relative to the app.
 PROFILES = {
     "": "APPLE_IOS_PROVISIONING_PROFILE",
@@ -272,6 +277,8 @@ def check_archive(archive: Archive, cfg: dict[str, Any], version: appdist.AppVer
         )
     if (archive.app / "Frameworks" / "Flutter.framework").is_dir() is False:
         raise StepError("the app carries no Flutter.framework")
+    check_dart_version([archive.app / DART_CODE], version.short)
+    checks.append(f"the Dart code of the app reports the version {version.short}")
     return checks
 
 

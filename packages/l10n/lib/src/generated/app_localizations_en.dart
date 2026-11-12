@@ -8310,6 +8310,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get runningStop => 'Stop';
 
   @override
+  String runningStopRefused(String reason) {
+    return 'The run was not stopped: $reason';
+  }
+
+  @override
   String get runningOpen => 'Open';
 
   @override

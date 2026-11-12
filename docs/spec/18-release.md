@@ -461,16 +461,27 @@ anything is signed ([release.md](../operations/release.md) 4).
 Versions are `X.Y.Z` without a pre-release; the build number is `X * 1000000 + Y * 1000 + Z`,
 the MSIX version `X.Y.Z.0`.
 
+The app reports the version of its package (addendum of 2026-11-12,
+docs/decisions.d/AUD-client-misc-01.md, ruling AUD-CM01/1; reason: an app that reported another
+version than its package was below every minimum version of section 9): the version the app
+compares, registers and reports is the build name that Flutter compiles into it from
+`--build-name`, the same name the system and the stores get. Every release step, desktop and
+phone, checks that the compiled Dart code of its build carries that version and stops otherwise,
+before a package reaches the output folder or a store. The trials build versions that no other
+text of the app holds, so their pass proves it.
+
 Trial with a test publisher (D-W-127, docs/decisions.d/M7-12.md): `make -C apps/client
 trial-apple` and `trial-windows` run the same steps with a self-signed identity in a temporary
-keychain or certificate store, a throwaway EdDSA key and an update host on `127.0.0.1`, build
-`0.1.0` and `0.1.1`, and prove the update path: Sparkle's own updater (`SPUUpdater` in
+keychain or certificate store, a throwaway EdDSA key and an update host on `127.0.0.1`, build an
+older and a newer version (`TRIAL_VERSIONS` of `tools/distribution/common.py`), and prove the
+update path: Sparkle's own updater (`SPUUpdater` in
 `tools/distribution/macos/update_harness.swift`) offers nothing on the default channel, refuses a
-changed archive, replaces the installed `0.1.0` by `0.1.1` on the channel beta and, after
-promotion, on the default channel; App Installer (`Add-AppxPackage -AppInstallerFile`) installs
-`0.1.0` from `beta.appinstaller`, refuses an MSIX with a changed signature, updates to `0.1.1` and installs it again
-from `stable.appinstaller`. CI runs both in the jobs `desktop trial (macOS)` and `desktop trial
-(Windows)` for changes of the release steps. Not proven by the trial: Developer ID signing,
+changed archive, replaces the installed older build by the newer one on the channel beta and,
+after promotion, on the default channel; App Installer (`Add-AppxPackage -AppInstallerFile`)
+installs the older build from `beta.appinstaller`, refuses an MSIX with a changed signature,
+updates to the newer build and installs it again from `stable.appinstaller`. CI runs both in the
+jobs `desktop trial (macOS)` and `desktop trial (Windows)` for changes of the release steps.
+Not proven by the trial: Developer ID signing,
 notarization and the acceptance of `spctl` (it rejects a test publisher, which the trial
 records), a signature by a certificate authority on Windows and the reputation of SmartScreen;
 they run first with the owner's accounts (OQ-08).
@@ -533,7 +544,8 @@ first with the owner's accounts (OQ-08).
 
 As built (M7-13): versions compare as SemVer 2.0.0, so a pre-release of the minimum is below it;
 only the rule of the app's own platform counts, a value that is no SemVer counts as absent (logged
-once), and an app version that is no SemVer is never blocked. The app checks at the start, on E1
+once), and an app version that is no SemVer is never blocked. The app's own version is the build
+name of its package (section 8.1). The app checks at the start, on E1
 and before every connection attempt of the sync engine (the connect gate,
 [15-client-architecture.md](15-client-architecture.md) 7.2), so an app that `getDiscovery` shows
 below the minimum opens no gateway connection and never reaches `4007` (without an answer the
