@@ -49,6 +49,18 @@ variables) and drives the service through `internal/wire` (`wire.NewBackupDaemon
 - Volumes measured for `bothy.storage.volume.*`: `/var/lib/postgresql` (`pgdata`, read-only),
   `file.fs.root` (`files`, driver `fs`), `/var/lib/pgbackrest` (`pgbackrest-repo`) and
   `/var/lib/bothy-backup` (`backup-scratch`, also the directory of the `pg_dump` file).
+- Last success (AUD-infra-observability-01): the default command reads the last successful run
+  of every kind from `backup_runs` for `bothy.backup.last_success.timestamp` and
+  `bothy.backup.restore_test.last_success.timestamp` when it starts. While that fails (the
+  database does not answer yet, or the table does not exist before the first `bothy migrate`),
+  it logs `read the last successful runs` and reads again before every tick until it succeeded
+  once. The alerts `BothyBackupStale` and `BothyRestoreTestStale` treat a value that is missing
+  for as long as their threshold like one that is too old
+  ([alerting.md](../../../../docs/observability/alerting.md) 3.2), so the gauges must not stay
+  empty until the next successful run. After that one read only the runs of this process move
+  the gauges; a run by hand reports its own value from its short process
+  (`TestSchedulePrimesUntilItSucceeds`, and with PostgreSQL and the metrics of the process
+  `TestScheduleReportsTheLastSuccessesOnceBackupRunsAnswers`).
 
 ## Tests
 

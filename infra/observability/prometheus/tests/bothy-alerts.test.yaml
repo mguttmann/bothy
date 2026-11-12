@@ -11,6 +11,13 @@
 # case (evaluation runs once a minute, so a change below one minute may pass).
 # Timestamp series such as '-93601+60x30' grow with the clock of the evaluation (60 s per
 # minute), so `time() - value` stays constant over the whole series.
+# The alerts on values that only bothy-backupd reports (last success per backup kind, last
+# archived WAL segment, last restore test) each have two more cases, because a value that is
+# missing must not keep them quiet: one where the value was never reported, and one where it
+# stops, which fires once the window of the rule and its `for` have run out and is quiet one
+# evaluation earlier, so a window made longer or shorter breaks a case. The cases with the
+# windows of 26 hours and 8 days are in bothy-alerts-windows.test.yaml, which evaluates every
+# 15 minutes: at one evaluation a minute they would take most of the run time of this check.
 
 rule_files:
   - ../rules/bothy-alerts.yaml
@@ -71,6 +78,45 @@ tests:
             exp_annotations:
               summary: "No telemetry from the server for 10 minutes (server down or export broken)."
               runbook_url: "docs/observability/alerting.md#bothyservertelemetrymissing"
+
+  - name: BothyBackupTelemetryMissing fires 15 minutes after the last target_info
+    interval: 1m
+    input_series:
+      - series: 'target_info{job="bothy/bothy-backupd", instance="backup-1"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: BothyBackupTelemetryMissing
+        exp_alerts: []
+      # Last sample at 10m: from 20m it is missing in the window [10m]; after `for: 5m` the alert fires.
+      - eval_time: 24m
+        alertname: BothyBackupTelemetryMissing
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: BothyBackupTelemetryMissing
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              job: bothy/bothy-backupd
+            exp_annotations:
+              summary: "No telemetry from bothy-backupd for 10 minutes (backup service down or export broken)."
+              runbook_url: "docs/observability/alerting.md#bothybackuptelemetrymissing"
+
+  - name: BothyBackupTelemetryMissing ignores other jobs
+    interval: 1m
+    input_series:
+      - series: 'target_info{job="bothy/bothy-server", instance="server-1"}'
+        values: '1x30'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: BothyBackupTelemetryMissing
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              job: bothy/bothy-backupd
+            exp_annotations:
+              summary: "No telemetry from bothy-backupd for 10 minutes (backup service down or export broken)."
+              runbook_url: "docs/observability/alerting.md#bothybackuptelemetrymissing"
 
   - name: BothyCollectorDown fires after 5 minutes down
     interval: 1m
@@ -465,11 +511,17 @@ tests:
 
   # ---- bothy-data -------------------------------------------------------------------------
 
+  # Every kind reports a value in the two threshold cases: a kind without one fires too (the
+  # cases after them).
   - name: BothyBackupStale fires above 26 h (backup.max_age)
     interval: 1m
     input_series:
       - series: 'bothy_backup_last_success_timestamp_seconds{job="bothy/bothy-backupd", bothy_backup_kind="physical"}'
         values: '-93601+60x30'
+      - series: 'bothy_backup_last_success_timestamp_seconds{job="bothy/bothy-backupd", bothy_backup_kind="logical"}'
+        values: '0+60x30'
+      - series: 'bothy_backup_last_success_timestamp_seconds{job="bothy/bothy-backupd", bothy_backup_kind="objects"}'
+        values: '0+60x30'
     alert_rule_test:
       - eval_time: 14m
         alertname: BothyBackupStale
@@ -489,10 +541,40 @@ tests:
     input_series:
       - series: 'bothy_backup_last_success_timestamp_seconds{job="bothy/bothy-backupd", bothy_backup_kind="physical"}'
         values: '-93600+60x30'
+      - series: 'bothy_backup_last_success_timestamp_seconds{job="bothy/bothy-backupd", bothy_backup_kind="logical"}'
+        values: '0+60x30'
+      - series: 'bothy_backup_last_success_timestamp_seconds{job="bothy/bothy-backupd", bothy_backup_kind="objects"}'
+        values: '0+60x30'
     alert_rule_test:
       - eval_time: 30m
         alertname: BothyBackupStale
         exp_alerts: []
+
+  # A kind whose runs have failed from the first one on never reports a last success.
+  - name: BothyBackupStale fires for every kind that never reported a success
+    interval: 1m
+    input_series:
+      - series: 'bothy_backup_last_success_timestamp_seconds{job="bothy/bothy-backupd", bothy_backup_kind="logical"}'
+        values: '0+60x30'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: BothyBackupStale
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: BothyBackupStale
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              bothy_backup_kind: physical
+            exp_annotations:
+              summary: "No successful physical backup for more than 26 hours."
+              runbook_url: "docs/observability/alerting.md#bothybackupstale"
+          - exp_labels:
+              severity: page
+              bothy_backup_kind: objects
+            exp_annotations:
+              summary: "No successful objects backup for more than 26 hours."
+              runbook_url: "docs/observability/alerting.md#bothybackupstale"
 
   - name: BothyWalArchiveStale fires above 900 s
     interval: 1m
@@ -522,6 +604,41 @@ tests:
         alertname: BothyWalArchiveStale
         exp_alerts: []
 
+  - name: BothyWalArchiveStale fires when no value was ever reported
+    interval: 1m
+    input_series: []
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: BothyWalArchiveStale
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: BothyWalArchiveStale
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: "No WAL segment archived for 15 minutes; point-in-time recovery is at risk."
+              runbook_url: "docs/observability/alerting.md#bothywalarchivestale"
+
+  # Last value at 10m: from 25m none lies in the window [15m]; after `for: 5m` the alert fires.
+  - name: BothyWalArchiveStale fires 20 minutes after the last value
+    interval: 1m
+    input_series:
+      - series: 'bothy_backup_wal_last_archived_timestamp_seconds{job="bothy/bothy-backupd"}'
+        values: '0+60x10'
+    alert_rule_test:
+      - eval_time: 29m
+        alertname: BothyWalArchiveStale
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: BothyWalArchiveStale
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: "No WAL segment archived for 15 minutes; point-in-time recovery is at risk."
+              runbook_url: "docs/observability/alerting.md#bothywalarchivestale"
+
   - name: BothyRestoreTestStale fires above 8 days (backup.restore_test.max_age)
     interval: 1m
     input_series:
@@ -549,6 +666,22 @@ tests:
       - eval_time: 90m
         alertname: BothyRestoreTestStale
         exp_alerts: []
+
+  - name: BothyRestoreTestStale fires when no value was ever reported
+    interval: 1m
+    input_series: []
+    alert_rule_test:
+      - eval_time: 59m
+        alertname: BothyRestoreTestStale
+        exp_alerts: []
+      - eval_time: 60m
+        alertname: BothyRestoreTestStale
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: "No successful automatic restore test for more than 8 days."
+              runbook_url: "docs/observability/alerting.md#bothyrestoreteststale"
 
   - name: BothyAuditChainBroken fires at once
     interval: 1m

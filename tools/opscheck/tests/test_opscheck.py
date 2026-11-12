@@ -1097,8 +1097,9 @@ def test_threshold_that_is_not_a_plain_number_fails(tree: Path, old: str, new: s
 
 
 def test_threshold_is_the_final_comparison(tree: Path) -> None:
-    rule = "expr: time() - max by (bothy_backup_kind) (bothy_backup_last_success_timestamp_seconds)"
-    edit(tree / ALERTS, rule, "expr: vector(1) > 0 and " + rule.removeprefix("expr: "))
+    # The expression goes on after the comparison (`or absent_over_time(...)`, without a `>`).
+    rule = "time() - max by (bothy_backup_kind) (bothy_backup_last_success_timestamp_seconds)"
+    edit(tree / ALERTS, rule, "vector(1) > 0 and " + rule)
     assert findings(tree, "alert-thresholds") == ()
     edit(tree / ALERTS, "> 93600", "> 93601")
     assert findings(tree, "alert-thresholds") == (
@@ -1108,10 +1109,10 @@ def test_threshold_is_the_final_comparison(tree: Path) -> None:
 
 
 def test_threshold_ignores_promql_comments_and_strings(tree: Path) -> None:
+    # The rule is a block scalar already, so the `#` reaches PromQL and is no YAML comment.
     metric = "bothy_backup_last_success_timestamp_seconds"
-    before = f"        expr: time() - max by (bothy_backup_kind) ({metric}) > 93600\n"
+    before = f"          time() - max by (bothy_backup_kind) ({metric}) > 93600\n"
     after = (
-        "        expr: |\n"
         f'          time() - max by (bothy_backup_kind) ({metric}{{note="a \\" > 1"}}) > 93600'
         " # was > 1\n"
     )

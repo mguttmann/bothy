@@ -157,9 +157,11 @@ func (d daemonTarget) NewScheduler(start time.Time) ticker { return d.BackupDaem
 // every started run has finished; a run canceled by the stop is recorded as failed with the code
 // canceled.
 func schedule(ctx context.Context, d scheduleTarget, clk clock.Clock, wait func(ctx context.Context, clk clock.Clock, at time.Time) bool) {
-	// The database may not be up yet: Prime logs the error, and the gauges start empty and fill
-	// with the first runs.
-	_ = d.Prime(ctx)
+	// The database may not be up yet: Prime logs the error and is tried again before every tick
+	// until it succeeded once. Without that the gauges of the last success stayed empty until the
+	// next successful run of each kind (up to a week for the restore test), and the alerts on
+	// them read a missing value as no success (BothyBackupStale, BothyRestoreTestStale).
+	primed := d.Prime(ctx) == nil
 	sched := d.NewScheduler(clk.Now())
 	defer sched.Wait()
 	d.Sample(ctx)
@@ -167,6 +169,9 @@ func schedule(ctx context.Context, d scheduleTarget, clk clock.Clock, wait func(
 		next := clk.Now().Truncate(time.Minute).Add(time.Minute)
 		if !wait(ctx, clk, next) {
 			return
+		}
+		if !primed {
+			primed = d.Prime(ctx) == nil
 		}
 		sched.Tick(ctx, clk.Now())
 		d.Sample(ctx)

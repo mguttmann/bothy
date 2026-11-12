@@ -86,6 +86,7 @@ alerts of `bothy-alerts.yaml`.
 |---|---|---|---|
 | `Watchdog` | heartbeat | always | |
 | `BothyServerTelemetryMissing` | page | no `target_info` from the server for 10 minutes | |
+| `BothyBackupTelemetryMissing` | page | no `target_info` from `bothy-backupd` for 10 minutes | |
 | `BothyCollectorDown` | page | collector does not respond | |
 | `BothyTelemetryExportFailing` | ticket | exporter of the collector fails | |
 | `BothyTelemetryDropped` | ticket | server discards telemetry | |
@@ -105,6 +106,14 @@ alerts of `bothy-alerts.yaml`.
 | `BothyDatabaseConnectionsHigh` | ticket | over 80 percent of `max_connections` | |
 | `BothyDatabaseDeadlocks` | ticket | deadlock reported | Lock order [03-data-model.md](../spec/03-data-model.md) 6.3 |
 
+`BothyBackupStale`, `BothyWalArchiveStale` and `BothyRestoreTestStale` compare a time that only
+`bothy-backupd` reports ([signals.md](signals.md) 4.6). They fail closed: a time that was not
+reported at all for as long as the threshold (26 hours per backup kind, 15 minutes, 8 days)
+counts like one that is too old, so a backup kind or a restore test that never succeeded and a
+value that is no longer reported raise the alert instead of keeping it quiet.
+`BothyBackupTelemetryMissing` reports within minutes that `bothy-backupd` sends nothing; it is
+the only alert for the volumes in that case, because `BothyVolumeFull` has no values then.
+
 ## 4. Runbook anchors
 
 Every rule names a `runbook_url` that points to an anchor of this file (alert name in lowercase).
@@ -115,6 +124,15 @@ No action needed. If the heartbeat is missing at the external service: check Pro
 
 ### bothyservertelemetrymissing
 `docker compose ps`; is `api` running? If yes: check the collector and `OTEL_EXPORTER_OTLP_ENDPOINT`.
+
+### bothybackuptelemetrymissing
+`docker compose ps backup`; is `bothy-backupd` running, and what does `docker compose logs backup`
+say (a configuration that does not load ends it with exit code `2`)? If it runs: check the
+collector and `OTEL_EXPORTER_OTLP_ENDPOINT` of the service `backup`. While this alert fires,
+nothing watches the backups, the WAL archive and the volumes: `bothy-backupd` sends every value
+that `BothyBackupStale`, `BothyWalArchiveStale`, `BothyRestoreTestStale` and `BothyVolumeFull`
+read. The service is also the repository host that `postgres` archives its WAL to, so `pg_wal`
+grows while it is down (see `bothywalarchivestale`).
 
 ### bothycollectordown
 `docker compose logs otel-collector`; often a missing secret of an overlay.
@@ -168,14 +186,29 @@ state `pending` and are not served.
 
 ### bothybackupstale
 `backup_runs` in the admin console; off-site target reachable? Space in the repository?
+The alert also fires for a kind without a reported last success in the last 26 hours. Then its
+runs have failed since the first one (the newest row of the kind in `backup_runs` holds the code
+in `error`; with the driver `s3` the kind `objects` needs an off-site target and fails with
+`s3_mirror_not_configured` without one), or `bothy-backupd` reports no value: either
+`BothyBackupTelemetryMissing` fires too, or its log holds `read the last successful runs`, which
+means that it could not read `backup_runs` yet; it tries again every minute. On a new
+installation the alert fires until every kind has succeeded once
+([install-compose.md](../operations/install-compose.md) 4).
 
 ### bothywalarchivestale
 pgBackRest `check` in the container `backup`; TLS between `postgres` and `backup`; space in `pg_wal`.
 If `pg_wal` fills up, PostgreSQL stops (PANIC), and the data is preserved
 (https://www.postgresql.org/docs/18/continuous-archiving.html, retrieved 2026-10-10) [verified].
+The alert also fires when no time of a last archived segment was reported for 15 minutes:
+PostgreSQL has archived none since its statistics were reset (`pg_stat_archiver`),
+`bothy-backupd` cannot read them (its log holds `backup sample of the WAL archive failed`), or it
+reports nothing (`BothyBackupTelemetryMissing`).
 
 ### bothyrestoreteststale
 Look at the last test run in `backup_runs`; which check fails?
+The alert also fires when no last successful test was reported for 8 days, for example because
+no test has succeeded since the installation; run one by hand
+(`docker compose exec backup bothy-backupd restore-test`).
 
 ### bothyauditchainbroken
 Treat as a security incident: who had write access to the database? Determine the last good point
@@ -206,7 +239,11 @@ with `promtool` and `amtool` in the version of the images:
    an alert without `for`, as soon as its condition holds. One evaluation earlier (the test file
    sets `evaluation_interval: 1m`) it is still quiet
    (Watchdog fires from the first evaluation on). Every alert with a threshold stays quiet in one
-   case exactly at the threshold. An alert without a firing case fails the check.
+   case exactly at the threshold. An alert without a firing case fails the check. The three
+   alerts on a time that `bothy-backupd` reports also fire in a case where the time was never
+   reported and in one where it stops; the cases over the windows of 26 hours and 8 days are in
+   [bothy-alerts-windows.test.yaml](../../infra/observability/prometheus/tests/bothy-alerts-windows.test.yaml),
+   which evaluates every 15 minutes.
 3. `amtool check-config` and the routes from section 1 with `amtool config routes test` (check
    `alertmanager`): `page` to `external-oncall` and `bothy-ops`, `ticket` to `bothy-ops`,
    `Watchdog` to `external-heartbeat`.
