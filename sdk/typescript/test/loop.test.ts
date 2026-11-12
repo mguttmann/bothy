@@ -1473,6 +1473,8 @@ describe("what the adapter keeps of ended runs", () => {
   it(
     "prunes its inbox at the start and every hour, so closed entries and jti rows go",
     async () => {
+      // "Every hour", the value the README and the ruling AUD-ST1/8 name.
+      expect(INBOX_PRUNE_INTERVAL_MS).toBe(60 * 60 * 1000);
       const inbox = new PrunedInbox();
       const eventId = "01900000-0000-7000-8000-00000000c105";
       await inbox.add(

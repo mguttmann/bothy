@@ -339,6 +339,11 @@ describe.each(Object.entries(kinds))("%s inbox store", (_name, make) => {
     expect(await store.get(done.eventId)).toBeUndefined();
   });
 
+  it("keeps a closed entry for one day by default", () => {
+    // The value the README and the ruling AUD-ST1/8 name.
+    expect(CLOSED_ENTRY_RETENTION_MS).toBe(24 * 60 * 60 * 1000);
+  });
+
   it("takes the retention of closed entries from its options", async () => {
     await store.close();
     store = make({ closedRetentionMs: 10 * S });
