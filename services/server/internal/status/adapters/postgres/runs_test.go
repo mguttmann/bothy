@@ -147,6 +147,79 @@ func TestRunsStartFinish(t *testing.T) {
 	}
 }
 
+// TestRunsFailRunning holds FailRunning, the step of bothy-backupd at its start for the rows of
+// runs whose process ended before it finished them: every row that is still running and was
+// started before the given time becomes failed with finished_at from the clock and the code; a
+// row started at or after that time, a finished row and its fields stay; a later Finish of a
+// closed row fails. It runs as bothy_backup, the role of the service.
+func TestRunsFailRunning(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	runs, clk, db := newRuns(t)
+
+	finished, err := runs.Start(ctx, status.BackupLogical)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clk.Advance(time.Minute)
+	manifest := []byte(`{"schema":"backup_manifest.v1","kind":"logical"}`)
+	if err := runs.Finish(ctx, status.FinishedRun{ID: finished, Succeeded: true, SizeBytes: 7, Manifest: manifest}); err != nil {
+		t.Fatal(err)
+	}
+	doneAt := clk.Now()
+	left, err := runs.Start(ctx, status.BackupPGFull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clk.Advance(time.Minute)
+	leftTest, err := runs.Start(ctx, status.BackupRestoreTest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The service starts again: its own runs begin at or after this instant.
+	clk.Advance(time.Hour)
+	processStart := clk.Now()
+	own, err := runs.Start(ctx, status.BackupObjects)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clk.Advance(time.Second)
+
+	n, err := runs.FailRunning(ctx, processStart, "interrupted")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Errorf("FailRunning closed %d rows, want the 2 that were left running", n)
+	}
+	for _, id := range []ids.ID{left, leftTest} {
+		r := readRun(t, db, id)
+		if r.state != "failed" || r.finished == nil || !r.finished.Equal(clk.Now()) || r.code == nil || *r.code != "interrupted" ||
+			r.size != nil || len(r.manifest) != 0 || len(r.checks) != 0 {
+			t.Errorf("left row %s: %+v, want failed with the code interrupted", r.kind, r)
+		}
+	}
+	if r := readRun(t, db, own); r.state != "running" || r.finished != nil || r.code != nil {
+		t.Errorf("the run of this process: %+v, want it still running", r)
+	}
+	if r := readRun(t, db, finished); r.state != "succeeded" || r.finished == nil || !r.finished.Equal(doneAt) ||
+		r.size == nil || *r.size != 7 || r.code != nil {
+		t.Errorf("the finished run changed: %+v", r)
+	}
+
+	// Nothing is left: a second call closes no row, and the closed run cannot be finished again.
+	if n, err := runs.FailRunning(ctx, processStart, "interrupted"); err != nil || n != 0 {
+		t.Errorf("second FailRunning = %d, %v; want 0 rows", n, err)
+	}
+	if err := runs.Finish(ctx, status.FinishedRun{ID: left, Succeeded: true}); err == nil {
+		t.Error("Finish of a row that was closed as interrupted succeeded")
+	}
+	if err := runs.Finish(ctx, status.FinishedRun{ID: own, Succeeded: true, SizeBytes: 1, Manifest: manifest}); err != nil {
+		t.Errorf("Finish of the run of this process: %v", err)
+	}
+}
+
 // TestRunsLastSuccess holds LastSuccess: the newest started_at of the succeeded rows of the given
 // kinds; failed and running rows and other kinds do not count; none gives false.
 func TestRunsLastSuccess(t *testing.T) {

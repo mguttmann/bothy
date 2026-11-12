@@ -167,9 +167,10 @@ Operating values of the own measurement ([25-visualization.md](../spec/25-visual
 | `bothy.backup.wal.last_archived.timestamp` | Gauge | `s` | none | bothy-backupd | `bothy_backup_wal_last_archived_timestamp_seconds` |
 | `bothy.backup.duration` | Gauge | `s` | `bothy.backup.kind` | bothy-backupd (last run) | `bothy_backup_duration_seconds` |
 | `bothy.backup.size` | Gauge | `By` | `bothy.backup.kind` | bothy-backupd | `bothy_backup_size_bytes` |
+| `bothy.backup.failures` | Counter | `{run}` | `bothy.backup.kind` (`pg_full`, `pg_diff`, `logical`, `objects`) | bothy-backupd: backup runs that failed, by the kind of their `backup_runs` row, so a failing full backup is not hidden behind differential backups that succeed; a run the stop of the process canceled does not count; every series starts at 0 with the process | `bothy_backup_failures_total` |
 | `bothy.backup.restore_test.last_success.timestamp` | Gauge | `s` | none | bothy-backupd | `bothy_backup_restore_test_last_success_timestamp_seconds` |
 | `bothy.backup.restore_test.duration` | Gauge | `s` | none | bothy-backupd (last run) | `bothy_backup_restore_test_duration_seconds` |
-| `bothy.backup.restore_test.failures` | Counter | `{check}` | `bothy.reason` (name of the check) | bothy-backupd | `bothy_backup_restore_test_failures_total` |
+| `bothy.backup.restore_test.failures` | Counter | `{check}` | `bothy.reason` (name of the check) | bothy-backupd; every series starts at 0 with the process | `bothy_backup_restore_test_failures_total` |
 | `bothy.storage.volume.free` | Gauge | `By` | `bothy.volume` (`pgdata`, `files`, `pgbackrest-repo`, `backup-scratch`) | bothy-backupd | `bothy_storage_volume_free_bytes` |
 | `bothy.storage.volume.size` | Gauge | `By` | `bothy.volume` | bothy-backupd | `bothy_storage_volume_size_bytes` |
 | `bothy.audit.verify.failures` | Counter | `{run}` | none | worker: periodic check of the hash chain | `bothy_audit_verify_failures_total` |
@@ -276,7 +277,7 @@ This list equals the allowlist in [infra/otel/collector.yaml](../../infra/otel/c
 | `bothy.action` | action ID from [05-actions.md](../spec/05-actions.md) | |
 | `bothy.agent.handle` | handle of the agent | assigned by the owner, not a person |
 | `bothy.agent.adapter_kind` | `agents.adapter_kind` | |
-| `bothy.backup.kind` | `physical`, `logical`, `objects`, `restore_test` | |
+| `bothy.backup.kind` | `physical`, `logical`, `objects`, `restore_test`; on `bothy.backup.failures` the backup kinds of `backup_runs`: `pg_full`, `pg_diff`, `logical`, `objects` | |
 | `bothy.billing_mode` | `personal`, `organization` | |
 | `bothy.channel.id`, `bothy.space.id`, `bothy.thread.id`, `bothy.message.id`, `bothy.run.id`, `bothy.file.id` | UUID | never on metrics |
 | `bothy.close.code` | close code from [04-sync-protocol.md](../spec/04-sync-protocol.md) 6.4 | |

@@ -28,6 +28,28 @@ func (q *Queries) BackupRunsExists(ctx context.Context) (bool, error) {
 	return exists, err
 }
 
+const failRunningBackupRuns = `-- name: FailRunningBackupRuns :execrows
+UPDATE backup_runs
+SET state = 'failed', finished_at = $1, error = $2
+WHERE state = 'running' AND started_at < $3
+`
+
+type FailRunningBackupRunsParams struct {
+	FinishedAt pgtype.Timestamptz
+	Error      pgtype.Text
+	Before     pgtype.Timestamptz
+}
+
+// The rows of runs whose process ended before it finished them (a kill, a crash of the host):
+// bothy-backupd closes them when it starts. Its own runs start after the given time.
+func (q *Queries) FailRunningBackupRuns(ctx context.Context, arg FailRunningBackupRunsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, failRunningBackupRuns, arg.FinishedAt, arg.Error, arg.Before)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const finishBackupRun = `-- name: FinishBackupRun :execrows
 UPDATE backup_runs
 SET state = $1, finished_at = $2, size_bytes = $3,

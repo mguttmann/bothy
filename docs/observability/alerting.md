@@ -99,8 +99,11 @@ alerts of `bothy-alerts.yaml`.
 | `BothySecretRefreshFailing` | ticket | re-reading a secret fails | |
 | `BothyMalwareScanFailing` | ticket | only errors, no result | |
 | `BothyBackupStale` | page | no backup for 26 h | `backup.max_age` |
+| `BothyBackupRunFailed` | ticket | a backup run failed in the last 24 hours, per kind of `backup_runs` (`pg_full`, `pg_diff`, `logical`, `objects`) | |
 | `BothyWalArchiveStale` | page | no WAL segment for 15 minutes | above `backup.pg.archive_timeout` |
 | `BothyRestoreTestStale` | ticket | no restore test for 8 days | `backup.restore_test.max_age` |
+| `BothyRestoreTestFailed` | ticket | a check of the automatic restore test other than the audit chain failed in the last 24 hours | |
+| `BothyRestoreTestAuditChainFailed` | page | the check of the audit chain of the automatic restore test failed in the last 24 hours | |
 | `BothyAuditChainBroken` | page | check of the hash chain fails | |
 | `BothyVolumeFull` | page | under 10 percent free | |
 | `BothyDatabaseConnectionsHigh` | ticket | over 80 percent of `max_connections` | |
@@ -195,6 +198,14 @@ means that it could not read `backup_runs` yet; it tries again every minute. On 
 installation the alert fires until every kind has succeeded once
 ([install-compose.md](../operations/install-compose.md) 4).
 
+### bothybackuprunfailed
+The label names the kind of the run. Its newest row in `backup_runs` (`state = 'failed'`) holds
+the code of the failed step in `error`, for example `pgbackrest_exit_82`; the log of the container
+`backup` holds the output of the tool. After the fix, run the kind by hand
+(`docker compose exec backup bothy-backupd backup <kind>`). The alert ends 24 hours after the
+last failed run of the kind. A run that the stop of `bothy-backupd` canceled raises no alert, and
+neither does a row closed as `interrupted` at its next start.
+
 ### bothywalarchivestale
 pgBackRest `check` in the container `backup`; TLS between `postgres` and `backup`; space in `pg_wal`.
 If `pg_wal` fills up, PostgreSQL stops (PANIC), and the data is preserved
@@ -209,6 +220,19 @@ Look at the last test run in `backup_runs`; which check fails?
 The alert also fires when no last successful test was reported for 8 days, for example because
 no test has succeeded since the installation; run one by hand
 (`docker compose exec backup bothy-backupd restore-test`).
+
+### bothyrestoretestfailed
+The label names the failed check. The newest `restore_test` row of `backup_runs` holds the result
+and the reason code of every check in `checks`
+([backup-restore.md](../operations/backup-restore.md) 4). After the fix, run the test by hand
+(`docker compose exec backup bothy-backupd restore-test`).
+
+### bothyrestoretestauditchainfailed
+The audit chain of the restored copy does not verify; `checks` of the newest `restore_test` row
+holds the reason code of the check `audit_chain`. If `BothyAuditChainBroken` fires as well, the
+chain of the running database is broken: follow its steps. If it is quiet, the backup or the
+repository is damaged: `docker compose exec backup pgbackrest --stanza=bothy verify`, then a new
+full backup and the test again.
 
 ### bothyauditchainbroken
 Treat as a security incident: who had write access to the database? Determine the last good point

@@ -163,6 +163,17 @@ groups:
           summary: "No successful {{ $labels.bothy_backup_kind }} backup for more than 26 hours."
           runbook_url: "docs/observability/alerting.md#bothybackupstale"
 
+      # One per failed run; a run that the stop of bothy-backupd canceled does not count. The
+      # counter keeps pg_full and pg_diff apart, which the gauge of BothyBackupStale does not:
+      # differential backups that succeed would hide a full backup that keeps failing.
+      - alert: BothyBackupRunFailed
+        expr: sum by (bothy_backup_kind) (increase(bothy_backup_failures_total[1d])) > 0
+        labels:
+          severity: ticket
+        annotations:
+          summary: "A {{ $labels.bothy_backup_kind }} backup run failed in the last 24 hours."
+          runbook_url: "docs/observability/alerting.md#bothybackuprunfailed"
+
       - alert: BothyWalArchiveStale
         expr: |
           time() - max(bothy_backup_wal_last_archived_timestamp_seconds) > 900
@@ -184,6 +195,23 @@ groups:
         annotations:
           summary: "No successful automatic restore test for more than 8 days."
           runbook_url: "docs/observability/alerting.md#bothyrestoreteststale"
+
+      # The check of the audit chain has its own alert below, so a failed check raises one alert.
+      - alert: BothyRestoreTestFailed
+        expr: sum by (bothy_reason) (increase(bothy_backup_restore_test_failures_total{bothy_reason!="audit_chain"}[1d])) > 0
+        labels:
+          severity: ticket
+        annotations:
+          summary: "The automatic restore test failed its check {{ $labels.bothy_reason }} in the last 24 hours."
+          runbook_url: "docs/observability/alerting.md#bothyrestoretestfailed"
+
+      - alert: BothyRestoreTestAuditChainFailed
+        expr: sum(increase(bothy_backup_restore_test_failures_total{bothy_reason="audit_chain"}[1d])) > 0
+        labels:
+          severity: page
+        annotations:
+          summary: "The automatic restore test found a broken audit chain in the restored backup."
+          runbook_url: "docs/observability/alerting.md#bothyrestoretestauditchainfailed"
 
       - alert: BothyAuditChainBroken
         expr: sum(increase(bothy_audit_verify_failures_total[1d])) > 0

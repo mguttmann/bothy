@@ -46,6 +46,15 @@ type BackupRuns interface {
 	// Finish moves the running row run.ID to succeeded or failed with finished_at = now, the
 	// size, the manifest and the error code. A row that is not running is an error.
 	Finish(ctx context.Context, run FinishedRun) error
+	// FailRunning moves every row that is still running and was started before the given time to
+	// failed with finished_at = now and the error code, and returns their number. bothy-backupd
+	// calls it when it starts, with its own start time: such a row belongs to a run whose
+	// process ended before it could finish it.
+	//
+	// Example:
+	//
+	//	n, err := runs.FailRunning(ctx, processStart, "interrupted")
+	FailRunning(ctx context.Context, before time.Time, code string) (int, error)
 	// LastSuccess returns the started_at of the newest succeeded run of any of kinds and true,
 	// or false when there is none. It returns ErrNoBackupTable when the table does not exist.
 	LastSuccess(ctx context.Context, kinds ...BackupKind) (time.Time, bool, error)

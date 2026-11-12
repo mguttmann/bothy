@@ -93,6 +93,21 @@ func (r *Runs) Finish(ctx context.Context, run status.FinishedRun) error {
 	return nil
 }
 
+// FailRunning implements status.BackupRuns: every row that is still running and was started
+// before the given time becomes failed with finished_at from the clock and the code; an empty
+// code records NULL. Size, manifest and checks keep the values of a running row.
+func (r *Runs) FailRunning(ctx context.Context, before time.Time, code string) (int, error) {
+	n, err := r.q.FailRunningBackupRuns(ctx, sqlcgen.FailRunningBackupRunsParams{
+		FinishedAt: ts(r.clock.Now()),
+		Error:      pgtype.Text{String: code, Valid: code != ""},
+		Before:     ts(before),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("status: closing the backup runs left running: %w", err)
+	}
+	return int(n), nil
+}
+
 // LastSuccess implements status.BackupRuns: the newest started_at of the succeeded rows of
 // kinds. It checks first that backup_runs exists and returns status.ErrNoBackupTable when the
 // schema predates M7-02.

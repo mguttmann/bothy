@@ -135,6 +135,11 @@ func restoreTestCommand(ctx context.Context, args, env []string, stderr io.Write
 type scheduleTarget interface {
 	Prime(ctx context.Context) error
 	Sample(ctx context.Context)
+	// ClearDumpDir removes what a run of an earlier process left in the dump directory.
+	ClearDumpDir(ctx context.Context) error
+	// CloseInterrupted closes the backup_runs rows that were still running before the given
+	// time, the start of this process.
+	CloseInterrupted(ctx context.Context, before time.Time) error
 	NewScheduler(start time.Time) ticker
 }
 
@@ -156,7 +161,19 @@ func (d daemonTarget) NewScheduler(start time.Time) ticker { return d.BackupDaem
 // an instant of clk or until ctx ends and reports whether the instant was reached. On return
 // every started run has finished; a run canceled by the stop is recorded as failed with the code
 // canceled.
+//
+// Before anything else it handles what a run left behind whose process ended without its cleanup
+// (a kill, an out-of-memory stop, a crash of the host): the dump directory is emptied once, and
+// the backup_runs rows that were running before this process started are closed as failed with
+// the code interrupted. The default command is the first process of its container, so nothing
+// else uses either at that moment; the short commands never do this step, because they run next
+// to the daemon.
 func schedule(ctx context.Context, d scheduleTarget, clk clock.Clock, wait func(ctx context.Context, clk clock.Clock, at time.Time) bool) {
+	started := clk.Now()
+	// Both log their own error. A dump directory that cannot be emptied does not stop the
+	// backups; the rows are tried again below.
+	_ = d.ClearDumpDir(ctx)
+	closed := d.CloseInterrupted(ctx, started) == nil
 	// The database may not be up yet: Prime logs the error and is tried again before every tick
 	// until it succeeded once. Without that the gauges of the last success stayed empty until the
 	// next successful run of each kind (up to a week for the restore test), and the alerts on
@@ -169,6 +186,10 @@ func schedule(ctx context.Context, d scheduleTarget, clk clock.Clock, wait func(
 		next := clk.Now().Truncate(time.Minute).Add(time.Minute)
 		if !wait(ctx, clk, next) {
 			return
+		}
+		if !closed {
+			// Still with the start of the process: a run a tick started since then is alive.
+			closed = d.CloseInterrupted(ctx, started) == nil
 		}
 		if !primed {
 			primed = d.Prime(ctx) == nil

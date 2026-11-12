@@ -106,6 +106,82 @@ func TestBackupDaemonRecordsRuns(t *testing.T) {
 	s.Wait()
 }
 
+// TestBackupDaemonHandlesWhatAnEarlierProcessLeft: the two steps of the default command of
+// bothy-backupd at its start, through the daemon built from the configuration and the role
+// bothy_backup. A run whose process was killed left its backup_runs row running and its dump and
+// the directory of its pg_dump password file in the dump directory: the row becomes failed with
+// the code interrupted, the directory is emptied, and a run started after the start of this
+// process stays untouched.
+func TestBackupDaemonHandlesWhatAnEarlierProcessLeft(t *testing.T) {
+	db := pgtest.New(t)
+	v := backupdEnv(t, db)
+	t.Setenv("PATH", t.TempDir())
+	ctx := testkit.Context(t)
+	super := db.SuperConn(t)
+
+	dumps := t.TempDir()
+	passDir := filepath.Join(dumps, ".pgpass-123456")
+	if err := os.Mkdir(passDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"bothy-0192f4a0-7b1c-7000-8a00-000000000001.dump", filepath.Join(".pgpass-123456", "pgpass")} {
+		if err := os.WriteFile(filepath.Join(dumps, name), []byte("EXAMPLE"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	processStart := time.Now()
+	const left, leftTest, own = "0192f4a0-7b1c-7000-8a00-000000000001", "0192f4a0-7b1c-7000-8a00-000000000002", "0192f4a0-7b1c-7000-8a00-000000000003"
+	for id, row := range map[string]struct {
+		kind    string
+		started time.Time
+	}{
+		left:     {"logical", processStart.Add(-time.Hour)},
+		leftTest: {"restore_test", processStart.Add(-time.Minute)},
+		own:      {"pg_full", processStart.Add(time.Second)},
+	} {
+		if _, err := super.Exec(ctx, "INSERT INTO backup_runs (id, kind, started_at) VALUES ($1, $2, $3)", id, row.kind, row.started); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	d, err := wire.NewBackupDaemon(ctx, v, wire.BackupDaemonOptions{DumpDir: dumps, ServerVersion: "1.2.3"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(d.Close)
+	if err := d.WaitReady(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.ClearDumpDir(ctx); err != nil {
+		t.Errorf("ClearDumpDir: %v", err)
+	}
+	if entries, err := os.ReadDir(dumps); err != nil || len(entries) != 0 {
+		t.Errorf("dump directory after the start: %d entries, %v; want it empty and present", len(entries), err)
+	}
+	if err := d.CloseInterrupted(ctx, processStart); err != nil {
+		t.Fatalf("CloseInterrupted: %v", err)
+	}
+	for id, want := range map[string]string{left: "failed interrupted true", leftTest: "failed interrupted true", own: "running  false"} {
+		var state, code string
+		var finished bool
+		if err := super.QueryRow(ctx, "SELECT state, COALESCE(error, ''), finished_at IS NOT NULL FROM backup_runs WHERE id = $1", id).
+			Scan(&state, &code, &finished); err != nil {
+			t.Fatal(err)
+		}
+		if got := state + " " + code + " " + strconv.FormatBool(finished); got != want {
+			t.Errorf("row %s: %q, want %q", id, got, want)
+		}
+	}
+	// A second call of the same process changes nothing.
+	if err := d.CloseInterrupted(ctx, processStart); err != nil {
+		t.Errorf("second CloseInterrupted: %v", err)
+	}
+	var running int
+	if err := super.QueryRow(ctx, "SELECT count(*) FROM backup_runs WHERE state = 'running'").Scan(&running); err != nil || running != 1 {
+		t.Errorf("%d running rows, %v; want the one of this process", running, err)
+	}
+}
+
 // TestBackupDaemonOffsiteMirror: with an off-site target and the driver s3 the daemon builds the
 // object mirror and repo2: no "local backup only" warning, and the pgBackRest environment
 // carries the off-site key of secrets/offsite/ (nothing is contacted).

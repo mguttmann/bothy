@@ -987,6 +987,20 @@ docs/decisions.d/M7-02.md D-M7-02-1 to D-M7-02-12):
 5. The row is written with the role `bothy_backup`; the manifest queries run as
    `migrate.bootstrap_user` in one `READ ONLY` transaction with `REPEATABLE READ`, with exact
    `count(*)` per table of the schema `public`.
+6. A run finishes its row itself, also when it is canceled: the stop of `bothy-backupd`, or
+   `SIGINT` or `SIGTERM` to `bothy-backupd backup <kind>` or `restore-test`, ends the run as
+   `failed` with the code `canceled`, and the dump of a logical run is removed. Only a process
+   that ends without that step (a kill, an out-of-memory stop, a crash of the host) leaves a row
+   in the state `running` and, for a logical run, the dump and the password file of `pg_dump` in
+   the volume `backup-scratch`. The default command of `bothy-backupd` therefore empties the dump
+   directory when it starts and closes every row that was `running` before its start as `failed`
+   with the code `interrupted`; while the database does not answer, it tries the rows again every
+   minute. The short commands never do this step, because they run next to the service
+   (docs/decisions.d/AUD-srv-status-01.md).
+7. A failed run adds one to `bothy.backup.failures` under the kind of its row, so a failing
+   `pg_full` shows next to `pg_diff` runs that succeed, and raises the alert
+   `BothyBackupRunFailed` ([alerting.md](../observability/alerting.md) 3.2); a `canceled` run
+   and a row closed as `interrupted` do not count.
 
 As built (M7-07, docs/decisions.d/M7-07.md): the manifest of every kind also names the position of
 the deletion journal ([20-privacy.md](20-privacy.md) 4.6), `deletion_journal.next_number`, read in
@@ -1053,7 +1067,11 @@ docs/decisions.d/M7-03.md D-M7-03-1 to D-M7-03-9):
 5. Metrics: `bothy.backup.restore_test.duration` and `bothy.backup.duration` with
    `bothy.backup.kind = restore_test`, `bothy.backup.restore_test.last_success.timestamp` after a
    test without a failed check, and one `bothy.backup.restore_test.failures` per failed check with
-   `bothy.reason` the name of the check.
+   `bothy.reason` the name of the check. A failed check raises the alert `BothyRestoreTestFailed`
+   (`ticket`), a failed check `audit_chain` the alert `BothyRestoreTestAuditChainFailed` (`page`)
+   instead ([alerting.md](../observability/alerting.md) 3.2).
+6. Not checked by the test: the copy in repo2, the logical dump and the restic repository beyond
+   the sampled objects ([backup-restore.md](../operations/backup-restore.md) 7 item 5).
 
 ### 8.4 Restore and sync
 
@@ -1412,7 +1430,7 @@ docs/decisions.d/M7-14.md D-M7-14-1 to D-M7-14-9):
 | Incidents | If `major_outage` lasts longer than `status.incident_after`, the `worker` creates an incident (`created_by` NULL). After recovery and `status.resolve_after`, it sets it to `resolved`. The owner can add texts at any time (`status.manage`) |
 | Agents | State from `agents.reported_runtime_state` (heartbeat). People see only agents with `agent.read` |
 | Visibility | `status.read` for logged-in principals; without login only with `status.public_enabled` |
-| Limit | The status page runs in the server. If the whole server fails, the app shows "Server unreachable"; the owner is then reached only via the external alert path (chapter 17, watchdog) |
+| Limit | The status page runs in the server. If the whole server fails, the app shows "Server unreachable"; the owner is then reached only via the external alert path (chapter 17, watchdog). The automatic states are as fresh as the last round of `status.probe`: while no `worker` runs the job, or the own measurement is not written, every component keeps its last state, and the page carries no time of the last round |
 
 | `health_source` | Check |
 |---|---|

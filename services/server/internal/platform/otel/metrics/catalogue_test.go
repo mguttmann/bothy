@@ -295,6 +295,8 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.maintenance.rejected",
 		// AR-04: the wake-up and autonomy instruments of 4.3.
 		"bothy.run.wake.pending", "bothy.run.wake.ended", "bothy.run.autonomy.cap_reached",
+		// AUD-srv-status-01: the failed backup runs by the kind of their row (4.6).
+		"bothy.backup.failures",
 	}
 	slices.Sort(want)
 	var got []string

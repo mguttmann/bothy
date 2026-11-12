@@ -4,6 +4,8 @@ package otelmetrics_test
 
 import (
 	"context"
+	"maps"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,7 +25,7 @@ type point struct {
 	attrs attribute.Set
 }
 
-// collect returns the gauge points of rm by instrument name.
+// collect returns the gauge points of rm by instrument name; the two counters are read by sums.
 func collect(t *testing.T, reader *sdkmetric.ManualReader) (map[string][]point, map[string]string) {
 	t.Helper()
 	var rm metricdata.ResourceMetrics
@@ -33,6 +35,9 @@ func collect(t *testing.T, reader *sdkmetric.ManualReader) (map[string][]point, 
 	points, units := map[string][]point{}, map[string]string{}
 	for _, sm := range rm.ScopeMetrics {
 		for _, m := range sm.Metrics {
+			if _, counter := m.Data.(metricdata.Sum[int64]); counter {
+				continue
+			}
 			g, ok := m.Data.(metricdata.Gauge[float64])
 			if !ok {
 				t.Fatalf("%s: data %T, want a float64 gauge", m.Name, m.Data)
@@ -44,6 +49,37 @@ func collect(t *testing.T, reader *sdkmetric.ManualReader) (map[string][]point, 
 		}
 	}
 	return points, units
+}
+
+// sums returns the points of the counters as "<instrument>{<value of its one attribute>}", and
+// fails on a counter that is not cumulative and monotonic.
+func sums(t *testing.T, reader *sdkmetric.ManualReader) map[string]int64 {
+	t.Helper()
+	var rm metricdata.ResourceMetrics
+	if err := reader.Collect(context.Background(), &rm); err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]int64{}
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			d, ok := m.Data.(metricdata.Sum[int64])
+			if !ok {
+				continue
+			}
+			if !d.IsMonotonic || d.Temporality != metricdata.CumulativeTemporality {
+				t.Errorf("%s: monotonic %v, temporality %v; want a cumulative counter", m.Name, d.IsMonotonic, d.Temporality)
+			}
+			for _, dp := range d.DataPoints {
+				if dp.Attributes.Len() != 1 {
+					t.Errorf("%s: %d attributes, want 1", m.Name, dp.Attributes.Len())
+					continue
+				}
+				kv, _ := dp.Attributes.Get(0)
+				out[m.Name+"{"+kv.Value.AsString()+"}"] = dp.Value
+			}
+		}
+	}
+	return out
 }
 
 // valueFor returns the value of the point of name whose attribute key has value, and whether
@@ -153,11 +189,10 @@ func TestRestoreTestMetrics(t *testing.T) {
 	if err := reader.Collect(ctx, &rm); err != nil {
 		t.Fatal(err)
 	}
-	gauges, failures := map[string]float64{}, map[string]int64{}
+	gauges := map[string]float64{}
 	for _, sm := range rm.ScopeMetrics {
 		for _, m := range sm.Metrics {
-			switch d := m.Data.(type) {
-			case metricdata.Gauge[float64]:
+			if d, ok := m.Data.(metricdata.Gauge[float64]); ok {
 				for _, dp := range d.DataPoints {
 					key := m.Name
 					if v, ok := dp.Attributes.Value("bothy.backup.kind"); ok {
@@ -165,14 +200,10 @@ func TestRestoreTestMetrics(t *testing.T) {
 					}
 					gauges[key] = dp.Value
 				}
-			case metricdata.Sum[int64]:
-				for _, dp := range d.DataPoints {
-					v, _ := dp.Attributes.Value("bothy.reason")
-					failures[m.Name+"{"+v.AsString()+"}"] = dp.Value
-				}
 			}
 		}
 	}
+	failures := sums(t, reader)
 	if got := gauges["bothy.backup.restore_test.last_success.timestamp"]; got != float64(at.Unix()) {
 		t.Errorf("last success %v, want the passed test %v", got, at.Unix())
 	}
@@ -185,7 +216,69 @@ func TestRestoreTestMetrics(t *testing.T) {
 	if _, ok := gauges["bothy.backup.size{restore_test}"]; ok {
 		t.Error("the restore test recorded a size")
 	}
-	if failures["bothy.backup.restore_test.failures{event_log}"] != 2 || failures["bothy.backup.restore_test.failures{audit_chain}"] != 1 || len(failures) != 2 {
-		t.Errorf("failures %v, want event_log 2 and audit_chain 1", failures)
+	wantFailures := map[string]int64{
+		"bothy.backup.restore_test.failures{event_log}": 2, "bothy.backup.restore_test.failures{audit_chain}": 1,
+		"bothy.backup.restore_test.failures{pgbackrest}": 0, "bothy.backup.restore_test.failures{manifest}": 0,
+		"bothy.backup.restore_test.failures{thread_sample}": 0, "bothy.backup.restore_test.failures{file_sample}": 0,
+		"bothy.backup.restore_test.failures{duration}": 0,
+		// A failed restore test is no failed backup run.
+		"bothy.backup.failures{pg_full}": 0, "bothy.backup.failures{pg_diff}": 0,
+		"bothy.backup.failures{logical}": 0, "bothy.backup.failures{objects}": 0,
+	}
+	if !maps.Equal(failures, wantFailures) {
+		t.Errorf("failures %v, want event_log 2, audit_chain 1 and every other series 0", failures)
+	}
+}
+
+// TestFailureCountersStartAtZero holds what the alerts BothyBackupRunFailed, BothyRestoreTestFailed
+// and BothyRestoreTestAuditChainFailed need (docs/observability/alerting.md): every series of
+// the two failure counters exists with 0 from the creation of the recorder on, before any run.
+// A cumulative counter that first appears with its first failure shows no increase to a rule, so
+// the first failure after every start of the process would raise no alert.
+func TestFailureCountersStartAtZero(t *testing.T) {
+	_, reader := newRecorder(t)
+	got := sums(t, reader)
+	want := map[string]int64{}
+	for _, k := range domain.Kinds() {
+		want["bothy.backup.failures{"+string(k)+"}"] = 0
+	}
+	for _, c := range domain.RestoreCheckNames() {
+		want["bothy.backup.restore_test.failures{"+string(c)+"}"] = 0
+	}
+	if len(want) != 11 {
+		t.Fatalf("%d series expected from the domain, want four kinds and seven checks", len(want))
+	}
+	if !maps.Equal(got, want) {
+		t.Errorf("counters at the start %v, want %v", got, want)
+	}
+}
+
+// TestRunFailed: a failed backup run counts under the kind of its backup_runs row, so pg_full
+// and pg_diff count apart (the gauges put both under physical, where a succeeding pg_diff hides
+// a failing pg_full); the restore test is no backup kind and counts nothing here.
+func TestRunFailed(t *testing.T) {
+	r, reader := newRecorder(t)
+	ctx := context.Background()
+	r.RunFailed(ctx, domain.KindPGFull)
+	r.RunFailed(ctx, domain.KindPGFull)
+	r.RunFailed(ctx, domain.KindObjects)
+	r.RunFailed(ctx, domain.KindRestoreTest)
+	got := sums(t, reader)
+	for kind, want := range map[string]int64{"pg_full": 2, "pg_diff": 0, "logical": 0, "objects": 1} {
+		if v, ok := got["bothy.backup.failures{"+kind+"}"]; !ok || v != want {
+			t.Errorf("bothy.backup.failures{%s} = %d (present %v), want %d", kind, v, ok, want)
+		}
+	}
+	for key := range got {
+		if strings.HasPrefix(key, "bothy.backup.failures{") && len(got) != 11 {
+			t.Errorf("series %v, want only the four backup kinds under bothy.backup.failures", got)
+			break
+		}
+	}
+	// A failed run still records the gauges of its metric kind through RunFinished.
+	r.RunFinished(ctx, domain.KindPGFull, false, time.Second, 0, time.Date(2026, 10, 19, 2, 0, 0, 0, time.UTC))
+	points, _ := collect(t, reader)
+	if v, ok := valueFor(points, "bothy.backup.duration", "bothy.backup.kind", "physical"); !ok || v != 1 {
+		t.Errorf("bothy.backup.duration{physical} = %v (present %v), want 1", v, ok)
 	}
 }

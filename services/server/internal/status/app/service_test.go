@@ -207,6 +207,9 @@ func TestRunWritesRowAndManifest(t *testing.T) {
 				f.duration <= 0 || !f.finishedAt.Equal(row.finished) {
 				t.Errorf("RunFinished %+v, want kind %s succeeded size %d duration %v at %v", f, c.kind, c.size, row.finished.Sub(row.started), row.finished)
 			}
+			if got := e.m.failedRuns(); len(got) != 0 {
+				t.Errorf("RunFailed %v for a succeeded run, want none", got)
+			}
 			if !strings.Contains(e.log.String(), "state=succeeded") || !strings.Contains(e.log.String(), row.id.String()) {
 				t.Errorf("log %q lacks the run line", e.log.String())
 			}
@@ -287,6 +290,11 @@ func TestRunFailureRecordsCode(t *testing.T) {
 			if len(e.m.finished) != 1 || e.m.finished[0].succeeded || e.m.finished[0].size != 0 {
 				t.Errorf("RunFinished %+v, want one failed run of size 0", e.m.finished)
 			}
+			// The failure counts under the kind of the row, so a failing pg_full is not hidden
+			// behind the pg_diff runs that share its metric kind physical.
+			if got := e.m.failedRuns(); !slices.Equal(got, []domain.Kind{c.kind}) {
+				t.Errorf("RunFailed %v, want one failure of %s", got, c.kind)
+			}
 		})
 	}
 
@@ -312,6 +320,10 @@ func TestRunFailureRecordsCode(t *testing.T) {
 		}
 		if _, err := os.Stat(e.exec.dumps[0]); !errors.Is(err, os.ErrNotExist) {
 			t.Errorf("dump left behind: %v", err)
+		}
+		// A stop of the process is no failed backup: it must not raise the failure alert.
+		if got := e.m.failedRuns(); len(got) != 0 {
+			t.Errorf("RunFailed %v for a canceled run, want none", got)
 		}
 	})
 
@@ -339,6 +351,119 @@ func TestRunFailureRecordsCode(t *testing.T) {
 			t.Errorf("Run(restore_test) = %v, want an error and no row", err)
 		}
 	})
+}
+
+// TestCloseInterrupted holds the step of bothy-backupd at its start for the rows of runs whose
+// process ended before it finished them (a kill, an out-of-memory stop, a crash of the host):
+// every row that is still running and was started before the start of this process becomes
+// failed with the code interrupted, a row this process started stays running, the log names the
+// number, and an error of the port is returned so the caller tries again.
+func TestCloseInterrupted(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	e := newEnv(t, nil)
+	backup, err := e.runs.Start(ctx, status.BackupLogical)
+	if err != nil {
+		t.Fatal(err)
+	}
+	test, err := e.runs.Start(ctx, status.BackupRestoreTest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.clk.Advance(time.Hour)
+	processStart := e.clk.Now()
+	own, err := e.runs.Start(ctx, status.BackupPGFull)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	e.runs.failErr = errors.New("connection refused")
+	if n, err := e.svc.CloseInterrupted(ctx, processStart); err == nil || n != 0 {
+		t.Errorf("CloseInterrupted with a failing port = %d, %v; want the error", n, err)
+	}
+	e.runs.failErr = nil
+
+	n, err := e.svc.CloseInterrupted(ctx, processStart)
+	if err != nil || n != 2 {
+		t.Fatalf("CloseInterrupted = %d, %v; want the 2 rows of the earlier process", n, err)
+	}
+	for _, row := range e.runs.snapshot() {
+		switch row.id {
+		case backup, test:
+			if row.state != "failed" || row.code != "interrupted" || row.finished.IsZero() {
+				t.Errorf("%s row %+v, want failed with the code interrupted", row.kind, row)
+			}
+		case own:
+			if row.state != "running" {
+				t.Errorf("the run of this process: %+v, want it still running", row)
+			}
+		}
+	}
+	if log := e.log.String(); !strings.Contains(log, "code=interrupted") || !strings.Contains(log, "count=2") {
+		t.Errorf("log %q lacks the line with the code and the number", log)
+	}
+	if !domain.ValidErrorCode("interrupted") {
+		t.Error("interrupted is no valid error code")
+	}
+	// No metric: a row closed at the start is no run of this process.
+	if len(e.m.finished) != 0 || len(e.m.failedRuns()) != 0 {
+		t.Errorf("metrics %+v, %v for rows closed at the start, want none", e.m.finished, e.m.failedRuns())
+	}
+
+	e.log.mu.Lock()
+	e.log.buf.Reset()
+	e.log.mu.Unlock()
+	if n, err := e.svc.CloseInterrupted(ctx, processStart); err != nil || n != 0 {
+		t.Errorf("second CloseInterrupted = %d, %v; want 0", n, err)
+	}
+	if log := e.log.String(); log != "" {
+		t.Errorf("a call that closed nothing logged %q", log)
+	}
+}
+
+// TestClearDumpDir holds the other half of that step: the dump directory is emptied, because a
+// run that ended without its cleanup left the dump with the whole content of the database, the
+// directory with the password file of pg_dump or the object copy of the mirror there. The
+// directory itself stays, and an empty one is no error.
+func TestClearDumpDir(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t, nil)
+	dir := e.cfg.DumpDir
+	if n, err := e.svc.ClearDumpDir(context.Background()); err != nil || n != 0 {
+		t.Errorf("ClearDumpDir of an empty directory = %d, %v; want 0", n, err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "bothy-0192f4a0-7b1c-7000-8a00-000000000001.dump"), []byte("PGDMP EXAMPLE"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	pass := filepath.Join(dir, ".pgpass-123456")
+	if err := os.Mkdir(pass, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pass, "pgpass"), []byte("db.example.com:5432:bothy:postgres:EXAMPLE\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".s3mirror-654321"), []byte("object"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	n, err := e.svc.ClearDumpDir(context.Background())
+	if err != nil || n != 3 {
+		t.Errorf("ClearDumpDir = %d, %v; want the 3 entries removed", n, err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("the dump directory itself is gone: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("%d entries left in the dump directory, first %s", len(entries), entries[0].Name())
+	}
+	if log := e.log.String(); !strings.Contains(log, "count=3") || strings.Contains(log, "pgpass") || strings.Contains(log, ".dump") {
+		t.Errorf("log %q, want the number and no file name", log)
+	}
+	// A logical run still works in the emptied directory.
+	if err := e.svc.Run(context.Background(), domain.KindLogical); err != nil {
+		t.Errorf("Run after ClearDumpDir: %v", err)
+	}
 }
 
 // TestOneRunPerKind holds "at most one run per kind" (brief M7-02 design note 1): a second run of

@@ -33,6 +33,11 @@ const localOnlyWarning = "local backup only: backup.offsite.target is empty"
 // manifestTag is the restic tag of the manifest snapshots, the tag their thinning selects.
 const manifestTag = "manifest"
 
+// codeInterrupted is the error code of a row that was still running when bothy-backupd started:
+// the process of its run ended before it could finish the row (CloseInterrupted). A run whose
+// context ends finishes its row itself, with codeCanceled.
+const codeInterrupted = "interrupted"
+
 // The keys of the log lines; their values are kinds, ids, states, codes and volume names only,
 // never output text.
 const (
@@ -43,6 +48,8 @@ const (
 	attrVolume = "volume"
 	// attrRecorded is false when the row could not be finished.
 	attrRecorded = "recorded"
+	// attrCount is the number of rows or directory entries a start step handled.
+	attrCount = "count"
 )
 
 // Config is the configuration of the backup service, bound from the keys backup.* and file.* by
@@ -209,7 +216,7 @@ func (s *Service) run(ctx context.Context, kind domain.Kind) error {
 	}
 	manifest, out, code, runErr := s.steps(ctx, kind, id, started)
 	if runErr != nil && ctx.Err() != nil {
-		code = "canceled"
+		code = codeCanceled
 	}
 
 	// The row is finished even when ctx was canceled: a run that stays running would block the
@@ -234,6 +241,11 @@ func (s *Service) run(ctx context.Context, kind domain.Kind) error {
 		slog.String(attrState, state), slog.String(attrCode, code), slog.Bool(attrRecorded, finishErr == nil))
 	if s.deps.Metrics != nil {
 		s.deps.Metrics.RunFinished(fctx, kind, runErr == nil, finishedAt.Sub(started), metricSize, finishedAt)
+		// A run the stop of the process canceled is no failed backup and must not raise the
+		// failure alert, like a canceled restore test (docs/decisions.d/M7-03.md D-M7-03-11).
+		if runErr != nil && code != codeCanceled {
+			s.deps.Metrics.RunFailed(fctx, kind)
+		}
 	}
 	if runErr != nil {
 		return runErr
@@ -242,6 +254,68 @@ func (s *Service) run(ctx context.Context, kind domain.Kind) error {
 		return fmt.Errorf("status: recording the end of the %s backup: %w", kind, finishErr)
 	}
 	return nil
+}
+
+// CloseInterrupted finishes as failed with the code "interrupted" every backup_runs row, of a
+// backup or of a restore test, that is still running and was started before the given time, and
+// returns their number. bothy-backupd calls it when it starts, with its own start time: a run
+// finishes its row itself, also when it is canceled, so such a row is left by a process that
+// ended without that step (a kill, an out-of-memory stop, a crash of the host), and nothing else
+// would ever close it. It records no metric, because no run of this process ended.
+//
+// The caller must be the only process that runs backups of the instance at that time; this
+// holds for the default command of bothy-backupd, the first process of its container. On an
+// error of the port nothing is known to be closed, and the caller may call again.
+//
+// Example:
+//
+//	n, err := svc.CloseInterrupted(ctx, processStart)
+func (s *Service) CloseInterrupted(ctx context.Context, before time.Time) (int, error) {
+	n, err := s.deps.Runs.FailRunning(ctx, before, codeInterrupted)
+	if err != nil {
+		return 0, fmt.Errorf("status: closing the interrupted backup runs: %w", err)
+	}
+	if n > 0 {
+		s.log.LogAttrs(ctx, slog.LevelWarn, "backup runs of an earlier process closed", slog.String(attrState, "failed"),
+			slog.String(attrCode, codeInterrupted), slog.Int(attrCount, n))
+	}
+	return n, nil
+}
+
+// ClearDumpDir removes every entry of the dump directory and returns their number; the
+// directory itself stays. bothy-backupd calls it when it starts: a logical run removes its dump
+// file and the directory of its password file itself, and the mirror its object copy, so an
+// entry found at the start was left by a process that ended without that step. The dump holds
+// the whole content of the database and the password file the password of
+// migrate.bootstrap_user; neither may wait for a later run, which never looks at them.
+//
+// The caller must be the only process that uses the directory at that time, as for
+// CloseInterrupted. It returns the joined errors of the entries it could not remove; the others
+// are removed.
+//
+// Example:
+//
+//	n, err := svc.ClearDumpDir(ctx)
+func (s *Service) ClearDumpDir(ctx context.Context) (int, error) {
+	entries, err := os.ReadDir(s.cfg.DumpDir)
+	if err != nil {
+		return 0, fmt.Errorf("status: reading the dump directory: %w", err)
+	}
+	var (
+		n    int
+		errs []error
+	)
+	for _, e := range entries {
+		if err := os.RemoveAll(filepath.Join(s.cfg.DumpDir, e.Name())); err != nil {
+			errs = append(errs, fmt.Errorf("status: removing an entry of the dump directory: %w", err))
+			continue
+		}
+		n++
+	}
+	if n > 0 {
+		s.log.LogAttrs(ctx, slog.LevelWarn, "backup files of an earlier process removed", slog.Int(attrCount, n))
+	}
+	return n, errors.Join(errs...)
 }
 
 // steps runs the backup of kind, then builds and stores the manifest and, without an off-site

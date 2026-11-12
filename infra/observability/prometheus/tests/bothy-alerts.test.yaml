@@ -576,6 +576,43 @@ tests:
               summary: "No successful objects backup for more than 26 hours."
               runbook_url: "docs/observability/alerting.md#bothybackupstale"
 
+  # The series start at 0 with the process (signals.md 4.6), so the first failed run is an
+  # increase. The kinds are those of backup_runs: a failed pg_full fires under its own kind
+  # while pg_diff runs succeed.
+  - name: BothyBackupRunFailed fires at once for the kind that failed
+    interval: 1m
+    input_series:
+      - series: 'bothy_backup_failures_total{job="bothy/bothy-backupd", bothy_backup_kind="pg_full"}'
+        values: '0 1 1'
+      - series: 'bothy_backup_failures_total{job="bothy/bothy-backupd", bothy_backup_kind="pg_diff"}'
+        values: '0 0 0'
+    alert_rule_test:
+      # No `for`: quiet before the first failed run, firing at the first evaluation after it.
+      - eval_time: 0m
+        alertname: BothyBackupRunFailed
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: BothyBackupRunFailed
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              bothy_backup_kind: pg_full
+            exp_annotations:
+              summary: "A pg_full backup run failed in the last 24 hours."
+              runbook_url: "docs/observability/alerting.md#bothybackuprunfailed"
+
+  - name: BothyBackupRunFailed stays quiet without failed runs
+    interval: 1m
+    input_series:
+      - series: 'bothy_backup_failures_total{job="bothy/bothy-backupd", bothy_backup_kind="pg_full"}'
+        values: '0x20'
+      - series: 'bothy_backup_failures_total{job="bothy/bothy-backupd", bothy_backup_kind="logical"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: BothyBackupRunFailed
+        exp_alerts: []
+
   - name: BothyWalArchiveStale fires above 900 s
     interval: 1m
     input_series:
@@ -682,6 +719,73 @@ tests:
             exp_annotations:
               summary: "No successful automatic restore test for more than 8 days."
               runbook_url: "docs/observability/alerting.md#bothyrestoreteststale"
+
+  # A failed check of the audit chain raises only the page alert, every other check only the
+  # ticket alert.
+  - name: BothyRestoreTestFailed fires at once for a failed check that is not the audit chain
+    interval: 1m
+    input_series:
+      - series: 'bothy_backup_restore_test_failures_total{job="bothy/bothy-backupd", bothy_reason="event_log"}'
+        values: '0 1 1'
+      - series: 'bothy_backup_restore_test_failures_total{job="bothy/bothy-backupd", bothy_reason="audit_chain"}'
+        values: '0 1 1'
+      - series: 'bothy_backup_restore_test_failures_total{job="bothy/bothy-backupd", bothy_reason="duration"}'
+        values: '0 0 0'
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: BothyRestoreTestFailed
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: BothyRestoreTestFailed
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              bothy_reason: event_log
+            exp_annotations:
+              summary: "The automatic restore test failed its check event_log in the last 24 hours."
+              runbook_url: "docs/observability/alerting.md#bothyrestoretestfailed"
+
+  - name: BothyRestoreTestFailed stays quiet without failed checks
+    interval: 1m
+    input_series:
+      - series: 'bothy_backup_restore_test_failures_total{job="bothy/bothy-backupd", bothy_reason="event_log"}'
+        values: '0x20'
+      - series: 'bothy_backup_restore_test_failures_total{job="bothy/bothy-backupd", bothy_reason="audit_chain"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: BothyRestoreTestFailed
+        exp_alerts: []
+
+  - name: BothyRestoreTestAuditChainFailed fires at once
+    interval: 1m
+    input_series:
+      - series: 'bothy_backup_restore_test_failures_total{job="bothy/bothy-backupd", bothy_reason="audit_chain"}'
+        values: '0 1 1'
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: BothyRestoreTestAuditChainFailed
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: BothyRestoreTestAuditChainFailed
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: "The automatic restore test found a broken audit chain in the restored backup."
+              runbook_url: "docs/observability/alerting.md#bothyrestoretestauditchainfailed"
+
+  - name: BothyRestoreTestAuditChainFailed stays quiet while only other checks fail
+    interval: 1m
+    input_series:
+      - series: 'bothy_backup_restore_test_failures_total{job="bothy/bothy-backupd", bothy_reason="audit_chain"}'
+        values: '0x20'
+      - series: 'bothy_backup_restore_test_failures_total{job="bothy/bothy-backupd", bothy_reason="event_log"}'
+        values: '0 1x19'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: BothyRestoreTestAuditChainFailed
+        exp_alerts: []
 
   - name: BothyAuditChainBroken fires at once
     interval: 1m
