@@ -10,6 +10,7 @@
 export {
   Adapter,
   AgentHandler,
+  INBOX_PRUNE_INTERVAL_MS,
   RuntimeFailure,
   type ActualBilling,
   type AdapterConfig,

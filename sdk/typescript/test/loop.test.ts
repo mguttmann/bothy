@@ -31,10 +31,10 @@ import {
   MemoryInboxStore,
 } from "../src/invocation/index.js";
 import { silentLogger } from "../src/logger.js";
-import { INBOX_PRUNE_INTERVAL_MS } from "../src/runs/adapter.js";
 import {
   Adapter,
   AgentHandler,
+  INBOX_PRUNE_INTERVAL_MS,
   RuntimeFailure,
   type ActualBilling,
   type AdapterConfig,
