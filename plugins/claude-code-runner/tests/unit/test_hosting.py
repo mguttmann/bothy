@@ -351,3 +351,80 @@ async def test_close_stops_every_connection_together() -> None:
     await hosting.close()
     assert order == ["first begins", "second begins", "first ends", "second ends"]
     assert hosting.agent_ids == []
+
+
+async def test_close_stops_every_connection_when_one_stop_fails(logs: LogLines) -> None:
+    # One stop that fails must not end the close: the stops of the other agents go on to
+    # their end (each waits until the turns of its agent are stopped), and the set is empty.
+    ended: list[str] = []
+
+    class Connection:
+        def __init__(self, name: str, fails: bool = False) -> None:
+            self.name = name
+            self.fails = fails
+
+        async def stop(self) -> None:
+            if self.fails:
+                raise RuntimeError("CANARY-7f3a in the message of the error")
+            for _ in range(3):  # this stop is still waiting when the other one has failed
+                await asyncio.sleep(0)
+            ended.append(self.name)
+
+    hosting = HostedAgents(SimpleNamespace())  # type: ignore[arg-type]
+    hosting._connections = {  # type: ignore[assignment]
+        UUID(int=1): Connection("first"),
+        UUID(int=2): Connection("second", fails=True),
+        UUID(int=3): Connection("third"),
+    }
+    await hosting.close()
+    assert ended == ["first", "third"]
+    assert hosting.agent_ids == []
+    assert _events(logs, "hosted_stop_failed") == [
+        {"event": "hosted_stop_failed", "agent_id": str(UUID(int=2)), "error": "RuntimeError"}
+    ]
+    assert "CANARY" not in logs.text
+
+
+async def test_close_empties_the_set_when_it_is_cancelled() -> None:
+    waiting = asyncio.Event()
+
+    class Connection:
+        async def stop(self) -> None:
+            waiting.set()
+            await asyncio.Event().wait()
+
+    hosting = HostedAgents(SimpleNamespace())  # type: ignore[arg-type]
+    hosting._connections = {UUID(int=1): Connection()}  # type: ignore[dict-item]
+    closing = asyncio.ensure_future(hosting.close())
+    await waiting.wait()
+    closing.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await closing
+    assert hosting.agent_ids == []
+
+
+async def test_a_connection_whose_close_fails_is_still_ended(tmp_path: Path) -> None:
+    # The stop of a connection waits until the agent is no longer served, which is when its
+    # turns are stopped. When closing the connection fails, it must not stay as it is: it is
+    # cancelled after the wait, as when it does not end in time.
+    class Adapter:
+        async def stop(self) -> None:
+            raise RuntimeError("the close failed")
+
+    async def serve() -> None:
+        await asyncio.Event().wait()  # a connection that never ends by itself
+
+    async def updated() -> None:
+        return None
+
+    context = SimpleNamespace(
+        state_dir=tmp_path, root=None, ceiling="host", settings=SimpleNamespace(http_timeout=0.01)
+    )
+    connection = HostedConnection(UUID(int=1), "chat", context, updated)  # type: ignore[arg-type]
+    connection._adapter = Adapter()  # type: ignore[assignment]
+    served = asyncio.ensure_future(serve())
+    connection._task = served
+    with pytest.raises(RuntimeError):
+        await connection.stop()
+    assert served.cancelled()
+    assert connection.stopping

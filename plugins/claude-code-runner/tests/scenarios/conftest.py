@@ -43,15 +43,20 @@ import helper
 API_KEY = "sk-ant-canary-0123456789"
 
 
+ERROR_CANARY = "ERROR-CANARY-4e9b"
+"""A text in the message of the error `fail_turn_records` raises (the file it names)."""
+
+
 def fail_turn_records(monkeypatch: pytest.MonkeyPatch) -> None:
     """From now on no turn record can be written, as in a state folder without space left.
 
     The next write raises `OSError` inside the run that makes it, at a place where the runner
-    expects no error: the run ends by an unexpected error (09 18.9).
+    expects no error: the run ends by an unexpected error (09 18.9). Its message names a file,
+    as the message of such an error does (`ERROR_CANARY`).
     """
 
     def no_space(*_: Any) -> None:
-        raise OSError(errno.ENOSPC, os.strerror(errno.ENOSPC))
+        raise OSError(errno.ENOSPC, os.strerror(errno.ENOSPC), f"/state/{ERROR_CANARY}.json")
 
     monkeypatch.setattr("claude_code_runner.runturn.write_turn_record", no_space)
 
@@ -401,6 +406,29 @@ class LogLines(logging.Handler):
     @property
     def text(self) -> str:
         return "\n".join(r.getMessage() for r in self.records)
+
+
+def runner_output(logs: LogLines) -> str:
+    """What the runner's console script writes of its own log lines.
+
+    It logs from level info on and formats a line as its message, followed by the traceback
+    when the record carries an error (``claude_code_runner.__main__``).
+    """
+    console = logging.Formatter("%(message)s")
+    return "\n".join(
+        console.format(r)
+        for r in logs.records
+        if r.name == "claude_code_runner" and r.levelno >= logging.INFO
+    )
+
+
+def debug_tracebacks(logs: LogLines) -> list[str]:
+    """The messages of the runner's lines of level debug that carry the traceback of an error."""
+    return [
+        r.getMessage()
+        for r in logs.records
+        if r.name == "claude_code_runner" and r.levelno == logging.DEBUG and r.exc_info
+    ]
 
 
 @pytest.fixture

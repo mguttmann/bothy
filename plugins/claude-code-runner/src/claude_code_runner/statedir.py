@@ -27,7 +27,14 @@ from collections.abc import Collection
 from pathlib import Path
 from uuid import UUID
 
-__all__ = ["StateDirError", "ensure_private_dir", "hosted_dir", "sweep", "write_private"]
+__all__ = [
+    "StateDirError",
+    "ensure_private_dir",
+    "hosted_dir",
+    "is_private_dir",
+    "sweep",
+    "write_private",
+]
 
 _OPEN_BITS = stat.S_IRWXG | stat.S_IRWXO
 _SWEPT = ("sessions", "files")
@@ -80,6 +87,28 @@ def ensure_private_dir(path: Path) -> Path:
     if info.st_mode & _OPEN_BITS:
         raise StateDirError("not_private")
     return path
+
+
+def is_private_dir(path: Path) -> bool:
+    """Tell whether ``path`` is a folder as `ensure_private_dir` leaves it; nothing is created.
+
+    Args:
+        path: The folder.
+
+    Returns:
+        True for a directory itself (no link to one) without a permission for group or others.
+
+    Examples:
+        >>> import tempfile, pathlib
+        >>> base = pathlib.Path(tempfile.mkdtemp())
+        >>> is_private_dir(ensure_private_dir(base / "x")), is_private_dir(base / "missing")
+        (True, False)
+    """
+    try:
+        info = path.lstat()
+    except OSError:
+        return False
+    return stat.S_ISDIR(info.st_mode) and not info.st_mode & _OPEN_BITS
 
 
 def hosted_dir(state_dir: Path, agent_id: object) -> Path:

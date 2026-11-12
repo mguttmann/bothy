@@ -38,7 +38,7 @@ the title once per new session and reports the cost of the run.
 | `runturn.py` | The turn processes of one run: recovery, follow-ups on stdin, stop, answers, box notes, finish, turn record |
 | `ledger.py` | The recovery invariants of a turn (stored offset, answers, inputs, kind, decided end), part of the turn record |
 | `failures.py`, `recovery.py` | Recognised CLI texts (`ERROR_TEXTS`) and the classification of a process end; the next action and the box notes |
-| `followups.py`, `background.py`, `stop.py`, `adoption.py` | Follow-up check, line and stdin rule; the background work that holds stdin open; the stop schedule; identity check and adoption decision |
+| `followups.py`, `background.py`, `stop.py`, `adoption.py` | Follow-up check, line and stdin rule; the background work that holds stdin open; the stop schedule; the checked read of a turn record, identity check and adoption decision |
 | `channels.py`, `workspace.py` | Cache of the served forums and their bindings, reloaded while running (09 18.1); resolution of `workspace_ref` and `runner.default_workspace`, readiness and the project folder report (09 18.13, M4-44) |
 | `causes.py` | The sentence for the thread that names the cause of a refused run (09 18.9, RUNNER-NO-GIT) |
 | `hosting.py` | The hosted agents of `runner.hosted_agents`: the hosted set, a token in memory per agent and its renewal, one connection, channel cache, heartbeat and state folder per agent (26 3.2, 3.3), and their turns from the definition (26 5) |
@@ -345,7 +345,9 @@ model in `system/init` and `modelUsage` without the selector in square brackets.
   of the error (log code `run_failed_unexpectedly`); the record and the run files go with the
   turn. The run of an adopted turn ends the same way, unless its follow fails only because the
   runner itself ends (the runner's client for the server is closed by then): that turn keeps
-  running with its record, and the next start adopts it again.
+  running with its record, and the next start adopts it again. A failed follow or takeover is
+  logged by the kind of its error only (`adopted_follow_failed`, `turn_takeover_failed`); the
+  traceback is a line of level debug, which `run` does not write.
 - **Crash of the runner**: turns keep running in their own process group with stdout and stderr in
   files. At start, before the first inbox event and heartbeat, the runner reads the turn records
   and, after checking the identity of each process (`ps` start time and session reference),
@@ -356,7 +358,12 @@ model in `system/init` and `modelUsage` without the selector in square brackets.
   runner: the stored offset never passes the run's last `result` before the finish, a reply's
   `client_msg_id` is stored before the send, an input counts as answered by its own `uuid`, the
   decided end is stored before the costs, and a process keeps its kind.
-  `tests/unit/test_crash_points.py` enumerates every first and second crash point. Turns of
+  `tests/unit/test_crash_points.py` enumerates every first and second crash point. A file in
+  `turns/` that is no record the runner wrote (no regular file, not named after its run, or
+  without UUIDs for the thread and the session) is logged with `turn_record_unreadable` and
+  left where it is; a process ID the system cannot hold names no process. With
+  `runner.turn_handover` the record of a run in `preparing` or `waiting_lock` carries no session
+  yet; the next runner reads it and removes it ("Phases" below). Turns of
   hosted agents are not adopted: see "What a crash leaves" under "Hosting built-in agents".
 
 ## Turn handover (09 18.19.3 to 18.19.7, AR-03)
@@ -552,7 +559,20 @@ and served channels are byte for byte those of the runner before stage A1 (the f
   `stop` and the agent) and its record removed, the record of a process that is gone is removed
   once its locks are free, and nothing is finished. The server ends the run (`interrupted`, or
   `stale` while nothing serves the agent), and the next message in the thread starts a new run.
-  At an orderly stop the connections of all hosted agents are stopped together.
+  At an orderly stop the connections of all hosted agents are stopped together; a stop that
+  fails is logged (`hosted_stop_failed` with the agent and the kind of the error) and the
+  others are still stopped.
+- **What counts as a record.** A record is a file, so nothing in it is taken as given
+  (FIX-RUNNER-HOSTING-REVIEW). The runner acts only on a regular file in the agent's own
+  `turns` folder (no link, no permission for group or others) that is named after its run and
+  carries UUIDs for the thread and the session and process IDs the system can hold; it signals
+  a process only when
+  its command line names that session as the argument of `--session-id` or `--resume` and the
+  agent's control folder (the `--settings` file of every hosted turn). Any other file is
+  logged with `turn_record_unreadable` and left where it is: remove it by hand once you know
+  where it came from. One such file never stops the start. A turn of class `host` runs
+  commands as the runner's user, so no folder mode keeps it out of the state folder; these
+  checks bound what a file it wrote there can cause.
 
 ## Turns of built-in agents (A1-05)
 
@@ -781,7 +801,9 @@ the agent ends with `definition_missing`). `tests/unit/test_definition.py` runs 
 `tests/scenarios/test_hosted_turns.py` hold the folders, the command line, channel skills and
 hosted turns of A1-05, the hosted turn a killed runner left behind (`tests/hosting_runner.py`
 is the hosting runner as a process of its own for it), and the end of a hosting runner while a
-turn it adopted works.
+turn it adopted works. `tests/unit/test_hosted_leftovers.py` holds what the start does with a
+file in the place of a hosted turn's record: which one it acts on, which process it signals, and
+that one file never stops the start.
 
 Every test uses Fake-Claude through `runner.claude_bin` and a fake `HOME`; no installed CLI and
 no login of the developer is touched. The real CLI runs only behind switches:

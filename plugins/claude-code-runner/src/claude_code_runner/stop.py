@@ -94,8 +94,12 @@ def group_alive(group: StoppableGroup) -> bool:
 
 
 def _signal(group: StoppableGroup, sig: signal.Signals) -> bool:
-    """Signal the group after its identity check; False when it no longer matches (gone)."""
-    if not group.may_signal():
+    """Signal the group after its identity check; False when it no longer matches (gone).
+
+    A group ID below 2 is never signalled, whatever the group says of itself: every turn runs
+    in a group of its own, and a signal to group 0 would go to the runner's own group.
+    """
+    if group.pgid <= 1 or not group.may_signal():
         return False
     with contextlib.suppress(ProcessLookupError, PermissionError):
         os.killpg(group.pgid, sig)

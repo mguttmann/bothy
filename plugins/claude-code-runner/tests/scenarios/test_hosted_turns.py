@@ -22,6 +22,7 @@ import dataclasses
 import json
 import os
 import signal
+import stat
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
@@ -171,6 +172,13 @@ async def test_a_hosted_turn_answers_in_its_folder(world: HostingWorld) -> None:
         "--strict-mcp-config",
     ]
     assert argv[argv.index("--model") + 1] == "model-small"
+    # The turn records of the agent lie in a private folder that is inside none of the folders
+    # the turn was given: its working folder, its temporary folder and the added folders.
+    records = (world.state / "hosted" / str(backend.agent_id) / "turns").resolve()
+    assert stat.S_IMODE(records.stat().st_mode) == 0o700
+    added = [argv[i + 1] for i, word in enumerate(argv) if word == "--add-dir"]
+    for folder in (turn["cwd"], turn["env"]["TMPDIR"], *added):
+        assert not records.is_relative_to(Path(folder).resolve()), folder
     # The per-turn file is gone after the turn; no secret in any environment or other file.
     # The file goes in the turn's finally, which runs after run.finish reached the server.
     await world.until(lambda: not turn_mcp.exists())
@@ -588,6 +596,7 @@ async def test_the_end_of_a_hosting_runner_keeps_an_adopted_turn_that_works(
         assert json.loads(record.read_text())["pid"] == own_turn["pid"]  # for the next start
         assert [r for r in world.requests("finishRun") if str(own.run_id) in r.path] == []
         assert "run_failed_unexpectedly" not in logs.text
+        assert "adopted_follow_failed" not in logs.text
         assert f"the follow of the adopted run {own.run_id} failed" not in logs.text
     finally:
         # The own turn would stay for its whole hold, and a hosted turn that this test did not

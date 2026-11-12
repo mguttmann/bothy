@@ -33,7 +33,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from claude_code_runner.adoption import read_identity
+from claude_code_runner.adoption import read_identity, read_turn_record
 
 if TYPE_CHECKING:
     from bothy_sdk.adapter import Adapter
@@ -99,17 +99,17 @@ def handover_records(state_dir: Path) -> list[Path]:
         state_dir: ``runner.state_dir``.
 
     Returns:
-        The paths of the records with a ``phase``, sorted; an unreadable record is skipped.
+        The paths of the records with a ``phase``, sorted; an unreadable record is skipped
+        (`claude_code_runner.adoption.read_turn_record`, the reader of the adoption).
     """
     found: list[Path] = []
     turns = state_dir / "turns"
     if not turns.is_dir():
         return found
     for path in sorted(turns.glob("*.json")):
-        with contextlib.suppress(OSError, ValueError):
-            record = json.loads(path.read_text())
-            if isinstance(record, dict) and "phase" in record:
-                found.append(path)
+        record = read_turn_record(path)
+        if record is not None and "phase" in record:
+            found.append(path)
     return found
 
 

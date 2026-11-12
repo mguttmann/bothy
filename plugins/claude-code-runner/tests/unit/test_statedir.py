@@ -13,9 +13,27 @@ from claude_code_runner.statedir import (
     StateDirError,
     ensure_private_dir,
     hosted_dir,
+    is_private_dir,
     sweep,
     write_private,
 )
+
+
+def test_a_private_dir_is_a_folder_itself_that_nobody_else_may_enter(tmp_path: Path) -> None:
+    # The check of what `ensure_private_dir` leaves, without creating anything.
+    folder = ensure_private_dir(tmp_path / "a")
+    assert is_private_dir(folder)
+    assert not is_private_dir(tmp_path / "missing")
+    assert not (tmp_path / "missing").exists()
+    link = tmp_path / "link"
+    link.symlink_to(folder, target_is_directory=True)
+    assert not is_private_dir(link)  # a link to a private folder is not one
+    file = tmp_path / "file"
+    file.write_text("")
+    assert not is_private_dir(file)
+    for mode in (0o750, 0o705, 0o701):
+        folder.chmod(mode)
+        assert not is_private_dir(folder), oct(mode)
 
 
 def test_private_dir_and_files(tmp_path: Path) -> None:

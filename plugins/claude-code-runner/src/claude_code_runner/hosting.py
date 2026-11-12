@@ -25,12 +25,17 @@ ready and on ``agent.definition_changed``.
 
 Hosted turns are not adopted after a crash of the runner (decisions.d/A1-05.md D-A1-05-9): the
 next start stops the ones that still run and removes their records (`stop_leftover_turns`,
-26 3.2 item 5).
+26 3.2 item 5). A record is a file, so nothing in it is taken as given
+(decisions.d/FIX-RUNNER-HOSTING-REVIEW.md): only a record as the runner writes it is acted on,
+only a process whose command line names the record's session and the agent's control folder is
+signalled, and a record that cannot be handled is logged and left, so the start goes on.
 
 Log lines name agent IDs and problem codes, never a token or content: ``hosted_agent_joined``,
 ``hosted_agent_left`` (with ``reason`` ``unlisted``, ``revoked`` or ``closed``),
 ``hosted_token_refreshed``, ``hosted_token_issue_failed`` (with ``code``),
-``hosted_definition_refused`` (with the field codes) and ``hosted_definition_written``.
+``hosted_definition_refused`` (with the field codes), ``hosted_definition_written``,
+``hosted_stop_failed`` and ``turn_record_unreadable`` (each with the kind of an error, never its
+message).
 
 Examples:
     >>> from datetime import UTC, datetime, timedelta
@@ -85,7 +90,13 @@ from bothy_sdk.settings import SdkSettings
 from bothy_sdk.sources import Envelope
 
 from claude_code_runner import ADAPTER_NAME, RUNTIME_NAME, __version__
-from claude_code_runner.adoption import AdoptedGroup, process_matches
+from claude_code_runner.adoption import (
+    AdoptedGroup,
+    matching_command,
+    names_session,
+    process_id,
+    read_turn_record,
+)
 from claude_code_runner.attachments import fetch_attachments
 from claude_code_runner.causes import TOOL_CLASS_MISMATCH, cause, definition_refused
 from claude_code_runner.channel_skills import resolve_channel_skills
@@ -106,6 +117,7 @@ from claude_code_runner.materialize import (
     AgentFolders,
     Materialized,
     MaterializeError,
+    control_name,
     definition_resolver,
     materialize,
     remove_turn_mcp,
@@ -113,7 +125,7 @@ from claude_code_runner.materialize import (
 )
 from claude_code_runner.reply_upload import remove_run_files
 from claude_code_runner.runturn import RunState, RunTurn
-from claude_code_runner.statedir import hosted_dir, sweep
+from claude_code_runner.statedir import hosted_dir, is_private_dir, sweep
 from claude_code_runner.stop import stop_group
 from claude_code_runner.toolclass import ORDER, lower
 from claude_code_runner.transcribe import Transcriber
@@ -189,6 +201,70 @@ def refresh_at(created_at: datetime, expires_at: datetime) -> datetime:
     return expires_at - (expires_at - created_at) * TOKEN_REFRESH_FRACTION
 
 
+class _LeftoverTurn(AdoptedGroup):
+    """The process group of a hosted turn that an earlier runner left behind (26 3.2 item 5).
+
+    Its identity check is that of 09 18.9 and two conditions more, both on the command line as
+    ``ps`` prints it now: it names the record's session as the whole argument of
+    ``--session-id`` or ``--resume``, and it names the control folder of the agent whose state
+    folder holds the record, where the ``--settings`` file of every hosted turn lies (26 5.3).
+    So a record leads to a signal only for a turn of that agent, whatever the record says. The
+    check runs before every signal (`AdoptedGroup.may_signal`).
+
+    Args:
+        record: The turn record (`_leftover_record`).
+        timeout: ``runner.cli_probe_timeout`` for ``ps``.
+        agent_id: The agent whose state folder holds the record.
+    """
+
+    def __init__(self, record: Mapping[str, Any], timeout: float, agent_id: UUID) -> None:
+        """Wrap a record; nothing counts as verified before the first check."""
+        super().__init__(record, timeout)
+        self._control = f"/{control_name(agent_id)}/"
+
+    def matches(self) -> bool:
+        """Whether the leader is the recorded process and a turn of the agent's session."""
+        command = matching_command(self.record, self.timeout)
+        if command is None:
+            return False
+        return names_session(command, str(self.record["session_ref"])) and self._control in command
+
+
+def _agent_of(folder: Path) -> UUID | None:
+    """The agent of a state folder ``hosted/<agent_id>``, named as `hosted_dir` names it."""
+    try:
+        agent_id = UUID(folder.name)
+    except ValueError:
+        return None
+    return agent_id if str(agent_id) == folder.name else None
+
+
+def _leftover_record(path: Path) -> dict[str, Any] | None:
+    """Read the record of a hosted turn and check it before anything is done with it.
+
+    Args:
+        path: ``hosted/<agent_id>/turns/<run_id>.json``.
+
+    Returns:
+        The record, or ``None`` when it is unreadable: its folder or the agent's folder is not
+        a private folder of its own (no link, no permission for group or others, 26 3.2 item
+        2), the file is no turn record (`claude_code_runner.adoption.read_turn_record`), it
+        carries no session, or of ``pid`` and ``pgid`` one is no process ID. Both are missing
+        in a record written before its process started.
+    """
+    if not (is_private_dir(path.parent) and is_private_dir(path.parent.parent)):
+        return None
+    record = read_turn_record(path)
+    # A hosted turn stores its session with its first record; only the runner's own agent
+    # writes a record before ``run.start``, which carries none (09 18.19.6).
+    if record is None or "session_ref" not in record:
+        return None
+    pid, pgid = record.get("pid"), record.get("pgid")
+    if (pid, pgid) != (None, None) and (process_id(pid) is None or process_id(pgid) is None):
+        return None
+    return record
+
+
 async def stop_leftover_turns(
     state_dir: Path, *, stop_grace: float, kill_grace: float, poll: float, timeout: float
 ) -> None:
@@ -206,6 +282,13 @@ async def stop_leftover_turns(
     The server ends such a run as 09 5.5 says (``interrupted``, or ``stale`` while nothing
     serves the agent), as it does for a turn that died.
 
+    A record that is not what the runner writes is left where it is and logged
+    (``turn_record_unreadable``): nothing is signalled and no lock is taken for it
+    (`_leftover_record`). A process is signalled only as a turn of the agent (`_LeftoverTurn`).
+    An unexpected error at one record is logged the same way with the kind of the error, the
+    record stays, and the next record is handled, so one record never stops the start for
+    every agent.
+
     Args:
         state_dir: ``runner.state_dir``.
         stop_grace: ``runner.stop_grace``.
@@ -215,38 +298,46 @@ async def stop_leftover_turns(
     """
     hosted = state_dir / "hosted"
     for path in sorted(hosted.glob("*/turns/*.json")) if hosted.is_dir() else []:
-        agent_dir = path.parent.parent
         try:
-            record = json.loads(path.read_text())
-            ids = {
-                "agent_id": UUID(agent_dir.name),
-                "run_id": UUID(record["run_id"]),
-                "thread_id": UUID(record["thread_id"]),
-            }
-        except (OSError, ValueError, KeyError, TypeError):
-            _warn("turn_record_unreadable", record=path.stem)
-            continue
-        alive = process_matches(record, timeout)
-        held: list[int] = []
+            await _stop_leftover(
+                path, stop_grace=stop_grace, kill_grace=kill_grace, poll=poll, timeout=timeout
+            )
+        except Exception as err:  # one record never stops the start for every other agent
+            _warn("turn_record_unreadable", record=path.stem, error=type(err).__name__)
+
+
+async def _stop_leftover(
+    path: Path, *, stop_grace: float, kill_grace: float, poll: float, timeout: float
+) -> None:
+    """Settle one record of `stop_leftover_turns`; its locks are released on every way out."""
+    agent_dir = path.parent.parent
+    agent_id = _agent_of(agent_dir)
+    record = None if agent_id is None else _leftover_record(path)
+    if agent_id is None or record is None:
+        _warn("turn_record_unreadable", record=path.stem)
+        return
+    thread_id = UUID(record["thread_id"])
+    ids = {"agent_id": agent_id, "run_id": UUID(record["run_id"]), "thread_id": thread_id}
+    group = _LeftoverTurn(record, timeout, agent_id)
+    alive = group.may_signal()  # the identity check; it runs again before every signal
+    held: list[int] = []
+    try:
         if not alive:
-            names = (f"thread-{ids['thread_id']}", f"session-{record.get('session_ref')}")
+            # Both names are built from checked UUIDs, so each lock lies in the lock folder.
+            names = (f"thread-{thread_id}", f"session-{record['session_ref']}")
             try:
                 for name in names:
                     held.append(await acquire(agent_dir / "locks" / f"{name}.lock", 0, poll))
             except LockTimeout:
-                for fd in held:
-                    release(fd)
                 _log("adoption_lock_busy", **ids)
-                continue
-        try:
-            _log("turn_adopted", action="stop" if alive else "leave", **ids)
-            if alive:
-                group = AdoptedGroup(record, timeout, verified=True)
-                await stop_group(group, stop_grace, kill_grace, poll, ids)
-            remove_turn_record(path)
-        finally:
-            for fd in reversed(held):
-                release(fd)
+                return
+        _log("turn_adopted", action="stop" if alive else "leave", **ids)
+        if alive:
+            await stop_group(group, stop_grace, kill_grace, poll, ids)
+        remove_turn_record(path)
+    finally:
+        for fd in reversed(held):
+            release(fd)
 
 
 @dataclass(frozen=True)
@@ -1000,11 +1091,22 @@ class HostedConnection:
         await self.handler.resync_channels("timer")
 
     async def stop(self) -> None:
-        """Close the connection and wait until the agent is no longer served."""
+        """Close the connection and wait until the agent is no longer served.
+
+        The wait also follows a close that failed, whose error is raised after it: the
+        connection is then cancelled once ``sdk.http_timeout`` has passed, which stops the
+        agent's turns as the end of its adapter does.
+        """
         self._stopping = True
         adapter = self._adapter
-        if adapter is not None:
-            await adapter.stop()
+        try:
+            if adapter is not None:
+                await adapter.stop()
+        finally:
+            await self._served()
+
+    async def _served(self) -> None:
+        """Wait for the end of the serving task; cancel it after ``sdk.http_timeout``."""
         task = self._task
         if task is not None and not task.done():
             try:
@@ -1268,14 +1370,27 @@ class HostedAgents:
                 await self._guarded(connection.resync_channels, "timer")
 
     async def close(self) -> None:
-        """Stop the timer and every hosted connection."""
+        """Stop the timer and every hosted connection.
+
+        A stop that fails is logged with the kind of its error (``hosted_stop_failed``) and
+        ends neither the stops of the other agents nor the close of the runner.
+        """
         tasks = [t for t in (self._timer, *self._syncs) if t is not None]
         for task in tasks:
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await task
         async with self._lock:
-            # Together: every stop waits until the turns of its agent are stopped (09 18.6),
-            # and one after the other these waits would add up over the agents.
-            await asyncio.gather(*(c.stop() for c in self._connections.values()))
-            self._connections.clear()
+            connections = list(self._connections.items())
+            try:
+                # Together: every stop waits until the turns of its agent are stopped
+                # (09 18.6), and one after the other these waits would add up over the agents.
+                # Every stop runs to its end, also when another one fails.
+                ends = await asyncio.gather(
+                    *(connection.stop() for _, connection in connections), return_exceptions=True
+                )
+            finally:
+                self._connections.clear()
+            for (agent_id, _), end in zip(connections, ends, strict=True):
+                if isinstance(end, BaseException):
+                    _warn("hosted_stop_failed", agent_id=agent_id, error=type(end).__name__)
