@@ -31,6 +31,21 @@ restart, clients are briefly disconnected; they receive `4013 server_restart` an
 
 Check: `docker compose ps`, `/readyz`, status page, SLO dashboard, version in the admin console.
 
+### 2.1 Installations from a bundle
+
+This procedure replaces the images only. An installation made by `install.sh` also holds the files
+of its bundle, among them `compose.yaml`, `.env.example`, `infra/otel` and `infra/observability`
+with the Grafana panel plugin, and the marker `.bothy-install`, which names the version of that
+bundle. No step replaces them yet: after the procedure above they are still those of the installed
+bundle, also when the new release changed them, and a variable that the new `.env.example` adds is
+missing in `.env`. `install.sh` of another version refuses the folder instead of upgrading it,
+because a newer bundle over a `.env` that keeps the old `BOTHY_VERSION` would mix two releases.
+The OpenTofu modules do not upgrade either: the cloud modules ignore a changed `bothy_version` on
+an existing server, and over SSH the setup ends in that refusal. A step that upgrades the bundle
+is not built (docs/decisions.d/AUD-infra-compose-01.md, ruling AUD-IC1/5). Until it is, a release
+whose bundle changed needs manual work, and the section "Upgrade notes" of its release notes
+(section 1, item 1) is the place that says so.
+
 ## 3. Rollback
 
 1. One release back: set `BOTHY_VERSION` to the previous version, `docker compose up -d`. The schema

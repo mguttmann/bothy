@@ -30,7 +30,8 @@ expect_nothing_written() {
 # of the rest. Arguments: $1 file.
 unchanged_lines() {
 	grep -v -e '^COMPOSE_PROFILES=' -e '^BOTHY_PUBLIC_URL=' -e '^BOTHY_STORAGE_DRIVER=' \
-		-e '^BOTHY_BACKUP_OFFSITE_TARGET=' -e '^BOTHY_TRUSTED_PROXIES=' -e '^TS_AUTHKEY=' "$1"
+		-e '^BOTHY_SCAN_MODE=' -e '^BOTHY_BACKUP_OFFSITE_TARGET=' -e '^BOTHY_TRUSTED_PROXIES=' \
+		-e '^TS_AUTHKEY=' "$1"
 }
 
 # ---- static checks of the script ------------------------------------------------------------
@@ -274,6 +275,7 @@ test_terminal_prompts() {
 	expect_in "$OUT" "Public address"
 	expect_in "$OUT" "Enrollment code (shown once): $ENROLL_CODE"
 	expect_env COMPOSE_PROFILES tailscale,s3,observability
+	expect_env BOTHY_SCAN_MODE off
 	expect_env BOTHY_PUBLIC_URL "$PUBLIC_URL"
 	expect_env BOTHY_STORAGE_DRIVER s3
 	expect_env BOTHY_BACKUP_OFFSITE_TARGET s3:https://s3.example.com/bothy-backup
@@ -337,10 +339,31 @@ test_scan_default_follows_memory() {
 	inst STUB_MEMTOTAL=2147483648 sh "$INSTALL" --yes --public-url "$PUBLIC_URL" --owner-handle alex --owner-name Alex
 	expect_rc 0
 	expect_env COMPOSE_PROFILES direct
+	expect_env BOTHY_SCAN_MODE off
+	expect_in "$ERR" "uploads are delivered unscanned"
 	inst STUB_MEMTOTAL=2147483648 sh "$INSTALL" --dir second --scan on --observability on --yes --public-url "$PUBLIC_URL" --owner-handle alex --owner-name Alex
 	expect_rc 0
 	expect_env COMPOSE_PROFILES direct,scan,observability "$CASE/second/infra/compose/.env"
+	expect_env BOTHY_SCAN_MODE required "$CASE/second/infra/compose/.env"
 	expect_in "$ERR" "3 GiB"
+}
+
+# Without clamd the default file.scan.mode = required leaves every upload pending (12-files.md
+# 5.3), so the scan mode follows the choice of the profile scan: both or neither.
+test_scan_off_sets_scan_mode_off() {
+	inst sh "$INSTALL" --yes --scan off --public-url "$PUBLIC_URL" --owner-handle alex --owner-name Alex
+	expect_rc 0
+	expect_env COMPOSE_PROFILES direct
+	expect_env BOTHY_SCAN_MODE off
+	expect_in "$ERR" "uploads are delivered unscanned"
+	[ "$(grep -c '^BOTHY_SCAN_MODE=' "$(std_env)")" = 1 ] || fail "BOTHY_SCAN_MODE is not there exactly once"
+	[ "$(unchanged_lines "$(std_env)" | cksum)" = "$(unchanged_lines "$CASE/bothy/infra/compose/.env.example" | cksum)" ] ||
+		fail "lines other than the answers changed"
+	inst sh "$INSTALL" --dir second --yes --public-url "$PUBLIC_URL" --owner-handle alex --owner-name Alex
+	expect_rc 0
+	expect_env COMPOSE_PROFILES direct,scan "$CASE/second/infra/compose/.env"
+	expect_env BOTHY_SCAN_MODE required "$CASE/second/infra/compose/.env"
+	expect_not_in "$ERR" "unscanned"
 }
 
 test_bundle_versions_pass_through() {
