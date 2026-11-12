@@ -442,7 +442,9 @@ func ScanEntries(ctx context.Context, env HelperEnv, req Request) string {
 }
 
 // scanFolder lists dir and returns its subfolders, or foreign when an entry belongs to one of the
-// accounts in ids. Links are entries, never followed.
+// accounts in ids. Links are entries, never followed. It reads the owner and the type of an entry
+// without its ACL (hostos.LstatOwner): the scan judges nothing else, and on macOS the ACL costs
+// one program start per entry.
 func scanFolder(env HelperEnv, dir string, ids map[string]bool) (sub []string, foreign bool) {
 	names, err := env.Files.ReadDir(dir)
 	if err != nil {
@@ -450,7 +452,7 @@ func scanFolder(env HelperEnv, dir string, ids map[string]bool) (sub []string, f
 	}
 	for _, n := range names {
 		p := filepath.Join(dir, n)
-		sec, err := env.Security.Lstat(p)
+		sec, err := hostos.LstatOwner(env.Security, p)
 		switch {
 		case errors.Is(err, fs.ErrNotExist):
 		case err != nil, ids[sec.OwnerID]:

@@ -1312,12 +1312,16 @@ remaining placeholders `OWNER` (V1-03).
 | V1-10 | Test from zero | A script and a recorded run on a fresh host that follows only the README, through install, first owner, a built-in agent from a template and its first answer; findings fixed. | `tests/from-zero/` (script and checklist), findings as fixes with tests | the recorded run passes on a fresh host; every finding fixed or ruled with a reason; the run by a third person is the owner's step (OQ-26) | A1-10, V1-09 |
 | V1-11 | Showcase current | The showcase of M7-28 shows built-in agents: "New agent", the preview and a first answer, regenerated from the demo instance. | `tools/showcase/`, `docs/assets/showcase/`, demo data `infra/demo/` | `make showcase` regenerates the images the build host can produce and the manifest check is green; no deny list hit | A1-10 |
 | V1-12 | Public texts | README, roadmap and site texts describe what a visitor can try, starting with built-in agents, and no real installation. | `README.md` ("How it is used today" and "Try it today"), `docs/index.md`, `docs/roadmap.md` | the one-minute test of M7-28 with a fresh reader; `make docs` and `make denylist` green; no sentence about a real installation | A1-10 |
+| V1-13 | `host-platform` green | The platform suite of the host service passes on the hosted Linux, macOS and Windows runners of `host-platform.yml`, which M2 exit criterion 8 asks for on all three systems. | `services/host` (suite or product, as each cause demands), `.github/workflows/host-platform.yml`; the causes known so far are in [decisions.d/AUD-misc-misc-01.md](decisions.d/AUD-misc-misc-01.md) | one passing run of `host-platform.yml` per system on `main` with its result file kept; 24 section 14 and `services/host/README.md` name the recorded runs in the same change; no test skipped or weakened | none |
 
 V1-07 to V1-12 come from the design note of the built-in agents ([builtin-agents.md](design/builtin-agents.md)
 section 10) and run as tasks from their rows here, without a brief (P-28): V1-07 waits for the
 owner's ruling OQ-25 and changes files outside this repository; V1-08 and V1-09 are small fixes
 whose cause is read on the day; V1-10 to V1-12 depend on the state after A1-10. A session that
-starts one of them reads its row, the design note and `AGENTS.md`.
+starts one of them reads its row, the design note and `AGENTS.md`. V1-13 comes from the audit of
+2026-11-11 and runs from its row in the same way; it belongs to the maintainers of
+`services/host` (`.github/CODEOWNERS`), and a session that starts it reads the rulings of
+AUD-misc-misc-01 first.
 
 ## 16. V2 Multi-user dev environment
 

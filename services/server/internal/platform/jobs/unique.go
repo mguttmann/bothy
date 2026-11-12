@@ -101,7 +101,7 @@ func (i inserter) pendingAt(ctx context.Context, tx pgx.Tx, kind, want string, a
 		AND NOT EXISTS (SELECT 1 FROM jsonb_each($2::jsonb) AS w(key, value) WHERE args -> w.key IS DISTINCT FROM w.value)
 		AND NOT (args ?| $3::text[]) ` + order + ` LIMIT 1`
 	var at time.Time
-	err := tx.QueryRow(ctx, q, kind, want, absent).Scan(&at)
+	err := tx.QueryRow(ctx, q, kind, want, absent).Scan(&at) // nosemgrep: bothy-go-sql-string-building -- the schema of River's table is a sanitized identifier and order one of the two ORDER BY literals of PendingTx and LatestPendingTx; every value is a parameter
 	if errors.Is(err, pgx.ErrNoRows) {
 		return time.Time{}, false, nil
 	}

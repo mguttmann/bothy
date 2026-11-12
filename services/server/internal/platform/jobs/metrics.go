@@ -61,7 +61,7 @@ func (m *jobMetrics) registerQueue(pool *pg.Pool, schema string, timeout time.Du
 			defer cancel()
 		}
 		counts := make(map[string]int64, len(m.kinds))
-		rows, err := pool.PGX().Query(ctx, q)
+		rows, err := pool.PGX().Query(ctx, q) // nosemgrep: bothy-go-sql-string-building -- the schema of River's table is a sanitized identifier and queueStates a constant; no value reaches the text
 		if err != nil {
 			return nil
 		}

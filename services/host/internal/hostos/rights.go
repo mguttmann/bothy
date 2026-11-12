@@ -74,6 +74,25 @@ type Security interface {
 	Lstat(path string) (FileSec, error)
 }
 
+// OwnerReader is a Security that reads the type, the owner, the group and the mode of a path
+// without its ACL, because the ACL costs it far more than the rest (macOS starts a program for
+// it).
+type OwnerReader interface {
+	// LstatOwner returns the security of path itself with an empty ACL.
+	LstatOwner(path string) (FileSec, error)
+}
+
+// LstatOwner returns the security of path itself for a caller that judges only its type and its
+// owner, such as the entry scan of HD11 over every entry of a home: without the ACL where sec is
+// an OwnerReader, else as sec.Lstat returns it. Never use the result to decide what an account
+// may write.
+func LstatOwner(sec Security, path string) (FileSec, error) {
+	if o, ok := sec.(OwnerReader); ok {
+		return o.LstatOwner(path)
+	}
+	return sec.Lstat(path)
+}
+
 // rightsOf returns the rights fs gives s. Owning an object counts as every right, because the
 // owner can change its rights.
 func rightsOf(f FileSec, s Subject) Rights {
