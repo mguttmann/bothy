@@ -4,12 +4,19 @@
 // the desktop apps (macOS, Windows) and the mobile apps (iOS, Android) the newest failed or
 // cancelled run of a thread offers Retry, which puts one retryRun into the outbox; a double tap
 // sends once; a completed run, an older run and an interrupted run (which keeps "Send again") do
-// not offer it; a refusal of the server shows its reason.
+// not offer it; a refusal of the server shows its reason, and a refusal that arrives after the
+// line left the screen leaves no failed entry behind (ruling AUD-CA01/4). The anchor of a run
+// the local table lacks loads the runs of its thread, once per thread and only then (ruling
+// AUD-CA01/1); `ended_runs_fake_server_test.dart` runs the same against the fake server.
+
+import 'dart:async';
 
 import 'package:client/agents/providers.dart';
+import 'package:client/agents/thread_runs_loader.dart';
 import 'package:client/sync/message_ops_app.dart';
 import 'package:client/thread/history_column.dart';
 import 'package:domain/domain.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_store/local_store.dart';
 
@@ -45,11 +52,30 @@ List<Message> retryMessages() => [
   ).copyWith(runId: runId(2)),
 ];
 
-/// Opens the thread with [runs] stored on [platform].
+/// A loader the test answers; [loads] are the threads it was asked for.
+final class FakeThreadRunsLoader implements ThreadRunsLoader {
+  /// Creates the loader; [onLoad] is what a load does.
+  FakeThreadRunsLoader(this.onLoad);
+
+  /// What a load does.
+  final Future<void> Function(ThreadId thread) onLoad;
+
+  /// The threads asked for, in order.
+  final List<ThreadId> loads = [];
+
+  @override
+  Future<void> load(ThreadId thread) {
+    loads.add(thread);
+    return onLoad(thread);
+  }
+}
+
+/// Opens the thread with [runs] stored on [platform]; [loader] loads the runs of a thread.
 Future<ColumnHost> openThread(
   WidgetTester tester,
   List<RunSummary> runs, {
   String platform = 'macos',
+  ThreadRunsLoader? loader,
 }) async {
   final host = await ColumnHost.open(tester);
   await host.run(tester, () async {
@@ -67,6 +93,7 @@ Future<ColumnHost> openThread(
       ...threadOverrides(FakeThreadReads(host.db)),
       runSourceProvider.overrideWithValue(StoreRunSource()),
       agentReadsProvider.overrideWithValue(FakeAgentReads()),
+      if (loader != null) threadRunsLoaderProvider.overrideWithValue(loader),
     ],
   );
   return host;
@@ -150,5 +177,88 @@ void main() {
     expect(find.text(en.liveBoxRetry), findsOneWidget);
     expect(await retries(tester, host), isEmpty);
     await host.dispose(tester);
+  });
+
+  testWidgets('a retry refused after its line left the screen is discarded', (
+    tester,
+  ) async {
+    final host = await openThread(tester, [
+      run(1, RunState.failed, reason: 'adapter_error'),
+    ]);
+    await tester.tap(find.text(en.liveBoxRetry));
+    await host.settle(tester);
+    final entry = (await retries(tester, host)).single;
+    // The person leaves the thread before the server answers.
+    await tester.pumpWidget(const SizedBox());
+    await host.settle(tester);
+    await host.run(
+      tester,
+      () => host.db.outboxDao.recordFailure(
+        entry.id,
+        code: 'agent_invocation_denied',
+        reason: 'operator_not_in_channel',
+      ),
+    );
+    await host.settle(tester);
+    expect(await retries(tester, host), isEmpty);
+    await host.dispose(tester);
+  });
+
+  group('a run the local table lacks', () {
+    Finder line(int n) => find.byKey(ValueKey('runline.${runId(n).value}'));
+
+    testWidgets('anchors whose runs are stored load nothing', (tester) async {
+      final loader = FakeThreadRunsLoader((_) async {});
+      final host = await openThread(tester, [
+        run(1, RunState.completed),
+        run(2, RunState.failed, reason: 'adapter_error'),
+      ], loader: loader);
+      expect(line(1), findsOneWidget);
+      expect(line(2), findsOneWidget);
+      expect(loader.loads, isEmpty);
+      await host.dispose(tester);
+    });
+
+    testWidgets('its anchor loads the runs of the thread once; the lines and '
+        'Retry show when they are stored', (tester) async {
+      final opened = Completer<ColumnHost>();
+      final loader = FakeThreadRunsLoader((_) async {
+        final host = await opened.future;
+        await host.db.runsDao.upsertIfNewer(run(1, RunState.completed));
+        await host.db.runsDao.upsertIfNewer(
+          run(2, RunState.failed, reason: 'adapter_error'),
+        );
+      });
+      // Both anchors of the thread lack their run: nothing shows while the load runs.
+      final host = await openThread(tester, const [], loader: loader);
+      expect(line(1), findsNothing);
+      expect(line(2), findsNothing);
+      opened.complete(host);
+      await host.settle(tester);
+      expect(line(1), findsOneWidget);
+      expect(line(2), findsOneWidget);
+      expect(find.text(en.liveBoxRetry), findsOneWidget);
+      expect(loader.loads, [threadId(1)]);
+      await host.dispose(tester);
+    });
+
+    testWidgets('a failed load leaves the anchor empty and is not repeated', (
+      tester,
+    ) async {
+      final loader = FakeThreadRunsLoader(
+        (_) async => throw Exception('offline'),
+      );
+      final host = await openThread(tester, [
+        run(1, RunState.completed),
+      ], loader: loader);
+      expect(line(1), findsOneWidget);
+      expect(line(2), findsNothing);
+      // The retry of Riverpod would run the provider again within these seconds.
+      await tester.pump(const Duration(seconds: 30));
+      await host.settle(tester);
+      expect(loader.loads, [threadId(1)]);
+      expect(line(2), findsNothing);
+      await host.dispose(tester);
+    });
   });
 }

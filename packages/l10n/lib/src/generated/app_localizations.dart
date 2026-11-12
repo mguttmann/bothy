@@ -13350,6 +13350,12 @@ abstract class AppLocalizations {
   /// **'No earlier sessions'**
   String get commandResumeEmpty;
 
+  /// Line of the /status and /resume dialogs when the sessions of the thread could not be read (09 10.1).
+  ///
+  /// In en, this message translates to:
+  /// **'The sessions could not be loaded. Try again.'**
+  String get commandSessionsFailed;
+
   /// Session column, agent part: the backend policy row (01 D1).
   ///
   /// In en, this message translates to:

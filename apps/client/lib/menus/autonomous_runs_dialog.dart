@@ -22,10 +22,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:l10n/l10n.dart';
 import 'package:local_store/local_store.dart' show AccessView;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:sync_engine/sync_engine.dart';
 
 import '../app/providers/session.dart';
 import '../sidebar/providers.dart';
+import '../sync/outbox_outcome.dart';
 import '../sync/wake_ops.dart';
 import '../thread/providers.dart';
 
@@ -116,15 +116,7 @@ class AutonomousRunsDialog extends ConsumerStatefulWidget {
 class _AutonomousRunsDialogState extends ConsumerState<AutonomousRunsDialog> {
   /// The value the person chose while its write waits, or null.
   bool? _pending;
-  String? _entryId;
   String? _refusal;
-  StreamSubscription<List<OutboxEntryView>>? _watch;
-
-  @override
-  void dispose() {
-    unawaited(_watch?.cancel());
-    super.dispose();
-  }
 
   Future<void> _set(Channel channel, bool allowed) async {
     final engine = ref.read(syncEngineProvider);
@@ -140,35 +132,19 @@ class _AutonomousRunsDialogState extends ConsumerState<AutonomousRunsDialog> {
       channel.version,
       allowed: allowed,
     );
+    // The wait ends with the entry, also when the dialog is closed by then (AUD-CA01/4).
+    final refusal = await outboxOutcome(engine.outbox, entry.id);
     if (!mounted) return;
-    _entryId = entry.id;
-    await _watch?.cancel();
-    _watch = engine.outbox.watchThread(null).listen((views) {
-      var waiting = false;
-      for (final v in views) {
-        if (v.id != _entryId) continue;
-        waiting = true;
-        if (v.stateLabel != OutboxStateLabel.failed) continue;
-        _entryId = null;
-        unawaited(engine.outbox.discard(v.id));
-        if (!mounted) return;
-        final reason = v.failureReason;
-        setState(() {
-          _pending = null;
-          _refusal = l.autonomousRunsRefused(
-            (reason == null ? null : dsReasonText(l, reason)) ??
-                problemText(l, v.failureCode ?? 'unknown', reason: reason),
-          );
-        });
-        return;
-      }
-      // Sent and stored: the stored channel carries the value now.
-      if (!waiting && _entryId != null && mounted) {
-        setState(() {
-          _entryId = null;
-          _pending = null;
-        });
-      }
+    final reason = refusal?.reason;
+    setState(() {
+      // Sent and stored: the stored channel carries the value now. Refused: its reason.
+      _pending = null;
+      _refusal = refusal == null
+          ? null
+          : l.autonomousRunsRefused(
+              (reason == null ? null : dsReasonText(l, reason)) ??
+                  problemText(l, refusal.code, reason: reason),
+            );
     });
   }
 

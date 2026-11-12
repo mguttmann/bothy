@@ -263,7 +263,7 @@ for reconciliation. Fields that can only be read with `manage` (channel prompt, 
 | `reactions_summary` | `reactions` | per message and emoji: count and "me" |
 | `my_mentions` | `mentions` | only mentions of the person themselves |
 | `message_components` | same name | state, definition |
-| `runs` | `runs` | summary from `run.state_changed`; document only in memory |
+| `runs` | `runs` | summary from `run.state_changed`; the runs of a thread from `listThreadRuns` when the anchor of a run finds no summary (a run that ended before the snapshot of a new device or of a resync); document only in memory |
 | `run_wakes` | `run_wakes` | every column (stage AR, AR-08); a thread's list from `listThreadWakes` when its view opens, kept current by `run.wake_changed` ([01](01-product.md) 6.21) |
 | `agents`, `principals` | `principals`, `agents` (card) | display, mode badge, reported presence |
 | `commands` | `commands` | for suggestions offline |
@@ -421,7 +421,9 @@ Focus on a thread with an active run delivers the whole document once, then patc
 `base_version` equal to local: apply; `version` less than or equal to local: ignore; otherwise a gap:
 `GET /api/v1/runs/{id}`. The interface draws at most once per frame (patches are collected per
 frame). When the run ends, the `RunStore` discards the document; the collapsed row comes from
-the table `runs`.
+the table `runs`. The snapshot names active runs only, so a run that ended before the snapshot
+of a new device or of a resync is not in the table: the anchor of such a run loads the runs of
+its thread (`listThreadRuns`) into the table.
 
 ### 7.5 Outbox
 
@@ -460,7 +462,11 @@ are in docs/DECISIONS.md D-M4-15-1.
 - **REST:** `api_client` (openapi-generator `dart-dio`, baseline R-Clients) with interceptors for
   DPoP, `Idempotency-Key`, correlation ID, retry only for reads (`Retry-After` plus jitter); the
   outbox retries writes. An outbox executor that reads within an attempt opts out of the read
-  retry, so a refused read is retried once, with its entry ([12](12-files.md) 3.8).
+  retry, so a refused read is retried once, with its entry ([12](12-files.md) 3.8). In the
+  agent interface the read retry is the one place that repeats a refused read: the provider
+  that passes the failure of a read on (the document of an ended run) turns off the retry of
+  Riverpod, and the read a person waits for in a dialog (`/status`, `/resume`) opts out of the
+  read retry and shows the failure (docs/decisions.d/AUD-client-agents-01.md).
 - **DPoP:** proof per request (RFC 9449) with the device key, ES256 (section 9); the server nonce
   is taken over. Gateway proof in `identify` ([04](04-sync-protocol.md) R-SY-01).
 - **Refresh:** exactly one refresh per refresh family at a time (single flight); the new token is

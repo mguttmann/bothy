@@ -45,10 +45,13 @@ enum BuiltinCommand {
     close => l.commandBuiltinClose,
   };
 
-  /// The built-in named [name] (without the slash), or null.
+  /// The built-in named [name] (without the slash) in any letter case, or null. The names
+  /// are reserved (09 10.1), and registered commands are matched without case as well, so
+  /// `/Stop` is the built-in and never a message that would reach a model.
   static BuiltinCommand? byName(String name) {
+    final lower = name.toLowerCase();
     for (final c in values) {
-      if (c.name == name) return c;
+      if (c.name == lower) return c;
     }
     return null;
   }

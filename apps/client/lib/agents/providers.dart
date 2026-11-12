@@ -15,6 +15,7 @@ import '../app/providers/session.dart';
 import '../sidebar/providers.dart';
 import 'agent_reads.dart';
 import 'commands/command_suggestions.dart';
+import 'thread_runs_loader.dart';
 import 'wakes/wake_loader.dart';
 
 part 'providers.g.dart';
@@ -27,13 +28,41 @@ AgentReads agentReads(Ref ref) {
 }
 
 /// The run summaries of [threadId] from the local `runs` table, oldest first (the summary
-/// of `run.state_changed`, 04 11.3).
+/// of `run.state_changed`, 04 11.3, and of [threadRunsBackfill] for the runs that ended before
+/// this device knew them).
 @riverpod
 Stream<List<RunSummary>> threadRuns(Ref ref, String threadId) {
   final db = ref.watch(localDatabaseProvider);
   return db == null
       ? Stream.value(const [])
       : db.runsDao.watchForThread(ThreadId.parse(threadId));
+}
+
+/// The loader of a thread's runs for an anchor whose run the local table lacks; tests override
+/// it.
+@riverpod
+ThreadRunsLoader threadRunsLoader(Ref ref) {
+  final engine = ref.watch(syncEngineProvider);
+  final db = ref.watch(localDatabaseProvider);
+  return engine == null || db == null
+      ? const NoThreadRunsLoader()
+      : EngineThreadRunsLoader(engine, db);
+}
+
+/// Loads the runs of [threadId] into the local `runs` table (ruling AUD-CA01/1). The table
+/// knows a run only from the active runs of the snapshot and from `run.state_changed` since
+/// then, so a new device and a device after a resync hold no run that ended before. The anchor
+/// of a run the table lacks watches this provider: one load per thread while such an anchor
+/// shows, none while every anchor on screen has its run. A failed read keeps what the table
+/// holds (the read retry of the API client has run by then); the anchor asks again the next
+/// time it shows.
+@riverpod
+Future<void> threadRunsBackfill(Ref ref, String threadId) async {
+  try {
+    await ref.watch(threadRunsLoaderProvider).load(ThreadId.parse(threadId));
+  } on Exception {
+    // Offline or refused: the anchors stay empty.
+  }
 }
 
 /// The wake-ups of [threadId] from the local `run_wakes` table in the order they fire (01 6.21,
@@ -116,9 +145,18 @@ Stream<RunDocument?> runDocument(Ref ref, String runId, String threadId) {
       : source.watch(RunId.parse(runId), ThreadId.parse(threadId));
 }
 
+/// The retry rule of a provider that reads through the API client and passes the failure on:
+/// Riverpod never runs it again (ruling AUD-CA01/2). The read retry of the API client has
+/// decided about a refused read by then (network error, timeout, `429`, `503`; D-M4-02-5);
+/// Riverpod's default would run the provider, and with it every attempt of that retry, several
+/// more times.
+Duration? noProviderRetry(int retryCount, Object error) => null;
+
 /// The document of the ended run [runId], loaded once when its collapsed line is expanded
-/// (`getRun`, 01 6.2; brief M4-21 Design note 1).
-@riverpod
+/// (`getRun`, 01 6.2; brief M4-21 Design note 1). A failed read is an error of this provider
+/// and is not repeated by Riverpod ([noProviderRetry]); the line loads again when it is
+/// expanded or built again.
+@Riverpod(retry: noProviderRetry)
 Future<RunDocument?> endedRunDocument(Ref ref, String runId) async {
   final json = await ref.watch(agentReadsProvider).run(RunId.parse(runId));
   if (json == null) return null;

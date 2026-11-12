@@ -8336,6 +8336,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get commandResumeEmpty => 'Keine früheren Sitzungen';
 
   @override
+  String get commandSessionsFailed =>
+      'Die Sitzungen konnten nicht geladen werden. Versuche es noch einmal.';
+
+  @override
   String get sessionAgentBackend => 'Backend';
 
   @override

@@ -2207,6 +2207,7 @@
   "commandStatusNoRun": "Kein Lauf aktiv",
   "commandResumeTitle": "Sitzung fortsetzen",
   "commandResumeEmpty": "Keine früheren Sitzungen",
+  "commandSessionsFailed": "Die Sitzungen konnten nicht geladen werden. Versuche es noch einmal.",
   "sessionAgentBackend": "Backend",
   "sessionAgentModel": "Modell",
   "sessionAgentSession": "Sitzung",
