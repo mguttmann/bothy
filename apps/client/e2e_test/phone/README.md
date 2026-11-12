@@ -54,6 +54,12 @@ host container; `MOBILE_E2E_SUITES` picks suites, `terminal` among them.
   the Android preview worker and the iOS Notification Service Extension find it; the iOS share
   suite does the same for the Share Extension. On the iOS simulator an unsigned build gets no APNs
   token, so the push suite registers a random one; `xcrun simctl push` needs none.
+- **The screen of the device.** The suites keep the view of the device they run on, and a list
+  builds its entries as they come into view. The emulator of the nightly job has the default
+  hardware of `avdmanager`, a screen of 320 x 640 logical pixels (seen in the run of
+  2026-11-12), where the Me list ends above "Hosts". A suite therefore scrolls to an entry below
+  the first ones before it taps it (`E2eApp.scrollTo`); a tap alone waits for a widget that is
+  not in the tree (docs/decisions.d/AUD-misc-testing-01.md).
 - **Waits.** Every wait ends at its condition and fails only after the repository's patience. In
   the background, where the app draws no frames, the waits poll without pumping. The push suite has
   Sam write again when no notification came within a while, because the server may still route a
