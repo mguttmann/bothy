@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Accessibility of A5 Agents (brief M4-32 Design note 1; 01 5.6 and 8): the agent list, an agent page, the backend switch, the switch of all agents and the guided flow say mode, presence and costs in words, with contrast and targets in light and dark and every control at text scale 2.
+// Accessibility of A5 Agents (brief M4-32 Design note 1; 01 5.6 and 8): the agent list, an agent page, the backend switch, the switch of all agents and the guided flow say mode, presence and costs in words, with contrast and targets in light and dark and every control at text scale 2; and the dialogs of an adapter agent ("Add adapter agent", the tool class, the features; AUD-adminui-agents-01).
 
 import 'package:design_system/testing.dart';
 import 'package:flutter/material.dart';
@@ -16,6 +16,9 @@ void main() {
     'guided_preview',
     'i1',
     'guided_result',
+    'add',
+    'tool_class',
+    'features',
   ]) {
     dsAccessibilityTests(
       'A5 $name',

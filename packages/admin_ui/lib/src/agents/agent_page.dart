@@ -3,8 +3,10 @@
 /// The page of one agent of A5: adapter, presence, configured and reported mode, the server's
 /// warnings, holder, operated targets, the backend switch and the tokens
 /// (docs/spec/01-product.md 5.2 A5; 10 8, 9, 11, 13; brief M4-28 Design note 1, fixed
-/// requirements 11 to 14), and for a built-in agent its section with "Edit", "Versions",
-/// "Change runner", "Disable" and "Continue setup" (01 6.20 item 6; brief A1-09).
+/// requirements 11 to 14), for a built-in agent its section with "Edit", "Versions",
+/// "Change runner", "Disable" and "Continue setup" (01 6.20 item 6; brief A1-09), and for the
+/// agent of an adapter its tool class, its features and "Disable" and "Enable" (07 2.11; 09
+/// 2.1, 2.2; rulings AUD-AA1/6 to AUD-AA1/8).
 library;
 
 import 'dart:async';
@@ -14,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
 import '../common/admin_action.dart';
+import '../common/confirm_change.dart';
 import '../common/problem_banner.dart';
 import '../data/access_repository.dart';
 import '../data/admin_repository.dart';
@@ -23,18 +26,23 @@ import '../grants/grant_labels.dart';
 import '../hosts/host_labels.dart';
 import '../self/self_feedback.dart';
 import 'agent_labels.dart';
+import 'agent_settings.dart';
 import 'agent_tokens.dart';
 import 'builtin/builtin_agent_section.dart';
 import 'holder_dialog.dart';
 import 'i1_explanation.dart';
 import 'new_agent/new_agent_dialog.dart' show NewAgentHost;
+import 'new_agent/new_agent_draft.dart' show AgentToolClass;
 import 'new_agent/new_agent_port.dart' show builtinAdapterKind;
+import 'new_agent/new_agent_texts.dart' show toolClassName;
 import 'switch_mode_dialog.dart';
 
 /// The agent [agentId] with every field of A5.
 ///
-/// The page loads `getAgent`, the targets the agent operates, the people (holder names and
-/// the holder picker) and the names the caller may read (for [I1Explanation]). The badge
+/// The page loads `getAgent`, the targets the agent operates and the people (holder names and
+/// the holder picker) side by side; the agents whose names [I1Explanation] shows besides the
+/// people are read only when a `409 i1_violation` arrives, and an answer for an agent the page
+/// no longer shows is dropped (ruling AUD-AA1/3). The badge
 /// shows the configured mode; the reported mode of the heartbeat stands next to it, and the
 /// warnings are exactly the server's codes of 10 8 mapped to their texts: the page never
 /// compares the two modes itself (15 1 principle 1). [presence] is the live presence (the
@@ -51,6 +59,13 @@ import 'switch_mode_dialog.dart';
 /// With [builtin] the card of a built-in agent (`adapter_kind = 'claude_agent'`) shows the
 /// [BuiltinAgentSection]; its "Switch billing" after `hosted_holder_mismatch` opens the billing
 /// switch of this card.
+///
+/// The agent of an adapter (every other `adapter_kind`) shows its tool class with "Change
+/// tool class" ([ToolClassDialog]), its features with "Edit features"
+/// ([AgentFeaturesDialog], `operator_config`) and its status with "Disable"; a disabled agent
+/// of either kind has "Enable", which the server may refuse with `409 i1_violation` (10 5.1).
+/// These are owner actions like the backend switch: each asks a reason or shows what it
+/// changes, goes through the step-up, and a `403` hides them all.
 ///
 /// Example:
 /// ```dart
@@ -116,6 +131,10 @@ class _AgentPageState extends State<AgentPage>
   /// The conflicts of the last `409 i1_violation`, shown until the next change.
   List<InvariantFinding>? _conflicts;
 
+  /// Counts the loads: the answer of an older one (another agent, or a load that a change
+  /// replaced) is dropped.
+  int _loads = 0;
+
   @override
   void initState() {
     super.initState();
@@ -150,38 +169,49 @@ class _AgentPageState extends State<AgentPage>
 
   Future<void> _load() async {
     final r = widget.repository;
+    final id = widget.agentId;
+    final load = ++_loads;
+    bool current() => mounted && load == _loads;
+    // The three reads do not depend on each other. The targets and the people may fail alone:
+    // the page then shows the problem of the targets, and the holder by its ID.
+    final targetsRead = Future.sync(() => r.operatedTargets(id))
+        .then<(List<OperatedTarget>?, Object?)>(
+          (targets) => (targets, null),
+          onError: (Object e) => (null, e),
+        );
+    final peopleRead = allPeople(r)
+        .then((people) => people, onError: (Object _) => const <AdminPerson>[]);
     try {
-      final agent = await r.agentRecord(widget.agentId);
-      List<OperatedTarget>? targets;
-      Object? targetsError;
-      try {
-        targets = await r.operatedTargets(widget.agentId);
-      } on Object catch (e) {
-        targetsError = e;
-      }
-      List<AdminPerson> people;
-      try {
-        people = await allPeople(r);
-      } on Object {
-        people = const [];
-      }
-      final names = await AccessNames.load(r);
-      if (!mounted) return;
+      final agent = await r.agentRecord(id);
+      final (targets, targetsError) = await targetsRead;
+      final people = await peopleRead;
+      if (!current()) return;
       setState(() {
         _agent = agent;
         _targets = targets;
         _targetsError = targetsError;
         _people = people;
-        _names = names;
         _error = null;
       });
     } on Object catch (e) {
-      if (mounted) {
-        setState(() {
-          _agent = null;
-          _error = e;
-        });
-      }
+      if (!current()) return;
+      setState(() {
+        _agent = null;
+        _error = e;
+      });
+    }
+  }
+
+  /// The names [I1Explanation] shows: the people the page has, and the agents, read only now
+  /// that the server answered `409 i1_violation`. Without the list an agent shows by its ID.
+  Future<AccessNames> _conflictNames() async {
+    try {
+      return AccessNames(
+        people: _people,
+        agents: await widget.repository.agents(),
+      );
+    } on Object {
+      return AccessNames(people: _people);
     }
   }
 
@@ -193,8 +223,14 @@ class _AgentPageState extends State<AgentPage>
       try {
         return await change();
       } on SelfActionFailed catch (e) {
-        if (e.problem?.code == 'i1_violation' && mounted) {
-          setState(() => _conflicts = e.conflicts);
+        if (e.problem?.code == 'i1_violation') {
+          final names = await _conflictNames();
+          if (mounted) {
+            setState(() {
+              _names = names;
+              _conflicts = e.conflicts;
+            });
+          }
         }
         rethrow;
       }
@@ -240,6 +276,71 @@ class _AgentPageState extends State<AgentPage>
       );
       return SelfNotice(
         l.adminHolderChanged(personName(_people, holderId), a.displayName),
+      );
+    });
+  }
+
+  Future<void> _changeToolClass(AgentRecord a) async {
+    final l = AppLocalizations.of(context);
+    final answer = await ToolClassDialog.show(context, agent: a);
+    if (answer == null || !mounted) return;
+    final (toolClass, reason) = answer;
+    await _run(() async {
+      await widget.repository.setToolClass(
+        a,
+        toolClass.wire,
+        reason: reason,
+        purpose: l.stepUpPurposeToolClass(a.displayName),
+      );
+      return SelfNotice(
+        l.adminAgentClassChanged(a.displayName, toolClassName(l, toolClass)),
+      );
+    });
+  }
+
+  Future<void> _editFeatures(AgentRecord a) async {
+    final l = AppLocalizations.of(context);
+    final config = await AgentFeaturesDialog.show(context, agent: a);
+    if (config == null || !mounted) return;
+    await _run(() async {
+      await widget.repository.setOperatorConfig(
+        a,
+        config,
+        purpose: l.stepUpPurposeAgentFeatures(a.displayName),
+      );
+      return SelfNotice(l.adminAgentFeaturesSaved(a.displayName));
+    });
+  }
+
+  /// "Disable" and "Enable": one confirmation that says what ends or comes back, with the
+  /// reason the server stores in the audit log.
+  Future<void> _setActive(AgentRecord a, {required bool active}) async {
+    final l = AppLocalizations.of(context);
+    final name = a.displayName;
+    final reason = await ConfirmChange.show(
+      context,
+      title: active
+          ? l.adminAgentEnableTitle(name)
+          : l.builtinAgentDisableTitle(name),
+      body: active
+          ? l.adminAgentEnableBody(name)
+          : l.adminAgentDisableBody(name),
+      confirmLabel: active ? l.adminAgentEnable : l.builtinAgentDisable,
+      destructive: !active,
+      withReason: true,
+    );
+    if (reason == null || !mounted) return;
+    await _run(() async {
+      await widget.repository.setActive(
+        a,
+        active: active,
+        reason: reason.isEmpty ? l.adminDefaultReason : reason,
+        purpose: active
+            ? l.stepUpPurposeEnableAgent(name)
+            : l.stepUpPurposeDisableAgent(name),
+      );
+      return SelfNotice(
+        active ? l.adminAgentEnabled(name) : l.builtinAgentDisabled(name),
       );
     });
   }
@@ -354,6 +455,97 @@ class _AgentPageState extends State<AgentPage>
     );
   }
 
+  /// The tool class, the features and the status of [a]. [adapter] is false for a built-in
+  /// agent, whose class follows its definition ("Edit"). While its own section shows
+  /// ([builtinShown]), that section has "Disable" and says that the agent is disabled, so the
+  /// status here appears only with "Enable", once the agent is disabled.
+  List<Widget> _administration(
+    AppLocalizations l,
+    AgentRecord a,
+    TextStyle body,
+    TextStyle secondary, {
+    required bool adapter,
+    required bool builtinShown,
+  }) {
+    final allowed = !denied.contains(_backend);
+    final toolClass = AgentToolClass.of(a.toolClass);
+    final off = agentFeaturesOff(a.operatorConfig);
+    final model = a.operatorConfig[agentDefaultModelKey];
+    return [
+      if (adapter) ...[
+        _heading(l.newAgentClass),
+        Text(
+          toolClassName(l, toolClass),
+          key: const ValueKey('agentPage.toolClass'),
+          style: body,
+        ),
+        Text(adapterToolClassExplanation(l, toolClass), style: secondary),
+        if (allowed)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: OutlinedButton(
+              key: const ValueKey('agentPage.toolClassChange'),
+              onPressed: busy ? null : () => _changeToolClass(a),
+              child: Text(l.adminAgentClassChange),
+            ),
+          ),
+        _heading(l.adminAgentFeatures),
+        Text(
+          off.isEmpty
+              ? l.adminAgentFeaturesAll
+              : l.adminAgentFeaturesOff(
+                  [for (final key in off) agentFeatureLabel(l, key)].join(', '),
+                ),
+          key: const ValueKey('agentPage.features'),
+          style: body,
+        ),
+        if (model is String && model.isNotEmpty)
+          Text(
+            l.adminAgentDefaultModelValue(model),
+            key: const ValueKey('agentPage.defaultModel'),
+            style: body,
+          ),
+        if (allowed)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: OutlinedButton(
+              key: const ValueKey('agentPage.featuresEdit'),
+              onPressed: busy ? null : () => _editFeatures(a),
+              child: Text(l.adminAgentFeaturesEdit),
+            ),
+          ),
+      ],
+      if (!builtinShown || !a.active) ...[
+        _heading(l.adminAgentStatus),
+        // A built-in agent says that it is disabled in its own section.
+        if (!builtinShown)
+          Text(
+            a.active ? l.adminAgentStatusActive : l.builtinAgentDisabledHint,
+            key: const ValueKey('agentPage.status'),
+            style: body,
+          ),
+        if (allowed && !a.active)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: OutlinedButton(
+              key: const ValueKey('agentPage.enable'),
+              onPressed: busy ? null : () => _setActive(a, active: true),
+              child: Text(l.adminAgentEnable),
+            ),
+          )
+        else if (allowed && !builtinShown)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: OutlinedButton(
+              key: const ValueKey('agentPage.disable'),
+              onPressed: busy ? null : () => _setActive(a, active: false),
+              child: Text(l.builtinAgentDisable),
+            ),
+          ),
+      ],
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -408,6 +600,8 @@ class _AgentPageState extends State<AgentPage>
     final conflicts = _conflicts;
     final heartbeat = r.lastHeartbeatAt;
     final version = r.runtimeVersion;
+    final adapter = a.adapterKind != builtinAdapterKind;
+    final builtinShown = !adapter && widget.builtin != null;
     return [
       Row(
         children: [
@@ -539,9 +733,19 @@ class _AgentPageState extends State<AgentPage>
           },
           onSwitchBilling: denied.contains(_backend) ? null : () => _switch(a),
         ),
+      ..._administration(
+        l,
+        a,
+        body,
+        secondary,
+        adapter: adapter,
+        builtinShown: builtinShown,
+      ),
       const SizedBox(height: DsSpace.s16),
       AgentTokens(
-        key: ValueKey('agentPage.tokens.${a.id}'),
+        // Disabling revokes the agent's tokens on the server, so the list is read again when
+        // the status changes.
+        key: ValueKey('agentPage.tokens.${a.id}.${a.active}'),
         repository: widget.repository,
         agent: a,
         timeZone: widget.timeZone,

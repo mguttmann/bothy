@@ -40,8 +40,10 @@ final class SelfFailure {
 /// A `404` reads as [notFound] when given; a `403` is [SelfFailure.denied] with the translated
 /// reason; no answer is the offline text; every other problem is its translated code (with its
 /// reason, for example a locked password step-up). A session without any step-up method
-/// ([StepUpUnavailable]) reads as `step_up_not_possible`, another error of the login layer as a
-/// revoked session.
+/// ([StepUpUnavailable]) reads as `step_up_not_possible`, a refresh that got no answer
+/// ([RefreshUnavailable], temporary) as the offline text, and a session that is gone
+/// ([SessionEnded], [NotSignedIn]) as a revoked session. `loadProblem` and `newAgentFailureOf`
+/// read the errors of the login layer the same way (ruling AUD-AA1/4).
 SelfFailure? selfFailure(AppLocalizations l, Object error, {String? notFound}) {
   if (error is StepUpCancelled) return null;
   if (error is SelfActionFailed) {
@@ -60,6 +62,8 @@ SelfFailure? selfFailure(AppLocalizations l, Object error, {String? notFound}) {
       denied: true,
     );
   }
+  // The refresh could not reach the server: the session is still there (brief M4-09 note 4).
+  if (error is RefreshUnavailable) return SelfFailure(l.selfOffline);
   if (error is AuthException) return SelfFailure(l.problemSessionRevoked);
   return SelfFailure(problemText(l, 'internal_error'));
 }

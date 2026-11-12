@@ -8,7 +8,15 @@
 /// the view shows a spinner, and the answer replaces it with the builder's questions, the draft
 /// or the fallback with its reason. "Use what we have" sets `want_draft`. The cost estimate is
 /// the sum of the estimates of every answer so far.
+///
+/// The server takes at most `agents.interview.max_turns` turns and refuses a longer interview
+/// with `too_many_items` on `/turns` before it asks the builder. The interview then ends: the
+/// same request goes out once more with `want_draft` and the turns that fit ([fittingTurns]),
+/// so a builder that keeps asking leads to a draft and never to an error the person cannot
+/// leave (ruling AUD-AA1/1).
 library;
+
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
@@ -37,6 +45,10 @@ final class AgentInterview extends ChangeNotifier {
   int _costMicros = 0;
   String? _currency;
   bool _hasCost = false;
+
+  /// The most turns the server took in one request of this interview: that many fit
+  /// `agents.interview.max_turns`, which the client cannot read.
+  int _taken = 0;
 
   /// The turns so far, oldest first: the builder's questions and the person's answers.
   List<InterviewTurn> get turns => List.unmodifiable(_turns);
@@ -90,10 +102,7 @@ final class AgentInterview extends ChangeNotifier {
     _error = null;
     _notify();
     try {
-      final reply = await _port.interview(
-        List.of(_turns),
-        wantDraft: wantDraft,
-      );
+      final reply = await _ask(List.of(_turns), wantDraft: wantDraft);
       if (_closed) return;
       if (reply.costMicros case final micros?) {
         _hasCost = true;
@@ -128,6 +137,28 @@ final class AgentInterview extends ChangeNotifier {
     }
   }
 
+  /// Sends [turns]; an interview the server finds too long is sent once more as a request for
+  /// the draft with the turns that fit.
+  Future<InterviewReply> _ask(
+    List<InterviewTurn> turns, {
+    required bool wantDraft,
+  }) async {
+    try {
+      final reply = await _port.interview(turns, wantDraft: wantDraft);
+      _taken = math.max(_taken, turns.length);
+      return reply;
+    } on NewAgentFailure catch (e) {
+      if (!_tooManyTurns(e)) rethrow;
+      // At least one turn fits: the lowest value of the key is 1 (26 14).
+      final fitting = fittingTurns(turns, math.max(_taken, 1));
+      if (fitting.length == turns.length) rethrow;
+      return _port.interview(fitting, wantDraft: true);
+    }
+  }
+
+  static bool _tooManyTurns(NewAgentFailure e) =>
+      e.errors.any((i) => i.pointer == '/turns' && i.code == 'too_many_items');
+
   void _notify() {
     if (!_closed) notifyListeners();
   }
@@ -137,4 +168,28 @@ final class AgentInterview extends ChangeNotifier {
     _closed = true;
     super.dispose();
   }
+}
+
+/// The at most [fit] turns of [turns] a request for the draft carries when the interview is
+/// longer than the server takes, in their order: first the builder's questions at the end that
+/// nobody answered are left out, then its questions from the oldest on, and only then the
+/// person's answers from the oldest on, so the person's own words reach the builder as long as
+/// they fit.
+///
+/// Example: with `fit` 3, `[q1, q2, a1, q3, a2]` becomes `[a1, q3, a2]`.
+List<InterviewTurn> fittingTurns(List<InterviewTurn> turns, int fit) {
+  final kept = List.of(turns);
+  while (kept.length > fit &&
+      kept.isNotEmpty &&
+      kept.last.role == InterviewRole.builder) {
+    kept.removeLast();
+  }
+  for (final role in [InterviewRole.builder, InterviewRole.owner]) {
+    while (kept.length > fit) {
+      final oldest = kept.indexWhere((t) => t.role == role);
+      if (oldest < 0) break;
+      kept.removeAt(oldest);
+    }
+  }
+  return kept;
 }

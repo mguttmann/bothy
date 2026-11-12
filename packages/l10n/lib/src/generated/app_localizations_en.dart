@@ -11294,4 +11294,158 @@ class AppLocalizationsEn extends AppLocalizations {
   String sidebarArchived(int count) {
     return 'Archived ($count)';
   }
+
+  @override
+  String get adminAgentsAdd => 'Add adapter agent';
+
+  @override
+  String get adminAddAgentBody =>
+      'The agent is the account of an adapter. It starts with the backend Organization and the tool class Chat. Its page opens next: create its token there.';
+
+  @override
+  String get adminAddAgentKind => 'Adapter';
+
+  @override
+  String get adminAddAgentKindRunner => 'Claude Code runner';
+
+  @override
+  String get adminAddAgentKindHermes => 'Hermes';
+
+  @override
+  String get adminAddAgentKindCustom => 'Own adapter';
+
+  @override
+  String get adminAddAgentSubmit => 'Create agent';
+
+  @override
+  String get adminAgentStatus => 'Status';
+
+  @override
+  String get adminAgentStatusActive => 'Active';
+
+  @override
+  String get adminAgentEnable => 'Enable';
+
+  @override
+  String adminAgentDisableBody(String name) {
+    return '$name stops answering: its tokens are revoked, its connections close and its runs are cancelled. Enabling it later does not bring the tokens back.';
+  }
+
+  @override
+  String adminAgentEnableTitle(String name) {
+    return 'Enable $name?';
+  }
+
+  @override
+  String adminAgentEnableBody(String name) {
+    return '$name can connect again. Its earlier tokens stay revoked: create a new token for its adapter.';
+  }
+
+  @override
+  String adminAgentEnabled(String name) {
+    return '$name is enabled.';
+  }
+
+  @override
+  String stepUpPurposeEnableAgent(String name) {
+    return 'Enable the agent $name';
+  }
+
+  @override
+  String get adminAgentClassChatExplain =>
+      'Replies and reads the thread. Nothing it does reaches beyond the thread.';
+
+  @override
+  String get adminAgentClassScopedExplain =>
+      'Uses named tools with minimal credentials of their own. An effect outside the thread needs an approval.';
+
+  @override
+  String get adminAgentClassHostExplain =>
+      'Shell, files and network with the rights of the user of the runtime. Only owners and people with a ready development environment of their own can start it.';
+
+  @override
+  String get adminAgentClassChange => 'Change tool class';
+
+  @override
+  String adminAgentClassTitle(String name) {
+    return 'Tool class of $name';
+  }
+
+  @override
+  String get adminAgentClassBody =>
+      'The tool class is the most the runtime of the agent may do. An adapter that reports a higher class than the one set here starts nothing.';
+
+  @override
+  String adminAgentClassChanged(String name, String toolClass) {
+    return '$name now has the tool class $toolClass.';
+  }
+
+  @override
+  String stepUpPurposeToolClass(String name) {
+    return 'Set the tool class of $name';
+  }
+
+  @override
+  String get adminAgentFeatures => 'Features';
+
+  @override
+  String get adminAgentFeaturesExplain =>
+      'A feature works when it is allowed here and the adapter reports it. Switching one off stops it; nothing here switches on what the adapter lacks.';
+
+  @override
+  String get adminAgentFeatureFollowups => 'Messages as a follow-up';
+
+  @override
+  String get adminAgentFeatureComponents => 'Components';
+
+  @override
+  String get adminAgentFeatureVoice => 'Voice input';
+
+  @override
+  String get adminAgentFeatureTitle => 'Title suggestions';
+
+  @override
+  String get adminAgentFeatureFilesOut => 'Sending files';
+
+  @override
+  String get adminAgentFeaturesAll =>
+      'Everything the adapter reports is allowed.';
+
+  @override
+  String adminAgentFeaturesOff(String features) {
+    return 'Switched off: $features';
+  }
+
+  @override
+  String get adminAgentDefaultModel => 'Default model';
+
+  @override
+  String adminAgentDefaultModelValue(String model) {
+    return 'Default model: $model';
+  }
+
+  @override
+  String get adminAgentDefaultModelHint => 'Empty: the adapter chooses';
+
+  @override
+  String get adminAgentDefaultModelInvalid =>
+      'Use letters, digits and the characters . _ : / @ - only.';
+
+  @override
+  String get adminAgentFeaturesEdit => 'Edit features';
+
+  @override
+  String adminAgentFeaturesTitle(String name) {
+    return 'Features of $name';
+  }
+
+  @override
+  String adminAgentFeaturesSaved(String name) {
+    return 'The features of $name are saved.';
+  }
+
+  @override
+  String stepUpPurposeAgentFeatures(String name) {
+    return 'Change the features of $name';
+  }
 }

@@ -2,7 +2,8 @@
 
 /// Agents, their backend switch, their operated targets and their API tokens over REST
 /// (docs/spec/01-product.md 5.2 A5; 10 5.2, 5.4, 8, 9, 11, 13; 08 12; brief M4-28 Design notes 1
-/// to 4).
+/// to 4), and the administration of an adapter agent: create, disable, enable, the tool class
+/// and the features the owner allows (09 2.1, 2.2; 07 2.11; rulings AUD-AA1/5 to AUD-AA1/8).
 ///
 /// The types carry what the server answers, unchanged: the warnings of 10 8 are the server's
 /// codes (`AgentRuntimeStatus.warnings`), never a comparison of the client (15 1 principle 1),
@@ -36,6 +37,27 @@ enum AgentBillingMode {
       values.where((m) => m != unknown && m.wire == wire).firstOrNull ??
       unknown;
 }
+
+/// The adapter kinds "Add adapter agent" offers (`AgentCreate.adapter_kind`, 03 `agents`): a
+/// Claude Code runner, Hermes and an adapter of one's own. A built-in agent (`claude_agent`)
+/// needs a hosting runner and is created by "New agent".
+const List<String> adapterKinds = ['code_runner', 'hermes', 'custom'];
+
+/// The feature switches of `agent_operator_config.v1` (09 2.2) in the order of the chapter; a
+/// missing key allows the feature, `false` switches it off.
+const List<String> agentFeatureKeys = [
+  'supports_followups',
+  'supports_components',
+  'supports_voice',
+  'supports_title',
+  'supports_files_out',
+];
+
+/// The key of the default model in `agent_operator_config.v1`.
+const String agentDefaultModelKey = 'default_model';
+
+/// The pattern of `default_model` (09 2.2).
+final RegExp agentDefaultModelPattern = RegExp(r'^[A-Za-z0-9._:/@-]+$');
 
 /// The state of the runtime as the heartbeat reports it (`AgentRuntimeState`, 09 4.8).
 enum AgentLiveStateKind {
@@ -137,7 +159,13 @@ final class AgentRecord {
     required this.version,
     this.holderId,
     this.modeChangedAt,
+    this.operatorConfig = const {},
   });
+
+  /// What the owner allows the adapter (`operator_config`, schema `agent_operator_config.v1`,
+  /// 09 2.2) as the server sent it: `default_model` and the switches of [agentFeatureKeys]. No
+  /// secrets.
+  final Map<String, Object?> operatorConfig;
 
   /// The agent ID.
   final String id;
@@ -265,7 +293,8 @@ final class AgentTokenCreated {
 
 /// The calls of the agent administration; a changing call carries the [purpose] text the
 /// step-up dialog shows when the server answers `401 step_up_required` (05:
-/// `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set` and
+/// `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`,
+/// `agent.create`, `agent.disable`, `agent.enable`, `agent.tool_class.set`, `agent.update` and
 /// `token.create` have step-up, `token.revoke` has none).
 ///
 /// Errors: [SelfActionFailed] with the server's problem (a `409 i1_violation` carries the
@@ -313,6 +342,44 @@ abstract interface class AgentsRepository {
   /// organization in the audit (`listAuditEvents` filtered by action; step-up of `audit.read`),
   /// or null when there is none.
   Future<SwitchAllProposal?> lastGlobalSwitch({required String purpose});
+
+  /// Creates the agent of an adapter (`createAgent`): [adapterKind] is one of [adapterKinds];
+  /// the server starts it with `organization` and the tool class `chat`. A taken handle is
+  /// `409 conflict` with `taken` on `/handle`.
+  Future<AgentRecord> createAgent({
+    required String handle,
+    required String displayName,
+    required String adapterKind,
+    String description = '',
+    required String purpose,
+  });
+
+  /// Disables ([active] false, `disableAgent`: its tokens and connections end and its runs
+  /// are cancelled) or enables [agent] (`enableAgent`: the tokens stay revoked, and I1 counts
+  /// the agent again, so `409 i1_violation` may refuse it) with the required [reason].
+  Future<AgentRecord> setActive(
+    AgentRecord agent, {
+    required bool active,
+    required String reason,
+    required String purpose,
+  });
+
+  /// Sets the tool class of [agent] to [toolClass] (`chat`, `scoped` or `host`;
+  /// `setAgentToolClass` with `If-Match`, 07 2.11) with the required [reason].
+  Future<AgentRecord> setToolClass(
+    AgentRecord agent,
+    String toolClass, {
+    required String reason,
+    required String purpose,
+  });
+
+  /// Replaces what the owner allows the adapter of [agent] (`updateAgent` with `If-Match`,
+  /// member `operator_config`): [config] is the whole object of `agent_operator_config.v1`.
+  Future<AgentRecord> setOperatorConfig(
+    AgentRecord agent,
+    Map<String, Object?> config, {
+    required String purpose,
+  });
 
   /// The API tokens of [principalId] (`listTokens`, all pages).
   Future<List<AgentToken>> tokens(String principalId);
@@ -496,6 +563,100 @@ final class ApiAgentsRepository implements AgentsRepository {
       });
 
   @override
+  Future<AgentRecord> createAgent({
+    required String handle,
+    required String displayName,
+    required String adapterKind,
+    String description = '',
+    required String purpose,
+  }) => adminCall(
+    () async => agentRecordOf(
+      (await _agents.createAgent(
+        idempotencyKey: _newKey(),
+        agentCreate: AgentCreate(
+          (b) => b
+            ..handle = handle
+            ..displayName = displayName
+            ..adapterKind = adapterKind
+            ..description = description,
+        ),
+        extra: _purpose(purpose),
+      )).data!,
+    ),
+  );
+
+  @override
+  Future<AgentRecord> setActive(
+    AgentRecord agent, {
+    required bool active,
+    required String reason,
+    required String purpose,
+  }) => adminCall(() async {
+    final body = ReasonBody((b) => b..reason = reason);
+    final key = _newKey();
+    final answer = active
+        ? await _agents.enableAgent(
+            agentId: agent.id,
+            idempotencyKey: key,
+            reasonBody: body,
+            extra: _purpose(purpose),
+          )
+        : await _agents.disableAgent(
+            agentId: agent.id,
+            idempotencyKey: key,
+            reasonBody: body,
+            extra: _purpose(purpose),
+          );
+    return agentRecordOf(answer.data!);
+  });
+
+  @override
+  Future<AgentRecord> setToolClass(
+    AgentRecord agent,
+    String toolClass, {
+    required String reason,
+    required String purpose,
+  }) => adminCall(
+    () async => agentRecordOf(
+      (await _agents.setAgentToolClass(
+        agentId: agent.id,
+        ifMatch: _ifMatch(agent),
+        toolClassSet: ToolClassSet(
+          (b) => b
+            ..toolClass = switch (toolClass) {
+              'host' => ToolClass.host,
+              'scoped' => ToolClass.scoped,
+              _ => ToolClass.chat,
+            }
+            ..reason = reason,
+        ),
+        extra: _purpose(purpose),
+      )).data!,
+    ),
+  );
+
+  @override
+  Future<AgentRecord> setOperatorConfig(
+    AgentRecord agent,
+    Map<String, Object?> config, {
+    required String purpose,
+  }) => adminCall(
+    () async => agentRecordOf(
+      (await _agents.updateAgent(
+        agentId: agent.id,
+        ifMatch: _ifMatch(agent),
+        idempotencyKey: _newKey(),
+        // The object travels as the JSON the dialog built, so no member is added or dropped.
+        agentUpdate: standardSerializers.deserializeWith(
+          AgentUpdate.serializer,
+          {'operator_config': config},
+        )!,
+        extra: _purpose(purpose),
+      )).data!,
+    ),
+  );
+
+  @override
   Future<List<AgentToken>> tokens(String principalId) => adminCall(() async {
     final out = <AgentToken>[];
     String? cursor;
@@ -612,6 +773,10 @@ AgentRecord agentRecordOf(Agent a) {
       warnings: p.warnings?.toList() ?? const [],
     ),
     version: a.version,
+    operatorConfig: {
+      for (final MapEntry(:key, :value) in a.operatorConfig.entries)
+        key: value?.value,
+    },
   );
 }
 

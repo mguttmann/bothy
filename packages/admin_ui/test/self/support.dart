@@ -218,12 +218,14 @@ class FakeSelfRepository implements SelfRepository {
 }
 
 /// Pumps [child] in an app with the localizations of [locale], the design theme and a
-/// navigator under [navigatorKey]; returns after the first frames settled.
+/// navigator under [navigatorKey]; returns after the first frames settled, or with [settle]
+/// false after the first frame (for a screen that still shows its spinner).
 Future<void> pumpInApp(
   WidgetTester tester,
   Widget child, {
   GlobalKey<NavigatorState>? navigatorKey,
   Locale locale = const Locale('en'),
+  bool settle = true,
 }) async {
   tester.view
     ..physicalSize = const Size(1200, 1000)
@@ -251,5 +253,5 @@ Future<void> pumpInApp(
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) await tester.pumpAndSettle();
 }

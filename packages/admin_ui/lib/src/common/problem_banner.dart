@@ -79,8 +79,9 @@ class ProblemBanner extends StatelessWidget {
 }
 
 /// The problem of a failed load [error]: the server's answer, or null without one (a session
-/// without any step-up method reads as `403 forbidden` with reason `step_up_not_possible`,
-/// another error of the login layer as a revoked session).
+/// without any step-up method reads as `403 forbidden` with reason `step_up_not_possible`, a
+/// refresh that got no answer as no answer, another error of the login layer as a revoked
+/// session; the same reading as `selfFailure`).
 ApiProblem? loadProblem(Object error) => switch (error) {
   SelfActionFailed(:final problem) => problem,
   StepUpUnavailable() => const ApiProblem(
@@ -88,6 +89,7 @@ ApiProblem? loadProblem(Object error) => switch (error) {
     code: 'forbidden',
     reason: 'step_up_not_possible',
   ),
+  RefreshUnavailable() => null,
   AuthException() => const ApiProblem(status: 401, code: 'session_revoked'),
   _ => const ApiProblem(status: 500, code: 'internal_error'),
 };

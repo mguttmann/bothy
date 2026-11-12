@@ -6,7 +6,10 @@
 // organization clears the holder, personal needs a holder, "all to personal" needs the list,
 // one violating agent changes nothing (BR-08), and `resolve_i1` switches the listed agents in
 // the same step as the outer change, both or none (BR-07). Agent tokens show their secret
-// once.
+// once. The administration of an adapter agent behaves like the server of 09 2.1 and 2.2 and
+// 07 2.11: a new agent starts with organization and the class chat, a taken handle is a `409
+// conflict` with `taken` on `/handle`, disabling revokes the agent's tokens, enabling checks I1
+// and brings no token back, and the class and the features ask `If-Match`.
 
 import 'package:admin_ui/admin_ui.dart';
 import 'package:api_client/api_client.dart';
@@ -23,6 +26,11 @@ const Map<String, bool> agentsStepUpOf = {
   'lastGlobalSwitch': true,
   'createToken': true,
   'revokeToken': false,
+  // 05: agent.create, agent.disable, agent.enable, agent.tool_class.set and agent.update.
+  'createAgent': true,
+  'setActive': true,
+  'setToolClass': true,
+  'setOperatorConfig': true,
 };
 
 /// The warning codes the server computes for an agent with these values (10 8, 09 4.8).
@@ -67,16 +75,20 @@ AgentRecord fakeAgentRecord(
   List<String>? warnings,
   bool active = true,
   int version = 1,
+  String adapterKind = 'hermes',
+  String toolClass = 'chat',
+  Map<String, Object?> operatorConfig = const {},
 }) => AgentRecord(
   id: id,
   handle: id,
   displayName: name ?? id,
   active: active,
-  adapterKind: 'hermes',
+  adapterKind: adapterKind,
   description: '',
   mode: mode,
   holderId: mode == AgentBillingMode.personal ? holderId : null,
-  toolClass: 'chat',
+  toolClass: toolClass,
+  operatorConfig: operatorConfig,
   runtime: AgentRuntimeInfo(
     state: state,
     reportedMode: reported,
@@ -196,6 +208,7 @@ mixin FakeAgents {
       holderId: mode == AgentBillingMode.personal ? holderId : null,
       modeChangedAt: DateTime.utc(2026, 10, 17, 9),
       toolClass: a.toolClass,
+      operatorConfig: a.operatorConfig,
       runtime: AgentRuntimeInfo(
         state: r.state,
         reportedMode: r.reportedMode,
@@ -361,6 +374,166 @@ mixin FakeAgents {
   Future<SwitchAllProposal?> lastGlobalSwitch({required String purpose}) async {
     await read('lastGlobalSwitch', purpose);
     return proposal;
+  }
+
+  /// [a] with the given parts replaced and the version raised, as the server answers a change.
+  AgentRecord _changed(
+    AgentRecord a, {
+    bool? active,
+    String? toolClass,
+    Map<String, Object?>? operatorConfig,
+  }) => AgentRecord(
+    id: a.id,
+    handle: a.handle,
+    displayName: a.displayName,
+    active: active ?? a.active,
+    adapterKind: a.adapterKind,
+    description: a.description,
+    mode: a.mode,
+    holderId: a.holderId,
+    modeChangedAt: a.modeChangedAt,
+    toolClass: toolClass ?? a.toolClass,
+    operatorConfig: operatorConfig ?? a.operatorConfig,
+    runtime: a.runtime,
+    version: a.version + 1,
+  );
+
+  /// The stored agent of [agent], or the `412` of a change that carries an older version.
+  AgentRecord _matching(AgentRecord agent) {
+    final current = _agent(agent.id);
+    if (current.version != agent.version) {
+      throw const SelfActionFailed(
+        ApiProblem(status: 412, code: 'version_conflict'),
+      );
+    }
+    return current;
+  }
+
+  /// Creates the agent of an adapter: organization, the class chat, version 1, no heartbeat.
+  Future<AgentRecord> createAgent({
+    required String handle,
+    required String displayName,
+    required String adapterKind,
+    String description = '',
+    required String purpose,
+  }) async {
+    await change(
+      'createAgent',
+      '$handle $displayName $adapterKind $description'.trim(),
+      purpose,
+    );
+    if (agentRecordsById.values.any((a) => a.handle == handle)) {
+      throw const SelfActionFailed(
+        ApiProblem(
+          status: 409,
+          code: 'conflict',
+          errors: [ProblemFieldError(pointer: '/handle', code: 'taken')],
+        ),
+      );
+    }
+    return agentRecordsById[handle] = AgentRecord(
+      id: handle,
+      handle: handle,
+      displayName: displayName,
+      active: true,
+      adapterKind: adapterKind,
+      description: description,
+      mode: AgentBillingMode.organization,
+      toolClass: 'chat',
+      runtime: const AgentRuntimeInfo(state: AgentLiveStateKind.unknown),
+      version: 1,
+    );
+  }
+
+  /// Disables or enables [agent]; a repeated call changes nothing, disabling revokes the
+  /// agent's tokens, enabling checks I1 (`i1On['setActive']`) and restores no token.
+  Future<AgentRecord> setActive(
+    AgentRecord agent, {
+    required bool active,
+    required String reason,
+    required String purpose,
+  }) async {
+    await change(
+      'setActive',
+      '${agent.id} ${active ? 'enable' : 'disable'} $reason',
+      purpose,
+    );
+    if (reason.trim().isEmpty) {
+      throw const SelfActionFailed(
+        ApiProblem(status: 400, code: 'validation_failed'),
+      );
+    }
+    final current = _agent(agent.id);
+    if (current.active == active) return current;
+    if (active) {
+      i1Guard('setActive', null);
+    } else {
+      final revokedAt = DateTime.utc(2026, 10, 17, 9);
+      tokensById[agent.id] = [
+        for (final t in tokensById[agent.id] ?? const <AgentToken>[])
+          AgentToken(
+            id: t.id,
+            name: t.name,
+            prefix: t.prefix,
+            createdAt: t.createdAt,
+            expiresAt: t.expiresAt,
+            lastUsedAt: t.lastUsedAt,
+            revokedAt: t.revokedAt ?? revokedAt,
+            dpopBound: t.dpopBound,
+          ),
+      ];
+    }
+    return agentRecordsById[agent.id] = _changed(current, active: active);
+  }
+
+  /// Sets the tool class; `If-Match` against the stored version.
+  Future<AgentRecord> setToolClass(
+    AgentRecord agent,
+    String toolClass, {
+    required String reason,
+    required String purpose,
+  }) async {
+    await change('setToolClass', '${agent.id} $toolClass $reason', purpose);
+    final current = _matching(agent);
+    if (reason.trim().isEmpty ||
+        !const {'chat', 'scoped', 'host'}.contains(toolClass)) {
+      throw const SelfActionFailed(
+        ApiProblem(status: 400, code: 'validation_failed'),
+      );
+    }
+    return agentRecordsById[agent.id] = _changed(current, toolClass: toolClass);
+  }
+
+  /// Replaces the operator configuration; `If-Match` against the stored version, and the
+  /// closed schema of `agent_operator_config.v1` (09 2.2).
+  Future<AgentRecord> setOperatorConfig(
+    AgentRecord agent,
+    Map<String, Object?> config, {
+    required String purpose,
+  }) async {
+    final members = config.keys.toList()..sort();
+    await change(
+      'setOperatorConfig',
+      '${agent.id} ${[for (final k in members) '$k=${config[k]}'].join(',')}'
+          .trim(),
+      purpose,
+    );
+    final current = _matching(agent);
+    final valid = config.entries.every(
+      (e) => e.key == agentDefaultModelKey
+          ? e.value is String &&
+                agentDefaultModelPattern.hasMatch(e.value! as String)
+          : agentFeatureKeys.contains(e.key) && e.value is bool,
+    );
+    if (!valid) {
+      throw const SelfActionFailed(
+        ApiProblem(status: 400, code: 'validation_failed'),
+      );
+    }
+    return agentRecordsById[agent.id] = _changed(
+      current,
+      operatorConfig: Map.of(config),
+    );
   }
 
   /// The tokens of [principalId].
