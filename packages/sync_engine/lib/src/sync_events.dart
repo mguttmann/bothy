@@ -54,8 +54,13 @@ final class Resynced extends SyncNotice {
   /// Creates the notice.
   const Resynced(this.reason);
 
+  /// The [reason] of a resync the engine started itself: a page failed twice at the same
+  /// cursor, and the snapshot passes the event that cannot be applied
+  /// (docs/decisions.d/AUD-pkg-sync-engine-01.md).
+  static const String pageFailed = 'page_failed';
+
   /// The reason the server named (`retention`, `too_far_behind`, `epoch_changed`,
-  /// `cursor_ahead`).
+  /// `cursor_ahead`), or [pageFailed].
   final String reason;
 }
 

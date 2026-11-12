@@ -867,4 +867,22 @@ final class _Control implements SessionControl {
 
   @override
   String? get syncEpoch => _c._session.syncEpoch;
+
+  @override
+  void reconnect({Duration? after}) {
+    if (!_c._identified) return;
+    _c._log('reconnect asked by the listener');
+    // Not awaited: this runs inside a frame step, and the close is handled by the queue.
+    unawaited(
+      _c._closeOwn(
+        CloseReaction(
+          code: null,
+          phase: ConnectionPhase.backoff,
+          reason: ConnectionReason.none,
+          reconnect: Reconnect.backoff,
+          retryAfter: after,
+        ),
+      ),
+    );
+  }
 }
