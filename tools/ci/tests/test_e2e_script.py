@@ -294,6 +294,8 @@ def test_leaf_passes_the_strict_check_of_the_fake_agent(tmp_path: Path) -> None:
     server = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     server.load_cert_chain(certs / "leaf.pem", certs / "leaf.key")
     client = ssl.create_default_context(cafile=str(certs / "ca.pem"))
+    # No handshake below TLS 1.2, whatever the interpreter allows by default.
+    client.minimum_version = ssl.TLSVersion.TLSv1_2
     # The default of Python 3.13 and later; named here so that an older interpreter checks too.
     client.verify_flags |= ssl.VERIFY_X509_STRICT
 
