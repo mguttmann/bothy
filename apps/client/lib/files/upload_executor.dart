@@ -211,10 +211,10 @@ abstract final class UploadOps {
   /// Deletes the file of a discarded upload (`deleteFile`): `204` once deleted (an open session
   /// is aborted with it). Any other final answer ends the entry as well, so nothing stays in the
   /// outbox that the person could neither see nor change: a file that is gone (`404`), one a
-  /// message attached after all (`409 file_attached`: the post was created and its answer was
-  /// lost), or a refusal (`403` after a lost right), whose open session the server's cleanup
-  /// expires after `file.upload_session_ttl` (12 12). A network error, `5xx` and `429` are
-  /// tried again like every entry.
+  /// message attached after all (`409 conflict` with `reason` `file_attached`: the post was
+  /// created and its answer was lost), or a refusal (`403` after a lost right), whose open
+  /// session the server's cleanup expires after `file.upload_session_ttl` (12 12). A network
+  /// error, `5xx` and `429` are tried again like every entry.
   static Future<OutboxResponse> _release(
     ApiClient api,
     UploadProgress progress,
