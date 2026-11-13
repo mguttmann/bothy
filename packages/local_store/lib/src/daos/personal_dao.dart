@@ -118,8 +118,10 @@ final class PersonalDao {
   /// every stored row of that target written up to [until] goes (every row without [until]),
   /// and a row written later stays, because it is the next draft of the target.
   ///
-  /// For a draft this device knows the server deleted without the ID of its row at hand: the
-  /// answer to an empty draft write (04 14: an empty draft is deleted).
+  /// For a draft this device knows the server deleted, or will delete, without the ID of its
+  /// row at hand: the answer to an empty draft write (04 14: an empty draft is deleted), with
+  /// its time as [until], and the device's own send with `clear_draft`, without [until]
+  /// (FIX-CDL/9 in docs/decisions.d/FIX-COMPOSER-DRAFT-LOST.md).
   Future<void> endDraft({
     required ChannelId channelId,
     ThreadId? threadId,

@@ -17,6 +17,7 @@ import 'package:client/app/app.dart';
 import 'package:client/app/providers/session.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:design_system/design_system.dart';
+import 'package:domain/domain.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -232,16 +233,23 @@ class _App {
     await tester.pump();
   }
 
-  /// The person sends what the composer of [thread] holds, with its send button.
+  /// The person sends what the composer of [thread] holds, with its send button. The button
+  /// takes a text the app put into the field in the next frame, and the phone slides it in
+  /// once the field holds text: frames only, so no request finishes meanwhile.
   Future<void> send(String thread) async {
-    await tester.tap(
-      find.descendant(
-        of: find.byKey(ValueKey('historyColumn.$thread.null')),
-        matching: find.byWidgetPredicate(
-          (w) => w is DsTappable && w.label == en.composerSend,
-        ),
+    final button = find.descendant(
+      of: find.byKey(ValueKey('historyColumn.$thread.null')),
+      matching: find.byWidgetPredicate(
+        (w) => w is DsTappable && w.label == en.composerSend,
       ),
     );
+    await tester.pump();
+    final watch = Stopwatch()..start();
+    while (button.hitTestable().evaluate().isEmpty) {
+      if (watch.elapsed >= testPatience) fail('the send button did not show');
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await tester.tap(button);
     await tester.pump();
   }
 
@@ -262,18 +270,31 @@ class _App {
     () async => [for (final d in await db.personalDao.allDrafts()) d.contentMd],
   );
 
-  /// Waits until nothing is on its way: every write of the outbox is answered and the app
-  /// applied every event of the fake. Then gives the views the time to take what was stored,
-  /// so a text that must not show had its chance to.
-  Future<void> idle() async {
-    await untilStored('the outbox sent and every event applied', () async {
-      final unsent = await db.outboxDao.allEntries();
-      final cursor = (await db.syncStateDao.read()).cursor?.value;
-      return unsent.isEmpty && cursor == fake.server.world.headSeq;
-    });
+  /// Whether every write of the outbox was answered; a write the server refused for good
+  /// stays in the table as failed.
+  Future<bool> answered() async =>
+      (await db.outboxDao.allEntries()).every((e) => e.state.isFinal);
+
+  /// Whether the app applied every event of the fake.
+  Future<bool> caughtUp() async =>
+      (await db.syncStateDao.read()).cursor?.value == fake.server.world.headSeq;
+
+  /// Gives the views the time to take what was stored, so a text that must not show had its
+  /// chance to.
+  Future<void> settle() async {
     for (var i = 0; i < 20; i++) {
       await _round();
     }
+  }
+
+  /// Waits until nothing is on its way: every write of the outbox is answered and the app
+  /// applied every event of the fake; then [settle].
+  Future<void> idle() async {
+    await untilStored(
+      'the outbox sent and every event applied',
+      () async => await answered() && await caughtUp(),
+    );
+    await settle();
   }
 
   /// Ends the app inside the test zone, where its timers live.
@@ -428,6 +449,206 @@ void main() {
         expect(app.textOf(one), isEmpty);
         await app.open(app.two);
         await app.open(app.one);
+        await app.idle();
+        expect(app.textOf(one), isEmpty);
+        expect(await app.stored(), isEmpty);
+      });
+
+      /// The messages the fake holds.
+      int messages() => fake.server.world.log
+          .where((e) => e.type == 'message.created')
+          .length;
+
+      // The draft ends on the device with the send (FIX-CDL/9). The `draft.deleted` of the
+      // first send is not applied while the person types, and the draft write of the second
+      // message never goes out: the second send drops it while the first is on its way. The
+      // server has no draft then and sends no second `draft.deleted`.
+      scenario('a sent text never comes back when the next message is sent '
+          'before the answer of the first send', (app) async {
+        final one = app.fieldOf(app.one);
+        await app.open(app.one);
+        await app.type(one, 'Message one');
+        await app.idle();
+        expect(await app.stored(), ['Message one']);
+        final base = messages();
+        // The answer of the first send is slow, its events are not.
+        fake.server.faults.delay(
+          const Duration(seconds: 3),
+          operationId: 'createMessage',
+        );
+        await app.send(app.one);
+        await app.type(one, 'Message two');
+        await app.until(
+          () => 'the first message on the server',
+          () => messages() == base + 1,
+        );
+        await app.untilStored('the events of the first send', app.caughtUp);
+        await app.send(app.one);
+        await app.idle();
+        expect(app.textOf(one), isEmpty);
+        await app.open(app.two);
+        await app.open(app.one);
+        await app.idle();
+        expect(app.textOf(one), isEmpty);
+        expect(await app.stored(), isEmpty);
+      });
+
+      // Three short messages in a row on a slow connection: every answer takes a while, and
+      // the events of a send arrive with its answer.
+      scenario('a sent text never comes back after three quick sends on a '
+          'slow connection', (app) async {
+        final one = app.fieldOf(app.one);
+        await app.open(app.one);
+        await app.type(one, 'Message one');
+        await app.idle();
+        expect(await app.stored(), ['Message one']);
+        final base = messages();
+        fake.server.faults
+          ..delay(
+            const Duration(seconds: 3),
+            operationId: 'createMessage',
+            times: 2,
+          )
+          ..holdDispatches();
+        await app.send(app.one);
+        await app.type(one, 'B');
+        await app.send(app.one);
+        // The first send is answered, the second is on its way.
+        await app.until(
+          () => 'the second message on the server',
+          () => messages() == base + 2,
+        );
+        await app.type(one, 'C');
+        fake.server.faults.releaseDispatches();
+        await app.untilStored('the events of the sends', app.caughtUp);
+        await app.send(app.one);
+        await app.idle();
+        expect(app.textOf(one), isEmpty);
+        await app.open(app.two);
+        await app.open(app.one);
+        await app.idle();
+        expect(app.textOf(one), isEmpty);
+        expect(await app.stored(), isEmpty);
+      });
+
+      // The draft of the next message never reaches the server: its write is refused for
+      // good, so no later draft takes the place of the sent one.
+      scenario('a sent text never comes back when the draft of the next '
+          'message is refused', (app) async {
+        final one = app.fieldOf(app.one);
+        await app.open(app.one);
+        await app.type(one, 'Message one');
+        await app.idle();
+        final base = messages();
+        fake.server.faults.holdDispatches();
+        await app.send(app.one);
+        await app.until(
+          () => 'the first message on the server',
+          () => messages() == base + 1,
+        );
+        fake.server.faults.onRequest(
+          'putThreadDraft',
+          status: 422,
+          code: 'validation_failed',
+        );
+        await app.type(one, 'Message two');
+        fake.server.faults.releaseDispatches();
+        await app.idle();
+        await app.open(app.two);
+        await app.open(app.one);
+        await app.idle();
+        expect(app.textOf(one), isEmpty);
+        expect(await app.stored(), isEmpty);
+      });
+
+      // FIX-CDL/6: a row an earlier version of the app left, which the server no longer has.
+      // The server deletes nothing with the send then and sends no `draft.deleted`.
+      scenario('a text an earlier version of the app left in a chat is gone '
+          'for good once it is sent', (app) async {
+        final one = app.fieldOf(app.one);
+        await app.inApp(
+          'storing the row',
+          () => app.db.personalDao.upsertDraftIfNewer(
+            Draft(
+              id: DraftId.parse(fake.server.world.nextId()),
+              channelId: ChannelId.parse(app.forum),
+              threadId: ThreadId.parse(app.one),
+              contentMd: 'Left behind',
+              fileIds: const [],
+              version: const ResourceVersion(2),
+            ),
+          ),
+        );
+        await app.open(app.one);
+        await app.shows(one, 'Left behind');
+        await app.send(app.one);
+        await app.idle();
+        expect(app.textOf(one), isEmpty);
+        await app.open(app.two);
+        await app.open(app.one);
+        await app.idle();
+        expect(app.textOf(one), isEmpty);
+        expect(await app.stored(), isEmpty);
+      });
+
+      // The draft write of the sent text is on its way when the person sends: its answer
+      // arrives after the send, and the events of the send arrive later still.
+      scenario('a sent text never comes back when the answer of its draft '
+          'write arrives after the send', (app) async {
+        final one = app.fieldOf(app.one);
+        await app.open(app.one);
+        final base = messages();
+        fake.server.faults
+          ..delay(const Duration(seconds: 3), operationId: 'putThreadDraft')
+          ..holdDispatches();
+        await app.type(one, 'Message one');
+        await app.untilStored('the draft write on its way', () async {
+          final entries = await app.db.outboxDao.allEntries();
+          return entries.any((e) => e.state == OutboxState.sending);
+        });
+        await app.send(app.one);
+        await app.until(
+          () => 'the message on the server',
+          () => messages() == base + 1,
+        );
+        await app.untilStored('the answer of the send', app.answered);
+        await app.settle();
+        expect(app.textOf(one), isEmpty);
+        await app.open(app.two);
+        await app.open(app.one);
+        await app.settle();
+        expect(app.textOf(one), isEmpty);
+        expect(await app.stored(), isEmpty);
+        fake.server.faults.releaseDispatches();
+        await app.idle();
+        expect(app.textOf(one), isEmpty);
+        expect(await app.stored(), isEmpty);
+      });
+
+      // 04 13: the send waits in the outbox, as it does without a connection. The draft
+      // ended with the send, also before the server knows of it. The first attempt of the
+      // send is refused for a while; `composer_test.dart` holds the same without a clock, with
+      // an engine that never sends.
+      scenario('a sent text is not back in the composer while its send '
+          'waits', (app) async {
+        final one = app.fieldOf(app.one);
+        await app.open(app.one);
+        await app.type(one, 'Message one');
+        await app.idle();
+        expect(await app.stored(), ['Message one']);
+        fake.server.faults.onRequest(
+          'createMessage',
+          status: 503,
+          code: 'unavailable',
+          retryAfter: const Duration(seconds: 3),
+        );
+        await app.send(app.one);
+        await app.open(app.two);
+        await app.open(app.one);
+        await app.settle();
+        expect(app.textOf(one), isEmpty);
+        expect(await app.stored(), isEmpty);
+        // The send goes out with the next attempt.
         await app.idle();
         expect(app.textOf(one), isEmpty);
         expect(await app.stored(), isEmpty);

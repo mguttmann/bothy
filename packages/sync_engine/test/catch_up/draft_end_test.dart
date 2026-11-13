@@ -5,7 +5,10 @@
 // draft of that thread is a new row with a new ID. The device stored the empty final state of
 // an empty write as a row, and it kept the row of a sent draft whenever the `draft.deleted` of
 // its own send arrived while the person typed the next message (the typing rule). The row
-// that was left then stood next to the next draft, or came back as the draft.
+// that was left then stood next to the next draft, or came back as the draft. The answer of a
+// draft write that arrives after the person sent the text is no row either (FIX-CDL/9).
+
+import 'dart:convert';
 
 import 'package:domain/domain.dart';
 import 'package:sync_engine/sync_engine.dart';
@@ -109,6 +112,124 @@ void main() {
         'overwrote_newer': true,
       });
       expect(w.notices.whereType<DraftOverwritten>(), hasLength(1));
+    });
+  });
+
+  group('the answer of a draft write that a send of this device has '
+      'overtaken', () {
+    /// Puts an entry into the outbox, as the app does for a send that waits.
+    Future<String> queued(
+      int n,
+      String kind,
+      Map<String, Object?> payload, {
+      ThreadId? thread,
+    }) async {
+      final entry = await w.db.outboxDao.enqueue(
+        id: id(0x700 + n),
+        kind: kind,
+        payload: jsonEncode(payload),
+        threadId: thread,
+      );
+      return entry.id;
+    }
+
+    /// The draft of a new post in forum [channelN]: a draft without a thread.
+    Map<String, Object?> newPostDraft(int n, String text, {int channelN = 1}) =>
+        {
+          ...draft(n, text),
+          'thread_id': null,
+          'channel_id': channelId(channelN),
+        };
+
+    test('stores no row: the draft ended with the send, and the server '
+        'deletes it when the send arrives', () async {
+      await w.connect(cursor: 30);
+      await queued(1, MessageOps.createMessage, {
+        'content_md': 'Message one',
+        'clear_draft': true,
+      }, thread: t1);
+      await put(draft(1, 'Message one'));
+      expect(await w.db.personalDao.allDrafts(), isEmpty);
+      expect(await storedDraft(), isNull);
+    });
+
+    test('still raises the notice of an overwritten draft', () async {
+      await w.connect(cursor: 30);
+      await queued(1, MessageOps.createMessage, {
+        'content_md': 'Message one',
+        'clear_draft': true,
+      }, thread: t1);
+      await w.catchUp.applyDraftPutResult({
+        'draft': draft(1, 'Message one', version: 5),
+        'overwrote_newer': true,
+      });
+      expect(w.notices.whereType<DraftOverwritten>(), hasLength(1));
+      expect(await w.db.personalDao.allDrafts(), isEmpty);
+    });
+
+    test('is the draft when the send keeps the draft, as a voice message '
+        'does', () async {
+      await w.connect(cursor: 30);
+      await queued(1, MessageOps.createMessage, {
+        'kind': 'voice',
+        'content_md': '',
+      }, thread: t1);
+      await put(draft(1, 'Still typing'));
+      expect((await storedDraft())!.contentMd, 'Still typing');
+    });
+
+    test('is the draft when the send was refused for good: the server kept '
+        'it', () async {
+      await w.connect(cursor: 30);
+      final send = await queued(1, MessageOps.createMessage, {
+        'content_md': 'Message one',
+        'clear_draft': true,
+      }, thread: t1);
+      await w.db.outboxDao.recordFailure(send, code: 'forbidden');
+      await put(draft(1, 'Message one'));
+      expect((await storedDraft())!.contentMd, 'Message one');
+    });
+
+    test('is the draft when the send is a message of another thread', () async {
+      await w.connect(cursor: 30);
+      await queued(1, MessageOps.createMessage, {
+        'content_md': 'Elsewhere',
+        'clear_draft': true,
+      }, thread: ThreadId.parse(threadId(2)));
+      await put(draft(1, 'Still typing'));
+      expect((await storedDraft())!.contentMd, 'Still typing');
+    });
+
+    test('of a new post stores no row while the post of its forum waits, and '
+        'the draft of another forum stays', () async {
+      await w.connect(cursor: 30);
+      // The app's entry of a new post: without a thread, with its forum in the payload.
+      await queued(1, 'createThread', {
+        'channel_id': channelId(1),
+        'title': '',
+        'content_md': 'An idea',
+        'clear_draft': true,
+      });
+      await put(newPostDraft(1, 'An idea'));
+      expect(await w.db.personalDao.allDrafts(), isEmpty);
+      await put(newPostDraft(2, 'Another forum', channelN: 2));
+      expect(
+        (await w.db.personalDao.allDrafts()).single.contentMd,
+        'Another forum',
+      );
+    });
+
+    test('of a thread is the draft while only a new post of its forum '
+        'waits', () async {
+      await w.connect(cursor: 30);
+      await queued(1, 'createThread', {
+        'channel_id': channelId(1),
+        'title': '',
+        'content_md': 'An idea',
+        'clear_draft': true,
+      });
+      await put(draft(1, 'Still typing'));
+      expect((await storedDraft())!.contentMd, 'Still typing');
     });
   });
 

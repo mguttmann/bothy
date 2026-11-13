@@ -59,6 +59,9 @@ final class NewChatController extends ChangeNotifier {
       editing: editing,
       deviceId: deviceId,
       sendNew: _sendNew,
+      // The server deletes its draft with the first message; the stored copy goes with the
+      // send, so the draft row becomes the row of the sent post (01 6.8 item 8).
+      endStored: _dropStoredDraft,
     )..attach = attach;
     composer.addListener(notifyListeners);
     attach?.addListener(notifyListeners);
@@ -149,9 +152,6 @@ final class NewChatController extends ChangeNotifier {
       ),
     ]);
     _sentEntry = entries.last.id;
-    // The server deletes its draft with the first message; the stored copy goes now, so the
-    // draft row becomes the row of the sent post (01 6.8 item 8).
-    await _dropStoredDraft();
   }
 
   /// The person leaves the view without sending: an empty draft is deleted (01 6.8 item 8);

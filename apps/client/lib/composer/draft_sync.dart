@@ -143,7 +143,8 @@ final class DraftWriter {
   });
 
   /// Drops the draft write that waits, because the message was sent with `clear_draft`
-  /// (04 14); a write that is in flight stays and the send clears it afterwards.
+  /// (04 14); a write that is in flight stays and the send clears it afterwards, and its
+  /// answer stores no draft while that send waits (`storeDraftPutResult` of `sync_engine`).
   Future<void> dropWaiting() => _serial(() async {
     final waiting = await _waitingEntry();
     _waiting = null;

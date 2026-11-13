@@ -229,7 +229,8 @@ these sets equal to the catalogue.
 
 Notices on `notices`: `TargetsRemoved`, `DraftOverwritten` (from `applyDraftPutResult`, the
 answer of `putThreadDraft` or `putChannelDraft`; the answer to an empty draft stores no row and
-ends the stored draft of its target), `Resynced`, `SignedOutNotice`. Counters: `countsOf(threadId)` and
+ends the stored draft of its target, and the answer to a draft stores no row while a send with
+`clear_draft` for its thread or forum waits in the outbox), `Resynced`, `SignedOutNotice`. Counters: `countsOf(threadId)` and
 `countChanges`, reset from each snapshot and `read_state.updated`, counted from `message.*` in
 between (04 14).
 

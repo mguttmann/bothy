@@ -498,6 +498,73 @@ void main() {
       await host.dispose(tester);
     },
   );
+  // FIX-COMPOSER-DRAFT-LOST (FIX-CDL/9): the draft ends on this device with the send. The
+  // engine of this host sends nothing, as without a connection, so no `draft.deleted` comes.
+  testWidgets('the stored draft goes with the send and does not come back '
+      'while the send waits', (tester) async {
+    final host = await open(tester);
+    await host.run(
+      tester,
+      () => host.db.personalDao.upsertDraftIfNewer(
+        Draft(
+          id: DraftId.parse(uuid(0xd7)),
+          threadId: threadId(1),
+          channelId: channelId(1),
+          contentMd: 'Hello',
+          fileIds: const [],
+          version: const ResourceVersion(1),
+        ),
+      ),
+    );
+    await host.settle(tester);
+    expect(tester.widget<TextField>(composerField).controller!.text, 'Hello');
+    await type(tester, host, 'Hello Sam');
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await host.settle(tester);
+    expect(
+      (await entries(
+        tester,
+        host,
+      )).where((e) => e.kind == MessageOps.createMessage),
+      hasLength(1),
+    );
+    expect(await host.run(tester, host.db.personalDao.allDrafts), isEmpty);
+    await pumpThreadWith(tester, host, const {}, show: false);
+    await pumpThreadWith(tester, host, const {});
+    expect(tester.widget<TextField>(composerField).controller!.text, isEmpty);
+    await host.dispose(tester);
+  });
+
+  testWidgets('a send ends the stored draft once, after the message is in the '
+      'outbox, and a send of nothing ends no draft', (tester) async {
+    final host = await open(tester);
+    // The messages in the outbox at each end of the stored draft.
+    final queuedAtEnd = <int>[];
+    final composer = ComposerController(
+      thread: threadId(1),
+      channel: channelId(1),
+      actions: ThreadActions(host.engine),
+      drafts: DraftWriter(
+        outbox: host.engine.outbox,
+        dao: host.db.outboxDao,
+        thread: threadId(1),
+      ),
+      editing: DraftEditingRegistry(),
+      endStored: () async {
+        final all = await host.db.outboxDao.allEntries();
+        queuedAtEnd.add(
+          all.where((e) => e.kind == MessageOps.createMessage).length,
+        );
+      },
+    );
+    addTearDown(composer.dispose);
+    expect(await host.run(tester, () => composer.send('   ')), isFalse);
+    expect(queuedAtEnd, isEmpty);
+    expect(await host.run(tester, () => composer.send('Hello Sam')), isTrue);
+    expect(queuedAtEnd, [1]);
+    await host.dispose(tester);
+  });
+
   // FIX-COMPOSER-DRAFT-LOST: a quick switch closes the composer while it reads the outbox for
   // the stored draft or for an unsent write; the closed composer sets no text.
   testWidgets('a composer closed while it takes the stored draft or an unsent '
