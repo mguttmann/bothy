@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/OWNER/bothy/services/server/api/restclient"
 )
@@ -44,8 +45,29 @@ const (
 // else is dropped, so a body can never bring content into the output.
 var problemToken = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 
+// problemPointer is the form of a field pointer the tool repeats in an error text: a JSON pointer
+// of member names and indexes of the request the tool sent itself ("/items/3/data/topic"). Anything
+// else is dropped like a code that is no problemToken.
+var problemPointer = regexp.MustCompile(`^(/[a-z0-9_]{1,64}){1,12}$`)
+
+// maxProblemFields bounds the field errors an error text names; the rest is a count.
+const maxProblemFields = 5
+
+// FieldProblem is one field error of a refused call (Problem.errors of docs/api/openapi.yaml): the
+// place and the rule, never a value or the explanation of the server.
+type FieldProblem struct {
+	// Pointer is the JSON pointer of the member in the request ("" for the request as a whole).
+	Pointer string
+	// Code is the machine code of the rule ("too_long", "limit_reached", ...).
+	Code string
+	// OriginKey is the origin key of the batch item the pointer names ("" when it names none). It
+	// holds Discord IDs only.
+	OriginKey string
+}
+
 // APIError is a call to the server that ended with a status the run does not accept. Its text names the
-// operation, the status, the problem code and the reason, never a body, a header or an ID.
+// operation, the status, the problem code, the reason and the field errors with their items, never a
+// body, a header or content.
 type APIError struct {
 	// Op is the operationId of the call.
 	Op string
@@ -55,9 +77,15 @@ type APIError struct {
 	Code string
 	// Reason is the reason of a 409 or 403 ("" without one).
 	Reason string
+	// Batch is the thread_origin_key of a refused thread batch ("" for a structure batch and for
+	// every other call).
+	Batch string
+	// Fields are the field errors of a 400 validation_failed, in the order of the server.
+	Fields []FieldProblem
 }
 
-// Error returns "bothy: <op>: status <n> [<code>] [(<reason>)]".
+// Error returns "bothy: <op>: status <n> [<code>] [(<reason>)]", followed for a refused batch by
+// ", batch <thread_origin_key>" and for each field error by ", <pointer> <code> [of <origin key>]".
 func (e *APIError) Error() string {
 	s := "bothy: " + e.Op + ": status " + strconv.Itoa(e.Status)
 	if e.Code != "" {
@@ -66,11 +94,28 @@ func (e *APIError) Error() string {
 	if e.Reason != "" {
 		s += " (" + e.Reason + ")"
 	}
+	if e.Batch != "" {
+		s += ", batch " + e.Batch
+	}
+	for i, f := range e.Fields {
+		if i == maxProblemFields {
+			s += ", and " + strconv.Itoa(len(e.Fields)-i) + " more"
+			break
+		}
+		s += ", " + strings.TrimSpace(f.Pointer+" "+f.Code)
+		if f.OriginKey != "" {
+			s += " of " + f.OriginKey
+		}
+	}
 	return s
 }
 
 // apiError builds the APIError of a failed call from its response and body.
-func apiError(op string, resp *http.Response, body []byte) error {
+func apiError(op string, resp *http.Response, body []byte) error { return problemOf(op, resp, body) }
+
+// problemOf reads the problem document of a failed call: the code, the reason and the field errors
+// in the forms problemToken and problemPointer; everything else of the body is dropped.
+func problemOf(op string, resp *http.Response, body []byte) *APIError {
 	e := &APIError{Op: op}
 	if resp != nil {
 		e.Status = resp.StatusCode
@@ -78,6 +123,10 @@ func apiError(op string, resp *http.Response, body []byte) error {
 	var p struct {
 		Code   string `json:"code"`
 		Reason string `json:"reason"`
+		Errors []struct {
+			Pointer string `json:"pointer"`
+			Code    string `json:"code"`
+		} `json:"errors"`
 	}
 	if json.Unmarshal(body, &p) == nil {
 		if problemToken.MatchString(p.Code) {
@@ -86,8 +135,55 @@ func apiError(op string, resp *http.Response, body []byte) error {
 		if problemToken.MatchString(p.Reason) {
 			e.Reason = p.Reason
 		}
+		for _, f := range p.Errors {
+			if !problemToken.MatchString(f.Code) {
+				continue
+			}
+			fp := FieldProblem{Code: f.Code}
+			if problemPointer.MatchString(f.Pointer) {
+				fp.Pointer = f.Pointer
+			}
+			e.Fields = append(e.Fields, fp)
+		}
 	}
 	return e
+}
+
+// batchError is apiError for a refused batch b: it adds the thread_origin_key of the batch and, to
+// every field error that names an item ("/items/<i>/..."), the origin key of that item, so the
+// owner sees which thread, item and rule stopped the run.
+func batchError(resp *http.Response, body []byte, b restclient.ImportBatch) error {
+	e := problemOf("applyImportBatch", resp, body)
+	if b.ThreadOriginKey != nil {
+		e.Batch = *b.ThreadOriginKey
+	}
+	for i := range e.Fields {
+		if n, _, ok := itemPointer(e.Fields[i].Pointer); ok && n < len(b.Items) {
+			e.Fields[i].OriginKey = b.Items[n].OriginKey
+		}
+	}
+	return e
+}
+
+// itemsPointer starts the pointer of a field error inside a batch item.
+const itemsPointer = "/items/"
+
+// itemPointer splits the pointer "/items/<i>[<rest>]" of a field error into the index of the item
+// and the rest ("/data/topic"); ok is false for any other pointer.
+func itemPointer(pointer string) (int, string, bool) {
+	tail, ok := strings.CutPrefix(pointer, itemsPointer)
+	if !ok {
+		return 0, "", false
+	}
+	index, rest := tail, ""
+	if i := strings.IndexByte(tail, '/'); i >= 0 {
+		index, rest = tail[:i], tail[i:]
+	}
+	n, err := strconv.Atoi(index)
+	if err != nil || n < 0 {
+		return 0, "", false
+	}
+	return n, rest, true
 }
 
 // bothyReads are the read calls of a run, each following the pages of its list.

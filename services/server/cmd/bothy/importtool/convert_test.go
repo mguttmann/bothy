@@ -5,6 +5,7 @@ package importtool
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"strconv"
 	"testing"
 	"time"
@@ -83,6 +84,16 @@ func TestConvertContentTable(t *testing.T) {
 		{"markdown kept", convMsg("**bold** _it_ `code`"), "**bold** _it_ `code`"},
 		{"embed", convEmbedMsg(), "look\n\n> [Release \\[1.0\\]](https://example.com/notes)\n> line one @Sam\n>\n> line two"},
 		{"embed title only", withEmbeds(convMsg(""), discord.Embed{Title: "Notice"}), "> Notice"},
+		{"embed with author, fields and footer", withEmbeds(convMsg(""), discord.Embed{
+			Author: &discord.EmbedAuthor{Name: "Build bot"}, Title: "Deployment", Description: "done",
+			Fields: []discord.EmbedField{{Name: "Version", Value: "1.2.0"}, {Name: "Owner", Value: "<@100000002>"},
+				{Value: "plain"}, {Name: "State"}, {Name: " ", Value: " "}},
+			Footer: &discord.EmbedFooter{Text: "staging"}}),
+			"> Build bot\n> Deployment\n> done\n> Version: 1.2.0\n> Owner: @Sam\n> plain\n> State\n> staging"},
+		{"embed with fields only", withEmbeds(convMsg(""), discord.Embed{Fields: []discord.EmbedField{{Name: "Result", Value: "line one\nline two"}}}),
+			"> Result: line one\n> line two"},
+		{"embed with an image only", withEmbeds(convMsg(""), discord.Embed{Type: "rich", Author: &discord.EmbedAuthor{Name: " "},
+			Footer: &discord.EmbedFooter{}}), ""},
 		{"sticker", withStickers(convMsg(""), discord.Sticker{ID: "600000001", Name: "wave"}), "[Sticker: wave]"},
 		{"poll", withPoll(convMsg(""), poll), "Poll: Lunch on Friday?\n- Pizza\n- Salad"},
 		{"forward snapshot", convForwardMsg(), "fwd\n\n> from @Sam\n>\n> [Sticker: wave]"},
@@ -93,6 +104,26 @@ func TestConvertContentTable(t *testing.T) {
 				t.Fatalf("ConvertContent:\n got %q\nwant %q", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestConvertEmbedOfDiscordJSON: the decoder reads the author, the fields and the footer of an
+// embed as Discord sends them, and the conversion keeps them as text (22 6.3). Before, a bot
+// message whose statement lay in its fields arrived with the title alone.
+func TestConvertEmbedOfDiscordJSON(t *testing.T) {
+	const raw = `{"id": "400000002", "channel_id": "300000001", "type": 0, "content": "",
+		"author": {"id": "100000001", "username": "alex", "global_name": "Alex"},
+		"embeds": [{"type": "rich", "title": "Nightly build", "color": 5763719,
+			"author": {"name": "Build bot", "icon_url": "https://cdn.example.com/icon.png"},
+			"fields": [{"name": "Tests", "value": "412 passed", "inline": true}, {"name": "Duration", "value": "7 min", "inline": true}],
+			"footer": {"text": "runner 3"}, "thumbnail": {"url": "https://cdn.example.com/thumb.png"}}]}`
+	var m discord.Message
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		t.Fatal(err)
+	}
+	want := "> Build bot\n> Nightly build\n> Tests: 412 passed\n> Duration: 7 min\n> runner 3"
+	if got := ConvertContent(m, convEnv()); got != want {
+		t.Errorf("ConvertContent:\n got %q\nwant %q", got, want)
 	}
 }
 
@@ -238,6 +269,7 @@ func TestAttachmentLine(t *testing.T) {
 		{"bytes", 512, "failed", "Attachment not taken over: plan.pdf (512 bytes, failed) " + jump},
 		{"kilobytes", 1536, "failed", "Attachment not taken over: plan.pdf (1.5 KB, failed) " + jump},
 		{"megabytes", 52_428_800, "too large", "Attachment not taken over: plan.pdf (50.0 MB, too large) " + jump},
+		{"of a forward", 2048, reasonForwarded, "Attachment not taken over: plan.pdf (2.0 KB, of a forwarded message) " + jump},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

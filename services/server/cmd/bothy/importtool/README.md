@@ -70,7 +70,7 @@ The file holds JSON lines, one object per line (blank lines are skipped):
 | Code | Meaning |
 |---|---|
 | `0` | done, or a dry run without errors |
-| `1` | aborted: network, rate limit above the limit, server error, or the owner paused the source; the state stays and a new run resumes |
+| `1` | aborted: network, rate limit above the limit, server error, a batch the server refused, or the owner paused the source; the state stays and a new run resumes |
 | `2` | invocation, configuration, mapping file or preflight faulty; nothing written |
 | `3` | another run holds the lease of the source; use `--takeover`; with `--once` the normal case for scheduled calls |
 
@@ -101,6 +101,38 @@ working and temporary directories.
    one that is too large or fails gives the message a line with file name, size, reason and the
    jump link. The cursor of a thread advances only after a successful batch.
 5. The report (22 11) goes to standard output; its totals are stored in `stats.tool`.
+
+## Values the server refuses
+
+The server checks an imported value like any other input, and a batch is one transaction: one
+refused item loses the batch, the cursor stays, and every later run stops at the same place. So
+the tool fits or leaves out the values below before it sends them, and follows the answer of the
+server for the pins (`fit.go`, 22 5.1 rule 5, 6.1, 6.5, 6.6):
+
+- A channel topic, a thread name and a forum tag name lose their control characters (each becomes
+  a space, line breaks and tabs included) and their bidi control characters. A topic is cut to
+  `TopicMaxChars`, the default of `channel.topic_max_chars`: `getInstance` does not carry the
+  effective value, so a server that allows less refuses the channel, and the run names the topic.
+  The row of the channel notes a fitted value, in the dry run too.
+- A message whose parts convert to no visible text and that has no attachment (an embed that
+  holds only an image, a forward of such a message) is counted as skipped with the reason
+  `empty`, in the dry run too. The rule reads the message alone, so a later run that looks a
+  reply target up decides the same; a reply to such a message gets the quote line.
+- The attachments of a forwarded message are not loaded: the message gets one line per attachment
+  with name, size and jump link, counted as `attachments_forwarded`. The origin key of a file is
+  `file:<attachment_id>`, and a file hangs on one message only, so a forward and its original
+  could not both carry a file with the same ID (22 6.5 item 7).
+- Pins above `pin.max_per_thread`: only the server knows the limit and the pins a thread has.
+  When it refuses a pin item with `limit_reached`, the tool sends the batch again without that
+  pin and the pins after it, sends no further pin for the thread in this run and counts them as
+  `pins_not_taken`. A dry run counts every pin as "would take over".
+
+Any other refusal ends a full run with exit `1`. The message names the `thread_origin_key` of the
+batch and, per field error of the server, its JSON pointer, its code and the origin key of the
+item, for example `/items/1/data/topic too_long of channel:13000103`; it repeats nothing else of
+the answer. The fake of `bothyapi/bothytest` applies the same rules (the pin limit when a test
+sets one), and [`test/importtool`](../../../test/importtool) holds each of them against the real
+server.
 
 Order (22 5.1 rule 4): the new spaces form one block after the last sort key of the spaces of the
 server, in Discord order; the new channels of a target space the server already holds form one
@@ -148,7 +180,9 @@ A failed round (network, `5xx`, `401`, a rate wait above the limit) never ends `
 round waits `min(import.follow.max_backoff, import.follow.poll_interval * 2^failures)`. The waits
 are slept in pieces of at most `import.follow.poll_interval` with a lease renewal after each, so a
 long backoff never frees the lease of a living mirror. An error of one thread (a `403` or `404` of
-Discord, a `4xx` of Bothy for its batch) is a note, and the round goes on with the next thread. A
+Discord, a `4xx` of Bothy for its batch) is a note, and the round goes on with the next thread; the
+note and a line on standard error name the thread and the error (for a refused batch the place,
+the rule and the item), so a thread that stays behind round after round says why. A
 paused or draft source makes the round a no-op with a note (a mirror may also start on one and
 takes the lease in its first round on a running source); a completed source ends the mirror with exit
 `0`, a failed one with exit `1`; SIGINT and SIGTERM finish the current batch, clear the lease and
@@ -183,12 +217,15 @@ Switch-over (22 13.3):
    before any write, with their count per agent ID: after step 3 the channel would not have their
    operator, and every message there would get the notice `operator_not_in_channel` instead of a
    run (09 3.4 step 4a). `--force` turns this into a warning on standard error (addendum of
-   2026-10-30). The command runs one mirror round for the channel (with the lease of a
+   2026-10-30); it is the only way on, because the mapping of a source is fixed and a file with a
+   changed `planned_operator` ends `switch` with exit `2`. The command runs one mirror round for the channel (with the lease of a
    run, exit `3` and `--takeover` as for `--once`), then reads the channel once more and applies
    the settle rule with the current time: anything still held back ends with exit `1` and the
    counts per reason (busy, unsettled, lookback_busy); repeat after `import.follow.settle_after`.
    Messages after the cursor that the rule does not hold but the round did not copy (written after
-   it) also end with exit `1`: the Discord lock of step 1 is evidently not in place yet. On success
+   it) also end with exit `1`: the Discord lock of step 1 is evidently not in place yet. When a
+   thread of the channel failed in the round, the text says that instead and the line above it
+   names the thread and the reason; it draws no conclusion about the lock. On success
    standard error carries steps 3 and 4.
 3. Web console, owner (step-up): Import, the channel, "Lead here" (lead `bothy`), which lifts read-only in the
    same transaction; then the channel's operator, the planned operator of the mapping (the
@@ -265,12 +302,15 @@ never calls `import.manage`.
 Standard output carries the report, standard error the errors; neither the report nor any error
 or log line carries message content, a file name of an attachment, a name of a person, a token or
 a signed URL (22 10.2 rule 4, `TestNoSecretInOutput`). The report names Discord channels and their
-targets, which are structure names.
+targets, which are structure names. The error of a refused call repeats of the server's answer
+only the problem code, the reason and the field errors in their fixed forms (a code, a JSON
+pointer of member names and indexes), never a detail text; the origin keys it adds hold Discord
+IDs only (`TestAPIErrorCarriesNoContentOfTheBody`).
 
 ## Tests
 
 Unit tests use the fake Discord and CDN of `discord/discordtest` and the fake Bothy of
 `bothyapi/bothytest`; the guarantees that need the real server (counts, no duplicate after a crash,
 the lease, the pause, imported messages never trigger, the read mirror, the switch-over and the
-revert with the probe) run against the harness in
+revert with the probe, the Discord values the server refuses) run against the harness in
 [`test/importtool`](../../../test/importtool).

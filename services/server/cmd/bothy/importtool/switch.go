@@ -201,7 +201,9 @@ func foreignOperators(ctx context.Context, r bothyReads, src *restclient.ImportS
 }
 
 // foreignOperatorText is the refusal of threadOperators: the count, the agents by ID with their
-// counts, the operator the channel will have and the two ways on.
+// counts, the operator the channel will have and the way on. It does not advise a change of
+// planned_operator: the stored mapping of a source cannot be changed (docs/decisions.d/M8-04.md
+// D-M8-04-3), and a file that differs from it ends switch with exit 2.
 func foreignOperatorText(id, planned string, total int, foreign map[string]int) string {
 	parts := make([]string, 0, len(foreign))
 	for _, agent := range slices.Sorted(maps.Keys(foreign)) {
@@ -216,23 +218,27 @@ func foreignOperatorText(id, planned string, total int, foreign map[string]int) 
 		noun = "imported thread names"
 	}
 	return fmt.Sprintf("%d %s an operator the channel will not have (%s); %s. A message in such a thread would get "+
-		"a notice instead of an agent run. Set planned_operator of channel %s to the agent of those threads and that agent "+
-		"as the channel's operator in step 3, or run switch with --force to switch anyway", total, noun, strings.Join(parts, ", "), will, id)
+		"a notice instead of an agent run. The mapping of a source is fixed once the source exists, so planned_operator of "+
+		"channel %s cannot be changed now: run switch with --force to switch anyway. After that such a thread gets an agent run "+
+		"once its agent is the channel's operator or holds a write grant of its own on the channel", total, noun, strings.Join(parts, ", "), will, id)
 }
 
 // switchResult counts what the settle check found after the last round: the messages held back
-// per reason and the messages after the cursor that the rule did not hold but the round did not
-// copy.
+// per reason, the messages after the cursor that the rule did not hold but the round did not
+// copy, and the threads of the channel that failed in the round.
 type switchResult struct {
-	held  map[HoldReason]int
-	fresh int
+	held   map[HoldReason]int
+	fresh  int
+	failed int
 }
 
 // heldReasons is the order in which the reasons are printed.
 var heldReasons = []HoldReason{HoldBusy, HoldUnsettled, HoldLookbackBusy}
 
 // verdict is the decision of brief design note 2: an error (exit 1) while anything is held back or
-// not copied, nil when the owner may go on with step 3.
+// not copied, nil when the owner may go on with step 3. Messages left behind by a thread that
+// failed in the round are named as such, apart from messages written after the round: only the
+// second says that the Discord channel is not locked.
 func (r switchResult) verdict() error {
 	total := 0
 	var parts []string
@@ -246,9 +252,14 @@ func (r switchResult) verdict() error {
 		return fmt.Errorf("%d messages are still held back (%s): wait import.follow.settle_after after their last change "+
 			"(and until the busy reactions are gone), then run switch again", total, strings.Join(parts, ", "))
 	}
+	if r.fresh > 0 && r.failed > 0 {
+		return fmt.Errorf("%d messages after the cursor were not copied by the last round, in which %d of the channel's threads "+
+			"failed (each with its reason in a line above; a batch the server refused names the rule and the item): this says "+
+			"nothing about the Discord lock of step 1; remove the cause and run switch again", r.fresh, r.failed)
+	}
 	if r.fresh > 0 {
-		return fmt.Errorf("%d messages after the cursor were not copied by the last round (written after it, or their thread "+
-			"failed): the Discord channel is evidently not read-only yet (step 1); run switch again", r.fresh)
+		return fmt.Errorf("%d messages after the cursor were not copied by the last round (written after it): the Discord "+
+			"channel is evidently not read-only yet (step 1); run switch again", r.fresh)
 	}
 	return nil
 }
@@ -258,7 +269,7 @@ func (r switchResult) verdict() error {
 // newer than the cursor the messages after it, and applies the settle rule once more with the
 // current time. It only reads.
 func settleCheck(ctx context.Context, o options, env Env, wk *walker, id string) (switchResult, error) {
-	res := switchResult{held: map[HoldReason]int{}}
+	res := switchResult{held: map[HoldReason]int{}, failed: wk.p.byID[id].rep.threadsFailed}
 	m := &mirror{o: o, env: env, wk: wk, reads: bothyReads{api: wk.api}, starters: map[string]*discord.Message{}}
 	chans, err := wk.dc.GuildChannels(ctx, wk.m.GuildID)
 	if err != nil {

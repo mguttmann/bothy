@@ -289,7 +289,7 @@ func sendBatch(ctx context.Context, api bothyAPI, src restclient.Uuid, b restcli
 		return nil, err
 	}
 	if resp.JSON200 == nil {
-		return nil, apiError("applyImportBatch", resp.HTTPResponse, resp.Body)
+		return nil, batchError(resp.HTTPResponse, resp.Body, b)
 	}
 	out := make(map[string]restclient.ImportItem, len(resp.JSON200.Items))
 	for _, it := range resp.JSON200.Items {

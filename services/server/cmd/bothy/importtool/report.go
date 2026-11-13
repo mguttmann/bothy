@@ -17,6 +17,7 @@ import (
 const reportVersion = 1
 
 // The notes of the report (22 11 column "Notes"); they carry no content and no names of people.
+// noteThreadFailed is followed by the thread and the error of the round (mirror.local).
 const (
 	notePermissions       = "permission_overwrites present: set grants deliberately"
 	notePrivateThreads    = "403 on archived private threads: MANAGE_THREADS missing, skipped"
@@ -29,33 +30,45 @@ const (
 	noteAfterSwitch       = "written in Discord after the switch-over: nothing copied (lead bothy)"
 	noteThreadFailed      = "a thread failed in this round and is retried in the next"
 	noteSourcePaused      = "the source is not running: the round copied nothing"
+	noteTopicFitted       = "the topic held characters the server refuses (control, bidi) or was longer than its limit: taken over without them, cut to the limit"
+	noteNameFitted        = "a thread or tag name held characters the server refuses (control, bidi): taken over without them"
+	notePinLimit          = "pin.max_per_thread reached in a thread: its further pins were not taken over"
 )
 
-// channelReport are the counters of one channel (22 11). Every member is a count; nothing
-// carries content, a name of a person or a Discord ID.
+// channelReport are the counters and the notes of one channel (22 11). Every exported member is a
+// count; nothing carries content or a name of a person, and only the note of a thread that failed
+// in a mirror round names Discord IDs (the thread and the items of its batch).
+// AttachmentsForwarded counts the attachments of forwarded messages, which are not loaded and get
+// a line in their message (22 6.5 item 7); PinsNotTaken counts the pins above pin.max_per_thread
+// of the server (22 6.6), which a dry run cannot see and counts as 0. threadsFailed counts the
+// threads of a mirror round that failed (mirror.local); switch reads it to tell a failed thread
+// from messages written after the round.
 type channelReport struct {
-	ThreadsOpen         int            `json:"threads_open"`
-	ThreadsDone         int            `json:"threads_done"`
-	MessagesTaken       int            `json:"messages_taken"`
-	MessagesPresent     int            `json:"messages_present"`
-	MessagesSkipped     map[string]int `json:"messages_skipped"`
-	MessagesFailed      int            `json:"messages_failed"`
-	MessagesHeld        int            `json:"messages_held"`
-	AttachmentsTaken    int            `json:"attachments_taken"`
-	AttachmentsTooLarge int            `json:"attachments_too_large"`
-	AttachmentsFailed   int            `json:"attachments_failed"`
-	PeopleMapped        int            `json:"people_mapped"`
-	PeoplePlaceholders  int            `json:"people_placeholders"`
-	SessionsTaken       int            `json:"sessions_taken"`
-	SessionsPresent     int            `json:"sessions_present"`
-	SessionsDiscarded   int            `json:"sessions_discarded"`
-	SessionsLate        int            `json:"sessions_late"`
-	PinsTaken           int            `json:"pins_taken"`
-	TagsTaken           int            `json:"tags_taken"`
-	ReactionsNotTaken   int            `json:"reactions_not_taken"`
-	SourceChanged       int            `json:"source_changed"`
-	notes               []string
-	peopleSeen          map[string]bool
+	ThreadsOpen          int            `json:"threads_open"`
+	ThreadsDone          int            `json:"threads_done"`
+	MessagesTaken        int            `json:"messages_taken"`
+	MessagesPresent      int            `json:"messages_present"`
+	MessagesSkipped      map[string]int `json:"messages_skipped"`
+	MessagesFailed       int            `json:"messages_failed"`
+	MessagesHeld         int            `json:"messages_held"`
+	AttachmentsTaken     int            `json:"attachments_taken"`
+	AttachmentsTooLarge  int            `json:"attachments_too_large"`
+	AttachmentsFailed    int            `json:"attachments_failed"`
+	AttachmentsForwarded int            `json:"attachments_forwarded"`
+	PeopleMapped         int            `json:"people_mapped"`
+	PeoplePlaceholders   int            `json:"people_placeholders"`
+	SessionsTaken        int            `json:"sessions_taken"`
+	SessionsPresent      int            `json:"sessions_present"`
+	SessionsDiscarded    int            `json:"sessions_discarded"`
+	SessionsLate         int            `json:"sessions_late"`
+	PinsTaken            int            `json:"pins_taken"`
+	PinsNotTaken         int            `json:"pins_not_taken"`
+	TagsTaken            int            `json:"tags_taken"`
+	ReactionsNotTaken    int            `json:"reactions_not_taken"`
+	SourceChanged        int            `json:"source_changed"`
+	notes                []string
+	peopleSeen           map[string]bool
+	threadsFailed        int
 }
 
 // skipMessage counts a message skipped for reason.
@@ -103,6 +116,7 @@ func (r *channelReport) add(o *channelReport) {
 	r.AttachmentsTaken += o.AttachmentsTaken
 	r.AttachmentsTooLarge += o.AttachmentsTooLarge
 	r.AttachmentsFailed += o.AttachmentsFailed
+	r.AttachmentsForwarded += o.AttachmentsForwarded
 	r.PeopleMapped += o.PeopleMapped
 	r.PeoplePlaceholders += o.PeoplePlaceholders
 	r.SessionsTaken += o.SessionsTaken
@@ -110,6 +124,7 @@ func (r *channelReport) add(o *channelReport) {
 	r.SessionsDiscarded += o.SessionsDiscarded
 	r.SessionsLate += o.SessionsLate
 	r.PinsTaken += o.PinsTaken
+	r.PinsNotTaken += o.PinsNotTaken
 	r.TagsTaken += o.TagsTaken
 	r.ReactionsNotTaken += o.ReactionsNotTaken
 	r.SourceChanged += o.SourceChanged
@@ -186,8 +201,8 @@ func (r *report) stats() map[string]any {
 		"messages_taken": t.MessagesTaken, "messages_present": t.MessagesPresent, "messages_failed": t.MessagesFailed,
 		"messages_held":     t.MessagesHeld,
 		"attachments_taken": t.AttachmentsTaken, "attachments_too_large": t.AttachmentsTooLarge,
-		"attachments_failed": t.AttachmentsFailed, "people_mapped": t.PeopleMapped,
-		"people_placeholders": t.PeoplePlaceholders, "pins_taken": t.PinsTaken, "tags_taken": t.TagsTaken,
+		"attachments_failed": t.AttachmentsFailed, "attachments_forwarded": t.AttachmentsForwarded, "people_mapped": t.PeopleMapped,
+		"people_placeholders": t.PeoplePlaceholders, "pins_taken": t.PinsTaken, "pins_not_taken": t.PinsNotTaken, "tags_taken": t.TagsTaken,
 		"reactions_not_taken": t.ReactionsNotTaken, "source_changed": t.SourceChanged,
 		"sessions_taken": t.SessionsTaken, "sessions_present": t.SessionsPresent, "sessions_discarded": t.SessionsDiscarded,
 		"sessions_late": t.SessionsLate,
@@ -200,17 +215,24 @@ func (r *report) stats() map[string]any {
 	return out
 }
 
+// currentRows returns the rows with the notes their channels hold now. A full run builds the
+// report before the walk (the cursor writes carry its counters), so the notes of the walk (a
+// channel that was not readable, a fitted name, the pin limit) reach the rows only here.
+func (r *report) currentRows() []reportRow {
+	rows := make([]reportRow, len(r.rows))
+	for i, row := range r.rows {
+		row.Notes = slices.Clone(row.Counts.notes)
+		if row.Notes == nil {
+			row.Notes = []string{}
+		}
+		rows[i] = row
+	}
+	return rows
+}
+
 // writeJSON writes the report as one JSON object with a version member.
 func (r *report) writeJSON(w io.Writer) error {
-	rows := r.rows
-	if rows == nil {
-		rows = []reportRow{}
-	}
-	for i := range rows {
-		if rows[i].Notes == nil {
-			rows[i].Notes = []string{}
-		}
-	}
+	rows := r.currentRows()
 	notes := r.notes
 	if notes == nil {
 		notes = []string{}
@@ -256,8 +278,8 @@ func (r *report) writeText(w io.Writer) error {
 		title = "Mirror round"
 	}
 	_, _ = fmt.Fprintf(tw, "%s (%s) of the Discord server %q\n\n", title, r.mode(), r.guildName)
-	_, _ = fmt.Fprintf(tw, "Channel\tTarget\tThreads open/done\tMessages %s/present/skipped/failed/held\tAttachments %s/too large/failed\tPeople mapped/placeholders\tSessions taken/present/discarded/late\tPins\tTags\tReactions not taken\tNotes\n", verb, verb)
-	for _, row := range r.rows {
+	_, _ = fmt.Fprintf(tw, "Channel\tTarget\tThreads open/done\tMessages %s/present/skipped/failed/held\tAttachments %s/too large/failed/forwarded\tPeople mapped/placeholders\tSessions taken/present/discarded/late\tPins taken/not taken\tTags\tReactions not taken\tNotes\n", verb, verb)
+	for _, row := range r.currentRows() {
 		writeRow(tw, row.Channel, row.Target, row.Counts, row.Notes)
 	}
 	t := r.total()
@@ -287,10 +309,10 @@ func writeRow(w io.Writer, channel, target string, c *channelReport, notes []str
 	if c.SourceChanged > 0 {
 		note = strings.TrimPrefix(note+"; "+noteSourceChanged+" "+strconv.Itoa(c.SourceChanged), "; ")
 	}
-	_, _ = fmt.Fprintf(w, "%s\t%s\t%d/%d\t%d/%d/%d/%d/%d\t%d/%d/%d\t%d/%d\t%d/%d/%d/%d\t%d\t%d\t%d\t%s\n", channel, target,
+	_, _ = fmt.Fprintf(w, "%s\t%s\t%d/%d\t%d/%d/%d/%d/%d\t%d/%d/%d/%d\t%d/%d\t%d/%d/%d/%d\t%d/%d\t%d\t%d\t%s\n", channel, target,
 		c.ThreadsOpen, c.ThreadsDone, c.MessagesTaken, c.MessagesPresent, skipped, c.MessagesFailed, c.MessagesHeld,
-		c.AttachmentsTaken, c.AttachmentsTooLarge, c.AttachmentsFailed, c.PeopleMapped, c.PeoplePlaceholders,
-		c.SessionsTaken, c.SessionsPresent, c.SessionsDiscarded, c.SessionsLate, c.PinsTaken, c.TagsTaken, c.ReactionsNotTaken, note)
+		c.AttachmentsTaken, c.AttachmentsTooLarge, c.AttachmentsFailed, c.AttachmentsForwarded, c.PeopleMapped, c.PeoplePlaceholders,
+		c.SessionsTaken, c.SessionsPresent, c.SessionsDiscarded, c.SessionsLate, c.PinsTaken, c.PinsNotTaken, c.TagsTaken, c.ReactionsNotTaken, note)
 }
 
 // counts formats a map of counts sorted by key: "a 1, b 2".

@@ -26,7 +26,8 @@ import (
 const (
 	// SkipType is a Discord message type other than 0, 19, 20, 21 and 23.
 	SkipType = "type"
-	// SkipEmpty is a message without content, attachment, embed, sticker, poll or snapshot.
+	// SkipEmpty is a message without content, attachment, embed, sticker, poll or snapshot, and a
+	// message whose parts convert to no visible text and that has no attachment (hollow).
 	SkipEmpty = "empty"
 	// SkipStarter is a type 21 message whose starter message is in the main thread.
 	SkipStarter = "starter_in_main"
@@ -92,8 +93,9 @@ func TakeOver(m discord.Message) (bool, string) {
 
 // ConvertContent converts the text parts of m to the Markdown dialect content_format 1 (22 6.3).
 // The parts, in this order and joined by a blank line, are: the content (tokens replaced, the
-// small-text marker removed per line), one quote block per embed (title as a link when it has
-// one, then the description; no image), one line "[Sticker: name]" per sticker, the poll as the
+// small-text marker removed per line), one quote block per embed (its author, the title as a link
+// when it has one, the description, its fields and its footer; no image), one line
+// "[Sticker: name]" per sticker, the poll as the
 // line "Poll: <question>" followed by one "- <answer>" line per answer, and one quote block per
 // forwarded snapshot with its content, embeds and stickers converted by the same rules (mentions
 // resolved from m.Mentions, because a snapshot carries none). Empty parts are left out. The
@@ -219,10 +221,15 @@ func escapeLinkText(s string) string {
 	return strings.NewReplacer(`\`, `\\`, "[", `\[`, "]", `\]`).Replace(s)
 }
 
-// embedPart returns the quote block of an embed: the title (a link when the embed has a URL),
-// or the URL alone, then the converted description. An embed without any of them gives "".
+// embedPart returns the quote block of an embed, in the order Discord shows it: the name of its
+// author, the title (a link when the embed has a URL) or the URL alone, the converted
+// description, one line per field and the footer text. An embed without any of them (only an
+// image) gives "".
 func embedPart(e discord.Embed, mentions []discord.User, env ConvertEnv) string {
 	var lines []string
+	if e.Author != nil && strings.TrimSpace(e.Author.Name) != "" {
+		lines = append(lines, e.Author.Name)
+	}
 	link := e.URL.Raw()
 	switch {
 	case e.Title != "" && link != "":
@@ -235,10 +242,32 @@ func embedPart(e discord.Embed, mentions []discord.User, env ConvertEnv) string 
 	if d := convertText(e.Description, mentions, env); strings.TrimSpace(d) != "" {
 		lines = append(lines, d)
 	}
+	for _, f := range e.Fields {
+		if l := embedField(f, mentions, env); l != "" {
+			lines = append(lines, l)
+		}
+	}
+	if e.Footer != nil && strings.TrimSpace(e.Footer.Text) != "" {
+		lines = append(lines, e.Footer.Text)
+	}
 	if len(lines) == 0 {
 		return ""
 	}
 	return quoteBlock(strings.Join(lines, "\n"))
+}
+
+// embedField returns the line "<name>: <value>" of an embed field with the value converted like
+// content, the name or the value alone when the other is blank, and "" when both are.
+func embedField(f discord.EmbedField, mentions []discord.User, env ConvertEnv) string {
+	name := strings.TrimSpace(f.Name)
+	value := strings.TrimSpace(convertText(f.Value, mentions, env))
+	switch {
+	case name == "":
+		return value
+	case value == "":
+		return name
+	}
+	return name + ": " + value
 }
 
 // pollPart returns the line "Poll: <question>" and one "- <answer>" line per answer, or "" for
@@ -291,11 +320,11 @@ func ReplyQuote(name, text string, max int) string {
 	return "> @" + name + ": " + flat
 }
 
-// AttachmentLine returns the line of an attachment that was not taken over (22 6.5 item 6):
+// AttachmentLine returns the line of an attachment that was not taken over (22 6.5 items 6 and 7):
 // "Attachment not taken over: <file name> (<size>, <reason>) <jump link>", with the size in
-// bytes, KB or MB (one decimal, base 1024), the reason ("too large" or "failed") and the jump
-// link https://discord.com/channels/{guild}/{channel}/{message}. The file name is message
-// content: the line goes into the message, never into output.
+// bytes, KB or MB (one decimal, base 1024), the reason ("too large", "failed" or "of a forwarded
+// message") and the jump link https://discord.com/channels/{guild}/{channel}/{message}. The file
+// name is message content: the line goes into the message, never into output.
 func AttachmentLine(a discord.Attachment, reason, guildID, channelID, messageID string) string {
 	return fmt.Sprintf("Attachment not taken over: %s (%s, %s) https://discord.com/channels/%s/%s/%s",
 		a.Filename, humanSize(a.Size), reason, guildID, channelID, messageID)
