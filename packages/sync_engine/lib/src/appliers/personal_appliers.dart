@@ -4,11 +4,16 @@
 /// (`updated_by_device_id`) is ignored, the read state only increases (`mergeReadState`) and
 /// sets the counters from the payload, a draft being typed on this device keeps its local text,
 /// settings, sidebar (spaces and channels), notification preferences and quiet hours apply per row by version.
+/// The answer to an empty draft write stores no row: the server deleted the draft. Neither does
+/// the answer to a draft that a send of this device has overtaken: the server deletes it with
+/// that send (docs/decisions.d/FIX-COMPOSER-DRAFT-LOST.md).
 library;
 
 import 'package:domain/domain.dart';
+import 'package:local_store/local_store.dart';
 
 import '../dispatcher.dart';
+import '../outbox/executors.dart' show decodePayload;
 import '../sync_events.dart';
 import '../wire.dart';
 
@@ -138,10 +143,50 @@ Future<void> _quietHours(ApplyContext c) async {
   }
 }
 
-/// Stores the answer of `putThreadDraft` (API `DraftPutResult`) of the app's write path and
-/// emits [DraftOverwritten] when the server reports `overwrote_newer` (04 14).
+/// Stores the answer of `putThreadDraft` or `putChannelDraft` (API `DraftPutResult`) of the
+/// app's write path and emits [DraftOverwritten] when the server reports `overwrote_newer`
+/// (04 14).
+///
+/// The answer to an empty draft is the empty final state of a draft the server deleted, so it
+/// is no row: the stored draft of the target ends, up to the time of the answer, and a draft
+/// another device wrote after it stays. The answer to a draft that a send of this device has
+/// overtaken ([_sendWaits]) is no row either: the draft ended on this device with that send,
+/// and the server deletes it when the send arrives (FIX-CDL/9 in
+/// docs/decisions.d/FIX-COMPOSER-DRAFT-LOST.md).
 Future<void> storeDraftPutResult(SyncContext sync, Json result) async {
   final draft = draftFromJson(obj(result, 'draft'));
-  await sync.db.personalDao.upsertDraftIfNewer(draft);
+  if (draft.contentMd.trim().isEmpty && draft.fileIds.isEmpty) {
+    await sync.db.personalDao.endDraft(
+      channelId: draft.channelId,
+      threadId: draft.threadId,
+      until: draft.updatedAt,
+    );
+  } else {
+    // One transaction: a send queued meanwhile is either seen here, or it ends the stored
+    // draft after this row was written.
+    await sync.db.transaction(() async {
+      if (await _sendWaits(sync.db, draft)) return;
+      await sync.db.personalDao.upsertDraftIfNewer(draft);
+    });
+  }
   if (flag(result, 'overwrote_newer')) sync.notify(DraftOverwritten(draft));
+}
+
+/// Whether a send of this device that ends the draft of [draft]'s target waits in the outbox:
+/// an entry without a final state whose payload carries `clear_draft`, which is a message of
+/// the draft's thread or, for the draft of a new post, a new post in its forum (`channel_id`).
+///
+/// A draft write and the sends of its target share one lane, so such a send was queued after
+/// the write whose answer [draft] is.
+Future<bool> _sendWaits(LocalDatabase db, Draft draft) async {
+  final thread = draft.threadId;
+  for (final entry in await db.outboxDao.entriesFor(thread)) {
+    if (entry.state.isFinal) continue;
+    final payload = decodePayload(entry.payload);
+    if (payload['clear_draft'] != true) continue;
+    if (thread != null || payload['channel_id'] == draft.channelId.value) {
+      return true;
+    }
+  }
+  return false;
 }

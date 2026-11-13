@@ -27,7 +27,9 @@ import '../files/upload_executor.dart' show MessageAttachments;
 /// M4-41) shares the lane of the forum's new posts, so a draft write queued before a send goes
 /// out before it. A new post sent with `clear_draft` (payload member `clear_draft`) has the
 /// server delete the person's draft of the forum in the transaction of the first message (04 14;
-/// docs/decisions.d/M4-41.md), so no `deleteChannelDraft` follows a send.
+/// docs/decisions.d/M4-41.md), so no `deleteChannelDraft` follows a send. While such an entry
+/// waits, `storeDraftPutResult` of `sync_engine` stores no draft of the forum: it reads the
+/// members `clear_draft` and `channel_id` of this payload (FIX-COMPOSER-DRAFT-LOST, FIX-CDL/9).
 ///
 /// A thread from a message of the main history (M4-20, 01 3.1) carries `parent_message_id`
 /// and no first message; the server titles it from the message (`title_source = auto`).

@@ -426,7 +426,9 @@ connected as long as the app runs.
 4. Gaps in `thread_seq` (an event does not fit the loaded ranges) are loaded by the fetcher through REST
    before it shows the message.
 5. Personal data: the echo of one's own device (`updated_by_device_id`) is ignored; a draft with
-   `overwrote_newer` shows a notice; read state only increases.
+   `overwrote_newer` shows a notice; read state only increases. The database holds at most one
+   draft per thread and per forum, and none from the device's own send on until the next draft
+   is written (04 14, addendum of 2026-11-13).
 6. The person's level and capabilities on a space or channel come only from a `SpaceView` or
    `ChannelView` (snapshot or REST); `space.created` and `channel.created` carry none, and an
    owner gets no `access.changed` for them. So after applying such an event, and for every

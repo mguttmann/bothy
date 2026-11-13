@@ -1866,7 +1866,11 @@ final class FakeWorld {
   }
 
   /// Stores the draft of [principalId] in [threadId] from a `DraftPut` [body]; returns the
-  /// `DraftPutResult` (`overwrote_newer` as [_overwroteNewer], 04 14).
+  /// `DraftPutResult` (`overwrote_newer` as [_overwroteNewer], 04 14). As the server's
+  /// `putDraft` does, a draft without content (only white space) and without `file_ids`
+  /// deletes the row like [deleteDraft] and answers the empty final state with the last
+  /// version plus one (1 without a row); the next draft of the thread is then a new row with a
+  /// new ID that starts at version 1 again (FIX-COMPOSER-DRAFT-LOST).
   JsonMap putDraft(
     String principalId,
     String threadId,
@@ -1878,30 +1882,37 @@ final class FakeWorld {
     final previous = drafts[key];
     final base = body['base_version'] as int?;
     final previousVersion = (previous?['version'] as int?) ?? 0;
+    final content = body['content_md'] as String? ?? '';
+    final files = body['file_ids'] as List<Object?>? ?? <Object?>[];
+    final empty = content.trim().isEmpty && files.isEmpty;
     final draft = <String, Object?>{
       'id': previous?['id'] ?? nextId(),
       'thread_id': threadId,
       'channel_id': thread['channel_id'],
-      'content_md': body['content_md'],
-      'reply_to_message_id': ?body['reply_to_message_id'],
-      'file_ids': body['file_ids'] ?? <Object?>[],
+      'content_md': empty ? '' : content,
+      if (!empty) 'reply_to_message_id': ?body['reply_to_message_id'],
+      'file_ids': empty ? <Object?>[] : files,
       'version': previousVersion + 1,
       'updated_by_device_id': ?deviceId,
       'updated_at': stamp(),
     };
-    drafts[key] = draft;
-    append(
-      'draft.updated',
-      resource: {
-        'kind': 'draft',
-        'id': draft['id'],
-        'version': draft['version'],
-      },
-      scope: _scopeOf(threadId),
-      payload: {'draft': draft},
-      actor: principalId,
-      audience: principalId,
-    );
+    if (empty) {
+      deleteDraft(principalId, threadId);
+    } else {
+      drafts[key] = draft;
+      append(
+        'draft.updated',
+        resource: {
+          'kind': 'draft',
+          'id': draft['id'],
+          'version': draft['version'],
+        },
+        scope: _scopeOf(threadId),
+        payload: {'draft': draft},
+        actor: principalId,
+        audience: principalId,
+      );
+    }
     return {
       'draft': draft,
       'overwrote_newer': _overwroteNewer(previous, base, deviceId, body),

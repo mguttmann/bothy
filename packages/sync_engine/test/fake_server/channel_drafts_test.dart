@@ -169,6 +169,61 @@ void main() {
     expect(h.server.violations, isEmpty);
   });
 
+  // FIX-COMPOSER-DRAFT-LOST: the fake kept the draft of a thread on an empty put, where the
+  // server deletes the row (`putDraft` of the server, 04 14), so no app test met a draft that
+  // comes back as a new row.
+  test('an empty put deletes the draft of a thread; the next put is a new row '
+      'that starts at version 1', () async {
+    final alex = h.device();
+    await signedIn(h, alex);
+    final prefs = alex.api.getPreferencesApi();
+    final thread = h.seed.releaseNotes;
+
+    final stored = (await prefs.putThreadDraft(
+      threadId: thread,
+      draftPut: DraftPut((b) => b..contentMd = 'First try'),
+    )).data!;
+    final cleared = (await prefs.putThreadDraft(
+      threadId: thread,
+      draftPut: DraftPut(
+        (b) => b
+          ..contentMd = ' \n'
+          ..baseVersion = stored.draft.version,
+      ),
+    )).data!;
+    expect(cleared.draft.id, stored.draft.id);
+    expect(cleared.draft.version, stored.draft.version + 1);
+    expect(cleared.draft.contentMd, '');
+    expect(cleared.draft.threadId, thread);
+    expect(cleared.overwroteNewer, isFalse);
+    final deleted = h.server.world.log.last;
+    expect(deleted.type, 'draft.deleted');
+    expect(payloadOf(deleted), {
+      'draft_id': stored.draft.id,
+      'channel_id': stored.draft.channelId,
+      'thread_id': thread,
+    });
+    expect((await prefs.listMyDrafts()).data!.items, isEmpty);
+
+    // Without a row: the empty final state with version 1 and no event.
+    final headBefore = h.server.world.headSeq;
+    final none = (await prefs.putThreadDraft(
+      threadId: thread,
+      draftPut: DraftPut((b) => b..contentMd = ''),
+    )).data!;
+    expect(none.draft.version, 1);
+    expect(none.draft.contentMd, '');
+    expect(h.server.world.headSeq, headBefore);
+
+    final again = (await prefs.putThreadDraft(
+      threadId: thread,
+      draftPut: DraftPut((b) => b..contentMd = 'Second try'),
+    )).data!;
+    expect(again.draft.id, isNot(stored.draft.id));
+    expect(again.draft.version, 1);
+    expect(h.server.violations, isEmpty);
+  });
+
   test('an empty put deletes the draft and answers the final state', () async {
     final alex = h.device();
     await signedIn(h, alex);

@@ -128,6 +128,11 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
       typing: engine.typing,
       deviceId: ref.read(signedInServicesProvider)?.auth.session?.deviceId,
       measurements: ref.read(appMeasurementsProvider),
+      // The draft ends on this device with the send (FIX-COMPOSER-DRAFT-LOST, FIX-CDL/9).
+      endStored: () => db.personalDao.endDraft(
+        channelId: widget.channelId,
+        threadId: widget.threadId,
+      ),
     )..addListener(_changed);
     final composer = _composer!;
     // M4-22: attachments and voice messages of this composer.

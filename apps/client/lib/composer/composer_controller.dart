@@ -48,7 +48,8 @@ final class ContentTooLong extends ComposerError {
 /// inserted text out of the field and attaches it as a file through [attach] (M4-47).
 /// [send] checks the limit (a draft over it keeps its head and sends the rest as the
 /// attachment [overflowFileName]), puts the message into the outbox with `clear_draft`,
-/// drops the waiting draft write, sends `typing.stop` and clears the field.
+/// drops the waiting draft write, ends the stored draft ([endStored]), sends `typing.stop`
+/// and clears the field.
 ///
 /// Example:
 /// ```dart
@@ -69,12 +70,20 @@ final class ComposerController extends ChangeNotifier {
     this.deviceId,
     this.measurements,
     this.sendNew,
+    this.endStored,
   });
 
   /// Sends the first message of a new post (the text, trimmed, and the attachments of
   /// [attach]); used when [thread] is null.
   final Future<void> Function(String body, MessageAttachments? attachments)?
   sendNew;
+
+  /// Ends the draft this device stores for the thread, or for the new post of the forum
+  /// (`PersonalDao.endDraft`); [send] calls it once the message is in the outbox. The draft
+  /// ends here with the send and not only with the server's `draft.deleted`: that event is not
+  /// applied while the person types the next message, and none comes when the server had no
+  /// draft (FIX-CDL/9 in docs/decisions.d/FIX-COMPOSER-DRAFT-LOST.md).
+  final Future<void> Function()? endStored;
 
   /// The measurement points of the app metrics: a send reports `client.send_local.duration`
   /// (brief M4-31), or nothing when null.
@@ -265,6 +274,8 @@ final class ComposerController extends ChangeNotifier {
     // An own write that is not confirmed is newer than any stored draft; its answer, which can
     // arrive after a send, must not bring the sent text back.
     if (await _drafts.hasUnsent() || call != _applyCalls || _typingNow) return;
+    // A quick switch closed this composer while it read the outbox; the next one takes over.
+    if (_closed) return;
     // Nothing unconfirmed and nobody typing: the stored draft, own or not, is the text (a
     // composer opened again shows the draft this device saved).
     final next = draft?.contentMd ?? '';
@@ -276,6 +287,9 @@ final class ComposerController extends ChangeNotifier {
   }
 
   int _applyCalls = 0;
+
+  /// Whether [dispose] ran: what [applyStored] or [restoreUnsent] read meanwhile is dropped.
+  bool _closed = false;
 
   bool _isOwn(Draft draft) {
     final own = deviceId;
@@ -289,7 +303,7 @@ final class ComposerController extends ChangeNotifier {
   /// opened again, or the app started again while offline, 04 13); the stored draft is older.
   Future<void> restoreUnsent() async {
     final unsent = await _drafts.restore();
-    if (unsent == null || _typingNow || unsent == text.text) return;
+    if (_closed || unsent == null || _typingNow || unsent == text.text) return;
     _setText(unsent);
     notifyListeners();
   }
@@ -430,6 +444,9 @@ final class ComposerController extends ChangeNotifier {
     }
     // The outbox write is done; the history shows it in the next frame.
     if (started != null) measurements!.sendShown(started);
+    // The server deletes the draft with the message (`clear_draft`, 04 14); the stored copy
+    // goes now, after the message is in the outbox, so it shows nowhere while the send waits.
+    await endStored?.call();
     return true;
   }
 
@@ -449,6 +466,7 @@ final class ComposerController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _closed = true;
     _editing.setEditing(channel, thread, editing: false);
     text.dispose();
     super.dispose();
