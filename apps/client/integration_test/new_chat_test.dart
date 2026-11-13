@@ -289,6 +289,10 @@ void main() {
       final shot = File('${dir.path}/screenshot.png')
         ..writeAsBytesSync(onePixelPng);
       paste.files = [PickedFile(path: shot.path, name: 'screenshot.png')];
+      // The paste key also pastes the text of the system clipboard into the field (the files
+      // are added beside it), and an earlier test of the same run can have left text there. A
+      // clipboard that holds a screenshot holds no text.
+      await Clipboard.setData(const ClipboardData(text: ''));
       await tester.tap(newChatField);
       final command = Platform.isMacOS
           ? LogicalKeyboardKey.meta
