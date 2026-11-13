@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from claude_code_runner.account import ACCOUNT_ERRORS
 from claude_code_runner.failures import (
     ERROR_TEXTS,
     ErrorKind,
@@ -41,6 +42,8 @@ def test_error_text_table_is_complete() -> None:
 
 ERROR = {"type": "result", "subtype": "error_during_execution", "is_error": True}
 OK = {"type": "result", "subtype": "success", "is_error": False, "result": "Done."}
+NOTED = {"type": "result", "subtype": "success", "is_error": False, "num_turns": 0, "result": ""}
+"""The result of a turn the CLI ended without a model turn."""
 
 CASES = [
     ("stop with an error result", TurnEvidence(stop_requested=True, result=ERROR), "stopped"),
@@ -79,6 +82,31 @@ CASES = [
         TurnEvidence(init_seen=True, result=ERROR, assistant_text="Not logged in · Run"),
         "not_authenticated",
     ),
+    # 09 18.9 (FIX-RLKR/12): after the account error that ended the process, a result without
+    # a model turn does not make the end completed; an answered turn still does.
+    ("a result without a model turn", TurnEvidence(init_seen=True, result=NOTED), "completed"),
+    (
+        "a result without a model turn after an account error",
+        TurnEvidence(init_seen=True, result=NOTED, account_failed=True),
+        "runtime_error",
+    ),
+    (
+        "a result without a model turn after a login that is gone",
+        TurnEvidence(
+            init_seen=True, result=NOTED, assistant_text="Not logged in · Run", account_failed=True
+        ),
+        "not_authenticated",
+    ),
+    (
+        "an answered turn after an account error",
+        TurnEvidence(init_seen=True, result={**OK, "num_turns": 1}, account_failed=True),
+        "completed",
+    ),
+    (
+        "a stop after an account error",
+        TurnEvidence(stop_requested=True, result=NOTED, account_failed=True),
+        "stopped",
+    ),
 ]
 
 
@@ -113,14 +141,23 @@ def test_stderr_text_never_in_turn_end() -> None:
 def test_fixture_texts_are_in_table() -> None:
     fragments = {e.fragment for e in ERROR_TEXTS}
     found = 0
+    by_member = 0
     for path in sorted(FIXTURES.glob("*.jsonl")) + sorted(FIXTURES.glob("*.txt")):
         meta = path.read_text().splitlines()[0]
         if '"error_text"' not in meta:
             continue
-        found += 1
-        text = json.loads(meta)["error_text"]
-        assert any(f in text for f in fragments), path.name
+        fixture = json.loads(meta)
+        kind = (fixture.get("members") or {}).get("error")
+        if any(f in fixture["error_text"] for f in fragments):
+            found += 1
+        else:
+            # An error the runner knows by the member ``error`` of the CLI's message, never
+            # by its text: an account error (09 18.9), or the server error the scenarios use
+            # as an error that is none.
+            by_member += 1
+            assert kind in {*ACCOUNT_ERRORS, "server_error"}, path.name
     assert found >= len(ErrorKind)
+    assert by_member >= len(set(ACCOUNT_ERRORS.values())) - 1  # the login text is in the table
 
 
 def test_only_the_cli_api_error_is_the_assistant_channel() -> None:

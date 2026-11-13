@@ -158,7 +158,10 @@ up. A frame has this shape (synthetic values, field names as in a runner stream)
 The runner handles none of this (no rate or usage limit text in `failures.py`, `causes.py` or
 `recovery.py`). Read from the code, a rejected request would end so: the error `result` closes
 stdin at once (18.5), after `runner.stop_grace` the runner stops the process with its background
-tasks, the run fails `runtime_error`, and nothing wakes the thread after `resetsAt`.
+tasks, the run fails `runtime_error`, and nothing wakes the thread after `resetsAt`. (Since
+2026-11-13 a process with background work is kept at such an error and the turn is tried again
+after short pauses, 09 18.9 "Account errors", `docs/decisions.d/FIX-RUNNER-LIMIT-KEEPS-RUN.md`;
+the wake-up at the reset stays the design below.)
 
 The schema of the frame in the pinned CLI strings names the values: `status` and `overageStatus`
 are each one of `allowed`, `allowed_warning`, `rejected`; `rateLimitType` is one of `five_hour`,

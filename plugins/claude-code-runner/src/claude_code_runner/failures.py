@@ -5,8 +5,9 @@
 of a text of the pinned Claude Code CLI, the channel the CLI writes it to and the evidence.
 `classify_turn_end` is a pure function from what a process left behind (`TurnEvidence`) to its
 end (`TurnEnd`), in this order (docs/DECISIONS.md D-M2-35-7): a requested stop; a ``result``
-with ``subtype`` ``success`` and no ``is_error``; the first table entry whose fragment occurs in
-its channel, where ``session_missing`` and ``session_exists`` count only while no
+with ``subtype`` ``success`` and no ``is_error``, except one without a model turn after the
+account error that ended the process (FIX-RLKR/12); the first table entry whose fragment occurs
+in its channel, where ``session_missing`` and ``session_exists`` count only while no
 ``system/init`` came; otherwise ``runtime_error`` with the error texts of the last ``result``.
 
 stderr is read only to match fragments: its text never reaches a `TurnEnd`, a step, a log line
@@ -169,6 +170,8 @@ class TurnEvidence:
             may quote an error text.
         stderr: Its stderr file content (only matched, never returned).
         exit_label: The exit code or the name of the ending signal (``Turn.exit_label``).
+        account_failed: An account error set the failure mark of the process (09 18.9): at
+            once, at the bound of the wait, or because the process ended during the wait.
     """
 
     stop_requested: bool = False
@@ -177,6 +180,7 @@ class TurnEvidence:
     assistant_text: str = ""
     stderr: str = ""
     exit_label: str = "0"
+    account_failed: bool = False
 
 
 @dataclass(frozen=True)
@@ -272,7 +276,10 @@ def classify_turn_end(evidence: TurnEvidence) -> TurnEnd:
         return TurnEnd("stopped", exit_label=label)
     result = evidence.result
     success = result is not None and result.get("subtype") == "success"
-    if success and result is not None and result.get("is_error") is not True:
+    # A turn that ended without a model turn answers nothing (09 18.9): read after the account
+    # error that ended the process, its success result must not hide that error.
+    unanswered = evidence.account_failed and result is not None and result.get("num_turns") == 0
+    if success and result is not None and result.get("is_error") is not True and not unanswered:
         return TurnEnd("completed", exit_label=label)
     for entry in ERROR_TEXTS:
         if entry.kind in _BEFORE_INIT_ONLY and evidence.init_seen:

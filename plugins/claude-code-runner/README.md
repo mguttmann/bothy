@@ -41,6 +41,7 @@ the title once per new session and reports the cost of the run.
 | `followups.py`, `background.py`, `stop.py`, `adoption.py` | Follow-up check, line and stdin rule; the background work that holds stdin open; the stop schedule; the checked read of a turn record, identity check and adoption decision |
 | `channels.py`, `workspace.py` | Cache of the served forums and their bindings, reloaded while running (09 18.1); resolution of `workspace_ref` and `runner.default_workspace`, readiness and the project folder report (09 18.13, M4-44) |
 | `causes.py` | The sentence for the thread that names the cause of a refused run (09 18.9, RUNNER-NO-GIT) |
+| `account.py` | Account errors of a turn (a usage limit, a login that is gone, subscription access switched off, an overloaded API): their class, the retry schedule, the status line and the retry line (09 18.9, FIX-RUNNER-LIMIT-KEEPS-RUN) |
 | `hosting.py` | The hosted agents of `runner.hosted_agents`: the hosted set, a token in memory per agent and its renewal, one connection, channel cache, heartbeat and state folder per agent (26 3.2, 3.3), and their turns from the definition (26 5) |
 | `definition.py` | The runner's own check of a definition (26 4.2, 4.3), held equal to the server's by the corpus `tests/agent-definitions`; the class a definition needs and the tool intersection (26 4.4) |
 | `materialize.py` | The agent and control folders: every file of 26 5.2, the runner settings of 26 5.4, the rebuild before each turn and the per-turn MCP file (26 5.6) |
@@ -57,7 +58,7 @@ the title once per new session and reports the cost of the run.
 | `reply_attachments.py`, `reply_upload.py` | Answer attachments: `ATTACH:` lines, roots, denied patterns, the checks of one file and of the set, the notice; staging, upload, sending and the persisted set (M3-12) |
 | `tests/unit/`, `tests/scenarios/` | Unit tests; scenarios with Fake-Claude and the SDK FakeServer |
 | `tests/fake_claude/` | Fake-Claude (plays `fixtures/*.jsonl`, constructed from the message shapes of 18.4 and the texts of the pinned CLI; see 09 16.1) |
-| `tests/real_cli/` | Tests against the installed CLI, only behind switches (see below); `record.py` writes the recordings of the pinned CLI against the stand-in `stand_in.py` ("Changing the pinned version") |
+| `tests/real_cli/` | Tests against the installed CLI, only behind switches (see below); `record.py` writes the recordings of the pinned CLI against the stand-in `stand_in.py` ("Changing the pinned version"); `test_refused_request.py` runs what the retry after an account error rests on |
 | `tests/realserver/` | The end-to-end suite: the runner with Fake-Claude against the server of this tree (`make adapters-e2e`) |
 | `tests/fixtures/baseline/`, `tests/unit/test_byte_equal_baseline.py` | The command line, heartbeats and served channels of the runner without the keys of stage A1, recorded before A1-04 and compared byte for byte (BA-T20) |
 | `keeper.py`, `launch.py` | With `runner.turn_handover`: the keeper program of one launch, and the runner's side of the launch handshake, the group of keeper and CLI, the named pipe writer and the cases of a `launching` record (09 18.19.4, 18.19.5) |
@@ -124,6 +125,12 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
 - Keep `runner.stop_grace` plus `runner.kill_grace` below `agent.cancel_grace` of the server,
   else the server ends a stopped run with `cancel_timeout` before the runner reports
   `cancelled`; the runner cannot read the server value.
+- `runner.account_retry_first`, `runner.account_retry_second`, `runner.account_retry_interval`
+  and `runner.account_retry_max_wait` set how a run with background work waits for the account
+  of Claude Code ("Account errors" below). The defaults fit an account that works again within
+  minutes; the runner never waits for the reset time of a usage limit. A run that waits keeps
+  its slot of `runner.max_parallel_runs`. `runner.account_retry_max_wait = "0s"` switches the
+  retry off: such a turn then ends the run at once, as before.
 - `runner.transcribe_cmd` is off by default; see "Voice messages" below. The transcriber runs as
   the runner user with the allow-list environment and gets the audio file of a person's message,
   so install only a program you trust there.
@@ -313,11 +320,31 @@ model in `system/init` and `modelUsage` without the selector in square brackets.
   longer holds the run for the background work: a process still alive `runner.stop_grace` after
   an error `result` is stopped (log code `turn_stopped_after_error`), its open task steps end
   `cancelled`, and the run ends with a summary that names the lost tasks
-  (FIX-runner-auth-failed-held). Once the process has ended nothing waits on the thread any
+  (FIX-runner-auth-failed-held). An account error is no such failure; see "Account errors"
+  below. Once the process has ended nothing waits on the thread any
   more, also when the last answer promised to go on later: a run its turn completes carries
   the summary "Run ended; nothing is waiting ..." with the code `run_ended_idle`, which the
   apps show next to the run's state on its collapsed line and in the opened box
   (FIX-runner-silent-stop).
+- **Account errors** (09 18.9, FIX-RUNNER-LIMIT-KEEPS-RUN): a turn can end because the account
+  of Claude Code does not work for a moment, not because of the turn: the usage limit of the
+  account is reached, the login is gone, the organization switched off subscription access,
+  or the API is overloaded. Claude Code names the kind in the member `error` of its API
+  error message (`rate_limit`, `authentication_failed`, `oauth_org_not_allowed`, `overloaded`),
+  and the runner reads only that member. When the process holds or held background work (the
+  turn of a task's notification, of a follow-up, or one that had started such work), the runner
+  keeps the process and its tasks, the run stays `running`, and the live box says "Waiting for
+  the Claude Code account" with the class of the error, the reset time of a usage limit in UTC
+  and when the next try comes. The try is one input line of the runner ("Automatic retry by
+  the runner ..."), written after `runner.account_retry_first`, then after
+  `runner.account_retry_second`, then every `runner.account_retry_interval`; the turn it starts
+  answers what the failed turn left open, and its answer is posted. The reset time is shown and
+  never waited for. A stop works at every moment of the wait. When no turn was answered within
+  `runner.account_retry_max_wait`, the run ends as after any error (`runtime_error`, or
+  `runtime_not_authenticated` for a login that is gone), and its summary names the error, the
+  reset time, the number of tries and the lost tasks. A process without background work ends
+  at the first such error, with the same summary and the note that nothing was kept. Log codes:
+  `account_wait_started`, `account_retry`, `account_wait_ended`, `account_wait_gave_up`.
 - **Attachments of follow-ups** (09 18.5, FIX-scan-state-stale): a follow-up whose files are
   still being checked waits, without a lock, until the server reports every file final, at most
   `runner.followup_file_wait`; its line then lists each file after the text under
@@ -335,8 +362,9 @@ model in `system/init` and `modelUsage` without the selector in square brackets.
   of a process with `--resume`) and the same prompt runs again, with a retry hint in the runner
   prompt when the turn had worked; a missing session is replaced by a new one and reported (with
   `bind_failed` in mode `bind`), fail open; a session that exists at the first turn is resumed; a
-  missing login ends `runtime_not_authenticated` (at a turn with a summary that says the login
-  was lost and that the next message continues the same session); a CLI too old for the model ends
+  missing login ends `runtime_not_authenticated` (at a turn with a summary that says so and that
+  the next message continues the same session; in a process with background work only after the
+  retries of "Account errors" above); a CLI too old for the model ends
   `runtime_error` with the required version in the last step and degrades the runner (see the
   operator rules); an error `result` ends `runtime_error` with its texts in the last step. Box notes are run steps of kind `status` with the codes
   `context_compacted`, `session_missing` and `runtime_error`. An error the runner handles nowhere

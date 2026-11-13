@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pytest
 
+from claude_code_runner.account import AccountEnd, AccountError
 from claude_code_runner.causes import (
     CAUSES,
     adapter_stopped_cause,
@@ -83,6 +84,58 @@ def test_lost_background_tasks_are_reported(lost: int, sentence: str) -> None:
 
 def test_an_error_without_lost_work_keeps_its_box_note_only() -> None:
     assert turn_end_cause("runtime_error", 0) is None
+
+
+LIMIT = AccountError("usage_limit", 1794535800)
+"""A used-up usage window that resets at 2026-11-13 02:10 UTC."""
+
+
+def test_an_account_error_names_its_class_and_the_reset_time() -> None:
+    # FIX-RUNNER-LIMIT-KEEPS-RUN: a run that an account error ended says which one, when the
+    # limit resets and what the runner did, never a name of the account.
+    text = turn_end_cause("runtime_error", 2, AccountEnd(LIMIT, retries=7, held=True))
+    assert text == (
+        "Claude Code could not use its account on the runner host: the usage limit of the "
+        "account is reached and resets at 2026-11-13 02:10 UTC. The runner kept the session and "
+        "tried the turn again 7 times (runner.account_retry_max_wait bounds that wait) before "
+        "the run ended. 2 background tasks were still running and were stopped; their results "
+        "are lost. Your next message starts a new run that continues the same session "
+        "(`runtime_error`)"
+    )
+    assert len(text) <= 2000  # run.summary_max_chars
+    once = turn_end_cause("runtime_error", 0, AccountEnd(LIMIT, retries=1, held=True))
+    assert once is not None
+    assert "tried the turn again 1 time (" in once
+
+
+def test_an_account_error_without_background_work_says_why_nothing_waited() -> None:
+    text = turn_end_cause("runtime_error", 0, AccountEnd(LIMIT))
+    assert text == (
+        "Claude Code could not use its account on the runner host: the usage limit of the "
+        "account is reached and resets at 2026-11-13 02:10 UTC. This session had no background "
+        "work to keep, so the run ended at once instead of waiting and trying again. Your next "
+        "message starts a new run that continues the same session (`runtime_error`)"
+    )
+    # With the retry switched off a held process ends at once too; nothing more to explain.
+    off = turn_end_cause("runtime_error", 1, AccountEnd(LIMIT, held=True))
+    assert off is not None
+    assert "no background work" not in off
+    assert "tried the turn again" not in off
+    assert "1 background task was still running" in off
+
+
+def test_a_login_that_is_gone_keeps_its_advice() -> None:
+    gone = AccountEnd(AccountError("not_logged_in"), retries=3, held=True)
+    text = turn_end_cause("runtime_not_authenticated", 1, gone)
+    assert text is not None
+    assert text.startswith(
+        "Claude Code could not use its account on the runner host: Claude Code is not logged in."
+    )
+    assert "tried the turn again 3 times" in text
+    assert text.endswith(
+        "Once the login works again, your next message starts a new run that continues the "
+        "same session (`runtime_not_authenticated`)"
+    )
 
 
 def test_definition_missing_names_the_built_in_agent() -> None:

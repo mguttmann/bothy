@@ -12,6 +12,7 @@ After this ticket, with `runner.end_state`, every answer of a runner turn ends w
 - Design note backlog item 23 (idle count and agents that wait for several CI runs).
 - Code on the base branch: `plugins/claude-code-runner/src/claude_code_runner` (`title.py` and the `TITLE:` handling, `processstate.py`, `runturn.py`, `followups.py`, `environment.py`, `prompt.py`, `prompts/runner_prompt.md`, `wakes/`).
 - Design note `docs/design/autonomous-runs.md` (context and evidence; where it differs from the chapters, the chapters win); ADR 0077; `docs/decisions.d/AR-01.md`.
+- `docs/decisions.d/FIX-RUNNER-LIMIT-KEEPS-RUN.md` and 09 18.9 "Account errors" (added 2026-11-13, after this brief was written): after an account error of a held process the runner writes an input line of its own, the retry line (`account.py` `retry_input`, `RunTurn._account_retry`). Its echo counts in `ProcessState._input_taken` like an input of a person: it clears the nudge mark and sets the count of autonomous inputs to zero. Where this ticket reads or writes those marks, flag the retry line as neither a person's nor an autonomous input.
 
 ## Fixed requirements that apply
 

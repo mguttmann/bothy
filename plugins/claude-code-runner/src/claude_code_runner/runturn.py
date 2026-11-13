@@ -14,6 +14,12 @@ run that the server ended stops its turn without a finish. An error nothing expe
 live process before the run ends ``failed`` with ``adapter_error`` (`RunTurn._on_error`, 18.9).
 `RunTurn.adopted` follows a turn that outlived an earlier runner (design note 12).
 
+A turn that ends with an account error (`claude_code_runner.account`) in a process that holds
+or held background work does not end the run: the process is kept, ``/status_line`` says why
+the run waits, and the runner writes a retry line after each pause of ``runner.account_retry_*``
+until a turn is answered or ``runner.account_retry_max_wait`` has passed (`RunTurn._idle`,
+09 18.9).
+
 A run of a hosted agent (docs/spec/26-builtin-agents.md 5) carries the parts of its command line
 in `RunState` (``hosted``, ``max_budget_usd``); a run stopped by the cost cap ends
 ``runtime_error`` with the cause ``cost_cap_reached`` (26 5.8). Channel skill folders of a
@@ -89,6 +95,7 @@ from bothy_sdk.long_answers import split_for_limit
 from bothy_sdk.outbox import OutboxState
 from bothy_sdk.runs import RunHandle, is_run_ended
 
+from claude_code_runner.account import AccountEnd, AccountRetry, retry_input, waiting_line
 from claude_code_runner.adoption import process_matches, read_identity
 from claude_code_runner.attachments import (
     describe_followup_files,
@@ -395,6 +402,8 @@ class _Outcome:
     """The process wrote ``system/compact_boundary`` (a compaction that reduced the context)."""
     lost_tasks: int = 0
     """Background tasks still running when the process ended after a failed turn."""
+    account: AccountEnd | None = None
+    """The account error the failed turn ended with, if it was one (the summary names it)."""
 
 
 @dataclass
@@ -466,11 +475,14 @@ class RunTurn:
         self.followup_order = _FollowupOrder()
         self.transcribing = 0
         """Transcriptions running now; the status line shows while one runs (issue 574)."""
-        self.ps = ProcessState(has_stdin=True)
+        self.ps = ProcessState(has_stdin=True, account_retry=self._account_schedule())
         """The stream-derived state of the current process (09 18.19.7): its background work
-        (18.5, FIX-runner-responsive-turns), the failure mark (FIX-runner-auth-failed-held) and
-        the rest the stdin and stop rule reads."""
+        (18.5, FIX-runner-responsive-turns), the failure mark (FIX-runner-auth-failed-held), the
+        wait for the account (FIX-RUNNER-LIMIT-KEEPS-RUN) and the rest the stdin and stop rule
+        reads."""
         self._held_logged = False
+        self._account_shown: tuple[float, int] | None = None
+        """The wait for the account that ``/status_line`` shows now (its last time and count)."""
         self.process: Turn | KeeperGroup | None = None
         self.phase = "starting"  # starting, open, closed, ended
         self.attempt = _Attempt()
@@ -651,7 +663,7 @@ class RunTurn:
                     await self._box_note("context_compacted", "failed", None)
                 summary = None
                 if attempt.kind == "turn":
-                    summary = turn_end_cause(action.reason, outcome.lost_tasks)
+                    summary = turn_end_cause(action.reason, outcome.lost_tasks, outcome.account)
                 if action.reason == "runtime_error" and cost_cap_reached(
                     outcome.evidence.result, self.state.cost_cap
                 ):
@@ -1061,6 +1073,9 @@ class RunTurn:
                 await self.stopping
             self.phase = "closed"
             await self._checkpoint(reader.offset)
+            if self.stop_reason is None and not self.server_ended:
+                # The process ended during a wait for the account: its error ended the turn.
+                self.ps.process_ended()
             ledger = self.ledger
             evidence = TurnEvidence(
                 stop_requested=self.stop_reason is not None,
@@ -1069,11 +1084,16 @@ class RunTurn:
                 assistant_text=ledger.api_error,
                 stderr=_read_from(paths.stderr, stderr_start),
                 exit_label=process.exit_label(),
+                account_failed=self.ps.account_error is not None,
             )
             # The run's highest outage number reached so far goes into the next attempt.
             self.outage = max(self.outage, self.ps.outage)
             return _Outcome(
-                evidence, self._worked, compacted=ledger.compacted, lost_tasks=self._lost_work()
+                evidence,
+                self._worked,
+                compacted=ledger.compacted,
+                lost_tasks=self._lost_work(),
+                account=self._account_end(),
             )
         finally:
             if self._fed is not None:
@@ -1301,10 +1321,37 @@ class RunTurn:
         """The background work of the current process (`ProcessState.background`)."""
         return self.ps.background
 
+    def _account_schedule(self) -> AccountRetry | None:
+        """The pauses and the bound of the retries after an account error (09 18.9).
+
+        Returns:
+            The schedule of ``runner.account_retry_*``; ``None`` when
+            ``runner.account_retry_max_wait`` is zero, which switches the retry off.
+        """
+        cfg = self.cfg
+        if cfg.account_retry_max_wait <= 0:
+            return None
+        return AccountRetry(
+            first=cfg.account_retry_first,
+            second=cfg.account_retry_second,
+            interval=cfg.account_retry_interval,
+            max_wait=cfg.account_retry_max_wait,
+        )
+
+    def _account_end(self) -> AccountEnd | None:
+        """The account error behind the failure mark of the process that ended, if any."""
+        error = self.ps.account_error
+        if error is None:
+            return None
+        return AccountEnd(error, self.ps.account_retries, held=self.background.seen)
+
     def _reset_process_state(self, outage: int = 0) -> None:
         """The per-process state of a new turn process (`ProcessState`, 09 18.19.7)."""
-        self.ps = ProcessState(has_stdin=True, outage=outage)
+        self.ps = ProcessState(
+            has_stdin=True, outage=outage, account_retry=self._account_schedule()
+        )
         self._held_logged = False
+        self._account_shown = None
         # The stop of an earlier process of the run is not the stop of this one: a stop request,
         # a run the server ended and the stop after an error apply to the process that runs
         # (18.6), so each process starts without one.
@@ -1439,7 +1486,8 @@ class RunTurn:
             self.server_ended = True
             _log("run_ended_by_server", **self.ids)
         if (self.server_ended or self.stop_reason is not None) and self.stopping is None:
-            # Also a stop that came while this process was being started (note 6 d).
+            # Also a stop that came while this process was being started (note 6 d), and one
+            # that comes while the run waits for its account.
             self._stop_group(process)
             return
         decision = self.ps.decide(
@@ -1456,6 +1504,10 @@ class RunTurn:
             lost = self.ps.lost_at_stop()
             _log("turn_stopped_after_error", background_tasks=lost, **self.ids)
             self._stop_group(process)
+        elif decision is Decision.RETRY:
+            await self._account_retry()
+        elif decision is Decision.GIVE_UP:
+            self._account_give_up()
         elif decision is Decision.HOLD:
             # Background work outlives the turn: once its input ended the CLI takes no line and
             # stops the work some time after, so stdin stays open, and every follow-up becomes a
@@ -1469,6 +1521,72 @@ class RunTurn:
             # Also the close at an error result; a queued input (Decision.WAIT) keeps stdin
             # open for the turn still to come (FIX-runner-hold-background).
             await self._close_stdin(process)
+        await self._show_account_wait()
+
+    # ---- the wait for the account (09 18.9, FIX-RUNNER-LIMIT-KEEPS-RUN) -----------------------
+
+    async def _account_retry(self) -> None:
+        """Write the retry line of a wait for the account: the CLI runs a turn again.
+
+        The failed turn's own input (a message, or a task's notification) is still part of the
+        conversation, so the turn of this line answers it. The retry is counted before the
+        write: a line that cannot be written is tried again after the next pause, not at
+        every poll.
+        """
+        wait = self.ps.account
+        if wait is None:
+            return
+        attempt = self.ps.account_retried(self.monotonic())
+        written = await self.offer_input(retry_input(wait.error))
+        _log("account_retry", attempt=attempt, error=wait.error.kind, written=written, **self.ids)
+
+    def _account_give_up(self) -> None:
+        """``runner.account_retry_max_wait`` has passed: the account error ends the turn.
+
+        From here on it is an error ``result`` like any other: stdin closes at the next check,
+        the stop of 18.5 follows ``runner.stop_grace`` later, and the run ends by 18.9 with
+        the error and the retries in its summary.
+        """
+        wait = self.ps.account
+        if wait is None:
+            return
+        _warn(
+            "account_wait_gave_up",
+            error=wait.error.kind,
+            retries=wait.retries,
+            background_tasks=len(self.background.running),
+            **self.ids,
+        )
+        self.ps.give_up(self.monotonic())
+
+    async def _show_account_wait(self) -> None:
+        """Keep ``/status_line`` equal to the wait for the account, so a person sees it.
+
+        The line names the class of the error, the reset time when the CLI gave one, and the
+        pause before the next try; it is sent again after every further error and every retry,
+        because a turn in between may have replaced it, and removed once a turn is answered
+        or the wait is given up.
+        """
+        wait = self.ps.account
+        shown = None if wait is None else (wait.last_at, wait.retries)
+        if shown == self._account_shown:
+            return
+        before, self._account_shown = self._account_shown, shown
+        if wait is None:
+            if self.ps.failed_at is None and before is not None:
+                _log("account_wait_ended", retries=before[1], **self.ids)
+            await self._status_line(None)
+            return
+        if before is None:
+            _log(
+                "account_wait_started",
+                error=wait.error.kind,
+                background_tasks=len(self.background.running),
+                **self.ids,
+            )
+        schedule = self._account_schedule()
+        pause = schedule.pause(wait.retries) if schedule is not None else 0.0
+        await self._status_line(waiting_line(wait.error, pause))
 
     async def _close_stdin(self, process: StoppableGroup) -> None:
         async with self.write_lock:
@@ -2231,6 +2349,10 @@ class RunTurn:
         """
         self.ledger.finishing = {"state": state, "reason": reason, "summary": summary}
         self._persist()
+        if self._account_shown is not None:
+            # The run ends during a wait for the account (a stop): it waits no longer.
+            self._account_shown = None
+            await self._status_line(None)
         reports, metrics = self._usage()
         kwargs: dict[str, Any] = {"costs": reports}
         if reason is not None:
@@ -2644,8 +2766,14 @@ class RunTurn:
         self.adopted_group = group
         self._identity = {k: str(cli[k]) for k in ("lstart", "command") if cli.get(k)}
         self.record_phase = "process"
-        self.ps = ProcessState(has_stdin=True, outage=launch.outage, autonomous=self.autonomous)
+        self.ps = ProcessState(
+            has_stdin=True,
+            outage=launch.outage,
+            autonomous=self.autonomous,
+            account_retry=self._account_schedule(),
+        )
         self._held_logged = False
+        self._account_shown = None
         lines = await replayed_lines(
             self._paths().stream, self.ledger.process_start, self.ledger.offset
         )

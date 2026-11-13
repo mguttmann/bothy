@@ -59,6 +59,17 @@ followup_grace = "30s"
 followup_file_wait = "2m"
 stop_grace = "10s"
 kill_grace = "5s"
+# A turn that ends with an account error (a usage limit, a login that is gone, subscription
+# access switched off, an overloaded API) while its process holds or held background work does
+# not end the run (09 18.9): the runner keeps the process and writes a retry line after
+# account_retry_first, then after account_retry_second, then every account_retry_interval. Once
+# account_retry_max_wait has passed since the first error and no turn runs, the run ends as
+# after any error; "0s" switches the retry off. The reset time of a usage limit is shown, never
+# waited for.
+account_retry_first = "1m"
+account_retry_second = "2m"
+account_retry_interval = "3m"
+account_retry_max_wait = "20m"
 session_lock_wait = "10m"
 max_parallel_runs = 4
 stream_log_retention = "14d"

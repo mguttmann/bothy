@@ -22,6 +22,7 @@ from typing import Any
 
 import pytest
 
+from claude_code_runner.account import AccountRetry
 from claude_code_runner.processstate import Decision, ProcessState, replayed_lines
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fake_claude"))
@@ -78,6 +79,24 @@ def _turn(fake: _Recorder, fixture: str, uuid: str) -> None:
     fake.emit(final)
 
 
+def held_stream(tmp: Path) -> _Recorder:
+    """A turn that started a background job and answered: the process is held for the job."""
+    fake = _Recorder({}, tmp / "capture.jsonl")
+    _turn(fake, "plain", "u-prompt")
+    fake.out.pop()  # the result comes after the job started
+    fake.start_background()
+    fake.emit({"type": "result", "subtype": "success", "is_error": False, "result": "Started."})
+    return fake
+
+
+def account_stream(tmp: Path, fixture: str) -> Stream:
+    """A held process whose next turn, a task's notification, ends with an API error."""
+    fake = held_stream(tmp)
+    fake.emit(fake.init_line())
+    fake.emit_api_error(*fake_claude._error(fixture))
+    return fake.out
+
+
 def fake_streams(tmp: Path) -> dict[str, Stream]:
     """Every stream shape of the scenarios, written by Fake-Claude's own code."""
     capture = tmp / "capture.jsonl"
@@ -108,6 +127,9 @@ def fake_streams(tmp: Path) -> dict[str, Stream]:
     fake.emit(fake.init_line())
     fake.emit_api_error("API Error: 401 authentication failed")
     streams["background_error"] = fake.out
+    # An account error while the job runs: the process is kept and the turn is tried again
+    # (FIX-RUNNER-LIMIT-KEEPS-RUN).
+    streams["background_account_error"] = account_stream(tmp, "usage_limit")
     # A resume after lost background work: results before the queued input started.
     fake = _Recorder({}, capture)
     fake.lost_work_turns("cmd-0", 2)
@@ -168,7 +190,13 @@ def simulate(
         if decision is Decision.CLOSE:
             stdin_open = False
         if decision is Decision.STOP:
+            state.lost_at_stop()
             stopped = True
+        # The runner writes the retry line or gives the wait up; neither is a stream line.
+        if decision is Decision.RETRY:
+            state.account_retried(now)
+        if decision is Decision.GIVE_UP:
+            state.give_up(now)
         return stopped
 
     now = start
@@ -198,11 +226,19 @@ def _kinds(decisions: list[tuple[float, Decision]]) -> list[tuple[float, Decisio
     return out
 
 
+SHORT_RETRY = AccountRetry(first=20.0, second=20.0, interval=20.0, max_wait=50.0)
+"""A schedule whose bound lies inside the simulated time of the class test."""
+
+
+def _state() -> ProcessState:
+    return ProcessState(has_stdin=True, account_retry=SHORT_RETRY)
+
+
 def compare(stream: Stream, k: int, gap: float) -> None:
     """The old runner's read against an adoption after line ``k - 1`` (``gap`` seconds later)."""
     times = [100.0 + 5.0 * i for i in range(len(stream))]
     end = times[-1] + 3 * (FOLLOWUP_GRACE + STOP_GRACE)
-    old_state = ProcessState(has_stdin=True)
+    old_state = _state()
     old = simulate(
         old_state,
         list(zip(times, stream, strict=True)),
@@ -217,7 +253,7 @@ def compare(stream: Stream, k: int, gap: float) -> None:
     stdin_open = not any(d is Decision.CLOSE for _, d in before)
     after = [(t + gap, d) for t, d in old.decisions if t > handover]
     adoption = handover + gap
-    adopter = ProcessState(has_stdin=True)
+    adopter = _state()
     adopter.replay(stream[:k], adoption)
     new = simulate(
         adopter,
@@ -260,6 +296,7 @@ def test_the_class_test_covers_every_stream_and_checkpoint(streams: dict[str, St
             checked += 1
     assert checked == 3 * sum(len(s) + 1 for s in streams.values())
     assert {"background", "background_error", "lost_work", "lifecycle", "happy"} <= set(streams)
+    assert "background_account_error" in streams
 
 
 def test_a_value_kept_outside_fails_the_class_test(
@@ -491,3 +528,230 @@ def test_a_followup_being_prepared_keeps_stdin_open() -> None:
         stop_grace=STOP_GRACE,
     )
     assert failed is Decision.CLOSE  # a failed turn absorbs nothing more
+
+
+# ---- account errors (docs/spec/09-agents.md 18.9, FIX-RUNNER-LIMIT-KEEPS-RUN) ------------------
+
+RETRY = AccountRetry(first=60.0, second=120.0, interval=180.0, max_wait=1200.0)
+"""The schedule of the defaults of ``runner.account_retry_*``."""
+
+
+def _held(tmp_path: Path, fixture: str = "usage_limit", at: float = 100.0) -> ProcessState:
+    """A held process whose notification turn ended with the API error ``fixture`` at ``at``."""
+    state = ProcessState(has_stdin=True, account_retry=RETRY)
+    for message in account_stream(tmp_path, fixture):
+        state.apply(message, at)
+    return state
+
+
+def _fail_again(
+    state: ProcessState, tmp_path: Path, at: float, fixture: str = "usage_limit"
+) -> None:
+    """The turn of a retry line: ``system/init``, then the same API error and its result."""
+    fake = _Recorder({}, tmp_path / "capture.jsonl")
+    fake.emit(fake.init_line())
+    fake.emit_api_error(*fake_claude._error(fixture))
+    for message in fake.out:
+        state.apply(message, at)
+
+
+@pytest.mark.parametrize(
+    "fixture", ["usage_limit", "not_authenticated", "subscription_disabled", "overloaded"]
+)
+def test_an_account_error_of_a_held_process_sets_no_failure_mark(
+    tmp_path: Path, fixture: str
+) -> None:
+    # The reported failure: this error result set the failure mark, so stdin closed at once and
+    # the process with its background tasks was stopped runner.stop_grace later.
+    state = _held(tmp_path, fixture)
+    assert state.failed_at is None
+    assert state.account is not None
+    assert state.account.since == 100.0
+    assert state.background.running == [fake_claude.BACKGROUND_TASK]
+    assert _decide(state, 100.0, True) is Decision.HOLD
+    assert _decide(state, 100.0 + STOP_GRACE, True) is Decision.HOLD  # no stop after the grace
+    assert _decide(state, 159.0, True) is Decision.HOLD
+    assert _decide(state, 160.0, True) is Decision.RETRY  # runner.account_retry_first
+
+
+def test_the_retries_follow_the_schedule_until_the_bound(tmp_path: Path) -> None:
+    state = _held(tmp_path)
+    retried: list[float] = []
+    gave_up: float | None = None
+    now = 100.0
+    while gave_up is None and now < 5000.0:
+        now += 1.0
+        decision = _decide(state, now, True)
+        if decision is Decision.RETRY:
+            retried.append(now)
+            assert state.account_retried(now) == len(retried)
+            _fail_again(state, tmp_path, now + 1.0)  # the account still does not work
+        elif decision is Decision.GIVE_UP:
+            gave_up = now
+        else:
+            assert decision is Decision.HOLD
+    # One minute, two minutes, then every three, each counted from the last error; the reset
+    # time of the limit is never a waiting time.
+    assert retried == [160.0, 281.0, 462.0, 643.0, 824.0, 1005.0, 1186.0]
+    assert gave_up == 1300.0  # runner.account_retry_max_wait after the first error
+    assert state.failed_at is None
+    state.give_up(1300.0)
+    assert (state.failed_at, state.lost_tasks, state.account) == (1300.0, 1, None)
+    assert state.account_error is not None
+    assert state.account_error.kind == "usage_limit"
+    assert state.account_retries == 7
+    # From here on the error is an ordinary one: stdin closes, the stop follows the grace.
+    assert _decide(state, 1300.0, True) is Decision.CLOSE
+    assert _decide(state, 1300.0 + STOP_GRACE - 1, False) is Decision.NONE
+    assert _decide(state, 1300.0 + STOP_GRACE, False) is Decision.STOP
+
+
+def test_an_answered_turn_ends_the_wait(tmp_path: Path) -> None:
+    state = _held(tmp_path)
+    state.account_retried(160.0)
+    state.apply({"type": "system", "subtype": "init"}, 161.0)
+    state.apply({"type": "result", "subtype": "success", "is_error": False, "num_turns": 2}, 170.0)
+    assert state.account is None
+    assert state.failed_at is None
+    assert state.account_error is None
+    assert _decide(state, 5000.0, True) is Decision.HOLD  # the job still runs: held as before
+
+
+def test_a_result_without_a_model_turn_does_not_end_the_wait(tmp_path: Path) -> None:
+    # The pinned CLI writes a success result with num_turns 0 for a turn it ran without a
+    # request to the model (a task's notification it only notes): no proof that the account
+    # works again.
+    state = _held(tmp_path)
+    state.apply({"type": "system", "subtype": "init"}, 110.0)
+    state.apply({"type": "result", "subtype": "success", "is_error": False, "num_turns": 0}, 111.0)
+    assert state.account is not None
+    assert _decide(state, 160.0, True) is Decision.RETRY
+
+
+def test_a_process_without_background_work_fails_at_once_and_keeps_the_reason(
+    tmp_path: Path,
+) -> None:
+    fake = _Recorder({}, tmp_path / "capture.jsonl")
+    fake.emit(fake.init_line())
+    fake.echo(_line("u-prompt", "Fix the form"))
+    fake.emit_api_error(*fake_claude._error("usage_limit"))
+    state = ProcessState(has_stdin=True, account_retry=RETRY)
+    for message in fake.out:
+        state.apply(message, 100.0)
+    assert state.account is None
+    assert state.failed_at == 100.0
+    assert state.account_error is not None  # the run's summary names it
+    assert state.account_error.resets_at == 1794535800
+    assert state.account_retries is None  # the runner did not wait
+    assert _decide(state, 100.0, True) is Decision.CLOSE
+
+
+def test_without_a_schedule_an_account_error_is_an_ordinary_error(tmp_path: Path) -> None:
+    # runner.account_retry_max_wait = "0s", and every turn the runner cannot write to.
+    state = ProcessState(has_stdin=True)
+    for message in account_stream(tmp_path, "usage_limit"):
+        state.apply(message, 100.0)
+    assert (state.failed_at, state.lost_tasks, state.account) == (100.0, 1, None)
+    assert _decide(state, 100.0, True) is Decision.CLOSE
+    assert _decide(state, 100.0 + STOP_GRACE, False) is Decision.STOP
+    reading = ProcessState(has_stdin=False, account_retry=RETRY)
+    reading.replay(account_stream(tmp_path, "usage_limit"), 100.0)
+    assert (reading.failed_at, reading.account) == (None, None)
+
+
+def test_an_ordinary_error_is_never_retried(tmp_path: Path) -> None:
+    for fixture in ("server_error", "context_full"):
+        state = _held(tmp_path, fixture)
+        assert state.account is None
+        assert (state.failed_at, state.lost_tasks) == (100.0, 1)
+        assert state.account_error is None
+        assert _decide(state, 100.0, True) is Decision.CLOSE
+        assert _decide(state, 100.0 + STOP_GRACE, False) is Decision.STOP
+    # Also in the middle of a wait: the error of the retried turn is then the turn's own.
+    state = _held(tmp_path)
+    _fail_again(state, tmp_path, 161.0, "server_error")
+    assert (state.failed_at, state.account, state.account_error) == (161.0, None, None)
+
+
+def test_the_words_of_the_model_never_start_a_wait(tmp_path: Path) -> None:
+    fake = held_stream(tmp_path)
+    fake.emit(fake.init_line())
+    fake.emit_api_error(*fake_claude._error("usage_limit"))
+    stream = fake.out
+    error = next(m for m in stream if m.get("is_api_error_message"))
+    error["is_api_error_message"] = False  # the model quotes the text of a limit
+    state = ProcessState(has_stdin=True, account_retry=RETRY)
+    for message in stream:
+        state.apply(message, 100.0)
+    assert state.account is None
+    assert state.failed_at == 100.0
+    # An account error of a subagent is not the turn's either.
+    error["is_api_error_message"] = True
+    error["parent_tool_use_id"] = "toolu_1"
+    state = ProcessState(has_stdin=True, account_retry=RETRY)
+    for message in stream:
+        state.apply(message, 100.0)
+    assert state.account is None
+
+
+def test_no_retry_while_a_turn_runs_or_an_input_is_queued(tmp_path: Path) -> None:
+    state = _held(tmp_path)
+    state.apply({"type": "system", "subtype": "init"}, 150.0)  # a task's notification turn
+    assert _decide(state, 5000.0, True) is Decision.HOLD  # neither a retry nor the bound
+    state.apply({"type": "result", "subtype": "success", "is_error": False, "num_turns": 0}, 151.0)
+    state.apply({"type": "command_lifecycle", "command_uuid": "c1", "state": "queued"}, 152.0)
+    assert _decide(state, 5000.0, True) is Decision.HOLD
+    state.apply({"type": "command_lifecycle", "command_uuid": "c1", "state": "cancelled"}, 153.0)
+    assert _decide(state, 5000.0, True) is Decision.GIVE_UP
+
+
+def test_with_stdin_closed_an_account_error_stops_like_any_error(tmp_path: Path) -> None:
+    # No retry line can be written (a keeper that ended, an adoption with reading rights
+    # only): the bound of FIX-runner-auth-failed-held holds as before.
+    state = _held(tmp_path)
+    assert _decide(state, 100.0 + STOP_GRACE - 1, False) is Decision.NONE
+    assert _decide(state, 100.0 + STOP_GRACE, False) is Decision.STOP
+    assert state.lost_at_stop() == 1
+    assert state.failed_at == 100.0
+    assert state.account is None
+    assert state.account_error is not None
+    assert state.account_retries is None  # no retry was written, so the summary names none
+
+
+def test_the_notification_turn_of_the_last_task_is_retried_too(tmp_path: Path) -> None:
+    # The task list is empty when the last task's notification turn runs; its failure must
+    # not end the run either, or the result of the work is never reported.
+    fake = held_stream(tmp_path)
+    fake.emit({"type": "system", "subtype": "background_tasks_changed", "tasks": []})
+    fake.emit(fake.init_line())
+    fake.emit_api_error(*fake_claude._error("usage_limit"))
+    state = ProcessState(has_stdin=True, account_retry=RETRY)
+    for message in fake.out:
+        state.apply(message, 100.0)
+    assert state.background.running == []
+    assert state.account is not None
+    assert _decide(state, 100.0 + FOLLOWUP_GRACE + 1, True) is Decision.HOLD  # no close
+    assert _decide(state, 160.0, True) is Decision.RETRY
+
+
+def test_a_replay_restarts_the_wait_at_the_adoption(tmp_path: Path) -> None:
+    stream = account_stream(tmp_path, "usage_limit")
+    adopter = ProcessState(has_stdin=True, account_retry=RETRY)
+    adopter.replay(stream, 5000.0)
+    assert adopter.account is not None
+    assert (adopter.account.since, adopter.account.retries) == (5000.0, 0)
+    assert _decide(adopter, 5059.0, True) is Decision.HOLD
+    assert _decide(adopter, 5060.0, True) is Decision.RETRY
+
+
+def test_the_end_of_the_process_settles_a_wait(tmp_path: Path) -> None:
+    # The CLI ended by itself during the wait: the account error is what ended its last turn.
+    state = _held(tmp_path)
+    state.account_retried(160.0)
+    state.process_ended()
+    assert (state.failed_at, state.lost_tasks, state.account) == (160.0, 1, None)
+    assert state.account_error is not None
+    assert state.account_retries == 1
+    plain = ProcessState(has_stdin=True, account_retry=RETRY)
+    plain.process_ended()
+    assert plain.failed_at is None

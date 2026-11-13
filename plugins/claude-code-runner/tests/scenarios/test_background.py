@@ -161,24 +161,37 @@ async def test_followup_during_a_long_turn_is_answered_without_waiting_for_its_e
 async def test_login_lost_while_background_runs_ends_the_run_with_its_cause(world: World) -> None:
     # FIX-runner-auth-failed-held, as on 2026-11-01: a turn ended and left background work
     # running; the notification turn the CLI started by itself failed because the host's login
-    # was briefly gone. The runner closed stdin, but the CLI kept the process for its work, so
-    # the run stayed "running" and refused the owner's next message until the work ended. Now
-    # the runner stops a process that outlives a failed turn by runner.stop_grace and ends the
-    # run with a cause in the thread; the next message continues the same session.
+    # was gone. The runner closed stdin, but the CLI kept the process for its work, so the run
+    # stayed "running" and refused the owner's next message until the work ended. A process
+    # that outlives a failed turn is therefore stopped runner.stop_grace later and the run ends
+    # with a cause in the thread; the next message continues the same session.
+    # Since FIX-RUNNER-LIMIT-KEEPS-RUN a login that is gone is first tried again (09 18.9): the
+    # end below comes only once runner.account_retry_max_wait has passed without a login.
     job = world.gate("background_gate")  # never opened: the work would outlive the test
     failure = world.gate("background_error_gate")
+    login = world.gate("account_gate")  # never opened: the login stays gone
     world.scenario(
         fixture="plain",
         background_gate=str(job),
         background_error_gate=str(failure),
         background_api_error="not_authenticated",
+        account_gate=str(login),
         background_survives_eof=True,
     )
-    await world.start(world.config(followup_grace="200ms"))
+    await world.start(
+        world.config(
+            followup_grace="200ms",
+            account_retry_first="200ms",
+            account_retry_second="200ms",
+            account_retry_interval="200ms",
+            account_retry_max_wait="1s",
+        )
+    )
     run = await world.fake.trigger("Run the suite", channel_id=world.forum_a)
     await world.until(lambda: texts(world) == ["Done."])
     world.release(failure)
     await world.until(lambda: world.calls("eof_with_background"))  # stdin closed, work runs on
+    assert world.calls("account_refused")  # the turn was tried again while the login was gone
     message_id = await world.fake.deliver_followup(run.run_id, "Any news?", author="alex")
     # The owner never waits for the background work: the run ends without the job's end.
     assert await world.ended(run.run_id) == "failed"
@@ -187,9 +200,11 @@ async def test_login_lost_while_background_runs_ends_the_run_with_its_cause(worl
     view = world.fake.run_state(run.run_id)
     assert view.state_reason == "runtime_not_authenticated"
     summary = world.fake.run(run.run_id)["summary"]
-    assert "lost its login" in summary
+    assert "Claude Code is not logged in" in summary
+    assert "tried the turn again" in summary
     assert "1 background task was still running" in summary
     assert "lost" in summary
+    assert "Once the login works again" in summary
     assert summary.endswith("(`runtime_not_authenticated`)")
     # The follow-up was not taken by the failed process: it stays queued, and the server
     # defers it into a new run of the thread (09 section 7).

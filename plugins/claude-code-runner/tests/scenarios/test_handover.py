@@ -264,7 +264,7 @@ async def test_error_result_before_the_checkpoint_stops_after_the_grace(
         stop_grace="3s",
         scenario={
             "background_error_gate": str(error_gate),
-            "background_api_error": "not_authenticated",
+            "background_api_error": "server_error",
         },
     )
     world.release(error_gate)
@@ -293,7 +293,7 @@ async def test_a_turn_with_stdin_closed_is_adopted_with_reading_rights_only(
         stop_grace="30s",
         scenario={
             "background_error_gate": str(error_gate),
-            "background_api_error": "not_authenticated",
+            "background_api_error": "server_error",
         },
     )
     world.release(error_gate)
@@ -308,6 +308,49 @@ async def test_a_turn_with_stdin_closed_is_adopted_with_reading_rights_only(
     assert runner.handler.adopted_run(run_id) is None
     await world.fake.cancel(run_id, "user_cancelled")  # ends the turn before the teardown
     assert await world.ended(run_id) == "cancelled"
+
+
+async def test_a_wait_for_the_account_survives_the_handover(world: World) -> None:
+    # FIX-RUNNER-LIMIT-KEEPS-RUN (09 18.9): a turn ended with an account error while the job
+    # runs, so the first runner keeps the process and waits; it never comes to a retry. The
+    # adopter finds the same error in the stream, waits again from the adoption, shows it and
+    # writes the retry line, which the account answers by then.
+    error_gate = world.gate("background_error_gate")
+    account = world.gate("account_gate")
+    first, run_id, job = await job_turn(
+        world,
+        followup_grace="300ms",
+        account_retry_first=f"{int(100 * PATIENCE)}s",
+        scenario={
+            "background_error_gate": str(error_gate),
+            "background_api_error": "usage_limit",
+            "account_gate": str(account),
+        },
+    )
+
+    def waiting() -> bool:
+        line = str(world.fake.run(run_id).get("status_line", ""))
+        return line.startswith("Waiting for the Claude Code account: the usage limit")
+
+    world.release(error_gate)
+    await world.until(waiting)
+    assert record(world, run_id).get("stdin_closed") is not True
+    assert await hand_over(world, first) == HANDOVER_EXIT
+    assert world.calls("stdin_eof") == []
+    assert world.state_of(run_id) == "running"
+    world.release(account)  # the account works again while no runner is there
+    await world.start(
+        world.config(turn_handover=True, followup_grace="300ms", account_retry_first="300ms")
+    )
+    await world.until(lambda: len(texts(world)) == 2)
+    assert texts(world)[1] == "Status: the background job is still running."
+    await world.until(lambda: "status_line" not in world.fake.run(run_id))
+    assert world.calls("background_killed") == []
+    assert world.calls("stdin_eof") == []
+    world.release(job)
+    assert await world.ended(run_id) == "completed"
+    assert texts(world)[2] == "The suite passed."
+    assert len(world.turns()) == 1
 
 
 # ---- AR-T03 -------------------------------------------------------------------------------------

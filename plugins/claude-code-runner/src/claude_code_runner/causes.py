@@ -5,6 +5,8 @@ Every refusal of the runner names its cause in the ``summary`` of ``finishRun``,
 shows with the reason in the thread, so a person never sees a bare "Error in the adapter". A
 text names the cause, what to do, and the log code in backticks at the end; it never carries a
 value of the host (a path, a user or a model name), only codes and configuration key names.
+The one value a text may carry is the reset time of a usage limit, which the CLI names and a
+person needs (`turn_end_cause`).
 
 A run its turn completed carries ``run_ended_idle``: its process ended, so nothing waits on the
 thread any more and only a new message continues it; an orderly stop of the runner names the
@@ -16,6 +18,11 @@ Examples:
 """
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from claude_code_runner.account import AccountEnd
 
 __all__ = [
     "ADAPTER_STOPPED",
@@ -235,18 +242,45 @@ def adapter_stopped_cause(lost_tasks: int) -> str:
 
 _LOGIN_LOST = "Claude Code lost its login on the runner host during this run, so the run ended."
 _NEXT = "your next message starts a new run that continues the same session"
+_ACCOUNT = "Claude Code could not use its account on the runner host"
+_NOTHING_KEPT = (
+    "This session had no background work to keep, so the run ended at once instead of waiting "
+    "and trying again."
+)
 
 
-def turn_end_cause(reason: str, lost_tasks: int) -> str | None:
+def _retried_sentence(retries: int) -> str:
+    """The sentence about the retries of a wait for the account that ended without an answer."""
+    times = "1 time" if retries == 1 else f"{retries} times"
+    return (
+        f"The runner kept the session and tried the turn again {times} "
+        "(runner.account_retry_max_wait bounds that wait) before the run ended."
+    )
+
+
+def _account_sentences(account: AccountEnd) -> list[str]:
+    """What the account error was and what the runner did about it."""
+    parts = [f"{_ACCOUNT}: {account.error.describe()}."]
+    if account.retries is not None:
+        parts.append(_retried_sentence(account.retries))
+    elif not account.held:
+        parts.append(_NOTHING_KEPT)
+    return parts
+
+
+def turn_end_cause(reason: str, lost_tasks: int, account: AccountEnd | None = None) -> str | None:
     """The summary of a run that a turn process ended with ``reason`` (FIX-runner-auth-failed-held).
 
     A lost login at a turn names what happened and what the next message does; background
     tasks that were still running when the process ended are named as lost, because they end
-    with it and nothing reports their result.
+    with it and nothing reports their result. A turn that ended with an account error names
+    the class of the error, the reset time when the CLI gave one, and whether the runner had
+    tried the turn again (09 18.9, FIX-RUNNER-LIMIT-KEEPS-RUN); never a name of the account.
 
     Args:
         reason: The run's ``failed`` reason.
         lost_tasks: How many background tasks of the session were still running.
+        account: The account error the failed turn ended with, if it was one.
 
     Returns:
         The text with the reason in backticks at the end, or ``None`` when there is nothing to
@@ -259,7 +293,9 @@ def turn_end_cause(reason: str, lost_tasks: int) -> str | None:
         True
     """
     parts: list[str] = []
-    if reason == "runtime_not_authenticated":
+    if account is not None:
+        parts += _account_sentences(account)
+    elif reason == "runtime_not_authenticated":
         parts.append(_LOGIN_LOST)
     lost = _lost_sentence(lost_tasks)
     if lost is not None:
