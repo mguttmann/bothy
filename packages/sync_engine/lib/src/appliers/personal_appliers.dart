@@ -4,6 +4,8 @@
 /// (`updated_by_device_id`) is ignored, the read state only increases (`mergeReadState`) and
 /// sets the counters from the payload, a draft being typed on this device keeps its local text,
 /// settings, sidebar (spaces and channels), notification preferences and quiet hours apply per row by version.
+/// The answer to an empty draft write stores no row: the server deleted the draft
+/// (docs/decisions.d/FIX-COMPOSER-DRAFT-LOST.md).
 library;
 
 import 'package:domain/domain.dart';
@@ -138,10 +140,23 @@ Future<void> _quietHours(ApplyContext c) async {
   }
 }
 
-/// Stores the answer of `putThreadDraft` (API `DraftPutResult`) of the app's write path and
-/// emits [DraftOverwritten] when the server reports `overwrote_newer` (04 14).
+/// Stores the answer of `putThreadDraft` or `putChannelDraft` (API `DraftPutResult`) of the
+/// app's write path and emits [DraftOverwritten] when the server reports `overwrote_newer`
+/// (04 14).
+///
+/// The answer to an empty draft is the empty final state of a draft the server deleted, so it
+/// is no row: the stored draft of the target ends, up to the time of the answer, and a draft
+/// another device wrote after it stays (docs/decisions.d/FIX-COMPOSER-DRAFT-LOST.md).
 Future<void> storeDraftPutResult(SyncContext sync, Json result) async {
   final draft = draftFromJson(obj(result, 'draft'));
-  await sync.db.personalDao.upsertDraftIfNewer(draft);
+  if (draft.contentMd.trim().isEmpty && draft.fileIds.isEmpty) {
+    await sync.db.personalDao.endDraft(
+      channelId: draft.channelId,
+      threadId: draft.threadId,
+      until: draft.updatedAt,
+    );
+  } else {
+    await sync.db.personalDao.upsertDraftIfNewer(draft);
+  }
   if (flag(result, 'overwrote_newer')) sync.notify(DraftOverwritten(draft));
 }

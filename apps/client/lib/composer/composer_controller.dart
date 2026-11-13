@@ -265,6 +265,8 @@ final class ComposerController extends ChangeNotifier {
     // An own write that is not confirmed is newer than any stored draft; its answer, which can
     // arrive after a send, must not bring the sent text back.
     if (await _drafts.hasUnsent() || call != _applyCalls || _typingNow) return;
+    // A quick switch closed this composer while it read the outbox; the next one takes over.
+    if (_closed) return;
     // Nothing unconfirmed and nobody typing: the stored draft, own or not, is the text (a
     // composer opened again shows the draft this device saved).
     final next = draft?.contentMd ?? '';
@@ -276,6 +278,9 @@ final class ComposerController extends ChangeNotifier {
   }
 
   int _applyCalls = 0;
+
+  /// Whether [dispose] ran: what [applyStored] or [restoreUnsent] read meanwhile is dropped.
+  bool _closed = false;
 
   bool _isOwn(Draft draft) {
     final own = deviceId;
@@ -289,7 +294,7 @@ final class ComposerController extends ChangeNotifier {
   /// opened again, or the app started again while offline, 04 13); the stored draft is older.
   Future<void> restoreUnsent() async {
     final unsent = await _drafts.restore();
-    if (unsent == null || _typingNow || unsent == text.text) return;
+    if (_closed || unsent == null || _typingNow || unsent == text.text) return;
     _setText(unsent);
     notifyListeners();
   }
@@ -449,6 +454,7 @@ final class ComposerController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _closed = true;
     _editing.setEditing(channel, thread, editing: false);
     text.dispose();
     super.dispose();

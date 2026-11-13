@@ -186,8 +186,8 @@ through the `Fetcher` instead.
 | `user.updated` | `principals` | seq |
 | `agent.updated` | `agents`, `principals` | version |
 | `read_state.updated` | `read_states` (`mergeReadState`), counters | version of the read state |
-| `draft.updated` | `drafts` (not the echo of this device, not while typed here) | version |
-| `draft.deleted` | `drafts` (not while typed here) | seq |
+| `draft.updated` | `drafts` (not the echo of this device, not while typed here); one row per thread and per forum: a draft with another ID replaces the stored one of its target unless that one was written later (FIX-COMPOSER-DRAFT-LOST) | version under one ID, `updated_at` across IDs |
+| `draft.deleted` | `drafts` (not while typed here), with the older drafts of its thread or forum | seq |
 | `settings.updated` | `user_settings` (`deleted: true` removes the key) | version of the setting |
 | `sidebar.updated` | `user_space_states` (`channel_order` included, M4-51; not the echo of this device) | version of the state |
 | `sidebar_channel.updated` | `user_channel_states` (the own thread order of a channel, M4-51, and its personal archive `hidden_at`, PROJ-ARCHIVE; not the echo of this device) | version of the state |
@@ -228,7 +228,8 @@ these sets equal to the catalogue.
 | `onEcho`, `onRunUpdated`, `onLive` | outbox (M4-15), `RunStore.onRunUpdated` (M4-16), outbox start | recorders |
 
 Notices on `notices`: `TargetsRemoved`, `DraftOverwritten` (from `applyDraftPutResult`, the
-answer of `putThreadDraft`), `Resynced`, `SignedOutNotice`. Counters: `countsOf(threadId)` and
+answer of `putThreadDraft` or `putChannelDraft`; the answer to an empty draft stores no row and
+ends the stored draft of its target), `Resynced`, `SignedOutNotice`. Counters: `countsOf(threadId)` and
 `countChanges`, reset from each snapshot and `read_state.updated`, counted from `message.*` in
 between (04 14).
 

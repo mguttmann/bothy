@@ -498,4 +498,46 @@ void main() {
       await host.dispose(tester);
     },
   );
+  // FIX-COMPOSER-DRAFT-LOST: a quick switch closes the composer while it reads the outbox for
+  // the stored draft or for an unsent write; the closed composer sets no text.
+  testWidgets('a composer closed while it takes the stored draft or an unsent '
+      'write sets no text', (tester) async {
+    final host = await open(tester);
+    ComposerController composer() => ComposerController(
+      thread: threadId(1),
+      channel: channelId(1),
+      actions: ThreadActions(host.engine),
+      drafts: DraftWriter(
+        outbox: host.engine.outbox,
+        dao: host.db.outboxDao,
+        thread: threadId(1),
+      ),
+      editing: DraftEditingRegistry(),
+    );
+    await host.run(tester, () async {
+      final stored = composer();
+      final applying = stored.applyStored(
+        Draft(
+          id: DraftId.parse(uuid(0xd6)),
+          threadId: threadId(1),
+          channelId: channelId(1),
+          contentMd: 'Stored draft',
+          fileIds: const [],
+          version: const ResourceVersion(1),
+        ),
+      );
+      stored.dispose();
+      await applying;
+    });
+    // An unsent draft write, as a composer of this thread left it.
+    await type(tester, host, 'Typed and left');
+    await host.run(tester, () async {
+      final unsent = composer();
+      final restoring = unsent.restoreUnsent();
+      unsent.dispose();
+      await restoring;
+    });
+    expect(tester.takeException(), isNull);
+    await host.dispose(tester);
+  });
 }
