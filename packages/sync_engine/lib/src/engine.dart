@@ -177,7 +177,7 @@ final class SyncEngine {
     late final EngineFocus focus;
     catchUp = CatchUpListener(
       db: store,
-      fetcher: ApiFetcher(api),
+      fetcher: ApiFetcher(api, readTimeout: config.syncReadTimeout),
       config: config,
       clock: time,
       identity: AuthIdentity(auth),

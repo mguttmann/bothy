@@ -1,0 +1,313 @@
+{
+  "rule": "read_state_advance",
+  "summary": "putReadState only moves the read position forward, inside the messages of the thread, and writes an event only for a change (04 section 14, R-SY-13)",
+  "events": [
+    "read_state.updated"
+  ],
+  "event_fields": [
+    "/audience",
+    "/resource/kind",
+    "/resource/id",
+    "/resource/version",
+    "/payload/read_state/thread_id",
+    "/payload/read_state/last_read_seq",
+    "/payload/read_state/version"
+  ],
+  "steps": [
+    {
+      "name": "sam posts message 1",
+      "as": "sam",
+      "method": "POST",
+      "path": "/threads/{thread}/messages",
+      "body": {
+        "client_msg_id": "{uuid:m1}",
+        "content_md": "one"
+      }
+    },
+    {
+      "name": "sam posts message 2",
+      "as": "sam",
+      "method": "POST",
+      "path": "/threads/{thread}/messages",
+      "body": {
+        "client_msg_id": "{uuid:m2}",
+        "content_md": "two"
+      }
+    },
+    {
+      "name": "sam posts message 3",
+      "as": "sam",
+      "method": "POST",
+      "path": "/threads/{thread}/messages",
+      "body": {
+        "client_msg_id": "{uuid:m3}",
+        "content_md": "three"
+      }
+    },
+    {
+      "name": "position zero on a thread never read answers the empty state",
+      "as": "alex",
+      "method": "PUT",
+      "path": "/threads/{thread}/read-state",
+      "body": {
+        "last_read_seq": 0
+      },
+      "observe": {
+        "body": [
+          "/thread_id",
+          "/channel_id",
+          "/last_read_seq",
+          "/version"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "/channel_id": "{channel}",
+          "/last_read_seq": 0,
+          "/thread_id": "{thread}",
+          "/version": 0
+        },
+        "events": []
+      }
+    },
+    {
+      "name": "alex reads up to the second message",
+      "as": "alex",
+      "method": "PUT",
+      "path": "/threads/{thread}/read-state",
+      "body": {
+        "last_read_seq": 2
+      },
+      "observe": {
+        "body": [
+          "/thread_id",
+          "/channel_id",
+          "/last_read_seq",
+          "/version"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "/channel_id": "{channel}",
+          "/last_read_seq": 2,
+          "/thread_id": "{thread}",
+          "/version": 1
+        },
+        "events": [
+          {
+            "/audience": "self",
+            "/payload/read_state/last_read_seq": 2,
+            "/payload/read_state/thread_id": "{thread}",
+            "/payload/read_state/version": 1,
+            "/resource/id": "{thread}",
+            "/resource/kind": "thread",
+            "type": "read_state.updated"
+          }
+        ]
+      }
+    },
+    {
+      "name": "an older position changes nothing",
+      "as": "alex",
+      "method": "PUT",
+      "path": "/threads/{thread}/read-state",
+      "body": {
+        "last_read_seq": 1
+      },
+      "observe": {
+        "body": [
+          "/thread_id",
+          "/channel_id",
+          "/last_read_seq",
+          "/version"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "/channel_id": "{channel}",
+          "/last_read_seq": 2,
+          "/thread_id": "{thread}",
+          "/version": 1
+        },
+        "events": []
+      }
+    },
+    {
+      "name": "the same position changes nothing",
+      "as": "alex",
+      "method": "PUT",
+      "path": "/threads/{thread}/read-state",
+      "body": {
+        "last_read_seq": 2
+      },
+      "observe": {
+        "body": [
+          "/thread_id",
+          "/channel_id",
+          "/last_read_seq",
+          "/version"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "/channel_id": "{channel}",
+          "/last_read_seq": 2,
+          "/thread_id": "{thread}",
+          "/version": 1
+        },
+        "events": []
+      }
+    },
+    {
+      "name": "position zero changes nothing",
+      "as": "alex",
+      "method": "PUT",
+      "path": "/threads/{thread}/read-state",
+      "body": {
+        "last_read_seq": 0
+      },
+      "observe": {
+        "body": [
+          "/thread_id",
+          "/channel_id",
+          "/last_read_seq",
+          "/version"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "/channel_id": "{channel}",
+          "/last_read_seq": 2,
+          "/thread_id": "{thread}",
+          "/version": 1
+        },
+        "events": []
+      }
+    },
+    {
+      "name": "a position after the last message is refused",
+      "as": "alex",
+      "method": "PUT",
+      "path": "/threads/{thread}/read-state",
+      "body": {
+        "last_read_seq": 4
+      },
+      "observe": {
+        "body": [
+          "/thread_id",
+          "/channel_id",
+          "/last_read_seq",
+          "/version"
+        ]
+      },
+      "expect": {
+        "status": 400,
+        "problem": {
+          "code": "validation_failed",
+          "errors": [
+            {
+              "pointer": "/last_read_seq",
+              "code": "out_of_range"
+            }
+          ]
+        },
+        "events": []
+      }
+    },
+    {
+      "name": "a negative position is refused",
+      "as": "alex",
+      "method": "PUT",
+      "path": "/threads/{thread}/read-state",
+      "body": {
+        "last_read_seq": -1
+      },
+      "observe": {
+        "body": [
+          "/thread_id",
+          "/channel_id",
+          "/last_read_seq",
+          "/version"
+        ]
+      },
+      "expect": {
+        "status": 400,
+        "problem": {
+          "code": "validation_failed",
+          "errors": [
+            {
+              "pointer": "/last_read_seq",
+              "code": "too_small"
+            }
+          ]
+        },
+        "events": []
+      }
+    },
+    {
+      "name": "alex reads to the end",
+      "as": "alex",
+      "method": "PUT",
+      "path": "/threads/{thread}/read-state",
+      "body": {
+        "last_read_seq": 3
+      },
+      "observe": {
+        "body": [
+          "/thread_id",
+          "/channel_id",
+          "/last_read_seq",
+          "/version"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "/channel_id": "{channel}",
+          "/last_read_seq": 3,
+          "/thread_id": "{thread}",
+          "/version": 2
+        },
+        "events": [
+          {
+            "/audience": "self",
+            "/payload/read_state/last_read_seq": 3,
+            "/payload/read_state/thread_id": "{thread}",
+            "/payload/read_state/version": 2,
+            "/resource/id": "{thread}",
+            "/resource/kind": "thread",
+            "type": "read_state.updated"
+          }
+        ]
+      }
+    },
+    {
+      "name": "the list of read states shows the position",
+      "as": "alex",
+      "method": "GET",
+      "path": "/me/read-states?channel_id={channel}",
+      "observe": {
+        "body": [
+          "/items/0/thread_id",
+          "/items/0/last_read_seq",
+          "/items/0/version",
+          "/items/1"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "/items/0/last_read_seq": 3,
+          "/items/0/thread_id": "{thread}",
+          "/items/0/version": 2
+        },
+        "events": []
+      }
+    }
+  ]
+}

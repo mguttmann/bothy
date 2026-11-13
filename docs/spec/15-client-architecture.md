@@ -412,7 +412,14 @@ connected as long as the app runs.
    transaction as the page. A gateway page is the run of `dispatch` frames up to the
    next `cursor` frame or `catchup.complete`; it is applied with the cursor of that frame
    (D-M4-14-1). An event whose type has no local table (for example `host.updated` before M4-36)
-   or that the client does not know advances the cursor and is skipped (04 6.1).
+   or that the client does not know advances the cursor and is skipped (04 6.1). A page whose
+   transaction fails leaves rows and cursor as they were; the client applies nothing more of
+   that connection, closes it and connects again after a wait of the reconnect backoff
+   (`sync.reconnect_backoff_*`, counted over failed commits until one works), so the state is
+   `Backoff` and the next connection repeats the page from the stored cursor. A page that fails
+   again at the same cursor is passed by a snapshot as in item 2, on the connection that
+   delivered it. A snapshot of `ready` or of item 2 that cannot be stored reconnects the same
+   way (AUD-pkg-sync-engine-01).
 2. On `resync_required`: empty the mirror tables (not the outbox, drafts, share inbox),
    `GET /api/v1/sync/snapshot`, cursor to `head_seq`, reload open threads. The connection
    stays open and is live from `head_seq`; no reconnect (04, 7.3). A snapshot that replaces the
@@ -433,6 +440,10 @@ connected as long as the app runs.
    stored space or channel without a level on a connection from the cursor, the client loads the
    view through REST (`getSpace` with `listSpaceChannels`, `getChannel`) and stores its access
    (FIX-access-on-created).
+7. Every REST read of the engine (`Fetcher`) has the deadline `client.sync.read_timeout`; a
+   read that passes it fails like a network error and is retried like one. The snapshot of
+   item 2 is loaded outside the order of the frames, so the end of the connection is handled
+   while a read is on its way (AUD-pkg-sync-engine-01).
 
 ### 7.4 Live box
 
@@ -1335,6 +1346,7 @@ it runs on and marks in its summary whether that is a reference device of sectio
 | `client.cache_max_bytes` | `1GiB` | upper limit for the local database plus file cache; above it the oldest entries are removed |
 | `client.sync.parse_offload_bytes` | `262144` | from this page size on, decoding happens in the background isolate |
 | `client.sync.connect_timeout` | `30s` | deadline of one connection attempt from its start in `Connecting`, before the socket opens, to `ready` or `resumed`; it also covers a connect that never completes; when it passes, the attempt ends and the backoff applies (7.2) |
+| `client.sync.read_timeout` | `30s` | deadline of one REST read of the sync engine (`Fetcher`): the connect, the sending and each wait for data of the answer may take this long; when it passes, the read fails like a network error and is retried like one (7.3) |
 | `client.outbox_stuck_after` | `2m` | from then on a waiting entry shows "Sending delayed" |
 | `client.push.fetch_timeout` | `20s` | time that the NSE or the Android service uses to fetch the text |
 | `client.voice.bitrate` | `64kbps` | bitrate of the AAC recording |

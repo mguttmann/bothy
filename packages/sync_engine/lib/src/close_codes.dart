@@ -69,7 +69,8 @@ final class CloseReaction {
   /// Whether the code is not expected by a person's client (`4015` is for agents only).
   final bool unexpected;
 
-  /// The wait the server named in the close reason (`4008`), replacing the jitter.
+  /// The wait that replaces the jitter: the one the server named in the close reason (`4008`),
+  /// or the one the listener asked for with `SessionControl.reconnect`.
   final Duration? retryAfter;
 }
 

@@ -29,6 +29,7 @@ const List<AppConfigKey> appConfigKeys = <AppConfigKey>[
   AppConfigKey('client.status_poll_interval', 'App', AppConfigKind.duration, '30s'),
   AppConfigKey('client.sync.connect_timeout', 'App', AppConfigKind.duration, '30s'),
   AppConfigKey('client.sync.parse_offload_bytes', 'App', AppConfigKind.integer, '262144'),
+  AppConfigKey('client.sync.read_timeout', 'App', AppConfigKind.duration, '30s'),
   AppConfigKey('client.terminal.font_size_default', 'App', AppConfigKind.integer, '14'),
   AppConfigKey('client.terminal.scrollback_lines', 'App', AppConfigKind.integer, '10000'),
   AppConfigKey('client.voice.bitrate', 'App', AppConfigKind.bitRate, '64kbps'),
@@ -131,6 +132,8 @@ extension AppConfigValues on AppConfig {
   Duration get syncConnectTimeout => value<Duration>('client.sync.connect_timeout');
   /// `client.sync.parse_offload_bytes` (integer, default `262144`).
   int get syncParseOffloadBytes => value<int>('client.sync.parse_offload_bytes');
+  /// `client.sync.read_timeout` (duration, default `30s`).
+  Duration get syncReadTimeout => value<Duration>('client.sync.read_timeout');
   /// `client.terminal.font_size_default` (integer, default `14`).
   int get terminalFontSizeDefault => value<int>('client.terminal.font_size_default');
   /// `client.terminal.scrollback_lines` (integer, default `10000`).

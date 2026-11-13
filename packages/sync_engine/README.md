@@ -90,7 +90,9 @@ D-M4-13-2). "Next frame" is the answer to the next `hello`.
 order (the control frames `heartbeat_ack` and `reauth_required` act outside that queue, so a long
 listener step cannot delay them); M4-14 applies the snapshot, catch-up pages, `cursor`, `catchup.complete` and
 `resync_required`, and sets `catchingUp`, `resyncing` or `live` through `SessionControl`,
-which also sends frames and sets `lastProcessedSeq` for the heartbeat. M4-15 (outbox) reads
+which also sends frames, sets `lastProcessedSeq` for the heartbeat and, with `reconnect`, closes
+the connection from the client side and connects again after a wait (a commit that failed,
+AUD-pkg-sync-engine-01). M4-15 (outbox) reads
 `connection.states` to know when the gateway is live. `connection.focus` (`FocusManager`, at
 most `sync.max_focused_threads`, the complete set per frame with `idle`, and from M4-39 the
 background threads of the control room and the run graph in `background_thread_ids` within the
@@ -116,7 +118,15 @@ same limit after the visible ones) and
   `catchup.complete`; it is applied with `SyncStateDao.commitPage` and the cursor of that frame
   (never below the stored one) and the epoch. Pages above `client.sync.parse_offload_bytes`
   decode in a background isolate (`decodeEnvelopes`). A failing page leaves rows and cursor as
-  they were and the listener applies nothing more until the next `ready` or `resumed`.
+  they were; the listener applies nothing more of that session and asks the connection to
+  reconnect (`SessionControl.reconnect`), so the phase is `backoff` and the next session repeats
+  the page from the stored cursor. The waits follow `sync.reconnect_backoff_base` and
+  `sync.reconnect_backoff_cap`, counted over failed commits and started again by a commit that
+  works. A page that fails again at the same cursor (an event that breaks its mapping) is passed
+  by a snapshot: the mirror is replaced as after `resync_required`, on the same connection,
+  with the notice `Resynced` and the reason `page_failed`. A snapshot of `ready` that cannot be
+  mapped or stored, and a resync snapshot that cannot be stored, reconnect the same way
+  (`test/catch_up/page_failure_test.dart`).
 - After `catchup.complete` the phase is `live` and `onLive` runs; every live durable event is its
   own transaction with `cursor = seq`; ephemeral events go to the `EphemeralStore` (typing capped
   at `sync.typing_ttl`, presence seeded from `ready`), raw to `onRunUpdated`, or as a
@@ -131,10 +141,17 @@ same limit after the visible ones) and
   `FileCacheEraser` after the commit (04 8.3 item 3). Frames that
   arrive meanwhile wait and pass the duplicate rule afterwards. When the snapshot cannot be
   loaded, mirror and cursor stay and the snapshot is retried after the reconnect backoff on the
-  same connection. The retry runs outside the frame queue and checks its session after its
-  awaits, so a session that started meanwhile is never set live by it (the follow-up reads of a
-  committed snapshot still run); a drain of held frames of
+  same connection. Every attempt, the first included, runs outside the frame queue, so the
+  close of the socket is handled while a snapshot read is on its way, and checks its session
+  after its awaits, so a session that started meanwhile is never set live by it (the follow-up
+  reads of a committed snapshot still run); a drain of held frames of
   an ended session does not hold the frames of the next one.
+- Every REST read of the engine (`ApiFetcher`) has the deadline `client.sync.read_timeout`
+  (15 22): it goes out as the request option `requestTimeoutExtra` of `auth`, which the DPoP
+  interceptor of the session's client sets as the connect, send and receive timeout. A read
+  without an answer fails like a network error and is retried like one, so it cannot hold the
+  chain of background reads for good (`test/scenarios/read_deadline_test.dart`). Writes of the
+  outbox and `getRun` have no deadline.
 - REST reads after a commit store nothing for a target removed meanwhile (the channel row must
   exist and no removal of the channel, its space or the thread may have happened).
 - `access.changed` stores `permission_version`; `removed` deletes the targets with
@@ -221,7 +238,7 @@ these sets equal to the catalogue.
 
 | Port or hook | Production (M4-17, M4-18, M4-22) | Tests |
 |---|---|---|
-| `Fetcher` | `ApiFetcher` over `api_client` (this package) | `ApiFetcher` on a fake REST adapter with recorded responses |
+| `Fetcher` | `ApiFetcher` over `api_client` (this package) with `client.sync.read_timeout` | `ApiFetcher` on a fake REST adapter with recorded responses |
 | `LocalIdentity` | `AuthIdentity` over the `AuthSession` | `FixedIdentity` |
 | `FileCacheEraser` | the file cache of M4-22 | a recording eraser |
 | `DraftEditing` | the composer of the app | a switch |
@@ -476,7 +493,9 @@ item 2, FIX-TITLE-EDIT-412). Test controls: `addPerson`, `addSpace`, `addChannel
 `getChannel`, `listChannelThreads`, `getThread`, `listThreadMessages`, `getMessage`,
 `createMessage` (04 5.1 replay and `422 idempotency_key_reuse`), `updateMessage` (`If-Match`,
 `412 version_conflict` with `current`, `410 message_deleted`), `deleteMessage` (idempotent
-`204`), `addReaction`, `removeReaction`, `putReadState`, `putThreadDraft`,
+`204`), `addReaction`, `removeReaction`, `putReadState` (forward only, `400 validation_failed`
+outside the messages of the thread, no event without a change; 04 14), `putThreadDraft` (an
+empty draft deletes the stored one with `draft.deleted`),
 `deleteThreadDraft`, `listMyReadStates`, `listMyDrafts`, `listMySettings`, `putMySetting`,
 `deleteMySetting`, `getRun`, `cancelRun`, `retryRun` (09 5.7), `listThreadWakes`,
 `cancelRunWake`, `setChannelAutonomousRuns` (AR-08); since M4-19 also `getMySidebar`,
@@ -638,6 +657,34 @@ above it (the app under test in the macOS app sandbox, M4-18), it uses the copy 
 `ScriptedAgent` whose steps come from an `AgentScript`). `test/scenarios/` runs them over
 `SyncEngine`; M4-18 implements `ScenarioClient` over the app (D-M4-17-5).
 
+### Conformance with the real server
+
+The fake copies rules of the server by hand. A rule with a scenario file in
+`test/fixtures/conformance/` is held equal to the real server
+(docs/decisions.d/AUD-pkg-sync-engine-01.md):
+
+- A file names the requests of one rule (`as`: `alex` or `sam`, method, path below `/api/v1`,
+  body), for each observed step the JSON Pointers into the answer to record (`observe.body`),
+  the event types of the rule (`events`) and the pointers into their envelopes
+  (`event_fields`). A step without `observe` prepares the world and must answer `2xx`.
+  Placeholders: `{alex}`, `{sam}`, `{space}`, `{channel}`, `{thread}` for the IDs of the world
+  (both people with `write` on one text channel and a thread of it) and `{uuid:<name>}` for a
+  UUID that is new in every run and the same for every use of the name.
+- `expect` of a step is what the real server showed: the status, the problem code with its
+  field errors, the picked members and the events of the rule's types the step appended, in
+  order. `TestFakeConformance` of `services/server/test/fakeconformance` records it from the
+  server of the tree and fails when the server answers differently
+  ([README](../../services/server/test/fakeconformance/README.md)).
+- `test/fake_server/conformance_test.dart` sends the same requests to the fake and fails with
+  the steps in which the fake differs.
+
+A new rule, or a rule of the fake that is changed: write the scenario file without `expect`,
+record it with `go test -tags contract_validate ./test/fakeconformance/ -update-conformance` in
+`services/server`, then
+make the fake pass. Held today: `read_state_advance` (`putReadState`, R-SY-13) and
+`thread_draft_put` (`putThreadDraft`). Every other rule below is a copy no test compares with
+the server; the form covers REST requests and durable events, not gateway frames.
+
 ### What the fake simplifies
 
 - Permissions: only visibility and the level per channel; no grants, groups, `manage` or
@@ -746,7 +793,7 @@ above it (the app under test in the macOS app sandbox, M4-18), it uses the copy 
 | `test/catch_up/` | tests of the catch-up on the connection fakes, an in-memory store and recorded REST responses |
 | `test/outbox/` | tests of the outbox on an in-memory database with scripted executors, a fake clock and a seeded jitter |
 | `test/runs/` | tests of the run documents, fixtures of a document at versions 1 to 4 under `fixtures/` |
-| `test/fake_server/` | the fake's own tests: contract, DPoP, idempotency, faults |
+| `test/fake_server/` | the fake's own tests: contract, DPoP, idempotency, faults, and `conformance_test.dart` over the scenario files of `test/fixtures/conformance/`, which the real server records |
 | `test/stats/` | the `stats.live` subscription on the connection fakes (M6-16) |
 | `test/scenarios/` | the scenarios of 04 16 and the wiring of `SyncEngine`, headless against the fake |
 | `test/` | tests, run by `make test` with coverage (`quality.coverage.dart_min_percent`) |

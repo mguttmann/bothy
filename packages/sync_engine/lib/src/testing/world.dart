@@ -1831,8 +1831,55 @@ final class FakeWorld {
   // -------------------------------------------------------------------------------------------
   // Personal state
 
-  /// Sets the read state of [principalId] in [threadId] and appends `read_state.updated`.
+  /// `putReadState`: advances the read position of [principalId] in [threadId] to [lastRead]
+  /// as the server does (04 14, R-SY-13; `Advance` of the server's sync app, held by the
+  /// conformance scenario `read_state_advance`): the position only moves forward. A position
+  /// at or below the stored one changes nothing and answers the current state (position and
+  /// version `0` without one) without an event and without a new version; a greater one is
+  /// stored with the next version and `read_state.updated`. Moving back is [markUnread].
+  ///
+  /// Throws [FakeProblem] `404` for a thread the principal does not see and `400
+  /// validation_failed` (`/last_read_seq`, `out_of_range`) for a position below `0` or after
+  /// the last message of the thread.
   JsonMap putReadState(
+    String principalId,
+    String threadId,
+    int lastRead, {
+    String? deviceId,
+  }) {
+    final thread = visibleThread(principalId, threadId);
+    if (lastRead < 0 || lastRead > (thread['last_message_seq']! as int)) {
+      throw const FakeProblem(
+        400,
+        'validation_failed',
+        errors: [
+          {'pointer': '/last_read_seq', 'code': 'out_of_range'},
+        ],
+      );
+    }
+    final previous = readStates['$principalId|$threadId'];
+    final current = (previous?['last_read_seq'] as int?) ?? 0;
+    if (lastRead <= current) {
+      return {
+        'thread_id': threadId,
+        'channel_id': thread['channel_id'],
+        'version': 0,
+        ...?previous,
+        'last_read_seq': current,
+        // Counted now, never stored (as the server's answer).
+        'mention_count': _mentions(
+          principalId,
+          _unread(principalId, threadId, current),
+        ),
+      };
+    }
+    return setReadState(principalId, threadId, lastRead, deviceId: deviceId);
+  }
+
+  /// Stores [lastRead] as the read position of [principalId] in [threadId], forward or back,
+  /// with the next version, and appends `read_state.updated`: the write behind
+  /// [putReadState] and [markUnread], and the way a test places a read state.
+  JsonMap setReadState(
     String principalId,
     String threadId,
     int lastRead, {
@@ -1866,7 +1913,11 @@ final class FakeWorld {
   }
 
   /// Stores the draft of [principalId] in [threadId] from a `DraftPut` [body]; returns the
-  /// `DraftPutResult` (`overwrote_newer` as [_overwroteNewer], 04 14).
+  /// `DraftPutResult` (`overwrote_newer` as [_overwroteNewer], 04 14). As the server's
+  /// `putDraft` does (held by the conformance scenario `thread_draft_put`), a draft without
+  /// content (only white space) and without `file_ids` deletes the row like [deleteDraft],
+  /// with `draft.deleted` instead of `draft.updated`, and answers the empty final state with
+  /// the last version plus one (1 without a row); a reply target alone keeps no draft.
   JsonMap putDraft(
     String principalId,
     String threadId,
@@ -1878,30 +1929,37 @@ final class FakeWorld {
     final previous = drafts[key];
     final base = body['base_version'] as int?;
     final previousVersion = (previous?['version'] as int?) ?? 0;
+    final content = body['content_md'] as String? ?? '';
+    final files = body['file_ids'] as List<Object?>? ?? <Object?>[];
+    final empty = content.trim().isEmpty && files.isEmpty;
     final draft = <String, Object?>{
       'id': previous?['id'] ?? nextId(),
       'thread_id': threadId,
       'channel_id': thread['channel_id'],
-      'content_md': body['content_md'],
-      'reply_to_message_id': ?body['reply_to_message_id'],
-      'file_ids': body['file_ids'] ?? <Object?>[],
+      'content_md': empty ? '' : content,
+      'reply_to_message_id': ?(empty ? null : body['reply_to_message_id']),
+      'file_ids': empty ? <Object?>[] : files,
       'version': previousVersion + 1,
       'updated_by_device_id': ?deviceId,
       'updated_at': stamp(),
     };
-    drafts[key] = draft;
-    append(
-      'draft.updated',
-      resource: {
-        'kind': 'draft',
-        'id': draft['id'],
-        'version': draft['version'],
-      },
-      scope: _scopeOf(threadId),
-      payload: {'draft': draft},
-      actor: principalId,
-      audience: principalId,
-    );
+    if (empty) {
+      deleteDraft(principalId, threadId);
+    } else {
+      drafts[key] = draft;
+      append(
+        'draft.updated',
+        resource: {
+          'kind': 'draft',
+          'id': draft['id'],
+          'version': draft['version'],
+        },
+        scope: _scopeOf(threadId),
+        payload: {'draft': draft},
+        actor: principalId,
+        audience: principalId,
+      );
+    }
     return {
       'draft': draft,
       'overwrote_newer': _overwroteNewer(previous, base, deviceId, body),
