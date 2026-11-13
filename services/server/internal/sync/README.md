@@ -404,6 +404,9 @@ below the value of 02; the threshold comes from the table of 02 through
   `event_log_resource_idx`) with one of the types and `seq < Before`, `PersonalEvents` the
   events of one audience (index `event_log_audience_seq_idx`) with one of the types and
   `seq > After`. No types read nothing. Rows map onto `Event` exactly as the log tail maps them.
+  `LastPersonalEvent` returns the one newest event of one audience on one resource with one of
+  the types and `seq < Before` (`ORDER BY seq DESC LIMIT 1`), so the previous read of a person in
+  a thread costs one row, however many people read the thread (AUD-srv-notify-01).
 - `ReadPositions` (implemented by `adapters/postgres.PersonalRepository`, constructor
   `NewPersonalRepository`): `PositionsFor(thread, people)` and `PositionsOfUser(person, threads)`
   return `read_states.last_read_seq` with an entry for every requested ID, 0 without a row

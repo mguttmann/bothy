@@ -282,6 +282,9 @@ type options struct {
 	// preview gives the push path the preview builder of M3-22 (withPreview), so
 	// notification.created carries the preview fields.
 	preview bool
+	// defaultFailureLimit leaves push.max_consecutive_failures out of the environment, so the
+	// default of the configuration schema applies (withDefaultFailureLimit).
+	defaultFailureLimit bool
 }
 
 // option changes the variant of a world.
@@ -311,6 +314,12 @@ func withVeto() option {
 // world; the world has no files module, so the builder reads no attachments (noAttachments).
 func withPreview() option {
 	return func(o *options) { o.preview = true }
+}
+
+// withDefaultFailureLimit runs the push path with the default of push.max_consecutive_failures
+// instead of the fixture value of pushEnv (AUD-srv-notify-01).
+func withDefaultFailureLimit() option {
+	return func(o *options) { o.defaultFailureLimit = true }
 }
 
 // withLive wires the push path as role all does (M3-23, desktop_test.go).
@@ -419,7 +428,13 @@ func newEmptyWorld(t *testing.T, o options) *world {
 		acts: map[string]actor.Actor{}, log: capture, pushLog: pushCapture, cancels: &cancelJobs{}, issuer: ids.New(), instanceID: ids.New()}
 	schema, err := wire.ConfigSchema()
 	must(t, err)
-	w.values, err = config.Load(schema, config.Sources{Env: pushEnv})
+	env := pushEnv
+	if o.defaultFailureLimit {
+		env = slices.DeleteFunc(slices.Clone(pushEnv), func(kv string) bool {
+			return strings.HasPrefix(kv, "BOTHY_PUSH__MAX_CONSECUTIVE_FAILURES=")
+		})
+	}
+	w.values, err = config.Load(schema, config.Sources{Env: env})
 	must(t, err)
 	search, err := searchlang.New([]string{"german", "english"}, map[string]string{"de": "german", "en": "english"})
 	must(t, err)

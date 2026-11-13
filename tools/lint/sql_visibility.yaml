@@ -550,6 +550,9 @@ exceptions:
   - query: sync.PersonalEvents
     category: log_tail
     reason: "the badge sync job reads the read_state.updated events of its one person, like the log tail; only thread ids that no longer count leave, and the person is checked as an active human (M3-19 design note 16)"
+  - query: sync.LastPersonalEvent
+    category: log_tail
+    reason: "the consumer push reads the one earlier read_state.updated of the person whose read it handles, for that thread, like the log tail; only the decision to schedule that person's badge sync leaves (M3-19 design note 16, AUD-srv-notify-01)"
   - query: sync.ReadPositionsOfThread
     category: system_job
     reason: "the flush job reads the stored read positions of the people the consumer push selected for one thread; only numbers leave, and the hint is checked with push.deliver (M3-19 design note 9 d)"

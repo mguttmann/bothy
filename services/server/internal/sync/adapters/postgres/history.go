@@ -4,6 +4,9 @@ package postgres
 
 import (
 	"context"
+	"errors"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres/sqlcgen"
@@ -43,6 +46,27 @@ func (r *Repository) PersonalEvents(ctx context.Context, q sync.PersonalQuery) (
 		return nil, err
 	}
 	return toEvents(rows), nil
+}
+
+// LastPersonalEvent implements sync.History (queries/history.sql): the newest retained event
+// with audience q.AudienceID on the resource of q, with one of q.Types and seq below q.Before;
+// found is false when there is none, and no types find nothing. It never authorizes; inside a
+// unit of work it reads the ambient transaction, else the pool.
+func (r *Repository) LastPersonalEvent(ctx context.Context, q sync.PersonalResourceQuery) (sync.Event, bool, error) {
+	if len(q.Types) == 0 {
+		return sync.Event{}, false, nil
+	}
+	row, err := r.queries(ctx).LastPersonalEvent(ctx, sqlcgen.LastPersonalEventParams{
+		AudiencePrincipalID: uuid(q.AudienceID), ResourceKind: q.ResourceKind, ResourceID: uuid(q.ResourceID),
+		Types: q.Types, BeforeSeq: q.Before,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sync.Event{}, false, nil
+	}
+	if err != nil {
+		return sync.Event{}, false, err
+	}
+	return toEvent(row), true, nil
 }
 
 // toEvents maps rows with toEvent, the mapping of the log tail; never nil.

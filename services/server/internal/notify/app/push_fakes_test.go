@@ -125,6 +125,15 @@ type pushWorld struct {
 	publisher *fakePublisher
 	// authzScopes are the request memo and the structure memo of every Authorize call.
 	authzScopes [][2]*authorize.RequestMemo
+	// historyRows counts the events the history handed to the push path.
+	historyRows int
+}
+
+// loaded counts n events the history handed out.
+func (w *pushWorld) loaded(n int) {
+	w.metricsMu.Lock()
+	defer w.metricsMu.Unlock()
+	w.historyRows += n
 }
 
 // agentMessage is one message of an agent in a thread of the fake messaging.
@@ -188,6 +197,15 @@ func (w *pushWorld) push() *app.Push {
 // pushWith builds the push path over the fakes after mod changed its collaborators.
 func (w *pushWorld) pushWith(mod func(*app.PushDeps)) *app.Push {
 	w.t.Helper()
+	p, err := w.newPush(mod)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	return p
+}
+
+// newPush is app.NewPush over the fakes after mod changed its collaborators.
+func (w *pushWorld) newPush(mod func(*app.PushDeps)) (*app.Push, error) {
 	routes := w.liveRoute
 	if routes == nil {
 		routes = &recordRoutes{w: w}
@@ -206,11 +224,7 @@ func (w *pushWorld) pushWith(mod func(*app.PushDeps)) *app.Push {
 	if mod != nil {
 		mod(&deps)
 	}
-	p, err := app.NewPush(w.cfg, deps)
-	if err != nil {
-		w.t.Fatal(err)
-	}
-	return p
+	return app.NewPush(w.cfg, deps)
 }
 
 func (w *pushWorld) presenceView() presence.View {
@@ -350,11 +364,11 @@ func (f pushFacts) QuietRules(_ context.Context, _ []ids.ID) (map[ids.ID][]domai
 	return map[ids.ID][]domain.QuietRule{}, nil
 }
 
-func (f pushFacts) LevelFactsOfUser(_ context.Context, user ids.ID, threads []ids.ID) (map[ids.ID]domain.LevelFacts, error) {
+func (f pushFacts) LevelFactsOfUser(_ context.Context, user ids.ID, threads []chat.ThreadPosition) (map[ids.ID]domain.LevelFacts, error) {
 	f.w.calls.inc("LevelFactsOfUser")
 	out := map[ids.ID]domain.LevelFacts{}
 	for _, t := range threads {
-		out[t] = f.w.levelFacts(user, t)
+		out[t.ThreadID] = f.w.levelFacts(user, t.ThreadID)
 	}
 	return out, nil
 }
@@ -468,6 +482,7 @@ func (p pushPresence) Connections(_ context.Context, users []ids.ID) (map[ids.ID
 type pushHistory struct{ w *pushWorld }
 
 func (h pushHistory) ResourceEvents(_ context.Context, q sync.ResourceQuery) ([]sync.Event, error) {
+	h.w.calls.inc("ResourceEvents")
 	var out []sync.Event
 	for _, ev := range h.w.history {
 		if ev.ResourceKind == q.ResourceKind && ev.ResourceID == q.ResourceID && slices.Contains(q.Types, ev.Type) && ev.Seq < q.Before {
@@ -475,7 +490,24 @@ func (h pushHistory) ResourceEvents(_ context.Context, q sync.ResourceQuery) ([]
 		}
 	}
 	slices.SortFunc(out, func(a, b sync.Event) int { return int(a.Seq - b.Seq) })
+	h.w.loaded(len(out))
 	return out, nil
+}
+
+func (h pushHistory) LastPersonalEvent(_ context.Context, q sync.PersonalResourceQuery) (sync.Event, bool, error) {
+	h.w.calls.inc("LastPersonalEvent")
+	var out sync.Event
+	found := false
+	for _, ev := range h.w.history {
+		if ev.AudiencePrincipalID == q.AudienceID && ev.ResourceKind == q.ResourceKind && ev.ResourceID == q.ResourceID &&
+			slices.Contains(q.Types, ev.Type) && ev.Seq < q.Before && (!found || ev.Seq > out.Seq) {
+			out, found = ev, true
+		}
+	}
+	if found {
+		h.w.loaded(1)
+	}
+	return out, found, nil
 }
 
 func (h pushHistory) PersonalEvents(_ context.Context, q sync.PersonalQuery) ([]sync.Event, error) {
@@ -798,6 +830,8 @@ type testProvider struct {
 	block   chan struct{}
 	running int
 	maxRun  int
+	// during runs while the request is in flight, between step 1 and step 3 of the send.
+	during func()
 }
 
 func (p *testProvider) Name() string { return p.name }
@@ -812,6 +846,9 @@ func (p *testProvider) Send(ctx context.Context, _ app.Registration, n app.Notif
 	p.mu.Unlock()
 	if block != nil {
 		<-block
+	}
+	if p.during != nil {
+		p.during()
 	}
 	p.mu.Lock()
 	p.running--

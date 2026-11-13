@@ -39,6 +39,7 @@ func (b BadgeCounter) For(ctx context.Context, user ids.ID) (int64, error) {
 
 // counting returns the threads that count for the badge of user now.
 func (p *Push) counting(ctx context.Context, user ids.ID) (map[ids.ID]bool, error) {
+	ctx = badgeScope(ctx)
 	scope, err := p.d.Authorizer.Scope(authorize.Filter(ctx), actor.Recheck(user), authorize.ActionPushDeliver)
 	if err != nil {
 		if denied(err) {
@@ -62,6 +63,17 @@ func (p *Push) counting(ctx context.Context, user ids.ID) (map[ids.ID]bool, erro
 		return nil, err
 	}
 	return p.countThreads(ctx, user, cands, scope.ChannelIDs, pos)
+}
+
+// badgeScope returns ctx with one rights version and one read of the facts of a channel for all
+// push.deliver checks of one badge count (13 8; docs/decisions.d/AUD-srv-notify-01.md
+// AUD-SN01/4): the count of the job notify.push_send, of the badge sync and of the preview decides
+// every counted thread of one person at one moment, so the checks share the rights version, as
+// the checks of one request do (authorize.WithRequestScope; the request of the preview keeps the
+// version it already read), and the facts of a channel are read once instead of once per counted
+// thread (authorize.WithStructureScope). The next count gets fresh ones.
+func badgeScope(ctx context.Context) context.Context {
+	return authorize.WithStructureScope(authorize.WithRequestScope(ctx))
 }
 
 // countThreads applies the rule of 13 8 to the candidate threads cands of user at the read
@@ -111,11 +123,11 @@ func pruneFalse(m map[ids.ID]bool) map[ids.ID]bool {
 
 // levelCandidates returns the unread threads that count only by their effective level: neither
 // mentioned nor in a DM channel.
-func levelCandidates(unread []chat.ThreadPosition, mentioned map[ids.ID]bool) []ids.ID {
-	var out []ids.ID
+func levelCandidates(unread []chat.ThreadPosition, mentioned map[ids.ID]bool) []chat.ThreadPosition {
+	var out []chat.ThreadPosition
 	for _, c := range unread {
 		if !mentioned[c.ThreadID] && c.ChannelKind != channelKindDM {
-			out = append(out, c.ThreadID)
+			out = append(out, c)
 		}
 	}
 	return out
@@ -225,25 +237,20 @@ func (p *Push) onReadState(ctx context.Context, ev sync.Event) error {
 }
 
 // previousPosition returns last_read_seq of the newest read_state.updated of user for thread
-// before seq, else 0.
+// before seq, else 0. It reads that one event (sync.History.LastPersonalEvent), never the reads
+// of the other people in the thread (docs/decisions.d/AUD-srv-notify-01.md AUD-SN01/3).
 func (p *Push) previousPosition(ctx context.Context, user, thread ids.ID, seq int64) (int64, error) {
-	events, err := p.d.History.ResourceEvents(ctx, sync.ResourceQuery{
-		ResourceKind: resourceThread, ResourceID: thread, Types: []string{string(authorize.EventReadStateUpdated)}, Before: seq,
+	ev, found, err := p.d.History.LastPersonalEvent(ctx, sync.PersonalResourceQuery{
+		AudienceID: user, ResourceKind: resourceThread, ResourceID: thread, Types: []string{string(authorize.EventReadStateUpdated)}, Before: seq,
 	})
-	if err != nil {
+	if err != nil || !found {
 		return 0, err
 	}
-	for i := len(events) - 1; i >= 0; i-- {
-		if events[i].AudiencePrincipalID != user {
-			continue
-		}
-		var pl readStatePayload
-		if err := decode(events[i], &pl); err != nil {
-			return 0, err
-		}
-		return pl.ReadState.LastReadSeq, nil
+	var pl readStatePayload
+	if err := decode(ev, &pl); err != nil {
+		return 0, err
 	}
-	return 0, nil
+	return pl.ReadState.LastReadSeq, nil
 }
 
 // BadgeSync is the use case of the job notify.badge_sync of user (design note 16 c), in one unit

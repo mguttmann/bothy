@@ -112,7 +112,7 @@ Migration `00059_notify_push_registrations.sql` creates the table exactly as 03 
 - Incoming `PushRegistrations.Active(ctx, userIDs)`: the registrations with `disabled_at IS NULL` of the given people, grouped by person, ascending by `id`, without token. It does not authorize: the callers select the people. M3-22 added `Register`, `Unregister` and `Preview` on the same port.
 - Outgoing ports of `notify/app`: `PushProvider` (`Name`, `Send(ctx, Registration, Notification)`; implemented by `adapters/apns` of M3-20, `adapters/fcm` of M3-21 and `adapters/fakepush`), `LiveRoutes` (the routes `gateway` and `push_delayed`; the default `FailClosedRoutes` returns an internal error, so the round rolls back), `Scheduler` (the jobs of `notify` over `platform/jobs`), `RegistrationStore` (loads a registration with its token, locks and writes its delivery columns, counts the active rows per provider) and `Metrics` (the push signals).
 - `Notification` holds only IDs, the kind, the quiet flag, the count and the badge (`Badge`, `HasBadge`); the badge sync has the kind `KindSync` (`sync`) and carries `Cleared`, the complete list of threads read since the last sync. `InstanceID` is the instance record's ID, passed in by `internal/wire`.
-- Reads of other modules, none of which authorizes: `authz.Recipients.Readers`, `sync.History` (`ResourceEvents`, `PersonalEvents`), `sync.ReadPositions` (`PositionsFor`, `PositionsOfUser`), `messaging.Messages` (`LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`), `messaging.Mentions.CountUnread`, `chat.Threads` (`Info`, `UnreadCandidates`), `identity.Directory` and `identity.Devices.ActiveForUsers`, and the kernel port `presence.View` (until M3-23 `NewPush` falls back to `presence.None`, because `internal/wire` passes no view).
+- Reads of other modules, none of which authorizes: `authz.Recipients.Readers`, `sync.History` (`ResourceEvents`, `PersonalEvents`, `LastPersonalEvent`), `sync.ReadPositions` (`PositionsFor`, `PositionsOfUser`), `messaging.Messages` (`LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`), `messaging.Mentions.CountUnread`, `chat.Threads` (`Info`, `UnreadCandidates`), `identity.Directory` and `identity.Devices.ActiveForUsers`, and the kernel port `presence.View` (until M3-23 `NewPush` falls back to `presence.None`, because `internal/wire` passes no view).
 
 ### Consumer `push`
 
@@ -134,7 +134,7 @@ Only active humans are recipients. The facts of all candidates of one event are 
 
 All five run on the queue `delivery` (02 12.2, 12.3):
 
-- `notify.push_send`: arguments `PushSend` (IDs, the kind as `KindCode` 1 to 9, quiet, count, t0 as `DueAtUnixMicro`, attempt). Step 1 in a transaction: registration, age, rights and provider are checked and the badge is counted; step 2 outside any transaction under `push.max_concurrent_requests`: `PushProvider.Send` inside the span `push.send`; step 3 in a transaction: `domain.ApplyResult` on the locked row and, for a retry, the same job with the next attempt at `domain.RetryDelay`. At least once with one `nid`.
+- `notify.push_send`: arguments `PushSend` (IDs, the kind as `KindCode` 1 to 9, quiet, count, t0 as `DueAtUnixMicro`, attempt). Step 1 in a transaction: registration, age, rights and provider are checked and the badge is counted; step 2 outside any transaction under `push.max_concurrent_requests`: `PushProvider.Send` inside the span `push.send`; step 3 in a transaction: `domain.ApplyResult` on the locked row and, for a retry, the same job with the next attempt at `domain.RetryDelay`. A transient failure counts in `failure_count` and never deactivates the registration unless `push.max_consecutive_failures` is above `0`; a row that was deactivated while the request ran stays as it is and the hint is not retried (13 7.3). At least once with one `nid`.
 - `notify.coalesce_window`: the marker of an open bundling window of (recipient, thread), scheduled at its end; unique per recipient, thread and end, the open window is the latest pending marker; its handler does nothing.
 - `notify.coalesce_flush`: exists exactly when a `message` hint was collected in the window; arguments recipient, thread and the window end, scheduled at the end; it sends one hint with the unread count, pointing at the newest message, or nothing.
 - `notify.badge_sync`: unique per person and time (`UserID` and `at` tagged `river:"unique"`), one waiting per person (the consumer reads the latest pending one; a due one may already run, so a later falling read gets a follow-up after the interval); it waits for a running hold of an earlier sync, then counts the badge, collects `Cleared`, inserts the hold and one `notify.push_send` of kind `sync` per active `apns` or `fcm` registration of an active `ios` or `android` device.
@@ -147,6 +147,8 @@ All five run on the queue `delivery` (02 12.2, 12.3):
 ### Badge
 
 `BadgeCounter.For(ctx, userID)` counts the threads the person can read that are unread and hold an unread mention of the person, have the effective level `all`, or lie in a DM channel (13 8); every counted thread is confirmed with `push.deliver`. `notify.push_send` sets it on every `Notification`; M3-22 calls it for the preview. A `read_state.updated` that lowers the number schedules `notify.badge_sync`, at most one per person per `notify.badge_sync_min_interval`.
+
+Cost of one count (docs/decisions.d/AUD-srv-notify-01.md): one read each of the visible channels, the candidate threads, the read positions, the unread mentions, the person's own preference rows and the stored default level, one path read per channel that holds an unread thread without a mention (`Facts.LevelFactsOfUser`), and one `push.deliver` check per counted thread; all checks of a count share one rights version and one read of the facts of a channel (`badgeScope`). The candidate and position reads still grow with the threads of the visible channels (D-M3-19-15). The previous read position of a `read_state.updated` is one event (`sync.History.LastPersonalEvent`), not the reads of every person in the thread.
 
 ### Skip reasons
 
@@ -561,5 +563,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 `adapters/postgres/queries/stats.sql`) serves `getErrorStats`: `PushStats` counts per bucket and
 provider the registrations active in the bucket and those disabled in it for a provider reason
 (`token_invalid`, `topic_mismatch`, `sender_mismatch`, `repeated_failures`; a logout or a revoked
-device is no failure). The registrations have no channel, so the stats use case calls it only for an
+device is no failure). `token_invalid` is also the reason of a registration that a newer token of
+the same app installation replaced (D-M3-22-4), so such a replacement counts here too
+(docs/decisions.d/AUD-srv-notify-01.md). The registrations have no channel, so the stats use case calls it only for an
 owner on the instance; no person, device or token leaves.

@@ -71,9 +71,11 @@ func (w *world) followUps(nid ids.ID, id int64) []pushJob {
 
 // TestPushSend_ProviderResults (13 7.1 to 7.3, brief M3-19 design note 13): through the job
 // notify.push_send with the FakeProvider programmed per result class, the registration columns
-// and the follow-up job follow the table of design note 13; a Retry-After of the provider is
-// respected; a hint whose next retry is past push.max_age is dropped as expired; the token never
-// appears in a captured log.
+// and the follow-up job follow the table of design note 13, on an instance that sets
+// push.max_consecutive_failures above 0 (3 in pushEnv; the default never deactivates,
+// TestPushSend_OutageKeepsRegistration); a Retry-After of the provider is respected; a hint whose
+// next retry is past push.max_age is dropped as expired; the token never appears in a captured
+// log.
 func TestPushSend_ProviderResults(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t)

@@ -33,6 +33,9 @@ type prepared struct {
 //     push.max_concurrent_requests: PushProvider.Send; a Go error counts as a transient failure;
 //  3. in a unit of work: domain.ApplyResult on the registration locked FOR UPDATE and, for a retry
 //     that is not past DueAt + push.max_age, the same job with Attempt + 1 at domain.RetryDelay.
+//     A transient failure never deactivates the registration unless push.max_consecutive_failures
+//     is above 0, and a row that was deactivated while the request ran stays as it is and is not
+//     retried (docs/decisions.d/AUD-srv-notify-01.md AUD-SN01/1 and AUD-SN01/2).
 //
 // A skip ends the job without error. A crash between steps 2 and 3 runs the job again, so a push
 // may reach a device twice with the same nid; the app replaces by thread (at least once, one nid

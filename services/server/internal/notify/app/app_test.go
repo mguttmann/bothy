@@ -55,6 +55,16 @@ func (s *fakeStore) LevelRows(_ context.Context, users []ids.ID, thread, channel
 	return out, nil
 }
 
+func (s *fakeStore) Preferences(_ context.Context, user ids.ID) ([]notify.Preference, error) {
+	var out []notify.Preference
+	for _, r := range s.levelRows {
+		if r.UserID == user {
+			out = append(out, r.Preference)
+		}
+	}
+	return out, nil
+}
+
 func (s *fakeStore) RulesOfUsers(_ context.Context, users []ids.ID) (map[ids.ID][]notify.QuietHoursRule, error) {
 	out := map[ids.ID][]notify.QuietHoursRule{}
 	for _, u := range users {
@@ -77,10 +87,21 @@ type fakePaths struct {
 	path     chat.NotificationPath
 	channels map[ids.ID][]ids.ID
 	threads  map[ids.ID][]ids.ID
+	// channelPaths are the paths of channels (kind channel); threadCalls counts the reads of a
+	// thread path.
+	channelPaths map[ids.ID]chat.NotificationPath
+	threadCalls  int
 }
 
 func (p *fakePaths) NotificationPath(_ context.Context, kind string, id ids.ID) (chat.NotificationPath, error) {
 	p.calls++
+	if kind == chat.TargetChannel {
+		if path, ok := p.channelPaths[id]; ok {
+			return path, nil
+		}
+		return chat.NotificationPath{}, errs.New(errs.CodeNotFound, "")
+	}
+	p.threadCalls++
 	if kind != chat.TargetThread || id != p.path.ThreadID {
 		return chat.NotificationPath{}, errs.New(errs.CodeNotFound, "")
 	}
@@ -235,6 +256,74 @@ func TestLevelFacts_OneQueryForAllCandidates(t *testing.T) {
 	}
 	if _, err := w.svc.Facts().LevelFacts(context.Background(), ids.New(), people); errs.KindOf(err) != errs.KindNotFound {
 		t.Fatalf("unknown thread: %v", err)
+	}
+}
+
+// TestLevelFactsOfUser_OnePathReadPerChannel (findings srv-notify-2 and performance-7,
+// docs/decisions.d/AUD-srv-notify-01.md AUD-SN01/4): the level facts of one person for 3000 unread
+// threads in three channels cost one path read per channel, one read of the person's rows and one
+// settings read, and no read of a thread path. The facts are those of the thread's place: the
+// channel default and the DM flag of its channel, the person's own row of the thread, of its
+// channel and of its space. The threads of a channel that no longer exists are left out.
+func TestLevelFactsOfUser_OnePathReadPerChannel(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t)
+	alex, space := ids.New(), ids.New()
+	text, muted, dm, gone := ids.New(), ids.New(), ids.New(), ids.New()
+	w.paths.channelPaths = map[ids.ID]chat.NotificationPath{
+		text:  {Kind: chat.TargetChannel, SpaceID: space, ChannelID: text, ChannelKind: "text", DefaultNotificationLevel: "all"},
+		muted: {Kind: chat.TargetChannel, SpaceID: space, ChannelID: muted, ChannelKind: "forum", DefaultNotificationLevel: "mute"},
+		dm:    {Kind: chat.TargetChannel, ChannelID: dm, ChannelKind: "dm"},
+	}
+	var threads []chat.ThreadPosition
+	for i := range 3000 {
+		ch := []ids.ID{text, muted, dm}[i%3]
+		threads = append(threads, chat.ThreadPosition{ThreadID: ids.New(), ChannelID: ch, LastMessageSeq: 5})
+	}
+	lost := chat.ThreadPosition{ThreadID: ids.New(), ChannelID: gone, LastMessageSeq: 5}
+	threads = append(threads, lost, chat.ThreadPosition{ThreadID: ids.New(), ChannelID: gone, LastMessageSeq: 5})
+	own, inMuted := threads[0].ThreadID, threads[1].ThreadID
+	until := time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)
+	w.store.levelRows = []app.PreferenceRow{
+		{UserID: alex, Preference: notify.Preference{Target: notify.Target{Kind: "thread", ID: own}, Level: "mute", MutedUntil: until}},
+		{UserID: alex, Preference: notify.Preference{Target: notify.Target{Kind: "channel", ID: muted}, Level: "mentions"}},
+		{UserID: alex, Preference: notify.Preference{Target: notify.Target{Kind: "space", ID: space}, Level: "all"}},
+		{UserID: ids.New(), Preference: notify.Preference{Target: notify.Target{Kind: "channel", ID: text}, Level: "mute"}},
+	}
+	w.settings.vals = map[ids.ID]map[string]json.RawMessage{alex: {"notify.default_level": json.RawMessage(`"all"`)}}
+	facts, err := w.svc.Facts().LevelFactsOfUser(context.Background(), alex, threads)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w.paths.calls != 4 || w.paths.threadCalls != 0 || w.settings.calls != 1 {
+		t.Fatalf("calls: path %d (of a thread %d), settings %d; want one path read per channel (4), none of a thread, one settings read",
+			w.paths.calls, w.paths.threadCalls, w.settings.calls)
+	}
+	if len(facts) != 3000 {
+		t.Fatalf("%d facts, want 3000: the threads of the missing channel are left out", len(facts))
+	}
+	if _, ok := facts[lost.ThreadID]; ok {
+		t.Fatal("a thread of a channel that no longer exists has facts")
+	}
+	f := facts[own]
+	if f.Thread == nil || f.Thread.Level != domain.LevelMute || !f.Thread.MutedUntil.Equal(until) || f.Channel != nil ||
+		f.Space == nil || f.Space.Level != domain.LevelAll {
+		t.Fatalf("facts of the thread with an own row: %+v", f)
+	}
+	if f.ChannelDefault != domain.LevelAll || f.DirectMessage || f.PersonalDefault != domain.LevelAll || f.InstanceDefault != domain.LevelMentions {
+		t.Fatalf("shared facts of a thread in the text channel: %+v", f)
+	}
+	if f := facts[inMuted]; f.Thread != nil || f.Channel == nil || f.Channel.Level != domain.LevelMentions || f.Space == nil ||
+		f.ChannelDefault != domain.LevelMute || f.DirectMessage {
+		t.Fatalf("facts of a thread in the channel with an own row: %+v", f)
+	}
+	if f := facts[threads[2].ThreadID]; !f.DirectMessage || f.Thread != nil || f.Channel != nil || f.Space != nil || f.ChannelDefault != "" {
+		t.Fatalf("facts of a thread in the DM channel: %+v", f)
+	}
+	// No thread, no read at all.
+	before := w.paths.calls
+	if facts, err := w.svc.Facts().LevelFactsOfUser(context.Background(), alex, nil); err != nil || len(facts) != 0 || w.paths.calls != before {
+		t.Fatalf("no threads: %d facts, %v, %d path reads", len(facts), err, w.paths.calls-before)
 	}
 }
 

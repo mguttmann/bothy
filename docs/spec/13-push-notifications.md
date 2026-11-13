@@ -848,9 +848,14 @@ material, the client e-mail, the project ID, an ID of the hint, `error.message`,
 
 ### 7.3 Common
 
-- Transient errors increase `failure_count`. From `push.max_consecutive_failures`
-  ([03-data-model.md](03-data-model.md)) on, the registration is disabled with
-  `repeated_failures`.
+- Transient errors increase `failure_count`, and an accepted push sets it back to `0`. They do
+  not disable a registration: an outage of the provider or of the way to it says nothing about
+  the token, and a disabled registration comes back only when the app registers again, which it
+  does for a new token or a new login. Of the answers to a send, only one about the token
+  disables (7.1, 7.2). `push.max_consecutive_failures` ([03-data-model.md](03-data-model.md)) is `0` by
+  default; an instance that sets it above `0` disables a registration with `repeated_failures`
+  at that many transient failures in a row, and such a registration stays disabled like every
+  other one (docs/decisions.d/AUD-srv-notify-01.md).
 - A notification that has not reached the provider after `push.max_age` is discarded.
   An old notification disturbs more than it helps; the unread counter carries the state.
 - Device revoked (`device.revoke`): all registrations `device_revoked`, immediately.
@@ -878,14 +883,17 @@ classes; the job `notify.push_send` applies the class to the registration row, l
 |---|---|---|---|
 | `accepted` | `last_success_at = now`, `failure_count = 0` | done | `accepted` |
 | `disable` | `disabled_at = now`, `disabled_reason` = `token_invalid`, `topic_mismatch` or `sender_mismatch`; unchanged when the provider names the time since which the token is invalid and the row was created after it (7.1 row `410`) | done | `rejected_token` |
-| `retry` | `failure_count + 1`; at `push.max_consecutive_failures` `disabled_at = now` with `repeated_failures` | retried unless deactivated or past `push.max_age` | `provider_error` |
+| `retry` | `failure_count + 1`; only with `push.max_consecutive_failures` above `0`: at that value `disabled_at = now` with `repeated_failures` | retried unless deactivated or past `push.max_age` | `provider_error` |
 | `throttled` | unchanged (the limit is the server's, not the token's) | retried | `throttled` |
 | `config_error`, `program_error` | unchanged | dropped (a retry cannot help; the adapter raises its alert) | `rejected_other` |
 
 A Go error of the provider call counts as `retry`. The pause before the next attempt is
 `min(push.retry_cap, push.retry_base * 2^(attempt-1))`, scaled by a random factor between 0.5
 and 1 and never below the provider's `Retry-After`; a retry whose time would be later than t0
-plus `push.max_age` is dropped as `expired`.
+plus `push.max_age` is dropped as `expired`. A registration that was disabled while the request
+ran (its session ended, its device was revoked, a newer registration replaced it) is not changed
+by the answer, whatever its class: it keeps its first reason and its time, and the hint is not
+retried; `bothy.outcome` still names the answer (docs/decisions.d/AUD-srv-notify-01.md).
 
 Delivery is at least once with one `nid`. The provider request cannot join a transaction, so the
 job reads and checks in one transaction, calls the provider outside any transaction, and records
@@ -918,7 +926,10 @@ thread confirmed with `authorize(r, push.deliver, thread)` in filter mode) and i
 (`threads.last_message_seq` above the greater of `read_states.last_read_seq`, 0 without a row,
 and `threads.unread_floor_seq`) and it holds an unread mention of r, or its effective level is
 `all`, or it lies in a DM channel. A thread the person cannot read never counts, also when a
-mention of r is stored there.
+mention of r is stored there. As built (docs/decisions.d/AUD-srv-notify-01.md): the level of the
+unread threads without a mention is resolved with one read of the place per channel, not per
+thread, and the checks of one count share one rights version; the reads of the candidate threads
+and of the read positions still grow with the threads of the visible channels.
 
 The sync: the consumer `push` reads every `read_state.updated` of r. The read lowers the number
 exactly when its thread counts at the previous read position of r (the `last_read_seq` of the

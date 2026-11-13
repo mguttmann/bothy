@@ -429,7 +429,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"push.retry_base":                                {Kind: config.KindDuration, Default: "2s", Min: "1ms", Chapter: "13-push-notifications.md"},
 		"push.retry_cap":                                 {Kind: config.KindDuration, Default: "5m", Min: "1ms", Chapter: "13-push-notifications.md"},
 		"push.max_concurrent_requests":                   {Kind: config.KindInt, Default: "32", Min: "1", Max: "100000", Chapter: "13-push-notifications.md"},
-		"push.max_consecutive_failures":                  {Kind: config.KindInt, Default: "5", Min: "1", Max: "100000", Chapter: "03-data-model.md"},
+		"push.max_consecutive_failures":                  {Kind: config.KindInt, Default: "0", Min: "0", Max: "100000", Chapter: "03-data-model.md"},
 		"push.ttl":                                       {Kind: config.KindDuration, Default: "24h", Min: "1s", Max: "672h", Chapter: "13-push-notifications.md"},
 		"push.apns.team_id":                              {Kind: config.KindString, Default: "", Chapter: "13-push-notifications.md"},
 		"push.apns.key_id":                               {Kind: config.KindString, Default: "", Chapter: "13-push-notifications.md"},

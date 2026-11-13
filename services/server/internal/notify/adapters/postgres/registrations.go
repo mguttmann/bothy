@@ -129,7 +129,7 @@ func (r *Registrations) Update(ctx context.Context, id ids.ID, state domain.Regi
 		return err
 	}
 	n, err := q.UpdateRegistrationDelivery(ctx, sqlcgen.UpdateRegistrationDeliveryParams{
-		LastSuccessAt: stamp(state.LastSuccessAt), FailureCount: int32(state.FailureCount), //nolint:gosec // G115: bounded by push.max_consecutive_failures
+		LastSuccessAt: stamp(state.LastSuccessAt), FailureCount: int32(state.FailureCount), //nolint:gosec // G115: domain.ApplyResult stops the count at the largest int32
 		DisabledAt: stamp(state.DisabledAt), DisabledReason: text(state.DisabledReason), ID: uuid(id),
 	})
 	if err != nil {

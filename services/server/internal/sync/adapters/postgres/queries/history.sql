@@ -29,3 +29,21 @@ WHERE audience_principal_id = sqlc.arg(audience_principal_id)::uuid
   AND type = ANY(sqlc.arg(types)::text[])
   AND seq > sqlc.arg(after_seq)::bigint
 ORDER BY seq;
+
+-- name: LastPersonalEvent :one
+-- The newest retained event of one audience on one resource with one of the types and seq below
+-- a bound: one row at most, so a caller that needs the previous event of a person on a resource
+-- never loads the events of every other person on it (index event_log_audience_seq_idx on
+-- (audience_principal_id, seq), or event_log_resource_idx on (resource_kind, resource_id)).
+SELECT seq, id, type, schema_version, occurred_at, actor_kind, actor_principal_id, space_id,
+       channel_id, thread_id, resource_kind, resource_id, resource_version, audience_principal_id,
+       receive_action, payload, truncated, redacted_at, correlation_id, trace_context,
+       client_msg_id, permission_version
+FROM event_log
+WHERE audience_principal_id = sqlc.arg(audience_principal_id)::uuid
+  AND resource_kind = sqlc.arg(resource_kind)::text
+  AND resource_id = sqlc.arg(resource_id)::uuid
+  AND type = ANY(sqlc.arg(types)::text[])
+  AND seq < sqlc.arg(before_seq)::bigint
+ORDER BY seq DESC
+LIMIT 1;

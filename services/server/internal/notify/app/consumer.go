@@ -10,6 +10,7 @@ import (
 	stdsync "sync"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
@@ -42,7 +43,8 @@ type PushConfig struct {
 	RetryCap  time.Duration `config:"push.retry_cap"`
 	// MaxConcurrentRequests is push.max_concurrent_requests per process (13 12 point 5).
 	MaxConcurrentRequests int `config:"push.max_concurrent_requests"`
-	// MaxConsecutiveFailures is push.max_consecutive_failures (03 section 9, 13 7.3).
+	// MaxConsecutiveFailures is push.max_consecutive_failures (03 section 9, 13 7.3): 0, the
+	// default, never deactivates a registration for transient failures.
 	MaxConsecutiveFailures int `config:"push.max_consecutive_failures"`
 }
 
@@ -57,8 +59,8 @@ func (c PushConfig) validate() error {
 		return errors.New("notify: push.retry_base must be positive and push.retry_cap at least push.retry_base")
 	case c.MaxConcurrentRequests < 1:
 		return errors.New("notify: push.max_concurrent_requests must be at least 1")
-	case c.MaxConsecutiveFailures < 1:
-		return errors.New("notify: push.max_consecutive_failures must be at least 1")
+	case c.MaxConsecutiveFailures < 0:
+		return errors.New("notify: push.max_consecutive_failures must not be negative")
 	}
 	return nil
 }
@@ -67,7 +69,7 @@ func (c PushConfig) validate() error {
 type FactsSource interface {
 	LevelFacts(ctx context.Context, threadID ids.ID, userIDs []ids.ID) (map[ids.ID]domain.LevelFacts, error)
 	QuietRules(ctx context.Context, userIDs []ids.ID) (map[ids.ID][]domain.QuietRule, error)
-	LevelFactsOfUser(ctx context.Context, userID ids.ID, threadIDs []ids.ID) (map[ids.ID]domain.LevelFacts, error)
+	LevelFactsOfUser(ctx context.Context, userID ids.ID, threads []chat.ThreadPosition) (map[ids.ID]domain.LevelFacts, error)
 }
 
 // PushDeps are the collaborators of the push path.

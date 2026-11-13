@@ -11,6 +11,69 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const lastPersonalEvent = `-- name: LastPersonalEvent :one
+SELECT seq, id, type, schema_version, occurred_at, actor_kind, actor_principal_id, space_id,
+       channel_id, thread_id, resource_kind, resource_id, resource_version, audience_principal_id,
+       receive_action, payload, truncated, redacted_at, correlation_id, trace_context,
+       client_msg_id, permission_version
+FROM event_log
+WHERE audience_principal_id = $1::uuid
+  AND resource_kind = $2::text
+  AND resource_id = $3::uuid
+  AND type = ANY($4::text[])
+  AND seq < $5::bigint
+ORDER BY seq DESC
+LIMIT 1
+`
+
+type LastPersonalEventParams struct {
+	AudiencePrincipalID pgtype.UUID
+	ResourceKind        string
+	ResourceID          pgtype.UUID
+	Types               []string
+	BeforeSeq           int64
+}
+
+// The newest retained event of one audience on one resource with one of the types and seq below
+// a bound: one row at most, so a caller that needs the previous event of a person on a resource
+// never loads the events of every other person on it (index event_log_audience_seq_idx on
+// (audience_principal_id, seq), or event_log_resource_idx on (resource_kind, resource_id)).
+func (q *Queries) LastPersonalEvent(ctx context.Context, arg LastPersonalEventParams) (EventLog, error) {
+	row := q.db.QueryRow(ctx, lastPersonalEvent,
+		arg.AudiencePrincipalID,
+		arg.ResourceKind,
+		arg.ResourceID,
+		arg.Types,
+		arg.BeforeSeq,
+	)
+	var i EventLog
+	err := row.Scan(
+		&i.Seq,
+		&i.ID,
+		&i.Type,
+		&i.SchemaVersion,
+		&i.OccurredAt,
+		&i.ActorKind,
+		&i.ActorPrincipalID,
+		&i.SpaceID,
+		&i.ChannelID,
+		&i.ThreadID,
+		&i.ResourceKind,
+		&i.ResourceID,
+		&i.ResourceVersion,
+		&i.AudiencePrincipalID,
+		&i.ReceiveAction,
+		&i.Payload,
+		&i.Truncated,
+		&i.RedactedAt,
+		&i.CorrelationID,
+		&i.TraceContext,
+		&i.ClientMsgID,
+		&i.PermissionVersion,
+	)
+	return i, err
+}
+
 const personalEvents = `-- name: PersonalEvents :many
 SELECT seq, id, type, schema_version, occurred_at, actor_kind, actor_principal_id, space_id,
        channel_id, thread_id, resource_kind, resource_id, resource_version, audience_principal_id,
