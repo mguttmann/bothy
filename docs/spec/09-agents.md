@@ -3822,8 +3822,8 @@ sets no failure mark:
 A stop (18.6), a run the server ended, an orderly stop of the runner and a handover (18.19.3)
 work at every moment of the wait as at any other; a runner that adopts the turn with full
 rights (18.19.7) starts the wait again at the adoption, and a process that ends by itself during
-the wait ends the run by its last error. A success `result` without a model turn (`num_turns`
-0) read after the account error that ended a process (at the first error, at
+the wait ends the run by its last error. A success `result` without a model turn
+(`num_turns` 0) read after the account error that ended a process (at the first error, at
 `runner.account_retry_max_wait` or because the process ended during the wait) does not make its
 end `completed`: the classification above goes on with the table and `runtime_error`
 (FIX-RLKR/12). For a process the runner cannot write to (stdin
