@@ -1817,6 +1817,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get selfOffline => 'No connection. Try again when you are online.';
 
   @override
+  String get selfAppFault => 'Something went wrong in the app';
+
+  @override
+  String selfProblemCorrelation(String text, String id) {
+    return '$text (correlation ID $id)';
+  }
+
+  @override
   String get selfLoadFailed => 'The list could not be loaded.';
 
   @override
@@ -3231,6 +3239,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get adminWizardKindAgent => 'Agent';
+
+  @override
+  String get adminWizardKindApp => 'App';
 
   @override
   String get adminWizardSearch => 'Search by name';

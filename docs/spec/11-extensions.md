@@ -184,7 +184,10 @@ sequenceDiagram
 A new manifest with the same `slug` shows a diff. New scopes and events need a new consent
 (`app.scopes.update`, step-up). Until then the app runs with the old granted scopes; new commands
 and events that need new scopes stay inactive. Removed scopes, events and commands take effect
-immediately. An update never adds a grant; grants arise only with `grant.create`. New target hosts
+immediately. An update never adds a grant; grants arise only with `grant.create`: in the
+administration the owner creates them under "Access grants", whose wizard offers the installed apps
+as subjects, for a target the new manifest asks for as for a second target of the app at any time
+(docs/decisions.d/AUD-adminui-misc-01.md AUD-AM1/1). New target hosts
 of the delivery are confirmed by the update itself (owner, step-up, `app.install`); they must be in
 `webhook.allowed_hosts`. A token keeps the scopes it was created with: a withdrawn scope takes
 effect from the next request, a newly granted one needs a new token.

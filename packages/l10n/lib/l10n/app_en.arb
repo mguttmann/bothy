@@ -2586,6 +2586,24 @@
   "@selfOffline": {
     "description": "Message when a device or session action got no answer from the server."
   },
+  "selfAppFault": "Something went wrong in the app",
+  "@selfAppFault": {
+    "description": "Message when a screen failed because of an error of the app itself, not because of an answer of the server; the error goes to the error handler of the app."
+  },
+  "selfProblemCorrelation": "{text} (correlation ID {id})",
+  "@selfProblemCorrelation": {
+    "description": "A problem text followed by the correlation ID under which the server logged the failed request (06 section 2); shown with a server error and with a code this app has no text for.",
+    "placeholders": {
+      "text": {
+        "type": "String",
+        "example": "Something went wrong on the server"
+      },
+      "id": {
+        "type": "String",
+        "example": "4bf92f35-77b3-4da6-a3ce-929d0e0e4736"
+      }
+    }
+  },
   "selfLoadFailed": "The list could not be loaded.",
   "@selfLoadFailed": {
     "description": "Banner when the device or session list could not be loaded."
@@ -4822,6 +4840,10 @@
   "adminWizardKindAgent": "Agent",
   "@adminWizardKindAgent": {
     "description": "Subject kind agent in the grant wizard."
+  },
+  "adminWizardKindApp": "App",
+  "@adminWizardKindApp": {
+    "description": "Subject kind app in the grant wizard, offered when an app is installed."
   },
   "adminWizardSearch": "Search by name",
   "@adminWizardSearch": {

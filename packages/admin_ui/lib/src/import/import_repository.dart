@@ -376,8 +376,14 @@ abstract interface class ImportRepository {
     required String purpose,
   });
 
-  /// Every item of the source in [state] (all pages of `listImportItems`).
-  Future<List<ImportItemEntry>> importItems(String id, {String? state});
+  /// The items of the source in [state], oldest first (the pages of `listImportItems`, which
+  /// the server orders by ascending ID). After each page [enough] gets the items of that page
+  /// and ends the read when it answers true; without it every page is read.
+  Future<List<ImportItemEntry>> importItems(
+    String id, {
+    String? state,
+    bool Function(List<ImportItemEntry> page)? enough,
+  });
 
   /// The channel [channelId] (`getChannel`).
   Future<ImportChannelState> importChannel(String channelId);
@@ -565,6 +571,7 @@ final class ApiImportRepository implements ImportRepository {
   Future<List<ImportItemEntry>> importItems(
     String id, {
     String? state,
+    bool Function(List<ImportItemEntry> page)? enough,
   }) => adminCall(() async {
     final out = <ImportItemEntry>[];
     String? cursor;
@@ -575,12 +582,13 @@ final class ApiImportRepository implements ImportRepository {
         limit: _itemPage,
         state: state == null ? null : ImportItemState.valueOf(state),
       )).data!;
+      final items = <ImportItemEntry>[];
       for (final i in page.items) {
         // The wire values (`forum_tag`), not the names of the generated enums.
         final json =
             (_api.serializers.serializeWith(ImportItem.serializer, i)! as Map)
                 .cast<String, Object?>();
-        out.add(
+        items.add(
           ImportItemEntry(
             id: i.id,
             originKey: i.originKey,
@@ -591,7 +599,8 @@ final class ApiImportRepository implements ImportRepository {
           ),
         );
       }
-      cursor = page.nextCursor;
+      out.addAll(items);
+      cursor = (enough?.call(items) ?? false) ? null : page.nextCursor;
     } while (cursor != null);
     return out;
   });

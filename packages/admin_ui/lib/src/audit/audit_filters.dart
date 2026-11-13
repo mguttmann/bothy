@@ -11,6 +11,7 @@ import 'package:l10n/l10n.dart';
 
 import '../data/admin_repository.dart';
 import '../groups/member_editor.dart' show parseDay;
+import '../people/person_choice.dart';
 import 'audit_repository.dart';
 
 /// The text of the result [result].
@@ -176,7 +177,7 @@ class _AuditFiltersState extends State<AuditFilters> {
               DropdownMenuItem(
                 key: ValueKey('audit.filter.actor.${p.id}'),
                 value: p.id,
-                child: Text(p.displayName),
+                child: PersonChoice(person: p),
               ),
           ],
           onChanged: (id) {

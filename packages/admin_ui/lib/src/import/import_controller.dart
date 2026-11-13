@@ -4,6 +4,8 @@
 /// its channels, failed items and agents (brief M8-08 Design notes 1 and 3; 15 3.1 rule 3).
 library;
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../data/admin_repository.dart';
@@ -125,6 +127,9 @@ final class ImportSourceDetails {
 /// the counters (brief M8-08 Design note 1). There is no timer: the console has no gateway and
 /// no configuration key sets an interval (fixed requirement 16).
 ///
+/// One pass of [refresh] runs per source at a time, and it reads only the items the page
+/// shows as far as `listImportItems` lets it (ruling AUD-AM1/5).
+///
 /// Example:
 /// ```dart
 /// final c = ImportController(repository);
@@ -141,6 +146,17 @@ class ImportController extends ChangeNotifier {
   final Map<String, ImportSourceSnapshot> _byId = {};
   final List<String> _order = [];
   final Map<String, ImportSourceDetails> _details = {};
+
+  /// The running pass of [refresh] per source, and the sources asked for again meanwhile.
+  final Map<String, Future<void>> _running = {};
+  final Set<String> _again = {};
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 
   /// The sources in the order of the list (newest first), each in its latest snapshot.
   List<ImportSourceSnapshot> get sources => [
@@ -190,24 +206,73 @@ class ImportController extends ChangeNotifier {
   /// the agents and the channel of every imported row (`getChannel`; a failure stays in the
   /// row).
   ///
-  /// Errors of `getImport` and the item lists pass to the caller; the agents are optional (a
-  /// refused list leaves the planned agent unresolved).
-  Future<void> refresh(String id) async {
+  /// One pass runs per source at a time: a call while a pass runs gets the future of that pass,
+  /// and one more pass follows it, so what changed meanwhile reaches the view and the requests of
+  /// an action, the refresh control and a tab that becomes visible never read side by side.
+  ///
+  /// Errors of `getImport` and the item lists pass to the caller, and to every caller that
+  /// waits for the same pass; the agents are optional (a refused list leaves the planned agent
+  /// unresolved).
+  Future<void> refresh(String id) {
+    final running = _running[id];
+    if (running != null) {
+      _again.add(id);
+      return running;
+    }
+    return _running[id] = _passes(id);
+  }
+
+  Future<void> _passes(String id) async {
+    try {
+      do {
+        _again.remove(id);
+        await _read(id);
+      } while (_again.contains(id) && !_disposed);
+    } finally {
+      _again.remove(id);
+      // The futures of the callers are done when this one is, so the next call starts anew.
+      unawaited(_running.remove(id));
+    }
+  }
+
+  /// The posted channel item of every mapped channel of [snapshot], by Discord ID.
+  ///
+  /// `listImportItems` filters by state but not by item kind (docs/decisions.d/M8-08.md
+  /// D-M8-08-1), so the posted items are read page by page, oldest first, only until every
+  /// mapped channel has its item: the import tool writes the channels before their content, so
+  /// that is the first pages of an import whose channels exist. While a mapped channel has no
+  /// posted item the read still goes through every posted item.
+  Future<Map<String, ImportItemEntry>> _postedChannels(
+    ImportSourceSnapshot snapshot,
+  ) async {
+    final wanted = {for (final m in snapshot.channels) m.discordId};
+    final posted = <String, ImportItemEntry>{};
+    if (wanted.isEmpty) return posted;
+    await repository.importItems(
+      snapshot.id,
+      state: 'posted',
+      enough: (page) {
+        for (final i in page) {
+          if (i.itemKind == 'channel' && i.originKey.startsWith('channel:')) {
+            posted[i.originKey.substring('channel:'.length)] = i;
+          }
+        }
+        return wanted.every(posted.containsKey);
+      },
+    );
+    return posted;
+  }
+
+  Future<void> _read(String id) async {
     final snapshot = await repository.importSource(id);
-    final items = await repository.importItems(id);
+    final failed = await repository.importItems(id, state: 'failed');
+    final posted = await _postedChannels(snapshot);
     List<AgentRecord> agents;
     try {
       agents = await repository.agentRecords();
     } on Object {
       agents = const [];
     }
-    final posted = <String, ImportItemEntry>{
-      for (final i in items)
-        if (i.itemKind == 'channel' &&
-            i.state == 'posted' &&
-            i.originKey.startsWith('channel:'))
-          i.originKey.substring('channel:'.length): i,
-    };
     final rows = <ImportChannelRow>[];
     for (final m in snapshot.channels) {
       final item = posted[m.discordId];
@@ -236,10 +301,7 @@ class ImportController extends ChangeNotifier {
     }
     _details[id] = ImportSourceDetails(
       rows: rows,
-      failedItems: [
-        for (final i in items)
-          if (i.state == 'failed') i,
-      ],
+      failedItems: failed,
       agents: agents,
     );
     apply(snapshot);

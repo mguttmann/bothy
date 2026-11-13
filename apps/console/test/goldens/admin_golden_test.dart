@@ -16,7 +16,8 @@ GoldenTestGroup _matrix(String name, Widget Function() builder) =>
       locales: const [Locale('de'), Locale('en')],
     );
 
-/// A repository with Alex and Sam and nothing waiting; every other call is unexpected.
+/// A repository with Alex (the owner) and Sam and nothing waiting; every other call is
+/// unexpected.
 class _People implements AdminRepository {
   @override
   Future<AdminPage<AdminPerson>> people({
@@ -41,6 +42,19 @@ class _People implements AdminRepository {
   @override
   Future<AdminPage<AdminGroup>> groups({String? cursor}) async =>
       const AdminPage([]);
+
+  // The people page lists the owners. Without this answer the list failed in the test double,
+  // which the page now reports as a fault of the app instead of showing it as a server error
+  // (docs/decisions.d/AUD-adminui-misc-01.md AUD-AM1/3).
+  @override
+  Future<List<AdminOwner>> owners() async => [
+    AdminOwner(
+      userId: 'a',
+      displayName: 'Alex',
+      grantedAt: DateTime.utc(2026, 10, 10, 9, 30),
+      reason: 'First owner',
+    ),
+  ];
 
   @override
   dynamic noSuchMethod(Invocation invocation) =>

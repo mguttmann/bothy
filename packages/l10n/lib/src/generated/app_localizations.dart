@@ -3019,6 +3019,18 @@ abstract class AppLocalizations {
   /// **'No connection. Try again when you are online.'**
   String get selfOffline;
 
+  /// Message when a screen failed because of an error of the app itself, not because of an answer of the server; the error goes to the error handler of the app.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong in the app'**
+  String get selfAppFault;
+
+  /// A problem text followed by the correlation ID under which the server logged the failed request (06 section 2); shown with a server error and with a code this app has no text for.
+  ///
+  /// In en, this message translates to:
+  /// **'{text} (correlation ID {id})'**
+  String selfProblemCorrelation(String text, String id);
+
   /// Banner when the device or session list could not be loaded.
   ///
   /// In en, this message translates to:
@@ -5334,6 +5346,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Agent'**
   String get adminWizardKindAgent;
+
+  /// Subject kind app in the grant wizard, offered when an app is installed.
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get adminWizardKindApp;
 
   /// Search field of the subject step.
   ///
