@@ -763,7 +763,14 @@ composer with the focus; Esc leaves to the overview. The text is the person's dr
 draft or the view exists, the forum's group starts with the draft row "New chat" in italics.
 Sending puts one `createThread` with `clear_draft` into the outbox (the server deletes the draft
 with the first message); the row shows "Sending" (or "Not sent" with the reason after a refusal)
-until the server created the post, then the post row takes its place and its history opens. The
+until the server created the post, then the post row takes its place and its history opens.
+The composer takes files before the chat exists, through the same code as a thread's composer
+(`lib/composer/attach_actions.dart`): the attachment button, a drop and Cmd+V or Ctrl+V on the
+desktop, the menu of camera, library and file on the phone. The files are staged in
+`<instance folder>/staged/<forum>/` until the send, which writes their uploads and the post in one
+outbox transaction; a post whose upload failed shows its files, "Upload again", "Try again" and
+"Discard", which removes the uploads too and releases what they created on the server
+(`lib/forum/post_actions.dart`; docs/decisions.d/FEAT-NEW-CHAT-ATTACH.md). The
 "New post" dialog of M4-19 is gone: "New chat" and "New post" of the overview open the view, and
 "Edit" of a refused post moves it back into the view. No git worktree, folder or runner request
 is involved (09 18.1). Rulings: docs/decisions.d/M4-41.md.

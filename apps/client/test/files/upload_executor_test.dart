@@ -430,14 +430,14 @@ void main() {
       await eventually(
         'failed',
         () async =>
-            (await h.db.outboxDao.byId(first.entryId))?.state ==
+            (await h.db.outboxDao.byId(first.entryId!))?.state ==
             OutboxState.failed,
       );
       await attach.retry(first.key);
       final again = attach.attachments.single;
       expect(again.key, first.key);
       expect(again.entryId, isNot(first.entryId));
-      expect(await h.db.outboxDao.byId(first.entryId), isNull);
+      expect(await h.db.outboxDao.byId(first.entryId!), isNull);
       await attach.retry('unknown');
       expect(attach.attachments.single.entryId, again.entryId);
     });

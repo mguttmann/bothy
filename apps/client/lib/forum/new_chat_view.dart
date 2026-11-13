@@ -3,7 +3,10 @@
 /// The new chat view of a forum in the content column (01 6.8 item 8; components.md 6; brief
 /// M4-41 requirement 12): "New chat in `forum`" or "New post in `forum`", the operator line, the
 /// title (optional with an operator agent, required without), the tags and the composer with
-/// the focus, without a dialog.
+/// the focus, without a dialog. The composer takes files as the composer of a thread does,
+/// before the chat exists: pasted, picked or dropped on the desktop, from the camera, the
+/// library or the files on the phone; they wait in the composer and go with the first message
+/// (FEAT-NEW-CHAT-ATTACH, rulings FNCA/2 and FNCA/5).
 library;
 
 import 'dart:async';
@@ -21,17 +24,23 @@ import 'package:sync_engine/sync_engine.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../app/router.dart' show NewChatLocation;
+import '../composer/attach_actions.dart';
 import '../composer/attachment_chips.dart';
 import '../composer/composer_controller.dart' show ContentTooLong;
 import '../composer/long_text.dart';
-import '../files/providers.dart' show newPostAttachmentsProvider;
+import '../files/providers.dart'
+    show newPostAttachmentsProvider, uploadProgressProvider;
+import '../files/upload_executor.dart' show UploadOps;
+import '../phone/compose/media_picker.dart';
 import '../settings/settings_providers.dart';
 import '../sidebar/providers.dart' show collapsedGroupsProvider;
 import '../sync/thread_ops.dart';
+import '../thread/outbox_rows.dart' show PendingFileChips;
 import '../thread/providers.dart'
     show draftEditingProvider, instanceLimitsProvider, syncNoticesProvider;
 import 'failed_post_notice.dart';
 import 'new_chat_controller.dart';
+import 'post_actions.dart';
 import 'providers.dart';
 
 /// The new chat view of [forum]; with [sentEntry] the view of the sent post that waits for the
@@ -196,15 +205,14 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
 
   bool _hadStoredDraft = false;
 
-  /// The outbox of the session; its entries without a thread are the uploads of the post.
-  Outbox? _outbox;
-
-  /// The outbox entries without a thread while the post has files (M4-47): a stream allows one
-  /// listener, so a new one is made each time the chips appear again.
-  Stream<List<OutboxEntryView>>? _uploads;
-
   /// This device overwrote a newer draft of another device (04 14).
   bool _overwritten = false;
+
+  /// The camera and the photo library of the phone (M5-07), made on first use.
+  MediaPicker? _media;
+
+  /// The notice of the last photo the camera or the library could not give, or null.
+  PhotoOutcome? _photo;
 
   @override
   void initState() {
@@ -212,7 +220,6 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
     final engine = ref.read(syncEngineProvider);
     final db = ref.read(localDatabaseProvider);
     if (engine == null || db == null) return;
-    _outbox = engine.outbox;
     final forum = widget.forum;
     final chat = _chat = NewChatController(
       forum: forum,
@@ -220,7 +227,8 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
       dao: db.outboxDao,
       editing: ref.read(draftEditingProvider),
       deviceId: ref.read(signedInServicesProvider)?.auth.session?.deviceId,
-      // M4-47: a long paste and the rest of a long text go out as files of the post.
+      // Pasted, picked, dropped and photographed files wait here until the send
+      // (FEAT-NEW-CHAT-ATTACH, FNCA/2), as a long paste and the rest of a long text do (M4-47).
       attach: ref.read(newPostAttachmentsProvider(forum.value)),
       dropStoredDraft: () async {
         final stored = await db.personalDao.watchDraft(channelId: forum).first;
@@ -286,6 +294,30 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
     context.go(NewChatLocation.pathOf(widget.forum, entry: entry));
   }
 
+  /// The attachment button of the desktop: the system's file dialog (M4-22).
+  Future<void> _pick() async {
+    final attach = _chat?.composer.attach;
+    if (attach != null) await pickComposerFiles(ref, attach);
+  }
+
+  /// The attachment menu of the phone (M5-07): camera, photo library or a file; the new chat
+  /// view has no templates, on the phone as on the desktop.
+  Future<void> _attachMenu() async {
+    final choice = await showAttachMenu(context, templates: false);
+    final attach = _chat?.composer.attach;
+    if (!mounted || choice == null || attach == null) return;
+    if (choice == AttachMenuItem.file) return _pick();
+    final media = _media ??= composerMediaPicker(ref);
+    final outcome = await attachPhoto(
+      media,
+      attach,
+      choice == AttachMenuItem.camera
+          ? MediaSource.camera
+          : MediaSource.library,
+    );
+    if (mounted) setState(() => _photo = photoNoticeOf(outcome));
+  }
+
   @override
   void dispose() {
     final chat = _chat;
@@ -299,19 +331,29 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
     super.dispose();
   }
 
-  /// The refusal over the limit, the note of a text larger than one message and the chips of
-  /// the attached files (M4-47).
+  /// The refusal over the limit, the note of a text larger than one message, the refusal of a
+  /// file, the drop hint, the photo notice and the chips of the attached files (M4-47,
+  /// FEAT-NEW-CHAT-ATTACH).
   List<Widget> _composerNotes(NewChatController chat, AppLocalizations l) {
     final composer = chat.composer;
     final attach = composer.attach;
     final hasFiles = attach != null && attach.attachments.isNotEmpty;
-    final uploads = hasFiles
-        ? _uploads ??= _outbox?.watchThread(null)
-        : _uploads = null;
-    Widget note(Key key, DsTone tone, String text) => Padding(
-      key: key,
-      padding: const EdgeInsets.only(bottom: DsSpace.s4),
-      child: DsBanner(tone: tone, text: text, liveRegion: true),
+    Widget note(Key key, DsTone tone, String text, {VoidCallback? onClose}) =>
+        Padding(
+          key: key,
+          padding: const EdgeInsets.only(bottom: DsSpace.s4),
+          child: DsBanner(
+            tone: tone,
+            text: text,
+            liveRegion: true,
+            actionLabel: onClose == null ? null : l.threadCancel,
+            onAction: onClose,
+          ),
+        );
+    final photo = photoNoticeText(
+      l,
+      _photo,
+      android: ref.read(appPortsProvider).platform == 'android',
     );
     return [
       if (composer.error case ContentTooLong(:final limit))
@@ -333,19 +375,28 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
           )
           case final refused?)
         note(const ValueKey('newChat.attachError'), DsTone.danger, refused),
+      if (attach != null && attach.dragging)
+        note(
+          const ValueKey('newChat.dropHint'),
+          DsTone.info,
+          l.composerDropFiles,
+        ),
+      if (photo != null)
+        note(
+          const ValueKey('newChat.photoNotice'),
+          DsTone.warning,
+          photo,
+          onClose: () => setState(() => _photo = null),
+        ),
       if (hasFiles)
         Padding(
           key: const ValueKey('newChat.attachments'),
           padding: const EdgeInsets.only(bottom: DsSpace.s4),
-          child: StreamBuilder<List<OutboxEntryView>>(
-            stream: uploads,
-            builder: (context, entries) => ComposerAttachmentChips(
-              attach: attach,
-              // Before the first list the chips follow the upload progress.
-              views: entries.data,
-              onInsertAsText: (key) =>
-                  unawaited(composer.insertPasteAsText(key)),
-            ),
+          // The files are staged: they have no upload entry before the send (FNCA/2).
+          child: ComposerAttachmentChips(
+            attach: attach,
+            views: const [],
+            onInsertAsText: (key) => unawaited(composer.insertPasteAsText(key)),
           ),
         ),
     ];
@@ -375,11 +426,14 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
         phase == ConnectionPhase.backoff ||
         phase == ConnectionPhase.suspended;
     final required = widget.titleRequired;
+    final attach = chat?.composer.attach;
+    final hasFiles = attach?.attachments.isNotEmpty ?? false;
     final missingTitle =
         chat != null &&
         required &&
         chat.title.text.trim().isEmpty &&
-        chat.composer.text.text.trim().isNotEmpty;
+        (chat.composer.text.text.trim().isNotEmpty || hasFiles);
+    final phone = ref.read(appPortsProvider).formFactor.isPhone;
     // The composer sits at the bottom of the column; when header, title and tags need more
     // than the window's height (text scale 2), the view scrolls instead of overflowing.
     return CustomScrollView(
@@ -454,22 +508,33 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
                     ),
                   ),
                 if (chat != null)
-                  Focus(
-                    focusNode: _fieldGroup,
-                    child: DsComposer(
-                      key: const ValueKey('newChat.composer'),
-                      targetName: channel?.name ?? '',
-                      maxLines: config.composerMaxLines,
-                      enterSends: ref
-                          .watch(personalSettingsProvider)
-                          .enterSends,
-                      controller: chat.composer.text,
-                      onChanged: chat.composer.onChanged,
-                      onSend: (text) => unawaited(_send(text)),
-                      offline: offline,
-                      sendEnabled: chat.canSend,
-                      hasAttachments:
-                          chat.composer.attach?.attachments.isNotEmpty ?? false,
+                  // The drop area and the paste key of files, as in a thread's composer.
+                  withComposerFiles(
+                    ref,
+                    attach,
+                    Focus(
+                      focusNode: _fieldGroup,
+                      child: DsComposer(
+                        key: const ValueKey('newChat.composer'),
+                        targetName: channel?.name ?? '',
+                        maxLines: config.composerMaxLines,
+                        enterSends: ref
+                            .watch(personalSettingsProvider)
+                            .enterSends,
+                        controller: chat.composer.text,
+                        onChanged: chat.composer.onChanged,
+                        onSend: (text) => unawaited(_send(text)),
+                        offline: offline,
+                        sendEnabled: chat.canSend,
+                        hasAttachments: hasFiles,
+                        // The attachment button: the file dialog on the desktop, the menu of
+                        // camera, library and file on the phone (FNCA/5).
+                        onAttach: attach == null
+                            ? null
+                            : phone
+                            ? () => unawaited(_attachMenu())
+                            : () => unawaited(_pick()),
+                      ),
                     ),
                   ),
               ],
@@ -482,7 +547,10 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
 }
 
 /// The view of a sent post that waits for the server: "Sending" (01 6.6), or the refusal with
-/// "Try again", "Edit" and "Discard". When the server created the post its history opens.
+/// "Try again", "Edit" and "Discard", and the chips of its files with the state of their
+/// uploads (FEAT-NEW-CHAT-ATTACH, FNCA/4): an upload that failed for good shows its reason,
+/// "Upload again" and the notice of the post. When the server created the post its history
+/// opens.
 class _SentPane extends ConsumerStatefulWidget {
   const _SentPane({
     required this.forum,
@@ -504,9 +572,13 @@ class _SentPaneState extends ConsumerState<_SentPane> {
   bool _checking = false;
   bool _recheck = false;
 
+  /// The outbox entries without a thread: the post and the uploads of its files.
+  Stream<List<OutboxEntryView>>? _entries;
+
   @override
   void initState() {
     super.initState();
+    _entries = ref.read(syncEngineProvider)?.outbox.watchThread(null);
     final created = ref.read(createdPostsProvider);
     _created = created.changes.listen((id) {
       if (id == widget.entry) _open(created.threadOf(id));
@@ -592,6 +664,7 @@ class _SentPaneState extends ConsumerState<_SentPane> {
       );
     }
     final engine = ref.read(syncEngineProvider);
+    final db = ref.read(localDatabaseProvider);
     return Padding(
       padding: const EdgeInsets.all(DsSpace.s12),
       child: Column(
@@ -608,23 +681,73 @@ class _SentPaneState extends ConsumerState<_SentPane> {
             )
           else
             FailedPostNotice(
+              key: ValueKey('postList.failed.${widget.entry}'),
               post: failed.first,
+              // A post that waits for a failed upload sends that upload again (FNCA/4).
               onRetry: () {
-                if (engine != null) {
-                  unawaited(engine.outbox.retry(widget.entry));
+                if (engine != null && db != null) {
+                  unawaited(
+                    retryPost(engine.outbox, db.outboxDao, widget.entry),
+                  );
                 }
               },
+              // Its uploads go with it, on this device and on the server (FNCA/4).
               onDiscard: () {
-                if (engine != null) {
-                  unawaited(engine.outbox.discard(widget.entry));
+                if (engine != null && db != null) {
+                  unawaited(
+                    discardPost(engine.outbox, db.outboxDao, widget.entry),
+                  );
                 }
                 context.go('/c/$forum');
               },
-              onEdit: () => unawaited(
-                editRefusedPost(context, ref, widget.forum, failed.first),
-              ),
+              onEdit: failed.first.hasFiles
+                  ? null
+                  : () => unawaited(
+                      editRefusedPost(context, ref, widget.forum, failed.first),
+                    ),
             ),
+          StreamBuilder<List<OutboxEntryView>>(
+            stream: _entries,
+            builder: (context, snapshot) =>
+                _files(snapshot.data ?? const []) ?? const SizedBox.shrink(),
+          ),
         ],
+      ),
+    );
+  }
+
+  /// The chips of the post's files with the state of their uploads, or null without files.
+  Widget? _files(List<OutboxEntryView> entries) {
+    OutboxEntryView? post;
+    final uploads = <String, OutboxEntryView>{};
+    for (final v in entries) {
+      if (v.id == widget.entry) post = v;
+      if (v.entry.kind == UploadOps.upload) {
+        final key = v.payload['attachment_key'];
+        if (key is String) uploads[key] = v;
+      }
+    }
+    if (post == null || !PendingFileChips.hasFiles(post.payload)) return null;
+    // Read, not watched: this runs in the builder of the stream, and the progress is one object
+    // of the session that the ListenableBuilder below follows.
+    final progress = ref.read(uploadProgressProvider);
+    final engine = ref.read(syncEngineProvider);
+    final db = ref.read(localDatabaseProvider);
+    final payload = post.payload;
+    return Padding(
+      key: const ValueKey('newChat.sentFiles'),
+      padding: const EdgeInsets.only(top: DsSpace.s8),
+      // The chips follow every confirmed part, as in the composer.
+      child: ListenableBuilder(
+        listenable: progress,
+        builder: (context, _) => PendingFileChips(
+          payload: payload,
+          uploads: uploads,
+          progress: progress,
+          onRetryUpload: engine == null || db == null
+              ? null
+              : (id) => unawaited(retryUpload(engine.outbox, db.outboxDao, id)),
+        ),
       ),
     );
   }

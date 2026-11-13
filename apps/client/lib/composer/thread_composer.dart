@@ -40,6 +40,7 @@ import '../thread/thread_actions.dart';
 import '../thread/typing_line.dart';
 import '../voice/recorder.dart';
 import '../voice/voice_button.dart';
+import 'attach_actions.dart';
 import 'attachment_chips.dart';
 import 'composer_controller.dart';
 import 'draft_sync.dart';
@@ -222,8 +223,8 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
   }
 
   Future<void> _pick() async {
-    final files = await ref.read(filePortsProvider).picker.pickFiles();
-    await _attach?.add(files);
+    final attach = _attach;
+    if (attach != null) await pickComposerFiles(ref, attach);
   }
 
   MediaPicker? _media;
@@ -231,91 +232,42 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
   /// The attachment menu of the phone (M5-07): camera, photo library or a file, and the
   /// templates, which have no button of their own beside the phone's field (brief M5-17).
   Future<void> _attachMenu({required bool templates}) async {
-    final l = AppLocalizations.of(context);
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      useSafeArea: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          key: const ValueKey('composer.attachMenu'),
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (final (key, label) in [
-              ('camera', l.composerAttachCamera),
-              ('library', l.composerAttachLibrary),
-              ('file', l.composerAttachFile),
-              if (templates) ('templates', l.composerTemplates),
-            ])
-              DsTappable(
-                key: ValueKey('composer.attach.$key'),
-                label: label,
-                excludeChildSemantics: true,
-                onTap: () => Navigator.of(context).pop(key),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: DsSpace.s16,
-                    vertical: DsSpace.s12,
-                  ),
-                  child: Text(
-                    label,
-                    style: dsTextStyle(DsType.body)
-                        .copyWith(color: context.dsColors.textPrimary),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
+    final choice = await showAttachMenu(context, templates: templates);
     if (!mounted || choice == null) return;
     final attach = _attach;
     if (attach == null) return;
-    if (choice == 'file') return _pick();
-    if (choice == 'templates') {
-      final picked = await showTemplates(
-        context,
-        ref,
-        channelId: widget.channelId,
-        canSave: _composer?.text.text.trim().isNotEmpty ?? false,
-      );
-      if (picked != null && mounted) await _template(picked);
-      return;
+    switch (choice) {
+      case AttachMenuItem.file:
+        return _pick();
+      case AttachMenuItem.templates:
+        final picked = await showTemplates(
+          context,
+          ref,
+          channelId: widget.channelId,
+          canSave: _composer?.text.text.trim().isNotEmpty ?? false,
+        );
+        if (picked != null && mounted) await _template(picked);
+        return;
+      case AttachMenuItem.camera || AttachMenuItem.library:
     }
-    final ports = ref.read(filePortsProvider);
-    final media = _media ??= MediaPicker(
-      port: ports.media(),
-      scratch: () async => Directory(
-        '${(await ports.temporary()).path}${Platform.pathSeparator}photos',
-      ),
-    );
+    final media = _media ??= composerMediaPicker(ref);
     final outcome = await attachPhoto(
       media,
       attach,
-      choice == 'camera' ? MediaSource.camera : MediaSource.library,
+      choice == AttachMenuItem.camera
+          ? MediaSource.camera
+          : MediaSource.library,
     );
     if (!mounted) return;
-    setState(
-      () => _photo =
-          outcome is PhotoPicked ||
-              outcome is PhotoCancelled ||
-              outcome is PhotoNoRoom
-          ? null
-          : outcome,
-    );
+    setState(() => _photo = photoNoticeOf(outcome));
   }
 
-  String? _photoText(AppLocalizations l, PhotoOutcome? outcome) {
-    final android = ref.read(appPortsProvider).platform == 'android';
-    return switch (outcome) {
-      null || PhotoPicked() || PhotoCancelled() || PhotoNoRoom() => null,
-      PhotoDenied(source: MediaSource.camera) =>
-        android ? l.photoCameraDeniedAndroid : l.photoCameraDeniedIos,
-      PhotoDenied(source: MediaSource.library) => l.photoLibraryDenied,
-      PhotoUnsupported(:final name) => l.photoUnsupported(dsIsolate(name)),
-      PhotoFailed() => l.photoFailed,
-    };
-  }
+  String? _photoText(AppLocalizations l, PhotoOutcome? outcome) =>
+      photoNoticeText(
+        l,
+        outcome,
+        android: ref.read(appPortsProvider).platform == 'android',
+      );
 
   /// The chips of the attached files with the state of their upload entries (12 2) and
   /// "Insert as text" on a long paste (M4-47).
@@ -333,19 +285,8 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
       );
 
   /// [child] with the drop area and the paste key of [attach] (brief M4-22 Scope).
-  Widget _withFiles(AttachController? attach, Widget child) {
-    if (attach == null) return child;
-    return AttachDropTarget(
-      controller: attach,
-      child: AttachPasteShortcut(
-        controller: attach,
-        paste: ref.read(filePortsProvider).paste,
-        scratch: () async => ref.read(outgoingFolderProvider),
-        originals: () => ref.read(personalSettingsProvider).pasteOriginals,
-        child: child,
-      ),
-    );
-  }
+  Widget _withFiles(AttachController? attach, Widget child) =>
+      withComposerFiles(ref, attach, child);
 
   String? _refusalText(AppLocalizations l, AttachRefusal? refusal) =>
       attachRefusalText(

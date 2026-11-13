@@ -1731,7 +1731,13 @@ none of them.
    per person and forum), so it survives a restart and appears on the person's other devices; "+"
    on a forum that has such a draft opens it instead of a second one. Sending creates the post with
    its first message through the outbox (`thread.create`); the draft row becomes the post row in
-   place. An empty draft is discarded when the person leaves the view.
+   place. An empty draft is discarded when the person leaves the view. The composer takes files
+   before the chat exists, as the composer of a chat does (addendum of 2026-11-13,
+   docs/decisions.d/FEAT-NEW-CHAT-ATTACH.md): pasted, picked or dropped on the desktop, from the
+   camera, the library or the files on the phone, with or without text. They wait on the device
+   until the send and are uploaded with it; the first message carries them, so the agent of the
+   forum gets them with the message that starts its run. A file removed before the send leaves
+   nothing behind; files not sent last while the app runs.
 9. **No worktree per post.** A new chat in a project forum is a new agent session in the same
    project folder; the app and the runner create no git worktree for it (09 18.1).
 10. **Dragging.** Spaces, channels and forum posts are dragged within their parent into the

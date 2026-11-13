@@ -1107,14 +1107,85 @@ final class ComposerAttachmentsFamily extends $Family
   String toString() => r'composerAttachmentsProvider';
 }
 
+/// The folder the files of new posts wait in until their send (FEAT-NEW-CHAT-ATTACH, ruling
+/// FNCA/2): `<instance folder>/staged`, one subfolder per forum, which the wipe deletes with
+/// the instance (D-M4-22-5).
+///
+/// Staged files live while the app runs, as the attachments of a thread's composer do (brief
+/// M4-22 Design note 2); nothing of them is in the outbox or on the server. So what an earlier
+/// run left there is deleted when the folder is first used in a run, before any file of this
+/// run is staged. Without an instance folder (tests) it lies in the temporary folder, as the
+/// outgoing folder does, and is not emptied.
+
+@ProviderFor(stagedFolder)
+final stagedFolderProvider = StagedFolderProvider._();
+
+/// The folder the files of new posts wait in until their send (FEAT-NEW-CHAT-ATTACH, ruling
+/// FNCA/2): `<instance folder>/staged`, one subfolder per forum, which the wipe deletes with
+/// the instance (D-M4-22-5).
+///
+/// Staged files live while the app runs, as the attachments of a thread's composer do (brief
+/// M4-22 Design note 2); nothing of them is in the outbox or on the server. So what an earlier
+/// run left there is deleted when the folder is first used in a run, before any file of this
+/// run is staged. Without an instance folder (tests) it lies in the temporary folder, as the
+/// outgoing folder does, and is not emptied.
+
+final class StagedFolderProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<Directory>,
+          Directory,
+          FutureOr<Directory>
+        >
+    with $FutureModifier<Directory>, $FutureProvider<Directory> {
+  /// The folder the files of new posts wait in until their send (FEAT-NEW-CHAT-ATTACH, ruling
+  /// FNCA/2): `<instance folder>/staged`, one subfolder per forum, which the wipe deletes with
+  /// the instance (D-M4-22-5).
+  ///
+  /// Staged files live while the app runs, as the attachments of a thread's composer do (brief
+  /// M4-22 Design note 2); nothing of them is in the outbox or on the server. So what an earlier
+  /// run left there is deleted when the folder is first used in a run, before any file of this
+  /// run is staged. Without an instance folder (tests) it lies in the temporary folder, as the
+  /// outgoing folder does, and is not emptied.
+  StagedFolderProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'stagedFolderProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$stagedFolderHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<Directory> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<Directory> create(Ref ref) {
+    return stagedFolder(ref);
+  }
+}
+
+String _$stagedFolderHash() => r'0bf8b1a7e5935b908c7f14c9b7dd9f7152a58718';
+
 /// The attachments of the first message of a new post in the forum [forumId] (the new chat
-/// view, M4-47), or null without an engine; kept while the app runs, as a thread's.
+/// view, M4-47, FEAT-NEW-CHAT-ATTACH), or null without an engine; kept while the app runs, as
+/// a thread's. The files are staged in `staged/<forum>` until the send (FNCA/2), and the
+/// staged folder is made ready (emptied of an earlier run) when the view first opens.
 
 @ProviderFor(newPostAttachments)
 final newPostAttachmentsProvider = NewPostAttachmentsFamily._();
 
 /// The attachments of the first message of a new post in the forum [forumId] (the new chat
-/// view, M4-47), or null without an engine; kept while the app runs, as a thread's.
+/// view, M4-47, FEAT-NEW-CHAT-ATTACH), or null without an engine; kept while the app runs, as
+/// a thread's. The files are staged in `staged/<forum>` until the send (FNCA/2), and the
+/// staged folder is made ready (emptied of an earlier run) when the view first opens.
 
 final class NewPostAttachmentsProvider
     extends
@@ -1125,7 +1196,9 @@ final class NewPostAttachmentsProvider
         >
     with $Provider<AttachController?> {
   /// The attachments of the first message of a new post in the forum [forumId] (the new chat
-  /// view, M4-47), or null without an engine; kept while the app runs, as a thread's.
+  /// view, M4-47, FEAT-NEW-CHAT-ATTACH), or null without an engine; kept while the app runs, as
+  /// a thread's. The files are staged in `staged/<forum>` until the send (FNCA/2), and the
+  /// staged folder is made ready (emptied of an earlier run) when the view first opens.
   NewPostAttachmentsProvider._({
     required NewPostAttachmentsFamily super.from,
     required String super.argument,
@@ -1179,10 +1252,12 @@ final class NewPostAttachmentsProvider
 }
 
 String _$newPostAttachmentsHash() =>
-    r'ba204a681eb288656aa7ec79a56da49dea2e8b48';
+    r'b7ebce9a336f77f9d18fadd5d64d2e2d9b573d9a';
 
 /// The attachments of the first message of a new post in the forum [forumId] (the new chat
-/// view, M4-47), or null without an engine; kept while the app runs, as a thread's.
+/// view, M4-47, FEAT-NEW-CHAT-ATTACH), or null without an engine; kept while the app runs, as
+/// a thread's. The files are staged in `staged/<forum>` until the send (FNCA/2), and the
+/// staged folder is made ready (emptied of an earlier run) when the view first opens.
 
 final class NewPostAttachmentsFamily extends $Family
     with $FunctionalFamilyOverride<AttachController?, String> {
@@ -1196,7 +1271,9 @@ final class NewPostAttachmentsFamily extends $Family
       );
 
   /// The attachments of the first message of a new post in the forum [forumId] (the new chat
-  /// view, M4-47), or null without an engine; kept while the app runs, as a thread's.
+  /// view, M4-47, FEAT-NEW-CHAT-ATTACH), or null without an engine; kept while the app runs, as
+  /// a thread's. The files are staged in `staged/<forum>` until the send (FNCA/2), and the
+  /// staged folder is made ready (emptied of an earlier run) when the view first opens.
 
   NewPostAttachmentsProvider call(String forumId) =>
       NewPostAttachmentsProvider._(argument: forumId, from: this);

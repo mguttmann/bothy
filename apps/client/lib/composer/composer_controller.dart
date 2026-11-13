@@ -356,14 +356,18 @@ final class ComposerController extends ChangeNotifier {
   /// Whether [send] writes the rest of a long text as [overflowFileName] (M4-47).
   bool _overflowing = false;
 
+  /// Whether [send] moves staged files of a new post to the outbox's folder (FNCA/3).
+  bool _taking = false;
+
   /// Sends [value] with the attachments of [attach]. Over the limit of the instance
   /// (D-W-115) the message keeps the head and the rest becomes the attachment
   /// [overflowFileName] of the same message (M4-47, D-M4-47-3); only when that attachment
   /// cannot be made it returns false and sets [error]. A message of attachments only has no
   /// text.
   Future<bool> send(String value) async {
-    // A second send while the rest of a long text is written would send it twice.
-    if (_overflowing) return false;
+    // A second send while the rest of a long text is written, or while staged files are
+    // taken, would send it twice.
+    if (_overflowing || _taking) return false;
     var body = value.trim();
     final hasFiles = attach?.attachments.isNotEmpty ?? false;
     if (body.isEmpty && !hasFiles) return false;
@@ -394,6 +398,18 @@ final class ComposerController extends ChangeNotifier {
       body = cut.head.trim().isEmpty ? '' : cut.head;
     }
     final reply = replyTo;
+    // Staged files of a new post move to the outbox's folder before the field is cleared, so a
+    // send that cannot take them keeps the text and the files (FEAT-NEW-CHAT-ATTACH, FNCA/3).
+    final stagedFiles = attach;
+    MessageAttachments? staged;
+    if (stagedFiles != null && stagedFiles.stages) {
+      _taking = true;
+      try {
+        staged = await stagedFiles.takeStaged();
+      } finally {
+        _taking = false;
+      }
+    }
     _seen = '';
     text.clear();
     replyTo = null;
@@ -405,7 +421,7 @@ final class ComposerController extends ChangeNotifier {
     final thread = this.thread;
     if (thread != null) _typing?.onSent(thread);
     notifyListeners();
-    final files = attach?.take();
+    final files = (stagedFiles?.stages ?? false) ? staged : attach?.take();
     await _drafts.dropWaiting();
     if (thread == null) {
       await sendNew?.call(body, files);

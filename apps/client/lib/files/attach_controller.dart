@@ -4,8 +4,10 @@
 /// attachment button, drag and drop and paste hand files to [AttachController], which checks
 /// the size against `file_max_upload_bytes` and the count against `message_max_attachments`
 /// before anything is written, and puts one upload entry per file into the outbox, before the
-/// message that will attach it. [AttachDropTarget] and [AttachPasteShortcut] are the drop
-/// area and the paste key of the composer.
+/// message that will attach it. The composer of a new chat stages its files instead and writes
+/// their upload entries with the post on the send (FEAT-NEW-CHAT-ATTACH, ruling FNCA/2).
+/// [AttachDropTarget] and [AttachPasteShortcut] are the drop area and the paste key of the
+/// composer.
 library;
 
 import 'dart:async';
@@ -60,7 +62,8 @@ final class FileUnreadable extends AttachRefusal {
   final String name;
 }
 
-/// A file attached in the composer whose upload entry is in the outbox.
+/// A file attached in the composer: its upload entry is in the outbox, or it is staged until the
+/// send ([entryId] null; the first message of a new post, FNCA/2).
 final class PendingAttachment {
   /// Creates the attachment.
   const PendingAttachment({
@@ -76,8 +79,8 @@ final class PendingAttachment {
   /// The attachment key: the message's slot `file:<key>` and the upload's `attachment_key`.
   final String key;
 
-  /// The upload entry (a new one after "Upload again").
-  final String entryId;
+  /// The upload entry (a new one after "Upload again"), or null while the file is staged.
+  final String? entryId;
 
   /// The file name.
   final String name;
@@ -110,6 +113,12 @@ final class PendingAttachment {
 /// The attachments of the composer of [thread] in [channel]; without a thread, of the first
 /// message of a new post in the forum [channel] (M4-47).
 ///
+/// With a staging folder ([stages], the new chat view, FEAT-NEW-CHAT-ATTACH ruling FNCA/2) the
+/// files pass the same checks and are copied into that folder, but no upload entry is written:
+/// nothing reaches the outbox or the server before the send, [remove] only deletes the copy, and
+/// [takeStaged] moves the copies into the outgoing folder and hands the upload entries to the
+/// caller, who writes them with the post in one batch.
+///
 /// Example:
 /// ```dart
 /// final attach = AttachController(thread: t, channel: c, outbox: engine.outbox,
@@ -119,7 +128,8 @@ final class PendingAttachment {
 /// ```
 final class AttachController extends ChangeNotifier {
   /// Creates the controller; [newKey] makes the attachment keys, [limits] are the instance's
-  /// (null while unknown: the server checks then).
+  /// (null while unknown: the server checks then), and `staging` is the folder the files of a
+  /// new post wait in until the send (null: every file goes to the outbox at once).
   AttachController({
     required this.thread,
     required this.channel,
@@ -128,6 +138,7 @@ final class AttachController extends ChangeNotifier {
     required this._newKey,
     required this._outgoing,
     this.limits,
+    this._staging,
   });
 
   /// The thread, or null for the first message of a new post.
@@ -144,6 +155,18 @@ final class AttachController extends ChangeNotifier {
   /// resume after a restart without the original (a sandboxed macOS app loses access to a
   /// picked file when it quits) and a later change of the original never mixes two versions.
   final Future<Directory> Function() _outgoing;
+
+  /// The folder the files of a new post wait in until the send, or null (FNCA/2).
+  final Future<Directory> Function()? _staging;
+
+  /// Whether the files are staged until the send instead of written to the outbox at once.
+  bool get stages => _staging != null;
+
+  /// The prepared upload of each staged file, by attachment key.
+  final Map<String, UploadSource> _staged = {};
+
+  /// The folder the copy of a file goes to: the staging folder or the outgoing folder.
+  Future<Directory> _copies() => (_staging ?? _outgoing)();
 
   /// The limits of the instance (D-W-115), or null.
   InstanceLimits? limits;
@@ -212,7 +235,7 @@ final class AttachController extends ChangeNotifier {
       final UploadSource source;
       try {
         final dir = Directory(
-          '${(await _outgoing()).path}${Platform.pathSeparator}$key',
+          '${(await _copies()).path}${Platform.pathSeparator}$key',
         );
         await dir.create(recursive: true);
         final copy = await File(f.path).copy(
@@ -223,7 +246,7 @@ final class AttachController extends ChangeNotifier {
       } on FileSystemException {
         return _refuse(FileUnreadable(f.name));
       }
-      _items.add(await _enqueue(source, key: key, owned: true));
+      _items.add(await _hold(source, key: key));
       notifyListeners();
     }
     return true;
@@ -254,7 +277,7 @@ final class AttachController extends ChangeNotifier {
     final UploadSource source;
     try {
       final dir = Directory(
-        '${(await _outgoing()).path}${Platform.pathSeparator}$key',
+        '${(await _copies()).path}${Platform.pathSeparator}$key',
       );
       await dir.create(recursive: true);
       final file = File(
@@ -265,7 +288,7 @@ final class AttachController extends ChangeNotifier {
     } on FileSystemException {
       return _refuse(FileUnreadable(name));
     }
-    final item = await _enqueue(source, key: key, owned: true);
+    final item = await _hold(source, key: key);
     _items.add(
       pastedText == null
           ? item
@@ -281,6 +304,24 @@ final class AttachController extends ChangeNotifier {
     );
     notifyListeners();
     return true;
+  }
+
+  /// Keeps the copy [source] of attachment [key]: staged until the send, or as an upload entry
+  /// in the outbox at once.
+  Future<PendingAttachment> _hold(
+    UploadSource source, {
+    required String key,
+  }) async {
+    if (!stages) return _enqueue(source, key: key, owned: true);
+    _staged[key] = source;
+    return PendingAttachment(
+      key: key,
+      entryId: null,
+      name: source.name,
+      sizeBytes: source.sizeBytes,
+      path: source.path,
+      mimeType: source.mimeType,
+    );
   }
 
   Future<PendingAttachment> _enqueue(
@@ -331,11 +372,14 @@ final class AttachController extends ChangeNotifier {
     final i = _items.indexWhere((a) => a.key == key);
     if (i < 0) return;
     final item = _items.removeAt(i);
+    _staged.remove(key);
     refusal = null;
     notifyListeners();
-    await _outbox.discard(item.entryId);
+    final entry = item.entryId;
+    if (entry != null) await _outbox.discard(entry);
     final copy = Directory(
-      '${(await _outgoing()).path}${Platform.pathSeparator}$key',
+      '${(await (entry == null ? _copies() : _outgoing())).path}'
+      '${Platform.pathSeparator}$key',
     );
     try {
       if (copy.existsSync()) await copy.delete(recursive: true);
@@ -348,14 +392,18 @@ final class AttachController extends ChangeNotifier {
   /// (brief M4-22 Design note 1).
   Future<void> retry(String key) async {
     final i = _items.indexWhere((a) => a.key == key);
-    if (i < 0) return;
-    final fresh = await _outbox.retry(_items[i].entryId);
+    final entry = i < 0 ? null : _items[i].entryId;
+    // A staged file has no upload yet.
+    if (entry == null) return;
+    final fresh = await _outbox.retry(entry);
     _items[i] = _items[i].withEntry(fresh);
     notifyListeners();
   }
 
   /// Hands the attachments to a message and clears the composer; null without attachments.
+  /// Staged files go through [takeStaged] instead.
   MessageAttachments? take() {
+    assert(!stages, 'staged files are taken with takeStaged');
     if (_items.isEmpty) return null;
     final taken = List.of(_items);
     _items.clear();
@@ -364,17 +412,82 @@ final class AttachController extends ChangeNotifier {
     return _attachmentsOf(taken);
   }
 
+  /// Hands the staged files to the send of a new post and clears the composer; null without
+  /// files (FNCA/2). Each copy moves from the staging folder into the outgoing folder, which
+  /// the upload reads and deletes after it (D-M4-22-5), and the result names the upload
+  /// entries to write ([MessageAttachments.requests], their ID the attachment key) before the
+  /// post. When a copy cannot be moved the files stay staged and the error goes on.
+  Future<MessageAttachments?> takeStaged() async {
+    final staging = _staging;
+    if (staging == null) throw StateError('the files are not staged');
+    if (_items.isEmpty) return null;
+    final taken = List.of(_items);
+    final from = await staging();
+    final to = await _outgoing();
+    await to.create(recursive: true);
+    final moved = <String>[];
+    final requests = <OutboxRequest>[];
+    try {
+      for (final a in taken) {
+        final source = _staged[a.key]!;
+        final sep = Platform.pathSeparator;
+        await _moveDirectory(
+          '${from.path}$sep${a.key}',
+          '${to.path}$sep${a.key}',
+        );
+        moved.add(a.key);
+        final file = source.path.split(sep).last;
+        requests.add(
+          UploadOps.request(
+            threadId: thread,
+            channelId: channel,
+            source: UploadSource(
+              path: '${to.path}$sep${a.key}$sep$file',
+              name: source.name,
+              sizeBytes: source.sizeBytes,
+              sha256: source.sha256,
+              mimeType: source.mimeType,
+            ),
+            key: a.key,
+            owned: true,
+            id: a.key,
+          ),
+        );
+      }
+    } on FileSystemException {
+      // The copies moved so far go back, so the staged files stay as they were.
+      for (final key in moved) {
+        final sep = Platform.pathSeparator;
+        await _moveDirectory('${to.path}$sep$key', '${from.path}$sep$key');
+      }
+      rethrow;
+    }
+    _items.clear();
+    _staged.clear();
+    refusal = null;
+    notifyListeners();
+    return MessageAttachments(
+      keys: [for (final a in taken) a.key],
+      uploads: [for (final r in requests) r.id!],
+      preview: _previewOf(taken),
+      requests: requests,
+    );
+  }
+
+  static List<Map<String, Object?>> _previewOf(List<PendingAttachment> items) =>
+      [
+        for (final a in items)
+          {'key': a.key, 'name': a.name, 'size_bytes': a.sizeBytes},
+      ];
+
   MessageAttachments _attachmentsOf(List<PendingAttachment> items) =>
       MessageAttachments(
         keys: [for (final a in items) a.key],
-        uploads: [for (final a in items) a.entryId],
+        uploads: [for (final a in items) ?a.entryId],
         fileIds: {
           for (final a in items) a.key: ?_progress.completedFileOf(a.key),
         },
-        preview: [
-          for (final a in items)
-            {'key': a.key, 'name': a.name, 'size_bytes': a.sizeBytes},
-        ],
+        preview: _previewOf(items),
       );
 
   /// The upload entry of the recording [file] (`audio/mp4`, 12 8.1) and the attachments of
@@ -428,6 +541,22 @@ Future<T> withMovedFile<T>(
   } on Object {
     await _move(to, from);
     rethrow;
+  }
+}
+
+/// Moves the folder [from] to [to]: a rename, or a copy of its files and a delete on another
+/// volume.
+Future<void> _moveDirectory(String from, String to) async {
+  try {
+    await Directory(from).rename(to);
+  } on FileSystemException {
+    await Directory(to).create(recursive: true);
+    await for (final e in Directory(from).list()) {
+      if (e is File) {
+        await e.copy('$to${Platform.pathSeparator}${e.uri.pathSegments.last}');
+      }
+    }
+    await Directory(from).delete(recursive: true);
   }
 }
 

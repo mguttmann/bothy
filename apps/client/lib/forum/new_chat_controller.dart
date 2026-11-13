@@ -132,19 +132,23 @@ final class NewChatController extends ChangeNotifier {
       for (final t in _tags)
         if (!_order.contains(t)) t,
     ];
-    final entry = await _outbox.enqueue(
+    // The staged files (FEAT-NEW-CHAT-ATTACH, FNCA/2) go as their upload entries and the post
+    // that waits for them, in one batch: the app quitting in between leaves all or nothing.
+    final entries = await _outbox.enqueueAll([
+      ...?attachments?.requests,
       ThreadOps.postRequest(
         forum: forum,
         // An empty title stays empty: the agent names the chat (09 12 rule 2).
         title: title.text.trim(),
         contentMd: body,
         tagIds: ordered,
-        // A long paste or the rest of a long text (M4-47): the post waits for its uploads.
+        // Pasted, picked, dropped or photographed files, a long paste or the rest of a long
+        // text (M4-47): the post waits for its uploads.
         attachments: attachments,
         clearDraft: true,
       ),
-    );
-    _sentEntry = entry.id;
+    ]);
+    _sentEntry = entries.last.id;
     // The server deletes its draft with the first message; the stored copy goes now, so the
     // draft row becomes the row of the sent post (01 6.8 item 8).
     await _dropStoredDraft();

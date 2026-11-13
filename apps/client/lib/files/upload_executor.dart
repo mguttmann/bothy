@@ -97,6 +97,13 @@ final class UploadProgress extends ChangeNotifier {
 /// | Kind | Payload | Lane |
 /// |---|---|---|
 /// | `upload` | `channel_id`, `path`, `name`, `size_bytes`, `sha256`, `declared_mime_type`, `attachment_key`; after the announcement `upload_session` | `upload:<channel id>` |
+/// | `releaseUpload` | `channel_id`, `attachment_key`, `file_id` when known | `upload:<channel id>` |
+///
+/// `releaseUpload` deletes the file of an upload whose post was discarded before the server
+/// created it (`deleteFile`, which aborts an open session too; 12 12): it runs in the lane of
+/// the uploads, so after an attempt that was under way when the post was discarded, and takes
+/// the file ID of that attempt from [UploadProgress] when its entry did not keep one
+/// (FEAT-NEW-CHAT-ATTACH, ruling FNCA/4).
 ///
 /// A message with attachments names its uploads in `depends_on` and holds
 /// `attachment_keys` (the keys in their order), `attachment_preview` (name and size for the
@@ -108,6 +115,9 @@ final class UploadProgress extends ChangeNotifier {
 abstract final class UploadOps {
   /// The kind of an upload entry.
   static const String upload = 'upload';
+
+  /// The kind of the entry that deletes the file of a discarded upload on the server.
+  static const String releaseUpload = 'releaseUpload';
 
   /// The payload member of an upload entry that keeps its session for the next attempt:
   /// `{"entry": <entry id>, "file_id": ..., "mode": ...}` (FIX-upload-retry-storm).
@@ -149,6 +159,22 @@ abstract final class UploadOps {
     },
   );
 
+  /// The entry that deletes on the server the file of the upload of attachment [key] in
+  /// [channelId]: [fileId] when the discarded entry kept its session, else the file the upload
+  /// progress of this run knows for [key] when the entry runs (none: nothing to delete).
+  static OutboxRequest releaseRequest({
+    required String channelId,
+    required String key,
+    String? fileId,
+  }) => OutboxRequest(
+    kind: releaseUpload,
+    payload: {
+      'channel_id': channelId,
+      'attachment_key': key,
+      'file_id': ?fileId,
+    },
+  );
+
   /// The lane of the upload entry [e]: one per channel, so the files of a message (and of the
   /// other messages of that conversation) upload one after another, in the order they were
   /// attached, never in parallel against one bucket of `rl.upload` (FIX-upload-retry-storm).
@@ -169,11 +195,47 @@ abstract final class UploadOps {
     Dio? objectStore,
   }) {
     final store = objectStore ?? Dio();
-    registry.register(
-      upload,
-      (e, ctx) => _send(api, store, baseUrl, progress, e, ctx),
-      lane: laneOf,
-    );
+    registry
+      ..register(
+        upload,
+        (e, ctx) => _send(api, store, baseUrl, progress, e, ctx),
+        lane: laneOf,
+      )
+      ..register(
+        releaseUpload,
+        (e, ctx) => _release(api, progress, e),
+        lane: laneOf,
+      );
+  }
+
+  /// Deletes the file of a discarded upload (`deleteFile`): `204` once deleted (an open session
+  /// is aborted with it). Any other final answer ends the entry as well, so nothing stays in the
+  /// outbox that the person could neither see nor change: a file that is gone (`404`), one a
+  /// message attached after all (`409 conflict` with `reason` `file_attached`: the post was
+  /// created and its answer was lost), or a refusal (`403` after a lost right), whose open
+  /// session the server's cleanup expires after `file.upload_session_ttl` (12 12). A network
+  /// error, `5xx` and `429` are tried again like every entry.
+  static Future<OutboxResponse> _release(
+    ApiClient api,
+    UploadProgress progress,
+    OutboxEntry e,
+  ) async {
+    final p = decodePayload(e.payload);
+    final key = p['attachment_key'] as String?;
+    final fileId =
+        p['file_id'] as String? ??
+        (key == null
+            ? null
+            : progress.completedFileOf(key) ?? progress.sessionFileOf(key));
+    // No session was announced for it: nothing is on the server.
+    if (fileId == null) return const OutboxResponse(status: 204);
+    try {
+      final done = await api.getFilesApi().deleteFile(fileId: fileId);
+      return OutboxResponse(status: done.statusCode);
+    } on DioException catch (error) {
+      if (classify(error).outcome == OutcomeClass.retry) rethrow;
+      return OutboxResponse(status: error.response?.statusCode);
+    }
   }
 
   static Future<OutboxResponse> _send(
@@ -419,6 +481,7 @@ final class MessageAttachments {
     required this.uploads,
     this.fileIds = const {},
     this.preview = const [],
+    this.requests = const [],
   });
 
   /// The attachment keys in their order.
@@ -426,6 +489,12 @@ final class MessageAttachments {
 
   /// The upload entries the message waits for.
   final List<String> uploads;
+
+  /// The upload entries still to be written, in their order, when the files were staged (the
+  /// first message of a new post, FEAT-NEW-CHAT-ATTACH ruling FNCA/2): the caller writes them
+  /// and the message in one batch (`Outbox.enqueueAll`); [uploads] are their IDs. Empty when
+  /// the upload entries exist already.
+  final List<OutboxRequest> requests;
 
   /// The file IDs of uploads confirmed already, by key.
   final Map<String, String> fileIds;

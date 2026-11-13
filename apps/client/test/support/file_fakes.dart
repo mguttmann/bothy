@@ -12,6 +12,7 @@ import 'package:client/files/file_ports.dart';
 import 'package:client/files/ticket_player.dart';
 import 'package:client/files/upload_executor.dart';
 import 'package:client/phone/compose/media_picker.dart';
+import 'package:client/sync/thread_ops.dart';
 import 'package:client/voice/recorder.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/widgets.dart';
@@ -304,11 +305,13 @@ class UploadHarness {
     this.folder,
   );
 
-  /// Starts the fake (parts of [partBytes]) and the outbox (started); [readRetry] is the read
-  /// retry of Alex's REST client (none by default).
+  /// Starts the fake (parts of [partBytes]) and the outbox (not started); [readRetry] is the
+  /// read retry of Alex's REST client (none by default). With [posts] the outbox also sends new
+  /// forum posts (`createThread` and the forum's draft writes, as the app registers them).
   static Future<UploadHarness> start({
     int partBytes = 4,
     ReadRetryPolicy? readRetry,
+    bool posts = false,
   }) async {
     final server = await FakeServer.start();
     final seed = WorldSeed.standard(server.world);
@@ -319,6 +322,7 @@ class UploadHarness {
     final progress = UploadProgress();
     final executors = OutboxExecutors();
     MessageOps.register(executors, alex.auth.api);
+    if (posts) ThreadOps.register(executors, alex.auth.api, (_) async {});
     UploadOps.register(
       executors,
       alex.auth.api,

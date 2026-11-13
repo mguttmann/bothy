@@ -37,7 +37,8 @@ String? attachRefusalText(
 };
 
 /// The chips of [attach]; [views] are the outbox entries of the composer's thread, or null
-/// where there is no thread yet (a new post: the state then follows the upload progress).
+/// where there is no thread yet (the state then follows the upload progress). A staged file of
+/// a new post (FEAT-NEW-CHAT-ATTACH, FNCA/2) has no upload yet and shows no state.
 /// [onInsertAsText] puts the text of a long paste back into the field.
 class ComposerAttachmentChips extends ConsumerWidget {
   /// Creates the chips.
@@ -104,7 +105,11 @@ class ComposerAttachmentChips extends ConsumerWidget {
     // follows the progress of the upload until it is confirmed.
     final fileId = progress.completedFileOf(a.key);
     final AttachmentState state;
-    if (view != null) {
+    if (a.entryId == null) {
+      // A staged file of a new post: nothing is uploaded before the send (FNCA/2), so the chip
+      // shows no upload state.
+      state = AttachmentState.ready;
+    } else if (view != null) {
       state = stateOfUpload(view);
     } else if (fileId != null) {
       state = stateAfterUpload(ref.watch(fileMetaProvider(fileId)).value);
