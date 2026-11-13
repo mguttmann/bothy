@@ -22,6 +22,15 @@ The usage values are carried through record and replay here; the stream reader l
 ``rate_limit_event`` with AR-06, which acts on the mark. The nudge mark and the autonomous count
 are fed by the input flags of the record, which AR-05 and AR-07 write.
 
+An account error (`claude_code_runner.account`) of a process that holds or held background work
+sets no failure mark: it starts a wait (`AccountWait`), during which stdin stays open and
+`ProcessState.decide` asks for a retry line after each pause of the schedule and, once
+``runner.account_retry_max_wait`` has passed, for giving up (09 18.9, FIX-RUNNER-LIMIT-KEEPS-RUN).
+The wait is rebuilt by the replay like everything else here and so starts again at the adoption:
+the process is kept longer, never shorter. What the runner itself adds (a retry written, the
+wait given up, the process ended) goes through `ProcessState.account_retried`,
+`ProcessState.give_up` and `ProcessState.process_ended`.
+
 Examples:
     >>> state = ProcessState(has_stdin=True)
     >>> state.apply({"type": "result", "subtype": "success"}, 10.0)
@@ -37,11 +46,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from claude_code_runner.account import AccountError, AccountRetry, account_error
 from claude_code_runner.background import BackgroundWork
 from claude_code_runner.followups import stdin_close_due
 from claude_code_runner.streamreader import StreamReader
 
-__all__ = ["Decision", "ProcessState", "UsageMark", "replayed_lines"]
+__all__ = ["AccountWait", "Decision", "ProcessState", "UsageMark", "replayed_lines"]
 
 _ALLOWED = frozenset({"allowed", "allowed_warning"})
 _WAKE_COMMAND = "bothy-wake"
@@ -61,6 +71,10 @@ class Decision(Enum):
     """Close stdin now: after a ``result`` with nothing pending, or after an error ``result``."""
     STOP = "stop"
     """Stop the group: the process outlived an error ``result`` by ``runner.stop_grace``."""
+    RETRY = "retry"
+    """Write the retry line now: the pause after an account error has passed (09 18.9)."""
+    GIVE_UP = "give_up"
+    """End the wait for the account: ``runner.account_retry_max_wait`` has passed."""
 
 
 @dataclass(frozen=True)
@@ -76,6 +90,24 @@ class UsageMark:
     rate_limit_type: str | None
 
 
+@dataclass
+class AccountWait:
+    """The wait of a process for its account after an account error (09 18.9).
+
+    Attributes:
+        error: The account error of the turn that failed last.
+        since: When the first account error of this wait was read.
+        last_at: When the last account error was read or the last retry line was written; the
+            pause before the next retry counts from here.
+        retries: The retry lines written in this wait.
+    """
+
+    error: AccountError
+    since: float
+    last_at: float
+    retries: int = 0
+
+
 class ProcessState:
     """The stream-derived state of one turn process; see the module docstring.
 
@@ -87,6 +119,9 @@ class ProcessState:
             ``launching`` record, 18.19.5).
         nudges: The ``uuid`` of every input line flagged as the nudge (18.19.11).
         autonomous: The ``uuid`` of every autonomous input line (a wake input, 5.8.6).
+        account_retry: The pauses and the bound of the retries after an account error
+            (``runner.account_retry_*``); ``None`` means no retry: an account error is then an
+            error ``result`` like any other.
 
     Attributes:
         background: The background work of the process.
@@ -102,6 +137,12 @@ class ProcessState:
         idle: The current input's turn made no tool call other than ``bothy-wake``.
         autonomous_inputs: Autonomous inputs taken in a row (reset by a person's input).
         last_line_at: The read time of the last line (the quiet window's clock).
+        account: The wait for the account while one runs, else ``None``.
+        account_error: The account error behind the failure mark, when the failed turn ended
+            with one (the run's summary names it); ``None`` for any other error.
+        account_retries: The retry lines written before that failure mark was set; ``None``
+            when none was written (the runner did not wait, or the wait ended before its
+            first retry).
     """
 
     def __init__(
@@ -111,6 +152,7 @@ class ProcessState:
         outage: int = 0,
         nudges: Collection[str] = (),
         autonomous: Collection[str] = (),
+        account_retry: AccountRetry | None = None,
     ) -> None:
         """Start the state of a process; see the class docstring."""
         self.has_stdin = has_stdin
@@ -127,6 +169,12 @@ class ProcessState:
         self.autonomous_inputs = 0
         self._nudges = set(nudges)
         self._autonomous = set(autonomous)
+        self.account: AccountWait | None = None
+        self.account_error: AccountError | None = None
+        self.account_retries: int | None = None
+        self._retry = account_retry
+        self._turn_error: AccountError | None = None
+        # The account error of the turn's last own assistant message, until its result.
 
     # ---- the one writer --------------------------------------------------------------------
 
@@ -150,6 +198,12 @@ class ProcessState:
                 self.last_result_at = now
             if not _success(message):
                 self._error_result(now)
+            elif message.get("num_turns") != 0:
+                # An answered turn: the account works. A result of a turn without a request
+                # to the model (num_turns 0, a task's notification the CLI only notes) is no
+                # such proof and leaves the wait as it is.
+                self.account = None
+            self._turn_error = None
         elif kind == "system" and subtype == "background_tasks_changed":
             self._task_list(message.get("tasks"))
         elif kind == "rate_limit_event":
@@ -158,6 +212,10 @@ class ProcessState:
             self._input_taken(message.get("uuid"))
         elif kind == "assistant":
             self._tool_calls(message)
+            if message.get("parent_tool_use_id") is None:
+                # Only the turn's last own message counts: an answer after an API error
+                # means the turn went on.
+                self._turn_error = account_error(message)
 
     def _error_result(self, now: float) -> None:
         if not self.has_stdin:
@@ -166,9 +224,28 @@ class ProcessState:
             # A usage error never sets the failure mark, also not after the mark clears.
             self.usage_error = True
             return
-        if self.failed_at is None:
-            self.failed_at = now
-            self.lost_tasks = len(self.background.running)
+        if self.failed_at is not None:
+            return
+        error = self._turn_error
+        held = self.account is not None or self.background.seen
+        if error is not None and self._retry is not None and held:
+            # An account error says nothing about the turn: the process and its background
+            # work are kept, and the turn is tried again after a short pause (09 18.9).
+            if self.account is None:
+                self.account = AccountWait(error, since=now, last_at=now)
+            else:
+                self.account.error = error
+                self.account.last_at = now
+            return
+        self._fail(now, error)
+
+    def _fail(self, now: float, error: AccountError | None) -> None:
+        """Set the failure mark; a wait for the account ends with it."""
+        wait, self.account = self.account, None
+        self.failed_at = now
+        self.lost_tasks = len(self.background.running)
+        self.account_error = error
+        self.account_retries = wait.retries if wait is not None and wait.retries else None
 
     def _task_list(self, tasks: object) -> None:
         if not isinstance(tasks, list):
@@ -267,7 +344,7 @@ class ProcessState:
         """`BackgroundWork.holds` of the process."""
         return self.background.holds(now, quiet)
 
-    def decide(  # noqa: PLR0913 - the inputs of the rule, all keyword-only
+    def decide(  # noqa: PLR0911, PLR0913 - one answer per check; keyword-only inputs
         self,
         now: float,
         *,
@@ -296,6 +373,17 @@ class ProcessState:
             return Decision.CLOSE
         if self.failed_at is not None and now - self.failed_at >= stop_grace:
             return Decision.STOP
+        wait = self.account
+        if wait is not None and self._retry is not None:
+            if not stdin_open:
+                # No retry line can be written: the error counts like any other error result.
+                return Decision.STOP if now - wait.last_at >= stop_grace else Decision.NONE
+            if not self.background.turn_open and not self.background.input_waiting:
+                if now - wait.since >= self._retry.max_wait:
+                    return Decision.GIVE_UP
+                if now - wait.last_at >= self._retry.pause(wait.retries):
+                    return Decision.RETRY
+            return Decision.HOLD  # stdin stays open for the retry, with or without a task
         if stdin_open and self.background.holds(now, followup_grace):
             return Decision.HOLD
         if self.background.input_waiting:
@@ -310,11 +398,56 @@ class ProcessState:
     def lost_at_stop(self) -> int:
         """The running tasks at the stop after an error; kept as the lost count.
 
+        A wait for the account that the stop ends (stdin was not open, so no retry could be
+        written) becomes the failure mark of its last error.
+
         Returns:
             The count of tasks the stop ends.
         """
+        self._settle()
         self.lost_tasks = len(self.background.running)
         return self.lost_tasks
+
+    # ---- what the runner adds to a wait for the account -------------------------------------
+
+    def account_retried(self, now: float) -> int:
+        """The runner writes a retry line now; the next pause counts from here.
+
+        Args:
+            now: The monotonic time.
+
+        Returns:
+            The number of this retry in the wait, from 1 (0 without a wait).
+        """
+        wait = self.account
+        if wait is None:
+            return 0
+        wait.retries += 1
+        wait.last_at = now
+        return wait.retries
+
+    def give_up(self, now: float) -> None:
+        """End the wait for the account: its error is the turn's error from ``now`` on.
+
+        The failure mark is set at ``now``, so stdin closes and the stop of 18.5 follows
+        ``runner.stop_grace`` later, as after any error ``result``.
+
+        Args:
+            now: The monotonic time.
+        """
+        wait = self.account
+        if wait is not None and self.failed_at is None:
+            self._fail(now, wait.error)
+
+    def process_ended(self) -> None:
+        """The process ended during a wait for the account: its last account error ended it."""
+        self._settle()
+
+    def _settle(self) -> None:
+        """A wait that ends without an answered turn becomes the failure mark of its error."""
+        wait = self.account
+        if wait is not None and self.failed_at is None:
+            self._fail(wait.last_at, wait.error)
 
 
 def _success(result: Mapping[str, Any]) -> bool:

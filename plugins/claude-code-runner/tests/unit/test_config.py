@@ -185,6 +185,29 @@ def test_example_lists_every_runner_key() -> None:
     assert set(example["runner"]) == fields
 
 
+def test_account_retry_keys(tmp_path: Path) -> None:
+    """``runner.account_retry_*`` (09 18.9): one minute, two, then every three, for 20 minutes."""
+    cfg = load_config(write(tmp_path))
+    assert (cfg.account_retry_first, cfg.account_retry_second) == (60.0, 120.0)
+    assert (cfg.account_retry_interval, cfg.account_retry_max_wait) == (180.0, 1200.0)
+    cfg = load_config(
+        write(
+            tmp_path,
+            'account_retry_first = "30s"\naccount_retry_second = "45s"\n'
+            'account_retry_interval = "90s"\naccount_retry_max_wait = "15m"\n',
+        )
+    )
+    assert (cfg.account_retry_first, cfg.account_retry_second) == (30.0, 45.0)
+    assert (cfg.account_retry_interval, cfg.account_retry_max_wait) == (90.0, 900.0)
+    # A pause of zero would write a retry line at every poll; the bound may be zero: off.
+    for key in ("account_retry_first", "account_retry_second", "account_retry_interval"):
+        with pytest.raises(ConfigError, match=key):
+            load_config(write(tmp_path, f'{key} = "0s"\n'))
+    assert (
+        load_config(write(tmp_path, 'account_retry_max_wait = "0s"\n')).account_retry_max_wait == 0
+    )
+
+
 def test_provision_keys(tmp_path: Path) -> None:
     cfg = load_config(write(tmp_path))
     assert cfg.git_bin == "git"

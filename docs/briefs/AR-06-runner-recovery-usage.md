@@ -12,6 +12,7 @@ After this ticket lost background work leads to a recovery run that lists it, or
 - Design note sections 2.3 and backlog item 18.
 - Code on the base branch: `plugins/claude-code-runner/src/claude_code_runner` (`streamreader.py` `KNOWN_TYPES`, `processstate.py`, `runturn.py`, `recovery.py`, `failures.py`, `causes.py`, `adoption.py`, `wakes/`), `tests/real_cli/captured/`.
 - Design note `docs/design/autonomous-runs.md` (context and evidence; where it differs from the chapters, the chapters win); ADR 0077; `docs/decisions.d/AR-01.md`.
+- `docs/decisions.d/FIX-RUNNER-LIMIT-KEEPS-RUN.md` and 09 18.9 "Account errors" (added 2026-11-13, after this brief was written): an account error of a held process, a used-up usage window included, is already kept and tried again after short pauses (`account.py`, `ProcessState.account`). The usage mark of this ticket is checked before that rule in `ProcessState._error_result`. Decide in `docs/decisions.d/AR-06.md` how the wake-up at the reset and the short retry meet once the frame sets the mark (for example: the retry runs first and the wake-up is created when it gives up), and flag the retry line as neither a person's nor an autonomous input where this ticket or AR-07 reads those marks.
 
 ## Fixed requirements that apply
 

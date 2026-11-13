@@ -1,1 +1,1 @@
-{"type":"fixture_meta","origin":"constructed","cli_version":"2.1.321","source":"pinned CLI file claude 2.1.321: the API error text without a login","channel":"assistant","error_text":"Not logged in · Please run /login"}
+{"type":"fixture_meta","origin":"constructed","cli_version":"2.1.321","source":"pinned CLI file claude 2.1.321: the API error text without a login and the value authentication_failed of its member error (read 2026-11-13)","channel":"assistant","error_text":"Not logged in · Please run /login","members":{"error":"authentication_failed"}}

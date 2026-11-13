@@ -40,12 +40,16 @@ class ApiError:
         message: ``error.message`` of the body.
         details: ``error.details`` of the body, if any (the API names a typed error kind there
             as ``error_code``).
+        headers: Further response headers, if any (``x-should-retry: false`` makes the CLI
+            give the error to the turn at once instead of trying the request again for
+            minutes).
     """
 
     status: int
     kind: str
     message: str
     details: Mapping[str, Any] | None = field(default=None)
+    headers: Mapping[str, str] | None = field(default=None)
 
     def body(self) -> dict[str, Any]:
         """Return the JSON body."""
@@ -100,7 +104,7 @@ class StandIn(BaseHTTPRequestHandler):
                     " ".join(str(b.get("text") or b.get("name") or "") for b in answer)
                 )
         if isinstance(answer, ApiError):
-            self._json(answer.body(), status=answer.status)
+            self._json(answer.body(), status=answer.status, headers=answer.headers)
             return
         self._message(body, [dict(block) for block in answer])
 
@@ -169,11 +173,15 @@ class StandIn(BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
 
-    def _json(self, value: Any, status: int = 200) -> None:
+    def _json(
+        self, value: Any, status: int = 200, headers: Mapping[str, str] | None = None
+    ) -> None:
         data = json.dumps(value).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
+        for name, header in (headers or {}).items():
+            self.send_header(name, header)
         self.end_headers()
         self.wfile.write(data)
 

@@ -17,7 +17,9 @@ environment of a turn drops every control variable. Commands:
   ``result`` and exits after stdin EOF. SIGINT ends it with ``error_during_execution``.
   With ``background_gate`` the turn starts a background job that runs until the test creates
   the gate file, and the process stays between turns meanwhile (`Fake.background_phase`);
-  together with ``api_error`` the turn fails after it started the job.
+  together with ``api_error`` the turn fails after it started the job. With ``account_gate``
+  the account does not work until the test creates that file: every turn of a held process
+  fails meanwhile with the API error of ``background_api_error``.
   With ``lost_notifications`` the turn first plays the resume after lost background work
   (`Fake.lost_work_turns`).
   ``{{tmpdir}}`` and ``{{add_dir}}`` in a fixture, in ``result_override`` or in
@@ -285,9 +287,9 @@ class Fake:
                 # error result comes while the job runs and the process stays for it, with
                 # ``background_survives_eof`` also after the end of stdin (`background_phase`).
                 self.start_background()
-                self.emit_api_error(_meta(str(error))["error_text"])
+                self.emit_api_error(*_error(str(error)))
                 return self.background_phase(lines, 0, 1)
-            return self.api_error(_meta(str(error))["error_text"], lines)
+            return self.api_error(str(error), lines)
         if self.scenario.get("hold"):
             self.sleep(600.0)
         # Like the CLI: user lines queued while the turn ran are folded into it, and its
@@ -359,9 +361,7 @@ class Fake:
                 self.emit(meta)
                 continue
             if self.scenario.get("api_error_on_followup"):
-                self.emit_api_error(
-                    _meta(str(self.scenario["api_error_on_followup"]))["error_text"]
-                )
+                self.emit_api_error(*_error(str(self.scenario["api_error_on_followup"])))
                 continue
             self.emit(
                 {**self.followup_result(answered, result), "user_message_uuids": [_uuid_of(line)]}
@@ -461,6 +461,12 @@ class Fake:
         * With ``background_survives_eof``: the end of stdin does not stop the job; the process
           stays until the job ends or a signal comes, as the pinned CLI did on 2026-11-01 for
           about ten minutes after a failed turn (``eof_with_background``).
+        * With ``account_gate``: until the test creates it the account does not work, as when
+          its usage window is used up. The turn of every further stdin line then fails with
+          the API error of ``background_api_error`` after its echo
+          (``account_refused``), and so does the notification turn of the job's end; the
+          process and the job stay, as the pinned CLI kept them on 2026-11-13 after a refused
+          request. Once the gate exists every turn is answered again.
         """
         gate = Path(str(self.scenario["background_gate"]))
         error_gate = self.scenario.get("background_error_gate")
@@ -477,12 +483,16 @@ class Fake:
                 error_gate = None
                 self.record("background_turn_failed")
                 self.emit(self.init_line())
-                self.emit_api_error(_meta(str(self.scenario["background_api_error"]))["error_text"])
+                self.emit_api_error(*_error(str(self.scenario["background_api_error"])))
             line, done = lines.wait(answered, 0.01)
             if line is not None:
                 answered += 1
                 self.emit(self.init_line())
                 self.echo(line)
+                if self.account_down():
+                    self.record("account_refused", line=_uuid_of(line))
+                    self.emit_api_error(*_error(str(self.scenario["background_api_error"])))
+                    continue
                 state = "still running" if running else "finished"
                 self.emit(
                     {
@@ -537,6 +547,11 @@ class Fake:
             }
         )
         self.emit(self.init_line())
+        if self.account_down():
+            # The notification turn of the last task meets an account that does not work.
+            self.record("account_refused", line="")
+            self.emit_api_error(*_error(str(self.scenario["background_api_error"])))
+            return
         self.emit(
             {
                 "type": "result",
@@ -546,6 +561,11 @@ class Fake:
                 "result": str(self.scenario.get("background_text", "The suite passed.")),
             }
         )
+
+    def account_down(self) -> bool:
+        """With ``account_gate``: whether the account does not work yet (the gate is missing)."""
+        gate = self.scenario.get("account_gate")
+        return bool(gate) and not Path(str(gate)).exists()
 
     # ---- M2-35: sessions, compaction, errors and follow-ups ----------------------------------
 
@@ -630,20 +650,28 @@ class Fake:
         self.record("turn_end", code=0)
         return 0
 
-    def api_error(self, text: str, lines: _StdinLines) -> int:
+    def api_error(self, name: str, lines: _StdinLines) -> int:
         """An API error as the CLI writes it: an assistant message, then an error result."""
-        self.emit_api_error(text)
+        self.emit_api_error(*_error(name))
         lines.read_all()
         self.record("turn_end", code=1)
         return 1
 
-    def emit_api_error(self, text: str) -> None:
+    def emit_api_error(self, text: str, members: dict[str, Any] | None = None) -> None:
+        """The API error message and its error result.
+
+        ``members`` are the further members the pinned CLI writes on the message (``error``,
+        ``api_error_status``, ``api_error``, ``api_error_params`` and others, as the fixture
+        names them); the result repeats those the CLI repeats there.
+        """
+        members = dict(members or {})
         self.emit(
             {
                 "type": "assistant",
                 "session_id": self.session_id,
                 "parent_tool_use_id": None,
                 "is_api_error_message": True,
+                **members,
                 "message": {
                     "id": "msg_err",
                     "model": "<synthetic>",
@@ -652,6 +680,9 @@ class Fake:
                 },
             }
         )
+        repeated = {k: v for k, v in members.items() if k in _RESULT_MEMBERS}
+        if members:
+            repeated.update(terminal_reason="api_error", num_turns=1)
         self.emit(
             {
                 "type": "result",
@@ -659,6 +690,7 @@ class Fake:
                 "is_error": True,
                 "session_id": self.session_id,
                 "result": text,
+                **repeated,
                 "modelUsage": _usage(self.model, 300, 0.003),
             }
         )
@@ -813,6 +845,16 @@ def _text_of(raw: str) -> str:
 def _meta(name: str) -> dict[str, Any]:
     meta: dict[str, Any] = json.loads((FIXTURES / f"{name}.jsonl").read_text().splitlines()[0])
     return meta
+
+
+_RESULT_MEMBERS = ("api_error_status", "api_error", "api_error_code", "api_error_origin")
+"""The members of an API error message that the pinned CLI repeats on the turn's result."""
+
+
+def _error(name: str) -> tuple[str, dict[str, Any] | None]:
+    """The text and the further message members of the API error fixture ``name``."""
+    meta = _meta(name)
+    return str(meta["error_text"]), meta.get("members")
 
 
 def _usage(model: str, tokens: int, cost: float) -> dict[str, Any]:

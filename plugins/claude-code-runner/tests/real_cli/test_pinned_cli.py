@@ -74,6 +74,17 @@ READ_TOKENS = (
     "skip_transcript",
     # FIX-runner-hold-background: an input line the CLI has queued and not started yet.
     "command_uuid",
+    # FIX-RUNNER-LIMIT-KEEPS-RUN: the kinds of an account error in the member ``error`` of an
+    # API error message, the reset time of a usage limit, and the count of model turns of a
+    # ``result`` (09 18.9).
+    "rate_limit",
+    "authentication_failed",
+    "oauth_org_not_allowed",
+    "overloaded",
+    "api_error_params",
+    "rate_limit_info",
+    "resetsAt",
+    "num_turns",
 )
 # The names behind the findings of 09 18.19.12, 18.9 and 26 5 that were read from the CLI's
 # file; a name that left the CLI means its finding has to be read again.

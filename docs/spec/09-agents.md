@@ -3542,7 +3542,11 @@ pinned CLI may keep the process for its background work after that (about ten mi
 after a `result` with an error is stopped as in 18.6 (log code `turn_stopped_after_error`; the
 end is classified as before, the stop does not make it `stopped`); task steps still open then
 end `cancelled`, and the run ends by 18.9 (addendum of 2026-11-01,
-docs/decisions.d/FIX-runner-auth-failed-held.md). A run its turn completes carries the
+docs/decisions.d/FIX-runner-auth-failed-held.md). Addendum of 2026-11-13
+(docs/decisions.d/FIX-RUNNER-LIMIT-KEEPS-RUN.md): an error `result` of an account error in a
+process that holds or held background work neither closes stdin nor starts that stop while the
+turn is tried again (18.9 "Account errors"); only once `runner.account_retry_max_wait` has passed
+does it count as a `result` with an error. A run its turn completes carries the
 `summary` "Run ended; nothing is waiting, so this thread continues only when someone sends a
 message" with the code `run_ended_idle`: once the process has ended nothing waits on the thread,
 also when the last answer promised to go on later. The apps show the summary of a completed run
@@ -3694,7 +3698,8 @@ and continues the session.
 | Context full | compact exactly once, then the same prompt again; never twice. If the turn had already done work, the new turn gets a note in the runner prompt. Check the availability of `/compact` in print mode against the pinned version before building. |
 | Session missing in Claude Code | new session, prompt again, `agent_session.report` with a new reference, note once in the box (fail open) |
 | Session already exists at the first turn | continue with `--resume`, report `started = true` |
-| Runtime not logged in | `failed`, `runtime_not_authenticated` |
+| Runtime not logged in | `failed`, `runtime_not_authenticated`; at a turn of a process that holds or held background work only after the retries of "Account errors" below |
+| Account error at a turn: a usage or rate limit, a login that is gone, subscription access switched off, an overloaded API (addendum of 2026-11-13, R-AG-58) | a process that holds or held background work is kept, the run stays `running` and says why it waits, and the turn is tried again after short pauses ("Account errors" below); after `runner.account_retry_max_wait`, and at once for a process that never had background work, `failed` with `runtime_error` (a login that is gone: `runtime_not_authenticated`) and a `summary` that names the error |
 | Claude Code too old for the model (the API's answer "Claude Code <version> does not support this model; version <version> or newer is required", the minimum of an organization's policy, or since Claude Code 2.1.321 "Claude Code <version> or later is required for your organization", D-FIX-RUNNER-CLI-PIN-321-4) | `failed`, `runtime_error`, the last step names the required version and says to update Claude Code (never the API's text itself); the runner reports `degraded` with `runtime_version_unsupported` at once (18.2 "Version"), so further runs end in prepare without a turn (D-RUNNER-CLI-PIN-2) |
 | `result` with an error subtype | `failed`, `runtime_error`, error texts in the last step |
 | Crash of the runner | the turn keeps running; a new runner takes it over or ends it; no new turn |
@@ -3771,7 +3776,57 @@ process end the `summary` says that Claude Code lost its login on the runner hos
 run and that, once the login works again, the next message starts a new run that continues the
 same session; a `failed` end of a turn process after which background tasks were still running
 also names their count as stopped and lost, for `runtime_error` too (addendum of 2026-11-01,
-docs/decisions.d/FIX-runner-auth-failed-held.md). The failed turn is not repeated in the run.
+docs/decisions.d/FIX-runner-auth-failed-held.md). The failed turn is not repeated in the run,
+except by the rule of the next paragraph.
+
+Account errors (addendum of 2026-11-13, docs/decisions.d/FIX-RUNNER-LIMIT-KEEPS-RUN.md, R-AG-58).
+An account error is an API error message of the turn itself (`is_api_error_message`, no
+`parent_tool_use_id`) whose member `error` is `rate_limit`, `authentication_failed`,
+`oauth_org_not_allowed` or `overloaded`, followed by the turn's error `result` without an answer
+of the model in between; the runner calls the classes `usage_limit`, `not_logged_in`,
+`subscription_disabled` and `overloaded` and never reads the text of the error. Such an error
+says nothing about the turn: the same request can succeed a moment later without any change to
+the session. In a turn process the runner can write to and that holds or held background work
+(18.5; a turn the CLI starts for a task's notification, also the one of the last task, the turn
+of a follow-up, and a turn that fails after it started background work) the error therefore
+sets no failure mark:
+
+- stdin stays open, no signal is sent, the run stays `running`, the progress patches of 18.5 go
+  on while a task runs, and a follow-up is written at once as before;
+- `/status_line` (5.3) says that the run waits for the Claude Code account, the class of the
+  error, the reset time in UTC when the CLI gave one (`api_error_params.rate_limit_info.resetsAt`)
+  and when the next try comes; it is sent again after every further account error and every
+  retry and removed when the wait ends (log codes `account_wait_started`,
+  `account_wait_ended`);
+- the runner writes one input line of its own words, like every further input (18.19.7), after
+  `runner.account_retry_first`, a second after `runner.account_retry_second` and every further
+  one after `runner.account_retry_interval`, each pause counted from the last account error or,
+  without an answer, from the last retry line, and never while a turn runs or an input is queued
+  (log code `account_retry`). The line says that it is an automatic retry and no message of a
+  person, and to go on where the previous turn stopped; the input of the failed turn is still
+  part of the conversation, so the turn of the line answers it, and its answer is posted like
+  any other. The reset time of a usage limit is shown and never used as a waiting time;
+- the wait ends when a turn of the process is answered: a `result` without error that reports
+  at least one model turn (`num_turns` not 0; the CLI also writes a success `result` for a turn
+  it ends without a request to the model, which proves nothing about the account);
+- once `runner.account_retry_max_wait` has passed since the first account error of the wait
+  (`0s` switches the retry off), the error counts as a `result` with an error from that moment
+  (log code `account_wait_gave_up`): stdin closes, the stop of 18.5 follows `runner.stop_grace`
+  later, and the run ends as the table says. Any other error `result` during the wait is the
+  turn's own error and ends the wait the same way at once.
+
+A stop (18.6), a run the server ended, an orderly stop of the runner and a handover (18.19.3)
+work at every moment of the wait as at any other; a runner that adopts the turn with full
+rights (18.19.7) starts the wait again at the adoption, and a process that ends by itself during
+the wait ends the run by its last error. For a process the runner cannot write to (stdin
+closed, a compaction, a turn adopted with reading rights only) nothing changes: its account
+error is handled like any other error `result` (18.5). A process that never had background work
+ends at the first account error as the table says. The `summary` of a run an account error ended names the class of the error, the
+reset time when the CLI gave one, how often the runner tried again and that
+`runner.account_retry_max_wait` bounds that, or that the session had no background work to keep,
+then the lost tasks and what the next message does; it carries no name of the account, of the
+organization or of the host, and never the text of the CLI. The reason `usage_limited` (5.2)
+stays that of 18.19.10.
 
 Crash of the runner (18.2 "Detachment", D-M2-35-11): the turn record holds run, thread, channel,
 the session reference and mode, PID, group, the identity of the process (start time and command
@@ -4763,6 +4818,12 @@ The classification keys on the frame, not on the `result` text, because the text
 CLI from parts and is not fixed (18.19.12). A rejected request that ends a turn without a
 preceding `rejected` frame ends `runtime_error` as today, and lost work leads to 18.19.9.
 
+Addendum of 2026-11-13 (docs/decisions.d/FIX-RUNNER-LIMIT-KEEPS-RUN.md): until the stream reader
+knows the frame (AR-06) no mark is set, and a used-up window reaches the runner as an account
+error of 18.9, which keeps a process with background work and tries the turn again after short
+pauses. With the mark set this section decides: the mark is checked before that rule. AR-06
+decides how the wake-up at the reset and the short retry meet.
+
 #### 18.19.11 End state of every run
 
 With `runner.end_state` the runner prompt requires a last line `STATE: done`, `STATE: waiting` or
@@ -4813,6 +4874,8 @@ D-FIX-RUNNER-CLI-PIN-321-5); a finding that differs names both versions:
 | Hooks of the host user | the runner passes no `--setting-sources` and no `--bare`, so the user, project and local settings of the runner's host user load, their hooks included; a hook reaches every runner turn of that user (`CLAUDE_PRODUCT_RUN=1` lets it recognise one, 18.5) |
 | Usage limit frame | `rate_limit_event` is written by a listener on the CLI's rate-limit state, which the CLI updates from the response headers of every request, a refused one included (`anthropic-ratelimit-unified-status: rejected`, with `retry-after` when no overage takes over); the frame is therefore queued when the refused answer is read, before the turn's error `result`. Not run with a real session |
 | Usage limit `result` text | built from parts (for example "You've hit your" with "session limit", "weekly limit", "Opus limit", "Sonnet limit" and the reset time); not a fixed text, so 18.19.10 keys on the frame |
+| Kind of an API error (addendum of 2026-11-13, read in 2.1.321) | the `assistant` message of an API error carries the member `error`, one of `authentication_failed`, `oauth_org_not_allowed`, `account_on_hold`, `verification_required`, `billing_error`, `rate_limit`, `overloaded`, `invalid_request`, `model_not_found`, `server_error`, `unknown`, `max_output_tokens`, `cloud_credential_error`; a used-up usage window gives `rate_limit` with `api_error` `usage_limit_reached` and `api_error_params.rate_limit_info` (`resetsAt`, `rateLimitType`), by status the CLI gives `overloaded` to an answer with 529, `rate_limit` to one with 429, `authentication_failed` to one with 401 or 403 (`oauth_org_not_allowed` when that answer says that OAuth authentication is not allowed for the organization), and `server_error` to any other status from 408 on. 18.9 "Account errors" keys on this member |
+| Process after a refused request (addendum of 2026-11-13) | run 2026-11-13 with 2.1.321 against the local stand-in for the API (`tests/real_cli/test_refused_request.py`): after a request refused with 429 (and `x-should-retry: false`, without which the CLI tries the request again by itself for minutes) the turn ends with the API error message and an error `result`, the process stays with stdin open and its background task keeps running; a further input line starts a turn of its own that is answered, and its request carries the input of the failed turn in the same user message as the new line, also when the failed turn was one the CLI had started by itself for the notification of a finished background task (the request then carries the `<task-notification>` text). A turn the CLI ends without a request to the model writes a success `result` with `num_turns` 0 (as for each stopped task at a resume after lost work, docs/decisions.d/FIX-runner-hold-background.md; not run) |
 | Rate-limit scenarios | the strings hold a mock with scenarios such as `session-limit-reached` and `weekly-limit-reached` behind an internal command `mock-limits`; no caller of it is reachable in the released build, so a free real-CLI check cannot use it. AR-06 captures the frame and the `result` against a local stand-in for the API that answers 429 with these headers (the method of `tests/real_cli/captured`), which needs no login and costs nothing |
 | `--disallowedTools` under `bypassPermissions` | `bypassPermissions` "auto-approves every tool call (except explicit deny rules)"; a bare tool name in `--disallowedTools` is a deny rule and removes the tool; AR-05 confirms the tool list of `system/init` against the local API stand-in |
 | `Bash(bothy-wake:*)` with an environment prefix | the CLI strips only a fixed list of safe variables (for example `LANG`, `TZ`, `NO_COLOR`; not `PATH` or `TMPDIR`) before matching a prefix rule; any other prefix makes the command need approval, which `dontAsk` refuses. A safe prefix runs `bothy-wake` itself, so no other program can run under the rule |
@@ -4826,7 +4889,8 @@ the named pipe finding.
 Limits and their decision (design note section 3): the CLI background ceiling and shell sweep
 are made irrelevant (stdin closes only when no task runs, and a restart no longer closes it);
 session crons and `ScheduleWakeup` are replaced by wake-ups and disallowed; the Monitor timeout,
-`runner.followup_grace`, `runner.stop_grace` after an error (except after a usage-window end),
+`runner.followup_grace`, `runner.stop_grace` after an error (except after a usage-window end and
+while an account error is tried again, 18.9),
 the compaction once per run (per attempt kind, 18.19.6), `run.queued_max_age`,
 `agent.invocation_token_ttl`, `run.stall_after`, the slot wait and the service's exit timeout are
 kept; `runner.session_lock_wait` is irrelevant for handed-over turns, and a wake-up never starts a
@@ -4836,7 +4900,8 @@ A hosted agent's `--max-budget-usd` (26 5.3) ends a run visibly with its cap; `d
 of the hosted settings removes workflows and adds no time limit. New limits are named keys and
 visible when they end work: `run.wake_max_pending`, `run.wake_max_wait`, `run.wake_min_delay`,
 `run.usage_wake_max`, `run.autonomous_chain_max`, `run.autonomous_idle_max` (5.8),
-`runner.wake_check_failures` and `runner.wake_check_backoff_max`.
+`runner.wake_check_failures` and `runner.wake_check_backoff_max`; and, since 2026-11-13,
+`runner.account_retry_max_wait` (18.9), whose end the run's `summary` names.
 
 #### 18.19.13 Tests
 
@@ -4846,7 +4911,7 @@ PostgreSQL. Each test asserts what is stored, logged and shown.
 | No. | Scenario | Expected |
 |---|---|---|
 | AR-T01 | SIGTERM to a runner with a live turn, `runner.turn_handover` off | the turn is stopped, `stop_escalated` logged, the run ends `cancelled` with `adapter_stopped`; the record is removed only after the process exited; no process of the group is left |
-| AR-T02 | With the key: the runner in its own process group, SIGTERM (exit 75), then SIGKILL to that whole group; a new runner adopts. The fake CLI (`background_survives_eof`) starts a background job whose `background_tasks_changed` lies before the stored offset; after the restart a follow-up and a wake input run while the job runs; then the job's gate opens | keeper and CLI alive; each input is echoed and answered and its `result` leaves stdin open; the fake records no end of input before the job's notification turn; the adopter's stdin and stop decisions equal the old runner's for every recorded fake stream and checkpoint position; nothing replayed is posted again; the run is in the first heartbeat's `active_runs`; no heartbeat after the handover began. Variants: (a) two restarts in a row, `process_start` unchanged; (b) restart inside the quiet window with no later input: stdin closes `runner.followup_grace` after the adoption and the run completes; (c) an error `result` while the job runs before the checkpoint: the adopter stops the group `runner.stop_grace` after the adoption, logs `turn_stopped_after_error` with the lost task; (d) a turn whose stdin was closed before the handover and a compaction process are adopted with reading rights only; macOS variant under a scratch launchd job (AR-09) |
+| AR-T02 | With the key: the runner in its own process group, SIGTERM (exit 75), then SIGKILL to that whole group; a new runner adopts. The fake CLI (`background_survives_eof`) starts a background job whose `background_tasks_changed` lies before the stored offset; after the restart a follow-up and a wake input run while the job runs; then the job's gate opens | keeper and CLI alive; each input is echoed and answered and its `result` leaves stdin open; the fake records no end of input before the job's notification turn; the adopter's stdin and stop decisions equal the old runner's for every recorded fake stream and checkpoint position; nothing replayed is posted again; the run is in the first heartbeat's `active_runs`; no heartbeat after the handover began. Variants: (a) two restarts in a row, `process_start` unchanged; (b) restart inside the quiet window with no later input: stdin closes `runner.followup_grace` after the adoption and the run completes; (c) an error `result` that is no account error of 18.9 while the job runs before the checkpoint: the adopter stops the group `runner.stop_grace` after the adoption, logs `turn_stopped_after_error` with the lost task; (d) a turn whose stdin was closed before the handover and a compaction process are adopted with reading rights only; macOS variant under a scratch launchd job (AR-09) |
 | AR-T03 | SIGKILL of the runner; SIGKILL of the keeper; the CLI ends on its own in the starting and in an adopting runner | adoption as AR-T02; after the keeper kill the lost tasks are counted and a recovery run or the note follows; the keeper exits with the CLI's code, `<launch>.exit` carries the wait status, `exit_label` and the classification equal today's; the 18.6 stop leaves no process of the group |
 | AR-T04 | Handover in each phase (`preparing`, `waiting_lock`, `transcribing`, `compaction_retry`), and a runner killed at a test-only crash point after every step of 18.19.5 at the launch of every attempt kind, also between an attempt's end and the next `launching` record; a keeper that writes `<launch>.cli` after the runner's last look; a keeper killed before `<launch>.fed`; a CLI that stops reading inside an initial input larger than the pipe buffer; an outage in attempt 2, then a handover | `preparing` and `waiting_lock` restart through the inbox with exactly one `run.start` and no launch check; the fake CLI starts at most once per attempt and exactly once after the run completes; every initial input arrives exactly once with its `uuid` and before any follow-up; no unnamed keeper group is left; an adopted process that fills its context is compacted and retried within the once-per-run limits (a used compaction ends `runtime_error`); a record without a named pipe is adopted as 18.9 says; the adopter requests no new outage number; launch check refusals (tool class lowered, `trigger` lost, run already `stale`) launch nothing and log `launch_check_refused`; with the server unreachable nothing launches |
 | AR-T05 | A runner returns after `run.orphan_timeout` with a live turn | adoption stops it; a recovery run or the note follows through `run.wake.recover` |
@@ -4923,6 +4988,7 @@ PostgreSQL. Each test asserts what is stored, logged and shown.
 | R-AG-55 | Every run end carries the agent's end state and whether a wake-up is pending; a `waiting` end with nothing pending gets one nudge and then a visible note (18.19.11). | Freedom from silent ends as a data field, not a text heuristic. |
 | R-AG-56 | Without `runner.turn_handover` an orderly stop of the runner stops its live turns as in 18.6 and finishes their runs `cancelled` with `adapter_stopped`; it never orphans a turn (18.19.2). | Reproduced: SIGTERM left an orphan that held the locks and lost its work at the CLI's background ceiling, against 18.2 "Detachment". |
 | R-AG-57 | A Hermes session of a platform the profile lists for the mirror shows as one post of the mirror forum per session, without a run, read-only for people, and never holds or fails the session (17.13, addendum of 2026-11-07). | Owner goal: every session of an agent visible, also one another program drives; the foreign session must run on when the server is away. |
+| R-AG-58 | An account error at a turn (a usage or rate limit, a login that is gone, subscription access switched off, an overloaded API) does not end a run whose process holds or held background work: the runner keeps the process, shows why the run waits, and tries the turn again after short pauses (`runner.account_retry_first`, then `runner.account_retry_second`, then every `runner.account_retry_interval`), for at most `runner.account_retry_max_wait`; the reset time of a limit is shown and never waited for (18.9, addendum of 2026-11-13). | Owner report and decision of 2026-11-13: such a message ended a session with background work, although the error can clear a minute or two later; nothing went on until a person wrote (docs/decisions.d/FIX-RUNNER-LIMIT-KEEPS-RUN.md). |
 
 ## 20. Alignment with the core contract
 
@@ -5031,6 +5097,10 @@ configuration of the respective program outside the server.
 | `runner.followup_file_wait` | Runner | `2m` | longest wait for the server's check of a follow-up's attachments before the follow-up is written; a file still not ready is named as such (18.5, addendum of 2026-10-31) |
 | `runner.stop_grace` | Runner | `10s` | after SIGINT until SIGTERM |
 | `runner.kill_grace` | Runner | `5s` | after SIGTERM until SIGKILL; `runner.stop_grace` plus `runner.kill_grace` must stay below `agent.cancel_grace` of the server (18.6), which the runner cannot read |
+| `runner.account_retry_first` | Runner | `1m` | pause before the first retry of a turn that ended with an account error while its process holds or held background work (18.9); above zero |
+| `runner.account_retry_second` | Runner | `2m` | pause before the second retry (18.9); above zero |
+| `runner.account_retry_interval` | Runner | `3m` | pause before every further retry (18.9); above zero |
+| `runner.account_retry_max_wait` | Runner | `20m` | longest time from the first account error of a wait until the error ends the turn like any other (18.9); `0s` switches the retry off |
 | `runner.session_lock_wait` | Runner | `10m` | wait time for a busy session |
 | `runner.max_parallel_runs` | Runner | `4` | concurrent turns |
 | `runner.stream_log_retention` | Runner | `14d` | retention of the recordings |

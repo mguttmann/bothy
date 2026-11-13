@@ -12,6 +12,7 @@ After this ticket, with `runner.wakes`, an agent in a runner turn asks for a wak
 - `docs/spec/26-builtin-agents.md` 4.4 (the intersection of hosted tools) and 5.3.
 - Code on the base branch: `plugins/claude-code-runner/src/claude_code_runner` (`commandline.py`, `toolclass.py`, `environment.py`, `followups.py`, `runturn.py`, `processstate.py`, `hosting.py`, `heartbeat.py`, `prompt.py`, `prompts/runner_prompt.md`, `config.py`), `sdk/python/src` (outbox, inbox), `tests/`.
 - Design note `docs/design/autonomous-runs.md` (context and evidence; where it differs from the chapters, the chapters win); ADR 0077; `docs/decisions.d/AR-01.md`.
+- `docs/decisions.d/FIX-RUNNER-LIMIT-KEEPS-RUN.md` and 09 18.9 "Account errors" (added 2026-11-13, after this brief was written): after an account error of a held process the runner writes an input line of its own, the retry line (`account.py` `retry_input`, `RunTurn._account_retry`). Its echo counts in `ProcessState._input_taken` like an input of a person: it clears the nudge mark and sets the count of autonomous inputs to zero. Where this ticket reads or writes those marks, flag the retry line as neither a person's nor an autonomous input.
 
 ## Fixed requirements that apply
 

@@ -205,6 +205,16 @@ class RunnerConfig:
             handshake, the phases in the turn record, the handover at SIGTERM and the adoption
             with full rights (09 18.19.3 to 18.19.7), and the capability ``turn_handover``; off
             by default, and off the runner behaves exactly as before stage AR (AR-T16).
+        account_retry_first: ``runner.account_retry_first``: the pause before the first retry
+            of a turn that ended with an account error while its process holds or held
+            background work (09 18.9); above zero.
+        account_retry_second: ``runner.account_retry_second``: the pause before the second
+            retry; above zero.
+        account_retry_interval: ``runner.account_retry_interval``: the pause before every
+            further retry; above zero.
+        account_retry_max_wait: ``runner.account_retry_max_wait``: the longest time from the
+            first account error of a wait until the runner gives up and the error ends the
+            turn like any other; zero switches the retry off.
     """
 
     source: Path
@@ -256,6 +266,10 @@ class RunnerConfig:
     mcp_stdio_runners: tuple[str, ...] = DEFAULT_STDIO_RUNNERS
     channel_skills_dir: Path | None = None
     turn_handover: bool = False
+    account_retry_first: float = 60.0
+    account_retry_second: float = 120.0
+    account_retry_interval: float = 180.0
+    account_retry_max_wait: float = 1200.0
 
 
 _Parse = Callable[[Any], Any]
@@ -666,6 +680,10 @@ def load_config(path: Path) -> RunnerConfig:
         mcp_stdio_runners=_stdio_runners(r),
         channel_skills_dir=_channel_skills_dir(r),
         turn_handover=r.get("turn_handover", bool, False),
+        account_retry_first=_positive(r, "account_retry_first", "1m"),
+        account_retry_second=_positive(r, "account_retry_second", "2m"),
+        account_retry_interval=_positive(r, "account_retry_interval", "3m"),
+        account_retry_max_wait=r.duration("account_retry_max_wait", "20m"),
     )
     r.unknown()
     if config.hosted_agents:
