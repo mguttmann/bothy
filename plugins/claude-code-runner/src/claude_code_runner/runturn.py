@@ -1084,6 +1084,7 @@ class RunTurn:
                 assistant_text=ledger.api_error,
                 stderr=_read_from(paths.stderr, stderr_start),
                 exit_label=process.exit_label(),
+                account_failed=self.ps.account_error is not None,
             )
             # The run's highest outage number reached so far goes into the next attempt.
             self.outage = max(self.outage, self.ps.outage)

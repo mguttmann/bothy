@@ -141,7 +141,10 @@ class _Cli:
         return line_uuid
 
     def messages(self) -> list[dict[str, Any]]:
-        return [json.loads(x) for x in self.out.read_text().splitlines() if x.startswith("{")]
+        # Only complete lines: a poll can meet the CLI in the middle of writing one.
+        written = self.out.read_bytes()
+        lines = written[: written.rfind(b"\n") + 1].decode().splitlines()
+        return [json.loads(x) for x in lines if x.startswith("{")]
 
     def results(self, count: int) -> list[dict[str, Any]]:
         """Wait for ``count`` results and return them."""

@@ -403,18 +403,22 @@ class Fake:
             )
         self.emit({"type": "command_lifecycle", "command_uuid": command, "state": "queued"})
         for _ in range(count):
-            self.emit(self.init_line())
-            self.emit(
-                {
-                    "type": "result",
-                    "subtype": "success",
-                    "is_error": False,
-                    "session_id": self.session_id,
-                    "num_turns": 0,
-                    "result": "",
-                }
-            )
+            self.noted_turn()
         self.emit({"type": "command_lifecycle", "command_uuid": command, "state": "started"})
+
+    def noted_turn(self) -> None:
+        """A turn that ends without a model turn: ``system/init`` and an empty ``result``."""
+        self.emit(self.init_line())
+        self.emit(
+            {
+                "type": "result",
+                "subtype": "success",
+                "is_error": False,
+                "session_id": self.session_id,
+                "num_turns": 0,
+                "result": "",
+            }
+        )
 
     def start_background(self) -> None:
         """The turn starts a background job (Bash with ``run_in_background``) before its result."""
@@ -458,6 +462,9 @@ class Fake:
         * With ``background_error_gate``: once the test creates it, the CLI starts a turn by
           itself (a task's notification) that fails with the API error of the fixture named by
           ``background_api_error``, as on 2026-11-01 when the host's login failed briefly.
+        * With ``background_error_noted``: right after that failed turn one more turn ends
+          without a model turn (`noted_turn`, ``turn_noted``), so a success ``result`` with
+          ``num_turns`` 0 is the last ``result`` after the error.
         * With ``background_survives_eof``: the end of stdin does not stop the job; the process
           stays until the job ends or a signal comes, as the pinned CLI did on 2026-11-01 for
           about ten minutes after a failed turn (``eof_with_background``).
@@ -484,6 +491,9 @@ class Fake:
                 self.record("background_turn_failed")
                 self.emit(self.init_line())
                 self.emit_api_error(*_error(str(self.scenario["background_api_error"])))
+                if self.scenario.get("background_error_noted"):
+                    self.record("turn_noted")
+                    self.noted_turn()
             line, done = lines.wait(answered, 0.01)
             if line is not None:
                 answered += 1

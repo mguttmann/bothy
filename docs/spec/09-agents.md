@@ -3711,7 +3711,9 @@ installed, pinned CLI version, behind the explicit switch of the real-CLI suite,
 texts and every stream message type and member the runner reads exist in the files of the CLI.
 
 Classification of a process end (D-M2-35-7), in this order: a requested stop gives `stopped`; a
-`result` with `subtype` `success` and no `is_error` gives `completed`; the first entry of the table
+`result` with `subtype` `success` and no `is_error` gives `completed` (except one without a model
+turn after the account error that ended the process, "Account errors" below); the first entry of
+the table
 whose fragment occurs in its channel (the `assistant` channel is only the text of an API error
 the CLI writes as an `assistant` message with `is_api_error_message` and no `parent_tool_use_id`, never the model's own words)
 gives its kind, where `session_missing` and `session_exists`
@@ -3810,15 +3812,21 @@ sets no failure mark:
   at least one model turn (`num_turns` not 0; the CLI also writes a success `result` for a turn
   it ends without a request to the model, which proves nothing about the account);
 - once `runner.account_retry_max_wait` has passed since the first account error of the wait
-  (`0s` switches the retry off), the error counts as a `result` with an error from that moment
-  (log code `account_wait_gave_up`): stdin closes, the stop of 18.5 follows `runner.stop_grace`
-  later, and the run ends as the table says. Any other error `result` during the wait is the
-  turn's own error and ends the wait the same way at once.
+  (`0s` switches the retry off) and no turn runs and no input is queued, the error counts as a
+  `result` with an error from that moment (log code `account_wait_gave_up`): stdin closes, the
+  stop of 18.5 follows `runner.stop_grace` later, and the run ends as the table says. A turn
+  that is open when that time passes is read to its `result` first: an answer ends the wait, a
+  further account error ends it by this rule at once. Any other error `result` during the wait
+  is the turn's own error and ends the wait the same way at once.
 
 A stop (18.6), a run the server ended, an orderly stop of the runner and a handover (18.19.3)
 work at every moment of the wait as at any other; a runner that adopts the turn with full
 rights (18.19.7) starts the wait again at the adoption, and a process that ends by itself during
-the wait ends the run by its last error. For a process the runner cannot write to (stdin
+the wait ends the run by its last error. A success `result` without a model turn (`num_turns`
+0) read after the account error that ended a process (at the first error, at
+`runner.account_retry_max_wait` or because the process ended during the wait) does not make its
+end `completed`: the classification above goes on with the table and `runtime_error`
+(FIX-RLKR/12). For a process the runner cannot write to (stdin
 closed, a compaction, a turn adopted with reading rights only) nothing changes: its account
 error is handled like any other error `result` (18.5). A process that never had background work
 ends at the first account error as the table says. The `summary` of a run an account error ended names the class of the error, the
@@ -5100,7 +5108,7 @@ configuration of the respective program outside the server.
 | `runner.account_retry_first` | Runner | `1m` | pause before the first retry of a turn that ended with an account error while its process holds or held background work (18.9); above zero |
 | `runner.account_retry_second` | Runner | `2m` | pause before the second retry (18.9); above zero |
 | `runner.account_retry_interval` | Runner | `3m` | pause before every further retry (18.9); above zero |
-| `runner.account_retry_max_wait` | Runner | `20m` | longest time from the first account error of a wait until the error ends the turn like any other (18.9); `0s` switches the retry off |
+| `runner.account_retry_max_wait` | Runner | `20m` | longest time from the first account error of a wait until the error ends the turn like any other, decided while no turn runs and no input is queued (18.9); `0s` switches the retry off |
 | `runner.session_lock_wait` | Runner | `10m` | wait time for a busy session |
 | `runner.max_parallel_runs` | Runner | `4` | concurrent turns |
 | `runner.stream_log_retention` | Runner | `14d` | retention of the recordings |

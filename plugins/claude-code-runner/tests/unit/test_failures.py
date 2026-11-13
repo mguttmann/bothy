@@ -42,6 +42,8 @@ def test_error_text_table_is_complete() -> None:
 
 ERROR = {"type": "result", "subtype": "error_during_execution", "is_error": True}
 OK = {"type": "result", "subtype": "success", "is_error": False, "result": "Done."}
+NOTED = {"type": "result", "subtype": "success", "is_error": False, "num_turns": 0, "result": ""}
+"""The result of a turn the CLI ended without a model turn."""
 
 CASES = [
     ("stop with an error result", TurnEvidence(stop_requested=True, result=ERROR), "stopped"),
@@ -79,6 +81,31 @@ CASES = [
         "not authenticated in the assistant text",
         TurnEvidence(init_seen=True, result=ERROR, assistant_text="Not logged in · Run"),
         "not_authenticated",
+    ),
+    # 09 18.9 (FIX-RLKR/12): after the account error that ended the process, a result without
+    # a model turn does not make the end completed; an answered turn still does.
+    ("a result without a model turn", TurnEvidence(init_seen=True, result=NOTED), "completed"),
+    (
+        "a result without a model turn after an account error",
+        TurnEvidence(init_seen=True, result=NOTED, account_failed=True),
+        "runtime_error",
+    ),
+    (
+        "a result without a model turn after a login that is gone",
+        TurnEvidence(
+            init_seen=True, result=NOTED, assistant_text="Not logged in · Run", account_failed=True
+        ),
+        "not_authenticated",
+    ),
+    (
+        "an answered turn after an account error",
+        TurnEvidence(init_seen=True, result={**OK, "num_turns": 1}, account_failed=True),
+        "completed",
+    ),
+    (
+        "a stop after an account error",
+        TurnEvidence(stop_requested=True, result=NOTED, account_failed=True),
+        "stopped",
     ),
 ]
 

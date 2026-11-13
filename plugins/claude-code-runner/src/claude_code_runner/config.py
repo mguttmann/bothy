@@ -214,7 +214,8 @@ class RunnerConfig:
             further retry; above zero.
         account_retry_max_wait: ``runner.account_retry_max_wait``: the longest time from the
             first account error of a wait until the runner gives up and the error ends the
-            turn like any other; zero switches the retry off.
+            turn like any other, decided while no turn runs and no input is queued; zero
+            switches the retry off.
     """
 
     source: Path

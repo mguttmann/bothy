@@ -75,6 +75,7 @@ that request is refused, and the request of the runner's retry line carries the 
 | FIX-RLKR/9 | 2026-11-13 | Amended by this ticket: D-FIX-runner-auth-failed-held-1 (the stop `runner.stop_grace` after an error `result` does not apply while an account error is tried again) and D-FIX-runner-auth-failed-held-2 (a turn that failed for the account is tried again inside the run; any other failed turn is not). R-AG-17 and 09 1 point 5 are untouched: no run that was aborted is started again, the run is still `running`. The usage mark of 18.19.10 keeps its precedence in `ProcessState._error_result`; the stream reader still skips `rate_limit_event` until AR-06. | The older rulings named the login as their example and no other account error. The stage AR design wakes a thread at the reset of the usage window; that stays the answer for an account that is really used up, and AR-06 decides how its mark and this short retry meet (noted in the brief of AR-06). |
 | FIX-RLKR/10 | 2026-11-13 | Test stand-ins: an API error fixture of Fake-Claude carries the members the pinned CLI writes (`members`: `error`, `api_error_status` and the rest), also the existing fixture of a missing login; `account_gate` keeps the account unusable until the test opens it, for the turn of every further line and for the notification turn of the job's end. The scenarios of an ordinary error in a held process (`tests/scenarios/test_handover.py`, variants c and d of AR-T02) use the new fixture `server_error`. The stand-in for the API can send response headers with an error. | A fixture without the member `error` would have kept the old tests green on a message the CLI does not write. The two handover scenarios are about an error of the turn, which a missing login no longer is in a held process. Without `x-should-retry: false` the CLI tries a `429` again by itself for minutes before the turn sees it. |
 | FIX-RLKR/11 | 2026-11-13 | The texts of the runner give what the pinned CLI writes, read in its file or run against the stand-in, and the reproduction as tests. They say nothing about one account or installation: no plan, and no count, date or duration of its use. `tools/docs/tests/test_runner_texts.py` (`ONE_ACCOUNT`) reads every tracked file of the runner, the rulings of its changelog fragments and chapter 09 for the wordings of that class. | AGENTS.md, "This repository is public": no billing or plan details and nothing about the machines and tools somebody uses privately. The red team of this ticket found both in the first draft of its texts, and the white-label scan holds terms, not this class. The test lives with the tools tests, like the one of the host service (`test_host_service_texts.py`): they run on every change, also on one that touches only a ruling, which starts no job of the runner (`tools/ci/components.py`). |
+| FIX-RLKR/12 | 2026-11-13 | Two rules the review of the pull request asked for. (a) The bound is decided like a retry, only while no turn runs and no input is queued (`ProcessState.decide`): a turn that is open when `runner.account_retry_max_wait` passes is read to its `result` first; an answer ends the wait, a further account error gives up at once. 09 18.9, the key in 09 21 and the texts of the key say so. (b) A success `result` without a model turn (`num_turns` 0) read after the account error that ended a process does not classify its end as `completed`: `classify_turn_end` then goes on with the table and `runtime_error` (`TurnEvidence.account_failed`, set from `ProcessState.account_error`). An answered turn after such an error still gives `completed`, and a requested stop still `stopped`. This amends D-M2-35-7. | (a) The read loop decides between turns: giving up in the middle of a turn would stop a try that may be answered a moment later. The bound can therefore be passed by the length of one open turn, which the text did not say. (b) FIX-RLKR/6 already says that such a `result` proves nothing about the account and leaves the wait as it is, and 09 18.9 says that a process that ends by itself during the wait ends the run by its last error. The classification read only the last `result`: a process that ended during the wait after such a `result` ended the run `completed`, without the error and without a word about the lost work (reproduced, see "Tests"). The same held for a stop after the bound whenever the process wrote no `result` at the signal. |
 
 ## Tests
 
@@ -97,6 +98,10 @@ running and was stopped; its result is lost ...) before it showed the wait".
 - Stop and shutdown: `test_stop_during_the_wait_ends_the_run_at_once`,
   `test_a_stop_of_the_runner_during_the_wait_ends_the_turn`; takeover:
   `tests/scenarios/test_handover.py::test_a_wait_for_the_account_survives_the_handover`.
+- A process that ends during the wait (FIX-RLKR/12):
+  `test_a_process_that_ends_during_the_wait_ends_the_run_by_the_account_error`. With a `result`
+  without a model turn after the error it failed with "assert 'completed' == 'failed'"; without
+  one it was green before. The cases of `tests/unit/test_failures.py` hold the classification.
 - What stays: `test_an_ordinary_error_while_background_runs_still_ends_the_run` (green before and
   after), `test_a_turn_without_background_work_fails_at_once_and_says_why` (the end was the same
   before, the summary was missing), `test_the_retry_is_off_with_a_bound_of_zero`.
@@ -141,7 +146,13 @@ running and was stopped; its result is lost ...) before it showed the wait".
   AR-05, AR-06 and AR-07).
 - The status line is one text for every reader: the reset time is UTC, not the reader's zone. A
   turn that sets the status line during the wait (a transcription, an upload of answer files)
-  replaces it until the next error or retry.
+  replaces it until the next error or retry. For a voice follow-up that is the `result` of its
+  own turn: the follow-up is written once its transcription ended, and its turn ends with an
+  answer (the wait ends) or with a further account error (the line is sent again).
+- The bound is not hard: it is decided while no turn runs and no input is queued (FIX-RLKR/12),
+  so a turn that is open when it passes is read to its `result` first.
+- Fake-Claude writes an error `result` at SIGINT also between two turns. Whether the pinned CLI
+  does so is not established; the classification no longer rests on it (FIX-RLKR/12 b).
 - A run that waits holds its slot of `runner.max_parallel_runs` and its thread for up to the
   bound; a person can stop it.
 - Hosted agents run through the same `RunTurn` and get the same wait (read in the code, no

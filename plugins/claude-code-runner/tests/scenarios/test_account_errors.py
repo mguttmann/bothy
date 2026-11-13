@@ -18,6 +18,8 @@ The pauses are a few hundred milliseconds here; Fake-Claude waits on gates only.
 from __future__ import annotations
 
 import json
+import os
+import signal
 from collections.abc import Callable
 from typing import Any
 from uuid import UUID
@@ -314,6 +316,42 @@ async def test_the_bound_ends_the_run_with_the_reason(world: World, logs: LogLin
     assert (gave_up["error"], gave_up["retries"]) == ("usage_limit", str(tried))
     [stopped] = named(logs, "turn_stopped_after_error")
     assert stopped["background_tasks"] == "1"
+
+
+@pytest.mark.parametrize("noted", [False, True])
+async def test_a_process_that_ends_during_the_wait_ends_the_run_by_the_account_error(
+    world: World, noted: bool
+) -> None:
+    # 09 18.9: a process that ends by itself during the wait ends the run by its last error.
+    # With ``noted`` a turn without a model turn ended after that error: its success result
+    # proves nothing about the account, but as the last result of the process it made the
+    # run end completed, without the error and without a word about the lost work.
+    failure = world.gate("background_error_gate")
+    waiting = {**FAST, "account_retry_first": NEVER}  # no retry comes inside the scenario
+    _, run_id, _job = await held_run(
+        world,
+        waiting,
+        background_error_gate=str(failure),
+        background_api_error="usage_limit",
+        background_error_noted=noted,
+    )
+    world.release(failure)
+    await reached(
+        world, run_id, lambda: status_line(world, run_id).startswith(WAITING), "it showed the wait"
+    )
+    if noted:
+        await reached(world, run_id, lambda: world.calls("turn_noted"), "the turn without a model")
+    [failed] = world.calls("background_turn_failed")
+    os.kill(failed["pid"], signal.SIGKILL)  # the CLI is gone without a further result
+    assert await world.ended(run_id) == "failed"
+    assert world.fake.run_state(run_id).state_reason == "runtime_error"
+    summary = world.fake.run(run_id)["summary"]
+    assert summary.startswith(f"Claude Code could not use its account on the runner host: {LIMIT}.")
+    assert "1 background task was still running and was stopped; its result is lost." in summary
+    assert summary.endswith("(`runtime_error`)")
+    assert retries(world) == []
+    assert texts(world) == ["Done."]
+    assert not status_line(world, run_id).startswith(WAITING)
 
 
 async def test_stop_during_the_wait_ends_the_run_at_once(world: World, logs: LogLines) -> None:

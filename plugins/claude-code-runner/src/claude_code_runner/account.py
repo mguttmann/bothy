@@ -119,7 +119,8 @@ class AccountRetry:
         second: ``runner.account_retry_second``: the pause before the second retry.
         interval: ``runner.account_retry_interval``: the pause before every further retry.
         max_wait: ``runner.account_retry_max_wait``: once this time has passed since the first
-            account error of the wait, the error counts as an ordinary error of the turn.
+            account error of the wait and no turn runs and no input is queued, the error counts
+            as an ordinary error of the turn.
     """
 
     first: float

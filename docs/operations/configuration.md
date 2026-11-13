@@ -513,7 +513,7 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.account_retry_first` |  | Runner |  | `1m` | pause before the first retry of a turn that ended with an account error while its process holds or held background work (18.9); above zero |  |
 | `runner.account_retry_second` |  | Runner |  | `2m` | pause before the second retry (18.9); above zero |  |
 | `runner.account_retry_interval` |  | Runner |  | `3m` | pause before every further retry (18.9); above zero |  |
-| `runner.account_retry_max_wait` |  | Runner |  | `20m` | longest time from the first account error of a wait until the error ends the turn like any other (18.9); `0s` switches the retry off |  |
+| `runner.account_retry_max_wait` |  | Runner |  | `20m` | longest time from the first account error of a wait until the error ends the turn like any other, decided while no turn runs and no input is queued (18.9); `0s` switches the retry off |  |
 | `runner.session_lock_wait` |  | Runner |  | `10m` | wait time for a busy session |  |
 | `runner.max_parallel_runs` |  | Runner |  | `4` | concurrent turns |  |
 | `runner.stream_log_retention` |  | Runner |  | `14d` | retention of the recordings |  |
