@@ -466,6 +466,9 @@ separate entries before the message that attaches them; the message waits until 
 of each of its files is completed (`completeUpload` with `200`, [12](12-files.md) 3.4) and then
 attaches them; the check of the server goes on, and the server holds the agent invocation until
 the check is final, at most `file.invocation_hold_max`, after which the invocation shows the attachments with their state ([12](12-files.md) 10; ruling D-M4-22-1).
+Writes that belong together are stored in one transaction (`Outbox.enqueueAll`): the uploads of
+the files of a new post and the post that waits for them, so the app quitting between them
+leaves all of them or none (docs/decisions.d/FEAT-NEW-CHAT-ATTACH.md FNCA/2).
 
 `409 request_in_progress` (the first request with the same `Idempotency-Key` is still running,
 04 5.2) is retried like a `5xx` with the same ID. So is `409 file_not_ready` (a voice message
@@ -1141,6 +1144,15 @@ a JPEG of quality 90 when that is at most 70 percent of the PNG's size, unless t
 setting `composer.paste_originals` is on ([01](01-product.md) 11); a file the person copied,
 dropped or picked is never re-encoded. Preview before sending locally; after sending from `file_thumbnails` through the
 server.
+
+The files of a new post (the new chat view, [01](01-product.md) 6.8 item 8; addendum of
+2026-11-13, docs/decisions.d/FEAT-NEW-CHAT-ATTACH.md) pass the same checks but are staged in the
+instance folder until the send: nothing of them is in the outbox or on the server before it. The
+send writes their uploads and the post in one transaction (7.5), and the post is created only
+after every upload was confirmed. A post that waits for an upload that failed for good shows as
+not sent with the reason; "Discard" removes the post and its uploads and deletes on the server
+what they created there (an open session or a completed file, `deleteFile`, [12](12-files.md)
+12), and "Try again" releases the failed session before the upload goes again.
 
 On the phone the photo library picker is multi-select: one opening picks several photos, limited
 to the free slots of `message_max_attachments` (the limit minus the attachments already in the

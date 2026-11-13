@@ -94,56 +94,19 @@ class PendingRow extends StatelessWidget {
   /// The files of the waiting message: one chip per attachment with the state of its upload
   /// entry; a confirmed upload is being checked by the server (12 2).
   Widget? _files(BuildContext context, AppLocalizations l) {
-    final preview = view.payload['attachment_preview'];
-    if (preview is! List || preview.isEmpty) return null;
+    if (!PendingFileChips.hasFiles(view.payload)) return null;
     return Padding(
       // Beside the content, `density.message-gutter` from the row (M5-17).
       padding: EdgeInsets.only(
         left: context.dsDensity.messageGutter + DsSpace.s8,
         top: DsSpace.s4,
       ),
-      child: Wrap(
-        spacing: DsSpace.s6,
-        runSpacing: DsSpace.s6,
-        children: [
-          for (final item in preview.cast<Map<String, Object?>>())
-            _chip(l, item),
-        ],
+      child: PendingFileChips(
+        payload: view.payload,
+        uploads: uploads,
+        progress: progress,
+        onRetryUpload: onRetryUpload,
       ),
-    );
-  }
-
-  Widget _chip(AppLocalizations l, Map<String, Object?> item) {
-    final key = item['key']! as String;
-    final upload = uploads[key];
-    if (upload == null) {
-      // A confirmed upload left the outbox: the chip shows the stored file, which
-      // file.updated keeps current (12 2, FIX-scan-state-stale).
-      final slot = view.payload[UploadOps.slotOf(key)];
-      final fileId = slot is String ? slot : progress?.completedFileOf(key);
-      return Consumer(
-        builder: (context, ref, _) => UploadChip(
-          attachmentKey: key,
-          name: item['name'] as String? ?? '',
-          sizeBytes: item['size_bytes'] as int? ?? 0,
-          state: fileId == null
-              ? AttachmentState.checking
-              : stateAfterUpload(ref.watch(fileMetaProvider(fileId)).value),
-        ),
-      );
-    }
-    final state = stateOfUpload(upload);
-    final code = upload.failureCode;
-    return UploadChip(
-      attachmentKey: key,
-      name: item['name'] as String? ?? '',
-      sizeBytes: item['size_bytes'] as int? ?? 0,
-      state: state,
-      percent: ((progress?.fractionOf(key) ?? 0) * 100).round(),
-      reason: code == null
-          ? null
-          : uploadFailureText(l, code, reason: upload.failureReason),
-      onRetry: onRetryUpload == null ? null : () => onRetryUpload!(upload.id),
     );
   }
 
@@ -192,6 +155,87 @@ class PendingRow extends StatelessWidget {
       onResend: onResend,
       onEdit: onEdit,
       onDiscard: onDiscard,
+    );
+  }
+}
+
+/// The files of a message or a new post that waits in the outbox (its `attachment_preview`):
+/// one chip per attachment with the state of its upload entry, "Upload again" on a failed one,
+/// and the stored file once the upload was confirmed (12 2, FIX-scan-state-stale). Shared by
+/// the history of a thread and the view of a sent post (FEAT-NEW-CHAT-ATTACH, FNCA/4).
+class PendingFileChips extends StatelessWidget {
+  /// Creates the chips of the entry [payload].
+  const PendingFileChips({
+    super.key,
+    required this.payload,
+    this.uploads = const {},
+    this.progress,
+    this.onRetryUpload,
+  });
+
+  /// Whether the entry [payload] names files.
+  static bool hasFiles(Map<String, Object?> payload) {
+    final preview = payload['attachment_preview'];
+    return preview is List && preview.isNotEmpty;
+  }
+
+  /// The payload of the message or post entry.
+  final Map<String, Object?> payload;
+
+  /// Its upload entries by attachment key (M4-22).
+  final Map<String, OutboxEntryView> uploads;
+
+  /// The progress of the uploads, or null.
+  final UploadProgress? progress;
+
+  /// "Upload again" of a failed upload entry, with its ID.
+  final ValueChanged<String>? onRetryUpload;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final preview = payload['attachment_preview'];
+    if (preview is! List) return const SizedBox.shrink();
+    return Wrap(
+      spacing: DsSpace.s6,
+      runSpacing: DsSpace.s6,
+      children: [
+        for (final item in preview.cast<Map<String, Object?>>()) _chip(l, item),
+      ],
+    );
+  }
+
+  Widget _chip(AppLocalizations l, Map<String, Object?> item) {
+    final key = item['key']! as String;
+    final upload = uploads[key];
+    if (upload == null) {
+      // A confirmed upload left the outbox: the chip shows the stored file, which
+      // file.updated keeps current (12 2, FIX-scan-state-stale).
+      final slot = payload[UploadOps.slotOf(key)];
+      final fileId = slot is String ? slot : progress?.completedFileOf(key);
+      return Consumer(
+        builder: (context, ref, _) => UploadChip(
+          attachmentKey: key,
+          name: item['name'] as String? ?? '',
+          sizeBytes: item['size_bytes'] as int? ?? 0,
+          state: fileId == null
+              ? AttachmentState.checking
+              : stateAfterUpload(ref.watch(fileMetaProvider(fileId)).value),
+        ),
+      );
+    }
+    final state = stateOfUpload(upload);
+    final code = upload.failureCode;
+    return UploadChip(
+      attachmentKey: key,
+      name: item['name'] as String? ?? '',
+      sizeBytes: item['size_bytes'] as int? ?? 0,
+      state: state,
+      percent: ((progress?.fractionOf(key) ?? 0) * 100).round(),
+      reason: code == null
+          ? null
+          : uploadFailureText(l, code, reason: upload.failureReason),
+      onRetry: onRetryUpload == null ? null : () => onRetryUpload!(upload.id),
     );
   }
 }

@@ -22,6 +22,7 @@ import 'done_section.dart';
 import 'failed_post_notice.dart';
 import 'forum_model.dart';
 import 'new_chat_view.dart' show editRefusedPost, openNewChat;
+import 'post_actions.dart';
 import 'post_list_header.dart';
 import 'post_row.dart';
 import 'project_readiness.dart' show ProjectReadinessBanner;
@@ -265,7 +266,8 @@ class _PostListViewState extends State<PostListView> {
                         post: f,
                         onRetry: () => w.onRetryPost?.call(f),
                         onDiscard: () => w.onDiscardPost?.call(f),
-                        onEdit: () => w.onEditPost?.call(f),
+                        // The files of a post cannot go back into the composer (FNCA/4).
+                        onEdit: f.hasFiles ? null : () => w.onEditPost?.call(f),
                       );
                     }
                     final i = at - failed.length;
@@ -373,15 +375,23 @@ class PostListColumn extends ConsumerWidget {
       initialOffset: ref.read(postListOffsetProvider(id)),
       onOffset: (o) => ref.read(postListOffsetProvider(id).notifier).keep(o),
       failedPosts: ref.watch(failedPostsProvider(id)).value ?? const [],
+      // A post that waits for a failed upload sends that upload again (FNCA/4).
       onRetryPost: (f) {
         final engine = ref.read(syncEngineProvider);
-        if (engine != null) unawaited(engine.outbox.retry(f.entryId));
+        final db = ref.read(localDatabaseProvider);
+        if (engine != null && db != null) {
+          unawaited(retryPost(engine.outbox, db.outboxDao, f.entryId));
+        }
       },
       // A refused post goes back into the new chat view to be changed (D-M4-41-3).
       onEditPost: (f) => unawaited(editRefusedPost(context, ref, channelId, f)),
+      // The uploads of the post go with it, on this device and on the server (FNCA/4).
       onDiscardPost: (f) {
         final engine = ref.read(syncEngineProvider);
-        if (engine != null) unawaited(engine.outbox.discard(f.entryId));
+        final db = ref.read(localDatabaseProvider);
+        if (engine != null && db != null) {
+          unawaited(discardPost(engine.outbox, db.outboxDao, f.entryId));
+        }
       },
       onNewPost: newPost,
       onView: (view) =>

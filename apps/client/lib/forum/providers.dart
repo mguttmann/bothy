@@ -12,6 +12,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:sync_engine/sync_engine.dart';
 
 import '../app/providers/session.dart';
+import '../files/upload_executor.dart' show UploadOps;
 import '../sidebar/providers.dart';
 import '../sync/thread_ops.dart';
 import 'failed_post_notice.dart';
@@ -133,7 +134,8 @@ final class PendingPost {
   /// The title, '' without one.
   final String title;
 
-  /// Whether the server refused it (`failed`).
+  /// Whether the server refused it (`failed`), or one of its uploads failed for good so it
+  /// cannot go without the person (FEAT-NEW-CHAT-ATTACH, FNCA/4).
   final bool failed;
 
   /// When it was put into the outbox.
@@ -147,6 +149,7 @@ Stream<List<PendingPost>> pendingPosts(Ref ref, String channelId) {
   final db = ref.watch(localDatabaseProvider);
   if (db == null) return Stream.value(const []);
   return db.outboxDao.watchEntriesFor(null).map((entries) {
+    final byId = {for (final e in entries) e.id: e};
     final posts = <PendingPost>[];
     for (final e in entries) {
       if (e.kind != ThreadOps.createThread ||
@@ -162,7 +165,9 @@ Stream<List<PendingPost>> pendingPosts(Ref ref, String channelId) {
         PendingPost(
           entryId: e.id,
           title: body['title'] as String? ?? '',
-          failed: e.state == OutboxState.failed,
+          failed:
+              e.state == OutboxState.failed ||
+              _failedUploadsOf(e, byId).isNotEmpty,
           createdAt: e.createdAt,
         ),
       );
@@ -222,29 +227,48 @@ class NewChatPreset extends _$NewChatPreset {
   }
 }
 
-/// The new posts of [channelId] the server refused (`createThread` entries of the outbox in
-/// `failed`), oldest first (04 13.2 item 5).
+/// The new posts of [channelId] that cannot go without the person, oldest first (04 13.2 item
+/// 5): those the server refused (`createThread` entries of the outbox in `failed`) and those
+/// that wait for an upload that failed for good (FEAT-NEW-CHAT-ATTACH, FNCA/4), which would
+/// otherwise read "Sending" for ever.
 @riverpod
 Stream<List<FailedPost>> failedPosts(Ref ref, String channelId) {
   final db = ref.watch(localDatabaseProvider);
   if (db == null) return Stream.value(const []);
-  return db.outboxDao
-      .watchEntriesFor(null)
-      .map(
-        (entries) => [
-          for (final e in entries)
-            if (e.kind == ThreadOps.createThread &&
-                e.state == OutboxState.failed)
-              ?_failedPost(e, channelId),
-        ],
-      );
+  return db.outboxDao.watchEntriesFor(null).map((entries) {
+    final byId = {for (final e in entries) e.id: e};
+    return [
+      for (final e in entries)
+        if (e.kind == ThreadOps.createThread) ?_failedPost(e, channelId, byId),
+    ];
+  });
 }
 
-/// The refused post of entry [e] when it belongs to [channelId], else null.
-FailedPost? _failedPost(OutboxEntry e, String channelId) {
+/// The upload entries of [post] (in [byId]) that failed for good.
+List<OutboxEntry> _failedUploadsOf(
+  OutboxEntry post,
+  Map<String, OutboxEntry> byId,
+) => [
+  for (final id in post.dependsOn?.split(',') ?? const <String>[])
+    if (byId[id] case final up?
+        when up.kind == UploadOps.upload && up.state == OutboxState.failed)
+      up,
+];
+
+/// The post of entry [e] that cannot go when it belongs to [channelId], else null: refused by
+/// the server, or waiting for a failed upload (whose reason it shows).
+FailedPost? _failedPost(
+  OutboxEntry e,
+  String channelId,
+  Map<String, OutboxEntry> byId,
+) {
   final body = decodePayload(e.payload);
   final title = body['title'];
   if (body['channel_id'] != channelId || title is! String) return null;
+  final refused = e.state == OutboxState.failed;
+  final uploads = refused ? const <OutboxEntry>[] : _failedUploadsOf(e, byId);
+  if (!refused && uploads.isEmpty) return null;
+  final cause = refused ? e : uploads.first;
   return FailedPost(
     entryId: e.id,
     title: title,
@@ -253,8 +277,10 @@ FailedPost? _failedPost(OutboxEntry e, String channelId) {
       for (final t in body['tag_ids'] as List? ?? const [])
         if (t is String) ForumTagId.parse(t),
     ],
-    code: e.lastErrorCode,
-    reason: e.lastErrorReason,
+    code: cause.lastErrorCode,
+    reason: cause.lastErrorReason,
+    uploadFailed: !refused,
+    hasFiles: (body['attachment_keys'] as List?)?.isNotEmpty ?? false,
   );
 }
 

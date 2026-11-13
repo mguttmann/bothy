@@ -204,12 +204,44 @@ AttachController? composerAttachments(
   return attach;
 }
 
+/// The folder the files of new posts wait in until their send (FEAT-NEW-CHAT-ATTACH, ruling
+/// FNCA/2): `<instance folder>/staged`, one subfolder per forum, which the wipe deletes with
+/// the instance (D-M4-22-5).
+///
+/// Staged files live while the app runs, as the attachments of a thread's composer do (brief
+/// M4-22 Design note 2); nothing of them is in the outbox or on the server. So what an earlier
+/// run left there is deleted when the folder is first used in a run, before any file of this
+/// run is staged. Without an instance folder (tests) it lies in the temporary folder, as the
+/// outgoing folder does, and is not emptied.
+@Riverpod(keepAlive: true)
+Future<Directory> stagedFolder(Ref ref) async {
+  final cache = ref.watch(fileCacheProvider);
+  if (cache == null) {
+    return Directory(
+      '${Directory.systemTemp.path}${Platform.pathSeparator}staged',
+    );
+  }
+  final dir = Directory(
+    '${cache.root.parent.path}${Platform.pathSeparator}staged',
+  );
+  try {
+    if (dir.existsSync()) await dir.delete(recursive: true);
+  } on FileSystemException {
+    // A file that cannot be deleted now goes with the instance folder.
+  }
+  return dir;
+}
+
 /// The attachments of the first message of a new post in the forum [forumId] (the new chat
-/// view, M4-47), or null without an engine; kept while the app runs, as a thread's.
+/// view, M4-47, FEAT-NEW-CHAT-ATTACH), or null without an engine; kept while the app runs, as
+/// a thread's. The files are staged in `staged/<forum>` until the send (FNCA/2), and the
+/// staged folder is made ready (emptied of an earlier run) when the view first opens.
 @Riverpod(keepAlive: true)
 AttachController? newPostAttachments(Ref ref, String forumId) {
   final engine = ref.watch(syncEngineProvider);
   if (engine == null) return null;
+  // The view opening makes the staged folder ready: what an earlier run left there goes.
+  final ready = ref.read(stagedFolderProvider.future);
   final attach = AttachController(
     thread: null,
     channel: ChannelId.parse(forumId),
@@ -217,6 +249,11 @@ AttachController? newPostAttachments(Ref ref, String forumId) {
     progress: ref.watch(uploadProgressProvider),
     newKey: ref.watch(attachmentKeysProvider),
     outgoing: () async => ref.read(outgoingFolderProvider),
+    staging: () async {
+      await ready;
+      final staged = await ref.read(stagedFolderProvider.future);
+      return Directory('${staged.path}${Platform.pathSeparator}$forumId');
+    },
   );
   ref.onDispose(attach.dispose);
   return attach;

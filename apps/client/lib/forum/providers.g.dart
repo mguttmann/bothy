@@ -712,7 +712,7 @@ final class PendingPostsProvider
   }
 }
 
-String _$pendingPostsHash() => r'1bb820f7d7af5c1b8541f41db40f00d104d5832e';
+String _$pendingPostsHash() => r'51cf1872c6664efcfdfdacbcc2528d7fc917f450';
 
 /// The new posts of the forum [channelId] that wait in the outbox or were refused, newest first.
 /// Threads from a message (`parent_message_id`) are not posts of the forum's list.
@@ -917,14 +917,18 @@ abstract class _$NewChatPreset
   }
 }
 
-/// The new posts of [channelId] the server refused (`createThread` entries of the outbox in
-/// `failed`), oldest first (04 13.2 item 5).
+/// The new posts of [channelId] that cannot go without the person, oldest first (04 13.2 item
+/// 5): those the server refused (`createThread` entries of the outbox in `failed`) and those
+/// that wait for an upload that failed for good (FEAT-NEW-CHAT-ATTACH, FNCA/4), which would
+/// otherwise read "Sending" for ever.
 
 @ProviderFor(failedPosts)
 final failedPostsProvider = FailedPostsFamily._();
 
-/// The new posts of [channelId] the server refused (`createThread` entries of the outbox in
-/// `failed`), oldest first (04 13.2 item 5).
+/// The new posts of [channelId] that cannot go without the person, oldest first (04 13.2 item
+/// 5): those the server refused (`createThread` entries of the outbox in `failed`) and those
+/// that wait for an upload that failed for good (FEAT-NEW-CHAT-ATTACH, FNCA/4), which would
+/// otherwise read "Sending" for ever.
 
 final class FailedPostsProvider
     extends
@@ -934,8 +938,10 @@ final class FailedPostsProvider
           Stream<List<FailedPost>>
         >
     with $FutureModifier<List<FailedPost>>, $StreamProvider<List<FailedPost>> {
-  /// The new posts of [channelId] the server refused (`createThread` entries of the outbox in
-  /// `failed`), oldest first (04 13.2 item 5).
+  /// The new posts of [channelId] that cannot go without the person, oldest first (04 13.2 item
+  /// 5): those the server refused (`createThread` entries of the outbox in `failed`) and those
+  /// that wait for an upload that failed for good (FEAT-NEW-CHAT-ATTACH, FNCA/4), which would
+  /// otherwise read "Sending" for ever.
   FailedPostsProvider._({
     required FailedPostsFamily super.from,
     required String super.argument,
@@ -980,10 +986,12 @@ final class FailedPostsProvider
   }
 }
 
-String _$failedPostsHash() => r'15d618110ce9cdbb54b15677b41d9bd93f563919';
+String _$failedPostsHash() => r'66b2829633a1a18704be7dd394339861f817f382';
 
-/// The new posts of [channelId] the server refused (`createThread` entries of the outbox in
-/// `failed`), oldest first (04 13.2 item 5).
+/// The new posts of [channelId] that cannot go without the person, oldest first (04 13.2 item
+/// 5): those the server refused (`createThread` entries of the outbox in `failed`) and those
+/// that wait for an upload that failed for good (FEAT-NEW-CHAT-ATTACH, FNCA/4), which would
+/// otherwise read "Sending" for ever.
 
 final class FailedPostsFamily extends $Family
     with $FunctionalFamilyOverride<Stream<List<FailedPost>>, String> {
@@ -996,8 +1004,10 @@ final class FailedPostsFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// The new posts of [channelId] the server refused (`createThread` entries of the outbox in
-  /// `failed`), oldest first (04 13.2 item 5).
+  /// The new posts of [channelId] that cannot go without the person, oldest first (04 13.2 item
+  /// 5): those the server refused (`createThread` entries of the outbox in `failed`) and those
+  /// that wait for an upload that failed for good (FEAT-NEW-CHAT-ATTACH, FNCA/4), which would
+  /// otherwise read "Sending" for ever.
 
   FailedPostsProvider call(String channelId) =>
       FailedPostsProvider._(argument: channelId, from: this);

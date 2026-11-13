@@ -53,7 +53,8 @@ final class Outbox {
     OutboxTimerFactory? timer,
     Random? random,
     OutboxConfirmationHook? onConfirmed,
-  }) : _dao = db.outboxDao,
+  }) : _db = db,
+       _dao = db.outboxDao,
        _executors = executors,
        _config = config,
        _newId = ids.next,
@@ -74,6 +75,7 @@ final class Outbox {
     );
   }
 
+  final LocalDatabase _db;
   final OutboxDao _dao;
   final OutboxExecutors _executors;
   final AppConfig _config;
@@ -97,16 +99,43 @@ final class Outbox {
   /// becomes its replacement; a discarded or unknown one is never taken as confirmed, so the
   /// entry is stored as failed with `dependency_discarded` (D-M4-15-10).
   Future<OutboxEntry> enqueue(OutboxRequest request) async {
-    final entry = await _lock.run(() async {
-      final deps = await _deps.resolve(request.dependsOn, personRetries: false);
-      final e = await _insert(request.withDependsOn(deps));
-      if (await _deps.readiness(e) != Readiness.broken) return e;
-      await _dao.recordFailure(e.id, code: dependencyDiscarded);
-      return (await _dao.byId(e.id))!;
-    });
+    final entry = await _lock.run(() => _store(request));
     _changed();
     unawaited(_sender.pump());
     return entry;
+  }
+
+  /// Stores [requests] as `pending` entries in one transaction, in their order, and returns
+  /// them; each is stored as [enqueue] stores it, and one may wait for an earlier one of the
+  /// same batch (its `dependsOn` names that entry's [OutboxRequest.id]).
+  ///
+  /// Either every entry is stored or none: when one cannot be stored (an ID that exists
+  /// already) the transaction rolls back and the error goes to the caller. The uploads of a new
+  /// post and the post that attaches them go in one batch, so the app quitting between them
+  /// never leaves uploads without their post (FEAT-NEW-CHAT-ATTACH, ruling FNCA/2).
+  Future<List<OutboxEntry>> enqueueAll(List<OutboxRequest> requests) async {
+    final entries = await _lock.run(
+      () => _db.transaction(() async {
+        final stored = <OutboxEntry>[];
+        for (final r in requests) {
+          stored.add(await _store(r));
+        }
+        return stored;
+      }),
+    );
+    _changed();
+    unawaited(_sender.pump());
+    return entries;
+  }
+
+  /// Stores [request] with its resolved dependencies; an entry that names a discarded or
+  /// unknown one is stored as failed (D-M4-15-10). Runs under the lock.
+  Future<OutboxEntry> _store(OutboxRequest request) async {
+    final deps = await _deps.resolve(request.dependsOn, personRetries: false);
+    final e = await _insert(request.withDependsOn(deps));
+    if (await _deps.readiness(e) != Readiness.broken) return e;
+    await _dao.recordFailure(e.id, code: dependencyDiscarded);
+    return (await _dao.byId(e.id))!;
   }
 
   /// Applies the edit [payload] to entry [id] after 04 13.3 and returns the ID of the entry

@@ -5,8 +5,14 @@
 // `createThread` with an empty title (`title_source = auto`), the draft row stays at the top
 // of the group and becomes the post row, and the post's history opens; the agent's title
 // reaches the row. Offline the rows show "Sending" and the posts are created after the
-// reconnect in the order of the outbox. A forum without an operator agent requires a title.
+// reconnect in the order of the outbox. A forum without an operator agent requires a title. A
+// screenshot pasted before any text is the first message of the new chat
+// (FEAT-NEW-CHAT-ATTACH): offline it waits in the outbox with its upload, and after the
+// reconnect the upload goes before the post that attaches it.
 
+import 'dart:io';
+
+import 'package:client/files/file_ports.dart';
 import 'package:design_system/design_system.dart' show dsIsolate;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -16,6 +22,8 @@ import 'package:sync_engine/sync_engine.dart' show ConnectionPhase;
 import 'package:sync_engine/testing.dart';
 
 import '../test/support/fakes.dart';
+import '../test/support/file_fakes.dart';
+import '../test/support/file_widgets.dart' show onePixelPng;
 import '../test/support/until.dart' show testPatience;
 import 'support/new_chat.dart';
 import 'support/test_app.dart';
@@ -46,9 +54,10 @@ final class Scene {
   /// The tester.
   WidgetTester get tester => app.tester;
 
-  /// Starts the app, signs in as Alex and waits until both forums show in the sidebar.
-  static Future<Scene> open(WidgetTester tester) async {
-    final app = await TestApp.start(tester);
+  /// Starts the app with the file ports [files], signs in as Alex and waits until both forums
+  /// show in the sidebar.
+  static Future<Scene> open(WidgetTester tester, {FilePorts? files}) async {
+    final app = await TestApp.start(tester, files: files);
     final world = app.fake.server.world;
     final seed = app.fake.seed;
     final forum = world.addForum(seed.space, 'server', {
@@ -266,6 +275,72 @@ void main() {
       expect(s.app.fake.server.violations, isEmpty);
     } finally {
       await s.app.stop();
+    }
+  });
+
+  testWidgets('a screenshot pasted before any text, sent offline, is the first '
+      'message of the new chat after the reconnect', (tester) async {
+    final paste = FakePaste();
+    final s = await Scene.open(tester, files: fakeFilePorts(paste: paste));
+    final dir = await Directory.systemTemp.createTemp('new-chat-paste');
+    try {
+      await s.offline();
+      await s.plus(s.forum, en.sidebarNewChatIn('server'));
+      final shot = File('${dir.path}/screenshot.png')
+        ..writeAsBytesSync(onePixelPng);
+      paste.files = [PickedFile(path: shot.path, name: 'screenshot.png')];
+      await tester.tap(newChatField);
+      final command = Platform.isMacOS
+          ? LogicalKeyboardKey.meta
+          : LogicalKeyboardKey.control;
+      await tester.sendKeyDownEvent(command);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+      await tester.sendKeyUpEvent(command);
+      await s.app.waitFor(find.byKey(const ValueKey('newChat.attachments')));
+      // Files only: the send button works without text.
+      await s.until('send enabled', newChatSendEnabled);
+      await tester.tap(newChatSend);
+      await s.until(
+        'the view of the sent post',
+        () => currentRoute(tester).startsWith('/c/${s.forum}/new?entry='),
+      );
+      expect(s.app.fake.server.requestsOf('createUpload'), isEmpty);
+      expect(s.creates, isEmpty);
+
+      await s.online();
+      await s.until('the post on the server', () => s.creates.isNotEmpty);
+      final first = s.creates.single['first_message']! as JsonMap;
+      expect(first['content_md'] ?? '', isEmpty);
+      expect(first['attachment_file_ids'], hasLength(1));
+      final ops = [
+        for (final r in s.app.fake.server.requests)
+          if (r.status >= 200 && r.status < 300) r.operationId,
+      ];
+      expect(
+        ops.indexOf('completeUpload'),
+        lessThan(ops.indexOf('createThread')),
+      );
+      final post =
+          s.world.threads.values.firstWhere(
+                (t) => t['channel_id'] == s.forum && t['id'] != s.older,
+              )['id']!
+              as String;
+      final message = s.world.messagesOf(post).first;
+      expect(
+        [
+          for (final a in message['attachments']! as List)
+            ((a as Map)['file']! as Map)['original_name'],
+        ],
+        ['screenshot.png'],
+      );
+      await s.until(
+        'the history opens',
+        () => currentRoute(tester) == '/t/$post',
+      );
+      expect(s.app.fake.server.violations, isEmpty);
+    } finally {
+      await s.app.stop();
+      if (dir.existsSync()) await dir.delete(recursive: true);
     }
   });
 

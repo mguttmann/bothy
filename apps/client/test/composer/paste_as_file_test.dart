@@ -393,6 +393,8 @@ void main() {
       await host.dispose(tester);
     });
 
+    // The file waits in the composer until the send (FEAT-NEW-CHAT-ATTACH, FNCA/2); its upload
+    // failing after the send shows on the view of the sent post.
     testWidgets('a failed upload of the post shows "Upload failed"', (
       tester,
     ) async {
@@ -403,7 +405,12 @@ void main() {
         host,
         find.byKey(const ValueKey('newChat.attachments')),
       );
-      final up = uploads(await entries(tester, host)).single;
+      expect(uploads(await entries(tester, host)), isEmpty);
+      await tester.enterText(forum.composerField, 'Look at this');
+      await host.settle(tester);
+      await tester.showKeyboard(forum.composerField);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      final up = uploads(await sent(tester, host)).single;
       await host.run(
         tester,
         () => host.db.outboxDao.recordFailure(up.id, code: 'conflict'),
@@ -411,7 +418,7 @@ void main() {
       await settleUntil(tester, host, find.text(en.fileStateUploadFailed));
       expect(
         find.descendant(
-          of: find.byKey(const ValueKey('newChat.attachments')),
+          of: find.byKey(const ValueKey('newChat.sentFiles')),
           matching: find.text(en.fileStateUploadFailed),
         ),
         findsOneWidget,
