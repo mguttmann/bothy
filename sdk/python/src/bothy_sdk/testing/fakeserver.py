@@ -244,7 +244,9 @@ class FakeServer:
         dpop: Bind Lotse's API token to a DPoP key (``credentials.dpop``); else a bearer token.
         billing_mode: Lotse's configured billing mode (``personal`` or ``organization``).
         tool_class: Lotse's configured tool class (``chat``, ``scoped`` or ``host``).
-        costs: Accept ``RunFinish.costs``; off by default, like the server before M2-22.
+        costs: Accept ``RunFinish.costs``, as the server does since M2-22. Off by default,
+            which plays a server without cost booking: ``RunHandle.finish`` then ends the run
+            without its costs (docs/decisions.d/M2-33.md D-M2-33-7).
 
     Raises:
         ValueError: An unknown timing key.
@@ -704,7 +706,7 @@ class FakeServer:
         behavior["settings_version"] += 1
 
     def enable_costs(self) -> None:
-        """Accept ``costs`` in ``finishRun`` (the server refuses them until M2-22)."""
+        """Accept ``costs`` in ``finishRun``, as the server does since M2-22 (see ``costs``)."""
         self.world.costs_enabled = True
 
     def start_session(self, thread_id: UUID, ref: str, *, started: bool = True) -> None:

@@ -125,6 +125,13 @@ const SERVER_ERROR = 500;
 const NOT_STORED: ReadonlySet<number> = new Set([401, 429]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * How often a running adapter prunes its inbox (`InboxStore.prune`): every hour, and once at
+ * its start. A prune drops the `jti` rows of tokens that cannot pass anymore and the entries
+ * that stayed closed for the store's retention.
+ */
+export const INBOX_PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+
 /** Configuration of an agent adapter. */
 export interface AdapterConfig {
   /** The API base, for example `https://example.com/api/v1`. */
@@ -141,7 +148,9 @@ export interface AdapterConfig {
   readonly transport?: "gateway" | "polling" | undefined;
   /**
    * The directory of the inbox (`inbox/`) and the outbox (`outbox.json`); absent keeps both in
-   * memory (tests only, not durable).
+   * memory (tests only, not durable). The adapter prunes the inbox at its start and every
+   * hour: an entry leaves it a day after it was closed, a `jti` row when its token cannot pass
+   * anymore. A failed outbox entry stays until the caller deals with it.
    */
   readonly stateDir?: string | undefined;
   /** `true` to keep the allow list of 17.7 (`getAgentTriggerers`). */
@@ -507,8 +516,9 @@ export class Adapter {
   private readonly logger: Logger;
   private readonly webSocket: GatewaySocketConstructor | undefined;
   private readonly runs = new Map<string, RunState>();
-  // The newest token per run of this process, kept after the end, so a late outbox entry of a
-  // run goes out bound to it and the server answers run_inactive (07 SR9).
+  // The newest token per run this process holds. After the end of a run the inbox still has
+  // its tokens, so a late outbox entry of the run goes out bound to it and the server answers
+  // run_inactive (07 SR9).
   private readonly runTokens = new Map<string, Secret>();
   private readonly tasks = new Set<Promise<unknown>>();
   private readonly stopper = new AbortController();
@@ -604,8 +614,10 @@ export class Adapter {
     this.source ??= this.defaultSource(discovery.gateway.url);
     const source = this.source;
     await this.recover();
+    await this.inbox.prune(this.clock.now());
     await this.outbox.flush();
     try {
+      this.spawn(() => this.pruneInbox());
       for await (const delivery of source) {
         if (delivery instanceof SourceReady) this.spawn(() => this.onReady());
         else if (delivery instanceof CursorAdvance)
@@ -679,6 +691,29 @@ export class Adapter {
 
   private discover(): Promise<S["Discovery"]> {
     return unwrap(this.client.GET("/instance/discovery"), "getDiscovery");
+  }
+
+  /** Prunes the inbox every {@link INBOX_PRUNE_INTERVAL_MS} until the adapter stops. */
+  private async pruneInbox(): Promise<void> {
+    for (;;) {
+      try {
+        await this.clock.sleep(INBOX_PRUNE_INTERVAL_MS, this.stopper.signal);
+      } catch {
+        return; // stopped
+      }
+      try {
+        await this.inbox.prune(this.clock.now());
+      } catch (error) {
+        // The next round tries again; nothing depends on a prune.
+        this.logger.warn("inbox prune failed", { error: errorName(error) });
+      }
+    }
+  }
+
+  /** Drops what this process keeps in memory about a run that is over for it. */
+  private forget(runId: string): void {
+    this.runs.delete(runId);
+    this.runTokens.delete(runId);
   }
 
   /** The newest token of a run for its outbox entries: this process's, else the inbox's. */
@@ -1165,7 +1200,9 @@ export class Adapter {
       // the most recently received token (09 4.5.1).
       if (stored.token !== undefined && !stored.token.equals(renewed))
         renewed = stored.token;
-      this.runTokens.set(state.runId, renewed);
+      // A run that was forgotten during the call (a cancel) keeps no token here.
+      if (this.runs.get(state.runId) === state)
+        this.runTokens.set(state.runId, renewed);
       this.client.setRunToken(state.runId, renewed);
       return renewed;
     });
@@ -1208,7 +1245,7 @@ export class Adapter {
     }
     if (eventId === undefined) {
       await this.inbox.setState(state.eventId, EntryState.CLOSED);
-      this.runs.delete(state.runId);
+      this.forget(state.runId);
     }
     return undefined;
   }
@@ -1342,7 +1379,7 @@ export class Adapter {
         ) {
           // The server already ended or holds the run: close the entry, start nothing.
           await this.inbox.setState(state.eventId, EntryState.CLOSED);
-          this.runs.delete(state.runId);
+          this.forget(state.runId);
           return undefined;
         }
         throw error;
@@ -1353,6 +1390,39 @@ export class Adapter {
 
   /** Runs handler work of a started run and ends the run as 09 4.9 says. */
   private async executeRun(
+    state: RunState,
+    token: Secret,
+    work: (inv: Invocation, run: RunHandle) => Promise<void>,
+    inv: Invocation,
+  ): Promise<void> {
+    const handle = state.handle;
+    try {
+      try {
+        await this.workAndEnd(state, token, work, inv);
+      } catch (error) {
+        // Only an end the server did not store is taken up here; it goes out again below.
+        if (!handle.finishPending) throw error;
+      }
+      if (handle.finishPending) {
+        this.logger.warn(
+          `end of run ${state.runId} not stored; sending it again`,
+        );
+        await this.resendEnd(state, token);
+      }
+    } finally {
+      if (handle.finished || handle.cancelled.aborted) {
+        try {
+          await this.inbox.setState(state.eventId, EntryState.CLOSED);
+        } catch {
+          // The store may be closed already when the adapter stops.
+        }
+        this.forget(state.runId);
+      }
+    }
+  }
+
+  /** The handler work of {@link Adapter.executeRun} and the end that follows from it. */
+  private async workAndEnd(
     state: RunState,
     token: Secret,
     work: (inv: Invocation, run: RunHandle) => Promise<void>,
@@ -1379,6 +1449,9 @@ export class Adapter {
           await handle.finish("completed");
       });
     } catch (error) {
+      // The end was asked for and the server did not store it: that is no failure of the
+      // handler, and the end asked for stays the run's end.
+      if (handle.finishPending) throw error;
       const failure = error instanceof RuntimeFailure;
       if (!failure)
         this.logger.error(`handler failed for run ${state.runId}`, {
@@ -1391,14 +1464,41 @@ export class Adapter {
           }),
         ),
       );
-    } finally {
-      if (handle.finished || handle.cancelled.aborted) {
-        try {
-          await this.inbox.setState(state.eventId, EntryState.CLOSED);
-        } catch {
-          // The store may be closed already when the adapter stops.
-        }
-        this.runs.delete(state.runId);
+    }
+  }
+
+  /**
+   * Sends the end of a run again until the server stored or refused it, or the adapter stops.
+   *
+   * The run stays in `active_runs` of the heartbeat meanwhile, so the server does not end it as
+   * interrupted (09 5.5). The waits double from `sync.reconnect_backoff_base` up to
+   * `sync.reconnect_backoff_cap`. After a stop the run is left to the server, like every run a
+   * stopped adapter still holds (09 4.9).
+   */
+  private async resendEnd(state: RunState, token: Secret): Promise<void> {
+    const handle = state.handle;
+    for (let attempt = 0; handle.finishPending; attempt++) {
+      const wait = Math.min(
+        this.settings.reconnectBackoffCapMs,
+        this.settings.reconnectBackoffBaseMs * 2 ** attempt,
+      );
+      try {
+        await this.clock.sleep(wait, this.stopper.signal);
+      } catch {
+        return; // stopped
+      }
+      try {
+        await this.client.bindRun(
+          state.runId,
+          this.runTokens.get(state.runId) ?? token,
+          () => handle.retryFinish(),
+        );
+      } catch (error) {
+        if (!(error instanceof ProblemError || error instanceof TransportError))
+          throw error;
+        this.logger.info(`end of run ${state.runId} not sent`, {
+          error: error.name,
+        });
       }
     }
   }
@@ -1417,7 +1517,7 @@ export class Adapter {
         throw error;
     }
     await this.inbox.setState(state.eventId, EntryState.CLOSED);
-    this.runs.delete(state.runId);
+    this.forget(state.runId);
   }
 
   /** `superseded`: start nothing; close when the run left `queued`, else wait. */
@@ -1437,7 +1537,7 @@ export class Adapter {
     }
     if (run !== undefined && run.state !== "queued") {
       await this.inbox.setState(state.eventId, EntryState.CLOSED);
-      this.runs.delete(state.runId);
+      this.forget(state.runId);
       return;
     }
     state.waitingForToken = true;
@@ -1490,7 +1590,8 @@ export class Adapter {
       }
       return;
     }
-    if (runningHere && !state.handle.finished) {
+    // A run whose end only waits to be sent again takes no more work.
+    if (runningHere && !state.handle.finished && !state.handle.finishPending) {
       const bound = this.runTokens.get(state.runId) ?? entry.token;
       await this.client.bindRun(state.runId, bound, () =>
         this.interruptible(undefined, () => work(inv, state.handle)),
@@ -1651,7 +1752,7 @@ export class Adapter {
       // Not started yet: the server cancels a queued run itself; only close the entry.
       state.interrupt.abort();
       await this.inbox.setState(state.eventId, EntryState.CLOSED);
-      this.runs.delete(state.runId);
+      this.forget(state.runId);
       return;
     }
     if (state.task !== undefined && !state.task.done) {
@@ -1664,7 +1765,7 @@ export class Adapter {
           ignoreProblem(() => state.handle.finish("cancelled", { reason })),
         );
       await this.inbox.setState(state.eventId, EntryState.CLOSED);
-      this.runs.delete(state.runId);
+      this.forget(state.runId);
     }
   }
 
@@ -1676,7 +1777,7 @@ export class Adapter {
     const next = typeof summary.state === "string" ? summary.state : undefined;
     if (state?.waitingForToken && next !== undefined && next !== "queued") {
       await this.inbox.setState(state.eventId, EntryState.CLOSED);
-      this.runs.delete(state.runId);
+      this.forget(state.runId);
     }
   }
 

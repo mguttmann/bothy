@@ -26,11 +26,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Secret } from "../src/auth/secret.js";
 import { uuidv7 } from "../src/ids.js";
 import {
+  CLOSED_ENTRY_RETENTION_MS,
   EntryState,
   FileInboxStore,
   InboxEntry,
   MemoryInboxStore,
   type InboxStore,
+  type InboxStoreOptions,
 } from "../src/invocation/index.js";
 
 const NOW = Date.UTC(2026, 9, 20, 9, 0);
@@ -84,8 +86,9 @@ function mode(path: string): Promise<number> {
 }
 
 const kinds = {
-  file: () => new FileInboxStore(join(dir, "inbox")),
-  memory: () => new MemoryInboxStore(),
+  file: (options?: InboxStoreOptions) =>
+    new FileInboxStore(join(dir, "inbox"), options),
+  memory: (options?: InboxStoreOptions) => new MemoryInboxStore(options),
 };
 
 describe.each(Object.entries(kinds))("%s inbox store", (_name, make) => {
@@ -273,7 +276,7 @@ describe.each(Object.entries(kinds))("%s inbox store", (_name, make) => {
     expect(await store.inStates(EntryState.ACCEPTED)).toHaveLength(2);
   });
 
-  it("keeps a jti until (not at) its end; prune drops jti rows only", async () => {
+  it("keeps a jti until (not at) its end; prune drops expired jti rows and no open entry", async () => {
     const e = entry();
     await store.add(e);
     await store.rememberJti("j1", NOW + 10 * S);
@@ -288,6 +291,69 @@ describe.each(Object.entries(kinds))("%s inbox store", (_name, make) => {
     // Remembering again keeps the later end.
     await store.rememberJti("j2", NOW + 20 * S);
     expect(await store.jtiSeen("j2", NOW + 60 * S)).toBe(true);
+    // An entry that is not closed stays, however long ago it was stored.
+    await store.prune(NOW + 10 * CLOSED_ENTRY_RETENTION_MS);
+    await store.prune(NOW + 20 * CLOSED_ENTRY_RETENTION_MS);
+    expect(await store.get(e.eventId)).toBeDefined();
+  });
+
+  it("drops a closed entry once it stayed closed for the retention", async () => {
+    const open = entry({ seq: 1 });
+    const waiting = entry({ seq: 2 });
+    const done = entry({ seq: 3 });
+    for (const e of [open, waiting, done]) await store.add(e);
+    await store.setState(waiting.eventId, EntryState.WAITING);
+    await store.setState(done.eventId, EntryState.CLOSED);
+    // The first prune that finds the entry closed starts its time.
+    await store.prune(NOW);
+    await store.prune(NOW + CLOSED_ENTRY_RETENTION_MS - 1);
+    expect(await store.get(done.eventId)).toBeDefined();
+    await store.prune(NOW + CLOSED_ENTRY_RETENTION_MS);
+    expect(await store.get(done.eventId)).toBeUndefined();
+    expect(await store.forRun(done.runId ?? "")).toEqual([]);
+    expect(await store.inStates(EntryState.CLOSED)).toEqual([]);
+    expect(
+      (await store.inStates(EntryState.ACCEPTED, EntryState.WAITING)).map(
+        (e) => e.eventId,
+      ),
+    ).toEqual([open.eventId, waiting.eventId]);
+    // The event is unknown again: a delivery after the retention is stored as a new event.
+    await expect(
+      store.redelivered(done.eventId, undefined, undefined, undefined),
+    ).rejects.toThrow(RangeError);
+    await store.add(done);
+    expect((await store.get(done.eventId))?.state).toBe(EntryState.ACCEPTED);
+  });
+
+  it("keeps a closed entry the server still delivers", async () => {
+    const done = entry({ state: EntryState.CLOSED });
+    await store.add(done);
+    await store.prune(NOW);
+    // A redelivery shows the server has not taken the acknowledgement: the time starts again.
+    await store.redelivered(done.eventId, undefined, undefined, undefined);
+    await store.prune(NOW + CLOSED_ENTRY_RETENTION_MS);
+    expect((await store.get(done.eventId))?.deliveries).toBe(2);
+    await store.prune(NOW + 2 * CLOSED_ENTRY_RETENTION_MS - 1);
+    expect(await store.get(done.eventId)).toBeDefined();
+    await store.prune(NOW + 2 * CLOSED_ENTRY_RETENTION_MS);
+    expect(await store.get(done.eventId)).toBeUndefined();
+  });
+
+  it("keeps a closed entry for one day by default", () => {
+    // The value the README and the ruling AUD-ST1/8 name.
+    expect(CLOSED_ENTRY_RETENTION_MS).toBe(24 * 60 * 60 * 1000);
+  });
+
+  it("takes the retention of closed entries from its options", async () => {
+    await store.close();
+    store = make({ closedRetentionMs: 10 * S });
+    const done = entry({ state: EntryState.CLOSED });
+    await store.add(done);
+    await store.prune(NOW);
+    await store.prune(NOW + 10 * S - 1);
+    expect(await store.get(done.eventId)).toBeDefined();
+    await store.prune(NOW + 10 * S);
+    expect(await store.get(done.eventId)).toBeUndefined();
   });
 
   it("stores a copy of the envelope", async () => {
@@ -367,6 +433,29 @@ describe("FileInboxStore", () => {
     } finally {
       await s.close();
     }
+  });
+
+  it("removes the file of a dropped entry, and a restart starts the time of the rest again", async () => {
+    const path = join(dir, "inbox");
+    const first = new FileInboxStore(path);
+    const gone = entry({ seq: 1, state: EntryState.CLOSED });
+    const kept = entry({ seq: 2, state: EntryState.CLOSED });
+    await first.add(gone);
+    await first.prune(NOW);
+    await first.add(kept);
+    await first.prune(NOW + CLOSED_ENTRY_RETENTION_MS);
+    expect((await readdir(path)).sort()).toEqual([
+      `entry-${kept.eventId}.json`,
+    ]);
+    await first.close();
+    // The new process does not know since when the entry is closed: it counts from its start.
+    const second = new FileInboxStore(path);
+    expect(await second.get(gone.eventId)).toBeUndefined();
+    await second.prune(NOW + 2 * CLOSED_ENTRY_RETENTION_MS);
+    expect(await second.get(kept.eventId)).toBeDefined();
+    await second.prune(NOW + 3 * CLOSED_ENTRY_RETENTION_MS);
+    expect(await readdir(path)).toEqual([]);
+    await second.close();
   });
 
   it("stores only the event, its token and the state fields", async () => {

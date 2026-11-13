@@ -230,6 +230,8 @@ export interface LiveBox {
   last_text_excerpt?: string;
   /** The plan. */
   plan?: S["RunPlan"];
+  /** The follow-up rows by message ID. */
+  followups?: Record<string, S["RunFollowup"]>;
 }
 
 /** A run row with the columns the rules need. */
@@ -264,6 +266,12 @@ export class RunRecord {
   lastJti: string | undefined;
   /** Whether a cancel waits for the adapter. */
   cancelRequested = false;
+  /** The `costs` of `finishRun`, when the run ended with some. */
+  costs: S["CostReport"][] | undefined;
+  /** What triggered the run: a message, or a model command (09 10.4). */
+  triggerKind: "message" | "command" = "message";
+  /** The command the tokens of a command run name; `undefined` for a message run. */
+  triggerObject: string | undefined;
 
   /**
    * Creates the row.
@@ -313,6 +321,8 @@ export interface WorldOptions {
   readonly toolClass: ToolClassName;
   /** Appends a durable event to the log and wakes the deliverers. */
   readonly append: (type: string, envelope: Envelope) => LogEntry;
+  /** Accept `RunFinish.costs`, as the server does since M2-22; default `false`. */
+  readonly costs?: boolean | undefined;
 }
 
 function closed(
@@ -397,6 +407,12 @@ export class World {
   billingMode: BillingModeName;
   /** Lotse's configured tool class. */
   toolClass: ToolClassName;
+  /** Whether `finishRun` accepts `costs`; off plays a server without cost booking. */
+  costsEnabled: boolean;
+  /** The agent session rows of every thread, in order. */
+  readonly sessions = new Map<string, S["AgentSession"][]>();
+  /** The stored `reportAgentSession` bodies of every thread, in order. */
+  readonly sessionReports = new Map<string, Record<string, unknown>[]>();
   private readonly append: WorldOptions["append"];
 
   /**
@@ -413,6 +429,7 @@ export class World {
   ) {
     this.billingMode = options.billingMode;
     this.toolClass = options.toolClass;
+    this.costsEnabled = options.costs ?? false;
     this.append = options.append;
     this.issuer = new Issuer(this.instanceId);
   }
@@ -452,7 +469,7 @@ export class World {
       channel_id: this.channelId,
       agent_id: this.lotse.id,
       triggered_by: run.triggeredBy,
-      trigger_kind: "message",
+      trigger_kind: run.triggerKind,
       triggering_message_id: run.triggeringMessageId,
       state: run.state,
       version: run.version,
@@ -464,7 +481,7 @@ export class World {
         is_estimate: true,
       },
       steps: { ...run.live.steps },
-      followups: {},
+      followups: structuredClone(run.live.followups ?? {}),
       queued_at: iso(run.queuedAt),
     };
     if (run.live.model !== undefined) doc.model = run.live.model;
@@ -638,10 +655,15 @@ export class World {
   /**
    * Creates a new thread with Alex's message, a queued run and its `agent.invocation`.
    *
+   * With `command` the run is the run of a model command (`trigger_kind = command`): the
+   * payload names the command and the invocation instead of the message, and every token of
+   * the run names the command (09 10.4).
+   *
    * @param text - The message content.
+   * @param command - The command of a model command run.
    * @returns The run.
    */
-  trigger(text: string): RunRecord {
+  trigger(text: string, command?: CommandDoc): RunRecord {
     const threadId = uuidv7();
     const message = this.message(threadId, this.alex, text);
     const run = new RunRecord(
@@ -659,11 +681,21 @@ export class World {
       channel_id: this.channelId,
       space_id: this.spaceId,
       trigger_kind: "message",
-      message_id: message.id,
       triggered_by: this.alex.ref(),
       billing_mode: this.billingMode,
       settings_version: this.settingsVersion,
     };
+    if (command === undefined) {
+      payload.message_id = message.id;
+    } else {
+      run.triggerKind = "command";
+      run.triggerObject = command.id;
+      payload.trigger_kind = "command";
+      payload.command_invocation_id = uuidv7();
+      payload.command_id = command.id;
+      payload.command_name = command.name;
+      payload.options = [];
+    }
     const envelope = this.envelope("agent.invocation", payload, {
       resource: { kind: "run", id: run.id },
       threadId,
@@ -683,6 +715,12 @@ export class World {
   followup(runId: string, text: string): string {
     const run = this.runOr404(runId);
     const message = this.message(run.threadId, this.alex, text);
+    // The run keeps a row per follow-up; the adapter moves its state with a patch (09 5.3).
+    run.live.followups ??= {};
+    run.live.followups[message.id] = {
+      message_id: message.id,
+      state: "queued",
+    };
     const payload: S["AgentFollowupPayload"] = {
       run_id: run.id,
       thread_id: run.threadId,
@@ -817,8 +855,8 @@ export class World {
   invocationClaims(run: RunRecord): InvocationClaims {
     const claims = this.claims(
       run.triggeredBy,
-      "message",
-      run.triggeringMessageId,
+      run.triggerKind,
+      run.triggerObject ?? run.triggeringMessageId,
       run.threadId,
     );
     return { iss: this.instanceId, jti: uuidv7(), ...claims, run_id: run.id };
@@ -850,8 +888,8 @@ export class World {
     let sub: string;
     if (entry.type === "agent.invocation") {
       [kind, obj, sub] = [
-        "message",
-        payload.message_id as string,
+        payload.trigger_kind as "message" | "command",
+        run?.triggerObject ?? (payload.message_id as string),
         run?.triggeredBy ?? this.alex.id,
       ];
     } else if (entry.type === "agent.followup") {
@@ -1134,7 +1172,8 @@ export class World {
     closed(body, ["state"], ["reason", "summary", "metrics", "costs"], {
       state: ["completed", "failed", "cancelled"],
     });
-    if ("costs" in body) throw fieldError("/costs", "not_enabled");
+    if ("costs" in body && !this.costsEnabled)
+      throw fieldError("/costs", "not_enabled");
     const state = body.state as "completed" | "failed" | "cancelled";
     let reason = (body.reason as string | undefined) || undefined;
     if ((state === "failed" || state === "cancelled") && !reason)
@@ -1159,6 +1198,8 @@ export class World {
       run.summary = body.summary;
     if ("metrics" in body)
       run.live.metrics = { ...(body.metrics as S["RunMetrics"]) };
+    if (Array.isArray(body.costs))
+      run.costs = [...(body.costs as S["CostReport"][])];
     this.transition(run, state, reason);
     return this.runDoc(run);
   }
@@ -1255,9 +1296,13 @@ export class World {
    *
    * @param runId - The run.
    * @returns The context.
+   * @throws {@link FakeProblem} `500 internal_error` for the run of a model command.
    */
   context(runId: string): RunContextDoc {
     const run = this.runOr404(runId);
+    // The server defines the context for a triggering message only (09 4.6) and answers a run
+    // of any other trigger kind with 500.
+    if (run.triggerKind !== "message") throw new FakeProblem("internal_error");
     const items = (this.threads.get(run.threadId) ?? []).map((id) =>
       this.contextItem(this.messages.get(id) as MessageDoc, run),
     );
@@ -1313,6 +1358,106 @@ export class World {
         settings_version: this.settingsVersion,
       },
     };
+  }
+
+  /**
+   * Returns the current agent session of a thread, if any.
+   *
+   * @param threadId - The thread.
+   * @returns The row.
+   */
+  currentSession(threadId: string): S["AgentSession"] | undefined {
+    return (this.sessions.get(threadId) ?? []).find((r) => r.is_current);
+  }
+
+  private sessionFor(
+    threadId: string,
+    ref: string,
+    started: boolean,
+    model?: string,
+  ): S["AgentSession"] {
+    const rows = this.sessions.get(threadId) ?? [];
+    for (const old of rows) old.is_current = false;
+    const row: S["AgentSession"] = {
+      id: uuidv7(),
+      thread_id: threadId,
+      agent_id: this.lotse.id,
+      external_session_ref: ref,
+      is_current: true,
+      started,
+      cost: { amount_micros: 0, currency: "USD", is_estimate: true },
+      created_at: this.nowIso(),
+      version: 1,
+    };
+    if (model) row.model = model;
+    rows.push(row);
+    this.sessions.set(threadId, rows);
+    return row;
+  }
+
+  /**
+   * `reportAgentSession`: compare-and-swap over the current row's version (09 9.1, 9.5).
+   *
+   * Only during an active run of the thread. A different reference replaces the stored one
+   * (9.5 point 3); `bind_failed` without a current row answers `session_not_bound`.
+   *
+   * @param threadId - The thread.
+   * @param body - The request body.
+   * @param ifMatch - The `If-Match` header.
+   * @returns The session row.
+   */
+  reportSession(
+    threadId: string,
+    body: unknown,
+    ifMatch: string | undefined,
+  ): S["AgentSession"] {
+    const key = canonicalUuid(threadId);
+    if (key === undefined || !this.threads.has(key))
+      throw new FakeProblem("not_found");
+    closed(body, ["external_session_ref"], ["model", "started", "bind_failed"]);
+    const ref = body.external_session_ref;
+    if (typeof ref !== "string" || !ref)
+      throw fieldError("/external_session_ref", "required");
+    if ("bind_failed" in body && body.bind_failed !== "session_missing")
+      throw fieldError("/bind_failed", "invalid_enum");
+    const active = [...this.runs.values()].some(
+      (r) => r.threadId === key && ACTIVE.has(r.state),
+    );
+    if (!active)
+      throw new FakeProblem("conflict", { reason: "run_not_active" });
+    const model =
+      typeof body.model === "string" && body.model ? body.model : undefined;
+    const reports = this.sessionReports.get(key) ?? [];
+    this.sessionReports.set(key, reports);
+    let row = this.currentSession(key);
+    const created = row === undefined;
+    if (row === undefined) {
+      if (ifMatch !== undefined) throw new FakeProblem("version_conflict");
+      if ("bind_failed" in body)
+        throw new FakeProblem("conflict", { reason: "session_not_bound" });
+      row = this.sessionFor(key, ref, false);
+    } else if (
+      ifMatch === undefined ||
+      ![`"${row.version}"`, `W/"${row.version}"`].includes(ifMatch.trim())
+    ) {
+      throw new FakeProblem("version_conflict", { current: { ...row } });
+    }
+    if ("bind_failed" in body && !created) {
+      // The bound row ends with rebind and a new current row takes over (09 9.5 point 4).
+      if (!row.started)
+        throw new FakeProblem("conflict", { reason: "session_not_bound" });
+      row.is_current = false;
+      row.end_reason = "rebind";
+      const fresh = this.sessionFor(key, ref, body.started === true, model);
+      reports.push({ ...body });
+      return { ...fresh };
+    }
+    row.external_session_ref = ref;
+    if (body.started === true) row.started = true;
+    if (model !== undefined) row.model = model;
+    if (!created) row.version += 1;
+    reports.push({ ...body });
+    return { ...row };
   }
 
   /**

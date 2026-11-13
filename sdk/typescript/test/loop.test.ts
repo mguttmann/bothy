@@ -25,14 +25,16 @@ import {
 } from "../src/gateway/index.js";
 import type { components } from "../src/generated/openapi.js";
 import {
+  CLOSED_ENTRY_RETENTION_MS,
   EntryState,
+  InboxEntry,
   MemoryInboxStore,
-  type InboxEntry,
 } from "../src/invocation/index.js";
 import { silentLogger } from "../src/logger.js";
 import {
   Adapter,
   AgentHandler,
+  INBOX_PRUNE_INTERVAL_MS,
   RuntimeFailure,
   type ActualBilling,
   type AdapterConfig,
@@ -551,6 +553,7 @@ async function running<T>(
 /** The adapter's private run table, read the way the Python tests read `_runs`. */
 interface Internals {
   readonly runs: Map<string, { readonly waitingForToken: boolean }>;
+  readonly runTokens: Map<string, Secret>;
   renew(state: unknown, token: Secret): Promise<Secret>;
 }
 
@@ -607,6 +610,38 @@ describe("acceptance and start", () => {
       const first = steps.map((s) => log.indexOf(s));
       expect(first.every((i) => i >= 0)).toBe(true);
       expect(first).toEqual([...first].sort((a, b) => a - b));
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "starts the run of a model command and hands the handler its payload",
+    async () => {
+      const handler = new RecordingHandler();
+      const adapter = makeAdapter(handler, "model-command");
+      const commandId = await fake.registerCommand("recap");
+      let runId = "";
+      await running(adapter, async () => {
+        runId = (await fake.trigger("Recap please", { command: "recap" }))
+          .runId;
+        await until(fake, async () =>
+          ["completed", "failed"].includes(await stateOf(runId)),
+        );
+      });
+      const view = await fake.runState(runId);
+      expect([view.state, view.stateReason, view.starts]).toEqual([
+        "completed",
+        undefined,
+        1,
+      ]);
+      expect(handler.count("execute", runId)).toBe(1);
+      const inv = handler.invocations[0];
+      expect([
+        inv?.payload.trigger_kind,
+        inv?.payload.command_id,
+        inv?.claims.triggerKind,
+        inv?.claims.commandId,
+      ]).toEqual(["command", commandId, "command", commandId]);
     },
     TEST_TIMEOUT,
   );
@@ -1241,6 +1276,298 @@ describe("runs in progress", () => {
           (p) => p.startsWith("POST") && p.endsWith("/consumers/polling/ack"),
         ),
       ).toBe(true);
+    },
+    TEST_TIMEOUT,
+  );
+});
+
+describe("an end the server did not store", () => {
+  /** The runs the adapter reports as active in its heartbeat. */
+  function activeRuns(adapter: Adapter): unknown {
+    return adapter.heartbeat().details?.active_runs;
+  }
+
+  /** The answered statuses of every `finishRun`, `0` for a dropped connection. */
+  function finishes(): number[] {
+    return fake
+      .requests()
+      .filter((r) => r.path.endsWith("/finish"))
+      .map((r) => r.status);
+  }
+
+  it(
+    "keeps the run active and sends the handler's end again after finishRun got no answer",
+    async () => {
+      class Summarising extends RecordingHandler {
+        override async execute(inv: Invocation, run: RunHandle): Promise<void> {
+          await super.execute(inv, run);
+          await run.finish("completed", { summary: "Answered" });
+        }
+      }
+      const handler = new Summarising();
+      const adapter = makeAdapter(handler, "lost-finish");
+      // Every attempt of the first two finishRun calls and one of the third are dropped.
+      const attempts = fake.sdkSettings.retryMaxAttempts;
+      const dropped = 2 * attempts + 1;
+      fake.inject("finishRun", Fault.disconnect(), dropped);
+      let runId = "";
+      await running(adapter, async () => {
+        runId = (await fake.trigger()).runId;
+        await until(
+          fake,
+          async () =>
+            finishes().length > attempts || (await closed(adapter, runId)),
+        );
+        // The server holds the run as running: the adapter still reports it and has not closed
+        // its entry, so the server does not end it as interrupted (09 5.5).
+        expect(finishes().every((status) => status === 0)).toBe(true);
+        expect(await closed(adapter, runId)).toBe(false);
+        expect(activeRuns(adapter)).toEqual([runId]);
+        expect(await stateOf(runId)).toBe("running");
+        await until(fake, () => closed(adapter, runId));
+      });
+      const view = await fake.runState(runId);
+      // The end the handler asked for arrived, not a failure of the handler.
+      expect([view.state, view.stateReason, fake.run(runId).summary]).toEqual([
+        "completed",
+        undefined,
+        "Answered",
+      ]);
+      expect(finishes()).toEqual([...Array<number>(dropped).fill(0), 200]);
+      expect(activeRuns(adapter)).toEqual([]);
+      expect(handler.count("execute", runId)).toBe(1);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "sends the adapter's own end again after the server answered 503",
+    async () => {
+      const handler = new RecordingHandler();
+      const recording = new RecordingFetch();
+      recording.override = answerFirst(
+        "/finish",
+        () => problem(503, "unavailable"),
+        2,
+      );
+      const adapter = makeAdapter(
+        handler,
+        "finish-503",
+        { settings: { ...fake.sdkSettings, retryMaxAttempts: 1 } },
+        { fetch: recording.fetch },
+      );
+      let runId = "";
+      await running(adapter, async () => {
+        runId = (await fake.trigger()).runId;
+        await until(
+          fake,
+          async () =>
+            recording.count("POST", "/finish") > 1 ||
+            (await closed(adapter, runId)),
+        );
+        expect(await closed(adapter, runId)).toBe(false);
+        expect(activeRuns(adapter)).toEqual([runId]);
+        expect(await stateOf(runId)).toBe("running");
+        await until(fake, () => closed(adapter, runId));
+      });
+      expect((await fake.runState(runId)).state).toBe("completed");
+      expect(
+        recording.seen
+          .filter((r) => r.path.endsWith("/finish"))
+          .map((r) => r.status),
+      ).toEqual([503, 503, 200]);
+      expect(activeRuns(adapter)).toEqual([]);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "leaves the run to the server when the adapter stops while the end waits",
+    async () => {
+      const handler = new RecordingHandler();
+      const adapter = makeAdapter(handler, "finish-stop", {
+        settings: { ...fake.sdkSettings, retryMaxAttempts: 1 },
+      });
+      fake.inject("finishRun", Fault.disconnect(), 2);
+      let runId = "";
+      await running(adapter, async () => {
+        runId = (await fake.trigger()).runId;
+        await until(fake, () => finishes().length === 2);
+      });
+      // The stop ended the wait: nothing more was sent, and the entry stays started for the
+      // next process, which closes it (09 4.9).
+      expect(finishes()).toEqual([0, 0]);
+      expect(await stateOf(runId)).toBe("running");
+      expect(handler.handles.get(runId)?.finishPending).toBe(true);
+      expect(await closed(adapter, runId)).toBe(false);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "hands no follow-up to the handler while the end waits to be sent again",
+    async () => {
+      const handler = new RecordingHandler();
+      const adapter = makeAdapter(handler, "finish-followup", {
+        settings: { ...fake.sdkSettings, retryMaxAttempts: 1 },
+      });
+      fake.inject("finishRun", Fault.disconnect(), 3);
+      let runId = "";
+      await running(adapter, async ({ source }) => {
+        runId = (await fake.trigger()).runId;
+        await until(fake, () => finishes().length > 0);
+        await fake.deliverFollowup(runId);
+        await until(fake, () => closed(adapter, runId));
+        expect(source.envelopes("agent.followup")).toHaveLength(1);
+      });
+      expect((await fake.runState(runId)).state).toBe("completed");
+      expect(handler.count("onFollowup")).toBe(0);
+    },
+    TEST_TIMEOUT,
+  );
+});
+
+describe("what the adapter keeps of ended runs", () => {
+  /** A source that is ready and then delivers nothing until it is closed. */
+  class IdleSource implements EventSource {
+    readonly closeReason = undefined;
+    private readonly closing = new Gate();
+
+    async *[Symbol.asyncIterator](): AsyncGenerator<Delivery, void, undefined> {
+      yield new SourceReady();
+      await this.closing.opened;
+    }
+
+    settle(): Promise<void> {
+      return Promise.resolve();
+    }
+
+    advance(): Promise<void> {
+      return Promise.resolve();
+    }
+
+    ack(): Promise<void> {
+      return Promise.resolve();
+    }
+
+    answerAutocomplete(): Promise<void> {
+      return Promise.resolve();
+    }
+
+    close(): Promise<void> {
+      this.closing.open();
+      return Promise.resolve();
+    }
+  }
+
+  /** Records the time of every prune. */
+  class PrunedInbox extends MemoryInboxStore {
+    readonly prunes: number[] = [];
+
+    override async prune(nowMs: number): Promise<void> {
+      await super.prune(nowMs);
+      this.prunes.push(nowMs);
+    }
+  }
+
+  it(
+    "prunes its inbox at the start and every hour, so closed entries and jti rows go",
+    async () => {
+      // "Every hour", the value the README and the ruling AUD-ST1/8 name.
+      expect(INBOX_PRUNE_INTERVAL_MS).toBe(60 * 60 * 1000);
+      const inbox = new PrunedInbox();
+      const eventId = "01900000-0000-7000-8000-00000000c105";
+      await inbox.add(
+        new InboxEntry({
+          eventId,
+          seq: 1,
+          type: "command.invoked",
+          runId: undefined,
+          envelope: { id: eventId, seq: 1 },
+          token: new Secret("an-old-token"),
+          tokenIat: 1,
+          tokenJti: "jti-old",
+          state: EntryState.CLOSED,
+          deliveries: 1,
+        }),
+      );
+      const start = fake.clock.now();
+      await inbox.rememberJti("jti-old", start + STEP_MS);
+      const adapter = makeAdapter(
+        new RecordingHandler(),
+        "prune",
+        {},
+        { inbox, source: new IdleSource() },
+      );
+      const done = adapter.run();
+      done.catch(() => undefined);
+      try {
+        await patiently(() => inbox.prunes.length === 1, "the first prune");
+        expect(inbox.prunes).toEqual([start]);
+        expect(await inbox.jtiSeen("jti-old", start)).toBe(true);
+        await fake.passTime(INBOX_PRUNE_INTERVAL_MS);
+        await patiently(() => inbox.prunes.length === 2, "the second prune");
+        // The token of the row cannot pass anymore: the row is gone, the entry is still kept.
+        expect(await inbox.jtiSeen("jti-old", start)).toBe(false);
+        expect(await inbox.get(eventId)).toBeDefined();
+        await fake.passTime(CLOSED_ENTRY_RETENTION_MS);
+        await patiently(
+          async () => (await inbox.get(eventId)) === undefined,
+          "the end of the closed entry",
+        );
+        expect(inbox.prunes.at(-1)).toBe(
+          start + INBOX_PRUNE_INTERVAL_MS + CLOSED_ENTRY_RETENTION_MS,
+        );
+      } finally {
+        await adapter.stop();
+        await withinPatience(
+          done.catch(() => undefined),
+          "the end of the adapter loop",
+        );
+      }
+      // The stop ended the prune loop: no prune waits on the clock.
+      const pruned = inbox.prunes.length;
+      await fake.passTime(INBOX_PRUNE_INTERVAL_MS);
+      expect(inbox.prunes).toHaveLength(pruned);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "forgets the token of an ended run and still binds a late reply with the inbox's token",
+    async () => {
+      const handler = new RecordingHandler();
+      const recording = new RecordingFetch();
+      const adapter = makeAdapter(
+        handler,
+        "late-reply",
+        {},
+        { fetch: recording.fetch },
+      );
+      await running(adapter, async ({ source }) => {
+        const { runId, threadId } = await fake.trigger();
+        await until(fake, async () => (await stateOf(runId)) === "completed");
+        await until(fake, () => closed(adapter, runId));
+        expect(internals(adapter).runs.size).toBe(0);
+        expect(internals(adapter).runTokens.size).toBe(0);
+        // A reply of the ended run goes out bound to the run, and the server refuses it for
+        // good as run_inactive instead of posting it outside a run (07 SR9).
+        const delivered = source.envelopes("agent.invocation")[0]?.token;
+        const entry = await adapter.outbox.sendMessage(threadId, "Too late", {
+          runId,
+        });
+        expect([entry.state, entry.problemCode]).toEqual([
+          "failed",
+          "invocation_token_invalid",
+        ]);
+        const sent = recording.seen.at(-1);
+        expect([sent?.path.endsWith("/messages"), sent?.status]).toEqual([
+          true,
+          403,
+        ]);
+        expect(sent?.bound).toBe(fingerprint(delivered as Secret));
+        expect(fake.messages).toHaveLength(0);
+      });
     },
     TEST_TIMEOUT,
   );

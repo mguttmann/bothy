@@ -20,6 +20,7 @@ import {
   InvocationTokenInvalid,
   ProblemError,
   RateLimitedError,
+  TransportError,
   ValidationFailed,
 } from "../src/errors.js";
 import type { components } from "../src/generated/openapi.js";
@@ -745,6 +746,34 @@ describe("follow-up states", () => {
   });
 });
 
+describe("follow-up states against the FakeServer", () => {
+  it("move the row the server keeps for the follow-up", async () => {
+    const fake = new FakeServer();
+    await fake.start();
+    try {
+      const api = fakeClient(fake, []);
+      const { runId, run } = await startRun(api, fake);
+      const messageId = await fake.deliverFollowup(runId);
+      const current = await unwrap(
+        api.GET("/runs/{run_id}", { params: { path: { run_id: runId } } }),
+        "getRun",
+      );
+      expect(current.followups[messageId]?.state).toBe("queued");
+      expect(current.version).toBe(run.version);
+      const patcher = new RunPatcher(api, runId, current.version);
+      patcher.followupDelivered(messageId);
+      await patcher.flush();
+      expect(fake.followupState(runId, messageId)).toBe("delivered");
+      patcher.followupAbsorbed(messageId);
+      await patcher.flush();
+      expect(fake.followupState(runId, messageId)).toBe("absorbed");
+      await patcher.aclose();
+    } finally {
+      await fake.stop();
+    }
+  });
+});
+
 describe("isRunEnded", () => {
   it("is true for run_not_active and run_inactive only", () => {
     expect(
@@ -881,6 +910,56 @@ describe("RunHandle", () => {
     await expect(handle.finish("cancelled")).rejects.toBeInstanceOf(
       ValidationFailed,
     );
+    // The server answered: the handle is done, nothing is sent again.
+    expect([handle.finished, handle.finishPending]).toEqual([true, false]);
+  });
+
+  it("stays unfinished when finishRun got no answer and sends the first end again", async () => {
+    const api = fakeClient(fake, sent, { retryMaxAttempts: 1 });
+    const { runId, threadId, run } = await startRun(api, fake);
+    const handle = new RunHandle(api, runId, threadId);
+    handle.started(run, "jti-1");
+    fake.inject("finishRun", Fault.disconnect());
+    await expect(
+      handle.finish("completed", { summary: "Answered" }),
+    ).rejects.toBeInstanceOf(TransportError);
+    expect([handle.finished, handle.finishPending]).toEqual([false, true]);
+    expect((await fake.runState(runId)).state).toBe("running");
+    // The first end asked for is the run's end: a later call sends it again, whatever it asks.
+    await handle.finish("failed", { reason: "adapter_error" });
+    expect([handle.finished, handle.finishPending]).toEqual([true, false]);
+    expect([
+      (await fake.runState(runId)).state,
+      fake.run(runId).summary,
+    ]).toEqual(["completed", "Answered"]);
+    const finishes = sent.filter((r) => r.path.endsWith("/finish"));
+    expect(finishes.map((r) => r.body)).toEqual([
+      { state: "completed", summary: "Answered" },
+      { state: "completed", summary: "Answered" },
+    ]);
+    await handle.finish("completed"); // once only
+    expect(sent.filter((r) => r.path.endsWith("/finish"))).toHaveLength(2);
+  });
+
+  it("keeps the end pending after a 5xx and after a 429, and retryFinish sends it", async () => {
+    const api = fakeClient(fake, sent, { retryMaxAttempts: 1 });
+    const { runId, threadId, run } = await startRun(api, fake);
+    const handle = new RunHandle(api, runId, threadId);
+    handle.started(run, "jti-1");
+    await handle.retryFinish(); // nothing asked for yet: nothing sent
+    expect(sent.filter((r) => r.path.endsWith("/finish"))).toHaveLength(0);
+    fake.inject("finishRun", Fault.rateLimited(0));
+    await expect(handle.finish("completed")).rejects.toBeInstanceOf(
+      RateLimitedError,
+    );
+    expect([handle.finished, handle.finishPending]).toEqual([false, true]);
+    // The server stored the end and answered 502: the repeated equal end answers 200.
+    fake.inject("finishRun", Fault.storedThen502());
+    await expect(handle.retryFinish()).rejects.toBeInstanceOf(ProblemError);
+    expect([handle.finished, handle.finishPending]).toEqual([false, true]);
+    expect((await fake.runState(runId)).state).toBe("completed");
+    await handle.retryFinish();
+    expect([handle.finished, handle.finishPending]).toEqual([true, false]);
   });
 
   it("finish drops a flush that finds the run ended", async () => {
@@ -1001,6 +1080,66 @@ describe("RunHandle", () => {
     await expect(new RunHandle(api, runId, threadId).send("x")).rejects.toThrow(
       /outbox/,
     );
+  });
+});
+
+describe("RunHandle against a FakeServer with costs and sessions", () => {
+  let fake: FakeServer;
+
+  beforeEach(async () => {
+    fake = new FakeServer({ costs: true });
+    await fake.start();
+  });
+
+  afterEach(async () => {
+    await fake.stop();
+  });
+
+  it("finish reports the costs of the run", async () => {
+    const sent: Sent[] = [];
+    const api = fakeClient(fake, sent);
+    const { runId, threadId, run } = await startRun(api, fake);
+    const handle = new RunHandle(api, runId, threadId);
+    handle.started(run, "jti-1");
+    const costs: S["CostReport"][] = [
+      { provider: "example", model: "model-small", currency: "USD" },
+    ];
+    await handle.finish("completed", { summary: "done", costs });
+    expect((await fake.runState(runId)).state).toBe("completed");
+    expect(fake.costs(runId)).toEqual(costs);
+  });
+
+  it("reportSession creates the session row and moves it with If-Match", async () => {
+    const sent: Sent[] = [];
+    const api = fakeClient(fake, sent);
+    const { runId, threadId, run } = await startRun(api, fake);
+    const handle = new RunHandle(api, runId, threadId);
+    handle.started(run, "jti-1");
+    const created = await handle.reportSession({
+      external_session_ref: "sess-7f3a",
+    });
+    expect([created.version, created.started, created.thread_id]).toEqual([
+      1,
+      false,
+      threadId,
+    ]);
+    await expect(
+      handle.reportSession({ external_session_ref: "sess-7f3a" }),
+    ).rejects.toMatchObject({ status: 412, code: "version_conflict" });
+    const started = await handle.reportSession(
+      {
+        external_session_ref: "sess-7f3a",
+        model: "model-large",
+        started: true,
+      },
+      { ifMatch: created.version },
+    );
+    expect([started.version, started.started, started.model]).toEqual([
+      2,
+      true,
+      "model-large",
+    ]);
+    expect(fake.sessionReports(threadId)).toHaveLength(2);
   });
 });
 

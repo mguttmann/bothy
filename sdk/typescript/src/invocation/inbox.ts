@@ -18,6 +18,11 @@
  * `FileInboxStore` is durable: its directory is the adapter's acceptance and holds tokens that
  * expire after `agent.invocation_token_ttl`. {@link MemoryInboxStore} behaves alike for tests.
  *
+ * Retention: {@link InboxStore.prune} drops the `jti` rows whose token cannot pass anymore and
+ * the closed entries that stayed closed for {@link CLOSED_ENTRY_RETENTION_MS}; an entry in any
+ * other state stays until it is closed. The adapter prunes at its start and every hour, so a
+ * store holds the open entries and about one day of closed ones.
+ *
  * @example
  * ```ts
  * const store = new MemoryInboxStore();
@@ -36,6 +41,19 @@ import type { Secret } from "../auth/secret.js";
 import type { ReplayStore } from "./verifier.js";
 
 const TOKEN_MEMBER = "invocation_token";
+
+/**
+ * How long a closed entry stays in a store before {@link InboxStore.prune} drops it: one day,
+ * far above the time in which the server delivers an event again (`agent.ack_timeout`) and
+ * above the life of the entry's token (`agent.invocation_token_ttl`).
+ */
+export const CLOSED_ENTRY_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+/** The options of the inbox stores. */
+export interface InboxStoreOptions {
+  /** How long a closed entry is kept; default {@link CLOSED_ENTRY_RETENTION_MS}. */
+  readonly closedRetentionMs?: number | undefined;
+}
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The state of an inbox entry. */
@@ -228,7 +246,12 @@ export interface InboxStore extends ReplayStore {
    */
   inStates(...states: EntryState[]): Promise<InboxEntry[]>;
   /**
-   * Drops the `jti` rows that expired at `nowMs`; inbox entries stay.
+   * Drops the `jti` rows that expired at `nowMs` and the closed entries whose retention ended.
+   *
+   * The first call that finds an entry closed starts its time; a call at least the retention
+   * later drops it, and the event is unknown to the store from then on. A redelivery in between
+   * starts the time again, because the server still delivers the event. An entry in any other
+   * state stays.
    *
    * @param nowMs - The current wall time.
    */
@@ -348,6 +371,54 @@ export function notStored(eventId: string): RangeError {
 }
 
 /**
+ * Since when the closed entries of one store are closed, for {@link InboxStore.prune}. A store
+ * keeps it in memory only: a new process counts from its own first prune.
+ */
+export class ClosedEntries {
+  private readonly since = new Map<string, number>();
+  private readonly retentionMs: number;
+
+  /**
+   * Creates the record.
+   *
+   * @param options - The retention of the store.
+   */
+  constructor(options: InboxStoreOptions = {}) {
+    this.retentionMs = options.closedRetentionMs ?? CLOSED_ENTRY_RETENTION_MS;
+  }
+
+  /**
+   * Starts the time of an entry again (it was delivered again).
+   *
+   * @param eventId - The envelope `id`.
+   */
+  touch(eventId: string): void {
+    this.since.delete(eventId);
+  }
+
+  /**
+   * Notes the entries found closed for the first time and returns those whose retention ended.
+   *
+   * @param entries - Every entry of the store.
+   * @param nowMs - The current wall time.
+   * @returns The event IDs to drop now.
+   */
+  due(entries: Iterable<InboxEntry>, nowMs: number): string[] {
+    const out: string[] = [];
+    for (const entry of entries) {
+      const since = this.since.get(entry.eventId);
+      if (entry.state !== EntryState.CLOSED) this.since.delete(entry.eventId);
+      else if (since === undefined) this.since.set(entry.eventId, nowMs);
+      else if (nowMs - since >= this.retentionMs) {
+        this.since.delete(entry.eventId);
+        out.push(entry.eventId);
+      }
+    }
+    return out;
+  }
+}
+
+/**
  * An in-memory {@link InboxStore} for tests; it behaves like `FileInboxStore` but is lost on
  * exit. Entries are kept in arrival order, so entries without `seq` keep their arrival order.
  *
@@ -359,6 +430,16 @@ export function notStored(eventId: string): RangeError {
 export class MemoryInboxStore implements InboxStore {
   private readonly entries = new Map<string, InboxEntry>();
   private jti = new Map<string, number>();
+  private readonly closed: ClosedEntries;
+
+  /**
+   * Creates the store.
+   *
+   * @param options - The retention of closed entries.
+   */
+  constructor(options: InboxStoreOptions = {}) {
+    this.closed = new ClosedEntries(options);
+  }
 
   /**
    * Returns whether `jti` is remembered beyond `nowMs`.
@@ -457,6 +538,7 @@ export class MemoryInboxStore implements InboxStore {
     iat: number | undefined,
     jti: string | undefined,
   ): Promise<InboxEntry> {
+    this.closed.touch(eventId);
     return this.update(eventId, (e) => afterRedelivery(e, token, iat, jti));
   }
 
@@ -499,13 +581,16 @@ export class MemoryInboxStore implements InboxStore {
   }
 
   /**
-   * Drops the expired `jti` rows.
+   * Drops the expired `jti` rows and the closed entries whose retention ended; see
+   * {@link InboxStore.prune}.
    *
    * @param nowMs - The current wall time.
    * @returns A promise that resolves when done.
    */
   prune(nowMs: number): Promise<void> {
     this.jti = new Map([...this.jti].filter(([, until]) => nowMs < until));
+    for (const eventId of this.closed.due(this.entries.values(), nowMs))
+      this.entries.delete(eventId);
     return Promise.resolve();
   }
 
