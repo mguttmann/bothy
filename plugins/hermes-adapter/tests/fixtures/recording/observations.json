@@ -1,25 +1,118 @@
 {
   "credential_store_calls": {
+    "access_policy_default": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "access_policy_own": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "access_policy_upstream": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "busy_interrupt": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "busy_queue": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "busy_queue_global": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "busy_steer": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "busy_steer_command": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "busy_steer_global": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "credential_api_key_only": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
     "credential_both": [
-      "security find-generic-password"
+      "systemctl --user",
+      "systemctl is-system-running"
     ],
     "credential_login_file_only": [
-      "security find-generic-password"
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "credential_login_file_optout": [
+      "systemctl --user",
+      "systemctl is-system-running"
     ],
     "credential_none": [
-      "security find-generic-password"
+      "systemctl --user",
+      "systemctl is-system-running"
     ],
     "credential_oauth_only": [
-      "security find-generic-password"
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "credential_other_provider": [
+      "systemctl --user",
+      "systemctl is-system-running"
     ],
     "credential_per_turn": [
-      "security find-generic-password"
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "interrupt": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "interrupt_command": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "session_new": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "session_resume": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "session_resume_admin": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "session_resume_missing": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "session_resume_same_thread": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "text_without_draft": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "tool_and_text": [
+      "systemctl --user",
+      "systemctl is-system-running"
+    ],
+    "tool_without_progress": [
+      "systemctl --user",
+      "systemctl is-system-running"
     ]
   },
   "egress": [],
-  "inputs_sha256": "6d21804057794ead7fc79673c06870002497c1f9d4da91173ecdfae261ef130e",
+  "inputs_sha256": "20f395a5bfe1ca407ee7f73dbde420fac985575f82c1a347ae49903ac6bca489",
   "pin": {
-    "commit": "a8b0bc15053c1d71fb2bfea39007847c9e1c5673",
+    "commit": "4b40ffb0ad6d7da5d3260f5e499e1691508dd4d5",
     "tag": null
   },
   "plugin_discovery": {
@@ -309,7 +402,7 @@
     "steer": {
       "facts": {
         "global_behaviour": {
-          "queue": "steered",
+          "queue": "new_turn",
           "steer": "steered"
         },
         "global_key": "display.busy_input_mode",
@@ -325,7 +418,7 @@
       "holds": false
     }
   },
-  "recorded_on": "2026-11-08",
+  "recorded_on": "2026-11-14",
   "surface": {
     "base.MAX_MESSAGE_LENGTH": {
       "present": false

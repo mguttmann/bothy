@@ -166,7 +166,7 @@
       "method": "on_processing_complete"
     }
   ],
-  "inputs_sha256": "6d21804057794ead7fc79673c06870002497c1f9d4da91173ecdfae261ef130e",
+  "inputs_sha256": "20f395a5bfe1ca407ee7f73dbde420fac985575f82c1a347ae49903ac6bca489",
   "model_requests": [
     {
       "credential": "none",
@@ -178,7 +178,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:e3dbe5350dd5485fa166d0bf708d686fd0e0d0c10dccfe93931be422f089bf08:5036",
+        "sha256:ad5c0908c98c8667142feb01ef8e30db16869e4076fb747bb3e0aa07a1a7f685:5009",
         "sha256:266d5c8789166e7a74817866b97360a713aee0852f2b0b617fe1125397f43594:40"
       ],
       "roles": [
@@ -309,7 +309,7 @@
     }
   ],
   "pin": {
-    "commit": "a8b0bc15053c1d71fb2bfea39007847c9e1c5673",
+    "commit": "4b40ffb0ad6d7da5d3260f5e499e1691508dd4d5",
     "tag": null
   },
   "scenario": "text_without_draft"

@@ -193,7 +193,7 @@
       "method": "on_processing_complete"
     }
   ],
-  "inputs_sha256": "6d21804057794ead7fc79673c06870002497c1f9d4da91173ecdfae261ef130e",
+  "inputs_sha256": "20f395a5bfe1ca407ee7f73dbde420fac985575f82c1a347ae49903ac6bca489",
   "model_requests": [
     {
       "credential": "none",
@@ -205,7 +205,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:8e27bf09fcabac93fb601b711948d08faa7a9ac1b442e03efbda74cb4d6ae6c8:5036",
+        "sha256:5fcc516251d0a62e1dbca7a42ae0e3f7816973fb908a312fe9b94a8ce1ba0fef:5009",
         "sha256:266d5c8789166e7a74817866b97360a713aee0852f2b0b617fe1125397f43594:40"
       ],
       "roles": [
@@ -229,10 +229,10 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:8e27bf09fcabac93fb601b711948d08faa7a9ac1b442e03efbda74cb4d6ae6c8:5036",
+        "sha256:5fcc516251d0a62e1dbca7a42ae0e3f7816973fb908a312fe9b94a8ce1ba0fef:5009",
         "sha256:266d5c8789166e7a74817866b97360a713aee0852f2b0b617fe1125397f43594:40",
         "sha256:e084269741111444ebbbec8aa05fb451b67cf2183522655e222280b5cbdcee55:46",
-        "sha256:7f55019f128aa292cb1fe787af9ab3e2c033e0492e97baa424a888f803d3f8c1:442"
+        "sha256:84c14bc5889fcc52f14eb25366f13cf9498cb6dfc38d1b1abf947d3204152632:448"
       ],
       "roles": [
         "system",
@@ -371,7 +371,7 @@
     }
   ],
   "pin": {
-    "commit": "a8b0bc15053c1d71fb2bfea39007847c9e1c5673",
+    "commit": "4b40ffb0ad6d7da5d3260f5e499e1691508dd4d5",
     "tag": null
   },
   "scenario": "busy_interrupt"
