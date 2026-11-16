@@ -17,9 +17,18 @@ with the records of the pinned CLI the runner reads (``tests/fixtures/recording/
 holds their members; a test compares) and with records it must skip, among them the three
 that hold account identifiers, here with `ACCOUNT_CANARY`. It plays the stream fixture of the
 scenario as transcript records, listens on the inbox socket of ``--messaging-socket-path``,
-takes a line after the running tool call (``remove`` with ``absorbed_mid_turn``) or as a turn
-of its own, and writes the session totals (``cost-state``) when ``stop`` ends it. Like the
-print side it waits on gates the test opens, never on a fixed time.
+takes a line after the running tool call (``remove`` with ``absorbed_mid_turn`` and the
+attachment ``queued_command``) or as a turn of its own, and writes the session totals
+(``cost-state``) when ``stop`` ends it. Like the print side it waits on gates the test opens,
+never on a fixed time.
+
+The socket takes a line of any program, as the CLI's does, and the player decides like the
+pinned CLI what becomes of it (`Player.inbound`): by ``crossSessionInbound`` of the settings
+when the launch set one, else per message by the permission classes: a session that bypasses
+permission prompts takes only a line whose envelope states ``bypass``, every other session
+every line that does not state it. A line that is held is noted in the transcript and never
+delivered; when the rule per message held it (not a value of the setting), the session list
+then shows the session as waiting for a permission prompt.
 
 The session's environment is the supervisor's (the environment of the launch that started
 it) with the ``env`` block of ``--settings`` on top, as in the pinned CLI, where the launching
@@ -49,7 +58,12 @@ ACCOUNT_CANARY = "ACCOUNT-CANARY-7c1d"
 """A value in the records that hold account identifiers; no file of the runner may carry it."""
 
 LOGIN_BETA = "oauth-2025-04-20"
-"""A beta name of a request that uses the stored login (its prefix is what the runner reads)."""
+"""The beta of a request that uses the stored login, as the pinned CLI names it."""
+
+ENVELOPE = re.compile(
+    r'^<cross-session-message from-mode="(bypass|prompting)">\n[\s\S]*\n</cross-session-message>$'
+)
+"""The envelope in which a sender states its permission class, as the pinned CLI reads it."""
 
 PEER_LEAD = "Another Claude session sent a message:\n"
 PEER_TAIL = (
@@ -395,7 +409,9 @@ class Player:
         self.followups = 0
         self.socket_path = _after(self.argv, "--messaging-socket-path")
         self.server: socket.socket | None = None
-        self.accepts = (self.spec.get("settings") or {}).get("crossSessionInbound") == "accept"
+        self.inbound_setting = (self.spec.get("settings") or {}).get("crossSessionInbound")
+        self.bypasses = _after(self.argv, "--permission-mode") == "bypassPermissions"
+        self.held = 0
         self.job_running = False
         self.turn_open = False
         self._status: tuple[str, str | None] | None = None
@@ -457,11 +473,25 @@ class Player:
             promptSource="typed" if origin.get("kind") == "human" else "system",
         )
 
-    def request(self) -> None:
+    def request(self, *, credential: bool = True) -> None:
+        """One request record, as the scenario scripts its login beta (the check of 18.3).
+
+        ``bg_no_login``: no request lists the beta; ``bg_login_beta``: another name stands in
+        its place (a renamed beta); ``bg_login_requests``: only the first so many requests
+        list it; ``bg_no_request``: the session writes no request record at all;
+        ``bg_request_records``: it writes one only for the first so many requests. Without a
+        ``credential`` the record lists no login beta, as the record of the pinned CLI for a
+        request it never sends because its login is gone.
+        """
         self.requests += 1
+        records = self.scenario.get("bg_request_records")
+        if self.scenario.get("bg_no_request") or (records is not None and self.requests > records):
+            return
         betas = ["claude-code-20250219", "interleaved-thinking-2025-05-14"]
-        if not self.scenario.get("bg_no_login"):
-            betas.append(LOGIN_BETA)
+        limit = self.scenario.get("bg_login_requests")
+        listed = not self.scenario.get("bg_no_login") and (limit is None or self.requests <= limit)
+        if credential and listed:
+            betas.append(str(self.scenario.get("bg_login_beta", LOGIN_BETA)))
         self.plain(
             "api-request",
             id=str(uuid.uuid4()),
@@ -491,8 +521,10 @@ class Player:
         )
 
     def api_error(self, text: str, members: dict[str, Any] | None) -> None:
-        self.request()
         named = dict(members or {})
+        # Like the pinned CLI: a session whose login is gone writes the record of a request
+        # without the login beta, sends nothing, and writes the error itself.
+        self.request(credential=named.get("error") != "authentication_failed")
         extra: dict[str, Any] = {"isApiErrorMessage": True, "error": named.get("error")}
         if "api_error_params" in named:
             extra["apiErrorParams"] = named["api_error_params"]
@@ -521,6 +553,10 @@ class Player:
     # ---- the session list ------------------------------------------------------------------------
 
     def status(self, value: str, waiting_for: str | None = None) -> None:
+        if self.held and waiting_for is None:
+            # Like the pinned CLI: a held message waits for an approval, whatever else the
+            # session does meanwhile.
+            value, waiting_for = "waiting", "permission prompt"
         if self._status == (value, waiting_for):
             return
         self._status = (value, waiting_for)
@@ -580,12 +616,38 @@ class Player:
                 if raw.strip():
                     self._arrived(json.loads(raw))
 
+    def inbound(self, text: str) -> str:
+        """What becomes of a line of the socket: ``accept``, ``hold``, ``review`` or ``refuse``.
+
+        The rule of the pinned CLI: a value of ``crossSessionInbound`` decides (``hold``
+        keeps the line without asking anyone); without one, the classes of both sessions do,
+        and a line they do not let through waits for a person's approval (``review``). The
+        class a sender states is read from the envelope around the text; a line without one
+        states none.
+        """
+        if self.scenario.get("bg_hold_inbound"):
+            return "hold"
+        if self.inbound_setting in ("accept", "hold", "refuse"):
+            return str(self.inbound_setting)
+        found = ENVELOPE.match(text)
+        mine = "bypass" if self.bypasses else "prompting"
+        if found is not None:
+            return "accept" if found.group(1) == mine else "review"
+        return "review" if self.bypasses else "accept"
+
     def _arrived(self, frame: dict[str, Any]) -> None:
         text = str(frame["message"]["content"])
-        self.fake.record("bg_socket", uuid=frame.get("uuid"), text=text)
-        if not self.accepts or self.scenario.get("bg_hold_inbound"):
-            # crossSessionInbound is not ``accept``: the message is noted, not delivered.
+        verdict = self.inbound(text)
+        self.fake.record("bg_socket", uuid=frame.get("uuid"), text=text, verdict=verdict)
+        if verdict == "refuse":
+            return
+        if verdict in ("hold", "review"):
+            # The message is noted, not delivered. One the rule per message kept waits for
+            # an approval nobody gives, and the session shows as waiting from then on.
             self.record("system", subtype="informational", content="Held peer message")
+            if verdict == "review":
+                self.held += 1
+                self.status(*(self._status or ("idle", None)))
             return
         with self.arrived:
             self.plain("queue-operation", operation="enqueue", content=text)
@@ -605,7 +667,17 @@ class Player:
                 commandUuid=line["uuid"],
                 deliveryId=str(uuid.uuid4()),
             )
-            self.record("attachment", attachment={"type": "queued_command", "prompt": line["text"]})
+            self.record(
+                "attachment",
+                attachment={
+                    "type": "queued_command",
+                    "prompt": line["text"],
+                    "source_uuid": line["uuid"],
+                    "commandMode": "prompt",
+                    "origin": {"kind": "peer", "from": "unknown"},
+                    "isMeta": True,
+                },
+            )
 
     def next_line(self, timeout: float) -> dict[str, Any] | None:
         with self.arrived:
@@ -715,7 +787,8 @@ class Player:
         self.followups += 1
         self.plain("queue-operation", operation="dequeue")
         self.status("busy")
-        self.user(PEER_LEAD + line["text"] + PEER_TAIL, {"kind": "peer"}, ident=line["uuid"])
+        origin = {"kind": "peer", "from": "unknown"}
+        self.user(PEER_LEAD + line["text"] + PEER_TAIL, origin, ident=line["uuid"])
         self.gate("followup_gate")
         if self.account_down():
             self.fake.record("account_refused", line=line["uuid"])
@@ -744,6 +817,14 @@ class Player:
             self.api_error(*self.fake.error(str(self.scenario["background_api_error"])))
         else:
             self.text(text)
+        self.turn_end()
+
+    def typed_turn(self) -> None:
+        """A person attached to the session and typed: a user message the runner never sent."""
+        self.status("busy")
+        self.fake.record("bg_typed")
+        self.user("Typed into the session by a person at the host", {"kind": "human"})
+        self.text("Answer to what was typed into the session.")
         self.turn_end()
 
     def account_down(self) -> bool:
@@ -776,6 +857,7 @@ class Player:
         job = scenario.get("background_gate")
         error_gate = scenario.get("background_error_gate")
         replace_gate = scenario.get("bg_replace_gate")
+        typed_gate = scenario.get("bg_typed_gate")
         deadline = time.monotonic() + 4 * self.fake.patience
         while time.monotonic() < deadline:
             self.status("busy" if self.job_running else "idle")
@@ -793,6 +875,10 @@ class Player:
             if replace_gate and Path(str(replace_gate)).exists():
                 replace_gate = None
                 self.replace()
+                continue
+            if typed_gate and Path(str(typed_gate)).exists():
+                typed_gate = None
+                self.typed_turn()
                 continue
             line = self.next_line(0.01)
             if line is not None:

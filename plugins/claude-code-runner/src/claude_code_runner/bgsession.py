@@ -14,7 +14,21 @@ pure function a test holds against a recording of the pinned version:
   ``id``, ``sessionId``, ``pid``, ``status``, ``waitingFor``, ``kind`` and ``name`` of its own
   sessions and never ``state``, which a model request writes;
 * ``claude stop``, ``claude rm`` and ``claude daemon status`` (`SessionCli`, `parse_supervisor`);
-* one JSON line per input on the session's inbox socket (`socket_frame`, `send_frames`).
+* one JSON line per input on the session's inbox socket (`socket_frame`, `send_frames`), for a
+  session that bypasses permission prompts inside the CLI's envelope that states the sender's
+  class (`sender_class`).
+
+What a session takes from the other Claude Code sessions of the host user is never widened: the
+settings file of a run sets no ``crossSessionInbound``, so the CLI's own rule per message and
+any stricter value of the host stay, and the tools that address or list other sessions are
+disallowed (`DENIED_TOOLS`). Neither authenticates a sender: the runner decides by the ``uuid``
+of every input the transcript shows (`claude_code_runner.bgtranscript`, 09 18.5).
+
+A session inherits the environment of the supervisor, which lives across runs. So the launch
+command, which starts the supervisor when none runs, gets the fixed environment of
+`claude_code_runner.bgmode.BackgroundMode` and never a value of a run, and every value of a run
+reaches its session only through the ``env`` block of the settings file, where every name is
+set in every launch (`RUN_ENV_NAMES`).
 
 `BgSession` is the handle of a started session as `claude_code_runner.runturn.RunTurn` drives a
 turn process: it tells whether the process lives, writes inputs, and stops the session with
@@ -59,7 +73,9 @@ from claude_code_runner.statedir import ensure_private_dir, write_private
 from claude_code_runner.stop import escalation_due
 
 __all__ = [
+    "DENIED_TOOLS",
     "NAME_PREFIX",
+    "RUN_ENV_NAMES",
     "BgSession",
     "LaunchOutput",
     "Reading",
@@ -76,6 +92,7 @@ __all__ = [
     "parse_supervisor",
     "prompt_text",
     "send_frames",
+    "sender_class",
     "session_name",
     "settings_document",
     "socket_frame",
@@ -90,8 +107,24 @@ NAME_PREFIX = "bothy-"
 of the session list under another name belongs to another program and is never stopped or
 removed."""
 
-_ASK_TOOL = "AskUserQuestion"
-"""A question of this tool blocks a background session until a person answers it."""
+DENIED_TOOLS = ("AskUserQuestion", "SendMessage", "ListAgents")
+"""The tools no background session of the runner has (``--disallowedTools``, 09 18.2). A
+question of ``AskUserQuestion`` blocks a session until a person answers it. ``SendMessage`` and
+``ListAgents`` are the two tools that address and list the other Claude Code sessions of the
+host user (run with the pinned CLI: a session offers no other such tool); without them a
+session of the runner can neither write to another session nor find one. The same deny rule
+also takes the messages to the session's own subagents and teammates, which that tool serves
+too."""
+
+RUN_ENV_NAMES = ("CLAUDE_PRODUCT_RUN", "DISABLE_AUTOUPDATER", "TMPDIR", "SSH_AUTH_SOCK")
+"""The names of the ``env`` block of a run's settings file, each set in every launch."""
+
+_ENVELOPE = "cross-session-message"
+"""The element the CLI wraps a message of another session in; its attribute ``from-mode`` is
+how a sender states its permission class (read in the file of the pinned CLI and run)."""
+_ENVELOPE_LETTERS = "".join(c for c in _ENVELOPE if c.isalpha())
+_BYPASS_CLASS = "bypass"
+"""The class of a session that bypasses permission prompts (``bypassPermissions``)."""
 
 _LAUNCHED = re.compile(r"^backgrounded · ([0-9a-f]{8}) · ", re.MULTILINE)
 """The first line of a launch (run with the pinned CLI 2.1.325 on 2026-11-16,
@@ -136,8 +169,9 @@ def background_class_flags(tool_class: str, tools: Sequence[str]) -> list[str]:
     """Return the flags of a tool class for a background session (09 18.2).
 
     The flags of `claude_code_runner.commandline.class_flags`, and under ``scoped`` and ``host``
-    ``AskUserQuestion`` in ``--disallowedTools``: nobody is there to answer the question, and a
-    session that waits for a person never ends its turn. ``chat`` has no tool.
+    `DENIED_TOOLS` in ``--disallowedTools``: nobody is there to answer a question, and a
+    session of the runner neither writes to nor lists the other sessions of the host user.
+    ``chat`` has no tool (``--tools ""`` leaves none, run with the pinned CLI).
 
     Args:
         tool_class: ``chat``, ``scoped`` or ``host``.
@@ -150,13 +184,15 @@ def background_class_flags(tool_class: str, tools: Sequence[str]) -> list[str]:
         ArgumentError: As `claude_code_runner.commandline.class_flags`.
 
     Examples:
-        >>> background_class_flags("host", [])
-        ['--permission-mode', 'bypassPermissions', '--disallowedTools', 'AskUserQuestion']
+        >>> background_class_flags("host", [])[:3]
+        ['--permission-mode', 'bypassPermissions', '--disallowedTools']
+        >>> background_class_flags("host", [])[3:]
+        ['AskUserQuestion', 'SendMessage', 'ListAgents']
     """
     flags = class_flags(tool_class, tools)
     if tool_class == "chat":
         return flags
-    return [*flags, "--disallowedTools", _ASK_TOOL]
+    return [*flags, "--disallowedTools", *DENIED_TOOLS]
 
 
 def background_argv(  # noqa: PLR0913 - every input of the command line is explicit
@@ -222,28 +258,73 @@ def background_argv(  # noqa: PLR0913 - every input of the command line is expli
 def settings_document(env: Mapping[str, str]) -> dict[str, Any]:
     """Return the settings of a run's background session (``--settings``, 09 18.2).
 
-    Exactly three members. ``crossSessionInbound`` ``accept`` lets the session take the lines
-    the runner writes to its inbox socket. ``worktree.bgIsolation`` ``none`` keeps the session
-    in the project folder: without it a background session moves into a Git worktree of its
-    own, against 18.1, and its transcript moves with it. ``env`` carries what must reach the
-    session process, because of the launching command's environment only ``PATH`` does.
+    Exactly two members. ``worktree.bgIsolation`` ``none`` keeps the session in the project
+    folder: without it a background session moves into a Git worktree of its own, against
+    18.1, and its transcript moves with it. ``env`` carries what must reach the session
+    process, because of the launching command's environment only ``PATH`` does.
+
+    Every name of `RUN_ENV_NAMES` is set in every document, a name the turn has no value for
+    to the empty text: a session inherits the environment of the supervisor, which lives across
+    runs, and a value in the ``env`` block goes before an inherited one (run with the pinned
+    CLI). So a run that must not have the SSH agent gets an empty ``SSH_AUTH_SOCK`` whatever
+    the supervisor carries.
+
+    The document sets no ``crossSessionInbound``. Without a value the CLI decides per message
+    by the permission classes of both sessions, and a stricter value of the host user's or of
+    managed settings stays in force; ``accept`` here would switch both off (18.5).
 
     Args:
         env: The environment of the turn (`claude_code_runner.environment.build_environment`).
 
     Returns:
         The document; ``env`` holds ``CLAUDE_PRODUCT_RUN``, ``DISABLE_AUTOUPDATER``, the run's
-        ``TMPDIR`` and, only when the turn's environment has it, ``SSH_AUTH_SOCK``.
+        ``TMPDIR`` and ``SSH_AUTH_SOCK``, which is empty unless the turn's environment has it.
     """
-    session_env = {"CLAUDE_PRODUCT_RUN": "1", "DISABLE_AUTOUPDATER": "1"}
-    for name in ("TMPDIR", "SSH_AUTH_SOCK"):
-        if env.get(name):
-            session_env[name] = env[name]
-    return {
-        "crossSessionInbound": "accept",
-        "worktree": {"bgIsolation": "none"},
-        "env": session_env,
+    session_env = {
+        "CLAUDE_PRODUCT_RUN": "1",
+        "DISABLE_AUTOUPDATER": "1",
+        "TMPDIR": env.get("TMPDIR", ""),
+        "SSH_AUTH_SOCK": env.get("SSH_AUTH_SOCK", ""),
     }
+    return {"worktree": {"bgIsolation": "none"}, "env": session_env}
+
+
+def sender_class(tool_class: str) -> str | None:
+    """Return the permission class the runner's lines state for a session of a tool class.
+
+    Without a value of ``crossSessionInbound`` the CLI takes a message into a session that
+    bypasses permission prompts only when its sender states that it bypasses them too, and
+    into every other session unless the sender states exactly that (run with the pinned CLI).
+    A turn of class ``host`` runs with ``bypassPermissions``, and the person whose message the
+    runner relays was allowed that class by the server (18.5), so its lines state ``bypass``.
+    The statement is a claim any sender can make, not a proof.
+
+    Args:
+        tool_class: ``chat``, ``scoped`` or ``host``.
+
+    Returns:
+        ``bypass`` for ``host``; ``None`` for a class whose sessions prompt (``dontAsk``),
+        which take a line that states nothing.
+
+    Examples:
+        >>> sender_class("host"), sender_class("scoped")
+        ('bypass', None)
+    """
+    return _BYPASS_CLASS if tool_class == "host" else None
+
+
+def _fits_envelope(text: str) -> bool:
+    """Whether the CLI reads a text in its envelope as the runner wrote it.
+
+    The CLI takes the sender's class only from an envelope it would write itself, and it
+    rewrites a body that holds the element's closing tag, which it matches in many spellings
+    (other letter cases, look-alike and invisible characters). The runner does not copy that
+    rule: a text whose letters ``a`` to ``z``, read without anything between them and in any
+    case, hold the element's name is not put into an envelope at all, which is more than the
+    CLI's rule covers.
+    """
+    letters = "".join(c for c in text.casefold() if "a" <= c <= "z")
+    return _ENVELOPE_LETTERS not in letters
 
 
 def _line_parts(line: bytes | str) -> tuple[str, str] | None:
@@ -286,24 +367,35 @@ def prompt_text(line: bytes | str) -> str | None:
     return parts[1] if parts is not None else None
 
 
-def socket_frame(line: bytes | str) -> bytes | None:
+def socket_frame(line: bytes | str, *, sender_class: str | None = None) -> bytes | None:
     """Return the inbox line of one input line of the runner (09 18.5).
 
     One JSON line ``{"type":"user","uuid":"<uuid>","message":{"role":"user","content":"<text>"}}``
     is what a session takes as a message from its inbox socket (run with the pinned CLI); the
     ``uuid`` is kept in the transcript because the socket was named at the launch, so the
-    echo of the line is exact.
+    echo of the line is exact and the runner knows its own lines by it.
+
+    With ``sender_class`` the text stands in the CLI's envelope
+    ``<cross-session-message from-mode="<class>">``, a line break, the text, a line break and
+    the closing tag, which is how a sender states its permission class (`sender_class`).
 
     Args:
         line: An input line of the runner: a follow-up, a retry line or any other input.
+        sender_class: The class the line states; ``None`` for a line that states none.
 
     Returns:
-        The line for the socket with its line break, or ``None`` for a line that is no message.
+        The line for the socket with its line break; ``None`` for a line that is no message,
+        and for a text the envelope cannot carry unchanged (it holds the element's name).
     """
     parts = _line_parts(line)
     if parts is None:
         return None
-    doc = {"type": "user", "uuid": parts[0], "message": {"role": "user", "content": parts[1]}}
+    text = parts[1]
+    if sender_class is not None:
+        if not _fits_envelope(text):
+            return None
+        text = f'<{_ENVELOPE} from-mode="{sender_class}">\n{text}\n</{_ENVELOPE}>'
+    doc = {"type": "user", "uuid": parts[0], "message": {"role": "user", "content": text}}
     return json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode("utf-8") + b"\n"
 
 
@@ -691,7 +783,10 @@ async def launch(  # noqa: PLR0913 - the parts of one launch
         argv: The argument list (`background_argv`).
         prompt: The prompt (`prompt_text`).
         cwd: The project folder.
-        env: The launch environment: the allow list of 18.2 with ``DISABLE_AUTOUPDATER``.
+        env: The launch environment: the fixed one of the runner process
+            (`claude_code_runner.bgmode.BackgroundMode.env`), never the environment of a
+            run. The command starts the supervisor when none runs, and every later session
+            inherits what the supervisor was started with.
         stdout: The file of the command's stdout.
         stderr: The file of the command's stderr.
         timeout: ``runner.cli_probe_timeout``.
@@ -854,6 +949,8 @@ class BgSession:
         lstart: Its start time as ``ps -o lstart=`` prints it.
         socket_file: The inbox socket the session was launched with.
         timeout: ``runner.cli_probe_timeout`` for ``ps``.
+        sender_class: The permission class the runner's lines state for this session
+            (`sender_class` of the run's tool class); ``None`` for a line that states none.
     """
 
     def __init__(  # noqa: PLR0913 - the parts of one session
@@ -866,6 +963,7 @@ class BgSession:
         lstart: str,
         socket_file: Path,
         timeout: float,
+        sender_class: str | None = None,
     ) -> None:
         """Wrap a started session; see the class docstring."""
         self.cli = cli
@@ -876,6 +974,7 @@ class BgSession:
         self.lstart = lstart
         self.socket_file = socket_file
         self.timeout = timeout
+        self.sender_class = sender_class
         self.verified = False
         self.stop_requested = False
         """The runner asked the CLI to stop the session (a stop, or the release of a run)."""
@@ -959,11 +1058,17 @@ class BgSession:
 
         Returns:
             True once every line reached the socket; False when the session takes no input
-            (it is being stopped, the socket is missing or refuses the bytes).
+            (it is being stopped, the socket is missing or refuses the bytes) or a line
+            cannot be written as the session would take it (`socket_frame`); then nothing
+            was written.
         """
         if self.stop_requested:
             return False
-        frames = [socket_frame(raw) for raw in data.split(b"\n") if raw.strip()]
+        frames = [
+            socket_frame(raw, sender_class=self.sender_class)
+            for raw in data.split(b"\n")
+            if raw.strip()
+        ]
         if not frames or any(frame is None for frame in frames):
             return False
         checked = [frame for frame in frames if frame is not None]

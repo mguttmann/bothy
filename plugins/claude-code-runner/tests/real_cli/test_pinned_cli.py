@@ -122,6 +122,17 @@ BACKGROUND_TOKENS = (
     "isApiErrorMessage",
     "apiErrorParams",
     "waitingFor",
+    # FIX-RUNNER-BG-INBOX-AUTH: whose input a session took (the attachment that names the
+    # origin of what a running turn took in, and the envelope in which a sender states its
+    # class), the two tools that reach other sessions, and the login beta of 18.3 by its
+    # whole name.
+    "queued_command",
+    "source_uuid",
+    "cross-session-message",
+    "from-mode",
+    "SendMessage",
+    "ListAgents",
+    "oauth-2025-04-20",
     "Workspace not trusted.",
     "--bg with bypassPermissions requires accepting the disclaimer first.",
     "is already running in the background, so this started a copy as",

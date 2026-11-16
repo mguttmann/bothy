@@ -694,8 +694,15 @@ def background_meta(today: str, after_turn: Mapping[str, Any]) -> dict[str, Any]
             "commands.json": "what stop, rm and daemon status printed, with their exit codes",
             "transcript_<scenario>.jsonl": (
                 "the session transcript of a scenario, reduced to the record types the runner "
-                "reads; every other type is dropped, among them session-owner and the "
-                "attachments session_context and credential_org, which hold account identifiers"
+                "reads (of the attachments only queued_command); every other type is dropped, "
+                "among them session-owner and the attachments session_context and "
+                "credential_org, which hold account identifiers"
+            ),
+            "transcript_login.jsonl": (
+                "one turn of a session that got a dummy token in the place of the key helper, "
+                "so its request record lists the beta of a request on a stored login; the "
+                "token is no credential, and a proxy on loopback that refuses every request "
+                "was the only way out of the CLI but the stand-in"
             ),
             "stream_<scenario>.jsonl": (
                 "the stream-json output of the same scenario as a print turn (claude -p); the "

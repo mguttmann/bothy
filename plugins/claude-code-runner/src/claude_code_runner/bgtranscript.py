@@ -15,20 +15,37 @@ The mapping, record by record (only records of the main conversation, ``isSidech
   offset is the run's prompt: ``system/init`` with the session, then the echo of the runner's
   prompt line. Every record before it is skipped: a resume first writes what closes the
   interrupted turn of the process before.
-* The first ``api-request`` record of the process gives ``system/bg_request`` with ``login``:
-  whether ``params.betas`` lists a beta whose name starts with ``oauth-``, which the CLI sends
-  exactly when a request uses the stored login (the counter-check of 18.3).
+* Every ``api-request`` record gives ``system/bg_request`` with ``login``: whether
+  ``params.betas`` lists `LOGIN_BETA`, the beta the pinned CLI sends exactly when a request
+  uses the stored login (the counter-check of 18.3). The name is compared as a whole.
 * ``assistant``: the message with its ``text`` and ``tool_use`` items and its usage; with
   ``isApiErrorMessage`` it carries ``is_api_error_message``, ``error`` and
   ``api_error_params``. The first one that is not synthetic first gives ``system/init`` with
   its model.
 * ``user`` with ``tool_result`` items: those items, reduced to ``tool_use_id`` and
   ``is_error``. ``user`` with ``origin.kind`` ``peer``: the echo of the inbox line with that
-  ``uuid`` (18.5).
+  ``uuid`` (18.5), when the runner wrote that line.
 * ``queue-operation``: ``enqueue`` is ``command_lifecycle`` ``queued``; ``dequeue`` is
   ``started`` and the start of a turn (``system/init``); ``remove`` with ``absorbed_mid_turn``
-  is the echo of the line with ``commandUuid``. The records of one queue are matched in their
-  order, because ``enqueue`` and ``dequeue`` carry no id.
+  is the echo of the runner's line with ``commandUuid``. The records of one queue are matched
+  in their order, because ``enqueue`` and ``dequeue`` carry no id.
+* ``attachment`` of the type ``queued_command``: what a running turn took in. Only its
+  ``origin.kind`` and ``source_uuid`` are read; every other attachment is skipped.
+
+**Whose input.** The inbox socket of a session takes a line of every program of the host
+user, and the CLI marks it ``peer`` whatever the line says about itself. So the mapper knows
+the runner's own lines only by their ``uuid`` (the predicate ``own``, which the runner answers
+from the set of the lines it wrote), and each ``uuid`` counts once. An input of anyone else
+gives ``system/bg_foreign`` and nothing else: a ``user`` record or a ``queued_command``
+attachment with ``origin.kind`` ``peer`` whose ``uuid`` the runner did not write, or wrote and
+saw taken before, and one with ``origin.kind`` ``human`` after the run's prompt (a person
+typed into the session). The runner then stops the session and posts no answer (18.5). An
+input the session gives itself (``task-notification``: the end of its own background work, a
+message of its own subagent) is none of these: the CLI removes it from its queue like a line,
+under a ``uuid`` it made, and names its origin in the attachment. So an input a running turn
+took under a ``uuid`` the runner did not write stays open until that attachment attributes it
+to something else than a line or a person; one that is still open at the next output of the
+session is foreign too. A mapper without ``own`` knows no line of the runner.
 * ``system`` ``turn_duration``: the end of the turn, a ``result`` whose text is the text of
   the turn's last assistant message, with ``is_error`` when that message is an API error.
 * ``cost-state``: ``bg_totals`` with ``modelUsage``, the session's totals (18.7).
@@ -63,8 +80,10 @@ from claude_code_runner.usage import ModelUsage
 
 __all__ = [
     "BACKGROUND_TASK",
+    "CAUSE_FOREIGN",
     "CAUSE_REPLACED",
     "CAUSE_WAITING",
+    "LOGIN_BETA",
     "READ_FIELDS",
     "PricedUsage",
     "TranscriptMapper",
@@ -80,6 +99,8 @@ READ_FIELDS: dict[str, tuple[str, ...]] = {
     "assistant": ("apiErrorParams", "error", "isApiErrorMessage", "isSidechain", "message"),
     "api-request": ("params",),
     "queue-operation": ("commandUuid", "operation", "reason"),
+    "attachment": ("attachment", "isSidechain"),
+    "attachment/queued_command": ("origin", "source_uuid", "type"),
     "system/turn_duration": ("isSidechain", "subtype"),
     "cost-state": ("modelUsage",),
 }
@@ -87,7 +108,8 @@ READ_FIELDS: dict[str, tuple[str, ...]] = {
 of 18.4. ``tests/fixtures/recording/background_<version>/transcript_fields.json`` lists what the
 pinned CLI writes; a test holds every name here against it, and the level-one test of the
 real-CLI suite compares that file with a fresh run. ``apiErrorParams`` is read in the CLI's
-file, not recorded: the stand-in for the API sends no usage window."""
+file, not recorded: the stand-in for the API sends no usage window. ``attachment/queued_command``
+names the members of the object ``attachment`` of that type, the only attachment read."""
 
 BACKGROUND_TASK = "background"
 """The task id the runner reports while the session list says ``busy`` between two turns: the
@@ -99,8 +121,19 @@ CAUSE_WAITING = "background_session_waiting"
 CAUSE_REPLACED = "background_process_replaced"
 """The cause of a run whose session runs in another process than the one the runner launched."""
 
+CAUSE_FOREIGN = "background_foreign_input"
+"""The cause of a run whose session took an input the runner did not write (18.5)."""
+
+LOGIN_BETA = "oauth-2025-04-20"
+"""The beta of a request that uses the stored login, as the pinned CLI names it. A request
+record counts as one on the login only when ``params.betas`` lists exactly this name:
+``tests/fixtures/recording/background_<version>/transcript_login.jsonl`` is a request record of
+the pinned CLI that carries it, and the level-one test of the real-CLI suite runs it again. A
+version that renames the beta fails that test, and until the name here follows, every
+``personal`` background turn ends ``billing_mode_mismatch`` instead of running unchecked."""
+
 _SYNTHETIC = "<synthetic>"
-_LOGIN_BETA = "oauth-"
+_QUEUED = "queued_command"
 _WAITING = {"input needed": "a question", "permission prompt": "a permission prompt"}
 
 
@@ -136,6 +169,9 @@ class TranscriptMapper:
 
     Args:
         prompt_uuid: The ``uuid`` of the runner's input line the session was launched with.
+        own: Tells whether the runner wrote an input line with this ``uuid`` to the session's
+            inbox socket. Without it no line counts as the runner's, so every input of the
+            socket is another sender's.
 
     Attributes:
         turn_open: A turn of the process has started and its ``turn_duration`` is not read.
@@ -143,14 +179,17 @@ class TranscriptMapper:
         started: The run's prompt was read: the session took it.
     """
 
-    def __init__(self, prompt_uuid: str) -> None:
+    def __init__(self, prompt_uuid: str, own: Callable[[str], bool] | None = None) -> None:
         """Start before the prompt of the launch."""
         self._prompt_uuid = prompt_uuid
+        self._own = own
         self.started = False
         self.turn_open = False
         self.skipped: Counter[str] = Counter()
         self._session_id = ""
-        self._request_seen = False
+        self._taken: set[str] = set()
+        self._attached: set[str] = set()
+        self._open: set[str] = set()
         self._model_sent = False
         self._queued: deque[str] = deque()
         self._commands = 0
@@ -175,6 +214,26 @@ class TranscriptMapper:
     @staticmethod
     def _echo(line_uuid: object) -> dict[str, Any]:
         return {"type": "user", "isReplay": True, "uuid": line_uuid}
+
+    @staticmethod
+    def _foreign(origin: str) -> dict[str, Any]:
+        """An input the runner did not write; nothing of the record but the kind of its origin."""
+        return {"type": "system", "subtype": "bg_foreign", "origin": origin}
+
+    def _line(self, line_uuid: object, seen: set[str]) -> bool | None:
+        """Whose line a ``uuid`` names, and whether it may still count.
+
+        Returns:
+            True for a line of the runner that ``seen`` does not hold yet (it holds it from
+            now on); False for a line of the runner seen before: its ``uuid`` counts once, so
+            a second input under it is another sender's; ``None`` for any other ``uuid``.
+        """
+        if not isinstance(line_uuid, str) or self._own is None or not self._own(line_uuid):
+            return None
+        if line_uuid in seen:
+            return False
+        seen.add(line_uuid)
+        return True
 
     # ---- the mapping -----------------------------------------------------------------------
 
@@ -201,34 +260,69 @@ class TranscriptMapper:
             if not isinstance(usage, Mapping):
                 return []
             return [{"type": "bg_totals", "modelUsage": _numbers(usage)}]
+        if kind == "attachment":
+            return self._attachment(record)
         if not self.started:
-            if not _is_prompt(record):
-                self.skipped[kind] += 1
-                return []
-            self.started = True
-            session = record.get("sessionId")
-            self._session_id = session if isinstance(session, str) else ""
-            return [self._init(session_id=self._session_id), self._echo(self._prompt_uuid)]
+            return self._before_prompt(kind, record)
         if kind == "user":
             return self._user(record)
         if kind == "assistant":
-            return self._assistant(record)
+            return self._unattributed() or self._assistant(record)
         if kind == "queue-operation":
             return self._queue(record)
         if kind == "system" and record.get("subtype") == "turn_duration":
-            return [self._turn_end()]
+            return self._unattributed() or [self._turn_end()]
         self.skipped[kind] += 1
         return []
 
-    def _request(self, record: Mapping[str, Any]) -> list[dict[str, Any]]:
-        if self._request_seen:
+    def _before_prompt(self, kind: str, record: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """A record before the run's prompt: skipped, unless it is the prompt or a line."""
+        if kind == "user" and _origin(record) == "peer":
+            # The runner writes no line before the session took its prompt.
+            return [self._foreign("peer")]
+        if not _is_prompt(record):
+            self.skipped[kind] += 1
             return []
-        self._request_seen = True
+        self.started = True
+        self._taken.add(self._prompt_uuid)  # the prompt came by the launch, not the socket
+        session = record.get("sessionId")
+        self._session_id = session if isinstance(session, str) else ""
+        return [self._init(session_id=self._session_id), self._echo(self._prompt_uuid)]
+
+    def _request(self, record: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """Every request record: whether it lists the login beta (the whole name, 18.3)."""
         params = record.get("params")
         betas = params.get("betas") if isinstance(params, Mapping) else None
         names = betas if isinstance(betas, list) else []
-        login = any(isinstance(b, str) and b.startswith(_LOGIN_BETA) for b in names)
-        return [{"type": "system", "subtype": "bg_request", "login": login}]
+        return [{"type": "system", "subtype": "bg_request", "login": LOGIN_BETA in names}]
+
+    def _attachment(self, record: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """What a running turn took in: only whose input it is (18.5), never its text."""
+        inner = record.get("attachment")
+        if not isinstance(inner, Mapping) or inner.get("type") != _QUEUED:
+            self.skipped["attachment"] += 1
+            return []
+        origin = _origin(inner)
+        if origin is None:
+            return []  # it attributes nothing: an open input stays open
+        self._open.discard(str(inner.get("source_uuid")))
+        if origin == "peer":
+            # A line of the runner shows once here, beside its ``remove`` record.
+            if self._line(inner.get("source_uuid"), self._attached):
+                return []
+            return [self._foreign("peer")]
+        if origin == "human" and self.started:
+            return [self._foreign("human")]
+        # Else the CLI attributes the input to the session itself (the notification of a
+        # task, a message of its own subagent): no line of the socket and no person.
+        return []
+
+    def _unattributed(self) -> list[dict[str, Any]]:
+        """An input a turn took that nothing attributed before the session's next output."""
+        if not self._open:
+            return []
+        self._open.clear()
+        return [self._foreign("unattributed")]
 
     def _user(self, record: Mapping[str, Any]) -> list[dict[str, Any]]:
         content = _content(record)
@@ -245,9 +339,15 @@ class TranscriptMapper:
             return [{"type": "user", "message": {"role": "user", "content": results}}]
         origin = _origin(record)
         if origin == "peer":
-            # A line of the inbox socket that starts or joins a turn: its echo (18.5).
-            return [*self._turn_start(), self._echo(record.get("uuid"))]
-        if origin in ("task-notification", "human"):
+            # A line of the inbox socket that starts a turn: its echo, when it is the
+            # runner's and its first (18.5).
+            if self._line(record.get("uuid"), self._taken):
+                return [*self._turn_start(), self._echo(record.get("uuid"))]
+            return [self._foreign("peer")]
+        if origin == "human":
+            # The run's prompt came before: a person typed this into the session.
+            return [self._foreign("human")]
+        if origin == "task-notification":
             return self._turn_start()
         self.skipped["user"] += 1
         return []
@@ -324,7 +424,16 @@ class TranscriptMapper:
         ]
         line_uuid = record.get("commandUuid")
         if record.get("reason") == "absorbed_mid_turn" and isinstance(line_uuid, str):
-            out.append(self._echo(line_uuid))
+            mine = self._line(line_uuid, self._taken)
+            if mine:
+                out.append(self._echo(line_uuid))
+            elif mine is False:
+                out.append(self._foreign("peer"))
+            else:
+                # An input of the session itself (the notification of a task) or of another
+                # sender: the ``queued_command`` attachment says which, and until it does
+                # the input is nobody's.
+                self._open.add(line_uuid)
         return out
 
     def _turn_end(self) -> dict[str, Any]:

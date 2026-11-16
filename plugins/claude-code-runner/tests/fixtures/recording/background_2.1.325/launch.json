@@ -1,28 +1,28 @@
 {
   "new": {
     "exit": 0,
-    "stdout": "backgrounded \u00b7 a04452ec \u00b7 bothy-post\n  claude agents             list sessions\n  claude attach a04452ec    open in this terminal\n  claude logs a04452ec      show recent output\n  claude stop a04452ec      stop this session\n",
+    "stdout": "backgrounded \u00b7 ae890437 \u00b7 bothy-post\n  claude agents             list sessions\n  claude attach ae890437    open in this terminal\n  claude logs ae890437      show recent output\n  claude stop ae890437      stop this session\n",
     "stderr": "Starting background service\u2026\n"
   },
   "resumed_in_place": {
     "exit": 0,
-    "stdout": "backgrounded \u00b7 a04452ec \u00b7 bothy-post\n  claude agents             list sessions\n  claude attach a04452ec    open in this terminal\n  claude logs a04452ec      show recent output\n  claude stop a04452ec      stop this session\n",
+    "stdout": "backgrounded \u00b7 ae890437 \u00b7 bothy-post\n  claude agents             list sessions\n  claude attach ae890437    open in this terminal\n  claude logs ae890437      show recent output\n  claude stop ae890437      stop this session\n",
     "stderr": ""
   },
   "copy_while_running": {
     "exit": 0,
-    "stdout": "backgrounded \u00b7 d1288bf1 \u00b7 bothy-fup\n  claude agents             list sessions\n  claude attach d1288bf1    open in this terminal\n  claude logs d1288bf1      show recent output\n  claude stop d1288bf1      stop this session\n",
-    "stderr": "note: session 91c17f2f is already running in the background, so this started a copy as d1288bf1. `claude attach 91c17f2f` opens the original.\n"
+    "stdout": "backgrounded \u00b7 7380a8b8 \u00b7 bothy-fup\n  claude agents             list sessions\n  claude attach 7380a8b8    open in this terminal\n  claude logs 7380a8b8      show recent output\n  claude stop 7380a8b8      stop this session\n",
+    "stderr": "note: session a87c5c2e is already running in the background, so this started a copy as 7380a8b8. `claude attach a87c5c2e` opens the original.\n"
   },
   "resume_unknown": {
     "exit": 0,
-    "stdout": "backgrounded \u00b7 542896e9 \u00b7 bothy-gone\n  claude agents             list sessions\n  claude attach 542896e9    open in this terminal\n  claude logs 542896e9      show recent output\n  claude stop 542896e9      stop this session\n",
+    "stdout": "backgrounded \u00b7 2a881398 \u00b7 bothy-gone\n  claude agents             list sessions\n  claude attach 2a881398    open in this terminal\n  claude logs 2a881398      show recent output\n  claude stop 2a881398      stop this session\n",
     "stderr": ""
   },
   "untrusted": {
     "exit": 1,
     "stdout": "",
-    "stderr": "Workspace not trusted. Run `claude` in /record/bg5bdd90/other once and accept the trust prompt, then retry.\n"
+    "stderr": "Workspace not trusted. Run `claude` in /record/bgc77a3f/other once and accept the trust prompt, then retry.\n"
   },
   "bypass": {
     "exit": 1,

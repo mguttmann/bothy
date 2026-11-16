@@ -10,7 +10,8 @@ Per scenario the same script of the stand-in runs twice: as a background session
 transcript is recorded, and as a print turn, whose stream is recorded. A test holds that both
 give the same decisions of the stdin and stop rule
 (``tests/unit/test_bgtranscript.py``). A recorded transcript keeps only the record types the
-runner reads (`KEPT`); every other type is dropped, among them the three that hold account
+runner reads (`KEPT`, and of the attachments only ``queued_command``, which names whose input
+a running turn took in); every other type is dropped, among them the three that hold account
 identifiers (``session-owner``, the attachments ``session_context`` and ``credential_org``).
 
 * ``new_post``: a prompt, one tool call, the answer, the release (``claude stop``).
@@ -19,6 +20,9 @@ identifiers (``session-owner``, the attachments ``session_context`` and ``creden
 * ``background``: a background command, a refused follow-up, the refused notification of the
   command's end, and the runner's retry line that is answered.
 * ``stopped``: a stop during a tool call.
+* ``login``: one turn of a session whose requests carry a login token, so its request record
+  lists the beta the counter-check of 18.3 reads. The token is a dummy
+  (``background.py``): no login, and no host but the stand-in is reached.
 """
 
 from __future__ import annotations
@@ -38,10 +42,22 @@ from real_cli.stand_in import cli_env, stand_in, user_line
 
 from claude_code_runner.bgsession import SessionEntry
 
-__all__ = ["KEPT", "PRINT_FLAGS", "USAGE", "record_background"]
+__all__ = ["KEPT", "PRINT_FLAGS", "QUEUED", "USAGE", "record_background"]
 
-KEPT = ("user", "assistant", "api-request", "queue-operation", "system", "cost-state")
-"""The record types a recorded transcript keeps: those the runner reads."""
+KEPT = (
+    "user",
+    "assistant",
+    "api-request",
+    "queue-operation",
+    "attachment",
+    "system",
+    "cost-state",
+)
+"""The record types a recorded transcript keeps: those the runner reads. Of ``attachment`` only
+the type `QUEUED` is kept, of ``system`` only ``turn_duration``."""
+
+QUEUED = "queued_command"
+"""The one attachment the runner reads: what a running turn took in, with its origin."""
 
 USAGE = {
     "input_tokens": 1200,
@@ -59,10 +75,17 @@ SECOND = "Follow-up from Sam (@sam):\n\nAnd the header"
 REFUSED_QUESTION = "Follow-up from Sam (@sam):\n\nREFUSE What is the state?"
 
 
+def _queued(record: dict[str, Any]) -> bool:
+    inner = record.get("attachment")
+    return isinstance(inner, dict) and inner.get("type") == QUEUED
+
+
 def _kept(record: dict[str, Any]) -> bool:
     kind = record.get("type")
     if kind == "system":
         return record.get("subtype") == "turn_duration"
+    if kind == "attachment":
+        return _queued(record)
     return kind in KEPT
 
 
@@ -72,6 +95,8 @@ def _fields(records: list[dict[str, Any]], table: dict[str, set[str]]) -> None:
         if name == "system":
             name = f"system/{record.get('subtype')}"
         table.setdefault(name, set()).update(record)
+        if name == "attachment" and _queued(record):
+            table.setdefault(f"attachment/{QUEUED}", set()).update(record["attachment"])
 
 
 class _Recording:
@@ -254,6 +279,20 @@ async def _stopped(base: Path, program: str, rec: _Recording) -> None:
             await world.close()
 
 
+async def _login(base: Path, program: str, rec: _Recording) -> None:
+    script = Script()
+    with stand_in(script, USAGE) as (url, _):
+        world = World(new_root(base), program, url, login_token=True)
+        try:
+            short_id, entry = await _started(world, "login", "Context.\n\nFix the form")
+            statuses: list[str] = []
+            await _turn(world, entry.session_id, short_id, 1, statuses)
+            await world.stop(short_id)
+            rec.transcript("login", world.records(entry.session_id), statuses)
+        finally:
+            await world.close()
+
+
 async def _waiting(world: World) -> str | None:
     """Launch a session in the default permission mode that asks a question; its short id."""
     proc = await asyncio.create_subprocess_exec(
@@ -388,6 +427,7 @@ async def _scenarios(base: Path, program: str, rec: _Recording) -> None:
     await _followup(base, program, rec)
     await _background(base, program, rec)
     await _stopped(base, program, rec)
+    await _login(base, program, rec)
 
 
 def record_background(program: Path, base: Path, *, twins: bool = True) -> dict[str, Any]:

@@ -75,7 +75,7 @@ from claude_code_runner.attachments import fetch_attachments
 from claude_code_runner.authcheck import auth_status, decide, evidence
 from claude_code_runner.bgmode import UNAVAILABLE, BackgroundMode
 from claude_code_runner.bgpaths import bg_files, remove_bg_files
-from claude_code_runner.bgsession import NAME_PREFIX, BgSession, SessionEntry
+from claude_code_runner.bgsession import NAME_PREFIX, BgSession, SessionEntry, sender_class
 from claude_code_runner.bgtranscript import TranscriptMapper, replayed_records
 from claude_code_runner.builder import AgentBuilder
 from claude_code_runner.causes import ADAPTER_STOPPED, cause
@@ -867,6 +867,7 @@ class RunnerHandler(AgentHandler):
             lstart=str(lstart or ""),
             socket_file=Path(str(part.get("socket") or files.socket)),
             timeout=self.config.cli_probe_timeout,
+            sender_class=sender_class(self.config.tool_class),
         )
         replaced = pid is not None and recorded is not None and pid != recorded
         alive = pid is not None and not replaced and session.alive()

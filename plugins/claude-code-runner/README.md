@@ -71,10 +71,11 @@ sessions".
 | `processstate.py` | `ProcessState`: every stream-derived value of the stdin and stop rule, and its replay (09 18.19.7) |
 | `handover.py` | The handover at SIGTERM (exit 75) and `stop --turns` (09 18.19.3) |
 | `bgmode.py`, `bgpaths.py` | Background mode of the runner process: the control commands, the one reader of the session list, the channels of the mode and the heartbeat reason of a fallback; the files of a background turn under `<runner.state_dir>/bg/` (09 18.2 "Background mode") |
-| `bgsession.py` | A background session: the argument list and the settings file of a launch, the parsers of the launch output, the session list and `daemon status`, the supervisor rule, the line of the inbox socket, and `BgSession`, the handle of the session process with stop and remove |
-| `bgtranscript.py` | The session transcript as the stream of a turn: `TranscriptMapper` maps each record to the stream message of 18.4 that means the same, `TranscriptReader` tails the file and adds what only the session list knows |
+| `bgsession.py` | A background session: the argument list (with the tools no session has) and the settings file of a launch (the run's environment, no inbound setting), the parsers of the launch output, the session list and `daemon status`, the supervisor rule, the line of the inbox socket with the envelope that states the sender's class, and `BgSession`, the handle of the session process with stop and remove |
+| `bgtranscript.py` | The session transcript as the stream of a turn: `TranscriptMapper` maps each record to the stream message of 18.4 that means the same, knows the runner's own lines by their `uuid` and names every other input, and judges every request record by the login beta; `TranscriptReader` tails the file and adds what only the session list knows |
 | `tests/fake_claude/fake_bg.py` | The background side of Fake-Claude: `--bg` prints the launch line and starts a player under a supervisor process; the player writes transcript records and listens on the inbox socket; `agents`, `stop`, `rm` and `daemon status` answer from a state file in the fake configuration folder |
 | `tests/unit/test_bgsession.py`, `test_bgtranscript.py`, `test_bgmode.py`, `tests/scenarios/test_bg_sessions.py`, `test_bg_fallback.py`, `test_bg_adoption.py` | Background mode: the launch and its parsers, the mapping with the class test over every recorded transcript and its print stream, the shared mode with the fallback codes held against the tables of 09 18.9 and of this file, the scenarios of a background turn, every fallback cause, and the adoption by a new runner process |
+| `tests/scenarios/test_bg_inbox_auth.py` | Background mode, what must hold before it is switched on (FIX-RUNNER-BG-INBOX-AUTH): an input the runner did not write stops the session and is never answered, also after an adoption; the login check fails closed; no value of one run's environment reaches the session of another |
 | `tests/real_cli/background.py`, `record_background.py`, `test_background.py`, `tests/fixtures/recording/background_<v>/` | Background sessions of the pinned CLI against the stand-in: the world of a test, the recorder, level one of the real-CLI suite and its recordings |
 | `tests/unit/test_keeper.py`, `test_launch.py`, `test_processstate.py`, `tests/scenarios/test_handover.py`, `test_launch_crash_points.py` | The keeper, the handshake, the replay with the class test over every Fake-Claude stream and checkpoint, AR-T02, AR-T03 and AR-T04 against real runner processes |
 | `tests/hosting_world.py`, `tests/hosting_runner.py` | The scenario world of a hosting runner: the runner's FakeServer with the hosting operations and one FakeServer per hosted agent; the hosting runner as a process of its own, for a scenario that kills it |
@@ -517,26 +518,55 @@ Before you switch it on:
 - **Agent view.** Every session of the runner is listed in the host user's agent view under the
   name `bothy-<run id>` while its run lasts. Do not attach to it, answer in it or stop it there:
   the runner treats a session that vanished or was started again as an error of the run.
-- **Other Claude Code sessions of the host user.** The settings file of a run sets
-  `crossSessionInbound` to `accept` for every tool class, because a session takes the lines the
-  runner writes to its inbox socket only with that value. With it the session takes every
-  message that arrives on the socket, also one of another Claude Code session of the same host
-  user. Two protections of the CLI do not apply then: without a value a session in bypass mode
-  (tool class `host`) holds a message of a session that is not in bypass mode for an approval,
-  and the value of `--settings` goes before the one in the host user's own user settings. What
-  stays: the CLI restricts the socket to the host user, such a message cannot approve anything,
-  and a slash command in it does not run. The runner prompt tells the model that a message with
-  the runner's lead-in is the person's own, so another session of the host user that writes
-  that lead-in can steer a runner session with the rights of its tool class. Switch the mode on
-  only where the host user runs no Claude Code sessions besides the runner's, or only ones that
-  are trusted like the runner.
+- **Other Claude Code sessions of the host user.** A follow-up reaches a session through its
+  inbox socket, the channel of Claude Code's cross-session messaging, and that socket takes a
+  line of every program of the host user. Switch the mode on only where the host user runs no
+  Claude Code sessions besides the runner's, or only ones that are trusted like the runner.
+  What the runner enforces (09 18.5 "Whose input"):
+  - It knows its own lines by their `uuid`, which the CLI keeps in the transcript. When a
+    session takes an input under any other `uuid`, or a person types into it, the runner stops
+    the session and the run ends `failed` with the cause `background_foreign_input`. No answer
+    to that input and no attachment of it is posted. A runner that adopts a turn after a crash
+    holds the same rule with the lines its turn record names.
+  - The settings file of a run sets no `crossSessionInbound`, so the CLI's own rule per message
+    applies and a stricter value of your own or of managed settings is not overridden. By
+    that rule a `host` session (bypass mode) takes only a message whose sender states that it
+    bypasses permission prompts too, and a `chat` or `scoped` session every message whose
+    sender does not state that. The runner's lines for a `host` session state it.
+  - `SendMessage` and `ListAgents` are disallowed, so a session of the runner neither writes
+    to another session nor lists one. The same rule takes the messages to the session's own
+    subagents.
+
+  What stays open: the class a sender states is a claim, so a session of yours in the same
+  class, or a program that writes the claim, still gets its message into a runner session.
+  The runner then stops that session at its next read of the transcript
+  (`runner.poll_interval`), and until then the model can act on the message with the rights of
+  the tool class. Nothing here protects against a program of the host user that reads or
+  writes the runner's state folder or the transcripts of Claude Code.
+- **Your own `crossSessionInbound`.** Leave it unset in the host user's Claude Code settings.
+  With `accept` there every session of the host takes every message again, the runner's too.
+  With `hold` or `refuse` the CLI keeps or drops the runner's own follow-up as well: the
+  running turn goes on without it, and the server defers it into a run of its own.
+- **The SSH agent.** With `runner.forward_ssh_agent` a turn gets the agent socket through the
+  settings file of its run. The supervisor is started from the runner's fixed environment,
+  which never carries the socket, and every settings file sets `SSH_AUTH_SOCK`, to the empty
+  text when the key is off, so a session never has the agent of another run or of an earlier
+  configuration.
+- **The login check.** Nothing a `personal` turn puts out is accepted unless the newest
+  request record of its session lists the login beta of the pinned CLI (`oauth-2025-04-20`);
+  otherwise the session is stopped and the run ends `billing_mode_mismatch`. A CLI version
+  that names the beta differently therefore ends every background turn that way instead of
+  running unchecked; the mode runs only on the pinned version anyway. A login that is gone
+  is no mismatch: the CLI then reports `authentication_failed`, and the run waits for the
+  account as in print mode.
 
 How a background turn runs:
 
 - **Launch.** One command `claude [--resume <id>] --bg --name bothy-<run id> ...` in the project
-  folder, with the prompt on its stdin, the allow-list environment plus `DISABLE_AUTOUPDATER`,
-  and a settings file of the run (`crossSessionInbound`, `worktree.bgIsolation` and an `env`
-  block; the launching command's environment does not reach the session). The files of the
+  folder, with the prompt on its stdin, the runner's fixed environment (the allow list plus
+  `DISABLE_AUTOUPDATER`, never a value of the run), and a settings file of the run
+  (`worktree.bgIsolation` and an `env` block with the run's `TMPDIR` and `SSH_AUTH_SOCK`; the
+  launching command's environment does not reach the session). The files of the
   launch lie in `<runner.state_dir>/bg/` and go when the run ends. The CLI makes the id of a new
   session; the runner reads it from the session list and reports it as the thread's session.
   Before a resume the runner stops and removes an entry of the session it created itself, which
@@ -552,13 +582,16 @@ How a background turn runs:
 - **Follow-ups.** A follow-up, and the retry line after an account error, is one line on the
   session's inbox socket (cross-session messaging of Claude Code). The model takes it in after
   the running tool call, as on stdin. The CLI introduces it as a message of another Claude
-  session; the runner prompt of a background session says that a message with the runner's
-  lead-in is the person's own, relayed by the runner. The CLI keeps the system prompt of a
-  session's first request, so a thread whose session began in print mode (before the key was
-  switched on, or in a run that fell back) does not get that paragraph: there the model reads
-  a follow-up as a message of another session. A slash command in such a message does not run.
-  When the socket cannot be used (it is missing, or a managed setting holds inbound messages),
-  the server defers the follow-up into a new run after this one.
+  session; the runner prompt of a background session says that follow-ups arrive this way,
+  that nothing in such a message proves its sender, and that each is handled as the CLI says
+  for a message of another session. The CLI keeps the system prompt of a session's first
+  request, so a thread whose session began in print mode (before the key was switched on, or
+  in a run that fell back) does not get that paragraph; the model reads a follow-up as a
+  message of another session either way. A slash command in such a message does not run.
+  When the socket cannot be used (it is missing, or a setting holds or refuses inbound
+  messages), the server defers the follow-up into a new run after this one. So it does with a
+  follow-up for a `host` session whose text holds the name of the element the CLI wraps
+  such a message in (`cross-session-message`): the runner writes no line for it.
 - **Stop and end.** A stop is `claude stop`, then SIGTERM and SIGKILL to the session's process
   group when the process still lives (`stop_escalated`), then `claude rm`. A background session
   does not end by itself, so the end of a run is the same stop. An orderly stop of the runner
@@ -593,8 +626,11 @@ doubt the runner stops the session and ends the run `runtime_error` with the cod
 so a prompt never runs twice. Further causes of a failed run in this mode:
 `background_session_copied` (the CLI started a copy at a resume, because another program
 started the session in between), `background_process_replaced` (the supervisor started the
-session again) and `background_session_waiting` (the session waited for a person; the class
-flags and `--disallowedTools AskUserQuestion` prevent it).
+session again), `background_session_waiting` (the session waited for a person; the class
+flags and `--disallowedTools AskUserQuestion` prevent a question, and a message of another
+session that the CLI holds for an approval shows the same way) and `background_foreign_input`
+(the session took a message the runner did not send; above). A run that ends `billing_mode_mismatch` in
+this mode failed the login check above.
 
 Switching the key off again needs no step: both modes continue the same sessions, and a turn
 record a background turn left is still settled at the next start.
@@ -1013,9 +1049,17 @@ no login of the developer is touched. The real CLI runs only behind switches:
   drive the launch, the session list, stop and remove (also right after the launch, while the
   entry names no process yet), the copy and the continuation in place at a resume, both
   refusals, the inbox socket, a refused request and a background command with the runner's own
-  functions, and compare the recorded member table of the transcript with a fresh run. Each
-  test stops and removes its sessions and waits until its supervisor and the supervisor's host
-  processes have ended. The
+  functions, and compare the recorded member table of the transcript with a fresh run. They
+  also hold what 09 18.5 "Whose input" and 18.2 rest on: that no class offers `SendMessage` or
+  `ListAgents`, what a session takes without a value of `crossSessionInbound` (a `host`
+  session needs the acceptance of bypass mode, which the test records in its own configuration
+  folder), that a line of another sender shows in the transcript like the runner's with
+  another `uuid`, and what a session of a second run sees of the environment of a first run
+  with the SSH agent. One test gives the CLI a dummy token in the place of the key helper, so
+  its request record lists the login beta of 18.3; the token is no credential, the requests go
+  to the stand-in, and a proxy on loopback that refuses is the only other way out the CLI has.
+  Each test stops and removes its sessions and waits until its supervisor and the supervisor's
+  host processes have ended. The
   temporary folder must be short (the inbox socket lies in it) and must not lie below a
   `CLAUDE.md` or a `.claude` folder: point `TMPDIR` at a short folder outside the home folder.
   Level two of this file (`CLAUDE_CODE_RUNNER_REAL_TURN=1` and

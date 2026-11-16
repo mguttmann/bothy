@@ -8,6 +8,10 @@ recorded member table, and the class test of the mode: every recorded transcript
 stdin and stop rule (`ProcessState.decide`) as the print stream of the same scenario. Then what
 only the session list says (background work, a session that waits, a replaced process), with
 synthetic records.
+
+Whose input a session took (18.5) and the counter-check of 18.3 are held here record by record:
+the recordings give the records of a line of the inbox socket and of a request on a login
+token, and the mapper is asked both as the runner that wrote the lines and as one that did not.
 """
 
 from __future__ import annotations
@@ -20,14 +24,16 @@ from typing import Any
 
 import pytest
 from real_cli.record import reduced_record
-from real_cli.record_background import KEPT
+from real_cli.record_background import KEPT, QUEUED
 
 from claude_code_runner.account import AccountRetry, account_error
 from claude_code_runner.bgsession import NAME_PREFIX, Reading, SessionEntry
 from claude_code_runner.bgtranscript import (
     BACKGROUND_TASK,
+    CAUSE_FOREIGN,
     CAUSE_REPLACED,
     CAUSE_WAITING,
+    LOGIN_BETA,
     READ_FIELDS,
     PricedUsage,
     TranscriptMapper,
@@ -48,11 +54,11 @@ RECORDED = (
     / "recording"
     / f"background_{PINNED_CLAUDE_CODE_VERSION}"
 )
-SCENARIOS = ("new_post", "resumed", "followup", "background", "stopped")
+SCENARIOS = ("new_post", "resumed", "followup", "background", "stopped", "login")
 TWINS = ("new_post", "resumed", "followup", "background")
-ACCOUNT_RECORDS = ("session-owner", "attachment")
-"""The record types that hold account identifiers (``session-owner`` and, as attachments,
-``session_context`` and ``credential_org``): no recording and no mapped message has them."""
+ACCOUNT_ATTACHMENTS = ("session_context", "credential_org")
+"""The attachments that hold account identifiers, as the record type ``session-owner`` does: no
+recording and no mapped message has any of the three."""
 PID = 4711
 
 
@@ -64,9 +70,23 @@ def transcript(scenario: str) -> list[dict[str, Any]]:
     return lines(f"transcript_{scenario}.jsonl")
 
 
-def mapped(scenario: str) -> list[dict[str, Any]]:
-    mapper = TranscriptMapper("prompt-uuid")
-    return [m for record in transcript(scenario) for m in mapper.map(record)]
+def lines_of_the_runner(records: list[dict[str, Any]]) -> set[str]:
+    """The ``uuid`` of every line the recorder wrote to the inbox socket of a scenario."""
+    started = {r["uuid"] for r in records if (r.get("origin") or {}).get("kind") == "peer"}
+    joined = {
+        r["attachment"]["source_uuid"]
+        for r in records
+        if r["type"] == "attachment" and r["attachment"]["origin"]["kind"] == "peer"
+    }
+    return started | joined
+
+
+def mapped(scenario: str, *, own: bool = True) -> list[dict[str, Any]]:
+    """The mapped messages of a recording, read by the runner that wrote its lines or not."""
+    records = transcript(scenario)
+    wrote = lines_of_the_runner(records) if own else set()
+    mapper = TranscriptMapper("prompt-uuid", wrote.__contains__)
+    return [m for record in records for m in mapper.map(record)]
 
 
 def shape(message: dict[str, Any]) -> str:
@@ -94,6 +114,7 @@ def test_a_new_post_maps_to_the_stream_of_a_turn() -> None:
         "system/init",  # the model of the first assistant message
         "assistant",
         "tool_result",
+        "system/bg_request",  # every request of the session is judged (18.3)
         "assistant",
         "result",
         "bg_totals",
@@ -109,7 +130,7 @@ def test_a_new_post_maps_to_the_stream_of_a_turn() -> None:
     assert messages[5]["message"]["content"] == [
         {"type": "tool_result", "tool_use_id": tool["id"], "is_error": False}
     ]
-    result = messages[7]
+    result = messages[8]
     assert (result["subtype"], result["result"], result["num_turns"]) == ("success", "Answer 1", 2)
     totals = messages[-1]["modelUsage"]
     [(model_name, usage)] = totals.items()
@@ -130,7 +151,10 @@ def test_a_resumed_process_starts_at_its_own_prompt() -> None:
 
 
 def test_inbox_lines_map_to_their_echo_in_the_turn_or_as_a_turn_of_their_own() -> None:
-    records, messages = transcript("followup"), mapped("followup")
+    records = transcript("followup")
+    # The request records lie where the CLI happened to write them, before or after the
+    # record of the line that started the turn: they are left out of the order here.
+    messages = [m for m in mapped("followup") if m.get("subtype") != "bg_request"]
     absorbed = next(r for r in records if r.get("reason") == "absorbed_mid_turn")
     own = next(r for r in records if (r.get("origin") or {}).get("kind") == "peer")
     shapes = [shape(m) for m in messages]
@@ -224,14 +248,278 @@ def test_records_before_the_prompt_sidechains_and_other_types_are_skipped() -> N
 
 def test_a_request_with_the_stored_login_is_known_by_its_beta() -> None:
     def login(betas: object) -> object:
-        mapper = TranscriptMapper("p")
-        [message] = mapper.map({"type": "api-request", "params": {"betas": betas}})
-        assert mapper.map({"type": "api-request", "params": {"betas": betas}}) == []  # once
+        [message] = TranscriptMapper("p").map({"type": "api-request", "params": {"betas": betas}})
+        assert (message["type"], message["subtype"]) == ("system", "bg_request")
         return message["login"]
 
-    assert login(["claude-code-20250219", "oauth-2025-04-20"]) is True
+    assert LOGIN_BETA == "oauth-2025-04-20"
+    assert login(["claude-code-20250219", LOGIN_BETA]) is True
     assert login(["claude-code-20250219"]) is False
     assert login(None) is False
+    assert login([]) is False
+    [missing] = TranscriptMapper("p").map({"type": "api-request"})
+    assert missing["login"] is False
+
+
+@pytest.mark.parametrize(
+    "beta",
+    [
+        "oauth-2025-04-21",  # a renamed beta of a later version
+        "oauth-",
+        "oauth-2025-04-20-beta",
+        "x-oauth-2025-04-20",
+        " oauth-2025-04-20",
+        "OAUTH-2025-04-20",
+        "oauth-2025-04-2",
+    ],
+)
+def test_only_the_whole_name_of_the_login_beta_counts(beta: str) -> None:
+    # A prefix would take any future beta whose name starts alike for a login (18.3).
+    [message] = TranscriptMapper("p").map({"type": "api-request", "params": {"betas": [beta]}})
+    assert message["login"] is False
+    [nested] = TranscriptMapper("p").map(
+        {"type": "api-request", "params": {"betas": [[LOGIN_BETA], {"name": LOGIN_BETA}]}}
+    )
+    assert nested["login"] is False
+
+
+def test_every_request_record_is_judged_not_only_the_first() -> None:
+    mapper = TranscriptMapper("p")
+    seen = [
+        mapper.map({"type": "api-request", "params": {"betas": betas}})[0]["login"]
+        for betas in ([LOGIN_BETA], [LOGIN_BETA], ["claude-code-20250219"], [LOGIN_BETA])
+    ]
+    assert seen == [True, True, False, True]
+
+
+def test_the_recorded_request_on_a_login_token_lists_the_beta_and_a_key_does_not() -> None:
+    # ``transcript_login.jsonl``: a session of the pinned CLI whose requests carried a token
+    # in the place of the key; every other recording ran on the key of a helper.
+    on_login = [m for m in mapped("login") if m.get("subtype") == "bg_request"]
+    assert [m["login"] for m in on_login] == [True]
+    [request] = [r for r in transcript("login") if r["type"] == "api-request"]
+    assert LOGIN_BETA in request["params"]["betas"]
+    for scenario in ("new_post", "resumed", "followup", "background", "stopped"):
+        requests = [m for m in mapped(scenario) if m.get("subtype") == "bg_request"]
+        records = [r for r in transcript(scenario) if r["type"] == "api-request"]
+        assert len(requests) == len(records) > 0, scenario
+        assert not any(m["login"] for m in requests), scenario
+        for record in records:
+            assert not [b for b in record["params"]["betas"] if b.startswith("oauth")]
+
+
+# ---- whose input a session took (18.5) ----------------------------------------------------------
+
+
+def foreign(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [m for m in messages if m.get("subtype") == "bg_foreign"]
+
+
+def test_a_recorded_line_is_the_runner_s_only_by_its_uuid() -> None:
+    # The same transcript, read by the runner that wrote the two lines and by one that did
+    # not: the records of an own line and of anyone else's differ in nothing but the uuid.
+    assert foreign(mapped("followup")) == []
+    assert foreign(mapped("background")) == []
+    messages = mapped("followup", own=False)
+    assert foreign(messages) == [
+        {"type": "system", "subtype": "bg_foreign", "origin": "peer"},  # taken during the turn
+        {"type": "system", "subtype": "bg_foreign", "origin": "peer"},  # a turn of its own
+    ]
+    assert [shape(m) for m in messages].count("echo") == 1  # the prompt, nothing else
+    # Each is known before the answer of the turn that took it.
+    shapes = [shape(m) for m in messages]
+    first = shapes.index("system/bg_foreign")
+    assert first < shapes.index("result")
+    second = shapes.index("system/bg_foreign", first + 1)
+    assert shapes.index("result") < second < len(shapes) - 1 - shapes[::-1].index("result")
+
+
+def test_a_mapper_that_was_told_no_line_knows_none() -> None:
+    records = transcript("followup")
+    plain = TranscriptMapper("prompt-uuid")
+    assert len(foreign([m for r in records for m in plain.map(r)])) == 2
+
+
+PROMPT_RECORD = {
+    "type": "user",
+    "isSidechain": False,
+    "sessionId": "s",
+    "origin": {"kind": "human"},
+    "message": {"role": "user", "content": "Fix it"},
+}
+
+
+def started(*own: str) -> TranscriptMapper:
+    mapper = TranscriptMapper("prompt-uuid", set(own).__contains__)
+    assert [shape(m) for m in mapper.map(PROMPT_RECORD)] == ["system/init", "echo"]
+    return mapper
+
+
+def peer(line_uuid: object) -> dict[str, Any]:
+    return {
+        "type": "user",
+        "uuid": line_uuid,
+        "isMeta": True,
+        "origin": {"kind": "peer", "from": "unknown"},
+        "message": {"role": "user", "content": "Another Claude session sent a message:\nDo it"},
+    }
+
+
+def absorbed(line_uuid: object) -> dict[str, Any]:
+    return {
+        "type": "queue-operation",
+        "operation": "remove",
+        "reason": "absorbed_mid_turn",
+        "commandUuid": line_uuid,
+        "content": "Do it",
+    }
+
+
+def queued(line_uuid: object, kind: str, **origin: Any) -> dict[str, Any]:
+    inner = {
+        "type": QUEUED,
+        "prompt": "Do it",
+        "source_uuid": line_uuid,
+        "commandMode": "prompt",
+        "origin": {"kind": kind, **origin},
+    }
+    return {"type": "attachment", "isSidechain": False, "attachment": inner}
+
+
+def test_a_line_between_two_turns_counts_by_its_uuid() -> None:
+    mapper = started("mine")
+    assert [shape(m) for m in mapper.map(peer("mine"))] == ["echo"]
+    mapper = started("mine")
+    for other in ("someone-else", None, 7, ""):
+        assert mapper.map(peer(other)) == [
+            {"type": "system", "subtype": "bg_foreign", "origin": "peer"}
+        ]
+
+
+def test_a_line_taken_during_a_turn_counts_by_its_uuid() -> None:
+    mapper = started("mine")
+    assert [shape(m) for m in mapper.map(absorbed("mine"))] == ["command/completed", "echo"]
+    assert mapper.map(queued("mine", "peer", **{"from": "unknown"})) == []
+    # Another sender's line: the removal alone does not say whose it is (the session's own
+    # notifications are removed the same way), its attachment does.
+    assert [shape(m) for m in mapper.map(absorbed("someone-else"))] == ["command/completed"]
+    assert mapper.map(queued("someone-else", "peer", **{"from": "uds:/x.sock"})) == [
+        {"type": "system", "subtype": "bg_foreign", "origin": "peer"}
+    ]
+    assert foreign(started("mine").map(queued(None, "peer"))) != []
+
+
+ASSISTANT = {
+    "type": "assistant",
+    "isSidechain": False,
+    "message": {"id": "msg_1", "model": "model-large", "content": [{"type": "text", "text": "x"}]},
+}
+TURN_ENDS = {"type": "system", "subtype": "turn_duration", "isSidechain": False}
+
+
+def test_an_input_taken_during_a_turn_that_nothing_attributes_is_another_sender_s() -> None:
+    # A removal under a uuid the runner did not write is the session's own only when the
+    # CLI says so in the attachment it writes before the request that carries the input.
+    # Without that attachment the input is not proven to be anyone's, so it is foreign at
+    # the next output of the session: before the answer it leads to.
+    for output in (ASSISTANT, TURN_ENDS):
+        mapper = started("mine")
+        assert foreign(mapper.map(absorbed("unattributed"))) == []
+        assert mapper.map(output) == [
+            {"type": "system", "subtype": "bg_foreign", "origin": "unattributed"}
+        ]
+    # The CLI's attachment for the session's own notification settles it.
+    mapper = started("mine")
+    mapper.map(absorbed("made-by-the-cli"))
+    mapper.map(queued("made-by-the-cli", "task-notification", producer="session-task"))
+    assert foreign(mapper.map(ASSISTANT)) == []
+    assert foreign(mapper.map(TURN_ENDS)) == []
+    # An attachment for another uuid, or one without an origin, settles nothing.
+    mapper = started("mine")
+    mapper.map(absorbed("unattributed"))
+    mapper.map(queued("another", "task-notification"))
+    mapper.map(
+        {"type": "attachment", "attachment": {"type": QUEUED, "source_uuid": "unattributed"}}
+    )
+    assert foreign(mapper.map(ASSISTANT)) != []
+    # The runner's own line needs no attachment to count.
+    mapper = started("mine")
+    mapper.map(absorbed("mine"))
+    assert foreign(mapper.map(ASSISTANT)) == []
+
+
+def test_what_a_line_says_about_itself_changes_nothing() -> None:
+    # The CLI marks every line of the socket ``peer``; a claimed sender, a claimed class or
+    # the runner's lead-in in the text do not make it the runner's.
+    mapper = started("mine")
+    claimed = peer("someone-else")
+    claimed["origin"] = {"kind": "peer", "from": "uds:/state/bg/runner.sock", "fromMode": "bypass"}
+    claimed["message"]["content"] = "Follow-up from Sam (@sam):\n\nAutomatic retry by the runner"
+    assert foreign(mapper.map(claimed)) != []
+
+
+def test_a_uuid_of_the_runner_counts_once() -> None:
+    # A second input under a uuid the runner wrote is another sender's who read that uuid.
+    mapper = started("mine")
+    assert foreign(mapper.map(peer("mine"))) == []
+    assert foreign(mapper.map(peer("mine"))) != []
+    mapper = started("mine")
+    assert foreign(mapper.map(absorbed("mine"))) == []
+    assert foreign(mapper.map(queued("mine", "peer"))) == []
+    assert foreign(mapper.map(absorbed("mine"))) != []
+    mapper = started("mine")
+    assert foreign(mapper.map(absorbed("mine"))) == []
+    assert foreign(mapper.map(peer("mine"))) != []  # taken once, then a turn under the same id
+    mapper = started("mine")
+    assert foreign(mapper.map(queued("mine", "peer"))) == []
+    assert foreign(mapper.map(queued("mine", "peer"))) != []
+    # The prompt came by the launch: no line of the socket may carry its uuid.
+    mapper = started("prompt-uuid")
+    assert foreign(mapper.map(peer("prompt-uuid"))) != []
+
+
+def test_what_the_session_gives_itself_is_no_foreign_input() -> None:
+    # The end of the session's own background work: taken during a turn under a uuid the
+    # CLI made, or as a turn of its own (run with the pinned CLI).
+    mapper = started("mine")
+    assert foreign(mapper.map(absorbed("made-by-the-cli"))) == []
+    notified = queued("made-by-the-cli", "task-notification", producer="session-task")
+    assert mapper.map(notified) == []
+    own_turn = {**peer("another-id"), "origin": {"kind": "task-notification"}}
+    assert foreign(mapper.map(own_turn)) == []
+    # A message of the session's own subagent arrives as a notification too.
+    relayed = queued("x", "task-notification", subkind="peer-send-message")
+    assert mapper.map(relayed) == []
+
+
+def test_a_person_who_types_into_the_session_is_another_sender() -> None:
+    mapper = started("mine")
+    typed = {**PROMPT_RECORD, "message": {"role": "user", "content": "Do something else"}}
+    assert mapper.map(typed) == [{"type": "system", "subtype": "bg_foreign", "origin": "human"}]
+    assert started().map(queued("typed", "human")) == [
+        {"type": "system", "subtype": "bg_foreign", "origin": "human"}
+    ]
+
+
+def test_a_line_before_the_prompt_is_never_the_runner_s() -> None:
+    # The runner writes to the socket only after the session took its prompt.
+    mapper = TranscriptMapper("prompt-uuid", {"mine"}.__contains__)
+    assert foreign(mapper.map(peer("someone-else"))) != []
+    assert not mapper.started
+    mapper = TranscriptMapper("prompt-uuid", {"mine"}.__contains__)
+    assert foreign(mapper.map(queued("someone-else", "peer"))) != []
+    # What a resume writes before the prompt (the end of the interrupted turn) is skipped.
+    mapper = TranscriptMapper("prompt-uuid", {"mine"}.__contains__)
+    closing = {"type": "user", "message": {"content": [{"type": "tool_result"}]}}
+    assert mapper.map(closing) == []
+    assert mapper.map(queued("typed", "human")) == []
+
+
+def test_a_foreign_input_carries_nothing_of_its_record() -> None:
+    for message in (*mapped("followup", own=False), *started().map(peer("x"))):
+        if message.get("subtype") == "bg_foreign":
+            assert set(message) == {"type", "subtype", "origin"}
+    assert CAUSE_FOREIGN == "background_foreign_input"
 
 
 # ---- the recorded member table ------------------------------------------------------------------
@@ -251,14 +539,19 @@ def test_every_member_the_runner_reads_is_one_the_pinned_cli_wrote() -> None:
 
 def test_a_recording_keeps_only_the_record_types_the_runner_reads() -> None:
     table = json.loads((RECORDED / "transcript_fields.json").read_text("utf-8"))
-    # The CLI wrote attachments (``session-owner`` comes only with a login); none is kept.
+    # The CLI wrote attachments (``session-owner`` comes only with a login); of them only the
+    # one that names whose input a running turn took is kept.
     assert "attachment" in table["records"]
     for scenario in SCENARIOS:
         kinds = {r["type"] for r in transcript(scenario)}
         assert kinds <= set(KEPT), scenario
-        assert not kinds & set(ACCOUNT_RECORDS)
+        assert "session-owner" not in kinds
+        attached = {r["attachment"]["type"] for r in transcript(scenario) if "attachment" in r}
+        assert attached <= {QUEUED}, scenario
+        assert not attached & set(ACCOUNT_ATTACHMENTS)
         versions = {r.get("version") for r in transcript(scenario)} - {None}
         assert versions == {PINNED_CLAUDE_CODE_VERSION}
+    assert QUEUED in {r["attachment"]["type"] for r in transcript("followup") if "attachment" in r}
 
 
 def test_a_recorded_request_keeps_only_its_model_and_betas() -> None:
@@ -338,7 +631,7 @@ def chunks(records: list[dict[str, Any]]) -> list[bytes]:
 
 
 async def read_through(
-    tmp_path: Path, pieces: list[bytes], sessions: Sessions
+    tmp_path: Path, pieces: list[bytes], sessions: Sessions, own: frozenset[str] = frozenset()
 ) -> tuple[list[dict[str, Any]], TranscriptReader]:
     """Read a transcript that grows piece by piece; the process ends after the last piece."""
     path = tmp_path / "session.jsonl"
@@ -348,7 +641,7 @@ async def read_through(
         lambda: path,
         0.0,
         lambda: alive[0],
-        TranscriptMapper("prompt-uuid"),
+        TranscriptMapper("prompt-uuid", own.__contains__),
         sessions=sessions,  # type: ignore[arg-type]
         short_id="1a2b3c4d",
         pid=PID,
@@ -390,7 +683,10 @@ async def test_a_recorded_transcript_gives_the_decisions_of_its_print_stream(
 ) -> None:
     meta = json.loads((RECORDED / "meta.json").read_text("utf-8"))
     sessions = Sessions(after_turn=meta["after_turn"][scenario])
-    background, _ = await read_through(tmp_path, chunks(transcript(scenario)), sessions)
+    records = transcript(scenario)
+    own = frozenset(lines_of_the_runner(records))
+    background, _ = await read_through(tmp_path, chunks(records), sessions, own)
+    assert foreign(background) == []
     printed = lines(f"stream_{scenario}.jsonl")
     assert decisions(background) == decisions(printed)
     results = [m for m in printed if m.get("type") == "result"]

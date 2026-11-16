@@ -112,7 +112,7 @@ from claude_code_runner.attachments import (
     fetch_followup_files,
     followup_files_final,
 )
-from claude_code_runner.bgmode import BackgroundMode, launch_environment
+from claude_code_runner.bgmode import BackgroundMode
 from claude_code_runner.bgpaths import bg_files, remove_bg_files
 from claude_code_runner.bgsession import (
     BgSession,
@@ -123,12 +123,14 @@ from claude_code_runner.bgsession import (
     launch,
     load_supervisor,
     prompt_text,
+    sender_class,
     session_name,
     settings_document,
     store_supervisor,
     supervisor_verdict,
 )
 from claude_code_runner.bgtranscript import (
+    CAUSE_FOREIGN,
     PricedUsage,
     TranscriptMapper,
     TranscriptReader,
@@ -592,6 +594,17 @@ class RunTurn:
         """What the run's background turns reported, for a process that wrote no totals (18.7)."""
         self.bg_launching = False
         """A launch command of this run was started and its session is not followed yet."""
+        self.bg_own: set[str] = set()
+        """The ``uuid`` of every input line the runner gave the current session process: the
+        line it was launched with and each line written to its inbox socket, noted before
+        the write. Only an input under one of them is the runner's (18.5). The set is part of
+        the turn record and never loses a member while the process lives."""
+        self.bg_login = False
+        """The newest request record of the current session process listed the login beta
+        (the counter-check of 18.3). Part of the turn record: a runner that adopts the turn
+        counts the check as not passed unless the record says so."""
+        self._bg_requests = 0
+        """How many request records of the session this runner read (for the log only)."""
         self._bg_rest: list[tuple[str, bytes]] = []
         self._bg_cause: str | None = None
 
@@ -1912,7 +1925,7 @@ class RunTurn:
             # its echo to the follow-up and patches it absorbed (design note 12 f 3).
             self.followups.add(message_id, line_uuid, line)
             self.lines[line_uuid] = line
-            self.ledger.written(line_uuid)
+            self._written(process, line_uuid)
             if self.handover:
                 # Recorded before it is written, marked written after its last byte (18.19.3).
                 self._store_lines([(line_uuid, line)])
@@ -2612,8 +2625,11 @@ class RunTurn:
             "cwd": str(self.state.cwd) if self.state.cwd is not None else None,
         }
         if self.bg_record is not None:
-            # A background session is found again by this part, never by a keeper (18.9).
-            record.update(launch_mode="background", bg=dict(self.bg_record), run=self._run_part())
+            # A background session is found again by this part, never by a keeper (18.9). It
+            # also holds what the next runner must not have to believe: which input lines
+            # are the runner's, and whether the counter-check of 18.3 has passed.
+            part = {**self.bg_record, "own": sorted(self.bg_own), "login": self.bg_login}
+            record.update(launch_mode="background", bg=part, run=self._run_part())
         elif self.handover:
             record.update(self._handover_part())
         if process is not None:
@@ -2696,7 +2712,7 @@ class RunTurn:
             line, line_uuid = user_line([text])
             data = line.encode("utf-8") + b"\n"
             self.lines[line_uuid] = data
-            self.ledger.written(line_uuid)
+            self._written(process, line_uuid)
             if autonomous:
                 self.autonomous.add(line_uuid)
                 self.ps.flag_input(line_uuid, autonomous=True)
@@ -3193,8 +3209,23 @@ class RunTurn:
             return started
         if not attempt.resume:
             attempt = dataclasses.replace(attempt, new_reference=True)
-        reader = self._transcript_reader(started, TranscriptMapper(inputs[0][0]), offset)
+        mapper = TranscriptMapper(inputs[0][0], self._wrote)
+        reader = self._transcript_reader(started, mapper, offset)
         return await self._follow(started, attempt, offset, 0, reader=reader), True
+
+    def _wrote(self, line_uuid: str) -> bool:
+        """Whether the runner gave the current session process an input line with this id."""
+        return line_uuid in self.bg_own
+
+    def _written(self, process: object, line_uuid: str) -> None:
+        """An input line is about to be written to ``process`` (before the record is saved).
+
+        For a background session the ``uuid`` also joins the lines the runner knows as its
+        own: the turn record names it before the session can show it (18.5).
+        """
+        self.ledger.written(line_uuid)
+        if isinstance(process, BgSession):
+            self.bg_own.add(line_uuid)
 
     async def _prepare_launch(
         self, attempt: _Attempt, inputs: Sequence[tuple[str, bytes]], name: str, offset: int
@@ -3237,6 +3268,11 @@ class RunTurn:
             self.ledger.written(line_uuid)
         self._bg_rest = list(inputs[1:])
         self._bg_cause = None
+        # A new session process: only these lines are the runner's so far, and no request
+        # of the process has shown the stored login yet.
+        self.bg_own = {line_uuid for line_uuid, _ in inputs}
+        self.bg_login = False
+        self._bg_requests = 0
         self.bg_record = {
             "name": name,
             "socket": str(files.socket),
@@ -3315,13 +3351,18 @@ class RunTurn:
 
         The caller holds `BackgroundMode.launching`: the next run of this runner reads the
         supervisor only after this record.
+
+        The command gets the fixed environment of `BackgroundMode`, never the run's own: it
+        starts the supervisor when none runs, the supervisor lives across runs, and every
+        later session inherits what it was started with. What belongs to this run reaches
+        its session through the ``env`` block of the settings file alone (18.2).
         """
         files = bg_files(self.cfg.state_dir, self.handle.run_id)
         out = await launch(
             argv,
             prompt=prompt,
             cwd=self.state.cwd or self.cfg.projects_root,
-            env=launch_environment(self.state.env),
+            env=bg.env,
             stdout=files.stdout,
             stderr=files.stderr,
             timeout=self.cfg.cli_probe_timeout,
@@ -3394,6 +3435,7 @@ class RunTurn:
             lstart=ident.lstart if ident is not None else "",
             socket_file=files.socket,
             timeout=timeout,
+            sender_class=sender_class(self.cfg.tool_class),
         )
         self.process = session
         self._identity = (
@@ -3571,21 +3613,31 @@ class RunTurn:
     ) -> _Outcome | None:
         """The effects of a mapped message that only a background session has (18.4).
 
+        Two checks end the run here, before anything of the message is posted. An input the
+        runner did not write (18.5) stops the session and fails the run. The counter-check of
+        18.3 fails closed: every request record is judged, and nothing a session puts out
+        (`_is_output`) is accepted unless the newest request record of its process listed
+        the login beta, so neither after a record without it nor before any record.
+
         Returns:
-            An outcome when the message ended the run (the counter-check), else ``None``.
+            An outcome when the message ended the run (one of the two checks), else ``None``.
         """
         kind, subtype = message.get("type"), message.get("subtype")
+        if kind == "system" and subtype == "bg_foreign":
+            return await self._foreign_input(session, str(message.get("origin")))
+        if kind == "system" and subtype == "bg_request":
+            self._bg_requests += 1
+            listed = message.get("login") is True
+            if listed != self.bg_login:
+                self.bg_login = listed
+                self._persist()  # an adopter reads whether the check has passed
+        elif not self.bg_login and _is_output(message):
+            code = "request_without_login" if self._bg_requests else "no_request_record"
+            return await self._login_unproven(session, code)
         if kind == "system" and subtype == "init" and attempt is not None:
             await self._report_session(message, attempt)
             if message.get("session_id") and self.phase == "starting":
                 await self._session_started(session)
-        elif kind == "system" and subtype == "bg_request" and attempt is not None:
-            if message.get("login") is not True and self.state.mode == "personal":
-                # The counter-check of 18.3: a personal turn uses the stored login.
-                _warn("counter_check_failed", **self.ids)
-                await self._terminate(session, self.ids)
-                await self._finish("failed", reason="billing_mode_mismatch")
-                return _Outcome(TurnEvidence(), self._worked, handled=True)
         elif kind == "bg_totals":
             self.ledger.totals(message)
             self._settle_cost()
@@ -3594,6 +3646,35 @@ class RunTurn:
         elif kind == "result" and isinstance(message.get("bg_cause"), str):
             self._bg_cause = str(message["bg_cause"])
         return None
+
+    async def _foreign_input(self, session: BgSession, origin: str) -> _Outcome:
+        """An input the runner did not write reached the session: stop it, fail the run (18.5).
+
+        The session is stopped before anything else, so its turn ends where it is; the run
+        finishes ``failed`` with the cause `CAUSE_FOREIGN`, and the answer of the turn that
+        took the input is never read, so neither it nor an attachment of it is posted.
+        """
+        _warn("background_foreign_input", origin=origin, **self.ids)
+        await self._terminate(session, self.ids)
+        text = "The background session took an input that the runner did not write."
+        await self._fail(
+            "runtime_error", (text,), session.exit_label(), summary=cause(CAUSE_FOREIGN)
+        )
+        return _Outcome(TurnEvidence(), self._worked, handled=True)
+
+    async def _login_unproven(self, session: BgSession, code: str) -> _Outcome:
+        """The counter-check of 18.3 did not pass: stop the session, ``billing_mode_mismatch``.
+
+        Args:
+            session: The session.
+            code: Why, for the log: ``request_without_login`` (the session put something out
+                after a request record that does not list the login beta) or
+                ``no_request_record`` (it did so before this runner read any request record).
+        """
+        _warn("counter_check_failed", code=code, **self.ids)
+        await self._terminate(session, self.ids)
+        await self._finish("failed", reason="billing_mode_mismatch")
+        return _Outcome(TurnEvidence(), self._worked, handled=True)
 
     async def _session_started(self, session: BgSession) -> None:
         """The session took the prompt: the further inputs of a recovery, then held follow-ups."""
@@ -3640,13 +3721,16 @@ class RunTurn:
                 )
                 done = True
                 return
-            mapper = TranscriptMapper(str(self.bg_record.get("prompt_uuid") or ""))
+            mapper = TranscriptMapper(str(self.bg_record.get("prompt_uuid") or ""), self._wrote)
             lines = replayed_records(
                 self._transcript(session.session_id),
                 self.ledger.process_start,
                 self.ledger.offset,
                 mapper,
             )
+            if await self._replayed_checks(session, [m for m, _, _ in lines]):
+                done = True
+                return
             self.ps = ProcessState(has_stdin=True, account_retry=self._account_schedule())
             self._replayed_worked = self._replay_ledger(lines)
             for message, _, _ in lines:
@@ -3682,8 +3766,34 @@ class RunTurn:
                 remove_run_files(self.cfg.state_dir, self.handle.run_id)
                 remove_bg_files(self.cfg.state_dir, self.handle.run_id)
 
+    async def _replayed_checks(
+        self, session: BgSession, messages: Sequence[Mapping[str, Any]]
+    ) -> bool:
+        """The two checks of `_read_background` over the part the previous runner read (18.9).
+
+        The previous runner acted on what it read, so this finds something only when it ended
+        between a record and its effect, or was a runner that did not check yet. Whether the
+        counter-check has passed is taken from the turn record alone, never from these lines.
+
+        Returns:
+            True when the run ended here.
+        """
+        for message in messages:
+            if message.get("type") == "system" and message.get("subtype") == "bg_foreign":
+                await self._foreign_input(session, str(message.get("origin")))
+                return True
+        return False
+
     def _restore_adopted(self, record: Mapping[str, Any], known_steps: Mapping[str, str]) -> None:
-        """The run's state from the record of a background turn."""
+        """The run's state from the record of a background turn.
+
+        Only what the record names is the runner's: a record without the members ``own`` and
+        ``login`` (an earlier runner wrote it) proves no line and no passed counter-check.
+        """
+        part = self.bg_record or {}
+        own = part.pop("own", None)
+        self.bg_own = {u for u in own if isinstance(u, str)} if isinstance(own, list) else set()
+        self.bg_login = part.pop("login", None) is True
         self.ledger = TurnLedger.from_record(record)
         self.title = str(record.get("title") or "")
         self.title_request = bool(record.get("title_request"))
@@ -3833,6 +3943,25 @@ class RunTurn:
         else:
             # Also an adopted compaction: it is never posted and never completes the run.
             await self._fail("runtime_error", errors, "unknown")
+
+
+def _is_output(message: Mapping[str, Any]) -> bool:
+    """Whether a mapped message of a background session is something the session put out.
+
+    What the counter-check of 18.3 must have passed for: an assistant message, the model the
+    live box takes from it, and a turn end without an error. The one exception is the CLI's
+    own record of a request it could not authenticate (``error`` ``authentication_failed``):
+    a session whose login is gone writes a request record without the login beta, sends
+    nothing and writes that error itself (run with the pinned CLI), and the account rules of
+    18.9 handle it. Every other API error means that some credential was taken.
+    """
+    kind, subtype = message.get("type"), message.get("subtype")
+    if kind == "assistant":
+        refused = message.get("is_api_error_message") is True
+        return not (refused and message.get("error") == "authentication_failed")
+    if kind == "system":
+        return subtype == "init" and "model" in message
+    return kind == "result" and is_success(message)
 
 
 def _group_runs(group: StoppableGroup) -> bool:

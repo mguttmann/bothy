@@ -5,7 +5,8 @@
     "launch.json": "what the launch command printed per case, with its exit code",
     "sessions.json": "one entry of claude agents --json --all per state",
     "commands.json": "what stop, rm and daemon status printed, with their exit codes",
-    "transcript_<scenario>.jsonl": "the session transcript of a scenario, reduced to the record types the runner reads; every other type is dropped, among them session-owner and the attachments session_context and credential_org, which hold account identifiers",
+    "transcript_<scenario>.jsonl": "the session transcript of a scenario, reduced to the record types the runner reads (of the attachments only queued_command); every other type is dropped, among them session-owner and the attachments session_context and credential_org, which hold account identifiers",
+    "transcript_login.jsonl": "one turn of a session that got a dummy token in the place of the key helper, so its request record lists the beta of a request on a stored login; the token is no credential, and a proxy on loopback that refuses every request was the only way out of the CLI but the stand-in",
     "stream_<scenario>.jsonl": "the stream-json output of the same scenario as a print turn (claude -p); the init message reduced to the fields the runner reads",
     "transcript_fields.json": "the members the CLI wrote per transcript record type and in an entry of the session list (names only)"
   },
@@ -26,7 +27,10 @@
       "idle",
       "idle"
     ],
-    "stopped": []
+    "stopped": [],
+    "login": [
+      "idle"
+    ]
   },
   "note": "Paths replaced by /work and /record. after_turn lists, per scenario, the status the session list showed after each turn end. Every answer comes from the stand-in, so no recording holds a text of a person."
 }
