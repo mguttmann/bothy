@@ -5,7 +5,8 @@ Every cause of the table "Background mode is unavailable": the run completes in 
 the live box names the cause once, the log has ``background_fallback``, a cause of the host
 shows as ``background_unavailable`` in the heartbeat, and the prompt reaches exactly one
 process. In every doubt whether a session took the prompt the run ends instead. Also the
-scope of the mode: only ``personal`` runs in the listed channels, and nothing without the key.
+scope of the mode: only ``personal`` runs in the listed channels, no turn that loads channel
+skills, and nothing without the key.
 """
 
 from __future__ import annotations
@@ -272,6 +273,35 @@ async def test_an_organization_run_stays_in_print_mode(bg_world: World) -> None:
     assert await world.ended(run.run_id) == "completed"
     assert len(world.turns()) == 1
     assert [c for kind in COMMANDS for c in world.calls(kind)] == []
+
+
+async def test_a_turn_that_loads_channel_skills_stays_in_print_mode(bg_world: World) -> None:
+    # The launch command of a background session carries no channel skill folder, so the
+    # turn of a channel with such a folder keeps the path that loads it (26 5.9).
+    world = bg_world
+    base = world.root / "channel-skills"
+    (base / "review").mkdir(parents=True)
+    (base / "review" / "SKILL.md").write_text("---\nname: review\ndescription: Reviews\n---\n")
+    world.fake.world.channels[world.forum_a]["behavior"]["skills"] = ["claude-code:review"]
+    plain = world.fake.add_forum("Projekt-C", "website")
+    world.fake.world.tool_class = "host"
+    await start(world, tool_class="host", channel_skills_dir=str(base))
+    run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "completed"
+    [turn] = world.turns()
+    argv = turn["argv"]
+    assert [argv[i + 1] for i, a in enumerate(argv) if a == "--plugin-dir"] == [
+        str(base / "review")
+    ]
+    assert [c for kind in COMMANDS for c in world.calls(kind)] == []
+    assert status_lines(world, run.run_id) == []  # the scope of the mode, not a fallback
+    # A channel of the same runner without such a folder runs as a background session.
+    other = await world.fake.trigger("Fix it", channel_id=plain)
+    assert await world.ended(other.run_id) == "completed"
+    assert len(world.turns()) == 1
+    [launch] = launches(world)
+    assert "--plugin-dir" not in launch["argv"]
+    assert len(players(world)) == 1
 
 
 async def test_without_the_key_no_command_of_background_sessions_runs(bg_world: World) -> None:

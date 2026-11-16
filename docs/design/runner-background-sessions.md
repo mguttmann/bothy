@@ -182,6 +182,7 @@ never sees or touches sessions of the developer.
 | Background work after a turn | stdin stays open while the stream lists a task | the process stays while `status` is `busy`; every follow-up is a turn of its own (4.5) |
 | Adoption after a runner restart | by the turn record and the process identity; without `runner.turn_handover` reading only | by the turn record and the session list; with every right, because no channel belongs to the runner process (4.11) |
 | Hosted agents | from their definition (26 5) | stay in print mode (4.2) |
+| Channel skills | one `--plugin-dir` per folder in a `host` turn (26 5.9) | a turn that loads such a folder stays in print mode (4.2) |
 | Tool classes | flags of 18.2 and `--permission-prompts none` | the same class flags without `--permission-prompts`; `AskUserQuestion` disallowed; a session that waits for a person is stopped (4.5) |
 | Voice | transcribed by the runner before the prompt or the follow-up line (18.14) | unchanged: the transcript text is part of the prompt or of the line |
 | Attachments | local files named in the prompt or the line, `--add-dir` for the thread's folder; `ATTACH:` lines of the answer | unchanged; `TMPDIR` of the run reaches the session through the `env` block of `--settings` (4.3) |
@@ -216,6 +217,11 @@ Only the turns of the runner's own agent in billing mode `personal`. In print mo
 - **The compaction attempt of 18.9.** `/compact` as an input line is a print-mode path, and a
   slash command in an inbox message does not run [docs]. Both modes share the session store
   (items 16 and 17), so the compaction runs in print mode and the retry in background mode.
+- **Turns that load channel skills** (26 5.9). In print mode a `host` turn of a channel with a
+  skill reference gets one `--plugin-dir` per resolved folder. The command of 4.3 has no such
+  argument, and whether a background session loads a folder named on its launch command was
+  not run. Such a turn stays in print mode, so the skills of a channel load as before; a turn
+  of the same runner in a channel without such a folder runs as a session.
 - **The one-shot calls** (search assistant, builder of the interview): they keep no session.
 
 - Alternative: every turn. Refused for the reasons above; each is a ticket of its own (7.5).
@@ -718,6 +724,8 @@ keeps every line of its behaviour.
 ### 7.5 Deliberately left for later
 
 - Background mode for hosted agents and a setting per agent.
+- Channel skills in background mode: `--plugin-dir` on the launch command, once a run of the
+  pinned CLI shows that a session loads such a folder.
 - A member of the binding for the mode per forum (server, API, apps).
 - Leaving background turns for the next runner at an orderly stop with
   `runner.turn_handover`.
@@ -760,6 +768,7 @@ change; this list names each such place.
 
 | Decision | Draft | Built | Reason |
 |---|---|---|---|
+| D-BG-2, channel skills | every `personal` turn of the own agent runs as a session | a turn that loads a channel skill folder stays in print mode | the launch command has no `--plugin-dir`; the review of the pull request found that such a turn ran as a session without the skills of its channel |
 | D-BG-3 step 2 and 3 | the launch files are "files of the run", the socket lies "in a folder of the state directory" | everything lies in `<runner.state_dir>/bg/`, named after the run; the socket's name is a digest of the run id | the session's folder is renamed when the CLI's id is known, and a live process keeps its paths; a socket path is bounded |
 | D-BG-3 step 7 | no bound for "started" | within `runner.cli_probe_timeout` | a launch that never takes the prompt must end |
 | D-BG-4, the `uuid` of a line | a fresh `uuid` per line | the `uuid` of the runner's input line | one record of an input in both modes; adoption maps the echo by it |

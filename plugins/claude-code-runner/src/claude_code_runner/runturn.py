@@ -3077,8 +3077,9 @@ class RunTurn:
         """Whether an attempt runs as a background session (the scope of 18.2).
 
         Only a turn of the runner's own agent in billing mode ``personal``, in a channel the
-        mode is switched on for, and only until the run fell back to print mode. A compaction
-        and every turn of a hosted agent stay in print mode.
+        mode is switched on for, and only until the run fell back to print mode. A compaction,
+        every turn of a hosted agent and a turn that loads channel skills (26 5.9) stay in
+        print mode: the launch command of a background session carries no ``--plugin-dir``.
         """
         return (
             self.bg is not None
@@ -3086,6 +3087,7 @@ class RunTurn:
             and repeat is None
             and attempt.kind == "turn"
             and self.state.hosted is None
+            and not self.state.plugin_dirs
             and self.state.mode == "personal"
             and self.bg.wants(self.state.channel_id)
         )

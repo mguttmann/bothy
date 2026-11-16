@@ -479,7 +479,9 @@ background sessions and behaves exactly as before, held by the byte-equal fixtur
 With `runner.launch_mode = "background"` a turn of the runner's own agent in billing mode
 `personal` runs as a Claude Code background session (`claude --bg`); with
 `runner.background_channels` only in the listed channels. Every `organization` turn, every turn
-of a hosted agent, the compaction of a full context and the one-shot calls stay in print mode.
+of a hosted agent, every turn that loads a channel skill folder (`runner.channel_skills_dir`,
+"Channel skills" below: the launch command of a background session carries no `--plugin-dir`),
+the compaction of a full context and the one-shot calls stay in print mode.
 Background sessions and agent view are a research preview of Claude Code, and most of what the
 runner reads of them is internal to the CLI; the mode therefore runs only on the pinned version
 and falls back to print mode whenever it is not available.

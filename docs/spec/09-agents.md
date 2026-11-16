@@ -3358,8 +3358,10 @@ without it the runner calls no command of background sessions and behaves exactl
 Scope: only a turn of the runner's own agent in billing mode `personal`, and, when
 `runner.background_channels` is not empty, only in a listed channel. In print mode stay every
 `organization` turn (a background session takes no API key from the environment), every turn of
-a hosted agent (26 5), the compaction of 18.9 (its retry runs as a session again; both modes
-share the session store) and the one-shot calls of 18.17 and 26 6.2. The mode runs only on the
+a hosted agent (26 5), every turn that loads a channel skill folder (26 5.9: the argument list
+below has no `--plugin-dir`, and such a folder was not run with a background session), the
+compaction of 18.9 (its retry runs as a session again; both modes share the session store) and
+the one-shot calls of 18.17 and 26 6.2. The mode runs only on the
 pinned version of the CLI. Everything below was run with the pinned CLI 2.1.325 against a local
 stand-in for the API and is recorded in
 `plugins/claude-code-runner/tests/fixtures/recording/background_<pinned version>`; a change of
