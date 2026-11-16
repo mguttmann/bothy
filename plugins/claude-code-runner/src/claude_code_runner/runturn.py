@@ -215,8 +215,8 @@ _RUNTIME_CURRENCY = "USD"
 COMPACT_IN_PRINT_MODE = True
 """``/compact`` is taken as an input line in print mode by the pinned CLI (design note 8 a):
 the command ``compact`` of Claude Code 2.1.259 has ``supportsNonInteractive: true`` (file of the
-installed pinned CLI; again in 2.1.288, read 2026-10-29, and in 2.1.321, read 2026-11-10) and
-the Agent SDK page on slash commands sends ``/compact`` as a prompt
+installed pinned CLI; again in 2.1.288, read 2026-10-29, in 2.1.321, read 2026-11-10, and in
+2.1.325, read 2026-11-16) and the Agent SDK page on slash commands sends ``/compact`` as a prompt
 (https://code.claude.com/docs/en/agent-sdk/slash-commands, retrieved 2026-10-24)."""
 
 

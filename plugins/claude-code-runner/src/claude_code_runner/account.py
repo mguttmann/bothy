@@ -58,7 +58,10 @@ Read in the file of the pinned CLI 2.1.321 on 2026-11-13 (the ``error`` enumerat
 message schema and the places that build the message): a used-up usage window gives
 ``rate_limit``, a missing login ``authentication_failed``, an answer that refuses OAuth
 authentication for the organization ``oauth_org_not_allowed`` and an answer with status 529
-``overloaded`` (09 18.19.12, docs/decisions.d/FIX-RUNNER-LIMIT-KEEPS-RUN.md)."""
+``overloaded`` (09 18.19.12, docs/decisions.d/FIX-RUNNER-LIMIT-KEEPS-RUN.md). Read again in
+2.1.325 on 2026-11-16: the enumeration and the assignment are unchanged, and the member
+``api_error_type`` that 2.1.325 adds to the message (the ``error.type`` of the API's answer) is
+not read (docs/decisions.d/FIX-RUNNER-CLI-PIN-325.md)."""
 
 _WHAT = {
     "usage_limit": "the usage limit of the account is reached",

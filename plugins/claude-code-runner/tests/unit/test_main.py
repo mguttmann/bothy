@@ -50,14 +50,16 @@ def test_check_config_prints_codes(tmp_path: Path, capsys: pytest.CaptureFixture
 @pytest.mark.parametrize(
     ("version", "runtime", "code"),
     [
-        ("2.1.321", "runtime ok", 0),
+        ("2.1.325", "runtime ok", 0),
+        ("2.1.321", "runtime runtime_version_untested", 1),  # the pin before 2026-11-16
         ("2.1.288", "runtime runtime_version_untested", 1),  # the pin before 2026-11-10
+        ("2.1.326", "runtime runtime_version_untested", 1),  # a later version is untested too
     ],
 )
-def test_check_config_takes_cli_2_1_321_as_tested(
+def test_check_config_takes_cli_2_1_325_as_tested(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], version: str, runtime: str, code: int
 ) -> None:
-    """With Claude Code 2.1.321 on the host ``check-config`` no longer names the version."""
+    """``check-config`` prints ``runtime ok`` for Claude Code 2.1.325 and for no other version."""
     key = tmp_path / "missing_key"
     key.write_text("api-key-canary\n")
     key.chmod(0o600)

@@ -1,10 +1,10 @@
 ### Changed
 
-- The pinned Claude Code version is 2.1.321 (was 2.1.288). A host with 2.1.321 reports `online`
-  again and `check-config` prints `runtime ok`; 2.1.288 now reports `runtime_version_untested`.
-  The recordings of the CLI (stream field table, agent tree, resumed session, captured API
-  errors) come from 2.1.321 and are written by `tests/real_cli/record.py` against a local
-  stand-in for the API, without a login or a model call.
+- The pinned Claude Code version left 2.1.288 (2.1.321 on 2026-11-10; the entry of
+  FIX-RUNNER-CLI-PIN-325 names the pin of today). The recordings of the CLI (stream field
+  table, agent tree, resumed session, captured API errors) come from the pinned version and are
+  written by `tests/real_cli/record.py` against a local stand-in for the API, without a login
+  or a model call.
 - `config.example.toml` names a real model for `runner.default_model`. A placeholder such as
   `model-large` reaches the API unchanged and is refused there; with a fallback model in the
   Claude Code settings a turn loads, Claude Code then answers that turn with the fallback

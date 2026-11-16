@@ -349,6 +349,39 @@ class Cli:
             time.sleep(0.2)
         raise TimeoutError(f"the CLI did not get there; stream: {self.out.read_text()[-2000:]}")
 
+    def until_quiet(
+        self,
+        done: Callable[[list[dict[str, Any]]], bool],
+        quiet: float = QUIET,
+        wait: float = WAIT,
+    ) -> None:
+        """Wait until ``done`` holds and no line came for ``quiet`` seconds.
+
+        The CLI starts a turn of its own for the last notification, so a turn with background
+        work is over only once the stream is quiet. The wait is bound, and a CLI that ended
+        before ``done`` held is an error: the recording would never be complete.
+
+        Args:
+            done: Tells for the messages so far whether the turn and its work are over.
+            quiet: The seconds without a new line that count as quiet.
+            wait: The bound of the whole wait in seconds.
+
+        Raises:
+            RuntimeError: The process ended before ``done`` held.
+            TimeoutError: The stream did not come to rest within ``wait``.
+        """
+        deadline = time.monotonic() + wait
+        seen = -1
+        while seen != len(self.lines()) or not done(self.messages()):
+            if self.process.poll() is not None and not done(self.messages()):
+                raise RuntimeError("the CLI ended before the recorded turn was over")
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"the stream did not come to rest; stream: {self.out.read_text()[-2000:]}"
+                )
+            seen = len(self.lines())
+            time.sleep(quiet)
+
     def close(self) -> int:
         """End the input and return the exit code."""
         assert self.process.stdin is not None
@@ -535,10 +568,7 @@ def record_agent_tree(program: Path, root: Path) -> list[str]:
             cli.write("Use a workflow: run the plan of the recording.")
             cli.until(_tree_over)
             # The CLI starts a turn of its own for the last notification: wait until it is quiet.
-            seen = -1
-            while seen != len(cli.lines()) or not _tree_over(cli.messages()):
-                seen = len(cli.lines())
-                time.sleep(QUIET)
+            cli.until_quiet(_tree_over)
         finally:
             code = cli.close()
     if code != 0:
