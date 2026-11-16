@@ -41,11 +41,11 @@ __all__ = [
 
 _PINNED_FILE = (
     "claude (package @anthropic-ai/claude-code-darwin-arm64 2.1.259, read again in 2.1.288 on "
-    "2026-10-29 and in 2.1.321 on 2026-11-10)"
+    "2026-10-29, in 2.1.321 on 2026-11-10 and in 2.1.325 on 2026-11-16)"
 )
 _CAPTURED = (
-    "tests/real_cli/captured/api_errors_2.1.321.jsonl (the pinned CLI against a local API, "
-    "2026-11-10)"
+    "tests/real_cli/captured/api_errors_2.1.325.jsonl (the pinned CLI against a local API, "
+    "2026-11-16)"
 )
 
 
@@ -144,7 +144,7 @@ ERROR_TEXTS: tuple[ErrorText, ...] = (
         "assistant",
         "claude (package @anthropic-ai/claude-code-darwin-arm64 2.1.321): the third branch of "
         "the same pattern, 'Claude Code <v> or later is required for your organization', new "
-        "in the pinned CLI (retrieved 2026-11-10)",
+        "in 2.1.321 (retrieved 2026-11-10; read again in 2.1.325 on 2026-11-16)",
     ),
 )
 """The recognised texts in match order; the first matching entry decides."""
@@ -294,8 +294,8 @@ def classify_turn_end(evidence: TurnEvidence) -> TurnEnd:
 BUDGET_SUBTYPE = "error_max_budget_usd"
 """The ``subtype`` of the ``result`` the pinned CLI sends when ``--max-budget-usd`` stops a turn
 (the result schema of the CLI's file lists it, and the print mode writes "Exceeded USD budget"
-for it; read from claude 2.1.288 on 2026-11-06, decisions.d/A1-05.md, and again from 2.1.321 on
-2026-11-10)."""
+for it; read from claude 2.1.288 on 2026-11-06, decisions.d/A1-05.md, again from 2.1.321 on
+2026-11-10 and from 2.1.325 on 2026-11-16)."""
 
 
 def cost_cap_reached(result: Mapping[str, Any] | None, cap: float | None) -> bool:

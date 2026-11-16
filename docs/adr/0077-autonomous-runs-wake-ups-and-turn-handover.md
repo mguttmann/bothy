@@ -139,6 +139,10 @@ marks a run usage-limited and wakes it at the reset, and every run ends with a `
   taken) and recorded in 09 18.19.12; they are checked again when the pin moves. Read again in
   2.1.321 on 2026-11-10: a background shell now keeps the CLI alive after the end of input
   (whether a pending loop wake-up alone does is not established), which changes nothing in the
-  decision (D-FIX-RUNNER-CLI-PIN-321-5).
+  decision (D-FIX-RUNNER-CLI-PIN-321-5). Read again in 2.1.325 on 2026-11-16: the time limits,
+  the handling of background work after the end of input and the filter for wake-ups equal
+  those of 2.1.321, and a run against the local stand-in for the API settled the open point: a
+  pending wake-up alone does not keep the process waiting after the end of input
+  (D-FIX-RUNNER-CLI-PIN-325-5).
 - Revisit when the CLI offers a durable wake-up of its own, when the runner runs under a service
   manager that kills whole sessions, or when `chat` sessions should ask for wake-ups.

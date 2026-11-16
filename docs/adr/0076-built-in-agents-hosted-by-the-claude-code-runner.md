@@ -135,6 +135,7 @@ pattern of the search assistant ([ADR 0075](0075-search-assistant-through-an-age
 
 - The stdio rule, the closed schema and the runner settings come from the red team rounds of the
   design note against the strings and help text of the pinned CLI (2.1.288 when the decision
-  was taken; the pin is 2.1.321 since 2026-11-10, D-FIX-RUNNER-CLI-PIN-321-1).
+  was taken; the pin was 2.1.321 from 2026-11-10, D-FIX-RUNNER-CLI-PIN-321-1, and is 2.1.325
+  since 2026-11-16, D-FIX-RUNNER-CLI-PIN-325-1).
 - Revisit when the pinned CLI changes a surface of 26 5.5, when built-in agents should serve
   project forums, or when `host` agents should get more of the CLI than `stdio` MCP servers.

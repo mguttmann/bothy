@@ -204,7 +204,7 @@ LIVE_TOO_OLD = (
     "version 2.1.280 or newer is required"
 )
 POLICY_TOO_OLD = (
-    "API Error: 400 Claude Code 2.1.321 is older than the minimum version required by your "
+    "API Error: 400 Claude Code 2.1.325 is older than the minimum version required by your "
     "organization's policy"
 )
 # The third text of the too-old pattern, which the pinned CLI knows since 2.1.321.

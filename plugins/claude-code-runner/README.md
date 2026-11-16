@@ -90,7 +90,7 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
   of `organization` live in the runner's own configuration folder and those of `personal` under
   `HOME`; M2-35 handles a missing session (fail open).
 - Install exactly the pinned Claude Code version (`PINNED_CLAUDE_CODE_VERSION` in
-  `heartbeat.py`, 2.1.321) and keep automatic updates of the CLI off; another version reports
+  `heartbeat.py`, 2.1.325) and keep automatic updates of the CLI off; another version reports
   `runtime_version_untested`, an older one `runtime_version_unsupported` and refuses runs.
   `claude-code-runner check-config --config <file>` prints `runtime ok` for the pinned version.
 - The API refuses a model to a CLI below the model's minimum version ("Claude Code <v> does not
@@ -113,7 +113,7 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
   model and says so only in a stream message the runner does not read (`system`
   `model_fallback`), while the live box still names the configured value (run against a local
   stand-in for the API). A `personal` turn of the runner's own agent loads the Claude Code
-  settings under the `HOME` of the runner's account, so a fallback model set there makes such
+  settings under the `HOME` of the runner's host user, so a fallback model set there makes such
   a placeholder run on that model without a sign in the thread. An `organization` turn loads
   the settings of the runner's own configuration folder instead, and a hosted agent's turn
   loads no settings of the user ("Turns of built-in agents").
@@ -276,13 +276,17 @@ throttles them to `agent.run_update_min_interval`.
 
 The run graph fields (`tool_use_id`, `task_type`, `usage`, the workflow type `local_workflow`)
 were read from the files of the pinned CLI 2.1.259 without a session (ruling D-M2-51-1), read
-again in 2.1.288 (D-RUNNER-CLI-PIN-1) and in 2.1.321
-(`tests/fixtures/recording/stream_fields_2.1.321.json`, D-FIX-RUNNER-CLI-PIN-321-3: the members
+again in 2.1.288 (D-RUNNER-CLI-PIN-1), in 2.1.321 (D-FIX-RUNNER-CLI-PIN-321-3) and in 2.1.325
+(`tests/fixtures/recording/stream_fields_2.1.325.json`, D-FIX-RUNNER-CLI-PIN-325-3: the members
 of every message of the table above, from the message schemas in the CLI's file and from a
 recorded turn). The level-one switch test holds the recorded table against the installed CLI.
 2.1.321 adds members the runner does not read (`run_id`, `parent_task_id` and `awaited` of a
 task, `wakeup_source` of a queued input, the cache write durations of `modelUsage`) and names the
-model in `system/init` and `modelUsage` without the selector in square brackets.
+model in `system/init` and `modelUsage` without the selector in square brackets. 2.1.325 adds
+further members the runner does not read: `api_error_type` of an API error message and of the
+`result` of its turn, `retracted_message_uuids` of a `user` message, `off_host` of a listed
+background task, and `restored_rewind` and three counters of a `result`; it removes and renames
+none.
 
 ## Follow-ups, stop and error paths (M2-35)
 
@@ -688,10 +692,10 @@ never copying a file of it, and checks it itself before every turn.
   member's, and its content is not the owner's choice; binding grants the member no Bothy
   permission. Keep in `channel_skills_dir` only skills you would run in such a turn.
 
-### Probe results of 26 5.7 (pinned CLI 2.1.321)
+### Probe results of 26 5.7 (pinned CLI 2.1.325)
 
 `tests/real_cli/test_hosted_probe.py` has one probe per row of 26 5.7. Level one (free) ran on
-2026-11-06 against 2.1.288 and on 2026-11-10 against 2.1.321 and passed: `--help` names every flag of 26 5.3 (`--tools` takes
+2026-11-06 against 2.1.288, on 2026-11-10 against 2.1.321 and on 2026-11-16 against 2.1.325 and passed: `--help` names every flag of 26 5.3 (`--tools` takes
 several values), and the CLI holds `disableSkillShellExecution`, `disableAllHooks`,
 `disableWorkflows`, the result subtype `error_max_budget_usd` and the placeholder "[shell command
 execution disabled by policy]". Level two (one real turn per row, costs money) has not run: it
@@ -880,7 +884,9 @@ the old version, give the `fixture_meta` lines of `tests/fake_claude/fixtures` t
 and the fixture `cli_too_old.jsonl` the captured text. The program refuses a CLI that is not the
 pinned version and a temporary folder that lies below a `CLAUDE.md` or a `.claude` folder (the
 CLI would read a developer's own instructions there; point `TMPDIR` at a folder outside the home
-folder then). Then read the stream table of 09 18.4 and the findings of 09 18.19.12 and 26 5
+folder then). `tests/unit/test_record.py` holds, without a CLI, what keeps a recording free of
+the recording host, the reader of the message schemas and the bound wait for the end of a
+recorded turn. Then read the stream table of 09 18.4 and the findings of 09 18.19.12 and 26 5
 against the new CLI, change the mapping and the error texts where the CLI changed, and record
 what was read in `docs/decisions.d/`. The baseline files change only in `runtime_version`. The
 doc comment of the pin names that fragment, and the texts about the pin say what the CLI does,
@@ -893,7 +899,7 @@ never which host runs or showed what (the repository is public; `tests/unit/test
   `system/init` interrupts the turn with SIGINT.
 - Is `/compact` available in print mode of the pinned version? Yes: the command `compact` of
   Claude Code 2.1.259 has `supportsNonInteractive: true` in the files of the pinned CLI
-  (retrieved 2026-10-24, again in 2.1.288 on 2026-10-29 and in 2.1.321 on 2026-11-10), and the Agent SDK page on slash commands sends `/compact` as a prompt
+  (retrieved 2026-10-24, again in 2.1.288 on 2026-10-29, in 2.1.321 on 2026-11-10 and in 2.1.325 on 2026-11-16), and the Agent SDK page on slash commands sends `/compact` as a prompt
   and reports it with a `system` message `compact_boundary`
   (https://code.claude.com/docs/en/agent-sdk/slash-commands, retrieved 2026-10-24). That the CLI
   takes it as the content of a stream-json `user` line is not run with a real session yet (level

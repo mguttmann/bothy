@@ -22,12 +22,20 @@ from claude_code_runner.account import (
     retry_input,
     waiting_line,
 )
+from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fake_claude"))
 import fake_claude
 
 RESET = 1794535800
 """The reset time of the fixture ``usage_limit``: 2026-11-13 02:10 UTC."""
+CAPTURED = (
+    Path(__file__).resolve().parents[1]
+    / "real_cli"
+    / "captured"
+    / f"api_errors_{PINNED_CLAUDE_CODE_VERSION}.jsonl"
+)
+"""Lines the pinned CLI wrote against a local API answering 400, 401 and 400 (``record.py``)."""
 
 
 class _Recorder(fake_claude.Fake):
@@ -80,6 +88,33 @@ def test_the_reset_time_comes_from_the_members_never_from_the_text() -> None:
 def test_any_other_api_error_is_no_account_error(fixture: str) -> None:
     message, _ = cli_error(fixture)
     assert account_error(message) is None
+
+
+def test_the_captured_errors_of_the_pinned_cli_are_classed_by_error_alone() -> None:
+    """What the pinned CLI wrote: the refused key is an account error, the two 400 are none.
+
+    Since 2.1.325 the message also names the ``error.type`` of the API's answer in
+    ``api_error_type``. The class still comes from ``error``: the new member is what the answer
+    says, which a gateway can word differently, and it never makes or unmakes an account error.
+    """
+    lines = [json.loads(line) for line in CAPTURED.read_text("utf-8").splitlines()]
+    too_long, refused_key, too_old = (m for m in lines if m["type"] == "assistant")
+    assert [m["api_error_type"] for m in (too_long, refused_key, too_old)] == [
+        "invalid_request_error",
+        "authentication_error",
+        "invalid_request_error",
+    ]
+    assert account_error(refused_key) == AccountError("not_logged_in", None)
+    assert account_error(too_long) is None
+    assert account_error(too_old) is None
+    # The new member alone decides nothing, in either direction.
+    assert account_error({**too_long, "api_error_type": "rate_limit_error"}) is None
+    assert account_error({**too_long, "api_error_type": "overloaded_error"}) is None
+    assert account_error({**refused_key, "api_error_type": "invalid_request_error"}) == (
+        AccountError("not_logged_in", None)
+    )
+    without = {k: v for k, v in refused_key.items() if k != "api_error_type"}
+    assert account_error(without) == AccountError("not_logged_in", None)
 
 
 def test_only_the_turns_own_api_error_counts() -> None:

@@ -1,6 +1,6 @@
 {
-  "cli_version": "2.1.321",
-  "origin": "read from the file of the pinned CLI (the npm package of the platform; no session, no login, no model call) and from the recorded turn agent_tree_2.1.321.jsonl by tests/real_cli/record.py on 2026-11-10",
+  "cli_version": "2.1.325",
+  "origin": "read from the file of the pinned CLI (the npm package of the platform; no session, no login, no model call) and from the recorded turn agent_tree_2.1.325.jsonl by tests/real_cli/record.py on 2026-11-16",
   "note": "Message types, subtypes and member names only, no content. Each list of messages names the members of the message schema in the CLI's file without the envelope (type, subtype, uuid, session_id), then the members the CLI wrote in the recorded turn that the schema does not name. workflow_agent lists what the CLI wrote in the agent entries of workflow_progress.",
   "messages": {
     "system/init": [
@@ -81,6 +81,7 @@
       "api_error",
       "api_error_params",
       "api_error_code",
+      "api_error_type",
       "api_error_origin",
       "error_details",
       "advisor_model",
@@ -122,6 +123,7 @@
       "permission_mode",
       "interrupted_message_id",
       "refused_message_id",
+      "retracted_message_uuids",
       "plugin_prompt",
       "agent_id",
       "isReplay",
@@ -243,6 +245,9 @@
       "main_stream_event_count",
       "main_stream_chunk_count",
       "tool_pool_build_count",
+      "tool_pool_build_lapsed_count",
+      "tool_pool_moved_at_lapse_count",
+      "tool_pool_limit_ms",
       "process_turn_states",
       "process_turn_threads",
       "input_attachments_detail",
@@ -287,6 +292,7 @@
       "is_error",
       "api_error_status",
       "api_error_code",
+      "api_error_type",
       "api_error_origin",
       "api_error",
       "num_turns",
@@ -304,6 +310,7 @@
       "deferred_tool_use",
       "terminal_reason",
       "interrupted_by_shutdown",
+      "restored_rewind",
       "stopped_by_permission_check",
       "result_index",
       "credential_expires_at",
@@ -320,7 +327,8 @@
     "description",
     "parent_task_id",
     "ambient",
-    "awaited"
+    "awaited",
+    "off_host"
   ],
   "usage": [
     "total_tokens",
