@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from importlib import resources
 from typing import Any
 
-__all__ = ["LiveCost", "PriceTable", "base_model", "load_prices"]
+__all__ = ["LiveCost", "PriceTable", "base_model", "load_prices", "priced_micros"]
 
 _MTOK = 1_000_000
 _SUFFIX = re.compile(r"(\[[^\]]*\]|-\d{8})$")
@@ -172,22 +172,38 @@ class LiveCost:
         self._open.clear()
 
     def _price(self, model: str, usage: Mapping[str, Any]) -> int:
-        total = 0
-        for member, unit in _UNITS:
-            tokens = _count(usage.get(member))
-            if tokens:
-                price = self._prices.price(model, unit)
-                if price is None:
-                    return 0
-                total += tokens * price
-        written = _count(usage.get("cache_creation_input_tokens"))
-        split = usage.get("cache_creation")
-        hour = _count(split.get("ephemeral_1h_input_tokens")) if isinstance(split, Mapping) else 0
-        hour = min(hour, written)
-        for tokens, unit in ((written - hour, "cache_write_mtok"), (hour, "cache_write_1h_mtok")):
-            if tokens:
-                price = self._prices.price(model, unit)
-                if price is None:
-                    return 0
-                total += tokens * price
-        return total // _MTOK
+        return priced_micros(self._prices, model, usage)
+
+
+def priced_micros(prices: PriceTable, model: str, usage: Mapping[str, Any]) -> int:
+    """Price the ``message.usage`` of one ``assistant`` message with the start prices.
+
+    Args:
+        prices: The price table.
+        model: The model name of the price table (`base_model`).
+        usage: ``message.usage``: ``input_tokens``, ``output_tokens``,
+            ``cache_read_input_tokens``, ``cache_creation_input_tokens`` and the 1-hour part of
+            ``cache_creation``.
+
+    Returns:
+        The amount in micros of US dollars; 0 when the model lacks a price for a unit it used.
+    """
+    total = 0
+    for member, unit in _UNITS:
+        tokens = _count(usage.get(member))
+        if tokens:
+            price = prices.price(model, unit)
+            if price is None:
+                return 0
+            total += tokens * price
+    written = _count(usage.get("cache_creation_input_tokens"))
+    split = usage.get("cache_creation")
+    hour = _count(split.get("ephemeral_1h_input_tokens")) if isinstance(split, Mapping) else 0
+    hour = min(hour, written)
+    for tokens, unit in ((written - hour, "cache_write_mtok"), (hour, "cache_write_1h_mtok")):
+        if tokens:
+            price = prices.price(model, unit)
+            if price is None:
+                return 0
+            total += tokens * price
+    return total // _MTOK

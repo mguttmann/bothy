@@ -7,6 +7,8 @@ package of the platform at the pinned version, no login)::
     CLAUDE_CODE_RUNNER_CLAUDE_BIN=<pinned claude> \
         uv run --locked python tests/real_cli/record.py
 
+``--only background`` records only the folder of background sessions.
+
 Free: no login, no credential and no model call. The CLI runs against the local stand-in for
 the API on loopback (``stand_in.py``) with an empty ``HOME`` and its own ``CLAUDE_CONFIG_DIR``,
 in a temporary working folder that has no ``CLAUDE.md`` and no ``.claude`` above it. The program
@@ -26,6 +28,12 @@ What it writes (``<v>`` is the pinned version), and what reads it:
 * ``tests/real_cli/captured/api_errors_<v>.jsonl``: the ``assistant`` and ``result`` lines of a
   prompt above the context window (400), a refused key (401, which the CLI retries for about
   three minutes) and a CLI below the model's minimum (400) (``test_failures.py``).
+* ``tests/fixtures/recording/background_<v>/``: background sessions (``claude --bg``, 09 18.2
+  "Background mode"), recorded by ``record_background.py``: what the launch command prints,
+  the session list in each state, the outputs of ``stop``, ``rm`` and ``daemon status``, the
+  transcript of each scenario with the print stream of the same scenario, and the members the
+  CLI wrote per transcript record type (``test_bgsession.py``, ``test_bgtranscript.py``; the
+  level-one test compares the member table with a fresh run).
 
 The recordings of an earlier pin are removed by hand in the same change. Every answer of the
 stand-in is written in this file, so a recording holds no text of a person; paths of the
@@ -53,6 +61,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from real_cli.record_background import record_background
 from real_cli.stand_in import (
     Answer,
     ApiError,
@@ -648,6 +657,82 @@ def resumed_meta(today: str) -> dict[str, Any]:
     }
 
 
+# ---- background sessions ---------------------------------------------------------------------
+
+_DAEMON_DIR = re.compile(r"/(?:private/)?tmp/cc-daemon-\d+/[0-9a-f]+")
+_REQUEST_MEMBERS = ("type", "sessionId", "timestamp", "version", "querySource")
+
+
+def reduced_record(record: Mapping[str, Any]) -> dict[str, Any]:
+    """Return a transcript record as a recording keeps it.
+
+    An ``api-request`` record keeps its envelope and, of ``params``, the model and the betas:
+    the rest describes the request of the recording host's CLI and is not read.
+    """
+    if record.get("type") != "api-request":
+        return dict(record)
+    params = record.get("params")
+    kept: dict[str, Any] = {k: record[k] for k in _REQUEST_MEMBERS if k in record}
+    if isinstance(params, Mapping):
+        kept["params"] = {k: params[k] for k in ("model", "betas") if k in params}
+    return kept
+
+
+def background_meta(today: str, after_turn: Mapping[str, Any]) -> dict[str, Any]:
+    """Return ``meta.json`` of the background recording."""
+    return {
+        "cli_version": PINNED_CLAUDE_CODE_VERSION,
+        "origin": (
+            f"recorded {today} by tests/real_cli/record.py: background sessions of the pinned "
+            "CLI (claude --bg) against a local stand-in of the Messages API on loopback, with "
+            "a configuration folder of its own, a key helper that prints a dummy key and a "
+            "trust entry for the working folder; no login and no model call"
+        ),
+        "files": {
+            "launch.json": "what the launch command printed per case, with its exit code",
+            "sessions.json": "one entry of claude agents --json --all per state",
+            "commands.json": "what stop, rm and daemon status printed, with their exit codes",
+            "transcript_<scenario>.jsonl": (
+                "the session transcript of a scenario, reduced to the record types the runner "
+                "reads; every other type is dropped, among them session-owner and the "
+                "attachments session_context and credential_org, which hold account identifiers"
+            ),
+            "stream_<scenario>.jsonl": (
+                "the stream-json output of the same scenario as a print turn (claude -p); the "
+                "init message reduced to the fields the runner reads"
+            ),
+            "transcript_fields.json": (
+                "the members the CLI wrote per transcript record type and in an entry of the "
+                "session list (names only)"
+            ),
+        },
+        "after_turn": dict(after_turn),
+        "note": (
+            "Paths replaced by /work and /record. after_turn lists, per scenario, the status "
+            "the session list showed after each turn end. Every answer comes from the "
+            "stand-in, so no recording holds a text of a person."
+        ),
+    }
+
+
+def write_background(recorded: Mapping[str, Any], clean: Cleaner, today: str) -> None:
+    """Write the folder ``background_<v>`` from what `record_background` returned."""
+    folder = RECORDING / f"background_{PINNED_CLAUDE_CODE_VERSION}"
+
+    def document(value: Any) -> Any:
+        return json.loads(_DAEMON_DIR.sub("/tmp/cc-daemon/dir", clean.line(json.dumps(value))))
+
+    for name, records in recorded["transcripts"].items():
+        lines = [clean.line(json.dumps(reduced_record(r))) for r in records]
+        _write(folder / f"transcript_{name}.jsonl", lines)
+    for name, stream in recorded["streams"].items():
+        _write(folder / f"stream_{name}.jsonl", [clean.line(x) for x in stream])
+    for name in ("launch", "sessions", "commands"):
+        _write_json(folder / f"{name}.json", document({"cases": recorded[name]})["cases"])
+    _write_json(folder / "transcript_fields.json", dict(recorded["fields"]))
+    _write_json(folder / "meta.json", background_meta(today, recorded["after_turn"]))
+
+
 def _roots(base: Path, names: tuple[str, ...]) -> Iterator[Path]:
     for name in names:
         root = base / name
@@ -669,6 +754,11 @@ def main(argv: list[str] | None = None) -> int:
         "--claude-bin",
         default=os.environ.get("CLAUDE_CODE_RUNNER_CLAUDE_BIN", "claude"),
         help="the pinned CLI (default: CLAUDE_CODE_RUNNER_CLAUDE_BIN, else claude in PATH)",
+    )
+    parser.add_argument(
+        "--only",
+        choices=("background",),
+        help="record only this part: background (the folder background_<v>)",
     )
     args = parser.parse_args(argv)
     program = _program(args.claude_bin)
@@ -694,7 +784,13 @@ def main(argv: list[str] | None = None) -> int:
         today = datetime.now(UTC).date().isoformat()
         pin = PINNED_CLAUDE_CODE_VERSION
         print(f"recording Claude Code {pin} against the local stand-in (no login, no model call)")
-        tree_root, resume_root, error_root = _roots(base, ("tree", "resume", "errors"))
+        tree_root, resume_root, error_root, bg_root = _roots(
+            base, ("tree", "resume", "errors", "bg")
+        )
+        print("recording background sessions (about two minutes)")
+        write_background(record_background(program, bg_root), Cleaner(bg_root), today)
+        if args.only == "background":
+            return 0
         tree = [Cleaner(tree_root).line(x) for x in record_agent_tree(program, tree_root)]
         _write(RECORDING / f"agent_tree_{pin}.jsonl", tree)
         fields = fields_document(cli_bytes(program), [json.loads(x) for x in tree], today)

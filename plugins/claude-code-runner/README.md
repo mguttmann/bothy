@@ -5,7 +5,8 @@ attachments (M3-12), folder creation of new projects (M4-43), live reload of cha
 optional transcription of voice messages (RUNNER-LIVE-RELOAD), Git optional, a default folder for
 forums without a binding and the cause of every refusal in the thread (RUNNER-NO-GIT), hosting of
 built-in agents behind `runner.hosted_agents` (A1-04) and runs their turns from their
-definitions (A1-05).
+definitions (A1-05), and an opt-in background mode that runs turns as Claude Code background
+sessions (FEAT-RUNNER-BG-SESSIONS).
 
 ## Purpose
 
@@ -15,7 +16,9 @@ forum without a binding works in `runner.default_workspace` when that is set (se
 without Git or without a folder"). The runner is one process per agent token on the host
 that holds the projects. For every run it starts exactly one `claude -p` turn with stream-json in
 the resolved project folder, fills the live box from the stream, answers in the thread, proposes
-the title once per new session and reports the cost of the run.
+the title once per new session and reports the cost of the run. With `runner.launch_mode =
+"background"` such a turn runs as a background session (`claude --bg`) instead; see "Background
+sessions".
 
 ## Contract
 
@@ -26,7 +29,10 @@ the title once per new session and reports the cost of the run.
 - Backend policy per run: docs/spec/10-backend-policy.md 7 and 10.2.
 - Follow-ups, stop and error paths: 09 18.5, 18.6 and 18.9.
 - Hosting of built-in agents: docs/spec/26-builtin-agents.md 3 and 5.6 item 4, 09 18.18.
-- Rulings: docs/decisions.d/M2-34.md, docs/decisions.d/M2-35.md and docs/decisions.d/A1-04.md.
+- Background mode: 09 18.2 "Background mode" and the paragraphs of that name in 18.3 to 18.7 and
+  18.9; the design with its evidence is docs/design/runner-background-sessions.md.
+- Rulings: docs/decisions.d/M2-34.md, docs/decisions.d/M2-35.md, docs/decisions.d/A1-04.md and
+  docs/decisions.d/FEAT-RUNNER-BG-SESSIONS.md.
 
 ## Layout
 
@@ -64,6 +70,12 @@ the title once per new session and reports the cost of the run.
 | `keeper.py`, `launch.py` | With `runner.turn_handover`: the keeper program of one launch, and the runner's side of the launch handshake, the group of keeper and CLI, the named pipe writer and the cases of a `launching` record (09 18.19.4, 18.19.5) |
 | `processstate.py` | `ProcessState`: every stream-derived value of the stdin and stop rule, and its replay (09 18.19.7) |
 | `handover.py` | The handover at SIGTERM (exit 75) and `stop --turns` (09 18.19.3) |
+| `bgmode.py`, `bgpaths.py` | Background mode of the runner process: the control commands, the one reader of the session list, the channels of the mode and the heartbeat reason of a fallback; the files of a background turn under `<runner.state_dir>/bg/` (09 18.2 "Background mode") |
+| `bgsession.py` | A background session: the argument list and the settings file of a launch, the parsers of the launch output, the session list and `daemon status`, the supervisor rule, the line of the inbox socket, and `BgSession`, the handle of the session process with stop and remove |
+| `bgtranscript.py` | The session transcript as the stream of a turn: `TranscriptMapper` maps each record to the stream message of 18.4 that means the same, `TranscriptReader` tails the file and adds what only the session list knows |
+| `tests/fake_claude/fake_bg.py` | The background side of Fake-Claude: `--bg` prints the launch line and starts a player under a supervisor process; the player writes transcript records and listens on the inbox socket; `agents`, `stop`, `rm` and `daemon status` answer from a state file in the fake configuration folder |
+| `tests/unit/test_bgsession.py`, `test_bgtranscript.py`, `test_bgmode.py`, `tests/scenarios/test_bg_sessions.py`, `test_bg_fallback.py`, `test_bg_adoption.py` | Background mode: the launch and its parsers, the mapping with the class test over every recorded transcript and its print stream, the shared mode with the fallback codes held against the tables of 09 18.9 and of this file, the scenarios of a background turn, every fallback cause, and the adoption by a new runner process |
+| `tests/real_cli/background.py`, `record_background.py`, `test_background.py`, `tests/fixtures/recording/background_<v>/` | Background sessions of the pinned CLI against the stand-in: the world of a test, the recorder, level one of the real-CLI suite and its recordings |
 | `tests/unit/test_keeper.py`, `test_launch.py`, `test_processstate.py`, `tests/scenarios/test_handover.py`, `test_launch_crash_points.py` | The keeper, the handshake, the replay with the class test over every Fake-Claude stream and checkpoint, AR-T02, AR-T03 and AR-T04 against real runner processes |
 | `tests/hosting_world.py`, `tests/hosting_runner.py` | The scenario world of a hosting runner: the runner's FakeServer with the hosting operations and one FakeServer per hosted agent; the hosting runner as a process of its own, for a scenario that kills it |
 
@@ -131,6 +143,10 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
   minutes; the runner never waits for the reset time of a usage limit. A run that waits keeps
   its slot of `runner.max_parallel_runs`. `runner.account_retry_max_wait = "0s"` switches the
   retry off: such a turn then ends the run at once, as before.
+- `runner.launch_mode` is `print` by default; `background` is a research preview of Claude Code
+  and has one-time steps on the host. Read "Background sessions" below before you set it, and
+  keep `runner.state_dir` short: the inbox socket of a session lies under it, and the start is
+  refused when its path is longer than a socket address of the system allows.
 - `runner.transcribe_cmd` is off by default; see "Voice messages" below. The transcriber runs as
   the runner user with the allow-list environment and gets the audio file of a person's message,
   so install only a program you trust there.
@@ -455,6 +471,134 @@ against a server that accepts the heartbeat capability `turn_handover` and has
   `stop --turns` stops such turns through their keeper also when the key is already off
   (`handover_records`, 09 18.19.1, issue 567).
 
+## Background sessions (09 18.2 "Background mode", FEAT-RUNNER-BG-SESSIONS)
+
+Off by default (`runner.launch_mode = "print"`); without the key the runner calls no command of
+background sessions and behaves exactly as before, held by the byte-equal fixtures of
+`tests/fixtures/baseline` and by `test_without_the_key_no_command_of_background_sessions_runs`.
+With `runner.launch_mode = "background"` a turn of the runner's own agent in billing mode
+`personal` runs as a Claude Code background session (`claude --bg`); with
+`runner.background_channels` only in the listed channels. Every `organization` turn, every turn
+of a hosted agent, every turn that loads a channel skill folder (`runner.channel_skills_dir`,
+"Channel skills" below: the launch command of a background session carries no `--plugin-dir`),
+the compaction of a full context and the one-shot calls stay in print mode.
+Background sessions and agent view are a research preview of Claude Code, and most of what the
+runner reads of them is internal to the CLI; the mode therefore runs only on the pinned version
+and falls back to print mode whenever it is not available.
+
+What the documentation of Claude Code promises and what it does not: it says that background
+sessions consume subscription usage the same as interactive sessions. It does not say that a
+print turn counts differently, and nothing here proves a rate. The runner makes the path
+selectable and provable (a transcript line of a background turn carries `"sessionKind":"bg"`);
+what either path draws from a subscription is a measurement on the operator's own account.
+
+Before you switch it on:
+
+- **Version.** Install exactly the pinned Claude Code version and keep its automatic update
+  off. On any other version every run uses print mode (`background_version_untested`).
+- **Workspace trust.** The CLI starts a background session only in a folder with workspace
+  trust: run `claude` once in each bound project folder (and in `runner.default_workspace`) as
+  the runner's host user and accept the prompt. A Git repository below a trusted folder needs
+  its own acceptance. The runner never writes that entry itself.
+- **Bypass mode** (tool class `host` only). The CLI refuses `--bg` with `bypassPermissions`
+  until the host user accepted bypass mode once: run `claude --dangerously-skip-permissions`
+  once interactively as that user. The runner never records the acceptance itself.
+- **The supervisor.** Background sessions run under a supervisor process of Claude Code that
+  the first launch starts and that ends with its last session. The runner installs, starts and
+  stops none. It launches only under a supervisor one of its own launches started (recorded in
+  `<runner.state_dir>/bg/supervisor.json`), because sessions inherit the supervisor's
+  environment and only such a supervisor carries the allow list of 18.2. While the host user
+  runs background sessions of their own (agent view), their supervisor is in the way and every
+  run of the runner uses print mode (`background_supervisor_foreign`).
+- **The small-model alias.** For a background session the CLI sends short requests of its own
+  (a summary for agent view at every turn end and a check at the session's start). They use the
+  small-model alias of the host user's Claude Code settings, are in no transcript and are not
+  booked by the runner. An alias that points at a large model pays that model at every turn end.
+- **Agent view.** Every session of the runner is listed in the host user's agent view under the
+  name `bothy-<run id>` while its run lasts. Do not attach to it, answer in it or stop it there:
+  the runner treats a session that vanished or was started again as an error of the run.
+- **Other Claude Code sessions of the host user.** The settings file of a run sets
+  `crossSessionInbound` to `accept` for every tool class, because a session takes the lines the
+  runner writes to its inbox socket only with that value. With it the session takes every
+  message that arrives on the socket, also one of another Claude Code session of the same host
+  user. Two protections of the CLI do not apply then: without a value a session in bypass mode
+  (tool class `host`) holds a message of a session that is not in bypass mode for an approval,
+  and the value of `--settings` goes before the one in the host user's own user settings. What
+  stays: the CLI restricts the socket to the host user, such a message cannot approve anything,
+  and a slash command in it does not run. The runner prompt tells the model that a message with
+  the runner's lead-in is the person's own, so another session of the host user that writes
+  that lead-in can steer a runner session with the rights of its tool class. Switch the mode on
+  only where the host user runs no Claude Code sessions besides the runner's, or only ones that
+  are trusted like the runner.
+
+How a background turn runs:
+
+- **Launch.** One command `claude [--resume <id>] --bg --name bothy-<run id> ...` in the project
+  folder, with the prompt on its stdin, the allow-list environment plus `DISABLE_AUTOUPDATER`,
+  and a settings file of the run (`crossSessionInbound`, `worktree.bgIsolation` and an `env`
+  block; the launching command's environment does not reach the session). The files of the
+  launch lie in `<runner.state_dir>/bg/` and go when the run ends. The CLI makes the id of a new
+  session; the runner reads it from the session list and reports it as the thread's session.
+  Before a resume the runner stops and removes an entry of the session it created itself, which
+  is what makes the CLI continue the session in place with this run's flags.
+- **Live box and answer.** The source is the session transcript, mapped record by record to the
+  stream messages of 18.4 (`bgtranscript.py`), and the session list `claude agents --json --all`,
+  of which the runner reads `status`, `pid` and `waitingFor` of its own sessions and never
+  `state`. A turn ends at the record `turn_duration`; its answer is the text of the turn's last
+  assistant message. Not available: steps inside subagents and workflows (each shows as the one
+  step of its tool), the count of background tasks (a summary names lost work without a
+  number), retry and compaction status lines, and the context percent of a model the session's
+  store has no window for.
+- **Follow-ups.** A follow-up, and the retry line after an account error, is one line on the
+  session's inbox socket (cross-session messaging of Claude Code). The model takes it in after
+  the running tool call, as on stdin. The CLI introduces it as a message of another Claude
+  session; the runner prompt of a background session says that a message with the runner's
+  lead-in is the person's own, relayed by the runner. The CLI keeps the system prompt of a
+  session's first request, so a thread whose session began in print mode (before the key was
+  switched on, or in a run that fell back) does not get that paragraph: there the model reads
+  a follow-up as a message of another session. A slash command in such a message does not run.
+  When the socket cannot be used (it is missing, or a managed setting holds inbound messages),
+  the server defers the follow-up into a new run after this one.
+- **Stop and end.** A stop is `claude stop`, then SIGTERM and SIGKILL to the session's process
+  group when the process still lives (`stop_escalated`), then `claude rm`. A background session
+  does not end by itself, so the end of a run is the same stop. An orderly stop of the runner
+  stops its background turns with `adapter_stopped`, also with `runner.turn_handover`.
+- **Costs.** The CLI writes the session's totals when the session process ends, so `/cost` is
+  priced from the messages while the run works and settled once, at the end of the run. A
+  process that was killed hard leaves no totals; the run then books the priced values and logs
+  `costs_priced_without_totals`.
+- **A runner that crashed.** The next runner finds the session by the turn record and the
+  session list and drives the turn on with every right (follow-ups, retry lines, stop), with or
+  without `runner.turn_handover`: no channel of a background session belonged to the old runner
+  process. A session whose process is gone is finished from its transcript when the end of the
+  turn is in it.
+
+When the mode is not available, the run uses print mode, the live box says once
+"Background sessions are not available (`<code>`); this run uses print mode.", the log has
+`background_fallback`, and for a cause of the host the heartbeat reports `degraded` with
+`background_unavailable` until the next background launch starts (it blocks no run):
+
+| Code | What to do |
+|---|---|
+| `background_version_untested` | install the pinned CLI version |
+| `background_supervisor_foreign` | a supervisor runs that the runner did not start: end the host user's own background sessions, or keep `print` on a host where agent view is in use |
+| `background_supervisor_version` | the runner's own supervisor runs another version than the pin (the CLI was updated under it): it ends with its last session |
+| `background_bypass_not_accepted` | accept bypass mode once as the host user (above) |
+| `background_workspace_untrusted` | accept workspace trust for the project folder (above) |
+| `background_session_foreign` | the thread's session is listed in agent view under a name the runner did not give: remove it there (`claude rm`) |
+| `background_launch_failed` | the launch or a control command failed, or the session got no process within `runner.cli_probe_timeout`; the files `<runner.state_dir>/bg/<run_id>.launch.err` of a running run and the log say more |
+
+The fallback happens only while it is certain that no session took the prompt. In every other
+doubt the runner stops the session and ends the run `runtime_error` with the code as the cause,
+so a prompt never runs twice. Further causes of a failed run in this mode:
+`background_session_copied` (the CLI started a copy at a resume, because another program
+started the session in between), `background_process_replaced` (the supervisor started the
+session again) and `background_session_waiting` (the session waited for a person; the class
+flags and `--disallowedTools AskUserQuestion` prevent it).
+
+Switching the key off again needs no step: both modes continue the same sessions, and a turn
+record a background turn left is still settled at the next start.
+
 ## Costs
 
 While a run works, `livecost.py` keeps its `/cost` current (FIX-cost-display): every `assistant`
@@ -505,7 +649,8 @@ ends it (SIGINT, SIGTERM and SIGKILL to its group, each escalation logged as `st
 its run finishes `cancelled` with the reason `adapter_stopped` and a note in the thread, which
 names the background tasks the stop ended (their results are lost; FIX-runner-silent-stop); the
 turn record goes only once no process of the turn is left. With `runner.turn_handover` a restart
-hands the turns over instead and no background task is lost. Turns adopted after a crash keep running and
+hands the turns over instead and no background task is lost (a turn in background mode is
+stopped in both cases, see "Background sessions"). Turns adopted after a crash keep running and
 keep their records for the next start (docs/spec/09-agents.md 18.6, 18.9).
 
 ## Folder creation (M4-43)
@@ -820,7 +965,12 @@ the main thread answered in the auto thread, a reply that resumes the session, a
 into the running turn, an answer attachment, a voice message with a local transcriber, cancel
 (also of the retry after a full context whose first process the runner stopped after its error)
 and retry. It needs the Go tool chain and a container runtime (`make adapters-e2e` from the
-repository root).
+repository root). `tests/realserver/test_background.py` runs one forum in background mode with
+the background side of Fake-Claude: a post whose session the server then knows under the id the
+CLI made, a follow-up into the running turn and a stop. It starts a server of its own, because
+background mode runs only `personal` turns: the owner revokes the grants of persons on the
+space and switches Lotse to `personal` with themselves as the credential holder (I1), which on
+the shared server would refuse every flow Alex triggers.
 
 `tests/unit/test_byte_equal_baseline.py` compares the runner without the keys of stage A1 with
 the fixtures in `tests/fixtures/baseline/`; their README says how they were recorded and that they
@@ -856,6 +1006,27 @@ no login of the developer is touched. The real CLI runs only behind switches:
   `auth status` per mode, two short real turns (one `--resume`) and one turn with a background
   command that checks what 09 18.5 "Background work" relies on. It uses the operator's key or
   login and costs money; running it is the owner's decision.
+- Level one also runs background sessions of the pinned CLI (`test_background.py`), free like the
+  rest: the CLI gets a `HOME` and a `CLAUDE_CONFIG_DIR` of its own with a key helper that prints
+  a dummy key and a trust entry for the working folder, and talks to the stand-in, so its
+  supervisor and its session list are separate from any session of the developer. The tests
+  drive the launch, the session list, stop and remove (also right after the launch, while the
+  entry names no process yet), the copy and the continuation in place at a resume, both
+  refusals, the inbox socket, a refused request and a background command with the runner's own
+  functions, and compare the recorded member table of the transcript with a fresh run. Each
+  test stops and removes its sessions and waits until its supervisor and the supervisor's host
+  processes have ended. The
+  temporary folder must be short (the inbox socket lies in it) and must not lie below a
+  `CLAUDE.md` or a `.claude` folder: point `TMPDIR` at a short folder outside the home folder.
+  Level two of this file (`CLAUDE_CODE_RUNNER_REAL_TURN=1` and
+  `CLAUDE_CODE_RUNNER_REAL_BG_FOLDER`, a folder with the workspace trust of the host user;
+  `CLAUDE_CODE_RUNNER_REAL_BG_MODEL` names the model, `haiku` by default) is one short background
+  turn on the stored login: it checks that the turn ran as a background session and that its
+  request carried the login beta of 18.3. It starts a background session of the host user,
+  refuses to start while a supervisor runs, and stops and removes only its own session; running
+  it is the owner's decision, as for print mode, and it was not run when the mode was built.
+- The unit and scenario tests of background mode put the inbox socket below a short folder
+  under `/tmp`; `CLAUDE_CODE_RUNNER_SHORT_TMP` names another base.
 - `tests/real_cli/captured/api_errors_<pinned version>.jsonl` holds the `assistant` and `result`
   lines the pinned CLI wrote against a local stand-in for the API (`ANTHROPIC_BASE_URL` on
   `127.0.0.1`, a fake key, an empty `HOME`; no model call): a prompt above the context window
@@ -879,14 +1050,19 @@ CLAUDE_CODE_RUNNER_REAL_CLI=1 CLAUDE_CODE_RUNNER_CLAUDE_BIN=<the new claude> \
 `record.py` starts the CLI only against the stand-in `tests/real_cli/stand_in.py` (no login, no
 model call; it takes a few minutes, because Claude Code retries a refused key) and writes
 `tests/fixtures/recording/stream_fields_<v>.json`, `agent_tree_<v>.jsonl`,
-`resumed_session_<v>/` and `tests/real_cli/captured/api_errors_<v>.jsonl`; remove the files of
-the old version, give the `fixture_meta` lines of `tests/fake_claude/fixtures` the new version
+`resumed_session_<v>/`, `background_<v>/` (the launch output, the session list per state, the
+outputs of the control commands, the transcripts of the background scenarios with their print
+streams and the member table; `--only background` records this folder alone) and
+`tests/real_cli/captured/api_errors_<v>.jsonl`; remove the files of the old version, give the `fixture_meta` lines of `tests/fake_claude/fixtures` the new version
 and the fixture `cli_too_old.jsonl` the captured text. The program refuses a CLI that is not the
 pinned version and a temporary folder that lies below a `CLAUDE.md` or a `.claude` folder (the
 CLI would read a developer's own instructions there; point `TMPDIR` at a folder outside the home
 folder then). `tests/unit/test_record.py` holds, without a CLI, what keeps a recording free of
 the recording host, the reader of the message schemas and the bound wait for the end of a
-recorded turn. Then read the stream table of 09 18.4 and the findings of 09 18.19.12 and 26 5
+recorded turn. For background mode read section 2.2 of
+docs/design/runner-background-sessions.md against the new version: the level-one tests of
+`test_background.py` run its mechanics, and `tests/unit/test_bgtranscript.py` holds every member
+the runner reads against the recorded table. Then read the stream table of 09 18.4 and the findings of 09 18.19.12 and 26 5
 against the new CLI, change the mapping and the error texts where the CLI changed, and record
 what was read in `docs/decisions.d/`. The baseline files change only in `runtime_version`. The
 doc comment of the pin names that fragment, and the texts about the pin say what the CLI does,

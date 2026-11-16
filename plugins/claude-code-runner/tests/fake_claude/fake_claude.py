@@ -31,6 +31,9 @@ test creates when it wants the command to go on (``auth_gate`` before the answer
 former wall-clock keys, so a test cannot rest on a race between a sleep and the machine's load.
 
 Fixtures are constructed from the message shapes of the Agent SDK reference, not recorded.
+
+The commands of background sessions (``--bg``, ``agents``, ``stop``, ``rm``, ``daemon status``)
+are in ``fake_bg.py``.
 """
 
 from __future__ import annotations
@@ -47,6 +50,8 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+import fake_bg
+
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 PINNED = "2.1.325"
 # quality.test.patience (bothy_sdk.testing._patience.PATIENCE); standard library only here.
@@ -56,6 +61,9 @@ BACKGROUND_TASK = "bgjob01"
 
 
 class Fake:
+    pinned = PINNED
+    patience = GATE_PATIENCE
+
     def __init__(self, scenario: dict[str, Any], capture: Path) -> None:
         self.scenario = scenario
         self.capture = capture
@@ -759,6 +767,16 @@ class Fake:
         self.record("turn_end", code=130, signal="SIGINT")
         os._exit(130)
 
+    @staticmethod
+    def error(name: str) -> tuple[str, dict[str, Any] | None]:
+        """The text and the further message members of the API error fixture ``name``."""
+        return _error(name)
+
+    @staticmethod
+    def expand(text: str) -> str:
+        """``{{tmpdir}}`` and ``{{add_dir}}`` of an answer text (`_expand`)."""
+        return _expand(text)
+
     def fixture(self) -> list[dict[str, Any]]:
         name = self.scenario.get("fixture", "plain")
         out = []
@@ -899,7 +917,7 @@ def _after(argv: list[str], flag: str) -> str | None:
     return None
 
 
-def main(scenario_path: str, capture_path: str) -> int:
+def main(scenario_path: str, capture_path: str) -> int:  # noqa: PLR0911 - one return per command
     scenario = json.loads(Path(scenario_path).read_text())
     fake = Fake(scenario, Path(capture_path))
     args = sys.argv[1:]
@@ -910,6 +928,20 @@ def main(scenario_path: str, capture_path: str) -> int:
     if args[:1] == ["--help"]:
         print("fake help")
         return 0
+    if args[:1] == ["--bg-player"]:
+        return fake_bg.player(fake, args[1])
+    if args[:1] == ["--bg-supervisor"]:
+        return fake_bg.supervisor(fake)
+    if "--bg" in args:
+        return fake_bg.launch(fake)
+    if args[:1] == ["agents"]:
+        return fake_bg.agents(fake)
+    if args[:1] == ["stop"]:
+        return fake_bg.stop(fake)
+    if args[:1] == ["rm"]:
+        return fake_bg.remove(fake)
+    if args[:2] == ["daemon", "status"]:
+        return fake_bg.daemon_status(fake)
     if "-p" in args and _after(args, "--output-format") == "json":
         builder = Path(_after(args, "--system-prompt-file") or "").name == "builder.md"
         return fake.builder() if builder else fake.assist()

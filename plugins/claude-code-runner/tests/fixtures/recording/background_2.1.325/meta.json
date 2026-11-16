@@ -1,0 +1,32 @@
+{
+  "cli_version": "2.1.325",
+  "origin": "recorded 2026-11-16 by tests/real_cli/record.py: background sessions of the pinned CLI (claude --bg) against a local stand-in of the Messages API on loopback, with a configuration folder of its own, a key helper that prints a dummy key and a trust entry for the working folder; no login and no model call",
+  "files": {
+    "launch.json": "what the launch command printed per case, with its exit code",
+    "sessions.json": "one entry of claude agents --json --all per state",
+    "commands.json": "what stop, rm and daemon status printed, with their exit codes",
+    "transcript_<scenario>.jsonl": "the session transcript of a scenario, reduced to the record types the runner reads; every other type is dropped, among them session-owner and the attachments session_context and credential_org, which hold account identifiers",
+    "stream_<scenario>.jsonl": "the stream-json output of the same scenario as a print turn (claude -p); the init message reduced to the fields the runner reads",
+    "transcript_fields.json": "the members the CLI wrote per transcript record type and in an entry of the session list (names only)"
+  },
+  "after_turn": {
+    "new_post": [
+      "idle"
+    ],
+    "resumed": [
+      "idle"
+    ],
+    "followup": [
+      "idle",
+      "idle"
+    ],
+    "background": [
+      "busy",
+      "busy",
+      "idle",
+      "idle"
+    ],
+    "stopped": []
+  },
+  "note": "Paths replaced by /work and /record. after_turn lists, per scenario, the status the session list showed after each turn end. Every answer comes from the stand-in, so no recording holds a text of a person."
+}

@@ -190,3 +190,60 @@ def test_a_folder_below_instruction_files_is_no_place_for_a_recording(tmp_path: 
     planted[1].mkdir()
     found = private_ancestors(work)
     assert [p for p in found if p not in before] == [p.resolve() for p in planted]
+
+
+def test_a_background_recording_is_written_without_the_recording_host(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "bg"
+    root.mkdir()
+    monkeypatch.setattr(record, "TESTS", tmp_path / "tests")
+    monkeypatch.setattr(record, "RECORDING", tmp_path / "tests" / "recording")
+    request = {
+        "type": "api-request",
+        "sessionId": "s",
+        "params": {"model": "m", "betas": ["b"], "max_tokens": 1},
+        "requestDigest": "d",
+    }
+    status = (
+        "pid:     4711\nversion: 2.1.325\n"
+        f"config:  {root}/bg12ab/config/daemon.json\n  sock dir:     /tmp/cc-daemon-501/0a1b2c3d\n"
+    )
+    recorded = {
+        "transcripts": {"new_post": [request, {"type": "user", "cwd": f"{root}/bg12ab/work"}]},
+        "streams": {"new_post": [json.dumps({"type": "result", "cwd": f"{root}/bg12ab/work"})]},
+        "launch": {"untrusted": {"exit": 1, "stdout": "", "stderr": f"in {root}/bg12ab/other"}},
+        "sessions": {"idle": {"id": "1a2b3c4d", "cwd": f"{root}/bg12ab/work", "status": "idle"}},
+        "commands": {"daemon_status_running": {"exit": 0, "stdout": status, "stderr": ""}},
+        "fields": {"records": {"user": ["cwd", "type"]}, "session_entry": ["id"]},
+        "after_turn": {"new_post": ["idle"]},
+    }
+    record.write_background(recorded, Cleaner(root), "2026-11-16")
+    [folder] = (tmp_path / "tests" / "recording").iterdir()
+    assert folder.name == f"background_{record.PINNED_CLAUDE_CODE_VERSION}"
+    written = {p.name: p.read_text() for p in folder.iterdir()}
+    assert sorted(written) == [
+        "commands.json",
+        "launch.json",
+        "meta.json",
+        "sessions.json",
+        "stream_new_post.jsonl",
+        "transcript_fields.json",
+        "transcript_new_post.jsonl",
+    ]
+    assert str(tmp_path) not in "".join(written.values())
+    kept, user = map(json.loads, written["transcript_new_post.jsonl"].splitlines())
+    assert kept == {
+        "type": "api-request",
+        "sessionId": "s",
+        "params": {"model": "m", "betas": ["b"]},
+    }
+    assert user["cwd"] == "/work"
+    assert json.loads(written["sessions.json"])["idle"]["cwd"] == "/work"
+    assert json.loads(written["launch.json"])["untrusted"]["stderr"] == "in /record/bg12ab/other"
+    stdout = json.loads(written["commands.json"])["daemon_status_running"]["stdout"]
+    assert "/tmp/cc-daemon/dir" in stdout
+    assert "cc-daemon-501" not in stdout
+    meta = json.loads(written["meta.json"])
+    assert meta["after_turn"] == {"new_post": ["idle"]}
+    assert meta["cli_version"] == record.PINNED_CLAUDE_CODE_VERSION

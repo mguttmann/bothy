@@ -289,6 +289,18 @@ class TurnLedger:
             self._error_from = None
             self._result(message)
 
+    def totals(self, message: Mapping[str, Any]) -> None:
+        """Take the session totals a background process wrote at its end (09 18.7).
+
+        In background mode no ``result`` carries ``modelUsage``: the totals come from the
+        ``cost-state`` record of the transcript, mapped to a message with that member. They
+        count like the usage of the run's last ``result`` (rule 2).
+
+        Args:
+            message: A message with ``modelUsage`` (model names and numbers only).
+        """
+        self.cost_result = _usage_only(message) or self.cost_result
+
     def end_result(self) -> dict[str, Any] | None:
         """The ``result`` the end of the process is judged by (rule 3).
 

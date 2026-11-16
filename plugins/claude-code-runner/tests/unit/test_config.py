@@ -3,6 +3,10 @@
 
 from __future__ import annotations
 
+import os
+import shutil
+import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -581,3 +585,89 @@ def test_channel_skills_dir_refused(tmp_path: Path, value: str) -> None:
     with pytest.raises(ConfigError) as err:
         load_config(write(tmp_path, f'channel_skills_dir = "{value}"'))
     assert err.value.key == "runner.channel_skills_dir"
+
+
+def test_background_mode_is_off_by_default(tmp_path: Path) -> None:
+    cfg = load_config(write(tmp_path))
+    assert cfg.launch_mode == "print"
+    assert cfg.background_channels == ()
+    assert cfg.background_status_interval == 2.0
+
+
+@pytest.fixture
+def short_dir() -> Iterator[Path]:
+    """A short folder: the state directory of background mode holds a socket (09 18.2)."""
+    base = os.environ.get("CLAUDE_CODE_RUNNER_SHORT_TMP") or "/tmp"
+    path = Path(tempfile.mkdtemp(prefix="ccr", dir=base))
+    try:
+        yield path
+    finally:
+        shutil.rmtree(path, ignore_errors=True)
+
+
+def test_background_mode_keys(tmp_path: Path, short_dir: Path) -> None:
+    channel = "0192d3a0-0000-7000-8000-0000000000c1"
+    path = write(
+        tmp_path,
+        'launch_mode = "background"\n'
+        f'background_channels = ["{channel}"]\n'
+        'background_status_interval = "500ms"',
+    )
+    path.write_text(path.read_text().replace(str(tmp_path / "state"), str(short_dir / "state")))
+    cfg = load_config(path)
+    assert cfg.launch_mode == "background"
+    assert [str(c) for c in cfg.background_channels] == [channel]
+    assert cfg.background_status_interval == 0.5
+
+
+@pytest.mark.parametrize(
+    ("runner", "key"),
+    [
+        ('launch_mode = "detached"', "runner.launch_mode"),
+        ("launch_mode = true", "runner.launch_mode"),
+        ('background_channels = ["not-a-channel"]', "runner.background_channels"),
+        (
+            'background_channels = ["0192D3A0-0000-7000-8000-0000000000C1"]',
+            "runner.background_channels",
+        ),
+        (
+            'background_channels = ["0192d3a0-0000-7000-8000-0000000000c1", '
+            '"0192d3a0-0000-7000-8000-0000000000c1"]',
+            "runner.background_channels",
+        ),
+        ("background_channels = [7]", "runner.background_channels"),
+        ('background_status_interval = "0s"', "runner.background_status_interval"),
+    ],
+)
+def test_background_mode_keys_refused(tmp_path: Path, runner: str, key: str) -> None:
+    with pytest.raises(ConfigError) as info:
+        load_config(write(tmp_path, runner))
+    assert info.value.key == key
+
+
+def test_a_state_dir_too_long_for_a_socket_refuses_background_mode(tmp_path: Path) -> None:
+    # The inbox socket of a background session lies under runner.state_dir (09 18.2).
+    deep = tmp_path / ("d" * 60) / ("e" * 60)
+    deep.mkdir(parents=True)
+    projects = tmp_path / "projects"
+    projects.mkdir()
+
+    def config(mode: str) -> Path:
+        path = tmp_path / f"{mode}.toml"
+        path.write_text(
+            "[runner]\n"
+            'server_url = "https://chat.example.com"\n'
+            f'instance_id = "{INSTANCE}"\n'
+            'agent_token_ref = "file:/srv/secrets/agent_token"\n'
+            'default_model = "model-large"\n'
+            f'projects_root = "{projects}"\n'
+            f'state_dir = "{deep / "state"}"\n'
+            f'launch_mode = "{mode}"\n'
+        )
+        return path
+
+    assert load_config(config("print")).launch_mode == "print"  # print mode has no socket
+    with pytest.raises(ConfigError) as info:
+        load_config(config("background"))
+    assert info.value.key == "runner.state_dir"
+    assert "socket" in info.value.problem

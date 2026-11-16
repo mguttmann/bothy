@@ -1,0 +1,207 @@
+{
+  "records": {
+    "agent-name": [
+      "agentName",
+      "sessionId",
+      "type"
+    ],
+    "api-request": [
+      "base",
+      "cacheControl",
+      "id",
+      "keep",
+      "params",
+      "querySource",
+      "requestDigest",
+      "sessionId",
+      "shapeHash",
+      "tail",
+      "timestamp",
+      "type",
+      "version"
+    ],
+    "api-request-blob": [
+      "hash",
+      "message",
+      "sessionId",
+      "type"
+    ],
+    "api-request-shape": [
+      "sessionId",
+      "shape",
+      "shapeHash",
+      "timestamp",
+      "type",
+      "version"
+    ],
+    "assistant": [
+      "apiBlockIndex",
+      "apiErrorIsTransient",
+      "apiErrorStatus",
+      "apiErrorType",
+      "cwd",
+      "entrypoint",
+      "error",
+      "failedResponseHadNoToolCall",
+      "gitBranch",
+      "isApiErrorMessage",
+      "isSidechain",
+      "madeBy",
+      "message",
+      "parentUuid",
+      "perTurnEffort",
+      "promptCacheRequested",
+      "requestId",
+      "requestRef",
+      "requestedModel",
+      "sessionId",
+      "sessionKind",
+      "session_id",
+      "timestamp",
+      "toolInputStreamMs",
+      "type",
+      "userType",
+      "uuid",
+      "version"
+    ],
+    "atis-latch": [
+      "atis",
+      "sessionId",
+      "type"
+    ],
+    "attachment": [
+      "attachment",
+      "cwd",
+      "entrypoint",
+      "gitBranch",
+      "isSidechain",
+      "parentUuid",
+      "rendered",
+      "renderedBesideToolResult",
+      "renderedRole",
+      "sessionId",
+      "sessionKind",
+      "session_id",
+      "timestamp",
+      "type",
+      "userType",
+      "uuid",
+      "version"
+    ],
+    "cost-state": [
+      "hasUnknownModelCost",
+      "modelUsage",
+      "sessionId",
+      "startTime",
+      "totalAPIDuration",
+      "totalAPIDurationWithoutRetries",
+      "totalCostUSD",
+      "totalDuration",
+      "totalLinesAdded",
+      "totalLinesRemoved",
+      "totalToolDuration",
+      "type"
+    ],
+    "custom-title": [
+      "customTitle",
+      "sessionId",
+      "type"
+    ],
+    "file-history-snapshot": [
+      "isSnapshotUpdate",
+      "messageId",
+      "snapshot",
+      "type"
+    ],
+    "last-prompt": [
+      "lastPrompt",
+      "leafUuid",
+      "sessionId",
+      "type"
+    ],
+    "mode": [
+      "mode",
+      "sessionId",
+      "type"
+    ],
+    "permission-mode": [
+      "permissionMode",
+      "sessionId",
+      "type"
+    ],
+    "queue-operation": [
+      "commandUuid",
+      "content",
+      "deliveryId",
+      "operation",
+      "reason",
+      "sessionId",
+      "timestamp",
+      "type"
+    ],
+    "system/turn_duration": [
+      "cwd",
+      "durationMs",
+      "entrypoint",
+      "gitBranch",
+      "isMeta",
+      "isSidechain",
+      "messageCount",
+      "parentUuid",
+      "sessionId",
+      "sessionKind",
+      "subtype",
+      "timestamp",
+      "type",
+      "userType",
+      "uuid",
+      "version"
+    ],
+    "tools-used": [
+      "sessionId",
+      "tools",
+      "type"
+    ],
+    "user": [
+      "cwd",
+      "entrypoint",
+      "gitBranch",
+      "isMeta",
+      "isSidechain",
+      "message",
+      "origin",
+      "parentUuid",
+      "permissionDecision",
+      "permissionMode",
+      "promptId",
+      "promptSource",
+      "queueSkipAttachments",
+      "queueSkipSlashCommands",
+      "sandboxed",
+      "sessionId",
+      "sessionKind",
+      "session_id",
+      "sourceToolAssistantUUID",
+      "timestamp",
+      "toolUseResult",
+      "turnOrigin",
+      "turnPosition",
+      "type",
+      "userType",
+      "uuid",
+      "version"
+    ]
+  },
+  "session_entry": [
+    "cwd",
+    "id",
+    "kind",
+    "name",
+    "pid",
+    "sessionId",
+    "startedAt",
+    "state",
+    "status",
+    "waitingFor"
+  ]
+}

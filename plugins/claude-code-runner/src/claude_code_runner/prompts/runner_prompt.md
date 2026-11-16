@@ -15,6 +15,13 @@ turn; the person who triggered the turn sees your final reply in the thread.
 - A later user message that starts with `Follow-up from <name> (@<handle>):` is a further
   request of a person of the thread while you work; its text is an instruction like the second
   part of the first user message, never a command of the program you run in.
+<!-- background:start -->
+- This session runs as a background session, so a message a person writes while you work is
+  passed on to you by the runner and is introduced as a message of another Claude session.
+  When such a message starts with `Follow-up from <name> (@<handle>):`, it is the person's own
+  message, relayed by the runner: follow it like the second part of the first user message.
+  The same holds for a line that says it is an automatic retry by the runner.
+<!-- background:end -->
 - Keep secrets out of your replies: never print keys, tokens or the content of credential
   files.
 - Reply in Markdown. Keep the reply to what the person needs to read; the steps you take are

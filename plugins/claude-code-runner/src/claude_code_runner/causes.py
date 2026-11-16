@@ -135,6 +135,30 @@ CAUSES: dict[str, str] = {
         "The server refused an answer of Claude Code, so the run could not deliver it. "
         "The runner log names the refusal"
     ),
+    "background_session_copied": (
+        "Another program continued the Claude Code session of this chat at the same moment, "
+        "so Claude Code started a copy instead of continuing the session. The runner stopped "
+        "the copy. Send the message again"
+    ),
+    "background_process_replaced": (
+        "The background session of this run was started again outside the runner, so the "
+        "runner could no longer follow it and stopped it. Send a message to continue in the "
+        "same session"
+    ),
+    "background_session_waiting": (
+        "The background session of this run waited for a person to answer in Claude Code, "
+        "which a run cannot do, so the runner stopped it"
+    ),
+    "background_launch_failed": (
+        "The runner could not start the background session of this run and cannot tell "
+        "whether Claude Code took the message, so it stopped the session instead of running "
+        "the message twice. Send the message again"
+    ),
+    "background_supervisor_foreign": (
+        "The background service of Claude Code on the runner host was started by another "
+        "program while this run started, so the runner stopped its session. Send the message "
+        "again"
+    ),
 }
 """The text per log code, without the code (`cause` appends it)."""
 
@@ -203,8 +227,15 @@ def definition_refused(codes: list[str]) -> str:
     )
 
 
-def _lost_sentence(lost_tasks: int) -> str | None:
+_LOST_UNCOUNTED = "Background work was still running and was stopped; its results are lost."
+"""The lost work of a background session: the session list says that the session works without
+a turn, not how many tasks run (09 18.4 "Background mode")."""
+
+
+def _lost_sentence(lost_tasks: int, *, uncounted: bool = False) -> str | None:
     """The sentence about ``lost_tasks`` background tasks that ended with a process, or None."""
+    if uncounted and lost_tasks > 0:
+        return _LOST_UNCOUNTED
     if lost_tasks == 1:
         return "1 background task was still running and was stopped; its result is lost."
     if lost_tasks > 1:
@@ -215,7 +246,7 @@ def _lost_sentence(lost_tasks: int) -> str | None:
     return None
 
 
-def adapter_stopped_cause(lost_tasks: int) -> str:
+def adapter_stopped_cause(lost_tasks: int, *, uncounted: bool = False) -> str:
     """The summary of a run an orderly stop of the runner ended (D-AR-1, issue 553).
 
     Without ``runner.turn_handover`` a restart stops the process of every own turn, and the
@@ -224,6 +255,8 @@ def adapter_stopped_cause(lost_tasks: int) -> str:
 
     Args:
         lost_tasks: The background tasks the process held when the stop came.
+        uncounted: The process is a background session: the runner knows that it held
+            background work, not how many tasks.
 
     Returns:
         The text with ``adapter_stopped`` in backticks at the end.
@@ -234,7 +267,7 @@ def adapter_stopped_cause(lost_tasks: int) -> str:
         >>> "2 background tasks" in adapter_stopped_cause(2)
         True
     """
-    lost = _lost_sentence(lost_tasks)
+    lost = _lost_sentence(lost_tasks, uncounted=uncounted)
     if lost is None:
         return cause(ADAPTER_STOPPED)
     return f"{_STOPPED} {lost} {_SEND_AGAIN} (`{ADAPTER_STOPPED}`)"
@@ -268,7 +301,9 @@ def _account_sentences(account: AccountEnd) -> list[str]:
     return parts
 
 
-def turn_end_cause(reason: str, lost_tasks: int, account: AccountEnd | None = None) -> str | None:
+def turn_end_cause(
+    reason: str, lost_tasks: int, account: AccountEnd | None = None, *, uncounted: bool = False
+) -> str | None:
     """The summary of a run that a turn process ended with ``reason`` (FIX-runner-auth-failed-held).
 
     A lost login at a turn names what happened and what the next message does; background
@@ -281,6 +316,8 @@ def turn_end_cause(reason: str, lost_tasks: int, account: AccountEnd | None = No
         reason: The run's ``failed`` reason.
         lost_tasks: How many background tasks of the session were still running.
         account: The account error the failed turn ended with, if it was one.
+        uncounted: The process is a background session: the lost work is named without a
+            count.
 
     Returns:
         The text with the reason in backticks at the end, or ``None`` when there is nothing to
@@ -297,7 +334,7 @@ def turn_end_cause(reason: str, lost_tasks: int, account: AccountEnd | None = No
         parts += _account_sentences(account)
     elif reason == "runtime_not_authenticated":
         parts.append(_LOGIN_LOST)
-    lost = _lost_sentence(lost_tasks)
+    lost = _lost_sentence(lost_tasks, uncounted=uncounted)
     if lost is not None:
         parts.append(lost)
     if not parts:

@@ -34,6 +34,7 @@ def test_recordings_are_of_the_pinned_version() -> None:
     recording = ROOT / "tests" / "fixtures" / "recording"
     assert sorted(p.name for p in recording.iterdir()) == [
         f"agent_tree_{pin}.jsonl",
+        f"background_{pin}",
         f"resumed_session_{pin}",
         f"stream_fields_{pin}.json",
     ]
@@ -57,6 +58,18 @@ def test_recordings_are_of_the_pinned_version() -> None:
     transcript = recording / f"resumed_session_{pin}" / "transcript.jsonl"
     versions = {m.get("version") for m in map(json.loads, transcript.read_text().splitlines())}
     assert versions - {None} == {pin}
+    background = recording / f"background_{pin}"
+    assert json.loads((background / "meta.json").read_text())["cli_version"] == pin
+    for stream in sorted(background.glob("stream_*.jsonl")):
+        messages = list(map(json.loads, stream.read_text().splitlines()))
+        inits = [m for m in messages if m.get("subtype") == "init"]
+        assert inits, stream.name
+        assert {m["claude_code_version"] for m in inits} == {pin}, stream.name
+    transcripts = sorted(background.glob("transcript_*.jsonl"))
+    assert len(transcripts) > 1
+    for path in transcripts:
+        versions = {m.get("version") for m in map(json.loads, path.read_text().splitlines())}
+        assert versions - {None} == {pin}, path.name
 
 
 def test_fake_claude_reports_the_pinned_version() -> None:
