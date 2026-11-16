@@ -515,6 +515,19 @@ Before you switch it on:
 - **Agent view.** Every session of the runner is listed in the host user's agent view under the
   name `bothy-<run id>` while its run lasts. Do not attach to it, answer in it or stop it there:
   the runner treats a session that vanished or was started again as an error of the run.
+- **Other Claude Code sessions of the host user.** The settings file of a run sets
+  `crossSessionInbound` to `accept` for every tool class, because a session takes the lines the
+  runner writes to its inbox socket only with that value. With it the session takes every
+  message that arrives on the socket, also one of another Claude Code session of the same host
+  user. Two protections of the CLI do not apply then: without a value a session in bypass mode
+  (tool class `host`) holds a message of a session that is not in bypass mode for an approval,
+  and the value of `--settings` goes before the one in the host user's own user settings. What
+  stays: the CLI restricts the socket to the host user, such a message cannot approve anything,
+  and a slash command in it does not run. The runner prompt tells the model that a message with
+  the runner's lead-in is the person's own, so another session of the host user that writes
+  that lead-in can steer a runner session with the rights of its tool class. Switch the mode on
+  only where the host user runs no Claude Code sessions besides the runner's, or only ones that
+  are trusted like the runner.
 
 How a background turn runs:
 
@@ -538,9 +551,12 @@ How a background turn runs:
   session's inbox socket (cross-session messaging of Claude Code). The model takes it in after
   the running tool call, as on stdin. The CLI introduces it as a message of another Claude
   session; the runner prompt of a background session says that a message with the runner's
-  lead-in is the person's own, relayed by the runner. A slash command in such a message does
-  not run. When the socket cannot be used (it is missing, or a managed setting holds inbound
-  messages), the server defers the follow-up into a new run after this one.
+  lead-in is the person's own, relayed by the runner. The CLI keeps the system prompt of a
+  session's first request, so a thread whose session began in print mode (before the key was
+  switched on, or in a run that fell back) does not get that paragraph: there the model reads
+  a follow-up as a message of another session. A slash command in such a message does not run.
+  When the socket cannot be used (it is missing, or a managed setting holds inbound messages),
+  the server defers the follow-up into a new run after this one.
 - **Stop and end.** A stop is `claude stop`, then SIGTERM and SIGKILL to the session's process
   group when the process still lives (`stop_escalated`), then `claude rm`. A background session
   does not end by itself, so the end of a run is the same stop. An orderly stop of the runner

@@ -3,7 +3,8 @@
 
 `BackgroundMode` is what every background turn of one runner process shares: the control
 commands with the environment of a ``personal`` turn, the one reader of the session list, the
-channels the mode is switched on for, and the heartbeat reason of a fallback.
+channels the mode is switched on for, the lock that lets one run at a time launch, and the
+heartbeat reason of a fallback.
 
 A run that should use background mode and cannot uses print mode and says why (18.9). When
 the cause lies with the host (the CLI is not the pinned version, a supervisor the runner did
@@ -18,6 +19,7 @@ Examples:
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from uuid import UUID
@@ -77,6 +79,11 @@ class BackgroundMode:
     Attributes:
         cli: The control commands.
         sessions: The reader of the session list.
+        launching: Held by a run from its check of the supervisor until its launch command
+            ended and the supervisor that command started is recorded (18.2 "Before a
+            launch"). Runs of one runner process launch one after the other, so a run never
+            reads the supervisor between the launch of another run that starts it and its
+            record, which would make the runner's own supervisor look like another program's.
         unavailable: The code of the last fallback for a cause of the host, ``None`` once a
             background launch started after it.
     """
@@ -103,6 +110,7 @@ class BackgroundMode:
             claude_bin or config.claude_bin, self.env, config.state_dir, config.cli_probe_timeout
         )
         self.sessions = SessionList(self.cli, config.background_status_interval)
+        self.launching = asyncio.Lock()
         self.unavailable: str | None = None
         self._on_change = on_change
 

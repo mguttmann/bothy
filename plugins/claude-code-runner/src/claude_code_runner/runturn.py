@@ -3165,15 +3165,54 @@ class RunTurn:
                 self.ledger.written(line_uuid)
             evidence = TurnEvidence(stderr=SESSION_MISSING_TEXT, exit_label="not_started")
             return _Outcome(evidence, False), True
-        checked = await self._background_checks(bg, attempt)
-        if not isinstance(checked, bool):
-            return checked
+        name = session_name(self.handle.run_id)
+        # One run at a time, from the check of the supervisor until the launch command ended
+        # and the supervisor it started is recorded (18.2 "Before a launch"): a run that read
+        # the supervisor in between would take the runner's own for another program's.
+        async with bg.launching:
+            checked = await self._background_checks(bg, attempt)
+            if not isinstance(checked, bool):
+                return checked
+            offset = _size(transcript) if transcript is not None else 0
+            argv = await self._prepare_launch(attempt, inputs, name, offset)
+            self.bg_launching = True
+            try:
+                out = await self._launch(bg, argv, prompt)
+            except BaseException:
+                await self._leave_no_session(bg, name)
+                raise
+        try:
+            started = await self._start_session(bg, attempt, out, offset, supervisor_ran=checked)
+        except BaseException:
+            await self._leave_no_session(bg, name)
+            raise
+        self.bg_launching = False
+        if not isinstance(started, BgSession):
+            return started
+        if not attempt.resume:
+            attempt = dataclasses.replace(attempt, new_reference=True)
+        reader = self._transcript_reader(started, TranscriptMapper(inputs[0][0]), offset)
+        return await self._follow(started, attempt, offset, 0, reader=reader), True
+
+    async def _prepare_launch(
+        self, attempt: _Attempt, inputs: Sequence[tuple[str, bytes]], name: str, offset: int
+    ) -> list[str]:
+        """Write what a launch needs and record the turn before it starts.
+
+        Args:
+            attempt: The attempt.
+            inputs: The inputs of the turn (uuid and line); the first one is the prompt.
+            name: The name of the session.
+            offset: The launch offset of the transcript.
+
+        Returns:
+            The argument list of the launch command.
+        """
         files = bg_files(self.cfg.state_dir, self.handle.run_id)
         ensure_private_dir(files.settings.parent)
         with contextlib.suppress(OSError):
             files.socket.unlink()  # a socket of an earlier process of this run
         write_private(files.settings, json.dumps(settings_document(self.state.env), sort_keys=True))
-        name = session_name(self.handle.run_id)
         argv = background_argv(
             claude_bin=self.h.claude_bin or self.cfg.claude_bin,
             model=self.state.model,
@@ -3186,7 +3225,6 @@ class RunTurn:
             socket_file=files.socket,
             settings_file=files.settings,
         )
-        offset = _size(transcript) if transcript is not None else 0
         await self._rebase_once(attempt)
         self.process = None
         self._identity = {}
@@ -3204,24 +3242,7 @@ class RunTurn:
             "resume": attempt.resume,
         }
         self._persist()  # before the launch: a next runner finds the session by its name
-        self.bg_launching = True
-        try:
-            started = await self._start_session(
-                bg, attempt, argv, prompt, offset, supervisor_ran=checked
-            )
-        except BaseException:
-            # A cancelled or failed launch leaves no session of this run behind.
-            self.process = None
-            with contextlib.suppress(Exception):
-                await asyncio.shield(self._discard(bg, name, None))
-            raise
-        self.bg_launching = False
-        if not isinstance(started, BgSession):
-            return started
-        if not attempt.resume:
-            attempt = dataclasses.replace(attempt, new_reference=True)
-        reader = self._transcript_reader(started, TranscriptMapper(inputs[0][0]), offset)
-        return await self._follow(started, attempt, offset, 0, reader=reader), True
+        return argv
 
     async def _background_checks(
         self, bg: BackgroundMode, attempt: _Attempt
@@ -3281,17 +3302,49 @@ class RunTurn:
                 return await self._fall_back("background_session_foreign")
         return None
 
-    async def _start_session(  # noqa: PLR0911, PLR0913 - one exit per check of the launch
+    async def _leave_no_session(self, bg: BackgroundMode, name: str) -> None:
+        """A cancelled or failed launch leaves no session of this run behind."""
+        self.process = None
+        with contextlib.suppress(Exception):
+            await asyncio.shield(self._discard(bg, name, None))
+
+    async def _launch(self, bg: BackgroundMode, argv: Sequence[str], prompt: str) -> LaunchOutput:
+        """Run the launch command and record the supervisor it started (18.2 "Before a launch").
+
+        The caller holds `BackgroundMode.launching`: the next run of this runner reads the
+        supervisor only after this record.
+        """
+        files = bg_files(self.cfg.state_dir, self.handle.run_id)
+        out = await launch(
+            argv,
+            prompt=prompt,
+            cwd=self.state.cwd or self.cfg.projects_root,
+            env=launch_environment(self.state.env),
+            stdout=files.stdout,
+            stderr=files.stderr,
+            timeout=self.cfg.cli_probe_timeout,
+        )
+        if out.short_id is not None and out.started_service:
+            await self._record_supervisor(bg)
+        return out
+
+    async def _start_session(  # noqa: PLR0911 - one exit per check of the launch
         self,
         bg: BackgroundMode,
         attempt: _Attempt,
-        argv: Sequence[str],
-        prompt: str,
+        out: LaunchOutput,
         offset: int,
         *,
         supervisor_ran: bool,
     ) -> BgSession | tuple[_Outcome | None, bool]:
-        """Launch the session and wait until it took the prompt (18.2 "Background mode").
+        """Wait until the session a launch started took the prompt (18.2 "Background mode").
+
+        Args:
+            bg: The background mode.
+            attempt: The attempt.
+            out: What the launch command printed (`_launch`).
+            offset: The launch offset of the transcript.
+            supervisor_ran: The check before the launch found the runner's own supervisor.
 
         Returns:
             The session once its entry has a process and its transcript shows the prompt;
@@ -3301,23 +3354,14 @@ class RunTurn:
         files = bg_files(self.cfg.state_dir, self.handle.run_id)
         name = session_name(self.handle.run_id)
         timeout = self.cfg.cli_probe_timeout
-        out = await launch(
-            argv,
-            prompt=prompt,
-            cwd=self.state.cwd or self.cfg.projects_root,
-            env=launch_environment(self.state.env),
-            stdout=files.stdout,
-            stderr=files.stderr,
-            timeout=timeout,
-        )
         if out.short_id is None:
             return await self._launch_refused(bg, out, name, offset)
         short_id = out.short_id
-        if out.started_service:
-            await self._record_supervisor(bg)
-        elif not supervisor_ran:
-            # A supervisor another program started between the check and the launch carries
-            # that program's environment, not the allow list of 18.2.
+        if not out.started_service and not supervisor_ran:
+            # No supervisor ran at the check and the launch started none: another program
+            # started one in between (never another run of this runner, which waits for
+            # `BackgroundMode.launching`). It carries that program's environment, not the
+            # allow list of 18.2.
             return await self._abort_launch(bg, "background_supervisor_foreign", short_id, offset)
         if attempt.resume and (short_id != self.session.ref[:8] or out.notes):
             # The CLI did not continue the session in place: another program started it in

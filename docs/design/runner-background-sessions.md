@@ -458,7 +458,13 @@ a line that cannot be written in print mode.
   supervisor with the pinned version: launch. Any other supervisor, of another
   version or started by another program of the same user: no launch, the run uses print mode
   with the cause
-  `background_supervisor_foreign` or `background_supervisor_version` (4.13). Reason: sessions
+  `background_supervisor_foreign` or `background_supervisor_version` (4.13). The check, the
+  launch and the record are one step that the runs of a runner process take one after the
+  other (a lock of the process, held until the launch command ended and the record is
+  written): of two runs that start together while no supervisor runs, the second reads the
+  supervisor only after the first one's launch started it and the runner recorded it. Without
+  that order the second run reads "no supervisor", its launch prints no line about the
+  service, and the runner takes its own supervisor for another program's. Reason: sessions
   inherit the supervisor's environment (item 7), and a supervisor a person started from their
   shell would hand that shell's variables to a `scoped` turn, which can print them with a
   read-only command. Alternative: accept a shared supervisor. Refused: it weakens the allow
@@ -612,11 +618,27 @@ the heartbeat (4.10).
 10. **Control calls.** Before the first request of a run the runner makes a handful of short
     CLI calls (supervisor check, session list, launch, and stop and remove for a resumed
     session), and the session list is read at the status interval while a background turn is
-    active. Each call starts the CLI binary, so a run starts later than in print mode.
+    active. Each call starts the CLI binary, so a run starts later than in print mode. Runs
+    that start together make the calls up to the launch one after the other (4.10), so each
+    of them also waits for the launches before it.
 11. **Not covered:** hosted agents, `organization` turns, a member of the binding for the
     mode, the handover of background turns at an orderly stop, steps inside subagents and
     workflows, the usage window of 18.19.10, Windows (the socket is a named pipe there, not
     run), and a helper that records workspace trust.
+12. **Messages of other sessions of the host user.** `crossSessionInbound` `"accept"` in the
+    settings file of a run is what makes the session take the runner's lines (item 14), and it
+    holds for every message on the inbox socket, not only the runner's. Without a value a
+    session that bypasses permission prompts (tool class `host`) holds a message of a session
+    that does not bypass them for an approval, and a value of `--settings` goes before the one
+    in the user settings [docs, cross-session-messaging]; with `"accept"` in the run's file
+    neither protects a runner session. The socket is restricted to the operating-system user,
+    such a message cannot approve anything and a command in it does not run [docs]. But the
+    paragraph of 4.4 tells the model that a message with the runner's lead-in is the person's
+    own, so another Claude Code session of the host user that writes the lead-in can steer a
+    runner session with the rights of its tool class [unproven]. The README tells an operator
+    to switch the mode on only where the host user runs no other sessions, or only ones
+    trusted like the runner. A marker per run in the paragraph and in every line, which
+    another session cannot know, would close this; it is not built.
 
 ## 6. Specification changes of the build
 
@@ -671,7 +693,8 @@ keeps every line of its behaviour.
   during a tool call and during the account wait; a background command with a follow-up and
   the notification's answer; the account error with retry and with give-up; a session that
   waits for a person; a copy at resume; a killed runner and the adoption, with a second kill
-  of the adopter; each fallback cause; a channel outside `runner.background_channels`.
+  of the adopter; each fallback cause; a channel outside `runner.background_channels`; two
+  runs that start together while no supervisor runs.
 - **Real CLI:** level one as in D-BG-12, required for the ticket. Level two only on the
   owner's word.
 - **End to end:** `tests/realserver` gains one forum in background mode with Fake-Claude: a
@@ -748,6 +771,7 @@ change; this list names each such place.
 | D-BG-7 | no rule for a cancellation during the launch | the session is stopped and removed, the run ends `cancelled` | the prompt must not run twice |
 | D-BG-9 | a retry that cannot be written counts as an error after `runner.stop_grace` | it is tried again after each pause until the give-up | the same path as print mode |
 | D-BG-10 | the supervisor is recorded after a launch without one | only when the launch printed that it started the service; else the launch is aborted | another program can start a supervisor between the check and the launch |
+| D-BG-10 | every run checks, launches and records by itself | the runs of a runner process do the three one after the other | the second of two runs that start together took the supervisor the first one's launch started for another program's and ended `runtime_error` |
 | D-BG-11 | adoption reads from the stored offset | it maps the records from the launch offset again first; a foreign process of the session is stopped; the end has no recovery; one lock attempt | the mapper holds state of earlier records; R-AG-17 |
 | D-BG-12 | the transcripts of every scenario of 7.3 are recorded | five scenarios and four print twins; the others are run by level one and played by Fake-Claude | a refusal, a copy and a waiting session are single commands, not conversations |
 | D-BG-13 | "no process" is judged at once | the entry is watched for `runner.cli_probe_timeout` first | a process that starts late would take the prompt after the fallback |

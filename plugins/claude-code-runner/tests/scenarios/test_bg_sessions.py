@@ -14,6 +14,7 @@ follow-ups, voice, answer attachments, stop, background work).
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import sys
@@ -246,6 +247,39 @@ async def test_the_next_message_continues_the_same_session(bg_world: World) -> N
             "amount_micros": 7500,
         }
     ]
+    await nothing_left(world)
+
+
+# ---- two runs at once ---------------------------------------------------------------------------
+
+
+async def test_two_runs_that_start_together_both_run_as_background_sessions(
+    bg_world: World, logs: LogLines
+) -> None:
+    world = bg_world
+    world.scenario(fixture="plain")
+    await start(world)
+    # No supervisor runs yet: the first launch starts it, and the second run must not take it
+    # for one of another program, whatever the order of the two runs' commands is.
+    runs = await asyncio.gather(
+        world.fake.trigger("Fix it", channel_id=world.forum_a),
+        world.fake.trigger("Fix that", channel_id=world.forum_a),
+    )
+    assert [await world.ended(r.run_id) for r in runs] == ["completed", "completed"]
+    assert [world.fake.run_state(r.run_id).state_reason for r in runs] == [None, None]
+    assert world.turns() == []  # no fallback: neither prompt ran in print mode
+    assert len(launches(world)) == len(players(world)) == 2
+    assert events(logs, "background_fallback") == []
+    assert events(logs, "background_launch_in_doubt") == []
+    assert not any(
+        "background_unavailable" in h.get("details", {}).get("degraded_reasons", [])
+        for h in world.fake.heartbeats
+    )
+    # One launch at a time: the second run reads the supervisor only after the first run's
+    # launch started it and the runner recorded it (check, launch, record; check, launch).
+    commands = sorted(world.calls("bg_daemon") + launches(world), key=lambda c: c["t"])
+    order = [c["kind"] for c in commands]
+    assert order[:5] == ["bg_daemon", "bg_launch", "bg_daemon", "bg_daemon", "bg_launch"]
     await nothing_left(world)
 
 
