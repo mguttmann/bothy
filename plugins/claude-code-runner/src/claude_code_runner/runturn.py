@@ -14,6 +14,14 @@ run that the server ended stops its turn without a finish. An error nothing expe
 live process before the run ends ``failed`` with ``adapter_error`` (`RunTurn._on_error`, 18.9).
 `RunTurn.adopted` follows a turn that outlived an earlier runner (design note 12).
 
+With ``runner.launch_mode`` ``background`` a turn of the runner's own agent in billing mode
+``personal`` runs as a Claude Code background session (``claude --bg``, 09 18.2 "Background
+mode"): `RunTurn._run_background` launches it, the session's transcript is read through
+`claude_code_runner.bgtranscript` as the stream of 18.4, inputs go to the session's inbox
+socket, and the release at the end of a run is ``claude stop`` (`claude_code_runner.bgsession`).
+A run that cannot use the mode uses print mode and says why (18.9), and
+`RunTurn.adopt_background` continues a background turn that outlived an earlier runner.
+
 A turn that ends with an account error (`claude_code_runner.account`) in a process that holds
 or held background work does not end the run: the process is kept, ``/status_line`` says why
 the run waits, and the runner writes a retry line after each pause of ``runner.account_retry_*``
@@ -40,6 +48,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import dataclasses
 import json
 import logging
 import os
@@ -103,6 +112,29 @@ from claude_code_runner.attachments import (
     fetch_followup_files,
     followup_files_final,
 )
+from claude_code_runner.bgmode import BackgroundMode, launch_environment
+from claude_code_runner.bgpaths import bg_files, remove_bg_files
+from claude_code_runner.bgsession import (
+    BgSession,
+    LaunchOutput,
+    Reading,
+    SessionEntry,
+    background_argv,
+    launch,
+    load_supervisor,
+    prompt_text,
+    session_name,
+    settings_document,
+    store_supervisor,
+    supervisor_verdict,
+)
+from claude_code_runner.bgtranscript import (
+    PricedUsage,
+    TranscriptMapper,
+    TranscriptReader,
+    prompt_taken,
+    replayed_records,
+)
 from claude_code_runner.causes import (
     ADAPTER_STOPPED,
     RUN_ENDED_IDLE,
@@ -112,6 +144,7 @@ from claude_code_runner.causes import (
 )
 from claude_code_runner.commandline import HostedArgs, SessionChoice, build_argv, reported_model
 from claude_code_runner.failures import (
+    SESSION_MISSING_TEXT,
     ErrorKind,
     TurnEnd,
     TurnEvidence,
@@ -126,6 +159,7 @@ from claude_code_runner.followups import (
     build_followup_line,
     followup_verdict,
 )
+from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
 from claude_code_runner.launch import (
     AttemptRecord,
     KeeperGroup,
@@ -404,6 +438,10 @@ class _Outcome:
     """Background tasks still running when the process ended after a failed turn."""
     account: AccountEnd | None = None
     """The account error the failed turn ended with, if it was one (the summary names it)."""
+    cause: str | None = None
+    """The cause a background session's turn failed for, as its summary names it (18.9)."""
+    uncounted: bool = False
+    """The process was a background session: lost work is named without a count (18.4)."""
 
 
 @dataclass
@@ -483,7 +521,7 @@ class RunTurn:
         self._held_logged = False
         self._account_shown: tuple[float, int] | None = None
         """The wait for the account that ``/status_line`` shows now (its last time and count)."""
-        self.process: Turn | KeeperGroup | None = None
+        self.process: Turn | KeeperGroup | BgSession | None = None
         self.phase = "starting"  # starting, open, closed, ended
         self.attempt = _Attempt()
         self.ledger = TurnLedger.begin("turn", 0)
@@ -514,7 +552,8 @@ class RunTurn:
         """The upload of an answer's attachment set while it runs (a stop cancels it)."""
         self.rebased = False
         """The run's first process started; only it takes the session totals (09 18.7)."""
-        self.live_cost = LiveCost(load_prices())
+        self._prices = load_prices()
+        self.live_cost = LiveCost(self._prices)
         """The run's ``/cost`` while it works (FIX-cost-display)."""
         self._cost_sent = 0
         # ---- runner.turn_handover (09 18.19.3 to 18.19.7) ----
@@ -540,6 +579,21 @@ class RunTurn:
         """The hint of a recorded retry after compaction (phase ``compaction_retry``)."""
         self.task: asyncio.Task[Any] | None = None
         self._fed: asyncio.Task[None] | None = None
+        # ---- runner.launch_mode background (09 18.2 "Background mode") ----
+        self.bg: BackgroundMode | None = getattr(handler, "background", None)
+        """The background mode of the runner; ``None`` without the key and for hosted agents."""
+        self.bg_fallback: str | None = None
+        """The code this run uses print mode for although its channel asks for background mode."""
+        self.bg_record: dict[str, Any] | None = None
+        """The background part of the turn record while the current process is a session."""
+        self.bg_adopted = False
+        """The run continues a background turn that outlived an earlier runner (18.9)."""
+        self.bg_priced = PricedUsage()
+        """What the run's background turns reported, for a process that wrote no totals (18.7)."""
+        self.bg_launching = False
+        """A launch command of this run was started and its session is not followed yet."""
+        self._bg_rest: list[tuple[str, bytes]] = []
+        self._bg_cause: str | None = None
 
     # ---- the run ---------------------------------------------------------------------------
 
@@ -661,14 +715,7 @@ class RunTurn:
             if isinstance(action, Fail):
                 if attempt.kind == "compaction":
                     await self._box_note("context_compacted", "failed", None)
-                summary = None
-                if attempt.kind == "turn":
-                    summary = turn_end_cause(action.reason, outcome.lost_tasks, outcome.account)
-                if action.reason == "runtime_error" and cost_cap_reached(
-                    outcome.evidence.result, self.state.cost_cap
-                ):
-                    summary = cause("cost_cap_reached")
-                await self._fail(action.reason, action.errors, end.exit_label, summary=summary)
+                await self._fail_turn(action, attempt.kind, outcome, end)
                 return
             next_attempt = await self._recover(action, outcome)
             if next_attempt is None:
@@ -677,6 +724,21 @@ class RunTurn:
                 worked_before = outcome.worked
             attempt = next_attempt
             outcome = None
+
+    async def _fail_turn(self, action: Fail, kind: str, outcome: _Outcome, end: TurnEnd) -> None:
+        """End the run ``failed`` after a process end, with the summary that names its cause."""
+        summary = None
+        if kind == "turn":
+            summary = turn_end_cause(
+                action.reason, outcome.lost_tasks, outcome.account, uncounted=outcome.uncounted
+            )
+        if action.reason == "runtime_error" and cost_cap_reached(
+            outcome.evidence.result, self.state.cost_cap
+        ):
+            summary = cause("cost_cap_reached")
+        if action.reason == "runtime_error" and outcome.cause is not None:
+            summary = cause(outcome.cause)
+        await self._fail(action.reason, action.errors, end.exit_label, summary=summary)
 
     async def _on_cancelled(self) -> None:
         """The SDK cancels the run: a stop as in 18.6, or nothing at a handover (18.19.3)."""
@@ -726,9 +788,7 @@ class RunTurn:
         _warn("run_failed_unexpectedly", error=type(exc).__name__, **self.ids)
         process = self.process
         if process is not None:
-            await terminate(
-                process, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval, self.ids
-            )
+            await self._terminate(process, self.ids)
             self.process = None
         elif self.adopted_group is not None and _group_runs(self.adopted_group):
             await self._stop(self.adopted_group)
@@ -753,6 +813,8 @@ class RunTurn:
             remove_run_files(self.cfg.state_dir, self.handle.run_id)
             if self.handover:
                 remove_launch_files(self.cfg.state_dir, str(self.handle.run_id))
+            if self.bg is not None:
+                remove_bg_files(self.cfg.state_dir, self.handle.run_id)
 
     def _crash(self, point: str) -> None:
         """The test-only crash hook after a step of the handshake (`crash_point`)."""
@@ -769,15 +831,31 @@ class RunTurn:
         """
         process = self.process
         if process is None:
+            await self._cancelled_launch()
             return
         if self.stop_reason is None:
             self.stop_reason = ADAPTER_STOPPED
             self._persist()
         self._count_stopped_tasks()
-        await terminate(
-            process, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval, self.ids
-        )
+        await self._terminate(process, self.ids)
         self.process = None
+        if self.server_ended or self.handle.patch.ended or self.handle.finished:
+            return
+        await self._finish_cancelled()
+
+    async def _cancelled_launch(self) -> None:
+        """A cancellation during the launch of a background session: the run ends ``cancelled``.
+
+        The session of the launch was stopped and removed (`_run_background`), but it may
+        have taken the prompt already, so the run is not left for a start from the inbox,
+        which would run the prompt again. Like a process the cancellation stopped, the run
+        finishes ``cancelled`` with ``adapter_stopped`` (18.6).
+        """
+        if not self.bg_launching:
+            return
+        self.bg_launching = False
+        if self.stop_reason is None:
+            self.stop_reason = ADAPTER_STOPPED
         if self.server_ended or self.handle.patch.ended or self.handle.finished:
             return
         await self._finish_cancelled()
@@ -975,10 +1053,32 @@ class RunTurn:
         write_private(paths.system_prompt, text)
         return paths.system_prompt
 
-    def _argv(self, attempt: _Attempt, prompt_file: Path) -> list[str]:
-        add_dir = None
+    def _background_prompt_file(self, attempt: _Attempt) -> Path:
+        """The system prompt file of a background session, among the files of the run.
+
+        It carries the paragraph on relayed messages (18.5), and it does not lie in the
+        session's folder, which moves when the runner learns the id the CLI made (18.1).
+        """
+        text = system_prompt(
+            title_request=self.title_request,
+            channel_prompt=self.state.channel_prompt,
+            background=True,
+        )
+        if attempt.hint:
+            text = text.rstrip() + "\n\n## Retry\n\n" + RETRY_HINT + "\n"
+        path = bg_files(self.cfg.state_dir, self.handle.run_id).system_prompt
+        ensure_private_dir(path.parent)
+        write_private(path, text)
+        return path
+
+    def _add_dir(self) -> Path | None:
+        """The thread's incoming folder as ``--add-dir``: ``scoped`` and ``host`` with files."""
         if self.cfg.tool_class in ("scoped", "host") and self.state.stored_files:
-            add_dir = self.cfg.state_dir / "files" / str(self.state.thread_id)
+            return self.cfg.state_dir / "files" / str(self.state.thread_id)
+        return None
+
+    def _argv(self, attempt: _Attempt, prompt_file: Path) -> list[str]:
+        add_dir = self._add_dir()
         session = SessionChoice(ref=self.session.ref, resume=attempt.resume, new=self.session.new)
         return build_argv(
             claude_bin=self.h.claude_bin or self.cfg.claude_bin,
@@ -1008,6 +1108,11 @@ class RunTurn:
         repeat: AttemptRecord | None = None,
         worked_before: bool = False,
     ) -> _Outcome | None:
+        if self._background(attempt, repeat):
+            outcome, handled = await self._run_background(attempt)
+            if handled:
+                return outcome
+        self.bg_record = None  # this process is a print turn (also after a fallback, 18.9)
         if self.handover:
             return await self._launch_process(attempt, repeat=repeat, worked_before=worked_before)
         paths = self._paths()
@@ -1044,31 +1149,36 @@ class RunTurn:
             await self._write_inputs(process)
         return await self._follow(process, attempt, stream_start, stderr_start)
 
-    async def _follow(
+    async def _follow(  # noqa: PLR0913 - the parts of one process to follow
         self,
-        process: Turn | KeeperGroup,
+        process: Turn | KeeperGroup | BgSession,
         attempt: _Attempt,
         read_from: int,
         stderr_start: int,
         *,
         adopted: bool = False,
+        reader: StreamReader | TranscriptReader | None = None,
     ) -> _Outcome | None:
-        """Read one process to its end and say how it ended (own or adopted alike)."""
+        """Read one process to its end and say how it ended (own or adopted alike).
+
+        A background session is read through ``reader``, the reader of its transcript; its
+        entry in the session list is removed once its process is gone (18.6).
+        """
         paths = self._paths()
+        session = process if isinstance(process, BgSession) else None
         try:
-            reader = StreamReader(
-                paths.stream,
-                self.cfg.poll_interval,
-                process.alive,
-                offset=read_from,
-                until_exit=True,
-            )
+            if reader is None:
+                reader = StreamReader(
+                    paths.stream,
+                    self.cfg.poll_interval,
+                    process.alive,
+                    offset=read_from,
+                    until_exit=True,
+                )
             outcome = await self._read(reader, process, attempt, adopted=adopted)
             if outcome is not None:
                 return outcome
-            await terminate(
-                process, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval, self.ids
-            )
+            await self._terminate(process, self.ids)
             if self.stopping is not None:
                 await self.stopping
             self.phase = "closed"
@@ -1082,7 +1192,7 @@ class RunTurn:
                 init_seen=ledger.init_seen,
                 result=ledger.end_result(),
                 assistant_text=ledger.api_error,
-                stderr=_read_from(paths.stderr, stderr_start),
+                stderr="" if session is not None else _read_from(paths.stderr, stderr_start),
                 exit_label=process.exit_label(),
                 account_failed=self.ps.account_error is not None,
             )
@@ -1094,6 +1204,8 @@ class RunTurn:
                 compacted=ledger.compacted,
                 lost_tasks=self._lost_work(),
                 account=self._account_end(),
+                cause=self._bg_cause if session is not None else None,
+                uncounted=session is not None,
             )
         finally:
             if self._fed is not None:
@@ -1410,7 +1522,7 @@ class RunTurn:
 
     async def _read(  # noqa: PLR0912 - one branch per message kind of 18.4
         self,
-        reader: StreamReader,
+        reader: StreamReader | TranscriptReader,
         group: StoppableGroup,
         attempt: _Attempt | None,
         *,
@@ -1427,6 +1539,7 @@ class RunTurn:
             An outcome when the read ended the run itself (the counter-check), else ``None``.
         """
         own = attempt is not None
+        session = group if isinstance(group, BgSession) else None
         self._worked = adopted and self._replayed_worked
         saved_at = self.monotonic()
         interval = self.handle.patch.settings.run_update_min_interval
@@ -1440,7 +1553,11 @@ class RunTurn:
             self.ledger.line(message, reader.line_offset, reader.offset)
             self.ps.apply(message, self.monotonic())
             kind, subtype = message.get("type"), message.get("subtype")
-            if kind == "system" and subtype == "init" and attempt is not None:
+            if session is not None:
+                handled = await self._read_background(message, session, attempt)
+                if handled is not None:
+                    return handled
+            elif kind == "system" and subtype == "init" and attempt is not None:
                 if message.get("apiKeySource") != _EXPECTED_KEY_SOURCE.get(self.state.mode):
                     _warn("counter_check_failed", **self.ids)
                     if self.process is not None:
@@ -1453,7 +1570,7 @@ class RunTurn:
                     await self._finish("failed", reason="billing_mode_mismatch")
                     return _Outcome(TurnEvidence(), self._worked, handled=True)
                 await self._report_session(message, attempt)
-            elif kind == "assistant":
+            if kind == "assistant":
                 # An API error the CLI writes as an assistant message is no work (note 8 b).
                 no_error = api_error_text(message) is None
                 self._worked = self._worked or (self.ledger.init_seen and no_error)
@@ -1462,7 +1579,8 @@ class RunTurn:
             elif kind == "user" and message.get("isReplay") is True:
                 await self._echo(message.get("uuid"), adopted=adopted or not own)
             elif kind == "result":
-                self._settle_cost()
+                if session is None:
+                    self._settle_cost()  # a session's totals come when its process ends (18.7)
                 if self.ledger.kind == "turn" and is_success(message):
                     await self._answer(message, reader.line_offset)
             if self.ledger.kind == "turn" and self.live is not None:
@@ -1594,6 +1712,9 @@ class RunTurn:
                 self.phase = "closed"
             self._record_stdin_closed()
             process.close_stdin()
+            if isinstance(process, BgSession):
+                # The release of a background session: nothing ends it but a stop (18.6).
+                self._stop_group(process)
 
     def _record_stdin_closed(self) -> None:
         """Every place that closes stdin records ``stdin_closed`` first (09 18.19.7)."""
@@ -1611,8 +1732,32 @@ class RunTurn:
     async def _stop(self, group: StoppableGroup) -> None:
         from claude_code_runner.stop import stop_group  # noqa: PLC0415 - keeps the import list flat
 
+        if isinstance(group, BgSession):
+            await group.stop(
+                self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval, self.ids
+            )
+            return
         await stop_group(
             group, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval, self.ids
+        )
+
+    async def _terminate(
+        self, process: Turn | KeeperGroup | BgSession, ids: Mapping[str, object] | None = None
+    ) -> None:
+        """End a turn process and everything of it (18.6).
+
+        A print turn gets `claude_code_runner.turn.terminate`. A background session is stopped
+        with ``claude stop`` and the same escalation, then its entry is removed from the
+        session list (``claude rm``); its transcript stays.
+        """
+        if isinstance(process, BgSession):
+            await process.stop(
+                self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval, ids
+            )
+            await process.remove()
+            return
+        await terminate(
+            process, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval, ids
         )
 
     # ---- stop ------------------------------------------------------------------------------
@@ -2235,7 +2380,11 @@ class RunTurn:
         thread in the summary, with the background tasks the stop ended (issue 553).
         """
         reason = self.stop_reason or "user_cancelled"
-        summary = adapter_stopped_cause(self.stopped_tasks) if reason == ADAPTER_STOPPED else None
+        summary = None
+        if reason == ADAPTER_STOPPED:
+            summary = adapter_stopped_cause(
+                self.stopped_tasks, uncounted=self.bg_record is not None
+            )
         await self._finish("cancelled", reason=reason, summary=summary)
 
     def _report_cost(self) -> None:
@@ -2281,15 +2430,45 @@ class RunTurn:
     def _usage(self) -> tuple[list[CostReport], RunMetrics | None]:
         """Cost reports and metrics from the run's last ``result`` (none without one, 12 f 2)."""
         result = self.ledger.cost_result
-        if result is None:
-            return [], None
         store = UsageStore(self.cfg.state_dir / "sessions" / self.session.ref)
+        if result is None:
+            priced = self._priced_reports(store)
+            return (priced, self._metrics(priced)) if priced else ([], None)
         reports = store.pending_for(str(self.handle.run_id))
         if reports is None:
             reports, current, remaining = self._run_reports(store, result)
             store.record(
                 str(self.handle.run_id), current, reports, context_windows(result), remaining
             )
+        return reports, self._metrics(reports)
+
+    def _priced_reports(self, store: UsageStore) -> list[CostReport]:
+        """The reports of a run whose background process wrote no session totals (18.7).
+
+        A session process that was killed hard writes no ``cost-state`` record. The run then
+        books what its ``assistant`` messages reported, priced with the start prices, and says
+        so in the log. The stored session values stay as they are: the CLI restores the
+        session's totals from the last ``cost-state`` record it finds, which lacks this
+        process too.
+        """
+        values = self.bg_priced.model_usage(self._prices)
+        if not values:
+            return []
+        reports = store.pending_for(str(self.handle.run_id))
+        if reports is None:
+            reports = cost_reports(values)
+            stored = store.load()
+            remaining = stored.baseline_remaining
+            if remaining is None and not stored.values:
+                remaining = self._start_baseline()
+            if remaining is not None:
+                reports, remaining = subtract_baseline(reports, remaining)
+            store.record(str(self.handle.run_id), {}, reports, {}, remaining)
+            _warn("costs_priced_without_totals", models=len(reports), **self.ids)
+        return reports
+
+    def _metrics(self, reports: Sequence[CostReport]) -> RunMetrics:
+        """The token sums of the run's reports and the counters of the live box."""
         metrics = RunMetrics(
             tokens_in=sum(_n(r.tokens_in) for r in reports),
             tokens_out=sum(_n(r.tokens_out) for r in reports),
@@ -2303,7 +2482,7 @@ class RunTurn:
             metrics.api_retries = live.api_retries
             if live.context_pct is not None:
                 metrics.context_pct = live.context_pct
-        return reports, metrics
+        return metrics
 
     def _rebase_usage(self) -> None:
         """Store the totals the resume restores, before the run's first process if it resumes.
@@ -2432,7 +2611,10 @@ class RunTurn:
             "steps": self.live.state() if self.live is not None else None,
             "cwd": str(self.state.cwd) if self.state.cwd is not None else None,
         }
-        if self.handover:
+        if self.bg_record is not None:
+            # A background session is found again by this part, never by a keeper (18.9).
+            record.update(launch_mode="background", bg=dict(self.bg_record), run=self._run_part())
+        elif self.handover:
             record.update(self._handover_part())
         if process is not None:
             record.update(pid=process.pid, pgid=process.pgid, identity=self._identity)
@@ -2448,17 +2630,9 @@ class RunTurn:
         text, a token or the environment), the current attempt with its launch files and
         flags, the run's highest outage number, the inputs of a retry and a line in flight.
         """
-        state = self.state
         part: dict[str, Any] = {
             "phase": self.record_phase,
-            "run": {
-                "model": state.model,
-                "tools": list(state.tools),
-                "mode": state.mode,
-                "plugin_dirs": [str(d) for d in state.plugin_dirs],
-                "stored_files": state.stored_files,
-                "own_uuid": self.own_uuid,
-            },
+            "run": self._run_part(),
             "outage": self.outage,
             "autonomous": sorted(self.autonomous),
         }
@@ -2471,6 +2645,18 @@ class RunTurn:
         if self.input_write is not None:
             part["input_write"] = dict(self.input_write)
         return part
+
+    def _run_part(self) -> dict[str, Any]:
+        """The run's parts a next runner needs (never a text, a token or the environment)."""
+        state = self.state
+        return {
+            "model": state.model,
+            "tools": list(state.tools),
+            "mode": state.mode,
+            "plugin_dirs": [str(d) for d in state.plugin_dirs],
+            "stored_files": state.stored_files,
+            "own_uuid": self.own_uuid,
+        }
 
     async def _checkpoint(self, read_to: int) -> None:
         """Store the offset after the patches of the lines before it went out (12 f 1).
@@ -2533,6 +2719,9 @@ class RunTurn:
         A turn whose stdin was closed and a compaction are adopted with reading rights only:
         their follow-ups stay ``queued`` and the server defers them (09 7).
         """
+        if self.bg_adopted:
+            # No channel of a background session belonged to the old runner (18.9).
+            return self.phase not in ("closed", "ended")
         if not self.handover or self.phase in ("closed", "ended"):
             return False
         launch = self.launch
@@ -2881,6 +3070,620 @@ class RunTurn:
                 return False
             _log("launch_check_allowed", **self.ids)
             return True
+
+    # ---- background sessions (09 18.2 "Background mode") ------------------------------------
+
+    def _background(self, attempt: _Attempt, repeat: AttemptRecord | None) -> bool:
+        """Whether an attempt runs as a background session (the scope of 18.2).
+
+        Only a turn of the runner's own agent in billing mode ``personal``, in a channel the
+        mode is switched on for, and only until the run fell back to print mode. A compaction
+        and every turn of a hosted agent stay in print mode.
+        """
+        return (
+            self.bg is not None
+            and self.bg_fallback is None
+            and repeat is None
+            and attempt.kind == "turn"
+            and self.state.hosted is None
+            and self.state.mode == "personal"
+            and self.bg.wants(self.state.channel_id)
+        )
+
+    async def _fall_back(self, code: str) -> tuple[None, bool]:
+        """This run uses print mode from here on, and says why (18.9).
+
+        The live box shows it once as a status line, the log has ``background_fallback``, and a
+        cause of the host shows in the heartbeat until a background launch starts again.
+
+        Returns:
+            ``(None, False)``: the attempt is not handled yet, the print path runs it.
+        """
+        bg = self.bg
+        self.bg_fallback = code
+        self.bg_record = None
+        self._bg_rest = []
+        _warn("background_fallback", code=code, **self.ids)
+        if bg is not None:
+            bg.fell_back(code)
+        await self._status_line(
+            f"Background sessions are not available (`{code}`); this run uses print mode."
+        )
+        return None, False
+
+    def _config_dir(self) -> Path | None:
+        """The CLI's configuration folder of the turn, where its transcripts live."""
+        found = claude_config_dir(self.state.env)
+        if found is None and self.bg is not None:
+            return self.bg.config_dir
+        return found
+
+    def _transcript(self, session_ref: str) -> Path | None:
+        config_dir = self._config_dir()
+        return find_transcript(config_dir, session_ref) if config_dir is not None else None
+
+    def _transcript_reader(
+        self, session: BgSession, mapper: TranscriptMapper, offset: int
+    ) -> TranscriptReader:
+        if self.bg is None:  # pragma: no cover - a session exists only with the mode
+            raise RuntimeError("no background mode")
+        return TranscriptReader(
+            lambda: self._transcript(session.session_id),
+            self.cfg.poll_interval,
+            session.alive,
+            mapper,
+            sessions=self.bg.sessions,
+            short_id=session.short_id,
+            pid=session.pid,
+            offset=offset,
+        )
+
+    async def _run_background(self, attempt: _Attempt) -> tuple[_Outcome | None, bool]:
+        """Run one attempt as a background session: the checks, the launch, the turn.
+
+        Returns:
+            The outcome of the session's process and True; ``(None, True)`` when the run
+            ended here; ``(None, False)`` when the attempt uses print mode (`_fall_back`).
+        """
+        bg = self.bg
+        if bg is None:  # pragma: no cover - `_background` asked first
+            return None, False
+        inputs = self.retry_inputs
+        if inputs is None:
+            inputs = [(self.own_uuid, self.prompt_line.encode("utf-8") + b"\n")]
+        prompt = prompt_text(inputs[0][1]) if inputs else None
+        if prompt is None:
+            return await self._fall_back("background_launch_failed")
+        transcript = self._transcript(self.session.ref) if attempt.resume else None
+        if attempt.resume and transcript is None:
+            # A session without a transcript cannot be continued: the path of a missing
+            # session of 18.9, which starts a new one with the same inputs.
+            _log("background_session_missing", **self.ids)
+            self.ledger = TurnLedger.begin("turn", 0, self.ledger)
+            for line_uuid, line in inputs:
+                self.lines[line_uuid] = line
+                self.ledger.written(line_uuid)
+            evidence = TurnEvidence(stderr=SESSION_MISSING_TEXT, exit_label="not_started")
+            return _Outcome(evidence, False), True
+        checked = await self._background_checks(bg, attempt)
+        if not isinstance(checked, bool):
+            return checked
+        files = bg_files(self.cfg.state_dir, self.handle.run_id)
+        ensure_private_dir(files.settings.parent)
+        with contextlib.suppress(OSError):
+            files.socket.unlink()  # a socket of an earlier process of this run
+        write_private(files.settings, json.dumps(settings_document(self.state.env), sort_keys=True))
+        name = session_name(self.handle.run_id)
+        argv = background_argv(
+            claude_bin=self.h.claude_bin or self.cfg.claude_bin,
+            model=self.state.model,
+            resume=self.session.ref if attempt.resume else None,
+            name=name,
+            tool_class=self.cfg.tool_class,
+            tools=self.state.tools,
+            add_dir=self._add_dir(),
+            system_prompt_file=self._background_prompt_file(attempt),
+            socket_file=files.socket,
+            settings_file=files.settings,
+        )
+        offset = _size(transcript) if transcript is not None else 0
+        await self._rebase_once(attempt)
+        self.process = None
+        self._identity = {}
+        # The kind is fixed here (12 f 4); the answers of earlier processes stay known (12 f 2).
+        self.ledger = TurnLedger.begin("turn", offset, self.ledger)
+        for line_uuid, line in inputs:
+            self.lines[line_uuid] = line
+            self.ledger.written(line_uuid)
+        self._bg_rest = list(inputs[1:])
+        self._bg_cause = None
+        self.bg_record = {
+            "name": name,
+            "socket": str(files.socket),
+            "prompt_uuid": inputs[0][0],
+            "resume": attempt.resume,
+        }
+        self._persist()  # before the launch: a next runner finds the session by its name
+        self.bg_launching = True
+        try:
+            started = await self._start_session(
+                bg, attempt, argv, prompt, offset, supervisor_ran=checked
+            )
+        except BaseException:
+            # A cancelled or failed launch leaves no session of this run behind.
+            self.process = None
+            with contextlib.suppress(Exception):
+                await asyncio.shield(self._discard(bg, name, None))
+            raise
+        self.bg_launching = False
+        if not isinstance(started, BgSession):
+            return started
+        if not attempt.resume:
+            attempt = dataclasses.replace(attempt, new_reference=True)
+        reader = self._transcript_reader(started, TranscriptMapper(inputs[0][0]), offset)
+        return await self._follow(started, attempt, offset, 0, reader=reader), True
+
+    async def _background_checks(
+        self, bg: BackgroundMode, attempt: _Attempt
+    ) -> bool | tuple[_Outcome | None, bool]:
+        """The checks before a launch: the version, the supervisor, the session list (18.2).
+
+        Returns:
+            Whether a supervisor runs already (the runner's own, in the pinned version) when
+            the launch may go on; else what `_run_background` returns.
+        """
+        if not bg.pinned():
+            return await self._fall_back("background_version_untested")
+        readable, supervisor = await bg.cli.supervisor()
+        if not readable:
+            return await self._fall_back("background_launch_failed")
+        verdict = await asyncio.to_thread(
+            supervisor_verdict,
+            supervisor,
+            load_supervisor(self.cfg.state_dir),
+            PINNED_CLAUDE_CODE_VERSION,
+            bg.lstart,
+        )
+        if verdict is not None:
+            return await self._fall_back(verdict)
+        reading = await bg.sessions.read(after=bg.sessions.now())
+        if reading is None:
+            return await self._fall_back("background_launch_failed")
+        if attempt.resume:
+            cleared = await self._clear_entries(bg, reading)
+            if cleared is not None:
+                return cleared
+        return supervisor is not None
+
+    async def _clear_entries(
+        self, bg: BackgroundMode, reading: Reading
+    ) -> tuple[_Outcome | None, bool] | None:
+        """Before a resume: no process of the session lives and no own entry is left (18.2).
+
+        An own entry is stopped when it has a process and then removed, which is what makes
+        the launch continue the session in place with this run's flags. An entry under another
+        name belongs to another program and is never touched: with a live process the run
+        ends ``session_busy``, without one it uses print mode.
+
+        Returns:
+            ``None`` when the launch may go on, else what `_run_background` returns.
+        """
+        for entry in reading.of_session(self.session.ref):
+            if entry.own:
+                if entry.has_process:
+                    await bg.cli.stop(entry.short_id)
+                await bg.cli.remove(entry.short_id)
+            elif entry.has_process:
+                _log("session_busy", **self.ids)
+                await self._fail("adapter_error", (), "not_started", summary=cause("session_busy"))
+                return None, True
+            else:
+                return await self._fall_back("background_session_foreign")
+        return None
+
+    async def _start_session(  # noqa: PLR0911, PLR0913 - one exit per check of the launch
+        self,
+        bg: BackgroundMode,
+        attempt: _Attempt,
+        argv: Sequence[str],
+        prompt: str,
+        offset: int,
+        *,
+        supervisor_ran: bool,
+    ) -> BgSession | tuple[_Outcome | None, bool]:
+        """Launch the session and wait until it took the prompt (18.2 "Background mode").
+
+        Returns:
+            The session once its entry has a process and its transcript shows the prompt;
+            else what `_run_background` returns: the fallback while it is certain that no
+            session took the prompt, in every other doubt the end of the run.
+        """
+        files = bg_files(self.cfg.state_dir, self.handle.run_id)
+        name = session_name(self.handle.run_id)
+        timeout = self.cfg.cli_probe_timeout
+        out = await launch(
+            argv,
+            prompt=prompt,
+            cwd=self.state.cwd or self.cfg.projects_root,
+            env=launch_environment(self.state.env),
+            stdout=files.stdout,
+            stderr=files.stderr,
+            timeout=timeout,
+        )
+        if out.short_id is None:
+            return await self._launch_refused(bg, out, name, offset)
+        short_id = out.short_id
+        if out.started_service:
+            await self._record_supervisor(bg)
+        elif not supervisor_ran:
+            # A supervisor another program started between the check and the launch carries
+            # that program's environment, not the allow list of 18.2.
+            return await self._abort_launch(bg, "background_supervisor_foreign", short_id, offset)
+        if attempt.resume and (short_id != self.session.ref[:8] or out.notes):
+            # The CLI did not continue the session in place: another program started it in
+            # between, so the launch made a copy (or woke it with other options).
+            _warn("background_session_copied", **self.ids)
+            await bg.cli.stop(short_id)
+            if short_id != self.session.ref[:8]:
+                await bg.cli.remove(short_id)
+            summary = cause("background_session_copied")
+            await self._fail("runtime_error", (), "not_started", summary=summary)
+            return None, True
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        entry = await self._await_process(bg, short_id, deadline)
+        if entry is None or entry.pid is None:
+            return await self._abort_launch(
+                bg, "background_launch_failed", short_id, offset, waited=True
+            )
+        if not attempt.resume and not await self._take_session_id(entry.session_id):
+            await self._discard(bg, name, short_id)
+            return None, True
+        ident = await asyncio.to_thread(read_identity, entry.pid, timeout)
+        session = BgSession(
+            bg.cli,
+            short_id=short_id,
+            session_id=self.session.ref,
+            pid=entry.pid,
+            lstart=ident.lstart if ident is not None else "",
+            socket_file=files.socket,
+            timeout=timeout,
+        )
+        self.process = session
+        self._identity = (
+            {"lstart": ident.lstart, "command": ident.command} if ident is not None else {}
+        )
+        self._reset_process_state()
+        self.bg_record = {**(self.bg_record or {}), "short_id": short_id}
+        self.phase = "starting"  # follow-ups wait until the session took the prompt
+        self._persist()
+        while not prompt_taken(self._transcript(self.session.ref), offset):
+            if self._stop_requested() or self.server_ended:
+                break  # the read loop stops the session and ends the run
+            if not session.alive() or loop.time() >= deadline:
+                self.process = None
+                return await self._abort_launch(
+                    bg, "background_launch_failed", short_id, offset, waited=True
+                )
+            await asyncio.sleep(self.cfg.poll_interval)
+        bg.launched()
+        _log("turn_started", kind=attempt.kind, launch_mode="background", **self.ids)
+        return session
+
+    async def _await_process(
+        self, bg: BackgroundMode, short_id: str, deadline: float
+    ) -> SessionEntry | None:
+        """Wait until the session's entry names a process, at most until ``deadline``."""
+        loop = asyncio.get_running_loop()
+        while True:
+            reading = await bg.sessions.read(after=bg.sessions.now())
+            entry = reading.entry(short_id) if reading is not None else None
+            if entry is not None and entry.pid is not None:
+                return entry
+            if self._stop_requested() or self.server_ended or loop.time() >= deadline:
+                return None
+            await asyncio.sleep(self.cfg.poll_interval)
+
+    async def _launch_refused(
+        self, bg: BackgroundMode, out: LaunchOutput, name: str, offset: int
+    ) -> tuple[_Outcome | None, bool]:
+        """The launch command started no session it named (18.9)."""
+        if out.refusal == "untrusted":
+            return await self._fall_back("background_workspace_untrusted")
+        if out.refusal == "bypass":
+            return await self._fall_back("background_bypass_not_accepted")
+        if out.exit_error:
+            return await self._fall_back("background_launch_failed")  # nothing was started
+        return await self._abort_launch(bg, "background_launch_failed", None, offset)
+
+    async def _record_supervisor(self, bg: BackgroundMode) -> None:
+        """Record the supervisor this run's launch started: later launches may use it (18.2)."""
+        _, started = await bg.cli.supervisor()
+        pid = started.pid if started is not None else None
+        lstart = await asyncio.to_thread(bg.lstart, pid) if pid is not None else None
+        if pid is not None and lstart:
+            store_supervisor(self.cfg.state_dir, pid, lstart)
+            _log("background_supervisor_started", **self.ids)
+
+    async def _abort_launch(
+        self,
+        bg: BackgroundMode,
+        code: str,
+        short_id: str | None,
+        offset: int,
+        *,
+        waited: bool = False,
+    ) -> tuple[_Outcome | None, bool]:
+        """A launch in doubt: stop what it started; print mode only when nothing took the prompt.
+
+        The fallback of 18.9 happens only while it is certain that no session took the prompt:
+        within ``runner.cli_probe_timeout`` the list shows no session of this run, or its
+        entry got no process and its transcript no record of the prompt. A session whose
+        process starts late would take the prompt after the fallback, so the entry is watched
+        that long before it is judged. In every other doubt the session is stopped and the
+        run ends ``runtime_error``, so a prompt never runs twice.
+
+        Args:
+            bg: The background mode.
+            code: The code of the fallback, or of the cause when the run ends.
+            short_id: The short id the launch printed, if it printed one.
+            offset: The launch offset of the transcript.
+            waited: The caller watched the entry for the whole time limit already.
+        """
+        name = session_name(self.handle.run_id)
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + (0 if waited else self.cfg.cli_probe_timeout)
+        while True:
+            reading = await bg.sessions.read(after=bg.sessions.now())
+            entry = None
+            if reading is not None:
+                entry = reading.entry(short_id) if short_id is not None else None
+                named = reading.named(name)
+                entry = entry or (named if named is not None and named.own else None)
+            pending = entry is not None and not entry.has_process
+            if not pending or self._stop_requested() or loop.time() >= deadline:
+                break
+            await asyncio.sleep(self.cfg.poll_interval)
+        certain = reading is not None and (
+            entry is None
+            or (
+                not entry.has_process
+                and not prompt_taken(self._transcript(entry.session_id), offset)
+            )
+        )
+        await self._discard(bg, name, short_id, reading)
+        if self._stop_requested():
+            await self._finish_cancelled()
+            return None, True
+        if self.server_ended:
+            self._ended_by_server()
+            return None, True
+        if certain:
+            return await self._fall_back(code)
+        _warn("background_launch_in_doubt", code=code, **self.ids)
+        await self._fail("runtime_error", (), "not_started", summary=cause(code))
+        return None, True
+
+    async def _discard(
+        self, bg: BackgroundMode, name: str, short_id: str | None, reading: Reading | None = None
+    ) -> None:
+        """Stop and remove the session a launch of this run started, as far as it is known."""
+        if reading is None:
+            reading = await bg.sessions.read(after=bg.sessions.now())
+        found: set[str] = {short_id} if short_id is not None else set()
+        if reading is not None:
+            named = reading.named(name)
+            if named is not None and named.own and named.short_id:
+                found.add(named.short_id)
+        for ident in found:
+            await bg.cli.stop(ident)
+            await bg.cli.remove(ident)
+
+    async def _take_session_id(self, session_id: str) -> bool:
+        """The CLI made the id of a new session: the run goes on under it (18.1).
+
+        The session lock and the session's state folder move to the id, as for the new
+        reference of a missing session; `_report_session` reports it once the session took
+        the prompt.
+
+        Returns:
+            False when the run ended here: the id is no session id, or its lock is held.
+        """
+        try:
+            valid = str(UUID(session_id)) == session_id
+        except ValueError:
+            valid = False
+        if not valid:
+            _warn("background_session_id_unreadable", **self.ids)
+            await self._fail("runtime_error", (), "not_started")
+            return False
+        locks = self.cfg.state_dir / "locks"
+        try:
+            fd = await acquire(
+                locks / f"session-{session_id}.lock",
+                self.cfg.session_lock_wait,
+                self.cfg.poll_interval,
+            )
+        except LockTimeout:
+            _log("session_busy", **self.ids)
+            await self._fail("adapter_error", (), "not_started", summary=cause("session_busy"))
+            return False
+        if len(self.state.locks) > 1:
+            release(self.state.locks.pop())
+        self.state.locks.append(fd)
+        sessions = self.cfg.state_dir / "sessions"
+        old, new = sessions / self.session.ref, sessions / session_id
+        with contextlib.suppress(OSError):
+            if old.is_dir() and not new.exists():
+                old.rename(new)
+        UsageStore(new).start_without_baseline()
+        self.session = SessionChoice(ref=session_id, resume=False, new=True)
+        return True
+
+    async def _read_background(
+        self, message: Mapping[str, Any], session: BgSession, attempt: _Attempt | None
+    ) -> _Outcome | None:
+        """The effects of a mapped message that only a background session has (18.4).
+
+        Returns:
+            An outcome when the message ended the run (the counter-check), else ``None``.
+        """
+        kind, subtype = message.get("type"), message.get("subtype")
+        if kind == "system" and subtype == "init" and attempt is not None:
+            await self._report_session(message, attempt)
+            if message.get("session_id") and self.phase == "starting":
+                await self._session_started(session)
+        elif kind == "system" and subtype == "bg_request" and attempt is not None:
+            if message.get("login") is not True and self.state.mode == "personal":
+                # The counter-check of 18.3: a personal turn uses the stored login.
+                _warn("counter_check_failed", **self.ids)
+                await self._terminate(session, self.ids)
+                await self._finish("failed", reason="billing_mode_mismatch")
+                return _Outcome(TurnEvidence(), self._worked, handled=True)
+        elif kind == "bg_totals":
+            self.ledger.totals(message)
+            self._settle_cost()
+        elif kind == "assistant":
+            self.bg_priced.add(message)
+        elif kind == "result" and isinstance(message.get("bg_cause"), str):
+            self._bg_cause = str(message["bg_cause"])
+        return None
+
+    async def _session_started(self, session: BgSession) -> None:
+        """The session took the prompt: the further inputs of a recovery, then held follow-ups."""
+        async with self.write_lock:
+            rest, self._bg_rest = self._bg_rest, []
+            for _, line in rest:
+                await session.write_bytes(line)
+            if self.phase == "starting" and self.stop_reason is None:
+                self.phase = "open"
+        self._offer_held()
+
+    async def adopt_background(
+        self, record: dict[str, Any], session: BgSession, known_steps: Mapping[str, str]
+    ) -> None:
+        """Continue a background turn that outlived the previous runner (09 18.9).
+
+        No channel of a background session belonged to the old runner process, so the turn
+        is driven like an own one: the transcript is read on from the stored offset after
+        the replay of the per-turn state (18.19.7), follow-ups and retry lines go to its
+        inbox socket, and a stop stops it. A session without a process is finished from its
+        transcript. Its end is classified without a recovery: no process is ever started
+        for an adopted run (R-AG-17).
+
+        Args:
+            record: The turn record.
+            session: The session of the record; its process may be gone.
+            known_steps: The status of each step of the server's run, by step id.
+        """
+        self.task = asyncio.current_task()
+        self.adopted_record = record
+        self.adopted_group = session
+        self.bg_adopted = True
+        part = record.get("bg")
+        self.bg_record = dict(part) if isinstance(part, Mapping) else {}
+        self._restore_adopted(record, known_steps)
+        done = False
+        try:
+            if self.ledger.finishing is not None:
+                # The previous runner decided the end and may have stored its costs: repeat it.
+                await self._terminate(session, self.ids)
+                decided = self.ledger.finishing
+                await self._finish(
+                    str(decided["state"]), reason=decided["reason"], summary=decided.get("summary")
+                )
+                done = True
+                return
+            mapper = TranscriptMapper(str(self.bg_record.get("prompt_uuid") or ""))
+            lines = replayed_records(
+                self._transcript(session.session_id),
+                self.ledger.process_start,
+                self.ledger.offset,
+                mapper,
+            )
+            self.ps = ProcessState(has_stdin=True, account_retry=self._account_schedule())
+            self._replayed_worked = self._replay_ledger(lines)
+            for message, _, _ in lines:
+                if message.get("type") == "assistant":
+                    self.bg_priced.add(message)
+            replayed = self.ps.replay([m for m, _, _ in lines], self.monotonic())
+            _log("turn_replayed", lines=replayed, **self.ids)
+            alive = session.alive()
+            if alive:
+                self.process = session
+                self._identity = {"lstart": session.lstart}  # the next adopter checks it too
+            self.phase = "closed"
+            if alive:
+                self.phase = "open" if mapper.started else "starting"
+            self._persist()  # every adopter writes the record again
+            resumed = self.bg_record.get("resume") is True
+            attempt = _Attempt(resume=resumed, new_reference=not resumed)
+            reader = self._transcript_reader(session, mapper, self.ledger.offset)
+            outcome = await self._follow(
+                session, attempt, self.ledger.offset, 0, adopted=True, reader=reader
+            )
+            if outcome is not None and not outcome.handled and not self.server_ended:
+                await self._end_adopted_background(outcome)
+            done = True
+        except Exception as exc:
+            done = await self._on_error(exc, followed=True)
+            raise
+        finally:
+            # An orderly stop of this runner keeps the record for the next start.
+            if done:
+                self.phase = "ended"
+                remove_turn_record(self.cfg.state_dir / "turns" / f"{self.handle.run_id}.json")
+                remove_run_files(self.cfg.state_dir, self.handle.run_id)
+                remove_bg_files(self.cfg.state_dir, self.handle.run_id)
+
+    def _restore_adopted(self, record: Mapping[str, Any], known_steps: Mapping[str, str]) -> None:
+        """The run's state from the record of a background turn."""
+        self.ledger = TurnLedger.from_record(record)
+        self.title = str(record.get("title") or "")
+        self.title_request = bool(record.get("title_request"))
+        self.cost_baseline = _stored_baseline(record.get("cost_baseline"))
+        self.followups = PendingFollowups.from_record(record.get("followups"))
+        version = record.get("session_version")
+        if isinstance(version, str) and version:
+            self.session_version = version
+        if record.get("stop") and self.stop_reason is None:
+            self.stop_reason = str(record["stop"])
+        run = record.get("run")
+        if isinstance(run, Mapping) and isinstance(run.get("own_uuid"), str):
+            self.own_uuid = str(run["own_uuid"])
+        self.report_due = False  # a new session is reported when its prompt is read (18.1)
+        self.rebased = True
+        self.live = LiveBox(
+            self.handle.patch,
+            own_uuid=self.own_uuid,
+            title_requested=False,
+            context_windows={},
+            now=lambda: datetime.now(UTC),
+            progress_interval=self.cfg.progress_patch_interval,
+        )
+        self.live.restore(record.get("steps"), known_steps)
+
+    async def _end_adopted_background(self, outcome: _Outcome) -> None:
+        """Finish the run of an adopted background turn by the classification of 18.9."""
+        end = classify_turn_end(outcome.evidence)
+        if end.outcome == ErrorKind.VERSION_UNSUPPORTED.value:
+            await self.h.runtime_too_old(end.required_version)
+        action = next_action(
+            end,
+            self.recovery,
+            self.state.session_mode,
+            worked=outcome.worked,
+            stop_reason=self.stop_reason,
+        )
+        if isinstance(action, Finish):
+            await self._complete()
+        elif isinstance(action, Cancelled):
+            await self._finish_cancelled()
+        elif isinstance(action, Fail):
+            await self._fail_turn(action, "turn", outcome, end)
+        else:
+            # A recovery would start a process, which an adopted run never does (R-AG-17).
+            await self._fail("runtime_error", end.errors, end.exit_label)
 
     # ---- adoption (design note 12) ---------------------------------------------------------
 

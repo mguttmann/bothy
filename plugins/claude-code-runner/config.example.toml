@@ -110,6 +110,20 @@ channel_skills_dir = ""
 # capability turn_handover. Switch it on only against a server that accepts that capability
 # (16 10.1); `claude-code-runner stop --turns` ends every turn on purpose.
 turn_handover = false
+# Background mode (docs/spec/09-agents.md 18.2 "Background mode"): "print" (the default) starts
+# every turn as `claude -p`. "background" runs the turns of the runner's own agent in billing
+# mode personal as Claude Code background sessions (`claude --bg`), a research preview of
+# Claude Code; every other turn, and every run the mode is not available for, uses print mode,
+# and such a run says why in its live box. Read the README section "Background sessions" first:
+# the mode needs the pinned CLI version, workspace trust for every bound folder and, for tool
+# class host, the recorded acceptance of bypass mode. Without the key nothing changes.
+launch_mode = "print"
+# Channel ids that use background mode; empty means every channel. With entries, only runs in
+# these channels use it, so the mode can be tried on one forum first.
+background_channels = []
+# How often the session list (`claude agents --json --all`) is read while a background turn is
+# active; one reading serves every turn of the runner.
+background_status_interval = "2s"
 # Roots of answer attachments by name only; an operator may narrow the list, never widen it.
 attach_allowed_roots = ["project", "thread_inbox", "runner_temp"]
 # Denied names of answer attachments; must contain the list of 09 18.10, may add more.

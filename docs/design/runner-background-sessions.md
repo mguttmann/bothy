@@ -1,11 +1,11 @@
 # Claude Code runner on background sessions
 
-Status: design draft of 2026-11-16 for the ticket FEAT-RUNNER-BG-SESSIONS. Nothing in it is
-built. This note records the goal, the evidence and the decisions with their reasons, and ends
-with the build brief. The ticket that builds it writes the normative text into
-[09-agents.md](../spec/09-agents.md) sections 18 and 21 and its rulings into
-`docs/decisions.d/FEAT-RUNNER-BG-SESSIONS.md`. Where this note and a chapter disagree, the
-chapter wins.
+Status: design of 2026-11-16, built by the ticket FEAT-RUNNER-BG-SESSIONS. This note records
+the goal, the evidence and the decisions with their reasons, and ends with the build brief. The
+normative text is in [09-agents.md](../spec/09-agents.md) sections 18 and 21 (the paragraphs
+"Background mode") and the rulings are in `docs/decisions.d/FEAT-RUNNER-BG-SESSIONS.md`. Where
+this note and a chapter disagree, the chapter wins. Section 9 lists where the build changed a
+decision of the draft; the decisions below say what was built.
 
 Why a design note: the change adds a second process contract to the runner
 (`plugins/claude-code-runner`) and rests on a part of Claude Code that is in research preview,
@@ -129,6 +129,7 @@ Each point is decided by a test of section 7.3.
 | 22 | The CLI sends requests of its own for a background session: short ones at every turn end for the row summary and state of agent view, a check at the session's start, and one for a title when `--name` is missing. They use the small-model alias of the settings, and neither the transcript nor `cost-state` records them | run A, run B |
 | 23 | The `api-request` records of a session list a beta whose name starts with `oauth-` exactly when its requests used the stored login: every record of a session on the login had it, no record of a session on a key | run A against run B |
 | 24 | A background session loads the user's settings like a print turn without `--bare`: instructions file, hooks, plugins, default permission mode, fallback model | run A |
+| 25 | Right after the launch command returned, the entry of the session names no `pid` yet. `claude stop` and `claude rm` at that moment both succeed and remove the entry, and no session process takes the prompt afterwards: no request reached the stand-in (found by the build) | run B |
 
 ### 2.3 Where the documentation and the runs disagree
 
@@ -234,13 +235,20 @@ Only the turns of the runner's own agent in billing mode `personal`. In print mo
    <model> <flags of the tool class> [--add-dir <folder>] --append-system-prompt-file <file>
    --messaging-socket-path <socket> --settings <file>`, in the project folder, with the
    allow-list environment of 18.2 plus `DISABLE_AUTOUPDATER`, the prompt on stdin, and stdout
-   and stderr in files of the run. The flags of the class are those of 18.2 with
+   and stderr in files of the run. The files of a launch (the settings file, the system prompt
+   file, the launch command's stdout and stderr) and the inbox socket lie in
+   `<runner.state_dir>/bg/` and are named after the run, never after the session: the CLI makes
+   the id of a new session only after the launch (step 5), the session's own folder moves to
+   that id, and a live session process keeps the paths it was started with. The socket's name is
+   the first 16 hexadecimal digits of the SHA-256 of the run id, which keeps the path below the
+   system's bound. They are removed when the run left the runner. The flags of the class are
+   those of 18.2 with
    `AskUserQuestion` added to `--disallowedTools` under `scoped` and `host` (`chat` has no
    tool). `--permission-prompts none` is left out (print mode only). A test compares the whole
-   list per class. The socket lies in a folder of the state directory; with
-   `runner.launch_mode` `"background"` the start is refused, naming `runner.state_dir`, when
-   such a path is longer than a socket address of the system allows.
-3. **The settings file** of the run (mode `0600`, in the run's files) holds exactly:
+   list per class. With `runner.launch_mode` `"background"` the start is refused, naming
+   `runner.state_dir`, when the socket path is longer than a socket address of the system
+   allows.
+3. **The settings file** of the run (mode `0600`, in that folder) holds exactly:
    `crossSessionInbound` `"accept"`, `worktree.bgIsolation` `"none"`, and `env` with
    `CLAUDE_PRODUCT_RUN`, `DISABLE_AUTOUPDATER`, the run's `TMPDIR` and, only with
    `runner.forward_ssh_agent`, `SSH_AUTH_SOCK`. Reasons: the launching command's environment
@@ -258,11 +266,12 @@ Only the turns of the runner's own agent in billing mode `personal`. In print mo
 6. **A resumed session.** The runner first checks that the transcript exists; a missing one
    takes the "session missing" path of 18.9 with a new session. After the launch the short id
    must be the first eight characters of the session id and stderr must carry no `note:` line;
-   otherwise a copy was started (another program started the session in between): the runner
-   stops and removes the copy and ends the run `failed` with `runtime_error` and the cause
-   `background_session_copied`.
+   otherwise the CLI did not continue the session in place (another program started the
+   session in between): the runner stops what the launch started, removes a copy, and ends the
+   run `failed` with `runtime_error` and the cause `background_session_copied`.
 7. **Started** means: the entry of the session has a `pid`, and the transcript shows the
-   prompt as a `user` record after the launch offset. The runner then records the process
+   prompt as a `user` record after the launch offset, both within `runner.cli_probe_timeout`
+   (4.13 says what happens otherwise). The runner then records the process
    (its id and start time), reports `started = true` as after `system/init`, and runs the
    counter-check of 18.3 on the first `api-request` record (item 23): a `personal` turn whose
    request did not use the stored login is stopped and ends `billing_mode_mismatch`. The
@@ -275,10 +284,11 @@ Only the turns of the runner's own agent in billing mode `personal`. In print mo
 
 `capabilities.followups` stays `steer`. A follow-up, a retry line of 18.9 and any other input
 of a running run is one line of the form of item 14 on the socket the runner named at the
-launch, with a fresh `uuid` (the line text is today's: lead-in, blank line, content,
-attachments and transcripts). The runner patches `delivered` when the line is written and
-`absorbed` when the transcript shows a `queue-operation` `remove` with that `commandUuid`, or a
-`user` record with that `uuid`. The checks of 18.5 before the write are unchanged.
+launch, with the `uuid` and the text the line has on stdin in print mode (lead-in, blank line,
+content, attachments and transcripts), so the record of an input is the same in both modes. The
+runner patches `delivered` when the line is written and `absorbed` when the transcript shows a
+`queue-operation` `remove` with that `commandUuid`, or a `user` record with `origin.kind` `peer`
+and that `uuid`. The checks of 18.5 before the write are unchanged.
 
 - Alternatives: (a) `claude --resume <id> --bg "<text>"`: starts a copy while the session lives
   (item 16). (b) typing into `claude attach` through a pseudo-terminal: it is the only channel
@@ -294,8 +304,10 @@ attachments and transcripts). The runner patches `delivered` when the line is wr
   cannot approve anything; a slash command in it does not run; it is plain text. A turn of the
   runner has nothing to approve, and a follow-up line never starts with its text anyway. The
   runner prompt gains one paragraph for sessions started in background mode: a message that
-  arrives this way and starts with the runner's lead-in is the person's own message, relayed
-  by the runner, and is followed like one.
+  arrives this way and starts with the runner's lead-in, or says that it is an automatic retry
+  by the runner, is the person's own message or the runner's own line, relayed by the runner,
+  and is followed like one. The prompt of a print turn does not carry the paragraph and keeps
+  its bytes.
 - When the socket cannot be used (the CLI binds none, or a managed setting holds or refuses
   inbound messages), the follow-up is not written, or is written and never taken in. Either
   way the server defers it into a new run after this one (section 7 of 09), as it does today
@@ -320,12 +332,16 @@ attachments and transcripts). The runner patches `delivered` when the line is wr
   message of the turn; a turn whose last assistant record is an API error has none. Each
   answered turn posts one answer, as each `result` does today.
 - **After a turn end** the runner waits for a reading of the list taken after it. `status`
-  `busy` means the process still works without a turn (background work): the run stays
-  `running` and the rule of 18.5 "Background work" applies with `status` in the place of the
-  task list. `status` `idle`, no written input without echo and, for a process that had
+  `busy` means the process still works without a turn (background work), unless the transcript
+  already shows the start of the next turn (a queued line or a notification makes the session
+  busy again at once): the run stays `running` and the rule of 18.5 "Background work" applies
+  with `status` in the place of the task list. Between two turns a reading that says `busy`
+  and is newer than the last read of the transcript is decided with the next read, for the
+  same reason. `status` `idle`, no written input without echo and, for a process that had
   background work, the quiet window `runner.followup_grace` end the run (4.7).
 - **A session that waits for a person** (`waitingFor` present) is stopped, and the run ends
-  `failed` with `runtime_error` and a box note that names the kind. The class flags prevent
+  `failed` with `runtime_error`, a box note that names the kind and the cause
+  `background_session_waiting`. The class flags prevent
   it: `dontAsk` refuses what would prompt, `bypassPermissions` does not prompt, and
   `AskUserQuestion` is disallowed (item 21).
 - Alternative for the turn end and the answer: a `Stop` hook of the runner in `--settings`,
@@ -343,14 +359,14 @@ per type in a debug line; no transcript line is copied anywhere (2.2 item 12).
 
 | Record | Fields | Live box and run |
 |---|---|---|
-| `user` with a text content and `origin.kind` `human`, the first after the launch offset | `sessionId` | the echo of the run's prompt, ignored; `agent_session.report` with `started = true` once (in the place of `system/init`) |
+| `user` with a text content and `origin.kind` `human`, the first after the launch offset | `sessionId` | the run's prompt, the echo of the input the session was launched with; `agent_session.report` with `started = true` once (in the place of `system/init`); every record before it is skipped, because a resume first writes what closes the interrupted turn of the process before |
 | `api-request`, the first of the process | `params.betas` | counter-check of 18.3 (4.3 step 7) |
 | `assistant` | `message.id`, `message.model`, `message.content[]` (`text`; `tool_use` with `id`, `name`, `input`), `message.usage` | `/model` from the first one that is not synthetic; `/last_text_excerpt`; one `tool_call` step per `tool_use`; context percent while the window of the model is known; `/cost` as in 18.7, once per `message.id` with its newest usage |
 | `assistant` with `isApiErrorMessage` | `error`, `apiErrorParams` | no work; the class of an account error and its reset time (4.9); the recognised error texts of 18.9 |
 | `user` with `tool_result` items | `tool_use_id`, `is_error` | the step ends `completed` or `failed` |
-| `user` whose `uuid` is that of a written line | `uuid` | `absorbed` of that follow-up: its turn starts |
+| `user` with `origin.kind` `peer` | `uuid` | the echo of the written line with that `uuid`: `absorbed` of that follow-up, its turn starts |
 | `user` with `origin.kind` `task-notification` | none | a turn the session starts by itself |
-| `queue-operation` | `operation`, `reason`, `commandUuid` | `enqueue` and `dequeue` stand in for `command_lifecycle` `queued` and `started` (18.5); `remove` with `absorbed_mid_turn` sets `absorbed` |
+| `queue-operation` | `operation`, `reason`, `commandUuid` | `enqueue` and `dequeue` stand in for `command_lifecycle` `queued` and `started` (18.5), matched in their order because they carry no id, and `dequeue` starts a turn; `remove` with `absorbed_mid_turn` sets `absorbed` |
 | `system` `turn_duration` | none | end of the turn, answer, account wait (4.5, 4.9) |
 | `cost-state`, the last after the process ended | `modelUsage` | costs of the run (4.8) |
 
@@ -358,12 +374,20 @@ Not available in background mode:
 
 | Print mode | In background mode |
 |---|---|
-| `tool_progress` | none; the runner patches `/metrics/progress_events` by its own clock once per `runner.progress_patch_interval` while `status` is `busy`, so a long tool call is not reported stalled |
+| `tool_progress` | none; while `status` is `busy` during a turn each reading of the session list counts as one progress event (the live box patches `/metrics/progress_events` at most once per `runner.progress_patch_interval`), so a long tool call is not reported stalled |
 | `system/task_*` and `workflow_progress`: steps of kind `subagent`, `workflow`, `background_job`, their usage, the agents of a workflow, `/metrics/subagents` | none; a subagent or a workflow shows as the one `tool_call` step of its tool, and steps inside it are not shown |
 | `system/background_tasks_changed`: `/metrics/background_jobs` | 1 while `status` is `busy` between turns, else 0; no task list, so a summary names lost work without a count per task |
 | `system/status` `compacting`, `system/api_retry` | none: no `compacting` status line, no retry metrics |
 | `rate_limit_event` | none; the usage mark of 18.19.10 cannot be set |
 | `result`: `contextWindow`, cost per turn, `num_turns` | the window of a model is known only from an earlier print turn of the session's store; `/cost` is settled once, after the process ended |
+
+How the build reads the table: each record is mapped to the stream message of 18.4 that means
+the same (`bgtranscript.py`), so the live box, the turn record, `ProcessState` and the rules of
+18.5 and 18.9 run one code path in both modes; a class test holds that every recorded
+transcript gives the decisions of the print stream of the same scenario. `apiErrorParams` is
+read in the CLI's file and is in no recording, because the stand-in sends no usage window. The
+record `session-owner` is written only on a login; the recorder and the runner drop it by type
+either way.
 
 ### 4.7 D-BG-7: stop and the end of a run
 
@@ -372,6 +396,11 @@ Not available in background mode:
   its process group, after `runner.kill_grace` SIGKILL, each logged `stop_escalated`. The run
   finishes `cancelled` only when the process is gone; then the entry is removed. A stop ends
   the session's background work, as today.
+- **A cancellation while the launch is under way** (a stop of the run or of the runner between
+  the launch command and "started") stops and removes the session of that launch and finishes
+  the run `cancelled` with `adapter_stopped`. The run is not left for a start from the inbox:
+  the session may have taken the prompt, and a second start would run it again. The stop works
+  also while the entry names no process yet (item 25).
 - **End of a run** ("release", in the place of closing stdin): the same `claude stop`, then
   the costs, then `claude rm`, then `run.finish`. The summary `run_ended_idle` is unchanged.
   Alternative: keep the process between runs and send the next run's prompt to the inbox
@@ -392,8 +421,10 @@ Not available in background mode:
 The run books the difference between the session's totals after its release and the stored
 values, by the rules of 18.7 unchanged; the totals come from the last `cost-state` record,
 which the runner already reads before a resume. While the run works, `/cost` is priced from
-`message.usage` as today. Without a `cost-state` record after the release (a process killed
-hard) the priced sum is booked and logged as such.
+`message.usage` as today. Without any totals of the run's processes after the release (a
+process killed hard writes no `cost-state` record) the priced sum of the run's `assistant`
+messages is booked and logged as `costs_priced_without_totals`; the stored session values stay
+as they are, because the CLI restores the totals from the last record it finds.
 
 - Not booked: the CLI's own requests of item 22. They are short, they draw the same
   subscription, and an operator whose settings point the small-model alias at a large model
@@ -409,8 +440,9 @@ API error record and the `turn_duration` after it (item 13). The retry line is w
 inbox socket; the turn it starts carries the refused input, a person's message or a task's
 notification, in the same request, and a background command lives through refused turns (item
 20, the three properties `tests/real_cli/test_refused_request.py` holds for print mode).
-Without a usable socket no retry can be written, and the error counts like any other after
-`runner.stop_grace`, as today for a process without stdin.
+Without a usable socket the retry line cannot be written; it is tried again after each pause
+of the schedule, and the wait ends with the give-up of `runner.account_retry_max_wait`, as for
+a line that cannot be written in print mode.
 
 ### 4.10 D-BG-10: the supervisor
 
@@ -418,8 +450,12 @@ Without a usable socket no retry can be written, and the error counts like any o
   supervisor when none runs, with the launch environment, so sessions inherit the allow list
   of 18.2 and nothing else.
 - **Check before every launch:** `claude daemon status`. No supervisor: launch, and record
-  the supervisor that launch started (its process id and start time, in the runner's state). A
-  recorded supervisor with the pinned version: launch. Any other supervisor, of another
+  the supervisor that launch started (its process id and start time, in
+  `<runner.state_dir>/bg/supervisor.json`) when the launch printed that it started the
+  service. A launch that printed no such line although the check found no supervisor ran
+  under a supervisor another program started in between: its session is stopped and removed
+  and the run goes on by the rule of 4.13 with `background_supervisor_foreign`. A recorded
+  supervisor with the pinned version: launch. Any other supervisor, of another
   version or started by another program of the same user: no launch, the run uses print mode
   with the cause
   `background_supervisor_foreign` or `background_supervisor_version` (4.13). Reason: sessions
@@ -445,18 +481,29 @@ Without a usable socket no retry can be written, and the error counts like any o
 
 ### 4.11 D-BG-11: adoption after a runner restart
 
-The turn record gains `launch_mode`, the short id, the socket path, the process id with its
-start time and the transcript offset. A session process cannot inherit the runner's lock
-descriptors, so the locks of a background turn live with the runner process; the adopting
-runner takes them again before it reads on. At start, before the first inbox event:
+The turn record gains `launch_mode`, the session's name, the short id once known, the socket
+path, the `uuid` of the input the session was launched with, the process id with its start
+time, the launch offset and the stored offset of the transcript, and the run's model, tools
+and billing mode. It is written before the launch command runs, so a next runner finds a
+session by its name. A session process cannot inherit the runner's lock descriptors, so the
+locks of a background turn live with the runner process; the adopting runner takes them again
+before it reads on (one attempt; a busy lock leaves the record for the next start). At start,
+before the first inbox event:
 
-- the session's entry has the recorded process and the run runs: adopt. The runner reads the
-  transcript from the stored offset, replays `ProcessState` as 18.19.7 describes, and from then
-  on drives the turn like its own, with follow-ups, retry lines and stop, because none of
-  these channels belonged to the old runner process.
+- the session's entry has the recorded process and the run runs: adopt. The runner maps the
+  transcript from the launch offset to the stored offset again, replays `ProcessState` as
+  18.19.7 describes, and from then on drives the turn like its own, with follow-ups, retry
+  lines and stop, because none of these channels belonged to the old runner process. The end
+  of an adopted turn is classified without a recovery: no process is ever started for an
+  adopted run (R-AG-17).
 - the process lives and the run has ended: stop and remove it.
-- no process: finish from the transcript when the turn's end is in it, by the ledger's rules
-  (an answer is posted once), else leave the run to the server (`interrupted`).
+- a process of the session that is not the recorded one (the supervisor started the session
+  again): it is stopped first and counts as gone.
+- no process: finish from the transcript when the turn's end is in it or the record holds a
+  decided end, by the ledger's rules (an answer is posted once), else leave the run to the
+  server (`interrupted`).
+- a record of a background turn is settled the same way by a runner whose
+  `runner.launch_mode` is `print` again, so switching the key off needs no step.
 - a record that still carries the runner's own UUID of 4.3 step 5 (the runner died between
   the launch and the report of the CLI's id): the session is found by its name
   `bothy-<run id>` and handled by the same three cases.
@@ -470,19 +517,31 @@ holds five surfaces: the launch output and the refusal texts of items 1, 5 and 6
 line of the inbox socket; the outputs of `stop`, `rm` and `daemon status`.
 
 - **Recorded fixtures** per pinned version, written by `tests/real_cli/record.py` with the
-  method of 2.4: the session list in each state, the transcripts of the scenarios of 7.3, and
-  a table of the members the runner reads per record type (the counterpart of
-  `stream_fields_<version>.json`). The recorder drops the record types of item 12.
+  method of 2.4 into `tests/fixtures/recording/background_<version>/`: what the launch command
+  prints per case, the session list in each state, the outputs of `stop`, `rm` and
+  `daemon status`, the transcripts of five scenarios (a new post, a resumed session, a
+  follow-up during a tool call, a background command with its notification, a stopped turn),
+  the print streams of the first four as their twins, and a table of the members the CLI
+  writes per record type (the counterpart of `stream_fields_<version>.json`). The recorder
+  keeps only the record types the runner reads, which drops those of item 12. The scenarios
+  that need a refused request, a copy or a waiting session are run live by level one and
+  played by Fake-Claude, not recorded.
 - **Fake-Claude** gains a background side: `--bg` prints the launch line and starts a detached
-  player that appends a fixture's transcript records with their pauses and listens on the
-  named socket; `agents --json --all`, `stop`, `rm` and `daemon status` answer from a state
-  file in the fake `HOME`. Every unit and scenario test uses it.
+  player under a fake supervisor process; the player writes the stream fixture of the scenario
+  as transcript records (a test holds every member it writes against the recorded table),
+  listens on the named socket and waits on the gates of a test; `agents --json --all`, `stop`,
+  `rm` and `daemon status` answer from a state file in the fake configuration folder. Every
+  unit and scenario test uses it.
 - **Real CLI, level one** (free, behind `CLAUDE_CODE_RUNNER_REAL_CLI=1`):
-  `tests/real_cli/test_background.py` runs the mechanics of items 1 to 6, 13, 14, 16 to 18 and
-  20 against the stand-in and compares the field table with a fresh run; `test_pinned_cli.py`
+  `tests/real_cli/test_background.py` runs the mechanics of items 1 to 6, 13, 14, 16 to 18, 20
+  and 25 against the stand-in and compares the field table with a fresh run; `test_pinned_cli.py`
   holds the names the mode relies on in the CLI's file.
 - **Real CLI, level two** (a real turn, the owner's decision as today): one short background
-  turn on the login that checks the `entrypoint` of item 12 and the beta of item 23.
+  turn on the login that checks the `entrypoint` of item 12 and the beta of item 23
+  (`test_real_background_turn_runs_on_the_stored_login`). It refuses to start while a
+  supervisor runs and stops and removes only its own session. The function that reads both
+  facts from a transcript is held by level one; the test itself was not run when the mode was
+  built.
 - Changing the pin records the fixtures again and reads section 2.2 against the new version;
   the README section "Changing the pinned version" gains these steps.
 
@@ -500,12 +559,17 @@ the heartbeat (4.10).
 | `background_bypass_not_accepted` | the refusal of item 6 (class `host`) | yes |
 | `background_workspace_untrusted` | the refusal of item 5 for this folder | no |
 | `background_session_foreign` | the session has an entry in the list that the runner did not create (4.3 step 1) | no |
-| `background_launch_failed` | any other launch that exits with an error, or no process within `runner.cli_probe_timeout` (agent view switched off, for example) | yes |
+| `background_launch_failed` | any other launch that exits with an error, `claude daemon status` or the session list that cannot be read, or no process within `runner.cli_probe_timeout` (agent view switched off, for example) | yes |
 
 - The rule that keeps a prompt from running twice: the fallback happens only while it is
-  certain that no session took the prompt (the launch exited with an error, or the entry has
-  no process and the transcript no record of the prompt). In every other doubt the runner
-  stops the session and ends the run `runtime_error`.
+  certain that no session took the prompt (the launch exited with an error, or, watched for
+  `runner.cli_probe_timeout`, the session list shows no session of the run or its entry got no
+  process and its transcript no record of the prompt; a session whose process starts late
+  would take the prompt after the fallback). In every other doubt the runner stops and removes
+  the session and ends the run `runtime_error` with the code as its cause.
+- The status line of the live box is "Background sessions are not available (`<code>`); this
+  run uses print mode.". The fallback holds for the rest of the run: a later process of the
+  same run (a recovery) uses print mode too.
 - The runner never writes the CLI's trust entry or its acceptance of bypass mode. Both are
   one-time steps of the operator in the host user's own CLI configuration; the README names
   them.
@@ -611,7 +675,10 @@ keeps every line of its behaviour.
 - **Real CLI:** level one as in D-BG-12, required for the ticket. Level two only on the
   owner's word.
 - **End to end:** `tests/realserver` gains one forum in background mode with Fake-Claude: a
-  post, a follow-up, a stop.
+  post, a follow-up, a stop. Built on a server of its own (`tests/realserver/test_background.py`):
+  the world of the shared server has Lotse on `organization`, and I1 allows `personal` only
+  while the credential holder alone can trigger, so the file revokes the grants of persons on
+  the space and switches Lotse to `personal` before its flows.
 
 ### 7.4 Order of work
 
@@ -661,3 +728,26 @@ keeps every line of its behaviour.
    Recommendation: keep the refusal in the first build, because the cause is visible and the
    alternative hands the person's shell environment to runner turns; add a key that accepts a
    shared supervisor only when the fallback proves to be a burden.
+
+## 9. What the build changed
+
+The build kept every decision of section 4 in substance. Where it had to be more exact than
+the draft, or found that the draft was wrong, the decision above was changed in the same
+change; this list names each such place.
+
+| Decision | Draft | Built | Reason |
+|---|---|---|---|
+| D-BG-3 step 2 and 3 | the launch files are "files of the run", the socket lies "in a folder of the state directory" | everything lies in `<runner.state_dir>/bg/`, named after the run; the socket's name is a digest of the run id | the session's folder is renamed when the CLI's id is known, and a live process keeps its paths; a socket path is bounded |
+| D-BG-3 step 7 | no bound for "started" | within `runner.cli_probe_timeout` | a launch that never takes the prompt must end |
+| D-BG-4 | a fresh `uuid` per line | the `uuid` of the runner's input line | one record of an input in both modes; adoption maps the echo by it |
+| D-BG-4 | the prompt paragraph names the lead-in | it also names the runner's retry line | the retry after an account error arrives the same way |
+| D-BG-5 | `busy` after a turn end is background work | unless the transcript already shows the next turn | a queued line or a notification makes the session busy again at once |
+| D-BG-5 | no cause for a waiting session | cause `background_session_waiting` | the summary in the thread names why the run failed |
+| D-BG-6 | the first prompt record is ignored | it is the echo of the launch input | the turn record counts the input as taken |
+| D-BG-6 | progress by the runner's own clock per `runner.progress_patch_interval` | one progress event per reading of the session list, throttled by the live box | the reading is the evidence that the session works |
+| D-BG-7 | no rule for a cancellation during the launch | the session is stopped and removed, the run ends `cancelled` | the prompt must not run twice |
+| D-BG-9 | a retry that cannot be written counts as an error after `runner.stop_grace` | it is tried again after each pause until the give-up | the same path as print mode |
+| D-BG-10 | the supervisor is recorded after a launch without one | only when the launch printed that it started the service; else the launch is aborted | another program can start a supervisor between the check and the launch |
+| D-BG-11 | adoption reads from the stored offset | it maps the records from the launch offset again first; a foreign process of the session is stopped; the end has no recovery; one lock attempt | the mapper holds state of earlier records; R-AG-17 |
+| D-BG-12 | the transcripts of every scenario of 7.3 are recorded | five scenarios and four print twins; the others are run by level one and played by Fake-Claude | a refusal, a copy and a waiting session are single commands, not conversations |
+| D-BG-13 | "no process" is judged at once | the entry is watched for `runner.cli_probe_timeout` first | a process that starts late would take the prompt after the fallback |

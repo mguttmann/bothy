@@ -18,10 +18,12 @@ import errno
 import json
 import logging
 import os
+import shutil
 import signal
 import stat
 import subprocess
 import sys
+import tempfile
 from collections.abc import AsyncIterator, Callable, Iterable, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -339,6 +341,10 @@ async def world(
             pump.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await pump
+            # A fake supervisor of background sessions ends by itself once its last session
+            # process is gone, like the CLI's; a session the runner left running keeps it.
+            supervisors = {c["pgid"] for c in w.calls("bg_supervisor")}
+            await _gone(supervisors - _session_groups(w))
             # No process group that the test or the runner under test started is left.
             left = [g for g in _started_groups(w) if _group_alive(g)]
             for group in left:
@@ -346,9 +352,24 @@ async def world(
             assert left == [], "a process group of the scenario is left"
 
 
+def _session_groups(w: World) -> set[int]:
+    """The process groups of the background sessions Fake-Claude started."""
+    return {c["pgid"] for c in w.calls("bg_player")}
+
+
+async def _gone(groups: set[int], timeout: float = 10.0) -> None:
+    """Wait until none of the groups lives (at most ``timeout`` seconds)."""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while any(_group_alive(g) for g in groups) and loop.time() < deadline:
+        await asyncio.sleep(0.02)
+
+
 def _started_groups(w: World) -> set[int]:
     # A turn's group is its own, or with runner.turn_handover its keeper's (09 18.19.4).
     groups = {c.get("pgid", c["pid"]) for c in w.calls("turn_start")}
+    # A background session leads its own group, and so does the fake supervisor.
+    groups |= _session_groups(w) | {c["pgid"] for c in w.calls("bg_supervisor")}
     keepers = set()
     turns = w.state / "turns"
     for path in turns.glob("*.keeper") if turns.is_dir() else []:
@@ -387,6 +408,42 @@ async def _pump(fake: FakeServer) -> None:
     while True:
         await fake.clock.advance(0.05)
         await asyncio.sleep(0.01)
+
+
+@pytest.fixture
+def short_dir() -> Iterator[Path]:
+    """A short private folder for a state directory that holds sockets (09 18.2).
+
+    The inbox socket of a background session lies under ``runner.state_dir``, and the system
+    bounds the length of a socket address; the temporary folder of a test is longer than that
+    on some systems. ``CLAUDE_CODE_RUNNER_SHORT_TMP`` names another base than ``/tmp``.
+    """
+    base = os.environ.get("CLAUDE_CODE_RUNNER_SHORT_TMP") or "/tmp"
+    path = Path(tempfile.mkdtemp(prefix="ccr", dir=base))
+    try:
+        yield path
+    finally:
+        shutil.rmtree(path, ignore_errors=True)
+
+
+BACKGROUND = {
+    "launch_mode": "background",
+    "allow_personal": True,
+    "background_status_interval": "50ms",
+}
+"""The runner keys of a scenario in background mode (``World.config``)."""
+
+
+@pytest.fixture
+def bg_world(short_dir: Path, world: World) -> World:
+    """The scenario world for background mode: ``personal`` runs and a short state folder.
+
+    ``short_dir`` comes first, so it is removed after the world has stopped its runners: a
+    runner writes its state while it stops, which would create the folder again.
+    """
+    world.state = short_dir / "state"
+    world.fake.world.billing_mode = "personal"
+    return world
 
 
 class LogLines(logging.Handler):

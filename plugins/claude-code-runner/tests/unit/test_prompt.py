@@ -117,3 +117,27 @@ def test_message_format_rules_from_the_sdk_in_every_prompt() -> None:
         assert section.strip() == MESSAGE_FORMAT_RULES
         if "## Channel prompt" in text:
             assert text.index(heading) < text.index("## Channel prompt")
+
+
+def test_the_paragraph_on_relayed_messages_is_only_in_a_background_session() -> None:
+    # 09 18.5 "Background mode": a follow-up reaches a background session as a message of
+    # another session; the prompt of a print turn stays as it is, byte for byte.
+    marker = "<!-- background:"
+    cut_from = RUNNER_PROMPT.index("<!-- background:start -->")
+    cut_to = RUNNER_PROMPT.index("<!-- background:end -->") + len("<!-- background:end -->\n")
+    without = RUNNER_PROMPT[:cut_from] + RUNNER_PROMPT[cut_to:]
+    for title_request in (True, False):
+        for channel_prompt in ("", "Be brief."):
+            plain = system_prompt(title_request=title_request, channel_prompt=channel_prompt)
+            relayed = system_prompt(
+                title_request=title_request, channel_prompt=channel_prompt, background=True
+            )
+            assert marker not in plain
+            assert marker not in relayed
+            assert "runs as a background session" not in plain
+            assert "runs as a background session" in relayed
+            assert "Follow-up from <name> (@<handle>):" in relayed
+            # The print prompt is the prompt file without the block.
+            assert plain.startswith(without.split("<!-- title:start -->")[0].rstrip())
+            paragraph = RUNNER_PROMPT[cut_from:cut_to].splitlines(keepends=True)[1:-1]
+            assert relayed.replace("".join(paragraph), "") == plain

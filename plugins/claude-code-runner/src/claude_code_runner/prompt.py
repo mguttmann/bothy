@@ -3,8 +3,9 @@
 
 * The system prompt file (``--append-system-prompt-file``) holds only the fixed runner
   instructions of ``prompts/runner_prompt.md`` (the TITLE request only for a new or unstarted
-  session), the format rules of `bothy_sdk.message_format` in an own section (09 4.11) and, in
-  an own section, the channel prompt ``behavior.prompt`` (SEC-AI-1).
+  session, the paragraph on relayed messages only for a background session, 18.5), the format
+  rules of `bothy_sdk.message_format` in an own section (09 4.11) and, in an own section, the
+  channel prompt ``behavior.prompt`` (SEC-AI-1).
 * The first stdin line is one ``user`` message with two text items: the system part of
   `bothy_sdk.context.render_context` (context with trust marks, ``unverified`` content and
   every file entry in marked data blocks) and its trigger part (the words and transcripts of
@@ -32,24 +33,28 @@ __all__ = ["RUNNER_PROMPT", "context_items", "system_prompt", "user_line"]
 RUNNER_PROMPT = (
     resources.files("claude_code_runner").joinpath("prompts/runner_prompt.md").read_text("utf-8")
 )
-"""The fixed runner instructions, with the TITLE request between its markers."""
+"""The fixed runner instructions, with the TITLE request and the paragraph for a background
+session each between its markers."""
 
 _TITLE = re.compile(r"\n?<!-- title:start -->\n(.*?)<!-- title:end -->\n?", re.DOTALL)
+_BACKGROUND = re.compile(r"<!-- background:start -->\n(.*?)<!-- background:end -->\n", re.DOTALL)
 
 
-def system_prompt(*, title_request: bool, channel_prompt: str) -> str:
+def system_prompt(*, title_request: bool, channel_prompt: str, background: bool = False) -> str:
     """Return the content of the system prompt file of one turn.
 
     Args:
         title_request: Ask for a ``TITLE:`` line (new or unstarted session).
         channel_prompt: ``behavior.prompt`` of the forum; an own section when not empty.
+        background: The turn runs as a background session (``runner.launch_mode``): a
+            follow-up then reaches the model as a message of another session, and the prompt
+            says that such a message with the runner's lead-in is the person's own (18.5).
 
     Returns:
         The text; it never contains a context element.
     """
-    text = _TITLE.sub(
-        (lambda m: "\n" + m.group(1)) if title_request else (lambda _m: ""), RUNNER_PROMPT
-    )
+    text = _BACKGROUND.sub((lambda m: m.group(1)) if background else (lambda _m: ""), RUNNER_PROMPT)
+    text = _TITLE.sub((lambda m: "\n" + m.group(1)) if title_request else (lambda _m: ""), text)
     text = text.rstrip() + "\n"
     text += f"\n## {MESSAGE_FORMAT_TITLE}\n\n{MESSAGE_FORMAT_RULES}\n"
     if channel_prompt.strip():

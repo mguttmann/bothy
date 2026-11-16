@@ -514,6 +514,9 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.account_retry_second` |  | Runner |  | `2m` | pause before the second retry (18.9); above zero |  |
 | `runner.account_retry_interval` |  | Runner |  | `3m` | pause before every further retry (18.9); above zero |  |
 | `runner.account_retry_max_wait` |  | Runner |  | `20m` | longest time from the first account error of a wait until the error ends the turn like any other, decided while no turn runs and no input is queued (18.9); `0s` switches the retry off |  |
+| `runner.launch_mode` |  | Runner |  | `print` | `print` starts every turn as `claude -p`; `background` runs the turns of the runner's own agent in billing mode `personal` as Claude Code background sessions (`claude --bg`, 18.2 "Background mode"); every other turn, and a run the mode is not available for, uses print mode (18.9) |  |
+| `runner.background_channels` |  | Runner |  | empty | channel ids; when not empty, only runs in these channels use background mode and every other run uses print mode (18.2) |  |
+| `runner.background_status_interval` |  | Runner |  | `2s` | interval at which the session list (`claude agents --json --all`) is read while a background turn is active; one reading serves every turn of the runner (18.4); above zero |  |
 | `runner.session_lock_wait` |  | Runner |  | `10m` | wait time for a busy session |  |
 | `runner.max_parallel_runs` |  | Runner |  | `4` | concurrent turns |  |
 | `runner.stream_log_retention` |  | Runner |  | `14d` | retention of the recordings |  |

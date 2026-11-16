@@ -73,6 +73,10 @@ from claude_code_runner.adoption import (
 )
 from claude_code_runner.attachments import fetch_attachments
 from claude_code_runner.authcheck import auth_status, decide, evidence
+from claude_code_runner.bgmode import UNAVAILABLE, BackgroundMode
+from claude_code_runner.bgpaths import bg_files, remove_bg_files
+from claude_code_runner.bgsession import NAME_PREFIX, BgSession, SessionEntry
+from claude_code_runner.bgtranscript import TranscriptMapper, replayed_records
 from claude_code_runner.builder import AgentBuilder
 from claude_code_runner.causes import ADAPTER_STOPPED, cause
 from claude_code_runner.channel_skills import resolve_channel_skills
@@ -126,6 +130,7 @@ from claude_code_runner.stop import stop_group
 from claude_code_runner.transcribe import Transcriber
 from claude_code_runner.trash import FolderTrash, GitRunner, TrashPlaces
 from claude_code_runner.turn import remove_turn_record, write_turn_record
+from claude_code_runner.usage import find_transcript
 from claude_code_runner.workspace import (
     WorkspaceError,
     default_readiness,
@@ -279,6 +284,30 @@ class RunnerHandler(AgentHandler):
         """SIGTERM began a handover: live turns are left running with their records (18.19.3)."""
         self.stopping_all = False
         """``stop --turns``: every adopted turn is stopped and its run finished ``cancelled``."""
+        self.background: BackgroundMode | None = (
+            self._background_mode() if config.launch_mode == "background" else None
+        )
+        """Background mode with ``runner.launch_mode`` ``background``; ``None`` without the key,
+        so no run ever calls a command of background sessions (09 18.2)."""
+        self._background_adoption: BackgroundMode | None = None
+
+    def _background_mode(self) -> BackgroundMode:
+        return BackgroundMode(
+            self.config,
+            self.claude_bin,
+            self.environ,
+            on_change=self._beat_soon,
+            version=lambda: self.probe.version,
+        )
+
+    def _beat_soon(self) -> None:
+        """Send a heartbeat at once; the task is kept until it ends and cancelled by `close`."""
+        if self.adapter is None:
+            return
+        with contextlib.suppress(RuntimeError):
+            task = asyncio.get_running_loop().create_task(self.adapter.send_heartbeat())
+            self._beats.add(task)
+            task.add_done_callback(self._beats.discard)
 
     # ---- answers to the SDK ---------------------------------------------------------------
 
@@ -321,6 +350,13 @@ class RunnerHandler(AgentHandler):
             slots=(self.slots.used, self.slots.total),
             waiting=dict(self._waiting),
         )
+        if self.background is not None and self.background.unavailable is not None:
+            # The last background launch fell back for a cause of the host; no run is blocked.
+            status = dataclasses.replace(
+                status,
+                state="degraded",
+                degraded_reasons=(*status.degraded_reasons, UNAVAILABLE),
+            )
         return dataclasses.replace(status, active_runs=sorted(self.adopted, key=str))
 
     def _wait(self, run_id: UUID, reason: str | None) -> None:
@@ -414,10 +450,42 @@ class RunnerHandler(AgentHandler):
         stopping = [
             (s.run_id, s.turn)
             for s in self._runs.values()
-            if s.turn is not None and s.turn.process is not None
+            if s.turn is not None and (s.turn.process is not None or s.turn.bg_launching)
         ]
-        if adopted:
-            stopping += list(self.adopted.items())
+        # An adopted background turn is driven like an own one, so it is stopped like one.
+        stopping += [(r, t) for r, t in self.adopted.items() if adopted or t.bg_adopted]
+        for _, turn in stopping:
+            await turn.request_stop(ADAPTER_STOPPED)
+        loop = asyncio.get_running_loop()
+        deadline = (
+            loop.time()
+            + self.config.stop_grace
+            + self.config.kill_grace
+            + self.config.cli_probe_timeout
+        )
+        while any(run_id in self._runs or run_id in self.adopted for run_id, _ in stopping):
+            if loop.time() >= deadline:
+                return False
+            await asyncio.sleep(self.config.poll_interval)
+        return True
+
+    async def stop_background_turns(self) -> bool:
+        """Stop every background turn before a handover (09 18.19.2, 18.19.3).
+
+        The keeper and the named pipe are parts of print mode, so a background turn is never
+        handed over: at an orderly stop it is stopped as in 18.6 with the reason
+        ``adapter_stopped``, also with ``runner.turn_handover`` on.
+
+        Returns:
+            True once none of these runs is left; false when one still runs after
+            ``runner.stop_grace`` plus ``runner.kill_grace`` plus ``runner.cli_probe_timeout``.
+        """
+        stopping = [
+            (s.run_id, s.turn)
+            for s in self._runs.values()
+            if s.turn is not None and s.turn.bg_record is not None
+        ]
+        stopping += [(r, t) for r, t in self.adopted.items() if t.bg_adopted]
         for _, turn in stopping:
             await turn.request_stop(ADAPTER_STOPPED)
         loop = asyncio.get_running_loop()
@@ -629,6 +697,9 @@ class RunnerHandler(AgentHandler):
         self, adapter: Adapter, path: Path, record: dict[str, Any], run_id: UUID, thread_id: UUID
     ) -> None:
         ids = {"run_id": run_id, "thread_id": thread_id}
+        if record.get("launch_mode") == "background":
+            await self._adopt_background(adapter, path, record, run_id, thread_id)
+            return
         if self.turn_handover and "phase" in record:
             await self._adopt_handover(adapter, path, record, run_id, thread_id)
             return
@@ -745,6 +816,177 @@ class RunnerHandler(AgentHandler):
                 _failed("adopted_follow_failed", "the follow of the adopted run", run_id, err)
         finally:
             self.adopted.pop(run_id, None)
+            adapter.client.release_run(run_id)
+
+    # ---- adoption of a background turn (09 18.9 "Background mode") ---------------------------
+
+    async def _adopt_background(  # noqa: PLR0912, PLR0915 - one exit per case of 18.9
+        self, adapter: Adapter, path: Path, record: dict[str, Any], run_id: UUID, thread_id: UUID
+    ) -> None:
+        """A record of a background turn: adopt it, stop it, finish it or leave it (18.9).
+
+        The session is found in the session list by its short id, or by its name
+        ``bothy-<run id>`` when the previous runner ended before it learnt the id. Then:
+        the entry has the recorded process and the run runs: the turn is adopted with every
+        right (`RunTurn.adopt_background`); the process lives and the run has ended: it is
+        stopped and removed without a finish; no process: the run is finished from the
+        transcript when the end of a turn is in it, else left to the server. A background
+        session cannot inherit lock descriptors, so the adopter takes the locks itself.
+        """
+        ids = {"run_id": run_id, "thread_id": thread_id}
+        mode = self.background or self._background_adoption or self._background_mode()
+        self._background_adoption = mode
+        part = record.get("bg")
+        part = part if isinstance(part, Mapping) else {}
+        name = f"{NAME_PREFIX}{run_id}"
+        reading = await mode.sessions.read(after=mode.sessions.now())
+        if reading is None:
+            warn("adoption_sessions_unreadable", **ids)  # the record stays for the next start
+            return
+        short = part.get("short_id")
+        entry: SessionEntry | None = reading.entry(short) if isinstance(short, str) else None
+        if entry is None:
+            named = reading.named(name)
+            entry = named if named is not None and named.own else None
+        session_ref = str(record.get("session_ref"))
+        if entry is not None and not isinstance(short, str) and entry.session_id:
+            # The previous runner ended between the launch and the report of the CLI's id.
+            session_ref = entry.session_id
+        recorded = record.get("pid") if isinstance(record.get("pid"), int) else None
+        identity = record.get("identity")
+        lstart = identity.get("lstart") if isinstance(identity, Mapping) else None
+        pid = entry.pid if entry is not None else None
+        if pid is not None and recorded is None:
+            lstart = await asyncio.to_thread(mode.lstart, pid)  # launched, not yet recorded
+        files = bg_files(self.config.state_dir, run_id)
+        session = BgSession(
+            mode.cli,
+            short_id=entry.short_id if entry is not None else str(short or ""),
+            session_id=session_ref,
+            pid=pid if pid is not None else int(recorded or 0),
+            lstart=str(lstart or ""),
+            socket_file=Path(str(part.get("socket") or files.socket)),
+            timeout=self.config.cli_probe_timeout,
+        )
+        replaced = pid is not None and recorded is not None and pid != recorded
+        alive = pid is not None and not replaced and session.alive()
+        if entry is not None and entry.has_process and not alive:
+            # A process the runner cannot prove to be the one it launched is not driven: the
+            # supervisor started the session again, or the record's process is gone.
+            log("turn_adopted", action="stop_unknown_process", launch_mode="background", **ids)
+            await mode.cli.stop(entry.short_id)
+        token = await _newest_token(adapter, run_id)
+        try:
+            with adapter.client.unbound():
+                run = await adapter.client.call_as(Run, get_run.asyncio_detailed, run_id=run_id)
+        except (ProblemError, httpx.TransportError) as err:
+            log("adoption_run_unreadable", code=getattr(err, "code", "transport_error"), **ids)
+            run = None
+        run_state = str(run.state.value) if run is not None else "unknown"
+        in_log = bool(record.get("finishing")) or self._turn_end_in_transcript(
+            mode, session_ref, record, str(part.get("prompt_uuid") or "")
+        )
+        action = adoption_decision(alive=alive, run_state=run_state, result_in_log=in_log)
+        if action in (AdoptionAction.ADOPT, AdoptionAction.FINISH_FROM_LOG) and (
+            token is None or run is None
+        ):
+            action = AdoptionAction.STOP if alive else AdoptionAction.LEAVE
+        log("turn_adopted", action=action.value, launch_mode="background", **ids)
+        if action in (AdoptionAction.LEAVE, AdoptionAction.STOP):
+            if alive:
+                await session.stop(
+                    self.config.stop_grace, self.config.kill_grace, self.config.poll_interval, ids
+                )
+            if entry is not None:
+                await mode.cli.remove(entry.short_id)
+            remove_turn_record(path)
+            remove_bg_files(self.config.state_dir, run_id)
+            return
+        if token is None or run is None:  # pragma: no cover - handled above
+            return
+        held: list[int] = []
+        locks = self.config.state_dir / "locks"
+        try:
+            for lock in (f"thread-{thread_id}", f"session-{session_ref}"):
+                held.append(await acquire(locks / f"{lock}.lock", 0, self.config.poll_interval))
+        except LockTimeout:
+            for fd in held:
+                release(fd)
+            log("adoption_lock_busy", **ids)
+            return
+        handle = RunHandle(
+            adapter.client, run_id, thread_id, outbox=adapter.outbox, settings=self.config.sdk
+        )
+        handle.started(run, stored_claims(token).jti)
+        state = _state_of({**record, "session_ref": session_ref}, run_id, thread_id, run.channel_id)
+        state.locks = held
+        turn = RunTurn(self, state, handle)
+        turn.bg = mode
+        if self.stopping_all:
+            turn.stop_reason = ADAPTER_STOPPED
+        known = {
+            key: str(step.status.value) for key, step in run.steps.additional_properties.items()
+        }
+        if action is AdoptionAction.FINISH_FROM_LOG:
+            try:
+                with adapter.client.bind_run(run_id, token):
+                    await turn.adopt_background(record, session, known)
+            finally:
+                state.close()
+            return
+        self.adopted[run_id] = turn
+        task = asyncio.ensure_future(
+            self._follow_background(adapter, turn, record, session, token, known)
+        )
+        self._adopting.add(task)
+        task.add_done_callback(self._adopting.discard)
+
+    def _turn_end_in_transcript(
+        self, mode: BackgroundMode, session_ref: str, record: Mapping[str, Any], prompt_uuid: str
+    ) -> bool:
+        """Whether the transcript holds the end of a turn after the record's offset."""
+        config_dir = mode.config_dir
+        transcript = find_transcript(config_dir, session_ref) if config_dir is not None else None
+        if transcript is None:
+            return False
+        try:
+            size = transcript.stat().st_size
+        except OSError:
+            return False
+        start = record.get("process_start")
+        offset = record.get("offset")
+        start = start if isinstance(start, int) and start >= 0 else 0
+        offset = offset if isinstance(offset, int) and offset >= start else start
+        lines = replayed_records(transcript, start, size, TranscriptMapper(prompt_uuid))
+        return any(
+            message.get("type") == "result" and line_start >= offset
+            for message, line_start, _ in lines
+        )
+
+    async def _follow_background(  # noqa: PLR0913, PLR0917 - the parts of one adopted turn
+        self,
+        adapter: Adapter,
+        turn: RunTurn,
+        record: dict[str, Any],
+        session: BgSession,
+        token: Secret,
+        known: Mapping[str, str],
+    ) -> None:
+        run_id = turn.handle.run_id
+        try:
+            with adapter.client.bind_run(run_id, token):
+                await turn.adopt_background(record, session, known)
+        except Exception as err:
+            if adapter.client.http.is_closed:
+                # The adapter closed under the follow, because the runner ends (18.9).
+                _LOG.debug(
+                    "the follow of the adopted run %s ended with the runner", run_id, exc_info=True
+                )
+            else:
+                _failed("adopted_follow_failed", "the follow of the adopted run", run_id, err)
+        finally:
+            self.adopted.pop(run_id, None)
+            turn.state.close()  # the locks the adopter took
             adapter.client.release_run(run_id)
 
     async def _adopt_handover(
@@ -1479,6 +1721,8 @@ class Runner:
         adopted turns are stopped as above.
         """
         if self.config.turn_handover and not stop_turns_requested(self.config.state_dir):
+            if not await self.handler.stop_background_turns():
+                warn("stop_turns_timeout")
             self.handed_over = await hand_over(self.handler, self.adapter)
             return
         if not await self.handler.stop_turns(adopted=self.config.turn_handover):

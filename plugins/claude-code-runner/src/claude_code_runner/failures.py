@@ -29,6 +29,7 @@ from typing import Any
 
 __all__ = [
     "ERROR_TEXTS",
+    "SESSION_MISSING_TEXT",
     "ErrorKind",
     "ErrorText",
     "TurnEnd",
@@ -47,6 +48,12 @@ _CAPTURED = (
     "tests/real_cli/captured/api_errors_2.1.325.jsonl (the pinned CLI against a local API, "
     "2026-11-16)"
 )
+
+
+SESSION_MISSING_TEXT = "No conversation found with session ID"
+"""The stable part of the CLI's text for ``--resume`` of a session it does not know. A background
+turn whose session has no transcript reports the same text to the classification, so a missing
+session takes one path in both modes (09 18.9)."""
 
 
 class ErrorKind(Enum):
@@ -97,7 +104,7 @@ ERROR_TEXTS: tuple[ErrorText, ...] = (
     ),
     ErrorText(
         ErrorKind.SESSION_MISSING,
-        "No conversation found with session ID",
+        SESSION_MISSING_TEXT,
         "stderr",
         f"{_PINNED_FILE}: print mode with --resume of an unknown session writes it to stderr "
         "(and, with stream-json, as an error result) and exits 1 before system/init "

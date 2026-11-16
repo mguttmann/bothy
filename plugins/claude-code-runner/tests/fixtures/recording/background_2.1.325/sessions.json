@@ -1,0 +1,65 @@
+{
+  "busy": {
+    "pid": 15515,
+    "id": "a04452ec",
+    "cwd": "/work",
+    "kind": "background",
+    "startedAt": 1794854088340,
+    "sessionId": "a04452ec-0b84-434b-9d2e-c03acbd64239",
+    "name": "bothy-post",
+    "status": "busy",
+    "state": "working"
+  },
+  "idle": {
+    "pid": 15515,
+    "id": "a04452ec",
+    "cwd": "/work",
+    "kind": "background",
+    "startedAt": 1794854088340,
+    "sessionId": "a04452ec-0b84-434b-9d2e-c03acbd64239",
+    "name": "bothy-post",
+    "status": "idle",
+    "state": "working"
+  },
+  "stopped": {
+    "id": "a04452ec",
+    "cwd": "/work",
+    "kind": "background",
+    "startedAt": 1794854087686,
+    "sessionId": "a04452ec-0b84-434b-9d2e-c03acbd64239",
+    "name": "bothy-post",
+    "state": "stopped"
+  },
+  "busy_between_turns": {
+    "pid": 16446,
+    "id": "d4980df4",
+    "cwd": "/work",
+    "kind": "background",
+    "startedAt": 1794854113646,
+    "sessionId": "d4980df4-d265-49cc-9efa-97ecab3e240d",
+    "name": "bothy-job",
+    "status": "busy",
+    "state": "working"
+  },
+  "failed": {
+    "id": "542896e9",
+    "cwd": "/work",
+    "kind": "background",
+    "startedAt": 1794854129799,
+    "sessionId": "542896e9-3333-4cd4-88bc-732d2ef51c3d",
+    "name": "bothy-gone",
+    "state": "working"
+  },
+  "waiting": {
+    "pid": 17386,
+    "id": "ef9996e7",
+    "cwd": "/work",
+    "kind": "background",
+    "startedAt": 1794854132710,
+    "sessionId": "ef9996e7-5766-4097-b16e-4ace8ba55f17",
+    "name": "bothy-wait",
+    "status": "waiting",
+    "waitingFor": "input needed",
+    "state": "blocked"
+  }
+}

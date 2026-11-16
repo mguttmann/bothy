@@ -104,6 +104,28 @@ FACT_TOKENS = (
     # The fallback of a model the API refuses (README, runner.default_model).
     "model_fallback",
 )
+# The names background mode relies on (09 18.2 "Background mode", FEAT-RUNNER-BG-SESSIONS): the
+# flags of the launch, the two settings, the transcript records and members the runner reads,
+# the member of a waiting session, and the stable parts of the refusals and of the copy note.
+# ``tests/real_cli/test_background.py`` runs them; a name that left the CLI fails here first.
+BACKGROUND_TOKENS = (
+    "--bg",
+    "--messaging-socket-path",
+    "crossSessionInbound",
+    "bgIsolation",
+    "hasTrustDialogAccepted",
+    "queue-operation",
+    "absorbed_mid_turn",
+    "commandUuid",
+    "turn_duration",
+    "task-notification",
+    "isApiErrorMessage",
+    "apiErrorParams",
+    "waitingFor",
+    "Workspace not trusted.",
+    "--bg with bypassPermissions requires accepting the disclaimer first.",
+    "is already running in the background, so this started a copy as",
+)
 _TOO_OLD = re.compile(rb"\\bClaude Code \\S\+ \(\?:([^)]+)\)")
 """The CLI's own pattern of the API error kind ``claude_code_version_too_old``."""
 
@@ -131,6 +153,11 @@ def test_pinned_cli_knows_error_texts_and_events(data: bytes) -> None:
     missing = [e.fragment for e in ERROR_TEXTS if e.fragment.encode() not in data]
     assert missing == []
     absent = [t for t in (*READ_TOKENS, *FACT_TOKENS) if t.encode() not in data]
+    assert absent == []
+
+
+def test_pinned_cli_knows_the_names_of_background_mode(data: bytes) -> None:
+    absent = [t for t in BACKGROUND_TOKENS if t.encode() not in data]
     assert absent == []
 
 

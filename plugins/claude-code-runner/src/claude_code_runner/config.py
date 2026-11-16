@@ -29,6 +29,7 @@ from uuid import UUID
 
 from bothy_sdk.settings import SdkSettings
 
+from claude_code_runner.bgpaths import socket_path_fits
 from claude_code_runner.reply_attachments import (
     DEFAULT_DENIED_PATTERNS,
     ROOT_NAMES,
@@ -42,6 +43,7 @@ from claude_code_runner.workspace import WorkspaceError, resolve_default
 
 __all__ = [
     "DEFAULT_STDIO_RUNNERS",
+    "LAUNCH_MODES",
     "ConfigError",
     "RunnerConfig",
     "check_argument",
@@ -58,6 +60,10 @@ _COMMAND = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._-]*")
 
 DEFAULT_STDIO_RUNNERS = ("npx", "uvx")
 """The default of ``runner.mcp_stdio_runners`` (26 14), equal to ``agents.mcp_stdio_runners``."""
+
+LAUNCH_MODES = ("print", "background")
+"""The values of ``runner.launch_mode`` (09 18.2): one ``claude -p`` process per turn, or a
+Claude Code background session per run (``claude --bg``)."""
 _BIDI = frozenset("\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069")
 
 
@@ -216,6 +222,15 @@ class RunnerConfig:
             first account error of a wait until the runner gives up and the error ends the
             turn like any other, decided while no turn runs and no input is queued; zero
             switches the retry off.
+        launch_mode: ``runner.launch_mode``: ``print`` (the default) starts every turn as
+            ``claude -p``; ``background`` runs the turns of the runner's own agent in billing
+            mode ``personal`` as Claude Code background sessions (``claude --bg``, 09 18.2
+            "Background mode"). Without the key the runner behaves exactly as before.
+        background_channels: ``runner.background_channels``: when not empty, only runs in
+            these channels use background mode and every other run uses print mode.
+        background_status_interval: ``runner.background_status_interval``: how often the
+            session list (``claude agents --json --all``) is read while a background turn is
+            active (09 18.4); above zero.
     """
 
     source: Path
@@ -271,6 +286,9 @@ class RunnerConfig:
     account_retry_second: float = 120.0
     account_retry_interval: float = 180.0
     account_retry_max_wait: float = 1200.0
+    launch_mode: str = "print"
+    background_channels: tuple[UUID, ...] = ()
+    background_status_interval: float = 2.0
 
 
 _Parse = Callable[[Any], Any]
@@ -566,6 +584,41 @@ def _hosted_max_tool_class(r: _Reader) -> str:
     return value
 
 
+def _launch_mode(r: _Reader) -> str:
+    """``runner.launch_mode``: ``print`` or ``background``."""
+    value: str = r.get("launch_mode", str, "print")
+    if value not in LAUNCH_MODES:
+        raise r.fail("launch_mode", "not print or background")
+    return value
+
+
+def _background_channels(r: _Reader) -> tuple[UUID, ...]:
+    """``runner.background_channels``: distinct channel ids in their canonical text."""
+    found: list[UUID] = []
+    for value in r.strings("background_channels"):
+        try:
+            channel = UUID(value)
+        except ValueError:
+            raise r.fail("background_channels", "an entry is not a channel id") from None
+        if str(channel) != value or channel in found:
+            raise r.fail("background_channels", "an entry is not canonical or is listed twice")
+        found.append(channel)
+    return tuple(found)
+
+
+def _check_background(r: _Reader, config: RunnerConfig) -> None:
+    """The start check of ``runner.launch_mode`` ``background`` (09 18.2).
+
+    The inbox socket of a background session lies under ``runner.state_dir``, and the system
+    bounds the length of a socket address: a longer path would leave every background turn
+    without follow-ups, so the start is refused instead.
+    """
+    if not socket_path_fits(config.state_dir):
+        raise r.fail(
+            "state_dir", "too long for the socket of a background session (runner.launch_mode)"
+        )
+
+
 def _plain(value: str) -> bool:
     """Not empty and without a control or bidi character (an argument may start with -)."""
     return check_argument("x" + value) and bool(value)
@@ -685,11 +738,21 @@ def load_config(path: Path) -> RunnerConfig:
         account_retry_second=_positive(r, "account_retry_second", "2m"),
         account_retry_interval=_positive(r, "account_retry_interval", "3m"),
         account_retry_max_wait=r.duration("account_retry_max_wait", "20m"),
+        launch_mode=_launch_mode(r),
+        background_channels=_background_channels(r),
+        background_status_interval=_positive(r, "background_status_interval", "2s"),
     )
     r.unknown()
+    _check_modes(r, config)
+    return config
+
+
+def _check_modes(r: _Reader, config: RunnerConfig) -> None:
+    """The start checks of the keys that switch a mode on: hosting and background mode."""
     if config.hosted_agents:
         _check_hosting(r, config)
-    return config
+    if config.launch_mode == "background":
+        _check_background(r, config)
 
 
 def _check_hosting(r: _Reader, config: RunnerConfig) -> None:
