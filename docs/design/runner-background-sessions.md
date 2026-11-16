@@ -762,16 +762,16 @@ change; this list names each such place.
 |---|---|---|---|
 | D-BG-3 step 2 and 3 | the launch files are "files of the run", the socket lies "in a folder of the state directory" | everything lies in `<runner.state_dir>/bg/`, named after the run; the socket's name is a digest of the run id | the session's folder is renamed when the CLI's id is known, and a live process keeps its paths; a socket path is bounded |
 | D-BG-3 step 7 | no bound for "started" | within `runner.cli_probe_timeout` | a launch that never takes the prompt must end |
-| D-BG-4 | a fresh `uuid` per line | the `uuid` of the runner's input line | one record of an input in both modes; adoption maps the echo by it |
-| D-BG-4 | the prompt paragraph names the lead-in | it also names the runner's retry line | the retry after an account error arrives the same way |
-| D-BG-5 | `busy` after a turn end is background work | unless the transcript already shows the next turn | a queued line or a notification makes the session busy again at once |
-| D-BG-5 | no cause for a waiting session | cause `background_session_waiting` | the summary in the thread names why the run failed |
-| D-BG-6 | the first prompt record is ignored | it is the echo of the launch input | the turn record counts the input as taken |
-| D-BG-6 | progress by the runner's own clock per `runner.progress_patch_interval` | one progress event per reading of the session list, throttled by the live box | the reading is the evidence that the session works |
+| D-BG-4, the `uuid` of a line | a fresh `uuid` per line | the `uuid` of the runner's input line | one record of an input in both modes; adoption maps the echo by it |
+| D-BG-4, the prompt paragraph | the prompt paragraph names the lead-in | it also names the runner's retry line | the retry after an account error arrives the same way |
+| D-BG-5, after a turn end | `busy` after a turn end is background work | unless the transcript already shows the next turn | a queued line or a notification makes the session busy again at once |
+| D-BG-5, a waiting session | no cause for a waiting session | cause `background_session_waiting` | the summary in the thread names why the run failed |
+| D-BG-6, the first prompt record | the first prompt record is ignored | it is the echo of the launch input | the turn record counts the input as taken |
+| D-BG-6, progress | progress by the runner's own clock per `runner.progress_patch_interval` | one progress event per reading of the session list, throttled by the live box | the reading is the evidence that the session works |
 | D-BG-7 | no rule for a cancellation during the launch | the session is stopped and removed, the run ends `cancelled` | the prompt must not run twice |
 | D-BG-9 | a retry that cannot be written counts as an error after `runner.stop_grace` | it is tried again after each pause until the give-up | the same path as print mode |
-| D-BG-10 | the supervisor is recorded after a launch without one | only when the launch printed that it started the service; else the launch is aborted | another program can start a supervisor between the check and the launch |
-| D-BG-10 | every run checks, launches and records by itself | the runs of a runner process do the three one after the other | the second of two runs that start together took the supervisor the first one's launch started for another program's and ended `runtime_error` |
+| D-BG-10, the record of the supervisor | the supervisor is recorded after a launch without one | only when the launch printed that it started the service; else the launch is aborted | another program can start a supervisor between the check and the launch |
+| D-BG-10, runs that start together | every run checks, launches and records by itself | the runs of a runner process do the three one after the other | the second of two runs that start together took the supervisor the first one's launch started for another program's and ended `runtime_error` |
 | D-BG-11 | adoption reads from the stored offset | it maps the records from the launch offset again first; a foreign process of the session is stopped; the end has no recovery; one lock attempt | the mapper holds state of earlier records; R-AG-17 |
 | D-BG-12 | the transcripts of every scenario of 7.3 are recorded | five scenarios and four print twins; the others are run by level one and played by Fake-Claude | a refusal, a copy and a waiting session are single commands, not conversations |
 | D-BG-13 | "no process" is judged at once | the entry is watched for `runner.cli_probe_timeout` first | a process that starts late would take the prompt after the fallback |
