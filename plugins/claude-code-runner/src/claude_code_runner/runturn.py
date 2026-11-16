@@ -3357,7 +3357,7 @@ class RunTurn:
         name = session_name(self.handle.run_id)
         timeout = self.cfg.cli_probe_timeout
         if out.short_id is None:
-            return await self._launch_refused(bg, out, name, offset)
+            return await self._launch_refused(bg, out, offset)
         short_id = out.short_id
         if not out.started_service and not supervisor_ran:
             # No supervisor ran at the check and the launch started none: another program
@@ -3431,7 +3431,7 @@ class RunTurn:
             await asyncio.sleep(self.cfg.poll_interval)
 
     async def _launch_refused(
-        self, bg: BackgroundMode, out: LaunchOutput, name: str, offset: int
+        self, bg: BackgroundMode, out: LaunchOutput, offset: int
     ) -> tuple[_Outcome | None, bool]:
         """The launch command started no session it named (18.9)."""
         if out.refusal == "untrusted":

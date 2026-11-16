@@ -705,7 +705,10 @@ async def launch(  # noqa: PLR0913 - the parts of one launch
         write_private(path, b"")
     code: int | None
     try:
-        with stdout.open("wb") as out, stderr.open("wb") as err:
+        # Two small files of the run on the local disk, opened once right before the command
+        # that writes them starts: no asynchronous file API (NOSONAR below,
+        # D-FEAT-RUNNER-BG-SESSIONS-17).
+        with stdout.open("wb") as out, stderr.open("wb") as err:  # NOSONAR
             proc = await asyncio.create_subprocess_exec(  # nosec B603 - argument list, no shell
                 *argv,
                 stdin=subprocess.PIPE,
