@@ -396,9 +396,11 @@ class TranscriptMapper:
             return []  # it attributes nothing: an open input stays open
         self._open.discard(str(inner.get("source_uuid")))
         if not self.started:
-            # Before the prompt the runner has written no line, so a line is never its own;
-            # what else an earlier process of the session queued is skipped with its records.
-            settled = sender != _PEER
+            # Before the prompt the runner has written no line, so a line is never its own,
+            # and an origin that is neither a person nor the session itself is another
+            # sender's, as for a ``user`` record there. What a person or the session queued
+            # in an earlier process is skipped with its records.
+            settled = sender in (_HUMAN, _SELF)
         elif sender == _PEER:
             # A line of the runner shows once here, beside its ``remove`` record.
             settled = self._line(inner.get("source_uuid"), self._attached) is True

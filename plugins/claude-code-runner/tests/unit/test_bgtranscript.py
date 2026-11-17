@@ -705,6 +705,26 @@ def test_what_the_cli_gives_a_session_by_itself_starts_a_turn_of_its_own(
     assert before.map(own) == []
 
 
+def test_an_attachment_of_another_sender_before_the_prompt_is_foreign() -> None:
+    # The same as a ``user`` record of that origin before the prompt (review of the PR).
+    for origin in (
+        {"subkind": "peer-send-message"},
+        {"producer": "session-task", "subkind": "session-inbox"},
+        {},
+    ):
+        mapper = TranscriptMapper("prompt-uuid", {"mine"}.__contains__)
+        assert mapper.map(queued("x", "task-notification", **origin)) == [
+            {"type": "system", "subtype": "bg_foreign", "origin": "other"}
+        ], origin
+    mapper = TranscriptMapper("prompt-uuid", {"mine"}.__contains__)
+    assert foreign(mapper.map(queued("x", "a-kind-a-later-version-adds"))) != []
+    # What the session itself or a person queued in an earlier process stays skipped.
+    mapper = TranscriptMapper("prompt-uuid", {"mine"}.__contains__)
+    assert mapper.map(queued("x", "task-notification", producer="session-task")) == []
+    assert mapper.map(queued("x", "auto-continuation")) == []
+    assert mapper.map(queued("x", "human")) == []
+
+
 def test_a_line_whose_attachment_stands_before_the_prompt_is_never_the_runner_s() -> None:
     mapper = TranscriptMapper("prompt-uuid", {"mine"}.__contains__)
     assert foreign(mapper.map(queued("mine", "peer"))) != []
