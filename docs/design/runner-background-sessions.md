@@ -491,7 +491,9 @@ a line that cannot be written in print mode.
   service. A launch that printed no such line although the check found no supervisor ran
   under a supervisor another program started in between: its session is stopped and removed
   and the run goes on by the rule of 4.13 with `background_supervisor_foreign`. A recorded
-  supervisor with the pinned version: launch. Any other supervisor, of another
+  supervisor with the pinned version: launch. A supervisor whose process is gone when its
+  start time is read ended on its own (it exits after its last session): the status is read
+  once more. Any other supervisor, of another
   version or started by another program of the same user: no launch, the run uses print mode
   with the cause
   `background_supervisor_foreign` or `background_supervisor_version` (4.13). The check, the

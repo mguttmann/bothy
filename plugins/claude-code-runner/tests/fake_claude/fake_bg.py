@@ -286,7 +286,9 @@ def supervisor(fake: Any) -> int:
                 quiet_since = None
                 continue
             quiet_since = quiet_since if quiet_since is not None else time.monotonic()
-            if time.monotonic() - quiet_since >= SUPERVISOR_LINGER:
+            # With ``bg_idle_supervisor_ends_after_status`` a status call ends it instead.
+            ends_on_status = fake.scenario.get("bg_idle_supervisor_ends_after_status")
+            if not ends_on_status and time.monotonic() - quiet_since >= SUPERVISOR_LINGER:
                 if (doc.get("supervisor") or {}).get("pid") == os.getpid():
                     doc.pop("supervisor")
                 return 0
@@ -375,7 +377,26 @@ def daemon_status(fake: Any) -> int:
     print(f"version: {found.get('version', fake.pinned)}")
     print("uptime:  1s")
     print("origin:  transient - started on-demand by `claude --bg`")
+    if fake.scenario.get("bg_idle_supervisor_ends_after_status") and not forced:
+        _end_idle_supervisor(found["pid"])
     return 0
+
+
+def _end_idle_supervisor(pid: int) -> None:
+    """End the supervisor right after its status was printed, when no session process lives.
+
+    The supervisor of the pinned CLI ends after its last session; this places that end
+    between ``daemon status`` and the caller's next look at the process.
+    """
+    with state() as doc:
+        if any(alive(e.get("pid")) for e in doc["sessions"].values()):
+            return
+        if (doc.get("supervisor") or {}).get("pid") == pid:
+            doc.pop("supervisor")
+    with contextlib.suppress(ProcessLookupError):
+        os.kill(pid, signal.SIGTERM)
+    while alive(pid):
+        time.sleep(0.01)
 
 
 # ---- the session process -----------------------------------------------------------------------

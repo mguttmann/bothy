@@ -89,6 +89,29 @@ async def test_a_supervisor_another_program_started_uses_print_mode(
     assert launches(world) == []
 
 
+async def test_the_own_supervisor_that_ends_right_after_the_check_is_no_foreign_one(
+    bg_world: World, logs: LogLines
+) -> None:
+    world = bg_world
+    # The supervisor ends when its last session has ended; here exactly after `daemon status`
+    # reported it idle and before the runner read its start time (a race of the full suite).
+    world.scenario(fixture="plain", bg_idle_supervisor_ends_after_status=True)
+    await start(world)
+    first = await world.fake.trigger("Fix it", channel_id=world.forum_a)
+    assert await world.ended(first.run_id) == "completed"
+    run = await world.fake.trigger("Fix that", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "completed"
+    assert events(logs, "background_fallback") == []
+    assert world.turns() == []  # both prompts ran as background sessions
+    assert len(launches(world)) == len(players(world)) == 2
+    assert "background_unavailable" not in reasons(world)
+    await nothing_left(world)
+    state = json.loads((world.home / ".claude" / "fake-bg" / "state.json").read_text())
+    left = (state.get("supervisor") or {}).get("pid")
+    if left:  # the second run's supervisor waits for a status call that ends it
+        os.kill(left, 15)
+
+
 async def test_the_own_supervisor_in_another_version_uses_print_mode(
     bg_world: World, logs: LogLines
 ) -> None:

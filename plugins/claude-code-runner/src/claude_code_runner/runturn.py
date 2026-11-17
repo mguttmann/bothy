@@ -3375,16 +3375,27 @@ class RunTurn:
         """
         if not bg.pinned():
             return await self._fall_back("background_version_untested")
-        readable, supervisor = await bg.cli.supervisor()
-        if not readable:
-            return await self._fall_back("background_launch_failed")
-        verdict = await asyncio.to_thread(
-            supervisor_verdict,
-            supervisor,
-            load_supervisor(self.cfg.state_dir),
-            PINNED_CLAUDE_CODE_VERSION,
-            bg.lstart,
-        )
+        for _ in range(2):
+            readable, supervisor = await bg.cli.supervisor()
+            if not readable:
+                return await self._fall_back("background_launch_failed")
+            verdict = await asyncio.to_thread(
+                supervisor_verdict,
+                supervisor,
+                load_supervisor(self.cfg.state_dir),
+                PINNED_CLAUDE_CODE_VERSION,
+                bg.lstart,
+            )
+            # An idle supervisor ends on its own: when the process `daemon status` reported is
+            # gone by the time its start time is read, the status is read once more.
+            ended = (
+                verdict == "background_supervisor_foreign"
+                and supervisor is not None
+                and supervisor.pid is not None
+                and await asyncio.to_thread(bg.lstart, supervisor.pid) is None
+            )
+            if not ended:
+                break
         if verdict is not None:
             return await self._fall_back(verdict)
         reading = await bg.sessions.read(after=bg.sessions.now())
