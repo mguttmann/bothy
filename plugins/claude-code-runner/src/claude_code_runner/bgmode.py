@@ -49,11 +49,13 @@ FALLBACK_CODES: dict[str, bool] = {
     "background_supervisor_version": True,
     "background_bypass_not_accepted": True,
     "background_workspace_untrusted": False,
+    "background_files_untrusted": True,
     "background_session_foreign": False,
     "background_launch_failed": True,
     "background_api_key": False,
     "background_compaction": False,
     "background_restricted": False,
+    "background_hosted_bypass": False,
 }
 """Why a run of background mode ends without a session (18.9; it never uses print mode,
 FIX-RUNNER-CLI-PIN-326), and whether the cause lies with the host (then the heartbeat reports

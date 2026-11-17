@@ -13,8 +13,10 @@ or with channel skill folders) and its own settings file:
    follow-up and no retry line could reach it, so the runner ends such a run with the cause
    ``background_restricted`` instead.
 2. A hosted ``host`` turn (``--setting-sources project,local``) and a turn of the runner's own
-   agent with a channel skill folder offer the skills of their plugin folders, and the hosted
-   one takes the runner's line from its inbox socket.
+   agent with a channel skill folder offer the skills of their plugin folders. Only the own one
+   keeps ``bypassPermissions`` and takes the runner's line from its inbox socket: without the
+   user settings the hosted session runs in mode ``default`` and holds the line, so the runner
+   ends a hosted ``host`` run with the cause ``background_hosted_bypass`` instead.
 """
 
 from __future__ import annotations
@@ -65,6 +67,11 @@ def _hosted(root: Path, skill: str, mcp_marker: Path | None) -> HostedArgs:
     return HostedArgs(
         settings=settings, plugin=_plugin(root, skill), mcp_config=mcp, has_skills=True
     )
+
+
+def _modes(records: Sequence[Mapping[str, Any]]) -> set[str]:
+    """The permission modes a session's transcript records."""
+    return {str(r.get("permissionMode")) for r in records if r.get("type") == "permission-mode"}
 
 
 def _sent(bodies: Sequence[Mapping[str, Any]], word: str) -> list[Mapping[str, Any]]:
@@ -126,10 +133,17 @@ def test_host_turns_load_their_plugin_folders_in_background() -> None:
             assert "heron" in hosted_body
             assert "egret" in hosted_body
             assert "ibis" in json.dumps(_sent(script.bodies, "OWN first")[0])
-            # The hosted host turn takes the runner's line from its inbox socket.
-            entry = await place.until_entry(out.short_id)
-            await place.send("hostedhost", "HOSTHOST second")
-            await place.until_turns(entry.session_id, 2)
-            assert _sent(script.bodies, "HOSTHOST second")
+            # Without the user settings (``--setting-sources project,local``, 26 5.3) the
+            # hosted session runs in mode ``default``, not ``bypassPermissions``, and holds the
+            # runner's line; the own host session with a plugin folder keeps the bypass and
+            # takes it. So a hosted turn never runs in background mode
+            # (D-FIX-RUNNER-CLI-PIN-326-10).
+            hosted_entry = await place.until_entry(out.short_id)
+            own_entry = await place.until_entry(own.short_id)
+            assert _modes(place.records(hosted_entry.session_id)) == {"default"}
+            assert _modes(place.records(own_entry.session_id)) == {"bypassPermissions"}
+            await place.send("own", "OWN second")
+            await place.until_turns(own_entry.session_id, 2)
+            assert _sent(script.bodies, "OWN second")
 
     asyncio.run(scenario())

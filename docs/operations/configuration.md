@@ -514,7 +514,7 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.account_retry_second` |  | Runner |  | `2m` | pause before the second retry (18.9); above zero |  |
 | `runner.account_retry_interval` |  | Runner |  | `3m` | pause before every further retry (18.9); above zero |  |
 | `runner.account_retry_max_wait` |  | Runner |  | `20m` | longest time from the first account error of a wait until the error ends the turn like any other, decided while no turn runs and no input is queued (18.9); `0s` switches the retry off |  |
-| `runner.launch_mode` |  | Runner |  | `print` | `print` starts every turn as `claude -p`; `background` runs every turn as a Claude Code background session (`claude --bg`, 18.2 "Background mode"), also of hosted agents; a run the mode is not available for ends `failed` with the cause and never uses print mode (18.9) |  |
+| `runner.launch_mode` |  | Runner |  | `print` | `print` starts every turn as `claude -p`; `background` runs every turn as a Claude Code background session (`claude --bg`, 18.2 "Background mode"); a run the mode is not available for (every run of a hosted agent among them) ends `failed` with the cause and never uses print mode (18.9) |  |
 | `runner.background_channels` |  | Runner |  | empty | channel ids; when not empty, only runs in these channels use background mode and every other run uses print mode (18.2) |  |
 | `runner.background_status_interval` |  | Runner |  | `2s` | interval at which the session list (`claude agents --json --all`) is read while a background turn is active; one reading serves every turn of the runner (18.4); above zero |  |
 | `runner.session_lock_wait` |  | Runner |  | `10m` | wait time for a busy session |  |

@@ -180,6 +180,12 @@ CAUSES: dict[str, str] = {
         "background session there. Open Claude Code in that folder once on the runner host, "
         "accept the trust prompt and send the message again"
     ),
+    "background_files_untrusted": (
+        "Claude Code on the runner host does not trust the runner's folder of chat files, so "
+        "it starts no background session that reads the files of this chat. Open Claude Code "
+        "once in the folder files of runner.state_dir on the runner host, accept the trust "
+        "prompt and send the message again"
+    ),
     "background_session_foreign": (
         "The Claude Code session of this chat is listed under another program on the runner "
         "host, so the runner does not continue it in the background. Remove that entry with "
@@ -197,8 +203,14 @@ CAUSES: dict[str, str] = {
     ),
     "background_restricted": (
         "This built-in agent runs with restricted tools, and a restricted background session "
-        "of Claude Code takes no follow-up messages. Give the agent the tool class host, or "
-        "set runner.launch_mode to print on the runner host"
+        "of Claude Code takes no follow-up messages. Set runner.launch_mode to print on the "
+        "runner host to run built-in agents"
+    ),
+    "background_hosted_bypass": (
+        "This built-in agent runs with the tool class host, and a background session of Claude "
+        "Code gives such an agent no permission bypass without the host user's own settings, "
+        "which a built-in agent never loads. Set runner.launch_mode to print on the runner host "
+        "to run built-in agents"
     ),
     "background_supervisor_foreign": (
         "The background service of Claude Code on the runner host was started by another "

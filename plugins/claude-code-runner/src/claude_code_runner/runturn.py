@@ -14,14 +14,13 @@ run that the server ended stops its turn without a finish. An error nothing expe
 live process before the run ends ``failed`` with ``adapter_error`` (`RunTurn._on_error`, 18.9).
 `RunTurn.adopted` follows a turn that outlived an earlier runner (design note 12).
 
-With ``runner.launch_mode`` ``background`` every turn, also of a hosted agent, runs as a Claude
-Code background session (``claude --bg``, 09 18.2 "Background
-mode"): `RunTurn._run_background` launches it, the session's transcript is read through
-`claude_code_runner.bgtranscript` as the stream of 18.4, inputs go to the session's inbox
-socket, and the release at the end of a run is ``claude stop`` (`claude_code_runner.bgsession`).
-A run that cannot use the mode ends ``failed`` with its cause and never uses print mode
-(18.9, FIX-RUNNER-CLI-PIN-326), and
-`RunTurn.adopt_background` continues a background turn that outlived an earlier runner.
+With ``runner.launch_mode`` ``background`` every turn runs as a Claude Code background session
+(``claude --bg``, 09 18.2 "Background mode"): `RunTurn._run_background` launches it, the
+session's transcript is read through `claude_code_runner.bgtranscript` as the stream of 18.4,
+inputs go to the session's inbox socket, and the release at the end of a run is ``claude stop``
+(`claude_code_runner.bgsession`). A run that cannot use the mode ends ``failed`` with its cause
+and never uses print mode (18.9, FIX-RUNNER-CLI-PIN-326), and `RunTurn.adopt_background`
+continues a background turn that outlived an earlier runner.
 
 A turn that ends with an account error (`claude_code_runner.account`) in a process that holds
 or held background work does not end the run: the process is kept, ``/status_line`` says why
@@ -1638,8 +1637,6 @@ class RunTurn:
                 self._worked = self._worked or (self.ledger.init_seen and no_error)
                 if self.live_cost.assistant(message):
                     self._report_cost()
-                if session is not None and self._over_cap():
-                    return await self._cap_reached(session)
             elif kind == "user" and message.get("isReplay") is True:
                 await self._echo(message.get("uuid"), adopted=adopted or not own)
             elif kind == "result":
@@ -3181,7 +3178,8 @@ class RunTurn:
 
         With ``runner.launch_mode`` ``background`` every attempt of a run in such a channel is
         a background session or ends the run (`_not_in_background`); it never uses print mode,
-        also not for a hosted agent or a turn that loads channel skills.
+        also not for a hosted agent (whose turns end the run) or a turn that loads channel
+        skills.
         """
         return self.bg is not None and self.bg.wants(self.state.channel_id)
 
@@ -3192,14 +3190,22 @@ class RunTurn:
         * A compaction: the runner follows a ``/compact`` only in print mode.
         * A hosted turn below ``host``: ``--restricted`` binds no inbox socket (run with the
           pinned CLI), so no follow-up and no retry line could reach the session.
+        * A hosted ``host`` turn: without the user settings, which 26 5.3 leaves out
+          (``--setting-sources project,local``), the session of the pinned CLI runs in
+          permission mode ``default`` instead of ``bypassPermissions`` and holds the runner's
+          lines (run with 2.1.326 against the stand-in).
         * A repeated launch of a handover: the keeper is a part of print mode.
         """
         if self.state.mode != "personal":
             return "background_api_key"
         if attempt.kind != "turn":
             return "background_compaction"
-        if self.state.hosted is not None and self.cfg.tool_class != "host":
-            return "background_restricted"
+        if self.state.hosted is not None:
+            return (
+                "background_restricted"
+                if self.cfg.tool_class != "host"
+                else ("background_hosted_bypass")
+            )
         if repeat is not None:
             return "background_launch_failed"
         return None
@@ -3599,6 +3605,8 @@ class RunTurn:
         """The launch command started no session it named (18.9)."""
         if out.refusal == "untrusted":
             return await self._fall_back("background_workspace_untrusted")
+        if out.refusal == "files_untrusted":
+            return await self._fall_back("background_files_untrusted")
         if out.refusal == "bypass":
             return await self._fall_back("background_bypass_not_accepted")
         if out.exit_error:
@@ -3784,23 +3792,6 @@ class RunTurn:
         await self._fail(
             "runtime_error", (text,), session.exit_label(), summary=cause(CAUSE_FOREIGN)
         )
-        return _Outcome(TurnEvidence(), self._worked, handled=True)
-
-    def _over_cap(self) -> bool:
-        """The run's cost reached the cost cap of a hosted definition (26 5.8)."""
-        cap = self.state.cost_cap
-        return cap is not None and self.live_cost.amount >= cap * 1_000_000
-
-    async def _cap_reached(self, session: BgSession) -> _Outcome:
-        """The cost cap in a background session: the runner holds it (FIX-RUNNER-CLI-PIN-326).
-
-        A background session does not act on ``--max-budget-usd``, so the runner stops the
-        session once the run's cost reaches the cap and ends it ``runtime_error`` with the
-        cause ``cost_cap_reached``, as the CLI's own budget end does in print mode.
-        """
-        _warn("cost_cap_reached", **self.ids)
-        await self._terminate(session, self.ids)
-        await self._fail("runtime_error", (), "stopped", summary=cause("cost_cap_reached"))
         return _Outcome(TurnEvidence(), self._worked, handled=True)
 
     async def _login_unproven(self, session: BgSession, code: str) -> _Outcome:

@@ -6,9 +6,9 @@ Standard library only; `fake_claude.main` calls it for the commands of backgroun
 * ``[--resume <id>] --bg <flags>`` with the prompt on stdin: prints the launch line
   ``backgrounded · <short id> · <name>``, starts the fake supervisor when none runs
   (``Starting background service…`` on stderr) and a detached player, the session process.
-  The refusals of the pinned CLI are scripted (``bg_refuse``: ``untrusted``, ``bypass``,
-  ``error``), a launch without a process (``bg_no_process``), and the copy the CLI starts for
-  a resume whose session still has an entry.
+  The refusals of the pinned CLI are scripted (``bg_refuse``: ``untrusted``, ``bypass``, ``add_dir``
+  for a launch with ``--add-dir``, ``error``), a launch without a process (``bg_no_process``), and
+  the copy the CLI starts for a resume whose session still has an entry.
 * ``agents --json --all``, ``stop <id>``, ``rm <id>`` and ``daemon status`` answer from the
   state file ``<config dir>/fake-bg/state.json`` of the fake ``HOME``.
 
@@ -170,6 +170,14 @@ def launch(fake: Any) -> int:  # noqa: PLR0912 - one branch per scripted behavio
         sys.stderr.write(
             f"Workspace not trusted. Run `claude` in {os.getcwd()} once and accept the trust "
             "prompt, then retry.\n"
+        )
+        return 1
+    if refuse == "add_dir" and "--add-dir" in argv:
+        folder = _after(argv, "--add-dir")
+        sys.stderr.write(
+            f"Added folder not trusted: {folder}. Leave out its --add-dir or, if you trust it "
+            "and everything in its repository or below it, start `claude` there once and "
+            "accept the trust prompt.\n"
         )
         return 1
     if refuse == "bypass":

@@ -168,6 +168,29 @@ async def test_a_folder_without_workspace_trust_fails_with_its_cause(
     assert world.fake.heartbeats[-1]["state"] == "online"
 
 
+async def test_a_files_folder_without_trust_fails_with_its_cause(
+    bg_world: World, logs: LogLines
+) -> None:
+    world = bg_world
+    world.scenario(fixture="plain", bg_refuse="add_dir")
+    await start(world)
+    notes = world.fake.add_file(b"NOTES", name="notes.txt", mime="text/plain")
+    run = await world.fake.trigger("Read it", channel_id=world.forum_a, attachments=[notes])
+    assert await world.ended(run.run_id) == "failed"
+    assert world.fake.run(run.run_id)["summary"] == cause("background_files_untrusted")
+    assert world.turns() == []  # never print mode
+    assert players(world) == []
+    [launch] = launches(world)
+    assert "--add-dir" in launch["argv"]
+    assert [e["code"] for e in events(logs, "background_unavailable")] == [
+        "background_files_untrusted"
+    ]
+    await world.until(lambda: "background_unavailable" in reasons(world))
+    # A run without files still runs as a session.
+    run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "completed"
+
+
 async def test_a_launch_that_fails_fails_with_its_cause(bg_world: World, logs: LogLines) -> None:
     world = bg_world
     world.scenario(fixture="plain", bg_refuse="error")

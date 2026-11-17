@@ -477,12 +477,14 @@ against a server that accepts the heartbeat capability `turn_handover` and has
 Off by default (`runner.launch_mode = "print"`); without the key the runner calls no command of
 background sessions and behaves exactly as before, held by the byte-equal fixtures of
 `tests/fixtures/baseline` and by `test_without_the_key_no_command_of_background_sessions_runs`.
-With `runner.launch_mode = "background"` every turn runs as a Claude Code background session
-(`claude --bg`), of the runner's own agent and of hosted agents, with channel skill folders
-(`--plugin-dir`) and the MCP file, settings and tool flags of a hosted turn; with
+With `runner.launch_mode = "background"` every turn of the runner's own agent runs as a Claude
+Code background session (`claude --bg`), with channel skill folders (`--plugin-dir`); with
 `runner.background_channels` only in the listed channels. Such a run never uses print mode: an
-`organization` turn, the compaction of a full context and a hosted turn below `host` end
-`failed` with their cause (table below); the runner holds a hosted agent's cost cap itself.
+`organization` turn, the compaction of a full context and every turn of a hosted agent end
+`failed` with their cause (table below). A hosted agent cannot run as a background session of
+the pinned CLI: below `host` `--restricted` binds no inbox socket, and under `host` the session
+drops `bypassPermissions` without the user settings that a hosted agent never loads. Keep
+`print` on a runner that serves hosted agents.
 Only the one-shot calls (search assistant, agent builder) stay `claude -p`.
 Background sessions and agent view are a research preview of Claude Code, and most of what the
 runner reads of them is internal to the CLI; the mode therefore runs only on the pinned version,
@@ -501,7 +503,11 @@ Before you switch it on:
 - **Workspace trust.** The CLI starts a background session only in a folder with workspace
   trust: run `claude` once in each bound project folder (and in `runner.default_workspace`) as
   the runner's host user and accept the prompt. A Git repository below a trusted folder needs
-  its own acceptance. The runner never writes that entry itself.
+  its own acceptance. The runner never writes that entry itself. Since 2.1.326 the folder of
+  chat files, `<runner.state_dir>/files` (passed as `--add-dir` to `scoped` and `host` turns
+  with files), needs that trust too: run `claude` there once and accept (trust of that folder
+  covers the folder of each thread below it). Without it every turn with files fails
+  (`background_files_untrusted`).
 - **Bypass mode** (tool class `host` only). The CLI refuses `--bg` with `bypassPermissions`
   until the host user accepted bypass mode once: run `claude --dangerously-skip-permissions`
   once interactively as that user. The runner never records the acceptance itself.
@@ -647,11 +653,13 @@ and never uses print mode (owner order 2026-11-17, FIX-RUNNER-CLI-PIN-326), the 
 | `background_supervisor_version` | the runner's own supervisor runs another version than the pin (the CLI was updated under it): it ends with its last session |
 | `background_bypass_not_accepted` | accept bypass mode once as the host user (above) |
 | `background_workspace_untrusted` | accept workspace trust for the project folder (above) |
+| `background_files_untrusted` | accept workspace trust for `<runner.state_dir>/files` (above) |
 | `background_session_foreign` | the thread's session is listed in agent view under a name the runner did not give: remove it there (`claude rm`) |
 | `background_launch_failed` | the launch or a control command failed, or the session got no process within `runner.cli_probe_timeout`; the files `<runner.state_dir>/bg/<run_id>.launch.err` of a running run and the log say more |
 | `background_api_key` | an `organization` run: a background session takes no API key; use `print` for such agents |
 | `background_compaction` | the context is full; the runner compacts only in print mode: start a new post |
-| `background_restricted` | a hosted agent below `host` (`--restricted` binds no inbox socket): give it `host` or use `print` |
+| `background_restricted` | a hosted agent below `host` (`--restricted` binds no inbox socket): use `print` |
+| `background_hosted_bypass` | a hosted agent of class `host` (no bypass without the user settings): use `print` |
 
 A launch is judged failed without a session only while it is certain that no session took the prompt. In every other
 doubt the runner stops the session and ends the run `runtime_error` with the code as the cause,

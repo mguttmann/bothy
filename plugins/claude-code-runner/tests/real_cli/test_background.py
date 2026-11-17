@@ -198,6 +198,11 @@ def test_launch_list_stop_and_remove() -> None:
         async with world() as (place, script):
             extra = place.root / "incoming"
             extra.mkdir()
+            # 2.1.326 refuses an added folder without workspace trust; the operator trusts the
+            # runner's folder of chat files once (README "Workspace trust").
+            refused = await place.launch("untrusted", PROMPT, add_dir=extra)
+            assert (refused.short_id, refused.refusal) == (None, "files_untrusted")
+            place.trust(extra.resolve())
             out = await place.launch("post", PROMPT, add_dir=extra)
             # 1. The launch returns with the short id; no supervisor ran, so it started one.
             assert out.refusal is None
@@ -835,6 +840,7 @@ def test_a_second_run_sees_nothing_of_the_first_run_s_environment() -> None:
             extra = place.root / "incoming-of-run-one"
             for folder in (first_tmp, second_tmp, extra):
                 folder.mkdir(parents=True)
+            place.trust(extra.resolve())  # an added folder needs workspace trust (2.1.326)
             with_agent = {"TMPDIR": str(first_tmp), "SSH_AUTH_SOCK": agent}
             without = {"TMPDIR": str(second_tmp)}
             one = await place.launch("one", "ENVSTEP of run one", run_env=with_agent, add_dir=extra)

@@ -3360,16 +3360,16 @@ Scope (changed 2026-11-17, owner order, FIX-RUNNER-CLI-PIN-326): every turn of a
 channel the mode is on for (every channel, or with `runner.background_channels` the listed
 ones), of the runner's own agent and of a hosted agent (26 5), with or without channel skill
 folders (26 5.9), runs as a background session or the run ends `failed` with the cause in the
-thread; such a run never uses print mode. A hosted turn and a turn with channel skills carry
-the parts of 26 5.3 and 26 5.9 in the launch (the tool flags of the class, `--restricted` or
-`--setting-sources`, `--plugin-dir`, `--mcp-config` with `--strict-mcp-config`); the hosted
-settings stand in the run's one settings file, and the cost cap of 26 5.8 is held by the runner
-(it stops the session once the run's cost reaches the cap, cause `cost_cap_reached`), because a
-background session does not act on `--max-budget-usd`. The run ends with a cause of 18.9
+thread; such a run never uses print mode. A turn with channel skills carries one `--plugin-dir`
+per folder (26 5.9) in the launch. A hosted turn cannot run as a background session of the
+pinned CLI, so its run ends `failed` with its cause: below `host` `--restricted` binds no inbox
+socket (`background_restricted`), and under `host` the session runs in permission mode `default`
+instead of `bypassPermissions` once `--setting-sources project,local` (26 5.3) leaves out the
+user settings, and holds the runner's lines (`background_hosted_bypass`; both run with 2.1.326).
+The run ends with a cause of 18.9
 "Background mode is unavailable" for an `organization` turn (a background session takes no API
-key; `background_api_key`), for the compaction of 18.9 (`background_compaction`) and for a
-hosted turn below `host` (`--restricted` binds no inbox socket, run with 2.1.326;
-`background_restricted`). The one-shot calls of 18.17 and 26 6.2 are no turns and stay
+key; `background_api_key`), for the compaction of 18.9 (`background_compaction`) and for every
+hosted turn (`background_restricted`, `background_hosted_bypass`). The one-shot calls of 18.17 and 26 6.2 are no turns and stay
 `claude -p`. The mode runs only on the
 pinned version of the CLI. Everything below was run with the pinned CLI 2.1.325 against a local
 stand-in for the API and is recorded in
@@ -4242,11 +4242,13 @@ next background launch starts; the reason blocks no run.
 | `background_supervisor_version` | the runner's own supervisor reports another version than the pin | yes |
 | `background_bypass_not_accepted` | the CLI refuses `--bg` with `bypassPermissions` because the host user never accepted bypass mode (class `host`) | yes |
 | `background_workspace_untrusted` | the CLI refuses the launch because the project folder has no workspace trust | no |
+| `background_files_untrusted` | the CLI refuses the launch because the `--add-dir` folder of the thread's files has no workspace trust (since 2.1.326; trust of `<runner.state_dir>/files` covers every thread) | yes |
 | `background_session_foreign` | the session has an entry in the session list under a name the runner did not give, without a process | no |
 | `background_launch_failed` | any other launch that exits with an error; `claude daemon status` or the session list cannot be read; or the launch left an entry that got no process within `runner.cli_probe_timeout` | yes |
 | `background_api_key` | the run is billed `organization`: a background session takes no API key | no |
 | `background_compaction` | the context is full: the runner follows the compaction of 18.9 only in print mode | no |
 | `background_restricted` | a hosted turn below `host`: `--restricted` binds no inbox socket | no |
+| `background_hosted_bypass` | a hosted `host` turn: without the user settings the session drops `bypassPermissions` | no |
 
 Also a launch is judged failed without a session only while it is certain that no session took the prompt: the launch
 exited with an error, or, watched for `runner.cli_probe_timeout`, the session list shows no
@@ -5496,7 +5498,7 @@ configuration of the respective program outside the server.
 | `runner.account_retry_second` | Runner | `2m` | pause before the second retry (18.9); above zero |
 | `runner.account_retry_interval` | Runner | `3m` | pause before every further retry (18.9); above zero |
 | `runner.account_retry_max_wait` | Runner | `20m` | longest time from the first account error of a wait until the error ends the turn like any other, decided while no turn runs and no input is queued (18.9); `0s` switches the retry off |
-| `runner.launch_mode` | Runner | `print` | `print` starts every turn as `claude -p`; `background` runs every turn as a Claude Code background session (`claude --bg`, 18.2 "Background mode"), also of hosted agents; a run the mode is not available for ends `failed` with the cause and never uses print mode (18.9) |
+| `runner.launch_mode` | Runner | `print` | `print` starts every turn as `claude -p`; `background` runs every turn as a Claude Code background session (`claude --bg`, 18.2 "Background mode"); a run the mode is not available for (every run of a hosted agent among them) ends `failed` with the cause and never uses print mode (18.9) |
 | `runner.background_channels` | Runner | empty | channel ids; when not empty, only runs in these channels use background mode and every other run uses print mode (18.2) |
 | `runner.background_status_interval` | Runner | `2s` | interval at which the session list (`claude agents --json --all`) is read while a background turn is active; one reading serves every turn of the runner (18.4); above zero |
 | `runner.session_lock_wait` | Runner | `10m` | wait time for a busy session |

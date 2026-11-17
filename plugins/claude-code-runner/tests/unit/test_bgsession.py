@@ -338,6 +338,19 @@ def test_the_refusals_of_the_pinned_cli() -> None:
     assert (bypass.short_id, bypass.refusal, bypass.exit_error) == (None, "bypass", True)
 
 
+def test_an_added_folder_without_trust_is_its_own_refusal() -> None:
+    # The words of 2.1.326 (run against the stand-in on 2026-11-17); 2.1.325 launched such a
+    # session without asking.
+    out = parse_launch(
+        1,
+        "",
+        "Added folder not trusted: /state/files/thread. Leave out its --add-dir or, if you "
+        "trust it and everything in its repository or below it, start `claude` there once and "
+        "accept the trust prompt.\n",
+    )
+    assert (out.short_id, out.refusal, out.exit_error) == (None, "files_untrusted", True)
+
+
 def test_any_other_output_is_a_failed_launch() -> None:
     error = parse_launch(1, "", "error: agent view is switched off")
     assert (error.refusal, error.exit_error) == ("failed", True)

@@ -143,6 +143,9 @@ _LAUNCHED = re.compile(r"^backgrounded · ([0-9a-f]{8}) · ", re.MULTILINE)
 """The first line of a launch (run with the pinned CLI 2.1.325 on 2026-11-16,
 ``tests/fixtures/recording/background_<version>``)."""
 _UNTRUSTED = "Workspace not trusted."
+_FILES_UNTRUSTED = "Added folder not trusted:"
+"""Since 2.1.326 a launch refuses an ``--add-dir`` folder without workspace trust; trust of a
+folder above it counts (run against the stand-in on 2026-11-17)."""
 _BYPASS = "--bg with bypassPermissions requires accepting the disclaimer first."
 _SERVICE = "Starting background service"
 _NOTE = "note:"
@@ -476,9 +479,10 @@ class LaunchOutput:
     Attributes:
         short_id: The short id of the session (the first eight characters of its session id);
             ``None`` when the command started none.
-        refusal: Why the command started nothing: ``untrusted`` (the folder has no workspace
-            trust), ``bypass`` (bypass mode without a recorded acceptance), ``failed`` (any
-            other error or an output the runner cannot read); ``None`` after a launch.
+        refusal: Why the command started nothing: ``untrusted`` (the folder has no workspace trust),
+            ``files_untrusted`` (the ``--add-dir`` folder has none), ``bypass`` (bypass mode without
+            a recorded acceptance), ``failed`` (any other error or an output the runner cannot
+            read); ``None`` after a launch.
         started_service: The command started the supervisor (none ran before).
         notes: The count of ``note:`` lines on stderr; one says that the command did not
             continue the session in place but started a copy, or woke it with saved options.
@@ -518,6 +522,8 @@ def parse_launch(returncode: int | None, stdout: str, stderr: str) -> LaunchOutp
         return LaunchOutput(found.group(1), None, service, notes)
     if _UNTRUSTED in stderr:
         refusal = "untrusted"
+    elif _FILES_UNTRUSTED in stderr:
+        refusal = "files_untrusted"
     elif _BYPASS in stderr:
         refusal = "bypass"
     else:

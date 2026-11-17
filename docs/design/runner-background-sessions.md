@@ -3,8 +3,9 @@
 Status: design of 2026-11-16, built by the ticket FEAT-RUNNER-BG-SESSIONS and changed by
 FIX-RUNNER-BG-INBOX-AUTH after the review of that build (section 10). FIX-RUNNER-CLI-PIN-326
 (owner order of 2026-11-17, rulings in `docs/decisions.d/FIX-RUNNER-CLI-PIN-326.md`) replaced
-D-BG-2 and D-BG-13: hosted agents and turns with channel skills run in background mode too, and
-a run the mode is not available for ends `failed` with its cause instead of using print mode;
+D-BG-2 and D-BG-13: turns with channel skills run in background mode too, every run of a hosted
+agent ends `failed` with its cause (its ruling 10), and a run the mode is not available for
+ends `failed` with its cause instead of using print mode;
 where 4.2, 4.13 and the lists below still say "print mode", that ruling wins. This note records the
 goal, the evidence and the decisions with their reasons, and ends with the build brief. The
 normative text is in [09-agents.md](../spec/09-agents.md) sections 18 and 21 (the paragraphs
