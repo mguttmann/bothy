@@ -1,0 +1,17 @@
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "user", "isSidechain": false, "uuid": "36a5a2d5-adac-4b4a-aa86-37412013dbc3", "sessionId": "s", "origin": {"kind": "human"}, "message": {"role": "user", "content": "prompt"}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "attachment", "isSidechain": false, "attachment": {"type": "deferred_tools_record"}}
+{"type": "assistant", "isSidechain": false, "uuid": "9a1d4b09-9503-459b-93b6-ad6cd37fe1ef", "message": {"id": "msg_011Ch8jV2VoPqxQRkPb1Fa8b", "model": "claude-opus-5-5", "content": [{"type": "tool_use", "id": "toolu_x", "name": "Bash", "input": {}}]}}
+{"type": "user", "isSidechain": false, "uuid": "88e62311-575d-4b2f-b8f4-63604e586bf9", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_x"}]}}
+{"type": "queue-operation", "operation": "remove", "reason": "absorbed_mid_turn", "commandUuid": "cac7fee0-bd9d-47fd-8028-855a63a2a1e9"}
+{"type": "queue-operation", "operation": "remove", "reason": "absorbed_mid_turn", "commandUuid": "68426f6a-b5ba-43e2-b0fb-95d07d76de86"}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "attachment", "isSidechain": false, "attachment": {"type": "queued_command", "source_uuid": "cac7fee0-bd9d-47fd-8028-855a63a2a1e9", "commandMode": "task-notification"}}
+{"type": "attachment", "isSidechain": false, "attachment": {"type": "queued_command", "source_uuid": "68426f6a-b5ba-43e2-b0fb-95d07d76de86", "commandMode": "task-notification", "origin": {"kind": "task-notification", "producer": "session-task"}}}
+{"type": "attachment", "isSidechain": false, "attachment": {"type": "deferred_tools_delta"}}
+{"type": "attachment", "isSidechain": false, "attachment": {"type": "mcp_instructions_delta"}}
+{"type": "assistant", "isSidechain": false, "uuid": "aa649124-84fd-49eb-8db4-35d1c72f9aa1", "message": {"id": "msg_011Ch8jVbBKgyotJMnLkYbSR", "model": "claude-opus-5-5", "content": [{"type": "thinking"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "741431be-9479-44bc-8ab6-c1f0e6105418", "message": {"id": "msg_011Ch8jVbBKgyotJMnLkYbSR", "model": "claude-opus-5-5", "content": [{"type": "tool_use", "id": "toolu_x", "name": "Bash", "input": {}}]}}

@@ -53,10 +53,11 @@ work counts. A ``queued_command`` attachment with ``commandMode`` ``task-notific
 no origin is the session's own too: the CLI queues the notification of a background agent, a
 monitor, a workflow or a timer without one, and every other sender's input carries an origin.
 So an input a running turn took under a ``uuid`` the runner did not write stays open until
-that attachment attributes it to the session itself; one that is still open at the next
-request or the end of the turn is foreign too. The next request is the deadline, not the next
-output: the CLI writes the attachment before the request that carries the input, and may
-write records of the answer before it, which that input cannot have led to. A mapper without
+that attachment attributes it to the session itself. The request that carries the input seals
+it, and one still open at the first output after that request, at the following request or at
+the end of the turn is foreign too: the CLI writes the attachment right after the request
+record (real transcript of the pinned CLI, FIX-RUNNER-BG-NOTICE-ORDER) and may write records
+of the answer before the request, which that input cannot have led to. A mapper without
 ``own`` knows no line of the runner.
 * ``system`` ``turn_duration``: the end of the turn, a ``result`` whose text is the text of
   the turn's last assistant message, with ``is_error`` when that message is an API error.
@@ -270,6 +271,7 @@ class TranscriptMapper:
         self._taken: set[str] = set()
         self._attached: set[str] = set()
         self._open: set[str] = set()
+        self._sealed: set[str] = set()
         self._model_sent = False
         self._queued: deque[str] = deque()
         self._commands = 0
@@ -338,11 +340,15 @@ class TranscriptMapper:
             self.skipped["sidechain"] += 1
             return []
         if kind == "api-request":
-            # The request carries every input the turn took since the last one: an input
-            # still unattributed here is not the session's own (the CLI writes the
-            # attachment that attributes it before this record, and outputs before it
-            # cannot answer that input; FIX-RUNNER-BG-OWN-NOTICE).
-            return [*self._unattributed(), *self._request(record)]
+            # The request carries every input the turn took since the last one. The CLI
+            # writes the attachments that attribute them right after this record (read in a
+            # real transcript of the pinned CLI), so an input open here is sealed and judged
+            # at the first output of this request: no output can answer it before
+            # (FIX-RUNNER-BG-NOTICE-ORDER).
+            out = self._unattributed(self._sealed)
+            self._sealed |= self._open
+            self._open.clear()
+            return [*out, *self._request(record)]
         if kind == "cost-state":
             usage = record.get("modelUsage")
             if not isinstance(usage, Mapping):
@@ -359,7 +365,7 @@ class TranscriptMapper:
         if kind == "queue-operation":
             return self._queue(record)
         if kind == "system" and record.get("subtype") == "turn_duration":
-            return self._unattributed() or [self._turn_end()]
+            return self._unattributed(self._sealed | self._open) or [self._turn_end()]
         self.skipped[kind] += 1
         return []
 
@@ -410,6 +416,7 @@ class TranscriptMapper:
         if sender is None:
             return []  # it attributes nothing: an open input stays open
         self._open.discard(str(inner.get("source_uuid")))
+        self._sealed.discard(str(inner.get("source_uuid")))
         if not self.started:
             # Before the prompt the runner has written no line, so a line is never its own,
             # and an origin that is neither a person nor the session itself is another
@@ -426,11 +433,12 @@ class TranscriptMapper:
             settled = sender == _SELF
         return [] if settled else [self._foreign(sender)]
 
-    def _unattributed(self) -> list[dict[str, Any]]:
-        """An input a turn took that nothing attributed before the request that carries it."""
-        if not self._open:
+    def _unattributed(self, inputs: set[str]) -> list[dict[str, Any]]:
+        """An input a turn took that nothing attributed before an output could answer it."""
+        if not inputs:
             return []
         self._open.clear()
+        self._sealed.clear()
         return [self._foreign("unattributed")]
 
     def _user(self, record: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -473,7 +481,7 @@ class TranscriptMapper:
         if not isinstance(message, Mapping):
             self.skipped["assistant"] += 1
             return []
-        out = self._turn_start()
+        out = [*self._unattributed(self._sealed), *self._turn_start()]
         model = message.get("model")
         error = record.get("isApiErrorMessage") is True
         items: list[dict[str, Any]] = []

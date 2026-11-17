@@ -435,6 +435,36 @@ def test_the_notification_of_an_own_background_agent_is_the_session_s_own() -> N
     assert foreign(out) == []
 
 
+OWN_NOTICE_AFTER_REQUEST = OWN_NOTICE.with_name("own_notice_after_request.jsonl")
+
+
+def test_own_notifications_attributed_after_their_request_are_the_session_s_own() -> None:
+    # The real records (structure only) of session d80b173e on 17.11. 15:25Z: two
+    # notifications of the session's own background agent were absorbed mid-turn, and the
+    # pinned CLI wrote the request record before the attachments that attribute them. The
+    # runner stopped the session as foreign ("unattributed") before this fix.
+    records = [json.loads(line) for line in OWN_NOTICE_AFTER_REQUEST.read_text().splitlines()]
+    mapper = TranscriptMapper("prompt-uuid")
+    out = [m for r in records for m in mapper.map(r)]
+    assert mapper.started
+    assert foreign(out) == []
+
+
+def test_an_input_nothing_attributes_before_the_answer_of_its_request_is_foreign() -> None:
+    # Same records without the attachment of one notification: the first output of the
+    # request that carried it can answer it, so the session stops there.
+    records = [
+        json.loads(line)
+        for line in OWN_NOTICE_AFTER_REQUEST.read_text().splitlines()
+        if "cac7fee0" not in line or '"queue-operation"' in line
+    ]
+    mapper = TranscriptMapper("prompt-uuid")
+    outs = [mapper.map(r) for r in records]
+    first = next(i for i, o in enumerate(outs) if foreign(o))
+    assert records[first]["type"] == "assistant"
+    assert [m["origin"] for m in foreign(outs[first])] == ["unattributed"]
+
+
 def notice(line_uuid: str, **inner: Any) -> dict[str, Any]:
     attachment = {"type": QUEUED, "source_uuid": line_uuid, "commandMode": "task-notification"}
     return {"type": "attachment", "isSidechain": False, "attachment": {**attachment, **inner}}
@@ -485,18 +515,24 @@ def test_another_sender_s_input_stays_foreign(name: str) -> None:
 
 def test_an_input_taken_during_a_turn_that_nothing_attributes_is_another_sender_s() -> None:
     # A removal under a uuid the runner did not write is the session's own only when the
-    # CLI says so in the attachment it writes before the request that carries the input.
-    # Without that attachment the input is not proven to be anyone's, so it is foreign at
-    # the next request (which carries it) or the end of the turn: before the answer it
-    # leads to. An output before that request cannot answer it (FIX-RUNNER-BG-OWN-NOTICE).
-    for output in (REQUEST, TURN_ENDS):
-        mapper = started("mine")
-        assert foreign(mapper.map(absorbed("unattributed"))) == []
-        assert mapper.map(output)[0] == {
-            "type": "system",
-            "subtype": "bg_foreign",
-            "origin": "unattributed",
-        }
+    # CLI says so in the attachment it writes right after the request that carries the
+    # input. Without that attachment the input is not proven to be anyone's, so it is
+    # foreign at the first output of that request or the end of the turn: before the answer
+    # it leads to. An output before that request cannot answer it
+    # (FIX-RUNNER-BG-OWN-NOTICE, FIX-RUNNER-BG-NOTICE-ORDER).
+    unattributed = {"type": "system", "subtype": "bg_foreign", "origin": "unattributed"}
+    mapper = started("mine")
+    assert foreign(mapper.map(absorbed("unattributed"))) == []
+    assert foreign(mapper.map(REQUEST)) == []
+    assert mapper.map(ASSISTANT)[0] == unattributed
+    mapper = started("mine")
+    mapper.map(absorbed("unattributed"))
+    assert mapper.map(TURN_ENDS)[0] == unattributed
+    # Sealed by one request and never attributed: foreign at the next request too.
+    mapper = started("mine")
+    mapper.map(absorbed("unattributed"))
+    mapper.map(REQUEST)
+    assert mapper.map(REQUEST)[0] == unattributed
     # The CLI's attachment for the session's own notification settles it.
     mapper = started("mine")
     mapper.map(absorbed("made-by-the-cli"))
@@ -511,7 +547,8 @@ def test_an_input_taken_during_a_turn_that_nothing_attributes_is_another_sender_
         {"type": "attachment", "attachment": {"type": QUEUED, "source_uuid": "unattributed"}}
     )
     assert foreign(mapper.map(ASSISTANT)) == []
-    assert foreign(mapper.map(REQUEST)) != []
+    assert foreign(mapper.map(REQUEST)) == []
+    assert foreign(mapper.map(ASSISTANT)) != []
     # The runner's own line needs no attachment to count.
     mapper = started("mine")
     mapper.map(absorbed("mine"))
