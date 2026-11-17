@@ -38,6 +38,7 @@ from claude_code_runner.bgtranscript import (
     PricedUsage,
     TranscriptMapper,
     TranscriptReader,
+    foreign_origin,
     prompt_taken,
     replayed_records,
 )
@@ -376,6 +377,7 @@ def absorbed(line_uuid: object) -> dict[str, Any]:
 
 
 def queued(line_uuid: object, kind: str, **origin: Any) -> dict[str, Any]:
+    """The attachment of an input a running turn took, with an origin of ``kind``."""
     inner = {
         "type": QUEUED,
         "prompt": "Do it",
@@ -437,7 +439,7 @@ def test_an_input_taken_during_a_turn_that_nothing_attributes_is_another_sender_
     # An attachment for another uuid, or one without an origin, settles nothing.
     mapper = started("mine")
     mapper.map(absorbed("unattributed"))
-    mapper.map(queued("another", "task-notification"))
+    mapper.map(queued("another", "task-notification", producer="session-task"))
     mapper.map(
         {"type": "attachment", "attachment": {"type": QUEUED, "source_uuid": "unattributed"}}
     )
@@ -485,11 +487,66 @@ def test_what_the_session_gives_itself_is_no_foreign_input() -> None:
     assert foreign(mapper.map(absorbed("made-by-the-cli"))) == []
     notified = queued("made-by-the-cli", "task-notification", producer="session-task")
     assert mapper.map(notified) == []
-    own_turn = {**peer("another-id"), "origin": {"kind": "task-notification"}}
+    own_turn = {**peer("another-id"), "origin": dict(OWN_NOTIFICATION, runId="0abc-1")}
     assert foreign(mapper.map(own_turn)) == []
-    # A message of the session's own subagent arrives as a notification too.
-    relayed = queued("x", "task-notification", subkind="peer-send-message")
-    assert mapper.map(relayed) == []
+
+
+OWN_NOTIFICATION = {"kind": "task-notification", "producer": "session-task"}
+"""The origin of a notification about work the session itself launched, as the pinned CLI
+writes it (the recording ``background`` holds one, with the ``runId`` of the task)."""
+
+NOTIFICATIONS_OF_OTHER_SENDERS = [
+    # A message another session of the same user sent with ``SendMessage``.
+    {"kind": "task-notification", "subkind": "peer-send-message"},
+    {"kind": "task-notification", "subkind": "projects-relay"},
+    {"kind": "task-notification", "subkind": "session-inbox"},
+    {"kind": "task-notification", "subkind": "scheduled-trigger", "fireReason": "manual"},
+    # A webhook or another delivery from outside carries no marker at all.
+    {"kind": "task-notification"},
+    {"kind": "task-notification", "runId": "0abc-1"},
+    # Only the one producer the pinned CLI names counts, and only without a subkind.
+    {"kind": "task-notification", "producer": "someone-else"},
+    {"kind": "task-notification", "producer": ["session-task"]},
+    {"kind": "task-notification", "producer": "session-task", "subkind": "peer-send-message"},
+    {"kind": "task-notification", "producer": "session-task", "subkind": None},
+]
+
+
+@pytest.mark.parametrize("origin", NOTIFICATIONS_OF_OTHER_SENDERS)
+def test_a_notification_is_the_session_s_own_only_by_its_producer(origin: dict[str, Any]) -> None:
+    # The pinned CLI records more than a session's own work under ``task-notification``: a
+    # message of another session of the same user, a relay, a scheduled prompt, a webhook.
+    # The kind alone proves nothing; only the producer the CLI stamps for work the session
+    # itself launched does, and a subkind always names a delivery from somewhere else.
+    other = [{"type": "system", "subtype": "bg_foreign", "origin": "other"}]
+    turn = {**peer("made-by-the-cli"), "origin": origin}
+    mapper = started("mine")
+    mapper.map(ASSISTANT)
+    mapper.map(TURN_ENDS)
+    assert mapper.map(turn) == other
+    # Taken during a running turn: the attachment names the same origin.
+    mapper = started("mine")
+    assert foreign(mapper.map(absorbed("made-by-the-cli"))) == []
+    assert mapper.map(queued("made-by-the-cli", **origin)) == other
+    # Before the prompt such a record is no rest of an earlier process either.
+    before = TranscriptMapper("prompt-uuid", {"mine"}.__contains__)
+    assert before.map(turn) == other
+    assert not before.started
+
+
+def test_the_recorded_notification_of_a_session_s_own_work_names_its_producer() -> None:
+    # What the rule rests on, in the recording of the pinned CLI: the notification of the
+    # session's own background command carries the producer and no subkind.
+    found = [
+        r["origin"]
+        for r in transcript("background")
+        if (r.get("origin") or {}).get("kind") == "task-notification"
+    ]
+    assert found
+    for origin in found:
+        assert origin["producer"] == "session-task"
+        assert "subkind" not in origin
+    assert foreign(mapped("background")) == []
 
 
 def test_a_person_who_types_into_the_session_is_another_sender() -> None:
@@ -621,18 +678,27 @@ def test_an_origin_that_is_not_known_as_the_session_s_own_is_another_sender(orig
     assert started("mine").map(attached) == other
 
 
-@pytest.mark.parametrize("kind", ["task-notification", "auto-continuation"])
-def test_what_the_cli_gives_a_session_by_itself_starts_a_turn_of_its_own(kind: str) -> None:
-    # The end of the session's own background work, and the continuation the CLI queues by
-    # itself (read in the file of the pinned CLI): no line of the socket carries these kinds.
+@pytest.mark.parametrize(
+    "origin",
+    [
+        {"kind": "task-notification", "producer": "session-task"},
+        {"kind": "task-notification", "producer": "session-task", "runId": "0abc-1"},
+        {"kind": "auto-continuation"},
+    ],
+)
+def test_what_the_cli_gives_a_session_by_itself_starts_a_turn_of_its_own(
+    origin: dict[str, Any],
+) -> None:
+    # The end of work the session itself launched, and the continuation the CLI queues by
+    # itself (read in the file of the pinned CLI): no line of the socket carries these.
     mapper = started("mine")
     mapper.map(ASSISTANT)
     mapper.map(TURN_ENDS)
-    own = {**peer("made-by-the-cli"), "origin": {"kind": kind}}
+    own = {**peer("made-by-the-cli"), "origin": origin}
     assert [shape(m) for m in mapper.map(own)] == ["system/init"]
     mapper = started("mine")
     mapper.map(absorbed("made-by-the-cli"))
-    assert mapper.map(queued("made-by-the-cli", kind)) == []
+    assert mapper.map(queued("made-by-the-cli", **origin)) == []
     assert foreign(mapper.map(ASSISTANT)) == []
     # Before the prompt such a record is skipped like the rest of an earlier process.
     before = TranscriptMapper("prompt-uuid", {"mine"}.__contains__)
@@ -653,8 +719,10 @@ def test_every_member_the_runner_reads_is_one_the_pinned_cli_wrote() -> None:
     table = json.loads((RECORDED / "transcript_fields.json").read_text("utf-8"))
     for record, members in READ_FIELDS.items():
         written = set(table["records"][record])
-        # Read in the CLI's file, not recorded: the stand-in sends no usage window.
-        assert set(members) - {"apiErrorParams"} <= written, record
+        # Read in the CLI's file, not recorded: the stand-in sends no usage window, and no
+        # recorded session got a delivery of another sender (``subkind``).
+        assert set(members) - {"apiErrorParams", "subkind"} <= written, record
+    assert {"kind", "producer", "subkind"} == set(READ_FIELDS["origin/task-notification"])
     read = {"id", "sessionId", "pid", "status", "waitingFor", "kind", "name"}
     assert read <= set(table["session_entry"])
     meta = json.loads((RECORDED / "meta.json").read_text("utf-8"))
@@ -865,7 +933,7 @@ def piece(*records: dict[str, Any]) -> bytes:
 
 async def test_busy_after_a_turn_end_is_background_work(tmp_path: Path) -> None:
     sessions = Sessions(after_turn=["busy", "idle"])
-    notified = record("user", origin={"kind": "task-notification"}, message={"content": "n"})
+    notified = record("user", origin=OWN_NOTIFICATION, message={"content": "n"})
     pieces = [
         piece(PROMPT, ANSWER, TURN_END),
         piece(
@@ -1002,6 +1070,47 @@ def test_an_adopter_maps_the_records_before_the_offset_again(tmp_path: Path) -> 
     assert [m.get("result") for m in rest if m["type"] == "result"] == ["Done."]
     assert replayed_records(path, 5, 5, TranscriptMapper("p")) == []
     assert replayed_records(None, 0, 10, TranscriptMapper("p")) == []
+
+
+def test_the_whole_transcript_of_a_released_process_is_judged(tmp_path: Path) -> None:
+    # A session released before a reader read its transcript to the end: what the process
+    # took is judged from its launch offset to the end of the file, with the runner's lines.
+    path = tmp_path / "session.jsonl"
+    earlier = piece({**peer("of-an-earlier-process"), "isSidechain": False})
+    own_line = {**peer("mine"), "isSidechain": False}
+    path.write_bytes(earlier + piece(PROMPT, ANSWER, TURN_END, own_line, ANSWER, TURN_END))
+    start = len(earlier)
+    wrote = {"mine"}.__contains__
+    assert foreign_origin(path, start, "prompt-uuid", wrote) is None
+    # The same transcript for a runner that wrote no line, and with a line behind the end.
+    assert foreign_origin(path, start, "prompt-uuid", None) == "peer"
+    with path.open("ab") as fh:
+        fh.write(piece({**peer("someone-else"), "isSidechain": False}))
+    assert foreign_origin(path, start, "prompt-uuid", wrote) == "peer"
+    typed = record("user", origin={"kind": "human"}, message={"role": "user", "content": "x"})
+    path.write_bytes(piece(PROMPT, ANSWER, TURN_END, typed))
+    assert foreign_origin(path, 0, "prompt-uuid", wrote) == "human"
+    # A line that is not complete yet is no record, and a missing transcript shows nothing.
+    path.write_bytes(piece(PROMPT, ANSWER, TURN_END) + piece(typed)[:-1])
+    assert foreign_origin(path, 0, "prompt-uuid", wrote) is None
+    assert foreign_origin(None, 0, "prompt-uuid", wrote) is None
+    assert foreign_origin(tmp_path / "missing.jsonl", 0, "prompt-uuid", wrote) is None
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS)
+def test_no_recorded_session_of_the_runner_is_judged_to_hold_a_foreign_input(
+    scenario: str,
+) -> None:
+    # Every release of a session judges its transcript once more (18.5 rule 4). The recorded
+    # sessions of the pinned CLI, among them one stopped in a tool call, one with the
+    # runner's lines and one with the notification of its own background command, hold no
+    # input of another sender for the runner that wrote their lines, and each line for one
+    # that did not.
+    path = RECORDED / f"transcript_{scenario}.jsonl"
+    wrote = lines_of_the_runner(transcript(scenario))
+    assert foreign_origin(path, 0, "prompt-uuid", wrote.__contains__) is None
+    expected = "peer" if wrote else None
+    assert foreign_origin(path, 0, "prompt-uuid", None) == expected
 
 
 def test_messages_are_priced_once_with_their_newest_usage() -> None:

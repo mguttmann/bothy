@@ -4,9 +4,10 @@
 Every directory the runner creates there has mode ``0700`` and every file ``0600``: the state
 holds transcripts, prompts, downloaded attachments and the inbox with its invocation tokens.
 Files older than ``runner.stream_log_retention`` under ``sessions/``, ``files/``, ``outgoing/``
-(staged answer attachments) and ``tmp/`` (temporary directories of runs) are swept. A hosted
-agent keeps its own state in ``hosted/<agent_id>/`` (`hosted_dir`, 26 3.2 item 2): its inbox,
-outbox and locks, never its token.
+(staged answer attachments) and ``tmp/`` (temporary directories of runs) are swept; what is
+state of a session and no recording stays (`_KEPT`). A hosted agent keeps its own state in
+``hosted/<agent_id>/`` (`hosted_dir`, 26 3.2 item 2): its inbox, outbox and locks, never its
+token.
 
 Examples:
     >>> import tempfile, pathlib
@@ -28,6 +29,7 @@ from pathlib import Path
 from uuid import UUID
 
 __all__ = [
+    "FOREIGN_INPUT_MARK",
     "StateDirError",
     "ensure_private_dir",
     "hosted_dir",
@@ -41,9 +43,14 @@ _SWEPT = ("sessions", "files")
 # One directory per run (the run's TMPDIR and its staged answer attachments, M3-12): swept as a
 # whole by its newest entry, never while the run is active, so a turn's unpacked old file stays.
 _SWEPT_RUNS = ("outgoing", "tmp")
+FOREIGN_INPUT_MARK = "foreign-input"
+"""The file in a session's folder that marks a session the runner never continues: its
+conversation took an input the runner did not write (09 18.5 "Whose input",
+`claude_code_runner.bgpaths.mark_foreign_input`)."""
 # The cumulative usage of a session is state, not a recording: without it a resumed session
-# would report its whole cost again (09 18.7).
-_KEPT = frozenset({"usage.json"})
+# would report its whole cost again (09 18.7). The mark of a session that took a foreign input
+# is state too: once it is gone the next run would continue that conversation (18.5).
+_KEPT = frozenset({"usage.json", FOREIGN_INPUT_MARK})
 
 
 class StateDirError(Exception):
@@ -169,7 +176,8 @@ def sweep(
     """Delete what is older than ``retention`` under the swept directories of ``root``.
 
     Under ``sessions/`` and ``files/`` every regular file older than ``retention`` goes and
-    directories left empty are removed; the usage of a session (``usage.json``) is kept. Under
+    directories left empty are removed; the usage of a session (``usage.json``) and the mark
+    of a session that took a foreign input (`FOREIGN_INPUT_MARK`) are kept. Under
     ``outgoing/`` and ``tmp/`` each run's directory goes as a whole once its newest entry is
     older than ``retention``, never while its run is active (``active``, or a turn record in
     ``turns/``). Symbolic links are never followed.

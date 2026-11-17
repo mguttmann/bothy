@@ -833,10 +833,16 @@ class Player:
         self.turn_end()
 
     def typed_turn(self) -> None:
-        """A person attached to the session and typed: a user message the runner never sent."""
+        """A person attached to the session and typed: a user message the runner never sent.
+
+        With ``bg_typed_origin`` the record of that turn carries the origin of the scenario
+        instead: an input the CLI took from somewhere else, as it records the message of
+        another session of the same user under ``task-notification`` with a ``subkind``.
+        """
         self.status("busy")
         self.fake.record("bg_typed")
-        self.user("Typed into the session by a person at the host", {"kind": "human"}, later=True)
+        origin = dict(self.scenario.get("bg_typed_origin") or {"kind": "human"})
+        self.user("Typed into the session by a person at the host", origin, later=True)
         self.text("Answer to what was typed into the session.")
         self.turn_end()
 
@@ -915,8 +921,16 @@ class Player:
         self.fake.stopping.set()
 
     def end(self, reason: str, *, keep_entry: bool = False) -> None:
-        """The end of the process: the session totals, then the entry without a process."""
+        """The end of the process: the session totals, then the entry without a process.
+
+        With ``bg_line_at_stop`` a stopped session first writes the record of a line of
+        another sender: one it took in the moment before the stop, which no read of the
+        transcript before the stop could show.
+        """
         with self.lock:
+            if reason == "stop" and self.scenario.get("bg_line_at_stop"):
+                origin = {"kind": "peer", "from": "unknown"}
+                self.user(PEER_LEAD + "Taken at the stop" + PEER_TAIL, origin, later=True)
             if not self.scenario.get("bg_no_cost_state"):
                 total = sum(float(v.get("costUSD", 0)) for v in self.totals.values())
                 for _ in range(2):  # the pinned CLI writes the record twice at its end

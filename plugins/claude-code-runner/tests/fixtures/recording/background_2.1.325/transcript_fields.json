@@ -135,6 +135,11 @@
       "sessionId",
       "type"
     ],
+    "origin/task-notification": [
+      "kind",
+      "producer",
+      "runId"
+    ],
     "permission-mode": [
       "permissionMode",
       "sessionId",

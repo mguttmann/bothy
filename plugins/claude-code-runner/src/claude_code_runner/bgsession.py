@@ -20,9 +20,10 @@ pure function a test holds against a recording of the pinned version:
 
 What a session takes from the other Claude Code sessions of the host user is never widened: the
 settings file of a run sets no ``crossSessionInbound``, so the CLI's own rule per message and
-any stricter value of the host stay, and the tools that address or list other sessions are
-disallowed (`DENIED_TOOLS`). Neither authenticates a sender: the runner decides by the ``uuid``
-of every input the transcript shows (`claude_code_runner.bgtranscript`, 09 18.5).
+any stricter value of the host stay, and the tools found in the pinned CLI that write to or
+list other sessions are disallowed (`DENIED_TOOLS`). Neither authenticates a sender: the runner
+decides by the ``uuid`` of every input the transcript shows (`claude_code_runner.bgtranscript`,
+09 18.5).
 
 A session inherits the environment of the supervisor, which lives across runs. So the launch
 command, which starts the supervisor when none runs, gets the fixed environment of
@@ -107,14 +108,20 @@ NAME_PREFIX = "bothy-"
 of the session list under another name belongs to another program and is never stopped or
 removed."""
 
-DENIED_TOOLS = ("AskUserQuestion", "SendMessage", "ListAgents")
+DENIED_TOOLS = ("AskUserQuestion", "SendMessage", "ListAgents", "SendFile")
 """The tools no background session of the runner has (``--disallowedTools``, 09 18.2). A
-question of ``AskUserQuestion`` blocks a session until a person answers it. ``SendMessage`` and
-``ListAgents`` are the two tools that address and list the other Claude Code sessions of the
-host user (run with the pinned CLI: a session offers no other such tool); without them a
-session of the runner can neither write to another session nor find one. The same deny rule
-also takes the messages to the session's own subagents and teammates, which that tool serves
-too."""
+question of ``AskUserQuestion`` blocks a session until a person answers it. The other three
+are the tools found in the pinned CLI that reach the other Claude Code sessions of the host
+user: ``SendMessage`` writes to one and ``ListAgents`` lists them (run with the pinned CLI),
+and ``SendFile`` sends files to one, by a name of that list or by the address of its socket
+(read in the file of the pinned CLI: an account feature switches the tool on, so a session
+without a login offers none and no run showed it). The deny rule for ``SendMessage`` also
+takes the messages to the session's own subagents and teammates, which that tool serves too.
+
+The list is what was found, by runs and by reading the file, not a proof that the CLI has no
+further such tool: one that a later version or another account feature adds is not denied
+until it stands here, and ``tests/real_cli/test_pinned_cli.py`` holds each name in the file
+of the pinned version."""
 
 RUN_ENV_NAMES = ("CLAUDE_PRODUCT_RUN", "DISABLE_AUTOUPDATER", "TMPDIR", "SSH_AUTH_SOCK")
 """The names of the ``env`` block of a run's settings file, each set in every launch."""
@@ -170,8 +177,8 @@ def background_class_flags(tool_class: str, tools: Sequence[str]) -> list[str]:
 
     The flags of `claude_code_runner.commandline.class_flags`, and under ``scoped`` and ``host``
     `DENIED_TOOLS` in ``--disallowedTools``: nobody is there to answer a question, and a
-    session of the runner neither writes to nor lists the other sessions of the host user.
-    ``chat`` has no tool (``--tools ""`` leaves none, run with the pinned CLI).
+    session of the runner neither writes or sends files to nor lists the other sessions of
+    the host user. ``chat`` has no tool (``--tools ""`` leaves none, run with the pinned CLI).
 
     Args:
         tool_class: ``chat``, ``scoped`` or ``host``.
@@ -187,7 +194,7 @@ def background_class_flags(tool_class: str, tools: Sequence[str]) -> list[str]:
         >>> background_class_flags("host", [])[:3]
         ['--permission-mode', 'bypassPermissions', '--disallowedTools']
         >>> background_class_flags("host", [])[3:]
-        ['AskUserQuestion', 'SendMessage', 'ListAgents']
+        ['AskUserQuestion', 'SendMessage', 'ListAgents', 'SendFile']
     """
     flags = class_flags(tool_class, tools)
     if tool_class == "chat":
@@ -320,8 +327,9 @@ def _fits_envelope(text: str) -> bool:
     rewrites a body that holds the element's closing tag, which it matches in many spellings
     (other letter cases, look-alike and invisible characters). The runner does not copy that
     rule: a text whose letters ``a`` to ``z``, read without anything between them and in any
-    case, hold the element's name is not put into an envelope at all, which is more than the
-    CLI's rule covers.
+    case, hold the element's name is not put into an envelope at all. That covers other
+    letter cases and characters between the letters, not a spelling with look-alike letters,
+    which passes here and is left to the CLI's own rule.
     """
     letters = "".join(c for c in text.casefold() if "a" <= c <= "z")
     return _ENVELOPE_LETTERS not in letters

@@ -42,7 +42,7 @@ from real_cli.stand_in import cli_env, stand_in, user_line
 
 from claude_code_runner.bgsession import SessionEntry
 
-__all__ = ["KEPT", "PRINT_FLAGS", "QUEUED", "USAGE", "record_background"]
+__all__ = ["KEPT", "NOTIFIED", "PRINT_FLAGS", "QUEUED", "USAGE", "record_background"]
 
 KEPT = (
     "user",
@@ -58,6 +58,10 @@ the type `QUEUED` is kept, of ``system`` only ``turn_duration``."""
 
 QUEUED = "queued_command"
 """The one attachment the runner reads: what a running turn took in, with its origin."""
+
+NOTIFIED = "task-notification"
+"""The one kind of origin of which the runner reads more than the kind: whether the
+notification is about work the session itself launched (its ``producer``)."""
 
 USAGE = {
     "input_tokens": 1200,
@@ -95,8 +99,12 @@ def _fields(records: list[dict[str, Any]], table: dict[str, set[str]]) -> None:
         if name == "system":
             name = f"system/{record.get('subtype')}"
         table.setdefault(name, set()).update(record)
+        origin = record.get("origin") if name == "user" else None
         if name == "attachment" and _queued(record):
             table.setdefault(f"attachment/{QUEUED}", set()).update(record["attachment"])
+            origin = record["attachment"].get("origin")
+        if isinstance(origin, dict) and origin.get("kind") == NOTIFIED:
+            table.setdefault(f"origin/{NOTIFIED}", set()).update(origin)
 
 
 class _Recording:

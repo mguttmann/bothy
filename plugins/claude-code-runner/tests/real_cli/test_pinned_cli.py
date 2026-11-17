@@ -124,7 +124,7 @@ BACKGROUND_TOKENS = (
     "waitingFor",
     # FIX-RUNNER-BG-INBOX-AUTH: whose input a session took (the attachment that names the
     # origin of what a running turn took in, the second origin under which a session gives
-    # itself an input, and the envelope in which a sender states its class), the two tools
+    # itself an input, and the envelope in which a sender states its class), the tools
     # that reach other sessions, the variable of the token a session gives its own child
     # processes, and the login beta of 18.3 by its whole name.
     "queued_command",
@@ -136,6 +136,21 @@ BACKGROUND_TOKENS = (
     "SendMessage",
     "ListAgents",
     "oauth-2025-04-20",
+    # The members by which a notification is the session's own or a delivery of another
+    # sender (read in the CLI's file: the producer of work the session itself launched, and
+    # the subkinds of what other sessions, a relay or a schedule deliver under that kind).
+    "producer",
+    "session-task",
+    "subkind",
+    "peer-send-message",
+    "projects-relay",
+    "session-inbox",
+    "scheduled-trigger",
+    # The third tool that reaches other sessions. An account feature switches it on, so no
+    # session without a login offers it and no run of this suite shows it: the name and the
+    # sentence that says what it does are held here instead.
+    "SendFile",
+    "Send files to another Claude Code session",
     "Workspace not trusted.",
     "--bg with bypassPermissions requires accepting the disclaimer first.",
     "is already running in the background, so this started a copy as",

@@ -157,6 +157,7 @@ async def test_a_new_post_runs_as_one_background_session(bg_world: World) -> Non
         "AskUserQuestion",
         "SendMessage",
         "ListAgents",
+        "SendFile",
         "--append-system-prompt-file",
         str(files.system_prompt),
         "--messaging-socket-path",
@@ -835,6 +836,7 @@ async def test_fake_claude_writes_only_members_the_pinned_cli_writes(bg_world: W
 
 
 QUEUED_ATTACHMENT = "attachment/queued_command"
+NOTIFICATION_ORIGIN = "origin/task-notification"
 
 
 def members_seen(world: World) -> set[str]:
@@ -861,8 +863,16 @@ def members_seen(world: World) -> set[str]:
             "origin",
         } <= set(record), name
         inner = record.get("attachment")
+        origin = record.get("origin") if name == "user" else None
         if name == "attachment" and inner.get("type") == "queued_command":
             seen.add(QUEUED_ATTACHMENT)
             assert set(inner) <= set(table[QUEUED_ATTACHMENT])
             assert set(READ_FIELDS[QUEUED_ATTACHMENT]) <= set(inner)
+            origin = inner.get("origin")
+        if isinstance(origin, dict) and origin.get("kind") == "task-notification":
+            # The notification of the session's own work, with the producer the runner reads
+            # (``subkind`` marks a delivery of another sender: read in the CLI's file).
+            seen.add(NOTIFICATION_ORIGIN)
+            assert set(origin) <= set(table[NOTIFICATION_ORIGIN])
+            assert set(READ_FIELDS[NOTIFICATION_ORIGIN]) - {"subkind"} <= set(origin)
     return seen

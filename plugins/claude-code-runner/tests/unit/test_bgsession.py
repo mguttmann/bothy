@@ -96,7 +96,7 @@ TAIL = [
     "/s/bg/run.settings.json",
 ]
 HEAD = ["/bin/claude", "--bg", "--name", "bothy-run", "--model", "model-large"]
-DENIED = ["AskUserQuestion", "SendMessage", "ListAgents"]
+DENIED = ["AskUserQuestion", "SendMessage", "ListAgents", "SendFile"]
 
 
 def test_the_argument_list_of_each_tool_class() -> None:
@@ -140,9 +140,12 @@ def test_the_argument_list_of_each_tool_class() -> None:
 
 
 def test_no_class_keeps_a_tool_that_asks_a_person_or_reaches_another_session() -> None:
-    # AskUserQuestion blocks a session nobody attends; SendMessage and ListAgents are the
-    # tools that address and list the other Claude Code sessions of the host user (18.2).
-    assert DENIED == ["AskUserQuestion", "SendMessage", "ListAgents"]
+    # AskUserQuestion blocks a session nobody attends. SendMessage, ListAgents and SendFile
+    # are the tools found in the pinned CLI that write to or list the other Claude Code
+    # sessions of the host user (18.2); SendFile is offered only with a feature of the
+    # account, so no run without a login shows it, and its name is held in the CLI's file
+    # (tests/real_cli/test_pinned_cli.py).
+    assert DENIED == ["AskUserQuestion", "SendMessage", "ListAgents", "SendFile"]
     assert tuple(DENIED) == DENIED_TOOLS
     for tool_class in ("scoped", "host"):
         flags = background_class_flags(tool_class, [])

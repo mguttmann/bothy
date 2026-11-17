@@ -3,13 +3,16 @@
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from pathlib import Path
 
 import pytest
 
+from claude_code_runner.bgpaths import mark_foreign_input, took_foreign_input
 from claude_code_runner.statedir import (
+    FOREIGN_INPUT_MARK,
     StateDirError,
     ensure_private_dir,
     hosted_dir,
@@ -84,6 +87,36 @@ def test_sweep_keeps_the_session_usage(tmp_path: Path) -> None:
     os.utime(usage, (past, past))
     assert sweep(tmp_path, 60.0) == 0
     assert usage.exists()
+
+
+def test_sweep_keeps_the_mark_of_a_session_that_took_a_foreign_input(tmp_path: Path) -> None:
+    # The mark is state, not a recording: without it the next run would continue the
+    # conversation that holds the foreign input (09 18.5), however long ago that was.
+    mark_foreign_input(tmp_path, "s", "run-1")
+    stream = tmp_path / "sessions" / "s" / "run-1.stream.jsonl"
+    stream.write_text("x")
+    past = time.time() - 365 * 24 * 3600
+    for path in (stream, stream.with_name(FOREIGN_INPUT_MARK)):
+        os.utime(path, (past, past))
+    assert sweep(tmp_path, 60.0) == 1
+    assert not stream.exists()
+    assert took_foreign_input(tmp_path, "s")
+
+
+def test_the_mark_of_a_session_is_private_and_names_only_the_run(tmp_path: Path) -> None:
+    assert not took_foreign_input(tmp_path, "s")
+    assert not (tmp_path / "sessions").exists()  # asking creates nothing
+    mark_foreign_input(tmp_path, "s", "run-1")
+    path = tmp_path / "sessions" / "s" / FOREIGN_INPUT_MARK
+    assert path.stat().st_mode & 0o777 == 0o600
+    assert path.parent.stat().st_mode & 0o777 == 0o700
+    assert json.loads(path.read_text()) == {"run_id": "run-1"}
+    assert took_foreign_input(tmp_path, "s")
+    assert not took_foreign_input(tmp_path, "another")
+    # A second input in the same session changes nothing, and only the name counts.
+    mark_foreign_input(tmp_path, "s", "run-2")
+    path.write_text("")
+    assert took_foreign_input(tmp_path, "s")
 
 
 def test_sweep_outgoing_and_run_temp(tmp_path: Path) -> None:

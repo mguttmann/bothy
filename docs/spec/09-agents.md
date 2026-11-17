@@ -3381,7 +3381,7 @@ argument list, in this order (no shell):
 | Rule | Content | Reason |
 |---|---|---|
 | Prompt | the stdin of the launch command: the two items of the first stdin line of "Input" above joined by a blank line, as one text | a positional argument is bounded by the system's argument limit and readable in the process list; the context comes first, so the prompt never starts with `/` or `!` |
-| Flags of the class | those of the table above, and under `scoped` and `host` `--disallowedTools AskUserQuestion SendMessage ListAgents`; `--permission-prompts none` is left out (it belongs to print mode) and `--session-id` too (the CLI ignores it for a background session). `chat` has no tool (`--tools ""` leaves none) | a question blocks a session until a person answers it in Claude Code; `SendMessage` and `ListAgents` are the tools that write to and list the other Claude Code sessions of the host user (cross-session messaging, https://code.claude.com/docs/en/cross-session-messaging, retrieved 2026-11-16), and a session of the runner does neither. The deny rule also takes the messages to the session's own subagents and teammates, which the same tool serves |
+| Flags of the class | those of the table above, and under `scoped` and `host` `--disallowedTools AskUserQuestion SendMessage ListAgents SendFile`; `--permission-prompts none` is left out (it belongs to print mode) and `--session-id` too (the CLI ignores it for a background session). `chat` has no tool (`--tools ""` leaves none) | a question blocks a session until a person answers it in Claude Code; `SendMessage` and `ListAgents` are the tools that write to and list the other Claude Code sessions of the host user (cross-session messaging, https://code.claude.com/docs/en/cross-session-messaging, retrieved 2026-11-16), and `SendFile` sends files to one, by a name of that list or by the address of its socket (read in the file of the pinned CLI on 2026-11-17: an account feature switches the tool on, so a session without a login offers none and no run showed it). A session of the runner does none of the three. The list holds the tools that were found, by runs and by reading the file; it is no proof that the CLI has no further one (18.5 "What stays open"). The deny rule for `SendMessage` also takes the messages to the session's own subagents and teammates, which the same tool serves |
 | Files | `<runner.state_dir>/bg/` holds, named after the run, the inbox socket `<digest>.sock` (the first 16 hexadecimal digits of the SHA-256 of the run id), the settings file `<run_id>.settings.json` (mode `0600`), the system prompt file `<run_id>.system-prompt.md` and the launch command's stdout and stderr; they are removed when the run left the runner. With `runner.launch_mode` `background` the start is refused, naming `runner.state_dir`, when the socket path is longer than a socket address of the system allows | a live session process keeps the files it was started with, so none of them lies in the session's folder, which moves when the runner learns the id of a new session (18.1) |
 | Settings file | exactly two members: `worktree.bgIsolation` `none`, and `env` with `CLAUDE_PRODUCT_RUN`, `DISABLE_AUTOUPDATER`, the run's `TMPDIR` and `SSH_AUTH_SOCK`, each of the four in every file: `SSH_AUTH_SOCK` holds the agent socket with `runner.forward_ssh_agent` and is the empty text otherwise. The file sets no `crossSessionInbound` (18.5 "Whose input") | without `none` the session moves into a Git worktree of its own (against 18.1) and its transcript moves with it; of the launching command's environment only `PATH` reaches the session, and a session inherits the environment of the supervisor, which lives across runs, so a name that is not set here would keep whatever the supervisor carries; a value of the `env` block goes before an inherited one |
 | Environment | the launch command and every control command (`claude agents --json --all`, `claude stop`, `claude rm`, `claude daemon status`) get one fixed environment of the runner process: the allow list above built once at the start, without the SSH agent and without the temporary folder of any run, plus `DISABLE_AUTOUPDATER`. No value of a run is ever in it; a run's values reach its session through the `env` block of the settings file alone | the launch that starts the supervisor hands it its environment, the supervisor lives across runs, and every later session inherits what it carries: an SSH agent socket in it would reach the session of a run that must not have one |
@@ -3549,10 +3549,10 @@ the content is read only afterwards.
 | `user` without an origin, with `tool_result` items | `tool_use_id`, `is_error` | the step ends `completed` or `failed`; a record that carries an origin is never read as a tool result |
 | `user` with `origin.kind` `peer` | `uuid` | a line of the inbox socket that started a turn. With a `uuid` the runner wrote, seen for the first time: its echo, the follow-up is `absorbed` (18.5). With any other `uuid`: an input of another sender (18.5 "Whose input") |
 | `user` with `origin.kind` `human` that is not the run's prompt | none | a person typed into the session: an input of another sender, whatever its content (18.5 "Whose input") |
-| `user` with `origin.kind` `task-notification` or `auto-continuation` | none | a turn the session starts by itself |
-| `user` with any other origin | none | an input of another sender (18.5 "Whose input") |
+| `user` with an origin of the session itself: `origin.kind` `task-notification` with `origin.producer` `session-task` and without `origin.subkind`, or `origin.kind` `auto-continuation` | `origin.producer`, `origin.subkind` | a turn the session starts by itself (18.5 "Whose input") |
+| `user` with any other origin, also `task-notification` without that producer or with a `subkind` | none | an input of another sender (18.5 "Whose input") |
 | `queue-operation` | `operation`, `reason`, `commandUuid` | `enqueue` and `dequeue` stand in for `command_lifecycle` `queued` and `started` (18.5), matched in their order, and `dequeue` starts a turn; `remove` with `absorbed_mid_turn` and a `commandUuid` the runner wrote is the echo of that line, a second one under the same `commandUuid` an input of another sender. The CLI removes the notification of the session's own background work the same way, under a `uuid` it made itself, so a removal under any other `uuid` leaves the input open until its attachment (next row) says whose it is |
-| `attachment` of the type `queued_command` | `attachment.origin.kind`, `attachment.source_uuid` | what a running turn took in, written before the request that carries it: with `origin.kind` `peer` and a `source_uuid` the runner did not write (or wrote and saw before), or with any other origin that is not one of the session itself, an input of another sender (18.5 "Whose input"); with an origin of the session itself (`task-notification`, `auto-continuation`) the input of that `source_uuid` is the session's own. An input that is still open at the next `assistant` record or turn end is an input of another sender too. No other attachment is read |
+| `attachment` of the type `queued_command` | `attachment.origin.kind`, of a `task-notification` also `attachment.origin.producer` and `attachment.origin.subkind`, `attachment.source_uuid` | what a running turn took in, written before the request that carries it: with `origin.kind` `peer` and a `source_uuid` the runner did not write (or wrote and saw before), or with any other origin that is not one of the session itself, an input of another sender (18.5 "Whose input"); with an origin of the session itself (the two of the `user` rows above) the input of that `source_uuid` is the session's own. An input that is still open at the next `assistant` record or turn end is an input of another sender too. No other attachment is read |
 | `system` `turn_duration` | none | the end of the turn: the answer is the text of the turn's last assistant message; a turn whose last assistant record is an API error has none and ends like a `result` with an error |
 | `cost-state`, written when the session process ends | `modelUsage` | the session's totals (18.7) |
 
@@ -3728,7 +3728,7 @@ Whose input (background mode, addendum of 2026-11-16, FIX-RUNNER-BG-INBOX-AUTH).
 socket of a session is open to every program of the host user, among them the other Claude Code
 sessions of that user, some of which read content nobody vetted. The CLI marks every line of
 the socket with `origin.kind` `peer`, whatever the line says about itself, and keeps its `uuid`
-(run with the pinned CLI). Three rules follow.
+(run with the pinned CLI). Four rules follow.
 
 1. **The runner knows its own lines by their `uuid`.** It notes the `uuid` of the line a
    session was launched with and of every line it writes to the session's socket in the turn
@@ -3749,10 +3749,18 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
    names, over the part of the transcript the previous runner read and over the rest; a record
    that names no line proves none, so every line then counts as another sender's (18.9). What
    a session gives itself is no such input, and its origins are a closed list:
-   `task-notification` (the end of its own background work, a message of its own subagent) and
-   `auto-continuation` (a continuation the CLI queues by itself; read in the file of the pinned
-   CLI). An origin of any other kind, also one a later version adds or one that cannot be
-   read, is another sender's.
+   `task-notification` with `producer` `session-task` and without a `subkind` (the
+   notification of work the session itself launched: a background command, run with the
+   pinned CLI; the file of the pinned CLI names a background agent, a workflow and a monitor
+   too) and `auto-continuation` (a continuation the CLI queues by itself; read in the file of
+   the pinned CLI). The kind `task-notification` alone proves nothing: the pinned CLI records
+   under it what other senders deliver as well, each with a `subkind` (`peer-send-message`,
+   a message of another session of the same user; `projects-relay`; `session-inbox`;
+   `scheduled-trigger`) or with no marker at all (a webhook), and it stamps the producer
+   only on a notification about the session's own work (read in the file of the pinned CLI
+   on 2026-11-17; the recording holds a notification with the producer; no such delivery
+   was run, because each needs a login). An origin of any other kind or shape, also one a
+   later version adds or one that cannot be read, is another sender's.
 
    Whose input a record is, is read from its origin before anything of its content, in the
    mapping of 18.4, in the check whether a launch took its prompt (18.9) and in the question
@@ -3762,7 +3770,9 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
    same. A record of a person before the run's prompt is the prompt only when its content is
    a text. (Addendum of 2026-11-17: the first version of this rule read the `tool_result`
    items of a record before its origin and took every origin but `peer` and `human` for the
-   session's own; the review of that version found both.)
+   session's own; the review of that version found both. The second version took every
+   `task-notification` for the session's own by its kind alone; the review of that version
+   found it.)
 2. **The settings file widens nothing.** It sets no `crossSessionInbound`, so the CLI's own
    rule per message stays and a stricter value of the host user's or of managed settings is
    not overridden. That rule, run with the pinned CLI: a session that bypasses permission
@@ -3783,8 +3793,38 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
    for a message of a session's own child process (a token the session gives its tool calls)
    exists only without a value, holds a living process that is no child, and rests on a token
    every tool call of the session can read (run with the pinned CLI).
-3. **A session of the runner reaches no other session.** `SendMessage` and `ListAgents` are
-   disallowed (18.2).
+3. **The tools that reach other sessions are disallowed.** `SendMessage`, `ListAgents` and
+   `SendFile` (18.2): the tools found in the pinned CLI that write to, list or send files to
+   the other Claude Code sessions of the host user. The list is what was found, not a proof
+   that the CLI has no further one (below).
+4. **A session that took an input of another sender is never continued** (addendum of
+   2026-11-17). The input stays in the session's conversation: a process that continues the
+   session sends it to the model again with its next request, and the runner of that run,
+   which reads the transcript from its launch offset, sees nothing of it and would post the
+   answer (run with the pinned CLI: after the stop and the removal of the entry, the request
+   of the resumed session carried the line of the other sender again). So the runner marks
+   the session before it stops it, with the file
+   `<runner.state_dir>/sessions/<session id>/foreign-input`, which names the run and nothing
+   of the input and which the retention of the state directory keeps. No new attempt of any
+   run continues a marked session, in background mode and in print mode alike: a run whose
+   session is marked takes the path of a missing session of 18.9 before it starts a process
+   (a new session reference, the same first line, the box note `session_missing` once,
+   `agent_session.report` with the new reference and, in mode `bind`, `bind_failed`), and the
+   log has `session_not_continued`. The cost is the history: the thread goes on in a new
+   session that knows nothing of the stopped one, and the cause of the failed run says so. A
+   mark that cannot be written is logged (`session_mark_failed`); the next run then
+   continues the session.
+
+   A session can be released before a runner read its transcript to the end: an error, the
+   counter-check of 18.3 or a cancellation of the run in the runner ends the run, or a runner
+   that starts after a crash does not follow the turn, because the previous runner had
+   decided its end, the run has ended, or the session has no process and the end of its turn
+   is not in the transcript (18.9). What the session took in the part nobody read stays in
+   its conversation all the same. So at every such release, once the process is gone, the
+   runner maps the transcript of that process from its launch offset to its end, with the
+   lines the turn record names as the runner's, and marks the session at an input of another
+   sender (log `background_foreign_input_unread` with the word of rule 1). The run ends as
+   it was going to.
 
 What stays open: the class in the envelope is a claim, not a proof, so rule 2 keeps out only
 senders that state their class truthfully, and a message that is taken reaches the model before
@@ -3795,6 +3835,15 @@ every message, the runner's too. A program of the host user that reads or writes
 state folder or the CLI's transcripts is outside what these rules can decide: the transcript is
 where the runner reads the answer, and it keeps the system prompt and every line in clear
 text, which is also why no secret marker in the prompt tells the model whose line it reads.
+Rule 4 covers the transcript of a process a runner followed or found by its turn record: what
+a session takes while no run follows it (a person or a program that continues the session by
+its id between two runs) is in no part of the transcript a runner reads, and neither is what
+a session of a launch in doubt (18.9) took before the runner stopped it. The deny list of
+rule 3 holds the tools that were found: a tool that reaches other sessions and that an
+account feature or a later version adds is not denied until it stands on the list, and a
+`host` session would run it without a prompt. And the closed list of rule 1 ends a run at
+every delivery that is not the session's own work, also one of the host user's own account or
+configuration (a scheduled prompt, a relay, a webhook, a plugin, a channel).
 The operator rule is in the runner's README ("Before you switch it on"): background mode is
 for a host on which the host user runs no other Claude Code session, or only ones that are
 trusted like the runner.
@@ -3954,6 +4003,7 @@ and continues the session.
 |---|---|
 | Context full | compact exactly once, then the same prompt again; never twice. If the turn had already done work, the new turn gets a note in the runner prompt. Check the availability of `/compact` in print mode against the pinned version before building. |
 | Session missing in Claude Code | new session, prompt again, `agent_session.report` with a new reference, note once in the box (fail open) |
+| Session that took an input of another sender in background mode (18.5 "Whose input", addendum of 2026-11-17) | the run that saw the input ends `failed` with `runtime_error` and the cause `background_foreign_input`, and the session is marked. No later run continues it, in either launch mode: before a process that would continue it, the run takes the path "Session missing" of the row above |
 | Session already exists at the first turn | continue with `--resume`, report `started = true` |
 | Runtime not logged in | `failed`, `runtime_not_authenticated`; at a turn of a process that holds or held background work only after the retries of "Account errors" below |
 | Account error at a turn: a usage or rate limit, a login that is gone, subscription access switched off, an overloaded API (addendum of 2026-11-13, R-AG-58) | a process that holds or held background work is kept, the run stays `running` and says why it waits, and the turn is tried again after short pauses ("Account errors" below); after `runner.account_retry_max_wait`, and at once for a process that never had background work, `failed` with `runtime_error` (a login that is gone: `runtime_not_authenticated`) and a `summary` that names the error |
@@ -4018,7 +4068,10 @@ started with `--session-id`), first time in the run: a process with `--resume <r
 first line, then the report of `started = true` of 18.4. Each recovery happens at most once per
 run; a second occurrence or any failure of the new process before `system/init` ends the run as
 `runtime_error`. A pre-check before a further process that does not allow the start ends the run
-with its reason.
+with its reason. A session that carries the mark of 18.5 rule 4 is replaced the same way before
+a new attempt that would continue it is started (`--resume`, in every mode of the payload, also
+after `session_exists`); no process fails first, and the replacement counts as the run's one.
+The relaunch of a recorded attempt (18.19.5) repeats an attempt that passed this check.
 
 Box notes (D-M2-35-10): a run step of kind `status` with an empty `title`, `finished_at` set, a
 UUIDv7 ID and `name` one of these codes, which clients render as a translated line:
@@ -4026,7 +4079,7 @@ UUIDv7 ID and `name` one of these codes, which clients render as a translated li
 | Code | Status | `detail` | When |
 |---|---|---|---|
 | `context_compacted` | `completed` or `failed` | none | after a compaction |
-| `session_missing` | `completed` | `{"mode": "<mode>"}` | once per run, when the new session's process starts |
+| `session_missing` | `completed` | `{"mode": "<mode>"}` | once per run, when the new session's process starts, also in the place of a session the runner does not continue (18.5 rule 4) |
 | `runtime_error` | `failed` | `{"errors": [<texts>], "exit": "<code or signal name>"}` | last step of a run that ends `runtime_error`, patched before `run.finish` |
 
 A runtime without login ends `failed` with `runtime_not_authenticated`, at the pre-check (no
@@ -4188,7 +4241,7 @@ stops and removes the session and ends the run `failed` with `runtime_error` and
 its cause, so a prompt never runs twice. The runner never writes the CLI's trust entry or its
 acceptance of bypass mode; both are one-time steps of the operator in the host user's own CLI
 configuration. A session without a transcript takes the path "Session missing" of the table
-above, with a new session.
+above, with a new session, and so does a session that carries the mark of 18.5 rule 4.
 
 Crash of the runner in background mode (addendum of 2026-11-16): the turn record carries
 `launch_mode` `background`, the session's name `bothy-<run id>`, its short id once known, the
@@ -4210,7 +4263,9 @@ has ended: it is stopped and removed without a finish. A process of the session 
 recorded one is stopped first and counts as gone. No process: the run is finished from the
 transcript when the end of a turn follows the stored offset or the record holds a decided end
 (an answer is posted once, by the invariants above), else the record is removed and the server
-ends the run `interrupted`. The end of an adopted turn is classified without a recovery: no
+ends the run `interrupted`. Before a record goes without its turn being followed, the
+transcript of the recorded process is judged to its end for an input of another sender (18.5
+rule 4). The end of an adopted turn is classified without a recovery: no
 process is ever started for an adopted run (R-AG-17). An orderly stop of the runner stops an
 adopted background turn like an own one (18.6).
 

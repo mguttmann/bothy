@@ -31,7 +31,7 @@ The mapping, record by record (only records of the main conversation, ``isSidech
   is the echo of the runner's line with ``commandUuid``. The records of one queue are matched
   in their order, because ``enqueue`` and ``dequeue`` carry no id.
 * ``attachment`` of the type ``queued_command``: what a running turn took in. Only its
-  ``origin.kind`` and ``source_uuid`` are read; every other attachment is skipped.
+  origin and ``source_uuid`` are read; every other attachment is skipped.
 
 **Whose input.** The inbox socket of a session takes a line of every program of the host
 user, and the CLI marks it ``peer`` whatever the line says about itself. So the mapper knows
@@ -43,13 +43,16 @@ saw taken before, one with ``origin.kind`` ``human`` that is not the run's promp
 typed into the session), and one with any origin that is not known as the session's own. The
 runner then stops the session and posts no answer (18.5). Whose input a record is, is read
 from its origin alone and before anything else (`_sender`): no content makes a record of a
-sender a step of the turn. An input the session gives itself (`_OWN_ORIGINS`: the end of its
-own background work, a message of its own subagent, a continuation the CLI queues by itself)
-is none of these: the CLI removes it from its queue like a line, under a ``uuid`` it made,
-and names its origin in the attachment. So an input a running turn took under a ``uuid`` the
-runner did not write stays open until that attachment attributes it to the session itself;
-one that is still open at the next output of the session is foreign too. A mapper without
-``own`` knows no line of the runner.
+sender a step of the turn. An input the session gives itself (`_own_origin`: the notification
+of work the session itself launched, a continuation the CLI queues by itself) is none of
+these: the CLI removes it from its queue like a line, under a ``uuid`` it made, and names
+its origin in the attachment. The kind ``task-notification`` alone does not make an input the
+session's own: the CLI records the message of another session of the same user, a relay and
+a scheduled prompt under that kind too, so only the producer it stamps for the session's own
+work counts. So an input a running turn took under a ``uuid`` the runner did not write stays
+open until that attachment attributes it to the session itself; one that is still open at
+the next output of the session is foreign too. A mapper without ``own`` knows no line of the
+runner.
 * ``system`` ``turn_duration``: the end of the turn, a ``result`` whose text is the text of
   the turn's last assistant message, with ``is_error`` when that message is an API error.
 * ``cost-state``: ``bg_totals`` with ``modelUsage``, the session's totals (18.7).
@@ -92,6 +95,7 @@ __all__ = [
     "PricedUsage",
     "TranscriptMapper",
     "TranscriptReader",
+    "foreign_origin",
     "prompt_taken",
     "replayed_records",
 ]
@@ -105,6 +109,7 @@ READ_FIELDS: dict[str, tuple[str, ...]] = {
     "queue-operation": ("commandUuid", "operation", "reason"),
     "attachment": ("attachment", "isSidechain"),
     "attachment/queued_command": ("origin", "source_uuid", "type"),
+    "origin/task-notification": ("kind", "producer", "subkind"),
     "system/turn_duration": ("isSidechain", "subtype"),
     "cost-state": ("modelUsage",),
 }
@@ -113,7 +118,10 @@ of 18.4. ``tests/fixtures/recording/background_<version>/transcript_fields.json`
 pinned CLI writes; a test holds every name here against it, and the level-one test of the
 real-CLI suite compares that file with a fresh run. ``apiErrorParams`` is read in the CLI's
 file, not recorded: the stand-in for the API sends no usage window. ``attachment/queued_command``
-names the members of the object ``attachment`` of that type, the only attachment read."""
+names the members of the object ``attachment`` of that type, the only attachment read.
+``origin/task-notification`` names the members of an origin of that kind, of a ``user`` record
+and of that attachment alike (of every other origin only ``kind`` is read); its ``subkind`` is
+read in the CLI's file, not recorded: no recorded session got a delivery of another sender."""
 
 BACKGROUND_TASK = "background"
 """The task id the runner reports while the session list says ``busy`` between two turns: the
@@ -144,17 +152,44 @@ _PEER = "peer"
 _HUMAN = "human"
 _SELF = "self"
 _OTHER = "other"
-_OWN_ORIGINS = frozenset({"task-notification", "auto-continuation"})
-"""The kinds of ``origin.kind`` under which a session gives itself an input: the end of its own
-background work and a message of its own subagent (``task-notification``, run with the pinned
-CLI), and the continuation the CLI queues by itself (``auto-continuation``, read in the file of
-the pinned CLI). The list is closed: an origin of any other kind, also one a later version
-adds, is another sender's until it stands here."""
+_NOTIFICATION = "task-notification"
+_OWN_PRODUCER = "session-task"
+_CONTINUATION = "auto-continuation"
 
 
 def _content(record: Mapping[str, Any]) -> object:
     message = record.get("message")
     return message.get("content") if isinstance(message, Mapping) else None
+
+
+def _own_origin(origin: Mapping[str, Any]) -> bool:
+    """Whether an origin is one under which a session gives itself an input.
+
+    The list is closed, and it holds two origins:
+
+    * ``task-notification`` with ``producer`` ``session-task`` and without a ``subkind``: the
+      notification of work the session itself launched (a background command, run with the
+      pinned CLI; the CLI's file names a background agent, a workflow and a monitor too).
+      The kind alone proves nothing. The pinned CLI records under it what other senders
+      deliver as well, each either with a ``subkind`` (``peer-send-message``: a message of
+      another session of the same user; ``projects-relay``, ``session-inbox``,
+      ``scheduled-trigger``) or with no marker at all (a webhook), and it stamps the producer
+      only on a notification about the session's own work (read in the file of the pinned
+      CLI; the recording holds the producer).
+    * ``auto-continuation``: the continuation the CLI queues by itself (read in the file of
+      the pinned CLI). That origin has no further member.
+
+    An origin of any other kind or shape, also one a later version adds, is another sender's
+    until it stands here.
+    """
+    kind = origin.get("kind")
+    if kind == _CONTINUATION:
+        return True
+    return (
+        kind == _NOTIFICATION
+        and origin.get("producer") == _OWN_PRODUCER
+        and "subkind" not in origin
+    )
 
 
 def _sender(record: Mapping[str, Any]) -> str | None:
@@ -168,8 +203,9 @@ def _sender(record: Mapping[str, Any]) -> str | None:
         ``None`` for a record without an origin, which is the CLI's own record (a tool
         result, a note): every input of a sender carries one (run with the pinned CLI).
         ``peer`` for a line of the inbox socket, ``human`` for what a person gave, ``self``
-        for an input the session gave itself (`_OWN_ORIGINS`), and ``other`` for every other
-        origin, also one whose kind cannot be read.
+        for an input the session gave itself (`_own_origin`), and ``other`` for every other
+        origin, also one whose kind cannot be read and a notification that is not about the
+        session's own work.
     """
     origin = record.get("origin")
     if origin is None:
@@ -179,7 +215,7 @@ def _sender(record: Mapping[str, Any]) -> str | None:
         return _OTHER
     if kind in (_PEER, _HUMAN):
         return kind
-    return _SELF if kind in _OWN_ORIGINS else _OTHER
+    return _SELF if _own_origin(origin) else _OTHER
 
 
 def _is_text(content: object) -> bool:
@@ -367,9 +403,9 @@ class TranscriptMapper:
             # A line of the runner shows once here, beside its ``remove`` record.
             settled = self._line(inner.get("source_uuid"), self._attached) is True
         else:
-            # The CLI attributes the input to the session itself (the notification of a
-            # task, a message of its own subagent): no line of the socket and no person.
-            # Every other origin is another sender's.
+            # The CLI attributes the input to the session itself (the notification of work
+            # the session launched): no line of the socket and no person. Every other
+            # origin is another sender's, also a notification without that producer.
             settled = sender == _SELF
         return [] if settled else [self._foreign(sender)]
 
@@ -602,6 +638,39 @@ def replayed_records(
             continue
         out.extend((message, line_start, at) for message in mapper.map(record))
     return out
+
+
+def foreign_origin(
+    path: Path | None, start: int, prompt_uuid: str, own: Callable[[str], bool] | None
+) -> str | None:
+    """Whose input a session process took that was not the runner's, if it took one (18.5).
+
+    The whole transcript of the process, from its launch offset to the end of the file,
+    mapped as `TranscriptMapper` maps it for the runner that wrote the lines ``own``. Asked
+    when a session is released and no reader read its transcript to the end (an error or a
+    cancellation ends the run, an adopter does not follow the turn): what the session took
+    in the part nobody read stays in its conversation all the same.
+
+    Args:
+        path: The session transcript; ``None`` when the session has none.
+        start: The launch offset of the process.
+        prompt_uuid: The ``uuid`` of the input the process was launched with.
+        own: Tells whether the runner wrote an input line with this ``uuid``.
+
+    Returns:
+        The word of the first foreign input (`TranscriptMapper`), or ``None`` without one.
+    """
+    if path is None:
+        return None
+    try:
+        end = path.stat().st_size
+    except OSError:
+        return None
+    mapper = TranscriptMapper(prompt_uuid, own)
+    for message, _, _ in replayed_records(path, start, end, mapper):
+        if message.get("type") == "system" and message.get("subtype") == "bg_foreign":
+            return str(message.get("origin"))
+    return None
 
 
 class PricedUsage:

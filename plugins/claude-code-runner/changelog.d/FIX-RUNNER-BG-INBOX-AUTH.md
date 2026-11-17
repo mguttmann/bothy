@@ -9,12 +9,19 @@
   input a transcript record is, the runner reads from the record's origin before its content:
   a record of another sender whose content is shaped like a tool result is not taken for a
   step of the turn, and an origin that is not known as the session's own counts as another
-  sender's. The
+  sender's. A notification is the session's own only with the producer Claude Code stamps for
+  work the session itself launched: a message of another session, a relay or a scheduled
+  prompt that Claude Code records as a notification ends the run like any other foreign
+  input. A session that took such an input is never continued, in background mode or in print
+  mode: the runner marks it in its state folder, and the next message of the thread starts a
+  new session without the history of the stopped one (the cause of the failed run says so).
+  The
   settings file of a run no longer sets `crossSessionInbound` to `accept`, so Claude Code's own
-  rule per message applies and a stricter setting of the host is kept; `SendMessage` and
-  `ListAgents` are disallowed in a session of the runner; and the runner prompt no longer tells
-  the model to follow a message because of its lead-in. What stays open, and the rule for
-  operators, is in the README section "Background sessions" under "Before you switch it on".
+  rule per message applies and a stricter setting of the host is kept; `SendMessage`,
+  `ListAgents` and `SendFile` are disallowed in a session of the runner; and the runner prompt
+  no longer tells the model to follow a message because of its lead-in. What stays open, and
+  the rule for operators, is in the README section "Background sessions" under "Before you
+  switch it on".
 - The check that a `personal` background turn runs on the stored login now fails closed.
   Nothing a session puts out is accepted unless its newest request record lists the login beta
   of the pinned Claude Code version by its whole name; otherwise the session is stopped and
