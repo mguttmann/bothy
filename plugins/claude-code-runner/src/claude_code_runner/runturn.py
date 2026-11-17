@@ -142,6 +142,7 @@ from claude_code_runner.bgtranscript import (
     foreign_origin,
     prompt_taken,
     replayed_records,
+    side_inputs,
 )
 from claude_code_runner.causes import (
     ADAPTER_STOPPED,
@@ -3319,9 +3320,20 @@ class RunTurn:
             return started
         if not attempt.resume:
             attempt = dataclasses.replace(attempt, new_reference=True)
-        mapper = TranscriptMapper(inputs[0][0], self._wrote)
+        mapper = TranscriptMapper(inputs[0][0], self._wrote, self._side(started))
         reader = self._transcript_reader(started, mapper, offset)
         return await self._follow(started, attempt, offset, 0, reader=reader), True
+
+    def _side(self, session: BgSession) -> Callable[[str], list[dict[str, Any]]]:
+        """The inputs the session's own agents took, by their files (`side_inputs`).
+
+        The transcript is located at each question: the CLI creates it after the launch.
+        """
+
+        def find(line_uuid: str) -> list[dict[str, Any]]:
+            return side_inputs(self._transcript(session.session_id))(line_uuid)
+
+        return find
 
     def _wrote(self, line_uuid: str) -> bool:
         """Whether the runner gave the current session process an input line with this id."""
@@ -3853,7 +3865,9 @@ class RunTurn:
                 )
                 done = True
                 return
-            mapper = TranscriptMapper(str(self.bg_record.get("prompt_uuid") or ""), self._wrote)
+            mapper = TranscriptMapper(
+                str(self.bg_record.get("prompt_uuid") or ""), self._wrote, self._side(session)
+            )
             lines = replayed_records(
                 self._transcript(session.session_id),
                 self.ledger.process_start,

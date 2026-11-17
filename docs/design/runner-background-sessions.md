@@ -651,7 +651,9 @@ enforces:
     attachment after it, a `user` record or attachment with any other origin that is not one of
     the session itself,
     and an input a running turn took under a `uuid` the runner did not write that no
-    attachment attributes to the session itself before the session's next output. At the
+    attachment attributes to the session itself before the session's next output (also the
+    attachment in the file of an agent of the session, see the bullet "Why the files of the
+    session's agents"). At the
     first one the runner stops the session and ends the run `failed` with
     `runtime_error` and the cause `background_foreign_input` (the log event of that name
     carries one of four words for whose input it was, `peer`, `human`, `other` or
@@ -669,6 +671,16 @@ enforces:
       every other origin another sender's. An input nothing settled before the first output of that
       request counts as another sender's, so the rule does not rest on the attachment being
       there.
+    - Why the files of the session's agents: an agent the session launched (a subagent, a
+      workflow agent) takes the notifications of its own background commands mid-turn. The
+      CLI writes the `remove` record of such an input into the session's transcript and the
+      `queued_command` attachment that attributes it only into the agent's file below
+      `<session id>/subagents/` (real transcript of the pinned CLI, live run on 2026-11-17:
+      the next turn of the session, started by a notification of a plugin, ended the run as
+      `unattributed`, and the thread lost its conversation). Before an open input counts as
+      another sender's, the runner reads those files for an attachment with the input's
+      `uuid` and judges it by the same rule; what nothing attributes stays foreign
+      (FIX-RUNNER-BG-SIDE-NOTICE).
     - Why `human`: a person, or a program that drives `claude attach`, can type into a session
       of the runner, and the answer to it would be posted into the thread as the agent's.
     - Why the `uuid` counts once: a program that read a line of the runner in the transcript

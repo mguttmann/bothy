@@ -41,6 +41,7 @@ from claude_code_runner.bgtranscript import (
     foreign_origin,
     prompt_taken,
     replayed_records,
+    side_inputs,
 )
 from claude_code_runner.failures import api_error_text
 from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
@@ -463,6 +464,83 @@ def test_an_input_nothing_attributes_before_the_answer_of_its_request_is_foreign
     first = next(i for i, o in enumerate(outs) if foreign(o))
     assert records[first]["type"] == "assistant"
     assert [m["origin"] for m in foreign(outs[first])] == ["unattributed"]
+
+
+SUBAGENT_NOTICE = OWN_NOTICE.with_name("subagent_notice") / "s.jsonl"
+"""The real records (structure only) of the steering session e02ef005 on 17.11. 17:13Z to
+17:45Z, with the attachments of its workflow agent's file (``s/subagents/workflows/...``).
+A workflow agent the session launched took four notifications of its own background commands
+mid-turn. The CLI wrote their ``remove`` records into the session's transcript and the
+attachments that attribute them into the agent's file only. The next request of the session
+(a notification of the plugin security-guidance) sealed them, and the runner stopped the run
+as foreign ("unattributed") at its first answer, live run 01a1ea80 (FIX-RUNNER-BG-SIDE-NOTICE)."""
+
+
+def test_own_notifications_a_subagent_took_are_the_session_s_own() -> None:
+    records = [json.loads(line) for line in SUBAGENT_NOTICE.read_text().splitlines()]
+    mapper = TranscriptMapper("prompt-uuid", side=side_inputs(SUBAGENT_NOTICE))
+    out = [m for r in records for m in mapper.map(r)]
+    assert mapper.started
+    assert foreign(out) == []
+    # Three turns ended; the stop of the run cut the fourth (its answer is the last record).
+    assert [m["type"] for m in out].count("result") == 3
+    assert foreign_origin(SUBAGENT_NOTICE, 0, "prompt-uuid", None) is None
+
+
+def test_without_the_subagent_files_the_same_inputs_stay_foreign() -> None:
+    # A mapper that cannot read the files of the session's agents knows nothing that
+    # attributes these inputs, so it keeps to the rule: foreign at the first answer.
+    records = [json.loads(line) for line in SUBAGENT_NOTICE.read_text().splitlines()]
+    mapper = TranscriptMapper("prompt-uuid")
+    outs = [mapper.map(r) for r in records]
+    first = next(i for i, o in enumerate(outs) if foreign(o))
+    assert records[first]["type"] == "assistant"
+    assert [m["origin"] for m in foreign(outs[first])] == ["unattributed"]
+
+
+def _subagent_copy(tmp_path: Path, **attachment: Any) -> Path:
+    """The fixture with the first attachment of the agent's file changed by ``attachment``."""
+    side = SUBAGENT_NOTICE.with_suffix("")
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    path = tmp_path / "s.jsonl"
+    path.write_bytes(SUBAGENT_NOTICE.read_bytes())
+    for source in side.rglob("*.jsonl"):
+        target = tmp_path / "s" / source.relative_to(side)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        lines = [json.loads(line) for line in source.read_text().splitlines()]
+        if attachment:
+            first = lines[0]["attachment"]
+            first.update(attachment)
+            for key in [k for k, v in attachment.items() if v is None]:
+                del first[key]
+        target.write_text("".join(json.dumps(line) + "\n" for line in lines))
+    return path
+
+
+@pytest.mark.parametrize(
+    ("attachment", "expected"),
+    [
+        ({"origin": {"kind": "peer", "from": "uds:/x.sock"}}, "peer"),
+        ({"origin": {"kind": "task-notification", "subkind": "peer-send-message"}}, "other"),
+        ({"origin": {"kind": "human"}, "commandMode": "prompt"}, "human"),
+        ({"source_uuid": "another"}, "unattributed"),
+    ],
+)
+def test_another_sender_s_input_a_subagent_took_stays_foreign(
+    tmp_path: Path, attachment: dict[str, Any], expected: str
+) -> None:
+    # The agent's file attributes an input by the same rule as the session's own file: only
+    # the session's own work is the session's, and an input it does not name stays open.
+    path = _subagent_copy(tmp_path, **attachment)
+    assert foreign_origin(path, 0, "prompt-uuid", None) == expected
+    assert foreign_origin(_subagent_copy(tmp_path / "same"), 0, "prompt-uuid", None) is None
+
+
+def test_the_subagent_files_of_another_session_attribute_nothing(tmp_path: Path) -> None:
+    path = _subagent_copy(tmp_path)
+    (tmp_path / "s").rename(tmp_path / "other")
+    assert foreign_origin(path, 0, "prompt-uuid", None) == "unattributed"
+    assert side_inputs(None)("e36df773-8e63-47a5-a711-00646903ce7d") == []
 
 
 def notice(line_uuid: str, **inner: Any) -> dict[str, Any]:

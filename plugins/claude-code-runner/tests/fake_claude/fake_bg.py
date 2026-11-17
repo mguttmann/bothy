@@ -852,9 +852,43 @@ class Player:
             self.add_usage({self.model: {"inputTokens": 1000, "costUSD": 0.01}})
         self.turn_end()
 
+    def agent_notice(self, origin: dict[str, Any]) -> None:
+        """An agent of the session took a notification mid-turn (``bg_agent_notice_origin``).
+
+        As the pinned CLI does (real transcript, FIX-RUNNER-BG-SIDE-NOTICE): the ``remove``
+        record lands in the session's transcript, the attachment that attributes the input
+        with ``origin`` only in the agent's own file below ``<session id>/subagents/``.
+        """
+        ident = str(uuid.uuid4())
+        notice = "<task-notification>\n<status>completed</status>\n</task-notification>"
+        self.plain("queue-operation", operation="enqueue", content=notice)
+        self.plain(
+            "queue-operation",
+            operation="remove",
+            content=notice,
+            reason="absorbed_mid_turn",
+            commandUuid=ident,
+            deliveryId=str(uuid.uuid4()),
+        )
+        agent = self.path.with_suffix("") / "subagents" / "workflows" / "wf_1" / "agent-a1.jsonl"
+        agent.parent.mkdir(parents=True, exist_ok=True)
+        attachment = {
+            "type": "queued_command",
+            "prompt": notice,
+            "source_uuid": ident,
+            "commandMode": "task-notification",
+            "origin": origin,
+        }
+        record = {"isSidechain": True, "agentId": "a1", "type": "attachment"}
+        with agent.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps({**record, "attachment": attachment, **self._envelope()}) + "\n")
+
     def notification_turn(self, text: str | None) -> None:
         """A turn the session starts by itself for the notification of its background job."""
         notice = "<task-notification>\n<status>completed</status>\n</task-notification>"
+        agent_origin = self.scenario.get("bg_agent_notice_origin")
+        if isinstance(agent_origin, dict):
+            self.agent_notice(agent_origin)
         self.plain("queue-operation", operation="enqueue", content=notice)
         self.plain("queue-operation", operation="dequeue")
         self.status("busy")

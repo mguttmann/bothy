@@ -259,6 +259,42 @@ async def test_a_message_the_cli_records_as_a_notification_gets_no_answer(
     world.release(job)
 
 
+@pytest.mark.parametrize(
+    ("origin", "expected"),
+    [
+        ({"kind": "task-notification", "producer": "session-task"}, None),
+        ({"kind": "task-notification", "subkind": "peer-send-message"}, "other"),
+        ({"kind": "peer", "from": "uds:/x.sock"}, "peer"),
+    ],
+)
+async def test_an_input_an_agent_of_the_session_took_is_judged_by_the_agent_s_file(
+    bg_world: World, logs: LogLines, origin: dict[str, str], expected: str | None
+) -> None:
+    # Live run 01a1ea80 (17.11.): a workflow agent of the session took the notifications of
+    # its own background commands; the CLI wrote their removal into the session's transcript
+    # and the attachment that attributes them into the agent's file. The next turn of the
+    # session ended the run as foreign and the thread lost its conversation
+    # (FIX-RUNNER-BG-SIDE-NOTICE). Another sender's input an agent took still ends the run.
+    world = bg_world
+    job = world.gate("background_gate")
+    world.scenario(fixture="plain", background_gate=str(job), bg_agent_notice_origin=origin)
+    await start(world)
+    run = await world.fake.trigger("Run the suite", channel_id=world.forum_a)
+    await world.until(lambda: texts(world) == ["Done."])
+    world.release(job)
+    if expected is None:
+        assert await world.ended(run.run_id) == "completed"
+        assert texts(world) == ["Done.", "The suite passed."]
+        assert events(logs, "background_foreign_input") == []
+        session = str(players(world)[0]["session_id"])
+        assert not mark(world, session).exists()
+        return
+    assert await world.ended(run.run_id) == "failed"
+    assert texts(world) == ["Done."]
+    failed_for_a_foreign_input(world, run.run_id)
+    assert [e["origin"] for e in events(logs, "background_foreign_input")] == [expected]
+
+
 # ---- the conversation that took a foreign input is not continued (18.9) ------------------------
 
 

@@ -1,0 +1,78 @@
+{"type": "user", "isSidechain": false, "uuid": "f342361c-e6c4-4d47-9df5-a7c0310c4b53", "sessionId": "s", "origin": {"kind": "human"}, "message": {"role": "user", "content": "text"}}
+{"type": "user", "isSidechain": false, "uuid": "c0f391b0-d520-4657-9958-18e2ba9e73d4", "sessionId": "s", "message": {"role": "user", "content": "text"}}
+{"type": "user", "isSidechain": false, "uuid": "db3ad3d8-ff7d-4b1f-a908-0ba8e86d1093", "sessionId": "s", "message": {"role": "user", "content": [{"type": "text", "text": "text"}]}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "54a9cdce-db9b-4908-824c-e3da7c6c60af", "message": {"id": "msg_011Ch8sjzBVZ64Bh2jw158Zq", "model": "claude-opus-5-5", "content": [{"type": "thinking"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "42aacd39-04e5-466a-ac76-f478a874fbc5", "message": {"id": "msg_011Ch8sjzBVZ64Bh2jw158Zq", "model": "claude-opus-5-5", "content": [{"type": "tool_use", "id": "toolu_016qLN587kVJXD5tMuuAK6Vy", "name": "Bash", "input": {}}]}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "aef57408-ae4a-4d13-8b18-27afab5f21fa", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_016qLN587kVJXD5tMuuAK6Vy"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "591ea0c3-63f2-408b-ac9b-552437ea0785", "message": {"id": "msg_011Ch8skZbfkCCLYArik6srZ", "model": "claude-opus-5-5", "content": [{"type": "thinking"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "9ddcca26-0dff-40cc-9df7-3a57a550ba6c", "message": {"id": "msg_011Ch8skZbfkCCLYArik6srZ", "model": "claude-opus-5-5", "content": [{"type": "tool_use", "id": "toolu_01AYgwVhGLEjdU2g9grtvAUT", "name": "Bash", "input": {}}]}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "790d5096-39bf-46cc-b5ed-d2e7bef502e7", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01AYgwVhGLEjdU2g9grtvAUT"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "d7d8f06d-05a3-49a1-956e-2a2b315419cf", "message": {"id": "msg_011Ch8sm2hbHoTJuCqGiDg4Q", "model": "claude-opus-5-5", "content": [{"type": "thinking"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "39fca922-097e-46a5-995f-25c9be3d6f4d", "message": {"id": "msg_011Ch8sm2hbHoTJuCqGiDg4Q", "model": "claude-opus-5-5", "content": [{"type": "tool_use", "id": "toolu_01SSWGkyG372KNZqdD8Uj9JT", "name": "Bash", "input": {}}]}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "5e08d989-f854-4f86-8659-85e2daea4c00", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01SSWGkyG372KNZqdD8Uj9JT"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "096a2431-f1c3-41fe-9279-c1467c73e840", "message": {"id": "msg_011Ch8smLc7ArEntuoYsieCu", "model": "claude-opus-5-5", "content": [{"type": "thinking"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "b2ee955f-d129-4752-9793-3ad6d126f126", "message": {"id": "msg_011Ch8smLc7ArEntuoYsieCu", "model": "claude-opus-5-5", "content": [{"type": "tool_use", "id": "toolu_01S8QUeU35UE9CYXLSjLXvXb", "name": "Bash", "input": {}}]}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "16ff3429-56fe-4099-bbab-78259bb04ec6", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01S8QUeU35UE9CYXLSjLXvXb"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "0076ad6b-53a4-4c38-8af4-9a7ac5cf9374", "message": {"id": "msg_011Ch8smgiLP4vZMRuCi61zS", "model": "claude-opus-5-5", "content": [{"type": "thinking"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "2011848d-3cb4-4f9d-b0fd-f4165411ac02", "message": {"id": "msg_011Ch8smgiLP4vZMRuCi61zS", "model": "claude-opus-5-5", "content": [{"type": "tool_use", "id": "toolu_01Ah1wpUVeZnaDJAcZzuka7Z", "name": "Bash", "input": {}}]}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "c48eb854-5fdb-4f91-97ef-3e204269ee7c", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01Ah1wpUVeZnaDJAcZzuka7Z"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "85c0693a-7b3a-43cc-93fa-21b7e7ae80d7", "message": {"id": "msg_011Ch8smxxdhBFYvTe36xe1Z", "model": "claude-opus-5-5", "content": [{"type": "thinking"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "7a5051ee-558e-4bac-8d75-c42ba509cd56", "message": {"id": "msg_011Ch8smxxdhBFYvTe36xe1Z", "model": "claude-opus-5-5", "content": [{"type": "text", "text": "text"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "9a4ada9a-29d9-4222-93eb-c3a7f48eb89d", "message": {"id": "msg_011Ch8smxxdhBFYvTe36xe1Z", "model": "claude-opus-5-5", "content": [{"type": "tool_use", "id": "toolu_01DUkMACuEjXDbrSgKRX4TDr", "name": "Bash", "input": {}}]}}
+{"type": "user", "isSidechain": false, "uuid": "c8894640-4e1a-4ba6-8742-a51aacfb0dec", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01DUkMACuEjXDbrSgKRX4TDr"}]}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "05d21ef3-90c9-45fd-92bc-c014022dbc78", "message": {"id": "msg_011Ch8snKj3vznfqqe7n9RkT", "model": "claude-opus-5-5", "content": [{"type": "thinking"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "fafa17ef-95a1-47fc-ac7d-47e4455a6168", "message": {"id": "msg_011Ch8snKj3vznfqqe7n9RkT", "model": "claude-opus-5-5", "content": [{"type": "tool_use", "id": "toolu_01ThsnkE9jb7iXga2P32VkLA", "name": "Bash", "input": {}}]}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "8e531966-2e69-413c-b02b-015340b72192", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01ThsnkE9jb7iXga2P32VkLA"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "408f8fca-3148-45cf-80bb-bd8a85a88686", "message": {"id": "msg_011Ch8snoTv1rMV3DUC12Suz", "model": "claude-opus-5-5", "content": [{"type": "thinking"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "93aa2cb0-d4a7-44cf-a27a-aa9a1dae1db4", "message": {"id": "msg_011Ch8snoTv1rMV3DUC12Suz", "model": "claude-opus-5-5", "content": [{"type": "tool_use", "id": "toolu_011wfL5pZuAMZFdqvPD1jqWA", "name": "Workflow", "input": {}}]}}
+{"type": "user", "isSidechain": false, "uuid": "a99341bb-e28b-4989-9f9e-357f186b3795", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_011wfL5pZuAMZFdqvPD1jqWA"}]}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "94406171-d984-477e-8d7c-bec3689b31d3", "message": {"id": "msg_011Ch8srYWMkTtGqzja9gNC4", "model": "claude-opus-5-5", "content": [{"type": "text", "text": "text"}]}}
+{"type": "system", "subtype": "turn_duration", "isSidechain": false}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "user", "isSidechain": false, "uuid": "5a1730a8-558b-4696-9f76-ec4094656c7e", "sessionId": "s", "origin": {"kind": "task-notification", "producer": "session-task"}, "message": {"role": "user", "content": "text"}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "ed53e254-f11e-4569-8e9e-dca9f7d37627", "message": {"id": "msg_011Ch8tn2Gvyde3AmspDZcuE", "model": "claude-opus-5-5", "content": [{"type": "thinking"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "2e1575b9-b648-46f5-9ad5-726ec9c1eeeb", "message": {"id": "msg_011Ch8tn2Gvyde3AmspDZcuE", "model": "claude-opus-5-5", "content": [{"type": "tool_use", "id": "toolu_01HrjJcv6rFgArGFFF9iJY6f", "name": "Bash", "input": {}}]}}
+{"type": "user", "isSidechain": false, "uuid": "952dbe23-b7f5-471a-99df-290d199eb012", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01HrjJcv6rFgArGFFF9iJY6f"}]}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "2fa19938-048c-4eec-aa44-3023f524fad5", "message": {"id": "msg_011Ch8to4bruWjevqyU9Uusc", "model": "claude-opus-5-5", "content": [{"type": "tool_use", "id": "toolu_01A3eKNSBtQjqjq11gAZ2DGM", "name": "Bash", "input": {}}]}}
+{"type": "user", "isSidechain": false, "uuid": "2d277a1d-2db8-4b19-8e26-bd7635149976", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01A3eKNSBtQjqjq11gAZ2DGM"}]}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "22397c10-5970-47ca-b22a-2a70f210d347", "message": {"id": "msg_011Ch8toG2wN4Fh3xRnmEt1Z", "model": "claude-opus-5-5", "content": [{"type": "thinking"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "120add8c-a948-4165-a646-90b58825f107", "message": {"id": "msg_011Ch8toG2wN4Fh3xRnmEt1Z", "model": "claude-opus-5-5", "content": [{"type": "text", "text": "text"}]}}
+{"type": "system", "subtype": "turn_duration", "isSidechain": false}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "user", "isSidechain": false, "uuid": "aa3f8f53-b72f-4b24-b3ed-219582b30519", "sessionId": "s", "origin": {"kind": "task-notification", "producer": "session-task"}, "message": {"role": "user", "content": "text"}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "6e4107f5-3873-4168-9aa1-cb957192eb97", "message": {"id": "msg_011Ch8tpFZCb95Tjgo86TFio", "model": "claude-opus-5-5", "content": [{"type": "text", "text": "text"}]}}
+{"type": "system", "subtype": "turn_duration", "isSidechain": false}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "remove", "reason": "absorbed_mid_turn", "commandUuid": "e36df773-8e63-47a5-a711-00646903ce7d"}
+{"type": "queue-operation", "operation": "remove", "reason": "absorbed_mid_turn", "commandUuid": "ab810324-3d3a-4ac2-b9e6-51ea8b0e4e6f"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "remove", "reason": "absorbed_mid_turn", "commandUuid": "fa77111d-31e4-42db-a6de-1129557bb9ba"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "remove", "reason": "absorbed_mid_turn", "commandUuid": "eec12b65-d0ae-4924-952f-72dc6e1306c0"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "user", "isSidechain": false, "uuid": "e0666fc7-5a15-4462-bf57-7c6650387277", "sessionId": "s", "origin": {"kind": "task-notification", "producer": "session-task"}, "message": {"role": "user", "content": "text"}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "d3ee6d15-26a3-44e7-9a41-b7b027bcd072", "message": {"id": "msg_011Ch8v9W112i1CctCNkRjUd", "model": "claude-opus-5-5", "content": [{"type": "thinking"}]}}
+{"type": "assistant", "isSidechain": false, "uuid": "44576dcb-8f18-46cc-913e-a9ee2d9ebdaa", "message": {"id": "msg_011Ch8v9W112i1CctCNkRjUd", "model": "claude-opus-5-5", "content": [{"type": "tool_use", "id": "toolu_01ExZEPKThECGTaJoU4S7gHo", "name": "Bash", "input": {}}]}}
+{"type": "user", "isSidechain": false, "uuid": "00fe1af9-a2a7-4e9e-bced-40b1b7c12522", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01ExZEPKThECGTaJoU4S7gHo"}]}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}

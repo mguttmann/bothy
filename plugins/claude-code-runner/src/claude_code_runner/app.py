@@ -76,7 +76,12 @@ from claude_code_runner.authcheck import auth_status, decide, evidence
 from claude_code_runner.bgmode import UNAVAILABLE, BackgroundMode
 from claude_code_runner.bgpaths import bg_files, mark_foreign_input, remove_bg_files
 from claude_code_runner.bgsession import NAME_PREFIX, BgSession, SessionEntry, sender_class
-from claude_code_runner.bgtranscript import TranscriptMapper, foreign_origin, replayed_records
+from claude_code_runner.bgtranscript import (
+    TranscriptMapper,
+    foreign_origin,
+    replayed_records,
+    side_inputs,
+)
 from claude_code_runner.builder import AgentBuilder
 from claude_code_runner.causes import ADAPTER_STOPPED, cause
 from claude_code_runner.channel_skills import resolve_channel_skills
@@ -992,7 +997,8 @@ class RunnerHandler(AgentHandler):
         offset = record.get("offset")
         start = start if isinstance(start, int) and start >= 0 else 0
         offset = offset if isinstance(offset, int) and offset >= start else start
-        lines = replayed_records(transcript, start, size, TranscriptMapper(prompt_uuid))
+        mapper = TranscriptMapper(prompt_uuid, side=side_inputs(transcript))
+        lines = replayed_records(transcript, start, size, mapper)
         return any(
             message.get("type") == "result" and line_start >= offset
             for message, line_start, _ in lines
