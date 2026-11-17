@@ -3751,15 +3751,19 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
    the turn (18.4; an attachment with `commandMode` `task-notification` and no origin is the
    session's own notification; an input that an agent of the session took is attributed by
    the attachment in that agent's file below `<session id>/subagents/`, by the same rule,
-   FIX-RUNNER-BG-SIDE-NOTICE). At the first such input the runner stops the session (18.6), and the run ends
-   `failed` with `runtime_error`, a box note and the cause `background_foreign_input` (log
-   event `background_foreign_input` with one of the words `peer`, `human`, `other` or
-   `unattributed` for whose input it was, never a text of the record). The record of
-   the input lies before the answer of the turn that took it, and the runner reads no further:
-   neither that answer nor an attachment of it is posted. Answers of earlier turns of the run
-   stay. A runner that adopts the turn applies the same rule with the lines the turn record
+   FIX-RUNNER-BG-SIDE-NOTICE). Such an input is logged and nothing else (addendum of
+   2026-11-17, FIX-RUNNER-BG-FOREIGN-LOG, the owner: who else would send a message into the
+   session, only he can, so nothing may be discarded): the log has the warning `background_foreign_input`
+   with one of the words `peer`, `human`, `other` or `unattributed` for whose input it was,
+   never a text of the record. The session is not stopped, the run goes on and ends as
+   usual, the input starts or joins a turn like the session's own input, and the answer is
+   posted. A runner that adopts the turn logs the same way with the lines the turn record
    names, over the part of the transcript the previous runner read and over the rest; a record
-   that names no line proves none, so every line then counts as another sender's (18.9). What
+   that names no line proves none, so every line then counts as another sender's (18.9). (The
+   first version of this rule, of 2026-11-16, stopped the session and ended the run `failed`
+   with the cause `background_foreign_input`; on the owner's host every such input was the
+   owner's own or one of Claude Code itself, a notification of an agent or of a plugin, and
+   the thread lost its conversation each time.) What
    a session gives itself is no such input, and its origins are a closed list:
    `task-notification` with `producer` `session-task` and without a `subkind` (the
    notification of work the session itself launched: a background command, run with the
@@ -3812,53 +3816,26 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
    the other Claude Code sessions of the host user. The list is what was found, not a proof
    that the CLI has no further one (below).
 
-4. **A session that took an input of another sender is never continued** (addendum of
-   2026-11-17). The input stays in the session's conversation: a process that continues the
-   session sends it to the model again with its next request, and the runner of that run,
-   which reads the transcript from its launch offset, sees nothing of it and would post the
-   answer (run with the pinned CLI: after the stop and the removal of the entry, the request
-   of the resumed session carried the line of the other sender again). So the runner marks
-   the session before it stops it, with the file
-   `<runner.state_dir>/sessions/<session id>/foreign-input`, which names the run and nothing
-   of the input and which the retention of the state directory keeps. No new attempt of any
-   run continues a marked session, in background mode and in print mode alike: a run whose
-   session is marked takes the path of a missing session of 18.9 before it starts a process
-   (a new session reference, the same first line, the box note `session_missing` once,
-   `agent_session.report` with the new reference and, in mode `bind`, `bind_failed`), and the
-   log has `session_not_continued`. The cost is the history: the thread goes on in a new
-   session that knows nothing of the stopped one, and the cause of the failed run says so. A
-   mark that cannot be written is logged (`session_mark_failed`); the next run then
-   continues the session.
-
-    A session can be released before a runner read its transcript to the end: an error, the
-    counter-check of 18.3 or a cancellation of the run in the runner ends the run, or a runner
-    that starts after a crash does not follow the turn, because the previous runner had
-    decided its end, the run has ended, or the session has no process and the end of its turn
-    is not in the transcript (18.9). What the session took in the part nobody read stays in
-    its conversation all the same. So at every such release, once the process is gone, the
-    runner maps the transcript of that process from its launch offset to its end, with the
-    lines the turn record names as the runner's, and marks the session at an input of another
-    sender (log `background_foreign_input_unread` with the word of rule 1). The run ends as
-    it was going to.
+4. **A session that took an input of another sender is continued like any other**
+   (addendum of 2026-11-17, FIX-RUNNER-BG-FOREIGN-LOG). The input stays in the session's
+   conversation, and a process that continues the session sends it to the model again with
+   its next request (run with the pinned CLI). The runner accepts that: nothing is marked, no
+   run takes a new session because of it, and a file
+   `<runner.state_dir>/sessions/<session id>/foreign-input` that a runner of the first version
+   wrote is read by no runner and goes with the retention of the state directory.
 
 What stays open: the class in the envelope is a claim, not a proof, so rule 2 keeps out only
-senders that state their class truthfully, and a message that is taken reaches the model before
-rule 1 stops the session at the next read of the transcript (`runner.poll_interval`); the
-session can act on it in that time with the rights of its tool class. A value `accept` of
+senders that state their class truthfully, and a message that is taken reaches the model, which
+acts on it with the rights of its tool class; rule 1 only logs it. A value `accept` of
 `crossSessionInbound` in the host user's own settings makes every session of the host take
 every message, the runner's too. A program of the host user that reads or writes the runner's
 state folder or the CLI's transcripts is outside what these rules can decide: the transcript is
 where the runner reads the answer, and it keeps the system prompt and every line in clear
 text, which is also why no secret marker in the prompt tells the model whose line it reads.
-Rule 4 covers the transcript of a process a runner followed or found by its turn record: what
-a session takes while no run follows it (a person or a program that continues the session by
-its id between two runs) is in no part of the transcript a runner reads, and neither is what
-a session of a launch in doubt (18.9) took before the runner stopped it. The deny list of
+The deny list of
 rule 3 holds the tools that were found: a tool that reaches other sessions and that an
 account feature or a later version adds is not denied until it stands on the list, and a
-`host` session would run it without a prompt. And the closed list of rule 1 ends a run at
-every delivery that is not the session's own work, also one of the host user's own account or
-configuration (a scheduled prompt, a relay, a webhook, a plugin, a channel).
+`host` session would run it without a prompt.
 The operator rule is in the runner's README ("Before you switch it on"): background mode is
 for a host on which the host user runs no other Claude Code session, or only ones that are
 trusted like the runner.
@@ -4018,7 +3995,7 @@ and continues the session.
 |---|---|
 | Context full | compact exactly once, then the same prompt again; never twice. If the turn had already done work, the new turn gets a note in the runner prompt. Check the availability of `/compact` in print mode against the pinned version before building. |
 | Session missing in Claude Code | new session, prompt again, `agent_session.report` with a new reference, note once in the box (fail open) |
-| Session that took an input of another sender in background mode (18.5 "Whose input", addendum of 2026-11-17) | the run that saw the input ends `failed` with `runtime_error` and the cause `background_foreign_input`, and the session is marked. No later run continues it, in either launch mode: before a process that would continue it, the run takes the path "Session missing" of the row above |
+| Session that took an input of another sender in background mode (18.5 "Whose input", addendum of 2026-11-17, FIX-RUNNER-BG-FOREIGN-LOG) | a warning `background_foreign_input` in the log and nothing else: the run goes on and ends as usual, its answers are posted, and the next run continues the session |
 | Session already exists at the first turn | continue with `--resume`, report `started = true` |
 | Runtime not logged in | `failed`, `runtime_not_authenticated`; at a turn of a process that holds or held background work only after the retries of "Account errors" below |
 | Account error at a turn: a usage or rate limit, a login that is gone, subscription access switched off, an overloaded API (addendum of 2026-11-13, R-AG-58) | a process that holds or held background work is kept, the run stays `running` and says why it waits, and the turn is tried again after short pauses ("Account errors" below); after `runner.account_retry_max_wait`, and at once for a process that never had background work, `failed` with `runtime_error` (a login that is gone: `runtime_not_authenticated`) and a `summary` that names the error |
@@ -4083,10 +4060,8 @@ started with `--session-id`), first time in the run: a process with `--resume <r
 first line, then the report of `started = true` of 18.4. Each recovery happens at most once per
 run; a second occurrence or any failure of the new process before `system/init` ends the run as
 `runtime_error`. A pre-check before a further process that does not allow the start ends the run
-with its reason. A session that carries the mark of 18.5 rule 4 is replaced the same way before
-a new attempt that would continue it is started (`--resume`, in every mode of the payload, also
-after `session_exists`); no process fails first, and the replacement counts as the run's one.
-The relaunch of a recorded attempt (18.19.5) repeats an attempt that passed this check.
+with its reason. A session that took an input of another sender is continued like any other
+(18.5 rule 4, since 2026-11-17).
 
 Box notes (D-M2-35-10): a run step of kind `status` with an empty `title`, `finished_at` set, a
 UUIDv7 ID and `name` one of these codes, which clients render as a translated line:
@@ -4094,7 +4069,7 @@ UUIDv7 ID and `name` one of these codes, which clients render as a translated li
 | Code | Status | `detail` | When |
 |---|---|---|---|
 | `context_compacted` | `completed` or `failed` | none | after a compaction |
-| `session_missing` | `completed` | `{"mode": "<mode>"}` | once per run, when the new session's process starts, also in the place of a session the runner does not continue (18.5 rule 4) |
+| `session_missing` | `completed` | `{"mode": "<mode>"}` | once per run, when the new session's process starts |
 | `runtime_error` | `failed` | `{"errors": [<texts>], "exit": "<code or signal name>"}` | last step of a run that ends `runtime_error`, patched before `run.finish` |
 
 A runtime without login ends `failed` with `runtime_not_authenticated`, at the pre-check (no
@@ -4261,7 +4236,7 @@ stops and removes the session and ends the run `failed` with `runtime_error` and
 its cause, so a prompt never runs twice. The runner never writes the CLI's trust entry or its
 acceptance of bypass mode; both are one-time steps of the operator in the host user's own CLI
 configuration. A session without a transcript takes the path "Session missing" of the table
-above, with a new session, and so does a session that carries the mark of 18.5 rule 4.
+above, with a new session.
 
 Crash of the runner in background mode (addendum of 2026-11-16): the turn record carries
 `launch_mode` `background`, the session's name `bothy-<run id>`, its short id once known, the
@@ -4283,9 +4258,7 @@ has ended: it is stopped and removed without a finish. A process of the session 
 recorded one is stopped first and counts as gone. No process: the run is finished from the
 transcript when the end of a turn follows the stored offset or the record holds a decided end
 (an answer is posted once, by the invariants above), else the record is removed and the server
-ends the run `interrupted`. Before a record goes without its turn being followed, the
-transcript of the recorded process is judged to its end for an input of another sender (18.5
-rule 4). The end of an adopted turn is classified without a recovery: no
+ends the run `interrupted`. The end of an adopted turn is classified without a recovery: no
 process is ever started for an adopted run (R-AG-17). An orderly stop of the runner stops an
 adopted background turn like an own one (18.6).
 

@@ -113,12 +113,7 @@ from claude_code_runner.attachments import (
     followup_files_final,
 )
 from claude_code_runner.bgmode import BackgroundMode
-from claude_code_runner.bgpaths import (
-    bg_files,
-    mark_foreign_input,
-    remove_bg_files,
-    took_foreign_input,
-)
+from claude_code_runner.bgpaths import bg_files, remove_bg_files
 from claude_code_runner.bgsession import (
     BgSession,
     LaunchOutput,
@@ -135,11 +130,9 @@ from claude_code_runner.bgsession import (
     supervisor_verdict,
 )
 from claude_code_runner.bgtranscript import (
-    CAUSE_FOREIGN,
     PricedUsage,
     TranscriptMapper,
     TranscriptReader,
-    foreign_origin,
     prompt_taken,
     replayed_records,
     side_inputs,
@@ -212,7 +205,7 @@ from claude_code_runner.reply_upload import (
     remove_run_files,
     send_answer_with_attachments,
 )
-from claude_code_runner.statedir import StateDirError, ensure_private_dir, write_private
+from claude_code_runner.statedir import ensure_private_dir, write_private
 from claude_code_runner.stop import StoppableGroup
 from claude_code_runner.streamreader import StreamReader
 from claude_code_runner.title import propose_title, split_title
@@ -614,9 +607,6 @@ class RunTurn:
         """How many request records of the session this runner read (for the log only)."""
         self._bg_rest: list[tuple[str, bytes]] = []
         self._bg_cause: str | None = None
-        self._bg_marked = False
-        """The current session process took a foreign input and its mark was written or
-        tried (18.5 rule 4): its release judges the transcript no second time."""
 
     # ---- the run ---------------------------------------------------------------------------
 
@@ -699,13 +689,6 @@ class RunTurn:
                     return  # R-AG-48: an adopter launches only on allow
                 self.launch_checked = False
                 precheck = True
-                if attempt.resume and repeat is None and self._session_left():
-                    # 18.5 rule 4, before every new attempt that would continue a session;
-                    # ``repeat`` launches a recorded attempt again, which passed this check.
-                    replaced = await self._leave_session()
-                    if replaced is None:
-                        return
-                    attempt = replaced
                 self.attempt = attempt
                 outcome = await self._run_process(
                     attempt, repeat=repeat, worked_before=worked_before
@@ -1053,35 +1036,6 @@ class RunTurn:
         self.session = SessionChoice(ref=ref, resume=False, new=True)
         self._persist()
         return True
-
-    def _session_left(self) -> bool:
-        """Whether the run's session is one the runner never continues (18.5 "Whose input")."""
-        return took_foreign_input(self.cfg.state_dir, self.session.ref)
-
-    async def _leave_session(self) -> _Attempt | None:
-        """Start a new session in the place of one that took a foreign input (18.5, 18.9).
-
-        The conversation of such a session holds the input of another sender, and a process
-        that continues it gives that input to the model again with its next request. So no
-        new attempt of any run continues it, in either launch mode: the run takes the path of
-        a missing session (a new reference, the same first line, the box note once and the
-        report of the new reference, with ``bind_failed`` in mode ``bind``). The decision is
-        the mark in the runner's state folder, never something the conversation says.
-
-        Returns:
-            The attempt on the new reference; ``None`` when the run ended here.
-        """
-        _warn("session_not_continued", cause=CAUSE_FOREIGN, **self.ids)
-        if not self.state.locks and not await self._take_locks():
-            return None  # an adopter holds no lock yet; the session lock moves below
-        bind = self.state.session_mode == "bind"
-        self.recovery = self.recovery.with_(session_replaced=True)
-        if not await self._new_reference():
-            await self._fail("adapter_error", (), "not_started", summary=cause("session_busy"))
-            return None
-        await self._box_note("session_missing", "completed", {"mode": self.state.session_mode})
-        label = attempt_kind(NewSession(bind_failed=bind))
-        return _Attempt(resume=False, new_reference=True, bind_failed=bind, label=label)
 
     async def _precheck_again(self) -> bool:
         """The pre-check of M2-34 before every further process (I3 per process)."""
@@ -1810,53 +1764,17 @@ class RunTurn:
 
         A print turn gets `claude_code_runner.turn.terminate`. A background session is stopped
         with ``claude stop`` and the same escalation, then its entry is removed from the
-        session list (``claude rm``); its transcript stays, and what the session took is
-        judged to the end of that transcript (`_judge_released`).
+        session list (``claude rm``); its transcript stays.
         """
         if isinstance(process, BgSession):
             await process.stop(
                 self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval, ids
             )
             await process.remove()
-            await self._judge_released(process)
             return
         await terminate(
             process, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval, ids
         )
-
-    async def _judge_released(self, session: BgSession) -> None:
-        """Mark a released session that took a foreign input nobody acted on (18.5 rule 4).
-
-        The read loop marks a session at the first foreign input it reads. A session can be
-        released before that loop read its transcript to the end: an error, the
-        counter-check or a cancellation ends the run, an adopter repeats a decided end. What the
-        session took in the part nobody read stays in its conversation all the same, so the
-        transcript of the process is mapped once more, from its launch offset to its end,
-        after the process is gone. Nothing else changes: the run ends as it was going to.
-        """
-        if self._bg_marked or took_foreign_input(self.cfg.state_dir, session.session_id):
-            return
-        prompt_uuid = str((self.bg_record or {}).get("prompt_uuid") or "")
-        own = frozenset(self.bg_own)
-        origin = await asyncio.to_thread(
-            foreign_origin,
-            self._transcript(session.session_id),
-            self.ledger.process_start,
-            prompt_uuid,
-            own.__contains__,
-        )
-        if origin is not None:
-            _warn("background_foreign_input_unread", origin=origin, **self.ids)
-            self._mark_session(session)
-
-    def _mark_session(self, session: BgSession) -> None:
-        """Write the mark of a session that took a foreign input; a failure is logged."""
-        self._bg_marked = True
-        try:
-            mark_foreign_input(self.cfg.state_dir, session.session_id, self.handle.run_id)
-        except (OSError, StateDirError):
-            # Without the mark the next run would continue the conversation: say so.
-            _warn("session_mark_failed", **self.ids)
 
     # ---- stop ------------------------------------------------------------------------------
 
@@ -3395,7 +3313,6 @@ class RunTurn:
             self.ledger.written(line_uuid)
         self._bg_rest = list(inputs[1:])
         self._bg_cause = None
-        self._bg_marked = False
         # A new session process: only these lines are the runner's so far, and no request
         # of the process has shown the stored login yet.
         self.bg_own = {line_uuid for line_uuid, _ in inputs}
@@ -3754,18 +3671,20 @@ class RunTurn:
     ) -> _Outcome | None:
         """The effects of a mapped message that only a background session has (18.4).
 
-        Two checks end the run here, before anything of the message is posted. An input the
-        runner did not write (18.5) stops the session and fails the run. The counter-check of
-        18.3 fails closed: every request record is judged, and nothing a session puts out
-        (`_is_output`) is accepted unless the newest request record of its process listed
+        An input the runner did not write (18.5) is logged and nothing else: the session answers it
+        like any input and the run goes on (owner, 2026-11-17: an input is never discarded and
+        never ends a run). The counter-check of 18.3 ends the run here, before anything of the
+        message is posted; it fails closed: every request record is judged, and nothing a session
+        puts out (`_is_output`) is accepted unless the newest request record of its process listed
         the login beta, so neither after a record without it nor before any record.
 
         Returns:
-            An outcome when the message ended the run (one of the two checks), else ``None``.
+            An outcome when the message ended the run (the counter-check), else ``None``.
         """
         kind, subtype = message.get("type"), message.get("subtype")
         if kind == "system" and subtype == "bg_foreign":
-            return await self._foreign_input(session, str(message.get("origin")))
+            _warn("background_foreign_input", origin=str(message.get("origin")), **self.ids)
+            return None
         if kind == "system" and subtype == "bg_request":
             self._bg_requests += 1
             listed = message.get("login") is True
@@ -3787,24 +3706,6 @@ class RunTurn:
         elif kind == "result" and isinstance(message.get("bg_cause"), str):
             self._bg_cause = str(message["bg_cause"])
         return None
-
-    async def _foreign_input(self, session: BgSession, origin: str) -> _Outcome:
-        """An input the runner did not write reached the session: stop it, fail the run (18.5).
-
-        The session is marked first: its conversation holds the input from now on, so no
-        later run continues it (`_leave_session`), also when this runner ends before the run
-        does. Then the session is stopped, so its turn ends where it is; the run finishes
-        ``failed`` with the cause `CAUSE_FOREIGN`, and the answer of the turn that took the
-        input is never read, so neither it nor an attachment of it is posted.
-        """
-        _warn("background_foreign_input", origin=origin, **self.ids)
-        self._mark_session(session)
-        await self._terminate(session, self.ids)
-        text = "The background session took an input that the runner did not write."
-        await self._fail(
-            "runtime_error", (text,), session.exit_label(), summary=cause(CAUSE_FOREIGN)
-        )
-        return _Outcome(TurnEvidence(), self._worked, handled=True)
 
     async def _login_unproven(self, session: BgSession, code: str) -> _Outcome:
         """The counter-check of 18.3 did not pass: stop the session, ``billing_mode_mismatch``.
@@ -3874,9 +3775,10 @@ class RunTurn:
                 self.ledger.offset,
                 mapper,
             )
-            if await self._replayed_checks(session, [m for m, _, _ in lines]):
-                done = True
-                return
+            for message, _, _ in lines:
+                if message.get("type") == "system" and message.get("subtype") == "bg_foreign":
+                    # Logged again: the previous runner may have ended before it logged it (18.5).
+                    _warn("background_foreign_input", origin=str(message.get("origin")), **self.ids)
             self.ps = ProcessState(has_stdin=True, account_retry=self._account_schedule())
             self._replayed_worked = self._replay_ledger(lines)
             for message, _, _ in lines:
@@ -3911,24 +3813,6 @@ class RunTurn:
                 remove_turn_record(self.cfg.state_dir / "turns" / f"{self.handle.run_id}.json")
                 remove_run_files(self.cfg.state_dir, self.handle.run_id)
                 remove_bg_files(self._bg_state, self.handle.run_id)
-
-    async def _replayed_checks(
-        self, session: BgSession, messages: Sequence[Mapping[str, Any]]
-    ) -> bool:
-        """The two checks of `_read_background` over the part the previous runner read (18.9).
-
-        The previous runner acted on what it read, so this finds something only when it ended
-        between a record and its effect, or was a runner that did not check yet. Whether the
-        counter-check has passed is taken from the turn record alone, never from these lines.
-
-        Returns:
-            True when the run ended here.
-        """
-        for message in messages:
-            if message.get("type") == "system" and message.get("subtype") == "bg_foreign":
-                await self._foreign_input(session, str(message.get("origin")))
-                return True
-        return False
 
     def _restore_adopted(self, record: Mapping[str, Any], known_steps: Mapping[str, str]) -> None:
         """The run's state from the record of a background turn.

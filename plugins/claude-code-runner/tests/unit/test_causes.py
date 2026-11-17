@@ -41,15 +41,10 @@ def test_every_cause_is_a_sentence_with_its_code(code: str) -> None:
     assert len(text.encode()) <= 400
 
 
-def test_a_foreign_input_says_that_the_session_is_not_continued() -> None:
-    # FIX-RUNNER-BG-INBOX-AUTH: the person learns that the answer is missing on purpose and
-    # that the next message starts a new session, without the history of the stopped one.
-    text = cause("background_foreign_input")
-    assert "did not send" in text
-    assert "posted no answer" in text
-    assert "does not continue this session" in text
-    assert "Send your message again" in text
-    assert "new session without the history" in text
+def test_a_foreign_input_is_no_cause_of_a_run() -> None:
+    # Owner ruling, 2026-11-17: an input the runner did not write never ends a run, so no run is
+    # told about it (FIX-RUNNER-BG-FOREIGN-LOG).
+    assert "background_foreign_input" not in CAUSES
 
 
 def test_unknown_code_still_names_it() -> None:

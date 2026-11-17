@@ -30,7 +30,6 @@ from claude_code_runner.account import AccountRetry, account_error
 from claude_code_runner.bgsession import NAME_PREFIX, Reading, SessionEntry
 from claude_code_runner.bgtranscript import (
     BACKGROUND_TASK,
-    CAUSE_FOREIGN,
     CAUSE_REPLACED,
     CAUSE_WAITING,
     LOGIN_BETA,
@@ -605,7 +604,10 @@ def test_an_input_taken_during_a_turn_that_nothing_attributes_is_another_sender_
     assert mapper.map(ASSISTANT)[0] == unattributed
     mapper = started("mine")
     mapper.map(absorbed("unattributed"))
-    assert mapper.map(TURN_ENDS)[0] == unattributed
+    ended = mapper.map(TURN_ENDS)
+    assert ended[0] == unattributed
+    # The turn still ends: the input is logged, its answer is not discarded (2026-11-17).
+    assert [m["type"] for m in ended] == ["system", "result"]
     # Sealed by one request and never attributed: foreign at the next request too.
     mapper = started("mine")
     mapper.map(absorbed("unattributed"))
@@ -706,7 +708,10 @@ def test_a_notification_is_the_session_s_own_only_by_its_producer(origin: dict[s
     mapper = started("mine")
     mapper.map(ASSISTANT)
     mapper.map(TURN_ENDS)
-    assert mapper.map(turn) == other
+    out = mapper.map(turn)
+    assert foreign(out) == other
+    # It is logged and starts a turn like the session's own input (owner ruling, 2026-11-17).
+    assert [m.get("subtype") for m in out] == ["bg_foreign", "init"]
     # Taken during a running turn: the attachment names the same origin.
     mapper = started("mine")
     assert foreign(mapper.map(absorbed("made-by-the-cli"))) == []
@@ -759,7 +764,6 @@ def test_a_foreign_input_carries_nothing_of_its_record() -> None:
     for message in (*mapped("followup", own=False), *started().map(peer("x"))):
         if message.get("subtype") == "bg_foreign":
             assert set(message) == {"type", "subtype", "origin"}
-    assert CAUSE_FOREIGN == "background_foreign_input"
 
 
 # ---- the origin of a record is judged before its content (18.5) ---------------------------------

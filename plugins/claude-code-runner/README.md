@@ -70,12 +70,12 @@ sessions".
 | `keeper.py`, `launch.py` | With `runner.turn_handover`: the keeper program of one launch, and the runner's side of the launch handshake, the group of keeper and CLI, the named pipe writer and the cases of a `launching` record (09 18.19.4, 18.19.5) |
 | `processstate.py` | `ProcessState`: every stream-derived value of the stdin and stop rule, and its replay (09 18.19.7) |
 | `handover.py` | The handover at SIGTERM (exit 75) and `stop --turns` (09 18.19.3) |
-| `bgmode.py`, `bgpaths.py` | Background mode of the runner process: the control commands, the one reader of the session list, the channels of the mode and the heartbeat reason of a fallback; the files of a background turn under `<runner.state_dir>/bg/` (09 18.2 "Background mode") and the mark of a session that took a foreign input and is never continued (09 18.5) |
+| `bgmode.py`, `bgpaths.py` | Background mode of the runner process: the control commands, the one reader of the session list, the channels of the mode and the heartbeat reason of a fallback; the files of a background turn under `<runner.state_dir>/bg/` (09 18.2 "Background mode") |
 | `bgsession.py` | A background session: the argument list (with the tools no session has) and the settings file of a launch (the run's environment, no inbound setting), the parsers of the launch output, the session list and `daemon status`, the supervisor rule, the line of the inbox socket with the envelope that states the sender's class, and `BgSession`, the handle of the session process with stop and remove |
-| `bgtranscript.py` | The session transcript as the stream of a turn: `TranscriptMapper` maps each record to the stream message of 18.4 that means the same, knows the runner's own lines by their `uuid` and names every other input, and judges every request record by the login beta; `TranscriptReader` tails the file and adds what only the session list knows; `foreign_origin` judges the whole transcript of a session process that is released (09 18.5 rule 4) |
+| `bgtranscript.py` | The session transcript as the stream of a turn: `TranscriptMapper` maps each record to the stream message of 18.4 that means the same, knows the runner's own lines by their `uuid` and names every other input, and judges every request record by the login beta; `TranscriptReader` tails the file and adds what only the session list knows; `foreign_origin` names the first input of another sender in a whole transcript, for an operator or a test (09 18.5) |
 | `tests/fake_claude/fake_bg.py` | The background side of Fake-Claude: `--bg` prints the launch line and starts a player under a supervisor process; the player writes transcript records and listens on the inbox socket; `agents`, `stop`, `rm` and `daemon status` answer from a state file in the fake configuration folder |
 | `tests/unit/test_bgsession.py`, `test_bgtranscript.py`, `test_bgmode.py`, `tests/scenarios/test_bg_sessions.py`, `test_bg_fallback.py`, `test_bg_adoption.py` | Background mode: the launch and its parsers, the mapping with the class test over every recorded transcript and its print stream, the shared mode with the fallback codes held against the tables of 09 18.9 and of this file, the scenarios of a background turn, every fallback cause, and the adoption by a new runner process |
-| `tests/scenarios/test_bg_inbox_auth.py` | Background mode, what must hold before it is switched on (FIX-RUNNER-BG-INBOX-AUTH): an input the runner did not write stops the session and is never answered, also after an adoption, also when its record is shaped like a tool result and also when the CLI records it as a notification; no later run continues that session, in either launch mode; the login check fails closed; no value of one run's environment reaches the session of another |
+| `tests/scenarios/test_bg_inbox_auth.py` | Background mode, what must hold before it is switched on (FIX-RUNNER-BG-INBOX-AUTH): an input the runner did not write is logged by its origin and answered like any input, also after an adoption, also when its record is shaped like a tool result and also when the CLI records it as a notification; the next run continues that session, in either launch mode, and a mark an earlier runner wrote has no effect (FIX-RUNNER-BG-FOREIGN-LOG); the login check fails closed; no value of one run's environment reaches the session of another |
 | `tests/real_cli/background.py`, `record_background.py`, `test_background.py`, `tests/fixtures/recording/background_<v>/` | Background sessions of the pinned CLI against the stand-in: the world of a test, the recorder, level one of the real-CLI suite and its recordings |
 | `tests/unit/test_keeper.py`, `test_launch.py`, `test_processstate.py`, `tests/scenarios/test_handover.py`, `test_launch_crash_points.py` | The keeper, the handshake, the replay with the class test over every Fake-Claude stream and checkpoint, AR-T02, AR-T03 and AR-T04 against real runner processes |
 | `tests/hosting_world.py`, `tests/hosting_runner.py` | The scenario world of a hosting runner: the runner's FakeServer with the hosting operations and one FakeServer per hosted agent; the hosting runner as a process of its own, for a scenario that kills it |
@@ -531,30 +531,20 @@ Before you switch it on:
   Claude Code sessions besides the runner's, or only ones that are trusted like the runner.
   What the runner enforces (09 18.5 "Whose input"):
   - It knows its own lines by their `uuid`, which the CLI keeps in the transcript. When a
-    session takes an input under any other `uuid`, or a person types into it, the runner stops
-    the session and the run ends `failed` with the cause `background_foreign_input`. No answer
-    to that input and no attachment of it is posted. A runner that adopts a turn after a crash
-    holds the same rule with the lines its turn record names. Whose input a transcript record
-    is, the runner reads from the record's origin before anything of its content, so a record
-    of a sender never passes as a step of the turn. What a session gives itself is a closed
-    list: the notification of work the session itself launched, which the CLI marks with the
-    producer `session-task`, and a continuation the CLI queues by itself. An input under any
-    other origin counts as another sender's. That includes what the CLI records as a
-    notification without that producer (a message of another session of yours, a relay, a
-    scheduled prompt, a webhook) and what a plugin or a channel of your own Claude Code
-    configuration queues: each ends the run.
-  - A session that took such an input is never continued. Its conversation holds the input,
-    and a resume would send it to the model again with the next message. The runner marks the
-    session (`<runner.state_dir>/sessions/<session id>/foreign-input`, kept by the retention
-    sweep), and the next message of the thread starts a new session, in background mode and
-    in print mode, with the box note of a session that was not found and the log line
-    `session_not_continued`. The price is the history: the new session knows nothing of the
-    stopped one, and the cause of the failed run says so. A session that is released before
-    the runner read its transcript to the end (a run ends with an error or fails the login
-    check, a runner that starts after a crash does not follow the turn) is judged the same
-    way first:
-    the runner reads the rest of that transcript and marks the session when it took such an
-    input there (`background_foreign_input_unread`).
+    session takes an input under any other `uuid`, or a person types into it, the runner logs
+    the warning `background_foreign_input` with a fixed word for whose input it was (`peer`,
+    `human`, `other`, `unattributed`) and nothing of its text. Nothing else happens: the run
+    goes on, the answer is posted, and the next message of the thread continues the session
+    (since 2026-11-17; before, the runner stopped the session, failed the run and started the
+    next message in a new session, and each time it was the owner's own input or a
+    notification of Claude Code itself). A runner that adopts a turn after a crash logs the
+    same way with the lines its turn record names. Whose input a transcript record is, the
+    runner reads from the record's origin before anything of its content, so a record of a
+    sender never passes as a step of the turn. What a session gives itself is a closed list
+    and is not logged: the notification of work the session itself launched, which the CLI
+    marks with the producer `session-task`, and a continuation the CLI queues by itself. A
+    file `<runner.state_dir>/sessions/<session id>/foreign-input` of the earlier rule has no
+    effect and goes with the retention sweep.
   - The settings file of a run sets no `crossSessionInbound`, so the CLI's own rule per message
     applies and a stricter value of your own or of managed settings is not overridden. By
     that rule a `host` session (bypass mode) takes only a message whose sender states that it
@@ -571,12 +561,9 @@ Before you switch it on:
 
   What stays open: the class a sender states is a claim, so a session of yours in the same
   class, or a program that writes the claim, still gets its message into a runner session.
-  The runner then stops that session at its next read of the transcript
-  (`runner.poll_interval`), and until then the model can act on the message with the rights of
-  the tool class. Nothing here protects against a program of the host user that reads or
-  writes the runner's state folder or the transcripts of Claude Code, and the runner sees
-  only what a session takes while a run follows it: whoever continues a session of a thread
-  by its id between two runs writes into the conversation unseen. A tool that reaches other
+  The runner only logs it, and the model acts on the message with the rights of the tool
+  class. Nothing here protects against a program of the host user that reads or
+  writes the runner's state folder or the transcripts of Claude Code. A tool that reaches other
   sessions and is not on the list above is not denied.
 - **Your own `crossSessionInbound`.** Leave it unset in the host user's Claude Code settings.
   With `accept` there every session of the host takes every message again, the runner's too.
@@ -668,13 +655,11 @@ so a prompt never runs twice. Further causes of a failed run in this mode:
 started the session in between), `background_process_replaced` (the supervisor started the
 session again), `background_session_waiting` (the session waited for a person; the class
 flags and `--disallowedTools AskUserQuestion` prevent a question, and a message of another
-session that the CLI holds for an approval shows the same way) and `background_foreign_input`
-(the session took a message the runner did not send, and no later run continues that session;
-above). A run that ends `billing_mode_mismatch` in this mode failed the login check above.
+session that the CLI holds for an approval shows the same way). A message the runner did not
+send ends no run (above). A run that ends `billing_mode_mismatch` in this mode failed the login check above.
 
 Switching the key off again needs no step: both modes continue the same sessions, and a turn
-record a background turn left is still settled at the next start. A session marked for a
-foreign input stays marked: print mode does not continue it either.
+record a background turn left is still settled at the next start.
 
 ## Costs
 
