@@ -3762,17 +3762,18 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
    was run, because each needs a login). An origin of any other kind or shape, also one a
    later version adds or one that cannot be read, is another sender's.
 
-   Whose input a record is, is read from its origin before anything of its content, in the
-   mapping of 18.4, in the check whether a launch took its prompt (18.9) and in the question
-   whether the next turn has started. A `user` record is a tool result only when it carries
-   no origin, which is how the pinned CLI writes every tool result; a record of a line or of
-   a person whose content is shaped like a tool result is an input of that sender all the
-   same. A record of a person before the run's prompt is the prompt only when its content is
-   a text. (Addendum of 2026-11-17: the first version of this rule read the `tool_result`
-   items of a record before its origin and took every origin but `peer` and `human` for the
-   session's own; the review of that version found both. The second version took every
-   `task-notification` for the session's own by its kind alone; the review of that version
-   found it.)
+    Whose input a record is, is read from its origin before anything of its content, in the
+    mapping of 18.4, in the check whether a launch took its prompt (18.9) and in the question
+    whether the next turn has started. A `user` record is a tool result only when it carries
+    no origin, which is how the pinned CLI writes every tool result; a record of a line or of
+    a person whose content is shaped like a tool result is an input of that sender all the
+    same. A record of a person before the run's prompt is the prompt only when its content is
+    a text. (Addendum of 2026-11-17: the first version of this rule read the `tool_result`
+    items of a record before its origin and took every origin but `peer` and `human` for the
+    session's own; the review of that version found both. The second version took every
+    `task-notification` for the session's own by its kind alone; the review of that version
+    found it.)
+
 2. **The settings file widens nothing.** It sets no `crossSessionInbound`, so the CLI's own
    rule per message stays and a stricter value of the host user's or of managed settings is
    not overridden. That rule, run with the pinned CLI: a session that bypasses permission
@@ -3793,10 +3794,12 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
    for a message of a session's own child process (a token the session gives its tool calls)
    exists only without a value, holds a living process that is no child, and rests on a token
    every tool call of the session can read (run with the pinned CLI).
+
 3. **The tools that reach other sessions are disallowed.** `SendMessage`, `ListAgents` and
    `SendFile` (18.2): the tools found in the pinned CLI that write to, list or send files to
    the other Claude Code sessions of the host user. The list is what was found, not a proof
    that the CLI has no further one (below).
+
 4. **A session that took an input of another sender is never continued** (addendum of
    2026-11-17). The input stays in the session's conversation: a process that continues the
    session sends it to the model again with its next request, and the runner of that run,
@@ -3815,16 +3818,16 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
    mark that cannot be written is logged (`session_mark_failed`); the next run then
    continues the session.
 
-   A session can be released before a runner read its transcript to the end: an error, the
-   counter-check of 18.3 or a cancellation of the run in the runner ends the run, or a runner
-   that starts after a crash does not follow the turn, because the previous runner had
-   decided its end, the run has ended, or the session has no process and the end of its turn
-   is not in the transcript (18.9). What the session took in the part nobody read stays in
-   its conversation all the same. So at every such release, once the process is gone, the
-   runner maps the transcript of that process from its launch offset to its end, with the
-   lines the turn record names as the runner's, and marks the session at an input of another
-   sender (log `background_foreign_input_unread` with the word of rule 1). The run ends as
-   it was going to.
+    A session can be released before a runner read its transcript to the end: an error, the
+    counter-check of 18.3 or a cancellation of the run in the runner ends the run, or a runner
+    that starts after a crash does not follow the turn, because the previous runner had
+    decided its end, the run has ended, or the session has no process and the end of its turn
+    is not in the transcript (18.9). What the session took in the part nobody read stays in
+    its conversation all the same. So at every such release, once the process is gone, the
+    runner maps the transcript of that process from its launch offset to its end, with the
+    lines the turn record names as the runner's, and marks the session at an input of another
+    sender (log `background_foreign_input_unread` with the word of rule 1). The run ends as
+    it was going to.
 
 What stays open: the class in the envelope is a claim, not a proof, so rule 2 keeps out only
 senders that state their class truthfully, and a message that is taken reaches the model before
