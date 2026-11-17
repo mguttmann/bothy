@@ -703,3 +703,59 @@ async def test_a_session_without_an_id_is_neither_stopped_nor_removed_by_name(
     assert await session.remove() is False
     assert cli.stopped == []
     assert cli.removed == []
+
+
+def test_a_hosted_launch_carries_the_parts_of_its_turn(tmp_path: Path) -> None:
+    # FIX-RUNNER-CLI-PIN-326: a hosted turn runs as a session with the parts of 26 5.3.
+    from claude_code_runner.commandline import HostedArgs
+
+    hosted = HostedArgs(
+        settings=tmp_path / "settings.json",
+        plugin=tmp_path / "plugin",
+        mcp_config=tmp_path / "mcp.json",
+        has_skills=True,
+    )
+    common: dict[str, Any] = {
+        "claude_bin": "/bin/claude",
+        "model": "m",
+        "resume": None,
+        "name": "bothy-x",
+        "add_dir": None,
+        "system_prompt_file": tmp_path / "p.md",
+        "socket_file": tmp_path / "s.sock",
+        "settings_file": tmp_path / "run.json",
+    }
+    scoped = background_argv(**common, tool_class="scoped", tools=["Read"], hosted=hosted)
+    assert scoped[scoped.index("--allowedTools") + 1 : scoped.index("--disallowedTools")] == [
+        "Read",
+        "Skill",
+    ]
+    assert "--restricted" in scoped
+    assert scoped.count("--settings") == 1  # the hosted settings are in the run's one file
+    assert scoped[scoped.index("--plugin-dir") + 1] == str(tmp_path / "plugin")
+    assert scoped[scoped.index("--mcp-config") + 1] == str(tmp_path / "mcp.json")
+    assert "--strict-mcp-config" in scoped
+    assert "--max-budget-usd" not in scoped
+    folder = tmp_path / "skills" / "review"
+    host = background_argv(
+        **common, tool_class="host", tools=[], hosted=hosted, plugin_dirs=[folder]
+    )
+    assert host[host.index("--setting-sources") + 1] == "project,local"
+    assert [host[i + 1] for i, a in enumerate(host) if a == "--plugin-dir"] == [
+        str(tmp_path / "plugin"),
+        str(folder),
+    ]
+    own = background_argv(**common, tool_class="host", tools=[], plugin_dirs=[folder])
+    assert own[own.index("--plugin-dir") + 1] == str(folder)
+    assert "--strict-mcp-config" not in own
+    with pytest.raises(ArgumentError):
+        background_argv(**common, tool_class="scoped", tools=[], plugin_dirs=[folder])
+
+
+def test_the_settings_file_of_a_hosted_turn_keeps_its_settings() -> None:
+    base = {"disableAllHooks": True, "permissions": {"deny": ["Edit(CLAUDE.md)"]}}
+    document = settings_document({"TMPDIR": "/t"}, base)
+    assert document["disableAllHooks"] is True
+    assert document["permissions"] == base["permissions"]
+    assert document["worktree"] == {"bgIsolation": "none"}
+    assert document["env"]["TMPDIR"] == "/t"

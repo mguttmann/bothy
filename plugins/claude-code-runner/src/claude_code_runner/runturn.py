@@ -14,12 +14,13 @@ run that the server ended stops its turn without a finish. An error nothing expe
 live process before the run ends ``failed`` with ``adapter_error`` (`RunTurn._on_error`, 18.9).
 `RunTurn.adopted` follows a turn that outlived an earlier runner (design note 12).
 
-With ``runner.launch_mode`` ``background`` a turn of the runner's own agent in billing mode
-``personal`` runs as a Claude Code background session (``claude --bg``, 09 18.2 "Background
+With ``runner.launch_mode`` ``background`` every turn, also of a hosted agent, runs as a Claude
+Code background session (``claude --bg``, 09 18.2 "Background
 mode"): `RunTurn._run_background` launches it, the session's transcript is read through
 `claude_code_runner.bgtranscript` as the stream of 18.4, inputs go to the session's inbox
 socket, and the release at the end of a run is ``claude stop`` (`claude_code_runner.bgsession`).
-A run that cannot use the mode uses print mode and says why (18.9), and
+A run that cannot use the mode ends ``failed`` with its cause and never uses print mode
+(18.9, FIX-RUNNER-CLI-PIN-326), and
 `RunTurn.adopt_background` continues a background turn that outlived an earlier runner.
 
 A turn that ends with an account error (`claude_code_runner.account`) in a process that holds
@@ -843,7 +844,7 @@ class RunTurn:
             if self.handover:
                 remove_launch_files(self.cfg.state_dir, str(self.handle.run_id))
             if self.bg is not None:
-                remove_bg_files(self.cfg.state_dir, self.handle.run_id)
+                remove_bg_files(self._bg_state, self.handle.run_id)
 
     def _crash(self, point: str) -> None:
         """The test-only crash hook after a step of the handshake (`crash_point`)."""
@@ -1124,7 +1125,7 @@ class RunTurn:
         )
         if attempt.hint:
             text = text.rstrip() + "\n\n## Retry\n\n" + RETRY_HINT + "\n"
-        path = bg_files(self.cfg.state_dir, self.handle.run_id).system_prompt
+        path = bg_files(self._bg_state, self.handle.run_id).system_prompt
         ensure_private_dir(path.parent)
         write_private(path, text)
         return path
@@ -1166,11 +1167,14 @@ class RunTurn:
         repeat: AttemptRecord | None = None,
         worked_before: bool = False,
     ) -> _Outcome | None:
-        if self._background(attempt, repeat):
-            outcome, handled = await self._run_background(attempt)
-            if handled:
-                return outcome
-        self.bg_record = None  # this process is a print turn (also after a fallback, 18.9)
+        if self._background():
+            code = self._not_in_background(attempt, repeat)
+            if code is not None:
+                await self._fall_back(code)
+                return None
+            outcome, _ = await self._run_background(attempt)
+            return outcome
+        self.bg_record = None  # this process is a print turn
         if self.handover:
             return await self._launch_process(attempt, repeat=repeat, worked_before=worked_before)
         paths = self._paths()
@@ -1634,6 +1638,8 @@ class RunTurn:
                 self._worked = self._worked or (self.ledger.init_seen and no_error)
                 if self.live_cost.assistant(message):
                     self._report_cost()
+                if session is not None and self._over_cap():
+                    return await self._cap_reached(session)
             elif kind == "user" and message.get("isReplay") is True:
                 await self._echo(message.get("uuid"), adopted=adopted or not own)
             elif kind == "result":
@@ -3170,45 +3176,62 @@ class RunTurn:
 
     # ---- background sessions (09 18.2 "Background mode") ------------------------------------
 
-    def _background(self, attempt: _Attempt, repeat: AttemptRecord | None) -> bool:
-        """Whether an attempt runs as a background session (the scope of 18.2).
+    def _background(self) -> bool:
+        """Whether the run's channel uses background mode (09 18.2, FIX-RUNNER-CLI-PIN-326).
 
-        Only a turn of the runner's own agent in billing mode ``personal``, in a channel the
-        mode is switched on for, and only until the run fell back to print mode. A compaction,
-        every turn of a hosted agent and a turn that loads channel skills (26 5.9) stay in
-        print mode: the launch command of a background session carries no ``--plugin-dir``.
+        With ``runner.launch_mode`` ``background`` every attempt of a run in such a channel is
+        a background session or ends the run (`_not_in_background`); it never uses print mode,
+        also not for a hosted agent or a turn that loads channel skills.
         """
-        return (
-            self.bg is not None
-            and self.bg_fallback is None
-            and repeat is None
-            and attempt.kind == "turn"
-            and self.state.hosted is None
-            and not self.state.plugin_dirs
-            and self.state.mode == "personal"
-            and self.bg.wants(self.state.channel_id)
-        )
+        return self.bg is not None and self.bg.wants(self.state.channel_id)
+
+    def _not_in_background(self, attempt: _Attempt, repeat: AttemptRecord | None) -> str | None:
+        """The cause code of an attempt that cannot run as a background session, else ``None``.
+
+        * ``organization``: a background session takes no API key (design 2.2 item 8).
+        * A compaction: the runner follows a ``/compact`` only in print mode.
+        * A hosted turn below ``host``: ``--restricted`` binds no inbox socket (run with the
+          pinned CLI), so no follow-up and no retry line could reach the session.
+        * A repeated launch of a handover: the keeper is a part of print mode.
+        """
+        if self.state.mode != "personal":
+            return "background_api_key"
+        if attempt.kind != "turn":
+            return "background_compaction"
+        if self.state.hosted is not None and self.cfg.tool_class != "host":
+            return "background_restricted"
+        if repeat is not None:
+            return "background_launch_failed"
+        return None
 
     async def _fall_back(self, code: str) -> tuple[None, bool]:
-        """This run uses print mode from here on, and says why (18.9).
+        """Background mode cannot run this attempt: the run ends ``failed`` with the cause.
 
-        The live box shows it once as a status line, the log has ``background_fallback``, and a
-        cause of the host shows in the heartbeat until a background launch starts again.
+        Never print mode (owner order 2026-11-17, FIX-RUNNER-CLI-PIN-326): the summary names
+        the cause in the thread, the log has ``background_unavailable``, and a cause of the
+        host shows in the heartbeat until a background launch starts again.
 
         Returns:
-            ``(None, False)``: the attempt is not handled yet, the print path runs it.
+            ``(None, True)``: the run ended here.
         """
         bg = self.bg
         self.bg_fallback = code
         self.bg_record = None
         self._bg_rest = []
-        _warn("background_fallback", code=code, **self.ids)
+        _warn("background_unavailable", code=code, **self.ids)
         if bg is not None:
             bg.fell_back(code)
-        await self._status_line(
-            f"Background sessions are not available (`{code}`); this run uses print mode."
-        )
-        return None, False
+        await self._fail("runtime_error", (), "not_started", summary=cause(code))
+        return None, True
+
+    @property
+    def _bg_state(self) -> Path:
+        """The runner's own state folder, where the files of a background launch lie.
+
+        Also for a hosted agent, whose ``state_dir`` is its own folder below it: a shorter
+        socket path, and one record of the supervisor per runner.
+        """
+        return self.bg.config.state_dir if self.bg is not None else self.cfg.state_dir
 
     def _config_dir(self) -> Path | None:
         """The CLI's configuration folder of the turn, where its transcripts live."""
@@ -3322,11 +3345,14 @@ class RunTurn:
         Returns:
             The argument list of the launch command.
         """
-        files = bg_files(self.cfg.state_dir, self.handle.run_id)
+        files = bg_files(self._bg_state, self.handle.run_id)
         ensure_private_dir(files.settings.parent)
         with contextlib.suppress(OSError):
             files.socket.unlink()  # a socket of an earlier process of this run
-        write_private(files.settings, json.dumps(settings_document(self.state.env), sort_keys=True))
+        hosted = self.state.hosted
+        base = json.loads(hosted.settings.read_text("utf-8")) if hosted is not None else None
+        document = settings_document(self.state.env, base)
+        write_private(files.settings, json.dumps(document, sort_keys=True))
         argv = background_argv(
             claude_bin=self.h.claude_bin or self.cfg.claude_bin,
             model=self.state.model,
@@ -3338,6 +3364,8 @@ class RunTurn:
             system_prompt_file=self._background_prompt_file(attempt),
             socket_file=files.socket,
             settings_file=files.settings,
+            hosted=hosted,
+            plugin_dirs=self.state.plugin_dirs,
         )
         await self._rebase_once(attempt)
         self.process = None
@@ -3382,7 +3410,7 @@ class RunTurn:
             verdict = await asyncio.to_thread(
                 supervisor_verdict,
                 supervisor,
-                load_supervisor(self.cfg.state_dir),
+                load_supervisor(self._bg_state),
                 PINNED_CLAUDE_CODE_VERSION,
                 bg.lstart,
             )
@@ -3450,7 +3478,7 @@ class RunTurn:
         later session inherits what it was started with. What belongs to this run reaches
         its session through the ``env`` block of the settings file alone (18.2).
         """
-        files = bg_files(self.cfg.state_dir, self.handle.run_id)
+        files = bg_files(self._bg_state, self.handle.run_id)
         out = await launch(
             argv,
             prompt=prompt,
@@ -3487,7 +3515,7 @@ class RunTurn:
             else what `_run_background` returns: the fallback while it is certain that no
             session took the prompt, in every other doubt the end of the run.
         """
-        files = bg_files(self.cfg.state_dir, self.handle.run_id)
+        files = bg_files(self._bg_state, self.handle.run_id)
         name = session_name(self.handle.run_id)
         timeout = self.cfg.cli_probe_timeout
         if out.short_id is None:
@@ -3583,7 +3611,7 @@ class RunTurn:
         pid = started.pid if started is not None else None
         lstart = await asyncio.to_thread(bg.lstart, pid) if pid is not None else None
         if pid is not None and lstart:
-            store_supervisor(self.cfg.state_dir, pid, lstart)
+            store_supervisor(self._bg_state, pid, lstart)
             _log("background_supervisor_started", **self.ids)
 
     async def _abort_launch(
@@ -3758,6 +3786,23 @@ class RunTurn:
         )
         return _Outcome(TurnEvidence(), self._worked, handled=True)
 
+    def _over_cap(self) -> bool:
+        """The run's cost reached the cost cap of a hosted definition (26 5.8)."""
+        cap = self.state.cost_cap
+        return cap is not None and self.live_cost.amount >= cap * 1_000_000
+
+    async def _cap_reached(self, session: BgSession) -> _Outcome:
+        """The cost cap in a background session: the runner holds it (FIX-RUNNER-CLI-PIN-326).
+
+        A background session does not act on ``--max-budget-usd``, so the runner stops the
+        session once the run's cost reaches the cap and ends it ``runtime_error`` with the
+        cause ``cost_cap_reached``, as the CLI's own budget end does in print mode.
+        """
+        _warn("cost_cap_reached", **self.ids)
+        await self._terminate(session, self.ids)
+        await self._fail("runtime_error", (), "stopped", summary=cause("cost_cap_reached"))
+        return _Outcome(TurnEvidence(), self._worked, handled=True)
+
     async def _login_unproven(self, session: BgSession, code: str) -> _Outcome:
         """The counter-check of 18.3 did not pass: stop the session, ``billing_mode_mismatch``.
 
@@ -3860,7 +3905,7 @@ class RunTurn:
                 self.phase = "ended"
                 remove_turn_record(self.cfg.state_dir / "turns" / f"{self.handle.run_id}.json")
                 remove_run_files(self.cfg.state_dir, self.handle.run_id)
-                remove_bg_files(self.cfg.state_dir, self.handle.run_id)
+                remove_bg_files(self._bg_state, self.handle.run_id)
 
     async def _replayed_checks(
         self, session: BgSession, messages: Sequence[Mapping[str, Any]]

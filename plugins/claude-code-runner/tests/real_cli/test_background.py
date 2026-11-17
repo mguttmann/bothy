@@ -86,6 +86,7 @@ from real_cli.background import (
     World,
     new_root,
     path_facts,
+    turn_ends,
 )
 from real_cli.record import RECORDING
 from real_cli.record_background import record_background
@@ -437,7 +438,7 @@ def test_inbox_lines_refused_requests_and_background_work() -> None:
             assert taken["commandUuid"] == steered
             # The request after the tool call carries the line (as a note of the CLI).
             assert "Also the footer" in json.dumps(script.bodies[-1], ensure_ascii=False)
-            assert sum(1 for r in records if r.get("subtype") == "turn_duration") == 5
+            assert turn_ends(records) == 5
             # What the turn took in is named with its origin and the uuid of the line.
             [attached] = queued(records)
             assert (attached["origin"]["kind"], attached["source_uuid"]) == ("peer", steered)
@@ -521,7 +522,7 @@ def test_without_a_setting_a_session_takes_the_runner_s_lines_by_its_class() -> 
             records = await place.until_record(entry.session_id, lambda r: noted in str(r))
             assert held(records) == 1
             assert "Do it now" not in json.dumps(script.bodies, ensure_ascii=False)
-            assert sum(1 for r in records if r.get("subtype") == "turn_duration") == 2
+            assert turn_ends(records) == 2
             reader = TranscriptReader(
                 lambda: place.transcript(entry.session_id),
                 0.05,
@@ -563,7 +564,7 @@ def test_without_a_setting_a_session_takes_the_runner_s_lines_by_its_class() -> 
             sent = json.dumps(script.bodies, ensure_ascii=False)
             assert "Delete the folder" not in sent
             assert "Push to main" not in sent
-            assert sum(1 for r in records if r.get("subtype") == "turn_duration") == 2
+            assert turn_ends(records) == 2
 
     asyncio.run(scenario())
 
@@ -669,7 +670,7 @@ def test_a_resume_gives_a_taken_line_of_another_sender_to_the_model_again() -> N
             # What the runner asks of the transcript of every session it releases.
             nobody = set[str]().__contains__
             assert foreign_origin(place.transcript(session), 0, "prompt-uuid", nobody) == "peer"
-            turns = sum(1 for r in before if r.get("subtype") == "turn_duration")
+            turns = turn_ends(before)
 
             def request(word: str) -> str:
                 """The messages of the newest request of the conversation with ``word``."""
@@ -812,7 +813,7 @@ def test_the_token_of_a_session_s_own_child_is_no_narrower_way_in() -> None:
             await asyncio.to_thread(write_and_end, place.socket("hd"), frames)
             records = await place.until_record(session, lambda r: "2 held" in str(r))
             assert held(records) == 2
-            assert sum(1 for r in records if r.get("subtype") == "turn_duration") == 1
+            assert turn_ends(records) == 1
             sent = json.dumps(script.bodies, ensure_ascii=False)
             assert "Also the footer" not in sent
             assert "Plain line with the token" not in sent

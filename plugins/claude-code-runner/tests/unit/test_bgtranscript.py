@@ -1261,3 +1261,14 @@ def test_messages_are_priced_once_with_their_newest_usage() -> None:
     assert model == "model-large"
     assert (values.input_tokens, values.output_tokens) == (1200, 20)
     assert values.cost_usd == Decimal(1200 * 3 + 20 * 15) / Decimal(1_000_000)
+
+
+def test_a_turn_duration_right_after_an_api_error_ends_no_second_turn() -> None:
+    # 2.1.326 ends a turn at its API error record (the recorded ``background`` transcript has
+    # no turn_duration after it); a turn_duration an older CLI writes there is the same end.
+    error = next(r for r in transcript("background") if r.get("isApiErrorMessage"))
+    mapper = TranscriptMapper("p")
+    mapper.started = True
+    first = mapper.map(error)
+    assert [m["is_error"] for m in first if m["type"] == "result"] == [True]
+    assert mapper.map({"type": "system", "subtype": "turn_duration"}) == []

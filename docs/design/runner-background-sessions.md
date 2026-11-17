@@ -1,7 +1,11 @@
 # Claude Code runner on background sessions
 
 Status: design of 2026-11-16, built by the ticket FEAT-RUNNER-BG-SESSIONS and changed by
-FIX-RUNNER-BG-INBOX-AUTH after the review of that build (section 10). This note records the
+FIX-RUNNER-BG-INBOX-AUTH after the review of that build (section 10). FIX-RUNNER-CLI-PIN-326
+(owner order of 2026-11-17, rulings in `docs/decisions.d/FIX-RUNNER-CLI-PIN-326.md`) replaced
+D-BG-2 and D-BG-13: hosted agents and turns with channel skills run in background mode too, and
+a run the mode is not available for ends `failed` with its cause instead of using print mode;
+where 4.2, 4.13 and the lists below still say "print mode", that ruling wins. This note records the
 goal, the evidence and the decisions with their reasons, and ends with the build brief. The
 normative text is in [09-agents.md](../spec/09-agents.md) sections 18 and 21 (the paragraphs
 "Background mode") and the rulings are in `docs/decisions.d/FEAT-RUNNER-BG-SESSIONS.md` and
@@ -224,6 +228,8 @@ use background mode and every other run uses print mode. Both keys are read at s
   back is one key.
 
 ### 4.2 D-BG-2: what runs in background mode
+
+Superseded by FIX-RUNNER-CLI-PIN-326 (see the status line at the top).
 
 Only the turns of the runner's own agent in billing mode `personal`. In print mode stay:
 
@@ -594,6 +600,8 @@ line of the inbox socket; the outputs of `stop`, `rm` and `daemon status`.
   the README section "Changing the pinned version" gains these steps.
 
 ### 4.13 D-BG-13: when the mode is unavailable, the run uses print mode and says why
+
+Superseded by FIX-RUNNER-CLI-PIN-326 (see the status line at the top).
 
 A run that should use background mode and cannot uses print mode. The live box shows once per
 run, as a status line, that background sessions are not available, with the code; the log has

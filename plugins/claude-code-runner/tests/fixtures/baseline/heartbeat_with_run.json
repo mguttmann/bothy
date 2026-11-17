@@ -1,6 +1,6 @@
 {
   "state": "online",
-  "runtime_version": "2.1.325",
+  "runtime_version": "2.1.326",
   "billing_modes_supported": [
     "organization"
   ],

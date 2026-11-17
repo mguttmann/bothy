@@ -98,6 +98,7 @@ from claude_code_runner.adoption import (
     read_turn_record,
 )
 from claude_code_runner.attachments import fetch_attachments
+from claude_code_runner.bgmode import BackgroundMode
 from claude_code_runner.causes import TOOL_CLASS_MISMATCH, cause, definition_refused
 from claude_code_runner.channel_skills import resolve_channel_skills
 from claude_code_runner.channels import RESYNC_EVENTS, ChannelCache
@@ -454,6 +455,15 @@ class HostedRuntime:
     def transcriber(self) -> Transcriber:
         """The runner's transcriber."""
         return self._runner.transcriber
+
+    @property
+    def background(self) -> BackgroundMode | None:
+        """The runner's background mode; ``None`` without ``launch_mode`` ``background``.
+
+        A hosted turn runs as a session like an own one (FIX-RUNNER-CLI-PIN-326).
+        """
+        found = getattr(self._runner, "background", None)
+        return found if isinstance(found, BackgroundMode) else None
 
     async def precheck(self, state: RunState, desired: str, ids: Mapping[str, Any]) -> None:
         """The runner's pre-check with the agent's configuration.

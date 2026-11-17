@@ -1,6 +1,6 @@
 {
-  "cli_version": "2.1.325",
-  "origin": "read from the file of the pinned CLI (the npm package of the platform; no session, no login, no model call) and from the recorded turn agent_tree_2.1.325.jsonl by tests/real_cli/record.py on 2026-11-16",
+  "cli_version": "2.1.326",
+  "origin": "read from the file of the pinned CLI (the npm package of the platform; no session, no login, no model call) and from the recorded turn agent_tree_2.1.326.jsonl by tests/real_cli/record.py on 2026-11-17",
   "note": "Message types, subtypes and member names only, no content. Each list of messages names the members of the message schema in the CLI's file without the envelope (type, subtype, uuid, session_id), then the members the CLI wrote in the recorded turn that the schema does not name. workflow_agent lists what the CLI wrote in the agent entries of workflow_progress.",
   "messages": {
     "system/init": [
@@ -100,6 +100,7 @@
       "requeue_if_interrupted_within_ms",
       "origin",
       "client_platform",
+      "keeps_request_id",
       "inbound_origin",
       "server_received_wall_ms",
       "historical",
@@ -181,6 +182,7 @@
       "reason",
       "output_file",
       "summary",
+      "summary_is_report",
       "usage",
       "resource_links",
       "handback",
@@ -251,6 +253,7 @@
       "process_turn_states",
       "process_turn_threads",
       "input_attachments_detail",
+      "memory_check_detail",
       "resume_store_confirm_detail",
       "tool_schema_build_detail",
       "message_normalization_detail",

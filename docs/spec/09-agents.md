@@ -3356,13 +3356,21 @@ With `runner.launch_mode` `background` a turn runs as a background session of Cl
 (`claude --bg`, https://code.claude.com/docs/en/agent-view, retrieved 2026-11-16; a research
 preview of Claude Code) instead of a `claude -p` process. The key is `print` by default, and
 without it the runner calls no command of background sessions and behaves exactly as above.
-Scope: only a turn of the runner's own agent in billing mode `personal`, and, when
-`runner.background_channels` is not empty, only in a listed channel. In print mode stay every
-`organization` turn (a background session takes no API key from the environment), every turn of
-a hosted agent (26 5), every turn that loads a channel skill folder (26 5.9: the argument list
-below has no `--plugin-dir`, and such a folder was not run with a background session), the
-compaction of 18.9 (its retry runs as a session again; both modes share the session store) and
-the one-shot calls of 18.17 and 26 6.2. The mode runs only on the
+Scope (changed 2026-11-17, owner order, FIX-RUNNER-CLI-PIN-326): every turn of a run in a
+channel the mode is on for (every channel, or with `runner.background_channels` the listed
+ones), of the runner's own agent and of a hosted agent (26 5), with or without channel skill
+folders (26 5.9), runs as a background session or the run ends `failed` with the cause in the
+thread; such a run never uses print mode. A hosted turn and a turn with channel skills carry
+the parts of 26 5.3 and 26 5.9 in the launch (the tool flags of the class, `--restricted` or
+`--setting-sources`, `--plugin-dir`, `--mcp-config` with `--strict-mcp-config`); the hosted
+settings stand in the run's one settings file, and the cost cap of 26 5.8 is held by the runner
+(it stops the session once the run's cost reaches the cap, cause `cost_cap_reached`), because a
+background session does not act on `--max-budget-usd`. The run ends with a cause of 18.9
+"Background mode is unavailable" for an `organization` turn (a background session takes no API
+key; `background_api_key`), for the compaction of 18.9 (`background_compaction`) and for a
+hosted turn below `host` (`--restricted` binds no inbox socket, run with 2.1.326;
+`background_restricted`). The one-shot calls of 18.17 and 26 6.2 are no turns and stay
+`claude -p`. The mode runs only on the
 pinned version of the CLI. Everything below was run with the pinned CLI 2.1.325 against a local
 stand-in for the API and is recorded in
 `plugins/claude-code-runner/tests/fixtures/recording/background_<pinned version>`; a change of
@@ -3385,7 +3393,7 @@ argument list, in this order (no shell):
 | Files | `<runner.state_dir>/bg/` holds, named after the run, the inbox socket `<digest>.sock` (the first 16 hexadecimal digits of the SHA-256 of the run id), the settings file `<run_id>.settings.json` (mode `0600`), the system prompt file `<run_id>.system-prompt.md` and the launch command's stdout and stderr; they are removed when the run left the runner. With `runner.launch_mode` `background` the start is refused, naming `runner.state_dir`, when the socket path is longer than a socket address of the system allows | a live session process keeps the files it was started with, so none of them lies in the session's folder, which moves when the runner learns the id of a new session (18.1) |
 | Settings file | exactly two members: `worktree.bgIsolation` `none`, and `env` with `CLAUDE_PRODUCT_RUN`, `DISABLE_AUTOUPDATER`, the run's `TMPDIR` and `SSH_AUTH_SOCK`, each of the four in every file: `SSH_AUTH_SOCK` holds the agent socket with `runner.forward_ssh_agent` and is the empty text otherwise. The file sets no `crossSessionInbound` (18.5 "Whose input") | without `none` the session moves into a Git worktree of its own (against 18.1) and its transcript moves with it; of the launching command's environment only `PATH` reaches the session, and a session inherits the environment of the supervisor, which lives across runs, so a name that is not set here would keep whatever the supervisor carries; a value of the `env` block goes before an inherited one |
 | Environment | the launch command and every control command (`claude agents --json --all`, `claude stop`, `claude rm`, `claude daemon status`) get one fixed environment of the runner process: the allow list above built once at the start, without the SSH agent and without the temporary folder of any run, plus `DISABLE_AUTOUPDATER`. No value of a run is ever in it; a run's values reach its session through the `env` block of the settings file alone | the launch that starts the supervisor hands it its environment, the supervisor lives across runs, and every later session inherits what it carries: an SSH agent socket in it would reach the session of a run that must not have one |
-| Before a launch | `claude daemon status` and the session list are read. No supervisor: the launch starts one, and the runner records it (its process id and start time, `<runner.state_dir>/bg/supervisor.json`) when the launch printed that it started the service. A supervisor that is the recorded one in the pinned version: launch. A supervisor whose process is gone when its start time is read ended on its own after its last session: `claude daemon status` is read once more. Any other supervisor: no launch (18.9 "Background mode is unavailable"). The runs of one runner process do this one after the other: a run reads `claude daemon status` only after the launch command of the run before it has ended and the supervisor that command started is recorded, so runs that start together launch under the same supervisor. Before a resume no process of the session may live: an entry of the session under the runner's name prefix `bothy-` is stopped (`claude stop`) and removed (`claude rm`), which makes the launch continue the session in place with this run's flags; an entry under another name belongs to another program and is never stopped or removed: with a process the run ends `failed` with `adapter_error` and the cause `session_busy`, without one the run uses print mode | sessions inherit the supervisor's environment, so only a supervisor a launch of the runner started carries the allow list and nothing else; a run that read the supervisor between the launch of another run and its record would take the runner's own supervisor for another program's; a resume of a session that still has an entry starts a copy |
+| Before a launch | `claude daemon status` and the session list are read. No supervisor: the launch starts one, and the runner records it (its process id and start time, `<runner.state_dir>/bg/supervisor.json`) when the launch printed that it started the service. A supervisor that is the recorded one in the pinned version: launch. A supervisor whose process is gone when its start time is read ended on its own after its last session: `claude daemon status` is read once more. Any other supervisor: no launch (18.9 "Background mode is unavailable"). The runs of one runner process do this one after the other: a run reads `claude daemon status` only after the launch command of the run before it has ended and the supervisor that command started is recorded, so runs that start together launch under the same supervisor. Before a resume no process of the session may live: an entry of the session under the runner's name prefix `bothy-` is stopped (`claude stop`) and removed (`claude rm`), which makes the launch continue the session in place with this run's flags; an entry under another name belongs to another program and is never stopped or removed: with a process the run ends `failed` with `adapter_error` and the cause `session_busy`, without one with `runtime_error` and the cause `background_session_foreign` | sessions inherit the supervisor's environment, so only a supervisor a launch of the runner started carries the allow list and nothing else; a run that read the supervisor between the launch of another run and its record would take the runner's own supervisor for another program's; a resume of a session that still has an entry starts a copy |
 | Started | the launch printed `backgrounded · <short id> · <name>` (the short id is the first eight characters of the session id), the entry of the session in the list has a `pid`, and the transcript shows the prompt as a `user` record after the launch offset, all within `runner.cli_probe_timeout`. The runner records the process (its id and start time; its command line names neither the session nor its flags) in the turn record. After a resume the short id must be that of the session and stderr must carry no `note:` line; otherwise the CLI did not continue the session in place (another program started it in between): the runner stops what the launch started, removes a copy, and ends the run `failed` with `runtime_error` and the cause `background_session_copied` | the identity of the process before every signal (18.9); a copy would answer in another session |
 | Supervisor | the runner installs, starts and stops no supervisor | `claude daemon stop` would end sessions of the host user |
 | Parallelism, locks | as above; `run_slots` counts a background turn until its release (18.6). The session process cannot inherit lock descriptors, so the locks of a background turn live with the runner process | a runner that adopts the turn takes the locks again (18.9) |
@@ -4220,10 +4228,10 @@ error, and the end of an adopted process is handled like an own one, with classi
 classification above without recovery" and "never a new process for such a run" for those
 records; a record without a named pipe is adopted as above.
 
-Background mode is unavailable (addendum of 2026-11-16, 18.2 "Background mode"): a run that
-should use background mode and cannot uses print mode. The live box shows once per run, as
-`/status_line`, "Background sessions are not available (`<code>`); this run uses print mode.",
-the log has `background_fallback` with the code, and a cause of the host adds
+Background mode is unavailable (addendum of 2026-11-16, changed 2026-11-17 by owner order,
+FIX-RUNNER-CLI-PIN-326): a run that should use background mode and cannot ends `failed` with
+`runtime_error` and the code as the cause in its summary; it never uses print mode. The log has
+`background_unavailable` with the code, and a cause of the host adds
 `background_unavailable` to `degraded_reasons` of the heartbeat (state `degraded`, 4.8) until the
 next background launch starts; the reason blocks no run.
 
@@ -4236,8 +4244,11 @@ next background launch starts; the reason blocks no run.
 | `background_workspace_untrusted` | the CLI refuses the launch because the project folder has no workspace trust | no |
 | `background_session_foreign` | the session has an entry in the session list under a name the runner did not give, without a process | no |
 | `background_launch_failed` | any other launch that exits with an error; `claude daemon status` or the session list cannot be read; or the launch left an entry that got no process within `runner.cli_probe_timeout` | yes |
+| `background_api_key` | the run is billed `organization`: a background session takes no API key | no |
+| `background_compaction` | the context is full: the runner follows the compaction of 18.9 only in print mode | no |
+| `background_restricted` | a hosted turn below `host`: `--restricted` binds no inbox socket | no |
 
-The fallback happens only while it is certain that no session took the prompt: the launch
+Also a launch is judged failed without a session only while it is certain that no session took the prompt: the launch
 exited with an error, or, watched for `runner.cli_probe_timeout`, the session list shows no
 session of the run or its entry got no process and its transcript no record of the prompt. In
 every other doubt (a launch whose output cannot be read, a supervisor another program started
@@ -5485,7 +5496,7 @@ configuration of the respective program outside the server.
 | `runner.account_retry_second` | Runner | `2m` | pause before the second retry (18.9); above zero |
 | `runner.account_retry_interval` | Runner | `3m` | pause before every further retry (18.9); above zero |
 | `runner.account_retry_max_wait` | Runner | `20m` | longest time from the first account error of a wait until the error ends the turn like any other, decided while no turn runs and no input is queued (18.9); `0s` switches the retry off |
-| `runner.launch_mode` | Runner | `print` | `print` starts every turn as `claude -p`; `background` runs the turns of the runner's own agent in billing mode `personal` as Claude Code background sessions (`claude --bg`, 18.2 "Background mode"); every other turn, and a run the mode is not available for, uses print mode (18.9) |
+| `runner.launch_mode` | Runner | `print` | `print` starts every turn as `claude -p`; `background` runs every turn as a Claude Code background session (`claude --bg`, 18.2 "Background mode"), also of hosted agents; a run the mode is not available for ends `failed` with the cause and never uses print mode (18.9) |
 | `runner.background_channels` | Runner | empty | channel ids; when not empty, only runs in these channels use background mode and every other run uses print mode (18.2) |
 | `runner.background_status_interval` | Runner | `2s` | interval at which the session list (`claude agents --json --all`) is read while a background turn is active; one reading serves every turn of the runner (18.4); above zero |
 | `runner.session_lock_wait` | Runner | `10m` | wait time for a busy session |

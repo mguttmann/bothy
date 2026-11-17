@@ -576,12 +576,18 @@ class Player:
             },
             **extra,
         )
+        self.error_ended = True
 
     def turn_end(self) -> None:
         # Like the pinned CLI: the session list shows the state after the turn (``busy`` only
-        # while background work runs) by the time the turn's last record is written.
+        # while background work runs) by the time the turn's last record is written; a turn
+        # that ended with an API error gets no ``turn_duration`` (2.1.326).
         self.status("busy" if self.job_running else "idle")
-        self.record("system", subtype="turn_duration", durationMs=1, messageCount=1, isMeta=False)
+        if not getattr(self, "error_ended", False):
+            self.record(
+                "system", subtype="turn_duration", durationMs=1, messageCount=1, isMeta=False
+            )
+        self.error_ended = False
         self.turn_open = False
 
     # ---- the session list ------------------------------------------------------------------------

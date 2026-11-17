@@ -60,7 +60,9 @@ record (real transcript of the pinned CLI, FIX-RUNNER-BG-NOTICE-ORDER) and may w
 of the answer before the request, which that input cannot have led to. A mapper without
 ``own`` knows no line of the runner.
 * ``system`` ``turn_duration``: the end of the turn, a ``result`` whose text is the text of
-  the turn's last assistant message, with ``is_error`` when that message is an API error.
+  the turn's last assistant message. An API error record ends its turn itself (``result``
+  with ``is_error``): the CLI writes no ``turn_duration`` after it since 2.1.326, and one
+  that follows it right away ends nothing more.
 * ``cost-state``: ``bg_totals`` with ``modelUsage``, the session's totals (18.7).
 
 Every other record type is skipped and counted per type in a debug line. No transcript line is
@@ -278,6 +280,9 @@ class TranscriptMapper:
         self._texts: dict[str, list[str]] = {}
         self._last_message: str | None = None
         self._last_error = False
+        self._error_ended = False
+        """The last turn ended at its API error record; a ``turn_duration`` that an older CLI
+        writes right after it ends nothing more."""
         self._requests: set[str] = set()
 
     # ---- helpers ---------------------------------------------------------------------------
@@ -365,6 +370,9 @@ class TranscriptMapper:
         if kind == "queue-operation":
             return self._queue(record)
         if kind == "system" and record.get("subtype") == "turn_duration":
+            if self._error_ended:
+                self._error_ended = False
+                return self._unattributed(self._sealed | self._open)
             return self._unattributed(self._sealed | self._open) or [self._turn_end()]
         self.skipped[kind] += 1
         return []
@@ -530,6 +538,11 @@ class TranscriptMapper:
         if not error and model != _SYNTHETIC:
             self._requests.add(key)
         out.append(mapped)
+        self._error_ended = error
+        if error:
+            # 2.1.326 writes no ``turn_duration`` after an API error: the error record is the
+            # last record of its turn (FIX-RUNNER-CLI-PIN-326).
+            out.extend(self._unattributed(self._sealed | self._open) or [self._turn_end()])
         return out
 
     def _queue(self, record: Mapping[str, Any]) -> list[dict[str, Any]]:

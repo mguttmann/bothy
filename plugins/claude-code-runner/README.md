@@ -103,7 +103,7 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
   of `organization` live in the runner's own configuration folder and those of `personal` under
   `HOME`; M2-35 handles a missing session (fail open).
 - Install exactly the pinned Claude Code version (`PINNED_CLAUDE_CODE_VERSION` in
-  `heartbeat.py`, 2.1.325) and keep automatic updates of the CLI off; another version reports
+  `heartbeat.py`, 2.1.326) and keep automatic updates of the CLI off; another version reports
   `runtime_version_untested`, an older one `runtime_version_unsupported` and refuses runs.
   `claude-code-runner check-config --config <file>` prints `runtime ok` for the pinned version.
 - The API refuses a model to a CLI below the model's minimum version ("Claude Code <v> does not
@@ -293,8 +293,8 @@ throttles them to `agent.run_update_min_interval`.
 
 The run graph fields (`tool_use_id`, `task_type`, `usage`, the workflow type `local_workflow`)
 were read from the files of the pinned CLI 2.1.259 without a session (ruling D-M2-51-1), read
-again in 2.1.288 (D-RUNNER-CLI-PIN-1), in 2.1.321 (D-FIX-RUNNER-CLI-PIN-321-3) and in 2.1.325
-(`tests/fixtures/recording/stream_fields_2.1.325.json`, D-FIX-RUNNER-CLI-PIN-325-3: the members
+again in 2.1.288 (D-RUNNER-CLI-PIN-1), in 2.1.321 (D-FIX-RUNNER-CLI-PIN-321-3), in 2.1.325 (D-FIX-RUNNER-CLI-PIN-325-3) and in
+2.1.326 (`tests/fixtures/recording/stream_fields_2.1.326.json`, D-FIX-RUNNER-CLI-PIN-326-2: the members
 of every message of the table above, from the message schemas in the CLI's file and from a
 recorded turn). The level-one switch test holds the recorded table against the installed CLI.
 2.1.321 adds members the runner does not read (`run_id`, `parent_task_id` and `awaited` of a
@@ -477,15 +477,16 @@ against a server that accepts the heartbeat capability `turn_handover` and has
 Off by default (`runner.launch_mode = "print"`); without the key the runner calls no command of
 background sessions and behaves exactly as before, held by the byte-equal fixtures of
 `tests/fixtures/baseline` and by `test_without_the_key_no_command_of_background_sessions_runs`.
-With `runner.launch_mode = "background"` a turn of the runner's own agent in billing mode
-`personal` runs as a Claude Code background session (`claude --bg`); with
-`runner.background_channels` only in the listed channels. Every `organization` turn, every turn
-of a hosted agent, every turn that loads a channel skill folder (`runner.channel_skills_dir`,
-"Channel skills" below: the launch command of a background session carries no `--plugin-dir`),
-the compaction of a full context and the one-shot calls stay in print mode.
+With `runner.launch_mode = "background"` every turn runs as a Claude Code background session
+(`claude --bg`), of the runner's own agent and of hosted agents, with channel skill folders
+(`--plugin-dir`) and the MCP file, settings and tool flags of a hosted turn; with
+`runner.background_channels` only in the listed channels. Such a run never uses print mode: an
+`organization` turn, the compaction of a full context and a hosted turn below `host` end
+`failed` with their cause (table below); the runner holds a hosted agent's cost cap itself.
+Only the one-shot calls (search assistant, agent builder) stay `claude -p`.
 Background sessions and agent view are a research preview of Claude Code, and most of what the
-runner reads of them is internal to the CLI; the mode therefore runs only on the pinned version
-and falls back to print mode whenever it is not available.
+runner reads of them is internal to the CLI; the mode therefore runs only on the pinned version,
+and a run it is not available for ends `failed` with its cause instead of using print mode.
 
 What the documentation of Claude Code promises and what it does not: it says that background
 sessions consume subscription usage the same as interactive sessions. It does not say that a
@@ -496,7 +497,7 @@ what either path draws from a subscription is a measurement on the operator's ow
 Before you switch it on:
 
 - **Version.** Install exactly the pinned Claude Code version and keep its automatic update
-  off. On any other version every run uses print mode (`background_version_untested`).
+  off. On any other version every run fails (`background_version_untested`).
 - **Workspace trust.** The CLI starts a background session only in a folder with workspace
   trust: run `claude` once in each bound project folder (and in `runner.default_workspace`) as
   the runner's host user and accept the prompt. A Git repository below a trusted folder needs
@@ -510,7 +511,7 @@ Before you switch it on:
   `<runner.state_dir>/bg/supervisor.json`), because sessions inherit the supervisor's
   environment and only such a supervisor carries the allow list of 18.2. While the host user
   runs background sessions of their own (agent view), their supervisor is in the way and every
-  run of the runner uses print mode (`background_supervisor_foreign`).
+  run of the runner fails (`background_supervisor_foreign`).
 - **The small-model alias.** For a background session the CLI sends short requests of its own
   (a summary for agent view at every turn end and a check at the session's start). They use the
   small-model alias of the host user's Claude Code settings, are in no transcript and are not
@@ -634,9 +635,9 @@ How a background turn runs:
   process. A session whose process is gone is finished from its transcript when the end of the
   turn is in it.
 
-When the mode is not available, the run uses print mode, the live box says once
-"Background sessions are not available (`<code>`); this run uses print mode.", the log has
-`background_fallback`, and for a cause of the host the heartbeat reports `degraded` with
+When the mode is not available, the run ends `failed` with the code as its cause in the thread
+and never uses print mode (owner order 2026-11-17, FIX-RUNNER-CLI-PIN-326), the log has
+`background_unavailable`, and for a cause of the host the heartbeat reports `degraded` with
 `background_unavailable` until the next background launch starts (it blocks no run):
 
 | Code | What to do |
@@ -648,8 +649,11 @@ When the mode is not available, the run uses print mode, the live box says once
 | `background_workspace_untrusted` | accept workspace trust for the project folder (above) |
 | `background_session_foreign` | the thread's session is listed in agent view under a name the runner did not give: remove it there (`claude rm`) |
 | `background_launch_failed` | the launch or a control command failed, or the session got no process within `runner.cli_probe_timeout`; the files `<runner.state_dir>/bg/<run_id>.launch.err` of a running run and the log say more |
+| `background_api_key` | an `organization` run: a background session takes no API key; use `print` for such agents |
+| `background_compaction` | the context is full; the runner compacts only in print mode: start a new post |
+| `background_restricted` | a hosted agent below `host` (`--restricted` binds no inbox socket): give it `host` or use `print` |
 
-The fallback happens only while it is certain that no session took the prompt. In every other
+A launch is judged failed without a session only while it is certain that no session took the prompt. In every other
 doubt the runner stops the session and ends the run `runtime_error` with the code as the cause,
 so a prompt never runs twice. Further causes of a failed run in this mode:
 `background_session_copied` (the CLI started a copy at a resume, because another program
@@ -1154,7 +1158,7 @@ never which host runs or showed what (the repository is public; `tests/unit/test
   `system/init` interrupts the turn with SIGINT.
 - Is `/compact` available in print mode of the pinned version? Yes: the command `compact` of
   Claude Code 2.1.259 has `supportsNonInteractive: true` in the files of the pinned CLI
-  (retrieved 2026-10-24, again in 2.1.288 on 2026-10-29, in 2.1.321 on 2026-11-10 and in 2.1.325 on 2026-11-16), and the Agent SDK page on slash commands sends `/compact` as a prompt
+  (retrieved 2026-10-24, again in 2.1.288 on 2026-10-29, in 2.1.321 on 2026-11-10, in 2.1.325 on 2026-11-16 and in 2.1.326 on 2026-11-17), and the Agent SDK page on slash commands sends `/compact` as a prompt
   and reports it with a `system` message `compact_boundary`
   (https://code.claude.com/docs/en/agent-sdk/slash-commands, retrieved 2026-10-24). That the CLI
   takes it as the content of a stream-json `user` line is not run with a real session yet (level

@@ -29,6 +29,7 @@ from claude_code_runner.app import Runner
 from claude_code_runner.bgpaths import bg_files
 from claude_code_runner.bgtranscript import READ_FIELDS
 from claude_code_runner.causes import ADAPTER_STOPPED, RUN_ENDED_IDLE, cause
+from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
 
 from .conftest import API_KEY, BACKGROUND, LogLines, World, _group_alive, live_files
 
@@ -755,25 +756,17 @@ async def test_a_lost_login_ends_the_run_not_authenticated(bg_world: World) -> N
 # ---- recoveries across the two modes (09 18.9) --------------------------------------------------
 
 
-async def test_a_full_context_is_compacted_in_print_mode_and_retried_in_the_session(
-    bg_world: World,
-) -> None:
+async def test_a_full_context_fails_the_run_without_print_mode(bg_world: World) -> None:
+    # The runner compacts only in print mode, which background mode never uses (owner order
+    # 2026-11-17, FIX-RUNNER-CLI-PIN-326): the run fails with the cause in the thread.
     world = bg_world
     world.scenario(fixture="plain", per_launch={"0": {"api_error": "context_full"}})
     await start(world)
     run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
-    assert await world.ended(run.run_id) == "completed"
-    one, two = launches(world)
-    session = players(world)[0]["session_id"]
-    # The compaction is a print turn of the same session; the retry continues it in place.
-    [compaction] = world.turns()
-    assert flag(compaction["argv"], "--resume") == session
-    assert two["argv"][:3] == ["--resume", session, "--bg"]
-    assert two["prompt"] == one["prompt"]  # the same prompt again, once per process
-    assert [p["session_id"] for p in players(world)] == [session, session]
-    assert texts(world) == ["Done."]
-    notes = [s["name"] for s in world.fake.run(run.run_id)["steps"].values()]
-    assert "context_compacted" in notes
+    assert await world.ended(run.run_id) == "failed"
+    assert world.fake.run(run.run_id)["summary"] == cause("background_compaction")
+    assert world.turns() == []  # no compaction with claude -p
+    assert len(launches(world)) == 1
     await nothing_left(world)
 
 
@@ -842,7 +835,7 @@ NOTIFICATION_ORIGIN = "origin/task-notification"
 def members_seen(world: World) -> set[str]:
     """Hold what Fake-Claude wrote against the recorded member table; the record types seen."""
     folder = Path(__file__).resolve().parents[1] / "fixtures" / "recording"
-    [recording] = folder.glob("background_*")
+    recording = folder / f"background_{PINNED_CLAUDE_CODE_VERSION}"
     table = json.loads((recording / "transcript_fields.json").read_text())["records"]
     seen = set()
     for record in transcript(world, players(world)[0]):

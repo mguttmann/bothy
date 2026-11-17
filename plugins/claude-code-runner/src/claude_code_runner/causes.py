@@ -157,9 +157,48 @@ CAUSES: dict[str, str] = {
         "this one"
     ),
     "background_launch_failed": (
-        "The runner could not start the background session of this run and cannot tell "
-        "whether Claude Code took the message, so it stopped the session instead of running "
-        "the message twice. Send the message again"
+        "The runner could not start the background session of this run, and it never runs a "
+        "message in print mode instead. Send the message again; the runner log names the "
+        "problem"
+    ),
+    "background_version_untested": (
+        "The Claude Code on the runner host is not the version the runner is pinned to, and "
+        "background sessions run only on that version. Install the pinned version on the "
+        "runner host"
+    ),
+    "background_supervisor_version": (
+        "The background service of Claude Code on the runner host runs another version than "
+        "the pinned one. Stop that service on the runner host and send the message again"
+    ),
+    "background_bypass_not_accepted": (
+        "Claude Code on the runner host has not accepted the permission bypass for background "
+        "sessions yet. Run claude --dangerously-skip-permissions once on the runner host and "
+        "send the message again"
+    ),
+    "background_workspace_untrusted": (
+        "Claude Code on the runner host does not trust this project folder, so it starts no "
+        "background session there. Open Claude Code in that folder once on the runner host, "
+        "accept the trust prompt and send the message again"
+    ),
+    "background_session_foreign": (
+        "The Claude Code session of this chat is listed under another program on the runner "
+        "host, so the runner does not continue it in the background. Remove that entry with "
+        "claude rm on the runner host or start a new post"
+    ),
+    "background_api_key": (
+        "This run is billed to the organization's API key, and a background session of Claude "
+        "Code takes no API key. Run it with a personal login, or set runner.launch_mode to "
+        "print on the runner host"
+    ),
+    "background_compaction": (
+        "The context of this session is full, and the runner compacts a session only in print "
+        "mode, which runner.launch_mode background never uses. Start a new post, or set "
+        "runner.launch_mode to print on the runner host"
+    ),
+    "background_restricted": (
+        "This built-in agent runs with restricted tools, and a restricted background session "
+        "of Claude Code takes no follow-up messages. Give the agent the tool class host, or "
+        "set runner.launch_mode to print on the runner host"
     ),
     "background_supervisor_foreign": (
         "The background service of Claude Code on the runner host was started by another "

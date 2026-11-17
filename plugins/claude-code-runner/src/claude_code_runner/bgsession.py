@@ -68,7 +68,13 @@ from pathlib import Path
 from typing import Any
 
 from claude_code_runner.adoption import process_id, read_identity
-from claude_code_runner.commandline import ArgumentError, class_flags
+from claude_code_runner.commandline import (
+    ArgumentError,
+    HostedArgs,
+    class_flags,
+    hosted_additions,
+    hosted_class_flags,
+)
 from claude_code_runner.config import check_argument
 from claude_code_runner.statedir import ensure_private_dir, write_private
 from claude_code_runner.stop import escalation_due
@@ -172,7 +178,9 @@ def session_name(run_id: object) -> str:
     return f"{NAME_PREFIX}{run_id}"
 
 
-def background_class_flags(tool_class: str, tools: Sequence[str]) -> list[str]:
+def background_class_flags(
+    tool_class: str, tools: Sequence[str], hosted: HostedArgs | None = None
+) -> list[str]:
     """Return the flags of a tool class for a background session (09 18.2).
 
     The flags of `claude_code_runner.commandline.class_flags`, and under ``scoped`` and ``host``
@@ -183,6 +191,7 @@ def background_class_flags(tool_class: str, tools: Sequence[str]) -> list[str]:
     Args:
         tool_class: ``chat``, ``scoped`` or ``host``.
         tools: The named tools of ``scoped``.
+        hosted: The parts of a hosted turn: the tool flags of 26 5.3 instead of 18.2.
 
     Returns:
         The flags.
@@ -196,7 +205,10 @@ def background_class_flags(tool_class: str, tools: Sequence[str]) -> list[str]:
         >>> background_class_flags("host", [])[3:]
         ['AskUserQuestion', 'SendMessage', 'ListAgents', 'SendFile']
     """
-    flags = class_flags(tool_class, tools)
+    if hosted is None:
+        flags = class_flags(tool_class, tools)
+    else:
+        flags = hosted_class_flags(tool_class, tools, has_skills=hosted.has_skills)
     if tool_class == "chat":
         return flags
     return [*flags, "--disallowedTools", *DENIED_TOOLS]
@@ -214,8 +226,17 @@ def background_argv(  # noqa: PLR0913 - every input of the command line is expli
     system_prompt_file: Path,
     socket_file: Path,
     settings_file: Path,
+    hosted: HostedArgs | None = None,
+    plugin_dirs: Sequence[Path] = (),
 ) -> list[str]:
     """Build the argument list of the launch command in the order of 09 18.2.
+
+    A hosted turn (26 5.3) and a turn with channel skills (26 5.9) carry the same parts as in
+    print mode: the tool flags of the hosted class, ``--restricted`` or ``--setting-sources``,
+    ``--plugin-dir`` per folder and ``--mcp-config`` with ``--strict-mcp-config``. The hosted
+    settings are not a second ``--settings``: `settings_document` writes them into the one
+    settings file of the launch. ``--max-budget-usd`` is left out, because a background
+    session does not act on it (the runner holds the cost cap itself).
 
     The prompt is not an argument: it is the stdin of the command, so it is neither bounded
     by the system's argument limit nor readable in the process list. ``--session-id`` is
@@ -233,22 +254,31 @@ def background_argv(  # noqa: PLR0913 - every input of the command line is expli
         system_prompt_file: The file of ``--append-system-prompt-file``.
         socket_file: The inbox socket (``--messaging-socket-path``).
         settings_file: The settings file of the run (``--settings``).
+        hosted: The parts of a hosted turn (26 5.3); ``None`` for the runner's own agent.
+        plugin_dirs: Channel skill folders (26 5.9), only for ``host``.
 
     Returns:
         The argument list.
 
     Raises:
-        ArgumentError: An invalid model or tool, or ``add_dir`` under ``chat``.
+        ArgumentError: An invalid model or tool, ``add_dir`` or an MCP file under ``chat``,
+            or a channel skill folder below ``host``.
     """
     if not check_argument(model):
         raise ArgumentError("invalid_argument")
     if add_dir is not None and tool_class == "chat":
         raise ArgumentError("invalid_argument")
+    if plugin_dirs and tool_class != "host":  # 26 5.9: channel skills only in host turns
+        raise ArgumentError("invalid_argument")
     argv = [claude_bin]
     if resume is not None:
         argv += ["--resume", resume]
     argv += ["--bg", "--name", name, "--model", model]
-    argv += background_class_flags(tool_class, tools)
+    argv += background_class_flags(tool_class, tools, hosted)
+    if hosted is None:
+        argv += [a for folder in plugin_dirs for a in ("--plugin-dir", str(folder))]
+    else:
+        argv += hosted_additions(tool_class, hosted, plugin_dirs, settings=False)
     if add_dir is not None:
         argv += ["--add-dir", str(add_dir)]
     argv += [
@@ -262,7 +292,9 @@ def background_argv(  # noqa: PLR0913 - every input of the command line is expli
     return argv
 
 
-def settings_document(env: Mapping[str, str]) -> dict[str, Any]:
+def settings_document(
+    env: Mapping[str, str], base: Mapping[str, Any] | None = None
+) -> dict[str, Any]:
     """Return the settings of a run's background session (``--settings``, 09 18.2).
 
     Exactly two members. ``worktree.bgIsolation`` ``none`` keeps the session in the project
@@ -280,8 +312,12 @@ def settings_document(env: Mapping[str, str]) -> dict[str, Any]:
     by the permission classes of both sessions, and a stricter value of the host user's or of
     managed settings stays in force; ``accept`` here would switch both off (18.5).
 
+    A hosted turn gives the settings of 26 5.4 as ``base``; the document is then those
+    settings with the two members added (they carry no ``env`` and no ``worktree``).
+
     Args:
         env: The environment of the turn (`claude_code_runner.environment.build_environment`).
+        base: The settings of a hosted turn, if any.
 
     Returns:
         The document; ``env`` holds ``CLAUDE_PRODUCT_RUN``, ``DISABLE_AUTOUPDATER``, the run's
@@ -293,7 +329,7 @@ def settings_document(env: Mapping[str, str]) -> dict[str, Any]:
         "TMPDIR": env.get("TMPDIR", ""),
         "SSH_AUTH_SOCK": env.get("SSH_AUTH_SOCK", ""),
     }
-    return {"worktree": {"bgIsolation": "none"}, "env": session_env}
+    return {**(base or {}), "worktree": {"bgIsolation": "none"}, "env": session_env}
 
 
 def sender_class(tool_class: str) -> str | None:

@@ -39,6 +39,7 @@ __all__ = [
     "choose_model",
     "choose_session",
     "class_flags",
+    "hosted_additions",
     "hosted_class_flags",
     "reported_model",
     "scoped_tools",
@@ -161,14 +162,29 @@ def hosted_class_flags(tool_class: str, tools: Sequence[str], *, has_skills: boo
     return class_flags(tool_class, tools)
 
 
-def _hosted_additions(
-    tool_class: str, hosted: HostedArgs, plugin_dirs: Sequence[Path]
+def hosted_additions(
+    tool_class: str, hosted: HostedArgs, plugin_dirs: Sequence[Path], *, settings: bool = True
 ) -> list[str]:
-    """The column "Added directly after ``--permission-prompts none``" of 26 5.3."""
+    """The column "Added directly after ``--permission-prompts none``" of 26 5.3.
+
+    Args:
+        tool_class: The loaded class of the hosted agent.
+        hosted: The parts of the hosted turn.
+        plugin_dirs: Channel skill folders (26 5.9).
+        settings: Name ``hosted.settings`` in ``--settings``; a background session carries
+            those settings in the one settings file of its launch instead.
+
+    Returns:
+        The flags.
+
+    Raises:
+        ArgumentError: An MCP file under ``chat``.
+    """
+    named = ["--settings", str(hosted.settings)] if settings else []
     if tool_class == "host":
-        added = ["--setting-sources", "project,local", "--settings", str(hosted.settings)]
+        added = ["--setting-sources", "project,local", *named]
     else:
-        added = ["--restricted", "--settings", str(hosted.settings)]
+        added = ["--restricted", *named]
     if hosted.plugin is not None:
         added += ["--plugin-dir", str(hosted.plugin)]
     for folder in plugin_dirs:
@@ -335,7 +351,7 @@ def build_argv(  # noqa: PLR0913 - every input of the command line is explicit
         added = [a for folder in plugin_dirs for a in ("--plugin-dir", str(folder))]
     else:
         flags = hosted_class_flags(tool_class, tools, has_skills=hosted.has_skills)
-        added = _hosted_additions(tool_class, hosted, plugin_dirs)
+        added = hosted_additions(tool_class, hosted, plugin_dirs)
     session_flag = "--resume" if session.resume else "--session-id"
     argv = [
         claude_bin,

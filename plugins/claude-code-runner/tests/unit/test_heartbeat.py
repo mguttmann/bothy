@@ -114,31 +114,33 @@ async def test_probe_unreachable(tmp_path: Path) -> None:
 def test_pin_is_a_version_that_serves_current_models() -> None:
     # 2.1.259 was refused by the API for current models ("version 2.1.280 or newer is
     # required", 2026-10-29); the pin moved to 2.1.288 (RUNNER-CLI-PIN), then to 2.1.321
-    # (FIX-RUNNER-CLI-PIN-321) and then to 2.1.325 (FIX-RUNNER-CLI-PIN-325).
-    assert PINNED_CLAUDE_CODE_VERSION == "2.1.325"
+    # (FIX-RUNNER-CLI-PIN-321), to 2.1.325 (FIX-RUNNER-CLI-PIN-325) and then to 2.1.326
+    # (FIX-RUNNER-CLI-PIN-326).
+    assert PINNED_CLAUDE_CODE_VERSION == "2.1.326"
     assert parse_version(PINNED_CLAUDE_CODE_VERSION) >= (2, 1, 280)  # type: ignore[operator]
 
 
 @pytest.mark.anyio
-async def test_cli_2_1_325_is_the_tested_version(tmp_path: Path) -> None:
-    """Claude Code 2.1.325 is reported ``online`` without a reason."""
-    current = script(tmp_path, "print('2.1.325 (Claude Code)')")
+async def test_cli_2_1_326_is_the_tested_version(tmp_path: Path) -> None:
+    """Claude Code 2.1.326 is reported ``online`` without a reason."""
+    current = script(tmp_path, "print('2.1.326 (Claude Code)')")
     probe = await probe_version(current, {}, tmp_path, PATIENCE)
-    assert (probe.version, probe.reasons, probe.blocking) == ("2.1.325", (), False)
+    assert (probe.version, probe.reasons, probe.blocking) == ("2.1.326", (), False)
     status = runtime_status(probe, [], None)
     assert (status.state, status.degraded_reasons) == ("online", ())
-    assert status.runtime_version == "2.1.325"
+    assert status.runtime_version == "2.1.326"
 
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
     "other",
     [
+        "2.1.325",  # the pin from 2026-11-16 to 2026-11-17
         "2.1.321",  # the pin from 2026-11-10 to 2026-11-16
         "2.1.288",  # the pin before that
         "2.1.259",  # the first pin, still the minimum
         "2.1.324",
-        "2.1.326",
+        "2.1.327",
         "2.2.0",
     ],
 )

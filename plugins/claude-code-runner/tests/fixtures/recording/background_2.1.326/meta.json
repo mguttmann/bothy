@@ -1,6 +1,6 @@
 {
-  "cli_version": "2.1.325",
-  "origin": "recorded 2026-11-16 by tests/real_cli/record.py: background sessions of the pinned CLI (claude --bg) against a local stand-in of the Messages API on loopback, with a configuration folder of its own, a key helper that prints a dummy key and a trust entry for the working folder; no login and no model call",
+  "cli_version": "2.1.326",
+  "origin": "recorded 2026-11-17 by tests/real_cli/record.py: background sessions of the pinned CLI (claude --bg) against a local stand-in of the Messages API on loopback, with a configuration folder of its own, a key helper that prints a dummy key and a trust entry for the working folder; no login and no model call",
   "files": {
     "launch.json": "what the launch command printed per case, with its exit code",
     "sessions.json": "one entry of claude agents --json --all per state",

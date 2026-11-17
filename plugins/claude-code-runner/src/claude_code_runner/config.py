@@ -223,9 +223,10 @@ class RunnerConfig:
             turn like any other, decided while no turn runs and no input is queued; zero
             switches the retry off.
         launch_mode: ``runner.launch_mode``: ``print`` (the default) starts every turn as
-            ``claude -p``; ``background`` runs the turns of the runner's own agent in billing
-            mode ``personal`` as Claude Code background sessions (``claude --bg``, 09 18.2
-            "Background mode"). Without the key the runner behaves exactly as before.
+            ``claude -p``; ``background`` runs every turn, also of a hosted agent, as a Claude
+            Code background session (``claude --bg``, 09 18.2 "Background mode"); a run the
+            mode is not available for ends ``failed`` and never uses print mode. Without the
+            key the runner behaves exactly as before.
         background_channels: ``runner.background_channels``: when not empty, only runs in
             these channels use background mode and every other run uses print mode.
         background_status_interval: ``runner.background_status_interval``: how often the
