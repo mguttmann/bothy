@@ -71,3 +71,22 @@ async def test_a_hosted_turn_that_cannot_run_in_background_fails_with_its_cause(
     assert _finish(backend)["summary"] == cause(code)
     assert world.turns() == []
     assert launches(world) == []
+
+
+@pytest.mark.parametrize(
+    ("tool_class", "code"),
+    [("host", "background_hosted_bypass"), ("scoped", "background_restricted")],
+)
+async def test_a_run_with_a_cost_cap_never_runs_as_a_background_session(
+    world: HostingWorld, tool_class: str, code: str
+) -> None:
+    # A background session does not act on --max-budget-usd, and only a hosted definition
+    # sets a cost cap: such a run ends with its cause before any session or cost exists, so
+    # the runner never has to hold a cap from priced messages (the review finding on
+    # 2c2b4f362, FIX-RUNNER-CLI-PIN-326).
+    backend = await _start(world, tool_class, max_cost_usd_per_run=0.5)
+    run = await backend.fake.trigger("Hello")
+    assert await _ended(world, backend, run.run_id) == "failed"
+    assert _finish(backend)["summary"] == cause(code)
+    assert world.turns() == []
+    assert launches(world) == []
