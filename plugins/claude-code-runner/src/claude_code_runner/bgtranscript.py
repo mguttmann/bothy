@@ -49,10 +49,15 @@ these: the CLI removes it from its queue like a line, under a ``uuid`` it made, 
 its origin in the attachment. The kind ``task-notification`` alone does not make an input the
 session's own: the CLI records the message of another session of the same user, a relay and
 a scheduled prompt under that kind too, so only the producer it stamps for the session's own
-work counts. So an input a running turn took under a ``uuid`` the runner did not write stays
-open until that attachment attributes it to the session itself; one that is still open at
-the next output of the session is foreign too. A mapper without ``own`` knows no line of the
-runner.
+work counts. A ``queued_command`` attachment with ``commandMode`` ``task-notification`` and
+no origin is the session's own too: the CLI queues the notification of a background agent, a
+monitor, a workflow or a timer without one, and every other sender's input carries an origin.
+So an input a running turn took under a ``uuid`` the runner did not write stays open until
+that attachment attributes it to the session itself; one that is still open at the next
+request or the end of the turn is foreign too. The next request is the deadline, not the next
+output: the CLI writes the attachment before the request that carries the input, and may
+write records of the answer before it, which that input cannot have led to. A mapper without
+``own`` knows no line of the runner.
 * ``system`` ``turn_duration``: the end of the turn, a ``result`` whose text is the text of
   the turn's last assistant message, with ``is_error`` when that message is an API error.
 * ``cost-state``: ``bg_totals`` with ``modelUsage``, the session's totals (18.7).
@@ -333,7 +338,11 @@ class TranscriptMapper:
             self.skipped["sidechain"] += 1
             return []
         if kind == "api-request":
-            return self._request(record)
+            # The request carries every input the turn took since the last one: an input
+            # still unattributed here is not the session's own (the CLI writes the
+            # attachment that attributes it before this record, and outputs before it
+            # cannot answer that input; FIX-RUNNER-BG-OWN-NOTICE).
+            return [*self._unattributed(), *self._request(record)]
         if kind == "cost-state":
             usage = record.get("modelUsage")
             if not isinstance(usage, Mapping):
@@ -346,7 +355,7 @@ class TranscriptMapper:
         if kind == "user":
             return self._user(record)
         if kind == "assistant":
-            return self._unattributed() or self._assistant(record)
+            return self._assistant(record)
         if kind == "queue-operation":
             return self._queue(record)
         if kind == "system" and record.get("subtype") == "turn_duration":
@@ -392,6 +401,12 @@ class TranscriptMapper:
             self.skipped["attachment"] += 1
             return []
         sender = _sender(inner)
+        if sender is None and inner.get("commandMode") == _NOTIFICATION:
+            # The CLI queues the notification of the session's own work without an origin
+            # too (a background agent, a monitor, a workflow, a timer: read in the file of
+            # the pinned CLI, the agent's in a real transcript); every other sender's input
+            # carries one (FIX-RUNNER-BG-OWN-NOTICE).
+            sender = _SELF
         if sender is None:
             return []  # it attributes nothing: an open input stays open
         self._open.discard(str(inner.get("source_uuid")))
@@ -412,7 +427,7 @@ class TranscriptMapper:
         return [] if settled else [self._foreign(sender)]
 
     def _unattributed(self) -> list[dict[str, Any]]:
-        """An input a turn took that nothing attributed before the session's next output."""
+        """An input a turn took that nothing attributed before the request that carries it."""
         if not self._open:
             return []
         self._open.clear()

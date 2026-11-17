@@ -417,19 +417,86 @@ ASSISTANT = {
     "message": {"id": "msg_1", "model": "model-large", "content": [{"type": "text", "text": "x"}]},
 }
 TURN_ENDS = {"type": "system", "subtype": "turn_duration", "isSidechain": False}
+REQUEST = {"type": "api-request", "params": {"betas": []}}
+OWN_NOTICE = (
+    Path(__file__).resolve().parents[1] / "fixtures" / "transcript" / "own_agent_notice.jsonl"
+)
+
+
+def test_the_notification_of_an_own_background_agent_is_the_session_s_own() -> None:
+    # The real records (structure only) of session 659529cf on 17.11. 15:19Z: the CLI took the
+    # notification of a background agent the session launched mid-turn, wrote two records of
+    # the answer, then the attachment without an origin, then the next request. The runner
+    # stopped the session as foreign ("unattributed") before this fix.
+    records = [json.loads(line) for line in OWN_NOTICE.read_text().splitlines()]
+    mapper = TranscriptMapper("prompt-uuid")
+    out = [m for r in records for m in mapper.map(r)]
+    assert mapper.started
+    assert foreign(out) == []
+
+
+def notice(line_uuid: str, **inner: Any) -> dict[str, Any]:
+    attachment = {"type": QUEUED, "source_uuid": line_uuid, "commandMode": "task-notification"}
+    return {"type": "attachment", "isSidechain": False, "attachment": {**attachment, **inner}}
+
+
+OWN_NOTICES = {
+    # The notifications of the session's own work, by the shapes the pinned CLI writes.
+    "background agent (no origin, real)": {},
+    "monitor event (no origin)": {"isMeta": True},
+    "workflow or timer (no origin)": {"isMeta": True, "priority": "later"},
+    "background command": {"origin": {"kind": "task-notification", "producer": "session-task"}},
+    "background command with run id": {
+        "origin": {"kind": "task-notification", "producer": "session-task", "runId": "0mwk-1"},
+        "runId": "0mwk-1",
+    },
+}
+FOREIGN_NOTICES = {
+    "a person typed during the turn": {"commandMode": "prompt"},
+    "another session's line": {"origin": {"kind": "peer", "from": "uds:/x.sock"}},
+    "another session's message": {
+        "origin": {"kind": "task-notification", "subkind": "peer-send-message"}
+    },
+    "a webhook": {"origin": {"kind": "task-notification"}},
+    "an unknown origin": {"origin": {"kind": "unclassified"}},
+}
+
+
+@pytest.mark.parametrize("name", list(OWN_NOTICES))
+def test_every_kind_of_own_notification_is_the_session_s_own(name: str) -> None:
+    mapper = started("mine")
+    out = mapper.map(absorbed("cli-made"))
+    out += mapper.map(ASSISTANT)
+    out += mapper.map(notice("cli-made", **OWN_NOTICES[name]))
+    out += mapper.map(REQUEST)
+    out += mapper.map(TURN_ENDS)
+    assert foreign(out) == []
+
+
+@pytest.mark.parametrize("name", list(FOREIGN_NOTICES))
+def test_another_sender_s_input_stays_foreign(name: str) -> None:
+    mapper = started("mine")
+    out = mapper.map(absorbed("someone"))
+    out += mapper.map(notice("someone", **FOREIGN_NOTICES[name]))
+    out += mapper.map(REQUEST)
+    out += mapper.map(TURN_ENDS)
+    assert foreign(out) != []
 
 
 def test_an_input_taken_during_a_turn_that_nothing_attributes_is_another_sender_s() -> None:
     # A removal under a uuid the runner did not write is the session's own only when the
     # CLI says so in the attachment it writes before the request that carries the input.
     # Without that attachment the input is not proven to be anyone's, so it is foreign at
-    # the next output of the session: before the answer it leads to.
-    for output in (ASSISTANT, TURN_ENDS):
+    # the next request (which carries it) or the end of the turn: before the answer it
+    # leads to. An output before that request cannot answer it (FIX-RUNNER-BG-OWN-NOTICE).
+    for output in (REQUEST, TURN_ENDS):
         mapper = started("mine")
         assert foreign(mapper.map(absorbed("unattributed"))) == []
-        assert mapper.map(output) == [
-            {"type": "system", "subtype": "bg_foreign", "origin": "unattributed"}
-        ]
+        assert mapper.map(output)[0] == {
+            "type": "system",
+            "subtype": "bg_foreign",
+            "origin": "unattributed",
+        }
     # The CLI's attachment for the session's own notification settles it.
     mapper = started("mine")
     mapper.map(absorbed("made-by-the-cli"))
@@ -443,7 +510,8 @@ def test_an_input_taken_during_a_turn_that_nothing_attributes_is_another_sender_
     mapper.map(
         {"type": "attachment", "attachment": {"type": QUEUED, "source_uuid": "unattributed"}}
     )
-    assert foreign(mapper.map(ASSISTANT)) != []
+    assert foreign(mapper.map(ASSISTANT)) == []
+    assert foreign(mapper.map(REQUEST)) != []
     # The runner's own line needs no attachment to count.
     mapper = started("mine")
     mapper.map(absorbed("mine"))

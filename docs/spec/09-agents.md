@@ -3739,7 +3739,9 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
    attachment after it, a `user` record or attachment with any other origin that is not one of
    the session itself, and
    an input a running turn took under a `uuid` the runner did not write that no attachment
-   attributes to the session itself before the session's next output (18.4). At the first such input the runner stops the session (18.6), and the run ends
+   attributes to the session itself before the next request of the session or the end of
+   the turn (18.4; an attachment with `commandMode` `task-notification` and no origin is the
+   session's own notification). At the first such input the runner stops the session (18.6), and the run ends
    `failed` with `runtime_error`, a box note and the cause `background_foreign_input` (log
    event `background_foreign_input` with one of the words `peer`, `human`, `other` or
    `unattributed` for whose input it was, never a text of the record). The record of
