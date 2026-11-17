@@ -10,3 +10,4 @@
   An `organization` run (`background_api_key`), a full context (`background_compaction`) and
   a hosted agent below `host` (`background_restricted`, no inbox socket under `--restricted`)
   end `failed` with their cause.
+- The example configuration and the README name `claude-opus-5-5[1m]` as the model.

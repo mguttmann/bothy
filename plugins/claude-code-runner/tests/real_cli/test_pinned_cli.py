@@ -214,7 +214,7 @@ def test_check_config_reports_the_pinned_cli_ok(
         'server_url = "https://chat.example.com"\n'
         'instance_id = "0192d3a0-0000-7000-8000-0000000000a1"\n'
         f'agent_token_ref = "file:{token}"\n'
-        'default_model = "claude-fable-5-2[1m]"\n'
+        'default_model = "claude-opus-5-5[1m]"\n'
         f'projects_root = "{tmp_path / "projects"}"\n'
         f'state_dir = "{tmp_path / "state"}"\n'
         f'claude_bin = "{_program()}"\n'

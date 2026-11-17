@@ -119,7 +119,7 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
   value as it is, `startRun` and `agent_session.report` get the model name without the suffix,
   because the server's model name (09 2.2) has no `[`.
 - `runner.default_model` and a binding's model must name a model the API serves, such as
-  `claude-fable-5-2[1m]`. The runner does not check the name, and Claude Code passes any value
+  `claude-opus-5-5[1m]`. The runner does not check the name, and Claude Code passes any value
   to the API unchanged. A placeholder such as `model-large` (the value of the example file
   until 2026-11-10) is unknown to the API: without a fallback model the turn fails with "There's
   an issue with the selected model", and with one Claude Code answers the turn with the fallback

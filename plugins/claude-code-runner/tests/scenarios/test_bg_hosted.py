@@ -40,7 +40,7 @@ async def _start(
     world: HostingWorld, tool_class: str, mode: str = "personal", **settings: Any
 ) -> HostedBackend:
     backend = await _hosted(world, tool_class, None)
-    wish = {"tool_class_wish": tool_class, "model": "claude-fable-5-1", **settings}
+    wish = {"tool_class_wish": tool_class, "model": "claude-opus-5-5", **settings}
     definition = _definition(world, backend.agent_id, settings=wish)
     if tool_class == "host":
         definition["mcp_servers"] = []  # an http server with a secret needs no change here

@@ -14,7 +14,7 @@ scoped_allowed_tools = []
 # does not check the name: the API refuses an unknown one, and Claude Code then fails the turn
 # or, with a fallback model in the Claude Code settings the turn loads, answers it with that
 # model without a sign in the thread.
-default_model = "claude-fable-5-2[1m]"
+default_model = "claude-opus-5-5[1m]"
 anthropic_api_key_ref = ""
 allow_personal = false
 forward_ssh_agent = false
