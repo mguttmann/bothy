@@ -75,7 +75,7 @@ sessions".
 | `bgtranscript.py` | The session transcript as the stream of a turn: `TranscriptMapper` maps each record to the stream message of 18.4 that means the same, knows the runner's own lines by their `uuid` and names every other input, and judges every request record by the login beta; `TranscriptReader` tails the file and adds what only the session list knows |
 | `tests/fake_claude/fake_bg.py` | The background side of Fake-Claude: `--bg` prints the launch line and starts a player under a supervisor process; the player writes transcript records and listens on the inbox socket; `agents`, `stop`, `rm` and `daemon status` answer from a state file in the fake configuration folder |
 | `tests/unit/test_bgsession.py`, `test_bgtranscript.py`, `test_bgmode.py`, `tests/scenarios/test_bg_sessions.py`, `test_bg_fallback.py`, `test_bg_adoption.py` | Background mode: the launch and its parsers, the mapping with the class test over every recorded transcript and its print stream, the shared mode with the fallback codes held against the tables of 09 18.9 and of this file, the scenarios of a background turn, every fallback cause, and the adoption by a new runner process |
-| `tests/scenarios/test_bg_inbox_auth.py` | Background mode, what must hold before it is switched on (FIX-RUNNER-BG-INBOX-AUTH): an input the runner did not write stops the session and is never answered, also after an adoption; the login check fails closed; no value of one run's environment reaches the session of another |
+| `tests/scenarios/test_bg_inbox_auth.py` | Background mode, what must hold before it is switched on (FIX-RUNNER-BG-INBOX-AUTH): an input the runner did not write stops the session and is never answered, also after an adoption and also when its record is shaped like a tool result; the login check fails closed; no value of one run's environment reaches the session of another |
 | `tests/real_cli/background.py`, `record_background.py`, `test_background.py`, `tests/fixtures/recording/background_<v>/` | Background sessions of the pinned CLI against the stand-in: the world of a test, the recorder, level one of the real-CLI suite and its recordings |
 | `tests/unit/test_keeper.py`, `test_launch.py`, `test_processstate.py`, `tests/scenarios/test_handover.py`, `test_launch_crash_points.py` | The keeper, the handshake, the replay with the class test over every Fake-Claude stream and checkpoint, AR-T02, AR-T03 and AR-T04 against real runner processes |
 | `tests/hosting_world.py`, `tests/hosting_runner.py` | The scenario world of a hosting runner: the runner's FakeServer with the hosting operations and one FakeServer per hosted agent; the hosting runner as a process of its own, for a scenario that kills it |
@@ -527,12 +527,20 @@ Before you switch it on:
     session takes an input under any other `uuid`, or a person types into it, the runner stops
     the session and the run ends `failed` with the cause `background_foreign_input`. No answer
     to that input and no attachment of it is posted. A runner that adopts a turn after a crash
-    holds the same rule with the lines its turn record names.
+    holds the same rule with the lines its turn record names. Whose input a transcript record
+    is, the runner reads from the record's origin before anything of its content, so a record
+    of a sender never passes as a step of the turn. What a session gives itself (the end of
+    its own background work, a continuation the CLI queues by itself) is a closed list; an
+    input under any other origin counts as another sender's, also one a plugin or a channel
+    of your own Claude Code configuration queues.
   - The settings file of a run sets no `crossSessionInbound`, so the CLI's own rule per message
     applies and a stricter value of your own or of managed settings is not overridden. By
     that rule a `host` session (bypass mode) takes only a message whose sender states that it
     bypasses permission prompts too, and a `chat` or `scoped` session every message whose
-    sender does not state that. The runner's lines for a `host` session state it.
+    sender does not state that. The runner's lines for a `host` session state it. The CLI
+    offers nothing narrower that still lets the runner's lines through: no list of allowed
+    senders, and its exception for a session's own child process exists only without a value
+    and rests on a token every tool call of the session can read.
   - `SendMessage` and `ListAgents` are disallowed, so a session of the runner neither writes
     to another session nor lists one. The same rule takes the messages to the session's own
     subagents.
@@ -1054,7 +1062,9 @@ no login of the developer is touched. The real CLI runs only behind switches:
   `ListAgents`, what a session takes without a value of `crossSessionInbound` (a `host`
   session needs the acceptance of bypass mode, which the test records in its own configuration
   folder), that a line of another sender shows in the transcript like the runner's with
-  another `uuid`, and what a session of a second run sees of the environment of a first run
+  another `uuid` and that a line whose content is no text becomes no record at all, that the
+  token a session gives its own child processes is no narrower way in, and what a session of
+  a second run sees of the environment of a first run
   with the SSH agent. One test gives the CLI a dummy token in the place of the key helper, so
   its request record lists the login beta of 18.3; the token is no credential, the requests go
   to the stand-in, and a proxy on loopback that refuses is the only other way out the CLI has.

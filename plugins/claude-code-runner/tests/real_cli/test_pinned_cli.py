@@ -123,11 +123,14 @@ BACKGROUND_TOKENS = (
     "apiErrorParams",
     "waitingFor",
     # FIX-RUNNER-BG-INBOX-AUTH: whose input a session took (the attachment that names the
-    # origin of what a running turn took in, and the envelope in which a sender states its
-    # class), the two tools that reach other sessions, and the login beta of 18.3 by its
-    # whole name.
+    # origin of what a running turn took in, the second origin under which a session gives
+    # itself an input, and the envelope in which a sender states its class), the two tools
+    # that reach other sessions, the variable of the token a session gives its own child
+    # processes, and the login beta of 18.3 by its whole name.
     "queued_command",
     "source_uuid",
+    "auto-continuation",
+    "CLAUDE_CODE_MESSAGING_TOKEN",
     "cross-session-message",
     "from-mode",
     "SendMessage",

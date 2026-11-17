@@ -5,7 +5,11 @@
   reaches a background session through its inbox socket, which every program of the host user
   can write to. The runner now knows its own lines by their `uuid`: when a session takes any
   other input, or a person types into it, the runner stops the session and the run ends
-  `failed` with the cause `background_foreign_input`, without an answer to that input. The
+  `failed` with the cause `background_foreign_input`, without an answer to that input. Whose
+  input a transcript record is, the runner reads from the record's origin before its content:
+  a record of another sender whose content is shaped like a tool result is not taken for a
+  step of the turn, and an origin that is not known as the session's own counts as another
+  sender's. The
   settings file of a run no longer sets `crossSessionInbound` to `accept`, so Claude Code's own
   rule per message applies and a stricter setting of the host is kept; `SendMessage` and
   `ListAgents` are disallowed in a session of the runner; and the runner prompt no longer tells

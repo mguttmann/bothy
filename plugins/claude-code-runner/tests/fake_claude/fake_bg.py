@@ -463,12 +463,25 @@ class Player:
         for kind in ("session_context", "credential_org"):
             self.record("attachment", attachment={"type": kind, "account": ACCOUNT_CANARY})
 
-    def user(self, text: str, origin: dict[str, Any], ident: str | None = None) -> None:
+    def user(
+        self, text: str, origin: dict[str, Any], ident: str | None = None, *, later: bool = False
+    ) -> None:
+        """A ``user`` record of an input; ``later`` for every input after the launch's prompt.
+
+        With ``bg_input_content`` ``tool_result`` such a later record carries its text as a
+        ``tool_result`` item: an input of a sender whose content is shaped like a step of the
+        turn. Its origin stays what it is. The pinned CLI writes no such record (it takes only
+        a text from the socket, and a tool result has no origin); the scenario holds that the
+        runner's rule does not rest on that.
+        """
         self.turn_open = True
+        content: Any = text
+        if later and self.scenario.get("bg_input_content") == "tool_result":
+            content = [{"type": "tool_result", "tool_use_id": "toolu_shaped", "content": text}]
         self.record(
             "user",
             uuid=ident,
-            message={"role": "user", "content": text},
+            message={"role": "user", "content": content},
             origin=origin,
             promptSource="typed" if origin.get("kind") == "human" else "system",
         )
@@ -788,7 +801,7 @@ class Player:
         self.plain("queue-operation", operation="dequeue")
         self.status("busy")
         origin = {"kind": "peer", "from": "unknown"}
-        self.user(PEER_LEAD + line["text"] + PEER_TAIL, origin, ident=line["uuid"])
+        self.user(PEER_LEAD + line["text"] + PEER_TAIL, origin, ident=line["uuid"], later=True)
         self.gate("followup_gate")
         if self.account_down():
             self.fake.record("account_refused", line=line["uuid"])
@@ -823,7 +836,7 @@ class Player:
         """A person attached to the session and typed: a user message the runner never sent."""
         self.status("busy")
         self.fake.record("bg_typed")
-        self.user("Typed into the session by a person at the host", {"kind": "human"})
+        self.user("Typed into the session by a person at the host", {"kind": "human"}, later=True)
         self.text("Answer to what was typed into the session.")
         self.turn_end()
 

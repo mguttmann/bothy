@@ -136,13 +136,15 @@ Each point is decided by a test of section 7.3.
 | 27 | A sender states its class in the content of the line: the element `<cross-session-message from-mode="bypass">` (or `prompting`), a line break, the text, a line break and the closing tag. Members of the line like `from_mode`, `origin` or `isMeta` are not read; `from` is kept as a claim. The CLI reads the class only from an envelope in the exact form it would write itself, and it rewrites a body that holds the closing tag, which it matches in other letter cases and with look-alike and invisible characters. The model receives the envelope as written | run B, read |
 | 28 | A message the rule of item 26 holds is never delivered. The transcript gets a `system` record `informational` that says so, and from then on the session list shows the session with `status` `waiting` and `waitingFor` `permission prompt`, while its turns go on: the message waits for an approval. A message that a value `hold` of the setting keeps is noted the same way and leaves the status as it is; one that a value `refuse` drops leaves no record. A line that repeats the text of the line before it within a short time is dropped without a record ("drops identical repeats arriving within a short window") | run B, docs |
 | 29 | Every line of the socket becomes an input with `origin.kind` `peer`, whatever the line says about itself. A line taken during a turn is recorded as `queue-operation` `remove` with `absorbed_mid_turn` and `commandUuid`, and as an `attachment` of the type `queued_command` with `source_uuid` and `origin`, written before the request that carries it. The notification of the session's own background command that ends during a turn is recorded the same way, with a `commandUuid` the CLI made and `origin.kind` `task-notification`. The order of the request record and of the `user` record of a line that starts a turn varies between runs | run B |
-| 30 | The exception for a message of the session's own child (docs) holds only without a value of the setting and only for a process that descends from the session process: the CLI reads the ancestry of the connecting process. The token `CLAUDE_CODE_MESSAGING_TOKEN` counts on macOS only when that evidence is missing (the process has ended), never for a living process that is no descendant. The runner is no child of a session | read, docs |
+| 30 | The exception for a message of the session's own child (docs) holds only without a value of the setting and only for a process that descends from the session process: the CLI asks the system which process wrote the line and reads its ancestry. The token `CLAUDE_CODE_MESSAGING_TOKEN`, which every tool call of a session has in its environment, counts on macOS only when that evidence is missing: a line without an envelope that a living process that is no descendant wrote behind the token was held by a `host` session, the same line of a process that had ended when the session looked was taken (its origin then carries `selfSent`, and its kind is `peer` like every line). With a value `hold` of the setting the line with the token was held like the runner's own. The runner is no child of a session | run B, read, docs |
 | 31 | With the class flags of a tool class a session offers `ListAgents` and names `SendMessage` among the tools it can load later; with both in `--disallowedTools` it offers neither, and a search for them by name finds no tool. A session with `--tools ""` has no tool. No other tool of a session addresses or lists other sessions | run B |
 | 32 | A second session under a supervisor sees every variable the launch that started the supervisor had: with the first launch's environment carrying an SSH agent socket and a marker, the session of a second launch without them had both. The `env` block of a session's settings file reaches neither the supervisor nor a later session, and a value of that block goes before an inherited one, also the empty text | run B |
 | 33 | A session whose supervisor has a token in `CLAUDE_CODE_OAUTH_TOKEN` (a dummy, no login) sends its requests to the base URL with the beta `oauth-2025-04-20` in `params.betas`; the `api-request` record has no member that names the credential. With a proxy on loopback that refuses as its only way out, the CLI asked for one host besides the stand-in and the turn ran | run B, read |
 | 34 | The transcript keeps the appended system prompt in clear text (the attachment `prompt_snapshot`) and the text of every line of the socket | run B |
 | 35 | A resume after a stop in the middle of a tool call first writes a `user` record with a `tool_result` for the interrupted call and a synthetic assistant message, then the prompt. A line that was queued in the stopped process and not taken does not come back | run B |
 | 36 | A session without any credential (no stored login, no token, no key helper) still writes an `api-request` record, without the login beta, sends no request and writes the API error record with `error` `authentication_failed` itself | run B |
+| 37 | A `user` record the CLI writes for a tool result carries no `origin`, also the one a resume writes for the interrupted call (item 35); the prompt of a launch carries `origin.kind` `human` and a text as its content. The CLI's file names more kinds of origin than the runs showed. One of them is an input a session gives itself like `task-notification`: `auto-continuation`, under which the CLI queues a continuation by itself (after a usage limit was reset, for one). The others name other senders or parts of the host's configuration, among them `channel`, `coordinator` and `plugin`. No run showed a line of the socket under another kind than `peer` (item 29) | run B, read |
+| 38 | A line of the socket whose content is not a text (a list with a `tool_result` item or with a text item, or no content) is dropped: the transcript gets no record of it. The content of a line that is taken is a text the CLI wraps (item 15) | run B |
 
 ### 2.3 Where the documentation and the runs disagree
 
@@ -186,7 +188,7 @@ never sees or touches sessions of the developer.
 | Continuation | `--resume <id>` with the full flag list of the run | any process of the session is stopped and its entry removed first, then `--resume <id> --bg` with the full flag list (4.3) |
 | State | the process and its stream | `pid`, `status` and `waitingFor` of `claude agents --json --all`, and the transcript; never `state` (4.5) |
 | Live box source | stream messages (18.4) | transcript records (4.6); no task, workflow, progress or retry frames |
-| Follow-up during a turn | one `user` line on stdin; absorbed after the running tool call; echo by `--replay-user-messages` | one line on the session's inbox socket; absorbed after the running tool call; echo by the transcript; the model is told the text comes from another session (4.4); the runner knows its own lines by their `uuid` and stops a session that took any other input (4.14) |
+| Follow-up during a turn | one `user` line on stdin; absorbed after the running tool call; echo by `--replay-user-messages` | one line on the session's inbox socket; absorbed after the running tool call; echo by the transcript; the model is told the text comes from another session (4.4); the runner knows its own lines by their `uuid` and stops a session that took any other input, read from the origin of a record before its content (4.14) |
 | Stop | SIGINT to the group, then SIGTERM, then SIGKILL | `claude stop`, then the same escalation to the session process (4.7) |
 | End of a turn and answer | `result` with the answer text | `system` `turn_duration`; the answer is the text of the turn's last assistant message (4.5) |
 | End of the run | stdin closes and the process exits | the runner stops the session and removes its entry (4.7) |
@@ -380,20 +382,23 @@ and that `uuid`. The checks of 18.5 before the write are unchanged.
 
 The table replaces the stream table of 18.4 for a background turn. Only records of the main
 conversation are read (`isSidechain` false). Every other record type is skipped and counted
-per type in a debug line; no transcript line is copied anywhere (2.2 item 12).
+per type in a debug line; no transcript line is copied anywhere (2.2 item 12). Of a `user`
+record and of a `queued_command` attachment the origin is read first, and it alone says whose
+input the record is; the content is read only afterwards (4.14).
 
 | Record | Fields | Live box and run |
 |---|---|---|
-| `user` with a text content and `origin.kind` `human`, the first after the launch offset | `sessionId` | the run's prompt, the echo of the input the session was launched with; `agent_session.report` with `started = true` once (in the place of `system/init`); every record before it is skipped, because a resume first writes what closes the interrupted turn of the process before |
+| `user` with a text content and `origin.kind` `human`, the first after the launch offset | `sessionId` | the run's prompt, the echo of the input the session was launched with; `agent_session.report` with `started = true` once (in the place of `system/init`); a record before it is skipped when it has no origin or one of the session itself, because a resume first writes what closes the interrupted turn of the process before; any other record with an origin before it is an input of another sender (4.14) |
 | `api-request`, every one | `params.betas` | counter-check of 18.3 (4.3 step 7, 4.15) |
 | `assistant` | `message.id`, `message.model`, `message.content[]` (`text`; `tool_use` with `id`, `name`, `input`), `message.usage` | `/model` from the first one that is not synthetic; `/last_text_excerpt`; one `tool_call` step per `tool_use`; context percent while the window of the model is known; `/cost` as in 18.7, once per `message.id` with its newest usage |
 | `assistant` with `isApiErrorMessage` | `error`, `apiErrorParams` | no work; the class of an account error and its reset time (4.9); the recognised error texts of 18.9 |
-| `user` with `tool_result` items | `tool_use_id`, `is_error` | the step ends `completed` or `failed` |
+| `user` without an origin, with `tool_result` items | `tool_use_id`, `is_error` | the step ends `completed` or `failed`; a record that carries an origin is never read as a tool result (item 37) |
 | `user` with `origin.kind` `peer` | `uuid` | with a `uuid` the runner wrote, seen for the first time: the echo of that line, `absorbed` of its follow-up, its turn starts; with any other: an input of another sender (4.14) |
-| `user` with `origin.kind` `human`, after the run's prompt | none | a person typed into the session: an input of another sender (4.14) |
-| `user` with `origin.kind` `task-notification` | none | a turn the session starts by itself |
+| `user` with `origin.kind` `human` that is not the run's prompt | none | a person typed into the session: an input of another sender, whatever its content (4.14) |
+| `user` with `origin.kind` `task-notification` or `auto-continuation` | none | a turn the session starts by itself |
+| `user` with any other origin | none | an input of another sender (4.14) |
 | `queue-operation` | `operation`, `reason`, `commandUuid` | `enqueue` and `dequeue` stand in for `command_lifecycle` `queued` and `started` (18.5), matched in their order because they carry no id, and `dequeue` starts a turn; `remove` with `absorbed_mid_turn` and a `commandUuid` the runner wrote sets `absorbed`, a second one under it is an input of another sender; under any other `uuid` it decides nothing (item 29) |
-| `attachment` of the type `queued_command` | `attachment.origin.kind`, `attachment.source_uuid` | what a running turn took in: with `peer` and a `uuid` the runner did not write, or with `human`, an input of another sender (4.14); no other attachment is read |
+| `attachment` of the type `queued_command` | `attachment.origin.kind`, `attachment.source_uuid` | what a running turn took in: with `peer` and a `uuid` the runner did not write, or with any other origin that is not one of the session itself (`task-notification`, `auto-continuation`), an input of another sender (4.14); no other attachment is read |
 | `system` `turn_duration` | none | end of the turn, answer, account wait (4.5, 4.9) |
 | `cost-state`, the last after the process ended | `modelUsage` | costs of the run (4.8) |
 
@@ -572,7 +577,7 @@ line of the inbox socket; the outputs of `stop`, `rm` and `daemon status`.
   unit and scenario test uses it.
 - **Real CLI, level one** (free, behind `CLAUDE_CODE_RUNNER_REAL_CLI=1`):
   `tests/real_cli/test_background.py` runs the mechanics of items 1 to 6, 13, 14, 16 to 18, 20,
-  25 to 29 and 31 to 34 against the stand-in and compares the field table with a fresh run;
+  25 to 34, 36 and 38 against the stand-in and compares the field table with a fresh run;
   `test_pinned_cli.py` holds the names the mode relies on in the CLI's file.
 - **Real CLI, level two** (a real turn, the owner's decision as today): one short background
   turn on the login that checks the `entrypoint` of item 12 and the beta of item 23
@@ -628,11 +633,15 @@ enforces:
    the turn record, before the write, and each counts once. An input of another sender is a
    `user` record or a `queued_command` attachment with `origin.kind` `peer` whose `uuid` the
    runner did not write or has seen taken before, such a record before the session took its
-   prompt, a `user` record or attachment with `origin.kind` `human` after the run's prompt,
+   prompt, a `user` record with `origin.kind` `human` that is not the run's prompt or such an
+   attachment after it, a `user` record or attachment with any other origin that is not one of
+   the session itself,
    and an input a running turn took under a `uuid` the runner did not write that no
    attachment attributes to the session itself before the session's next output. At the
    first one the runner stops the session and ends the run `failed` with
-   `runtime_error` and the cause `background_foreign_input`. The record lies before the answer
+   `runtime_error` and the cause `background_foreign_input` (the log event of that name
+   carries one of four words for whose input it was, `peer`, `human`, `other` or
+   `unattributed`, never a text of the record). The record lies before the answer
    of the turn that took the input, and the runner reads no further, so that answer and its
    attachments are never posted. An adopter applies the rule with the lines the record names
    (D-BG-11), also over the part of the transcript the previous runner read; a record that
@@ -641,26 +650,48 @@ enforces:
      background work from its queue the same way, under a `uuid` it made (item 29). So a
      removal under a `uuid` the runner did not write leaves the input open, and the
      attachment, which names the origin and is written before the request that carries the
-     input, settles it: `peer` or `human` is another sender, any other origin the session
-     itself. An input nothing settled before the session's next output counts as another
-     sender's, so the rule does not rest on the attachment being there.
+     input, settles it: an origin of the session itself (below) makes it the session's own,
+     every other origin another sender's. An input nothing settled before the session's next
+     output counts as another sender's, so the rule does not rest on the attachment being
+     there.
    - Why `human`: a person, or a program that drives `claude attach`, can type into a session
      of the runner, and the answer to it would be posted into the thread as the agent's.
    - Why the `uuid` counts once: a program that read a line of the runner in the transcript
      could write a second line under the same `uuid`.
-   - What it does not decide: inputs the session gives itself (`task-notification`: the end
-     of its own background work, a message of its own subagent) and the inputs of the host
-     user's own configuration (hooks, plugins), which the session loads like any session of
-     that user (item 24).
+   - Why the origin is judged before the content: the first version of this change read the
+     `tool_result` items of a `user` record before it looked at the record's origin, so a
+     record of a line or of a person whose content was shaped like a tool result passed as a
+     step of the turn and never reached the rule (found by the review of that version). The
+     origin is now read in one place, first and alone, by the mapper, by the reader that
+     asks whether the next turn has started, and by the check whether a launch took its
+     prompt; an adopter maps with the same code. Only a record without an origin is a tool
+     result, which is how the pinned CLI writes every one (item 37). The same holds before
+     the prompt: a record of a person there is the prompt only when its content is a text.
+   - Why the session's own origins are a closed list: the first version of this change took
+     every origin but `peer` and `human` for the session's own, so a kind the mapper did not
+     know passed. What is not proven to be the runner's or the session's own is another
+     sender's. The list holds `task-notification` (the end of the session's own background
+     work, a message of its own subagent; run) and `auto-continuation` (a continuation the CLI
+     queues by itself; read, item 37). Every other kind ends the run, also one a later
+     version adds; the mode runs only on the pin.
+   - What it does not decide: the inputs a session gets without a record of its own, which
+     are those of the host user's own configuration (hooks, instruction files), loaded like
+     in any session of that user (item 24). A part of that configuration that queues an
+     input under an origin of its own (a plugin, a channel) counts as another sender and ends
+     the run.
 2. **The settings file sets no `crossSessionInbound`** (the narrowest the CLI offers). The
    CLI has three values and a rule per message for a session without one (item 26); it has no
    list of allowed senders. Tried against the pinned CLI:
    - `"hold"` and `"refuse"` stop the runner's own lines too.
    - Delivery as the session's own child, with the token of the documentation: the exception
      holds only for a process that descends from the session process, and the token counts
-     only where that evidence is missing (item 30). The runner is no child of a session, and
-     a process that outlives its write is never taken for one. Refused: it would need a
-     helper inside every session that stays its child.
+     only where that evidence is missing (item 30, run). The runner is no child of a session,
+     and a process that outlives its write is never taken for one. It is also no narrower
+     way in: the exception exists only without a value of the setting, so it cannot be
+     paired with `"hold"` or `"refuse"` for everybody else, and the token is in the
+     environment of every tool call of the session, where a program of the host user reads
+     it. Refused: it would need a helper inside every session that stays its child, and
+     would keep out nobody.
    - No value: a `chat` or `scoped` session takes the runner's plain line, and a `host`
      session takes it when it stands in the envelope that states the class `bypass` (items 26
      and 27). Chosen. The runner states `bypass` only for a run of class `host`, whose person
@@ -959,18 +990,21 @@ change; this list names each such place.
 
 The automated review of the build on 2026-11-16 found three ways in which a background turn
 could act for the wrong party; each was confirmed at the code and, where it concerns the CLI,
-run against the pinned version with the method of 2.4 (items 26 to 35). The mode was not
-switched on anywhere in between.
+run against the pinned version with the method of 2.4 (items 26 to 36). The review of the first
+version of this change found a fourth, in the new rule itself (the last row; reproduced by a
+test before it was fixed). The mode was not switched on anywhere in between.
 
 | Finding | First build | Now | Where |
 |---|---|---|---|
 | An input of another sender is taken for the runner's | `crossSessionInbound` `"accept"`; the prompt tells the model to follow a line with the runner's lead-in; no check of the `uuid` of an echo | the runner stops a session that took an input it did not write; no inbound setting; `SendMessage` and `ListAgents` disallowed; the prompt names no sign to trust | 4.14 |
 | The counter-check is open when it finds nothing | the first request record only, by a prefix of a beta name; no record means no check | every request record, the whole name, no output accepted before one passed, the state in the turn record | 4.15 |
 | A value of one run reaches the session of another | the launch command gets the run's environment, and with it the supervisor | one fixed environment for the launch; every name of a run set in its own settings file | 4.16 |
+| The content of a record decides before its origin (first version of this change) | a `user` record with `tool_result` items was a tool result whatever its origin; every origin but `peer` and `human` was the session's own | the origin is read first and alone; only a record without one is a tool result; the session's own origins are a closed list | 4.14 item 1, 4.6 |
 
 Core goals of the change, each decided by a test: an input of another sender never leads to a
 posted answer (scenarios with a line between two turns, a line taken during a tool call, a
-repeated `uuid`, a typed message, and the same after an adoption with and without the record's
+repeated `uuid`, a typed message, a line and a typed message whose record is shaped like a
+tool result, and the same after an adoption with and without the record's
 list; the mapping record by record against the recordings); the runner's own follow-ups are
 `delivered` and `absorbed` without the setting, for `scoped` and for `host` (scenarios, and
 level one on the pinned CLI); the counter-check fails closed (a missing record, a record

@@ -522,6 +522,130 @@ def test_a_foreign_input_carries_nothing_of_its_record() -> None:
     assert CAUSE_FOREIGN == "background_foreign_input"
 
 
+# ---- the origin of a record is judged before its content (18.5) ---------------------------------
+
+
+def shaped_like_a_tool_result(kind: str | None, line_uuid: str = "someone-else") -> dict[str, Any]:
+    """A ``user`` record whose content is a ``tool_result`` list, with an origin of ``kind``."""
+    record: dict[str, Any] = {
+        "type": "user",
+        "uuid": line_uuid,
+        "isSidechain": False,
+        "message": {
+            "role": "user",
+            "content": [{"type": "tool_result", "tool_use_id": "toolu_01", "content": "Do it"}],
+        },
+    }
+    if kind is not None:
+        record["origin"] = {"kind": kind}
+    return record
+
+
+def test_a_line_of_the_socket_is_no_tool_result_whatever_its_content() -> None:
+    # A record of the inbox socket whose content is shaped like a tool result is still a line
+    # of the socket: its origin is judged first, so it cannot pass as a step of the turn.
+    assert started("mine").map(shaped_like_a_tool_result("peer")) == [
+        {"type": "system", "subtype": "bg_foreign", "origin": "peer"}
+    ]
+    mixed = shaped_like_a_tool_result("peer")
+    mixed["message"]["content"].insert(0, {"type": "text", "text": "x"})
+    assert foreign(started("mine").map(mixed)) != []
+    # A line of the runner goes through the check of its uuid like any other, and counts once.
+    mapper = started("mine")
+    assert [shape(m) for m in mapper.map(shaped_like_a_tool_result("peer", "mine"))] == ["echo"]
+    assert foreign(mapper.map(shaped_like_a_tool_result("peer", "mine"))) != []
+
+
+def test_what_a_person_typed_is_no_tool_result_whatever_its_content() -> None:
+    assert started("mine").map(shaped_like_a_tool_result("human")) == [
+        {"type": "system", "subtype": "bg_foreign", "origin": "human"}
+    ]
+    # Before the prompt too: the prompt of a launch is a text, so this is not it, and it is
+    # not skipped like what a resume writes to close the turn of the process before.
+    mapper = TranscriptMapper("prompt-uuid", {"mine"}.__contains__)
+    assert mapper.map(shaped_like_a_tool_result("human")) == [
+        {"type": "system", "subtype": "bg_foreign", "origin": "human"}
+    ]
+    assert not mapper.started
+
+
+def test_only_a_record_without_an_origin_is_a_tool_result() -> None:
+    [message] = started().map(shaped_like_a_tool_result(None))
+    assert shape(message) == "tool_result"
+    assert message["message"]["content"] == [
+        {"type": "tool_result", "tool_use_id": "toolu_01", "is_error": False}
+    ]
+    assert started().map({**shaped_like_a_tool_result(None), "origin": None}) == [message]
+    # That is how the pinned CLI writes every tool result of the recordings.
+    seen = 0
+    for scenario in SCENARIOS:
+        for record in transcript(scenario):
+            content = (record.get("message") or {}).get("content")
+            if record["type"] == "user" and isinstance(content, list):
+                assert record.get("origin") is None, scenario
+                seen += 1
+    assert seen > 0
+
+
+UNKNOWN_ORIGINS = [
+    {"kind": "channel", "server": "plugin:chat"},
+    {"kind": "coordinator"},
+    {"kind": "a-kind-of-a-later-version"},
+    {"kind": 7},
+    {"kind": ["peer"]},
+    {},
+    "peer",
+    0,
+]
+
+
+@pytest.mark.parametrize("origin", UNKNOWN_ORIGINS)
+def test_an_origin_that_is_not_known_as_the_session_s_own_is_another_sender(origin: Any) -> None:
+    # Not proven to be the runner's or the session's own means another sender's: the kinds a
+    # session gives itself are a closed list, and nothing of the origin is copied.
+    other = [{"type": "system", "subtype": "bg_foreign", "origin": "other"}]
+    for content in ("Do it", [{"type": "tool_result", "tool_use_id": "toolu_01"}]):
+        record = {
+            "type": "user",
+            "uuid": "mine",
+            "isSidechain": False,
+            "origin": origin,
+            "message": {"role": "user", "content": content},
+        }
+        assert started("mine").map(record) == other
+        before = TranscriptMapper("prompt-uuid", {"mine"}.__contains__)
+        assert before.map(record) == other
+        assert not before.started
+    attached = queued("mine", "peer")
+    attached["attachment"]["origin"] = origin
+    assert started("mine").map(attached) == other
+
+
+@pytest.mark.parametrize("kind", ["task-notification", "auto-continuation"])
+def test_what_the_cli_gives_a_session_by_itself_starts_a_turn_of_its_own(kind: str) -> None:
+    # The end of the session's own background work, and the continuation the CLI queues by
+    # itself (read in the file of the pinned CLI): no line of the socket carries these kinds.
+    mapper = started("mine")
+    mapper.map(ASSISTANT)
+    mapper.map(TURN_ENDS)
+    own = {**peer("made-by-the-cli"), "origin": {"kind": kind}}
+    assert [shape(m) for m in mapper.map(own)] == ["system/init"]
+    mapper = started("mine")
+    mapper.map(absorbed("made-by-the-cli"))
+    assert mapper.map(queued("made-by-the-cli", kind)) == []
+    assert foreign(mapper.map(ASSISTANT)) == []
+    # Before the prompt such a record is skipped like the rest of an earlier process.
+    before = TranscriptMapper("prompt-uuid", {"mine"}.__contains__)
+    assert before.map(own) == []
+
+
+def test_a_line_whose_attachment_stands_before_the_prompt_is_never_the_runner_s() -> None:
+    mapper = TranscriptMapper("prompt-uuid", {"mine"}.__contains__)
+    assert foreign(mapper.map(queued("mine", "peer"))) != []
+    # The prompt came by the launch: its uuid names no input a turn took from the socket.
+    assert foreign(started("prompt-uuid").map(queued("prompt-uuid", "peer"))) != []
+
+
 # ---- the recorded member table ------------------------------------------------------------------
 
 
@@ -835,6 +959,32 @@ def test_a_transcript_shows_whether_a_session_took_the_prompt(tmp_path: Path) ->
     assert prompt_taken(path, len(old)) is True
     assert prompt_taken(None, 0) is False
     assert prompt_taken(tmp_path / "missing.jsonl", 0) is False
+
+
+def test_an_input_of_a_person_shows_a_taken_prompt_whatever_its_content(tmp_path: Path) -> None:
+    # The reader that decides whether a launch started judges the origin alone, like the
+    # mapper: a session that took any input of a person never gets the prompt a second time
+    # in print mode, and the mapper then says whose input it was.
+    path = tmp_path / "session.jsonl"
+    path.write_bytes(piece(shaped_like_a_tool_result("human")))
+    assert prompt_taken(path, 0) is True
+    path.write_bytes(piece(shaped_like_a_tool_result(None), shaped_like_a_tool_result("peer")))
+    assert prompt_taken(path, 0) is False
+    path.write_bytes(piece({**PROMPT, "isSidechain": True}))
+    assert prompt_taken(path, 0) is False
+
+
+async def test_only_a_record_of_the_main_conversation_starts_the_next_turn(tmp_path: Path) -> None:
+    # Busy after a turn end is background work unless the next turn has started. The reader
+    # asks that of the same records the mapper reads: a record of a subagent starts no turn.
+    sessions = Sessions(after_turn=["busy", "idle"])
+    inside = record("user", origin={"kind": "human"}, message={"content": "x"})
+    inside["isSidechain"] = True
+    messages, _ = await read_through(tmp_path, [piece(PROMPT, ANSWER, TURN_END, inside)], sessions)
+    shapes = [shape(m) for m in messages]
+    # The running task is reported before the result, as for any background work.
+    assert shapes.index("system/background_tasks_changed") < shapes.index("result")
+    assert foreign(messages) == []
 
 
 def test_an_adopter_maps_the_records_before_the_offset_again(tmp_path: Path) -> None:

@@ -3536,20 +3536,23 @@ log line or a request (the records `session-owner` and the attachments `session_
 prefix `bothy-`) and never `state`, which a model request writes at each turn end and which was
 wrong or stuck in several runs. The transcript format is internal to Claude Code; the members
 the runner reads are held by `transcript_fields.json` of the recording and a level-one test of
-the real-CLI suite.
+the real-CLI suite. Of a `user` record and of a `queued_command` attachment the runner reads
+the origin first, and the origin alone says whose input the record is (18.5 "Whose input");
+the content is read only afterwards.
 
 | Record | Fields | Live box and run |
 |---|---|---|
-| `user` with a text content and `origin.kind` `human`, the first after the launch offset | `sessionId` | the run's prompt: `agent_session.report` with `started = true` once, in the place of `system/init`; every record before it is skipped (a resume first writes what closes the interrupted turn of the process before) |
+| `user` with a text content and `origin.kind` `human`, the first after the launch offset | `sessionId` | the run's prompt: `agent_session.report` with `started = true` once, in the place of `system/init`; a record before it is skipped when it has no origin or one of the session itself (a resume first writes what closes the interrupted turn of the process before); any other record with an origin before it is an input of another sender (18.5 "Whose input") |
 | `api-request`, every one | `params.betas` | the counter-check of 18.3 |
 | `assistant` | `message.id`, `message.model`, `message.content[]` (`text`; `tool_use` with `id`, `name`, `input`), `message.usage` | `/model` from the first one that is not synthetic; `/last_text_excerpt`; one `tool_call` step per `tool_use`; context percent while the window of the model is known; `/cost` as in 18.7, once per `message.id` with its newest usage |
 | `assistant` with `isApiErrorMessage` | `error`, `apiErrorParams` | no work; the class of an account error and its reset time (18.9); the recognised error texts of 18.9 |
-| `user` with `tool_result` items | `tool_use_id`, `is_error` | the step ends `completed` or `failed` |
+| `user` without an origin, with `tool_result` items | `tool_use_id`, `is_error` | the step ends `completed` or `failed`; a record that carries an origin is never read as a tool result |
 | `user` with `origin.kind` `peer` | `uuid` | a line of the inbox socket that started a turn. With a `uuid` the runner wrote, seen for the first time: its echo, the follow-up is `absorbed` (18.5). With any other `uuid`: an input of another sender (18.5 "Whose input") |
-| `user` with `origin.kind` `human`, after the run's prompt | none | a person typed into the session: an input of another sender (18.5 "Whose input") |
-| `user` with `origin.kind` `task-notification` | none | a turn the session starts by itself |
+| `user` with `origin.kind` `human` that is not the run's prompt | none | a person typed into the session: an input of another sender, whatever its content (18.5 "Whose input") |
+| `user` with `origin.kind` `task-notification` or `auto-continuation` | none | a turn the session starts by itself |
+| `user` with any other origin | none | an input of another sender (18.5 "Whose input") |
 | `queue-operation` | `operation`, `reason`, `commandUuid` | `enqueue` and `dequeue` stand in for `command_lifecycle` `queued` and `started` (18.5), matched in their order, and `dequeue` starts a turn; `remove` with `absorbed_mid_turn` and a `commandUuid` the runner wrote is the echo of that line, a second one under the same `commandUuid` an input of another sender. The CLI removes the notification of the session's own background work the same way, under a `uuid` it made itself, so a removal under any other `uuid` leaves the input open until its attachment (next row) says whose it is |
-| `attachment` of the type `queued_command` | `attachment.origin.kind`, `attachment.source_uuid` | what a running turn took in, written before the request that carries it: with `origin.kind` `peer` and a `source_uuid` the runner did not write (or wrote and saw before), or with `origin.kind` `human`, an input of another sender (18.5 "Whose input"); with any other origin (`task-notification`: the session's own work) the input of that `source_uuid` is the session's own. An input that is still open at the next `assistant` record or turn end is an input of another sender too. No other attachment is read |
+| `attachment` of the type `queued_command` | `attachment.origin.kind`, `attachment.source_uuid` | what a running turn took in, written before the request that carries it: with `origin.kind` `peer` and a `source_uuid` the runner did not write (or wrote and saw before), or with any other origin that is not one of the session itself, an input of another sender (18.5 "Whose input"); with an origin of the session itself (`task-notification`, `auto-continuation`) the input of that `source_uuid` is the session's own. An input that is still open at the next `assistant` record or turn end is an input of another sender too. No other attachment is read |
 | `system` `turn_duration` | none | the end of the turn: the answer is the text of the turn's last assistant message; a turn whose last assistant record is an API error has none and ends like a `result` with an error |
 | `cost-state`, written when the session process ends | `modelUsage` | the session's totals (18.7) |
 
@@ -3732,18 +3735,34 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
    record, before the write, and each `uuid` counts once. An input of another sender is: a
    `user` record or a `queued_command` attachment with `origin.kind` `peer` whose `uuid` the
    runner did not write or has already seen taken, such a record before the session took its
-   prompt, a `user` record or attachment with `origin.kind` `human` after the run's prompt, and
+   prompt, a `user` record with `origin.kind` `human` that is not the run's prompt or such an
+   attachment after it, a `user` record or attachment with any other origin that is not one of
+   the session itself, and
    an input a running turn took under a `uuid` the runner did not write that no attachment
    attributes to the session itself before the session's next output (18.4). At the first such input the runner stops the session (18.6), and the run ends
    `failed` with `runtime_error`, a box note and the cause `background_foreign_input` (log
-   event `background_foreign_input` with the kind of the origin, never a text). The record of
+   event `background_foreign_input` with one of the words `peer`, `human`, `other` or
+   `unattributed` for whose input it was, never a text of the record). The record of
    the input lies before the answer of the turn that took it, and the runner reads no further:
    neither that answer nor an attachment of it is posted. Answers of earlier turns of the run
    stay. A runner that adopts the turn applies the same rule with the lines the turn record
    names, over the part of the transcript the previous runner read and over the rest; a record
    that names no line proves none, so every line then counts as another sender's (18.9). What
-   a session gives itself (`task-notification`: the end of its own background work, a message
-   of its own subagent) is no such input.
+   a session gives itself is no such input, and its origins are a closed list:
+   `task-notification` (the end of its own background work, a message of its own subagent) and
+   `auto-continuation` (a continuation the CLI queues by itself; read in the file of the pinned
+   CLI). An origin of any other kind, also one a later version adds or one that cannot be
+   read, is another sender's.
+
+   Whose input a record is, is read from its origin before anything of its content, in the
+   mapping of 18.4, in the check whether a launch took its prompt (18.9) and in the question
+   whether the next turn has started. A `user` record is a tool result only when it carries
+   no origin, which is how the pinned CLI writes every tool result; a record of a line or of
+   a person whose content is shaped like a tool result is an input of that sender all the
+   same. A record of a person before the run's prompt is the prompt only when its content is
+   a text. (Addendum of 2026-11-17: the first version of this rule read the `tool_result`
+   items of a record before its origin and took every origin but `peer` and `human` for the
+   session's own; the review of that version found both.)
 2. **The settings file widens nothing.** It sets no `crossSessionInbound`, so the CLI's own
    rule per message stays and a stricter value of the host user's or of managed settings is
    not overridden. That rule, run with the pinned CLI: a session that bypasses permission
@@ -3759,7 +3778,11 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
    it. A message this rule holds is never delivered; the session list then shows the session
    as waiting for a permission prompt, and the runner stops it as a session that waits for a
    person (below). A value `hold` or `refuse` of the host's own settings keeps or drops a
-   message without that, the runner's own lines included.
+   message without that, the runner's own lines included. The CLI offers nothing narrower
+   that lets the runner's lines through: it has no list of allowed senders, and its exception
+   for a message of a session's own child process (a token the session gives its tool calls)
+   exists only without a value, holds a living process that is no child, and rests on a token
+   every tool call of the session can read (run with the pinned CLI).
 3. **A session of the runner reaches no other session.** `SendMessage` and `ListAgents` are
    disallowed (18.2).
 
