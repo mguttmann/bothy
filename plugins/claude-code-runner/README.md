@@ -545,8 +545,8 @@ Before you switch it on:
     marks with the producer `session-task`, and a continuation the CLI queues by itself. A
     file `<runner.state_dir>/sessions/<session id>/foreign-input` of the earlier rule has no
     effect and goes with the retention sweep.
-  - The settings file of a run sets no `crossSessionInbound` while your own Claude Code
-    settings have none, so the CLI's own rule per message applies. By that rule a `host` session (bypass mode) takes only a message whose sender states that it
+  - The settings file of a run sets no `crossSessionInbound` unless your own Claude Code
+    settings say `hold` (below), so the CLI's own rule per message applies. By that rule a `host` session (bypass mode) takes only a message whose sender states that it
     bypasses permission prompts too, and a `chat` or `scoped` session every message whose
     sender does not state that. The runner's lines for a `host` session state it. The CLI
     offers nothing narrower that still lets the runner's lines through: no list of allowed
@@ -568,10 +568,12 @@ Before you switch it on:
   Any value there switches the CLI's rule per message off for every session, and `hold` or
   `refuse` would keep the runner's own follow-ups out of the session too (the server then
   defers each into runs of their own and the same message is answered again). So when your
-  settings have a value, the settings file of every run sets `accept`, which goes before
-  yours: a runner session then takes every message, the runner logs each one it did not write,
-  and the model acts on it with the rights of the tool class. Your other sessions keep your
-  value. A value `hold` or `refuse` of managed settings still holds the runner's lines.
+  settings say `hold`, the settings file of every run sets `accept`, which goes before yours:
+  a runner session then takes every message, the runner logs each one it did not write, and
+  the model acts on it with the rights of the tool class. A `refuse` of yours is taken as a
+  deliberate choice and never overridden: the runner's follow-ups are then refused as well
+  and each waits for a run of its own. Your other sessions keep your value. A value `hold` or
+  `refuse` of managed settings still holds the runner's lines.
 - **The SSH agent.** With `runner.forward_ssh_agent` a turn gets the agent socket through the
   settings file of its run. The supervisor is started from the runner's fixed environment,
   which never carries the socket, and every settings file sets `SSH_AUTH_SOCK`, to the empty

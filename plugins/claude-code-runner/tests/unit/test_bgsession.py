@@ -225,10 +225,7 @@ def test_the_settings_file_never_widens_what_the_session_takes_from_other_sessio
     assert "crossSessionInbound" not in settings_document({"CLAUDE_CONFIG_DIR": str(config)})
 
 
-@pytest.mark.parametrize("value", ["hold", "refuse", "accept", "sometimes"])
-def test_a_value_of_the_host_user_s_settings_is_replaced_by_accept(
-    tmp_path: Path, value: str
-) -> None:
+def test_a_hold_of_the_host_user_s_settings_is_replaced_by_accept(tmp_path: Path) -> None:
     # The owner's host on 2026-11-17: the host user's own settings held "crossSessionInbound":
     # "hold", so the session held every follow-up of the runner ("Held peer message ... Your
     # "crossSessionInbound" setting is "hold"") and the server deferred each into runs of
@@ -238,7 +235,7 @@ def test_a_value_of_the_host_user_s_settings_is_replaced_by_accept(
     home = tmp_path / "home"
     (home / ".claude").mkdir(parents=True)
     (home / ".claude" / "settings.json").write_text(
-        json.dumps({"crossSessionInbound": value}), "utf-8"
+        json.dumps({"crossSessionInbound": "hold"}), "utf-8"
     )
     document = settings_document({"HOME": str(home), "TMPDIR": "/t"})
     assert document["crossSessionInbound"] == "accept"
@@ -252,6 +249,23 @@ def test_a_value_of_the_host_user_s_settings_is_replaced_by_accept(
     hosted = settings_document({"HOME": str(home)}, {"permissions": {"deny": ["X"]}})
     assert hosted["crossSessionInbound"] == "accept"
     assert hosted["permissions"] == {"deny": ["X"]}
+
+
+@pytest.mark.parametrize("value", ["refuse", "accept", "sometimes"])
+def test_any_other_value_of_the_host_user_s_settings_stays_in_force(
+    tmp_path: Path, value: str
+) -> None:
+    # Only "hold" is lifted. A "refuse" is the operator's deliberate choice to take nothing
+    # from other sessions and is never overridden; "accept" lets the runner's lines through
+    # already; a value the CLI does not know is left as it is.
+    home = tmp_path / "home"
+    (home / ".claude").mkdir(parents=True)
+    (home / ".claude" / "settings.json").write_text(
+        json.dumps({"crossSessionInbound": value}), "utf-8"
+    )
+    for base in (None, {"permissions": {"deny": ["X"]}}):
+        document = settings_document({"HOME": str(home), "TMPDIR": "/t"}, base)
+        assert "crossSessionInbound" not in document
 
 
 def test_every_name_of_the_run_s_environment_is_set_in_every_settings_file() -> None:

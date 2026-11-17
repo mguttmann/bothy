@@ -921,6 +921,36 @@ async def test_a_hold_in_the_host_user_s_settings_does_not_keep_the_runner_s_fol
     await nothing_left(world)
 
 
+async def test_a_refuse_in_the_host_user_s_settings_is_never_overridden(bg_world: World) -> None:
+    # Only a "hold" of the host user's settings is lifted (FIX-RUNNER-BG-HELD-FOLLOWUP). A
+    # "refuse" is the operator's deliberate choice to take nothing from other sessions: the
+    # run's settings file sets no value, the CLI refuses the runner's line too, and the
+    # follow-up is never taken by the turn.
+    world = bg_world
+    claude_home = world.home / ".claude"
+    claude_home.mkdir(parents=True, exist_ok=True)
+    (claude_home / "settings.json").write_text(
+        json.dumps({"crossSessionInbound": "refuse"}), "utf-8"
+    )
+    gate = world.gate("turn_gate")
+    world.scenario(fixture="happy", turn_gate=str(gate), gate_after_lines=1)
+    await start(world)
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    message_id = await world.fake.deliver_followup(run.run_id, "Also the footer", author="sam")
+    await world.until(lambda: world.fake.followup_state(run.run_id, message_id) == "delivered")
+    await world.until(lambda: len(world.calls("bg_socket")) == 1)
+    [line] = world.calls("bg_socket")
+    assert line["verdict"] == "refuse"
+    [launch] = launches(world)
+    assert "crossSessionInbound" not in launch["settings"]
+    world.release(gate)
+    assert await world.ended(run.run_id) == "completed"
+    assert "absorbed" not in followup_states(world, message_id)
+    assert texts(world) == [ANSWER]
+    await nothing_left(world)
+
+
 async def test_a_host_session_holds_a_line_that_states_no_class_and_the_run_ends(
     bg_world: World,
 ) -> None:

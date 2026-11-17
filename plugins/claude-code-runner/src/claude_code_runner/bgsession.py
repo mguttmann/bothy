@@ -19,10 +19,11 @@ pure function a test holds against a recording of the pinned version:
   class (`sender_class`).
 
 What a session takes from the other Claude Code sessions of the host user is widened only as far
-as the runner's own lines need: the settings file of a run sets no ``crossSessionInbound`` while
-the host user's own settings have none, so the CLI's own rule per message stays, and ``accept``
-when they have one, which would otherwise hold the runner's follow-ups too
-(`host_inbound_value`, FIX-RUNNER-BG-HELD-FOLLOWUP). The tools found in the pinned CLI that
+as the runner's own lines need: the settings file of a run sets ``crossSessionInbound``
+``accept`` only when the host user's own settings say ``hold``, which would otherwise hold the
+runner's follow-ups too (`host_inbound_value`, FIX-RUNNER-BG-HELD-FOLLOWUP), and none otherwise,
+so the CLI's own rule per message or any other value of the host stays; a ``refuse`` there is
+never overridden. The tools found in the pinned CLI that
 write to or list other sessions are disallowed (`DENIED_TOOLS`). Neither authenticates a
 sender: the runner decides by the ``uuid`` of every input the transcript shows
 (`claude_code_runner.bgtranscript`, 09 18.5).
@@ -319,15 +320,18 @@ def settings_document(
     CLI). So a run that must not have the SSH agent gets an empty ``SSH_AUTH_SOCK`` whatever
     the supervisor carries.
 
-    The document sets ``crossSessionInbound`` only when the host user's own settings give it a
-    value (`host_inbound_value`), and then to ``accept``. Without any value the CLI decides per
+    The document sets ``crossSessionInbound`` ``accept`` only when the host user's own
+    settings say ``hold`` (`host_inbound_value`). Without any value the CLI decides per
     message by the permission classes of both sessions, which lets the runner's lines through
     (18.5). A value of the user's settings switches that rule off for every message: ``hold``
-    or ``refuse`` there kept every follow-up of the runner out of the session, and the server
-    deferred each into runs of their own, where the same message was answered again (the
-    owner's host on 2026-11-17, FIX-RUNNER-BG-HELD-FOLLOWUP). A value of ``--settings`` goes
-    before one of the user's settings, and only ``accept`` lets the runner's lines through; a
-    value of managed settings stays in force.
+    there kept every follow-up of the runner out of the session, and the server deferred each
+    into runs of their own, where the same message was answered again (the owner's host on
+    2026-11-17, FIX-RUNNER-BG-HELD-FOLLOWUP). A value of ``--settings`` goes before one of the
+    user's settings, and only ``accept`` lets the runner's lines through. Any other value of
+    the user's stays in force: ``refuse`` is the operator's deliberate choice to take nothing
+    from other sessions and is never overridden (a follow-up then waits for a run of its
+    own), ``accept`` already lets the lines through, and a value the CLI does not know is left
+    as it is. A value of managed settings stays in force too.
 
     A hosted turn gives the settings of 26 5.4 as ``base``; the document is then those
     settings with the two members added (they carry no ``env`` and no ``worktree``).
@@ -347,7 +351,7 @@ def settings_document(
         "SSH_AUTH_SOCK": env.get("SSH_AUTH_SOCK", ""),
     }
     document = {**(base or {}), "worktree": {"bgIsolation": "none"}, "env": session_env}
-    if host_inbound_value(env) is not None:
+    if host_inbound_value(env) == "hold":
         document[INBOUND_SETTING] = "accept"
     return document
 
@@ -357,8 +361,7 @@ def host_inbound_value(env: Mapping[str, str]) -> object | None:
 
     The file is ``settings.json`` in the CLI's configuration folder of the turn
     (``CLAUDE_CONFIG_DIR``, else ``$HOME/.claude``). A ``null`` is no value, as for the CLI,
-    which drops such a member; a value it does not know counts, because the CLI holds every
-    message while it is present. A file that cannot be read or is no JSON object gives none.
+    which drops such a member. A file that cannot be read or is no JSON object gives none.
 
     Args:
         env: The environment of the turn.

@@ -452,7 +452,9 @@ async def test_a_stop_escalates_to_the_process_group_of_the_session(
         bg_ignore_stop=True,
         ignore_sigterm=True,
     )
-    await start(world, stop_grace="200ms", kill_grace="200ms")
+    # The grace counts from before `claude stop`, a process of its own that can take longer
+    # than 400 ms on a loaded host; then SIGKILL is due at once and SIGTERM is never sent.
+    await start(world, stop_grace="2s", kill_grace="200ms")
     run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
     await world.until(lambda: len(world.calls("gate_wait")) == 1)
     await world.fake.cancel(run.run_id, "user_cancelled")
