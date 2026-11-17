@@ -38,8 +38,10 @@ What background mode rests on, each run here with the functions the runner uses:
     record without the beta, sends nothing and writes the error ``authentication_failed``.
 12. The token a session gives its own child processes is no narrower way in for the runner: a
     living process that is no child of the session is held with it, a line that got in with
-    it is ``peer`` in the transcript like every other, and a value ``hold`` of
-    ``crossSessionInbound`` keeps a line with the token and the runner's own line alike.
+    it is ``peer`` in the transcript like every other. A value ``hold`` of
+    ``crossSessionInbound`` in the host user's settings keeps the runner's own line too, and
+    the run's ``accept``, which the runner then sets, goes before it: the runner's line is
+    taken with its ``uuid``, and a line of another sender is taken and is ``peer``.
 13. A line of another sender that a session took stays in its conversation: after the stop
     and the removal of the entry, a resume of the session sends the line to the model again
     with the next prompt, and the transcript behind the launch offset shows nothing of it.
@@ -802,10 +804,31 @@ def test_the_token_of_a_session_s_own_child_is_no_narrower_way_in() -> None:
     async def with_a_value() -> None:
         async with world() as (place, script):
             place.accept_bypass()
-            # A value of the host user's own settings decides for every message.
+            # A value of the host user's own settings decides for every message, as on the
+            # The owner's host on 2026-11-17: "hold" there held every follow-up of the runner
+            # (FIX-RUNNER-BG-HELD-FOLLOWUP).
             path = place.config / "settings.json"
             settings = json.loads(path.read_text("utf-8"))
             path.write_text(json.dumps({**settings, "crossSessionInbound": "hold"}), "utf-8")
+            # Without the runner's own value (a turn environment whose configuration folder
+            # has no settings) the CLI holds the runner's line in its envelope.
+            empty = place.root / "no-settings"
+            empty.mkdir()
+            bare_env = {"TMPDIR": str(place.root / "tmp"), "CLAUDE_CONFIG_DIR": str(empty)}
+            out = await place.launch(
+                "hb", "Context.\n\nENVSTEP first", tool_class="host", run_env=bare_env
+            )
+            assert out.short_id is not None
+            entry = await place.until_entry(out.short_id)
+            await place.until_turns(entry.session_id, 1)
+            await place.send("hb", FOLLOWUP)
+            records = await place.until_record(entry.session_id, lambda r: "1 held" in str(r))
+            assert held(records) == 1
+            assert "Also the footer" not in json.dumps(script.bodies, ensure_ascii=False)
+            await place.stop(out.short_id)
+            # The runner's settings file sets "accept", which goes before the user's value:
+            # the runner's line is taken with its uuid, and so is a line of another sender,
+            # which the runner logs (18.5).
             out = await place.launch("hd", "Context.\n\nENVSTEP first", tool_class="host")
             assert out.short_id is not None
             entry = await place.until_entry(out.short_id)
@@ -813,19 +836,18 @@ def test_the_token_of_a_session_s_own_child_is_no_narrower_way_in() -> None:
             await place.until_turns(session, 1)
             token = script.environment("ENVSTEP").get(TOKEN_NAME)
             assert token
-            # The runner's own line in its envelope and a line with the token are both kept.
-            await place.send("hd", FOLLOWUP)
-            records = await place.until_record(session, lambda r: "1 held" in str(r))
-            _, frames = token_frames(token, "Plain line with the token")
+            during = await place.send("hd", FOLLOWUP)
+            records = await place.until_turns(session, 2)
+            ident, frames = token_frames(token, "Plain line with the token")
             await asyncio.to_thread(write_and_end, place.socket("hd"), frames)
-            records = await place.until_record(session, lambda r: "2 held" in str(r))
-            assert held(records) == 2
-            assert turn_ends(records) == 1
+            records = await place.until_turns(session, 3)
+            assert held(records) == 0
+            messages = mapped(records, during)
+            assert echoes(messages)[1:] == [during]
+            assert foreign(messages) == ["peer"]
+            assert ident not in echoes(messages)
             sent = json.dumps(script.bodies, ensure_ascii=False)
-            assert "Also the footer" not in sent
-            assert "Plain line with the token" not in sent
-            # A value leaves the status as it is: the follow-up waits for a run of its own.
-            assert (await place.until_status(out.short_id, "idle")).waiting_for is None
+            assert "Also the footer" in sent
 
     asyncio.run(without_a_value())
     asyncio.run(with_a_value())

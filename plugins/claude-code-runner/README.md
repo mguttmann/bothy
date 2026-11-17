@@ -545,9 +545,8 @@ Before you switch it on:
     marks with the producer `session-task`, and a continuation the CLI queues by itself. A
     file `<runner.state_dir>/sessions/<session id>/foreign-input` of the earlier rule has no
     effect and goes with the retention sweep.
-  - The settings file of a run sets no `crossSessionInbound`, so the CLI's own rule per message
-    applies and a stricter value of your own or of managed settings is not overridden. By
-    that rule a `host` session (bypass mode) takes only a message whose sender states that it
+  - The settings file of a run sets no `crossSessionInbound` while your own Claude Code
+    settings have none, so the CLI's own rule per message applies. By that rule a `host` session (bypass mode) takes only a message whose sender states that it
     bypasses permission prompts too, and a `chat` or `scoped` session every message whose
     sender does not state that. The runner's lines for a `host` session state it. The CLI
     offers nothing narrower that still lets the runner's lines through: no list of allowed
@@ -566,9 +565,13 @@ Before you switch it on:
   writes the runner's state folder or the transcripts of Claude Code. A tool that reaches other
   sessions and is not on the list above is not denied.
 - **Your own `crossSessionInbound`.** Leave it unset in the host user's Claude Code settings.
-  With `accept` there every session of the host takes every message again, the runner's too.
-  With `hold` or `refuse` the CLI keeps or drops the runner's own follow-up as well: the
-  running turn goes on without it, and the server defers it into a run of its own.
+  Any value there switches the CLI's rule per message off for every session, and `hold` or
+  `refuse` would keep the runner's own follow-ups out of the session too (the server then
+  defers each into runs of their own and the same message is answered again). So when your
+  settings have a value, the settings file of every run sets `accept`, which goes before
+  yours: a runner session then takes every message, the runner logs each one it did not write,
+  and the model acts on it with the rights of the tool class. Your other sessions keep your
+  value. A value `hold` or `refuse` of managed settings still holds the runner's lines.
 - **The SSH agent.** With `runner.forward_ssh_agent` a turn gets the agent socket through the
   settings file of its run. The supervisor is started from the runner's fixed environment,
   which never carries the socket, and every settings file sets `SSH_AUTH_SOCK`, to the empty
@@ -1079,7 +1082,8 @@ no login of the developer is touched. The real CLI runs only behind switches:
   also hold what 09 18.5 "Whose input" and 18.2 rest on: that no class offers `SendMessage` or
   `ListAgents` (`SendFile`, which only an account feature switches on, is held by its name in
   the CLI's file, `test_pinned_cli.py`), what a session takes without a value of
-  `crossSessionInbound` (a `host`
+  `crossSessionInbound` and that the run's `accept` goes before a `hold` of the host user's
+  settings (a `host`
   session needs the acceptance of bypass mode, which the test records in its own configuration
   folder), that a line of another sender shows in the transcript like the runner's with
   another `uuid` and that a line whose content is no text becomes no record at all, that a

@@ -887,6 +887,40 @@ async def test_a_host_session_takes_the_runner_s_line_in_its_envelope(bg_world: 
     await nothing_left(world)
 
 
+@pytest.mark.parametrize("tool_class", ["host", "scoped"])
+async def test_a_hold_in_the_host_user_s_settings_does_not_keep_the_runner_s_follow_up(
+    bg_world: World, tool_class: str
+) -> None:
+    # The owner's host on 2026-11-17 (FIX-RUNNER-BG-HELD-FOLLOWUP): the host user's own
+    # ~/.claude/settings.json held "crossSessionInbound": "hold". The session held every
+    # follow-up the runner wrote during a turn, the follow-up stayed "delivered", and the
+    # server deferred it into a run of its own and offered it to each later run as a follow-up
+    # again: the same message was answered in up to four runs. The runner's settings file
+    # now sets "accept", which goes before the user's value.
+    world = bg_world
+    claude_home = world.home / ".claude"
+    claude_home.mkdir(parents=True, exist_ok=True)
+    (claude_home / "settings.json").write_text(json.dumps({"crossSessionInbound": "hold"}), "utf-8")
+    world.fake.world.tool_class = tool_class
+    gate = world.gate("turn_gate")
+    world.scenario(fixture="happy", turn_gate=str(gate), gate_after_lines=1)
+    await start(world, tool_class=tool_class)
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    message_id = await world.fake.deliver_followup(run.run_id, "Also the footer", author="sam")
+    await world.until(lambda: world.fake.followup_state(run.run_id, message_id) == "delivered")
+    [line] = world.calls("bg_socket")
+    assert line["verdict"] == "accept"
+    [launch] = launches(world)
+    assert launch["settings"]["crossSessionInbound"] == "accept"
+    world.release(gate)
+    assert await world.ended(run.run_id) == "completed"
+    # The turn took it: absorbed, never left "delivered" for a run of its own.
+    assert followup_states(world, message_id) == ["delivered", "absorbed"]
+    assert texts(world) == [ANSWER]
+    await nothing_left(world)
+
+
 async def test_a_host_session_holds_a_line_that_states_no_class_and_the_run_ends(
     bg_world: World,
 ) -> None:

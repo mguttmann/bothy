@@ -202,12 +202,56 @@ def test_the_settings_file_holds_the_isolation_and_the_run_s_environment() -> No
     assert set(forwarded["env"]) == set(RUN_ENV_NAMES)
 
 
-def test_the_settings_file_never_widens_what_the_session_takes_from_other_sessions() -> None:
-    # No value of crossSessionInbound: the CLI's own rule per message stays, and a stricter
-    # value of the host user's or of managed settings is not overridden (18.5).
-    for env in ({}, {"TMPDIR": "/t", "SSH_AUTH_SOCK": "/a.sock"}):
+def test_the_settings_file_never_widens_what_the_session_takes_from_other_sessions(
+    tmp_path: Path,
+) -> None:
+    # No value of crossSessionInbound while the host user's settings have none: the CLI's
+    # own rule per message stays (18.5).
+    config = tmp_path / "config"
+    config.mkdir()
+    (config / "settings.json").write_text(json.dumps({"model": "m"}), "utf-8")
+    for env in (
+        {},
+        {"TMPDIR": "/t", "SSH_AUTH_SOCK": "/a.sock"},
+        {"HOME": str(tmp_path / "nobody")},
+        {"CLAUDE_CONFIG_DIR": str(config)},
+    ):
         assert "crossSessionInbound" not in settings_document(env)
         assert set(settings_document(env)) == {"worktree", "env"}
+    # A null is no value for the CLI either, and a file it cannot read gives none.
+    (config / "settings.json").write_text('{"crossSessionInbound": null}', "utf-8")
+    assert "crossSessionInbound" not in settings_document({"CLAUDE_CONFIG_DIR": str(config)})
+    (config / "settings.json").write_text("{not json", "utf-8")
+    assert "crossSessionInbound" not in settings_document({"CLAUDE_CONFIG_DIR": str(config)})
+
+
+@pytest.mark.parametrize("value", ["hold", "refuse", "accept", "sometimes"])
+def test_a_value_of_the_host_user_s_settings_is_replaced_by_accept(
+    tmp_path: Path, value: str
+) -> None:
+    # The owner's host on 2026-11-17: the host user's own settings held "crossSessionInbound":
+    # "hold", so the session held every follow-up of the runner ("Held peer message ... Your
+    # "crossSessionInbound" setting is "hold"") and the server deferred each into runs of
+    # their own (FIX-RUNNER-BG-HELD-FOLLOWUP). A value there switches the CLI's rule per message
+    # off, and only "accept" lets the runner's lines through; a value of --settings goes
+    # before one of the user's settings.
+    home = tmp_path / "home"
+    (home / ".claude").mkdir(parents=True)
+    (home / ".claude" / "settings.json").write_text(
+        json.dumps({"crossSessionInbound": value}), "utf-8"
+    )
+    document = settings_document({"HOME": str(home), "TMPDIR": "/t"})
+    assert document["crossSessionInbound"] == "accept"
+    assert set(document) == {"worktree", "env", "crossSessionInbound"}
+    # CLAUDE_CONFIG_DIR goes before HOME, as for the CLI.
+    other = tmp_path / "other"
+    other.mkdir()
+    env = {"HOME": str(home), "CLAUDE_CONFIG_DIR": str(other)}
+    assert "crossSessionInbound" not in settings_document(env)
+    # A hosted turn's base keeps its members beside it.
+    hosted = settings_document({"HOME": str(home)}, {"permissions": {"deny": ["X"]}})
+    assert hosted["crossSessionInbound"] == "accept"
+    assert hosted["permissions"] == {"deny": ["X"]}
 
 
 def test_every_name_of_the_run_s_environment_is_set_in_every_settings_file() -> None:

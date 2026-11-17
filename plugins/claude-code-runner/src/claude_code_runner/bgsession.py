@@ -18,12 +18,14 @@ pure function a test holds against a recording of the pinned version:
   session that bypasses permission prompts inside the CLI's envelope that states the sender's
   class (`sender_class`).
 
-What a session takes from the other Claude Code sessions of the host user is never widened: the
-settings file of a run sets no ``crossSessionInbound``, so the CLI's own rule per message and
-any stricter value of the host stay, and the tools found in the pinned CLI that write to or
-list other sessions are disallowed (`DENIED_TOOLS`). Neither authenticates a sender: the runner
-decides by the ``uuid`` of every input the transcript shows (`claude_code_runner.bgtranscript`,
-09 18.5).
+What a session takes from the other Claude Code sessions of the host user is widened only as far
+as the runner's own lines need: the settings file of a run sets no ``crossSessionInbound`` while
+the host user's own settings have none, so the CLI's own rule per message stays, and ``accept``
+when they have one, which would otherwise hold the runner's follow-ups too
+(`host_inbound_value`, FIX-RUNNER-BG-HELD-FOLLOWUP). The tools found in the pinned CLI that
+write to or list other sessions are disallowed (`DENIED_TOOLS`). Neither authenticates a
+sender: the runner decides by the ``uuid`` of every input the transcript shows
+(`claude_code_runner.bgtranscript`, 09 18.5).
 
 A session inherits the environment of the supervisor, which lives across runs. So the launch
 command, which starts the supervisor when none runs, gets the fixed environment of
@@ -78,6 +80,7 @@ from claude_code_runner.commandline import (
 from claude_code_runner.config import check_argument
 from claude_code_runner.statedir import ensure_private_dir, write_private
 from claude_code_runner.stop import escalation_due
+from claude_code_runner.usage import claude_config_dir
 
 __all__ = [
     "DENIED_TOOLS",
@@ -92,6 +95,7 @@ __all__ = [
     "Supervisor",
     "background_argv",
     "background_class_flags",
+    "host_inbound_value",
     "launch",
     "load_supervisor",
     "parse_launch",
@@ -131,6 +135,10 @@ of the pinned version."""
 
 RUN_ENV_NAMES = ("CLAUDE_PRODUCT_RUN", "DISABLE_AUTOUPDATER", "TMPDIR", "SSH_AUTH_SOCK")
 """The names of the ``env`` block of a run's settings file, each set in every launch."""
+
+INBOUND_SETTING = "crossSessionInbound"
+"""The CLI's setting of what a session takes from other sessions (``accept``, ``hold``,
+``refuse``; unset: a rule per message by the permission classes of both sessions)."""
 
 _ENVELOPE = "cross-session-message"
 """The element the CLI wraps a message of another session in; its attribute ``from-mode`` is
@@ -311,9 +319,15 @@ def settings_document(
     CLI). So a run that must not have the SSH agent gets an empty ``SSH_AUTH_SOCK`` whatever
     the supervisor carries.
 
-    The document sets no ``crossSessionInbound``. Without a value the CLI decides per message
-    by the permission classes of both sessions, and a stricter value of the host user's or of
-    managed settings stays in force; ``accept`` here would switch both off (18.5).
+    The document sets ``crossSessionInbound`` only when the host user's own settings give it a
+    value (`host_inbound_value`), and then to ``accept``. Without any value the CLI decides per
+    message by the permission classes of both sessions, which lets the runner's lines through
+    (18.5). A value of the user's settings switches that rule off for every message: ``hold``
+    or ``refuse`` there kept every follow-up of the runner out of the session, and the server
+    deferred each into runs of their own, where the same message was answered again (the
+    owner's host on 2026-11-17, FIX-RUNNER-BG-HELD-FOLLOWUP). A value of ``--settings`` goes
+    before one of the user's settings, and only ``accept`` lets the runner's lines through; a
+    value of managed settings stays in force.
 
     A hosted turn gives the settings of 26 5.4 as ``base``; the document is then those
     settings with the two members added (they carry no ``env`` and no ``worktree``).
@@ -332,7 +346,34 @@ def settings_document(
         "TMPDIR": env.get("TMPDIR", ""),
         "SSH_AUTH_SOCK": env.get("SSH_AUTH_SOCK", ""),
     }
-    return {**(base or {}), "worktree": {"bgIsolation": "none"}, "env": session_env}
+    document = {**(base or {}), "worktree": {"bgIsolation": "none"}, "env": session_env}
+    if host_inbound_value(env) is not None:
+        document[INBOUND_SETTING] = "accept"
+    return document
+
+
+def host_inbound_value(env: Mapping[str, str]) -> object | None:
+    """Return the value of ``crossSessionInbound`` in the host user's own settings, if any.
+
+    The file is ``settings.json`` in the CLI's configuration folder of the turn
+    (``CLAUDE_CONFIG_DIR``, else ``$HOME/.claude``). A ``null`` is no value, as for the CLI,
+    which drops such a member; a value it does not know counts, because the CLI holds every
+    message while it is present. A file that cannot be read or is no JSON object gives none.
+
+    Args:
+        env: The environment of the turn.
+
+    Returns:
+        The value, or ``None``.
+    """
+    folder = claude_config_dir(env)
+    if folder is None:
+        return None
+    try:
+        doc = json.loads((folder / "settings.json").read_text("utf-8"))
+    except (OSError, ValueError):
+        return None
+    return doc.get(INBOUND_SETTING) if isinstance(doc, dict) else None
 
 
 def sender_class(tool_class: str) -> str | None:

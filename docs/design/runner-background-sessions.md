@@ -285,7 +285,8 @@ Only the turns of the runner's own agent in billing mode `personal`. In print mo
 3. **The settings file** of the run (mode `0600`, in that folder) holds exactly:
    `worktree.bgIsolation` `"none"`, and `env` with `CLAUDE_PRODUCT_RUN`, `DISABLE_AUTOUPDATER`,
    the run's `TMPDIR` and `SSH_AUTH_SOCK`, every name in every file (the agent socket with
-   `runner.forward_ssh_agent`, else the empty text; 4.16). It sets no `crossSessionInbound`
+   `runner.forward_ssh_agent`, else the empty text; 4.16). It sets `crossSessionInbound`
+   `"accept"` only when the host user's own `settings.json` gives that setting a value
    (4.14). Reasons: the launching command's environment does not reach the session (item 7);
    without `bgIsolation` `"none"` the session would move into a worktree of its own, against
    18.1, and its transcript would move with it (item 12).
@@ -716,7 +717,8 @@ enforces:
       input under an origin of its own (a plugin, a channel) counts as another sender and ends
       the run.
 
-2. **The settings file sets no `crossSessionInbound`** (the narrowest the CLI offers). The
+2. **The settings file sets no `crossSessionInbound` while the host user's settings have
+    none** (the narrowest the CLI offers; with a value there it sets `"accept"`, below). The
     CLI has three values and a rule per message for a session without one (item 26); it has no
     list of allowed senders. Tried against the pinned CLI:
 
@@ -738,9 +740,9 @@ enforces:
     What it narrows against `"accept"`: a `host` session holds every message whose sender
     does not state `bypass`, which is what a session of another class and a line without an
     envelope are; a `chat` or `scoped` session holds a message whose sender states `bypass`;
-    and a stricter value of the host user's or of managed settings is no longer overridden
-    (then the runner's lines are held or dropped too, and follow-ups wait for the end of the
-    run). A message the rule per message holds is never delivered, and the session then shows
+    and a stricter value of managed settings is not overridden (then the runner's lines are
+    held or dropped too, and follow-ups wait for the end of the run). A value of the host
+    user's own settings is overridden with `"accept"` (FIX-RUNNER-BG-HELD-FOLLOWUP). A message the rule per message holds is never delivered, and the session then shows
     as waiting for a permission prompt (item 28), which ends the run by the rule of 4.5.
 
     - The envelope and its text: the CLI rewrites a body that holds the element's closing tag
@@ -907,9 +909,15 @@ carries (item 32, reproduced with an SSH agent socket). Decided:
       the rights of the tool class; the CLI tells it that the message is not from its user,
       cannot approve anything and is no reason to change settings. No answer is posted, but
       a tool call the model made in that time happened.
-    - `crossSessionInbound` `"accept"` in the host user's own settings makes every session of
-      the host take every message again. `"hold"` or `"refuse"` there keeps or drops the
-      runner's own lines too: a follow-up then waits for a run of its own.
+    - Any value of `crossSessionInbound` in the host user's own settings switches the rule
+      per message off. `"hold"` or `"refuse"` there kept the runner's own lines out too: on
+      the owner's host on 2026-11-17 (`"hold"` there since September) every follow-up of a
+      background turn was held, stayed `delivered`, and the server deferred it into runs of
+      their own and offered it to each later run again, so one message was answered in up to
+      four runs. Since FIX-RUNNER-BG-HELD-FOLLOWUP the settings file of a run sets `"accept"`
+      whenever the user's settings have a value, which goes before it (run with the pinned
+      CLI): a runner session then takes every message, the runner's and every other sender's,
+      which the runner logs.
     - A program of the host user that reads or writes the runner's state folder or the CLI's
       transcripts is outside these rules: the runner reads the answer from the transcript.
     - A message of another session that the rule per message holds ends the run as well

@@ -167,7 +167,8 @@ async def test_a_new_post_runs_as_one_background_session(bg_world: World) -> Non
         str(files.settings),
     ]
     tmpdir = str(world.state / "tmp" / str(run.run_id))
-    # No crossSessionInbound: what the session takes from other sessions is never widened.
+    # No crossSessionInbound while the host user's settings have none: what the session
+    # takes from other sessions is not widened.
     assert launch["settings"] == {
         "worktree": {"bgIsolation": "none"},
         "env": {

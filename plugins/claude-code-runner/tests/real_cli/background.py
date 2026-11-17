@@ -432,7 +432,9 @@ class World:
         base = None
         if hosted is not None:
             base = json.loads(hosted.settings.read_text("utf-8"))
-        document = settings_document(turn_env, base)
+        # The runner's turn environment names the CLI's configuration folder: the folder of
+        # the world, unless ``run_env`` names another.
+        document = settings_document({"CLAUDE_CONFIG_DIR": str(self.config), **turn_env}, base)
         settings.write_text(json.dumps(document), encoding="utf-8")
         self.classes[name] = tool_class
         argv = background_argv(

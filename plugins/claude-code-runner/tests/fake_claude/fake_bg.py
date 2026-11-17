@@ -667,8 +667,9 @@ class Player:
     def inbound(self, text: str) -> str:
         """What becomes of a line of the socket: ``accept``, ``hold``, ``review`` or ``refuse``.
 
-        The rule of the pinned CLI: a value of ``crossSessionInbound`` decides (``hold``
-        keeps the line without asking anyone); without one, the classes of both sessions do,
+        The rule of the pinned CLI: a value of ``crossSessionInbound`` decides, one of
+        ``--settings`` before one of the host user's own ``settings.json`` (``hold`` keeps
+        the line without asking anyone); without one, the classes of both sessions do,
         and a line they do not let through waits for a person's approval (``review``). The
         class a sender states is read from the envelope around the text; a line without one
         states none.
@@ -677,6 +678,12 @@ class Player:
             return "hold"
         if self.inbound_setting in ("accept", "hold", "refuse"):
             return str(self.inbound_setting)
+        # Without a value in --settings, one of the host user's own settings decides; a value
+        # the CLI does not know holds every message while it is present.
+        user = _read_json(str(base_dir() / "settings.json"))
+        value = user.get("crossSessionInbound") if isinstance(user, dict) else None
+        if value is not None:
+            return str(value) if value in ("accept", "hold", "refuse") else "hold"
         found = ENVELOPE.match(text)
         mine = "bypass" if self.bypasses else "prompting"
         if found is not None:
