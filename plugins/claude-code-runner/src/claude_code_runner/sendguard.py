@@ -105,7 +105,7 @@ def main() -> int:
     if reason is None:
         return 0
     sys.stderr.write(
-        f"Not sent: {reason}. A session of the Bothy runner sends SendMessage only to an agent"
+        f"Not sent: {reason}. A session of this runner sends SendMessage only to an agent"
         " it launched with the Agent tool (to: the agentId of the spawn result), never to"
         " another session or a workflow agent, and never by name.\n"
     )
