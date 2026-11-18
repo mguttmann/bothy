@@ -37,7 +37,10 @@ The mapping, record by record (only records of the main conversation, ``isSidech
   ``<tool-use-id>`` names, when this process started it, with its ``<status>`` and the
   ``<usage>`` after the agent's result; the result itself is never read.
 * ``queue-operation``: ``enqueue`` is ``command_lifecycle`` ``queued``; ``dequeue`` is
-  ``started`` and the start of a turn (``system/init``); ``remove`` with ``absorbed_mid_turn``
+  ``started`` and the start of a turn (``system/init``); after the final answer of a turn
+  (``end_turn``, no request since) and before its end, after that turn's ``result`` (the CLI
+  may dequeue the next input before it writes the turn's end); ``remove`` with
+  ``absorbed_mid_turn``
   is the echo of the runner's line with ``commandUuid``. The records of one queue are matched
   in their order, because ``enqueue`` and ``dequeue`` carry no id.
 * ``attachment`` of the type ``queued_command``: what a running turn took in. Only its
@@ -332,6 +335,10 @@ class TranscriptMapper:
         self._sealed: set[str] = set()
         self._model_sent = False
         self._queued: deque[str] = deque()
+        self._deferred: list[dict[str, Any]] = []
+        """The start of an input the CLI dequeued before it wrote the end of the turn before."""
+        self._answered = False
+        """The open turn's last output is a final answer (``end_turn``) and no request followed."""
         self._commands = 0
         self._texts: dict[str, list[str]] = {}
         self._last_message: str | None = None
@@ -418,7 +425,7 @@ class TranscriptMapper:
             # real transcript of the pinned CLI), so an input open here is sealed and judged
             # at the first output of this request: no output can answer it before
             # (FIX-RUNNER-BG-NOTICE-ORDER).
-            out = self._unattributed(self._sealed)
+            out = [*self._unattributed(self._sealed), *self._resume_deferred()]
             self._sealed |= self._open
             self._open.clear()
             return [*out, *self._request(record)]
@@ -441,7 +448,7 @@ class TranscriptMapper:
             if self._error_ended:
                 self._error_ended = False
                 return self._unattributed(self._sealed | self._open)
-            return [*self._unattributed(self._sealed | self._open), self._turn_end()]
+            return [*self._unattributed(self._sealed | self._open), *self._end_turn()]
         self.skipped[kind] += 1
         return []
 
@@ -583,7 +590,8 @@ class TranscriptMapper:
         if not isinstance(message, Mapping):
             self.skipped["assistant"] += 1
             return []
-        out = [*self._unattributed(self._sealed), *self._turn_start()]
+        out = [*self._unattributed(self._sealed), *self._resume_deferred(), *self._turn_start()]
+        self._answered = message.get("stop_reason") == "end_turn"
         model = message.get("model")
         error = record.get("isApiErrorMessage") is True
         items: list[dict[str, Any]] = []
@@ -637,7 +645,7 @@ class TranscriptMapper:
         if error:
             # 2.1.326 writes no ``turn_duration`` after an API error: the error record is the
             # last record of its turn (FIX-RUNNER-CLI-PIN-326).
-            out.extend([*self._unattributed(self._sealed | self._open), self._turn_end()])
+            out.extend([*self._unattributed(self._sealed | self._open), *self._end_turn()])
         return out
 
     # ---- the tasks of the session (FIX-RUNNER-BG-AGENT-STEPS) ------------------------------
@@ -765,6 +773,15 @@ class TranscriptMapper:
         if operation == "dequeue":
             # The queued input starts a turn of its own (a line of the inbox, a notification).
             started = {"type": "command_lifecycle", "command_uuid": command, "state": "started"}
+            if self.turn_open and self._answered:
+                # 2.1.326 may dequeue the next input after the turn's final answer but before
+                # it writes the turn's end (real transcript of a live run,
+                # FIX-RUNNER-FOLLOWUP-AT-TURN-END). Its start follows that turn's ``result``, as
+                # in a print stream, so the result never counts as the answer of the turn the
+                # input starts. A dequeue while the turn still works (no final answer yet, or a
+                # request after it) is given on at once, as before.
+                self._deferred.append(started)
+                return []
             return [started, self._init()]
         out: list[dict[str, Any]] = [
             {"type": "command_lifecycle", "command_uuid": command, "state": "completed"}
@@ -782,6 +799,18 @@ class TranscriptMapper:
                 # the input is nobody's.
                 self._open.add(line_uuid)
         return out
+
+    def _end_turn(self) -> list[dict[str, Any]]:
+        """The ``result`` of the turn, then the start of each input dequeued before it."""
+        deferred, self._deferred = self._deferred, []
+        self._answered = False
+        return [self._turn_end(), *((*deferred, self._init()) if deferred else ())]
+
+    def _resume_deferred(self) -> list[dict[str, Any]]:
+        """The turn went on after its final answer: a deferred start is given on now."""
+        self._answered = False
+        deferred, self._deferred = self._deferred, []
+        return [*deferred, *(self._turn_start() if deferred else ())]
 
     def _turn_end(self) -> dict[str, Any]:
         texts = self._texts.get(self._last_message or "", [])
