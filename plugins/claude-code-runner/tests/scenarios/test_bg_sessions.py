@@ -760,8 +760,8 @@ async def test_a_lost_login_ends_the_run_not_authenticated(bg_world: World) -> N
 
 
 async def test_a_full_context_fails_the_run_without_print_mode(bg_world: World) -> None:
-    # The runner compacts only in print mode, which background mode never uses (owner order
-    # 2026-11-17, FIX-RUNNER-CLI-PIN-326): the run fails with the cause in the thread.
+    # The runner compacts only in print mode, which background mode never uses (ruling
+    # D-FIX-RUNNER-CLI-PIN-326-4): the run fails with the cause in the thread.
     world = bg_world
     world.scenario(fixture="plain", per_launch={"0": {"api_error": "context_full"}})
     await start(world)

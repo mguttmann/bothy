@@ -87,8 +87,9 @@ def test_sweep_keeps_the_session_usage(tmp_path: Path) -> None:
 
 
 def test_sweep_takes_the_mark_an_earlier_runner_left_like_any_old_file(tmp_path: Path) -> None:
-    # Owner ruling, 2026-11-17: a foreign input never leaves a session. The file ``foreign-input``
-    # of the earlier rule is read by no runner and goes with the retention like a recording.
+    # D-FIX-RUNNER-BG-FOREIGN-LOG-1: a foreign input never leaves a session. The file
+    # ``foreign-input`` of the earlier rule is read by no runner and goes with the retention like
+    # a recording.
     folder = tmp_path / "sessions" / "s"
     folder.mkdir(parents=True)
     mark = folder / "foreign-input"

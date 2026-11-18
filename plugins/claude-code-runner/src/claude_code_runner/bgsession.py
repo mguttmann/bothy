@@ -325,8 +325,8 @@ def settings_document(
     message by the permission classes of both sessions, which lets the runner's lines through
     (18.5). A value of the user's settings switches that rule off for every message: ``hold``
     there kept every follow-up of the runner out of the session, and the server deferred each
-    into runs of their own, where the same message was answered again (the owner's host on
-    2026-11-17, FIX-RUNNER-BG-HELD-FOLLOWUP). A value of ``--settings`` goes before one of the
+    into runs of their own, where the same message was answered again
+    (FIX-RUNNER-BG-HELD-FOLLOWUP). A value of ``--settings`` goes before one of the
     user's settings, and only ``accept`` lets the runner's lines through. Any other value of
     the user's stays in force: ``refuse`` is the operator's deliberate choice to take nothing
     from other sessions and is never overridden (a follow-up then waits for a run of its

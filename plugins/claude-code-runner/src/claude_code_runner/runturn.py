@@ -3132,7 +3132,7 @@ class RunTurn:
     async def _fall_back(self, code: str) -> tuple[None, bool]:
         """Background mode cannot run this attempt: the run ends ``failed`` with the cause.
 
-        Never print mode (owner order 2026-11-17, FIX-RUNNER-CLI-PIN-326): the summary names
+        Never print mode (ruling D-FIX-RUNNER-CLI-PIN-326-4): the summary names
         the cause in the thread, the log has ``background_unavailable``, and a cause of the
         host shows in the heartbeat until a background launch starts again.
 
@@ -3672,11 +3672,12 @@ class RunTurn:
         """The effects of a mapped message that only a background session has (18.4).
 
         An input the runner did not write (18.5) is logged and nothing else: the session answers it
-        like any input and the run goes on (owner, 2026-11-17: an input is never discarded and
-        never ends a run). The counter-check of 18.3 ends the run here, before anything of the
-        message is posted; it fails closed: every request record is judged, and nothing a session
-        puts out (`_is_output`) is accepted unless the newest request record of its process listed
-        the login beta, so neither after a record without it nor before any record.
+        like any input and the run goes on (ruling D-FIX-RUNNER-BG-FOREIGN-LOG-1: an input is never
+        discarded and never ends a run). The counter-check of 18.3 ends the run here, before
+        anything of the message is posted; it fails closed: every request record is judged, and
+        nothing a session puts out (`_is_output`) is accepted unless the newest request record of
+        its process listed the login beta, so neither after a record without it nor before any
+        record.
 
         Returns:
             An outcome when the message ended the run (the counter-check), else ``None``.

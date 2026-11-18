@@ -424,7 +424,7 @@ OWN_NOTICE = (
 
 
 def test_the_notification_of_an_own_background_agent_is_the_session_s_own() -> None:
-    # The real records (structure only) of session 659529cf on 17.11. 15:19Z: the CLI took the
+    # Real records of the pinned CLI (structure only): the CLI took the
     # notification of a background agent the session launched mid-turn, wrote two records of
     # the answer, then the attachment without an origin, then the next request. The runner
     # stopped the session as foreign ("unattributed") before this fix.
@@ -439,7 +439,7 @@ OWN_NOTICE_AFTER_REQUEST = OWN_NOTICE.with_name("own_notice_after_request.jsonl"
 
 
 def test_own_notifications_attributed_after_their_request_are_the_session_s_own() -> None:
-    # The real records (structure only) of session d80b173e on 17.11. 15:25Z: two
+    # Real records of the pinned CLI (structure only): two
     # notifications of the session's own background agent were absorbed mid-turn, and the
     # pinned CLI wrote the request record before the attachments that attribute them. The
     # runner stopped the session as foreign ("unattributed") before this fix.
@@ -466,13 +466,13 @@ def test_an_input_nothing_attributes_before_the_answer_of_its_request_is_foreign
 
 
 SUBAGENT_NOTICE = OWN_NOTICE.with_name("subagent_notice") / "s.jsonl"
-"""The real records (structure only) of the steering session e02ef005 on 17.11. 17:13Z to
-17:45Z, with the attachments of its workflow agent's file (``s/subagents/workflows/...``).
+"""Real records of the pinned CLI (structure only), with the attachments of a workflow agent's
+file (``s/subagents/workflows/...``).
 A workflow agent the session launched took four notifications of its own background commands
 mid-turn. The CLI wrote their ``remove`` records into the session's transcript and the
 attachments that attribute them into the agent's file only. The next request of the session
-(a notification of the plugin security-guidance) sealed them, and the runner stopped the run
-as foreign ("unattributed") at its first answer, live run 01a1ea80 (FIX-RUNNER-BG-SIDE-NOTICE)."""
+(a notification of a plugin) sealed them, and the earlier runner stopped the run as foreign
+("unattributed") at its first answer (FIX-RUNNER-BG-SIDE-NOTICE)."""
 
 
 def test_own_notifications_a_subagent_took_are_the_session_s_own() -> None:
@@ -736,7 +736,7 @@ def test_a_notification_is_the_session_s_own_only_by_its_producer(origin: dict[s
     mapper.map(TURN_ENDS)
     out = mapper.map(turn)
     assert foreign(out) == other
-    # It is logged and starts a turn like the session's own input (owner ruling, 2026-11-17).
+    # It is logged and starts a turn like the session's own input (D-FIX-RUNNER-BG-FOREIGN-LOG-1).
     assert [m.get("subtype") for m in out] == ["bg_foreign", "init"]
     # Taken during a running turn: the attachment names the same origin.
     mapper = started("mine")

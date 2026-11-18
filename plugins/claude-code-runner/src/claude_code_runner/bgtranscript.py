@@ -41,25 +41,25 @@ and nothing else: a ``user`` record or a ``queued_command`` attachment with ``or
 whose ``uuid`` the runner did not write, or wrote and saw taken before, one with ``origin.kind``
 ``human`` that is not the run's prompt (a person typed into the session), and one with any origin
 that is not known as the session's own. The runner logs it (``background_foreign_input``) and
-nothing else: the input starts a turn like the session's own, and its answer is posted (18.5, owner
-2026-11-17). Whose input a record is, is read from its origin alone and before anything else
-(`_sender`): no content makes a record of a sender a step of the turn. An input the session gives
-itself (`_own_origin`: the notification of work the session itself launched, a continuation the CLI
-queues by itself) is none of these: the CLI removes it from its queue like a line, under a ``uuid``
-it made, and names its origin in the attachment. The kind ``task-notification`` alone does not make
-an input the session's own: the CLI records the message of another session of the same user, a relay
-and a scheduled prompt under that kind too, so only the producer it stamps for the session's own
-work counts. A ``queued_command`` attachment with ``commandMode`` ``task-notification`` and no
-origin is the session's own too: the CLI queues the notification of a background agent, a monitor, a
-workflow or a timer without one, and every other sender's input carries an origin. So an input a
-running turn took under a ``uuid`` the runner did not write stays open until that attachment
-attributes it to the session itself. The request that carries the input seals it, and one still open
-at the first output after that request, at the following request or at the end of the turn is
-foreign too: the CLI writes the attachment right after the request record (real transcript of the
-pinned CLI, FIX-RUNNER-BG-NOTICE-ORDER) and may write records of the answer before the request,
-which that input cannot have led to. An input that an agent of the session took is attributed in
-that agent's own file, by the same rule (``side``, `side_inputs`, FIX-RUNNER-BG-SIDE-NOTICE). A
-mapper without ``own`` knows no line of the runner.
+nothing else: the input starts a turn like the session's own, and its answer is posted (18.5,
+D-FIX-RUNNER-BG-FOREIGN-LOG-1). Whose input a record is, is read from its origin alone and before
+anything else (`_sender`): no content makes a record of a sender a step of the turn. An input the
+session gives itself (`_own_origin`: the notification of work the session itself launched, a
+continuation the CLI queues by itself) is none of these: the CLI removes it from its queue like a
+line, under a ``uuid`` it made, and names its origin in the attachment. The kind
+``task-notification`` alone does not make an input the session's own: the CLI records the message of
+another session of the same user, a relay and a scheduled prompt under that kind too, so only the
+producer it stamps for the session's own work counts. A ``queued_command`` attachment with
+``commandMode`` ``task-notification`` and no origin is the session's own too: the CLI queues the
+notification of a background agent, a monitor, a workflow or a timer without one, and every other
+sender's input carries an origin. So an input a running turn took under a ``uuid`` the runner did
+not write stays open until that attachment attributes it to the session itself. The request that
+carries the input seals it, and one still open at the first output after that request, at the
+following request or at the end of the turn is foreign too: the CLI writes the attachment right
+after the request record (real transcript of the pinned CLI, FIX-RUNNER-BG-NOTICE-ORDER) and may
+write records of the answer before the request, which that input cannot have led to. An input that
+an agent of the session took is attributed in that agent's own file, by the same rule (``side``,
+`side_inputs`, FIX-RUNNER-BG-SIDE-NOTICE). A mapper without ``own`` knows no line of the runner.
 * ``system`` ``turn_duration``: the end of the turn, a ``result`` whose text is the text of
   the turn's last assistant message. An API error record ends its turn itself (``result``
   with ``is_error``): the CLI writes no ``turn_duration`` after it since 2.1.326, and one
@@ -504,7 +504,8 @@ class TranscriptMapper:
         if sender is not None:
             # The run's prompt came before: a person typed this into the session, or it
             # came from an origin that is not known as the session's own. It starts a turn
-            # like the session's own input (owner ruling, 2026-11-17: never discard an input).
+            # like the session's own input (ruling D-FIX-RUNNER-BG-FOREIGN-LOG-1: never discard an
+            # input).
             return [self._foreign(sender), *self._turn_start()]
         content = _content(record)
         results = [

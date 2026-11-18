@@ -13,7 +13,7 @@ may be in it. What belongs to a run reaches its session through the settings fil
 launch (`claude_code_runner.bgsession.settings_document`).
 
 A run that should use background mode and cannot ends ``failed`` with its cause in the thread;
-it never uses print mode (owner order 2026-11-17, FIX-RUNNER-CLI-PIN-326). When the cause lies
+it never uses print mode (ruling D-FIX-RUNNER-CLI-PIN-326-4). When the cause lies
 with the host (the CLI is not the pinned version, a supervisor the runner did
 not start, bypass mode without a recorded acceptance, a launch that fails), the runner reports
 `UNAVAILABLE` in ``details.degraded_reasons`` until the next background launch starts; the

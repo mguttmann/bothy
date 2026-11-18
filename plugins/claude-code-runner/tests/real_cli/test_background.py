@@ -659,8 +659,8 @@ def test_a_line_of_another_sender_shows_in_the_transcript_with_another_uuid() ->
 
 def test_a_resume_gives_a_taken_line_of_another_sender_to_the_model_again() -> None:
     # 13. A resume carries a taken foreign input on (18.5, 18.9). The runner before
-    # 2026-11-17 therefore never continued such a session; since the owner's ruling of that day
-    # it continues it (on this host only the owner writes to it), and this records the fact.
+    # D-FIX-RUNNER-BG-FOREIGN-LOG-1 therefore never continued such a session; since that ruling
+    # it continues it, and this records the fact.
     async def scenario() -> None:
         async with world() as (place, script):
             out = await place.launch("one", "Context.\n\nHello first")
@@ -804,9 +804,8 @@ def test_the_token_of_a_session_s_own_child_is_no_narrower_way_in() -> None:
     async def with_a_value() -> None:
         async with world() as (place, script):
             place.accept_bypass()
-            # A value of the host user's own settings decides for every message, as on the
-            # The owner's host on 2026-11-17: "hold" there held every follow-up of the runner
-            # (FIX-RUNNER-BG-HELD-FOLLOWUP).
+            # A value of the host user's own settings decides for every message: "hold" there
+            # holds every follow-up of the runner (FIX-RUNNER-BG-HELD-FOLLOWUP).
             path = place.config / "settings.json"
             settings = json.loads(path.read_text("utf-8"))
             path.write_text(json.dumps({**settings, "crossSessionInbound": "hold"}), "utf-8")

@@ -42,8 +42,8 @@ def test_every_cause_is_a_sentence_with_its_code(code: str) -> None:
 
 
 def test_a_foreign_input_is_no_cause_of_a_run() -> None:
-    # Owner ruling, 2026-11-17: an input the runner did not write never ends a run, so no run is
-    # told about it (FIX-RUNNER-BG-FOREIGN-LOG).
+    # D-FIX-RUNNER-BG-FOREIGN-LOG-1: an input the runner did not write never ends a run, so no
+    # run is told about it.
     assert "background_foreign_input" not in CAUSES
 
 

@@ -9,8 +9,8 @@
   `<runner.state_dir>/sessions/<session id>/foreign-input`, the log lines
   `session_not_continued`, `session_mark_failed` and `background_foreign_input_unread`, and
   the replacement of a marked session by a new one are gone; a mark an earlier version wrote
-  has no effect and goes with the retention sweep. On the owner's host every input the earlier
-  rule stopped was the owner's own or a notification of Claude Code itself (an agent of the
-  session, a plugin), and each stop cost the thread its conversation. This replaces the
+  has no effect and goes with the retention sweep. Where only the thread's person and Claude
+  Code itself (an agent of the session, a plugin) write into a session, every stop of the
+  earlier rule was a false alarm that cost the thread its conversation. This replaces the
   stopping and the "never continued" rule of the entries FIX-RUNNER-BG-INBOX-AUTH and
   FIX-RUNNER-BG-SIDE-NOTICE above.

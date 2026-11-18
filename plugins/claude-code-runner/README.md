@@ -536,8 +536,8 @@ Before you switch it on:
     `human`, `other`, `unattributed`) and nothing of its text. Nothing else happens: the run
     goes on, the answer is posted, and the next message of the thread continues the session
     (since 2026-11-17; before, the runner stopped the session, failed the run and started the
-    next message in a new session, and each time it was the owner's own input or a
-    notification of Claude Code itself). A runner that adopts a turn after a crash logs the
+    next message in a new session, a false alarm wherever only the thread's person and Claude
+    Code itself write into a session). A runner that adopts a turn after a crash logs the
     same way with the lines its turn record names. Whose input a transcript record is, the
     runner reads from the record's origin before anything of its content, so a record of a
     sender never passes as a step of the turn. What a session gives itself is a closed list
@@ -634,7 +634,7 @@ How a background turn runs:
   turn is in it.
 
 When the mode is not available, the run ends `failed` with the code as its cause in the thread
-and never uses print mode (owner order 2026-11-17, FIX-RUNNER-CLI-PIN-326), the log has
+and never uses print mode (D-FIX-RUNNER-CLI-PIN-326-4), the log has
 `background_unavailable`, and for a cause of the host the heartbeat reports `degraded` with
 `background_unavailable` until the next background launch starts (it blocks no run):
 

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """When background mode is unavailable, the run fails with its cause (09 18.9).
 
-Never print mode (owner order 2026-11-17, FIX-RUNNER-CLI-PIN-326). Every cause of the table
+Never print mode (ruling D-FIX-RUNNER-CLI-PIN-326-4). Every cause of the table
 "Background mode is unavailable": the run ends ``failed`` with ``runtime_error`` and the cause
 in its summary, no ``claude -p`` process starts, the log has ``background_unavailable``, and a
 cause of the host shows as ``background_unavailable`` in the heartbeat. Also the scope of the

@@ -3752,18 +3752,17 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
    session's own notification; an input that an agent of the session took is attributed by
    the attachment in that agent's file below `<session id>/subagents/`, by the same rule,
    FIX-RUNNER-BG-SIDE-NOTICE). Such an input is logged and nothing else (addendum of
-   2026-11-17, FIX-RUNNER-BG-FOREIGN-LOG, the owner: who else would send a message into the
-   session, only he can, so nothing may be discarded): the log has the warning `background_foreign_input`
-   with one of the words `peer`, `human`, `other` or `unattributed` for whose input it was,
+   2026-11-17, D-FIX-RUNNER-BG-FOREIGN-LOG-1: an input in the thread's chat is never
+   discarded): the log has the warning `background_foreign_input` with one of the words `peer`, `human`, `other` or `unattributed` for whose input it was,
    never a text of the record. The session is not stopped, the run goes on and ends as
    usual, the input starts or joins a turn like the session's own input, and the answer is
    posted. A runner that adopts the turn logs the same way with the lines the turn record
    names, over the part of the transcript the previous runner read and over the rest; a record
    that names no line proves none, so every line then counts as another sender's (18.9). (The
    first version of this rule, of 2026-11-16, stopped the session and ended the run `failed`
-   with the cause `background_foreign_input`; on the owner's host every such input was the
-   owner's own or one of Claude Code itself, a notification of an agent or of a plugin, and
-   the thread lost its conversation each time.) What
+   with the cause `background_foreign_input`; where only the thread's person and Claude Code
+   itself, a notification of an agent or of a plugin, write into a session, every stop was a
+   false alarm, and the thread lost its conversation each time.) What
    a session gives itself is no such input, and its origins are a closed list:
    `task-notification` with `producer` `session-task` and without a `subkind` (the
    notification of work the session itself launched: a background command, run with the
@@ -3795,7 +3794,7 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
    per message stays. When they have a value, that value decides every message and the rule
    per message is off: `hold` there keeps every follow-up of the runner out of the session,
    and the server defers each into runs of their own, where the same message is answered
-   again (the owner's host on 2026-11-17, FIX-RUNNER-BG-HELD-FOLLOWUP). For `hold` the file
+   again (FIX-RUNNER-BG-HELD-FOLLOWUP). For `hold` the file
    then sets `accept`, which goes before a value of the user's settings and lets the runner's
    lines through, and every other sender's too, which rule 1 logs. Every other value of the
    user's settings stays in force and the file sets none: `refuse` is the operator's

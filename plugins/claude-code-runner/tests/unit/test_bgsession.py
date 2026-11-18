@@ -226,10 +226,10 @@ def test_the_settings_file_never_widens_what_the_session_takes_from_other_sessio
 
 
 def test_a_hold_of_the_host_user_s_settings_is_replaced_by_accept(tmp_path: Path) -> None:
-    # The owner's host on 2026-11-17: the host user's own settings held "crossSessionInbound":
-    # "hold", so the session held every follow-up of the runner ("Held peer message ... Your
-    # "crossSessionInbound" setting is "hold"") and the server deferred each into runs of
-    # their own (FIX-RUNNER-BG-HELD-FOLLOWUP). A value there switches the CLI's rule per message
+    # When the host user's own settings hold "crossSessionInbound": "hold", the session holds
+    # every follow-up of the runner ("Held peer message ... Your "crossSessionInbound" setting
+    # is "hold"") and the server defers each into runs of their own
+    # (FIX-RUNNER-BG-HELD-FOLLOWUP). A value there switches the CLI's rule per message
     # off, and only "accept" lets the runner's lines through; a value of --settings goes
     # before one of the user's settings.
     home = tmp_path / "home"
