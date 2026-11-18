@@ -206,7 +206,7 @@ never sees or touches sessions of the developer.
 | Adoption after a runner restart | by the turn record and the process identity; without `runner.turn_handover` reading only | by the turn record and the session list; with every right, because no channel belongs to the runner process (4.11) |
 | Hosted agents | from their definition (26 5) | stay in print mode (4.2) |
 | Channel skills | one `--plugin-dir` per folder in a `host` turn (26 5.9) | a turn that loads such a folder stays in print mode (4.2) |
-| Tool classes | flags of 18.2 and `--permission-prompts none` | the same class flags without `--permission-prompts`; `AskUserQuestion`, `SendMessage`, `ListAgents` and `SendFile` disallowed; a session that waits for a person is stopped (4.5) |
+| Tool classes | flags of 18.2 and `--permission-prompts none` | the same class flags without `--permission-prompts`; `AskUserQuestion`, `ListAgents` and `SendFile` disallowed, `SendMessage` to the session's own subagents only (a hook of the settings file; disallowed where hooks cannot run, 4.14 item 3); a session that waits for a person is stopped (4.5) |
 | Voice | transcribed by the runner before the prompt or the follow-up line (18.14) | unchanged: the transcript text is part of the prompt or of the line |
 | Attachments | local files named in the prompt or the line, `--add-dir` for the thread's folder; `ATTACH:` lines of the answer | unchanged; `TMPDIR` of the run reaches the session through the `env` block of `--settings` (4.3) |
 | Environment | the allow list of 18.2, built per run, given to the process | the launch and the control commands get one fixed environment of the runner process; what belongs to a run is in the `env` block of its settings file (4.16) |
@@ -277,8 +277,9 @@ Only the turns of the runner's own agent in billing mode `personal`. In print mo
    the first 16 hexadecimal digits of the SHA-256 of the run id, which keeps the path below the
    system's bound. They are removed when the run left the runner. The flags of the class are
    those of 18.2 with
-   `AskUserQuestion`, `SendMessage`, `ListAgents` and `SendFile` added to `--disallowedTools`
-   under `scoped` and `host` (`chat` has no tool; 4.14 says why the last three). `--permission-prompts none` is left out (print mode only). A test compares the whole
+   `AskUserQuestion`, `ListAgents` and `SendFile` added to `--disallowedTools`
+   under `scoped` and `host`, and `SendMessage` too where hooks cannot run (`chat` has no
+   tool; 4.14 item 3 says why). `--permission-prompts none` is left out (print mode only). A test compares the whole
    list per class. With `runner.launch_mode` `"background"` the start is refused, naming
    `runner.state_dir`, when the socket path is longer than a socket address of the system
    allows.
@@ -754,11 +755,19 @@ enforces:
       whose letters hold the element's name gets no line for a `host` session; the follow-up
       stays `queued` and the server defers it into a run of its own, where it is the prompt.
 
-3. **`SendMessage`, `ListAgents` and `SendFile` are disallowed** under `scoped` and `host`
-    (items 31 and 39): a session of the runner neither writes or sends files to nor lists the
-    other sessions of the host user. The rule for `SendMessage` also takes the messages to
-    the session's own subagents and teammates, which the same tool serves; a subagent still
-    returns its result to the turn that started it.
+3. **`ListAgents` and `SendFile` are disallowed, and `SendMessage` reaches the session's own
+    subagents only** under `scoped` and `host` (items 31 and 39): a session of the runner
+    neither writes or sends files to nor lists the other sessions of the host user. Until
+    2026-11-18 `SendMessage` was disallowed too, which also took the messages to the
+    session's own subagents. Since FIX-RUNNER-SENDMESSAGE-OWN the session keeps the tool so a
+    running background agent can get more to work with, and a `PreToolUse` hook of the run's
+    settings file (`sendguard.py`) lets a call through only to `main` or to the `agentId` of
+    an agent of the session that is no workflow agent: the pinned CLI resolves a recipient of
+    that form among the agents of the session and never among other sessions, while a name
+    of another session reaches it (run, `tests/real_cli/test_send_guard.py`). Where hooks
+    cannot run (`disableAllHooks` of the host user, a managed setting, a hosted turn) the
+    tool stays disallowed. The rulings, the evidence and what stays open are in
+    `docs/decisions.d/FIX-RUNNER-SENDMESSAGE-OWN.md`.
 
     - The second version of this change denied two tools and said that a session has no
       other such tool. That sentence rested on runs without a login, which cannot show a tool

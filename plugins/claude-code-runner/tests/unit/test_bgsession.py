@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import shlex
 import shutil
 import signal
 import socket
@@ -25,10 +26,13 @@ from typing import Any
 
 import pytest
 
+from claude_code_runner import sendguard
 from claude_code_runner.adoption import read_identity
 from claude_code_runner.bgpaths import SOCKET_PATH_MAX, bg_files, socket_path, socket_path_fits
 from claude_code_runner.bgsession import (
     DENIED_TOOLS,
+    GUARD_TIMEOUT,
+    OWN_MESSAGE_DENIED,
     RUN_ENV_NAMES,
     BgSession,
     SessionEntry,
@@ -36,12 +40,15 @@ from claude_code_runner.bgsession import (
     Supervisor,
     background_argv,
     background_class_flags,
+    hooks_switched_off,
     load_supervisor,
+    own_agent_messages,
     parse_launch,
     parse_sessions,
     parse_supervisor,
     prompt_text,
     send_frames,
+    send_guard_command,
     sender_class,
     session_name,
     settings_document,
@@ -154,6 +161,94 @@ def test_no_class_keeps_a_tool_that_asks_a_person_or_reaches_another_session() -
     # ``chat`` has no tool at all: ``--tools ""`` leaves none to deny.
     chat = background_class_flags("chat", [])
     assert chat[chat.index("--tools") + 1] == ""
+
+
+def test_a_session_with_the_hook_keeps_sendmessage_for_its_own_subagents() -> None:
+    # FIX-RUNNER-SENDMESSAGE-OWN: SendMessage stays so a running subagent of the session can
+    # get more to work with; the hook of the settings file refuses every other recipient.
+    # ListAgents and SendFile stay denied.
+    assert OWN_MESSAGE_DENIED == ("AskUserQuestion", "ListAgents", "SendFile")
+    for tool_class in ("scoped", "host"):
+        flags = background_class_flags(tool_class, [], own_messages=True)
+        assert flags[flags.index("--disallowedTools") + 1 :] == list(OWN_MESSAGE_DENIED)
+        launched = argv(tool_class, [], own_messages=True)
+        at = launched.index("--disallowedTools")
+        assert launched[at + 1 : at + 4] == ["AskUserQuestion", "ListAgents", "SendFile"]
+        assert "SendMessage" not in launched
+    assert argv("chat", [], own_messages=True) == argv("chat", [])
+    # A hosted turn runs without hooks (26 5.4): SendMessage stays denied whatever is asked.
+    from claude_code_runner.commandline import HostedArgs
+
+    hosted = HostedArgs(settings=Path("/h.json"), plugin=None, mcp_config=None, has_skills=False)
+    flags = background_class_flags("host", [], hosted, own_messages=True)
+    assert flags[flags.index("--disallowedTools") + 1 :] == DENIED
+
+
+def test_the_settings_file_of_a_session_with_the_hook(tmp_path: Path) -> None:
+    env = {"HOME": str(tmp_path / "nobody"), "TMPDIR": "/t"}
+    document = settings_document(env, own_messages=True)
+    assert set(document) == {"worktree", "env", "hooks", "disableAllHooks"}
+    # A true of the project's settings would switch the hook off; --settings goes before it.
+    assert document["disableAllHooks"] is False
+    assert GUARD_TIMEOUT == 60  # the time limit 09 18.2 and the ruling name
+    assert document["hooks"] == {
+        "PreToolUse": [
+            {
+                "matcher": "SendMessage",
+                "hooks": [
+                    {"type": "command", "command": send_guard_command(), "timeout": GUARD_TIMEOUT}
+                ],
+            }
+        ]
+    }
+    assert send_guard_command() == (
+        f"{shlex.quote(sys.executable)} -I {shlex.quote(sendguard.__file__)} || exit 2"
+    )
+    # Without the decision nothing changes, and a hosted turn never gets the hook.
+    assert set(settings_document(env)) == {"worktree", "env"}
+    hosted = settings_document(env, {"disableAllHooks": True}, own_messages=True)
+    assert hosted["disableAllHooks"] is True
+    assert "hooks" not in hosted
+
+
+def test_a_setting_that_switches_hooks_off_keeps_sendmessage_denied(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    (home / ".claude").mkdir(parents=True)
+    managed = tmp_path / "managed"
+    env = {"HOME": str(home)}
+    assert hooks_switched_off(env, managed) is False
+    # The host user's own choice is never overridden.
+    (home / ".claude" / "settings.json").write_text('{"disableAllHooks": true}', "utf-8")
+    assert hooks_switched_off(env, managed) is True
+    (home / ".claude" / "settings.json").write_text('{"disableAllHooks": false}', "utf-8")
+    assert hooks_switched_off(env, managed) is False
+    # Managed settings: a file of the folder or of its drop-in folder, and one that cannot be
+    # read counts as switching hooks off.
+    (managed / "managed-settings.d").mkdir(parents=True)
+    for doc in ('{"disableAllHooks": true}', '{"allowManagedHooksOnly": true}', "{no", "[]"):
+        (managed / "managed-settings.json").write_text(doc, "utf-8")
+        assert hooks_switched_off(env, managed) is True, doc
+    (managed / "managed-settings.json").write_text('{"model": "m"}', "utf-8")
+    assert hooks_switched_off(env, managed) is False
+    (managed / "managed-settings.d" / "10-hooks.json").write_text(
+        '{"allowManagedHooksOnly": true}', "utf-8"
+    )
+    assert hooks_switched_off(env, managed) is True
+
+
+def test_only_a_turn_of_the_runner_s_own_agent_with_hooks_messages_its_subagents(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from claude_code_runner import bgsession
+
+    monkeypatch.setattr(bgsession, "MANAGED_SETTINGS_DIR", tmp_path / "managed")
+    home = tmp_path / "home"
+    (home / ".claude").mkdir(parents=True)
+    env = {"HOME": str(home)}
+    assert own_agent_messages(env, hosted=False) is True
+    assert own_agent_messages(env, hosted=True) is False
+    (home / ".claude" / "settings.json").write_text('{"disableAllHooks": true}', "utf-8")
+    assert own_agent_messages(env, hosted=False) is False
 
 
 def test_a_resume_and_the_incoming_folder_have_their_places() -> None:

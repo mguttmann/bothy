@@ -122,6 +122,7 @@ from claude_code_runner.bgsession import (
     background_argv,
     launch,
     load_supervisor,
+    own_agent_messages,
     prompt_text,
     sender_class,
     session_name,
@@ -3287,7 +3288,9 @@ class RunTurn:
             files.socket.unlink()  # a socket of an earlier process of this run
         hosted = self.state.hosted
         base = json.loads(hosted.settings.read_text("utf-8")) if hosted is not None else None
-        document = settings_document(self.state.env, base)
+        # One decision for the deny list and the hook (FIX-RUNNER-SENDMESSAGE-OWN).
+        own = own_agent_messages(self.state.env, hosted=hosted is not None)
+        document = settings_document(self.state.env, base, own_messages=own)
         write_private(files.settings, json.dumps(document, sort_keys=True))
         argv = background_argv(
             claude_bin=self.h.claude_bin or self.cfg.claude_bin,
@@ -3302,6 +3305,7 @@ class RunTurn:
             settings_file=files.settings,
             hosted=hosted,
             plugin_dirs=self.state.plugin_dirs,
+            own_messages=own,
         )
         await self._rebase_once(attempt)
         self.process = None

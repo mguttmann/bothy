@@ -552,11 +552,17 @@ Before you switch it on:
     offers nothing narrower that still lets the runner's lines through: no list of allowed
     senders, and its exception for a session's own child process exists only without a value
     and rests on a token every tool call of the session can read.
-  - `SendMessage`, `ListAgents` and `SendFile` are disallowed: the tools found in the pinned
-    CLI that write to, list or send files to another session. The rule for `SendMessage`
-    also takes the messages to the session's own subagents. The list is what was found (the
-    third tool only by reading the CLI's file, because an account feature switches it on),
-    not a proof that the CLI has no further one.
+  - `ListAgents` and `SendFile` are disallowed: the tools found in the pinned CLI that list
+    or send files to another session. The list is what was found (`SendFile` only by reading
+    the CLI's file, because an account feature switches it on), not a proof that the CLI has
+    no further one.
+  - `SendMessage` reaches the session's own subagents only, so a running background agent
+    can get more to work with. A `PreToolUse` hook in the run's settings file
+    (`sendguard.py`) lets a call through only to `main` or to the `agentId` of an agent the
+    session launched with the `Agent` tool, never to another session, to a workflow agent or
+    to a name. When the host user's `settings.json` sets `disableAllHooks`, a managed setting
+    switches hooks off, or the turn is hosted, the hook cannot run and `SendMessage` is
+    disallowed instead (`docs/decisions.d/FIX-RUNNER-SENDMESSAGE-OWN.md`).
 
   What stays open: the class a sender states is a claim, so a session of yours in the same
   class, or a program that writes the claim, still gets its message into a runner session.
@@ -1081,9 +1087,13 @@ no login of the developer is touched. The real CLI runs only behind switches:
   entry names no process yet), the copy and the continuation in place at a resume, both
   refusals, the inbox socket, a refused request and a background command with the runner's own
   functions, and compare the recorded member table of the transcript with a fresh run. They
-  also hold what 09 18.5 "Whose input" and 18.2 rest on: that no class offers `SendMessage` or
-  `ListAgents` (`SendFile`, which only an account feature switches on, is held by its name in
-  the CLI's file, `test_pinned_cli.py`), what a session takes without a value of
+  also hold what 09 18.5 "Whose input" and 18.2 rest on: that no class with the deny list
+  offers `SendMessage` or `ListAgents` (`SendFile`, which only an account feature switches on,
+  is held by its name in the CLI's file, `test_pinned_cli.py`), that the hook of
+  `sendguard.py` lets `SendMessage` reach the session's own agent and refuses another
+  session's name, while without it that name reaches the other session
+  (`test_send_guard.py`, print mode beside a second session of the same configuration
+  folder), what a session takes without a value of
   `crossSessionInbound` and that the run's `accept` goes before a `hold` of the host user's
   settings (a `host`
   session needs the acceptance of bypass mode, which the test records in its own configuration
