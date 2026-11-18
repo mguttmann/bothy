@@ -8,6 +8,8 @@
 - A question card of the agent says how long the agent waits for the answer. An answer after
   the question expired is no longer taken silently: the run says that the question expired and
   that the answer did not reach the agent.
+- On Hermes Agent main a message of a person Hermes' allow list refuses no longer leaves the
+  run open: it ends as failed.
 
 ### Changed
 

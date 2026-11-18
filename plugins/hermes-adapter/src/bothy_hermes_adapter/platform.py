@@ -505,11 +505,22 @@ class ServerPlatform(BasePlatformAdapter):
             return TurnOutcome.FAILED
         future: asyncio.Future[TurnOutcome] = self._loop.create_future()
         self._turns[str(event.message_id)] = future
+        key = self._event_session_key(event)
+        before = self._session_tasks.get(key)
         try:
             await self.handle_message(event)
             if not getattr(event, "_gateway_accepted", True) and not future.done():
                 # Hermes dropped the event (busy lane, policy); no completion will come.
                 return TurnOutcome.FAILED
+            task = self._session_tasks.get(key)
+            if task is not None and task is not before and not future.done():
+                # The event's own processing task: Hermes main skips the processing hooks for a
+                # sender its allow list refuses, so the task can end without a completion
+                # (D-HAM-5).
+                await asyncio.wait({future, task}, return_when=asyncio.FIRST_COMPLETED)
+                if not future.done():
+                    _LOG.info("turn ended without a completion from Hermes (refused sender)")
+                    return TurnOutcome.FAILED
             return await future
         finally:
             self._turns.pop(str(event.message_id), None)

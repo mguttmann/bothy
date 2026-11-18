@@ -2911,6 +2911,9 @@ Three layers, each sufficient on its own for "no stranger triggers":
    a switch (I4), which needs a restart in Hermes anyway. With `organization`
    this list stays empty, and Hermes relies on layer 2; a list that would need a restart on every
    grant would not be operable.
+   A person the list refuses gets no turn: Hermes main (`f7e2898aaefc`) then calls neither
+   `on_processing_start` nor `on_processing_complete`, so the adapter ends the run `failed` when
+   the event's own processing task of Hermes ends without a completion (D-HAM-5).
 
 The server checks approval decisions (11.5); the adapter passes on only the callback ID and the
 acting person.
