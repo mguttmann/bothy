@@ -70,12 +70,12 @@ sessions".
 | `keeper.py`, `launch.py` | With `runner.turn_handover`: the keeper program of one launch, and the runner's side of the launch handshake, the group of keeper and CLI, the named pipe writer and the cases of a `launching` record (09 18.19.4, 18.19.5) |
 | `processstate.py` | `ProcessState`: every stream-derived value of the stdin and stop rule, and its replay (09 18.19.7) |
 | `handover.py` | The handover at SIGTERM (exit 75) and `stop --turns` (09 18.19.3) |
-| `bgmode.py`, `bgpaths.py` | Background mode of the runner process: the control commands, the one reader of the session list, the channels of the mode and the heartbeat reason of a fallback; the files of a background turn under `<runner.state_dir>/bg/` (09 18.2 "Background mode") and the mark of a session that took a foreign input and is never continued (09 18.5) |
+| `bgmode.py`, `bgpaths.py` | Background mode of the runner process: the control commands, the one reader of the session list, the channels of the mode and the heartbeat reason of a fallback; the files of a background turn under `<runner.state_dir>/bg/` (09 18.2 "Background mode") |
 | `bgsession.py` | A background session: the argument list (with the tools no session has) and the settings file of a launch (the run's environment, no inbound setting), the parsers of the launch output, the session list and `daemon status`, the supervisor rule, the line of the inbox socket with the envelope that states the sender's class, and `BgSession`, the handle of the session process with stop and remove |
-| `bgtranscript.py` | The session transcript as the stream of a turn: `TranscriptMapper` maps each record to the stream message of 18.4 that means the same, knows the runner's own lines by their `uuid` and names every other input, and judges every request record by the login beta; `TranscriptReader` tails the file and adds what only the session list knows; `foreign_origin` judges the whole transcript of a session process that is released (09 18.5 rule 4) |
+| `bgtranscript.py` | The session transcript as the stream of a turn: `TranscriptMapper` maps each record to the stream message of 18.4 that means the same, knows the runner's own lines by their `uuid` and names every other input, and judges every request record by the login beta; `TranscriptReader` tails the file and adds what only the session list knows; `foreign_origin` names the first input of another sender in a whole transcript, for an operator or a test (09 18.5) |
 | `tests/fake_claude/fake_bg.py` | The background side of Fake-Claude: `--bg` prints the launch line and starts a player under a supervisor process; the player writes transcript records and listens on the inbox socket; `agents`, `stop`, `rm` and `daemon status` answer from a state file in the fake configuration folder |
 | `tests/unit/test_bgsession.py`, `test_bgtranscript.py`, `test_bgmode.py`, `tests/scenarios/test_bg_sessions.py`, `test_bg_fallback.py`, `test_bg_adoption.py` | Background mode: the launch and its parsers, the mapping with the class test over every recorded transcript and its print stream, the shared mode with the fallback codes held against the tables of 09 18.9 and of this file, the scenarios of a background turn, every fallback cause, and the adoption by a new runner process |
-| `tests/scenarios/test_bg_inbox_auth.py` | Background mode, what must hold before it is switched on (FIX-RUNNER-BG-INBOX-AUTH): an input the runner did not write stops the session and is never answered, also after an adoption, also when its record is shaped like a tool result and also when the CLI records it as a notification; no later run continues that session, in either launch mode; the login check fails closed; no value of one run's environment reaches the session of another |
+| `tests/scenarios/test_bg_inbox_auth.py` | Background mode, what must hold before it is switched on (FIX-RUNNER-BG-INBOX-AUTH): an input the runner did not write is logged by its origin and answered like any input, also after an adoption, also when its record is shaped like a tool result and also when the CLI records it as a notification; the next run continues that session, in either launch mode, and a mark an earlier runner wrote has no effect (FIX-RUNNER-BG-FOREIGN-LOG); the login check fails closed; no value of one run's environment reaches the session of another |
 | `tests/real_cli/background.py`, `record_background.py`, `test_background.py`, `tests/fixtures/recording/background_<v>/` | Background sessions of the pinned CLI against the stand-in: the world of a test, the recorder, level one of the real-CLI suite and its recordings |
 | `tests/unit/test_keeper.py`, `test_launch.py`, `test_processstate.py`, `tests/scenarios/test_handover.py`, `test_launch_crash_points.py` | The keeper, the handshake, the replay with the class test over every Fake-Claude stream and checkpoint, AR-T02, AR-T03 and AR-T04 against real runner processes |
 | `tests/hosting_world.py`, `tests/hosting_runner.py` | The scenario world of a hosting runner: the runner's FakeServer with the hosting operations and one FakeServer per hosted agent; the hosting runner as a process of its own, for a scenario that kills it |
@@ -103,7 +103,7 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
   of `organization` live in the runner's own configuration folder and those of `personal` under
   `HOME`; M2-35 handles a missing session (fail open).
 - Install exactly the pinned Claude Code version (`PINNED_CLAUDE_CODE_VERSION` in
-  `heartbeat.py`, 2.1.325) and keep automatic updates of the CLI off; another version reports
+  `heartbeat.py`, 2.1.326) and keep automatic updates of the CLI off; another version reports
   `runtime_version_untested`, an older one `runtime_version_unsupported` and refuses runs.
   `claude-code-runner check-config --config <file>` prints `runtime ok` for the pinned version.
 - The API refuses a model to a CLI below the model's minimum version ("Claude Code <v> does not
@@ -119,7 +119,7 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
   value as it is, `startRun` and `agent_session.report` get the model name without the suffix,
   because the server's model name (09 2.2) has no `[`.
 - `runner.default_model` and a binding's model must name a model the API serves, such as
-  `claude-fable-5-2[1m]`. The runner does not check the name, and Claude Code passes any value
+  `claude-opus-5-5[1m]`. The runner does not check the name, and Claude Code passes any value
   to the API unchanged. A placeholder such as `model-large` (the value of the example file
   until 2026-11-10) is unknown to the API: without a fallback model the turn fails with "There's
   an issue with the selected model", and with one Claude Code answers the turn with the fallback
@@ -293,8 +293,8 @@ throttles them to `agent.run_update_min_interval`.
 
 The run graph fields (`tool_use_id`, `task_type`, `usage`, the workflow type `local_workflow`)
 were read from the files of the pinned CLI 2.1.259 without a session (ruling D-M2-51-1), read
-again in 2.1.288 (D-RUNNER-CLI-PIN-1), in 2.1.321 (D-FIX-RUNNER-CLI-PIN-321-3) and in 2.1.325
-(`tests/fixtures/recording/stream_fields_2.1.325.json`, D-FIX-RUNNER-CLI-PIN-325-3: the members
+again in 2.1.288 (D-RUNNER-CLI-PIN-1), in 2.1.321 (D-FIX-RUNNER-CLI-PIN-321-3), in 2.1.325 (D-FIX-RUNNER-CLI-PIN-325-3) and in
+2.1.326 (`tests/fixtures/recording/stream_fields_2.1.326.json`, D-FIX-RUNNER-CLI-PIN-326-2: the members
 of every message of the table above, from the message schemas in the CLI's file and from a
 recorded turn). The level-one switch test holds the recorded table against the installed CLI.
 2.1.321 adds members the runner does not read (`run_id`, `parent_task_id` and `awaited` of a
@@ -477,15 +477,18 @@ against a server that accepts the heartbeat capability `turn_handover` and has
 Off by default (`runner.launch_mode = "print"`); without the key the runner calls no command of
 background sessions and behaves exactly as before, held by the byte-equal fixtures of
 `tests/fixtures/baseline` and by `test_without_the_key_no_command_of_background_sessions_runs`.
-With `runner.launch_mode = "background"` a turn of the runner's own agent in billing mode
-`personal` runs as a Claude Code background session (`claude --bg`); with
-`runner.background_channels` only in the listed channels. Every `organization` turn, every turn
-of a hosted agent, every turn that loads a channel skill folder (`runner.channel_skills_dir`,
-"Channel skills" below: the launch command of a background session carries no `--plugin-dir`),
-the compaction of a full context and the one-shot calls stay in print mode.
+With `runner.launch_mode = "background"` every turn of the runner's own agent runs as a Claude
+Code background session (`claude --bg`), with channel skill folders (`--plugin-dir`); with
+`runner.background_channels` only in the listed channels. Such a run never uses print mode: an
+`organization` turn, the compaction of a full context and every turn of a hosted agent end
+`failed` with their cause (table below). A hosted agent cannot run as a background session of
+the pinned CLI: below `host` `--restricted` binds no inbox socket, and under `host` the session
+drops `bypassPermissions` without the user settings that a hosted agent never loads. Keep
+`print` on a runner that serves hosted agents.
+Only the one-shot calls (search assistant, agent builder) stay `claude -p`.
 Background sessions and agent view are a research preview of Claude Code, and most of what the
-runner reads of them is internal to the CLI; the mode therefore runs only on the pinned version
-and falls back to print mode whenever it is not available.
+runner reads of them is internal to the CLI; the mode therefore runs only on the pinned version,
+and a run it is not available for ends `failed` with its cause instead of using print mode.
 
 What the documentation of Claude Code promises and what it does not: it says that background
 sessions consume subscription usage the same as interactive sessions. It does not say that a
@@ -496,11 +499,15 @@ what either path draws from a subscription is a measurement on the operator's ow
 Before you switch it on:
 
 - **Version.** Install exactly the pinned Claude Code version and keep its automatic update
-  off. On any other version every run uses print mode (`background_version_untested`).
+  off. On any other version every run fails (`background_version_untested`).
 - **Workspace trust.** The CLI starts a background session only in a folder with workspace
   trust: run `claude` once in each bound project folder (and in `runner.default_workspace`) as
   the runner's host user and accept the prompt. A Git repository below a trusted folder needs
-  its own acceptance. The runner never writes that entry itself.
+  its own acceptance. The runner never writes that entry itself. Since 2.1.326 the folder of
+  chat files, `<runner.state_dir>/files` (passed as `--add-dir` to `scoped` and `host` turns
+  with files), needs that trust too: run `claude` there once and accept (trust of that folder
+  covers the folder of each thread below it). Without it every turn with files fails
+  (`background_files_untrusted`).
 - **Bypass mode** (tool class `host` only). The CLI refuses `--bg` with `bypassPermissions`
   until the host user accepted bypass mode once: run `claude --dangerously-skip-permissions`
   once interactively as that user. The runner never records the acceptance itself.
@@ -510,7 +517,7 @@ Before you switch it on:
   `<runner.state_dir>/bg/supervisor.json`), because sessions inherit the supervisor's
   environment and only such a supervisor carries the allow list of 18.2. While the host user
   runs background sessions of their own (agent view), their supervisor is in the way and every
-  run of the runner uses print mode (`background_supervisor_foreign`).
+  run of the runner fails (`background_supervisor_foreign`).
 - **The small-model alias.** For a background session the CLI sends short requests of its own
   (a summary for agent view at every turn end and a check at the session's start). They use the
   small-model alias of the host user's Claude Code settings, are in no transcript and are not
@@ -524,33 +531,22 @@ Before you switch it on:
   Claude Code sessions besides the runner's, or only ones that are trusted like the runner.
   What the runner enforces (09 18.5 "Whose input"):
   - It knows its own lines by their `uuid`, which the CLI keeps in the transcript. When a
-    session takes an input under any other `uuid`, or a person types into it, the runner stops
-    the session and the run ends `failed` with the cause `background_foreign_input`. No answer
-    to that input and no attachment of it is posted. A runner that adopts a turn after a crash
-    holds the same rule with the lines its turn record names. Whose input a transcript record
-    is, the runner reads from the record's origin before anything of its content, so a record
-    of a sender never passes as a step of the turn. What a session gives itself is a closed
-    list: the notification of work the session itself launched, which the CLI marks with the
-    producer `session-task`, and a continuation the CLI queues by itself. An input under any
-    other origin counts as another sender's. That includes what the CLI records as a
-    notification without that producer (a message of another session of yours, a relay, a
-    scheduled prompt, a webhook) and what a plugin or a channel of your own Claude Code
-    configuration queues: each ends the run.
-  - A session that took such an input is never continued. Its conversation holds the input,
-    and a resume would send it to the model again with the next message. The runner marks the
-    session (`<runner.state_dir>/sessions/<session id>/foreign-input`, kept by the retention
-    sweep), and the next message of the thread starts a new session, in background mode and
-    in print mode, with the box note of a session that was not found and the log line
-    `session_not_continued`. The price is the history: the new session knows nothing of the
-    stopped one, and the cause of the failed run says so. A session that is released before
-    the runner read its transcript to the end (a run ends with an error or fails the login
-    check, a runner that starts after a crash does not follow the turn) is judged the same
-    way first:
-    the runner reads the rest of that transcript and marks the session when it took such an
-    input there (`background_foreign_input_unread`).
-  - The settings file of a run sets no `crossSessionInbound`, so the CLI's own rule per message
-    applies and a stricter value of your own or of managed settings is not overridden. By
-    that rule a `host` session (bypass mode) takes only a message whose sender states that it
+    session takes an input under any other `uuid`, or a person types into it, the runner logs
+    the warning `background_foreign_input` with a fixed word for whose input it was (`peer`,
+    `human`, `other`, `unattributed`) and nothing of its text. Nothing else happens: the run
+    goes on, the answer is posted, and the next message of the thread continues the session
+    (since 2026-11-17; before, the runner stopped the session, failed the run and started the
+    next message in a new session, a false alarm wherever only the thread's person and Claude
+    Code itself write into a session). A runner that adopts a turn after a crash logs the
+    same way with the lines its turn record names. Whose input a transcript record is, the
+    runner reads from the record's origin before anything of its content, so a record of a
+    sender never passes as a step of the turn. What a session gives itself is a closed list
+    and is not logged: the notification of work the session itself launched, which the CLI
+    marks with the producer `session-task`, and a continuation the CLI queues by itself. A
+    file `<runner.state_dir>/sessions/<session id>/foreign-input` of the earlier rule has no
+    effect and goes with the retention sweep.
+  - The settings file of a run sets no `crossSessionInbound` unless your own Claude Code
+    settings say `hold` (below), so the CLI's own rule per message applies. By that rule a `host` session (bypass mode) takes only a message whose sender states that it
     bypasses permission prompts too, and a `chat` or `scoped` session every message whose
     sender does not state that. The runner's lines for a `host` session state it. The CLI
     offers nothing narrower that still lets the runner's lines through: no list of allowed
@@ -564,17 +560,20 @@ Before you switch it on:
 
   What stays open: the class a sender states is a claim, so a session of yours in the same
   class, or a program that writes the claim, still gets its message into a runner session.
-  The runner then stops that session at its next read of the transcript
-  (`runner.poll_interval`), and until then the model can act on the message with the rights of
-  the tool class. Nothing here protects against a program of the host user that reads or
-  writes the runner's state folder or the transcripts of Claude Code, and the runner sees
-  only what a session takes while a run follows it: whoever continues a session of a thread
-  by its id between two runs writes into the conversation unseen. A tool that reaches other
+  The runner only logs it, and the model acts on the message with the rights of the tool
+  class. Nothing here protects against a program of the host user that reads or
+  writes the runner's state folder or the transcripts of Claude Code. A tool that reaches other
   sessions and is not on the list above is not denied.
 - **Your own `crossSessionInbound`.** Leave it unset in the host user's Claude Code settings.
-  With `accept` there every session of the host takes every message again, the runner's too.
-  With `hold` or `refuse` the CLI keeps or drops the runner's own follow-up as well: the
-  running turn goes on without it, and the server defers it into a run of its own.
+  Any value there switches the CLI's rule per message off for every session, and `hold` or
+  `refuse` would keep the runner's own follow-ups out of the session too (the server then
+  defers each into runs of their own and the same message is answered again). So when your
+  settings say `hold`, the settings file of every run sets `accept`, which goes before yours:
+  a runner session then takes every message, the runner logs each one it did not write, and
+  the model acts on it with the rights of the tool class. A `refuse` of yours is taken as a
+  deliberate choice and never overridden: the runner's follow-ups are then refused as well
+  and each waits for a run of its own. Your other sessions keep your value. A value `hold` or
+  `refuse` of managed settings still holds the runner's lines.
 - **The SSH agent.** With `runner.forward_ssh_agent` a turn gets the agent socket through the
   settings file of its run. The supervisor is started from the runner's fixed environment,
   which never carries the socket, and every settings file sets `SSH_AUTH_SOCK`, to the empty
@@ -634,9 +633,9 @@ How a background turn runs:
   process. A session whose process is gone is finished from its transcript when the end of the
   turn is in it.
 
-When the mode is not available, the run uses print mode, the live box says once
-"Background sessions are not available (`<code>`); this run uses print mode.", the log has
-`background_fallback`, and for a cause of the host the heartbeat reports `degraded` with
+When the mode is not available, the run ends `failed` with the code as its cause in the thread
+and never uses print mode (D-FIX-RUNNER-CLI-PIN-326-4), the log has
+`background_unavailable`, and for a cause of the host the heartbeat reports `degraded` with
 `background_unavailable` until the next background launch starts (it blocks no run):
 
 | Code | What to do |
@@ -646,23 +645,26 @@ When the mode is not available, the run uses print mode, the live box says once
 | `background_supervisor_version` | the runner's own supervisor runs another version than the pin (the CLI was updated under it): it ends with its last session |
 | `background_bypass_not_accepted` | accept bypass mode once as the host user (above) |
 | `background_workspace_untrusted` | accept workspace trust for the project folder (above) |
+| `background_files_untrusted` | accept workspace trust for `<runner.state_dir>/files` (above) |
 | `background_session_foreign` | the thread's session is listed in agent view under a name the runner did not give: remove it there (`claude rm`) |
 | `background_launch_failed` | the launch or a control command failed, or the session got no process within `runner.cli_probe_timeout`; the files `<runner.state_dir>/bg/<run_id>.launch.err` of a running run and the log say more |
+| `background_api_key` | an `organization` run: a background session takes no API key; use `print` for such agents |
+| `background_compaction` | the context is full; the runner compacts only in print mode: start a new post |
+| `background_restricted` | a hosted agent below `host` (`--restricted` binds no inbox socket): use `print` |
+| `background_hosted_bypass` | a hosted agent of class `host` (no bypass without the user settings): use `print` |
 
-The fallback happens only while it is certain that no session took the prompt. In every other
+A launch is judged failed without a session only while it is certain that no session took the prompt. In every other
 doubt the runner stops the session and ends the run `runtime_error` with the code as the cause,
 so a prompt never runs twice. Further causes of a failed run in this mode:
 `background_session_copied` (the CLI started a copy at a resume, because another program
 started the session in between), `background_process_replaced` (the supervisor started the
 session again), `background_session_waiting` (the session waited for a person; the class
 flags and `--disallowedTools AskUserQuestion` prevent a question, and a message of another
-session that the CLI holds for an approval shows the same way) and `background_foreign_input`
-(the session took a message the runner did not send, and no later run continues that session;
-above). A run that ends `billing_mode_mismatch` in this mode failed the login check above.
+session that the CLI holds for an approval shows the same way). A message the runner did not
+send ends no run (above). A run that ends `billing_mode_mismatch` in this mode failed the login check above.
 
 Switching the key off again needs no step: both modes continue the same sessions, and a turn
-record a background turn left is still settled at the next start. A session marked for a
-foreign input stays marked: print mode does not continue it either.
+record a background turn left is still settled at the next start.
 
 ## Costs
 
@@ -1082,7 +1084,8 @@ no login of the developer is touched. The real CLI runs only behind switches:
   also hold what 09 18.5 "Whose input" and 18.2 rest on: that no class offers `SendMessage` or
   `ListAgents` (`SendFile`, which only an account feature switches on, is held by its name in
   the CLI's file, `test_pinned_cli.py`), what a session takes without a value of
-  `crossSessionInbound` (a `host`
+  `crossSessionInbound` and that the run's `accept` goes before a `hold` of the host user's
+  settings (a `host`
   session needs the acceptance of bypass mode, which the test records in its own configuration
   folder), that a line of another sender shows in the transcript like the runner's with
   another `uuid` and that a line whose content is no text becomes no record at all, that a
@@ -1154,7 +1157,7 @@ never which host runs or showed what (the repository is public; `tests/unit/test
   `system/init` interrupts the turn with SIGINT.
 - Is `/compact` available in print mode of the pinned version? Yes: the command `compact` of
   Claude Code 2.1.259 has `supportsNonInteractive: true` in the files of the pinned CLI
-  (retrieved 2026-10-24, again in 2.1.288 on 2026-10-29, in 2.1.321 on 2026-11-10 and in 2.1.325 on 2026-11-16), and the Agent SDK page on slash commands sends `/compact` as a prompt
+  (retrieved 2026-10-24, again in 2.1.288 on 2026-10-29, in 2.1.321 on 2026-11-10, in 2.1.325 on 2026-11-16 and in 2.1.326 on 2026-11-17), and the Agent SDK page on slash commands sends `/compact` as a prompt
   and reports it with a `system` message `compact_boundary`
   (https://code.claude.com/docs/en/agent-sdk/slash-commands, retrieved 2026-10-24). That the CLI
   takes it as the content of a stream-json `user` line is not run with a real session yet (level

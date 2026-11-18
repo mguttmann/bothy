@@ -1,0 +1,32 @@
+{
+  "new": {
+    "exit": 0,
+    "stdout": "backgrounded \u00b7 61289806 \u00b7 bothy-post\n  claude agents             list sessions\n  claude attach 61289806    open in this terminal\n  claude logs 61289806      show recent output\n  claude stop 61289806      stop this session\n",
+    "stderr": "Starting background service\u2026\n"
+  },
+  "resumed_in_place": {
+    "exit": 0,
+    "stdout": "backgrounded \u00b7 61289806 \u00b7 bothy-post\n  claude agents             list sessions\n  claude attach 61289806    open in this terminal\n  claude logs 61289806      show recent output\n  claude stop 61289806      stop this session\n",
+    "stderr": ""
+  },
+  "copy_while_running": {
+    "exit": 0,
+    "stdout": "backgrounded \u00b7 896dee00 \u00b7 bothy-fup\n  claude agents             list sessions\n  claude attach 896dee00    open in this terminal\n  claude logs 896dee00      show recent output\n  claude stop 896dee00      stop this session\n",
+    "stderr": "note: session 30624aa8 is already running in the background, so this started a copy as 896dee00. `claude attach 30624aa8` opens the original.\n"
+  },
+  "resume_unknown": {
+    "exit": 0,
+    "stdout": "backgrounded \u00b7 ccaf64cf \u00b7 bothy-gone\n  claude agents             list sessions\n  claude attach ccaf64cf    open in this terminal\n  claude logs ccaf64cf      show recent output\n  claude stop ccaf64cf      stop this session\n",
+    "stderr": ""
+  },
+  "untrusted": {
+    "exit": 1,
+    "stdout": "",
+    "stderr": "Workspace not trusted. Run `claude` in /record/bgc55938/other once and accept the trust prompt, then retry.\n"
+  },
+  "bypass": {
+    "exit": 1,
+    "stdout": "",
+    "stderr": "--bg with bypassPermissions requires accepting the disclaimer first. Run `claude --dangerously-skip-permissions` once interactively.\n"
+  }
+}

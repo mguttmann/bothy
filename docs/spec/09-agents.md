@@ -3356,13 +3356,21 @@ With `runner.launch_mode` `background` a turn runs as a background session of Cl
 (`claude --bg`, https://code.claude.com/docs/en/agent-view, retrieved 2026-11-16; a research
 preview of Claude Code) instead of a `claude -p` process. The key is `print` by default, and
 without it the runner calls no command of background sessions and behaves exactly as above.
-Scope: only a turn of the runner's own agent in billing mode `personal`, and, when
-`runner.background_channels` is not empty, only in a listed channel. In print mode stay every
-`organization` turn (a background session takes no API key from the environment), every turn of
-a hosted agent (26 5), every turn that loads a channel skill folder (26 5.9: the argument list
-below has no `--plugin-dir`, and such a folder was not run with a background session), the
-compaction of 18.9 (its retry runs as a session again; both modes share the session store) and
-the one-shot calls of 18.17 and 26 6.2. The mode runs only on the
+Scope (changed 2026-11-17, owner order, FIX-RUNNER-CLI-PIN-326): every turn of a run in a
+channel the mode is on for (every channel, or with `runner.background_channels` the listed
+ones), of the runner's own agent and of a hosted agent (26 5), with or without channel skill
+folders (26 5.9), runs as a background session or the run ends `failed` with the cause in the
+thread; such a run never uses print mode. A turn with channel skills carries one `--plugin-dir`
+per folder (26 5.9) in the launch. A hosted turn cannot run as a background session of the
+pinned CLI, so its run ends `failed` with its cause: below `host` `--restricted` binds no inbox
+socket (`background_restricted`), and under `host` the session runs in permission mode `default`
+instead of `bypassPermissions` once `--setting-sources project,local` (26 5.3) leaves out the
+user settings, and holds the runner's lines (`background_hosted_bypass`; both run with 2.1.326).
+The run ends with a cause of 18.9
+"Background mode is unavailable" for an `organization` turn (a background session takes no API
+key; `background_api_key`), for the compaction of 18.9 (`background_compaction`) and for every
+hosted turn (`background_restricted`, `background_hosted_bypass`). The one-shot calls of 18.17 and 26 6.2 are no turns and stay
+`claude -p`. The mode runs only on the
 pinned version of the CLI. Everything below was run with the pinned CLI 2.1.325 against a local
 stand-in for the API and is recorded in
 `plugins/claude-code-runner/tests/fixtures/recording/background_<pinned version>`; a change of
@@ -3383,9 +3391,9 @@ argument list, in this order (no shell):
 | Prompt | the stdin of the launch command: the two items of the first stdin line of "Input" above joined by a blank line, as one text | a positional argument is bounded by the system's argument limit and readable in the process list; the context comes first, so the prompt never starts with `/` or `!` |
 | Flags of the class | those of the table above, and under `scoped` and `host` `--disallowedTools AskUserQuestion SendMessage ListAgents SendFile`; `--permission-prompts none` is left out (it belongs to print mode) and `--session-id` too (the CLI ignores it for a background session). `chat` has no tool (`--tools ""` leaves none) | a question blocks a session until a person answers it in Claude Code; `SendMessage` and `ListAgents` are the tools that write to and list the other Claude Code sessions of the host user (cross-session messaging, https://code.claude.com/docs/en/cross-session-messaging, retrieved 2026-11-16), and `SendFile` sends files to one, by a name of that list or by the address of its socket (read in the file of the pinned CLI on 2026-11-17: an account feature switches the tool on, so a session without a login offers none and no run showed it). A session of the runner does none of the three. The list holds the tools that were found, by runs and by reading the file; it is no proof that the CLI has no further one (18.5 "What stays open"). The deny rule for `SendMessage` also takes the messages to the session's own subagents and teammates, which the same tool serves |
 | Files | `<runner.state_dir>/bg/` holds, named after the run, the inbox socket `<digest>.sock` (the first 16 hexadecimal digits of the SHA-256 of the run id), the settings file `<run_id>.settings.json` (mode `0600`), the system prompt file `<run_id>.system-prompt.md` and the launch command's stdout and stderr; they are removed when the run left the runner. With `runner.launch_mode` `background` the start is refused, naming `runner.state_dir`, when the socket path is longer than a socket address of the system allows | a live session process keeps the files it was started with, so none of them lies in the session's folder, which moves when the runner learns the id of a new session (18.1) |
-| Settings file | exactly two members: `worktree.bgIsolation` `none`, and `env` with `CLAUDE_PRODUCT_RUN`, `DISABLE_AUTOUPDATER`, the run's `TMPDIR` and `SSH_AUTH_SOCK`, each of the four in every file: `SSH_AUTH_SOCK` holds the agent socket with `runner.forward_ssh_agent` and is the empty text otherwise. The file sets no `crossSessionInbound` (18.5 "Whose input") | without `none` the session moves into a Git worktree of its own (against 18.1) and its transcript moves with it; of the launching command's environment only `PATH` reaches the session, and a session inherits the environment of the supervisor, which lives across runs, so a name that is not set here would keep whatever the supervisor carries; a value of the `env` block goes before an inherited one |
+| Settings file | two members: `worktree.bgIsolation` `none`, and `env` with `CLAUDE_PRODUCT_RUN`, `DISABLE_AUTOUPDATER`, the run's `TMPDIR` and `SSH_AUTH_SOCK`, each of the four in every file: `SSH_AUTH_SOCK` holds the agent socket with `runner.forward_ssh_agent` and is the empty text otherwise. A third, `crossSessionInbound` `accept`, only when the host user's own `settings.json` in the turn's configuration folder gives that setting the value `hold` (18.5 "Whose input") | without `none` the session moves into a Git worktree of its own (against 18.1) and its transcript moves with it; of the launching command's environment only `PATH` reaches the session, and a session inherits the environment of the supervisor, which lives across runs, so a name that is not set here would keep whatever the supervisor carries; a value of the `env` block goes before an inherited one |
 | Environment | the launch command and every control command (`claude agents --json --all`, `claude stop`, `claude rm`, `claude daemon status`) get one fixed environment of the runner process: the allow list above built once at the start, without the SSH agent and without the temporary folder of any run, plus `DISABLE_AUTOUPDATER`. No value of a run is ever in it; a run's values reach its session through the `env` block of the settings file alone | the launch that starts the supervisor hands it its environment, the supervisor lives across runs, and every later session inherits what it carries: an SSH agent socket in it would reach the session of a run that must not have one |
-| Before a launch | `claude daemon status` and the session list are read. No supervisor: the launch starts one, and the runner records it (its process id and start time, `<runner.state_dir>/bg/supervisor.json`) when the launch printed that it started the service. A supervisor that is the recorded one in the pinned version: launch. Any other supervisor: no launch (18.9 "Background mode is unavailable"). The runs of one runner process do this one after the other: a run reads `claude daemon status` only after the launch command of the run before it has ended and the supervisor that command started is recorded, so runs that start together launch under the same supervisor. Before a resume no process of the session may live: an entry of the session under the runner's name prefix `bothy-` is stopped (`claude stop`) and removed (`claude rm`), which makes the launch continue the session in place with this run's flags; an entry under another name belongs to another program and is never stopped or removed: with a process the run ends `failed` with `adapter_error` and the cause `session_busy`, without one the run uses print mode | sessions inherit the supervisor's environment, so only a supervisor a launch of the runner started carries the allow list and nothing else; a run that read the supervisor between the launch of another run and its record would take the runner's own supervisor for another program's; a resume of a session that still has an entry starts a copy |
+| Before a launch | `claude daemon status` and the session list are read. No supervisor: the launch starts one, and the runner records it (its process id and start time, `<runner.state_dir>/bg/supervisor.json`) when the launch printed that it started the service. A supervisor that is the recorded one in the pinned version: launch. A supervisor whose process is gone when its start time is read ended on its own after its last session: `claude daemon status` is read once more. Any other supervisor: no launch (18.9 "Background mode is unavailable"). The runs of one runner process do this one after the other: a run reads `claude daemon status` only after the launch command of the run before it has ended and the supervisor that command started is recorded, so runs that start together launch under the same supervisor. Before a resume no process of the session may live: an entry of the session under the runner's name prefix `bothy-` is stopped (`claude stop`) and removed (`claude rm`), which makes the launch continue the session in place with this run's flags; an entry under another name belongs to another program and is never stopped or removed: with a process the run ends `failed` with `adapter_error` and the cause `session_busy`, without one with `runtime_error` and the cause `background_session_foreign` | sessions inherit the supervisor's environment, so only a supervisor a launch of the runner started carries the allow list and nothing else; a run that read the supervisor between the launch of another run and its record would take the runner's own supervisor for another program's; a resume of a session that still has an entry starts a copy |
 | Started | the launch printed `backgrounded · <short id> · <name>` (the short id is the first eight characters of the session id), the entry of the session in the list has a `pid`, and the transcript shows the prompt as a `user` record after the launch offset, all within `runner.cli_probe_timeout`. The runner records the process (its id and start time; its command line names neither the session nor its flags) in the turn record. After a resume the short id must be that of the session and stderr must carry no `note:` line; otherwise the CLI did not continue the session in place (another program started it in between): the runner stops what the launch started, removes a copy, and ends the run `failed` with `runtime_error` and the cause `background_session_copied` | the identity of the process before every signal (18.9); a copy would answer in another session |
 | Supervisor | the runner installs, starts and stops no supervisor | `claude daemon stop` would end sessions of the host user |
 | Parallelism, locks | as above; `run_slots` counts a background turn until its release (18.6). The session process cannot inherit lock descriptors, so the locks of a background turn live with the runner process | a runner that adopts the turn takes the locks again (18.9) |
@@ -3552,7 +3560,7 @@ the content is read only afterwards.
 | `user` with an origin of the session itself: `origin.kind` `task-notification` with `origin.producer` `session-task` and without `origin.subkind`, or `origin.kind` `auto-continuation` | `origin.producer`, `origin.subkind` | a turn the session starts by itself (18.5 "Whose input") |
 | `user` with any other origin, also `task-notification` without that producer or with a `subkind` | none | an input of another sender (18.5 "Whose input") |
 | `queue-operation` | `operation`, `reason`, `commandUuid` | `enqueue` and `dequeue` stand in for `command_lifecycle` `queued` and `started` (18.5), matched in their order, and `dequeue` starts a turn; `remove` with `absorbed_mid_turn` and a `commandUuid` the runner wrote is the echo of that line, a second one under the same `commandUuid` an input of another sender. The CLI removes the notification of the session's own background work the same way, under a `uuid` it made itself, so a removal under any other `uuid` leaves the input open until its attachment (next row) says whose it is |
-| `attachment` of the type `queued_command` | `attachment.origin.kind`, of a `task-notification` also `attachment.origin.producer` and `attachment.origin.subkind`, `attachment.source_uuid` | what a running turn took in, written before the request that carries it: with `origin.kind` `peer` and a `source_uuid` the runner did not write (or wrote and saw before), or with any other origin that is not one of the session itself, an input of another sender (18.5 "Whose input"); with an origin of the session itself (the two of the `user` rows above) the input of that `source_uuid` is the session's own. An input that is still open at the next `assistant` record or turn end is an input of another sender too. No other attachment is read |
+| `attachment` of the type `queued_command` | `attachment.origin.kind`, of a `task-notification` also `attachment.origin.producer` and `attachment.origin.subkind`, `attachment.source_uuid` | what a running turn took in, written right after the record of the request that carries it: with `origin.kind` `peer` and a `source_uuid` the runner did not write (or wrote and saw before), or with any other origin that is not one of the session itself, an input of another sender (18.5 "Whose input"); with an origin of the session itself (the two of the `user` rows above) the input of that `source_uuid` is the session's own. An input that is still open at the first `assistant` record after the request that carries it, at the next request or at turn end is an input of another sender too, unless the same attachment in the file of an agent of the session (`<session id>/subagents/**/*.jsonl`, a record with `isSidechain` true) attributes it by this row: an agent the session launched takes inputs too, and the CLI writes their removal into the session's transcript and their attachment into the agent's file. No other attachment is read |
 | `system` `turn_duration` | none | the end of the turn: the answer is the text of the turn's last assistant message; a turn whose last assistant record is an API error has none and ends like a `result` with an error |
 | `cost-state`, written when the session process ends | `modelUsage` | the session's totals (18.7) |
 
@@ -3739,15 +3747,22 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
    attachment after it, a `user` record or attachment with any other origin that is not one of
    the session itself, and
    an input a running turn took under a `uuid` the runner did not write that no attachment
-   attributes to the session itself before the session's next output (18.4). At the first such input the runner stops the session (18.6), and the run ends
-   `failed` with `runtime_error`, a box note and the cause `background_foreign_input` (log
-   event `background_foreign_input` with one of the words `peer`, `human`, `other` or
-   `unattributed` for whose input it was, never a text of the record). The record of
-   the input lies before the answer of the turn that took it, and the runner reads no further:
-   neither that answer nor an attachment of it is posted. Answers of earlier turns of the run
-   stay. A runner that adopts the turn applies the same rule with the lines the turn record
+   attributes to the session itself before the next request of the session or the end of
+   the turn (18.4; an attachment with `commandMode` `task-notification` and no origin is the
+   session's own notification; an input that an agent of the session took is attributed by
+   the attachment in that agent's file below `<session id>/subagents/`, by the same rule,
+   FIX-RUNNER-BG-SIDE-NOTICE). Such an input is logged and nothing else (addendum of
+   2026-11-17, D-FIX-RUNNER-BG-FOREIGN-LOG-1: an input in the thread's chat is never
+   discarded): the log has the warning `background_foreign_input` with one of the words `peer`, `human`, `other` or `unattributed` for whose input it was,
+   never a text of the record. The session is not stopped, the run goes on and ends as
+   usual, the input starts or joins a turn like the session's own input, and the answer is
+   posted. A runner that adopts the turn logs the same way with the lines the turn record
    names, over the part of the transcript the previous runner read and over the rest; a record
-   that names no line proves none, so every line then counts as another sender's (18.9). What
+   that names no line proves none, so every line then counts as another sender's (18.9). (The
+   first version of this rule, of 2026-11-16, stopped the session and ended the run `failed`
+   with the cause `background_foreign_input`; where only the thread's person and Claude Code
+   itself, a notification of an agent or of a plugin, write into a session, every stop was a
+   false alarm, and the thread lost its conversation each time.) What
    a session gives itself is no such input, and its origins are a closed list:
    `task-notification` with `producer` `session-task` and without a `subkind` (the
    notification of work the session itself launched: a background command, run with the
@@ -3774,9 +3789,19 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
     `task-notification` for the session's own by its kind alone; the review of that version
     found it.)
 
-2. **The settings file widens nothing.** It sets no `crossSessionInbound`, so the CLI's own
-   rule per message stays and a stricter value of the host user's or of managed settings is
-   not overridden. That rule, run with the pinned CLI: a session that bypasses permission
+2. **The settings file widens only what the runner's own lines need.** It sets no
+   `crossSessionInbound` while the host user's own settings have none, so the CLI's own rule
+   per message stays. When they have a value, that value decides every message and the rule
+   per message is off: `hold` there keeps every follow-up of the runner out of the session,
+   and the server defers each into runs of their own, where the same message is answered
+   again (FIX-RUNNER-BG-HELD-FOLLOWUP). For `hold` the file
+   then sets `accept`, which goes before a value of the user's settings and lets the runner's
+   lines through, and every other sender's too, which rule 1 logs. Every other value of the
+   user's settings stays in force and the file sets none: `refuse` is the operator's
+   deliberate choice to take nothing from other sessions and is never overridden (the
+   runner's lines are refused too, and a follow-up waits for a run of its own), `accept`
+   lets the lines through already, and a value the CLI does not know is left as it is. A
+   value of managed settings stays in force. The rule per message, run with the pinned CLI: a session that bypasses permission
    prompts (`host`, `bypassPermissions`) takes a message only when its sender states that it
    bypasses them too, and holds every other one; every other session (`chat` and `scoped`,
    `dontAsk`) takes a message unless its sender states that it bypasses prompts. A sender
@@ -3788,8 +3813,7 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
    element is not written into an envelope: the follow-up stays `queued` and the server defers
    it. A message this rule holds is never delivered; the session list then shows the session
    as waiting for a permission prompt, and the runner stops it as a session that waits for a
-   person (below). A value `hold` or `refuse` of the host's own settings keeps or drops a
-   message without that, the runner's own lines included. The CLI offers nothing narrower
+   person (below). The CLI offers nothing narrower
    that lets the runner's lines through: it has no list of allowed senders, and its exception
    for a message of a session's own child process (a token the session gives its tool calls)
    exists only without a value, holds a living process that is no child, and rests on a token
@@ -3800,53 +3824,26 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
    the other Claude Code sessions of the host user. The list is what was found, not a proof
    that the CLI has no further one (below).
 
-4. **A session that took an input of another sender is never continued** (addendum of
-   2026-11-17). The input stays in the session's conversation: a process that continues the
-   session sends it to the model again with its next request, and the runner of that run,
-   which reads the transcript from its launch offset, sees nothing of it and would post the
-   answer (run with the pinned CLI: after the stop and the removal of the entry, the request
-   of the resumed session carried the line of the other sender again). So the runner marks
-   the session before it stops it, with the file
-   `<runner.state_dir>/sessions/<session id>/foreign-input`, which names the run and nothing
-   of the input and which the retention of the state directory keeps. No new attempt of any
-   run continues a marked session, in background mode and in print mode alike: a run whose
-   session is marked takes the path of a missing session of 18.9 before it starts a process
-   (a new session reference, the same first line, the box note `session_missing` once,
-   `agent_session.report` with the new reference and, in mode `bind`, `bind_failed`), and the
-   log has `session_not_continued`. The cost is the history: the thread goes on in a new
-   session that knows nothing of the stopped one, and the cause of the failed run says so. A
-   mark that cannot be written is logged (`session_mark_failed`); the next run then
-   continues the session.
-
-    A session can be released before a runner read its transcript to the end: an error, the
-    counter-check of 18.3 or a cancellation of the run in the runner ends the run, or a runner
-    that starts after a crash does not follow the turn, because the previous runner had
-    decided its end, the run has ended, or the session has no process and the end of its turn
-    is not in the transcript (18.9). What the session took in the part nobody read stays in
-    its conversation all the same. So at every such release, once the process is gone, the
-    runner maps the transcript of that process from its launch offset to its end, with the
-    lines the turn record names as the runner's, and marks the session at an input of another
-    sender (log `background_foreign_input_unread` with the word of rule 1). The run ends as
-    it was going to.
+4. **A session that took an input of another sender is continued like any other**
+   (addendum of 2026-11-17, FIX-RUNNER-BG-FOREIGN-LOG). The input stays in the session's
+   conversation, and a process that continues the session sends it to the model again with
+   its next request (run with the pinned CLI). The runner accepts that: nothing is marked, no
+   run takes a new session because of it, and a file
+   `<runner.state_dir>/sessions/<session id>/foreign-input` that a runner of the first version
+   wrote is read by no runner and goes with the retention of the state directory.
 
 What stays open: the class in the envelope is a claim, not a proof, so rule 2 keeps out only
-senders that state their class truthfully, and a message that is taken reaches the model before
-rule 1 stops the session at the next read of the transcript (`runner.poll_interval`); the
-session can act on it in that time with the rights of its tool class. A value `accept` of
-`crossSessionInbound` in the host user's own settings makes every session of the host take
-every message, the runner's too. A program of the host user that reads or writes the runner's
+senders that state their class truthfully, and a message that is taken reaches the model, which
+acts on it with the rights of its tool class; rule 1 only logs it. A `hold` or an
+`accept` of `crossSessionInbound` in the host user's own settings makes every session of the
+runner take every message (rule 2). A program of the host user that reads or writes the runner's
 state folder or the CLI's transcripts is outside what these rules can decide: the transcript is
 where the runner reads the answer, and it keeps the system prompt and every line in clear
 text, which is also why no secret marker in the prompt tells the model whose line it reads.
-Rule 4 covers the transcript of a process a runner followed or found by its turn record: what
-a session takes while no run follows it (a person or a program that continues the session by
-its id between two runs) is in no part of the transcript a runner reads, and neither is what
-a session of a launch in doubt (18.9) took before the runner stopped it. The deny list of
+The deny list of
 rule 3 holds the tools that were found: a tool that reaches other sessions and that an
 account feature or a later version adds is not denied until it stands on the list, and a
-`host` session would run it without a prompt. And the closed list of rule 1 ends a run at
-every delivery that is not the session's own work, also one of the host user's own account or
-configuration (a scheduled prompt, a relay, a webhook, a plugin, a channel).
+`host` session would run it without a prompt.
 The operator rule is in the runner's README ("Before you switch it on"): background mode is
 for a host on which the host user runs no other Claude Code session, or only ones that are
 trusted like the runner.
@@ -4006,7 +4003,7 @@ and continues the session.
 |---|---|
 | Context full | compact exactly once, then the same prompt again; never twice. If the turn had already done work, the new turn gets a note in the runner prompt. Check the availability of `/compact` in print mode against the pinned version before building. |
 | Session missing in Claude Code | new session, prompt again, `agent_session.report` with a new reference, note once in the box (fail open) |
-| Session that took an input of another sender in background mode (18.5 "Whose input", addendum of 2026-11-17) | the run that saw the input ends `failed` with `runtime_error` and the cause `background_foreign_input`, and the session is marked. No later run continues it, in either launch mode: before a process that would continue it, the run takes the path "Session missing" of the row above |
+| Session that took an input of another sender in background mode (18.5 "Whose input", addendum of 2026-11-17, FIX-RUNNER-BG-FOREIGN-LOG) | a warning `background_foreign_input` in the log and nothing else: the run goes on and ends as usual, its answers are posted, and the next run continues the session |
 | Session already exists at the first turn | continue with `--resume`, report `started = true` |
 | Runtime not logged in | `failed`, `runtime_not_authenticated`; at a turn of a process that holds or held background work only after the retries of "Account errors" below |
 | Account error at a turn: a usage or rate limit, a login that is gone, subscription access switched off, an overloaded API (addendum of 2026-11-13, R-AG-58) | a process that holds or held background work is kept, the run stays `running` and says why it waits, and the turn is tried again after short pauses ("Account errors" below); after `runner.account_retry_max_wait`, and at once for a process that never had background work, `failed` with `runtime_error` (a login that is gone: `runtime_not_authenticated`) and a `summary` that names the error |
@@ -4071,10 +4068,8 @@ started with `--session-id`), first time in the run: a process with `--resume <r
 first line, then the report of `started = true` of 18.4. Each recovery happens at most once per
 run; a second occurrence or any failure of the new process before `system/init` ends the run as
 `runtime_error`. A pre-check before a further process that does not allow the start ends the run
-with its reason. A session that carries the mark of 18.5 rule 4 is replaced the same way before
-a new attempt that would continue it is started (`--resume`, in every mode of the payload, also
-after `session_exists`); no process fails first, and the replacement counts as the run's one.
-The relaunch of a recorded attempt (18.19.5) repeats an attempt that passed this check.
+with its reason. A session that took an input of another sender is continued like any other
+(18.5 rule 4, since 2026-11-17).
 
 Box notes (D-M2-35-10): a run step of kind `status` with an empty `title`, `finished_at` set, a
 UUIDv7 ID and `name` one of these codes, which clients render as a translated line:
@@ -4082,7 +4077,7 @@ UUIDv7 ID and `name` one of these codes, which clients render as a translated li
 | Code | Status | `detail` | When |
 |---|---|---|---|
 | `context_compacted` | `completed` or `failed` | none | after a compaction |
-| `session_missing` | `completed` | `{"mode": "<mode>"}` | once per run, when the new session's process starts, also in the place of a session the runner does not continue (18.5 rule 4) |
+| `session_missing` | `completed` | `{"mode": "<mode>"}` | once per run, when the new session's process starts |
 | `runtime_error` | `failed` | `{"errors": [<texts>], "exit": "<code or signal name>"}` | last step of a run that ends `runtime_error`, patched before `run.finish` |
 
 A runtime without login ends `failed` with `runtime_not_authenticated`, at the pre-check (no
@@ -4218,10 +4213,10 @@ error, and the end of an adopted process is handled like an own one, with classi
 classification above without recovery" and "never a new process for such a run" for those
 records; a record without a named pipe is adopted as above.
 
-Background mode is unavailable (addendum of 2026-11-16, 18.2 "Background mode"): a run that
-should use background mode and cannot uses print mode. The live box shows once per run, as
-`/status_line`, "Background sessions are not available (`<code>`); this run uses print mode.",
-the log has `background_fallback` with the code, and a cause of the host adds
+Background mode is unavailable (addendum of 2026-11-16, changed 2026-11-17 by owner order,
+FIX-RUNNER-CLI-PIN-326): a run that should use background mode and cannot ends `failed` with
+`runtime_error` and the code as the cause in its summary; it never uses print mode. The log has
+`background_unavailable` with the code, and a cause of the host adds
 `background_unavailable` to `degraded_reasons` of the heartbeat (state `degraded`, 4.8) until the
 next background launch starts; the reason blocks no run.
 
@@ -4232,10 +4227,15 @@ next background launch starts; the reason blocks no run.
 | `background_supervisor_version` | the runner's own supervisor reports another version than the pin | yes |
 | `background_bypass_not_accepted` | the CLI refuses `--bg` with `bypassPermissions` because the host user never accepted bypass mode (class `host`) | yes |
 | `background_workspace_untrusted` | the CLI refuses the launch because the project folder has no workspace trust | no |
+| `background_files_untrusted` | the CLI refuses the launch because the `--add-dir` folder of the thread's files has no workspace trust (since 2.1.326; trust of `<runner.state_dir>/files` covers every thread) | yes |
 | `background_session_foreign` | the session has an entry in the session list under a name the runner did not give, without a process | no |
 | `background_launch_failed` | any other launch that exits with an error; `claude daemon status` or the session list cannot be read; or the launch left an entry that got no process within `runner.cli_probe_timeout` | yes |
+| `background_api_key` | the run is billed `organization`: a background session takes no API key | no |
+| `background_compaction` | the context is full: the runner follows the compaction of 18.9 only in print mode | no |
+| `background_restricted` | a hosted turn below `host`: `--restricted` binds no inbox socket | no |
+| `background_hosted_bypass` | a hosted `host` turn: without the user settings the session drops `bypassPermissions` | no |
 
-The fallback happens only while it is certain that no session took the prompt: the launch
+Also a launch is judged failed without a session only while it is certain that no session took the prompt: the launch
 exited with an error, or, watched for `runner.cli_probe_timeout`, the session list shows no
 session of the run or its entry got no process and its transcript no record of the prompt. In
 every other doubt (a launch whose output cannot be read, a supervisor another program started
@@ -4244,7 +4244,7 @@ stops and removes the session and ends the run `failed` with `runtime_error` and
 its cause, so a prompt never runs twice. The runner never writes the CLI's trust entry or its
 acceptance of bypass mode; both are one-time steps of the operator in the host user's own CLI
 configuration. A session without a transcript takes the path "Session missing" of the table
-above, with a new session, and so does a session that carries the mark of 18.5 rule 4.
+above, with a new session.
 
 Crash of the runner in background mode (addendum of 2026-11-16): the turn record carries
 `launch_mode` `background`, the session's name `bothy-<run id>`, its short id once known, the
@@ -4266,9 +4266,7 @@ has ended: it is stopped and removed without a finish. A process of the session 
 recorded one is stopped first and counts as gone. No process: the run is finished from the
 transcript when the end of a turn follows the stored offset or the record holds a decided end
 (an answer is posted once, by the invariants above), else the record is removed and the server
-ends the run `interrupted`. Before a record goes without its turn being followed, the
-transcript of the recorded process is judged to its end for an input of another sender (18.5
-rule 4). The end of an adopted turn is classified without a recovery: no
+ends the run `interrupted`. The end of an adopted turn is classified without a recovery: no
 process is ever started for an adopted run (R-AG-17). An orderly stop of the runner stops an
 adopted background turn like an own one (18.6).
 
@@ -5483,7 +5481,7 @@ configuration of the respective program outside the server.
 | `runner.account_retry_second` | Runner | `2m` | pause before the second retry (18.9); above zero |
 | `runner.account_retry_interval` | Runner | `3m` | pause before every further retry (18.9); above zero |
 | `runner.account_retry_max_wait` | Runner | `20m` | longest time from the first account error of a wait until the error ends the turn like any other, decided while no turn runs and no input is queued (18.9); `0s` switches the retry off |
-| `runner.launch_mode` | Runner | `print` | `print` starts every turn as `claude -p`; `background` runs the turns of the runner's own agent in billing mode `personal` as Claude Code background sessions (`claude --bg`, 18.2 "Background mode"); every other turn, and a run the mode is not available for, uses print mode (18.9) |
+| `runner.launch_mode` | Runner | `print` | `print` starts every turn as `claude -p`; `background` runs every turn as a Claude Code background session (`claude --bg`, 18.2 "Background mode"); a run the mode is not available for (every run of a hosted agent among them) ends `failed` with the cause and never uses print mode (18.9) |
 | `runner.background_channels` | Runner | empty | channel ids; when not empty, only runs in these channels use background mode and every other run uses print mode (18.2) |
 | `runner.background_status_interval` | Runner | `2s` | interval at which the session list (`claude agents --json --all`) is read while a background turn is active; one reading serves every turn of the runner (18.4); above zero |
 | `runner.session_lock_wait` | Runner | `10m` | wait time for a busy session |

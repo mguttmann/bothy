@@ -6,9 +6,9 @@ Standard library only; `fake_claude.main` calls it for the commands of backgroun
 * ``[--resume <id>] --bg <flags>`` with the prompt on stdin: prints the launch line
   ``backgrounded · <short id> · <name>``, starts the fake supervisor when none runs
   (``Starting background service…`` on stderr) and a detached player, the session process.
-  The refusals of the pinned CLI are scripted (``bg_refuse``: ``untrusted``, ``bypass``,
-  ``error``), a launch without a process (``bg_no_process``), and the copy the CLI starts for
-  a resume whose session still has an entry.
+  The refusals of the pinned CLI are scripted (``bg_refuse``: ``untrusted``, ``bypass``, ``add_dir``
+  for a launch with ``--add-dir``, ``error``), a launch without a process (``bg_no_process``), and
+  the copy the CLI starts for a resume whose session still has an entry.
 * ``agents --json --all``, ``stop <id>``, ``rm <id>`` and ``daemon status`` answer from the
   state file ``<config dir>/fake-bg/state.json`` of the fake ``HOME``.
 
@@ -172,6 +172,14 @@ def launch(fake: Any) -> int:  # noqa: PLR0912 - one branch per scripted behavio
             "prompt, then retry.\n"
         )
         return 1
+    if refuse == "add_dir" and "--add-dir" in argv:
+        folder = _after(argv, "--add-dir")
+        sys.stderr.write(
+            f"Added folder not trusted: {folder}. Leave out its --add-dir or, if you trust it "
+            "and everything in its repository or below it, start `claude` there once and "
+            "accept the trust prompt.\n"
+        )
+        return 1
     if refuse == "bypass":
         sys.stderr.write(
             "--bg with bypassPermissions requires accepting the disclaimer first. Run "
@@ -286,7 +294,9 @@ def supervisor(fake: Any) -> int:
                 quiet_since = None
                 continue
             quiet_since = quiet_since if quiet_since is not None else time.monotonic()
-            if time.monotonic() - quiet_since >= SUPERVISOR_LINGER:
+            # With ``bg_idle_supervisor_ends_after_status`` a status call ends it instead.
+            ends_on_status = fake.scenario.get("bg_idle_supervisor_ends_after_status")
+            if not ends_on_status and time.monotonic() - quiet_since >= SUPERVISOR_LINGER:
                 if (doc.get("supervisor") or {}).get("pid") == os.getpid():
                     doc.pop("supervisor")
                 return 0
@@ -375,7 +385,26 @@ def daemon_status(fake: Any) -> int:
     print(f"version: {found.get('version', fake.pinned)}")
     print("uptime:  1s")
     print("origin:  transient - started on-demand by `claude --bg`")
+    if fake.scenario.get("bg_idle_supervisor_ends_after_status") and not forced:
+        _end_idle_supervisor(found["pid"])
     return 0
+
+
+def _end_idle_supervisor(pid: int) -> None:
+    """End the supervisor right after its status was printed, when no session process lives.
+
+    The supervisor of the pinned CLI ends after its last session; this places that end
+    between ``daemon status`` and the caller's next look at the process.
+    """
+    with state() as doc:
+        if any(alive(e.get("pid")) for e in doc["sessions"].values()):
+            return
+        if (doc.get("supervisor") or {}).get("pid") == pid:
+            doc.pop("supervisor")
+    with contextlib.suppress(ProcessLookupError):
+        os.kill(pid, signal.SIGTERM)
+    while alive(pid):
+        time.sleep(0.01)
 
 
 # ---- the session process -----------------------------------------------------------------------
@@ -555,12 +584,18 @@ class Player:
             },
             **extra,
         )
+        self.error_ended = True
 
     def turn_end(self) -> None:
         # Like the pinned CLI: the session list shows the state after the turn (``busy`` only
-        # while background work runs) by the time the turn's last record is written.
+        # while background work runs) by the time the turn's last record is written; a turn
+        # that ended with an API error gets no ``turn_duration`` (2.1.326).
         self.status("busy" if self.job_running else "idle")
-        self.record("system", subtype="turn_duration", durationMs=1, messageCount=1, isMeta=False)
+        if not getattr(self, "error_ended", False):
+            self.record(
+                "system", subtype="turn_duration", durationMs=1, messageCount=1, isMeta=False
+            )
+        self.error_ended = False
         self.turn_open = False
 
     # ---- the session list ------------------------------------------------------------------------
@@ -632,8 +667,9 @@ class Player:
     def inbound(self, text: str) -> str:
         """What becomes of a line of the socket: ``accept``, ``hold``, ``review`` or ``refuse``.
 
-        The rule of the pinned CLI: a value of ``crossSessionInbound`` decides (``hold``
-        keeps the line without asking anyone); without one, the classes of both sessions do,
+        The rule of the pinned CLI: a value of ``crossSessionInbound`` decides, one of
+        ``--settings`` before one of the host user's own ``settings.json`` (``hold`` keeps
+        the line without asking anyone); without one, the classes of both sessions do,
         and a line they do not let through waits for a person's approval (``review``). The
         class a sender states is read from the envelope around the text; a line without one
         states none.
@@ -642,6 +678,12 @@ class Player:
             return "hold"
         if self.inbound_setting in ("accept", "hold", "refuse"):
             return str(self.inbound_setting)
+        # Without a value in --settings, one of the host user's own settings decides; a value
+        # the CLI does not know holds every message while it is present.
+        user = _read_json(str(base_dir() / "settings.json"))
+        value = user.get("crossSessionInbound") if isinstance(user, dict) else None
+        if value is not None:
+            return str(value) if value in ("accept", "hold", "refuse") else "hold"
         found = ENVELOPE.match(text)
         mine = "bypass" if self.bypasses else "prompting"
         if found is not None:
@@ -817,9 +859,43 @@ class Player:
             self.add_usage({self.model: {"inputTokens": 1000, "costUSD": 0.01}})
         self.turn_end()
 
+    def agent_notice(self, origin: dict[str, Any]) -> None:
+        """An agent of the session took a notification mid-turn (``bg_agent_notice_origin``).
+
+        As the pinned CLI does (real transcript, FIX-RUNNER-BG-SIDE-NOTICE): the ``remove``
+        record lands in the session's transcript, the attachment that attributes the input
+        with ``origin`` only in the agent's own file below ``<session id>/subagents/``.
+        """
+        ident = str(uuid.uuid4())
+        notice = "<task-notification>\n<status>completed</status>\n</task-notification>"
+        self.plain("queue-operation", operation="enqueue", content=notice)
+        self.plain(
+            "queue-operation",
+            operation="remove",
+            content=notice,
+            reason="absorbed_mid_turn",
+            commandUuid=ident,
+            deliveryId=str(uuid.uuid4()),
+        )
+        agent = self.path.with_suffix("") / "subagents" / "workflows" / "wf_1" / "agent-a1.jsonl"
+        agent.parent.mkdir(parents=True, exist_ok=True)
+        attachment = {
+            "type": "queued_command",
+            "prompt": notice,
+            "source_uuid": ident,
+            "commandMode": "task-notification",
+            "origin": origin,
+        }
+        record = {"isSidechain": True, "agentId": "a1", "type": "attachment"}
+        with agent.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps({**record, "attachment": attachment, **self._envelope()}) + "\n")
+
     def notification_turn(self, text: str | None) -> None:
         """A turn the session starts by itself for the notification of its background job."""
         notice = "<task-notification>\n<status>completed</status>\n</task-notification>"
+        agent_origin = self.scenario.get("bg_agent_notice_origin")
+        if isinstance(agent_origin, dict):
+            self.agent_notice(agent_origin)
         self.plain("queue-operation", operation="enqueue", content=notice)
         self.plain("queue-operation", operation="dequeue")
         self.status("busy")

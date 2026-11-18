@@ -51,6 +51,7 @@ from claude_code_runner.bgsession import (
     socket_frame,
 )
 from claude_code_runner.bgtranscript import TranscriptMapper
+from claude_code_runner.commandline import HostedArgs
 from claude_code_runner.prompt import user_line
 from claude_code_runner.usage import find_transcript
 
@@ -66,6 +67,7 @@ __all__ = [
     "World",
     "frame",
     "path_facts",
+    "turn_ends",
 ]
 
 MODEL = "claude-sonnet-4-5"
@@ -284,6 +286,22 @@ def _variables(content: object) -> dict[str, str]:
     return out
 
 
+def turn_ends(records: Sequence[Mapping[str, Any]]) -> int:
+    """How many turns of a transcript ended: a ``turn_duration``, or an API error record.
+
+    2.1.326 writes no ``turn_duration`` after an API error; one right after it is the same end.
+    """
+    count, after_error = 0, False
+    for record in records:
+        if record.get("type") == "assistant":
+            after_error = record.get("isApiErrorMessage") is True
+            count += after_error
+        elif record.get("subtype") == "turn_duration":
+            count += not after_error
+            after_error = False
+    return count
+
+
 def path_facts(records: Sequence[Mapping[str, Any]]) -> tuple[set[str], set[str], bool | None]:
     """Which path a turn took, read from its transcript records (09 18.2, 18.3).
 
@@ -396,6 +414,8 @@ class World:
         extra: Sequence[str] = (),
         run_env: Mapping[str, str] | None = None,
         without: Sequence[str] = (),
+        hosted: HostedArgs | None = None,
+        plugin_dirs: Sequence[Path] = (),
     ) -> LaunchOutput:
         """Launch one session with the runner's own argument list and settings file.
 
@@ -409,7 +429,12 @@ class World:
         prompt_file.write_text(system, encoding="utf-8")
         settings = self.root / f"{name}.settings.json"
         turn_env = {"TMPDIR": str(self.root / "tmp")} if run_env is None else dict(run_env)
-        document = settings_document(turn_env)
+        base = None
+        if hosted is not None:
+            base = json.loads(hosted.settings.read_text("utf-8"))
+        # The runner's turn environment names the CLI's configuration folder: the folder of
+        # the world, unless ``run_env`` names another.
+        document = settings_document({"CLAUDE_CONFIG_DIR": str(self.config), **turn_env}, base)
         settings.write_text(json.dumps(document), encoding="utf-8")
         self.classes[name] = tool_class
         argv = background_argv(
@@ -423,6 +448,8 @@ class World:
             system_prompt_file=prompt_file,
             socket_file=self.socket(name),
             settings_file=settings,
+            hosted=hosted,
+            plugin_dirs=plugin_dirs,
         )
         out = await launch(
             [*(a for a in argv if a not in without), *extra],
@@ -487,7 +514,7 @@ class World:
         deadline = time.monotonic() + WAIT
         while time.monotonic() < deadline:
             records = self.records(session_id)
-            if sum(1 for r in records if r.get("subtype") == "turn_duration") >= count:
+            if turn_ends(records) >= count:
                 return records
             await asyncio.sleep(0.1)
         raise AssertionError(f"no {count} turn ends in the transcript of {session_id}")

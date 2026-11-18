@@ -14,13 +14,13 @@ run that the server ended stops its turn without a finish. An error nothing expe
 live process before the run ends ``failed`` with ``adapter_error`` (`RunTurn._on_error`, 18.9).
 `RunTurn.adopted` follows a turn that outlived an earlier runner (design note 12).
 
-With ``runner.launch_mode`` ``background`` a turn of the runner's own agent in billing mode
-``personal`` runs as a Claude Code background session (``claude --bg``, 09 18.2 "Background
-mode"): `RunTurn._run_background` launches it, the session's transcript is read through
-`claude_code_runner.bgtranscript` as the stream of 18.4, inputs go to the session's inbox
-socket, and the release at the end of a run is ``claude stop`` (`claude_code_runner.bgsession`).
-A run that cannot use the mode uses print mode and says why (18.9), and
-`RunTurn.adopt_background` continues a background turn that outlived an earlier runner.
+With ``runner.launch_mode`` ``background`` every turn runs as a Claude Code background session
+(``claude --bg``, 09 18.2 "Background mode"): `RunTurn._run_background` launches it, the
+session's transcript is read through `claude_code_runner.bgtranscript` as the stream of 18.4,
+inputs go to the session's inbox socket, and the release at the end of a run is ``claude stop``
+(`claude_code_runner.bgsession`). A run that cannot use the mode ends ``failed`` with its cause
+and never uses print mode (18.9, FIX-RUNNER-CLI-PIN-326), and `RunTurn.adopt_background`
+continues a background turn that outlived an earlier runner.
 
 A turn that ends with an account error (`claude_code_runner.account`) in a process that holds
 or held background work does not end the run: the process is kept, ``/status_line`` says why
@@ -113,12 +113,7 @@ from claude_code_runner.attachments import (
     followup_files_final,
 )
 from claude_code_runner.bgmode import BackgroundMode
-from claude_code_runner.bgpaths import (
-    bg_files,
-    mark_foreign_input,
-    remove_bg_files,
-    took_foreign_input,
-)
+from claude_code_runner.bgpaths import bg_files, remove_bg_files
 from claude_code_runner.bgsession import (
     BgSession,
     LaunchOutput,
@@ -135,13 +130,12 @@ from claude_code_runner.bgsession import (
     supervisor_verdict,
 )
 from claude_code_runner.bgtranscript import (
-    CAUSE_FOREIGN,
     PricedUsage,
     TranscriptMapper,
     TranscriptReader,
-    foreign_origin,
     prompt_taken,
     replayed_records,
+    side_inputs,
 )
 from claude_code_runner.causes import (
     ADAPTER_STOPPED,
@@ -211,7 +205,7 @@ from claude_code_runner.reply_upload import (
     remove_run_files,
     send_answer_with_attachments,
 )
-from claude_code_runner.statedir import StateDirError, ensure_private_dir, write_private
+from claude_code_runner.statedir import ensure_private_dir, write_private
 from claude_code_runner.stop import StoppableGroup
 from claude_code_runner.streamreader import StreamReader
 from claude_code_runner.title import propose_title, split_title
@@ -613,9 +607,6 @@ class RunTurn:
         """How many request records of the session this runner read (for the log only)."""
         self._bg_rest: list[tuple[str, bytes]] = []
         self._bg_cause: str | None = None
-        self._bg_marked = False
-        """The current session process took a foreign input and its mark was written or
-        tried (18.5 rule 4): its release judges the transcript no second time."""
 
     # ---- the run ---------------------------------------------------------------------------
 
@@ -698,13 +689,6 @@ class RunTurn:
                     return  # R-AG-48: an adopter launches only on allow
                 self.launch_checked = False
                 precheck = True
-                if attempt.resume and repeat is None and self._session_left():
-                    # 18.5 rule 4, before every new attempt that would continue a session;
-                    # ``repeat`` launches a recorded attempt again, which passed this check.
-                    replaced = await self._leave_session()
-                    if replaced is None:
-                        return
-                    attempt = replaced
                 self.attempt = attempt
                 outcome = await self._run_process(
                     attempt, repeat=repeat, worked_before=worked_before
@@ -843,7 +827,7 @@ class RunTurn:
             if self.handover:
                 remove_launch_files(self.cfg.state_dir, str(self.handle.run_id))
             if self.bg is not None:
-                remove_bg_files(self.cfg.state_dir, self.handle.run_id)
+                remove_bg_files(self._bg_state, self.handle.run_id)
 
     def _crash(self, point: str) -> None:
         """The test-only crash hook after a step of the handshake (`crash_point`)."""
@@ -1053,35 +1037,6 @@ class RunTurn:
         self._persist()
         return True
 
-    def _session_left(self) -> bool:
-        """Whether the run's session is one the runner never continues (18.5 "Whose input")."""
-        return took_foreign_input(self.cfg.state_dir, self.session.ref)
-
-    async def _leave_session(self) -> _Attempt | None:
-        """Start a new session in the place of one that took a foreign input (18.5, 18.9).
-
-        The conversation of such a session holds the input of another sender, and a process
-        that continues it gives that input to the model again with its next request. So no
-        new attempt of any run continues it, in either launch mode: the run takes the path of
-        a missing session (a new reference, the same first line, the box note once and the
-        report of the new reference, with ``bind_failed`` in mode ``bind``). The decision is
-        the mark in the runner's state folder, never something the conversation says.
-
-        Returns:
-            The attempt on the new reference; ``None`` when the run ended here.
-        """
-        _warn("session_not_continued", cause=CAUSE_FOREIGN, **self.ids)
-        if not self.state.locks and not await self._take_locks():
-            return None  # an adopter holds no lock yet; the session lock moves below
-        bind = self.state.session_mode == "bind"
-        self.recovery = self.recovery.with_(session_replaced=True)
-        if not await self._new_reference():
-            await self._fail("adapter_error", (), "not_started", summary=cause("session_busy"))
-            return None
-        await self._box_note("session_missing", "completed", {"mode": self.state.session_mode})
-        label = attempt_kind(NewSession(bind_failed=bind))
-        return _Attempt(resume=False, new_reference=True, bind_failed=bind, label=label)
-
     async def _precheck_again(self) -> bool:
         """The pre-check of M2-34 before every further process (I3 per process)."""
         try:
@@ -1124,7 +1079,7 @@ class RunTurn:
         )
         if attempt.hint:
             text = text.rstrip() + "\n\n## Retry\n\n" + RETRY_HINT + "\n"
-        path = bg_files(self.cfg.state_dir, self.handle.run_id).system_prompt
+        path = bg_files(self._bg_state, self.handle.run_id).system_prompt
         ensure_private_dir(path.parent)
         write_private(path, text)
         return path
@@ -1166,11 +1121,14 @@ class RunTurn:
         repeat: AttemptRecord | None = None,
         worked_before: bool = False,
     ) -> _Outcome | None:
-        if self._background(attempt, repeat):
-            outcome, handled = await self._run_background(attempt)
-            if handled:
-                return outcome
-        self.bg_record = None  # this process is a print turn (also after a fallback, 18.9)
+        if self._background():
+            code = self._not_in_background(attempt, repeat)
+            if code is not None:
+                await self._fall_back(code)
+                return None
+            outcome, _ = await self._run_background(attempt)
+            return outcome
+        self.bg_record = None  # this process is a print turn
         if self.handover:
             return await self._launch_process(attempt, repeat=repeat, worked_before=worked_before)
         paths = self._paths()
@@ -1806,53 +1764,17 @@ class RunTurn:
 
         A print turn gets `claude_code_runner.turn.terminate`. A background session is stopped
         with ``claude stop`` and the same escalation, then its entry is removed from the
-        session list (``claude rm``); its transcript stays, and what the session took is
-        judged to the end of that transcript (`_judge_released`).
+        session list (``claude rm``); its transcript stays.
         """
         if isinstance(process, BgSession):
             await process.stop(
                 self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval, ids
             )
             await process.remove()
-            await self._judge_released(process)
             return
         await terminate(
             process, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval, ids
         )
-
-    async def _judge_released(self, session: BgSession) -> None:
-        """Mark a released session that took a foreign input nobody acted on (18.5 rule 4).
-
-        The read loop marks a session at the first foreign input it reads. A session can be
-        released before that loop read its transcript to the end: an error, the
-        counter-check or a cancellation ends the run, an adopter repeats a decided end. What the
-        session took in the part nobody read stays in its conversation all the same, so the
-        transcript of the process is mapped once more, from its launch offset to its end,
-        after the process is gone. Nothing else changes: the run ends as it was going to.
-        """
-        if self._bg_marked or took_foreign_input(self.cfg.state_dir, session.session_id):
-            return
-        prompt_uuid = str((self.bg_record or {}).get("prompt_uuid") or "")
-        own = frozenset(self.bg_own)
-        origin = await asyncio.to_thread(
-            foreign_origin,
-            self._transcript(session.session_id),
-            self.ledger.process_start,
-            prompt_uuid,
-            own.__contains__,
-        )
-        if origin is not None:
-            _warn("background_foreign_input_unread", origin=origin, **self.ids)
-            self._mark_session(session)
-
-    def _mark_session(self, session: BgSession) -> None:
-        """Write the mark of a session that took a foreign input; a failure is logged."""
-        self._bg_marked = True
-        try:
-            mark_foreign_input(self.cfg.state_dir, session.session_id, self.handle.run_id)
-        except (OSError, StateDirError):
-            # Without the mark the next run would continue the conversation: say so.
-            _warn("session_mark_failed", **self.ids)
 
     # ---- stop ------------------------------------------------------------------------------
 
@@ -3170,45 +3092,71 @@ class RunTurn:
 
     # ---- background sessions (09 18.2 "Background mode") ------------------------------------
 
-    def _background(self, attempt: _Attempt, repeat: AttemptRecord | None) -> bool:
-        """Whether an attempt runs as a background session (the scope of 18.2).
+    def _background(self) -> bool:
+        """Whether the run's channel uses background mode (09 18.2, FIX-RUNNER-CLI-PIN-326).
 
-        Only a turn of the runner's own agent in billing mode ``personal``, in a channel the
-        mode is switched on for, and only until the run fell back to print mode. A compaction,
-        every turn of a hosted agent and a turn that loads channel skills (26 5.9) stay in
-        print mode: the launch command of a background session carries no ``--plugin-dir``.
+        With ``runner.launch_mode`` ``background`` every attempt of a run in such a channel is
+        a background session or ends the run (`_not_in_background`); it never uses print mode,
+        also not for a hosted agent (whose turns end the run) or a turn that loads channel
+        skills.
         """
-        return (
-            self.bg is not None
-            and self.bg_fallback is None
-            and repeat is None
-            and attempt.kind == "turn"
-            and self.state.hosted is None
-            and not self.state.plugin_dirs
-            and self.state.mode == "personal"
-            and self.bg.wants(self.state.channel_id)
-        )
+        return self.bg is not None and self.bg.wants(self.state.channel_id)
+
+    def _not_in_background(self, attempt: _Attempt, repeat: AttemptRecord | None) -> str | None:
+        """The cause code of an attempt that cannot run as a background session, else ``None``.
+
+        * ``organization``: a background session takes no API key (design 2.2 item 8).
+        * A compaction: the runner follows a ``/compact`` only in print mode.
+        * A hosted turn below ``host``: ``--restricted`` binds no inbox socket (run with the
+          pinned CLI), so no follow-up and no retry line could reach the session.
+        * A hosted ``host`` turn: without the user settings, which 26 5.3 leaves out
+          (``--setting-sources project,local``), the session of the pinned CLI runs in
+          permission mode ``default`` instead of ``bypassPermissions`` and holds the runner's
+          lines (run with 2.1.326 against the stand-in).
+        * A repeated launch of a handover: the keeper is a part of print mode.
+        """
+        if self.state.mode != "personal":
+            return "background_api_key"
+        if attempt.kind != "turn":
+            return "background_compaction"
+        if self.state.hosted is not None:
+            return (
+                "background_restricted"
+                if self.cfg.tool_class != "host"
+                else ("background_hosted_bypass")
+            )
+        if repeat is not None:
+            return "background_launch_failed"
+        return None
 
     async def _fall_back(self, code: str) -> tuple[None, bool]:
-        """This run uses print mode from here on, and says why (18.9).
+        """Background mode cannot run this attempt: the run ends ``failed`` with the cause.
 
-        The live box shows it once as a status line, the log has ``background_fallback``, and a
-        cause of the host shows in the heartbeat until a background launch starts again.
+        Never print mode (ruling D-FIX-RUNNER-CLI-PIN-326-4): the summary names
+        the cause in the thread, the log has ``background_unavailable``, and a cause of the
+        host shows in the heartbeat until a background launch starts again.
 
         Returns:
-            ``(None, False)``: the attempt is not handled yet, the print path runs it.
+            ``(None, True)``: the run ended here.
         """
         bg = self.bg
         self.bg_fallback = code
         self.bg_record = None
         self._bg_rest = []
-        _warn("background_fallback", code=code, **self.ids)
+        _warn("background_unavailable", code=code, **self.ids)
         if bg is not None:
             bg.fell_back(code)
-        await self._status_line(
-            f"Background sessions are not available (`{code}`); this run uses print mode."
-        )
-        return None, False
+        await self._fail("runtime_error", (), "not_started", summary=cause(code))
+        return None, True
+
+    @property
+    def _bg_state(self) -> Path:
+        """The runner's own state folder, where the files of a background launch lie.
+
+        Also for a hosted agent, whose ``state_dir`` is its own folder below it: a shorter
+        socket path, and one record of the supervisor per runner.
+        """
+        return self.bg.config.state_dir if self.bg is not None else self.cfg.state_dir
 
     def _config_dir(self) -> Path | None:
         """The CLI's configuration folder of the turn, where its transcripts live."""
@@ -3290,9 +3238,20 @@ class RunTurn:
             return started
         if not attempt.resume:
             attempt = dataclasses.replace(attempt, new_reference=True)
-        mapper = TranscriptMapper(inputs[0][0], self._wrote)
+        mapper = TranscriptMapper(inputs[0][0], self._wrote, self._side(started))
         reader = self._transcript_reader(started, mapper, offset)
         return await self._follow(started, attempt, offset, 0, reader=reader), True
+
+    def _side(self, session: BgSession) -> Callable[[str], list[dict[str, Any]]]:
+        """The inputs the session's own agents took, by their files (`side_inputs`).
+
+        The transcript is located at each question: the CLI creates it after the launch.
+        """
+
+        def find(line_uuid: str) -> list[dict[str, Any]]:
+            return side_inputs(self._transcript(session.session_id))(line_uuid)
+
+        return find
 
     def _wrote(self, line_uuid: str) -> bool:
         """Whether the runner gave the current session process an input line with this id."""
@@ -3322,11 +3281,14 @@ class RunTurn:
         Returns:
             The argument list of the launch command.
         """
-        files = bg_files(self.cfg.state_dir, self.handle.run_id)
+        files = bg_files(self._bg_state, self.handle.run_id)
         ensure_private_dir(files.settings.parent)
         with contextlib.suppress(OSError):
             files.socket.unlink()  # a socket of an earlier process of this run
-        write_private(files.settings, json.dumps(settings_document(self.state.env), sort_keys=True))
+        hosted = self.state.hosted
+        base = json.loads(hosted.settings.read_text("utf-8")) if hosted is not None else None
+        document = settings_document(self.state.env, base)
+        write_private(files.settings, json.dumps(document, sort_keys=True))
         argv = background_argv(
             claude_bin=self.h.claude_bin or self.cfg.claude_bin,
             model=self.state.model,
@@ -3338,6 +3300,8 @@ class RunTurn:
             system_prompt_file=self._background_prompt_file(attempt),
             socket_file=files.socket,
             settings_file=files.settings,
+            hosted=hosted,
+            plugin_dirs=self.state.plugin_dirs,
         )
         await self._rebase_once(attempt)
         self.process = None
@@ -3349,7 +3313,6 @@ class RunTurn:
             self.ledger.written(line_uuid)
         self._bg_rest = list(inputs[1:])
         self._bg_cause = None
-        self._bg_marked = False
         # A new session process: only these lines are the runner's so far, and no request
         # of the process has shown the stored login yet.
         self.bg_own = {line_uuid for line_uuid, _ in inputs}
@@ -3375,16 +3338,27 @@ class RunTurn:
         """
         if not bg.pinned():
             return await self._fall_back("background_version_untested")
-        readable, supervisor = await bg.cli.supervisor()
-        if not readable:
-            return await self._fall_back("background_launch_failed")
-        verdict = await asyncio.to_thread(
-            supervisor_verdict,
-            supervisor,
-            load_supervisor(self.cfg.state_dir),
-            PINNED_CLAUDE_CODE_VERSION,
-            bg.lstart,
-        )
+        for _ in range(2):
+            readable, supervisor = await bg.cli.supervisor()
+            if not readable:
+                return await self._fall_back("background_launch_failed")
+            verdict = await asyncio.to_thread(
+                supervisor_verdict,
+                supervisor,
+                load_supervisor(self._bg_state),
+                PINNED_CLAUDE_CODE_VERSION,
+                bg.lstart,
+            )
+            # An idle supervisor ends on its own: when the process `daemon status` reported is
+            # gone by the time its start time is read, the status is read once more.
+            ended = (
+                verdict == "background_supervisor_foreign"
+                and supervisor is not None
+                and supervisor.pid is not None
+                and await asyncio.to_thread(bg.lstart, supervisor.pid) is None
+            )
+            if not ended:
+                break
         if verdict is not None:
             return await self._fall_back(verdict)
         reading = await bg.sessions.read(after=bg.sessions.now())
@@ -3439,7 +3413,7 @@ class RunTurn:
         later session inherits what it was started with. What belongs to this run reaches
         its session through the ``env`` block of the settings file alone (18.2).
         """
-        files = bg_files(self.cfg.state_dir, self.handle.run_id)
+        files = bg_files(self._bg_state, self.handle.run_id)
         out = await launch(
             argv,
             prompt=prompt,
@@ -3476,7 +3450,7 @@ class RunTurn:
             else what `_run_background` returns: the fallback while it is certain that no
             session took the prompt, in every other doubt the end of the run.
         """
-        files = bg_files(self.cfg.state_dir, self.handle.run_id)
+        files = bg_files(self._bg_state, self.handle.run_id)
         name = session_name(self.handle.run_id)
         timeout = self.cfg.cli_probe_timeout
         if out.short_id is None:
@@ -3560,6 +3534,8 @@ class RunTurn:
         """The launch command started no session it named (18.9)."""
         if out.refusal == "untrusted":
             return await self._fall_back("background_workspace_untrusted")
+        if out.refusal == "files_untrusted":
+            return await self._fall_back("background_files_untrusted")
         if out.refusal == "bypass":
             return await self._fall_back("background_bypass_not_accepted")
         if out.exit_error:
@@ -3572,7 +3548,7 @@ class RunTurn:
         pid = started.pid if started is not None else None
         lstart = await asyncio.to_thread(bg.lstart, pid) if pid is not None else None
         if pid is not None and lstart:
-            store_supervisor(self.cfg.state_dir, pid, lstart)
+            store_supervisor(self._bg_state, pid, lstart)
             _log("background_supervisor_started", **self.ids)
 
     async def _abort_launch(
@@ -3695,18 +3671,21 @@ class RunTurn:
     ) -> _Outcome | None:
         """The effects of a mapped message that only a background session has (18.4).
 
-        Two checks end the run here, before anything of the message is posted. An input the
-        runner did not write (18.5) stops the session and fails the run. The counter-check of
-        18.3 fails closed: every request record is judged, and nothing a session puts out
-        (`_is_output`) is accepted unless the newest request record of its process listed
-        the login beta, so neither after a record without it nor before any record.
+        An input the runner did not write (18.5) is logged and nothing else: the session answers it
+        like any input and the run goes on (ruling D-FIX-RUNNER-BG-FOREIGN-LOG-1: an input is never
+        discarded and never ends a run). The counter-check of 18.3 ends the run here, before
+        anything of the message is posted; it fails closed: every request record is judged, and
+        nothing a session puts out (`_is_output`) is accepted unless the newest request record of
+        its process listed the login beta, so neither after a record without it nor before any
+        record.
 
         Returns:
-            An outcome when the message ended the run (one of the two checks), else ``None``.
+            An outcome when the message ended the run (the counter-check), else ``None``.
         """
         kind, subtype = message.get("type"), message.get("subtype")
         if kind == "system" and subtype == "bg_foreign":
-            return await self._foreign_input(session, str(message.get("origin")))
+            _warn("background_foreign_input", origin=str(message.get("origin")), **self.ids)
+            return None
         if kind == "system" and subtype == "bg_request":
             self._bg_requests += 1
             listed = message.get("login") is True
@@ -3728,24 +3707,6 @@ class RunTurn:
         elif kind == "result" and isinstance(message.get("bg_cause"), str):
             self._bg_cause = str(message["bg_cause"])
         return None
-
-    async def _foreign_input(self, session: BgSession, origin: str) -> _Outcome:
-        """An input the runner did not write reached the session: stop it, fail the run (18.5).
-
-        The session is marked first: its conversation holds the input from now on, so no
-        later run continues it (`_leave_session`), also when this runner ends before the run
-        does. Then the session is stopped, so its turn ends where it is; the run finishes
-        ``failed`` with the cause `CAUSE_FOREIGN`, and the answer of the turn that took the
-        input is never read, so neither it nor an attachment of it is posted.
-        """
-        _warn("background_foreign_input", origin=origin, **self.ids)
-        self._mark_session(session)
-        await self._terminate(session, self.ids)
-        text = "The background session took an input that the runner did not write."
-        await self._fail(
-            "runtime_error", (text,), session.exit_label(), summary=cause(CAUSE_FOREIGN)
-        )
-        return _Outcome(TurnEvidence(), self._worked, handled=True)
 
     async def _login_unproven(self, session: BgSession, code: str) -> _Outcome:
         """The counter-check of 18.3 did not pass: stop the session, ``billing_mode_mismatch``.
@@ -3806,16 +3767,19 @@ class RunTurn:
                 )
                 done = True
                 return
-            mapper = TranscriptMapper(str(self.bg_record.get("prompt_uuid") or ""), self._wrote)
+            mapper = TranscriptMapper(
+                str(self.bg_record.get("prompt_uuid") or ""), self._wrote, self._side(session)
+            )
             lines = replayed_records(
                 self._transcript(session.session_id),
                 self.ledger.process_start,
                 self.ledger.offset,
                 mapper,
             )
-            if await self._replayed_checks(session, [m for m, _, _ in lines]):
-                done = True
-                return
+            for message, _, _ in lines:
+                if message.get("type") == "system" and message.get("subtype") == "bg_foreign":
+                    # Logged again: the previous runner may have ended before it logged it (18.5).
+                    _warn("background_foreign_input", origin=str(message.get("origin")), **self.ids)
             self.ps = ProcessState(has_stdin=True, account_retry=self._account_schedule())
             self._replayed_worked = self._replay_ledger(lines)
             for message, _, _ in lines:
@@ -3849,25 +3813,7 @@ class RunTurn:
                 self.phase = "ended"
                 remove_turn_record(self.cfg.state_dir / "turns" / f"{self.handle.run_id}.json")
                 remove_run_files(self.cfg.state_dir, self.handle.run_id)
-                remove_bg_files(self.cfg.state_dir, self.handle.run_id)
-
-    async def _replayed_checks(
-        self, session: BgSession, messages: Sequence[Mapping[str, Any]]
-    ) -> bool:
-        """The two checks of `_read_background` over the part the previous runner read (18.9).
-
-        The previous runner acted on what it read, so this finds something only when it ended
-        between a record and its effect, or was a runner that did not check yet. Whether the
-        counter-check has passed is taken from the turn record alone, never from these lines.
-
-        Returns:
-            True when the run ended here.
-        """
-        for message in messages:
-            if message.get("type") == "system" and message.get("subtype") == "bg_foreign":
-                await self._foreign_input(session, str(message.get("origin")))
-                return True
-        return False
+                remove_bg_files(self._bg_state, self.handle.run_id)
 
     def _restore_adopted(self, record: Mapping[str, Any], known_steps: Mapping[str, str]) -> None:
         """The run's state from the record of a background turn.

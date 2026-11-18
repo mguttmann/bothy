@@ -53,7 +53,7 @@ from typing import Any
 import fake_bg
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
-PINNED = "2.1.325"
+PINNED = "2.1.326"
 # quality.test.patience (bothy_sdk.testing._patience.PATIENCE); standard library only here.
 GATE_PATIENCE = 180.0
 BACKGROUND_TASK = "bgjob01"

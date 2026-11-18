@@ -12,8 +12,9 @@ supervisor lives across runs, and every session inherits what it carries; so not
 may be in it. What belongs to a run reaches its session through the settings file of its
 launch (`claude_code_runner.bgsession.settings_document`).
 
-A run that should use background mode and cannot uses print mode and says why (18.9). When
-the cause lies with the host (the CLI is not the pinned version, a supervisor the runner did
+A run that should use background mode and cannot ends ``failed`` with its cause in the thread;
+it never uses print mode (ruling D-FIX-RUNNER-CLI-PIN-326-4). When the cause lies
+with the host (the CLI is not the pinned version, a supervisor the runner did
 not start, bypass mode without a recorded acceptance, a launch that fails), the runner reports
 `UNAVAILABLE` in ``details.degraded_reasons`` until the next background launch starts; the
 reason blocks no run.
@@ -40,7 +41,7 @@ from claude_code_runner.usage import claude_config_dir
 __all__ = ["FALLBACK_CODES", "UNAVAILABLE", "BackgroundMode", "launch_environment"]
 
 UNAVAILABLE = "background_unavailable"
-"""The degraded reason while the last launch attempt fell back for a cause of the host."""
+"""The degraded reason while the last launch attempt failed for a cause of the host."""
 
 FALLBACK_CODES: dict[str, bool] = {
     "background_version_untested": True,
@@ -48,11 +49,17 @@ FALLBACK_CODES: dict[str, bool] = {
     "background_supervisor_version": True,
     "background_bypass_not_accepted": True,
     "background_workspace_untrusted": False,
+    "background_files_untrusted": True,
     "background_session_foreign": False,
     "background_launch_failed": True,
+    "background_api_key": False,
+    "background_compaction": False,
+    "background_restricted": False,
+    "background_hosted_bypass": False,
 }
-"""Why a run uses print mode instead of background mode (18.9), and whether the cause lies
-with the host (then the heartbeat reports `UNAVAILABLE`)."""
+"""Why a run of background mode ends without a session (18.9; it never uses print mode,
+FIX-RUNNER-CLI-PIN-326), and whether the cause lies with the host (then the heartbeat reports
+`UNAVAILABLE`)."""
 
 _NO_UPDATE = ("DISABLE_AUTOUPDATER", "1")
 
@@ -151,7 +158,7 @@ class BackgroundMode:
         return found.lstart if found is not None else None
 
     def fell_back(self, code: str) -> None:
-        """A run uses print mode for the cause ``code``; a cause of the host is reported.
+        """A run ended without a session for the cause ``code``; a cause of the host is reported.
 
         Args:
             code: One of `FALLBACK_CODES`.

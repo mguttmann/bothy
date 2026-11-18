@@ -74,9 +74,13 @@ from claude_code_runner.adoption import (
 from claude_code_runner.attachments import fetch_attachments
 from claude_code_runner.authcheck import auth_status, decide, evidence
 from claude_code_runner.bgmode import UNAVAILABLE, BackgroundMode
-from claude_code_runner.bgpaths import bg_files, mark_foreign_input, remove_bg_files
+from claude_code_runner.bgpaths import bg_files, remove_bg_files
 from claude_code_runner.bgsession import NAME_PREFIX, BgSession, SessionEntry, sender_class
-from claude_code_runner.bgtranscript import TranscriptMapper, foreign_origin, replayed_records
+from claude_code_runner.bgtranscript import (
+    TranscriptMapper,
+    replayed_records,
+    side_inputs,
+)
 from claude_code_runner.builder import AgentBuilder
 from claude_code_runner.causes import ADAPTER_STOPPED, cause
 from claude_code_runner.channel_skills import resolve_channel_skills
@@ -125,7 +129,7 @@ from claude_code_runner.reply_upload import remove_run_files, run_temp_dir
 from claude_code_runner.runturn import RunState, RunTurn
 from claude_code_runner.searchassist import SearchAssistant
 from claude_code_runner.secrets import SecretError, resolve
-from claude_code_runner.statedir import StateDirError, ensure_private_dir, sweep
+from claude_code_runner.statedir import ensure_private_dir, sweep
 from claude_code_runner.stop import stop_group
 from claude_code_runner.transcribe import Transcriber
 from claude_code_runner.trash import FolderTrash, GitRunner, TrashPlaces
@@ -900,9 +904,6 @@ class RunnerHandler(AgentHandler):
                 )
             if entry is not None:
                 await mode.cli.remove(entry.short_id)
-            # Nobody follows this turn, but what its session took while no runner read its
-            # transcript stays in the conversation: judged before the record goes (18.5).
-            await asyncio.to_thread(self._judge_unfollowed, mode, session_ref, record, run_id)
             remove_turn_record(path)
             remove_bg_files(self.config.state_dir, run_id)
             return
@@ -945,37 +946,6 @@ class RunnerHandler(AgentHandler):
         self._adopting.add(task)
         task.add_done_callback(self._adopting.discard)
 
-    def _judge_unfollowed(
-        self, mode: BackgroundMode, session_ref: str, record: Mapping[str, Any], run_id: UUID
-    ) -> None:
-        """Mark the session of a turn no runner follows when it took a foreign input (18.5).
-
-        The transcript of the recorded process is mapped from its launch offset to its end
-        with the lines the record names as the runner's; a record that names none proves
-        none. A marked session is not continued by a later run (`RunTurn._leave_session`).
-        """
-        part = record.get("bg")
-        part = part if isinstance(part, Mapping) else {}
-        named = part.get("own")
-        own = {u for u in named if isinstance(u, str)} if isinstance(named, list) else set()
-        config_dir = mode.config_dir
-        transcript = find_transcript(config_dir, session_ref) if config_dir is not None else None
-        start = record.get("process_start")
-        start = (
-            start if isinstance(start, int) and not isinstance(start, bool) and start >= 0 else 0
-        )
-        origin = foreign_origin(
-            transcript, start, str(part.get("prompt_uuid") or ""), own.__contains__
-        )
-        if origin is None:
-            return
-        warn("background_foreign_input_unread", origin=origin, run_id=run_id)
-        try:
-            mark_foreign_input(self.config.state_dir, session_ref, run_id)
-        except (OSError, StateDirError):
-            # Without the mark the next run would continue the conversation: say so.
-            warn("session_mark_failed", run_id=run_id)
-
     def _turn_end_in_transcript(
         self, mode: BackgroundMode, session_ref: str, record: Mapping[str, Any], prompt_uuid: str
     ) -> bool:
@@ -992,7 +962,8 @@ class RunnerHandler(AgentHandler):
         offset = record.get("offset")
         start = start if isinstance(start, int) and start >= 0 else 0
         offset = offset if isinstance(offset, int) and offset >= start else start
-        lines = replayed_records(transcript, start, size, TranscriptMapper(prompt_uuid))
+        mapper = TranscriptMapper(prompt_uuid, side=side_inputs(transcript))
+        lines = replayed_records(transcript, start, size, mapper)
         return any(
             message.get("type") == "result" and line_start >= offset
             for message, line_start, _ in lines

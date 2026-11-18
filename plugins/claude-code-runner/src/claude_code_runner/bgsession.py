@@ -18,12 +18,15 @@ pure function a test holds against a recording of the pinned version:
   session that bypasses permission prompts inside the CLI's envelope that states the sender's
   class (`sender_class`).
 
-What a session takes from the other Claude Code sessions of the host user is never widened: the
-settings file of a run sets no ``crossSessionInbound``, so the CLI's own rule per message and
-any stricter value of the host stay, and the tools found in the pinned CLI that write to or
-list other sessions are disallowed (`DENIED_TOOLS`). Neither authenticates a sender: the runner
-decides by the ``uuid`` of every input the transcript shows (`claude_code_runner.bgtranscript`,
-09 18.5).
+What a session takes from the other Claude Code sessions of the host user is widened only as far
+as the runner's own lines need: the settings file of a run sets ``crossSessionInbound``
+``accept`` only when the host user's own settings say ``hold``, which would otherwise hold the
+runner's follow-ups too (`host_inbound_value`, FIX-RUNNER-BG-HELD-FOLLOWUP), and none otherwise,
+so the CLI's own rule per message or any other value of the host stays; a ``refuse`` there is
+never overridden. The tools found in the pinned CLI that
+write to or list other sessions are disallowed (`DENIED_TOOLS`). Neither authenticates a
+sender: the runner decides by the ``uuid`` of every input the transcript shows
+(`claude_code_runner.bgtranscript`, 09 18.5).
 
 A session inherits the environment of the supervisor, which lives across runs. So the launch
 command, which starts the supervisor when none runs, gets the fixed environment of
@@ -68,10 +71,17 @@ from pathlib import Path
 from typing import Any
 
 from claude_code_runner.adoption import process_id, read_identity
-from claude_code_runner.commandline import ArgumentError, class_flags
+from claude_code_runner.commandline import (
+    ArgumentError,
+    HostedArgs,
+    class_flags,
+    hosted_additions,
+    hosted_class_flags,
+)
 from claude_code_runner.config import check_argument
 from claude_code_runner.statedir import ensure_private_dir, write_private
 from claude_code_runner.stop import escalation_due
+from claude_code_runner.usage import claude_config_dir
 
 __all__ = [
     "DENIED_TOOLS",
@@ -86,6 +96,7 @@ __all__ = [
     "Supervisor",
     "background_argv",
     "background_class_flags",
+    "host_inbound_value",
     "launch",
     "load_supervisor",
     "parse_launch",
@@ -126,6 +137,10 @@ of the pinned version."""
 RUN_ENV_NAMES = ("CLAUDE_PRODUCT_RUN", "DISABLE_AUTOUPDATER", "TMPDIR", "SSH_AUTH_SOCK")
 """The names of the ``env`` block of a run's settings file, each set in every launch."""
 
+INBOUND_SETTING = "crossSessionInbound"
+"""The CLI's setting of what a session takes from other sessions (``accept``, ``hold``,
+``refuse``; unset: a rule per message by the permission classes of both sessions)."""
+
 _ENVELOPE = "cross-session-message"
 """The element the CLI wraps a message of another session in; its attribute ``from-mode`` is
 how a sender states its permission class (read in the file of the pinned CLI and run)."""
@@ -137,6 +152,9 @@ _LAUNCHED = re.compile(r"^backgrounded · ([0-9a-f]{8}) · ", re.MULTILINE)
 """The first line of a launch (run with the pinned CLI 2.1.325 on 2026-11-16,
 ``tests/fixtures/recording/background_<version>``)."""
 _UNTRUSTED = "Workspace not trusted."
+_FILES_UNTRUSTED = "Added folder not trusted:"
+"""Since 2.1.326 a launch refuses an ``--add-dir`` folder without workspace trust; trust of a
+folder above it counts (run against the stand-in on 2026-11-17)."""
 _BYPASS = "--bg with bypassPermissions requires accepting the disclaimer first."
 _SERVICE = "Starting background service"
 _NOTE = "note:"
@@ -172,7 +190,9 @@ def session_name(run_id: object) -> str:
     return f"{NAME_PREFIX}{run_id}"
 
 
-def background_class_flags(tool_class: str, tools: Sequence[str]) -> list[str]:
+def background_class_flags(
+    tool_class: str, tools: Sequence[str], hosted: HostedArgs | None = None
+) -> list[str]:
     """Return the flags of a tool class for a background session (09 18.2).
 
     The flags of `claude_code_runner.commandline.class_flags`, and under ``scoped`` and ``host``
@@ -183,6 +203,7 @@ def background_class_flags(tool_class: str, tools: Sequence[str]) -> list[str]:
     Args:
         tool_class: ``chat``, ``scoped`` or ``host``.
         tools: The named tools of ``scoped``.
+        hosted: The parts of a hosted turn: the tool flags of 26 5.3 instead of 18.2.
 
     Returns:
         The flags.
@@ -196,7 +217,10 @@ def background_class_flags(tool_class: str, tools: Sequence[str]) -> list[str]:
         >>> background_class_flags("host", [])[3:]
         ['AskUserQuestion', 'SendMessage', 'ListAgents', 'SendFile']
     """
-    flags = class_flags(tool_class, tools)
+    if hosted is None:
+        flags = class_flags(tool_class, tools)
+    else:
+        flags = hosted_class_flags(tool_class, tools, has_skills=hosted.has_skills)
     if tool_class == "chat":
         return flags
     return [*flags, "--disallowedTools", *DENIED_TOOLS]
@@ -214,8 +238,17 @@ def background_argv(  # noqa: PLR0913 - every input of the command line is expli
     system_prompt_file: Path,
     socket_file: Path,
     settings_file: Path,
+    hosted: HostedArgs | None = None,
+    plugin_dirs: Sequence[Path] = (),
 ) -> list[str]:
     """Build the argument list of the launch command in the order of 09 18.2.
+
+    A hosted turn (26 5.3) and a turn with channel skills (26 5.9) carry the same parts as in
+    print mode: the tool flags of the hosted class, ``--restricted`` or ``--setting-sources``,
+    ``--plugin-dir`` per folder and ``--mcp-config`` with ``--strict-mcp-config``. The hosted
+    settings are not a second ``--settings``: `settings_document` writes them into the one
+    settings file of the launch. ``--max-budget-usd`` is left out, because a background
+    session does not act on it (the runner holds the cost cap itself).
 
     The prompt is not an argument: it is the stdin of the command, so it is neither bounded
     by the system's argument limit nor readable in the process list. ``--session-id`` is
@@ -233,22 +266,31 @@ def background_argv(  # noqa: PLR0913 - every input of the command line is expli
         system_prompt_file: The file of ``--append-system-prompt-file``.
         socket_file: The inbox socket (``--messaging-socket-path``).
         settings_file: The settings file of the run (``--settings``).
+        hosted: The parts of a hosted turn (26 5.3); ``None`` for the runner's own agent.
+        plugin_dirs: Channel skill folders (26 5.9), only for ``host``.
 
     Returns:
         The argument list.
 
     Raises:
-        ArgumentError: An invalid model or tool, or ``add_dir`` under ``chat``.
+        ArgumentError: An invalid model or tool, ``add_dir`` or an MCP file under ``chat``,
+            or a channel skill folder below ``host``.
     """
     if not check_argument(model):
         raise ArgumentError("invalid_argument")
     if add_dir is not None and tool_class == "chat":
         raise ArgumentError("invalid_argument")
+    if plugin_dirs and tool_class != "host":  # 26 5.9: channel skills only in host turns
+        raise ArgumentError("invalid_argument")
     argv = [claude_bin]
     if resume is not None:
         argv += ["--resume", resume]
     argv += ["--bg", "--name", name, "--model", model]
-    argv += background_class_flags(tool_class, tools)
+    argv += background_class_flags(tool_class, tools, hosted)
+    if hosted is None:
+        argv += [a for folder in plugin_dirs for a in ("--plugin-dir", str(folder))]
+    else:
+        argv += hosted_additions(tool_class, hosted, plugin_dirs, settings=False)
     if add_dir is not None:
         argv += ["--add-dir", str(add_dir)]
     argv += [
@@ -262,7 +304,9 @@ def background_argv(  # noqa: PLR0913 - every input of the command line is expli
     return argv
 
 
-def settings_document(env: Mapping[str, str]) -> dict[str, Any]:
+def settings_document(
+    env: Mapping[str, str], base: Mapping[str, Any] | None = None
+) -> dict[str, Any]:
     """Return the settings of a run's background session (``--settings``, 09 18.2).
 
     Exactly two members. ``worktree.bgIsolation`` ``none`` keeps the session in the project
@@ -276,12 +320,25 @@ def settings_document(env: Mapping[str, str]) -> dict[str, Any]:
     CLI). So a run that must not have the SSH agent gets an empty ``SSH_AUTH_SOCK`` whatever
     the supervisor carries.
 
-    The document sets no ``crossSessionInbound``. Without a value the CLI decides per message
-    by the permission classes of both sessions, and a stricter value of the host user's or of
-    managed settings stays in force; ``accept`` here would switch both off (18.5).
+    The document sets ``crossSessionInbound`` ``accept`` only when the host user's own
+    settings say ``hold`` (`host_inbound_value`). Without any value the CLI decides per
+    message by the permission classes of both sessions, which lets the runner's lines through
+    (18.5). A value of the user's settings switches that rule off for every message: ``hold``
+    there kept every follow-up of the runner out of the session, and the server deferred each
+    into runs of their own, where the same message was answered again
+    (FIX-RUNNER-BG-HELD-FOLLOWUP). A value of ``--settings`` goes before one of the
+    user's settings, and only ``accept`` lets the runner's lines through. Any other value of
+    the user's stays in force: ``refuse`` is the operator's deliberate choice to take nothing
+    from other sessions and is never overridden (a follow-up then waits for a run of its
+    own), ``accept`` already lets the lines through, and a value the CLI does not know is left
+    as it is. A value of managed settings stays in force too.
+
+    A hosted turn gives the settings of 26 5.4 as ``base``; the document is then those
+    settings with the two members added (they carry no ``env`` and no ``worktree``).
 
     Args:
         env: The environment of the turn (`claude_code_runner.environment.build_environment`).
+        base: The settings of a hosted turn, if any.
 
     Returns:
         The document; ``env`` holds ``CLAUDE_PRODUCT_RUN``, ``DISABLE_AUTOUPDATER``, the run's
@@ -293,7 +350,33 @@ def settings_document(env: Mapping[str, str]) -> dict[str, Any]:
         "TMPDIR": env.get("TMPDIR", ""),
         "SSH_AUTH_SOCK": env.get("SSH_AUTH_SOCK", ""),
     }
-    return {"worktree": {"bgIsolation": "none"}, "env": session_env}
+    document = {**(base or {}), "worktree": {"bgIsolation": "none"}, "env": session_env}
+    if host_inbound_value(env) == "hold":
+        document[INBOUND_SETTING] = "accept"
+    return document
+
+
+def host_inbound_value(env: Mapping[str, str]) -> object | None:
+    """Return the value of ``crossSessionInbound`` in the host user's own settings, if any.
+
+    The file is ``settings.json`` in the CLI's configuration folder of the turn
+    (``CLAUDE_CONFIG_DIR``, else ``$HOME/.claude``). A ``null`` is no value, as for the CLI,
+    which drops such a member. A file that cannot be read or is no JSON object gives none.
+
+    Args:
+        env: The environment of the turn.
+
+    Returns:
+        The value, or ``None``.
+    """
+    folder = claude_config_dir(env)
+    if folder is None:
+        return None
+    try:
+        doc = json.loads((folder / "settings.json").read_text("utf-8"))
+    except (OSError, ValueError):
+        return None
+    return doc.get(INBOUND_SETTING) if isinstance(doc, dict) else None
 
 
 def sender_class(tool_class: str) -> str | None:
@@ -440,9 +523,10 @@ class LaunchOutput:
     Attributes:
         short_id: The short id of the session (the first eight characters of its session id);
             ``None`` when the command started none.
-        refusal: Why the command started nothing: ``untrusted`` (the folder has no workspace
-            trust), ``bypass`` (bypass mode without a recorded acceptance), ``failed`` (any
-            other error or an output the runner cannot read); ``None`` after a launch.
+        refusal: Why the command started nothing: ``untrusted`` (the folder has no workspace trust),
+            ``files_untrusted`` (the ``--add-dir`` folder has none), ``bypass`` (bypass mode without
+            a recorded acceptance), ``failed`` (any other error or an output the runner cannot
+            read); ``None`` after a launch.
         started_service: The command started the supervisor (none ran before).
         notes: The count of ``note:`` lines on stderr; one says that the command did not
             continue the session in place but started a copy, or woke it with saved options.
@@ -482,6 +566,8 @@ def parse_launch(returncode: int | None, stdout: str, stderr: str) -> LaunchOutp
         return LaunchOutput(found.group(1), None, service, notes)
     if _UNTRUSTED in stderr:
         refusal = "untrusted"
+    elif _FILES_UNTRUSTED in stderr:
+        refusal = "files_untrusted"
     elif _BYPASS in stderr:
         refusal = "bypass"
     else:

@@ -202,12 +202,70 @@ def test_the_settings_file_holds_the_isolation_and_the_run_s_environment() -> No
     assert set(forwarded["env"]) == set(RUN_ENV_NAMES)
 
 
-def test_the_settings_file_never_widens_what_the_session_takes_from_other_sessions() -> None:
-    # No value of crossSessionInbound: the CLI's own rule per message stays, and a stricter
-    # value of the host user's or of managed settings is not overridden (18.5).
-    for env in ({}, {"TMPDIR": "/t", "SSH_AUTH_SOCK": "/a.sock"}):
+def test_the_settings_file_never_widens_what_the_session_takes_from_other_sessions(
+    tmp_path: Path,
+) -> None:
+    # No value of crossSessionInbound while the host user's settings have none: the CLI's
+    # own rule per message stays (18.5).
+    config = tmp_path / "config"
+    config.mkdir()
+    (config / "settings.json").write_text(json.dumps({"model": "m"}), "utf-8")
+    for env in (
+        {},
+        {"TMPDIR": "/t", "SSH_AUTH_SOCK": "/a.sock"},
+        {"HOME": str(tmp_path / "nobody")},
+        {"CLAUDE_CONFIG_DIR": str(config)},
+    ):
         assert "crossSessionInbound" not in settings_document(env)
         assert set(settings_document(env)) == {"worktree", "env"}
+    # A null is no value for the CLI either, and a file it cannot read gives none.
+    (config / "settings.json").write_text('{"crossSessionInbound": null}', "utf-8")
+    assert "crossSessionInbound" not in settings_document({"CLAUDE_CONFIG_DIR": str(config)})
+    (config / "settings.json").write_text("{not json", "utf-8")
+    assert "crossSessionInbound" not in settings_document({"CLAUDE_CONFIG_DIR": str(config)})
+
+
+def test_a_hold_of_the_host_user_s_settings_is_replaced_by_accept(tmp_path: Path) -> None:
+    # When the host user's own settings hold "crossSessionInbound": "hold", the session holds
+    # every follow-up of the runner ("Held peer message ... Your "crossSessionInbound" setting
+    # is "hold"") and the server defers each into runs of their own
+    # (FIX-RUNNER-BG-HELD-FOLLOWUP). A value there switches the CLI's rule per message
+    # off, and only "accept" lets the runner's lines through; a value of --settings goes
+    # before one of the user's settings.
+    home = tmp_path / "home"
+    (home / ".claude").mkdir(parents=True)
+    (home / ".claude" / "settings.json").write_text(
+        json.dumps({"crossSessionInbound": "hold"}), "utf-8"
+    )
+    document = settings_document({"HOME": str(home), "TMPDIR": "/t"})
+    assert document["crossSessionInbound"] == "accept"
+    assert set(document) == {"worktree", "env", "crossSessionInbound"}
+    # CLAUDE_CONFIG_DIR goes before HOME, as for the CLI.
+    other = tmp_path / "other"
+    other.mkdir()
+    env = {"HOME": str(home), "CLAUDE_CONFIG_DIR": str(other)}
+    assert "crossSessionInbound" not in settings_document(env)
+    # A hosted turn's base keeps its members beside it.
+    hosted = settings_document({"HOME": str(home)}, {"permissions": {"deny": ["X"]}})
+    assert hosted["crossSessionInbound"] == "accept"
+    assert hosted["permissions"] == {"deny": ["X"]}
+
+
+@pytest.mark.parametrize("value", ["refuse", "accept", "sometimes"])
+def test_any_other_value_of_the_host_user_s_settings_stays_in_force(
+    tmp_path: Path, value: str
+) -> None:
+    # Only "hold" is lifted. A "refuse" is the operator's deliberate choice to take nothing
+    # from other sessions and is never overridden; "accept" lets the runner's lines through
+    # already; a value the CLI does not know is left as it is.
+    home = tmp_path / "home"
+    (home / ".claude").mkdir(parents=True)
+    (home / ".claude" / "settings.json").write_text(
+        json.dumps({"crossSessionInbound": value}), "utf-8"
+    )
+    for base in (None, {"permissions": {"deny": ["X"]}}):
+        document = settings_document({"HOME": str(home), "TMPDIR": "/t"}, base)
+        assert "crossSessionInbound" not in document
 
 
 def test_every_name_of_the_run_s_environment_is_set_in_every_settings_file() -> None:
@@ -336,6 +394,19 @@ def test_the_refusals_of_the_pinned_cli() -> None:
         True,
     )
     assert (bypass.short_id, bypass.refusal, bypass.exit_error) == (None, "bypass", True)
+
+
+def test_an_added_folder_without_trust_is_its_own_refusal() -> None:
+    # The words of 2.1.326 (run against the stand-in on 2026-11-17); 2.1.325 launched such a
+    # session without asking.
+    out = parse_launch(
+        1,
+        "",
+        "Added folder not trusted: /state/files/thread. Leave out its --add-dir or, if you "
+        "trust it and everything in its repository or below it, start `claude` there once and "
+        "accept the trust prompt.\n",
+    )
+    assert (out.short_id, out.refusal, out.exit_error) == (None, "files_untrusted", True)
 
 
 def test_any_other_output_is_a_failed_launch() -> None:
@@ -703,3 +774,59 @@ async def test_a_session_without_an_id_is_neither_stopped_nor_removed_by_name(
     assert await session.remove() is False
     assert cli.stopped == []
     assert cli.removed == []
+
+
+def test_a_hosted_launch_carries_the_parts_of_its_turn(tmp_path: Path) -> None:
+    # FIX-RUNNER-CLI-PIN-326: a hosted turn runs as a session with the parts of 26 5.3.
+    from claude_code_runner.commandline import HostedArgs
+
+    hosted = HostedArgs(
+        settings=tmp_path / "settings.json",
+        plugin=tmp_path / "plugin",
+        mcp_config=tmp_path / "mcp.json",
+        has_skills=True,
+    )
+    common: dict[str, Any] = {
+        "claude_bin": "/bin/claude",
+        "model": "m",
+        "resume": None,
+        "name": "bothy-x",
+        "add_dir": None,
+        "system_prompt_file": tmp_path / "p.md",
+        "socket_file": tmp_path / "s.sock",
+        "settings_file": tmp_path / "run.json",
+    }
+    scoped = background_argv(**common, tool_class="scoped", tools=["Read"], hosted=hosted)
+    assert scoped[scoped.index("--allowedTools") + 1 : scoped.index("--disallowedTools")] == [
+        "Read",
+        "Skill",
+    ]
+    assert "--restricted" in scoped
+    assert scoped.count("--settings") == 1  # the hosted settings are in the run's one file
+    assert scoped[scoped.index("--plugin-dir") + 1] == str(tmp_path / "plugin")
+    assert scoped[scoped.index("--mcp-config") + 1] == str(tmp_path / "mcp.json")
+    assert "--strict-mcp-config" in scoped
+    assert "--max-budget-usd" not in scoped
+    folder = tmp_path / "skills" / "review"
+    host = background_argv(
+        **common, tool_class="host", tools=[], hosted=hosted, plugin_dirs=[folder]
+    )
+    assert host[host.index("--setting-sources") + 1] == "project,local"
+    assert [host[i + 1] for i, a in enumerate(host) if a == "--plugin-dir"] == [
+        str(tmp_path / "plugin"),
+        str(folder),
+    ]
+    own = background_argv(**common, tool_class="host", tools=[], plugin_dirs=[folder])
+    assert own[own.index("--plugin-dir") + 1] == str(folder)
+    assert "--strict-mcp-config" not in own
+    with pytest.raises(ArgumentError):
+        background_argv(**common, tool_class="scoped", tools=[], plugin_dirs=[folder])
+
+
+def test_the_settings_file_of_a_hosted_turn_keeps_its_settings() -> None:
+    base = {"disableAllHooks": True, "permissions": {"deny": ["Edit(CLAUDE.md)"]}}
+    document = settings_document({"TMPDIR": "/t"}, base)
+    assert document["disableAllHooks"] is True
+    assert document["permissions"] == base["permissions"]
+    assert document["worktree"] == {"bgIsolation": "none"}
+    assert document["env"]["TMPDIR"] == "/t"

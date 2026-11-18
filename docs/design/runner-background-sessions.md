@@ -1,7 +1,12 @@
 # Claude Code runner on background sessions
 
 Status: design of 2026-11-16, built by the ticket FEAT-RUNNER-BG-SESSIONS and changed by
-FIX-RUNNER-BG-INBOX-AUTH after the review of that build (section 10). This note records the
+FIX-RUNNER-BG-INBOX-AUTH after the review of that build (section 10). FIX-RUNNER-CLI-PIN-326
+(owner order of 2026-11-17, rulings in `docs/decisions.d/FIX-RUNNER-CLI-PIN-326.md`) replaced
+D-BG-2 and D-BG-13: turns with channel skills run in background mode too, every run of a hosted
+agent ends `failed` with its cause (its ruling 10), and a run the mode is not available for
+ends `failed` with its cause instead of using print mode;
+where 4.2, 4.13 and the lists below still say "print mode", that ruling wins. This note records the
 goal, the evidence and the decisions with their reasons, and ends with the build brief. The
 normative text is in [09-agents.md](../spec/09-agents.md) sections 18 and 21 (the paragraphs
 "Background mode") and the rulings are in `docs/decisions.d/FEAT-RUNNER-BG-SESSIONS.md` and
@@ -135,7 +140,7 @@ Each point is decided by a test of section 7.3.
 | 26 | Without a value of `crossSessionInbound` the CLI decides per message by the permission classes of both sides. A session with `bypassPermissions` takes a message only when its sender states the class `bypass` and holds every other one, also one that states nothing. A session with `dontAsk` takes every message unless its sender states `bypass`. A value of the setting decides for every message, and the CLI reads it from managed settings first, then `--settings`, then user settings | run B, read, docs |
 | 27 | A sender states its class in the content of the line: the element `<cross-session-message from-mode="bypass">` (or `prompting`), a line break, the text, a line break and the closing tag. Members of the line like `from_mode`, `origin` or `isMeta` are not read; `from` is kept as a claim. The CLI reads the class only from an envelope in the exact form it would write itself, and it rewrites a body that holds the closing tag, which it matches in other letter cases and with look-alike and invisible characters. The model receives the envelope as written | run B, read |
 | 28 | A message the rule of item 26 holds is never delivered. The transcript gets a `system` record `informational` that says so, and from then on the session list shows the session with `status` `waiting` and `waitingFor` `permission prompt`, while its turns go on: the message waits for an approval. A message that a value `hold` of the setting keeps is noted the same way and leaves the status as it is; one that a value `refuse` drops leaves no record. A line that repeats the text of the line before it within a short time is dropped without a record ("drops identical repeats arriving within a short window") | run B, docs |
-| 29 | Every line of the socket becomes an input with `origin.kind` `peer`, whatever the line says about itself. A line taken during a turn is recorded as `queue-operation` `remove` with `absorbed_mid_turn` and `commandUuid`, and as an `attachment` of the type `queued_command` with `source_uuid` and `origin`, written before the request that carries it. The notification of the session's own background command that ends during a turn is recorded the same way, with a `commandUuid` the CLI made and `origin.kind` `task-notification` (`producer` `session-task`). The order of the request record and of the `user` record of a line that starts a turn varies between runs | run B |
+| 29 | Every line of the socket becomes an input with `origin.kind` `peer`, whatever the line says about itself. A line taken during a turn is recorded as `queue-operation` `remove` with `absorbed_mid_turn` and `commandUuid`, and as an `attachment` of the type `queued_command` with `source_uuid` and `origin`, written right after the record of the request that carries it (run with the pinned CLI, 2026-11-17). The notification of the session's own background command that ends during a turn is recorded the same way, with a `commandUuid` the CLI made and `origin.kind` `task-notification` (`producer` `session-task`). The order of the request record and of the `user` record of a line that starts a turn varies between runs | run B |
 | 30 | The exception for a message of the session's own child (docs) holds only without a value of the setting and only for a process that descends from the session process: the CLI asks the system which process wrote the line and reads its ancestry. The token `CLAUDE_CODE_MESSAGING_TOKEN`, which every tool call of a session has in its environment, counts on macOS only when that evidence is missing: a line without an envelope that a living process that is no descendant wrote behind the token was held by a `host` session, the same line of a process that had ended when the session looked was taken (its origin then carries `selfSent`, and its kind is `peer` like every line). With a value `hold` of the setting the line with the token was held like the runner's own. The runner is no child of a session | run B, read, docs |
 | 31 | With the class flags of a tool class a session offers `ListAgents` and names `SendMessage` among the tools it can load later; with both in `--disallowedTools` it offers neither, and a search for them by name finds no tool. A session with `--tools ""` has no tool. A session without a login offers no other tool that addresses or lists other sessions; the CLI's file holds a third one that an account feature switches on (item 39) | run B |
 | 32 | A second session under a supervisor sees every variable the launch that started the supervisor had: with the first launch's environment carrying an SSH agent socket and a marker, the session of a second launch without them had both. The `env` block of a session's settings file reaches neither the supervisor nor a later session, and a value of that block goes before an inherited one, also the empty text | run B |
@@ -225,6 +230,8 @@ use background mode and every other run uses print mode. Both keys are read at s
 
 ### 4.2 D-BG-2: what runs in background mode
 
+Superseded by FIX-RUNNER-CLI-PIN-326 (see the status line at the top).
+
 Only the turns of the runner's own agent in billing mode `personal`. In print mode stay:
 
 - **`organization` turns.** A background session takes no API key from the environment (2.2
@@ -278,8 +285,9 @@ Only the turns of the runner's own agent in billing mode `personal`. In print mo
 3. **The settings file** of the run (mode `0600`, in that folder) holds exactly:
    `worktree.bgIsolation` `"none"`, and `env` with `CLAUDE_PRODUCT_RUN`, `DISABLE_AUTOUPDATER`,
    the run's `TMPDIR` and `SSH_AUTH_SOCK`, every name in every file (the agent socket with
-   `runner.forward_ssh_agent`, else the empty text; 4.16). It sets no `crossSessionInbound`
-   (4.14). Reasons: the launching command's environment does not reach the session (item 7);
+   `runner.forward_ssh_agent`, else the empty text; 4.16). It sets `crossSessionInbound`
+   `"accept"` only when the host user's own `settings.json` gives that setting the value
+   `"hold"` (4.14). Reasons: the launching command's environment does not reach the session (item 7);
    without `bgIsolation` `"none"` the session would move into a worktree of its own, against
    18.1, and its transcript would move with it (item 12).
 4. **The prompt** is the two parts of the first stdin line of 18.2 (the context with trust
@@ -491,7 +499,9 @@ a line that cannot be written in print mode.
   service. A launch that printed no such line although the check found no supervisor ran
   under a supervisor another program started in between: its session is stopped and removed
   and the run goes on by the rule of 4.13 with `background_supervisor_foreign`. A recorded
-  supervisor with the pinned version: launch. Any other supervisor, of another
+  supervisor with the pinned version: launch. A supervisor whose process is gone when its
+  start time is read ended on its own (it exits after its last session): the status is read
+  once more. Any other supervisor, of another
   version or started by another program of the same user: no launch, the run uses print mode
   with the cause
   `background_supervisor_foreign` or `background_supervisor_version` (4.13). The check, the
@@ -593,6 +603,8 @@ line of the inbox socket; the outputs of `stop`, `rm` and `daemon status`.
 
 ### 4.13 D-BG-13: when the mode is unavailable, the run uses print mode and says why
 
+Superseded by FIX-RUNNER-CLI-PIN-326 (see the status line at the top).
+
 A run that should use background mode and cannot uses print mode. The live box shows once per
 run, as a status line, that background sessions are not available, with the code; the log has
 `background_fallback` with the code; and a cause of the host sets `background_unavailable` in
@@ -640,24 +652,35 @@ enforces:
     attachment after it, a `user` record or attachment with any other origin that is not one of
     the session itself,
     and an input a running turn took under a `uuid` the runner did not write that no
-    attachment attributes to the session itself before the session's next output. At the
-    first one the runner stops the session and ends the run `failed` with
-    `runtime_error` and the cause `background_foreign_input` (the log event of that name
-    carries one of four words for whose input it was, `peer`, `human`, `other` or
-    `unattributed`, never a text of the record). The record lies before the answer
-    of the turn that took the input, and the runner reads no further, so that answer and its
-    attachments are never posted. An adopter applies the rule with the lines the record names
-    (D-BG-11), also over the part of the transcript the previous runner read; a record that
-    names none proves none.
+    attachment attributes to the session itself before the session's next output (also the
+    attachment in the file of an agent of the session, see the bullet "Why the files of the
+    session's agents"). Such an input is logged and nothing else (since 2026-11-17,
+    D-FIX-RUNNER-BG-FOREIGN-LOG-1): the warning `background_foreign_input` carries one of four
+    words for whose input it was, `peer`, `human`, `other` or `unattributed`, never a text of
+    the record; the run goes on, and the answer is posted. An adopter logs with the lines the
+    record names (D-BG-11), also over the part of the transcript the previous runner read; a
+    record that names none proves none. (The first version stopped the session and ended the
+    run `failed` with the cause `background_foreign_input`; where only the thread's person and
+    Claude Code itself write into a session, every such stop was a false alarm.)
 
     - Why not the removal record alone: the CLI removes the notification of the session's own
       background work from its queue the same way, under a `uuid` it made (item 29). So a
       removal under a `uuid` the runner did not write leaves the input open, and the
-      attachment, which names the origin and is written before the request that carries the
-      input, settles it: an origin of the session itself (below) makes it the session's own,
-      every other origin another sender's. An input nothing settled before the session's next
-      output counts as another sender's, so the rule does not rest on the attachment being
+      attachment, which names the origin and is written right after the request that carries
+      the input, settles it: an origin of the session itself (below) makes it the session's own,
+      every other origin another sender's. An input nothing settled before the first output of that
+      request counts as another sender's, so the rule does not rest on the attachment being
       there.
+    - Why the files of the session's agents: an agent the session launched (a subagent, a
+      workflow agent) takes the notifications of its own background commands mid-turn. The
+      CLI writes the `remove` record of such an input into the session's transcript and the
+      `queued_command` attachment that attributes it only into the agent's file below
+      `<session id>/subagents/` (real transcript of the pinned CLI; under the earlier rule
+      the next turn of the session, started by a notification of a plugin, ended the run as
+      `unattributed`, and the thread lost its conversation). Before an open input counts as
+      another sender's, the runner reads those files for an attachment with the input's
+      `uuid` and judges it by the same rule; what nothing attributes stays foreign
+      (FIX-RUNNER-BG-SIDE-NOTICE).
     - Why `human`: a person, or a program that drives `claude attach`, can type into a session
       of the runner, and the answer to it would be posted into the thread as the agent's.
     - Why the `uuid` counts once: a program that read a line of the runner in the transcript
@@ -677,8 +700,11 @@ enforces:
       sender's. The list holds `task-notification` with the producer `session-task` and
       without a `subkind` (the notification of work the session itself launched; the producer
       run with a background command, the rest read, item 40) and `auto-continuation` (a
-      continuation the CLI queues by itself; read, item 37). Every other origin ends the run,
-      also one a later version adds; the mode runs only on the pin.
+      continuation the CLI queues by itself; read, item 37). A `queued_command` attachment
+      with `commandMode` `task-notification` and no origin is the session's own too: the CLI
+      queues the notification of a background agent, monitor, workflow or timer of the
+      session that way (FIX-RUNNER-BG-OWN-NOTICE). Every other origin, also one a
+      later version adds, is another sender's and is logged; the mode runs only on the pin.
     - Why the kind `task-notification` is not enough: the second version of this change took
       every origin of that kind for the session's own. The CLI records under it what other
       senders deliver as well (item 40), among them the message another session of the same
@@ -686,15 +712,16 @@ enforces:
       was posted (found by the review of that version, reproduced with a record of that
       shape). Only the producer the CLI stamps for the session's own work counts, and a
       `subkind` always names a delivery from elsewhere. A message of the session's own
-      background subagent would, by the CLI's schema, arrive as `peer` and end the run with
-      the cause; that is not run (item 40) and stays the safe side.
+      background subagent would, by the CLI's schema, arrive as `peer` and be logged as
+      another sender's; that is not run (item 40).
     - What it does not decide: the inputs a session gets without a record of its own, which
       are those of the host user's own configuration (hooks, instruction files), loaded like
       in any session of that user (item 24). A part of that configuration that queues an
-      input under an origin of its own (a plugin, a channel) counts as another sender and ends
-      the run.
+      input under an origin of its own (a plugin, a channel) counts as another sender and is
+      logged.
 
-2. **The settings file sets no `crossSessionInbound`** (the narrowest the CLI offers). The
+2. **The settings file sets no `crossSessionInbound` unless the host user's settings say
+    `"hold"`** (the narrowest the CLI offers; for `"hold"` there it sets `"accept"`, below). The
     CLI has three values and a rule per message for a session without one (item 26); it has no
     list of allowed senders. Tried against the pinned CLI:
 
@@ -716,9 +743,10 @@ enforces:
     What it narrows against `"accept"`: a `host` session holds every message whose sender
     does not state `bypass`, which is what a session of another class and a line without an
     envelope are; a `chat` or `scoped` session holds a message whose sender states `bypass`;
-    and a stricter value of the host user's or of managed settings is no longer overridden
-    (then the runner's lines are held or dropped too, and follow-ups wait for the end of the
-    run). A message the rule per message holds is never delivered, and the session then shows
+    and a stricter value of managed settings is not overridden (then the runner's lines are
+    held or dropped too, and follow-ups wait for the end of the run). A value of the host
+    user's own settings is overridden with `"accept"` only when it is `"hold"`; a `"refuse"`
+    there is the operator's deliberate choice and stays (FIX-RUNNER-BG-HELD-FOLLOWUP). A message the rule per message holds is never delivered, and the session then shows
     as waiting for a permission prompt (item 28), which ends the run by the rule of 4.5.
 
     - The envelope and its text: the CLI rewrites a body that holds the element's closing tag
@@ -750,42 +778,15 @@ enforces:
       secret from exactly the senders it is meant to keep out, and the model would trust a
       line because of it.
 
-5. **A session that took an input of another sender is never continued.** The second
-    version of this change stopped the session and failed the run, and the cause told the
-    person to send the message again. The next run then continued the same session: the
-    input of the other sender is part of its conversation, the CLI sends it to the model
-    again with the next prompt, and the runner of that run reads the transcript from its
-    launch offset, behind the record, so it posted the answer (item 41; found by the review
-    of that version). Decided:
-
-    - The runner marks the session before it stops it: a file `foreign-input` in the
-      session's folder of the state directory, which names the run and nothing of the input.
-      The retention sweep keeps it like the session's usage.
-    - Before every new attempt that would continue a session (`--resume`), in background mode
-      and in print mode, the runner looks for the mark. A marked session is replaced as a
-      missing one is (18.9): a new reference, the same first line, the box note
-      `session_missing`, the report of the new reference. Both modes share the session store
-      (4.2), so the check stands before the choice of the mode.
-    - The cost is the history of the thread's session; the cause of the failed run says that
-      the next message starts a new session. The thread itself keeps every message.
-    - The read loop is not the only way a session is released. An error, the counter-check or
-      a cancellation of the run in the runner ends the run, or the runner that starts after a
-      crash does not follow the turn (a decided end, a run that has ended, a session without
-      a process whose turn end is not in the transcript). In each of these a part of the
-      transcript was read by nobody, and a line the session took there would stay in a
-      conversation the next run continues. So every release of a session maps the transcript
-      of its process once more,
-      from the launch offset to the end, after the process is gone, with the lines the turn
-      record names, and marks the session at a foreign input; the run ends as it was going
-      to. The mapper holds only what the records before produced (D-BG-11), so this second
-      reading gives what the read loop would have given.
-    - Alternatives. Reporting a new reference to the server when the input is found: the
-      report can fail, and then nothing holds the next run back; the mark is local and is
-      written before the stop. Moving or deleting the transcript, so that the CLI itself
-      finds no session: the runner would change a file of the CLI on the strength of the
-      CLI's internal layout, and the record of what the other sender wrote would be gone for
-      the operator. Repairing the conversation (removing the record): the transcript format
-      is internal, and the answer of the model to the input is part of it too.
+5. **A session that took an input of another sender is continued like any other** (since
+    2026-11-17, D-FIX-RUNNER-BG-FOREIGN-LOG-1). The input is part of the session's
+    conversation, and the CLI sends it to the model again with the next prompt (item 41). The
+    earlier version marked such a session (a file `foreign-input` in the session's folder of
+    the state directory) and replaced it at the next run by a new one without history, so every
+    false alarm (an input of the thread's person or of Claude Code itself that the runner could
+    not attribute) cost the thread its conversation. Since that ruling nothing is discarded: there is no mark, no check before an attempt and no judging of a released
+    transcript any more, and a mark an earlier runner wrote has no effect and goes with the
+    retention sweep.
 
 What stays open is in section 5 item 12.
 
@@ -887,9 +888,11 @@ carries (item 32, reproduced with an SSH agent socket). Decided:
     workflows, the usage window of 18.19.10, Windows (the socket is a named pipe there, not
     run), and a helper that records workspace trust.
 12. **Messages of other sessions of the host user.** What is enforced is in 4.14: the runner
-    stops a session that took an input it did not write, posts no answer to it and never
-    continues that session, the settings file widens nothing, and a session of the runner
-    reaches no other session with the tools that were found. What stays open:
+    logs an input it did not write (since 2026-11-17 it neither stops the session nor drops
+    the answer, D-FIX-RUNNER-BG-FOREIGN-LOG-1), the settings file of a run widens nothing
+    unless the host user's own settings say `"hold"` (then it sets `"accept"`, which lets
+    every sender's line in, D-FIX-RUNNER-BG-HELD-FOLLOWUP-1 and -2), and a session of the
+    runner reaches no other session with the tools that were found. What stays open:
     - The class in the envelope is a claim. A `host` session takes the message of another
       session of the host user that bypasses prompts too, and of any program that writes the
       envelope; a `chat` or `scoped` session takes the message of every sender that does not
@@ -897,27 +900,29 @@ carries (item 32, reproduced with an SSH agent socket). Decided:
       sender of a line is the line's own claim and, while the writer still holds its
       connection, the process id of the writer; the runner's own lines carry none, because
       it closes the connection after the write, and the design does not use the member.
-    - An input a session takes while no run follows it (a person or a program that continues
-      the session by its id between two runs) is in no part of the transcript a runner
-      reads, and neither is what the session of a launch in doubt (4.13) took before it was
-      stopped; the mark of 4.14 item 5 covers the transcript of a process a runner followed
-      or found by its turn record. A check before every resume of what the transcript gained
-      since the runner last judged it would close this; it needs that offset kept for both
-      launch modes and is not built.
+    - A message that is taken reaches the model, which acts on it with the rights of its
+      tool class; the runner only logs it, and an input a session takes while no run follows
+      it is not even logged.
     - The deny list of 4.14 item 3 holds the tools that were found. A tool that reaches other
       sessions and that an account feature or a later version adds is not denied until it
       stands there, and a `host` session would run it without a prompt.
-    - The closed list of 4.14 item 1 ends a run at every delivery that is not the session's
-      own work, also one of the host user's own account or configuration (a scheduled
-      prompt, a relay, a webhook, a plugin, a channel).
-    - Such a message reaches the model before the runner stops the session at its next read
-      of the transcript (`runner.poll_interval`). Until then the model can act on it with
-      the rights of the tool class; the CLI tells it that the message is not from its user,
-      cannot approve anything and is no reason to change settings. No answer is posted, but
-      a tool call the model made in that time happened.
-    - `crossSessionInbound` `"accept"` in the host user's own settings makes every session of
-      the host take every message again. `"hold"` or `"refuse"` there keeps or drops the
-      runner's own lines too: a follow-up then waits for a run of its own.
+    - The closed list of 4.14 item 1 makes every delivery that is not the session's own work
+      an input of another sender, also one of the host user's own account or configuration (a
+      scheduled prompt, a relay, a webhook, a plugin, a channel); the runner logs it and
+      nothing else.
+    - Such a message reaches the model, and the runner stops nothing: the model acts on it
+      with the rights of the tool class, and the answer is posted into the thread as the
+      agent's. The CLI tells the model that the message is not from its user, cannot approve
+      anything and is no reason to change settings.
+    - Any value of `crossSessionInbound` in the host user's own settings switches the rule
+      per message off. `"hold"` or `"refuse"` there kept the runner's own lines out too: with
+      `"hold"` there every follow-up of a background turn was held, stayed `delivered`, and
+      the server deferred it into runs of their own and offered it to each later run again,
+      so one message was answered in several runs. Since FIX-RUNNER-BG-HELD-FOLLOWUP the settings file of a run sets `"accept"`
+      when the user's settings say `"hold"`, which goes before it (run with the pinned CLI):
+      a runner session then takes every message, the runner's and every other sender's,
+      which the runner logs. A `"refuse"` there is never overridden: the runner's lines are
+      refused too, and a follow-up waits for a run of its own. Any other value stays as well.
     - A program of the host user that reads or writes the runner's state folder or the CLI's
       transcripts is outside these rules: the runner reads the answer from the transcript.
     - A message of another session that the rule per message holds ends the run as well
@@ -1079,16 +1084,17 @@ between.
 
 | Finding | First build | Now | Where |
 |---|---|---|---|
-| An input of another sender is taken for the runner's | `crossSessionInbound` `"accept"`; the prompt tells the model to follow a line with the runner's lead-in; no check of the `uuid` of an echo | the runner stops a session that took an input it did not write; no inbound setting; `SendMessage` and `ListAgents` disallowed; the prompt names no sign to trust | 4.14 |
+| An input of another sender is taken for the runner's | `crossSessionInbound` `"accept"`; the prompt tells the model to follow a line with the runner's lead-in; no check of the `uuid` of an echo | the runner logs an input it did not write (until 2026-11-17 it stopped the session); no inbound setting unless the host user's settings say `"hold"`, then `"accept"` (FIX-RUNNER-BG-HELD-FOLLOWUP); `SendMessage` and `ListAgents` disallowed; the prompt names no sign to trust | 4.14 |
 | The counter-check is open when it finds nothing | the first request record only, by a prefix of a beta name; no record means no check | every request record, the whole name, no output accepted before one passed, the state in the turn record | 4.15 |
 | A value of one run reaches the session of another | the launch command gets the run's environment, and with it the supervisor | one fixed environment for the launch; every name of a run set in its own settings file | 4.16 |
 | The content of a record decides before its origin (first version of this change) | a `user` record with `tool_result` items was a tool result whatever its origin; every origin but `peer` and `human` was the session's own | the origin is read first and alone; only a record without one is a tool result; the session's own origins are a closed list | 4.14 item 1, 4.6 |
-| The next run continues the conversation that took the foreign input (second version) | the session was stopped and the run failed; the thread's session stayed the same, and the next run resumed it behind the record | the session is marked before the stop, and no run continues a marked session in either mode: the next run starts a new one | 4.14 item 5 |
+| The next run continues the conversation that took the foreign input (second version) | the session was stopped and the run failed; the thread's session stayed the same, and the next run resumed it behind the record | accepted since 2026-11-17: the input is only logged, and the next run continues the session (D-FIX-RUNNER-BG-FOREIGN-LOG-1) | 4.14 item 5 |
 | A delivery of another sender passes as the session's own notification (second version) | every origin of the kind `task-notification` was the session's own | only one with the producer `session-task` and without a `subkind`; every other one is another sender's | 4.14 item 1, 4.6 |
 | A tool that reaches other sessions is not denied (second version) | `SendMessage` and `ListAgents`, with the sentence that a session has no other such tool | `SendFile` too; the list is called what it is, a list of the tools found | 4.14 item 3 |
 
-Core goals of the change, each decided by a test: an input of another sender never leads to a
-posted answer (scenarios with a line between two turns, a line taken during a tool call, a
+Core goals of the change, each decided by a test (the first one replaced on 2026-11-17 by
+D-FIX-RUNNER-BG-FOREIGN-LOG-1: such an input is logged, answered and the session continued,
+by the same scenarios): an input of another sender never leads to a posted answer (scenarios with a line between two turns, a line taken during a tool call, a
 repeated `uuid`, a typed message, a line and a typed message whose record is shaped like a
 tool result, a delivery the CLI records as a notification, and the same after an adoption
 with and without the record's list; the next run of the thread after such an input, as a

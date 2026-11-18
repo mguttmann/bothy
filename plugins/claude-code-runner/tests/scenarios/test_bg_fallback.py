@@ -1,12 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-"""When background mode is unavailable, a run uses print mode and says why (09 18.9).
+"""When background mode is unavailable, the run fails with its cause (09 18.9).
 
-Every cause of the table "Background mode is unavailable": the run completes in print mode,
-the live box names the cause once, the log has ``background_fallback``, a cause of the host
-shows as ``background_unavailable`` in the heartbeat, and the prompt reaches exactly one
-process. In every doubt whether a session took the prompt the run ends instead. Also the
-scope of the mode: only ``personal`` runs in the listed channels, no turn that loads channel
-skills, and nothing without the key.
+Never print mode (ruling D-FIX-RUNNER-CLI-PIN-326-4). Every cause of the table
+"Background mode is unavailable": the run ends ``failed`` with ``runtime_error`` and the cause
+in its summary, no ``claude -p`` process starts, the log has ``background_unavailable``, and a
+cause of the host shows as ``background_unavailable`` in the heartbeat. Also the scope of the
+mode: every run in the listed channels, channel skills included, and nothing without the key.
 """
 
 from __future__ import annotations
@@ -22,7 +21,7 @@ from bothy_sdk.testing._patience import PATIENCE
 from claude_code_runner.causes import cause
 
 from .conftest import BACKGROUND, LogLines, World
-from .test_bg_sessions import events, flag, launches, nothing_left, players, start, texts
+from .test_bg_sessions import events, flag, launches, nothing_left, players, start
 
 pytestmark = pytest.mark.anyio
 
@@ -51,23 +50,22 @@ def reasons(world: World) -> list[str]:
 
 
 async def fell_back(world: World, logs: LogLines, code: str, *, host: bool) -> UUID:
-    """One run that must use print mode for ``code``: it completes there and says why."""
+    """One run that cannot use background mode for ``code``: it fails and says why."""
     run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
-    assert await world.ended(run.run_id) == "completed"
-    assert len(world.turns()) == 1  # the prompt ran once, in print mode
-    assert players(world) == []  # and no session ever took it
-    assert texts(world) == ["Done."]
-    assert status_lines(world, run.run_id) == [
-        f"Background sessions are not available (`{code}`); this run uses print mode."
-    ]
-    assert [e["code"] for e in events(logs, "background_fallback")] == [code]
+    assert await world.ended(run.run_id) == "failed"
+    assert world.fake.run_state(run.run_id).state_reason == "runtime_error"
+    assert world.fake.run(run.run_id)["summary"] == cause(code)
+    assert world.turns() == []  # never print mode
+    assert players(world) == []  # and no session took the prompt
+    assert status_lines(world, run.run_id) == []
+    assert [e["code"] for e in events(logs, "background_unavailable")] == [code]
     await world.until(lambda: ("background_unavailable" in reasons(world)) == host)
     if host:
         assert world.fake.heartbeats[-1]["state"] == "degraded"
     return run.run_id
 
 
-async def test_another_version_than_the_pin_uses_print_mode(
+async def test_another_version_than_the_pin_fails_with_its_cause(
     bg_world: World, logs: LogLines
 ) -> None:
     world = bg_world
@@ -78,18 +76,41 @@ async def test_another_version_than_the_pin_uses_print_mode(
     assert world.calls("bg_daemon") == []
 
 
-async def test_a_supervisor_another_program_started_uses_print_mode(
+async def test_a_supervisor_another_program_started_fails_with_its_cause(
     bg_world: World, logs: LogLines
 ) -> None:
     world = bg_world
     # A supervisor of the pinned version the runner did not start (here: the test's process).
-    world.scenario(fixture="plain", bg_supervisor={"pid": os.getpid(), "version": "2.1.325"})
+    world.scenario(fixture="plain", bg_supervisor={"pid": os.getpid(), "version": "2.1.326"})
     await start(world)
     await fell_back(world, logs, "background_supervisor_foreign", host=True)
     assert launches(world) == []
 
 
-async def test_the_own_supervisor_in_another_version_uses_print_mode(
+async def test_the_own_supervisor_that_ends_right_after_the_check_is_no_foreign_one(
+    bg_world: World, logs: LogLines
+) -> None:
+    world = bg_world
+    # The supervisor ends when its last session has ended; here exactly after `daemon status`
+    # reported it idle and before the runner read its start time (a race of the full suite).
+    world.scenario(fixture="plain", bg_idle_supervisor_ends_after_status=True)
+    await start(world)
+    first = await world.fake.trigger("Fix it", channel_id=world.forum_a)
+    assert await world.ended(first.run_id) == "completed"
+    run = await world.fake.trigger("Fix that", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "completed"
+    assert events(logs, "background_unavailable") == []
+    assert world.turns() == []  # both prompts ran as background sessions
+    assert len(launches(world)) == len(players(world)) == 2
+    assert "background_unavailable" not in reasons(world)
+    await nothing_left(world)
+    state = json.loads((world.home / ".claude" / "fake-bg" / "state.json").read_text())
+    left = (state.get("supervisor") or {}).get("pid")
+    if left:  # the second run's supervisor waits for a status call that ends it
+        os.kill(left, 15)
+
+
+async def test_the_own_supervisor_in_another_version_fails_with_its_cause(
     bg_world: World, logs: LogLines
 ) -> None:
     world = bg_world
@@ -110,20 +131,21 @@ async def test_the_own_supervisor_in_another_version_uses_print_mode(
     )
     recorded = json.loads((world.state / "bg" / "supervisor.json").read_text())
     # The supervisor a launch of the runner started now reports another version.
-    forced = {"pid": recorded["pid"], "version": "2.1.326"}
+    forced = {"pid": recorded["pid"], "version": "2.1.327"}
     world.scenario(fixture="plain", bg_supervisor=forced)
     run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
-    assert await world.ended(run.run_id) == "completed"
-    assert [e["code"] for e in events(logs, "background_fallback")] == [
+    assert await world.ended(run.run_id) == "failed"
+    assert world.fake.run(run.run_id)["summary"] == cause("background_supervisor_version")
+    assert [e["code"] for e in events(logs, "background_unavailable")] == [
         "background_supervisor_version"
     ]
-    assert len(world.turns()) == 1
+    assert world.turns() == []
     assert len(launches(world)) == 1
     world.release(gate)
     assert await world.ended(held.run_id) == "completed"
 
 
-async def test_bypass_mode_without_a_recorded_acceptance_uses_print_mode(
+async def test_bypass_mode_without_a_recorded_acceptance_fails_with_its_cause(
     bg_world: World, logs: LogLines
 ) -> None:
     world = bg_world
@@ -136,7 +158,7 @@ async def test_bypass_mode_without_a_recorded_acceptance_uses_print_mode(
     assert launch["argv"][launch["argv"].index("--disallowedTools") + 1] == "AskUserQuestion"
 
 
-async def test_a_folder_without_workspace_trust_uses_print_mode(
+async def test_a_folder_without_workspace_trust_fails_with_its_cause(
     bg_world: World, logs: LogLines
 ) -> None:
     world = bg_world
@@ -146,14 +168,39 @@ async def test_a_folder_without_workspace_trust_uses_print_mode(
     assert world.fake.heartbeats[-1]["state"] == "online"
 
 
-async def test_a_launch_that_fails_uses_print_mode(bg_world: World, logs: LogLines) -> None:
+async def test_a_files_folder_without_trust_fails_with_its_cause(
+    bg_world: World, logs: LogLines
+) -> None:
+    world = bg_world
+    world.scenario(fixture="plain", bg_refuse="add_dir")
+    await start(world)
+    notes = world.fake.add_file(b"NOTES", name="notes.txt", mime="text/plain")
+    run = await world.fake.trigger("Read it", channel_id=world.forum_a, attachments=[notes])
+    assert await world.ended(run.run_id) == "failed"
+    assert world.fake.run(run.run_id)["summary"] == cause("background_files_untrusted")
+    assert world.turns() == []  # never print mode
+    assert players(world) == []
+    [launch] = launches(world)
+    assert "--add-dir" in launch["argv"]
+    assert [e["code"] for e in events(logs, "background_unavailable")] == [
+        "background_files_untrusted"
+    ]
+    await world.until(lambda: "background_unavailable" in reasons(world))
+    # A run without files still runs as a session.
+    run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "completed"
+
+
+async def test_a_launch_that_fails_fails_with_its_cause(bg_world: World, logs: LogLines) -> None:
     world = bg_world
     world.scenario(fixture="plain", bg_refuse="error")
     await start(world)
     await fell_back(world, logs, "background_launch_failed", host=True)
 
 
-async def test_a_launch_without_a_process_uses_print_mode(bg_world: World, logs: LogLines) -> None:
+async def test_a_launch_without_a_process_fails_with_its_cause(
+    bg_world: World, logs: LogLines
+) -> None:
     world = bg_world
     world.scenario(fixture="plain", bg_no_process=True)
     await start(world, cli_probe_timeout="1s")
@@ -175,6 +222,7 @@ async def test_the_next_launch_that_starts_clears_the_heartbeat_reason(
     run = await world.fake.trigger("Again", channel_id=world.forum_a)
     assert await world.ended(run.run_id) == "completed"
     assert len(players(world)) == 1
+    assert world.turns() == []
     await world.until(lambda: "background_unavailable" not in reasons(world))
     assert world.fake.heartbeats[-1]["state"] == "online"
 
@@ -184,7 +232,7 @@ def _foreign(session: str, **more: Any) -> dict[str, Any]:
     return {"id": session[:8], "sessionId": session, "name": "my-own-session", **more}
 
 
-async def test_a_session_another_program_listed_uses_print_mode(
+async def test_a_session_another_program_listed_fails_with_its_cause(
     bg_world: World, logs: LogLines
 ) -> None:
     world = bg_world
@@ -195,13 +243,13 @@ async def test_a_session_another_program_listed_uses_print_mode(
     entry = _foreign(session, kind="background", state="stopped")
     world.scenario(fixture="resume", bg_foreign_entries=[entry])
     second = await world.fake.trigger("Add a test", thread_id=first.thread_id)
-    assert await world.ended(second.run_id) == "completed"
-    assert [e["code"] for e in events(logs, "background_fallback")] == [
+    assert await world.ended(second.run_id) == "failed"
+    assert world.fake.run(second.run_id)["summary"] == cause("background_session_foreign")
+    assert [e["code"] for e in events(logs, "background_unavailable")] == [
         "background_session_foreign"
     ]
-    # The session goes on in print mode, and the entry of the other program is untouched.
-    [turn] = world.turns()
-    assert flag(turn["argv"], "--resume") == session
+    # No print turn, and the entry of the other program is untouched.
+    assert world.turns() == []
     assert len(launches(world)) == 1
     assert [c["id"] for c in world.calls("bg_rm")] == [session[:8]]  # only the first run's own
     assert "background_unavailable" not in reasons(world)
@@ -237,7 +285,7 @@ async def test_a_launch_in_doubt_ends_the_run_instead_of_running_the_prompt_twic
     assert world.fake.run_state(run.run_id).state_reason == "runtime_error"
     assert world.fake.run(run.run_id)["summary"] == cause("background_launch_failed")
     assert world.turns() == []  # never in print mode: the session may have taken the prompt
-    assert events(logs, "background_fallback") == []
+    assert events(logs, "background_unavailable") == []
     assert len(events(logs, "background_launch_in_doubt")) == 1
     await nothing_left(world)
 
@@ -265,42 +313,33 @@ async def test_a_listed_channel_uses_background_mode(bg_world: World) -> None:
     assert len(players(world)) == 1
 
 
-async def test_an_organization_run_stays_in_print_mode(bg_world: World) -> None:
+async def test_an_organization_run_fails_with_its_cause(bg_world: World, logs: LogLines) -> None:
     world = bg_world
     world.fake.world.billing_mode = "organization"
     await start(world)
-    run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
-    assert await world.ended(run.run_id) == "completed"
-    assert len(world.turns()) == 1
+    await fell_back(world, logs, "background_api_key", host=False)
     assert [c for kind in COMMANDS for c in world.calls(kind)] == []
 
 
-async def test_a_turn_that_loads_channel_skills_stays_in_print_mode(bg_world: World) -> None:
-    # The launch command of a background session carries no channel skill folder, so the
-    # turn of a channel with such a folder keeps the path that loads it (26 5.9).
+async def test_a_turn_that_loads_channel_skills_runs_as_a_background_session(
+    bg_world: World,
+) -> None:
+    # The channel skill folder is a --plugin-dir of the launch (26 5.9, FIX-RUNNER-CLI-PIN-326).
     world = bg_world
     base = world.root / "channel-skills"
     (base / "review").mkdir(parents=True)
     (base / "review" / "SKILL.md").write_text("---\nname: review\ndescription: Reviews\n---\n")
     world.fake.world.channels[world.forum_a]["behavior"]["skills"] = ["claude-code:review"]
-    plain = world.fake.add_forum("Projekt-C", "website")
     world.fake.world.tool_class = "host"
     await start(world, tool_class="host", channel_skills_dir=str(base))
     run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
     assert await world.ended(run.run_id) == "completed"
-    [turn] = world.turns()
-    argv = turn["argv"]
+    assert world.turns() == []
+    [launch] = launches(world)
+    argv = launch["argv"]
     assert [argv[i + 1] for i, a in enumerate(argv) if a == "--plugin-dir"] == [
         str(base / "review")
     ]
-    assert [c for kind in COMMANDS for c in world.calls(kind)] == []
-    assert status_lines(world, run.run_id) == []  # the scope of the mode, not a fallback
-    # A channel of the same runner without such a folder runs as a background session.
-    other = await world.fake.trigger("Fix it", channel_id=plain)
-    assert await world.ended(other.run_id) == "completed"
-    assert len(world.turns()) == 1
-    [launch] = launches(world)
-    assert "--plugin-dir" not in launch["argv"]
     assert len(players(world)) == 1
 
 

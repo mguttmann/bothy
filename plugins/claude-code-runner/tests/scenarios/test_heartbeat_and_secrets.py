@@ -67,21 +67,21 @@ async def test_untested_version_only_warns(world: World) -> None:
     assert await world.ended(run.run_id) == "completed"
 
 
-async def test_cli_2_1_325_is_online_and_runs(world: World) -> None:
-    """A runner with Claude Code 2.1.325 reports ``online`` without a reason, and turns run."""
-    world.scenario(version="2.1.325", fixture="plain")
+async def test_cli_2_1_326_is_online_and_runs(world: World) -> None:
+    """A runner with Claude Code 2.1.326 reports ``online`` without a reason, and turns run."""
+    world.scenario(version="2.1.326", fixture="plain")
     await world.start()
     beat = world.fake.heartbeats[-1]
     assert beat["state"] == "online"
-    assert beat["runtime_version"] == "2.1.325"
+    assert beat["runtime_version"] == "2.1.326"
     assert beat["details"].get("degraded_reasons", []) == []
     run = await world.fake.trigger("Hello", channel_id=world.forum_a)
     assert await world.ended(run.run_id) == "completed"
 
 
-@pytest.mark.parametrize("former", ["2.1.321", "2.1.288"])
+@pytest.mark.parametrize("former", ["2.1.325", "2.1.321", "2.1.288"])
 async def test_a_former_pin_only_warns(world: World, former: str) -> None:
-    """2.1.321 (the pin until 2026-11-16) and 2.1.288 report the version untested; turns run."""
+    """The former pins 2.1.325, 2.1.321 and 2.1.288 report the version untested; turns run."""
     world.scenario(version=former, fixture="plain")
     await world.start()
     beat = world.fake.heartbeats[-1]

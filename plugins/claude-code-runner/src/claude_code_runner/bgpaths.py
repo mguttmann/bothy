@@ -14,12 +14,6 @@ socket) must not move when the runner learns that id.
   (``--append-system-prompt-file``).
 * ``<run_id>.launch.out`` and ``<run_id>.launch.err``: what the launch command printed.
 
-One file of the mode is named after the session and outlives the run:
-``<runner.state_dir>/sessions/<session id>/foreign-input`` marks a session whose conversation
-took an input the runner did not write (18.5 "Whose input"). No run continues such a session,
-in either launch mode (`mark_foreign_input`, `took_foreign_input`), and the retention sweep
-keeps the file.
-
 Examples:
     >>> from pathlib import Path
     >>> socket_path(Path("/state"), "0192d3a0-0000-7000-8000-000000000001").parent.as_posix()
@@ -30,24 +24,19 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
-import json
 import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from uuid import UUID
 
-from claude_code_runner.statedir import FOREIGN_INPUT_MARK, ensure_private_dir, write_private
-
 __all__ = [
     "SOCKET_PATH_MAX",
     "BgFiles",
     "bg_files",
-    "mark_foreign_input",
     "remove_bg_files",
     "socket_path",
     "socket_path_fits",
-    "took_foreign_input",
 ]
 
 _DIR = "bg"
@@ -139,53 +128,3 @@ def remove_bg_files(state_dir: Path, run_id: UUID | str) -> None:
     for path in (files.socket, files.settings, files.system_prompt, files.stdout, files.stderr):
         with contextlib.suppress(OSError):
             path.unlink()
-
-
-def _foreign_input_mark(state_dir: Path, session_ref: str) -> Path:
-    return state_dir / "sessions" / session_ref / FOREIGN_INPUT_MARK
-
-
-def mark_foreign_input(state_dir: Path, session_ref: str, run_id: UUID | str) -> None:
-    """Mark a session whose conversation took an input the runner did not write (09 18.5).
-
-    The foreign input stays in the conversation: a process that continues the session gives
-    it to the model again with its next request. So the session is never continued, by no
-    run and in no launch mode (`took_foreign_input`). The mark names the run that found the
-    input and nothing of the input itself.
-
-    Args:
-        state_dir: ``runner.state_dir``.
-        session_ref: The session.
-        run_id: The run whose session took the input.
-
-    Raises:
-        OSError: The file could not be written.
-        claude_code_runner.statedir.StateDirError: The session's folder is not private.
-    """
-    path = _foreign_input_mark(state_dir, session_ref)
-    ensure_private_dir(path.parent)
-    write_private(path, json.dumps({"run_id": str(run_id)}) + "\n", atomic=True)
-
-
-def took_foreign_input(state_dir: Path, session_ref: str) -> bool:
-    """Whether a session carries the mark of `mark_foreign_input`.
-
-    Only the presence of the name counts, whatever the entry is or holds.
-
-    Args:
-        state_dir: ``runner.state_dir``.
-        session_ref: The session.
-
-    Returns:
-        True for a marked session.
-
-    Examples:
-        >>> import tempfile
-        >>> state = Path(tempfile.mkdtemp())
-        >>> took_foreign_input(state, "s")
-        False
-        >>> mark_foreign_input(state, "s", "run-1")
-        >>> took_foreign_input(state, "s"), took_foreign_input(state, "another")
-        (True, False)
-    """
-    return os.path.lexists(_foreign_input_mark(state_dir, session_ref))

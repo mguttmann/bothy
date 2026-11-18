@@ -46,13 +46,14 @@ __all__ = [
 MIN_CLAUDE_CODE_VERSION = "2.1.259"
 """The version 09 18.2 names for ``--permission-prompts none``."""
 
-PINNED_CLAUDE_CODE_VERSION = "2.1.325"
+PINNED_CLAUDE_CODE_VERSION = "2.1.326"
 """The version the fixtures and the stream field table were written for (RK-14).
 
 2.1.259 until 2026-10-29, when the API refused current models to it ("version 2.1.280 or newer
 is required"; D-RUNNER-CLI-PIN-1), then 2.1.288 until 2026-11-10, then 2.1.321 until
-2026-11-16 (docs/decisions.d/FIX-RUNNER-CLI-PIN-321.md), since then 2.1.325
-(docs/decisions.d/FIX-RUNNER-CLI-PIN-325.md). A change of the pin records the fixtures again
+2026-11-16 (docs/decisions.d/FIX-RUNNER-CLI-PIN-321.md), then 2.1.325 until 2026-11-17
+(docs/decisions.d/FIX-RUNNER-CLI-PIN-325.md), since then 2.1.326
+(docs/decisions.d/FIX-RUNNER-CLI-PIN-326.md). A change of the pin records the fixtures again
 with ``tests/real_cli/record.py`` and runs level one of the real-CLI suite."""
 
 CAPABILITIES: Mapping[str, bool | str] = {

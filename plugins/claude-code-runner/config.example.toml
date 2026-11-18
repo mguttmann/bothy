@@ -14,7 +14,7 @@ scoped_allowed_tools = []
 # does not check the name: the API refuses an unknown one, and Claude Code then fails the turn
 # or, with a fallback model in the Claude Code settings the turn loads, answers it with that
 # model without a sign in the thread.
-default_model = "claude-fable-5-2[1m]"
+default_model = "claude-opus-5-5[1m]"
 anthropic_api_key_ref = ""
 allow_personal = false
 forward_ssh_agent = false
@@ -111,10 +111,10 @@ channel_skills_dir = ""
 # (16 10.1); `claude-code-runner stop --turns` ends every turn on purpose.
 turn_handover = false
 # Background mode (docs/spec/09-agents.md 18.2 "Background mode"): "print" (the default) starts
-# every turn as `claude -p`. "background" runs the turns of the runner's own agent in billing
-# mode personal as Claude Code background sessions (`claude --bg`), a research preview of
-# Claude Code; every other turn, and every run the mode is not available for, uses print mode,
-# and such a run says why in its live box. Read the README section "Background sessions" first:
+# every turn as `claude -p`. "background" runs every turn as a Claude Code background session
+# (`claude --bg`), a research preview of Claude Code; a run the mode is not available for (an
+# organization run and every run of a hosted agent among them) ends failed with its cause in
+# the thread and never uses print mode. Read the README section "Background sessions" first:
 # the mode needs the pinned CLI version, workspace trust for every bound folder and, for tool
 # class host, the recorded acceptance of bypass mode. Without the key nothing changes.
 launch_mode = "print"
