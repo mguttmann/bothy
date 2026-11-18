@@ -526,7 +526,8 @@ def followup_attachments(attachments: Sequence[Attachment]) -> list[RunContextAt
     """The attachments of a follow-up in the shape of the run context, in position order.
 
     So they take the trigger's path (`scan_refusal`, the limit, the media cache, the inline
-    text); a failed upload counts as blocked. A message carries no transcript.
+    text); a failed upload counts as blocked, one not complete yet as still checked. A message
+    carries no transcript.
 
     Args:
         attachments: ``attachments`` of the message read with ``getMessage``.
@@ -537,9 +538,13 @@ def followup_attachments(attachments: Sequence[Attachment]) -> list[RunContextAt
     out = []
     for item in sorted(attachments, key=lambda a: a.position):
         f = item.file
-        scan = _wire(f.scan_status)
-        if _wire(f.upload_state) == "failed":
+        scan, upload = _wire(f.scan_status), _wire(f.upload_state)
+        if upload == "failed":
             scan = "error"
+        elif upload != "complete":
+            # An image stays pending after a clean scan until its cleaned original is stored
+            # (12 3.4): its check has not ended, and its size is not the size it will have.
+            scan = "pending"
         out.append(
             RunContextAttachment(
                 file_id=f.id,

@@ -1101,6 +1101,38 @@ async def test_image_answer_to_a_clarify_reaches_it_with_its_path(tmp_path: Path
     assert "'tent.jpg' (image/jpeg)" in given
 
 
+async def test_stop_while_an_image_answer_waits_for_its_check_stops_hermes(
+    tmp_path: Path,
+) -> None:
+    """A stop during the file wait of a card answer interrupts Hermes' turn (D-FMS-8, 09 8).
+
+    The SDK cancels the answer's task, which runs before the wait for the run's end, so the
+    handler interrupts the turn itself before the cancellation goes on.
+    """
+    request = CardRequest(CardKind.CLARIFY, "c1", "Which tent?", ("a", "b"), "k")
+    rt = FakeRuntime(script=card_script(request))
+    async with rig(
+        tmp_path,
+        runtime=rt,
+        busy_mode="steer",
+        background_poll_interval=0.05,
+        followup_file_wait=30,
+    ) as r:
+        triggered = await r.fake.trigger()
+        await r.until(lambda: r.fake.run_state(triggered.run_id).state == "waiting_input")
+        shot = r.fake.add_file(
+            b"\xff\xd8\xff\xe0 tent", name="t.jpg", mime="image/jpeg", status="pending"
+        )
+        with captured_logs() as logs:
+            answer = await r.fake.deliver_followup(triggered.run_id, "this one", files=[shot])
+            await r.until(lambda: len(r.requests("getMessage")) >= 3, "a few reads")
+            await r.fake.cancel(triggered.run_id)
+            await r.until(lambda: rt.interrupted, "the interrupt")
+        assert f"follow-up {answer} not steered code=stopped" in logs.text()
+    assert rt.interrupted == [triggered.thread_id]
+    assert rt.answered == []
+
+
 async def test_followups_not_steered_are_logged(tmp_path: Path) -> None:
     """A voice answer to a card left for the follow-on run gets its log line (D-FMS-6)."""
     request = CardRequest(CardKind.CLARIFY, "c1", "Which?", ("a", "b"), "k")

@@ -23,8 +23,10 @@ from bothy_sdk.testing.faults import Fault
 from bothy_hermes_adapter.media import (
     NO_TEXT,
     audio_cache_ext,
+    followup_attachments,
     inline_text,
     is_text_attachment,
+    scan_refusal,
     too_long_note,
 )
 from bothy_hermes_adapter.runtime import FileSent, MediaKind, TurnOutcome, TurnRequest
@@ -615,6 +617,31 @@ async def test_followup_at_queue_is_logged_with_its_reason(tmp_path: Path) -> No
         assert rt.steered == []
         assert "code=busy_mode_queue" in logs.text()
         assert r.fake.followup_state(triggered.run_id, with_file) == "queued"
+
+
+def test_clean_image_not_stored_yet_counts_as_still_checked() -> None:
+    """A clean image whose cleaned original is not stored yet is not final (12 3.4, D-FMS-3).
+
+    Its size is the size before cleaning, so it is never refused as too large: the follow-up
+    stays queued for the follow-on run, which gets the cleaned file.
+    """
+    from bothy_sdk.generated.models import Attachment
+
+    doc = {
+        "id": str(uuid7()),
+        "size_bytes": 10**12,
+        "mime_type": "image/png",
+        "original_name": "shot.png",
+        "uploaded_by": str(uuid7()),
+        "purpose": "attachment",
+        "upload_state": "pending",
+        "scan_status": "clean",
+        "transcript_status": "none",
+        "thumbnails": [],
+        "created_at": "2026-11-18T08:00:00Z",
+    }
+    (item,) = followup_attachments([Attachment.from_dict({"position": 0, "file": doc})])
+    assert scan_refusal(item) == "scan_pending"
 
 
 async def test_followup_to_a_stopped_turn_is_logged(tmp_path: Path) -> None:

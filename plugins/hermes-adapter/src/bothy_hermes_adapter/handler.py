@@ -1418,10 +1418,17 @@ class HermesHandler(AgentHandler):
         if turn.card is not None:
             # The answer to the open card, in both modes: the SDK resumed the run already.
             card = turn.card
-            await self._disable_card(turn)
-            message = await self._followup_message(run, message_id)
-            if message is not None and await self.store.claim(_claim_key(turn.run_id, card)):
-                await self._answer_card(turn, card, message)
+            try:
+                await self._disable_card(turn)
+                message = await self._followup_message(run, message_id)
+                if message is not None and await self.store.claim(_claim_key(turn.run_id, card)):
+                    await self._answer_card(turn, card, message)
+            except asyncio.CancelledError:
+                # A stop cancels this task (the SDK resumed the run for it), also during the
+                # file wait of D-FMS-8: interrupt Hermes' turn as _until_settled does (09 8).
+                _LOG.info("run %s: follow-up %s not steered code=stopped", run.run_id, message_id)
+                await self._abandon(turn)
+                raise
             await self._until_settled(turn)
             return
         async with turn.followup_order:
