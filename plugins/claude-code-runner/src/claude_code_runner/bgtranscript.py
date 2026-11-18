@@ -76,7 +76,7 @@ an agent of the session took is attributed in that agent's own file, by the same
 text of an input only to compare, never to keep it: an input of another sender that holds an owner
 code the runner wrote gives ``owner_code`` true in its ``system/bg_foreign`` (the runner stops the
 session for it, FIX-RUNNER-TRUSTED-OWNER-FOLLOWUPS), and an input under the ``uuid`` of a marked
-line is the runner's only when it holds that line's text; otherwise it is another sender's.
+line is the runner's only when it is exactly that line; otherwise it is another sender's.
 * ``system`` ``turn_duration``: the end of the turn, a ``result`` whose text is the text of
   the turn's last assistant message. An API error record ends its turn itself (``result``
   with ``is_error``): the CLI writes no ``turn_duration`` after it since 2.1.326, and one
@@ -302,7 +302,7 @@ class TranscriptMapper:
             (`claude_code_runner.ownercode.OwnerLines`). With it an input of another sender
             that carries such a code gives ``owner_code`` true in its ``system/bg_foreign``,
             and an input under the ``uuid`` of a marked line counts as the runner's only when
-            it holds that line's text.
+            it is exactly that line.
 
     Attributes:
         turn_open: A turn of the process has started and its ``turn_duration`` is not read.
@@ -376,7 +376,7 @@ class TranscriptMapper:
         return message
 
     def _genuine(self, line_uuid: object, content: object) -> bool:
-        """Whether an input under a ``uuid`` of the runner holds the text of its marked line."""
+        """Whether an input under a ``uuid`` of the runner is exactly its marked line."""
         return self._owner is None or self._owner.genuine(line_uuid, content)
 
     def _line(self, line_uuid: object, seen: set[str]) -> bool | None:

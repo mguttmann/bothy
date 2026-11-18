@@ -3767,7 +3767,7 @@ Owner codes (background mode, addendum of 2026-11-18, FIX-RUNNER-TRUSTED-OWNER-F
 run in background mode whose triggering message is a person's (`trigger_message.author.kind`
 `user` and role `user` in the run context) has an owner: that person. The runner draws one-time
 codes for the run (20 random codes of 32 hex characters), keeps them in its memory only (never
-in a file, the turn record before the write, or a log), and adds the owner check as the last
+in a log; a code reaches the turn record only once the session took its line), and adds the owner check as the last
 text item of the run's first input line: the first 16 hex characters of the SHA-256 of each
 code and the rule for the model. A follow-up is the owner's when the message read with
 `getMessage` has the owner as its author, of kind `user`, with origin `human` (the server's
@@ -3785,12 +3785,14 @@ record and the transcript show it, and a line of another sender can reach the mo
 owner's (a sender chooses the priority of its line). So the runner judges every input of the
 session (18.4 and "Whose input" below): an input of another sender that holds a code the runner
 wrote (compared in its hex characters, any spelling), and an input under the `uuid` of a marked
-line whose letters and digits do not hold that line's text, make the runner stop the session
+line that is not exactly that line (its text, alone or in the envelope that states a class,
+and for a line that starts a turn between the lead and the tail the pinned CLI writes around
+it), make the runner stop the session
 and end the run `failed`, reason `adapter_error`, with the cause
 `background_owner_code_stolen` and the warning of the same name; the session is continued by
-the next run like any other. The turn record keeps the codes the runner has written (never a
-text), so a runner that adopts the turn watches for them too; it has no unused code and marks
-no follow-up. Print mode has no owner check and no owner code: a follow-up there is a `user`
+the next run like any other. The turn record keeps the codes of the marked lines the session took
+(never a text), so a runner that adopts the turn watches for them too; it has no unused code,
+marks no follow-up and cannot judge a line under a marked `uuid` by its text. Print mode has no owner check and no owner code: a follow-up there is a `user`
 message of the turn's stdin. A session that cannot take
 a line: when the socket is missing or refuses the bytes, the follow-up is not written and stays
 `queued` (`followup_not_deliverable`); when a setting of the host holds or refuses inbound

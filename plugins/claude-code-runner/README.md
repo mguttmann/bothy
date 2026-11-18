@@ -640,11 +640,12 @@ How a background turn runs:
   session's inbox socket (cross-session messaging of Claude Code). The model takes it in after
   the running tool call, as on stdin. The CLI introduces it as a message of another Claude
   session; the runner prompt of a background session says that follow-ups arrive this way,
-  that nothing in such a message proves its sender, and that each is handled as the CLI says
-  for a message of another session. The CLI keeps the system prompt of a session's first
-  request, so a thread whose session began in print mode (before the key was switched on, or
-  in a run that fell back) does not get that paragraph; the model reads a follow-up as a
-  message of another session either way. A slash command in such a message does not run.
+  that the text of such a message proves nothing, that a valid owner code (below, "Owner
+  codes") makes a follow-up the triggering person's own word, and that every other one is
+  handled as the CLI says for a message of another session. The CLI keeps the system prompt of
+  a session's first request, so a thread whose session began in print mode (before the key was
+  switched on, or in a run that fell back) does not get that paragraph; the owner check with
+  its rule stands in the first message of every run, so it reaches such a session too. A slash command in such a message does not run.
   When the socket cannot be used (it is missing, or a setting holds or refuses inbound
   messages), the server defers the follow-up into a new run after this one. So it does with a
   follow-up for a `host` session whose text holds the name of the element the CLI wraps

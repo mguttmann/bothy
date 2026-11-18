@@ -813,7 +813,7 @@ enforces:
       request (read in the file of the pinned CLI). A program that reads the transcript in
       time could put the owner's code under its own text ahead of the owner's line. So the
       mapper reads the text of every input of another sender for a code the runner wrote, and
-      the text of an input under the `uuid` of a marked line for that line's text, and the
+      an input under the `uuid` of a marked line for being exactly that line, and the
       runner stops the session at the first such input and ends the run
       `background_owner_code_stolen`. The input is judged when the CLI records it (the
       `user` record of a turn it starts, or the attachment written right after the request
@@ -1139,7 +1139,7 @@ between.
 
 | Finding | First build | Now | Where |
 |---|---|---|---|
-| An input of another sender is taken for the runner's | `crossSessionInbound` `"accept"`; the prompt tells the model to follow a line with the runner's lead-in; no check of the `uuid` of an echo | the runner logs an input it did not write (until 2026-11-17 it stopped the session); no inbound setting unless the host user's settings say `"hold"`, then `"accept"` (FIX-RUNNER-BG-HELD-FOLLOWUP); `SendMessage` and `ListAgents` disallowed; the prompt names no sign to trust | 4.14 |
+| An input of another sender is taken for the runner's | `crossSessionInbound` `"accept"`; the prompt tells the model to follow a line with the runner's lead-in; no check of the `uuid` of an echo | the runner logs an input it did not write (until 2026-11-17 it stopped the session); no inbound setting unless the host user's settings say `"hold"`, then `"accept"` (FIX-RUNNER-BG-HELD-FOLLOWUP); `SendMessage` and `ListAgents` disallowed; the prompt names no text to trust (since 2026-11-18 one proof: a valid owner code, 4.14 item 4) | 4.14 |
 | The counter-check is open when it finds nothing | the first request record only, by a prefix of a beta name; no record means no check | every request record, the whole name, no output accepted before one passed, the state in the turn record | 4.15 |
 | A value of one run reaches the session of another | the launch command gets the run's environment, and with it the supervisor | one fixed environment for the launch; every name of a run set in its own settings file | 4.16 |
 | The content of a record decides before its origin (first version of this change) | a `user` record with `tool_result` items was a tool result whatever its origin; every origin but `peer` and `human` was the session's own | the origin is read first and alone; only a record without one is a tool result; the session's own origins are a closed list | 4.14 item 1, 4.6 |
