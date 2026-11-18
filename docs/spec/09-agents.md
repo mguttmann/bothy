@@ -3765,10 +3765,10 @@ inside the work of the session and within its rights, never an approval.
 
 Owner codes (background mode, addendum of 2026-11-18, FIX-RUNNER-TRUSTED-OWNER-FOLLOWUPS). A
 run in background mode whose triggering message is a person's (`trigger_message.author.kind`
-`user` and role `user` in the run context) has an owner: that person. The runner draws one-time
-codes for the run (20 random codes of 32 hex characters), keeps them in its memory only (never
-in a log; the turn record names a code from the moment its line is written), and adds the owner check as the last
-text item of the run's first input line: the first 16 hex characters of the SHA-256 of each
+`user`, role `user` and origin `human` in the run context) has an owner: that person. The
+runner draws one-time codes for the run (20 random codes of 32 hex characters), keeps them in
+its memory only (never in a log; the turn record names a code from right before its line is
+written), and adds the owner check as the last text item of the run's first input line: the first 16 hex characters of the SHA-256 of each
 code and the rule for the model. A follow-up is the owner's when the message read with
 `getMessage` has the owner as its author, of kind `user`, with origin `human` (the server's
 data, never a text); its line then has the lead-in `Follow-up from <name> (@<handle>), owner

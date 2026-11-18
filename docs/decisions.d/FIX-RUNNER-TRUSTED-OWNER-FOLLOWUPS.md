@@ -27,6 +27,9 @@ check in its first message, and its follow-ups stay relayed messages.
 Open minors (red team, first round; for the next run in this area): an input attributed only by
 the file of a session's agent is not checked for a code (`_unattributed`, `_side_verdict`); an
 adopter knows no texts of marked lines, so it cannot judge a line under a marked `uuid` by its
-text (the `uuid` is in the turn record before the write, needed for the adoption); the wrapper
+text (the `uuid` is in the turn record before the write, needed for the adoption), so a forgery
+under that `uuid` ahead of the owner's line passes after a restart until the owner's line comes
+(recommended: keep a SHA-256 of each marked line's text in the turn record, which gives nothing
+away because the text holds the code); the wrapper
 `PEER_TAIL` is the one of the recording, and another form of the CLI would stop the session at
 the owner's own line.
