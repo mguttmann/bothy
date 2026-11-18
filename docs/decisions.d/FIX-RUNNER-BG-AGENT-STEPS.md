@@ -39,8 +39,9 @@ Open minors (for the next run in this area of the runner):
 - An adopter counts a subagent twice in `/metrics/subagents` when the runner died after it
   stored the step id of a task and before the server got the step: `restore` drops the task
   but keeps the stored count, and `replay_tasks` adds the task and counts it again. The step
-  itself is right. Either `restore` lowers the count by the dropped subagent tasks or the
-  replay does not count a task whose step id the record had.
+  itself is right. `restore` lowers the count by the dropped subagent tasks; a replay that
+  only skips the count is not enough, because with a stored offset before the task's start
+  the later read of the transcript adds and counts the task again.
 - No scenario test covers the call of `replay_tasks` in the adopter (`runturn.py`): replacing
   it with `pass` leaves the adoption and background scenarios green. A test adopts a turn
   whose agent started before the stored offset and sends its notification after it.

@@ -562,7 +562,9 @@ Before you switch it on:
     session launched with the `Agent` tool, never to another session, to a workflow agent or
     to a name. When the host user's `settings.json` sets `disableAllHooks`, a managed setting
     switches hooks off, or the turn is hosted, the hook cannot run and `SendMessage` is
-    disallowed instead (`docs/decisions.d/FIX-RUNNER-SENDMESSAGE-OWN.md`).
+    disallowed instead (`docs/decisions.d/FIX-RUNNER-SENDMESSAGE-OWN.md`). Under `scoped`
+    the call runs only when `runner.scoped_allowed_tools` names `SendMessage` (as it names
+    `Agent`); a `chat` turn has no tool and gets no hook.
 
   What stays open: the class a sender states is a claim, so a session of yours in the same
   class, or a program that writes the claim, still gets its message into a runner session.

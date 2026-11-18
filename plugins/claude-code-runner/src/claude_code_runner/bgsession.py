@@ -442,22 +442,26 @@ def send_guard_command(python: str | None = None) -> str:
     return f"{shlex.quote(interpreter)} -I {shlex.quote(sendguard.__file__)} || exit 2"
 
 
-def own_agent_messages(env: Mapping[str, str], *, hosted: bool) -> bool:
+def own_agent_messages(env: Mapping[str, str], *, hosted: bool, tool_class: str) -> bool:
     """Whether a run's session may message its own subagents (FIX-RUNNER-SENDMESSAGE-OWN).
 
-    Only where the hook of `claude_code_runner.sendguard` runs: never in a hosted turn, whose
-    settings switch hooks off (26 5.4), and not while the host user's own settings or managed
-    settings switch hooks off (`hooks_switched_off`). Otherwise ``SendMessage`` stays
-    disallowed, as before.
+    Only under ``scoped`` and ``host`` (a ``chat`` turn has no tool, so its settings file
+    must not switch the project's hooks on again) and only where the hook of
+    `claude_code_runner.sendguard` runs: never in a hosted turn, whose settings switch hooks
+    off (26 5.4), and not while the host user's own settings or managed settings switch hooks
+    off (`hooks_switched_off`). Otherwise ``SendMessage`` stays disallowed, as before.
 
     Args:
         env: The environment of the turn.
         hosted: The turn is a hosted one (26 5.3).
+        tool_class: ``chat``, ``scoped`` or ``host``.
 
     Returns:
         True when the launch keeps ``SendMessage`` and its settings file carries the hook.
     """
-    return not hosted and not hooks_switched_off(env)
+    if tool_class not in ("scoped", "host") or hosted:
+        return False
+    return not hooks_switched_off(env)
 
 
 def hooks_switched_off(env: Mapping[str, str], managed: Path | None = None) -> bool:

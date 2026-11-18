@@ -48,6 +48,11 @@ What stays open, and is accepted:
 - A session of class `host` can reach other sessions through `Bash` anyway (the `claude` command,
   or writing to a socket). The hook closes the tool path, as the deny rule did, not that one.
 - Print mode was never covered by the deny list of 18.2 and is not changed here.
+- Under `scoped` the permission mode `dontAsk` runs only the tools of
+  `runner.scoped_allowed_tools`, and the runner does not add `SendMessage` to them: a
+  `scoped` session messages its subagents only when the operator names `SendMessage` there,
+  as it starts them only when `Agent` is named. The hook refuses every other recipient
+  either way. A `chat` turn gets neither the hook nor `disableAllHooks` (it has no tool).
 
 Open minors (for the next run in this area of the runner):
 
@@ -55,6 +60,19 @@ Open minors (for the next run in this area of the runner):
   a `queued_command` with origin `peer`, and the runner logs `background_foreign_input` `peer`
   for the session's own agent (only a warning in the log). Either the hook refuses `main` or
   the mapper knows such a sender by `senderTaskId`.
+- The pinned CLI knows `onFailure` `"block"` for a command hook. With it a hook that runs out
+  of its time limit would refuse the call instead of letting it through (accepted above);
+  adding it needs a real-CLI test that a timed out hook blocks `SendMessage`.
+- `hooks_switched_off` treats a `managed-settings.d` folder that exists but cannot be listed
+  like an empty one (`Path.glob` swallows the error); it should keep `SendMessage` denied.
+  The runner host has no managed settings folder.
+- `sendguard.decide` lets a payload without `tool_name` through; the CLI calls the hook only
+  for `SendMessage` (the matcher), so only a missing name would reach it.
+- Tests: the real-CLI guard test leaves its `mkdtemp` folder behind and waits for the peer
+  session with a fixed sleep instead of a readiness check (a slow peer would let the final
+  assertion pass without proof); the scenario of the background launch does not isolate
+  `MANAGED_SETTINGS_DIR`; the unit test of the hook command compares the quoted text instead
+  of the parsed arguments.
 
 Supersedes for the runner's own agent: D-FIX-RUNNER-BG-INBOX-AUTH-3 as far as it denies
 `SendMessage`; `ListAgents` and `SendFile` stay denied.

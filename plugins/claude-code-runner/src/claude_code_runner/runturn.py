@@ -3289,7 +3289,9 @@ class RunTurn:
         hosted = self.state.hosted
         base = json.loads(hosted.settings.read_text("utf-8")) if hosted is not None else None
         # One decision for the deny list and the hook (FIX-RUNNER-SENDMESSAGE-OWN).
-        own = own_agent_messages(self.state.env, hosted=hosted is not None)
+        own = own_agent_messages(
+            self.state.env, hosted=hosted is not None, tool_class=self.cfg.tool_class
+        )
         document = settings_document(self.state.env, base, own_messages=own)
         write_private(files.settings, json.dumps(document, sort_keys=True))
         argv = background_argv(

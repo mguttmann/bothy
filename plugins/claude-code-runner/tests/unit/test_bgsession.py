@@ -245,10 +245,13 @@ def test_only_a_turn_of_the_runner_s_own_agent_with_hooks_messages_its_subagents
     home = tmp_path / "home"
     (home / ".claude").mkdir(parents=True)
     env = {"HOME": str(home)}
-    assert own_agent_messages(env, hosted=False) is True
-    assert own_agent_messages(env, hosted=True) is False
+    assert own_agent_messages(env, hosted=False, tool_class="host") is True
+    assert own_agent_messages(env, hosted=False, tool_class="scoped") is True
+    assert own_agent_messages(env, hosted=True, tool_class="host") is False
+    # A chat turn has no tool, so its settings never override the project's hook switch.
+    assert own_agent_messages(env, hosted=False, tool_class="chat") is False
     (home / ".claude" / "settings.json").write_text('{"disableAllHooks": true}', "utf-8")
-    assert own_agent_messages(env, hosted=False) is False
+    assert own_agent_messages(env, hosted=False, tool_class="host") is False
 
 
 def test_a_resume_and_the_incoming_folder_have_their_places() -> None:
