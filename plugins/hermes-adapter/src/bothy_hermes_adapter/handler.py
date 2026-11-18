@@ -1410,9 +1410,11 @@ class HermesHandler(AgentHandler):
             run: The run.
         """
         turn = self._by_run.get(run.run_id)
-        if turn is None or turn.dropped:
-            return
         message_id = inv.payload.message_id
+        if turn is None or turn.dropped:
+            code = "stopped" if turn is not None else "no_turn"
+            _LOG.info("run %s: follow-up %s not steered code=%s", run.run_id, message_id, code)
+            return
         if turn.card is not None:
             # The answer to the open card, in both modes: the SDK resumed the run already.
             card = turn.card
@@ -1442,8 +1444,9 @@ class HermesHandler(AgentHandler):
         content: _FollowupContent | None = None
         if message.attachments:
             message = await self._files_final(turn, run, message)
-            if turn.dropped:
-                _LOG.info("run %s: follow-up %s not steered code=stopped", run.run_id, message_id)
+            if turn.dropped or turn.handle.finished:
+                code = "stopped" if turn.dropped else "run_ended"
+                _LOG.info("run %s: follow-up %s not steered code=%s", run.run_id, message_id, code)
                 return
             content = await self._followup_content(run, message)
             if content.later is not None and not content.worth:
@@ -1605,11 +1608,20 @@ class HermesHandler(AgentHandler):
         completed, like a steered follow-up: left ``queued``, the server would start a follow-on
         run with the same text at the end of the run. An answer Hermes did not take (at ``queue``
         to a prompt that is refused, or when nothing waited for it) stays ``queued`` for that
-        run, and so does one with a file: its text still answers the card, nothing of it is
-        steered, and the follow-on run takes the whole message (17.6).
+        run. An answer with files gives the card the text a steered follow-up has, with the path
+        of each file (D-FMS-8); one with a file that may still come (audio, not ready) is not
+        acknowledged, and the follow-on run takes the whole message (17.6). One log line names
+        every answer Hermes did not take (D-FMS-6).
         """
+        run = turn.handle
+        content: _FollowupContent | None = None
+        if message.attachments:
+            message = await self._files_final(turn, run, message)
+            content = await self._followup_content(run, message)
         text = _content(message)
-        whole = not message.attachments
+        if content is not None and content.worth:
+            text = content.steer_text
+        whole = content is None or content.later is None
         if card.request.kind is CardKind.CLARIFY:
             answered = await self.runtime.answer_card(card, text)
             taken = whole and answered is not None
@@ -1618,8 +1630,11 @@ class HermesHandler(AgentHandler):
             await self.runtime.answer_card(card, text)
         if taken:
             with contextlib.suppress(ValueError):
-                turn.handle.patch.followup_delivered(message.id)
+                run.patch.followup_delivered(message.id)
             turn.steered.append(message.id)
+            return
+        code = content.later if content is not None and content.later else "card_answer_not_taken"
+        _LOG.info("run %s: follow-up %s not steered code=%s", run.run_id, message.id, code)
 
     async def _followup_message(self, run: RunHandle, message_id: UUID) -> Message | None:
         """A follow-up message read with the run's token, or ``None`` when the server refuses.

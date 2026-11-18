@@ -617,6 +617,43 @@ async def test_followup_at_queue_is_logged_with_its_reason(tmp_path: Path) -> No
         assert r.fake.followup_state(triggered.run_id, with_file) == "queued"
 
 
+async def test_followup_to_a_stopped_turn_is_logged(tmp_path: Path) -> None:
+    """A follow-up that reaches a turn being stopped gets its log line too (D-FMS-6)."""
+    rt = FakeRuntime(script=_held_turn)
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await r.fake.trigger("first")
+        await r.until(lambda: r.fake.messages)
+        turn = r.handler._by_run[triggered.run_id]
+        turn.dropped = True
+        with captured_logs() as logs:
+            followup = await r.fake.deliver_followup(triggered.run_id, "plain text")
+            await r.until(lambda: f"follow-up {followup} not steered" in logs.text(), "the line")
+        turn.dropped = False
+        rt.stop_event(triggered.thread_id).set()
+        await r.until(lambda: r.finished(triggered.run_id))
+        assert "code=stopped" in logs.text()
+        assert rt.steered == []
+
+
+async def test_run_end_during_the_file_wait_is_logged_as_such(tmp_path: Path) -> None:
+    """The run ends while a file is checked: nothing more is loaded, the line says why."""
+    rt = FakeRuntime(script=_held_turn)
+    async with rig(tmp_path, runtime=rt, background_poll_interval=0.05, followup_file_wait=30) as r:
+        triggered = await r.fake.trigger("first")
+        await r.until(lambda: r.fake.messages)
+        data, name, mime = _SHOT
+        fid = r.fake.add_file(data, name=name, mime=mime, status="pending")
+        with captured_logs() as logs:
+            followup = await r.fake.deliver_followup(triggered.run_id, "look", files=[fid])
+            await r.until(lambda: len(r.requests("getMessage")) >= 3, "a few reads")
+            rt.stop_event(triggered.thread_id).set()
+            await r.until(lambda: r.finished(triggered.run_id))
+            await r.until(lambda: f"follow-up {followup} not steered" in logs.text(), "the line")
+        assert f"follow-up {followup} not steered code=run_ended" in logs.text()
+        assert rt.steered == []
+        assert rt.cached == []
+
+
 # ---- text attachments inline (FIX-hermes-text-attachment-inline) ------------------------------
 
 

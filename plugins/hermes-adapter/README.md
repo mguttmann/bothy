@@ -334,7 +334,8 @@ of its own with the files as media. A voice message, and a file still not ready 
 is left to the server's follow-on run, which takes the whole message as its triggering message
 and transcribes its audio as above; a text sent with it is steered at once with a note. Every
 follow-up the adapter does not steer gets a log line with the reason. Sent as the answer to an
-open card, a message with files only releases the card and is left to the follow-on run.
+open question, a message with files answers it with their paths; one with a voice message only
+releases the card and is left to the follow-on run.
 
 ## Inbox, state and restart
 

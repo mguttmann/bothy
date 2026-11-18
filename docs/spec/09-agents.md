@@ -2716,9 +2716,10 @@ the hold of 17.12): the text that resolved a clarify, and the text steered in fr
 prompt. An answer Hermes did not take stays `queued`, and the
 follow-on run of section 7 takes it: at `queue` the text to an approval or a confirmation (no
 follow-up enters a turn at `queue`), and an answer no prompt of Hermes waited for any more. An
-answer with an attachment only releases the card: its text answers a clarify (an empty text, as
-of a voice message, is Hermes' form of no answer), nothing of it is steered and it is not
-acknowledged, so the follow-on run takes the whole message with its files (17.6).
+answer with attachments gives the card the text with the paths of its files (next paragraph);
+one with a file that may still come, such as a voice message, is not acknowledged, so the
+follow-on run takes the whole message (an empty text, as of a voice message, is Hermes' form of
+no answer to a clarify).
 
 A follow-up with attachments (addendum of 2026-11-18, FIX-followup-media-steer) is passed on in
 the order follow-ups arrive, like one without. The adapter reads the message again every
@@ -2739,9 +2740,13 @@ note that the message comes again with that file in a new turn, and the follow-o
 is not steered at all. A file the scan blocked, one over Hermes' limit and one Hermes refused
 stays a note and the follow-up is acknowledged, because the follow-on run could not pass it on
 either. While the run holds work (17.12 point 5) such a follow-up is a turn of its own whose
-files ride as media. Every follow-up the adapter does not steer gets one log line with its
-message ID and the reason code (`not_readable`, `stopped`, `audio`, `scan_pending`,
-`unavailable`, `own_turn`, `busy_mode_queue`, `turn_answered`, `turn_ended`). From 2026-11-02 to
+files ride as media. The answer to an open card with files takes the same path: a clarify gets
+the text with the paths, an approval or confirmation is refused with that text in front, and it
+is acknowledged as above unless a file may still come (D-FMS-8). Every follow-up the adapter does
+not steer, also an answer to a card Hermes did not take, gets one log line with its message ID
+and the reason code (`no_turn`, `not_readable`, `stopped`, `run_ended`, `audio`,
+`scan_pending`, `unavailable`, `own_turn`, `busy_mode_queue`, `turn_answered`, `turn_ended`,
+`card_answer_not_taken`). From 2026-11-02 to
 2026-11-18 every follow-up with a file stayed `queued` until the end of the run (D-FIX-HIMG-3,
 AUD-HA1/3); before 2026-11-02 its text was steered without the file.
 
@@ -2868,8 +2873,8 @@ Hermes' media cache and reach the running turn as steered paths (17.5); a follow
 stays `queued`, and the follow-on run of section 7 takes it as its triggering message and
 transcribes its audio as above. Until 2026-11-11 a follow-up with audio was steered as its bare
 text, so a voice message reached the turn empty and was acknowledged, and no run carried what the
-person said (AUD-HA1/3). As the answer to an open card such a message only releases the card
-(17.5).
+person said (AUD-HA1/3). As the answer to an open card a message with audio only releases the
+card; one with other files answers it with their paths (17.5).
 
 Elements with `already_delivered` stay in the context with that mark in their header: the
 session holds a steered follow-up only as bare text without author or trust mark, and before

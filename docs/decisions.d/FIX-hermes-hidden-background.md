@@ -27,7 +27,7 @@ posted its answer without a run. Rule and design: 09 17.12, R-AG-44,
 Limits (recorded, not built): a process that never ends keeps its run `running` until a stop; a
 restart of the gateway or the adapter ends the hold, and a result Hermes replays later runs
 without a run (tools refused, text as a report); a turn whose `on_session_end` never comes keeps
-the run open until a stop (closed by FIX-hermes-result-turn-end); a follow-up with a file waits for the end of the hold.
+the run open until a stop (closed by FIX-hermes-result-turn-end); a follow-up with a file waits for the end of the hold (since D-FMS-5 of FIX-followup-media-steer it is a turn of its own; only audio or a file not ready waits).
 
 Deploy note: nothing to configure; the three new keys have defaults (09 21). Hermes itself is not
 changed.

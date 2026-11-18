@@ -1080,6 +1080,41 @@ async def test_card_answer_with_a_file_is_left_to_the_follow_on_run(
     assert rt.steered == []
 
 
+async def test_image_answer_to_a_clarify_reaches_it_with_its_path(tmp_path: Path) -> None:
+    """A screenshot typed at an open question answers it with the file's path (D-FMS-8).
+
+    The clarify gets the person's text with the cached path, and the answer is acknowledged,
+    so no follow-on run brings it again.
+    """
+    request = CardRequest(CardKind.CLARIFY, "c1", "Which tent?", ("a", "b"), "k")
+    rt = FakeRuntime(script=card_script(request))
+    async with rig(tmp_path, runtime=rt, busy_mode="steer") as r:
+        triggered = await r.fake.trigger()
+        await r.until(lambda: r.fake.run_state(triggered.run_id).state == "waiting_input")
+        shot = r.fake.add_file(b"\xff\xd8\xff\xe0 tent", name="tent.jpg", mime="image/jpeg")
+        answer = await r.fake.deliver_followup(triggered.run_id, "this one", files=[shot])
+        await r.until(lambda: r.finished(triggered.run_id))
+        assert r.fake.followup_state(triggered.run_id, answer) == "absorbed"
+    (given,) = rt.answered
+    assert given.endswith("this one")
+    assert "It is saved at:" in given
+    assert "'tent.jpg' (image/jpeg)" in given
+
+
+async def test_followups_not_steered_are_logged(tmp_path: Path) -> None:
+    """A voice answer to a card left for the follow-on run gets its log line (D-FMS-6)."""
+    request = CardRequest(CardKind.CLARIFY, "c1", "Which?", ("a", "b"), "k")
+    rt = FakeRuntime(script=card_script(request))
+    async with rig(tmp_path, runtime=rt, busy_mode="steer") as r:
+        triggered = await r.fake.trigger()
+        await r.until(lambda: r.fake.run_state(triggered.run_id).state == "waiting_input")
+        audio = r.fake.add_file(b"\x00\x00\x00\x1cftypM4A ", name="n.m4a", mime="audio/mp4")
+        with captured_logs() as logs:
+            voice = await r.fake.deliver_followup(triggered.run_id, "", files=[audio])
+            await r.until(lambda: r.finished(triggered.run_id))
+        assert f"follow-up {voice} not steered code=audio" in logs.text()
+
+
 async def test_no_answer_after_a_mode_abort(tmp_path: Path) -> None:
     async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
         await rt.stop_event(turn.thread_id).wait()
