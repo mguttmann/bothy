@@ -48,7 +48,7 @@ Examples:
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -256,6 +256,21 @@ class LiveBox:
             value = raw.get(name)
             if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
                 setattr(self, name, value)
+
+    def replay_tasks(self, messages: Iterable[Mapping[str, Any]]) -> None:
+        """Apply the task messages of the lines an adopter replayed, in their order.
+
+        An adopted background turn reads its transcript on from the stored offset, so the
+        launch of an agent before that offset reaches the live box only here; without it the
+        agent's notification would open a ``background_job`` step (FIX-RUNNER-BG-AGENT-STEPS).
+        A task the record already has keeps its step; every other message is skipped.
+
+        Args:
+            messages: The replayed messages of the transcript mapper.
+        """
+        for message in messages:
+            if message.get("type") == "system" and message.get("subtype") in _TASKS:
+                self._task(message)
 
     def apply(self, message: Mapping[str, Any]) -> None:
         """Apply one stream message.
@@ -524,7 +539,7 @@ class LiveBox:
             if isinstance(value := raw.get(key), int) and not isinstance(value, bool) and value >= 0
         }
         step, kind = self._tasks[task_id]
-        if not usage or self._usage.get(step) == usage:
+        if step in self._ended or not usage or self._usage.get(step) == usage:
             return
         self._usage[step] = usage
         detail: dict[str, Any] = {"type": "local_agent"} if kind == "subagent" else {}

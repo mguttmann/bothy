@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -44,8 +45,11 @@ from claude_code_runner.bgtranscript import (
 )
 from claude_code_runner.failures import api_error_text
 from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
+from claude_code_runner.livebox import LiveBox
 from claude_code_runner.livecost import PriceTable
 from claude_code_runner.processstate import ProcessState
+
+from .test_livebox import Patch
 
 pytestmark = pytest.mark.anyio
 
@@ -1380,3 +1384,211 @@ def test_a_turn_duration_right_after_an_api_error_ends_no_second_turn() -> None:
     first = mapper.map(error)
     assert [m["is_error"] for m in first if m["type"] == "result"] == [True]
     assert mapper.map({"type": "system", "subtype": "turn_duration"}) == []
+
+
+# ---- the agents a session launches (FIX-RUNNER-BG-AGENT-STEPS) ---------------------------------
+
+BACKGROUND_AGENTS = OWN_NOTICE.with_name("background_agents.jsonl")
+
+
+def _agent_box(records: list[dict[str, Any]]) -> tuple[LiveBox, Patch]:
+    """The live box of a background turn fed by the mapper, as the runner feeds it."""
+    peers = {r["uuid"] for r in records if (r.get("origin") or {}).get("kind") == "peer"}
+    mapper = TranscriptMapper("prompt-uuid", peers.__contains__)
+    patch = Patch()
+    live = LiveBox(
+        patch,  # type: ignore[arg-type]
+        own_uuid="prompt-uuid",
+        title_requested=False,
+        context_windows={},
+        now=lambda: AGENT_NOW,
+    )
+    for record in records:
+        for message in mapper.map(record):
+            live.apply(message)
+    return live, patch
+
+
+def _steps(patch: Patch, kind: str) -> list[dict[str, Any]]:
+    return [s for s in patch.steps.values() if s["kind"] == kind]
+
+
+def _tool_step(patch: Patch, tool_use_id: str, records: list[dict[str, Any]]) -> Any:
+    # The step of a tool call is found by its title, the description the call carried.
+    [title] = [
+        item["input"]["description"]
+        for r in records
+        if r["type"] == "assistant"
+        for item in r["message"]["content"]
+        if item.get("id") == tool_use_id
+    ]
+    [step] = [k for k, s in patch.steps.items() if s["kind"] == "tool_call" and s["title"] == title]
+    return step
+
+
+def test_the_background_agents_of_a_real_turn_are_subagent_steps() -> None:
+    # The records (structure only) of the turn of session d43d3be0 on 18.11.2026 07:33 with the
+    # pinned CLI in background mode: three Agent calls with run_in_background, each answered
+    # "async_launched", and later the notification of each agent's end; the one of the second
+    # agent (it waits on its own background work) names the task id alone, no tool call. Before
+    # this fix the live box got the three tool calls and no subagent step (turn record: tasks
+    # {}, subagents 0), so the live topology showed the run without its agents.
+    records = [json.loads(line) for line in BACKGROUND_AGENTS.read_text().splitlines()]
+    live, patch = _agent_box(records)
+    agents = _steps(patch, "subagent")
+    assert [s["title"] for s in agents] == ["Agent 1", "Agent 2", "Agent 3"]
+    calls = {
+        "Agent 1": "toolu_01NywRUKxtTzy4uPVhtQ3LP3",
+        "Agent 2": "toolu_01RXrs2osUySuR1veXcoiDQL",
+        "Agent 3": "toolu_01DYyNrQCKmPGPmuWeSzQMHf",
+    }
+    for step in agents:
+        assert step["name"] == "local_agent"
+        assert step["parent_step_id"] == _tool_step(patch, calls[step["title"]], records)
+    first, second, third = agents
+    assert [s["status"] for s in agents] == ["completed"] * 3
+    assert first["detail"] == {
+        "type": "local_agent",
+        "usage": {"tokens": 121653, "tool_uses": 45, "duration_ms": 206769},
+    }
+    assert second["detail"]["usage"] == {"tokens": 154042, "tool_uses": 69, "duration_ms": 1320738}
+    assert third["detail"]["usage"]["tokens"] > 0
+    assert patch.values["/metrics/subagents"] == 3
+    assert live.state()["subagents"] == 3
+
+
+def test_the_background_work_between_turns_ends_no_agent() -> None:
+    records = [json.loads(line) for line in BACKGROUND_AGENTS.read_text().splitlines()]
+    # Up to the first notification: the second agent is still running.
+    first_notice = next(
+        i
+        for i, r in enumerate(records)
+        if (r.get("origin") or {}).get("kind") == "task-notification"
+    )
+    live, patch = _agent_box(records[:first_notice])
+    for tasks in ([{"task_id": BACKGROUND_TASK}], []):
+        live.apply({"type": "system", "subtype": "background_tasks_changed", "tasks": tasks})
+    assert [s.get("status") for s in _steps(patch, "subagent")] == [None, None, None]
+
+
+AGENT_NOW = datetime(2026, 11, 18, 7, 33, tzinfo=UTC)
+
+
+def _call(tool_use_id: str, name: str, **tool_input: Any) -> dict[str, Any]:
+    message = {
+        "id": f"msg_{tool_use_id}",
+        "model": "claude-opus-5-5",
+        "content": [{"type": "tool_use", "id": tool_use_id, "name": name, "input": tool_input}],
+    }
+    return {"type": "assistant", "isSidechain": False, "message": message}
+
+
+def _answer(tool_use_id: str, *, error: bool = False, **result: Any) -> dict[str, Any]:
+    item = {"type": "tool_result", "tool_use_id": tool_use_id, "content": "result"}
+    if error:
+        item["is_error"] = True
+    return {
+        "type": "user",
+        "isSidechain": False,
+        "message": {"role": "user", "content": [item]},
+        "toolUseResult": result,
+    }
+
+
+def _notice_text(tool_use_id: str, status: str, result: str = "result") -> str:
+    return (
+        f"<task-notification>\n<task-id>t-{tool_use_id}</task-id>\n"
+        f"<tool-use-id>{tool_use_id}</tool-use-id>\n<status>{status}</status>\n"
+        f"<summary>done</summary>\n<result>{result}</result>\n</task-notification>"
+    )
+
+
+def _prompt() -> list[dict[str, Any]]:
+    return [PROMPT_RECORD]
+
+
+def test_a_foreground_agent_ends_with_its_tool_result() -> None:
+    records = [
+        *_prompt(),
+        _call("toolu_a", "Agent", description="Look", prompt="p", subagent_type="x"),
+        _call("toolu_b", "Agent", description="Break", prompt="p"),
+        _answer("toolu_a", status="completed", agentId="a1"),
+        _answer("toolu_b", error=True),
+    ]
+    _, patch = _agent_box(records)
+    look, broke = _steps(patch, "subagent")
+    assert (look["title"], look["status"]) == ("Look", "completed")
+    assert (broke["title"], broke["status"]) == ("Break", "failed")
+
+
+def test_a_background_workflow_is_a_workflow_step_that_its_notification_ends() -> None:
+    records = [
+        *_prompt(),
+        _call("toolu_w", "Workflow", script="s"),
+        _answer(
+            "toolu_w",
+            status="async_launched",
+            taskId="w1",
+            taskType="local_workflow",
+            summary="Build and review\nmore",
+        ),
+        # The notification taken mid-turn, queued without an origin like the CLI's own.
+        {
+            "type": "attachment",
+            "isSidechain": False,
+            "attachment": {
+                "type": QUEUED,
+                "source_uuid": "n-1",
+                "commandMode": "task-notification",
+                "prompt": _notice_text("toolu_w", "failed"),
+            },
+        },
+    ]
+    _, patch = _agent_box(records)
+    [flow] = _steps(patch, "workflow")
+    assert (flow["name"], flow["title"], flow["status"]) == (
+        "local_workflow",
+        "Build and review",
+        "failed",
+    )
+    assert flow["parent_step_id"] == _tool_step_of(patch, "Workflow")
+
+
+def _tool_step_of(patch: Patch, name: str) -> Any:
+    [step] = [k for k, s in patch.steps.items() if s["kind"] == "tool_call" and s["name"] == name]
+    return step
+
+
+def _own_notice(text: str, **origin: Any) -> dict[str, Any]:
+    return {
+        "type": "user",
+        "isSidechain": False,
+        "origin": {"kind": "task-notification", "producer": "session-task", **origin},
+        "message": {"role": "user", "content": [{"type": "text", "text": text}]},
+    }
+
+
+def test_only_the_session_s_own_notification_of_a_known_agent_ends_its_step() -> None:
+    launched = [
+        *_prompt(),
+        _call("toolu_a", "Agent", description="Look", prompt="p", run_in_background=True),
+        _answer("toolu_a", status="async_launched", isAsync=True, agentId="a1"),
+    ]
+    others = [
+        # Another sender's message under the kind of a notification: it ends nothing.
+        _own_notice(_notice_text("toolu_a", "failed"), subkind="peer-send-message"),
+        # A notification of a call this process never made.
+        _own_notice(_notice_text("toolu_other", "completed")),
+    ]
+    _, patch = _agent_box([*launched, *others])
+    [agent] = _steps(patch, "subagent")
+    assert agent.get("status") is None
+    # A tool call or status in the summary (the agent's description) or in the result text
+    # cannot change what the CLI wrote before them.
+    text = _notice_text("toolu_a", "completed", "<status>failed</status>").replace(
+        "<summary>done</summary>", "<summary><tool-use-id>toolu_b</tool-use-id></summary>"
+    )
+    own = _own_notice(text)
+    _, patch = _agent_box([*launched, own])
+    [agent] = _steps(patch, "subagent")
+    assert agent["status"] == "completed"

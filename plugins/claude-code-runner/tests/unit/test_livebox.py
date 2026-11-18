@@ -337,3 +337,64 @@ def test_end_open_tasks_cancels_only_running_task_steps() -> None:
     status = {s["title"]: s.get("status") for s in patch.steps.values()}
     assert status == {"a1": "cancelled", "b1": "cancelled", "b2": "completed"}
     assert live.steps_changed
+
+
+def agent_started(call: str) -> dict[str, Any]:
+    return {
+        "type": "system",
+        "subtype": "task_started",
+        "task_id": call,
+        "tool_use_id": call,
+        "task_type": "local_agent",
+        "description": "Agent 1",
+    }
+
+
+def agent_ended(call: str, total: int) -> dict[str, Any]:
+    usage = {"total_tokens": total, "tool_uses": 1, "duration_ms": 10}
+    return {
+        "type": "system",
+        "subtype": "task_notification",
+        "task_id": call,
+        "tool_use_id": call,
+        "status": "completed",
+        "usage": usage,
+    }
+
+
+def test_replayed_task_starts_give_an_adopter_the_agents_the_record_lacks() -> None:
+    # An adopted background turn reads on from the stored offset; the launch of an agent before
+    # it reaches the live box only through the replay (FIX-RUNNER-BG-AGENT-STEPS), so the
+    # notification later ends a subagent step instead of opening a background_job step.
+    adopted, patch = box()
+    adopted.restore({"tasks": {}}, {})
+    adopted.replay_tasks(
+        [agent_started("toolu_a"), {"type": "assistant", "message": {"content": []}}]
+    )
+    adopted.apply(agent_ended("toolu_a", 7))
+    [step] = patch.steps.values()
+    assert (step["kind"], step["status"]) == ("subagent", "completed")
+    assert step["detail"]["usage"]["tokens"] == 7
+    assert patch.values["/metrics/subagents"] == 1
+
+
+def test_replayed_task_starts_keep_the_steps_the_record_has() -> None:
+    first, before = box()
+    first.apply(agent_started("toolu_a"))
+    [kept] = list(before.steps)
+    adopted, patch = box()
+    patch.steps = {kept: {}}
+    adopted.restore(first.state(), {str(kept): "running"})
+    adopted.replay_tasks([agent_started("toolu_a")])
+    assert list(patch.steps) == [kept]
+    adopted.apply(agent_ended("toolu_a", 7))
+    assert patch.steps[kept]["status"] == "completed"
+
+
+def test_a_later_notice_leaves_the_usage_of_an_ended_task() -> None:
+    live, patch = box()
+    live.apply(agent_started("toolu_a"))
+    live.apply(agent_ended("toolu_a", 7))
+    live.apply(agent_ended("toolu_a", 9))
+    [step] = patch.steps.values()
+    assert step["detail"]["usage"]["tokens"] == 7

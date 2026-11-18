@@ -1,0 +1,197 @@
+{"type": "user", "isSidechain": false, "uuid": "2c9285fd-4f56-4585-948f-75412fe62301", "sessionId": "s", "origin": {"kind": "human"}, "message": {"role": "user", "content": "prompt"}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "attachment", "isSidechain": false, "attachment": {"type": "environment"}}
+{"type": "attachment", "isSidechain": false, "attachment": {"type": "deferred_tools_delta"}}
+{"type": "attachment", "isSidechain": false, "attachment": {"type": "mcp_instructions_delta"}}
+{"type": "attachment", "isSidechain": false, "attachment": {"type": "task_reminder"}}
+{"type": "assistant", "isSidechain": false, "uuid": "0ae151a0-5e93-4f4f-b254-199783c29589", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9vgJFBcvJBkWm7KjjrG", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "1ea16cb2-488d-49d5-82ca-a3e49439ed2e", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01S6bKiKVZ1fojevVVV17wYo", "name": "Bash", "input": {"description": "step", "command": "true"}}], "id": "msg_011Ch9vgJFBcvJBkWm7KjjrG", "model": "claude-opus-5-5"}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "b17d0572-cbc5-42d2-bee8-d8a35ed4985d", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01S6bKiKVZ1fojevVVV17wYo", "content": "result"}]}, "toolUseResult": {}}
+{"type": "attachment", "isSidechain": false, "attachment": {"type": "deferred_tools_delta"}}
+{"type": "attachment", "isSidechain": false, "attachment": {"type": "mcp_instructions_delta"}}
+{"type": "assistant", "isSidechain": false, "uuid": "92e13527-df02-48a3-8a09-aff4bf4aa21d", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9vgnkguMzgWnRjkrR97", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "0f2fe9da-4b9f-4ae2-a327-2fb749ae5e72", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_014uH4BeaSRyiee6DbZHtZnP", "name": "Bash", "input": {"description": "step", "command": "true"}}], "id": "msg_011Ch9vgnkguMzgWnRjkrR97", "model": "claude-opus-5-5"}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "286c297e-19b4-4217-88b6-04e033103cf8", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_014uH4BeaSRyiee6DbZHtZnP", "content": "result"}]}, "toolUseResult": {}}
+{"type": "assistant", "isSidechain": false, "uuid": "b323e480-4395-48ed-a696-5d5867085794", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9vhGdj4swB1g29UTrDo", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "b6d619d7-73d3-4a61-bf88-5e2e7748a510", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01CT1vaedrRRosFQiGqF1fcY", "name": "Bash", "input": {"description": "step", "command": "true"}}], "id": "msg_011Ch9vhGdj4swB1g29UTrDo", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "61501d9a-22ab-43f6-a716-b9672c921875", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01CT1vaedrRRosFQiGqF1fcY", "content": "result"}]}, "toolUseResult": {}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "assistant", "isSidechain": false, "uuid": "8776b377-2398-4028-97e3-6ff616e09431", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9vhZJpyX4mr2HmdrWg1", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "4b01e52b-1eab-4d29-8f7b-89c2fe4af1d9", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01NywRUKxtTzy4uPVhtQ3LP3", "name": "Agent", "input": {"run_in_background": "true", "subagent_type": "general-purpose", "description": "Agent 1", "prompt": "prompt"}}], "id": "msg_011Ch9vhZJpyX4mr2HmdrWg1", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "2b011264-77e5-490d-abd1-4463ead77837", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01NywRUKxtTzy4uPVhtQ3LP3", "content": "result"}]}, "toolUseResult": {"status": "async_launched", "isAsync": true, "agentId": "ae0c8f30d912635a6", "description": "Agent 1"}}
+{"type": "assistant", "isSidechain": false, "uuid": "cdc7e90d-d0ad-47d2-ad87-715ea29ac029", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01RXrs2osUySuR1veXcoiDQL", "name": "Agent", "input": {"run_in_background": "true", "subagent_type": "general-purpose", "description": "Agent 2", "prompt": "prompt"}}], "id": "msg_011Ch9vhZJpyX4mr2HmdrWg1", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "fdf9b02c-d0d9-4636-a342-925781fe7748", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01RXrs2osUySuR1veXcoiDQL", "content": "result"}]}, "toolUseResult": {"status": "async_launched", "isAsync": true, "agentId": "ad01a1193eaeccd69", "description": "Agent 2"}}
+{"type": "queue-operation", "operation": "remove", "reason": "absorbed_mid_turn", "commandUuid": "9b73f615-0d08-4741-804f-38c4be0373b7"}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "attachment", "isSidechain": false, "attachment": {"type": "queued_command", "source_uuid": "9b73f615-0d08-4741-804f-38c4be0373b7", "commandMode": "prompt", "origin": {"kind": "peer"}, "prompt": "prompt"}}
+{"type": "assistant", "isSidechain": false, "uuid": "a9ac7a7d-bfdb-4296-84ac-23ed4a27d5d5", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9vk3Sp2r4KVqnN1ehgP", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "844dd970-f330-4d42-b7f8-07cf83c8db6c", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01JBnbqv3rAdhFzgzVYXL1EK", "name": "Bash", "input": {"description": "step", "command": "true"}}], "id": "msg_011Ch9vk3Sp2r4KVqnN1ehgP", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "34d8184a-c16c-4499-a43a-b7567fa10a20", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01JBnbqv3rAdhFzgzVYXL1EK", "content": "result"}]}, "toolUseResult": {}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "attachment", "isSidechain": false, "attachment": {"type": "silent_turn_reminder"}}
+{"type": "assistant", "isSidechain": false, "uuid": "4a73ab08-8809-43f6-a223-9a1006395cd2", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01A3NhrdSsgrHAe9mHRsdvDY", "name": "Bash", "input": {"description": "step", "command": "true"}}], "id": "msg_011Ch9vkP4WzByufSypsyn42", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "4e79d5d4-b24e-4266-8f96-b8f6e4b76f19", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01A3NhrdSsgrHAe9mHRsdvDY", "content": "result"}]}, "toolUseResult": {}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "755c2771-b1bd-4e47-8e8e-560400ae9e74", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9vkceL4KA2KgEsNJV27", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "15919c8c-da02-4029-b309-1ad4b3d7cbb3", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "text", "text": "text"}], "id": "msg_011Ch9vkceL4KA2KgEsNJV27", "model": "claude-opus-5-5"}}
+{"type": "system", "isSidechain": false, "subtype": "turn_duration"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "579756a9-e172-4c87-ad18-6a117209ad4d", "sessionId": "s", "origin": {"kind": "peer"}, "message": {"role": "user", "content": "prompt"}}
+{"type": "assistant", "isSidechain": false, "uuid": "34a0bf21-dfca-48a9-a274-0030de7b44df", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9voGctkg4xmWg9t53mv", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "0ba165f3-8d79-4643-8a43-b5c1706bde61", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "text", "text": "text"}], "id": "msg_011Ch9voGctkg4xmWg9t53mv", "model": "claude-opus-5-5"}}
+{"type": "system", "isSidechain": false, "subtype": "turn_duration"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "dbfe208f-9f59-40e9-962f-3eb8d0dad311", "sessionId": "s", "origin": {"kind": "peer"}, "message": {"role": "user", "content": "prompt"}}
+{"type": "assistant", "isSidechain": false, "uuid": "ae821fb6-5c4b-4e4e-929a-00e4561a913f", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_017bJrcf7iyaPEB6X45GVQk2", "name": "Read", "input": {}}], "id": "msg_011Ch9vtPBBgWA9NqZ8vUzde", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "7a7d6fac-75bd-4581-9ff9-8746461588c7", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_017bJrcf7iyaPEB6X45GVQk2", "content": "result"}]}, "toolUseResult": {}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "attachment", "isSidechain": false, "attachment": {"type": "task_reminder"}}
+{"type": "assistant", "isSidechain": false, "uuid": "17a1e7ed-4455-4846-af63-3c08949fe3d1", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9vtYJrf5GGfLBDdGfrQ", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "6e14860a-8e28-425c-b2b2-192f8bef3d7c", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_015fB1ETWxNuSfLftP3XX5GW", "name": "Bash", "input": {"description": "step", "command": "true"}}], "id": "msg_011Ch9vtYJrf5GGfLBDdGfrQ", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "e67904fd-dcd6-4f78-bd24-43decc1c141f", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_015fB1ETWxNuSfLftP3XX5GW", "content": "result"}]}, "toolUseResult": {}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "b1dbb2a1-9159-481f-a33d-751b1ec0e098", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9vtvhFTnCgpQNbowipp", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "52b9f51d-a5a2-4557-b2f3-29ff970f33ef", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01DYyNrQCKmPGPmuWeSzQMHf", "name": "Agent", "input": {"run_in_background": "true", "subagent_type": "general-purpose", "description": "Agent 3", "prompt": "prompt"}}], "id": "msg_011Ch9vtvhFTnCgpQNbowipp", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "6b3e05b0-788f-4dcf-8ef7-86def76da9e3", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01DYyNrQCKmPGPmuWeSzQMHf", "content": "result"}]}, "toolUseResult": {"status": "async_launched", "isAsync": true, "agentId": "ae501e73a7367b62f", "description": "Agent 3"}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "7804a0c2-527c-49d8-a925-bfbcb98c8a5e", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "text", "text": "text"}], "id": "msg_011Ch9vv7TgncMhjf3s4tjJ1", "model": "claude-opus-5-5"}}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "system", "isSidechain": false, "subtype": "turn_duration"}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "2570bd12-150b-403a-a72b-65e9feb82d82", "sessionId": "s", "origin": {"kind": "peer"}, "message": {"role": "user", "content": "prompt"}}
+{"type": "assistant", "isSidechain": false, "uuid": "1751399d-50bb-47b8-8e9f-dd1d590399ad", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9vvn3A6A2Tro8pX9r93", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "4d2651a9-5be6-43f3-bb17-474b08997d06", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "text", "text": "text"}], "id": "msg_011Ch9vvn3A6A2Tro8pX9r93", "model": "claude-opus-5-5"}}
+{"type": "system", "isSidechain": false, "subtype": "turn_duration"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "0c6b85a1-47a0-4bf0-8ba5-f353b2e2d13b", "sessionId": "s", "origin": {"kind": "peer"}, "message": {"role": "user", "content": "prompt"}}
+{"type": "assistant", "isSidechain": false, "uuid": "db1edd9c-d5b9-4b6c-a051-8d764fa597dd", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9vyw9gE3Qnec1Aqu8R8", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "4ba3322c-55ee-4a8a-a544-a0b62093397d", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "text", "text": "text"}], "id": "msg_011Ch9vyw9gE3Qnec1Aqu8R8", "model": "claude-opus-5-5"}}
+{"type": "system", "isSidechain": false, "subtype": "turn_duration"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "5c61254e-f41e-4e09-afde-e4a8e1f46af7", "sessionId": "s", "origin": {"kind": "task-notification", "producer": "session-task"}, "message": {"role": "user", "content": "<task-notification>\n<task-id>ae0c8f30d912635a6</task-id>\n<tool-use-id>toolu_01NywRUKxtTzy4uPVhtQ3LP3</tool-use-id>\n<output-file>/tmp/claude/-work/s/tasks/ae0c8f30d912635a6.output</output-file>\n<status>completed</status>\n<summary>Agent \"Agent 1\" finished</summary>\n<result>result</result>\n<usage><subagent_tokens>121653</subagent_tokens><tool_uses>45</tool_uses><duration_ms>206769</duration_ms></usage>\n</task-notification>"}}
+{"type": "assistant", "isSidechain": false, "uuid": "41949ec0-c8e9-4e9c-9f25-22a99b00295e", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "text", "text": "text"}], "id": "msg_011Ch9vzPsHHVm5ifZ1qap5m", "model": "claude-opus-5-5"}}
+{"type": "system", "isSidechain": false, "subtype": "turn_duration"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "0d1579d1-4889-482f-8853-386b2b062772", "sessionId": "s", "origin": {"kind": "peer"}, "message": {"role": "user", "content": "prompt"}}
+{"type": "assistant", "isSidechain": false, "uuid": "919139da-677c-4178-aaa6-554f2f20ecf6", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9w51QoH3tccfCGVWWzV", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "7ba455b9-15c0-4322-9b18-20dee4d92004", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "text", "text": "text"}], "id": "msg_011Ch9w51QoH3tccfCGVWWzV", "model": "claude-opus-5-5"}}
+{"type": "system", "isSidechain": false, "subtype": "turn_duration"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "remove", "reason": "absorbed_mid_turn", "commandUuid": "2c6c32b4-4cff-465d-92cf-c91ee79bb603"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "4a83a19c-410a-41ff-9649-569dae30dbf4", "sessionId": "s", "origin": {"kind": "peer"}, "message": {"role": "user", "content": "prompt"}}
+{"type": "assistant", "isSidechain": false, "uuid": "91c8f857-c09b-4c5b-b736-6fd4d63f1828", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01StbK77CpstkFHesbcTYzVp", "name": "Read", "input": {}}], "id": "msg_011Ch9wCDcTzyary6VUUdkdz", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "0ae3c541-5432-415f-a8fe-9d6b0835e929", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01StbK77CpstkFHesbcTYzVp", "content": "result"}]}, "toolUseResult": {}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "6cb72bba-170a-489f-86e8-8df882ffa404", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9wCND9UD2koGbhJeyeB", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "d0f1e9eb-be0e-4e22-b5e0-cd330313b7c8", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "text", "text": "text"}], "id": "msg_011Ch9wCND9UD2koGbhJeyeB", "model": "claude-opus-5-5"}}
+{"type": "system", "isSidechain": false, "subtype": "turn_duration"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "df5e39fe-74bc-43be-abca-459462d4a7e1", "sessionId": "s", "origin": {"kind": "peer"}, "message": {"role": "user", "content": "prompt"}}
+{"type": "assistant", "isSidechain": false, "uuid": "0b16a7e7-fd63-45c0-8621-fd04b4463846", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01QAVrPphnt5gd5NUbFwDPVs", "name": "Read", "input": {}}], "id": "msg_011Ch9wJhPy3N7hL32pmPFrz", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "39454979-5f88-419a-9a92-5bf343a578e9", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01QAVrPphnt5gd5NUbFwDPVs", "content": "result"}]}, "toolUseResult": {}}
+{"type": "assistant", "isSidechain": false, "uuid": "6fead145-1dd5-4c92-b45d-fbecf0696bb3", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01LK8eq6WUzrfF5sEcWyFLPJ", "name": "Bash", "input": {"description": "step", "command": "true"}}], "id": "msg_011Ch9wJhPy3N7hL32pmPFrz", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "8e1a3184-d33b-4e34-885d-1fa041b2aaf2", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01LK8eq6WUzrfF5sEcWyFLPJ", "content": "result"}]}, "toolUseResult": {}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "attachment", "isSidechain": false, "attachment": {"type": "task_reminder"}}
+{"type": "assistant", "isSidechain": false, "uuid": "d68fd152-a666-4daf-b102-123e1ba7959d", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9wK1F1ofHxKLUttwbjF", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "2139f267-36ca-4416-8a53-b0f8526628fe", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01Xo83k2cR7Hhvbg2X1AKpBw", "name": "Bash", "input": {"description": "step", "command": "true"}}], "id": "msg_011Ch9wK1F1ofHxKLUttwbjF", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "d5265587-8a2a-42c9-9c50-4cfda8c71f6f", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01Xo83k2cR7Hhvbg2X1AKpBw", "content": "result"}]}, "toolUseResult": {}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "33f7f5c2-88b1-4186-9254-d63c0e348f05", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "text", "text": "text"}], "id": "msg_011Ch9wKD6u7pJ3cyHs6q8Xu", "model": "claude-opus-5-5"}}
+{"type": "system", "isSidechain": false, "subtype": "turn_duration"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "aaf931ad-14e0-4f56-8aaa-e8335d726342", "sessionId": "s", "message": {"role": "user", "content": "prompt"}}
+{"type": "user", "isSidechain": false, "uuid": "39393a0a-00bd-4b93-ab0d-a15a0773a6d3", "sessionId": "s", "origin": {"kind": "task-notification", "producer": "session-task"}, "message": {"role": "user", "content": "<task-notification>\n<task-id>ae501e73a7367b62f</task-id>\n<tool-use-id>toolu_01DYyNrQCKmPGPmuWeSzQMHf</tool-use-id>\n<output-file>/tmp/claude/-work/s/tasks/ae501e73a7367b62f.output</output-file>\n<status>completed</status>\n<summary>Agent \"Agent 3\" is waiting on its own background work</summary>\n<result>result</result>\n<usage><subagent_tokens>208902</subagent_tokens><tool_uses>75</tool_uses><duration_ms>508263</duration_ms></usage>\n</task-notification>"}}
+{"type": "assistant", "isSidechain": false, "uuid": "cf463122-354e-4dd7-9ab0-98864968f0b2", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "text", "text": "text"}], "id": "msg_011Ch9wZb5PLVp3PN3ALMH8G", "model": "claude-opus-5-5"}}
+{"type": "system", "isSidechain": false, "subtype": "turn_duration"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "user", "isSidechain": false, "uuid": "ee6c30cc-ea7b-4b05-b5ff-d1f21adf84b9", "sessionId": "s", "origin": {"kind": "peer"}, "message": {"role": "user", "content": "prompt"}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "d3813a67-2ad4-4900-8b2d-dfe5b5986e83", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "text", "text": "text"}], "id": "msg_011Ch9wtU1GgVHm8CJJtufoh", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "28a6b000-4a58-4238-ab05-d3345319f71e", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_016g2f7AUB6TB6k9eR1sVLEH", "name": "Bash", "input": {"description": "step", "command": "true"}}], "id": "msg_011Ch9wtU1GgVHm8CJJtufoh", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "c8ac877b-f180-4dd3-8dab-19bc1bb48c7e", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_016g2f7AUB6TB6k9eR1sVLEH", "content": "result"}]}, "toolUseResult": {}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "b446b84c-1169-4567-86b9-4e98dff8b570", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9wtnXV5ZvUJrVciMmko", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "0854415e-2d0c-40f5-8fbc-6956d28f0d63", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01C5N32zKVai5g28oY9JHfEF", "name": "Bash", "input": {"description": "step", "command": "true"}}], "id": "msg_011Ch9wtnXV5ZvUJrVciMmko", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "4da45f7d-f40a-4bc1-934f-62335733c893", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01C5N32zKVai5g28oY9JHfEF", "content": "result"}]}, "toolUseResult": {}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "4e71e2f0-faf2-40ec-9674-4d3d5692e240", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "text", "text": "text"}], "id": "msg_011Ch9wu2GEV3bycuUQ1j3Rg", "model": "claude-opus-5-5"}}
+{"type": "system", "isSidechain": false, "subtype": "turn_duration"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "user", "isSidechain": false, "uuid": "d726423b-b17c-4b05-973a-c5754c0a164e", "sessionId": "s", "origin": {"kind": "peer"}, "message": {"role": "user", "content": "prompt"}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "fdd02d02-a367-4b04-96e2-2cf11a1f7aad", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9wvipYaffq1sCmY23EF", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "c36af691-082c-464f-aa58-b8a5a4a6cb02", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01FPV53z8bgugV3rjkjvMSz9", "name": "Bash", "input": {"description": "step", "command": "true"}}], "id": "msg_011Ch9wvipYaffq1sCmY23EF", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "b0762eed-30fb-48e7-a45a-b7a955f2d46b", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01FPV53z8bgugV3rjkjvMSz9", "content": "result"}]}, "toolUseResult": {}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "23e4a32b-de62-4367-81c1-cb3f5889621f", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01X1xymqDL9GNkLh26cBoYvb", "name": "Bash", "input": {"description": "step", "command": "true"}}], "id": "msg_011Ch9wwFHdRmNTcQDLKoztc", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "93c322f5-a5ae-4de7-8a20-eedd7375541e", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01X1xymqDL9GNkLh26cBoYvb", "content": "result"}]}, "toolUseResult": {}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "bda9a653-d38f-4ce5-a0b9-3eb3d4695a01", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9wwUWN1NP6pNLnigh7i", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "1049cb98-1ef1-4f0d-9e09-31aa8ca0c81a", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "text", "text": "text"}], "id": "msg_011Ch9wwUWN1NP6pNLnigh7i", "model": "claude-opus-5-5"}}
+{"type": "system", "isSidechain": false, "subtype": "turn_duration"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "user", "isSidechain": false, "uuid": "cf0f0995-8695-4300-878f-239a28126ef2", "sessionId": "s", "origin": {"kind": "peer"}, "message": {"role": "user", "content": "prompt"}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "fcd48e53-52a0-4bf6-9e05-10eda86dc290", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_012nBjDeZbXR3EDonokyPTuT", "name": "Bash", "input": {"description": "step", "command": "true"}}], "id": "msg_011Ch9x2WL9Af4s4PXeWCgFx", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "86eb6a7d-ca20-48af-be19-533aeee0dc09", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_012nBjDeZbXR3EDonokyPTuT", "content": "result"}]}, "toolUseResult": {}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "attachment", "isSidechain": false, "attachment": {"type": "task_reminder"}}
+{"type": "assistant", "isSidechain": false, "uuid": "1a694aeb-67e0-47ca-8975-71773a8d97b6", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9x2m6PsdNWwwRz43CXn", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "6dd5bee3-9cd7-4112-a3a1-4cd4e118cba0", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "text", "text": "text"}], "id": "msg_011Ch9x2m6PsdNWwwRz43CXn", "model": "claude-opus-5-5"}}
+{"type": "system", "isSidechain": false, "subtype": "turn_duration"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "remove", "reason": "delivered_to_agent"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "user", "isSidechain": false, "uuid": "6d6a1383-c7ea-4b48-95ea-c56d582465a5", "sessionId": "s", "origin": {"kind": "peer"}, "message": {"role": "user", "content": "prompt"}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "queue-operation", "operation": "remove", "reason": "absorbed_mid_turn", "commandUuid": "5e7b786e-86b6-4a8b-9f23-b8aac0309e0b"}
+{"type": "assistant", "isSidechain": false, "uuid": "b5343bff-683d-4cef-ade7-f127395bff90", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9xBtvRnfNdc8HvD3BJC", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "3d49d532-2e64-4869-918f-cc5211f780bd", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_014nrnrQBiBLVXAaydPXbj6w", "name": "Bash", "input": {"description": "step", "command": "true"}}], "id": "msg_011Ch9xBtvRnfNdc8HvD3BJC", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "e288b3ff-fe0c-41e5-847a-19a2a225ad72", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_014nrnrQBiBLVXAaydPXbj6w", "content": "result", "is_error": true}]}, "toolUseResult": {}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "f0d72669-0da9-45a6-8bb4-d434db213b30", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01EZqSQ6yQv4x6A6M2x26emz", "name": "Bash", "input": {"description": "step", "command": "true"}}], "id": "msg_011Ch9xCCqT4yNdETRsZXJQQ", "model": "claude-opus-5-5"}}
+{"type": "user", "isSidechain": false, "uuid": "39e17a4d-da29-4067-b414-e14f2b3508ab", "sessionId": "s", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01EZqSQ6yQv4x6A6M2x26emz", "content": "result"}]}, "toolUseResult": {}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "969e4bcb-394a-4f05-9e16-f2a4c8998be0", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9xCVXJAZtN1TkvwLJq6", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "5e429a7c-eefe-4055-88ed-f6650d72fb58", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "text", "text": "text"}], "id": "msg_011Ch9xCVXJAZtN1TkvwLJq6", "model": "claude-opus-5-5"}}
+{"type": "system", "isSidechain": false, "subtype": "turn_duration"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "user", "isSidechain": false, "uuid": "01a942c6-833a-45de-96c6-ff19ab7d712a", "sessionId": "s", "origin": {"kind": "task-notification", "producer": "session-task"}, "message": {"role": "user", "content": "<task-notification>\n<task-id>ad01a1193eaeccd69</task-id>\n<output-file>/tmp/claude/-work/s/tasks/ad01a1193eaeccd69.output</output-file>\n<status>completed</status>\n<summary>Agent \"Agent 2\" is waiting on its own background work</summary>\n<result>result</result>\n<usage><subagent_tokens>154042</subagent_tokens><tool_uses>69</tool_uses><duration_ms>1320738</duration_ms></usage>\n</task-notification>"}}
+{"type": "assistant", "isSidechain": false, "uuid": "9badb4bb-b1ae-48c4-8abb-a31bd1ce6aca", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "text", "text": "text"}], "id": "msg_011Ch9xRPqrefZQtJGRKEGbe", "model": "claude-opus-5-5"}}
+{"type": "system", "isSidechain": false, "subtype": "turn_duration"}
+{"type": "queue-operation", "operation": "enqueue"}
+{"type": "queue-operation", "operation": "dequeue"}
+{"type": "user", "isSidechain": false, "uuid": "6dac5da0-9349-4e28-9ece-c2383bab244c", "sessionId": "s", "origin": {"kind": "task-notification", "producer": "session-task"}, "message": {"role": "user", "content": "<task-notification>\n<summary>summary</summary>\n</task-notification>"}}
+{"type": "api-request", "params": {"betas": []}}
+{"type": "assistant", "isSidechain": false, "uuid": "cc4cb18e-2346-476e-8ff6-6c0bc892a93c", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "thinking"}], "id": "msg_011Ch9xVVRpZhrMSuMw1S1k4", "model": "claude-opus-5-5"}}
+{"type": "assistant", "isSidechain": false, "uuid": "e04c67ca-9b66-48fa-b048-2ee4660436cb", "sessionId": "s", "message": {"role": "assistant", "content": [{"type": "text", "text": "text"}], "id": "msg_011Ch9xVVRpZhrMSuMw1S1k4", "model": "claude-opus-5-5"}}
+{"type": "system", "isSidechain": false, "subtype": "turn_duration"}

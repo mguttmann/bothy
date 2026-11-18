@@ -21,17 +21,28 @@ The mapping, record by record (only records of the main conversation, ``isSidech
 * ``assistant``: the message with its ``text`` and ``tool_use`` items and its usage; with
   ``isApiErrorMessage`` it carries ``is_api_error_message``, ``error`` and
   ``api_error_params``. The first one that is not synthetic first gives ``system/init`` with
-  its model.
+  its model. Each ``tool_use`` of the tool ``Agent`` then gives ``system/task_started`` of a
+  ``local_agent`` task known by the id of the call (FIX-RUNNER-BG-AGENT-STEPS), so the live box
+  shows the subagent under its call as in print mode.
 * ``user`` with ``origin.kind`` ``peer``: the echo of the inbox line with that ``uuid``
   (18.5), when the runner wrote that line. ``user`` without an origin and with ``tool_result``
   items: those items, reduced to ``tool_use_id`` and ``is_error``. The origin of a ``user``
   record is judged before its content, so only a record without one is ever a tool result.
+  Its ``toolUseResult.status`` decides the task of the call: the result of an ``Agent`` call
+  ends that task (``system/task_notification``) unless the status is ``async_launched`` (a
+  background agent, which ends with its notification); ``async_launched`` with ``taskType``
+  `WORKFLOW_TASK_TYPE` starts a workflow task titled with the ``summary``.
+* A notification the session gave itself (a ``user`` record or a ``queued_command``
+  attachment of the session's own origin, below) ends the task of the tool call its
+  ``<tool-use-id>`` names, when this process started it, with its ``<status>`` and the
+  ``<usage>`` after the agent's result; the result itself is never read.
 * ``queue-operation``: ``enqueue`` is ``command_lifecycle`` ``queued``; ``dequeue`` is
   ``started`` and the start of a turn (``system/init``); ``remove`` with ``absorbed_mid_turn``
   is the echo of the runner's line with ``commandUuid``. The records of one queue are matched
   in their order, because ``enqueue`` and ``dequeue`` carry no id.
 * ``attachment`` of the type ``queued_command``: what a running turn took in. Only its
-  origin and ``source_uuid`` are read; every other attachment is skipped.
+  origin and ``source_uuid`` are read, and of the session's own notification its ``prompt``
+  for the end of a task (above); every other attachment is skipped.
 
 **Whose input.** The inbox socket of a session takes a line of every program of the host user, and
 the CLI marks it ``peer`` whatever the line says about itself. So the mapper knows the runner's own
@@ -83,6 +94,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 from collections import Counter, deque
 from collections.abc import AsyncIterator, Callable, Mapping
@@ -91,6 +103,7 @@ from pathlib import Path
 from typing import Any
 
 from claude_code_runner.bgsession import SessionEntry, SessionList
+from claude_code_runner.livebox import WORKFLOW_TASK_TYPE
 from claude_code_runner.livecost import PriceTable, base_model, priced_micros
 from claude_code_runner.usage import ModelUsage
 
@@ -112,12 +125,12 @@ __all__ = [
 _LOG = logging.getLogger("claude_code_runner")
 
 READ_FIELDS: dict[str, tuple[str, ...]] = {
-    "user": ("isSidechain", "message", "origin", "sessionId", "uuid"),
+    "user": ("isSidechain", "message", "origin", "sessionId", "toolUseResult", "uuid"),
     "assistant": ("apiErrorParams", "error", "isApiErrorMessage", "isSidechain", "message"),
     "api-request": ("params",),
     "queue-operation": ("commandUuid", "operation", "reason"),
     "attachment": ("attachment", "isSidechain"),
-    "attachment/queued_command": ("origin", "source_uuid", "type"),
+    "attachment/queued_command": ("commandMode", "origin", "prompt", "source_uuid", "type"),
     "origin/task-notification": ("kind", "producer", "subkind"),
     "system/turn_duration": ("isSidechain", "subtype"),
     "cost-state": ("modelUsage",),
@@ -161,6 +174,14 @@ _OTHER = "other"
 _NOTIFICATION = "task-notification"
 _OWN_PRODUCER = "session-task"
 _CONTINUATION = "auto-continuation"
+_AGENT_TOOL = "Agent"
+_LAUNCHED = "async_launched"
+_NOTICE = re.compile(r"<(task-id|tool-use-id|status)>([^<]*)</\1>")
+_NOTICE_USAGE = (
+    ("subagent_tokens", "total_tokens"),
+    ("tool_uses", "tool_uses"),
+    ("duration_ms", "duration_ms"),
+)
 
 
 def _content(record: Mapping[str, Any]) -> object:
@@ -305,6 +326,10 @@ class TranscriptMapper:
         """The last turn ended at its API error record; a ``turn_duration`` that an older CLI
         writes right after it ends nothing more."""
         self._requests: set[str] = set()
+        self._tasks: set[str] = set()
+        """The tool calls of this process that opened a task step (an agent, a workflow)."""
+        self._task_calls: dict[str, str] = {}
+        """The tool call of each task id the CLI named in an ``async_launched`` result."""
 
     # ---- helpers ---------------------------------------------------------------------------
 
@@ -454,7 +479,9 @@ class TranscriptMapper:
             # the session launched): no line of the socket and no person. Every other
             # origin is another sender's, also a notification without that producer.
             settled = sender == _SELF
-        return [] if settled else [self._foreign(sender)]
+        if not settled:
+            return [self._foreign(sender)]
+        return self._notified(inner.get("prompt")) if sender == _SELF and self.started else []
 
     def _unattributed(self, inputs: set[str]) -> list[dict[str, Any]]:
         """An input a turn took that nothing attributed before an output could answer it.
@@ -500,7 +527,7 @@ class TranscriptMapper:
                 return [*self._turn_start(), self._echo(record.get("uuid"))]
             return [self._foreign(_PEER), *self._turn_start()]
         if sender == _SELF:
-            return self._turn_start()
+            return [*self._turn_start(), *self._notified(_content(record))]
         if sender is not None:
             # The run's prompt came before: a person typed this into the session, or it
             # came from an origin that is not known as the session's own. It starts a turn
@@ -518,7 +545,8 @@ class TranscriptMapper:
             if isinstance(item, Mapping) and item.get("type") == "tool_result"
         ]
         if results:
-            return [{"type": "user", "message": {"role": "user", "content": results}}]
+            message = {"type": "user", "message": {"role": "user", "content": results}}
+            return [message, *self._task_results(record, results)]
         self.skipped["user"] += 1
         return []
 
@@ -576,11 +604,127 @@ class TranscriptMapper:
         if not error and model != _SYNTHETIC:
             self._requests.add(key)
         out.append(mapped)
+        out.extend(self._agents_started(items))
         self._error_ended = error
         if error:
             # 2.1.326 writes no ``turn_duration`` after an API error: the error record is the
             # last record of its turn (FIX-RUNNER-CLI-PIN-326).
             out.extend([*self._unattributed(self._sealed | self._open), self._turn_end()])
+        return out
+
+    # ---- the tasks of the session (FIX-RUNNER-BG-AGENT-STEPS) ------------------------------
+
+    def _task_started(
+        self, tool_use_id: str, task_type: str, description: object
+    ) -> dict[str, Any]:
+        self._tasks.add(tool_use_id)
+        return {
+            "type": "system",
+            "subtype": "task_started",
+            "task_id": tool_use_id,
+            "tool_use_id": tool_use_id,
+            "task_type": task_type,
+            "description": description if isinstance(description, str) else "",
+        }
+
+    def _task_ended(self, tool_use_id: str, status: str, **more: Any) -> dict[str, Any]:
+        return {
+            "type": "system",
+            "subtype": "task_notification",
+            "task_id": tool_use_id,
+            "tool_use_id": tool_use_id,
+            "status": status,
+            **more,
+        }
+
+    def _agents_started(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """A subagent step for each call of the Agent tool, as ``task_started`` in print mode.
+
+        The task is known by its tool call, the one id the call, its result and its
+        notification all name; a call read again after an adoption opens nothing new.
+        """
+        return [
+            self._task_started(
+                item["id"],
+                "local_agent",
+                (item.get("input") or {}).get("description")
+                if isinstance(item.get("input"), Mapping)
+                else None,
+            )
+            for item in items
+            if item.get("type") == "tool_use"
+            and item.get("name") == _AGENT_TOOL
+            and isinstance(item.get("id"), str)
+            and item["id"] not in self._tasks
+        ]
+
+    def _task_results(
+        self, record: Mapping[str, Any], results: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """What the result of a tool call says about a task.
+
+        ``toolUseResult.status`` ``async_launched`` keeps the agent's step open (it ends with
+        its notification); any other result of an agent call ends it with the call. A workflow
+        launched in the background (``taskType`` the workflow type) opens a workflow step.
+        """
+        raw = record.get("toolUseResult")
+        result = raw if isinstance(raw, Mapping) else {}
+        launched = result.get("status") == _LAUNCHED
+        out: list[dict[str, Any]] = []
+        for item in results:
+            ref = item["tool_use_id"]
+            if not isinstance(ref, str):
+                continue
+            # A notification may name the task by the CLI's id alone (agentId, taskId).
+            task_id = result.get("agentId") or result.get("taskId")
+            if launched and isinstance(task_id, str) and task_id:
+                self._task_calls[task_id] = ref
+            if ref in self._tasks:
+                if not launched:
+                    out.append(self._task_ended(ref, "failed" if item["is_error"] else "completed"))
+            elif launched and result.get("taskType") == WORKFLOW_TASK_TYPE:
+                out.append(self._task_started(ref, WORKFLOW_TASK_TYPE, result.get("summary")))
+        return out
+
+    def _notified(self, content: object) -> list[dict[str, Any]]:
+        """The end of a task in the notification the session gave itself.
+
+        Only an input the session's own origin marks reaches here, and only a tool call of this
+        process ends: another sender's text never ends a step. The CLI writes the task id, the
+        tool call (not always: a notification of an agent that waits on its own background work
+        names only the task id, real transcript of the pinned CLI) and the status before the
+        summary and the result, and the usage after the result; so only the part before
+        ``<summary>`` and the usage after the last ``</result>`` are read, never the summary
+        (it holds the agent's description) nor the result.
+        """
+        texts = [content] if isinstance(content, str) else []
+        if isinstance(content, list):
+            texts = [
+                i["text"]
+                for i in content
+                if isinstance(i, Mapping)
+                and i.get("type") == "text"
+                and isinstance(i.get("text"), str)
+            ]
+        out: list[dict[str, Any]] = []
+        for text in texts:
+            head = text.split("<summary>", 1)[0].split("<result>", 1)[0]
+            found: dict[str, str] = {}
+            for tag, value in _NOTICE.findall(head):
+                found.setdefault(tag, value.strip())
+            ref, status = found.get("tool-use-id"), found.get("status")
+            if ref is None:
+                ref = self._task_calls.get(found.get("task-id", ""))
+            if ref not in self._tasks or not status:
+                continue
+            tail = text.rsplit("</result>", 1)[-1]
+            usage = {
+                out_key: int(m.group(1))
+                for tag, out_key in _NOTICE_USAGE
+                if (m := re.search(rf"<{tag}>(\d+)</{tag}>", tail))
+            }
+            more = {"usage": usage} if usage else {}
+            out.append(self._task_ended(str(ref), status, **more))
         return out
 
     def _queue(self, record: Mapping[str, Any]) -> list[dict[str, Any]]:

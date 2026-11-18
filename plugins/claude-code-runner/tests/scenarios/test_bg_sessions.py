@@ -848,10 +848,12 @@ def members_seen(world: World) -> set[str]:
         if name not in READ_FIELDS:
             continue
         seen.add(name)
-        # Read in the CLI's file, not recorded: the stand-in sends no usage window.
+        # Read in the CLI's file, not recorded: the stand-in sends no usage window. A tool
+        # result carries ``toolUseResult`` only for the calls that report a task.
         assert set(record) - {"apiErrorParams"} <= set(table[name]), name
         assert set(READ_FIELDS[name]) - {
             "apiErrorParams",
+            "toolUseResult",
             "commandUuid",
             "reason",
             "error",
