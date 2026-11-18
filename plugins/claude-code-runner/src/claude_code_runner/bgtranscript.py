@@ -71,6 +71,12 @@ after the request record (real transcript of the pinned CLI, FIX-RUNNER-BG-NOTIC
 write records of the answer before the request, which that input cannot have led to. An input that
 an agent of the session took is attributed in that agent's own file, by the same rule (``side``,
 `side_inputs`, FIX-RUNNER-BG-SIDE-NOTICE). A mapper without ``own`` knows no line of the runner.
+
+**Owner codes.** With ``owner`` (`claude_code_runner.ownercode.OwnerLines`) the mapper reads the
+text of an input only to compare, never to keep it: an input of another sender that holds an owner
+code the runner wrote gives ``owner_code`` true in its ``system/bg_foreign`` (the runner stops the
+session for it, FIX-RUNNER-TRUSTED-OWNER-FOLLOWUPS), and an input under the ``uuid`` of a marked
+line is the runner's only when it holds that line's text; otherwise it is another sender's.
 * ``system`` ``turn_duration``: the end of the turn, a ``result`` whose text is the text of
   the turn's last assistant message. An API error record ends its turn itself (``result``
   with ``is_error``): the CLI writes no ``turn_duration`` after it since 2.1.326, and one
@@ -105,6 +111,7 @@ from typing import Any
 from claude_code_runner.bgsession import SessionEntry, SessionList
 from claude_code_runner.livebox import WORKFLOW_TASK_TYPE
 from claude_code_runner.livecost import PriceTable, base_model, priced_micros
+from claude_code_runner.ownercode import OwnerLines
 from claude_code_runner.usage import ModelUsage
 
 __all__ = [
@@ -291,6 +298,11 @@ class TranscriptMapper:
         side: The ``queued_command`` attachments with this ``source_uuid`` in the files of
             the session's own agents (`side_inputs`). Without it an input that only such a
             file attributes stays foreign.
+        owner: The owner codes the runner wrote and its marked lines
+            (`claude_code_runner.ownercode.OwnerLines`). With it an input of another sender
+            that carries such a code gives ``owner_code`` true in its ``system/bg_foreign``,
+            and an input under the ``uuid`` of a marked line counts as the runner's only when
+            it holds that line's text.
 
     Attributes:
         turn_open: A turn of the process has started and its ``turn_duration`` is not read.
@@ -303,11 +315,13 @@ class TranscriptMapper:
         prompt_uuid: str,
         own: Callable[[str], bool] | None = None,
         side: Callable[[str], list[dict[str, Any]]] | None = None,
+        owner: OwnerLines | None = None,
     ) -> None:
         """Start before the prompt of the launch."""
         self._prompt_uuid = prompt_uuid
         self._own = own
         self._side = side
+        self._owner = owner
         self.started = False
         self.turn_open = False
         self.skipped: Counter[str] = Counter()
@@ -348,14 +362,22 @@ class TranscriptMapper:
     def _echo(line_uuid: object) -> dict[str, Any]:
         return {"type": "user", "isReplay": True, "uuid": line_uuid}
 
-    @staticmethod
-    def _foreign(origin: str) -> dict[str, Any]:
+    def _foreign(self, origin: str, content: object = None) -> dict[str, Any]:
         """An input the runner did not write; nothing of its record but whose it is.
 
         ``origin`` is one of four fixed words, never a text of the record: ``peer``,
-        ``human``, ``other`` (`_sender`) or ``unattributed`` (`_unattributed`).
+        ``human``, ``other`` (`_sender`) or ``unattributed`` (`_unattributed`). With the
+        input's ``content`` the message says whether it carries an owner code the runner
+        wrote (``owner_code`` true, only then), never the code or the text.
         """
-        return {"type": "system", "subtype": "bg_foreign", "origin": origin}
+        message: dict[str, Any] = {"type": "system", "subtype": "bg_foreign", "origin": origin}
+        if self._owner is not None and self._owner.carries_code(content):
+            message["owner_code"] = True
+        return message
+
+    def _genuine(self, line_uuid: object, content: object) -> bool:
+        """Whether an input under a ``uuid`` of the runner holds the text of its marked line."""
+        return self._owner is None or self._owner.genuine(line_uuid, content)
 
     def _line(self, line_uuid: object, seen: set[str]) -> bool | None:
         """Whose line a ``uuid`` names, and whether it may still count.
@@ -438,7 +460,7 @@ class TranscriptMapper:
             self.skipped[kind] += 1
             return []
         if sender != _HUMAN or not _is_text(_content(record)):
-            return [self._foreign(sender)]
+            return [self._foreign(sender, _content(record))]
         self.started = True
         # The prompt came by the launch, not the socket: no line may carry its uuid.
         self._taken.add(self._prompt_uuid)
@@ -472,15 +494,18 @@ class TranscriptMapper:
             # in an earlier process is skipped with its records.
             settled = sender in (_HUMAN, _SELF)
         elif sender == _PEER:
-            # A line of the runner shows once here, beside its ``remove`` record.
-            settled = self._line(inner.get("source_uuid"), self._attached) is True
+            # A line of the runner shows once here, beside its ``remove`` record, and a marked
+            # line with its own text: another program may have read its ``uuid``.
+            settled = self._line(inner.get("source_uuid"), self._attached) is True and (
+                self._genuine(inner.get("source_uuid"), inner.get("prompt"))
+            )
         else:
             # The CLI attributes the input to the session itself (the notification of work
             # the session launched): no line of the socket and no person. Every other
             # origin is another sender's, also a notification without that producer.
             settled = sender == _SELF
         if not settled:
-            return [self._foreign(sender)]
+            return [self._foreign(sender, inner.get("prompt"))]
         return self._notified(inner.get("prompt")) if sender == _SELF and self.started else []
 
     def _unattributed(self, inputs: set[str]) -> list[dict[str, Any]]:
@@ -523,9 +548,12 @@ class TranscriptMapper:
         if sender == _PEER:
             # A line of the inbox socket that starts a turn: its echo, when it is the
             # runner's and its first (18.5).
-            if self._line(record.get("uuid"), self._taken):
+            content = _content(record)
+            if self._line(record.get("uuid"), self._taken) and self._genuine(
+                record.get("uuid"), content
+            ):
                 return [*self._turn_start(), self._echo(record.get("uuid"))]
-            return [self._foreign(_PEER), *self._turn_start()]
+            return [self._foreign(_PEER, content), *self._turn_start()]
         if sender == _SELF:
             return [*self._turn_start(), *self._notified(_content(record))]
         if sender is not None:
@@ -533,7 +561,7 @@ class TranscriptMapper:
             # came from an origin that is not known as the session's own. It starts a turn
             # like the session's own input (ruling D-FIX-RUNNER-BG-FOREIGN-LOG-1: never discard an
             # input).
-            return [self._foreign(sender), *self._turn_start()]
+            return [self._foreign(sender, _content(record)), *self._turn_start()]
         content = _content(record)
         results = [
             {

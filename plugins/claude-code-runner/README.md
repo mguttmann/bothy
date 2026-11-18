@@ -76,6 +76,7 @@ sessions".
 | `tests/fake_claude/fake_bg.py` | The background side of Fake-Claude: `--bg` prints the launch line and starts a player under a supervisor process; the player writes transcript records and listens on the inbox socket; `agents`, `stop`, `rm` and `daemon status` answer from a state file in the fake configuration folder |
 | `tests/unit/test_bgsession.py`, `test_bgtranscript.py`, `test_bgmode.py`, `tests/scenarios/test_bg_sessions.py`, `test_bg_fallback.py`, `test_bg_adoption.py` | Background mode: the launch and its parsers, the mapping with the class test over every recorded transcript and its print stream, the shared mode with the fallback codes held against the tables of 09 18.9 and of this file, the scenarios of a background turn, every fallback cause, and the adoption by a new runner process |
 | `tests/scenarios/test_bg_inbox_auth.py` | Background mode, what must hold before it is switched on (FIX-RUNNER-BG-INBOX-AUTH): an input the runner did not write is logged by its origin and answered like any input, also after an adoption, also when its record is shaped like a tool result and also when the CLI records it as a notification; the next run continues that session, in either launch mode, and a mark an earlier runner wrote has no effect (FIX-RUNNER-BG-FOREIGN-LOG); the login check fails closed; no value of one run's environment reaches the session of another |
+| `ownercode.py`, `tests/unit/test_ownercode.py`, `tests/scenarios/test_bg_owner_codes.py` | Owner codes of background mode (09 18.5): the owner check of a run's first message, the mark of the owner's follow-up (decided from the server's data), the watch for a written code in another sender's input |
 | `tests/real_cli/background.py`, `record_background.py`, `test_background.py`, `tests/fixtures/recording/background_<v>/` | Background sessions of the pinned CLI against the stand-in: the world of a test, the recorder, level one of the real-CLI suite and its recordings |
 | `tests/unit/test_keeper.py`, `test_launch.py`, `test_processstate.py`, `tests/scenarios/test_handover.py`, `test_launch_crash_points.py` | The keeper, the handshake, the replay with the class test over every Fake-Claude stream and checkpoint, AR-T02, AR-T03 and AR-T04 against real runner processes |
 | `tests/hosting_world.py`, `tests/hosting_runner.py` | The scenario world of a hosting runner: the runner's FakeServer with the hosting operations and one FakeServer per hosted agent; the hosting runner as a process of its own, for a scenario that kills it |
@@ -548,6 +549,24 @@ Before you switch it on:
     marks with the producer `session-task`, and a continuation the CLI queues by itself. A
     file `<runner.state_dir>/sessions/<session id>/foreign-input` of the earlier rule has no
     effect and goes with the retention sweep.
+  - **Owner codes** (FIX-RUNNER-TRUSTED-OWNER-FOLLOWUPS). Claude Code tells the model that a
+    relayed message is not its user's and can approve nothing, so a follow-up would never count
+    as the person's word. For a run whose triggering message is a person's, the runner draws
+    20 one-time codes, keeps them in its memory only, and ends the run's first message with an
+    owner check: the first 16 hex characters of each code's SHA-256 and the rule. A follow-up
+    of that same person (the author of the message read with `getMessage` is the author of the
+    triggering message, a person, origin `human`) gets the next code in its lead-in,
+    `Follow-up from <name> (@<handle>), owner code <code>:`; the log has
+    `followup_owner_marked`, never the code. The model checks the code with a tool against the
+    list and counts it once; a valid code makes the follow-up the person's own request and
+    approval. A follow-up of anyone else, a forged line and a code that fails the check keep
+    the rule of another session's message. A code is unknown to every other program until the
+    runner writes it; from then on the CLI's queue record and the transcript show it, so when
+    a session takes an input of another sender that carries a written code, or an input under
+    the `uuid` of a marked line with another text, the runner stops the session and the run
+    ends `failed` with `background_owner_code_stolen` (the log has the warning of the same
+    name). A runner that adopts the turn after a restart has no codes and marks nothing; it
+    still watches for the codes its turn record names. Print mode is unchanged.
   - The settings file of a run sets no `crossSessionInbound` unless your own Claude Code
     settings say `hold` (below), so the CLI's own rule per message applies. By that rule a `host` session (bypass mode) takes only a message whose sender states that it
     bypasses permission prompts too, and a `chat` or `scoped` session every message whose

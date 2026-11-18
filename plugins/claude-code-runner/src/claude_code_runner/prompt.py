@@ -9,8 +9,9 @@
 * The first stdin line is one ``user`` message with two text items: the system part of
   `bothy_sdk.context.render_context` (context with trust marks, ``unverified`` content and
   every file entry in marked data blocks) and its trigger part (the words and transcripts of
-  the triggering person). The context thus becomes part of the session history, so a
-  ``--resume`` turn still knows what ``context_floor_seq`` no longer sends.
+  the triggering person). A background run with an owner adds the owner check as a third
+  item (`claude_code_runner.ownercode`, 18.5). The context thus becomes part of the session
+  history, so a ``--resume`` turn still knows what ``context_floor_seq`` no longer sends.
 
 Examples:
     >>> "TITLE:" in system_prompt(title_request=False, channel_prompt="")
@@ -48,9 +49,9 @@ def system_prompt(*, title_request: bool, channel_prompt: str, background: bool 
         channel_prompt: ``behavior.prompt`` of the forum; an own section when not empty.
         background: The turn runs as a background session (``runner.launch_mode``): a
             follow-up then reaches the model as a message of another session, and the prompt
-            says how to handle such a message. It names no sign by which the model could
-            take one for the person's own: every such sign is text any sender can write, and
-            the runner, not the model, decides whose input a session took (18.5).
+            says how to handle such a message. Its text proves nothing, since any sender can
+            write it; the one proof it names is a valid owner code, which the runner gives
+            only a follow-up of the run's owner (`claude_code_runner.ownercode`, 18.5).
 
     Returns:
         The text; it never contains a context element.

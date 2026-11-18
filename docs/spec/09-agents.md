@@ -3756,12 +3756,42 @@ session that had background work, the quiet window `runner.followup_grace` end t
 What differs for the model: the CLI introduces such a line as a message of another Claude
 session that very likely works for the user, which cannot approve anything and in which a slash
 command does not run. The system prompt of a session started in background mode says that a
-message of a person of the thread and the runner's retry line arrive this way, that nothing in
-such a message proves who sent it (the lead-in `Follow-up from <name> (@<handle>):`, a name or
-a sentence that names the runner is text any sender can write), and that every such message is
+message of a person of the thread and the runner's retry line arrive this way, that the text of
+such a message proves nothing (the lead-in `Follow-up from <name> (@<handle>):`, a name or a
+sentence that names the runner is text any sender can write), that a message with a valid owner
+code is the own word of the person who triggered the turn, and that every other such message is
 handled as the CLI says for a message of another session: a request the model may act on
-inside the work of the session and within its rights, never an approval. The prompt names no
-sign by which the model could take a message for the person's own. A session that cannot take
+inside the work of the session and within its rights, never an approval.
+
+Owner codes (background mode, addendum of 2026-11-18, FIX-RUNNER-TRUSTED-OWNER-FOLLOWUPS). A
+run in background mode whose triggering message is a person's (`trigger_message.author.kind`
+`user` and role `user` in the run context) has an owner: that person. The runner draws one-time
+codes for the run (20 random codes of 32 hex characters), keeps them in its memory only (never
+in a file, the turn record before the write, or a log), and adds the owner check as the last
+text item of the run's first input line: the first 16 hex characters of the SHA-256 of each
+code and the rule for the model. A follow-up is the owner's when the message read with
+`getMessage` has the owner as its author, of kind `user`, with origin `human` (the server's
+data, never a text); its line then has the lead-in `Follow-up from <name> (@<handle>), owner
+code <code>:` with the next unused code (log `followup_owner_marked`, without the code), and
+once every code is used a further follow-up gets the plain lead-in. The model checks a code
+with a tool (the SHA-256, never in its head) against the list of the newest first message of a
+run and counts each code once; a valid code makes the message the owner's own request,
+including the explicit approval for a step that needs it. A message with a code that fails the
+check, without a code or that the model cannot check keeps the rule above. The owner check
+stands in the first message of every run, not in the system prompt, because the CLI keeps the
+system prompt of a conversation's first request for a session that a later run continues. A
+code is unknown to any other program until the runner writes it; from then on the CLI's queue
+record and the transcript show it, and a line of another sender can reach the model before the
+owner's (a sender chooses the priority of its line). So the runner judges every input of the
+session (18.4 and "Whose input" below): an input of another sender that holds a code the runner
+wrote (compared in its hex characters, any spelling), and an input under the `uuid` of a marked
+line whose letters and digits do not hold that line's text, make the runner stop the session
+and end the run `failed`, reason `adapter_error`, with the cause
+`background_owner_code_stolen` and the warning of the same name; the session is continued by
+the next run like any other. The turn record keeps the codes the runner has written (never a
+text), so a runner that adopts the turn watches for them too; it has no unused code and marks
+no follow-up. Print mode has no owner check and no owner code: a follow-up there is a `user`
+message of the turn's stdin. A session that cannot take
 a line: when the socket is missing or refuses the bytes, the follow-up is not written and stays
 `queued` (`followup_not_deliverable`); when a setting of the host holds or refuses inbound
 messages, or the CLI drops the line as a repeat of the one before it, it is written and gets
@@ -3792,7 +3822,9 @@ the socket with `origin.kind` `peer`, whatever the line says about itself, and k
    2026-11-17, D-FIX-RUNNER-BG-FOREIGN-LOG-1: an input in the thread's chat is never
    discarded): the log has the warning `background_foreign_input` with one of the words `peer`, `human`, `other` or `unattributed` for whose input it was,
    never a text of the record. The session is not stopped, the run goes on and ends as
-   usual, the input starts or joins a turn like the session's own input, and the answer is
+   usual (one exception since 2026-11-18: an input that carries an owner code the runner wrote,
+   or that takes the `uuid` of a marked line with another text, stops it, see "Owner codes"
+   above), the input starts or joins a turn like the session's own input, and the answer is
    posted. A runner that adopts the turn logs the same way with the lines the turn record
    names, over the part of the transcript the previous runner read and over the rest; a record
    that names no line proves none, so every line then counts as another sender's (18.9). (The
