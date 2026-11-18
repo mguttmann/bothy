@@ -419,7 +419,8 @@ not move a session that is live in another thread of the same gateway in `v0.22.
 again in `a8b0bc15053c`; the adapter fails open for such a bind on both (17.4), and the global
 `queue` steers there. Recorded against `f7e2898aaefc`: the global `queue` starts a new turn after
 the current one again (the adapter passes no follow-up into a turn at `queue`), and a message
-Hermes refuses for its access policy ends without `on_processing_complete`. The recording is
+of a person Hermes refuses at admission without the adapter's own policy declaration
+(`access_policy_default`) ends without `on_processing_complete`. The recording is
 part of the normal test run and needs the network for the pinned downloads.
 
 The harness guarantees: the checkout of the pinned commit lies read-only in a throwaway

@@ -1215,10 +1215,10 @@ class ServerPlatform(BasePlatformAdapter):
         draft, so Hermes offers Deny only (D-HAM-3). The card is one message within
         ``hermes_adapter.max_message_bytes``; a character takes at most four bytes in UTF-8.
         """
-        del smart_denied  # its line is within the reserve
         limit = self.settings.max_message_bytes if self.settings else DEFAULT_MAX_MESSAGE_BYTES
         room = limit - len(description.encode("utf-8")) - _EA_CARD_RESERVE
-        return max(0, room // 4)
+        # Never below Hermes' own budget: a small message limit keeps Hermes' preview as before.
+        return max(super()._exec_approval_cmd_budget(description, smart_denied), room // 4)
 
     async def _send_exec_approval_prompt(self, prompt: ExecApprovalPrompt) -> SendResult:
         """An approval as the card of 09 11.5 (``appr:<id>:<choice>``)."""

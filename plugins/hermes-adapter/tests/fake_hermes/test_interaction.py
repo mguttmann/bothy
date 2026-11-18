@@ -475,3 +475,43 @@ async def test_long_command_approval_offers_every_choice(world: HermesWorld) -> 
         await _end(rig, triggered.run_id)
         # The whole command was never sent ahead of the card as the run's progress.
         assert not [m for m in fake.messages if m["kind"] == "text" and command in m["content_md"]]
+
+
+_BUDGET = """
+import json, sys
+from types import SimpleNamespace
+from gateway.config import Platform, PlatformConfig
+from gateway.platforms.base import BasePlatformAdapter
+import bothy_hermes_adapter.platform as module
+Platform._add_pseudo_member(sys.argv[1])
+platform = module.ServerPlatform(PlatformConfig(enabled=True), sys.argv[1])
+own = BasePlatformAdapter._exec_approval_cmd_budget(platform, "why", False)
+out = {"hermes": own}
+for limit in (4096, 262144):
+    platform.settings = SimpleNamespace(max_message_bytes=limit)
+    out[str(limit)] = platform._exec_approval_cmd_budget("why", False)
+print(json.dumps(out))
+"""
+
+
+async def test_approval_preview_budget_never_falls_below_hermes_own(world: HermesWorld) -> None:
+    """D-HAM-3: the preview budget follows the message limit but never drops below Hermes' own
+    budget, so a small limit keeps Hermes' preview (and its approve choices) as before."""
+    import subprocess
+
+    from fake_hermes_kit import PLATFORM_KEY
+
+    async with hermes_rig(world, [], start=False) as rig:
+        done = await asyncio.to_thread(
+            subprocess.run,
+            [str(world.python), "-c", _BUDGET, PLATFORM_KEY],
+            env=rig.env,
+            cwd=rig.homes.work,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    assert done.returncode == 0, done.stderr
+    budgets = json.loads(done.stdout.strip().splitlines()[-1])
+    assert budgets["4096"] == budgets["hermes"]
+    assert budgets["262144"] > budgets["hermes"]

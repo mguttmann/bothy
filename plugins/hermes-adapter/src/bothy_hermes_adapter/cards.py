@@ -63,7 +63,7 @@ CLARIFY_EXPIRED: Final = (
 
 CLARIFY_EXPIRED_TYPED: Final = (
     "This question had expired, so your message did not answer it: the agent went on without "
-    "an answer. The agent gets your message as a new message after this run."
+    "an answer. Your message stays queued for the agent after this run."
 )
 """The run's message after a typed answer to an expired clarify card (D-HAM-2)."""
 
