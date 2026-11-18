@@ -110,6 +110,14 @@ enum DsTriggerState implements DsCode {
   /// The follow-up reached the running agent.
   followupDelivered('followup_delivered'),
 
+  /// A follow-up the server holds until the run ends (shown for `received` while the run that
+  /// was active when it was sent still runs; never sent by the server).
+  followupWaiting('followup_waiting'),
+
+  /// A follow-up the person's stop of the run discarded (shown for `cancelled` with
+  /// `user_cancelled` of a message sent while that run was active; never sent by the server).
+  followupDiscarded('followup_discarded'),
+
   /// A value this app does not know.
   unknown('');
 

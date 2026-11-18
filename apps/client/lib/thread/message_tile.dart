@@ -25,7 +25,7 @@ import 'select_text_view.dart';
 /// (a missing one shows the handle-less placeholder of the system), [timeLabel] formatted by
 /// the caller, the [reactions], the quoted [replied] message, and the tokens of `mention_ids`
 /// as mentions (03 content format item 4). Only a server message of kind `system` is a
-/// system line (SEC-OUT-3).
+/// system line (SEC-OUT-3). The thread's [runs] tell a follow-up's state (`triggerOf`).
 DsMessageData messageData(
   Message message, {
   required Map<PrincipalId, Principal> principals,
@@ -35,6 +35,7 @@ DsMessageData messageData(
   Message? replied,
   DsDelivery delivery = DsDelivery.sent,
   String? failureText,
+  Iterable<RunSummary> runs = const [],
 }) {
   final author = principals[message.authorId];
   final name = author?.displayName ?? message.authorId.value;
@@ -58,7 +59,7 @@ DsMessageData messageData(
     mentionHandles: mentionHandles(message.mentionIds, principals),
     edited: message.editedAt != null && message.deletedAt == null,
     deleted: message.deletedAt != null,
-    triggerState: triggerOf(message)?.state,
+    triggerState: triggerOf(message, runs: runs)?.state,
     triggerReason: message.triggerStateReason,
     delivery: delivery,
     failureText: failureText,

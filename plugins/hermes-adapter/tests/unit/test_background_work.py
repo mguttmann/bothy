@@ -288,6 +288,32 @@ async def test_voice_followup_while_held_gets_no_turn_of_its_own(tmp_path: Path)
     assert [t.user_text for t in rt.turns[1:]] == ["How far is the team?"]
 
 
+async def test_image_followup_while_held_is_a_turn_of_its_own_with_the_image(
+    tmp_path: Path,
+) -> None:
+    """A follow-up with an image while the run holds work gets its own turn (D-FMS-5).
+
+    The image rides that turn as media, as on a trigger, so Hermes's vision sees it.
+    """
+    rt = FakeRuntime(script=_starting(TEAM))
+    async with rig(tmp_path, runtime=rt, **FAST) as r:
+        triggered = await r.fake.trigger()
+        await r.until(lambda: _steps(r, triggered.run_id, "subagent"), "the subagent step")
+        await r.until(lambda: r.fake.messages, "the first answer")
+        shot = r.fake.add_file(b"\xff\xd8\xff\xe0 shot", name="shot.jpg", mime="image/jpeg")
+        followup = await r.fake.deliver_followup(triggered.run_id, "Is it this?", files=[shot])
+        await r.until(
+            lambda: r.fake.followup_state(triggered.run_id, followup) == "absorbed",
+            "the absorbed follow-up",
+        )
+        rt.finish_background(triggered.thread_id, "deleg_1")
+        await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
+    second = rt.turns[1]
+    assert (second.user_text, second.message_id) == ("Is it this?", followup)
+    assert [m.media_type for m in second.media] == ["image/jpeg"]
+    assert rt.steered == []
+
+
 async def test_run_of_an_answered_card_holds_its_background_work(tmp_path: Path) -> None:
     """A card answered by a click, then a delegation: the run stays open (AUD-HA1/1).
 

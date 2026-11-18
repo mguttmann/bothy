@@ -35,6 +35,11 @@ Evidence, each test failed before the change (of the card answer with a file, th
   `tests/unit/test_background_work.py::test_voice_followup_while_held_gets_no_turn_of_its_own`,
   `tests/unit/test_handler_runs.py::test_card_answer_with_a_file_is_left_to_the_follow_on_run`.
 
+Since FIX-followup-media-steer (2026-11-18, D-FMS-1 to D-FMS-3) the files of a follow-up are
+steered into the running turn as paths; AUD-HA1/3 holds for audio and for a file that is not ready,
+also in the answer to an open card (D-FMS-8: a card answer with other files gets their paths),
+and AUD-HA1/4 stands.
+
 ## Open minors
 
 - Read in the code, not run: a stop of a run whose resumed handler already returned because the

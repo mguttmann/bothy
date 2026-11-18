@@ -13,6 +13,7 @@ __all__ = [
     "DEFAULT_BACKGROUND_POLL_INTERVAL",
     "DEFAULT_BACKGROUND_PROGRESS_INTERVAL",
     "DEFAULT_BACKGROUND_SETTLE",
+    "DEFAULT_FOLLOWUP_FILE_WAIT",
     "DEFAULT_MAX_MESSAGE_BYTES",
     "NO_SPLIT_LENGTH",
 ]
@@ -43,3 +44,7 @@ DEFAULT_BACKGROUND_PROGRESS_INTERVAL: Final = 120.0
 """Default of `hermes_adapter.background_progress_interval` in seconds: while background work runs,
 ``/metrics/progress_events`` rises once per interval; it must stay below the server's
 ``run.stall_after`` (09 5.5, 17.12)."""
+
+DEFAULT_FOLLOWUP_FILE_WAIT: Final = 120.0
+"""Default of `hermes_adapter.followup_file_wait` in seconds: the longest wait for the server's
+check of a follow-up's attachments before it is steered into the running turn (09 17.5)."""

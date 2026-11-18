@@ -75,6 +75,7 @@ def test_config_defaults_and_values() -> None:
         ("hermes_adapter.background_poll_interval", "soon"),
         ("hermes_adapter.background_settle", 0),
         ("hermes_adapter.background_progress_interval", True),
+        ("hermes_adapter.followup_file_wait", "later"),
     ],
 )
 def test_config_rejects_invalid_values(key: str, value: Any) -> None:
@@ -144,9 +145,11 @@ def test_background_durations() -> None:
         DEFAULT_BACKGROUND_POLL_INTERVAL,
         DEFAULT_BACKGROUND_PROGRESS_INTERVAL,
         DEFAULT_BACKGROUND_SETTLE,
+        DEFAULT_FOLLOWUP_FILE_WAIT,
     )
 
     settings = load_settings(_extra())
+    assert settings.followup_file_wait == DEFAULT_FOLLOWUP_FILE_WAIT
     assert settings.background_poll_interval == DEFAULT_BACKGROUND_POLL_INTERVAL
     assert settings.background_settle == DEFAULT_BACKGROUND_SETTLE
     assert settings.background_progress_interval == DEFAULT_BACKGROUND_PROGRESS_INTERVAL
@@ -154,6 +157,7 @@ def test_background_durations() -> None:
         ("hermes_adapter.background_poll_interval", DEFAULT_BACKGROUND_POLL_INTERVAL),
         ("hermes_adapter.background_settle", DEFAULT_BACKGROUND_SETTLE),
         ("hermes_adapter.background_progress_interval", DEFAULT_BACKGROUND_PROGRESS_INTERVAL),
+        ("hermes_adapter.followup_file_wait", DEFAULT_FOLLOWUP_FILE_WAIT),
     ):
         assert parse_duration(_default_of(key)) == value
     # The progress must come before the server's stall notice (09 5.5).

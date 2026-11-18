@@ -221,13 +221,19 @@ hovering shows the caption and jumps to the live box.
 | `failed` | `trigger.failed` | `color.trigger.failed` | Fehlgeschlagen | Failed |
 | `cancelled` | `run.cancelled` | `color.run.cancelled` | Abgebrochen | Canceled |
 | `followup_delivered` | `trigger.followup` | `color.trigger.followup` | Nachtrag zugestellt | Follow-up delivered |
+| `received`, follow-up of the active run (app only) | `trigger.queued` | `color.trigger.queued` | Wartet auf Ende des Laufs | Waiting for the run to end |
+| `cancelled` with `user_cancelled`, follow-up of the stopped run (app only) | `run.cancelled` | `color.run.cancelled` | Verworfen: Lauf gestoppt | Discarded: the run was stopped |
 
 <!-- language-check: on -->
 
 For `failed`, the reason is in the tooltip and in the semantics label ("Failed: Project not
 ready"). Messages without a trigger (`trigger_state` empty) show nothing. `cancelled` is a deliberate stop
 (09 section 6): it uses the neutral run color, never the error style of `failed`, and names the
-reason the same way ("Canceled: Canceled by Sam").
+reason the same way ("Canceled: Canceled by Sam"). The two rows marked "app only" are display
+states of a follow-up (FIX-followup-media-steer, D-FMS-7): a message sent after the `queued_at`
+of a run of the thread and before its `finished_at` is a follow-up of that run; while it is still
+`received` and a run is active it waits for the end of the run, and when the stop of that run
+set it `cancelled` with `user_cancelled` it was discarded (09 section 7).
 
 ## 6. Thread list with status (forum)
 

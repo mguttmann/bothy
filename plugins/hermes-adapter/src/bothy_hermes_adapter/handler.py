@@ -23,7 +23,10 @@ SDK's (M2-29); this module decides what Hermes does:
   once, as a message of the agent without a run. `tool_allowed` answers Hermes'
   ``pre_tool_call``: no tool runs in a thread without an open run.
 * `on_followup` steers a running turn or answers a waiting card; `on_interaction` resolves a
-  card's Hermes callback exactly once and answers the interaction.
+  card's Hermes callback exactly once and answers the interaction. The files of a follow-up
+  are loaded like the trigger's once the server checked them and steered as paths (Hermes
+  steers text only); audio and a file not ready leave it to the follow-on run
+  (FIX-followup-media-steer).
 * `on_command` runs a control command (``command.invoked``) of
   `bothy_hermes_adapter.hermes_commands` in the thread's Hermes session and posts Hermes' reply
   as the agent's message without a run (09 10.4); `on_report` posts a message Hermes sends
@@ -119,12 +122,18 @@ from bothy_hermes_adapter.hermes_commands import (
 from bothy_hermes_adapter.jobs import JobError, JobRecord, JobRegistry
 from bothy_hermes_adapter.live_box import LiveBox
 from bothy_hermes_adapter.media import (
+    LATER_REASONS,
     NO_TEXT,
     FileRefused,
     audio_to_transcribe,
+    file_line,
     files_for_hermes,
+    followup_attachments,
+    followup_files_final,
     inline_text,
+    is_audio,
     is_text_attachment,
+    later_note,
     problem_reason,
     read_local_file,
     scan_refusal,
@@ -269,6 +278,11 @@ class _Turn:
     progress_events: int = 0
     wake: asyncio.Event = field(default_factory=asyncio.Event)
     pending: list[Message] = field(default_factory=list)
+    # Follow-ups are passed on in the order they arrived, also while the files of one are
+    # loaded (D-FMS-4); the prepared content of a follow-up with files that waits for a turn of
+    # its own (D-FMS-5).
+    followup_order: asyncio.Lock = field(default_factory=asyncio.Lock)
+    prepared: dict[UUID, _FollowupContent] = field(default_factory=dict)
 
 
 class HermesHandler(AgentHandler):
@@ -661,17 +675,37 @@ class HermesHandler(AgentHandler):
         content is not included (docs/decisions.d/FIX-hermes-text-attachment-inline.md). Logs
         carry codes only (SEC-LOG-2).
         """
+        media: list[InboundMedia] = []
+        notes: list[str] = []
+        texts: list[str] = []
+        inlined: set[UUID] = set()
+        for item in await self._load_files(run, files_for_hermes(ctx)):
+            if item.cached is None:
+                notes.append(undelivered_note(item.attachment, item.reason or "unavailable"))
+                continue
+            if item.text is not None:
+                texts.append(item.text)
+                inlined.add(item.attachment.file_id)
+            elif item.too_long is not None:
+                notes.append(item.too_long)
+            media.append(item.cached)
+        return _InboundMedia(tuple(media), notes, texts, frozenset(inlined))
+
+    async def _load_files(self, run: RunHandle, items: list[Any]) -> list[_LoadedFile]:
+        """Load attachments into Hermes's media cache, in order, with the reason of each refusal.
+
+        The one path for the files of the trigger and of a follow-up (D-FMS-2): the server's
+        scan state, Hermes's limit (nothing is loaded over it), the server's answer and Hermes's
+        cache decide; a text within ``hermes_adapter.max_message_bytes`` is inlined.
+        """
         try:
             limit = int(self.runtime.media_limit())
         except Exception as exc:  # an unreadable limit is none; the server's upload limit holds
             _LOG.warning("media limit not readable: %s", type(exc).__name__)
             limit = 0
         text_limit = self.settings.max_message_bytes
-        media: list[InboundMedia] = []
-        notes: list[str] = []
-        texts: list[str] = []
-        inlined: set[UUID] = set()
-        for item in files_for_hermes(ctx):
+        out: list[_LoadedFile] = []
+        for item in items:
             reason = scan_refusal(item)
             if reason is None and limit > 0 and int(item.size_bytes) > limit:
                 reason = "too_large"
@@ -679,17 +713,18 @@ class HermesHandler(AgentHandler):
                 cached, reason, data = await self._cache(run, item)
                 if cached is not None:
                     if is_text_attachment(item) and len(data) <= text_limit:
-                        texts.append(inline_text(item, data))
-                        inlined.add(item.file_id)
                         cached = replace(cached, text_inlined=True)
+                        out.append(_LoadedFile(item, cached, None, inline_text(item, data)))
                     elif is_text_attachment(item):
                         _LOG.info("run %s: attachment text not inlined code=too_long", run.run_id)
-                        notes.append(too_long_note(item, len(data), text_limit))
-                    media.append(cached)
+                        note = too_long_note(item, len(data), text_limit)
+                        out.append(_LoadedFile(item, cached, None, too_long=note))
+                    else:
+                        out.append(_LoadedFile(item, cached, None))
                     continue
             _LOG.info("run %s: attachment not passed on code=%s", run.run_id, reason)
-            notes.append(undelivered_note(item, reason or "unavailable"))
-        return _InboundMedia(tuple(media), notes, texts, frozenset(inlined))
+            out.append(_LoadedFile(item, None, reason or "unavailable"))
+        return out
 
     async def _cache(
         self, run: RunHandle, item: Any
@@ -1187,6 +1222,7 @@ class HermesHandler(AgentHandler):
         turn.steered.append(message_id)
         self._touch(turn)
         author = message.author
+        content = turn.prepared.pop(message_id, None)
         request = TurnRequest(
             run_id=turn.run_id,
             thread_id=turn.thread_id,
@@ -1194,9 +1230,10 @@ class HermesHandler(AgentHandler):
             user_id=author.id,
             user_name=str(getattr(author, "display_name", "") or ""),
             message_id=message_id,
-            user_text=_content(message),
+            user_text=_content(message) if content is None else content.turn_text,
             user_side=turn.built.user_side,
             context_taken=True,
+            media=() if content is None else content.media,
         )
         outcome = TurnOutcome.FAILED
         try:
@@ -1373,40 +1410,182 @@ class HermesHandler(AgentHandler):
             run: The run.
         """
         turn = self._by_run.get(run.run_id)
-        if turn is None or turn.dropped:
-            return
         message_id = inv.payload.message_id
+        if turn is None or turn.dropped:
+            code = "stopped" if turn is not None else "no_turn"
+            _LOG.info("run %s: follow-up %s not steered code=%s", run.run_id, message_id, code)
+            return
         if turn.card is not None:
             # The answer to the open card, in both modes: the SDK resumed the run already.
             card = turn.card
-            await self._disable_card(turn)
-            message = await self._followup_message(run, message_id)
-            if message is not None and await self.store.claim(_claim_key(turn.run_id, card)):
-                await self._answer_card(turn, card, message)
+            try:
+                await self._disable_card(turn)
+                message = await self._followup_message(run, message_id)
+                if message is not None and await self.store.claim(_claim_key(turn.run_id, card)):
+                    await self._answer_card(turn, card, message)
+            except asyncio.CancelledError:
+                # A stop cancels this task (the SDK resumed the run for it), also during the
+                # file wait of D-FMS-8: interrupt Hermes' turn as _until_settled does (09 8).
+                _LOG.info("run %s: follow-up %s not steered code=stopped", run.run_id, message_id)
+                await self._abandon(turn)
+                raise
             await self._until_settled(turn)
             return
+        async with turn.followup_order:
+            await self._pass_followup(turn, run, message_id)
+
+    async def _pass_followup(self, turn: _Turn, run: RunHandle, message_id: UUID) -> None:
+        """Pass one follow-up on: steered into the turn, a turn of its own, or left queued.
+
+        A follow-up with files is steered as text that names each file by its path in Hermes's
+        media cache once the server's check of its files ended (D-FMS-1, D-FMS-2); Hermes steers
+        text only. A file that may still come (audio, still checked, not loaded) leaves the
+        follow-up ``queued`` for the server's follow-on run, after its other content was steered
+        with a note (D-FMS-3). Every follow-up that is not steered gets one log line with the
+        reason (D-FMS-6).
+        """
         message = await self._followup_message(run, message_id)
-        if message is None or message.attachments:
-            # Hermes steers text only and queues a message with media as a turn of its own, and
-            # the audio of a follow-up is not transcribed (a voice message has no text at all).
-            # Left undelivered, the server's follow-on run takes it as its triggering message,
-            # whose files reach Hermes as media and whose audio is transcribed (09 7, 17.6;
-            # D-FIX-HIMG-3, AUD-HA1/3).
+        if message is None:
+            _LOG.info("run %s: follow-up %s not steered code=not_readable", run.run_id, message_id)
             return
+        content: _FollowupContent | None = None
+        if message.attachments:
+            message = await self._files_final(turn, run, message)
+            if turn.dropped or turn.handle.finished:
+                code = "stopped" if turn.dropped else "run_ended"
+                _LOG.info("run %s: follow-up %s not steered code=%s", run.run_id, message_id, code)
+                return
+            content = await self._followup_content(run, message)
+            if content.later is not None and not content.worth:
+                _LOG.info(
+                    "run %s: follow-up %s not steered code=%s",
+                    run.run_id,
+                    message_id,
+                    content.later,
+                )
+                return
         if turn.held:
             # The run holds background work: the follow-up is a turn of its own (09 17.12).
+            if content is not None and content.later is not None:
+                _LOG.info(
+                    "run %s: follow-up %s not steered code=%s",
+                    run.run_id,
+                    message_id,
+                    content.later,
+                )
+                return
+            _LOG.info("run %s: follow-up %s not steered code=own_turn", run.run_id, message_id)
+            if content is not None:
+                turn.prepared[message_id] = content
             turn.pending.append(message)
             self._touch(turn)
             return
-        text = _content(message)
+        text = content.steer_text if content is not None else _content(message)
         if await self._into_turn(turn, text, message_id):
+            if content is not None and content.later is not None:
+                # Steered without a file that may still come: the follow-on run brings it all.
+                _LOG.info(
+                    "run %s: follow-up %s steered, left queued code=%s",
+                    run.run_id,
+                    message_id,
+                    content.later,
+                )
+                return
             with contextlib.suppress(ValueError):
                 run.patch.followup_delivered(message_id)
             turn.steered.append(message_id)
-        else:
-            # Not taken by this turn: a turn of its own if the run comes to hold background
-            # work; otherwise it stays queued for the follow-on run (09 7).
-            turn.pending.append(message)
+            return
+        _LOG.info(
+            "run %s: follow-up %s not steered code=%s", run.run_id, message_id, self._why_not(turn)
+        )
+        if content is not None and content.later is not None:
+            return
+        # Not taken by this turn: a turn of its own if the run comes to hold background
+        # work; otherwise it stays queued for the follow-on run (09 7).
+        if content is not None:
+            turn.prepared[message_id] = content
+        turn.pending.append(message)
+
+    def _why_not(self, turn: _Turn) -> str:
+        """The log code of a follow-up `_into_turn` did not pass (D-FMS-6)."""
+        if self.busy_mode != BusyMode.STEER:
+            return f"busy_mode_{self.busy_mode}"
+        if turn.dropped:
+            return "stopped"
+        if turn.ended:
+            return "turn_ended"
+        return "turn_answered"
+
+    async def _files_final(self, turn: _Turn, run: RunHandle, message: Message) -> Message:
+        """The follow-up read again until the server's check of its files ended (12 10).
+
+        The server delivers a follow-up when the message is stored, also while a file is still
+        checked. The message is read every ``hermes_adapter.background_poll_interval`` until
+        every file but audio is final, the run is stopped or ended, or
+        ``hermes_adapter.followup_file_wait`` passed; a file still not ready then is left to the
+        follow-on run (D-FMS-3).
+        """
+        deadline = time.monotonic() + self.settings.followup_file_wait
+        while not followup_files_final(message.attachments):
+            if turn.dropped or turn.handle.finished:
+                return message
+            if time.monotonic() >= deadline:
+                _LOG.info("run %s: follow-up %s files not ready", run.run_id, message.id)
+                return message
+            await asyncio.sleep(self.settings.background_poll_interval)
+            message = await self._followup_message(run, message.id) or message
+        return message
+
+    async def _followup_content(self, run: RunHandle, message: Message) -> _FollowupContent:
+        """What a follow-up with files gives the running turn (D-FMS-2, D-FMS-3).
+
+        Its files take the trigger's path into Hermes's media cache (`_load_files`). The steered
+        text has a line per cached file with its path, the notes of files not passed on, the
+        inlined texts and the person's text; a turn of its own gets the files as media instead
+        of the lines. Audio, a file still checked and one the server did not hand out are
+        ``later``: the follow-on run brings them.
+        """
+        items = followup_attachments(message.attachments)
+        loaded = await self._load_files(run, [i for i in items if not is_audio(i)])
+        lines: list[str] = []
+        notes: list[str] = []
+        texts: list[str] = []
+        media: list[InboundMedia] = []
+        later: str | None = None
+        final_notes = False
+        for item in loaded:
+            if item.cached is None:
+                reason = item.reason or "unavailable"
+                if reason in LATER_REASONS:
+                    later = later or reason
+                    notes.append(later_note(item.attachment, reason))
+                else:
+                    final_notes = True
+                    notes.append(undelivered_note(item.attachment, reason))
+                continue
+            media.append(item.cached)
+            if item.text is not None:
+                texts.append(item.text)
+            elif item.too_long is not None:
+                notes.append(item.too_long)
+            lines.append(
+                file_line(item.attachment, item.cached.path, inlined=item.text is not None)
+            )
+        for attachment in items:
+            if is_audio(attachment):
+                later = later or "audio"
+                notes.append(later_note(attachment, "audio"))
+        person = _content(message) if _content(message).strip() else ""
+        said = person or (NO_TEXT if media or final_notes else "")
+        steer = [*lines, *notes, *texts, said] if said else [*lines, *notes, *texts]
+        own = [*notes, *texts, said] if said else [*notes, *texts]
+        return _FollowupContent(
+            steer_text="\n\n".join(steer),
+            turn_text="\n\n".join(own),
+            media=tuple(media),
+            later=later,
+            worth=bool(person or media or final_notes),
+        )
 
     async def _into_turn(self, turn: _Turn, text: str, message_id: UUID) -> bool:
         """Pass a person's text into the running turn: the one place that may (09 7, 17.5).
@@ -1436,11 +1615,20 @@ class HermesHandler(AgentHandler):
         completed, like a steered follow-up: left ``queued``, the server would start a follow-on
         run with the same text at the end of the run. An answer Hermes did not take (at ``queue``
         to a prompt that is refused, or when nothing waited for it) stays ``queued`` for that
-        run, and so does one with a file: its text still answers the card, nothing of it is
-        steered, and the follow-on run takes the whole message (17.6).
+        run. An answer with files gives the card the text a steered follow-up has, with the path
+        of each file (D-FMS-8); one with a file that may still come (audio, not ready) is not
+        acknowledged, and the follow-on run takes the whole message (17.6). One log line names
+        every answer Hermes did not take (D-FMS-6).
         """
+        run = turn.handle
+        content: _FollowupContent | None = None
+        if message.attachments:
+            message = await self._files_final(turn, run, message)
+            content = await self._followup_content(run, message)
         text = _content(message)
-        whole = not message.attachments
+        if content is not None and content.worth:
+            text = content.steer_text
+        whole = content is None or content.later is None
         if card.request.kind is CardKind.CLARIFY:
             answered = await self.runtime.answer_card(card, text)
             taken = whole and answered is not None
@@ -1449,8 +1637,11 @@ class HermesHandler(AgentHandler):
             await self.runtime.answer_card(card, text)
         if taken:
             with contextlib.suppress(ValueError):
-                turn.handle.patch.followup_delivered(message.id)
+                run.patch.followup_delivered(message.id)
             turn.steered.append(message.id)
+            return
+        code = content.later if content is not None and content.later else "card_answer_not_taken"
+        _LOG.info("run %s: follow-up %s not steered code=%s", run.run_id, message.id, code)
 
     async def _followup_message(self, run: RunHandle, message_id: UUID) -> Message | None:
         """A follow-up message read with the run's token, or ``None`` when the server refuses.
@@ -2122,6 +2313,45 @@ def _log_task_failure(task: asyncio.Task[Any]) -> None:
     exc = task.exception()
     if exc is not None:
         _LOG.warning("handler task failed: %s", type(exc).__name__)
+
+
+@dataclass(frozen=True)
+class _LoadedFile:
+    """One attachment after `HermesHandler._load_files`; no text appears in ``repr``.
+
+    Attributes:
+        attachment: The attachment.
+        cached: It in Hermes's media cache, or ``None`` when it was not passed on.
+        reason: The reason code when it was not passed on.
+        text: Its inlined text (a data block), for a text within the inline limit.
+        too_long: The note of a text over the inline limit.
+    """
+
+    attachment: Any = field(repr=False)
+    cached: InboundMedia | None
+    reason: str | None
+    text: str | None = field(default=None, repr=False)
+    too_long: str | None = field(default=None, repr=False)
+
+
+@dataclass(frozen=True)
+class _FollowupContent:
+    """What a follow-up with files gives Hermes (D-FMS-2); no text appears in ``repr``.
+
+    Attributes:
+        steer_text: The text steered into the running turn: the files as paths.
+        turn_text: The text of a turn of its own, whose files ride as media.
+        media: The files in Hermes's media cache.
+        later: The reason code of the first file left to the follow-on run, else ``None``.
+        worth: Whether anything but notes of later files is in it (the person's text, a file,
+            a final note).
+    """
+
+    steer_text: str = field(repr=False)
+    turn_text: str = field(repr=False)
+    media: tuple[InboundMedia, ...]
+    later: str | None
+    worth: bool
 
 
 @dataclass(frozen=True)

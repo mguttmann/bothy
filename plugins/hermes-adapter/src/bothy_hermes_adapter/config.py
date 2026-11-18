@@ -38,6 +38,7 @@ from bothy_hermes_adapter.defaults import (
     DEFAULT_BACKGROUND_POLL_INTERVAL,
     DEFAULT_BACKGROUND_PROGRESS_INTERVAL,
     DEFAULT_BACKGROUND_SETTLE,
+    DEFAULT_FOLLOWUP_FILE_WAIT,
     DEFAULT_MAX_MESSAGE_BYTES,
 )
 
@@ -73,6 +74,7 @@ _OWN_KEYS: Final = (
     "hermes_adapter.background_poll_interval",
     "hermes_adapter.background_settle",
     "hermes_adapter.background_progress_interval",
+    "hermes_adapter.followup_file_wait",
     "hermes_adapter.mirror_channel",
     "hermes_adapter.mirror_platforms",
 )
@@ -111,6 +113,7 @@ class AdapterSettings:
         background_settle: ``hermes_adapter.background_settle`` in seconds.
         background_progress_interval: ``hermes_adapter.background_progress_interval`` in
             seconds.
+        followup_file_wait: ``hermes_adapter.followup_file_wait`` in seconds.
         mirror_channel: ``hermes_adapter.mirror_channel``, the forum of the session mirror
             (09 17.13), ``None`` without a mirror.
         mirror_platforms: ``hermes_adapter.mirror_platforms``, the foreign platform keys whose
@@ -129,6 +132,7 @@ class AdapterSettings:
     background_poll_interval: float = DEFAULT_BACKGROUND_POLL_INTERVAL
     background_settle: float = DEFAULT_BACKGROUND_SETTLE
     background_progress_interval: float = DEFAULT_BACKGROUND_PROGRESS_INTERVAL
+    followup_file_wait: float = DEFAULT_FOLLOWUP_FILE_WAIT
     mirror_channel: UUID | None = None
     mirror_platforms: frozenset[str] = frozenset()
     sdk: SdkSettings = field(default_factory=SdkSettings)
@@ -258,6 +262,9 @@ def load_settings(extra: Mapping[str, Any]) -> AdapterSettings:
             extra,
             "hermes_adapter.background_progress_interval",
             DEFAULT_BACKGROUND_PROGRESS_INTERVAL,
+        ),
+        followup_file_wait=_duration(
+            extra, "hermes_adapter.followup_file_wait", DEFAULT_FOLLOWUP_FILE_WAIT
         ),
         mirror_channel=mirror_channel,
         mirror_platforms=mirror_platforms,

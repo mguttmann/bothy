@@ -28,6 +28,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get triggerStateFollowupDelivered => 'Follow-up delivered';
 
   @override
+  String get triggerStateFollowupWaiting => 'Waiting for the run to end';
+
+  @override
+  String get triggerStateFollowupDiscarded => 'Discarded: the run was stopped';
+
+  @override
   String triggerStateFailedWithReason(String reason) {
     return 'Failed: $reason';
   }

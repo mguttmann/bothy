@@ -270,6 +270,7 @@ server's `message.max_content_bytes`; a longer answer goes out as one message wi
 one attachment `answer.txt`, and Hermes never splits an answer, M4-47), `hermes_adapter.attachment_text_max_bytes`,
 `hermes_adapter.background_poll_interval` (`2s`), `hermes_adapter.background_settle` (`15s`),
 `hermes_adapter.background_progress_interval` (`2m`, below the server's `run.stall_after`),
+`hermes_adapter.followup_file_wait` (`2m`, the wait for the check of a follow-up's files),
 `hermes_adapter.mirror_channel` and `hermes_adapter.mirror_platforms` (the session mirror, off
 by default, set by hand), and the SDK keys
 `adapter.invocation_token_leeway`, `adapter.jwks_refresh_min_interval`, `sdk.http_timeout`,
@@ -325,11 +326,16 @@ files, never as an empty message. An attachment that cannot be passed on reaches
 note with its name, type and reason: the virus scan has not finished, the scan blocked it, it is
 larger than Hermes' `gateway.max_inbound_media_bytes`, Hermes refused the bytes, or the server
 did not hand it out. Attachments of earlier messages stay lines of the context. A follow-up
-with a file of any type, a voice message too, is not passed into the running run: neither steered
-into its turn nor started as a turn of its own while the run holds background work. The server's
-follow-on run takes it as its triggering message, so its files reach Hermes and its audio is
-transcribed as above. Sent as the answer to an open card, such a message only releases the card
-and is left to the follow-on run as well.
+with files sent while a run is open reaches the running turn at once: the adapter waits for the
+server's check of its files (at most `hermes_adapter.followup_file_wait`, `2m`), loads them into
+the media cache the same way, and steers the person's text with the path of each file and a
+hint how to open it (Hermes steers text only); while the run holds background work it is a turn
+of its own with the files as media. A voice message, and a file still not ready after the wait,
+is left to the server's follow-on run, which takes the whole message as its triggering message
+and transcribes its audio as above; a text sent with it is steered at once with a note. Every
+follow-up the adapter does not steer gets a log line with the reason. Sent as the answer to an
+open question, a message with files answers it with their paths; one with a voice message only
+releases the card and is left to the follow-on run.
 
 ## Inbox, state and restart
 

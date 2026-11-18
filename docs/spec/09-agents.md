@@ -2716,9 +2716,39 @@ the hold of 17.12): the text that resolved a clarify, and the text steered in fr
 prompt. An answer Hermes did not take stays `queued`, and the
 follow-on run of section 7 takes it: at `queue` the text to an approval or a confirmation (no
 follow-up enters a turn at `queue`), and an answer no prompt of Hermes waited for any more. An
-answer with an attachment only releases the card: its text answers a clarify (an empty text, as
-of a voice message, is Hermes' form of no answer), nothing of it is steered and it is not
-acknowledged, so the follow-on run takes the whole message with its files (17.6).
+answer with attachments gives the card the text with the paths of its files (next paragraph);
+one with a file that may still come, such as a voice message, is not acknowledged, so the
+follow-on run takes the whole message (an empty text, as of a voice message, is Hermes' form of
+no answer to a clarify).
+
+A follow-up with attachments (addendum of 2026-11-18, FIX-followup-media-steer) is passed on in
+the order follow-ups arrive, like one without. The adapter reads the message again every
+`hermes_adapter.background_poll_interval` until the server's check of every attachment that is
+not audio has ended (the server delivers a follow-up when it is stored, also while a file is
+still checked, 12 10), at most `hermes_adapter.followup_file_wait`. It then loads every such file
+into Hermes' media cache exactly as an attachment of the triggering message (17.6: the same
+scan states, Hermes' limit, the same caching function and inline rule for text files) and
+steers one text into the turn: a line per cached file with its path and what the agent can do
+with it (look at an image with its image analysis tool, read any other file with its file
+tools), the notes of files not passed on, the inlined texts and the person's text (Hermes'
+no-text wording when there is none). Hermes steers text only, so the path is how the running
+turn reaches the file. Such a follow-up is acknowledged like a text one. A file that may still
+come (audio, which only the follow-on run transcribes; a file still checked when the wait ended;
+one the server did not hand out) leaves the follow-up `queued`: the rest of it is steered with a
+note that the message comes again with that file in a new turn, and the follow-on run of section
+7 takes the whole message as its triggering message; a follow-up that has nothing but such files
+is not steered at all. A file the scan blocked, one over Hermes' limit and one Hermes refused
+stays a note and the follow-up is acknowledged, because the follow-on run could not pass it on
+either. While the run holds work (17.12 point 5) such a follow-up is a turn of its own whose
+files ride as media. The answer to an open card with files takes the same path: a clarify gets
+the text with the paths, an approval or confirmation is refused with that text in front, and it
+is acknowledged as above unless a file may still come (D-FMS-8). Every follow-up the adapter does
+not steer, also an answer to a card Hermes did not take, gets one log line with its message ID
+and the reason code (`no_turn`, `not_readable`, `stopped`, `run_ended`, `audio`,
+`scan_pending`, `unavailable`, `own_turn`, `busy_mode_queue`, `turn_answered`, `turn_ended`,
+`card_answer_not_taken`). From 2026-11-02 to
+2026-11-18 every follow-up with a file stayed `queued` until the end of the run (D-FIX-HIMG-3,
+AUD-HA1/3); before 2026-11-02 its text was steered without the file.
 
 ### 17.6 Flow of an invocation
 
@@ -2838,14 +2868,13 @@ Hermes' own limit for incoming media (`gateway.max_inbound_media_bytes`, nothing
 Hermes refused the bytes (an image that is none), or the server did not hand it out. A message
 with attachments and no text is never an empty message: its text is Hermes' Discord wording
 `(The user sent a message with no text content)`. Attachments of context messages are not
-passed on; they stay lines of the context. A follow-up with an attachment of any type, audio
-too, is not passed into a turn of the running run, neither steered nor started as a turn of its
-own while the run holds work (Hermes steers text only and gives a message with media a turn of
-its own, and a voice message has no text at all): it stays `queued`, and the follow-on run of
-section 7 takes it as its triggering message with its files and transcribes its audio as above.
-Until 2026-11-11 a follow-up with audio was steered as its bare text, so a voice message reached
-the turn empty and was acknowledged, and no run carried what the person said (AUD-HA1/3). As the
-answer to an open card such a message only releases the card (17.5).
+passed on; they stay lines of the context. The files of a follow-up take the same path into
+Hermes' media cache and reach the running turn as steered paths (17.5); a follow-up with audio
+stays `queued`, and the follow-on run of section 7 takes it as its triggering message and
+transcribes its audio as above. Until 2026-11-11 a follow-up with audio was steered as its bare
+text, so a voice message reached the turn empty and was acknowledged, and no run carried what the
+person said (AUD-HA1/3). As the answer to an open card a message with audio only releases the
+card; one with other files answers it with their paths (17.5).
 
 Elements with `already_delivered` stay in the context with that mark in their header: the
 session holds a steered follow-up only as bare text without author or trust mark, and before
@@ -3057,9 +3086,10 @@ work of the runner (18.5) for Hermes:
    its answer, or at `queue`, 17.5) once the run holds work, is a turn of its own in the run, one
    after the other: the person's text, the format rules and channel instructions on the user side
    (the run context rode the first turn), `delivered` at its start and `absorbed` when it
-   completed; a failed one ends the run `failed` (`runtime_error`). A follow-up with a file, a
-   voice message too, stays `queued` for the follow-on run (17.6), and so does every follow-up of
-   a run without background work, as before.
+   completed; a failed one ends the run `failed` (`runtime_error`). The files of such a
+   follow-up ride its turn as media, as on a trigger (17.6); one with audio or with a file that
+   is not ready stays `queued` for the follow-on run (17.5), and so does every follow-up of a run
+   without background work that its turn did not take, as before.
 6. Stop (section 8) interrupts the thread's turn, interrupts the session's live delegation units
    (`interrupt_for_session`) and kills its running processes with their output consumed, so no
    turn follows a killed process. Every other end before the work is done (a failed turn, an
@@ -5456,6 +5486,7 @@ configuration of the respective program outside the server.
 | `hermes_adapter.attachment_text_max_bytes` | Hermes adapter | `32768` | longest attachment text the adapter inlines as a data block of the context; the default equals `agent.context_message_max_bytes` |
 | `hermes_adapter.background_poll_interval` | Hermes adapter | `2s` | how often a run that holds background work reads Hermes' registries (17.12) |
 | `hermes_adapter.background_settle` | Hermes adapter | `15s` | how long a run that saw background work stays open after the work ended and no turn of the thread ran, for the turn Hermes starts with the result (17.12) |
+| `hermes_adapter.followup_file_wait` | Hermes adapter | `2m` | longest wait for the server's check of a follow-up's attachments before the follow-up is steered into the running turn; a file still not ready is left to the follow-on run (17.5, FIX-followup-media-steer) |
 | `hermes_adapter.background_progress_interval` | Hermes adapter | `2m` | while background work runs, `/metrics/progress_events` rises once per interval; must stay below the server's `run.stall_after` (17.12) |
 | `hermes_adapter.mirror_channel` | Hermes adapter | no default (mirror off) | forum of the session mirror; only with `hermes_adapter.mirror_platforms` (17.13) |
 | `hermes_adapter.mirror_platforms` | Hermes adapter | no default (mirror off) | foreign platform keys whose sessions are mirrored, for example `acp`, `cli`, `cron`; never the adapter's own key; only with `hermes_adapter.mirror_channel` (17.13) |

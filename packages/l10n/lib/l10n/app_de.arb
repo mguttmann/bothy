@@ -6,6 +6,8 @@
   "triggerStateDone": "Erledigt",
   "triggerStateFailed": "Fehlgeschlagen",
   "triggerStateFollowupDelivered": "Nachtrag zugestellt",
+  "triggerStateFollowupWaiting": "Wartet auf Ende des Laufs",
+  "triggerStateFollowupDiscarded": "Verworfen: Lauf gestoppt",
   "triggerStateFailedWithReason": "Fehlgeschlagen: {reason}",
   "liveBoxStateQueued": "In Warteschlange",
   "liveBoxStateRunning": "Läuft",

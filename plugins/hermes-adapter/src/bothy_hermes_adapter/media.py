@@ -49,6 +49,7 @@ from bothy_sdk.context import DATA_NOTICE
 from bothy_sdk.errors import ProblemError
 from bothy_sdk.generated.api.files import abort_upload, complete_upload, create_upload
 from bothy_sdk.generated.models import (
+    Attachment,
     File,
     RunContext,
     RunContextAttachment,
@@ -62,14 +63,20 @@ from bothy_sdk.ids import uuid7
 from bothy_sdk.uploads import upload_part
 
 __all__ = [
+    "LATER_REASONS",
     "NO_TEXT",
     "FileRefused",
     "LocalFile",
     "audio_cache_ext",
     "audio_to_transcribe",
+    "file_line",
     "files_for_hermes",
+    "followup_attachments",
+    "followup_files_final",
     "inline_text",
+    "is_audio",
     "is_text_attachment",
+    "later_note",
     "problem_reason",
     "read_local_file",
     "scan_refusal",
@@ -83,6 +90,10 @@ _LOG = logging.getLogger("bothy_hermes_adapter")
 
 _READ_CHUNK: Final = 1024 * 1024
 _SERVED: Final = frozenset({"clean", "skipped"})
+#: Scan states of a file the server never serves (12 2).
+_NEVER: Final = frozenset({"infected", "error"})
+#: Reason codes of an attachment that may still reach Hermes later (by the follow-on run).
+LATER_REASONS: Final = frozenset({"scan_pending", "unavailable"})
 #: Audio suffixes a voice attachment keeps in Hermes's audio cache; Hermes's speech to text
 #: picks its handling from the suffix, and the person names the file.
 _AUDIO_SUFFIXES: Final = frozenset(
@@ -473,3 +484,135 @@ def undelivered_note(item: RunContextAttachment, reason: str) -> str:
     name = _display_name(item)
     why = _REASONS.get(reason, _REASONS["unavailable"])
     return f"[The user sent the file '{name}' ({_mime(item)}), but it did not reach you: {why}.]"
+
+
+def is_audio(item: RunContextAttachment) -> bool:
+    """Whether an attachment is audio, which reaches Hermes only as a transcript (09 13)."""
+    return _mime(item).startswith("audio/")
+
+
+def _wire(member: object) -> str:
+    """The wire value of a generated enum member (or a plain string)."""
+    return str(getattr(member, "value", member))
+
+
+def followup_files_final(attachments: Sequence[Attachment]) -> bool:
+    """Whether the server's check of every non-audio attachment of a follow-up has ended.
+
+    A follow-up is delivered when its message is stored, also while a file is still checked
+    (12 10 rule 1); an image stays ``pending`` after a clean scan until its cleaned original is
+    stored (12 3.4). A file is final once it is servable or never will be. Audio does not count:
+    it is left to the follow-on run (D-FMS-3).
+
+    Args:
+        attachments: ``attachments`` of the message read with ``getMessage``.
+
+    Returns:
+        True when no such attachment waits for the server.
+    """
+    for item in attachments:
+        f = item.file
+        if str(f.mime_type).split(";", 1)[0].strip().lower().startswith("audio/"):
+            continue
+        upload, scan = _wire(f.upload_state), _wire(f.scan_status)
+        if upload == "failed" or scan in _NEVER:
+            continue
+        if upload != "complete" or scan not in _SERVED:
+            return False
+    return True
+
+
+def followup_attachments(attachments: Sequence[Attachment]) -> list[RunContextAttachment]:
+    """The attachments of a follow-up in the shape of the run context, in position order.
+
+    So they take the trigger's path (`scan_refusal`, the limit, the media cache, the inline
+    text); a failed upload counts as blocked, one not complete yet as still checked. A message
+    carries no transcript.
+
+    Args:
+        attachments: ``attachments`` of the message read with ``getMessage``.
+
+    Returns:
+        One entry per attachment.
+    """
+    out = []
+    for item in sorted(attachments, key=lambda a: a.position):
+        f = item.file
+        scan, upload = _wire(f.scan_status), _wire(f.upload_state)
+        if upload == "failed":
+            scan = "error"
+        elif upload != "complete":
+            # An image stays pending after a clean scan until its cleaned original is stored
+            # (12 3.4): its check has not ended, and its size is not the size it will have.
+            scan = "pending"
+        out.append(
+            RunContextAttachment(
+                file_id=f.id,
+                original_name=str(f.original_name),
+                mime_type=str(f.mime_type),
+                size_bytes=int(f.size_bytes),
+                scan_status=scan,
+            )
+        )
+    return out
+
+
+def file_line(item: RunContextAttachment, path: str, *, inlined: bool) -> str:
+    """The line a steered follow-up gives for an attachment in Hermes's media cache (D-FMS-2).
+
+    Hermes steers text only, so the file is named by its cached path with what the agent can do
+    with it, in the form of Hermes's own attachment notes: an image is looked at with the
+    agent's image tool, any other file read with its file tools.
+
+    Args:
+        item: The attachment.
+        path: Its path in Hermes's media cache.
+        inlined: Whether its text stands in the steered text already.
+
+    Returns:
+        The line.
+    """
+    name = _display_name(item)
+    mime = _mime(item)
+    if inlined:
+        return (
+            f"[The user sent the text file '{name}'. Its content has been included above. "
+            f"The file is also saved at: {path}]"
+        )
+    if mime.startswith("image/"):
+        kind, how = "an image", "look at it with your image analysis tool"
+    elif mime.startswith("video/"):
+        kind, how = "a video", "inspect it with a video or media tool"
+    else:
+        kind, how = "a file", "read it with your file tools"
+    return (
+        f"[The user sent {kind}: '{name}' ({mime}). It is saved at: {path}. Its content is not "
+        f"inlined here; {how} when the user's request involves it, instead of asking the "
+        f"user to describe it.]"
+    )
+
+
+def later_note(item: RunContextAttachment, reason: str) -> str:
+    """The line for an attachment of a steered follow-up that reaches Hermes only later.
+
+    The follow-up stays for the server's follow-on run, which brings the whole message again
+    as a turn of its own once the current one ended (09 7, D-FMS-3).
+
+    Args:
+        item: The attachment.
+        reason: ``audio`` or a reason code of `LATER_REASONS`.
+
+    Returns:
+        The note.
+    """
+    name = _display_name(item)
+    why = (
+        "it is a voice or audio file"
+        if reason == "audio"
+        else _REASONS.get(reason, _REASONS["unavailable"]).split(";", 1)[0]
+    )
+    return (
+        f"[The user also sent the file '{name}' ({_mime(item)}), which is not available yet: "
+        f"{why}. This message reaches you again with that file in a new turn after the "
+        f"current one.]"
+    )
