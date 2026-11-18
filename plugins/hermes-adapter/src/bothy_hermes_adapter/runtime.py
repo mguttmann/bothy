@@ -268,6 +268,8 @@ class CardRequest:
         choices: The answers of a clarify prompt (empty for an open question).
         session_key: Hermes's session key the resolver needs (approval, slash confirmation).
         title: The title of a slash confirmation.
+        expires_after: Seconds Hermes waits for the answer of a clarify prompt, ``None`` when
+            it waits without limit or the adapter cannot tell (D-HAM-2).
     """
 
     kind: CardKind
@@ -276,6 +278,7 @@ class CardRequest:
     choices: Sequence[str] = field(default=(), repr=False)
     session_key: str = ""
     title: str = field(default="", repr=False)
+    expires_after: int | None = None
 
 
 @dataclass(frozen=True)

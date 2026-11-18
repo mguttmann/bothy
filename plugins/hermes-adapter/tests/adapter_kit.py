@@ -98,6 +98,8 @@ class FakeRuntime:
     cancelled_background: list[UUID] = field(default_factory=list)
     # Hermes' busy state of a thread's session (`turn_running`); ``None``: the fake cannot tell.
     busy: set[UUID] | None = None
+    # Hermes' clarify expired: its resolvers take no answer any more (D-HAM-2).
+    expired: bool = False
     _events: HermesHandler | None = None
     _scripts: set[asyncio.Task[TurnOutcome]] = field(default_factory=set)
 
@@ -131,6 +133,8 @@ class FakeRuntime:
     ) -> str | None:
         label = cards.chosen_label(card, custom_id, values)
         self.resolved.append((custom_id, str(label)))
+        if self.expired and card.request.kind.value == "clarify":
+            return None
         if label is not None:
             self.answers.put_nowait(label)
         return label
@@ -142,6 +146,8 @@ class FakeRuntime:
             else ("deny" if card.request.kind.value == "approval" else "cancel")
         )
         self.answered.append(answer)
+        if self.expired and card.request.kind.value == "clarify":
+            return None
         self.answers.put_nowait(answer)
         return answer
 

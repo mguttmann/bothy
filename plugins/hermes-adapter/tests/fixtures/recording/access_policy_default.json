@@ -17,19 +17,6 @@
     },
     {
       "args": {
-        "event": {
-          "chat_id": "<id:2>",
-          "message_id": "<id:1>",
-          "text": "Please plan the trip to the lake.",
-          "thread_id": "<id:3>",
-          "type": "MessageEvent",
-          "user_id": "u-robin"
-        }
-      },
-      "method": "on_processing_start"
-    },
-    {
-      "args": {
         "value": false
       },
       "method": "read:authorization_is_upstream"
@@ -42,23 +29,18 @@
     },
     {
       "args": {
-        "event": {
-          "chat_id": "<id:2>",
-          "message_id": "<id:1>",
-          "text": "Please plan the trip to the lake.",
-          "thread_id": "<id:3>",
-          "type": "MessageEvent",
-          "user_id": "u-robin"
-        },
-        "outcome": {
-          "enum": "ProcessingOutcome",
-          "value": "success"
-        }
+        "value": false
       },
-      "method": "on_processing_complete"
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:enforces_own_access_policy"
     }
   ],
-  "inputs_sha256": "6d21804057794ead7fc79673c06870002497c1f9d4da91173ecdfae261ef130e",
+  "inputs_sha256": "a46fe617d5c9ef8f86b532b3d07b8e6b1f49abe2a38637bfb48c4781b9b3b5a3",
   "model_requests": [
     {
       "credential": "none",
@@ -81,40 +63,10 @@
         "is_reconnect": false
       },
       "method": "connect"
-    },
-    {
-      "args": {
-        "event": {
-          "chat_id": "<id:1>",
-          "message_id": "<id:2>",
-          "text": "Please plan the trip to the lake.",
-          "thread_id": "<id:3>",
-          "type": "MessageEvent",
-          "user_id": "u-robin"
-        }
-      },
-      "method": "on_processing_start"
-    },
-    {
-      "args": {
-        "event": {
-          "chat_id": "<id:1>",
-          "message_id": "<id:2>",
-          "text": "Please plan the trip to the lake.",
-          "thread_id": "<id:3>",
-          "type": "MessageEvent",
-          "user_id": "u-robin"
-        },
-        "outcome": {
-          "enum": "ProcessingOutcome",
-          "value": "success"
-        }
-      },
-      "method": "on_processing_complete"
     }
   ],
   "pin": {
-    "commit": "a8b0bc15053c1d71fb2bfea39007847c9e1c5673",
+    "commit": "f7e2898aaefc8f967dbf7345e3999a65672fe60e",
     "tag": null
   },
   "scenario": "access_policy_default"

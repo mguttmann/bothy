@@ -24,4 +24,5 @@ class PlatformConfig:
         channel_overrides: dict[str, Any] = ...,
         extra: dict[str, Any] = ...,
         disabled_by_relay: bool = ...,
+        loaded_version: tuple[Any, ...] | None = ...,
     ) -> None: ...

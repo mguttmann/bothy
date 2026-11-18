@@ -1632,6 +1632,9 @@ class HermesHandler(AgentHandler):
         if card.request.kind is CardKind.CLARIFY:
             answered = await self.runtime.answer_card(card, text)
             taken = whole and answered is not None
+            if answered is None:
+                # Hermes no longer waits: its clarify expired and the turn went on (D-HAM-2).
+                await self._notice(turn, cards.CLARIFY_EXPIRED_TYPED)
         else:
             taken = whole and await self._into_turn(turn, text, message.id)
             await self.runtime.answer_card(card, text)
@@ -1710,8 +1713,24 @@ class HermesHandler(AgentHandler):
         )
         if resolved is None:
             _LOG.info("run %s: nothing waited for the callback", run.run_id)
-        await self._respond(run, interaction.id, InteractionRespondState.ACKNOWLEDGED, label)
+        if resolved is None and card.request.kind is CardKind.CLARIFY:
+            # Hermes' clarify expired and the turn went on without the answer (D-HAM-2).
+            await self._respond(
+                run, interaction.id, InteractionRespondState.REJECTED, cards.CLARIFY_EXPIRED
+            )
+            await self._notice(turn, cards.CLARIFY_EXPIRED)
+        else:
+            await self._respond(run, interaction.id, InteractionRespondState.ACKNOWLEDGED, label)
         await self._until_settled(turn)
+
+    async def _notice(self, turn: _Turn, text: str) -> None:
+        """A short message of the run that tells the person what happened to their answer."""
+        if turn.dropped:
+            return
+        with self._bound(turn):
+            entry = await turn.handle.send(text, kind="text")
+        if entry.message_id is None:
+            _LOG.info("run %s: notice not posted code=%s", turn.run_id, entry.problem_code)
 
     async def _respond(
         self,

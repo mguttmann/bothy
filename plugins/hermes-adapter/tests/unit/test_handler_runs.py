@@ -26,6 +26,7 @@ from bothy_sdk.testing.fakeserver import ContextFile, ContextMessage, FakeServer
 from bothy_sdk.testing.faults import Fault
 
 import bothy_hermes_adapter
+from bothy_hermes_adapter import cards
 from bothy_hermes_adapter.defaults import NO_SPLIT_LENGTH
 from bothy_hermes_adapter.reports import standalone_send
 from bothy_hermes_adapter.runtime import (
@@ -1252,3 +1253,60 @@ async def test_followup_after_interim_commentary_is_steered(tmp_path: Path) -> N
         rt.stop_event(triggered.thread_id).set()
         await r.until(lambda: r.finished(triggered.run_id))
     assert [text for _, text, _ in rt.steered] == ["one more thing"]
+
+
+def _expired_clarify_script(request: CardRequest, seen: list[Rig], notice: str) -> Any:
+    """A turn whose clarify card Hermes no longer waits for: it goes on and answers alone.
+
+    It answers once the run posted ``notice``, so the run is still open for the notice.
+    """
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        assert await rt.events.on_card(turn.thread_id, request)
+        while not any(m["content_md"] == notice for m in seen[0].fake.messages):
+            await asyncio.sleep(0.01)
+        await rt.events.on_answer(turn.thread_id, "I went on with red.", None)
+        return TurnOutcome.COMPLETED
+
+    return script
+
+
+async def test_choice_on_an_expired_clarify_card_tells_the_person(tmp_path: Path) -> None:
+    """D-HAM-2: Hermes' clarify expired, so the choice is rejected and the run says why."""
+    request = CardRequest(CardKind.CLARIFY, "c1", "Which colour?", ("Red", "Blue"), "k")
+    seen: list[Rig] = []
+    rt = FakeRuntime(
+        script=_expired_clarify_script(request, seen, cards.CLARIFY_EXPIRED), expired=True
+    )
+    async with rig(tmp_path, runtime=rt) as r:
+        seen.append(r)
+        triggered = await r.fake.trigger()
+        await r.until(lambda: r.fake.run_state(triggered.run_id).state == "waiting_input")
+        await r.fake.click(triggered.run_id, "cl:c1:1")
+        await r.until(lambda: r.finished(triggered.run_id))
+        interactions = list(r.fake.world.interactions.values())
+        texts = [m["content_md"] for m in r.fake.messages if m["kind"] == "text"]
+    assert rt.resolved == [("cl:c1:1", "Blue")]
+    assert [i["state"] for i in interactions] == ["rejected"]
+    assert texts == [cards.CLARIFY_EXPIRED, "I went on with red."]
+
+
+async def test_typed_answer_to_an_expired_clarify_card_tells_the_person(tmp_path: Path) -> None:
+    """D-HAM-2: a typed answer Hermes' expired clarify did not take stays ``queued`` for the
+    follow-on run, and the run says so."""
+    request = CardRequest(CardKind.CLARIFY, "c1", "Which colour?", ("Red", "Blue"), "k")
+    seen: list[Rig] = []
+    rt = FakeRuntime(
+        script=_expired_clarify_script(request, seen, cards.CLARIFY_EXPIRED_TYPED), expired=True
+    )
+    async with rig(tmp_path, runtime=rt) as r:
+        seen.append(r)
+        triggered = await r.fake.trigger()
+        await r.until(lambda: r.fake.run_state(triggered.run_id).state == "waiting_input")
+        typed = await r.fake.deliver_followup(triggered.run_id, "Blue, please")
+        await r.until(lambda: r.finished(triggered.run_id))
+        state = r.fake.followup_state(triggered.run_id, typed)
+        texts = [m["content_md"] for m in r.fake.messages if m["kind"] == "text"]
+    assert rt.answered == ["Blue, please"]
+    assert state == "queued"
+    assert texts == [cards.CLARIFY_EXPIRED_TYPED, "I went on with red."]

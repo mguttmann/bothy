@@ -284,3 +284,64 @@ async def test_switch_session_fails_open_for_a_session_live_in_another_thread(
     assert done.returncode == 0, done.stderr
     result = json.loads(done.stdout.strip().splitlines()[-1])
     assert result == {"other": "new", "own": "bound", "sent": ["/resume here --all"]}
+
+
+_WRITE_SESSIONS = """
+import warnings
+warnings.simplefilter("ignore")
+from hermes_state import SessionDB
+with SessionDB() as db:
+    db.create_session("20261118_000000_titled", "cli")
+    db.set_session_title("20261118_000000_titled", "Trip to Rome")
+    db.create_session("20261118_000000_untitled", "cli")
+"""
+
+_READ_SESSIONS = """
+import importlib.util, json, sys, uuid
+from gateway.config import Platform, PlatformConfig
+import bothy_hermes_adapter.platform as module
+Platform._add_pseudo_member(sys.argv[1])
+platform = module.ServerPlatform(PlatformConfig(enabled=True), sys.argv[1])
+ids = {"titled": "20261118_000000_titled", "untitled": "20261118_000000_untitled",
+       "missing": "20261118_000000_missing"}
+threads = {name: uuid.uuid4() for name in ids}
+platform._sessions.update({threads[name]: sid for name, sid in ids.items()})
+print(json.dumps({
+    "titles": {name: platform.session_title(threads[name]) for name in ids},
+    "known": {name: module._session_known(sid) for name, sid in ids.items()},
+    "storage_interface": importlib.util.find_spec("persistence_assembly") is not None,
+    "hermes_state_loaded": "hermes_state" in sys.modules,
+}))
+"""
+
+
+async def test_session_title_and_bind_check_read_the_pinned_store(world: HermesWorld) -> None:
+    """D-HAM-1: the automatic title and the bind check read Hermes' session store, through its
+    storage interface where Hermes has one (never the deprecated ``hermes_state``)."""
+    import asyncio
+    import json
+    import subprocess
+
+    from fake_hermes_kit import PLATFORM_KEY
+
+    async with hermes_rig(world, [], start=False) as rig:
+        runs = []
+        for script in (_WRITE_SESSIONS, _READ_SESSIONS):
+            runs.append(
+                await asyncio.to_thread(
+                    subprocess.run,
+                    [str(world.python), "-c", script, PLATFORM_KEY],
+                    env=rig.env,
+                    cwd=rig.homes.work,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            )
+    for done in runs:
+        assert done.returncode == 0, done.stderr
+    result = json.loads(runs[1].stdout.strip().splitlines()[-1])
+    assert result["titles"] == {"titled": "Trip to Rome", "untitled": None, "missing": None}
+    assert result["known"] == {"titled": True, "untitled": True, "missing": False}
+    if result["storage_interface"]:
+        assert result["hermes_state_loaded"] is False

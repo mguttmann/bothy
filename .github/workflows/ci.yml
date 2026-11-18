@@ -811,7 +811,8 @@ jobs:
     needs: plan
     if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-sdk-plugins ')
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # The Hermes adapter suite against the pinned Hermes takes most of this limit (D-HAM-6).
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

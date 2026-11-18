@@ -77,7 +77,6 @@ TOOLSET_CLASSES: Final[Mapping[str, tuple[str, str]]] = {
     "hermes-wecom-callback": ("host", _COMPOSITE),
     "hermes-weixin": ("host", _COMPOSITE),
     "hermes-whatsapp": ("host", _COMPOSITE),
-    "hermes-yuanbao": ("host", _COMPOSITE),
     "image_gen": ("host", "host: sends prompts to an outside service"),
     "kanban": ("host", "host: shared boards outside the thread"),
     "memory": ("host", "host: memory shared across threads"),
@@ -95,7 +94,6 @@ TOOLSET_CLASSES: Final[Mapping[str, tuple[str, str]]] = {
     "vision": ("host", "host: sends images to an outside service"),
     "web": ("host", "host: sends queries to an outside service"),
     "x_search": ("host", "host: sends queries to an outside service"),
-    "yuanbao": ("host", _HOST),
 }
 """Every toolset of the pinned Hermes version: name to (class, reason)."""
 
