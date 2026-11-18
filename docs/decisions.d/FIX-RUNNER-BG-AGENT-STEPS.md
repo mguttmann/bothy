@@ -1,10 +1,10 @@
 # FIX-RUNNER-BG-AGENT-STEPS Background mode: the agents a session launches are steps again
 
-On 2026-11-18 the production runner ran its turns in background mode with the pinned CLI
-2.1.326. In a turn whose session launched two agents with the Agent tool and
-`run_in_background`, the live topology showed only the run, without its agents; in print mode
-the same kind of turn had shown them. The turn record of that run held `steps.tasks` `{}`,
-`steps.agents` `{}` and `steps.subagents` `0`, while its `steps.tools` held the two Agent calls.
+Reproduction condition: a runner runs its turns in background mode with the pinned CLI
+2.1.326, and the session of a turn launches two agents with the Agent tool and
+`run_in_background`. Result: the live topology shows only the run, without its agents; in print
+mode the same kind of turn shows them. The turn record holds `steps.tasks` `{}`,
+`steps.agents` `{}` and `steps.subagents` `0`, while its `steps.tools` holds the two Agent calls.
 Cause: the live box makes a `subagent` or `workflow` step only from `system/task_*` messages,
 which only the stream of a print turn carries. The session transcript, the live source of a
 background turn, has no such record: it has the `tool_use` of the Agent call, its tool result
@@ -21,3 +21,16 @@ as a limit of the mode).
 
 Deploy note: the runner's restart. A turn that runs at the restart is adopted and mapped again
 from its launch offset, so its agents get their steps then.
+
+Open minors (for the next run in this area of the runner):
+
+- The test of a tool call in the summary passes without the split at `<summary>` too; a test
+  needs a notification without `<tool-use-id>` in its header and a foreign one in its summary.
+- `agentId` and `taskId` of a `toolUseResult` are mapped to every tool result of the record;
+  the pinned CLI writes one result per record, so no harm is reproduced.
+- Ruling 2 says a notification `completed` of an agent that waits on its own background work
+  ends its step as in print mode; that was not checked against a print turn.
+- The cause above names `<tool-use-id>` only; the notification by task id alone is in ruling 1.
+- An agent that `SendMessage` resumes (FIX-RUNNER-SENDMESSAGE-OWN) gets no step for its further
+  work: its notification names the `SendMessage` call, which opened no step, and its first step
+  is already ended. Nothing is mapped to a wrong step; ruling 2 does not name the case yet.
