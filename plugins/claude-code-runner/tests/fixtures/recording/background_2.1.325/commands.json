@@ -14,25 +14,25 @@
       "status"
     ],
     "exit": 0,
-    "stdout": "pid:     15502\nversion: 2.1.325\nuptime:  0s\norigin:  transient \u2014 started on-demand by `claude --bg` (pid 15497) in /work\nconfig:  /record/bg5da90c/config/daemon.json\nlog:     /record/bg5da90c/config/daemon.log\n\nbg sessions:\n  sock dir:     /tmp/cc-daemon/dir\n  control.sock: reachable\n  bg workers:   1 running (control.sock), 1 in roster.json\n  roster.json:  updated 0s ago\n  daemon.log:   556B at /record/bg5da90c/config/daemon.log\n\nholding this daemon open:\n  1 bg worker running (daemon waits for them to settle)\n\nto let it idle-exit: wait for (or cancel) bg workers and close any `claude agents`\n",
+    "stdout": "pid:     46411\nversion: 2.1.325\nuptime:  0s\norigin:  transient \u2014 started on-demand by `claude --bg` (pid 46408) in /work\nconfig:  /record/bg182b5c/config/daemon.json\nlog:     /record/bg182b5c/config/daemon.log\n\nbg sessions:\n  sock dir:     /tmp/cc-daemon/dir\n  control.sock: reachable\n  bg workers:   1 running (control.sock), 1 in roster.json\n  roster.json:  updated 0s ago\n  daemon.log:   556B at /record/bg182b5c/config/daemon.log\n\nholding this daemon open:\n  1 bg worker running (daemon waits for them to settle)\n\nto let it idle-exit: wait for (or cancel) bg workers and close any `claude agents`\n",
     "stderr": ""
   },
   "stop": {
     "args": [
       "stop",
-      "a04452ec"
+      "ae890437"
     ],
     "exit": 0,
-    "stdout": "stopped a04452ec\n",
+    "stdout": "stopped ae890437\n",
     "stderr": ""
   },
   "rm": {
     "args": [
       "rm",
-      "a04452ec"
+      "ae890437"
     ],
     "exit": 0,
-    "stdout": "removed a04452ec\n",
+    "stdout": "removed ae890437\n",
     "stderr": ""
   },
   "stop_unknown": {

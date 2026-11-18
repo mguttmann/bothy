@@ -88,6 +88,17 @@
       "uuid",
       "version"
     ],
+    "attachment/queued_command": [
+      "commandMode",
+      "delivery_id",
+      "isMeta",
+      "origin",
+      "prompt",
+      "sendMessageToolAbsent",
+      "source_uuid",
+      "timestamp",
+      "type"
+    ],
     "cost-state": [
       "hasUnknownModelCost",
       "modelUsage",
@@ -123,6 +134,11 @@
       "mode",
       "sessionId",
       "type"
+    ],
+    "origin/task-notification": [
+      "kind",
+      "producer",
+      "runId"
     ],
     "permission-mode": [
       "permissionMode",

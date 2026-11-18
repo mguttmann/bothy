@@ -13,22 +13,46 @@ The mapping, record by record (only records of the main conversation, ``isSidech
 
 * The first ``user`` record with a text content and ``origin.kind`` ``human`` after the launch
   offset is the run's prompt: ``system/init`` with the session, then the echo of the runner's
-  prompt line. Every record before it is skipped: a resume first writes what closes the
-  interrupted turn of the process before.
-* The first ``api-request`` record of the process gives ``system/bg_request`` with ``login``:
-  whether ``params.betas`` lists a beta whose name starts with ``oauth-``, which the CLI sends
-  exactly when a request uses the stored login (the counter-check of 18.3).
+  prompt line. A record before it is skipped when it carries no origin or one of the session
+  itself: a resume first writes what closes the interrupted turn of the process before.
+* Every ``api-request`` record gives ``system/bg_request`` with ``login``: whether
+  ``params.betas`` lists `LOGIN_BETA`, the beta the pinned CLI sends exactly when a request
+  uses the stored login (the counter-check of 18.3). The name is compared as a whole.
 * ``assistant``: the message with its ``text`` and ``tool_use`` items and its usage; with
   ``isApiErrorMessage`` it carries ``is_api_error_message``, ``error`` and
   ``api_error_params``. The first one that is not synthetic first gives ``system/init`` with
   its model.
-* ``user`` with ``tool_result`` items: those items, reduced to ``tool_use_id`` and
-  ``is_error``. ``user`` with ``origin.kind`` ``peer``: the echo of the inbox line with that
-  ``uuid`` (18.5).
+* ``user`` with ``origin.kind`` ``peer``: the echo of the inbox line with that ``uuid``
+  (18.5), when the runner wrote that line. ``user`` without an origin and with ``tool_result``
+  items: those items, reduced to ``tool_use_id`` and ``is_error``. The origin of a ``user``
+  record is judged before its content, so only a record without one is ever a tool result.
 * ``queue-operation``: ``enqueue`` is ``command_lifecycle`` ``queued``; ``dequeue`` is
   ``started`` and the start of a turn (``system/init``); ``remove`` with ``absorbed_mid_turn``
-  is the echo of the line with ``commandUuid``. The records of one queue are matched in their
-  order, because ``enqueue`` and ``dequeue`` carry no id.
+  is the echo of the runner's line with ``commandUuid``. The records of one queue are matched
+  in their order, because ``enqueue`` and ``dequeue`` carry no id.
+* ``attachment`` of the type ``queued_command``: what a running turn took in. Only its
+  origin and ``source_uuid`` are read; every other attachment is skipped.
+
+**Whose input.** The inbox socket of a session takes a line of every program of the host
+user, and the CLI marks it ``peer`` whatever the line says about itself. So the mapper knows
+the runner's own lines only by their ``uuid`` (the predicate ``own``, which the runner answers
+from the set of the lines it wrote), and each ``uuid`` counts once. An input of anyone else
+gives ``system/bg_foreign`` and nothing else: a ``user`` record or a ``queued_command``
+attachment with ``origin.kind`` ``peer`` whose ``uuid`` the runner did not write, or wrote and
+saw taken before, one with ``origin.kind`` ``human`` that is not the run's prompt (a person
+typed into the session), and one with any origin that is not known as the session's own. The
+runner then stops the session and posts no answer (18.5). Whose input a record is, is read
+from its origin alone and before anything else (`_sender`): no content makes a record of a
+sender a step of the turn. An input the session gives itself (`_own_origin`: the notification
+of work the session itself launched, a continuation the CLI queues by itself) is none of
+these: the CLI removes it from its queue like a line, under a ``uuid`` it made, and names
+its origin in the attachment. The kind ``task-notification`` alone does not make an input the
+session's own: the CLI records the message of another session of the same user, a relay and
+a scheduled prompt under that kind too, so only the producer it stamps for the session's own
+work counts. So an input a running turn took under a ``uuid`` the runner did not write stays
+open until that attachment attributes it to the session itself; one that is still open at
+the next output of the session is foreign too. A mapper without ``own`` knows no line of the
+runner.
 * ``system`` ``turn_duration``: the end of the turn, a ``result`` whose text is the text of
   the turn's last assistant message, with ``is_error`` when that message is an API error.
 * ``cost-state``: ``bg_totals`` with ``modelUsage``, the session's totals (18.7).
@@ -63,12 +87,15 @@ from claude_code_runner.usage import ModelUsage
 
 __all__ = [
     "BACKGROUND_TASK",
+    "CAUSE_FOREIGN",
     "CAUSE_REPLACED",
     "CAUSE_WAITING",
+    "LOGIN_BETA",
     "READ_FIELDS",
     "PricedUsage",
     "TranscriptMapper",
     "TranscriptReader",
+    "foreign_origin",
     "prompt_taken",
     "replayed_records",
 ]
@@ -80,6 +107,9 @@ READ_FIELDS: dict[str, tuple[str, ...]] = {
     "assistant": ("apiErrorParams", "error", "isApiErrorMessage", "isSidechain", "message"),
     "api-request": ("params",),
     "queue-operation": ("commandUuid", "operation", "reason"),
+    "attachment": ("attachment", "isSidechain"),
+    "attachment/queued_command": ("origin", "source_uuid", "type"),
+    "origin/task-notification": ("kind", "producer", "subkind"),
     "system/turn_duration": ("isSidechain", "subtype"),
     "cost-state": ("modelUsage",),
 }
@@ -87,7 +117,11 @@ READ_FIELDS: dict[str, tuple[str, ...]] = {
 of 18.4. ``tests/fixtures/recording/background_<version>/transcript_fields.json`` lists what the
 pinned CLI writes; a test holds every name here against it, and the level-one test of the
 real-CLI suite compares that file with a fresh run. ``apiErrorParams`` is read in the CLI's
-file, not recorded: the stand-in for the API sends no usage window."""
+file, not recorded: the stand-in for the API sends no usage window. ``attachment/queued_command``
+names the members of the object ``attachment`` of that type, the only attachment read.
+``origin/task-notification`` names the members of an origin of that kind, of a ``user`` record
+and of that attachment alike (of every other origin only ``kind`` is read); its ``subkind`` is
+read in the CLI's file, not recorded: no recorded session got a delivery of another sender."""
 
 BACKGROUND_TASK = "background"
 """The task id the runner reports while the session list says ``busy`` between two turns: the
@@ -99,9 +133,28 @@ CAUSE_WAITING = "background_session_waiting"
 CAUSE_REPLACED = "background_process_replaced"
 """The cause of a run whose session runs in another process than the one the runner launched."""
 
+CAUSE_FOREIGN = "background_foreign_input"
+"""The cause of a run whose session took an input the runner did not write (18.5)."""
+
+LOGIN_BETA = "oauth-2025-04-20"
+"""The beta of a request that uses the stored login, as the pinned CLI names it. A request
+record counts as one on the login only when ``params.betas`` lists exactly this name:
+``tests/fixtures/recording/background_<version>/transcript_login.jsonl`` is a request record of
+the pinned CLI that carries it, and the level-one test of the real-CLI suite runs it again. A
+version that renames the beta fails that test, and until the name here follows, every
+``personal`` background turn ends ``billing_mode_mismatch`` instead of running unchecked."""
+
 _SYNTHETIC = "<synthetic>"
-_LOGIN_BETA = "oauth-"
+_QUEUED = "queued_command"
 _WAITING = {"input needed": "a question", "permission prompt": "a permission prompt"}
+
+_PEER = "peer"
+_HUMAN = "human"
+_SELF = "self"
+_OTHER = "other"
+_NOTIFICATION = "task-notification"
+_OWN_PRODUCER = "session-task"
+_CONTINUATION = "auto-continuation"
 
 
 def _content(record: Mapping[str, Any]) -> object:
@@ -109,23 +162,78 @@ def _content(record: Mapping[str, Any]) -> object:
     return message.get("content") if isinstance(message, Mapping) else None
 
 
-def _origin(record: Mapping[str, Any]) -> str | None:
+def _own_origin(origin: Mapping[str, Any]) -> bool:
+    """Whether an origin is one under which a session gives itself an input.
+
+    The list is closed, and it holds two origins:
+
+    * ``task-notification`` with ``producer`` ``session-task`` and without a ``subkind``: the
+      notification of work the session itself launched (a background command, run with the
+      pinned CLI; the CLI's file names a background agent, a workflow and a monitor too).
+      The kind alone proves nothing. The pinned CLI records under it what other senders
+      deliver as well, each either with a ``subkind`` (``peer-send-message``: a message of
+      another session of the same user; ``projects-relay``, ``session-inbox``,
+      ``scheduled-trigger``) or with no marker at all (a webhook), and it stamps the producer
+      only on a notification about the session's own work (read in the file of the pinned
+      CLI; the recording holds the producer).
+    * ``auto-continuation``: the continuation the CLI queues by itself (read in the file of
+      the pinned CLI). That origin has no further member.
+
+    An origin of any other kind or shape, also one a later version adds, is another sender's
+    until it stands here.
+    """
+    kind = origin.get("kind")
+    if kind == _CONTINUATION:
+        return True
+    return (
+        kind == _NOTIFICATION
+        and origin.get("producer") == _OWN_PRODUCER
+        and "subkind" not in origin
+    )
+
+
+def _sender(record: Mapping[str, Any]) -> str | None:
+    """Who gave a ``user`` record or a queued input to the session, by its origin alone.
+
+    The one place that reads an origin, and the first thing every reader of such a record
+    asks: nothing of the record's content is looked at here, so no content can change whose
+    input it is.
+
+    Returns:
+        ``None`` for a record without an origin, which is the CLI's own record (a tool
+        result, a note): every input of a sender carries one (run with the pinned CLI).
+        ``peer`` for a line of the inbox socket, ``human`` for what a person gave, ``self``
+        for an input the session gave itself (`_own_origin`), and ``other`` for every other
+        origin, also one whose kind cannot be read and a notification that is not about the
+        session's own work.
+    """
     origin = record.get("origin")
+    if origin is None:
+        return None
     kind = origin.get("kind") if isinstance(origin, Mapping) else None
-    return kind if isinstance(kind, str) else None
+    if not isinstance(kind, str):
+        return _OTHER
+    if kind in (_PEER, _HUMAN):
+        return kind
+    return _SELF if _own_origin(origin) else _OTHER
 
 
-def _is_prompt(record: Mapping[str, Any]) -> bool:
-    """A ``user`` record of the main conversation with a text content a person's prompt gave."""
-    if record.get("type") != "user" or record.get("isSidechain") is True:
-        return False
-    content = _content(record)
-    if isinstance(content, list):
-        if any(isinstance(i, Mapping) and i.get("type") == "tool_result" for i in content):
-            return False
-    elif not isinstance(content, str):
-        return False
-    return _origin(record) == "human"
+def _is_text(content: object) -> bool:
+    """Whether a content is what a prompt has: a text, or items none of which is a tool result."""
+    if isinstance(content, str):
+        return True
+    return isinstance(content, list) and not any(
+        isinstance(item, Mapping) and item.get("type") == "tool_result" for item in content
+    )
+
+
+def _is_input(record: Mapping[str, Any]) -> bool:
+    """A ``user`` record of the main conversation that carries an origin: an input, no step."""
+    return (
+        record.get("type") == "user"
+        and record.get("isSidechain") is not True
+        and _sender(record) is not None
+    )
 
 
 class TranscriptMapper:
@@ -136,6 +244,9 @@ class TranscriptMapper:
 
     Args:
         prompt_uuid: The ``uuid`` of the runner's input line the session was launched with.
+        own: Tells whether the runner wrote an input line with this ``uuid`` to the session's
+            inbox socket. Without it no line counts as the runner's, so every input of the
+            socket is another sender's.
 
     Attributes:
         turn_open: A turn of the process has started and its ``turn_duration`` is not read.
@@ -143,14 +254,17 @@ class TranscriptMapper:
         started: The run's prompt was read: the session took it.
     """
 
-    def __init__(self, prompt_uuid: str) -> None:
+    def __init__(self, prompt_uuid: str, own: Callable[[str], bool] | None = None) -> None:
         """Start before the prompt of the launch."""
         self._prompt_uuid = prompt_uuid
+        self._own = own
         self.started = False
         self.turn_open = False
         self.skipped: Counter[str] = Counter()
         self._session_id = ""
-        self._request_seen = False
+        self._taken: set[str] = set()
+        self._attached: set[str] = set()
+        self._open: set[str] = set()
         self._model_sent = False
         self._queued: deque[str] = deque()
         self._commands = 0
@@ -175,6 +289,30 @@ class TranscriptMapper:
     @staticmethod
     def _echo(line_uuid: object) -> dict[str, Any]:
         return {"type": "user", "isReplay": True, "uuid": line_uuid}
+
+    @staticmethod
+    def _foreign(origin: str) -> dict[str, Any]:
+        """An input the runner did not write; nothing of its record but whose it is.
+
+        ``origin`` is one of four fixed words, never a text of the record: ``peer``,
+        ``human``, ``other`` (`_sender`) or ``unattributed`` (`_unattributed`).
+        """
+        return {"type": "system", "subtype": "bg_foreign", "origin": origin}
+
+    def _line(self, line_uuid: object, seen: set[str]) -> bool | None:
+        """Whose line a ``uuid`` names, and whether it may still count.
+
+        Returns:
+            True for a line of the runner that ``seen`` does not hold yet (it holds it from
+            now on); False for a line of the runner seen before: its ``uuid`` counts once, so
+            a second input under it is another sender's; ``None`` for any other ``uuid``.
+        """
+        if not isinstance(line_uuid, str) or self._own is None or not self._own(line_uuid):
+            return None
+        if line_uuid in seen:
+            return False
+        seen.add(line_uuid)
+        return True
 
     # ---- the mapping -----------------------------------------------------------------------
 
@@ -201,36 +339,105 @@ class TranscriptMapper:
             if not isinstance(usage, Mapping):
                 return []
             return [{"type": "bg_totals", "modelUsage": _numbers(usage)}]
+        if kind == "attachment":
+            return self._attachment(record)
         if not self.started:
-            if not _is_prompt(record):
-                self.skipped[kind] += 1
-                return []
-            self.started = True
-            session = record.get("sessionId")
-            self._session_id = session if isinstance(session, str) else ""
-            return [self._init(session_id=self._session_id), self._echo(self._prompt_uuid)]
+            return self._before_prompt(kind, record)
         if kind == "user":
             return self._user(record)
         if kind == "assistant":
-            return self._assistant(record)
+            return self._unattributed() or self._assistant(record)
         if kind == "queue-operation":
             return self._queue(record)
         if kind == "system" and record.get("subtype") == "turn_duration":
-            return [self._turn_end()]
+            return self._unattributed() or [self._turn_end()]
         self.skipped[kind] += 1
         return []
 
-    def _request(self, record: Mapping[str, Any]) -> list[dict[str, Any]]:
-        if self._request_seen:
+    def _before_prompt(self, kind: str, record: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """A record before the run's prompt: skipped, unless it is the prompt or an input.
+
+        The origin decides first. Without one the record is the CLI's own (a resume first
+        writes what closes the interrupted turn of the process before), and what the session
+        gave itself belongs to that earlier process too: both are skipped. The first text of
+        a person is the prompt of the launch. Every other record with an origin is an input
+        of another sender: the runner writes no line before the session took its prompt, and
+        the prompt of a launch is a text, whatever else a person's record holds.
+        """
+        sender = _sender(record) if kind == "user" else None
+        if sender is None or sender == _SELF:
+            self.skipped[kind] += 1
             return []
-        self._request_seen = True
+        if sender != _HUMAN or not _is_text(_content(record)):
+            return [self._foreign(sender)]
+        self.started = True
+        # The prompt came by the launch, not the socket: no line may carry its uuid.
+        self._taken.add(self._prompt_uuid)
+        self._attached.add(self._prompt_uuid)
+        session = record.get("sessionId")
+        self._session_id = session if isinstance(session, str) else ""
+        return [self._init(session_id=self._session_id), self._echo(self._prompt_uuid)]
+
+    def _request(self, record: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """Every request record: whether it lists the login beta (the whole name, 18.3)."""
         params = record.get("params")
         betas = params.get("betas") if isinstance(params, Mapping) else None
         names = betas if isinstance(betas, list) else []
-        login = any(isinstance(b, str) and b.startswith(_LOGIN_BETA) for b in names)
-        return [{"type": "system", "subtype": "bg_request", "login": login}]
+        return [{"type": "system", "subtype": "bg_request", "login": LOGIN_BETA in names}]
+
+    def _attachment(self, record: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """What a running turn took in: only whose input it is (18.5), never its text."""
+        inner = record.get("attachment")
+        if not isinstance(inner, Mapping) or inner.get("type") != _QUEUED:
+            self.skipped["attachment"] += 1
+            return []
+        sender = _sender(inner)
+        if sender is None:
+            return []  # it attributes nothing: an open input stays open
+        self._open.discard(str(inner.get("source_uuid")))
+        if not self.started:
+            # Before the prompt the runner has written no line, so a line is never its own,
+            # and an origin that is neither a person nor the session itself is another
+            # sender's, as for a ``user`` record there. What a person or the session queued
+            # in an earlier process is skipped with its records.
+            settled = sender in (_HUMAN, _SELF)
+        elif sender == _PEER:
+            # A line of the runner shows once here, beside its ``remove`` record.
+            settled = self._line(inner.get("source_uuid"), self._attached) is True
+        else:
+            # The CLI attributes the input to the session itself (the notification of work
+            # the session launched): no line of the socket and no person. Every other
+            # origin is another sender's, also a notification without that producer.
+            settled = sender == _SELF
+        return [] if settled else [self._foreign(sender)]
+
+    def _unattributed(self) -> list[dict[str, Any]]:
+        """An input a turn took that nothing attributed before the session's next output."""
+        if not self._open:
+            return []
+        self._open.clear()
+        return [self._foreign("unattributed")]
 
     def _user(self, record: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """A ``user`` record after the prompt: whose input it is first, then what it holds.
+
+        The origin is judged before the content, so a record of a sender never passes as a
+        step of the turn because its content is shaped like one (18.5). Only a record without
+        an origin is read as tool results.
+        """
+        sender = _sender(record)
+        if sender == _PEER:
+            # A line of the inbox socket that starts a turn: its echo, when it is the
+            # runner's and its first (18.5).
+            if self._line(record.get("uuid"), self._taken):
+                return [*self._turn_start(), self._echo(record.get("uuid"))]
+            return [self._foreign(_PEER)]
+        if sender == _SELF:
+            return self._turn_start()
+        if sender is not None:
+            # The run's prompt came before: a person typed this into the session, or it
+            # came from an origin that is not known as the session's own.
+            return [self._foreign(sender)]
         content = _content(record)
         results = [
             {
@@ -243,12 +450,6 @@ class TranscriptMapper:
         ]
         if results:
             return [{"type": "user", "message": {"role": "user", "content": results}}]
-        origin = _origin(record)
-        if origin == "peer":
-            # A line of the inbox socket that starts or joins a turn: its echo (18.5).
-            return [*self._turn_start(), self._echo(record.get("uuid"))]
-        if origin in ("task-notification", "human"):
-            return self._turn_start()
         self.skipped["user"] += 1
         return []
 
@@ -324,7 +525,16 @@ class TranscriptMapper:
         ]
         line_uuid = record.get("commandUuid")
         if record.get("reason") == "absorbed_mid_turn" and isinstance(line_uuid, str):
-            out.append(self._echo(line_uuid))
+            mine = self._line(line_uuid, self._taken)
+            if mine:
+                out.append(self._echo(line_uuid))
+            elif mine is False:
+                out.append(self._foreign("peer"))
+            else:
+                # An input of the session itself (the notification of a task) or of another
+                # sender: the ``queued_command`` attachment says which, and until it does
+                # the input is nobody's.
+                self._open.add(line_uuid)
         return out
 
     def _turn_end(self) -> dict[str, Any]:
@@ -371,12 +581,18 @@ def _decode(raw: bytes) -> dict[str, Any] | None:
 def prompt_taken(path: Path | None, offset: int) -> bool:
     """Whether a transcript shows a prompt after ``offset``: a session took the launch's prompt.
 
+    Only the origin is judged, as in the mapper: a session that took any input of a person
+    after the offset has started, whatever the content of that record is, so its prompt is
+    never given to a print turn as well. Whether that input is the prompt is the mapper's
+    question (`TranscriptMapper`).
+
     Args:
         path: The session transcript; ``None`` when the session has none.
         offset: The launch offset.
 
     Returns:
-        True when a ``user`` record with ``origin.kind`` ``human`` follows the offset.
+        True when a ``user`` record of the main conversation with ``origin.kind`` ``human``
+        follows the offset.
     """
     if path is None:
         return False
@@ -388,7 +604,7 @@ def prompt_taken(path: Path | None, offset: int) -> bool:
         return False
     for raw in data.split(b"\n"):
         record = _decode(raw)
-        if record is not None and _is_prompt(record):
+        if record is not None and _is_input(record) and _sender(record) == _HUMAN:
             return True
     return False
 
@@ -424,6 +640,39 @@ def replayed_records(
             continue
         out.extend((message, line_start, at) for message in mapper.map(record))
     return out
+
+
+def foreign_origin(
+    path: Path | None, start: int, prompt_uuid: str, own: Callable[[str], bool] | None
+) -> str | None:
+    """Whose input a session process took that was not the runner's, if it took one (18.5).
+
+    The whole transcript of the process, from its launch offset to the end of the file,
+    mapped as `TranscriptMapper` maps it for the runner that wrote the lines ``own``. Asked
+    when a session is released and no reader read its transcript to the end (an error or a
+    cancellation ends the run, an adopter does not follow the turn): what the session took
+    in the part nobody read stays in its conversation all the same.
+
+    Args:
+        path: The session transcript; ``None`` when the session has none.
+        start: The launch offset of the process.
+        prompt_uuid: The ``uuid`` of the input the process was launched with.
+        own: Tells whether the runner wrote an input line with this ``uuid``.
+
+    Returns:
+        The word of the first foreign input (`TranscriptMapper`), or ``None`` without one.
+    """
+    if path is None:
+        return None
+    try:
+        end = path.stat().st_size
+    except OSError:
+        return None
+    mapper = TranscriptMapper(prompt_uuid, own)
+    for message, _, _ in replayed_records(path, start, end, mapper):
+        if message.get("type") == "system" and message.get("subtype") == "bg_foreign":
+            return str(message.get("origin"))
+    return None
 
 
 class PricedUsage:
@@ -638,14 +887,18 @@ class TranscriptReader:
         return [{"type": "system", "subtype": "background_tasks_changed", "tasks": tasks}]
 
     def _turn_follows(self) -> bool:
-        """Whether the lines read and not yet mapped already start the next turn."""
+        """Whether the lines read and not yet mapped already start the next turn.
+
+        Asked of the records the mapper reads: an input of the main conversation, by its
+        origin alone, whoever gave it (the mapper then says whose it is).
+        """
         for raw in self._pending:
             record = _decode(raw)
             if record is None:
                 continue
             if record.get("type") == "queue-operation" and record.get("operation") == "dequeue":
                 return True
-            if record.get("type") == "user" and _origin(record) is not None:
+            if _is_input(record):
                 return True
         return False
 

@@ -149,6 +149,13 @@ CAUSES: dict[str, str] = {
         "The background session of this run waited for a person to answer in Claude Code, "
         "which a run cannot do, so the runner stopped it"
     ),
+    "background_foreign_input": (
+        "The background session of this run took a message that the runner did not send: "
+        "another Claude Code session or program on the runner host wrote to it. The runner "
+        "stopped the session, posted no answer to that message and does not continue this "
+        "session. Send your message again: it starts a new session without the history of "
+        "this one"
+    ),
     "background_launch_failed": (
         "The runner could not start the background session of this run and cannot tell "
         "whether Claude Code took the message, so it stopped the session instead of running "

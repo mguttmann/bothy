@@ -113,6 +113,12 @@ targetRules = ["jwt"]
 paths = ['''(^|/)services/host/testdata/control/host_frames\.json$''']
 
 [[allowlists]]
+description = "A public beta name of the Messages API that stands right after the login beta oauth-2025-04-20 in a recorded request record of the pinned Claude Code (plugins/claude-code-runner/tests/fixtures/recording/background_<version>/transcript_login.jsonl, FIX-RUNNER-BG-INBOX-AUTH): the word oauth in front of it makes the generic rule read the next name as a key. Exact value only; a beta name is no credential"
+targetRules = ["generic-api-key"]
+regexTarget = "secret"
+regexes = ['''^interleaved-thinking-2025-05-14$''']
+
+[[allowlists]]
 description = "Checksum manifests: one line maps a file name to its sha256"
 regexTarget = "line"
 regexes = ['''^\s*"[^"]+\.[A-Za-z0-9]+": "[0-9a-f]{64}",?\s*$''']

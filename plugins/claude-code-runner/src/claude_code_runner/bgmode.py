@@ -1,10 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
 """Background mode of the runner process (09 18.2 "Background mode", 18.9).
 
-`BackgroundMode` is what every background turn of one runner process shares: the control
-commands with the environment of a ``personal`` turn, the one reader of the session list, the
+`BackgroundMode` is what every background turn of one runner process shares: the one fixed
+environment of every launch and control command, the one reader of the session list, the
 channels the mode is switched on for, the lock that lets one run at a time launch, and the
 heartbeat reason of a fallback.
+
+The environment is built once, from the allow list of 18.2 without the SSH agent and without
+the temporary folder of any run. The first launch starts the CLI's supervisor with it, the
+supervisor lives across runs, and every session inherits what it carries; so nothing of a run
+may be in it. What belongs to a run reaches its session through the settings file of its
+launch (`claude_code_runner.bgsession.settings_document`).
 
 A run that should use background mode and cannot uses print mode and says why (18.9). When
 the cause lies with the host (the CLI is not the pinned version, a supervisor the runner did
@@ -77,6 +83,7 @@ class BackgroundMode:
         version: Returns the version of the installed CLI as the last probe read it.
 
     Attributes:
+        env: The fixed environment of every launch and control command; no value of a run.
         cli: The control commands.
         sessions: The reader of the session list.
         launching: Held by a run from its check of the supervisor until its launch command

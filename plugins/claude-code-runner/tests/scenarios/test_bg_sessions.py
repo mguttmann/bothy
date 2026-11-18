@@ -155,6 +155,9 @@ async def test_a_new_post_runs_as_one_background_session(bg_world: World) -> Non
         "Bash(git status)",
         "--disallowedTools",
         "AskUserQuestion",
+        "SendMessage",
+        "ListAgents",
+        "SendFile",
         "--append-system-prompt-file",
         str(files.system_prompt),
         "--messaging-socket-path",
@@ -163,21 +166,32 @@ async def test_a_new_post_runs_as_one_background_session(bg_world: World) -> Non
         str(files.settings),
     ]
     tmpdir = str(world.state / "tmp" / str(run.run_id))
+    # No crossSessionInbound: what the session takes from other sessions is never widened.
     assert launch["settings"] == {
-        "crossSessionInbound": "accept",
         "worktree": {"bgIsolation": "none"},
-        "env": {"CLAUDE_PRODUCT_RUN": "1", "DISABLE_AUTOUPDATER": "1", "TMPDIR": tmpdir},
+        "env": {
+            "CLAUDE_PRODUCT_RUN": "1",
+            "DISABLE_AUTOUPDATER": "1",
+            "TMPDIR": tmpdir,
+            "SSH_AUTH_SOCK": "",
+        },
     }
     # The prompt is the stdin of the command: the context, a blank line, the trigger part.
     assert launch["prompt"].endswith("Fix the login form")
     assert "\n\n" in launch["prompt"]
     assert not launch["prompt"].startswith(("/", "!"))
-    # The launch environment is the allow list of 18.2 plus DISABLE_AUTOUPDATER, never a key.
+    # The launch environment is the fixed one of the runner: the allow list of 18.2 plus
+    # DISABLE_AUTOUPDATER, never a key and never a value of the run. The launch starts the
+    # supervisor, which later sessions inherit from; the run's own temporary folder reaches
+    # the session through the settings file alone.
     assert launch["env"]["DISABLE_AUTOUPDATER"] == "1"
     assert launch["env"]["CLAUDE_PRODUCT_RUN"] == "1"
     assert "ANTHROPIC_API_KEY" not in launch["env"]
     assert API_KEY not in json.dumps(launch)
+    assert tmpdir not in json.dumps(launch["env"])
+    assert "SSH_AUTH_SOCK" not in launch["env"]
     assert player["env"]["TMPDIR"] == tmpdir
+    assert player["env"]["SSH_AUTH_SOCK"] == ""
     # A follow-up reaches a background session as a relayed message: the prompt says so.
     assert "runs as a background session" in launch["system_prompt"]
     assert "TITLE:" in launch["system_prompt"]
@@ -313,6 +327,8 @@ async def test_a_followup_during_a_tool_call_is_absorbed_in_the_same_turn(bg_wor
     answer = max(i for i, r in enumerate(records) if r["type"] == "assistant")
     assert taken < answer
     assert sum(1 for r in records if r.get("subtype") == "turn_duration") == 1
+    # The attachment that names whose input the turn took has the members of the pinned CLI.
+    assert QUEUED_ATTACHMENT in members_seen(world)
     await nothing_left(world)
 
 
@@ -815,6 +831,16 @@ async def test_fake_claude_writes_only_members_the_pinned_cli_writes(bg_world: W
     await world.until(lambda: len(texts(world)) == 2)  # the retry was answered
     world.release(job)
     assert await world.ended(run_id) == "completed"
+    # The attachment of a line taken during a turn is held by the scenario of that line.
+    assert members_seen(world) == set(READ_FIELDS) - {QUEUED_ATTACHMENT}
+
+
+QUEUED_ATTACHMENT = "attachment/queued_command"
+NOTIFICATION_ORIGIN = "origin/task-notification"
+
+
+def members_seen(world: World) -> set[str]:
+    """Hold what Fake-Claude wrote against the recorded member table; the record types seen."""
     folder = Path(__file__).resolve().parents[1] / "fixtures" / "recording"
     [recording] = folder.glob("background_*")
     table = json.loads((recording / "transcript_fields.json").read_text())["records"]
@@ -836,4 +862,17 @@ async def test_fake_claude_writes_only_members_the_pinned_cli_writes(bg_world: W
             "isApiErrorMessage",
             "origin",
         } <= set(record), name
-    assert seen == set(READ_FIELDS)
+        inner = record.get("attachment")
+        origin = record.get("origin") if name == "user" else None
+        if name == "attachment" and inner.get("type") == "queued_command":
+            seen.add(QUEUED_ATTACHMENT)
+            assert set(inner) <= set(table[QUEUED_ATTACHMENT])
+            assert set(READ_FIELDS[QUEUED_ATTACHMENT]) <= set(inner)
+            origin = inner.get("origin")
+        if isinstance(origin, dict) and origin.get("kind") == "task-notification":
+            # The notification of the session's own work, with the producer the runner reads
+            # (``subkind`` marks a delivery of another sender: read in the CLI's file).
+            seen.add(NOTIFICATION_ORIGIN)
+            assert set(origin) <= set(table[NOTIFICATION_ORIGIN])
+            assert set(READ_FIELDS[NOTIFICATION_ORIGIN]) - {"subkind"} <= set(origin)
+    return seen

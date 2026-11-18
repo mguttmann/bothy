@@ -48,7 +48,9 @@ def system_prompt(*, title_request: bool, channel_prompt: str, background: bool 
         channel_prompt: ``behavior.prompt`` of the forum; an own section when not empty.
         background: The turn runs as a background session (``runner.launch_mode``): a
             follow-up then reaches the model as a message of another session, and the prompt
-            says that such a message with the runner's lead-in is the person's own (18.5).
+            says how to handle such a message. It names no sign by which the model could
+            take one for the person's own: every such sign is text any sender can write, and
+            the runner, not the model, decides whose input a session took (18.5).
 
     Returns:
         The text; it never contains a context element.
