@@ -3776,10 +3776,7 @@ class RunTurn:
                 self.ledger.offset,
                 mapper,
             )
-            for message, _, _ in lines:
-                if message.get("type") == "system" and message.get("subtype") == "bg_foreign":
-                    # Logged again: the previous runner may have ended before it logged it (18.5).
-                    _warn("background_foreign_input", origin=str(message.get("origin")), **self.ids)
+            self._replay_adopted([m for m, _, _ in lines])
             self.ps = ProcessState(has_stdin=True, account_retry=self._account_schedule())
             self._replayed_worked = self._replay_ledger(lines)
             for message, _, _ in lines:
@@ -3814,6 +3811,19 @@ class RunTurn:
                 remove_turn_record(self.cfg.state_dir / "turns" / f"{self.handle.run_id}.json")
                 remove_run_files(self.cfg.state_dir, self.handle.run_id)
                 remove_bg_files(self._bg_state, self.handle.run_id)
+
+    def _replay_adopted(self, messages: list[dict[str, Any]]) -> None:
+        """What an adopter takes from the lines before the stored offset besides the ledger.
+
+        A foreign input is logged again (the previous runner may have ended before it logged
+        it, 18.5), and the task messages reach the live box, so an agent launched before the
+        offset is a subagent step when its notification comes (FIX-RUNNER-BG-AGENT-STEPS).
+        """
+        for message in messages:
+            if message.get("type") == "system" and message.get("subtype") == "bg_foreign":
+                _warn("background_foreign_input", origin=str(message.get("origin")), **self.ids)
+        if self.live is not None:
+            self.live.replay_tasks(messages)
 
     def _restore_adopted(self, record: Mapping[str, Any], known_steps: Mapping[str, str]) -> None:
         """The run's state from the record of a background turn.

@@ -20,7 +20,9 @@ as a limit of the mode).
 | D-FIX-RUNNER-BG-AGENT-STEPS-2 | 2026-11-18 | Not covered: a background shell command stays the one `tool_call` step of its tool; the agents of a workflow, the steps inside a subagent and the usage before the end are not shown; an agent whose notification comes to a later session process is not ended by it; a notification `completed` of an agent that waits on its own background work ends its step, as in print mode, and a later one changes nothing. | The reader reports background work between turns as one task of its own (`background`), whose list would end a `background_job` step at once; the transcript of the main conversation carries no `workflow_progress` and no records of the agents. None of these is the reported fault. |
 
 Deploy note: the runner's restart. A turn that runs at the restart is adopted and mapped again
-from its launch offset, so its agents get their steps then.
+from its launch offset; the adopter gives the task messages of that replay to the live box
+before it reads on, so its agents get their steps then (a step the record has keeps its id),
+and a later notification of an ended agent changes neither its status nor its usage.
 
 Open minors (for the next run in this area of the runner):
 
