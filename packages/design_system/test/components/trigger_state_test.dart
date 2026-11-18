@@ -25,6 +25,14 @@ void main() {
         DsIcons.triggerFollowup,
         l.triggerStateFollowupDelivered,
       ),
+      DsTriggerState.followupWaiting: (
+        DsIcons.triggerQueued,
+        l.triggerStateFollowupWaiting,
+      ),
+      DsTriggerState.followupDiscarded: (
+        DsIcons.runCancelled,
+        l.triggerStateFollowupDiscarded,
+      ),
     };
     final colors = DsColors.light;
     final tokens = {
@@ -35,6 +43,8 @@ void main() {
       DsTriggerState.failed: colors.triggerFailed,
       DsTriggerState.cancelled: colors.runCancelled,
       DsTriggerState.followupDelivered: colors.triggerFollowup,
+      DsTriggerState.followupWaiting: colors.triggerQueued,
+      DsTriggerState.followupDiscarded: colors.runCancelled,
     };
     for (final MapEntry(key: state, value: (glyph, label))
         in expected.entries) {

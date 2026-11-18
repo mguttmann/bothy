@@ -28,6 +28,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get triggerStateFollowupDelivered => 'Nachtrag zugestellt';
 
   @override
+  String get triggerStateFollowupWaiting => 'Wartet auf Ende des Laufs';
+
+  @override
+  String get triggerStateFollowupDiscarded => 'Verworfen: Lauf gestoppt';
+
+  @override
   String triggerStateFailedWithReason(String reason) {
     return 'Fehlgeschlagen: $reason';
   }

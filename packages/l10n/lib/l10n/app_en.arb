@@ -21,6 +21,14 @@
     "description": "Label of the trigger state `failed` on the triggering message (components.md section 5)."
   },
   "triggerStateFollowupDelivered": "Follow-up delivered",
+  "triggerStateFollowupWaiting": "Waiting for the run to end",
+  "@triggerStateFollowupWaiting": {
+    "description": "Label on a follow-up the server holds until the active run ends (trigger_state `received` while that run is active; components.md section 5)."
+  },
+  "triggerStateFollowupDiscarded": "Discarded: the run was stopped",
+  "@triggerStateFollowupDiscarded": {
+    "description": "Label on a follow-up that a person's stop of the run discarded (trigger_state `cancelled` with `user_cancelled`; 09 section 7; components.md section 5)."
+  },
   "@triggerStateFollowupDelivered": {
     "description": "Label of the trigger state `followup_delivered` on the triggering message (components.md section 5)."
   },

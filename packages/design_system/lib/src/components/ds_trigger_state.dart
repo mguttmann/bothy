@@ -68,6 +68,8 @@ class DsTriggerStateIcon extends StatelessWidget {
             ? l.triggerStateCancelled
             : l.triggerStateCancelledWithReason(why),
       DsTriggerState.followupDelivered => l.triggerStateFollowupDelivered,
+      DsTriggerState.followupWaiting => l.triggerStateFollowupWaiting,
+      DsTriggerState.followupDiscarded => l.triggerStateFollowupDiscarded,
       DsTriggerState.unknown => l.triggerStateUnknown(code ?? ''),
     };
   }
@@ -88,6 +90,14 @@ class DsTriggerStateIcon extends StatelessWidget {
       DsTriggerState.followupDelivered => (
         DsIcons.triggerFollowup,
         colors.triggerFollowup,
+      ),
+      DsTriggerState.followupWaiting => (
+        DsIcons.triggerQueued,
+        colors.triggerQueued,
+      ),
+      DsTriggerState.followupDiscarded => (
+        DsIcons.runCancelled,
+        colors.runCancelled,
       ),
       DsTriggerState.unknown => (DsIcons.stateInfo, colors.textSecondary),
     };

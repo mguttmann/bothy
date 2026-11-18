@@ -926,6 +926,11 @@ class _MessageRow extends ConsumerWidget {
     // internal image references in it (SEC-OUT-2).
     final files =
         ref.watch(messageFilesProvider(message.id.value)).value ?? const [];
+    // A follow-up shows whether it waits for the end of its run or was discarded by a stop.
+    final runs = message.triggerState == null
+        ? const <RunSummary>[]
+        : ref.watch(threadRunsProvider(message.threadId.value)).value ??
+              const <RunSummary>[];
     return MessageTile(
       data: messageData(
         message,
@@ -934,6 +939,7 @@ class _MessageRow extends ConsumerWidget {
         timeLabel: time,
         reactions: reactions,
         replied: replied,
+        runs: runs,
       ),
       continuation: continuation,
       collapseLines: collapseLines,

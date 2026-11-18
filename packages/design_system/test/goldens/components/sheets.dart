@@ -296,7 +296,13 @@ Widget indicatorSheet() => Sheet([
   Wrap(
     spacing: DsSpace.s8,
     children: [
-      for (final state in DsTriggerState.values)
+      // The two follow-up display states reuse the icons and colors of `queued` and
+      // `cancelled` (components.md 5), so the sheet keeps the server's states only.
+      for (final state in DsTriggerState.values.where(
+        (s) =>
+            s != DsTriggerState.followupWaiting &&
+            s != DsTriggerState.followupDiscarded,
+      ))
         DsTriggerStateIcon(
           state: state,
           reason: state == DsTriggerState.failed ? 'project_not_ready' : null,

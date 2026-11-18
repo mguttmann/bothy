@@ -443,41 +443,177 @@ _SHOT = (b"\xff\xd8\xff\xe0 a pasted screenshot", "shot.jpg", "image/jpeg")
 _VOICE = (b"\x00\x00\x00\x1cftypM4A a voice note", "note.m4a", "audio/mp4")
 
 
-@pytest.mark.parametrize(
-    ("text", "file"),
-    [("", _SHOT), ("and this one", _SHOT), ("", _VOICE), ("listen to this", _VOICE)],
-)
-async def test_followup_with_a_file_is_left_to_the_follow_on_run(
-    tmp_path: Path, text: str, file: tuple[bytes, str, str]
-) -> None:
-    """A follow-up with a file is never steered as bare text (D-FIX-HIMG-3, AUD-HA1/3).
+async def _held_turn(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+    """A turn that called a tool and runs until the test lets it end."""
+    rt.events.on_model_reply(turn.thread_id, 1)
+    await rt.events.on_answer(turn.thread_id, "Let me check.", None)
+    await rt.stop_event(turn.thread_id).wait()
+    return TurnOutcome.COMPLETED
 
-    Hermes steers text only and queues a message with media as a turn of its own; here the
-    follow-up stays ``queued`` so the server's follow-on run takes it as its triggering message,
-    where its file reaches Hermes as media and its audio is transcribed. A voice message has no
-    text at all: steered, it reached the turn empty and was acknowledged, so no run carried what
-    the person said. A text follow-up after it is still steered.
+
+async def test_image_followup_is_steered_at_once_with_its_path(tmp_path: Path) -> None:
+    """A follow-up with an image reaches the running turn at once (D-FMS-1, D-FMS-2).
+
+    Hermes steers text only, so the image is loaded into Hermes's media cache like one of the
+    trigger and the steered text names its path with the tool to open it; the follow-up is
+    acknowledged like a text one, so no follow-on run takes it again. A text follow-up sent
+    after it keeps its place behind it (D-FMS-4).
     """
-
-    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
-        rt.events.on_model_reply(turn.thread_id, 1)
-        await rt.events.on_answer(turn.thread_id, "Let me check.", None)
-        await rt.stop_event(turn.thread_id).wait()
-        return TurnOutcome.COMPLETED
-
-    rt = FakeRuntime(script=script)
+    rt = FakeRuntime(script=_held_turn)
     async with rig(tmp_path, runtime=rt, busy_mode="steer") as r:
         triggered = await r.fake.trigger("first")
         await r.until(lambda: r.fake.messages)
-        data, name, mime = file
+        data, name, mime = _SHOT
         fid = r.fake.add_file(data, name=name, mime=mime)
-        with_file = await r.fake.deliver_followup(triggered.run_id, text, files=[fid])
+        with_file = await r.fake.deliver_followup(triggered.run_id, "and this one", files=[fid])
         plain = await r.fake.deliver_followup(triggered.run_id, "only text")
-        await r.until(lambda: any(m == plain for _, _, m in rt.steered), "the text follow-up")
+        await r.until(lambda: len(rt.steered) == 2, "both follow-ups")
         rt.stop_event(triggered.thread_id).set()
         await r.until(lambda: r.finished(triggered.run_id))
-        assert [m for _, _, m in rt.steered] == [plain]
+        assert [m for _, _, m in rt.steered] == [with_file, plain]
+        steered = rt.steered[0][1]
+        assert rt.cached == [(data, name, mime)]
+        path = str(rt.cache_dir / f"1-{name}") if rt.cache_dir else ""
+        assert f"It is saved at: {path}." in steered
+        assert "'shot.jpg' (image/jpeg)" in steered
+        assert "image analysis tool" in steered
+        assert steered.endswith("and this one")
+        assert r.fake.followup_state(triggered.run_id, with_file) == "absorbed"
         assert r.fake.followup_state(triggered.run_id, plain) == "absorbed"
+
+
+async def test_followup_with_files_only_is_steered_with_hermes_no_text_wording(
+    tmp_path: Path,
+) -> None:
+    rt = FakeRuntime(script=_held_turn)
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await r.fake.trigger("first")
+        await r.until(lambda: r.fake.messages)
+        pdf = r.fake.add_file(REPORT, name="plan.pdf", mime="application/pdf")
+        note = r.fake.add_file(b"bring the tent", name="list.txt", mime="text/plain")
+        with_files = await r.fake.deliver_followup(triggered.run_id, "", files=[pdf, note])
+        await r.until(lambda: rt.steered, "the follow-up")
+        rt.stop_event(triggered.thread_id).set()
+        await r.until(lambda: r.finished(triggered.run_id))
+        steered = rt.steered[0][1]
+        assert "'plan.pdf' (application/pdf)" in steered
+        assert "file tools" in steered
+        # A text file is inlined as data of the user and named with its path.
+        assert "bring the tent" in steered
+        assert "Its content has been included above" in steered
+        assert steered.endswith(NO_TEXT)
+        assert r.fake.followup_state(triggered.run_id, with_files) == "absorbed"
+
+
+async def test_followup_waits_for_the_check_of_its_files(tmp_path: Path) -> None:
+    """A file still checked is waited for, then steered (12 10; D-FMS-1)."""
+    rt = FakeRuntime(script=_held_turn)
+    async with rig(tmp_path, runtime=rt, background_poll_interval=0.05) as r:
+        triggered = await r.fake.trigger("first")
+        await r.until(lambda: r.fake.messages)
+        data, name, mime = _SHOT
+        fid = r.fake.add_file(data, name=name, mime=mime, status="pending")
+        with_file = await r.fake.deliver_followup(triggered.run_id, "look", files=[fid])
+        await r.until(lambda: len(r.requests("getMessage")) >= 3, "a few reads")
+        assert rt.steered == []
+        r.fake.set_file_status(fid, "clean")
+        await r.until(lambda: rt.steered, "the follow-up")
+        rt.stop_event(triggered.thread_id).set()
+        await r.until(lambda: r.finished(triggered.run_id))
+        assert "It is saved at:" in rt.steered[0][1]
+        assert r.fake.followup_state(triggered.run_id, with_file) == "absorbed"
+
+
+async def test_file_not_ready_after_the_wait_is_left_to_the_follow_on_run(tmp_path: Path) -> None:
+    """The text is steered with a note; the follow-up stays ``queued`` (D-FMS-3)."""
+    rt = FakeRuntime(script=_held_turn)
+    async with rig(
+        tmp_path, runtime=rt, background_poll_interval=0.05, followup_file_wait=0.2
+    ) as r:
+        triggered = await r.fake.trigger("first")
+        await r.until(lambda: r.fake.messages)
+        data, name, mime = _SHOT
+        fid = r.fake.add_file(data, name=name, mime=mime, status="pending")
+        with captured_logs() as logs:
+            with_file = await r.fake.deliver_followup(triggered.run_id, "look", files=[fid])
+            await r.until(lambda: rt.steered, "the follow-up")
+        rt.stop_event(triggered.thread_id).set()
+        await r.until(lambda: r.finished(triggered.run_id))
+        steered = rt.steered[0][1]
+        assert "not available yet" in steered
+        assert "again with that file in a new turn" in steered
+        assert steered.endswith("look")
+        assert rt.cached == []
+        assert r.fake.followup_state(triggered.run_id, with_file) == "queued"
+        assert f"follow-up {with_file} steered, left queued code=scan_pending" in logs.text()
+        assert "shot.jpg" not in logs.text()
+
+
+async def test_blocked_file_of_a_followup_is_steered_as_a_note(tmp_path: Path) -> None:
+    """A file the scan blocked never comes: the note is final and the follow-up absorbed."""
+    rt = FakeRuntime(script=_held_turn)
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await r.fake.trigger("first")
+        await r.until(lambda: r.fake.messages)
+        data, name, mime = _SHOT
+        fid = r.fake.add_file(data, name=name, mime=mime, status="blocked")
+        with_file = await r.fake.deliver_followup(triggered.run_id, "look", files=[fid])
+        await r.until(lambda: rt.steered, "the follow-up")
+        rt.stop_event(triggered.thread_id).set()
+        await r.until(lambda: r.finished(triggered.run_id))
+        assert "virus scan blocked it" in rt.steered[0][1]
+        assert r.fake.followup_state(triggered.run_id, with_file) == "absorbed"
+
+
+@pytest.mark.parametrize("text", ["", "listen to this"])
+async def test_voice_followup_is_left_to_the_follow_on_run(tmp_path: Path, text: str) -> None:
+    """Audio of a follow-up is not transcribed here (AUD-HA1/4): it stays ``queued``.
+
+    A voice message without text is not steered at all; the text beside audio is steered with
+    a note that the message comes again with its audio (D-FMS-3). Either way one log line
+    names the reason.
+    """
+    rt = FakeRuntime(script=_held_turn)
+    async with rig(tmp_path, runtime=rt, busy_mode="steer") as r:
+        triggered = await r.fake.trigger("first")
+        await r.until(lambda: r.fake.messages)
+        data, name, mime = _VOICE
+        fid = r.fake.add_file(data, name=name, mime=mime)
+        with captured_logs() as logs:
+            voice = await r.fake.deliver_followup(triggered.run_id, text, files=[fid])
+            plain = await r.fake.deliver_followup(triggered.run_id, "only text")
+            await r.until(lambda: any(m == plain for _, _, m in rt.steered), "the text")
+        rt.stop_event(triggered.thread_id).set()
+        await r.until(lambda: r.finished(triggered.run_id))
+        assert rt.cached == []
+        if text:
+            assert [m for _, _, m in rt.steered] == [voice, plain]
+            assert "voice or audio file" in rt.steered[0][1]
+            assert "code=audio" in logs.text()
+        else:
+            assert [m for _, _, m in rt.steered] == [plain]
+            assert f"follow-up {voice} not steered code=audio" in logs.text()
+        assert r.fake.followup_state(triggered.run_id, plain) == "absorbed"
+        assert r.fake.followup_state(triggered.run_id, voice) == "queued"
+
+
+async def test_followup_at_queue_is_logged_with_its_reason(tmp_path: Path) -> None:
+    """At ``queue`` nothing is steered; the follow-up stays and one log line says why."""
+    rt = FakeRuntime(script=_held_turn)
+    async with rig(tmp_path, runtime=rt, busy_mode="queue") as r:
+        triggered = await r.fake.trigger("first")
+        await r.until(lambda: r.fake.messages)
+        data, name, mime = _SHOT
+        fid = r.fake.add_file(data, name=name, mime=mime)
+        with captured_logs() as logs:
+            with_file = await r.fake.deliver_followup(triggered.run_id, "look", files=[fid])
+            await r.until(
+                lambda: f"follow-up {with_file} not steered" in logs.text(), "the log line"
+            )
+        rt.stop_event(triggered.thread_id).set()
+        await r.until(lambda: r.finished(triggered.run_id))
+        assert rt.steered == []
+        assert "code=busy_mode_queue" in logs.text()
         assert r.fake.followup_state(triggered.run_id, with_file) == "queued"
 
 

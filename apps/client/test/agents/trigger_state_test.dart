@@ -104,4 +104,74 @@ void main() {
     expect(colorOf(DsTriggerState.failed), colors.triggerFailed);
     await host.dispose(tester);
   });
+
+  test('a follow-up held for the end of its run shows that it waits '
+      '(FIX-followup-media-steer)', () {
+    // The run was queued at minute 1; the follow-up came at minute 5.
+    final followup = msg(
+      2,
+      minutes: 5,
+    ).copyWith(triggerState: TriggerState.received);
+    final active = run(1, RunState.running);
+    expect(
+      triggerOf(followup, runs: [active])!.state,
+      DsTriggerState.followupWaiting,
+    );
+    // Without an active run, and for the run's own trigger, `received` stays.
+    expect(
+      triggerOf(followup, runs: [run(1, RunState.completed)])!.state,
+      DsTriggerState.received,
+    );
+    final trigger = msg(
+      1,
+      minutes: 0,
+    ).copyWith(triggerState: TriggerState.received);
+    expect(triggerOf(trigger, runs: [active])!.state, DsTriggerState.received);
+  });
+
+  test('a follow-up discarded by a stop shows "discarded"', () {
+    final stopped = run(
+      1,
+      RunState.cancelled,
+      reason: 'user_cancelled',
+    ).copyWith(finishedAt: t0.add(const Duration(minutes: 9)));
+    final followup = msg(2, minutes: 5).copyWith(
+      triggerState: TriggerState.cancelled,
+      triggerStateReason: 'user_cancelled',
+    );
+    expect(
+      triggerOf(followup, runs: [stopped])!.state,
+      DsTriggerState.followupDiscarded,
+    );
+    // The stopped run's own trigger stays "canceled".
+    final trigger = msg(1, minutes: 0).copyWith(
+      triggerState: TriggerState.cancelled,
+      triggerStateReason: 'user_cancelled',
+    );
+    expect(
+      triggerOf(trigger, runs: [stopped])!.state,
+      DsTriggerState.cancelled,
+    );
+  });
+
+  testWidgets('the history labels a waiting follow-up', (tester) async {
+    final host = await ColumnHost.open(tester);
+    await host.run(tester, () async {
+      await seedThread(
+        host.db,
+        messages: [
+          msg(1, author: alex).copyWith(triggerState: TriggerState.working),
+          msg(
+            2,
+            author: alex,
+            minutes: 5,
+          ).copyWith(triggerState: TriggerState.received),
+        ],
+      );
+      await host.db.runsDao.upsertIfNewer(run(1, RunState.running));
+    });
+    await pumpThread(tester, host, FakeThreadReads(host.db));
+    expect(find.bySemanticsLabel(en.triggerStateFollowupWaiting), findsWidgets);
+    await host.dispose(tester);
+  });
 }

@@ -1611,6 +1611,11 @@ the screen reader label. Icons and colors: [components.md](../design/components.
 | `failed` | Triggering or the run has failed; the reason is shown with it. |
 | `followup_delivered` | The follow-up has reached the running agent. |
 
+A follow-up (a message sent while a run of the thread is active, 09 section 7) that is still
+`received` shows "Waiting for the run to end" while a run is active, and one that a person's stop
+discarded (`cancelled` with `user_cancelled`) shows "Discarded: the run was stopped" (addendum of
+2026-11-18, FIX-followup-media-steer; components.md section 5).
+
 ### 6.4 Long replies
 
 Messages over `ui.message_collapse_lines` lines are collapsed with "Show more";

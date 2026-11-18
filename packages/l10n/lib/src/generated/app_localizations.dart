@@ -134,6 +134,18 @@ abstract class AppLocalizations {
   /// **'Follow-up delivered'**
   String get triggerStateFollowupDelivered;
 
+  /// Label on a follow-up the server holds until the active run ends (trigger_state `received` while that run is active; components.md section 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the run to end'**
+  String get triggerStateFollowupWaiting;
+
+  /// Label on a follow-up that a person's stop of the run discarded (trigger_state `cancelled` with `user_cancelled`; 09 section 7; components.md section 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Discarded: the run was stopped'**
+  String get triggerStateFollowupDiscarded;
+
   /// Tooltip and semantics label of the trigger state `failed` with the translated reason (components.md section 5).
   ///
   /// In en, this message translates to:
