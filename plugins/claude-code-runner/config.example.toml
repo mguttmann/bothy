@@ -124,6 +124,12 @@ background_channels = []
 # How often the session list (`claude agents --json --all`) is read while a background turn is
 # active; one reading serves every turn of the runner.
 background_status_interval = "2s"
+# A Claude Code version besides the pin that the operator proved with the contract subset of
+# the real-CLI suite (README "Following new Claude Code versions"), and the pin whose recordings
+# the proof used. Both or none; the version counts only while the pin is the code's pin, any
+# other version stays untested. An update chain writes them; empty means only the pin.
+tested_claude_code_version = ""
+tested_claude_code_pin = ""
 # Roots of answer attachments by name only; an operator may narrow the list, never widen it.
 attach_allowed_roots = ["project", "thread_inbox", "runner_temp"]
 # Denied names of answer attachments; must contain the list of 09 18.10, may add more.

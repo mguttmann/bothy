@@ -487,7 +487,8 @@ drops `bypassPermissions` without the user settings that a hosted agent never lo
 `print` on a runner that serves hosted agents.
 Only the one-shot calls (search assistant, agent builder) stay `claude -p`.
 Background sessions and agent view are a research preview of Claude Code, and most of what the
-runner reads of them is internal to the CLI; the mode therefore runs only on the pinned version,
+runner reads of them is internal to the CLI; the mode therefore runs only on the pinned version
+(or a version proved against it, "Following new Claude Code versions" below),
 and a run it is not available for ends `failed` with its cause instead of using print mode.
 
 What the documentation of Claude Code promises and what it does not: it says that background
@@ -498,8 +499,10 @@ what either path draws from a subscription is a measurement on the operator's ow
 
 Before you switch it on:
 
-- **Version.** Install exactly the pinned Claude Code version and keep its automatic update
-  off. On any other version every run fails (`background_version_untested`).
+- **Version.** Install exactly the pinned Claude Code version, or a newer one proved against
+  the pin and named in `runner.tested_claude_code_version` ("Following new Claude Code
+  versions" below), and keep its automatic update off. On any other version every run fails
+  (`background_version_untested`).
 - **Workspace trust.** The CLI starts a background session only in a folder with workspace
   trust: run `claude` once in each bound project folder (and in `runner.default_workspace`) as
   the runner's host user and accept the prompt. A Git repository below a trusted folder needs
@@ -648,7 +651,7 @@ and never uses print mode (D-FIX-RUNNER-CLI-PIN-326-4), the log has
 
 | Code | What to do |
 |---|---|
-| `background_version_untested` | install the pinned CLI version |
+| `background_version_untested` | install the pinned CLI version, or prove the installed one and name it in `runner.tested_claude_code_version` |
 | `background_supervisor_foreign` | a supervisor runs that the runner did not start: end the host user's own background sessions, or keep `print` on a host where agent view is in use |
 | `background_supervisor_version` | the runner's own supervisor runs another version than the pin (the CLI was updated under it): it ends with its last session |
 | `background_bypass_not_accepted` | accept bypass mode once as the host user (above) |
@@ -1161,6 +1164,39 @@ against the new CLI, change the mapping and the error texts where the CLI change
 what was read in `docs/decisions.d/`. The baseline files change only in `runtime_version`. The
 doc comment of the pin names that fragment, and the texts about the pin say what the CLI does,
 never which host runs or showed what (the repository is public; `tests/unit/test_versions.py`).
+
+### Following new Claude Code versions
+
+A newer CLI can run without a change of the pin (FIX-RUNNER-TESTED-CLI). The operator proves it
+with the free contract subset of the real-CLI suite, against the recordings of the pin:
+
+```sh
+cd plugins/claude-code-runner
+CLAUDE_CODE_RUNNER_REAL_CLI=1 CLAUDE_CODE_RUNNER_CLAUDE_BIN=<the new claude> \
+CLAUDE_CODE_RUNNER_TESTED_VERSION=<its version> uv run --locked pytest \
+  tests/real_cli/test_pinned_cli.py tests/real_cli/test_named_pipe.py \
+  tests/real_cli/test_refused_request.py tests/real_cli/test_send_guard.py \
+  tests/real_cli/test_real_cli.py::test_installed_version_equals_pin \
+  tests/real_cli/test_real_cli.py::test_help_lists_contract_flags \
+  tests/real_cli/test_hosted_probe.py::test_help_names_every_hosted_flag \
+  tests/real_cli/test_hosted_probe.py::test_cli_knows_every_switch_and_the_budget_result
+```
+
+When they pass, the configuration names the CLI, the version and the pin it was proved against:
+
+```toml
+claude_bin = "<the new claude>"
+tested_claude_code_version = "<its version>"
+tested_claude_code_pin = "<PINNED_CLAUDE_CODE_VERSION of the running code>"
+```
+
+The probe then reports the CLI `online`, `check-config` prints `runtime ok`, and background
+mode runs on it. Every other version stays `runtime_version_untested` and fails background
+runs (`background_version_untested`). The proof holds only for the recordings of that pin: a
+runner whose pin differs ignores the entry, and `check-config` reports it `pin_changed`, a
+failure, so a deploy of a new pin removes the two keys. The contract subset does not prove
+what only a real turn shows (level two) or the mechanics of `test_background.py`; a CLI change
+there shows as failed runs, and the operator goes back to the pinned CLI.
 
 ## To check before the build
 

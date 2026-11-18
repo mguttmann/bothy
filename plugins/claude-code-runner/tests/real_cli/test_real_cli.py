@@ -20,13 +20,10 @@ import uuid
 from pathlib import Path
 
 import pytest
+from real_cli.record import expected_version
 
 from claude_code_runner.authcheck import parse_auth_method
-from claude_code_runner.heartbeat import (
-    MIN_CLAUDE_CODE_VERSION,
-    PINNED_CLAUDE_CODE_VERSION,
-    parse_version,
-)
+from claude_code_runner.heartbeat import MIN_CLAUDE_CODE_VERSION, parse_version
 from claude_code_runner.usage import parse_model_usage
 
 CONTRACT_FLAGS = (
@@ -76,7 +73,7 @@ def run(
 def test_installed_version_equals_pin() -> None:
     version = parse_version(run(["--version"]).stdout)
     assert version is not None
-    assert ".".join(map(str, version)) == PINNED_CLAUDE_CODE_VERSION
+    assert ".".join(map(str, version)) == expected_version()  # the pin or the tested version
     assert version >= parse_version(MIN_CLAUDE_CODE_VERSION)  # type: ignore[operator]
 
 

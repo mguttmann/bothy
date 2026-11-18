@@ -861,12 +861,13 @@ def supervisor_verdict(
     Args:
         found: The supervisor ``claude daemon status`` reports; ``None`` when none runs.
         recorded: The supervisor a launch of the runner started (``pid``, ``lstart``), if any.
-        pinned: The pinned version of the CLI.
+        pinned: The version the supervisor must run: the installed CLI's, which the mode
+            accepts (the pin or the tested version, `BackgroundMode.accepted_version`).
         lstart: Reads the start time of a process (``None`` when it does not exist).
 
     Returns:
         ``None`` when the launch may go on: no supervisor runs (the launch starts one), or the
-        one that runs is the recorded one in the pinned version. Else the code of the
+        one that runs is the recorded one in that version. Else the code of the
         fallback: ``background_supervisor_foreign`` for a supervisor the runner did not start,
         ``background_supervisor_version`` for its own in another version.
     """

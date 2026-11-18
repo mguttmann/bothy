@@ -135,6 +135,15 @@ _QUOTES = (b'"', b"'", b"`")
 _SCHEMA_MAX_BYTES = 1 << 18  # no message schema is longer; a match in other bytes ends here
 
 
+def expected_version() -> str:
+    """The version the contract tests expect of the installed CLI (FIX-RUNNER-TESTED-CLI).
+
+    The pin, or ``CLAUDE_CODE_RUNNER_TESTED_VERSION`` when an update chain proves a newer CLI
+    against the recordings of the pin; the version alone is no proof, the other checks are.
+    """
+    return os.environ.get("CLAUDE_CODE_RUNNER_TESTED_VERSION") or PINNED_CLAUDE_CODE_VERSION
+
+
 def cli_bytes(program: Path) -> bytes:
     """Return the bytes of the CLI: the program, or the package of a launcher script."""
     if program.stat().st_size > _WRAPPER_MAX_BYTES:

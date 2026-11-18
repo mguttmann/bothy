@@ -61,6 +61,21 @@ def test_the_mode_runs_only_on_the_pinned_version(tmp_path: Path) -> None:
     assert mode(tmp_path, version=None)[0].pinned() is False
 
 
+def test_the_mode_runs_on_a_tested_version_only_with_its_entry(tmp_path: Path) -> None:
+    """A version the update chain proved against this pin runs too; nothing else does."""
+    entry = {
+        "tested_claude_code_version": "2.1.327",
+        "tested_claude_code_pin": PINNED_CLAUDE_CODE_VERSION,
+    }
+    assert mode(tmp_path, version="2.1.327")[0].accepted_version() is None
+    built = mode(tmp_path, version="2.1.327", **entry)[0]
+    assert (built.pinned(), built.accepted_version()) == (True, "2.1.327")
+    assert mode(tmp_path, version="2.1.328", **entry)[0].pinned() is False
+    assert mode(tmp_path, **entry)[0].accepted_version() == PINNED_CLAUDE_CODE_VERSION
+    stale = {**entry, "tested_claude_code_pin": "2.1.325"}
+    assert mode(tmp_path, version="2.1.327", **stale)[0].pinned() is False
+
+
 def test_a_cause_of_the_host_shows_until_the_next_launch_starts(tmp_path: Path) -> None:
     built, changes = mode(tmp_path, launch_mode="background")
     assert built.unavailable is None

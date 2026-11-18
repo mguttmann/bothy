@@ -4,7 +4,8 @@
 `probe_version` runs ``claude --version`` within ``runner.cli_probe_timeout``; its outcome gives
 the degraded reasons ``runtime_unreachable`` (no answer), ``runtime_version_unsupported``
 (below `MIN_CLAUDE_CODE_VERSION`, below a minimum the API named for the model, or unreadable)
-and ``runtime_version_untested`` (another version than `PINNED_CLAUDE_CODE_VERSION`).
+and ``runtime_version_untested`` (another version than `PINNED_CLAUDE_CODE_VERSION` and than the
+version ``runner.tested_claude_code_version`` adds, `extra_tested_version`).
 `runtime_status` turns the last probe, the project readiness and the provable billing modes
 into the SDK's `RuntimeStatus`; the SDK adds
 ``details`` (capabilities, active runs, adapter and runtime names, protocol version).
@@ -37,6 +38,7 @@ __all__ = [
     "Probe",
     "billing_modes_supported",
     "capabilities",
+    "extra_tested_version",
     "parse_version",
     "probe_version",
     "raised_minimum",
@@ -152,6 +154,29 @@ class Probe:
         return bool(BLOCKING & set(self.reasons))
 
 
+def extra_tested_version(version: str | None, pin: str | None) -> str | None:
+    """Return the version ``runner.tested_claude_code_version`` adds to the pin, if any.
+
+    An update chain of the operator proves a newer CLI with the contract subset of the real-CLI
+    suite (``tests/real_cli``) against the recordings of this code's pin and records it with the
+    pin it was proved against (FIX-RUNNER-TESTED-CLI). The proof holds only for those
+    recordings, so the entry counts only while ``runner.tested_claude_code_pin`` is
+    `PINNED_CLAUDE_CODE_VERSION`.
+
+    Args:
+        version: ``runner.tested_claude_code_version``.
+        pin: ``runner.tested_claude_code_pin``.
+
+    Returns:
+        ``version`` while ``pin`` is this code's pin, else ``None``.
+
+    Examples:
+        >>> extra_tested_version("9.9.9", "1.0.0") is None
+        True
+    """
+    return version if version is not None and pin == PINNED_CLAUDE_CODE_VERSION else None
+
+
 def raised_minimum(minimum: str, *, current: str | None, required: str | None) -> str:
     """Return the minimum after the API refused the model to the CLI as too old (18.9).
 
@@ -181,13 +206,14 @@ def raised_minimum(minimum: str, *, current: str | None, required: str | None) -
     return ".".join(str(p) for p in wanted)
 
 
-async def probe_version(  # noqa: PLR0911 - one return per outcome
+async def probe_version(  # noqa: PLR0911, PLR0913 - one return per outcome, one input each
     claude_bin: str | None,
     env: Mapping[str, str],
     cwd: Path,
     timeout: float,  # NOSONAR - a timeout is a classified outcome, D-RUNNER-CLI-PIN-4
     *,
     minimum: str = MIN_CLAUDE_CODE_VERSION,
+    tested: str | None = None,
 ) -> Probe:
     """Run ``<claude_bin> --version`` and classify the answer.
 
@@ -198,6 +224,8 @@ async def probe_version(  # noqa: PLR0911 - one return per outcome
         timeout: ``runner.cli_probe_timeout``.
         minimum: The lowest supported version: `MIN_CLAUDE_CODE_VERSION`, or the higher one
             the API named for the model (`raised_minimum`).
+        tested: The version the operator proved against this pin (`extra_tested_version`); it
+            counts as tested like the pin.
 
     Returns:
         The probe.
@@ -233,7 +261,7 @@ async def probe_version(  # noqa: PLR0911 - one return per outcome
     version = ".".join(str(p) for p in parsed)
     if parsed < max(_as_tuple(MIN_CLAUDE_CODE_VERSION), _as_tuple(minimum)):
         return Probe(version, ("runtime_version_unsupported",))
-    if parsed != _as_tuple(PINNED_CLAUDE_CODE_VERSION):
+    if parsed != _as_tuple(PINNED_CLAUDE_CODE_VERSION) and version != tested:
         return Probe(version, ("runtime_version_untested",))
     return Probe(version, ())
 
