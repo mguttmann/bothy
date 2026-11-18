@@ -204,15 +204,10 @@ def test_the_wrapper_is_the_pinned_cli_s() -> None:
     assert content == PEER_LEAD + "Follow-up from Sam (@sam):\n\nAnd the header" + PEER_TAIL
 
 
-def test_the_record_names_a_marked_line_only_once_the_session_took_it() -> None:
+def test_the_record_keeps_every_written_code_and_never_a_text() -> None:
     watch, code = lines()
-    # Written, not taken: no file may name its uuid or code yet, the memory knows both.
-    assert watch.pending == {"mine"}
-    assert watch.codes == []
-    assert watch.carries_code(code)
-    assert watch.taken("mine")
-    assert not watch.taken("mine")
-    assert watch.pending == set()
+    # Noted before the write: a runner that adopts the turn knows it, also while the
+    # session has not taken the line yet.
     assert watch.codes == [code]
     again = OwnerLines(watch.codes)
     assert again.carries_code(code)

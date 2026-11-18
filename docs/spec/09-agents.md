@@ -3767,7 +3767,7 @@ Owner codes (background mode, addendum of 2026-11-18, FIX-RUNNER-TRUSTED-OWNER-F
 run in background mode whose triggering message is a person's (`trigger_message.author.kind`
 `user` and role `user` in the run context) has an owner: that person. The runner draws one-time
 codes for the run (20 random codes of 32 hex characters), keeps them in its memory only (never
-in a log; a code reaches the turn record only once the session took its line), and adds the owner check as the last
+in a log; the turn record names a code from the moment its line is written), and adds the owner check as the last
 text item of the run's first input line: the first 16 hex characters of the SHA-256 of each
 code and the rule for the model. A follow-up is the owner's when the message read with
 `getMessage` has the owner as its author, of kind `user`, with origin `human` (the server's
@@ -3790,8 +3790,9 @@ and for a line that starts a turn between the lead and the tail the pinned CLI w
 it), make the runner stop the session
 and end the run `failed`, reason `adapter_error`, with the cause
 `background_owner_code_stolen` and the warning of the same name; the session is continued by
-the next run like any other. The turn record keeps the codes of the marked lines the session took
-(never a text), so a runner that adopts the turn watches for them too; it has no unused code,
+the next run like any other. The turn record keeps every code the runner wrote, from before its
+line is written (never a text), so a runner that adopts the turn watches for them too, also
+for the code of a line the session had not taken yet; it has no unused code,
 marks no follow-up and cannot judge a line under a marked `uuid` by its text. Print mode has no owner check and no owner code: a follow-up there is a `user`
 message of the turn's stdin. A session that cannot take
 a line: when the socket is missing or refuses the bytes, the follow-up is not written and stays

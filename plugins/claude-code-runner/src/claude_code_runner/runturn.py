@@ -2143,7 +2143,6 @@ class RunTurn:
             self._persist()
             return
         echoed = self.followups.echo(line_uuid)
-        self.owner_lines.taken(line_uuid)
         if echoed is not None:
             await self._followup_state(echoed.message_id, "absorbed")
         self._persist()
@@ -2679,8 +2678,7 @@ class RunTurn:
             # are the runner's, and whether the counter-check of 18.3 has passed.
             part = {
                 **self.bg_record,
-                # A marked line's uuid joins the record once the session took it (18.5).
-                "own": sorted(self.bg_own - self.owner_lines.pending),
+                "own": sorted(self.bg_own),
                 "login": self.bg_login,
                 "owner_codes": self.owner_lines.codes,
             }
