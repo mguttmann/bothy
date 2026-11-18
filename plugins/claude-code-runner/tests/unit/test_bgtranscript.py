@@ -1429,9 +1429,10 @@ def _tool_step(patch: Patch, tool_use_id: str, records: list[dict[str, Any]]) ->
 def test_the_background_agents_of_a_real_turn_are_subagent_steps() -> None:
     # The records (structure only) of the turn of session d43d3be0 on 18.11.2026 07:33 with the
     # pinned CLI in background mode: three Agent calls with run_in_background, each answered
-    # "async_launched", and later the notification of the first agent's end. Before this fix
-    # the live box got the three tool calls and no subagent step (turn record: tasks {},
-    # subagents 0), so the live topology showed the run without its agents.
+    # "async_launched", and later the notification of each agent's end; the one of the second
+    # agent (it waits on its own background work) names the task id alone, no tool call. Before
+    # this fix the live box got the three tool calls and no subagent step (turn record: tasks
+    # {}, subagents 0), so the live topology showed the run without its agents.
     records = [json.loads(line) for line in BACKGROUND_AGENTS.read_text().splitlines()]
     live, patch = _agent_box(records)
     agents = _steps(patch, "subagent")
@@ -1445,19 +1446,29 @@ def test_the_background_agents_of_a_real_turn_are_subagent_steps() -> None:
         assert step["name"] == "local_agent"
         assert step["parent_step_id"] == _tool_step(patch, calls[step["title"]], records)
     first, second, third = agents
-    assert first["status"] == "completed"
+    assert [s["status"] for s in agents] == ["completed"] * 3
     assert first["detail"] == {
         "type": "local_agent",
         "usage": {"tokens": 121653, "tool_uses": 45, "duration_ms": 206769},
     }
-    assert second.get("status") is None  # still running: no end was read
-    assert third.get("status") is None
+    assert second["detail"]["usage"] == {"tokens": 154042, "tool_uses": 69, "duration_ms": 1320738}
+    assert third["detail"]["usage"]["tokens"] > 0
     assert patch.values["/metrics/subagents"] == 3
     assert live.state()["subagents"] == 3
-    # The background work the session list reports between turns ends no agent.
+
+
+def test_the_background_work_between_turns_ends_no_agent() -> None:
+    records = [json.loads(line) for line in BACKGROUND_AGENTS.read_text().splitlines()]
+    # Up to the first notification: the second agent is still running.
+    first_notice = next(
+        i
+        for i, r in enumerate(records)
+        if (r.get("origin") or {}).get("kind") == "task-notification"
+    )
+    live, patch = _agent_box(records[:first_notice])
     for tasks in ([{"task_id": BACKGROUND_TASK}], []):
         live.apply({"type": "system", "subtype": "background_tasks_changed", "tasks": tasks})
-    assert second.get("status") is None
+    assert [s.get("status") for s in _steps(patch, "subagent")] == [None, None, None]
 
 
 AGENT_NOW = datetime(2026, 11, 18, 7, 33, tzinfo=UTC)
@@ -1572,8 +1583,12 @@ def test_only_the_session_s_own_notification_of_a_known_agent_ends_its_step() ->
     _, patch = _agent_box([*launched, *others])
     [agent] = _steps(patch, "subagent")
     assert agent.get("status") is None
-    # The agent's own result text cannot change the status the CLI wrote before it.
-    own = _own_notice(_notice_text("toolu_a", "completed", "<status>failed</status>"))
+    # A tool call or status in the summary (the agent's description) or in the result text
+    # cannot change what the CLI wrote before them.
+    text = _notice_text("toolu_a", "completed", "<status>failed</status>").replace(
+        "<summary>done</summary>", "<summary><tool-use-id>toolu_b</tool-use-id></summary>"
+    )
+    own = _own_notice(text)
     _, patch = _agent_box([*launched, own])
     [agent] = _steps(patch, "subagent")
     assert agent["status"] == "completed"

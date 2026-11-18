@@ -176,7 +176,7 @@ _OWN_PRODUCER = "session-task"
 _CONTINUATION = "auto-continuation"
 _AGENT_TOOL = "Agent"
 _LAUNCHED = "async_launched"
-_NOTICE = re.compile(r"<(tool-use-id|status)>([^<]*)</\1>")
+_NOTICE = re.compile(r"<(task-id|tool-use-id|status)>([^<]*)</\1>")
 _NOTICE_USAGE = (
     ("subagent_tokens", "total_tokens"),
     ("tool_uses", "tool_uses"),
@@ -328,6 +328,8 @@ class TranscriptMapper:
         self._requests: set[str] = set()
         self._tasks: set[str] = set()
         """The tool calls of this process that opened a task step (an agent, a workflow)."""
+        self._task_calls: dict[str, str] = {}
+        """The tool call of each task id the CLI named in an ``async_launched`` result."""
 
     # ---- helpers ---------------------------------------------------------------------------
 
@@ -673,6 +675,10 @@ class TranscriptMapper:
             ref = item["tool_use_id"]
             if not isinstance(ref, str):
                 continue
+            # A notification may name the task by the CLI's id alone (agentId, taskId).
+            task_id = result.get("agentId") or result.get("taskId")
+            if launched and isinstance(task_id, str) and task_id:
+                self._task_calls[task_id] = ref
             if ref in self._tasks:
                 if not launched:
                     out.append(self._task_ended(ref, "failed" if item["is_error"] else "completed"))
@@ -684,9 +690,12 @@ class TranscriptMapper:
         """The end of a task in the notification the session gave itself.
 
         Only an input the session's own origin marks reaches here, and only a tool call of this
-        process ends: another sender's text never ends a step. The CLI writes the tool call and
-        the status before the result of the agent and the usage after it, so the first of the
-        former and the usage after the last ``</result>`` count; the result is never read.
+        process ends: another sender's text never ends a step. The CLI writes the task id, the
+        tool call (not always: a notification of an agent that waits on its own background work
+        names only the task id, real transcript of the pinned CLI) and the status before the
+        summary and the result, and the usage after the result; so only the part before
+        ``<summary>`` and the usage after the last ``</result>`` are read, never the summary
+        (it holds the agent's description) nor the result.
         """
         texts = [content] if isinstance(content, str) else []
         if isinstance(content, list):
@@ -699,11 +708,13 @@ class TranscriptMapper:
             ]
         out: list[dict[str, Any]] = []
         for text in texts:
-            head = text.split("<result>", 1)[0]
+            head = text.split("<summary>", 1)[0].split("<result>", 1)[0]
             found: dict[str, str] = {}
             for tag, value in _NOTICE.findall(head):
                 found.setdefault(tag, value.strip())
             ref, status = found.get("tool-use-id"), found.get("status")
+            if ref is None:
+                ref = self._task_calls.get(found.get("task-id", ""))
             if ref not in self._tasks or not status:
                 continue
             tail = text.rsplit("</result>", 1)[-1]
