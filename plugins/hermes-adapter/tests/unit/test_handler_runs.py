@@ -1255,12 +1255,15 @@ async def test_followup_after_interim_commentary_is_steered(tmp_path: Path) -> N
     assert [text for _, text, _ in rt.steered] == ["one more thing"]
 
 
-def _expired_clarify_script(request: CardRequest) -> Any:
-    """A turn whose clarify card Hermes no longer waits for: it goes on and answers alone."""
+def _expired_clarify_script(request: CardRequest, seen: list[Rig], notice: str) -> Any:
+    """A turn whose clarify card Hermes no longer waits for: it goes on and answers alone.
+
+    It answers once the run posted ``notice``, so the run is still open for the notice.
+    """
 
     async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
         assert await rt.events.on_card(turn.thread_id, request)
-        while not (rt.resolved or rt.answered):
+        while not any(m["content_md"] == notice for m in seen[0].fake.messages):
             await asyncio.sleep(0.01)
         await rt.events.on_answer(turn.thread_id, "I went on with red.", None)
         return TurnOutcome.COMPLETED
@@ -1271,8 +1274,12 @@ def _expired_clarify_script(request: CardRequest) -> Any:
 async def test_choice_on_an_expired_clarify_card_tells_the_person(tmp_path: Path) -> None:
     """D-HAM-2: Hermes' clarify expired, so the choice is rejected and the run says why."""
     request = CardRequest(CardKind.CLARIFY, "c1", "Which colour?", ("Red", "Blue"), "k")
-    rt = FakeRuntime(script=_expired_clarify_script(request), expired=True)
+    seen: list[Rig] = []
+    rt = FakeRuntime(
+        script=_expired_clarify_script(request, seen, cards.CLARIFY_EXPIRED), expired=True
+    )
     async with rig(tmp_path, runtime=rt) as r:
+        seen.append(r)
         triggered = await r.fake.trigger()
         await r.until(lambda: r.fake.run_state(triggered.run_id).state == "waiting_input")
         await r.fake.click(triggered.run_id, "cl:c1:1")
@@ -1288,8 +1295,12 @@ async def test_typed_answer_to_an_expired_clarify_card_tells_the_person(tmp_path
     """D-HAM-2: a typed answer Hermes' expired clarify did not take stays ``queued`` for the
     follow-on run, and the run says so."""
     request = CardRequest(CardKind.CLARIFY, "c1", "Which colour?", ("Red", "Blue"), "k")
-    rt = FakeRuntime(script=_expired_clarify_script(request), expired=True)
+    seen: list[Rig] = []
+    rt = FakeRuntime(
+        script=_expired_clarify_script(request, seen, cards.CLARIFY_EXPIRED_TYPED), expired=True
+    )
     async with rig(tmp_path, runtime=rt) as r:
+        seen.append(r)
         triggered = await r.fake.trigger()
         await r.until(lambda: r.fake.run_state(triggered.run_id).state == "waiting_input")
         typed = await r.fake.deliver_followup(triggered.run_id, "Blue, please")
