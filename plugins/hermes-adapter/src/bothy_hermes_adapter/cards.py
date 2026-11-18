@@ -37,11 +37,14 @@ from bothy_hermes_adapter.runtime import CardKind, CardRequest, OpenCard
 
 __all__ = [
     "APPROVAL_BUTTONS",
+    "CLARIFY_EXPIRED",
+    "CLARIFY_EXPIRED_TYPED",
     "MAX_BUTTONS",
     "MAX_RESPONSE_CHARS",
     "build_components",
     "card_text",
     "chosen_label",
+    "expiry_line",
     "parse_custom_id",
     "status_line",
 ]
@@ -51,6 +54,18 @@ MAX_BUTTONS: Final = 5
 
 MAX_RESPONSE_CHARS: Final = 200
 """Longest ``response.text`` of an answered interaction (the chosen label)."""
+
+CLARIFY_EXPIRED: Final = (
+    "This question has expired: the agent went on without an answer, so your choice did not "
+    "reach it. Send your answer as a message if it still matters."
+)
+"""The run's message after a choice on a clarify card Hermes no longer waits for (D-HAM-2)."""
+
+CLARIFY_EXPIRED_TYPED: Final = (
+    "This question had expired, so your message did not answer it: the agent went on without "
+    "an answer. The agent gets your message as a new message after this run."
+)
+"""The run's message after a typed answer to an expired clarify card (D-HAM-2)."""
 
 _LABEL_CHARS: Final = 80
 _STATUS_CHARS: Final = 200
@@ -76,6 +91,28 @@ def _label(text: str) -> str:
     return line if len(line) <= _LABEL_CHARS else line[: _LABEL_CHARS - 1] + "…"
 
 
+def _duration(seconds: int) -> str:
+    """A wait in words: seconds below two minutes, minutes below two hours, else hours."""
+    if seconds < 120:
+        return f"{seconds} second" if seconds == 1 else f"{seconds} seconds"
+    if seconds < 7200:
+        return f"{round(seconds / 60)} minutes"
+    return f"{round(seconds / 3600)} hours"
+
+
+def expiry_line(seconds: int) -> str:
+    """The line of a clarify card that says how long Hermes waits for the answer (D-HAM-2).
+
+    Example:
+        >>> "within 90 seconds;" in expiry_line(90)
+        True
+    """
+    return (
+        f"_This question expires if it is not answered within {_duration(seconds)}; "
+        "the agent then goes on without the answer._"
+    )
+
+
 def card_text(request: CardRequest) -> str:
     """The Markdown of the card message.
 
@@ -83,10 +120,13 @@ def card_text(request: CardRequest) -> str:
         request: The Hermes prompt.
 
     Returns:
-        The title and question.
+        The title and question; a clarify question with a time limit ends with its
+        `expiry_line`.
     """
     if request.kind is CardKind.SLASH_CONFIRM and request.title:
         return f"**{_label(request.title)}**\n\n{request.question}"
+    if request.kind is CardKind.CLARIFY and request.expires_after:
+        return f"{request.question}\n\n{expiry_line(request.expires_after)}"
     return request.question
 
 

@@ -17,9 +17,9 @@
     ]
   },
   "egress": [],
-  "inputs_sha256": "6d21804057794ead7fc79673c06870002497c1f9d4da91173ecdfae261ef130e",
+  "inputs_sha256": "a46fe617d5c9ef8f86b532b3d07b8e6b1f49abe2a38637bfb48c4781b9b3b5a3",
   "pin": {
-    "commit": "a8b0bc15053c1d71fb2bfea39007847c9e1c5673",
+    "commit": "f7e2898aaefc8f967dbf7345e3999a65672fe60e",
     "tag": null
   },
   "plugin_discovery": {
@@ -309,7 +309,7 @@
     "steer": {
       "facts": {
         "global_behaviour": {
-          "queue": "steered",
+          "queue": "new_turn",
           "steer": "steered"
         },
         "global_key": "display.busy_input_mode",
@@ -325,7 +325,7 @@
       "holds": false
     }
   },
-  "recorded_on": "2026-11-08",
+  "recorded_on": "2026-11-18",
   "surface": {
     "base.MAX_MESSAGE_LENGTH": {
       "present": false

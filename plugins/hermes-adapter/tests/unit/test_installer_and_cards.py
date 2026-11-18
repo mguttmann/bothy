@@ -288,3 +288,20 @@ async def test_store_claims_once_and_keeps_cards(tmp_path: Path) -> None:
     reopened = CallbackStore(path)
     assert not await reopened.claim("cl:c1")
     await reopened.close()
+
+
+def test_clarify_card_says_how_long_hermes_waits() -> None:
+    """D-HAM-2: a clarify card names Hermes' wait; other cards and an unlimited wait do not."""
+    ninety = CardRequest(CardKind.CLARIFY, "c1", "Which colour?", ("Red",), "k", expires_after=90)
+    hour = CardRequest(CardKind.CLARIFY, "c1", "Which colour?", ("Red",), "k", expires_after=3600)
+    open_ended = CardRequest(CardKind.CLARIFY, "c1", "Which colour?", ("Red",), "k")
+    approval = CardRequest(CardKind.APPROVAL, "a1", "Run it?", ("once",), "k", expires_after=90)
+    assert cards.card_text(ninety) == (
+        "Which colour?\n\n_This question expires if it is not answered within 90 seconds; "
+        "the agent then goes on without the answer._"
+    )
+    assert "within 60 minutes;" in cards.card_text(hour)
+    assert cards.card_text(open_ended) == "Which colour?"
+    assert cards.card_text(approval) == "Run it?"
+    assert "within 3 hours;" in cards.expiry_line(10800)
+    assert "within 1 second;" in cards.expiry_line(1)

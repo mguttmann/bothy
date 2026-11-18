@@ -99,7 +99,7 @@ from tools.async_delegation import (
     interrupt_for_session,
     list_async_delegations,
 )
-from tools.clarify_gateway import resolve_gateway_clarify
+from tools.clarify_gateway import get_clarify_timeout, resolve_gateway_clarify
 from tools.process_registry import process_registry
 from tools.transcription_tools import _get_provider, _load_stt_config, is_stt_enabled
 
@@ -111,7 +111,7 @@ from bothy_hermes_adapter.config import (
     load_token,
 )
 from bothy_hermes_adapter.context_format import ComposedUserSide
-from bothy_hermes_adapter.defaults import NO_SPLIT_LENGTH
+from bothy_hermes_adapter.defaults import DEFAULT_MAX_MESSAGE_BYTES, NO_SPLIT_LENGTH
 from bothy_hermes_adapter.handler import TOOL_REFUSED, HermesHandler
 from bothy_hermes_adapter.heartbeat import ADAPTER_NAME, RUNTIME_NAME, HermesAdapterLoop
 from bothy_hermes_adapter.hermes_commands import declared_commands
@@ -160,15 +160,67 @@ _INTERIM: Final = "interim text is shown as the run's progress"
 # How often the adapter looks at the gateway's startup restore before it connects; a poll of a
 # flag, not a deadline (the wait ends when Hermes is ready).
 _READY_POLL_S: Final = 0.1
+# Bytes of an approval card that are not the command: Hermes' header, fences, reason label,
+# deadline and smart-deny lines and the cut notice of a longer command (D-HAM-3).
+_EA_CARD_RESERVE: Final = 4096
 _PLATFORMS: dict[str, ServerPlatform] = {}
+
+
+def _stored_session(session_id: str, *, title_only: bool) -> tuple[bool, str | None]:
+    """Whether Hermes's session store has ``session_id``, and the session's title.
+
+    Hermes after the old session store (be3d6affc8) answers through its storage interface: a
+    handle on the profile's process-shared store, released at once (D-HAM-1). An older Hermes
+    has no ``persistence_assembly``; there ``hermes_state.SessionDB`` reads the row and its
+    context manager closes it. With ``title_only`` the storage interface reads the title alone
+    (``(False, None)`` then means no title, not an unknown session).
+
+    Raises:
+        Exception: The store cannot be read (the caller decides what that means).
+    """
+    try:
+        from persistence_assembly import (  # noqa: PLC0415 - only for a bind or a title
+            open_persistence,
+            profile_scope,
+        )
+    except ImportError:
+        from hermes_state import SessionDB  # noqa: PLC0415 - Hermes before the storage interface
+
+        with SessionDB() as db:
+            row = db.get_session(session_id)
+        if row is None:
+            return False, None
+        title = row.get("title")
+        return True, str(title) if title else None
+    with open_persistence(profile_scope()) as store:
+        if title_only:
+            title = store.sessions.get_title(session_id)
+            return bool(title), str(title) if title else None
+        record = store.sessions.get(session_id)
+    if record is None:
+        return False, None
+    title = record.title
+    return True, str(title) if title else None
+
+
+def _clarify_timeout() -> int | None:
+    """Seconds Hermes waits for a clarify answer; ``None`` without limit or when unreadable.
+
+    Hermes reads the same setting for the wait (``clarify.timeout``, else
+    ``agent.clarify_timeout``; 3600 by default before Hermes main lowered it to 90).
+    """
+    try:
+        seconds = int(get_clarify_timeout())
+    except Exception as exc:  # the card is shown without the line
+        _LOG.info("clarify timeout not readable: %s", type(exc).__name__)
+        return None
+    return seconds if seconds > 0 else None
 
 
 def _session_known(session_id: str) -> bool:
     """Whether Hermes's session store has ``session_id`` (``True`` when it cannot be read)."""
     try:
-        from hermes_state import SessionDB  # noqa: PLC0415 - only for a bind
-
-        return SessionDB().get_session(session_id) is not None
+        return _stored_session(session_id, title_only=False)[0]
     except Exception as exc:  # unreadable: let Hermes's /resume decide as before
         _LOG.info("session store not readable: %s", type(exc).__name__)
         return True
@@ -723,13 +775,11 @@ class ServerPlatform(BasePlatformAdapter):
         if session_id is None:
             return None
         try:
-            from hermes_state import SessionDB  # noqa: PLC0415 - only after a turn
-
-            title = SessionDB().get_session_title(session_id)
+            title = _stored_session(session_id, title_only=True)[1]
         except Exception as exc:  # no title is a valid answer
             _LOG.info("session title not readable: %s", type(exc).__name__)
             return None
-        return str(title) if title else None
+        return title
 
     def resolved_credential(self) -> ResolvedCredential:
         """The credential kind of the next turn (17.8), never its value."""
@@ -1135,15 +1185,29 @@ class ServerPlatform(BasePlatformAdapter):
         session_key: str,
         metadata: dict[str, Any] | None = None,
     ) -> SendResult:
-        """A clarify question as a card (``cl:<id>:<idx>``)."""
+        """A clarify question as a card (``cl:<id>:<idx>``) that says how long Hermes waits."""
         request = CardRequest(
             CardKind.CLARIFY,
             str(clarify_id),
             str(question),
             tuple(str(c) for c in choices or ()),
             str(session_key),
+            expires_after=_clarify_timeout(),
         )
         return await self._card(chat_id, metadata, request)
+
+    def _exec_approval_cmd_budget(self, description: str, smart_denied: bool) -> int:
+        """Characters of the command an approval card shows: as many as the message holds.
+
+        Hermes cuts the preview to this budget (3000 by default). A cut preview makes Hermes
+        main send the whole command first as progress, which the adapter shows as the run's
+        draft, so Hermes offers Deny only (D-HAM-3). The card is one message within
+        ``hermes_adapter.max_message_bytes``; a character takes at most four bytes in UTF-8.
+        """
+        del smart_denied  # its line is within the reserve
+        limit = self.settings.max_message_bytes if self.settings else DEFAULT_MAX_MESSAGE_BYTES
+        room = limit - len(description.encode("utf-8")) - _EA_CARD_RESERVE
+        return max(0, room // 4)
 
     async def _send_exec_approval_prompt(self, prompt: ExecApprovalPrompt) -> SendResult:
         """An approval as the card of 09 11.5 (``appr:<id>:<choice>``)."""

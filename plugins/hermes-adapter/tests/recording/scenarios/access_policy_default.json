@@ -26,11 +26,6 @@
       "user": "robin"
     },
     {
-      "do": "wait_for",
-      "message": "m-1",
-      "method": "on_processing_complete"
-    },
-    {
       "do": "wait_quiet"
     }
   ],

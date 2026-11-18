@@ -17,6 +17,12 @@
     },
     {
       "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
         "event": {
           "chat_id": "<id:2>",
           "message_id": "<id:1>",
@@ -176,6 +182,12 @@
     },
     {
       "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
+    },
+    {
+      "args": {
         "event": {
           "chat_id": "<id:2>",
           "message_id": "<id:8>",
@@ -222,6 +234,12 @@
         }
       },
       "method": "on_processing_complete"
+    },
+    {
+      "args": {
+        "value": false
+      },
+      "method": "read:authorization_is_upstream"
     },
     {
       "args": {
@@ -357,7 +375,7 @@
       "method": "on_processing_complete"
     }
   ],
-  "inputs_sha256": "6d21804057794ead7fc79673c06870002497c1f9d4da91173ecdfae261ef130e",
+  "inputs_sha256": "a46fe617d5c9ef8f86b532b3d07b8e6b1f49abe2a38637bfb48c4781b9b3b5a3",
   "model_requests": [
     {
       "credential": "none",
@@ -369,7 +387,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:2166158104bffab7fc7f0f5c620a40a0ed57a9ba2d19d7ed94f19d68d7f7cf59:5036",
+        "sha256:41f2c94ae6e171952e6c3fe17860c159281a6830138852a723e375f2a2869457:5184",
         "sha256:354fffcff870d90b48e0469344c0dd645038ce983084ac81086eeb4f70266c04:37"
       ],
       "roles": [
@@ -424,7 +442,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:2166158104bffab7fc7f0f5c620a40a0ed57a9ba2d19d7ed94f19d68d7f7cf59:5036",
+        "sha256:41f2c94ae6e171952e6c3fe17860c159281a6830138852a723e375f2a2869457:5184",
         "sha256:354fffcff870d90b48e0469344c0dd645038ce983084ac81086eeb4f70266c04:37",
         "sha256:42069384d477d67e018da6d80538e858956d30482b09488a9daf31219f3da392:46"
       ],
@@ -622,7 +640,7 @@
     }
   ],
   "pin": {
-    "commit": "a8b0bc15053c1d71fb2bfea39007847c9e1c5673",
+    "commit": "f7e2898aaefc8f967dbf7345e3999a65672fe60e",
     "tag": null
   },
   "scenario": "session_resume_missing"

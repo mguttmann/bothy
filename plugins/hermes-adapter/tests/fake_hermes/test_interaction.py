@@ -411,3 +411,67 @@ async def test_followup_after_interim_commentary_is_steered(world: HermesWorld) 
         ]
         assert steered, "the follow-up did not reach the running turn"
         assert _followup_states(rig, message) == ["delivered", "absorbed"]
+
+
+async def test_late_choice_on_an_expired_clarify_card_is_told(world: HermesWorld) -> None:
+    """D-HAM-2 against the pinned Hermes: the card names Hermes' clarify wait, and a choice
+    after it expired is rejected with a message of the run instead of failing silently."""
+    from bothy_hermes_adapter import cards
+
+    clarify = {
+        "name": "clarify",
+        "arguments": {"questions": [{"question": "Which colour?", "choices": ["Red", "Blue"]}]},
+    }
+    script = [
+        ScriptTurn(tool_calls=(clarify,)),
+        ScriptTurn(text=("I went ", "on with red."), hold="after", paced=True),
+    ]
+    profile = Profile(config={"agent": {"clarify_timeout": 2}})
+    async with hermes_rig(world, script, profile=profile) as rig:
+        fake = rig.fake
+        triggered = await fake.trigger("Pick a colour.")
+        await rig.until(
+            lambda: fake.run_state(triggered.run_id).state == "waiting_input", "the card"
+        )
+        card = next(m for m in fake.messages if m["kind"] == "card")
+        assert card["content_md"].endswith(cards.expiry_line(2)), card["content_md"]
+        # Hermes' wait ends and the turn goes on: its next model request is held.
+        await asyncio.to_thread(rig.model.wait_held, "after")
+        custom = [c["custom_id"] for c in card["components"]]
+        assert await fake.click(triggered.run_id, custom[1]) is not None
+        await rig.until(
+            lambda: any(m["content_md"] == cards.CLARIFY_EXPIRED for m in fake.messages),
+            "the expiry notice",
+        )
+        rig.model.release("after")
+        await _end(rig, triggered.run_id)
+        responds = rig.requests("respondToInteraction")
+        assert [q.json["state"] for q in responds] == ["rejected"]
+        texts = [m["content_md"] for m in fake.messages if m["kind"] == "text"]
+        assert texts == [cards.CLARIFY_EXPIRED, "I went on with red."], gateway_log(rig)
+
+
+async def test_long_command_approval_offers_every_choice(world: HermesWorld) -> None:
+    """D-HAM-3 against the pinned Hermes: an approval card shows a command longer than Hermes'
+    3000-character preview whole and keeps its approve buttons."""
+    command = "rm -r /tmp/bothy-ham-probe-missing && echo " + "x" * 3500
+    shell = {"name": "terminal", "arguments": {"command": command}}
+    script = [
+        ScriptTurn(tool_calls=(shell,)),
+        ScriptTurn(text=("Not ", "run."), paced=True),
+    ]
+    profile = Profile(toolsets=("todo", "terminal"))
+    async with hermes_rig(world, script, profile=profile, tool_class="host") as rig:
+        fake = rig.fake
+        triggered = await fake.trigger("Clean up.")
+        await rig.until(
+            lambda: fake.run_state(triggered.run_id).state == "waiting_input", "the card"
+        )
+        card = next(m for m in fake.messages if m["kind"] == "card")
+        custom = [c["custom_id"] for c in card["components"]]
+        assert command in card["content_md"], gateway_log(rig)
+        assert [c.rsplit(":", 1)[1] for c in custom] == ["once", "session", "always", "deny"]
+        assert await fake.click(triggered.run_id, custom[-1]) is not None
+        await _end(rig, triggered.run_id)
+        # The whole command was never sent ahead of the card as the run's progress.
+        assert not [m for m in fake.messages if m["kind"] == "text" and command in m["content_md"]]
