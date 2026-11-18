@@ -700,7 +700,10 @@ enforces:
       sender's. The list holds `task-notification` with the producer `session-task` and
       without a `subkind` (the notification of work the session itself launched; the producer
       run with a background command, the rest read, item 40) and `auto-continuation` (a
-      continuation the CLI queues by itself; read, item 37). Every other origin, also one a
+      continuation the CLI queues by itself; read, item 37). A `queued_command` attachment
+      with `commandMode` `task-notification` and no origin is the session's own too: the CLI
+      queues the notification of a background agent, monitor, workflow or timer of the
+      session that way (FIX-RUNNER-BG-OWN-NOTICE). Every other origin, also one a
       later version adds, is another sender's and is logged; the mode runs only on the pin.
     - Why the kind `task-notification` is not enough: the second version of this change took
       every origin of that kind for the session's own. The CLI records under it what other
