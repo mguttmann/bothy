@@ -22,3 +22,6 @@ a send of the whole command first. Normative text: 09 17.3 (rows `send_clarify`,
 - `cards._duration` rounds: a clarify wait of 210 s reads "4 minutes" on the card although the question expires after three and a half; round down for waits that are not whole minutes.
 - With a small `hermes_adapter.max_message_bytes` the approval preview budget of D-HAM-3 falls below Hermes' own 3000 characters (about 1000 characters at 8192 bytes, none below the reserve), so an old Hermes shows less of the command than before; keep at least Hermes' default when the card still fits.
 - `CLARIFY_EXPIRED` says the agent went on; after a restart of the gateway the question is gone without the turn going on, so the wording is not exact there.
+- D-HAM-5 reads the session task before `handle_message` awaits; in the busy path a hand-over to the drain task of another, already pending event inside that window would make `_dispatch` wait on the foreign task (not reproduced). Wait only when the task came from `_start_session_processing` of the own event.
+- 09 17.3, row `on_processing_complete`, does not name the second way to `run.finish` `failed` (the end of the task without a completion); only 17.7 does.
+- The two stranger tests of D-HAM-5 check that the run finished, not that it ended `failed`; the log line "refused sender" also covers other ends without a completion.
