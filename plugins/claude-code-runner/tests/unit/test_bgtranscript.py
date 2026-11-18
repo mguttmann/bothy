@@ -488,13 +488,14 @@ def test_own_notifications_a_subagent_took_are_the_session_s_own() -> None:
 
 def test_without_the_subagent_files_the_same_inputs_stay_foreign() -> None:
     # A mapper that cannot read the files of the session's agents knows nothing that
-    # attributes these inputs, so it keeps to the rule: foreign at the first answer.
+    # attributes these inputs, so it keeps to the rule: foreign at the first answer, each
+    # input with its own warning.
     records = [json.loads(line) for line in SUBAGENT_NOTICE.read_text().splitlines()]
     mapper = TranscriptMapper("prompt-uuid")
     outs = [mapper.map(r) for r in records]
     first = next(i for i, o in enumerate(outs) if foreign(o))
     assert records[first]["type"] == "assistant"
-    assert [m["origin"] for m in foreign(outs[first])] == ["unattributed"]
+    assert [m["origin"] for m in foreign(outs[first])] == ["unattributed"] * 4
 
 
 def _subagent_copy(tmp_path: Path, **attachment: Any) -> Path:
@@ -633,6 +634,31 @@ def test_an_input_taken_during_a_turn_that_nothing_attributes_is_another_sender_
     mapper = started("mine")
     mapper.map(absorbed("mine"))
     assert foreign(mapper.map(ASSISTANT)) == []
+
+
+def test_each_unattributed_input_is_logged_and_a_newer_one_stays_open() -> None:
+    # Since an input of another sender is only logged (FIX-RUNNER-BG-FOREIGN-LOG), judging
+    # one input must not drop the others: each one gives its own warning, and an input the
+    # next request has not carried yet is judged at that request's first output.
+    mapper = started("mine")
+    mapper.map(absorbed("first"))
+    mapper.map(absorbed("second"))
+    mapper.map(REQUEST)
+    mapper.map(absorbed("newer"))
+    assert [m["origin"] for m in foreign(mapper.map(ASSISTANT))] == [
+        "unattributed",
+        "unattributed",
+    ]
+    mapper.map(REQUEST)
+    assert [m["origin"] for m in foreign(mapper.map(ASSISTANT))] == ["unattributed"]
+    assert foreign(mapper.map(TURN_ENDS)) == []
+    # The session's own input among them still gives no warning.
+    mapper = started("mine")
+    mapper.map(absorbed("someone"))
+    mapper.map(absorbed("made-by-the-cli"))
+    mapper.map(REQUEST)
+    mapper.map(queued("made-by-the-cli", "task-notification", producer="session-task"))
+    assert [m["origin"] for m in foreign(mapper.map(ASSISTANT))] == ["unattributed"]
 
 
 def test_what_a_line_says_about_itself_changes_nothing() -> None:

@@ -463,17 +463,18 @@ class TranscriptMapper:
         such an input into the session's transcript but the attachment that attributes it
         into the agent's own file (real transcript of the pinned CLI, FIX-RUNNER-BG-SIDE-NOTICE).
         So the files of the session's agents (``side``) are asked first, by the same rule as
-        an attachment here: only the session's own work is the session's.
+        an attachment here: only the session's own work is the session's. Each judged input
+        gives its own warning and leaves the sets alone; an input not in ``inputs`` stays open
+        until its own request (FIX-RUNNER-BG-FOREIGN-LOG).
         """
+        out: list[dict[str, Any]] = []
         for line in sorted(inputs):
             verdict = self._side_verdict(line)
-            if verdict != _SELF:
-                self._open.clear()
-                self._sealed.clear()
-                return [self._foreign(verdict or "unattributed")]
             self._open.discard(line)
             self._sealed.discard(line)
-        return []
+            if verdict != _SELF:
+                out.append(self._foreign(verdict or "unattributed"))
+        return out
 
     def _side_verdict(self, line: str) -> str | None:
         """Whose input the files of the session's agents say ``line`` was; ``None``: nobody's."""
