@@ -61,3 +61,7 @@ Evidence (each test fails on the previous handler or app):
   authority, guarded by the data block with a random boundary only.
 - A follow-up steered but left `queued` (D-FMS-3) shows "Discarded" after a stop although its
   text reached the agent.
+- Answer to an open card (red team round 2): a stop during its file wait cancels the handler
+  before its log line; it does not check the run's end after the wait; an unreadable answer is
+  logged without its message ID and a lost claim not at all; it does not take the order lock of
+  D-FMS-4, so a text sent during its wait can overtake it.
