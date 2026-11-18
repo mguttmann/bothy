@@ -27,6 +27,7 @@ from bothy_sdk.testing._patience import PATIENCE
 
 from claude_code_runner.app import Runner
 from claude_code_runner.bgpaths import bg_files
+from claude_code_runner.bgsession import GUARD_TIMEOUT, send_guard_command
 from claude_code_runner.bgtranscript import READ_FIELDS
 from claude_code_runner.causes import ADAPTER_STOPPED, RUN_ENDED_IDLE, cause
 from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
@@ -156,7 +157,6 @@ async def test_a_new_post_runs_as_one_background_session(bg_world: World) -> Non
         "Bash(git status)",
         "--disallowedTools",
         "AskUserQuestion",
-        "SendMessage",
         "ListAgents",
         "SendFile",
         "--append-system-prompt-file",
@@ -168,7 +168,8 @@ async def test_a_new_post_runs_as_one_background_session(bg_world: World) -> Non
     ]
     tmpdir = str(world.state / "tmp" / str(run.run_id))
     # No crossSessionInbound while the host user's settings have none: what the session
-    # takes from other sessions is not widened.
+    # takes from other sessions is not widened. SendMessage reaches the session's own
+    # subagents only, through the hook of the settings file (FIX-RUNNER-SENDMESSAGE-OWN).
     assert launch["settings"] == {
         "worktree": {"bgIsolation": "none"},
         "env": {
@@ -177,6 +178,21 @@ async def test_a_new_post_runs_as_one_background_session(bg_world: World) -> Non
             "TMPDIR": tmpdir,
             "SSH_AUTH_SOCK": "",
         },
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "matcher": "SendMessage",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": send_guard_command(),
+                            "timeout": GUARD_TIMEOUT,
+                        }
+                    ],
+                }
+            ]
+        },
+        "disableAllHooks": False,
     }
     # The prompt is the stdin of the command: the context, a blank line, the trigger part.
     assert launch["prompt"].endswith("Fix the login form")

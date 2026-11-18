@@ -23,10 +23,12 @@ as the runner's own lines need: the settings file of a run sets ``crossSessionIn
 ``accept`` only when the host user's own settings say ``hold``, which would otherwise hold the
 runner's follow-ups too (`host_inbound_value`, FIX-RUNNER-BG-HELD-FOLLOWUP), and none otherwise,
 so the CLI's own rule per message or any other value of the host stays; a ``refuse`` there is
-never overridden. The tools found in the pinned CLI that
-write to or list other sessions are disallowed (`DENIED_TOOLS`). Neither authenticates a
-sender: the runner decides by the ``uuid`` of every input the transcript shows
-(`claude_code_runner.bgtranscript`, 09 18.5).
+never overridden. The tools found in the pinned CLI that list other sessions or send files to
+them are disallowed (`DENIED_TOOLS`). ``SendMessage`` reaches the session's own subagents
+only: the settings file carries the hook `claude_code_runner.sendguard`, which refuses every
+other recipient, and where hooks cannot run the tool is disallowed too (`own_agent_messages`,
+FIX-RUNNER-SENDMESSAGE-OWN). None of this authenticates a sender: the runner decides by the
+``uuid`` of every input the transcript shows (`claude_code_runner.bgtranscript`, 09 18.5).
 
 A session inherits the environment of the supervisor, which lives across runs. So the launch
 command, which starts the supervisor when none runs, gets the fixed environment of
@@ -61,15 +63,18 @@ import json
 import logging
 import os
 import re
+import shlex
 import signal
 import socket
 import subprocess  # nosec B404 - argument lists, never a shell, program from the cleaned PATH
+import sys
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from claude_code_runner import sendguard
 from claude_code_runner.adoption import process_id, read_identity
 from claude_code_runner.commandline import (
     ArgumentError,
@@ -85,7 +90,10 @@ from claude_code_runner.usage import claude_config_dir
 
 __all__ = [
     "DENIED_TOOLS",
+    "GUARD_TIMEOUT",
+    "MANAGED_SETTINGS_DIR",
     "NAME_PREFIX",
+    "OWN_MESSAGE_DENIED",
     "RUN_ENV_NAMES",
     "BgSession",
     "LaunchOutput",
@@ -96,14 +104,17 @@ __all__ = [
     "Supervisor",
     "background_argv",
     "background_class_flags",
+    "hooks_switched_off",
     "host_inbound_value",
     "launch",
     "load_supervisor",
+    "own_agent_messages",
     "parse_launch",
     "parse_sessions",
     "parse_supervisor",
     "prompt_text",
     "send_frames",
+    "send_guard_command",
     "sender_class",
     "session_name",
     "settings_document",
@@ -120,19 +131,40 @@ of the session list under another name belongs to another program and is never s
 removed."""
 
 DENIED_TOOLS = ("AskUserQuestion", "SendMessage", "ListAgents", "SendFile")
-"""The tools no background session of the runner has (``--disallowedTools``, 09 18.2). A
-question of ``AskUserQuestion`` blocks a session until a person answers it. The other three
-are the tools found in the pinned CLI that reach the other Claude Code sessions of the host
-user: ``SendMessage`` writes to one and ``ListAgents`` lists them (run with the pinned CLI),
-and ``SendFile`` sends files to one, by a name of that list or by the address of its socket
-(read in the file of the pinned CLI: an account feature switches the tool on, so a session
-without a login offers none and no run showed it). The deny rule for ``SendMessage`` also
-takes the messages to the session's own subagents and teammates, which that tool serves too.
+"""The tools a background session of the runner has not where hooks cannot run
+(``--disallowedTools``, 09 18.2). A question of ``AskUserQuestion`` blocks a session until a
+person answers it. The other three are the tools found in the pinned CLI that reach the other
+Claude Code sessions of the host user: ``SendMessage`` writes to one and ``ListAgents`` lists
+them (run with the pinned CLI), and ``SendFile`` sends files to one, by a name of that list or
+by the address of its socket (read in the file of the pinned CLI: an account feature switches
+the tool on, so a session without a login offers none and no run showed it).
 
 The list is what was found, by runs and by reading the file, not a proof that the CLI has no
 further such tool: one that a later version or another account feature adds is not denied
 until it stands here, and ``tests/real_cli/test_pinned_cli.py`` holds each name in the file
 of the pinned version."""
+
+SEND_TOOL = "SendMessage"
+
+OWN_MESSAGE_DENIED = tuple(tool for tool in DENIED_TOOLS if tool != SEND_TOOL)
+"""The deny list of a session whose settings file carries the hook of
+`claude_code_runner.sendguard` (`own_agent_messages`): ``SendMessage`` stays, so the session
+can give one of its own running subagents more to work with, and the hook refuses every
+recipient that is not an agent of the session (FIX-RUNNER-SENDMESSAGE-OWN). ``ListAgents``
+stays denied: the ``agentId`` a message needs is in the result of the ``Agent`` tool."""
+
+GUARD_TIMEOUT = 60
+"""The time limit of the hook (seconds). The pinned CLI runs the tool when a hook runs out of
+time (run with the pinned CLI), so the limit is far above the few file checks of the hook."""
+
+MANAGED_SETTINGS_DIR = Path(
+    "/Library/Application Support/ClaudeCode" if sys.platform == "darwin" else "/etc/claude-code"
+)
+"""The folder of the managed settings files of the CLI (``managed-settings.json`` and
+``managed-settings.d``), read in the file of the pinned CLI."""
+
+_HOOKS_OFF = ("disableAllHooks", "allowManagedHooksOnly")
+"""The members of a managed settings file that keep the hook of a run from running."""
 
 RUN_ENV_NAMES = ("CLAUDE_PRODUCT_RUN", "DISABLE_AUTOUPDATER", "TMPDIR", "SSH_AUTH_SOCK")
 """The names of the ``env`` block of a run's settings file, each set in every launch."""
@@ -191,19 +223,26 @@ def session_name(run_id: object) -> str:
 
 
 def background_class_flags(
-    tool_class: str, tools: Sequence[str], hosted: HostedArgs | None = None
+    tool_class: str,
+    tools: Sequence[str],
+    hosted: HostedArgs | None = None,
+    *,
+    own_messages: bool = False,
 ) -> list[str]:
     """Return the flags of a tool class for a background session (09 18.2).
 
     The flags of `claude_code_runner.commandline.class_flags`, and under ``scoped`` and ``host``
     `DENIED_TOOLS` in ``--disallowedTools``: nobody is there to answer a question, and a
     session of the runner neither writes or sends files to nor lists the other sessions of
-    the host user. ``chat`` has no tool (``--tools ""`` leaves none, run with the pinned CLI).
+    the host user. With ``own_messages`` the list is `OWN_MESSAGE_DENIED`: the session keeps
+    ``SendMessage`` for its own subagents, and the hook of its settings file refuses every
+    other recipient. ``chat`` has no tool (``--tools ""`` leaves none, run with the pinned CLI).
 
     Args:
         tool_class: ``chat``, ``scoped`` or ``host``.
         tools: The named tools of ``scoped``.
         hosted: The parts of a hosted turn: the tool flags of 26 5.3 instead of 18.2.
+        own_messages: The settings file carries the hook (`own_agent_messages`).
 
     Returns:
         The flags.
@@ -216,6 +255,8 @@ def background_class_flags(
         ['--permission-mode', 'bypassPermissions', '--disallowedTools']
         >>> background_class_flags("host", [])[3:]
         ['AskUserQuestion', 'SendMessage', 'ListAgents', 'SendFile']
+        >>> background_class_flags("host", [], own_messages=True)[3:]
+        ['AskUserQuestion', 'ListAgents', 'SendFile']
     """
     if hosted is None:
         flags = class_flags(tool_class, tools)
@@ -223,7 +264,8 @@ def background_class_flags(
         flags = hosted_class_flags(tool_class, tools, has_skills=hosted.has_skills)
     if tool_class == "chat":
         return flags
-    return [*flags, "--disallowedTools", *DENIED_TOOLS]
+    own = own_messages and hosted is None  # a hosted turn runs without hooks (26 5.4)
+    return [*flags, "--disallowedTools", *(OWN_MESSAGE_DENIED if own else DENIED_TOOLS)]
 
 
 def background_argv(  # noqa: PLR0913 - every input of the command line is explicit
@@ -240,6 +282,7 @@ def background_argv(  # noqa: PLR0913 - every input of the command line is expli
     settings_file: Path,
     hosted: HostedArgs | None = None,
     plugin_dirs: Sequence[Path] = (),
+    own_messages: bool = False,
 ) -> list[str]:
     """Build the argument list of the launch command in the order of 09 18.2.
 
@@ -268,6 +311,8 @@ def background_argv(  # noqa: PLR0913 - every input of the command line is expli
         settings_file: The settings file of the run (``--settings``).
         hosted: The parts of a hosted turn (26 5.3); ``None`` for the runner's own agent.
         plugin_dirs: Channel skill folders (26 5.9), only for ``host``.
+        own_messages: The settings file carries the hook of `claude_code_runner.sendguard`
+            (`own_agent_messages`), so ``SendMessage`` is not disallowed.
 
     Returns:
         The argument list.
@@ -286,7 +331,7 @@ def background_argv(  # noqa: PLR0913 - every input of the command line is expli
     if resume is not None:
         argv += ["--resume", resume]
     argv += ["--bg", "--name", name, "--model", model]
-    argv += background_class_flags(tool_class, tools, hosted)
+    argv += background_class_flags(tool_class, tools, hosted, own_messages=own_messages)
     if hosted is None:
         argv += [a for folder in plugin_dirs for a in ("--plugin-dir", str(folder))]
     else:
@@ -305,14 +350,18 @@ def background_argv(  # noqa: PLR0913 - every input of the command line is expli
 
 
 def settings_document(
-    env: Mapping[str, str], base: Mapping[str, Any] | None = None
+    env: Mapping[str, str],
+    base: Mapping[str, Any] | None = None,
+    *,
+    own_messages: bool = False,
 ) -> dict[str, Any]:
     """Return the settings of a run's background session (``--settings``, 09 18.2).
 
-    Exactly two members. ``worktree.bgIsolation`` ``none`` keeps the session in the project
-    folder: without it a background session moves into a Git worktree of its own, against
-    18.1, and its transcript moves with it. ``env`` carries what must reach the session
-    process, because of the launching command's environment only ``PATH`` does.
+    Exactly two members, and with ``own_messages`` two more. ``worktree.bgIsolation`` ``none``
+    keeps the session in the project folder: without it a background session moves into a
+    Git worktree of its own, against 18.1, and its transcript moves with it. ``env`` carries
+    what must reach the session process, because of the launching command's environment only
+    ``PATH`` does.
 
     Every name of `RUN_ENV_NAMES` is set in every document, a name the turn has no value for
     to the empty text: a session inherits the environment of the supervisor, which lives across
@@ -333,12 +382,22 @@ def settings_document(
     own), ``accept`` already lets the lines through, and a value the CLI does not know is left
     as it is. A value of managed settings stays in force too.
 
+    With ``own_messages`` (`own_agent_messages`, FIX-RUNNER-SENDMESSAGE-OWN) the document
+    carries the ``PreToolUse`` hook of `claude_code_runner.sendguard` for ``SendMessage``,
+    which refuses every recipient but an agent of the session, and ``disableAllHooks``
+    ``false``: a ``true`` of the project's settings, which are content of the folder the run
+    works in, would switch the hook off, and a value of ``--settings`` goes before it (run
+    with the pinned CLI). A ``true`` of the host user's own settings or of managed settings
+    makes `own_agent_messages` false instead, so the document never overrides the operator's
+    choice. A hosted turn never gets the hook: its settings switch hooks off (26 5.4).
+
     A hosted turn gives the settings of 26 5.4 as ``base``; the document is then those
     settings with the two members added (they carry no ``env`` and no ``worktree``).
 
     Args:
         env: The environment of the turn (`claude_code_runner.environment.build_environment`).
         base: The settings of a hosted turn, if any.
+        own_messages: The session may message its own subagents (`own_agent_messages`).
 
     Returns:
         The document; ``env`` holds ``CLAUDE_PRODUCT_RUN``, ``DISABLE_AUTOUPDATER``, the run's
@@ -353,7 +412,103 @@ def settings_document(
     document = {**(base or {}), "worktree": {"bgIsolation": "none"}, "env": session_env}
     if host_inbound_value(env) == "hold":
         document[INBOUND_SETTING] = "accept"
+    if own_messages and base is None:
+        guard = {
+            "matcher": SEND_TOOL,
+            "hooks": [
+                {"type": "command", "command": send_guard_command(), "timeout": GUARD_TIMEOUT}
+            ],
+        }
+        document["hooks"] = {"PreToolUse": [guard]}
+        document["disableAllHooks"] = False
     return document
+
+
+def send_guard_command(python: str | None = None) -> str:
+    """Return the command of the ``SendMessage`` hook of a run's settings file.
+
+    The file of `claude_code_runner.sendguard` runs by its path with ``-I``, so neither the
+    environment of the session nor an import of the package decides; ``|| exit 2`` refuses the
+    call when the interpreter does not start, because the CLI runs the tool after any other
+    exit status of a hook (run with the pinned CLI).
+
+    Args:
+        python: The interpreter; the runner's own by default.
+
+    Returns:
+        The command line for the shell of the CLI.
+    """
+    interpreter = python or sys.executable
+    return f"{shlex.quote(interpreter)} -I {shlex.quote(sendguard.__file__)} || exit 2"
+
+
+def own_agent_messages(env: Mapping[str, str], *, hosted: bool, tool_class: str) -> bool:
+    """Whether a run's session may message its own subagents (FIX-RUNNER-SENDMESSAGE-OWN).
+
+    Only under ``scoped`` and ``host`` (a ``chat`` turn has no tool, so its settings file
+    must not switch the project's hooks on again) and only where the hook of
+    `claude_code_runner.sendguard` runs: never in a hosted turn, whose settings switch hooks
+    off (26 5.4), and not while the host user's own settings or managed settings switch hooks
+    off (`hooks_switched_off`). Otherwise ``SendMessage`` stays disallowed, as before.
+
+    Args:
+        env: The environment of the turn.
+        hosted: The turn is a hosted one (26 5.3).
+        tool_class: ``chat``, ``scoped`` or ``host``.
+
+    Returns:
+        True when the launch keeps ``SendMessage`` and its settings file carries the hook.
+    """
+    if tool_class not in ("scoped", "host") or hosted:
+        return False
+    return not hooks_switched_off(env)
+
+
+def hooks_switched_off(env: Mapping[str, str], managed: Path | None = None) -> bool:
+    """Whether a setting the runner does not override keeps the hook of a run from running.
+
+    ``disableAllHooks`` ``true`` in the host user's own settings (`host_inbound_value` reads
+    the same file), or ``disableAllHooks`` or ``allowManagedHooksOnly`` ``true`` in a managed
+    settings file. A managed file that exists but cannot be read counts as switching hooks off.
+    Managed settings of a device management profile or of a server are not read here; a host
+    that has them is checked before the runner runs there.
+
+    Args:
+        env: The environment of the turn.
+        managed: The folder of the managed settings files (`MANAGED_SETTINGS_DIR`).
+
+    Returns:
+        True when hooks may not run.
+    """
+    user = _user_settings(env)
+    if user is not None and user.get("disableAllHooks") is True:
+        return True
+    folder = MANAGED_SETTINGS_DIR if managed is None else managed
+    files = [folder / "managed-settings.json"]
+    with contextlib.suppress(OSError):
+        files += sorted((folder / "managed-settings.d").glob("*.json"))
+    for path in files:
+        if not path.exists():
+            continue
+        try:
+            doc = json.loads(path.read_text("utf-8"))
+        except (OSError, ValueError):
+            return True
+        if not isinstance(doc, dict) or any(doc.get(key) is True for key in _HOOKS_OFF):
+            return True
+    return False
+
+
+def _user_settings(env: Mapping[str, str]) -> dict[str, Any] | None:
+    """The host user's own ``settings.json`` of the turn, or ``None`` when it cannot be read."""
+    folder = claude_config_dir(env)
+    if folder is None:
+        return None
+    try:
+        doc = json.loads((folder / "settings.json").read_text("utf-8"))
+    except (OSError, ValueError):
+        return None
+    return doc if isinstance(doc, dict) else None
 
 
 def host_inbound_value(env: Mapping[str, str]) -> object | None:
@@ -369,14 +524,8 @@ def host_inbound_value(env: Mapping[str, str]) -> object | None:
     Returns:
         The value, or ``None``.
     """
-    folder = claude_config_dir(env)
-    if folder is None:
-        return None
-    try:
-        doc = json.loads((folder / "settings.json").read_text("utf-8"))
-    except (OSError, ValueError):
-        return None
-    return doc.get(INBOUND_SETTING) if isinstance(doc, dict) else None
+    doc = _user_settings(env)
+    return None if doc is None else doc.get(INBOUND_SETTING)
 
 
 def sender_class(tool_class: str) -> str | None:
