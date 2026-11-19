@@ -23,3 +23,5 @@ Open minors (for the next run in this area of the runner):
   the contract subset holds them against a newer CLI.
 - `field_changes` names no message schema that a newer CLI adds beyond `record.SCHEMAS`; it can
   only report additions inside the recorded messages.
+- The `state` values of the workflow agent entries (`livebox._AGENT_END`) are not part of the
+  field table, so neither the pin nor a tested CLI is held against them.

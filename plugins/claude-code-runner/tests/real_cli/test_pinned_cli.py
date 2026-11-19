@@ -241,7 +241,8 @@ def test_recorded_stream_fields_equal_the_installed_cli(data: bytes) -> None:
 
     At the pin the table is equal: the schema members, then what only the recorded turn wrote.
     A tested newer CLI (``CLAUDE_CODE_RUNNER_TESTED_VERSION``) keeps every recorded schema member
-    and every value the runner maps; members it adds are named in a warning
+    and the values the test compares (task status, command states, workflow type); members it
+    adds are named in a warning
     (FIX-RUNNER-CONTRACT-TOLERANT).
     """
     path = RECORDING / f"stream_fields_{PINNED_CLAUDE_CODE_VERSION}.json"
@@ -253,6 +254,9 @@ def test_recorded_stream_fields_equal_the_installed_cli(data: bytes) -> None:
         for name, members in fresh["messages"].items():
             beyond = recorded["written_only"].get(name, [])
             assert recorded["messages"][name] == members + beyond, name
+        assert {key: recorded[key] for key in fresh if key != "messages"} == {
+            key: value for key, value in fresh.items() if key != "messages"
+        }
         assert added == []
     elif added:
         known = f"stream members the recording does not know: {', '.join(added)}"

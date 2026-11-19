@@ -299,7 +299,8 @@ again in 2.1.288 (D-RUNNER-CLI-PIN-1), in 2.1.321 (D-FIX-RUNNER-CLI-PIN-321-3), 
 of every message of the table above, from the message schemas in the CLI's file and from a
 recorded turn). The level-one switch test holds the recorded table against the installed CLI:
 equal at the pin, and as a floor against a tested newer CLI, which may add members (named in a
-warning) but keeps every recorded schema member and every value the runner maps
+warning) but keeps every recorded schema member and the compared values (task status,
+command states, workflow type)
 (D-FIX-RUNNER-CONTRACT-TOLERANT-1).
 2.1.321 adds members the runner does not read (`run_id`, `parent_task_id` and `awaited` of a
 task, `wakeup_source` of a queued input, the cache write durations of `modelUsage`) and names the
