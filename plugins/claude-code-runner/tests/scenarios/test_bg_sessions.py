@@ -411,6 +411,35 @@ async def test_a_followup_after_the_last_tool_call_gets_a_turn_of_its_own(bg_wor
     assert len(players(world)) == 1
 
 
+async def test_a_followup_taken_as_the_turn_ends_is_answered_before_the_release(
+    bg_world: World,
+) -> None:
+    # Live probe of 2026-11-18 (FIX-RUNNER-FOLLOWUP-AT-TURN-END): the CLI dequeued the line
+    # before it wrote the end of the turn, and the runner stopped the session while the model
+    # worked on the line; the run failed without an answer to it.
+    world = bg_world
+    gate = world.gate("turn_gate")
+    answer = world.gate("followup_gate")
+    world.scenario(
+        fixture="plain", turn_gate=str(gate), followup_gate=str(answer), bg_dequeue_at_turn_end=True
+    )
+    await start(world, followup_grace="200ms")
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    message_id = await world.fake.deliver_followup(run.run_id, "One more", author="alex")
+    await world.until(lambda: world.fake.followup_state(run.run_id, message_id) == "delivered")
+    world.release(gate)
+    await world.until(lambda: world.fake.followup_state(run.run_id, message_id) == "absorbed")
+    await world.until(lambda: len(world.calls("gate_wait")) == 2)  # the model works on it
+    await asyncio.sleep(10 * 0.2)  # well past runner.followup_grace
+    assert world.state_of(run.run_id) == "running"
+    assert world.calls("bg_player_end") == []
+    world.release(answer)
+    assert await world.ended(run.run_id) == "completed"
+    assert texts(world) == ["Done.", "Follow-up 1 handled."]
+    assert len(players(world)) == 1
+
+
 def _transcriber(world: World) -> str:
     path = world.root / "transcribe"
     path.write_text(

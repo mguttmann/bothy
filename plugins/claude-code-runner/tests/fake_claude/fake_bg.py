@@ -784,6 +784,9 @@ class Player:
             self.request()
             message = dict(line["message"])
             message.setdefault("type", "message")
+            # Like the pinned CLI, every assistant record names why the model stopped.
+            calls = any(b.get("type") == "tool_use" for b in message.get("content") or [])
+            message.setdefault("stop_reason", "tool_use" if calls else "end_turn")
             self.assistant(message)
             return True
         if line.get("type") == "user":
@@ -840,12 +843,22 @@ class Player:
             self.text(text, ident="msg_final")
         # Like the result of a print turn, the fixture names the session's totals after it.
         self.add_usage(final.get("modelUsage"), absolute=True)
+        early = None
+        if scenario.get("bg_dequeue_at_turn_end"):
+            # Like the pinned CLI in a live run: a line that arrived as the turn ended is
+            # dequeued before the turn's ``turn_duration``, its record follows after it.
+            early = self.next_line(0.0)
+            if early is not None:
+                self.plain("queue-operation", operation="dequeue")
         self.turn_end()
+        if early is not None:
+            self.followup_turn(early, dequeued=True)
 
-    def followup_turn(self, line: dict[str, Any]) -> None:
+    def followup_turn(self, line: dict[str, Any], *, dequeued: bool = False) -> None:
         running = self.job_running
         self.followups += 1
-        self.plain("queue-operation", operation="dequeue")
+        if not dequeued:
+            self.plain("queue-operation", operation="dequeue")
         self.status("busy")
         origin = {"kind": "peer", "from": "unknown"}
         self.user(PEER_LEAD + line["text"] + PEER_TAIL, origin, ident=line["uuid"], later=True)

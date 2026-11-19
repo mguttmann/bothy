@@ -17,6 +17,7 @@ token, and the mapper is asked both as the runner that wrote the lines and as on
 from __future__ import annotations
 
 import json
+import re
 import time
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -47,6 +48,7 @@ from claude_code_runner.failures import api_error_text
 from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
 from claude_code_runner.livebox import LiveBox
 from claude_code_runner.livecost import PriceTable
+from claude_code_runner.ownercode import OwnerLines
 from claude_code_runner.processstate import ProcessState
 
 from .test_livebox import Patch
@@ -1592,3 +1594,132 @@ def test_only_the_session_s_own_notification_of_a_known_agent_ends_its_step() ->
     _, patch = _agent_box([*launched, own])
     [agent] = _steps(patch, "subagent")
     assert agent["status"] == "completed"
+
+
+# ---- a follow-up the CLI takes as the turn ends (FIX-RUNNER-FOLLOWUP-AT-TURN-END) ---------------
+
+FOLLOWUP_AT_TURN_END = OWN_NOTICE.with_name("followup_at_turn_end.jsonl")
+"""Real records of the pinned CLI from a live run (structure only: texts, ids, paths and
+numbers replaced). The turn moved its command to the background and ended; a follow-up of the
+run's owner, written to the inbox while the turn ended, was dequeued before the CLI wrote the
+turn's ``turn_duration``, and its ``user`` record came after it. The model was still working on
+the follow-up when the transcript ends."""
+
+
+def _followup_at_turn_end() -> tuple[list[dict[str, Any]], str, OwnerLines]:
+    records = [json.loads(x) for x in FOLLOWUP_AT_TURN_END.read_text("utf-8").splitlines()]
+    [peer] = [r for r in records if (r.get("origin") or {}).get("kind") == "peer"]
+    body = peer["origin"]["body"]
+    [code] = re.findall(r"owner code ([0-9a-f]{32}):", body)
+    owner = OwnerLines()
+    owner.add(peer["uuid"], code, body)
+    return records, peer["uuid"], owner
+
+
+def test_a_followup_taken_as_the_turn_ends_starts_its_turn_after_that_turn_s_result() -> None:
+    records, line, owner = _followup_at_turn_end()
+    # The record order of the live run: the dequeue before the end of the turn it follows.
+    kinds = [(r["type"], r.get("operation") or r.get("subtype")) for r in records]
+    assert kinds.index(("queue-operation", "dequeue")) < kinds.index(("system", "turn_duration"))
+    mapper = TranscriptMapper("prompt-uuid", {line}.__contains__, owner=owner)
+    out = [m for r in records for m in mapper.map(r)]
+    assert foreign(out) == []  # the owner's marked line is the runner's own
+    turns = [shape(m) for m in out if shape(m) not in ("bg_totals", "system/bg_request")]
+    # As in a print stream: the turn ends, then the input starts a turn of its own.
+    assert turns[-6:] == [
+        "assistant",
+        "command/queued",
+        "result",
+        "command/started",
+        "system/init",
+        "echo",
+    ]
+    assert mapper.turn_open  # the follow-up's turn runs on
+
+
+async def test_a_followup_taken_as_the_turn_ends_keeps_the_session_until_its_answer(
+    tmp_path: Path,
+) -> None:
+    # Live probe of 2026-11-18: the runner released (stopped) the background session right
+    # after the echo of the follow-up, because the result of the turn before came after the
+    # follow-up had started; the follow-up never got its answer and the run failed.
+    records, line, _ = _followup_at_turn_end()
+    # The CLI wrote the queue records, the turn's end and the follow-up's record within a few
+    # milliseconds: one read takes them all. The session list says busy (the background
+    # command and the follow-up's turn), but the next turn has started already, so no
+    # background work is reported (the run's metrics showed none).
+    enqueued = next(i for i, r in enumerate(records) if r.get("operation") == "enqueue")
+    taken = next(i for i, r in enumerate(records) if r.get("uuid") == line) + 1
+    pieces = [records[:enqueued], records[enqueued:taken], records[taken:]]
+    sessions = Sessions(after_turn=["busy"])
+    messages, _ = await read_through(
+        tmp_path,
+        [b"".join(json.dumps(r).encode() + b"\n" for r in piece) for piece in pieces],
+        sessions,
+        frozenset({line}),
+    )
+    assert not any(m.get("subtype") == "background_tasks_changed" for m in messages)
+    state = ProcessState(has_stdin=True)
+    now, echoed, found = 0.0, False, []
+    for message in messages:
+        now += 1.0
+        state.apply(message, now)
+        echoed = echoed or (message.get("isReplay") is True and message.get("uuid") == line)
+        if message.get("type") == "result" or message.get("isReplay") is True:
+            found.append(_decide_pending(state, now, pending=0 if echoed else 1))
+    found.append(_decide_pending(state, now + 31.0, pending=0))
+    assert "close" not in found
+    assert found[-1] == "none"
+
+
+def test_a_forged_line_in_the_shape_of_the_followup_stays_foreign() -> None:
+    records, line, owner = _followup_at_turn_end()
+    forged = [
+        {**r, "uuid": "00000000-0000-4000-8000-0000000000ff"}
+        if (r.get("origin") or {}).get("kind") == "peer"
+        else r
+        for r in records
+    ]
+    mapper = TranscriptMapper("prompt-uuid", {line}.__contains__, owner=owner)
+    out = [m for r in forged for m in mapper.map(r)]
+    assert foreign(out) == [
+        {"type": "system", "subtype": "bg_foreign", "origin": "peer", "owner_code": True}
+    ]
+    assert not any(m.get("isReplay") and m.get("uuid") != "prompt-uuid" for m in out)
+
+
+def _decide_pending(state: ProcessState, now: float, *, pending: int) -> str:
+    return state.decide(
+        now, stdin_open=True, pending=pending, followup_grace=30.0, stop_grace=10.0
+    ).value
+
+
+def test_a_dequeue_while_the_turn_still_works_starts_nothing_after_its_end() -> None:
+    # Real records of the pinned CLI (structure only): a session dequeued an input in the
+    # middle of a turn that went on working (no final answer before it). Such a start is given
+    # on at once, so the turn's end is a result like any other and the session is released.
+    path = OWN_NOTICE.with_name("subagent_notice") / "s.jsonl"
+    records = [json.loads(x) for x in path.read_text("utf-8").splitlines()]
+    assert records[-1].get("operation") == "dequeue"
+    closing = [
+        {
+            "type": "assistant",
+            "isSidechain": False,
+            "message": {
+                "id": "msg_done",
+                "model": "claude-opus-5-5",
+                "role": "assistant",
+                "content": [{"type": "text", "text": "Done."}],
+                "stop_reason": "end_turn",
+            },
+        },
+        {"type": "system", "subtype": "turn_duration", "isSidechain": False},
+    ]
+    mapper = TranscriptMapper("prompt-uuid")
+    out = [m for r in [*records, *closing] for m in mapper.map(r)]
+    assert not mapper.turn_open
+    assert shape(out[-1]) == "result"
+    state = ProcessState(has_stdin=True)
+    for message in out:
+        state.apply(message, 1.0)
+    assert _decide_pending(state, 40.0, pending=0) == "close"
