@@ -139,6 +139,99 @@ def test_written_members_are_named_per_message_and_per_workflow_agent() -> None:
     assert written["workflow_agent"] == ["index", "label", "state", "type"]
 
 
+def _table(init: list[str], **lists: list[str]) -> dict[str, Any]:
+    """A field table in the form of ``record.read_fields`` with one message."""
+    return {
+        "messages": {"system/init": list(init)},
+        "background_task": ["task_id", "task_type"],
+        "usage": ["total_tokens"],
+        "task_status": ["completed", "failed"],
+        "command_states": ["queued", "started"],
+        "task_types": ["local_agent", "local_workflow"],
+        "workflow_task_type": "local_workflow",
+    } | lists
+
+
+# The recording of the pin: the schema of system/init, then a member only the recorded turn wrote.
+RECORDED = _table(["cwd", "apiKeySource", "model", "extra_written"]) | {
+    "written_only": {"system/init": ["extra_written"]},
+    "workflow_agent": ["agentId"],
+}
+
+
+def test_a_newer_cli_that_adds_members_passes_and_names_them() -> None:
+    fresh = _table(
+        ["cwd", "apiKeySource", "new_member", "model", "cloud_session"],
+        task_types=["local_agent", "local_workflow", "remote_agent"],
+        background_task=["task_id", "task_type", "off_host"],
+    )
+    lost, added = record.field_changes(RECORDED, fresh)
+    assert lost == []
+    assert added == [
+        "system/init: new_member",
+        "system/init: cloud_session",
+        "background_task: off_host",
+        "task_types: remote_agent",
+    ]
+
+
+def test_a_newer_cli_without_a_member_the_runner_reads_fails() -> None:
+    # ``apiKeySource`` is read by the runner (READ_TOKENS); a rename is a loss plus an addition.
+    fresh = _table(["cwd", "api_key_source", "model"])
+    lost, added = record.field_changes(RECORDED, fresh)
+    assert lost == ["system/init: apiKeySource"]
+    assert added == ["system/init: api_key_source"]
+
+
+def test_a_newer_cli_without_any_recorded_schema_member_fails() -> None:
+    fresh = _table(["cwd", "apiKeySource"], usage=[])
+    lost, _ = record.field_changes(RECORDED, fresh)
+    assert lost == ["system/init: model", "usage: total_tokens"]
+
+
+def test_a_changed_value_list_or_workflow_type_fails() -> None:
+    fresh = _table(
+        ["cwd", "apiKeySource", "model"],
+        task_status=["completed", "failed", "killed"],
+        workflow_task_type="workflow",
+    )
+    lost, _ = record.field_changes(RECORDED, fresh)
+    assert lost == [
+        "task_status: ['completed', 'failed'] became ['completed', 'failed', 'killed']",
+        "workflow_task_type: 'local_workflow' became 'workflow'",
+    ]
+
+
+def test_a_message_schema_the_cli_no_longer_has_fails() -> None:
+    fresh = _table([]) | {"messages": {}}
+    lost, _ = record.field_changes(RECORDED, fresh)
+    assert lost == ["system/init: the message schema"]
+
+
+def test_the_fields_document_names_what_only_the_recorded_turn_wrote() -> None:
+    turn = [{"type": "result", "subtype": "success", "num_turns": 1, "written": True}]
+    doc = record.fields_document(_cli_file_with_all_schemas(), turn, "2026-11-19")
+    assert doc["messages"]["result/success"][-1] == "written"
+    assert doc["written_only"] == {"result/success": ["written"]}
+
+
+def _cli_file_with_all_schemas() -> bytes:
+    """A CLI file with an object per schema of ``record.SCHEMAS`` and the task type table."""
+    parts = [b'var T={local_bash:"b",local_workflow:"w"};']
+    for name in record.SCHEMAS:
+        kind, _, sub = name.partition("/")
+        head = f'type:C("{kind}")' + (f',subtype:C("{sub}")' if sub else "")
+        extra = {
+            "system/background_tasks_changed": ",tasks:A(u({task_id:o()}))",
+            "system/task_progress": ",usage:u({total_tokens:k()})",
+            "system/task_notification": ',status:B(["completed"])',
+            "command_lifecycle": ',state:B(["queued"])',
+            "result/success": ",num_turns:k()",
+        }.get(name, ",member:o()")
+        parts.append(f"var X=u({{{head},uuid:g(){extra}}});".encode())
+    return b"".join(parts)
+
+
 class _Process:
     """A process that ends after a number of polls (never, for ``None``)."""
 
