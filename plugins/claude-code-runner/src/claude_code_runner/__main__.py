@@ -5,7 +5,9 @@
 process took the consumer over) or SIGINT/SIGTERM arrives. With ``runner.turn_handover`` SIGTERM
 hands the live turns over and the runner exits 75 when it handed at least one over (09 18.19.3).
 ``check-config`` loads the file, resolves every set ``secret_ref`` without printing it, probes
-``claude --version`` and prints one code per check; it contacts no server. ``stop --turns`` stops
+``claude --version`` and prints one code per check; it contacts no server. A set
+``runner.tested_claude_code_version`` adds the line ``ok``, or ``pin_changed`` (a failure) when
+it was proved against another pin than the code's. ``stop --turns`` stops
 every turn as in 18.6, finishes each run ``cancelled`` with ``adapter_stopped`` and exits 0
 (`claude_code_runner.handover.stop_turns`). Logs are JSON lines on stderr.
 
@@ -28,6 +30,7 @@ from pathlib import Path
 from claude_code_runner.app import Runner, RunnerHandler, StartError
 from claude_code_runner.config import ConfigError, RunnerConfig, load_config
 from claude_code_runner.handover import HANDOVER_EXIT, stop_turns
+from claude_code_runner.heartbeat import extra_tested_version
 from claude_code_runner.secrets import SecretError, resolve
 
 __all__ = ["check_config", "main"]
@@ -69,6 +72,12 @@ def check_config(config: RunnerConfig) -> list[str]:
             lines.append(f"{key} ok")
         except SecretError as err:
             lines.append(f"{key} {err.code}")
+    if config.tested_claude_code_version is not None:
+        # The entry is proof only for the pin it was proved against (FIX-RUNNER-TESTED-CLI).
+        valid = extra_tested_version(
+            config.tested_claude_code_version, config.tested_claude_code_pin
+        )
+        lines.append(f"runner.tested_claude_code_version {'ok' if valid else 'pin_changed'}")
     handler = RunnerHandler(config, os.environ)
     probe = asyncio.run(handler.refresh_probe())
     lines.append(f"runtime {','.join(probe.reasons) or 'ok'}")

@@ -30,6 +30,7 @@ from uuid import UUID
 from bothy_sdk.settings import SdkSettings
 
 from claude_code_runner.bgpaths import socket_path_fits
+from claude_code_runner.heartbeat import MIN_CLAUDE_CODE_VERSION
 from claude_code_runner.reply_attachments import (
     DEFAULT_DENIED_PATTERNS,
     ROOT_NAMES,
@@ -64,6 +65,8 @@ DEFAULT_STDIO_RUNNERS = ("npx", "uvx")
 LAUNCH_MODES = ("print", "background")
 """The values of ``runner.launch_mode`` (09 18.2): one ``claude -p`` process per turn, or a
 Claude Code background session per run (``claude --bg``)."""
+_PLAIN_VERSION = re.compile(r"(\d+)\.(\d+)\.(\d+)")
+_MIN_VERSION = tuple(int(p) for p in MIN_CLAUDE_CODE_VERSION.split("."))
 _BIDI = frozenset("\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069")
 
 
@@ -232,6 +235,12 @@ class RunnerConfig:
         background_status_interval: ``runner.background_status_interval``: how often the
             session list (``claude agents --json --all``) is read while a background turn is
             active (09 18.4); above zero.
+        tested_claude_code_version: ``runner.tested_claude_code_version``: a Claude Code version
+            the operator's update chain proved with the contract subset of the real-CLI suite;
+            the runner takes it as tested like the pin while ``tested_claude_code_pin`` is the
+            code's pin (FIX-RUNNER-TESTED-CLI). ``None`` (empty, the default): only the pin.
+        tested_claude_code_pin: ``runner.tested_claude_code_pin``: the pin whose recordings the
+            proof used; required with ``tested_claude_code_version`` and only with it.
     """
 
     source: Path
@@ -290,6 +299,8 @@ class RunnerConfig:
     launch_mode: str = "print"
     background_channels: tuple[UUID, ...] = ()
     background_status_interval: float = 2.0
+    tested_claude_code_version: str | None = None
+    tested_claude_code_pin: str | None = None
 
 
 _Parse = Callable[[Any], Any]
@@ -607,6 +618,26 @@ def _background_channels(r: _Reader) -> tuple[UUID, ...]:
     return tuple(found)
 
 
+def _tested_claude_code(r: _Reader) -> tuple[str | None, str | None]:
+    """``runner.tested_claude_code_version`` and ``_pin``: both or none, each a plain version.
+
+    A version is ``major.minor.patch`` in digits and at least `MIN_CLAUDE_CODE_VERSION`; empty
+    counts as unset.
+    """
+    values: list[str | None] = []
+    for name in ("tested_claude_code_version", "tested_claude_code_pin"):
+        text = r.get(name, str, "")
+        match = _PLAIN_VERSION.fullmatch(text)
+        if text and (match is None or tuple(map(int, match.groups())) < _MIN_VERSION):
+            raise r.fail(name, f"not a version major.minor.patch from {MIN_CLAUDE_CODE_VERSION} on")
+        values.append(text or None)
+    version, pin = values
+    if (version is None) != (pin is None):
+        missing = "tested_claude_code_pin" if pin is None else "tested_claude_code_version"
+        raise r.fail(missing, "required with the other tested_claude_code key")
+    return version, pin
+
+
 def _check_background(r: _Reader, config: RunnerConfig) -> None:
     """The start check of ``runner.launch_mode`` ``background`` (09 18.2).
 
@@ -681,6 +712,7 @@ def load_config(path: Path) -> RunnerConfig:
     if not check_argument(git_bin):
         raise r.fail("git_bin", "empty, starts with - or has controls")
     projects_root = _root(r, "projects_root")
+    tested = _tested_claude_code(r)
     config = RunnerConfig(
         source=path,
         server_url=server_url,
@@ -742,6 +774,8 @@ def load_config(path: Path) -> RunnerConfig:
         launch_mode=_launch_mode(r),
         background_channels=_background_channels(r),
         background_status_interval=_positive(r, "background_status_interval", "2s"),
+        tested_claude_code_version=tested[0],
+        tested_claude_code_pin=tested[1],
     )
     r.unknown()
     _check_modes(r, config)

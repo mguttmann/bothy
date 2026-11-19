@@ -14,7 +14,8 @@ launch (`claude_code_runner.bgsession.settings_document`).
 
 A run that should use background mode and cannot ends ``failed`` with its cause in the thread;
 it never uses print mode (ruling D-FIX-RUNNER-CLI-PIN-326-4). When the cause lies
-with the host (the CLI is not the pinned version, a supervisor the runner did
+with the host (the CLI is neither the pinned version nor the tested version of
+``runner.tested_claude_code_version``, a supervisor the runner did
 not start, bypass mode without a recorded acceptance, a launch that fails), the runner reports
 `UNAVAILABLE` in ``details.degraded_reasons`` until the next background launch starts; the
 reason blocks no run.
@@ -35,7 +36,7 @@ from claude_code_runner.adoption import read_identity
 from claude_code_runner.bgsession import SessionCli, SessionList
 from claude_code_runner.config import RunnerConfig
 from claude_code_runner.environment import RunEnvironmentError, build_environment, clean_path
-from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
+from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION, extra_tested_version
 from claude_code_runner.usage import claude_config_dir
 
 __all__ = ["FALLBACK_CODES", "UNAVAILABLE", "BackgroundMode", "launch_environment"]
@@ -148,9 +149,23 @@ class BackgroundMode:
         listed = self.config.background_channels
         return not listed or channel_id in listed
 
+    def accepted_version(self) -> str | None:
+        """The installed CLI's version when the mode may run on it, else ``None`` (18.2).
+
+        The mode runs on the pinned version and on the version the operator's update chain
+        proved against this pin (`claude_code_runner.heartbeat.extra_tested_version`), on no other.
+        """
+        version = self._version() if self._version is not None else None
+        tested = extra_tested_version(
+            self.config.tested_claude_code_version, self.config.tested_claude_code_pin
+        )
+        if version is None or version not in (PINNED_CLAUDE_CODE_VERSION, tested):
+            return None
+        return version
+
     def pinned(self) -> bool:
-        """Whether the installed CLI is the pinned version: the mode runs on no other (18.2)."""
-        return self._version is not None and self._version() == PINNED_CLAUDE_CODE_VERSION
+        """Whether the mode may run on the installed CLI (`accepted_version`)."""
+        return self.accepted_version() is not None
 
     def lstart(self, pid: int) -> str | None:
         """The start time of a process as ``ps`` prints it; ``None`` when it does not exist."""

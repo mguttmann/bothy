@@ -671,3 +671,26 @@ def test_a_state_dir_too_long_for_a_socket_refuses_background_mode(tmp_path: Pat
         load_config(config("background"))
     assert info.value.key == "runner.state_dir"
     assert "socket" in info.value.problem
+
+
+def test_tested_claude_code_keys(tmp_path: Path) -> None:
+    """``runner.tested_claude_code_version`` and ``_pin`` (FIX-RUNNER-TESTED-CLI): both or none."""
+    cfg = load_config(write(tmp_path))
+    assert (cfg.tested_claude_code_version, cfg.tested_claude_code_pin) == (None, None)
+    empty = 'tested_claude_code_version = ""\ntested_claude_code_pin = ""\n'
+    cfg = load_config(write(tmp_path, empty))
+    assert (cfg.tested_claude_code_version, cfg.tested_claude_code_pin) == (None, None)
+    both = 'tested_claude_code_version = "2.1.327"\ntested_claude_code_pin = "2.1.326"\n'
+    cfg = load_config(write(tmp_path, both))
+    assert (cfg.tested_claude_code_version, cfg.tested_claude_code_pin) == ("2.1.327", "2.1.326")
+    with pytest.raises(ConfigError, match="tested_claude_code_pin"):
+        load_config(write(tmp_path, 'tested_claude_code_version = "2.1.327"\n'))
+    with pytest.raises(ConfigError, match="tested_claude_code_version"):
+        load_config(write(tmp_path, 'tested_claude_code_pin = "2.1.326"\n'))
+    for bad in ("2.1", "v2.1.327", "2.1.327 ", "2.1.327-beta", "2.1.200"):
+        text = f'tested_claude_code_version = "{bad}"\ntested_claude_code_pin = "2.1.326"\n'
+        with pytest.raises(ConfigError, match="tested_claude_code_version"):
+            load_config(write(tmp_path, text))
+        text = f'tested_claude_code_version = "2.1.327"\ntested_claude_code_pin = "{bad}"\n'
+        with pytest.raises(ConfigError, match="tested_claude_code_pin"):
+            load_config(write(tmp_path, text))

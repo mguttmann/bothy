@@ -9,7 +9,10 @@ bytes of the CLI's files (design note 14). ``CLAUDE_CODE_RUNNER_CLAUDE_BIN`` nam
 
 A change of the pin runs this file against the new CLI: the version probe reports ``online``,
 the recorded stream field table equals a fresh read of the CLI's file (``record.py`` writes it),
-and every text of the CLI's own "too old" pattern is one the runner recognises.
+and every text of the CLI's own "too old" pattern is one the runner recognises. An update chain
+runs it against a newer CLI with ``CLAUDE_CODE_RUNNER_TESTED_VERSION`` set to that version
+(FIX-RUNNER-TESTED-CLI): the CLI is then held against the recordings of the pin, and the probe
+and ``check-config`` take it with the configuration entry the chain writes.
 """
 
 from __future__ import annotations
@@ -21,7 +24,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from real_cli.record import RECORDING, cli_bytes, read_fields
+from real_cli.record import RECORDING, cli_bytes, expected_version, read_fields
 
 from claude_code_runner.__main__ import main
 from claude_code_runner.environment import clean_path, find_program
@@ -178,7 +181,7 @@ def test_pinned_cli_knows_error_texts_and_events(data: bytes) -> None:
     )
     version = parse_version(out.stdout)
     assert version is not None
-    assert ".".join(map(str, version)) == PINNED_CLAUDE_CODE_VERSION
+    assert ".".join(map(str, version)) == expected_version()
     missing = [e.fragment for e in ERROR_TEXTS if e.fragment.encode() not in data]
     assert missing == []
     absent = [t for t in (*READ_TOKENS, *FACT_TOKENS) if t.encode() not in data]
@@ -195,8 +198,9 @@ async def test_pinned_cli_is_reported_online(tmp_path: Path) -> None:
     """The runner's own probe of the installed CLI: no degraded reason, state ``online``."""
     path = os.pathsep.join(clean_path(os.environ.get("PATH", "")))
     env = {"HOME": str(tmp_path), "PATH": path}
-    probe = await probe_version(str(_program()), env, tmp_path, 120.0)
-    assert (probe.version, probe.reasons) == (PINNED_CLAUDE_CODE_VERSION, ())
+    tested = expected_version() if expected_version() != PINNED_CLAUDE_CODE_VERSION else None
+    probe = await probe_version(str(_program()), env, tmp_path, 120.0, tested=tested)
+    assert (probe.version, probe.reasons) == (expected_version(), ())
     assert runtime_status(probe, [], None).state == "online"
 
 
@@ -218,6 +222,12 @@ def test_check_config_reports_the_pinned_cli_ok(
         f'projects_root = "{tmp_path / "projects"}"\n'
         f'state_dir = "{tmp_path / "state"}"\n'
         f'claude_bin = "{_program()}"\n'
+        + (
+            f'tested_claude_code_version = "{expected_version()}"\n'
+            f'tested_claude_code_pin = "{PINNED_CLAUDE_CODE_VERSION}"\n'
+            if expected_version() != PINNED_CLAUDE_CODE_VERSION
+            else ""
+        )
     )
     assert main(["check-config", "--config", str(config)]) == 0
     assert capsys.readouterr().out.splitlines()[-1] == "runtime ok"

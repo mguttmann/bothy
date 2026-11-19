@@ -45,3 +45,6 @@ Open minors (for the next run in this area of the runner):
 - No scenario test covers the call of `replay_tasks` in the adopter (`runturn.py`): replacing
   it with `pass` leaves the adoption and background scenarios green. A test adopts a turn
   whose agent started before the stored offset and sends its notification after it.
+- The design row of agent steps in background mode says a step is open "from the call"; a
+  `workflow` step opens only with the `async_launched` result of its call
+  (`bgtranscript.py` `_task_results`). Its end is described right.

@@ -25,6 +25,7 @@ from claude_code_runner.heartbeat import (
     Probe,
     billing_modes_supported,
     capabilities,
+    extra_tested_version,
     parse_version,
     probe_version,
     raised_minimum,
@@ -249,3 +250,27 @@ def test_capabilities_with_hosting_report_the_ceiling(ceiling: str) -> None:
     caps = capabilities(voice_input=False, hosts_agents=ceiling)
     assert caps["hosts_agents"] == ceiling
     assert {k: v for k, v in caps.items() if k != "hosts_agents"} == capabilities(voice_input=False)
+
+
+def test_a_tested_version_counts_only_with_the_pin_it_was_tested_against() -> None:
+    """``runner.tested_claude_code_version`` counts while its pin entry names this code's pin."""
+    assert extra_tested_version("2.1.327", PINNED_CLAUDE_CODE_VERSION) == "2.1.327"
+    assert extra_tested_version("2.1.327", "2.1.325") is None  # proved against an earlier pin
+    assert extra_tested_version(None, None) is None
+
+
+@pytest.mark.anyio
+async def test_the_tested_version_is_online_and_every_other_still_untested(tmp_path: Path) -> None:
+    """The version the update chain proved is ``online`` beside the pin; any other is not."""
+    prog = script(tmp_path, "print('2.1.327 (Claude Code)')")
+    probe = await probe_version(prog, {}, tmp_path, PATIENCE, tested="2.1.327")
+    assert (probe.version, probe.reasons) == ("2.1.327", ())
+    assert runtime_status(probe, [], None).state == "online"
+    probe = await probe_version(prog, {}, tmp_path, PATIENCE)
+    assert probe.reasons == ("runtime_version_untested",)
+    other = script(tmp_path, "print('2.1.328 (Claude Code)')")
+    probe = await probe_version(other, {}, tmp_path, PATIENCE, tested="2.1.327")
+    assert (probe.version, probe.reasons) == ("2.1.328", ("runtime_version_untested",))
+    pinned = script(tmp_path, f"print('{PINNED_CLAUDE_CODE_VERSION} (Claude Code)')")
+    probe = await probe_version(pinned, {}, tmp_path, PATIENCE, tested="2.1.327")
+    assert probe.reasons == ()  # the pin itself still runs

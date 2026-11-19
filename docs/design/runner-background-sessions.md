@@ -567,7 +567,10 @@ before the first inbox event:
 ### 4.12 D-BG-12: the version pin and the tests that hold the interface
 
 Background mode runs only on the pinned version; on any other version a run uses print mode
-with the cause `background_version_untested` (print mode itself only warns then). The pin
+with the cause `background_version_untested` (print mode itself only warns then). Changed by
+FIX-RUNNER-TESTED-CLI: the version of `runner.tested_claude_code_version` runs too while
+`runner.tested_claude_code_pin` is the code's pin; an update chain of the operator writes it
+after the contract subset of level one passed against that CLI and the pin's recordings. The pin
 holds five surfaces: the launch output and the refusal texts of items 1, 5 and 6 with the
 `note:` lines of item 16; the fields of the session list; the transcript records of 4.6; the
 line of the inbox socket; the outputs of `stop`, `rm` and `daemon status`.
@@ -613,7 +616,7 @@ the heartbeat (4.10).
 
 | Code | When | Host cause |
 |---|---|---|
-| `background_version_untested` | the installed CLI is not the pinned version | yes |
+| `background_version_untested` | the installed CLI is neither the pinned version nor the tested version of `runner.tested_claude_code_version` | yes |
 | `background_supervisor_foreign`, `background_supervisor_version` | 4.10 | yes |
 | `background_bypass_not_accepted` | the refusal of item 6 (class `host`) | yes |
 | `background_workspace_untrusted` | the refusal of item 5 for this folder | no |

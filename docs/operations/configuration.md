@@ -494,6 +494,8 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `hermes_adapter.mirror_channel` |  | Hermes adapter |  | no default (mirror off) | forum of the session mirror; only with `hermes_adapter.mirror_platforms` (17.13) |  |
 | `hermes_adapter.mirror_platforms` |  | Hermes adapter |  | no default (mirror off) | foreign platform keys whose sessions are mirrored, for example `acp`, `cli`, `cron`; never the adapter's own key; only with `hermes_adapter.mirror_channel` (17.13) |  |
 | `runner.claude_bin` |  | Runner |  | `claude` | program, searched in the cleaned `PATH` |  |
+| `runner.tested_claude_code_version` |  | Runner |  | empty | a Claude Code version besides the pin that the operator proved with the contract subset of the real-CLI suite; counts as tested only while `runner.tested_claude_code_pin` is the code's pin (09 18.2, FIX-RUNNER-TESTED-CLI); `major.minor.patch`, at least the minimum version |  |
+| `runner.tested_claude_code_pin` |  | Runner |  | empty | the pin whose recordings that proof used; required with `runner.tested_claude_code_version` and only with it |  |
 | `runner.git_bin` |  | Runner |  | `git` | program for the folder creation of 18.12, searched in the cleaned `PATH` |  |
 | `runner.provision_timeout` |  | Runner |  | `10m` | time limit of one folder creation (`git init` or `git clone`, 18.12) |  |
 | `runner.provision_retry_after` |  | Runner |  | `5m` | a failed folder creation is not tried again for the same binding content before this time (18.12) |  |

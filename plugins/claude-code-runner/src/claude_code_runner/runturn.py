@@ -162,7 +162,6 @@ from claude_code_runner.followups import (
     build_followup_line,
     followup_verdict,
 )
-from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
 from claude_code_runner.launch import (
     AttemptRecord,
     KeeperGroup,
@@ -3339,10 +3338,11 @@ class RunTurn:
         """The checks before a launch: the version, the supervisor, the session list (18.2).
 
         Returns:
-            Whether a supervisor runs already (the runner's own, in the pinned version) when
-            the launch may go on; else what `_run_background` returns.
+            Whether a supervisor runs already (the runner's own, in the installed version the
+            mode accepts) when the launch may go on; else what `_run_background` returns.
         """
-        if not bg.pinned():
+        version = bg.accepted_version()
+        if version is None:
             return await self._fall_back("background_version_untested")
         for _ in range(2):
             readable, supervisor = await bg.cli.supervisor()
@@ -3352,7 +3352,7 @@ class RunTurn:
                 supervisor_verdict,
                 supervisor,
                 load_supervisor(self._bg_state),
-                PINNED_CLAUDE_CODE_VERSION,
+                version,
                 bg.lstart,
             )
             # An idle supervisor ends on its own: when the process `daemon status` reported is

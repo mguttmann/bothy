@@ -282,6 +282,48 @@ async def test_the_next_message_continues_the_same_session(bg_world: World) -> N
     await nothing_left(world)
 
 
+async def test_a_tested_version_runs_in_background_mode_with_its_entry(bg_world: World) -> None:
+    """The CLI the update chain proved runs background turns (FIX-RUNNER-TESTED-CLI).
+
+    Two runs start together, so the second one finds the supervisor the first launch started,
+    in the tested version, and takes it as the runner's own.
+    """
+    world = bg_world
+    world.scenario(fixture="plain", version="2.1.327")
+    await start(
+        world,
+        tested_claude_code_version="2.1.327",
+        tested_claude_code_pin=PINNED_CLAUDE_CODE_VERSION,
+    )
+    beat = world.fake.heartbeats[-1]
+    assert (beat["state"], beat["runtime_version"]) == ("online", "2.1.327")
+    runs = await asyncio.gather(
+        world.fake.trigger("Fix it", channel_id=world.forum_a),
+        world.fake.trigger("Fix that", channel_id=world.forum_a),
+    )
+    assert [await world.ended(r.run_id) for r in runs] == ["completed", "completed"]
+    assert len(launches(world)) == 2
+    kinds = [
+        c["kind"] for c in sorted(world.calls("bg_daemon") + launches(world), key=lambda c: c["t"])
+    ]
+    assert kinds[:5] == ["bg_daemon", "bg_launch", "bg_daemon", "bg_daemon", "bg_launch"]
+    await nothing_left(world)
+
+
+async def test_another_version_than_pin_and_entry_still_fails_the_run(bg_world: World) -> None:
+    world = bg_world
+    world.scenario(version="2.1.328")
+    await start(
+        world,
+        tested_claude_code_version="2.1.327",
+        tested_claude_code_pin=PINNED_CLAUDE_CODE_VERSION,
+    )
+    run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "failed"
+    assert world.fake.run(run.run_id)["summary"] == cause("background_version_untested")
+    assert launches(world) == []
+
+
 # ---- two runs at once ---------------------------------------------------------------------------
 
 

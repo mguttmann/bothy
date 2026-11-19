@@ -76,6 +76,54 @@ def test_check_config_takes_cli_2_1_326_as_tested(
     ]
 
 
+@pytest.mark.parametrize(
+    ("version", "pin", "lines", "code"),
+    [
+        ("2.1.327", "2.1.326", ["runner.tested_claude_code_version ok", "runtime ok"], 0),
+        (
+            "2.1.328",
+            "2.1.326",
+            ["runner.tested_claude_code_version ok", "runtime runtime_version_untested"],
+            1,
+        ),
+        (
+            "2.1.327",
+            "2.1.325",
+            ["runner.tested_claude_code_version pin_changed", "runtime runtime_version_untested"],
+            1,
+        ),
+        ("2.1.326", "2.1.325", ["runner.tested_claude_code_version pin_changed", "runtime ok"], 1),
+    ],
+)
+def test_check_config_takes_the_tested_version_of_this_pin(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    version: str,
+    pin: str,
+    lines: list[str],
+    code: int,
+) -> None:
+    """The version the update chain proved is ``runtime ok`` while its entry names this pin.
+
+    An entry proved against another pin is reported (``pin_changed``) and fails the check, so a
+    deploy of a new pin removes it (FIX-RUNNER-TESTED-CLI).
+    """
+    key = tmp_path / "missing_key"
+    key.write_text("api-key-canary\n")
+    key.chmod(0o600)
+    helper.install(tmp_path / "bin", {"version": version}, tmp_path / "capture.jsonl")
+    entry = f'tested_claude_code_version = "2.1.327"\ntested_claude_code_pin = "{pin}"\n'
+    assert main(["check-config", "--config", str(config(tmp_path, entry))]) == code
+    out = capsys.readouterr().out.splitlines()
+    assert out == [
+        "config ok",
+        "runner.agent_token_ref ok",
+        "runner.dpop_key_ref unset",
+        "runner.anthropic_api_key_ref ok",
+        *lines,
+    ]
+
+
 def test_config_error_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     path = config(tmp_path, 'surprise = "secret-value"\n')
     assert main(["check-config", "--config", str(path)]) == 2

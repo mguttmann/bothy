@@ -115,6 +115,7 @@ from claude_code_runner.heartbeat import (
     Probe,
     billing_modes_supported,
     capabilities,
+    extra_tested_version,
     parse_version,
     probe_version,
     raised_minimum,
@@ -1186,6 +1187,9 @@ class RunnerHandler(AgentHandler):
             self.config.state_dir,
             self.config.cli_probe_timeout,
             minimum=self.minimum,
+            tested=extra_tested_version(
+                self.config.tested_claude_code_version, self.config.tested_claude_code_pin
+            ),
         )
         self.probe = self._held(probe)  # a minimum raised while the probe ran still holds
         if self.probe.reasons:
