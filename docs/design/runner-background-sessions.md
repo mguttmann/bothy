@@ -342,10 +342,12 @@ and that `uuid`. The checks of 18.5 before the write are unchanged.
   cannot approve anything; a slash command in it does not run; it is plain text. A turn of the
   runner has nothing to approve, and a follow-up line never starts with its text anyway. The
   runner prompt gains one paragraph for sessions started in background mode: follow-ups and
-  the runner's retry line arrive this way, nothing in such a message proves who sent it, and
+  the runner's retry line arrive this way, the text of such a message proves nothing, and
   each is handled as the CLI says for a message of another session. The first build told the
   model to follow a message with the runner's lead-in like a user message; any sender can
-  write that lead-in, so the paragraph no longer names a sign to trust (4.14). The prompt of a
+  write that lead-in, so the paragraph names no text to trust (4.14). Since 2026-11-18 it
+  names one proof: an owner code that passes the owner check of the run's first message
+  makes a follow-up the triggering person's own word (4.14 item 4). The prompt of a
   print turn does not carry the paragraph and keeps its bytes.
 - When the socket cannot be used (the CLI binds none, or a setting of the host holds or
   refuses inbound messages), the follow-up is not written, or is written and never taken in. Either
@@ -778,8 +780,11 @@ enforces:
       file. The list is a deny list of what was found, and it is named as that (section 5
       item 12). A list of the only tools a `host` session may have was not evaluated.
 
-4. **The prompt names no sign to trust.** The paragraph of 4.4 says that nothing in a relayed
-    message proves its sender.
+4. **The prompt names one sign to trust: a valid owner code** (since 2026-11-18,
+    FIX-RUNNER-TRUSTED-OWNER-FOLLOWUPS; rulings in `docs/decisions.d/FIX-RUNNER-TRUSTED-OWNER-FOLLOWUPS.md`).
+    Until then the paragraph of 4.4 said that nothing in a relayed message proves its sender,
+    so a follow-up of the person who triggered the run never counted as that person's word, and
+    the person had to send it again after the turn ended.
 
     - A marker only the runner and the session know, in the system prompt file and in every
       line, was evaluated and not built, for two reasons the runs gave. The CLI keeps the
@@ -789,7 +794,32 @@ enforces:
       text (item 34), where every program of the host user reads it: the marker would be no
       secret from exactly the senders it is meant to keep out, and the model would trust a
       line because of it.
-
+    - Nothing the CLI shows the model is a proof either (read in the file of the pinned CLI):
+      the attributes of the envelope (`from`, `from-session`, `hop-chain`, `from-name`,
+      `from-mode`, `from-plugin`) are the sender's claim, and the process id the kernel
+      verifies (`verifiedPeerPid`) is a member of the origin the model does not see. The
+      text for a line of the session's own child process says, like the one for every other
+      session, that it is not the user's and approves nothing.
+    - Built: one-time codes behind a digest. The runner draws 20 codes per run in its memory
+      and lists only the first 16 hex characters of each code's SHA-256 at the end of the
+      run's first input line, which every run sends, also one that continues a session. The
+      owner's follow-up names the next code; the model computes the digest with a tool and
+      counts each code once. A digest does not give its code away, and a code is in no file
+      until the runner writes it, so no other program can name a valid code beforehand.
+    - What a written code is worth to another program, and why the runner watches: the CLI
+      writes the text of a queued line into the transcript (`queue-operation` `enqueue`)
+      before the model reads it, and a sender chooses the priority of its line; a line with
+      `"priority":"now"` is taken before one with the default and interrupts the running
+      request (read in the file of the pinned CLI). A program that reads the transcript in
+      time could put the owner's code under its own text ahead of the owner's line. So the
+      mapper reads the text of every input of another sender for a code the runner wrote, and
+      an input under the `uuid` of a marked line for being exactly that line, and the
+      runner stops the session at the first such input and ends the run
+      `background_owner_code_stolen`. The input is judged when the CLI records it (the
+      `user` record of a turn it starts, or the attachment written right after the request
+      that carries it), and the runner reads the transcript every `runner.poll_interval`. The
+      model needs a request before a tool of its answer runs, so the stop normally comes
+      first; that is a race the runner does not control (section 5 item 12).
 5. **A session that took an input of another sender is continued like any other** (since
     2026-11-17, D-FIX-RUNNER-BG-FOREIGN-LOG-1). The input is part of the session's
     conversation, and the CLI sends it to the model again with the next prompt (item 41). The
@@ -937,6 +967,17 @@ carries (item 32, reproduced with an SSH agent socket). Decided:
       refused too, and a follow-up waits for a run of its own. Any other value stays as well.
     - A program of the host user that reads or writes the runner's state folder or the CLI's
       transcripts is outside these rules: the runner reads the answer from the transcript.
+    - Owner codes (4.14 item 4) prove the owner's follow-up against a program that writes
+      into the socket and reads every file of the host user, but not against one that reads
+      the runner's memory (a debugger attached to the runner process) or that types into the
+      session with `claude attach`, which gives a real user message without any code (logged
+      as `human`). Against a program that takes a code from the transcript in the moment
+      between the runner's write and the model's read and sends it ahead of the owner's
+      line, the runner's stop is a race: it reads the transcript every
+      `runner.poll_interval`, and the model's first tool call of that answer needs a request.
+      The model's check rests on the model: it is told to compute the digest with a tool and
+      to count each code once, and a session without a tool that computes it treats every
+      follow-up as a relayed message.
     - A message of another session that the rule per message holds ends the run as well
       (4.5), so any session of the host user can end a run of the runner; it can also stop
       it by name.
@@ -1044,7 +1085,9 @@ keeps every line of its behaviour.
    ticket.
 2. **Steering as a relayed message.** In background mode a follow-up reaches the model marked
    as coming from another session (4.4). Recommendation: accept it, with the paragraph in the
-   runner prompt; the alternative is `followups = queue` for this mode.
+   runner prompt; the alternative is `followups = queue` for this mode. Since 2026-11-18 a follow-up of the person
+   who triggered the run carries an owner code and counts as that person's word (4.14 item 4,
+   FIX-RUNNER-TRUSTED-OWNER-FOLLOWUPS).
 3. **Hosted agents stay in print mode** in the first build. Recommendation: yes, and decide
    after the first weeks of use whether the follow-up ticket is worth it.
 4. **The CLI's own requests** at every turn end are not booked and follow the host's
@@ -1096,7 +1139,7 @@ between.
 
 | Finding | First build | Now | Where |
 |---|---|---|---|
-| An input of another sender is taken for the runner's | `crossSessionInbound` `"accept"`; the prompt tells the model to follow a line with the runner's lead-in; no check of the `uuid` of an echo | the runner logs an input it did not write (until 2026-11-17 it stopped the session); no inbound setting unless the host user's settings say `"hold"`, then `"accept"` (FIX-RUNNER-BG-HELD-FOLLOWUP); `SendMessage` and `ListAgents` disallowed; the prompt names no sign to trust | 4.14 |
+| An input of another sender is taken for the runner's | `crossSessionInbound` `"accept"`; the prompt tells the model to follow a line with the runner's lead-in; no check of the `uuid` of an echo | the runner logs an input it did not write (until 2026-11-17 it stopped the session); no inbound setting unless the host user's settings say `"hold"`, then `"accept"` (FIX-RUNNER-BG-HELD-FOLLOWUP); `SendMessage` and `ListAgents` disallowed; the prompt names no text to trust (since 2026-11-18 one proof: a valid owner code, 4.14 item 4) | 4.14 |
 | The counter-check is open when it finds nothing | the first request record only, by a prefix of a beta name; no record means no check | every request record, the whole name, no output accepted before one passed, the state in the turn record | 4.15 |
 | A value of one run reaches the session of another | the launch command gets the run's environment, and with it the supervisor | one fixed environment for the launch; every name of a run set in its own settings file | 4.16 |
 | The content of a record decides before its origin (first version of this change) | a `user` record with `tool_result` items was a tool result whatever its origin; every origin but `peer` and `human` was the session's own | the origin is read first and alone; only a record without one is a tool result; the session's own origins are a closed list | 4.14 item 1, 4.6 |

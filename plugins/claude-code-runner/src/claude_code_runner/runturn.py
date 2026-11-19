@@ -180,6 +180,7 @@ from claude_code_runner.ledger import TurnLedger, is_success
 from claude_code_runner.livebox import LiveBox
 from claude_code_runner.livecost import LiveCost, load_prices
 from claude_code_runner.locks import LockTimeout, SlotPool, acquire, release
+from claude_code_runner.ownercode import OwnerCodes, OwnerLines, is_owner_followup, is_owner_trigger
 from claude_code_runner.processstate import Decision, ProcessState, replayed_lines
 from claude_code_runner.prompt import context_items, system_prompt, user_line
 from claude_code_runner.recovery import (
@@ -607,6 +608,12 @@ class RunTurn:
         """How many request records of the session this runner read (for the log only)."""
         self._bg_rest: list[tuple[str, bytes]] = []
         self._bg_cause: str | None = None
+        self.owner_codes: OwnerCodes | None = None
+        """The owner codes of a background run whose trigger is a person's message (18.5), in
+        memory only: an adopter has none and marks no follow-up."""
+        self.owner_lines = OwnerLines()
+        """The owner codes written so far and the marked lines, to judge what a session took;
+        the turn record keeps the codes, never a text."""
 
     # ---- the run ---------------------------------------------------------------------------
 
@@ -642,7 +649,13 @@ class RunTurn:
             raise RuntimeError("no context")
         await self._transcribe(context)
         rendered = render_context(context, file_texts=self.state.file_texts)
-        self.prompt_line, self.own_uuid = user_line(context_items(rendered))
+        items = context_items(rendered)
+        if self._background() and is_owner_trigger(context.trigger_message):
+            # The owner check ends the first message of every run, so it also reaches a
+            # session a later run continues, whose system prompt stays the first one (18.5).
+            self.owner_codes = OwnerCodes()
+            items.append(self.owner_codes.check_text())
+        self.prompt_line, self.own_uuid = user_line(items)
         write_private(paths.input, self.prompt_line + "\n")
         usage = UsageStore(self.cfg.state_dir / "sessions" / self.session.ref)
         self.live = LiveBox(
@@ -1914,16 +1927,13 @@ class RunTurn:
                 return
             if verdict is not FollowupVerdict.WRITE or process is None:
                 return
-            author = message.author.to_dict()
             line_uuid = str(uuid4())
             if prepared is None:  # the turn opened while it waited: prepared here
                 prepared = await self._followup_files(message)
             if prepared is None:  # the run ended during the transcription
                 _log("followup_not_deliverable", **ids)
                 return
-            line = build_followup_line(
-                author, message.content_md, line_uuid, prepared.files, prepared.transcripts
-            )
+            line = self._followup_line(process, message, line_uuid, prepared)
             # The record knows the line before the CLI can: a runner that adopts the turn maps
             # its echo to the follow-up and patches it absorbed (design note 12 f 3).
             self.followups.add(message_id, line_uuid, line)
@@ -1955,6 +1965,41 @@ class RunTurn:
         # Only a follow-up that reached the turn gets the note; a deferred one is transcribed
         # again in its own run (issue 574).
         await self._note_untranscribed(prepared.missing)
+
+    def _followup_line(
+        self, process: object, message: Message, line_uuid: str, prepared: _Prepared
+    ) -> bytes:
+        """The line of one follow-up, with an owner code when it is the run owner's (18.5)."""
+        code = self._owner_code(process, message)
+        line = build_followup_line(
+            message.author.to_dict(),
+            message.content_md,
+            line_uuid,
+            prepared.files,
+            prepared.transcripts,
+            owner_code=code,
+        )
+        if code is not None:
+            # Noted before the line can be read anywhere (18.5 "Owner codes").
+            self.owner_lines.add(line_uuid, code, prompt_text(line) or "")
+            _log("followup_owner_marked", **self.ids, message_id=message.id)
+        return line
+
+    def _owner_code(self, process: object, message: Message) -> str | None:
+        """The owner code of a follow-up, when it is the run owner's into a background session.
+
+        Whose follow-up it is comes from the server's data (the author of the message read with
+        ``getMessage`` and of the run's triggering message), never from a text (18.5).
+        """
+        context = self.state.context
+        if not isinstance(process, BgSession) or self.owner_codes is None or context is None:
+            return None
+        if not is_owner_followup(message, context.trigger_message):
+            return None
+        code = self.owner_codes.take()
+        if code is None:
+            _log("followup_owner_codes_used_up", **self.ids)
+        return code
 
     def _followup_verdict(
         self, inv: Invocation, message_id: UUID, message: Message, offered_at: float
@@ -2631,7 +2676,12 @@ class RunTurn:
             # A background session is found again by this part, never by a keeper (18.9). It
             # also holds what the next runner must not have to believe: which input lines
             # are the runner's, and whether the counter-check of 18.3 has passed.
-            part = {**self.bg_record, "own": sorted(self.bg_own), "login": self.bg_login}
+            part = {
+                **self.bg_record,
+                "own": sorted(self.bg_own),
+                "login": self.bg_login,
+                "owner_codes": self.owner_lines.codes,
+            }
             record.update(launch_mode="background", bg=part, run=self._run_part())
         elif self.handover:
             record.update(self._handover_part())
@@ -3238,7 +3288,9 @@ class RunTurn:
             return started
         if not attempt.resume:
             attempt = dataclasses.replace(attempt, new_reference=True)
-        mapper = TranscriptMapper(inputs[0][0], self._wrote, self._side(started))
+        mapper = TranscriptMapper(
+            inputs[0][0], self._wrote, self._side(started), owner=self.owner_lines
+        )
         reader = self._transcript_reader(started, mapper, offset)
         return await self._follow(started, attempt, offset, 0, reader=reader), True
 
@@ -3691,6 +3743,8 @@ class RunTurn:
         kind, subtype = message.get("type"), message.get("subtype")
         if kind == "system" and subtype == "bg_foreign":
             _warn("background_foreign_input", origin=str(message.get("origin")), **self.ids)
+            if message.get("owner_code") is True:
+                return await self._owner_code_stolen(session, str(message.get("origin")))
             return None
         if kind == "system" and subtype == "bg_request":
             self._bg_requests += 1
@@ -3713,6 +3767,21 @@ class RunTurn:
         elif kind == "result" and isinstance(message.get("bg_cause"), str):
             self._bg_cause = str(message["bg_cause"])
         return None
+
+    async def _owner_code_stolen(self, session: BgSession, origin: str) -> _Outcome:
+        """Another sender gave the session an owner code the runner wrote: stop it (18.5).
+
+        Such an input is a forgery with a code read after the runner wrote it, and it may
+        reach the model before the owner's line does. The session is stopped before the
+        model can act on it, and the run ends ``failed``; the session stays and the next run
+        continues it, like every session that took an input of another sender.
+        """
+        _warn("background_owner_code_stolen", origin=origin, **self.ids)
+        await self._terminate(session, self.ids)
+        await self._finish(
+            "failed", reason="adapter_error", summary=cause("background_owner_code_stolen")
+        )
+        return _Outcome(TurnEvidence(), self._worked, handled=True)
 
     async def _login_unproven(self, session: BgSession, code: str) -> _Outcome:
         """The counter-check of 18.3 did not pass: stop the session, ``billing_mode_mismatch``.
@@ -3774,7 +3843,10 @@ class RunTurn:
                 done = True
                 return
             mapper = TranscriptMapper(
-                str(self.bg_record.get("prompt_uuid") or ""), self._wrote, self._side(session)
+                str(self.bg_record.get("prompt_uuid") or ""),
+                self._wrote,
+                self._side(session),
+                owner=self.owner_lines,
             )
             lines = replayed_records(
                 self._transcript(session.session_id),
@@ -3841,6 +3913,8 @@ class RunTurn:
         own = part.pop("own", None)
         self.bg_own = {u for u in own if isinstance(u, str)} if isinstance(own, list) else set()
         self.bg_login = part.pop("login", None) is True
+        codes = part.pop("owner_codes", None)
+        self.owner_lines = OwnerLines(codes if isinstance(codes, list) else ())
         self.ledger = TurnLedger.from_record(record)
         self.title = str(record.get("title") or "")
         self.title_request = bool(record.get("title_request"))

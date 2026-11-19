@@ -32,6 +32,7 @@ from uuid import UUID
 from bothy_sdk.invocation import Actual, InvocationClaims, TokenVerdict, compare_actual
 
 __all__ = [
+    "OWNER_LEAD_IN",
     "FollowupCheck",
     "FollowupVerdict",
     "PendingFollowups",
@@ -43,6 +44,10 @@ __all__ = [
 
 LEAD_IN = "Follow-up from {name} (@{handle}):"
 """The lead-in of a follow-up line, in the language of the runner prompt."""
+
+OWNER_LEAD_IN = "Follow-up from {name} (@{handle}), owner code {code}:"
+"""The lead-in of a follow-up of the run's owner in a background session
+(`claude_code_runner.ownercode`)."""
 
 
 class FollowupVerdict(Enum):
@@ -128,12 +133,14 @@ def followup_verdict(check: FollowupCheck) -> tuple[FollowupVerdict, str]:  # no
     return FollowupVerdict.WRITE, ""
 
 
-def build_followup_line(
+def build_followup_line(  # noqa: PLR0913 - the parts of one line
     author: Mapping[str, Any],
     text: str,
     line_uuid: str | None = None,
     files: Sequence[str] = (),
     transcripts: Sequence[tuple[str, str]] = (),
+    *,
+    owner_code: str | None = None,
 ) -> bytes:
     r"""Build the stdin line of one follow-up (design note 3).
 
@@ -146,6 +153,8 @@ def build_followup_line(
         transcripts: The name and transcript of each audio attachment the runner transcribed
             (09 18.14), after the text as in the trigger part of the context
             (FIX-followup-transcribe).
+        owner_code: The owner code of a follow-up of the run's owner in a background session
+            (`claude_code_runner.ownercode`), in the lead-in; ``None`` for every other line.
 
     Returns:
         One JSON line of type ``user`` with its line break.
@@ -158,7 +167,8 @@ def build_followup_line(
     """
     name = str(author.get("display_name") or author.get("handle") or "")
     handle = str(author.get("handle") or "")
-    parts = [LEAD_IN.format(name=name, handle=handle)]
+    lead_in = LEAD_IN if owner_code is None else OWNER_LEAD_IN
+    parts = [lead_in.format(name=name, handle=handle, code=owner_code)]
     if text.strip() or not (files or transcripts):
         parts.append(text)
     parts.extend(

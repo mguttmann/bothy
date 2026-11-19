@@ -589,7 +589,8 @@ def prompt_text(line: bytes | str) -> str | None:
     r"""Return the prompt of a launch: the text items of an input line joined by a blank line.
 
     The first input line of a run has two items, the context with trust marks and the trigger
-    part (18.2 "Input"); as one text the context comes first, so the prompt never starts with
+    part (18.2 "Input"), and a third with the owner check for a run with an owner (18.5); as
+    one text the context comes first, so the prompt never starts with
     ``/`` or ``!``.
 
     Args:

@@ -210,6 +210,11 @@ CAUSES: dict[str, str] = {
         "program while this run started, so the runner stopped its session. Send the message "
         "again"
     ),
+    "background_owner_code_stolen": (
+        "Another program on the runner host sent this session a message with the code that "
+        "marks your follow-up as yours, so the runner stopped the session before Claude Code "
+        "could act on it. Check the runner host, then send your message again"
+    ),
 }
 """The text per log code, without the code (`cause` appends it)."""
 

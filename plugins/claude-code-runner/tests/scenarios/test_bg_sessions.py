@@ -194,8 +194,9 @@ async def test_a_new_post_runs_as_one_background_session(bg_world: World) -> Non
         },
         "disableAllHooks": False,
     }
-    # The prompt is the stdin of the command: the context, a blank line, the trigger part.
-    assert launch["prompt"].endswith("Fix the login form")
+    # The prompt is the stdin of the command: the context, a blank line, the trigger part,
+    # and for a person's trigger the owner check (18.5).
+    assert "\n\nFix the login form\n\nOwner check of this turn" in launch["prompt"]
     assert "\n\n" in launch["prompt"]
     assert not launch["prompt"].startswith(("/", "!"))
     # The launch environment is the fixed one of the runner: the allow list of 18.2 plus
