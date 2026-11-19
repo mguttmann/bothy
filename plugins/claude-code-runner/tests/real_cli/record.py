@@ -285,12 +285,62 @@ def written_members(messages: list[dict[str, Any]]) -> dict[str, Any]:
     return {"messages": by_message, "workflow_agent": sorted(agent)}
 
 
+GROWING_LISTS = ("background_task", "usage", "task_types")
+"""The member and type lists of the field table besides the messages that a newer CLI may extend.
+The value lists ``task_status`` and ``command_states`` and the workflow type stay equal: the
+runner maps each value, and a new one would end no step (09 18.4)."""
+
+
+def field_changes(
+    recorded: Mapping[str, Any], fresh: Mapping[str, Any]
+) -> tuple[list[str], list[str]]:
+    """Compare the field table of a CLI with the recording of the pin (CONTRACT-TOLERANT).
+
+    A recorded schema member that the CLI no longer names is lost: that covers every member the
+    runner reads, and a renamed member is a loss and an addition. Members only the recorded turn
+    wrote (``written_only``) are not part of a schema and are held by the token tests instead.
+    A member the recording does not know is an addition, which the stream reader ignores.
+
+    Args:
+        recorded: ``stream_fields_<pin>.json``.
+        fresh: `read_fields` of the CLI under test.
+
+    Returns:
+        The losses and the additions, each as ``"<table>: <member>"``; only losses fail.
+    """
+    lost: list[str] = []
+    added: list[str] = []
+    written_only = recorded.get("written_only", {})
+    for name, known in recorded["messages"].items():
+        now = fresh["messages"].get(name)
+        if now is None:
+            lost.append(f"{name}: the message schema")
+            continue
+        skip = set(written_only.get(name, ()))
+        lost += [f"{name}: {m}" for m in known if m not in now and m not in skip]
+        added += [f"{name}: {m}" for m in now if m not in known]
+    for key, value in fresh.items():
+        if key == "messages":
+            continue
+        was = recorded.get(key)
+        if key in GROWING_LISTS and isinstance(was, list):
+            lost += [f"{key}: {m}" for m in was if m not in value]
+            added += [f"{key}: {m}" for m in value if m not in was]
+        elif was != value:
+            lost.append(f"{key}: {was!r} became {value!r}")
+    return lost, added
+
+
 def fields_document(data: bytes, tree: list[dict[str, Any]], today: str) -> dict[str, Any]:
     """Build ``stream_fields_<v>.json`` from the CLI's file and the recorded turn."""
     fields = read_fields(data)
     written = written_members(tree)
+    written_only: dict[str, list[str]] = {}
     for name, members in fields["messages"].items():
-        members.extend(sorted(written["messages"].get(name, set()) - set(members)))
+        beyond = sorted(written["messages"].get(name, set()) - set(members))
+        members.extend(beyond)
+        if beyond:
+            written_only[name] = beyond
     return {
         "cli_version": PINNED_CLAUDE_CODE_VERSION,
         "origin": (
@@ -303,10 +353,12 @@ def fields_document(data: bytes, tree: list[dict[str, Any]], today: str) -> dict
             "names the members of the message schema in the CLI's file without the envelope "
             "(type, subtype, uuid, session_id), then the members the CLI wrote in the recorded "
             "turn that the schema does not name. workflow_agent lists what the CLI wrote in the "
-            "agent entries of workflow_progress."
+            "agent entries of workflow_progress. written_only names, per message, the members "
+            "of its list that only the recorded turn wrote."
         ),
         **fields,
         "workflow_agent": written["workflow_agent"],
+        "written_only": written_only,
     }
 
 

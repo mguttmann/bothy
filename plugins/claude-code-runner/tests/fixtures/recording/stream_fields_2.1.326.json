@@ -1,7 +1,7 @@
 {
   "cli_version": "2.1.326",
   "origin": "read from the file of the pinned CLI (the npm package of the platform; no session, no login, no model call) and from the recorded turn agent_tree_2.1.326.jsonl by tests/real_cli/record.py on 2026-11-17",
-  "note": "Message types, subtypes and member names only, no content. Each list of messages names the members of the message schema in the CLI's file without the envelope (type, subtype, uuid, session_id), then the members the CLI wrote in the recorded turn that the schema does not name. workflow_agent lists what the CLI wrote in the agent entries of workflow_progress.",
+  "note": "Message types, subtypes and member names only, no content. Each list of messages names the members of the message schema in the CLI's file without the envelope (type, subtype, uuid, session_id), then the members the CLI wrote in the recorded turn that the schema does not name. workflow_agent lists what the CLI wrote in the agent entries of workflow_progress. written_only names, per message, the members of its list that only the recorded turn wrote.",
   "messages": {
     "system/init": [
       "agents",
@@ -387,5 +387,19 @@
     "tokens",
     "toolCalls",
     "type"
-  ]
+  ],
+  "written_only": {
+    "user": [
+      "agent_id",
+      "isReplay",
+      "subagent_type",
+      "task_description"
+    ],
+    "system/task_started": [
+      "owned_by_subagent"
+    ],
+    "system/task_progress": [
+      "workflow_progress"
+    ]
+  }
 }

@@ -12,7 +12,8 @@ the recorded stream field table equals a fresh read of the CLI's file (``record.
 and every text of the CLI's own "too old" pattern is one the runner recognises. An update chain
 runs it against a newer CLI with ``CLAUDE_CODE_RUNNER_TESTED_VERSION`` set to that version
 (FIX-RUNNER-TESTED-CLI): the CLI is then held against the recordings of the pin, and the probe
-and ``check-config`` take it with the configuration entry the chain writes.
+and ``check-config`` take it with the configuration entry the chain writes. Its field table may
+name members the recording does not know, never lose one it knows (FIX-RUNNER-CONTRACT-TOLERANT).
 """
 
 from __future__ import annotations
@@ -21,10 +22,11 @@ import json
 import os
 import re
 import subprocess
+import warnings
 from pathlib import Path
 
 import pytest
-from real_cli.record import RECORDING, cli_bytes, expected_version, read_fields
+from real_cli.record import RECORDING, cli_bytes, expected_version, field_changes, read_fields
 
 from claude_code_runner.__main__ import main
 from claude_code_runner.environment import clean_path, find_program
@@ -233,15 +235,32 @@ def test_check_config_reports_the_pinned_cli_ok(
     assert capsys.readouterr().out.splitlines()[-1] == "runtime ok"
 
 
+@pytest.mark.filterwarnings("default:stream members the recording does not know:UserWarning")
 def test_recorded_stream_fields_equal_the_installed_cli(data: bytes) -> None:
-    """The field table of the recording is the one the installed CLI's file holds."""
+    """The field table of the recording is the one the installed CLI's file holds.
+
+    At the pin the table is equal: the schema members, then what only the recorded turn wrote.
+    A tested newer CLI (``CLAUDE_CODE_RUNNER_TESTED_VERSION``) keeps every recorded schema member
+    and the values the test compares (task status, command states, workflow type); members it
+    adds are named in a warning
+    (FIX-RUNNER-CONTRACT-TOLERANT).
+    """
     path = RECORDING / f"stream_fields_{PINNED_CLAUDE_CODE_VERSION}.json"
     recorded = json.loads(path.read_text("utf-8"))
     fresh = read_fields(data)
-    for name, members in fresh.pop("messages").items():
-        # The recording appends what the CLI wrote in the recorded turn beyond the schema.
-        assert recorded["messages"][name][: len(members)] == members, name
-    assert {key: recorded[key] for key in fresh} == fresh
+    lost, added = field_changes(recorded, fresh)
+    assert lost == []
+    if expected_version() == PINNED_CLAUDE_CODE_VERSION:
+        for name, members in fresh["messages"].items():
+            beyond = recorded["written_only"].get(name, [])
+            assert recorded["messages"][name] == members + beyond, name
+        assert {key: recorded[key] for key in fresh if key != "messages"} == {
+            key: value for key, value in fresh.items() if key != "messages"
+        }
+        assert added == []
+    elif added:
+        known = f"stream members the recording does not know: {', '.join(added)}"
+        warnings.warn(known, UserWarning, stacklevel=1)
 
 
 def test_every_text_of_the_too_old_pattern_is_recognised(data: bytes) -> None:
