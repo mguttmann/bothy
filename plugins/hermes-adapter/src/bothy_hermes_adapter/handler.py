@@ -22,6 +22,9 @@ SDK's (M2-29); this module decides what Hermes does:
   (`bothy_hermes_adapter.jobs`, 17.12 point 8); `sweep_jobs` posts a live job no open run covers
   once, as a message of the agent without a run. `tool_allowed` answers Hermes'
   ``pre_tool_call``: no tool runs in a thread without an open run.
+* While a run is open, the stage files its tool calls registered (`bothy_hermes_adapter.stages`,
+  17.12 point 9) are read every ``background_poll_interval``; their lines become steps and the
+  status line of the run, and the open ones end ``cancelled`` with the run.
 * `on_followup` steers a running turn or answers a waiting card; `on_interaction` resolves a
   card's Hermes callback exactly once and answers the interaction. The files of a follow-up
   are loaded like the trigger's once the server checked them and steered as paths (Hermes
@@ -166,6 +169,7 @@ from bothy_hermes_adapter.runtime import (
     TurnRequest,
     Usage,
 )
+from bothy_hermes_adapter.stages import StageCursor, StageRegistry, StageSteps
 from bothy_hermes_adapter.store import CallbackStore
 from bothy_hermes_adapter.tool_class import classify
 
@@ -283,6 +287,13 @@ class _Turn:
     # its own (D-FMS-5).
     followup_order: asyncio.Lock = field(default_factory=asyncio.Lock)
     prepared: dict[UUID, _FollowupContent] = field(default_factory=dict)
+    # Stage files of the thread (17.12 point 9): the follower task, a lock so the last read at
+    # the end never runs beside a poll, and the open steps of each source in this run.
+    stage_task: asyncio.Task[None] | None = None
+    stage_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    stage_open: dict[str, dict[str, str]] = field(default_factory=dict)
+    stage_cursors: dict[str, StageCursor] = field(default_factory=dict)
+    stages_closed: bool = False
 
 
 class HermesHandler(AgentHandler):
@@ -296,9 +307,10 @@ class HermesHandler(AgentHandler):
         now: The wall time (for step end times).
         jobs: The registry of external jobs (09 17.12 point 8), ``None`` without one.
         mirror: The store of the session mirror (09 17.13): its posts are read-only here.
+        stages: The registry of stage files (09 17.12 point 9), ``None`` without one.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - every part of the handler is explicit
         self,
         runtime: Runtime,
         settings: AdapterSettings,
@@ -308,10 +320,12 @@ class HermesHandler(AgentHandler):
         now: Any = None,
         jobs: JobRegistry | None = None,
         mirror: MirrorMap | None = None,
+        stages: StageRegistry | None = None,
     ) -> None:
         """Create the handler; the tool class is read from Hermes at once."""
         self.runtime = runtime
         self._jobs = jobs
+        self._stages = stages
         self._mirror = mirror
         # Runs in a mirror post (09 17.13): answered without Hermes.
         self._mirror_runs: set[UUID] = set()
@@ -606,6 +620,8 @@ class HermesHandler(AgentHandler):
         )
         self._turns[run.thread_id] = turn
         self._by_run[run.run_id] = turn
+        if self._stages is not None:
+            turn.stage_task = asyncio.ensure_future(self._follow_stages(turn))
         try:
             await self._run_turn(inv, turn)
             if turn.dropped:
@@ -861,6 +877,7 @@ class HermesHandler(AgentHandler):
                 await self._cancel_work(turn)
         finally:
             self._stopped(turn)
+        await self._end_stages(turn)
         metrics, costs = self._usage(turn)
         if turn.abort_reason is not None:
             await handle.finish("failed", reason=turn.abort_reason, metrics=metrics, costs=costs)
@@ -1118,6 +1135,83 @@ class HermesHandler(AgentHandler):
         for record in jobs.records():
             if record.thread_id == thread_id and record.started_at >= since:
                 jobs.stop(record)
+
+    # ---- stage files of the run (09 17.12 point 9) ------------------------------------------
+
+    async def _follow_stages(self, turn: _Turn) -> None:
+        """Read the thread's stage files every ``background_poll_interval`` while the run lives."""
+        while not (turn.ended or turn.dropped):
+            try:
+                await self._poll_stages(turn)
+            except Exception as exc:  # the run goes on; the next poll reads again
+                _LOG.warning("run %s: stage files not read: %s", turn.run_id, type(exc).__name__)
+            await asyncio.sleep(self.settings.background_poll_interval)
+
+    async def _poll_stages(self, turn: _Turn, *, closing: str | None = None) -> None:
+        """Show the new lines of the thread's stage files; ``closing`` ends the open steps.
+
+        A source's cursor is kept in the turn and saved after its lines were applied, with the
+        steps this run left open, so a later read (also of a later run of the thread) never shows
+        a line twice, also when the save failed. The open steps of a source that is no longer
+        registered (deregistered, or replaced by a new registration of its file) end
+        ``cancelled``.
+        """
+        stages = self._stages
+        if stages is None:
+            return
+        async with turn.stage_lock:
+            if turn.dropped or turn.handle.finished or turn.handle.waiting:
+                return
+            if turn.stages_closed and closing is None:
+                return
+            run_id = str(turn.run_id)
+            try:
+                found = await asyncio.to_thread(
+                    stages.collect, turn.thread_id, run_id, dict(turn.stage_cursors)
+                )
+            except (JobError, OSError) as exc:
+                _LOG.warning("run %s: stage files not readable: %s", turn.run_id, exc)
+                return
+            if _gone(turn):  # stopped or ended while the files were read
+                return
+            listed = {source.source_id for source, _, _ in found}
+            for gone in [sid for sid in turn.stage_open if sid not in listed]:
+                with self._bound(turn):
+                    StageSteps(turn.handle.patch, self._now, turn.stage_open.pop(gone)).close_all(
+                        "cancelled"
+                    )
+                turn.stage_cursors.pop(gone, None)
+            for source, cursor, events in found:
+                opened = turn.stage_open.setdefault(source.source_id, {})
+                if cursor.run_id == run_id and not opened:
+                    opened.update(cursor.open)  # a reader of this run that started again
+                steps = StageSteps(turn.handle.patch, self._now, opened)
+                ended = False
+                with self._bound(turn):
+                    for event in events:
+                        ended = steps.apply(event) or ended
+                    if closing is not None and not ended:
+                        steps.close_all(closing)
+                cursor.run_id, cursor.open = run_id, dict(opened)
+                turn.stage_cursors[source.source_id] = cursor
+                try:
+                    if ended:
+                        await asyncio.to_thread(stages.retire, source.source_id)
+                    else:
+                        await asyncio.to_thread(stages.save_cursor, source.source_id, cursor)
+                except (JobError, OSError) as exc:
+                    _LOG.warning("run %s: stage cursor not saved: %s", turn.run_id, exc)
+
+    async def _end_stages(self, turn: _Turn) -> None:
+        """The run ends: read the stage files a last time and end their open steps.
+
+        A poll that runs now finishes first (the lock); later polls of the task do nothing.
+        """
+        turn.stages_closed = True
+        try:
+            await self._poll_stages(turn, closing="cancelled")
+        except Exception as exc:  # the run still ends; the log names the failure
+            _LOG.warning("run %s: stage files not closed: %s", turn.run_id, type(exc).__name__)
 
     # ---- registered jobs without an open run (09 17.12 point 8) ------------------------------
 
@@ -1386,6 +1480,8 @@ class HermesHandler(AgentHandler):
     def _forget(self, turn: _Turn) -> None:
         turn.ended = True
         turn.settled.set()
+        if turn.stage_task is not None:
+            turn.stage_task.cancel()
         if self._turns.get(turn.thread_id) is turn:
             del self._turns[turn.thread_id]
         self._by_run.pop(turn.run_id, None)

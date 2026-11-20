@@ -136,6 +136,7 @@ from bothy_hermes_adapter.runtime import (
     TurnRequest,
     Usage,
 )
+from bothy_hermes_adapter.stages import STAGES_DIR, StageRegistry
 from bothy_hermes_adapter.store import CallbackStore
 
 __all__ = ["CONTROL_SENDER", "ServerPlatform", "dispatch_hook"]
@@ -343,6 +344,11 @@ class ServerPlatform(BasePlatformAdapter):
             jobs.prepare()
         except (JobError, OSError) as exc:  # no folder: a helper's registration is refused
             _LOG.exception("jobs folder refused: %s", exc)
+        stages = StageRegistry(state_dir / STAGES_DIR)
+        try:
+            stages.prepare()
+        except (JobError, OSError) as exc:  # no folder: a registration is refused
+            _LOG.exception("stages folder refused: %s", exc)
         self.handler = HermesHandler(
             self,
             settings,
@@ -350,6 +356,7 @@ class ServerPlatform(BasePlatformAdapter):
             busy_mode=busy,
             jobs=jobs,
             mirror=MirrorMap(state_dir / MIRROR_DB),
+            stages=stages,
         )
         config = AdapterConfig(
             base_url=settings.server_url,

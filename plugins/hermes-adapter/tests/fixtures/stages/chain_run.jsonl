@@ -1,0 +1,21 @@
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"run","state":"started","text":"run started"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"intake","state":"started","text":"intake started"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"intake","state":"ended","outcome":"passed","text":"intake ended: passed"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"triage","state":"started","text":"triage started"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"triage","state":"ended","outcome":"passed","text":"triage ended: passed"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"plan","state":"started","text":"plan started"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"plan","state":"ended","outcome":"passed-direct","text":"plan ended: passed-direct"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"base-check","state":"started","text":"base-check started"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"base-check","state":"ended","outcome":"passed","text":"base-check ended: passed"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"build","state":"started","text":"build started"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"build","state":"ended","outcome":"passed","text":"build ended: passed"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"evidence","state":"started","text":"evidence started"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"evidence","state":"ended","outcome":"passed","text":"evidence ended: passed"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"red-team","state":"started","text":"red-team started"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"red-team","state":"pass","text":"red-team pass 2"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"red-team","state":"pass","text":"red-team pass 3"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"red-team","state":"pass","text":"red-team pass 4"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"red-team","state":"ended","outcome":"passed","text":"red-team ended: passed"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"ship","state":"started","text":"ship started"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"ship","state":"ended","outcome":"passed","text":"ship ended: passed"}
+{"at":"2026-11-19T12:00:00.000Z","ticket":"TOY-7","run":"r1794736920000","stage":"run","state":"ended","outcome":"code-done","text":"run ended: code-done"}
