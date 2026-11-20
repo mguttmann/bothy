@@ -561,3 +561,38 @@ async def test_a_cursor_that_cannot_be_saved_shows_no_line_twice(
     shown = [(s["title"], s["status"]) for s in _steps(r, triggered.run_id)]
     assert shown == [("intake: passed", "completed"), ("triage", "cancelled")]
     assert "stage cursor not saved" in caplog.text
+
+
+def test_a_deeply_nested_line_is_malformed() -> None:
+    assert parse_line(b"[" * 100000 + b"]" * 100000) in ("malformed", "too_long")
+    assert parse_line(b"[" * 2000 + b"]" * 2000) == "malformed"
+
+
+def test_an_unreadable_file_stays_listed_with_its_cursor(
+    tmp_path: Path, registry: StageRegistry
+) -> None:
+    path = tmp_path / "stages.jsonl"
+    thread = uuid4()
+    record = registry.register(thread, path)
+    path.write_bytes(SAMPLE[0])
+    known = {record.source_id: StageCursor(0)}
+    path.chmod(0o000)
+    try:
+        [(source, cursor, events)] = registry.collect(thread, "r", known)
+    finally:
+        path.chmod(0o600)
+    assert (source.source_id, cursor.offset, events) == (record.source_id, 0, [])
+    [(_, cursor, events)] = registry.collect(thread, "r", known)
+    assert [e.text for e in events] == ["run started"]
+
+
+def test_a_failed_write_leaves_no_temporary_file(
+    registry: StageRegistry, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse(fd: int, data: bytes) -> int:
+        raise OSError(28, "no space left")
+
+    monkeypatch.setattr(stages.os, "write", refuse)
+    with pytest.raises(OSError, match="no space"):
+        registry.save_cursor("a" * 32, StageCursor(0))
+    assert list(registry.directory.iterdir()) == []

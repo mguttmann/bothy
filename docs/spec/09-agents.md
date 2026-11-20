@@ -3134,21 +3134,21 @@ work of the runner (18.5) for Hermes:
 9. Stage files (addendum of 2026-11-20, FEAT-hermes-adapter-stages,
    docs/decisions.d/FEAT-hermes-adapter-stages.md): a long command a tool call runs may write its
    progress as one JSON line per event into a file, in the line format of the stage events of a
-   coding chain (`at`, `ticket`, `run`, `stage`, `state`, `outcome` on `ended`, `text`; `stage`
-   one of `intake`, `triage`, `plan`, `plan-approval`, `base-check`, `build`, `evidence`,
-   `review`, `red-team`, `ship`, `ci` or `run`; `state` `started`, `pass` or `ended`). The tool
-   call registers the file for its thread through the adapter's helper
-   `bothy_hermes_adapter.stages` (`python -m bothy_hermes_adapter stages register --profile-home
-   <home> --thread <thread ID> --file <absolute path> [--ticket <key>]`, `stages deregister
-   --source-id <ID>`, `stages list`); records and their cursors are files of mode `0600` in
-   `<profile home>/<platform key>/stages` with the rules of point 8. Reading starts at the file's
-   size at the registration. While a run of the thread is open, the adapter reads the complete
-   lines it has not read every `hermes_adapter.background_poll_interval`, during the turn and
-   during the hold, and once more right before the run ends; a partial last line waits for its
-   newline. Each source keeps a cursor (offset, the file's identity, the run and the steps it
-   opened there) that is saved after its lines were applied, so a later read, also by a later
-   run of the same thread after a restart, never shows a line twice and shows what was written
-   while no run was open. Mapping, applied in the file's order:
+   coding chain (`at`, `ticket`, `run`, `stage`, `state`, `outcome` on `ended`, `text`; `stage` one
+   of `intake`, `triage`, `plan`, `plan-approval`, `base-check`, `build`, `evidence`, `review`,
+   `red-team`, `ship`, `ci` or `run`; `state` `started`, `pass` or `ended`). The tool call registers
+   the file for its thread through the adapter's helper `bothy_hermes_adapter.stages` (`python -m
+   bothy_hermes_adapter stages register --profile-home <home> --thread <thread ID> --file <absolute
+   path> [--ticket <key>]`, `stages deregister --profile-home <home> --source-id <ID>`, `stages list
+   --profile-home <home>`); records and their cursors are files of mode `0600` in `<profile
+   home>/<platform key>/stages` with the rules of point 8. Reading starts at the file's size at the
+   registration. While a run of the thread is open, the adapter reads the complete lines it has not
+   read every `hermes_adapter.background_poll_interval`, during the turn and during the hold, and
+   once more right before the run ends; a partial last line waits for its newline. Each source keeps
+   a cursor (offset, the file's identity, the run and the steps it opened there) that is saved after
+   its lines were applied, so a later read, also by a later run of the same thread after a restart,
+   never shows a line twice that a saved cursor covers, and shows what was written while no run was
+   open. Mapping, applied in the file's order:
 
    | Line | Steps | `/status_line` |
    |---|---|---|

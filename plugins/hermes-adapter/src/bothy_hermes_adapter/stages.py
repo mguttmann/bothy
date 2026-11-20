@@ -195,7 +195,7 @@ def parse_line(data: bytes, ticket: str | None = None) -> StageEvent | str:
         return "too_long"
     try:
         raw: Any = json.loads(data)
-    except (ValueError, UnicodeDecodeError):
+    except (ValueError, UnicodeDecodeError, RecursionError):  # also a deeply nested line
         return "malformed"
     if not isinstance(raw, dict):
         return "malformed"
@@ -415,11 +415,11 @@ class StageRegistry:
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
         fd = os.open(temporary, flags, 0o600)
         try:
-            os.fchmod(fd, 0o600)
-            os.write(fd, data)
-        finally:
-            os.close(fd)
-        try:
+            try:
+                os.fchmod(fd, 0o600)
+                os.write(fd, data)
+            finally:
+                os.close(fd)
             temporary.replace(folder / name)
         except OSError:
             temporary.unlink(missing_ok=True)
@@ -533,22 +533,27 @@ class StageRegistry:
         Returns:
             Per source of the thread: the record, the moved cursor and the events.
         """
-        out = []
+        out: list[tuple[StageSource, StageCursor, list[StageEvent]]] = []
         for source in self.records():
             if source.thread_id != thread_id:
                 continue
             mine = (known or {}).get(source.source_id)
             cursor = self.cursor(source) if mine is None else replace(mine, open=dict(mine.open))
+            moved = replace(cursor, open=dict(cursor.open))
             try:
-                lines, notes = read_new(source.path, cursor)
+                lines, notes = read_new(source.path, moved)
             except OSError as exc:
+                # Still listed with no event: a file unreadable for a moment is no retired
+                # source, and its cursor stays where it was.
                 _LOG.warning(
                     "run %s: stage source %s not readable: %s",
                     run_id,
                     source.source_id,
                     type(exc).__name__,
                 )
+                out.append((source, cursor, []))
                 continue
+            cursor = moved
             events = []
             for line in lines:
                 parsed = parse_line(line, source.ticket)

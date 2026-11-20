@@ -253,7 +253,8 @@ python -m bothy_hermes_adapter stages deregister --profile-home "$HERMES_HOME" -
 
 The adapter reads the file every `hermes_adapter.background_poll_interval` while a run of the
 thread is open and keeps a cursor per file, so a later run of the thread goes on where the last
-one stopped (also after a restart of the gateway). Only the checked words of a line reach the
+one stopped (also after a restart of the gateway, from the last cursor saved on disk: a cursor
+that could not be saved holds only within the run). Only the checked words of a line reach the
 run; a line off the format is skipped and logged with a reason code. The steps a file left open
 end `cancelled` with the run, and the file's `run` `ended` line removes the registration. A stage
 file does not keep the run open: the command does, as the tool call's process or as background
