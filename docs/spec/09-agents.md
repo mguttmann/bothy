@@ -3159,21 +3159,21 @@ work of the runner (18.5) for Hermes:
    | `run` `ended` | every open step ends `failed` for `failed` and `base-red`, `cancelled` for `halted`, else `completed`; the source is retired | `<ticket>: run ended: <end>` |
    | anything else | none; skipped and logged with a reason code | unchanged |
 
-   The chain runs one stage at a time and writes an `ended` line for each stage; a start that
-   comes while another stage's step is open (a line lost, or a writer that leaves out an end)
-   ends that step, so no step stays open behind the chain. A source that is no longer registered
-   while its steps are open (deregistered, or replaced by a new registration of its file in the
-   run) ends them `cancelled` at the next read, and the adapter keeps each cursor in memory as
-   well, so a cursor it cannot save never makes a line show twice. Only checked words reach the run: an
-   outcome off the lists of the chain shows as `unknown`, the text is rebuilt from the words and
-   never copied, a line of another ticket than the registration names, of an unknown stage or
-   state, of no JSON object or longer than `LINE_MAX_BYTES` of the module is skipped; the log
-   names the run, the source ID and the reason code, never the line or the path. When the run
-   ends, the steps a source left open end `cancelled`. A source is retired (record and cursor
-   removed) at its `run` `ended` line, by `stages deregister`, by a newer registration of the
-   same file in the same thread, and at the next registration once it is older than
-   `SOURCE_MAX_AGE_S` of the module. A stage file does not hold the run: the command itself is the
-   tool call's foreground process, or background work of points 1 or 8.
+   The chain runs one stage at a time and writes an `ended` line for each stage; a start that comes
+   while another stage's step is open (a line lost, or a writer that leaves out an end) ends that
+   step, so no step stays open behind the chain. A source that is no longer registered while its
+   steps are open (deregistered, or replaced by a new registration of its file in the run) ends them
+   `cancelled` at the next read, and the adapter keeps each cursor in memory as well, so a cursor it
+   cannot save makes no line show twice within the run. Only checked words reach the run: an outcome
+   off the lists of the chain shows as `unknown`, the text is rebuilt from the words and never
+   copied, a line of another ticket than the registration names, of an unknown stage or state, of no
+   JSON object or longer than `LINE_MAX_BYTES` of the module is skipped; the log names the run, the
+   source ID and the reason code, never the line or the path. When the run ends, the steps a source
+   left open end `cancelled`. A source is retired (record and cursor removed) at its `run` `ended`
+   line, by `stages deregister`, by a newer registration of the same file in the same thread, and at
+   the next registration once it is older than `SOURCE_MAX_AGE_S` of the module. A stage file does
+   not hold the run: the command itself is the tool call's foreground process, or background work of
+   points 1 or 8.
 
 Limits: a process that never ends keeps its run `running` until a person stops it; a restart of
 the gateway or the adapter ends the hold (the server ends the run `interrupted` or `stale`), and a
