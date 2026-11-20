@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """Stage files of a coding chain become steps and the status line of the run (09 17.12 point 9).
 
-The sample ``tests/fixtures/stages/chain_run.jsonl`` was written by the chain's own
-``withStageEvents`` (``src/chain-command/stage-events.ts`` of the coding chain) for an invented
-run of the ticket ``TOY-7`` that goes through every stage, with a further pass of build and
-evidence, and ends ``code-done``. It shows that the chain writes the ``ended`` line only for the
-first stage that ends; the next start ends the stage before.
+The sample ``tests/fixtures/stages/chain_run.jsonl`` was written by the coding chain's own
+runner (``runTicket`` of its ``src/runner/runner.ts``, with the store wrapped by
+``withStageEvents`` of ``src/chain-command/stage-events.ts``) for the invented bug ticket of the
+chain's test material, run in a scratch copy; only the ticket key was set to ``TOY-7``. The run
+goes through the stages with an ``ended`` line each, three further passes of the red team, and
+ends ``code-done``.
 """
 
 from __future__ import annotations
@@ -223,7 +224,7 @@ def test_registration_starts_after_the_lines_already_there(
     with path.open("ab") as f:
         f.write(SAMPLE[4])
     [(_, cursor, events)] = registry.collect(thread, "r")
-    assert [e.text for e in events] == ["plan started"]
+    assert [e.text for e in events] == ["triage ended: passed"]
     assert registry.collect(uuid4(), "r") == []  # another thread reads nothing
     registry.save_cursor(record.source_id, cursor)
     # A new process (a restart) goes on from the saved cursor.
@@ -305,7 +306,7 @@ def test_the_command_line_registers_lists_and_deregisters(
 # ---- the mapping ---------------------------------------------------------------------------------
 
 
-def test_the_sample_run_becomes_one_step_per_stage_and_pass() -> None:
+def test_the_sample_run_becomes_one_step_per_stage() -> None:
     patch = Patcher()
     steps = StageSteps(patch, _now, {})
     ended = [
@@ -316,24 +317,38 @@ def test_the_sample_run_becomes_one_step_per_stage_and_pass() -> None:
     shown = [(s["title"], s["status"]) for s in patch.steps.values()]
     assert shown == [
         ("intake: passed", "completed"),
-        ("triage", "completed"),
-        ("plan", "completed"),
-        ("plan-approval", "completed"),
-        ("base-check", "completed"),
-        ("build", "completed"),
-        ("evidence", "completed"),
-        ("build (pass 2)", "completed"),
-        ("evidence (pass 2)", "completed"),
-        ("review", "completed"),
-        ("red-team", "completed"),
-        ("ship", "completed"),
-        ("ci", "completed"),
+        ("triage: passed", "completed"),
+        ("plan: passed-direct", "completed"),
+        ("base-check: passed", "completed"),
+        ("build: passed", "completed"),
+        ("evidence: passed", "completed"),
+        ("red-team: passed", "completed"),
+        ("ship: passed", "completed"),
     ]
+    red_team = [s for s in patch.steps.values() if s["detail"]["stage"] == "red-team"]
+    assert red_team[0]["detail"] == {"stage": "red-team", "outcome": "passed"}
     assert {(s["kind"], s["name"]) for s in patch.steps.values()} == {("workflow", "chain_stage")}
     assert all(s.get("finished_at") for s in patch.steps.values())
     assert patch.status[0] == "TOY-7: run started"
     assert patch.status[-1] == "TOY-7: run ended: code-done"
     assert steps.open == {}
+
+
+def test_a_start_ends_an_open_step_of_another_stage_and_a_pass_renames() -> None:
+    patch = Patcher()
+    steps = StageSteps(patch, _now, {})
+    raw = json.loads(line("build", "pass"))
+    raw["text"] = "build pass 2"
+    for data in (line("build", "started"), line("evidence", "started"), json.dumps(raw).encode()):
+        event = parse_line(data.strip())
+        assert isinstance(event, StageEvent)
+        steps.apply(event)
+    shown = [(s["title"], s["status"]) for s in patch.steps.values()]
+    assert shown == [
+        ("build", "completed"),
+        ("evidence", "completed"),
+        ("build (pass 2)", "running"),
+    ]
 
 
 @pytest.mark.parametrize(
@@ -413,7 +428,7 @@ async def test_the_run_shows_the_chain_while_the_turn_runs(
         await r.until(ended, "the chain's end in the status line")
         # The steps show while the turn still runs.
         assert r.fake.run_state(triggered.run_id).state == "running"
-        assert len(_steps(r, triggered.run_id)) == 13
+        assert len(_steps(r, triggered.run_id)) == 8
         hold.set()
         await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
     assert r.fake.run_state(triggered.run_id).state == "completed"
@@ -436,7 +451,7 @@ async def test_the_end_of_the_run_ends_the_open_steps_and_the_reading(
         triggered = await r.fake.trigger()
         await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
         shown = [(s["title"], s["status"]) for s in _steps(r, triggered.run_id)]
-        assert shown[-1] == ("build", "cancelled")
+        assert shown[-1] == ("base-check", "cancelled")
         assert all(status != "running" for _, status in shown)
         patches = len(r.requests("patchRun"))
         with path.open("ab") as f:
@@ -466,13 +481,11 @@ async def test_the_next_run_of_the_thread_goes_on_from_the_cursor(
         await r.until(lambda: r.finished(second.run_id), "the end of the second run")
     titles = [s["title"] for s in _steps(r, second.run_id)]
     assert titles == [
-        "evidence",
-        "build (pass 2)",
-        "evidence (pass 2)",
-        "review",
-        "red-team",
-        "ship",
-        "ci",
+        "base-check: passed",
+        "build: passed",
+        "evidence: passed",
+        "red-team: passed",
+        "ship: passed",
     ]
     assert r.fake.run(second.run_id)["status_line"] == "TOY-7: run ended: code-done"
     assert registry.records() == []
@@ -490,3 +503,61 @@ async def test_a_run_of_another_thread_reads_nothing(
         await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
     assert _steps(r, triggered.run_id) == []
     assert len(registry.records()) == 1
+
+
+async def test_a_new_registration_in_the_run_ends_the_old_sources_steps(
+    tmp_path: Path, registry: StageRegistry
+) -> None:
+    path = tmp_path / "stages.jsonl"
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        # The first call of the chain stops after its intake started (no end line).
+        registry.register(turn.thread_id, path, "TOY-7")
+        with path.open("ab") as f:
+            f.write(b"".join(SAMPLE[:2]))
+        await asyncio.sleep(0.3)
+        # The agent calls the chain again for the same ticket in the same run.
+        registry.register(turn.thread_id, path, "TOY-7")
+        with path.open("ab") as f:
+            f.write(SAMPLE[2] + SAMPLE[-1])
+        await asyncio.sleep(0.3)
+        await rt.events.on_answer(turn.thread_id, "done", str(turn.message_id))
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt, stages=registry, **FAST) as r:
+        triggered = await r.fake.trigger()
+        await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
+    shown = [(s["title"], s["status"]) for s in _steps(r, triggered.run_id)]
+    assert shown == [("intake", "cancelled"), ("intake: passed", "completed")]
+
+
+async def test_a_cursor_that_cannot_be_saved_shows_no_line_twice(
+    tmp_path: Path, registry: StageRegistry, caplog: pytest.LogCaptureFixture
+) -> None:
+    path = tmp_path / "stages.jsonl"
+    hold = asyncio.Event()
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        registry.register(turn.thread_id, path, "TOY-7")
+        registry.directory.chmod(0o500)  # a full disk, for example: no cursor is written
+        with path.open("ab") as f:
+            f.write(b"".join(SAMPLE[:4]))
+        await hold.wait()
+        await rt.events.on_answer(turn.thread_id, "done", str(turn.message_id))
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    caplog.set_level(logging.WARNING, logger="bothy_hermes_adapter")
+    try:
+        async with rig(tmp_path, runtime=rt, stages=registry, **FAST) as r:
+            triggered = await r.fake.trigger()
+            await r.until(lambda: len(_steps(r, triggered.run_id)) >= 2, "the steps")
+            await asyncio.sleep(0.3)  # many polls
+            hold.set()
+            await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
+    finally:
+        registry.directory.chmod(0o700)
+    shown = [(s["title"], s["status"]) for s in _steps(r, triggered.run_id)]
+    assert shown == [("intake: passed", "completed"), ("triage", "cancelled")]
+    assert "stage cursor not saved" in caplog.text

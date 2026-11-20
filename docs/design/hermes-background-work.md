@@ -146,3 +146,12 @@ sequenceDiagram
     J->>P: job deregister (or the process is gone)
     P->>P: step completed, run finishes after the settle time
 ```
+
+## 7. Stage files (addendum of 2026-11-20)
+
+A long command a tool call runs (the coding chain of a Hermes profile) may write its progress as
+one JSON line per stage event. That is no background work of its own: it does not hold the run.
+The tool call registers the file for its thread (`python -m bothy_hermes_adapter stages
+register`), and while a run of the thread is open the adapter shows the lines as steps
+`workflow` named `chain_stage` and as the status line. Rule and mapping table: 09 17.12 point 9;
+rulings: docs/decisions.d/FEAT-hermes-adapter-stages.md.

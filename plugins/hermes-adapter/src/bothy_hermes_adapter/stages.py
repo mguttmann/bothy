@@ -58,8 +58,8 @@ import stat
 import sys
 import time
 import uuid
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Final
@@ -513,16 +513,22 @@ class StageRegistry:
             _LOG.warning("stage record %s skipped: %s", name, reason)
 
     def collect(
-        self, thread_id: uuid.UUID, run_id: str
+        self,
+        thread_id: uuid.UUID,
+        run_id: str,
+        known: Mapping[str, StageCursor] | None = None,
     ) -> list[tuple[StageSource, StageCursor, list[StageEvent]]]:
         """Read the new lines of every source of a thread for one of its runs.
 
         The cursors move past what was read but are not saved: the caller saves each one after
         it applied the events (`save_cursor`). Skipped lines are logged with their reason code.
+        A cursor of ``known`` (the reader's own, kept since its last read) wins over the saved
+        one, so a cursor that could not be saved never makes a line show twice.
 
         Args:
             thread_id: The thread of the run.
             run_id: The run (logged, and the cursor's run when it opens steps).
+            known: The reader's cursors by source ID (copied, never changed).
 
         Returns:
             Per source of the thread: the record, the moved cursor and the events.
@@ -531,7 +537,8 @@ class StageRegistry:
         for source in self.records():
             if source.thread_id != thread_id:
                 continue
-            cursor = self.cursor(source)
+            mine = (known or {}).get(source.source_id)
+            cursor = self.cursor(source) if mine is None else replace(mine, open=dict(mine.open))
             try:
                 lines, notes = read_new(source.path, cursor)
             except OSError as exc:
@@ -615,14 +622,13 @@ def _parse_cursor(data: bytes) -> StageCursor | None:
 class StageSteps:
     """Turn the events of one source into steps and the status line of one run.
 
-    Mapping (09 17.12 point 9): the chain runs one stage at a time, and it writes the ``ended``
-    line of a stage only for the first stage that ends in its run (the next stage's start is the
-    end of the one before). So a stage's ``started`` or ``pass`` first ends every open step of
-    another stage ``completed``. A stage's ``started`` opens a step ``workflow`` named
-    ``chain_stage`` with the stage as its title; ``pass`` renames the open step of the stage to
-    ``<stage> (pass <n>)``, or opens one so titled when the stage has none open; ``ended`` closes
-    it ``failed`` for an outcome of `FAILED_OUTCOMES`, else ``completed``, with the title
-    ``<stage>: <outcome>`` (an ``ended`` without an open step adds the closed step). ``run``
+    Mapping (09 17.12 point 9): the chain runs one stage at a time and writes an ``ended`` line for
+    each stage; a stage's ``started`` or ``pass`` first ends every open step of another stage
+    ``completed``, so a lost end line leaves no step running. A stage's ``started`` opens a step
+    ``workflow`` named ``chain_stage`` with the stage as its title; ``pass`` renames the open step
+    of the stage to ``<stage> (pass <n>)``, or opens one so titled when the stage has none open;
+    ``ended`` closes it ``failed`` for an outcome of `FAILED_OUTCOMES`, else ``completed``, with the
+    title ``<stage>: <outcome>`` (an ``ended`` without an open step adds the closed step). ``run``
     ``started`` opens no step; ``run`` ``ended`` closes every open step of the source (``failed``
     after an end of `FAILED_OUTCOMES`, ``cancelled`` after one of `CANCELLED_ENDS`, else
     ``completed``). Every event sets ``/status_line`` to ``<ticket>: <text>``. Detail of a step:

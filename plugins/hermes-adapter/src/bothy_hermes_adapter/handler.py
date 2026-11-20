@@ -169,7 +169,7 @@ from bothy_hermes_adapter.runtime import (
     TurnRequest,
     Usage,
 )
-from bothy_hermes_adapter.stages import StageRegistry, StageSteps
+from bothy_hermes_adapter.stages import StageCursor, StageRegistry, StageSteps
 from bothy_hermes_adapter.store import CallbackStore
 from bothy_hermes_adapter.tool_class import classify
 
@@ -292,6 +292,7 @@ class _Turn:
     stage_task: asyncio.Task[None] | None = None
     stage_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     stage_open: dict[str, dict[str, str]] = field(default_factory=dict)
+    stage_cursors: dict[str, StageCursor] = field(default_factory=dict)
     stages_closed: bool = False
 
 
@@ -1149,8 +1150,11 @@ class HermesHandler(AgentHandler):
     async def _poll_stages(self, turn: _Turn, *, closing: str | None = None) -> None:
         """Show the new lines of the thread's stage files; ``closing`` ends the open steps.
 
-        A source's cursor is saved after its lines were applied, with the steps this run left
-        open, so a later read (also of a later run of the thread) never shows a line twice.
+        A source's cursor is kept in the turn and saved after its lines were applied, with the
+        steps this run left open, so a later read (also of a later run of the thread) never shows
+        a line twice, also when the save failed. The open steps of a source that is no longer
+        registered (deregistered, or replaced by a new registration of its file) end
+        ``cancelled``.
         """
         stages = self._stages
         if stages is None:
@@ -1162,12 +1166,21 @@ class HermesHandler(AgentHandler):
                 return
             run_id = str(turn.run_id)
             try:
-                found = await asyncio.to_thread(stages.collect, turn.thread_id, run_id)
+                found = await asyncio.to_thread(
+                    stages.collect, turn.thread_id, run_id, dict(turn.stage_cursors)
+                )
             except (JobError, OSError) as exc:
                 _LOG.warning("run %s: stage files not readable: %s", turn.run_id, exc)
                 return
             if _gone(turn):  # stopped or ended while the files were read
                 return
+            listed = {source.source_id for source, _, _ in found}
+            for gone in [sid for sid in turn.stage_open if sid not in listed]:
+                with self._bound(turn):
+                    StageSteps(turn.handle.patch, self._now, turn.stage_open.pop(gone)).close_all(
+                        "cancelled"
+                    )
+                turn.stage_cursors.pop(gone, None)
             for source, cursor, events in found:
                 opened = turn.stage_open.setdefault(source.source_id, {})
                 if cursor.run_id == run_id and not opened:
@@ -1180,6 +1193,7 @@ class HermesHandler(AgentHandler):
                     if closing is not None and not ended:
                         steps.close_all(closing)
                 cursor.run_id, cursor.open = run_id, dict(opened)
+                turn.stage_cursors[source.source_id] = cursor
                 try:
                     if ended:
                         await asyncio.to_thread(stages.retire, source.source_id)
@@ -1194,7 +1208,10 @@ class HermesHandler(AgentHandler):
         A poll that runs now finishes first (the lock); later polls of the task do nothing.
         """
         turn.stages_closed = True
-        await self._poll_stages(turn, closing="cancelled")
+        try:
+            await self._poll_stages(turn, closing="cancelled")
+        except Exception as exc:  # the run still ends; the log names the failure
+            _LOG.warning("run %s: stage files not closed: %s", turn.run_id, type(exc).__name__)
 
     # ---- registered jobs without an open run (09 17.12 point 8) ------------------------------
 

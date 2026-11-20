@@ -3159,8 +3159,12 @@ work of the runner (18.5) for Hermes:
    | `run` `ended` | every open step ends `failed` for `failed` and `base-red`, `cancelled` for `halted`, else `completed`; the source is retired | `<ticket>: run ended: <end>` |
    | anything else | none; skipped and logged with a reason code | unchanged |
 
-   The chain runs one stage at a time and writes `ended` only for the first stage that ends in
-   its run, so the next start ends the stage before. Only checked words reach the run: an
+   The chain runs one stage at a time and writes an `ended` line for each stage; a start that
+   comes while another stage's step is open (a line lost, or a writer that leaves out an end)
+   ends that step, so no step stays open behind the chain. A source that is no longer registered
+   while its steps are open (deregistered, or replaced by a new registration of its file in the
+   run) ends them `cancelled` at the next read, and the adapter keeps each cursor in memory as
+   well, so a cursor it cannot save never makes a line show twice. Only checked words reach the run: an
    outcome off the lists of the chain shows as `unknown`, the text is rebuilt from the words and
    never copied, a line of another ticket than the registration names, of an unknown stage or
    state, of no JSON object or longer than `LINE_MAX_BYTES` of the module is skipped; the log
