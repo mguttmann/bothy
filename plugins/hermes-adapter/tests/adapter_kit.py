@@ -43,6 +43,7 @@ from bothy_hermes_adapter.runtime import (
     TurnRequest,
     Usage,
 )
+from bothy_hermes_adapter.stages import StageRegistry
 from bothy_hermes_adapter.store import CallbackStore
 
 Script = Callable[[TurnRequest, "FakeRuntime"], Awaitable[TurnOutcome]]
@@ -291,6 +292,7 @@ async def rig(
     commands: Any = None,
     jobs: JobRegistry | None = None,
     mirror: MirrorMap | None = None,
+    stages: StageRegistry | None = None,
     **settings: Any,
 ) -> AsyncIterator[Rig]:
     """Start everything; stop and close on exit.
@@ -311,7 +313,13 @@ async def rig(
     adapter_settings = settings_for(server, root, **settings)
     store = CallbackStore(state / "hermes.sqlite3")
     handler = HermesHandler(
-        rt, adapter_settings, store, busy_mode=busy_mode, jobs=jobs, mirror=mirror
+        rt,
+        adapter_settings,
+        store,
+        busy_mode=busy_mode,
+        jobs=jobs,
+        mirror=mirror,
+        stages=stages,
     )
     rt._events = handler
     config = AdapterConfig(

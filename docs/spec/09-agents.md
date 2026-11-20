@@ -3131,6 +3131,45 @@ work of the runner (18.5) for Hermes:
    command `job stop --profile-home <home> --job-id <ID>`, and removes the records of ended
    jobs every `hermes_adapter.background_poll_interval`. Point 7 stays: the registration is part
    of a tool call of the run.
+9. Stage files (addendum of 2026-11-20, FEAT-hermes-adapter-stages,
+   docs/decisions.d/FEAT-hermes-adapter-stages.md): a long command a tool call runs may write its
+   progress as one JSON line per event into a file, in the line format of the stage events of a
+   coding chain (`at`, `ticket`, `run`, `stage`, `state`, `outcome` on `ended`, `text`; `stage`
+   one of `intake`, `triage`, `plan`, `plan-approval`, `base-check`, `build`, `evidence`,
+   `review`, `red-team`, `ship`, `ci` or `run`; `state` `started`, `pass` or `ended`). The tool
+   call registers the file for its thread through the adapter's helper
+   `bothy_hermes_adapter.stages` (`python -m bothy_hermes_adapter stages register --profile-home
+   <home> --thread <thread ID> --file <absolute path> [--ticket <key>]`, `stages deregister
+   --source-id <ID>`, `stages list`); records and their cursors are files of mode `0600` in
+   `<profile home>/<platform key>/stages` with the rules of point 8. Reading starts at the file's
+   size at the registration. While a run of the thread is open, the adapter reads the complete
+   lines it has not read every `hermes_adapter.background_poll_interval`, during the turn and
+   during the hold, and once more right before the run ends; a partial last line waits for its
+   newline. Each source keeps a cursor (offset, the file's identity, the run and the steps it
+   opened there) that is saved after its lines were applied, so a later read, also by a later
+   run of the same thread after a restart, never shows a line twice and shows what was written
+   while no run was open. Mapping, applied in the file's order:
+
+   | Line | Steps | `/status_line` |
+   |---|---|---|
+   | `run` `started` | none | `<ticket>: run started` |
+   | stage `started` | every open step of another stage ends `completed`; a step `workflow` named `chain_stage`, title the stage, detail `stage`, `running` | `<ticket>: <stage> started` |
+   | stage `pass` | every open step of another stage ends `completed`; the stage's open step is renamed `<stage> (pass <n>)`, else such a step is opened; detail `pass` | `<ticket>: <stage> pass <n>` |
+   | stage `ended` | the stage's step (opened and closed at once when none is open) gets the title `<stage>: <outcome>` and detail `outcome`, and ends `failed` for `failed`, `base-red` and `red`, else `completed` | `<ticket>: <stage> ended: <outcome>` |
+   | `run` `ended` | every open step ends `failed` for `failed` and `base-red`, `cancelled` for `halted`, else `completed`; the source is retired | `<ticket>: run ended: <end>` |
+   | anything else | none; skipped and logged with a reason code | unchanged |
+
+   The chain runs one stage at a time and writes `ended` only for the first stage that ends in
+   its run, so the next start ends the stage before. Only checked words reach the run: an
+   outcome off the lists of the chain shows as `unknown`, the text is rebuilt from the words and
+   never copied, a line of another ticket than the registration names, of an unknown stage or
+   state, of no JSON object or longer than `LINE_MAX_BYTES` of the module is skipped; the log
+   names the run, the source ID and the reason code, never the line or the path. When the run
+   ends, the steps a source left open end `cancelled`. A source is retired (record and cursor
+   removed) at its `run` `ended` line, by `stages deregister`, by a newer registration of the
+   same file in the same thread, and at the next registration once it is older than
+   `SOURCE_MAX_AGE_S` of the module. A stage file does not hold the run: the command itself is the
+   tool call's foreground process, or background work of points 1 or 8.
 
 Limits: a process that never ends keeps its run `running` until a person stops it; a restart of
 the gateway or the adapter ends the hold (the server ends the run `interrupted` or `stale`), and a
@@ -3141,7 +3180,8 @@ registries that does not register by point 8 stays invisible, and a job's worker
 process group outlive a stop. Evidence:
 `plugins/hermes-adapter/tests/unit/test_background_work.py`,
 `tests/unit/test_external_jobs.py` and `tests/unit/test_external_jobs_run.py` (real detached
-processes) and the Fake-Hermes tests
+processes), `tests/unit/test_stages.py` (stage files, with lines the chain's own code wrote) and
+the Fake-Hermes tests
 `tests/fake_hermes/test_background_work.py` (also a detached job a `terminal` call registers with
 the helper, its thread and profile home taken from the shell Hermes gives the tool) and
 `tests/fake_hermes/test_result_turn_end.py` against the pinned version.

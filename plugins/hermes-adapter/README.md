@@ -42,6 +42,7 @@ installation.
 | `src/bothy_hermes_adapter/hermes_commands.py` | the command table of the pinned version, the control and skill commands the adapter declares (17.3) |
 | `src/bothy_hermes_adapter/mirror.py` | the mirror of sessions of other platforms into a forum (17.13), imported at the first such hook |
 | `src/bothy_hermes_adapter/reports.py` | reports without a run: targets, a new forum post or the main thread, the standalone sender (17.9) |
+| `src/bothy_hermes_adapter/jobs.py`, `stages.py` | external jobs and stage files a tool call registers (17.12 points 8 and 9); standard library only |
 | `src/bothy_hermes_adapter/live_box.py`, `cards.py`, `store.py`, `heartbeat.py` | live box, cards, resolved callbacks and open cards, heartbeat |
 | `src/bothy_hermes_adapter/config.py`, `defaults.py` | the configuration from `PlatformConfig.extra` and its defaults |
 | `src/bothy_hermes_adapter/installer.py`, `__main__.py` | the installer |
@@ -231,6 +232,32 @@ files of mode `0600` in `<profile home>/<platform key>/jobs` (mode `0700`); the 
 the host. A live job that no open run covers (its run ended at a gateway restart, or it was
 registered outside a run) is posted once in its thread as a message of the agent with the stop
 command above; a later run does not take it over. Linux and macOS only.
+
+### Stage files
+
+A long command that writes its progress as stage events, one JSON line per stage start, further
+pass and end (the line format of the coding chain's `stages.jsonl`), shows them in the run of the
+thread: each stage is a step `workflow` named `chain_stage`, and the status line shows the last
+event as `<ticket>: <text>` (09 17.12 point 9, the mapping table there). The tool call registers
+the file right before it starts the command; reading starts at the file's size then, so lines of
+an earlier call never show again.
+
+```sh
+# In a shell of Hermes' terminal tool, before the chain starts:
+python -m bothy_hermes_adapter stages register --profile-home "$HERMES_HOME" \
+  --thread "$HERMES_SESSION_THREAD_ID" --file "$CHAIN_HOME/tickets/$KEY/stages.jsonl" \
+  --ticket "$KEY"                    # prints {"ok": true, "source_id": "...", "offset": ...}
+python -m bothy_hermes_adapter stages list --profile-home "$HERMES_HOME"
+python -m bothy_hermes_adapter stages deregister --profile-home "$HERMES_HOME" --source-id "$ID"
+```
+
+The adapter reads the file every `hermes_adapter.background_poll_interval` while a run of the
+thread is open and keeps a cursor per file, so a later run of the thread goes on where the last
+one stopped (also after a restart of the gateway). Only the checked words of a line reach the
+run; a line off the format is skipped and logged with a reason code. The steps a file left open
+end `cancelled` with the run, and the file's `run` `ended` line removes the registration. A stage
+file does not keep the run open: the command does, as the tool call's process or as background
+work.
 
 ## Mirror of sessions outside Bothy
 
