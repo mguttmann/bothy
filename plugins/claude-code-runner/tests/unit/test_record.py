@@ -234,9 +234,18 @@ def test_the_fields_document_names_what_only_the_recorded_turn_wrote() -> None:
     assert doc["written_only"] == {"result/success": ["written"]}
 
 
-def _cli_file_with_all_schemas() -> bytes:
+def test_the_task_type_table_is_found_without_a_type_the_runner_does_not_map() -> None:
+    # A newer CLI may drop ``local_bash`` too; the table is found by the workflow type.
+    table = b'var T={local_agent:"a",local_workflow:"w",remote_agent:"r"};'
+    fields = record.read_fields(_cli_file_with_all_schemas(table))
+    assert fields["task_types"] == ["local_agent", "local_workflow", "remote_agent"]
+
+
+def _cli_file_with_all_schemas(
+    table: bytes = b'var T={local_bash:"b",local_workflow:"w"};',
+) -> bytes:
     """A CLI file with an object per schema of ``record.SCHEMAS`` and the task type table."""
-    parts = [b'var T={local_bash:"b",local_workflow:"w"};']
+    parts = [table]
     for name in record.SCHEMAS:
         kind, _, sub = name.partition("/")
         head = f'type:C("{kind}")' + (f',subtype:C("{sub}")' if sub else "")

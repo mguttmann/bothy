@@ -251,7 +251,10 @@ def read_fields(data: bytes) -> dict[str, Any]:
         the value lists of the task status and the command state, and the task types.
     """
     schemas = {name: _schema(data, name) for name in SCHEMAS}
-    prefixes = re.search(rb'\{local_bash:"\w"(?:,[a-z_]+:"\w")+\}', data)
+    # The table of one-letter id prefixes per task type, found by the workflow type the runner
+    # maps, not by a type a newer CLI may drop (CONTRACT-TOLERANT-3).
+    workflow = re.escape(WORKFLOW_TASK_TYPE.encode())
+    prefixes = re.search(rb'\{(?:[a-z_]+:"\w",)*' + workflow + rb':"\w"(?:,[a-z_]+:"\w")*\}', data)
     if prefixes is None:
         raise ValueError("no task type table in the CLI's file")
     task_types = sorted(_members(prefixes.group(0)))
