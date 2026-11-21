@@ -8,6 +8,13 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'dart:io'
+    show
+        File,
+        FileSystemEntity,
+        FileSystemEntityType,
+        FileSystemException,
+        PathNotFoundException;
 import 'dart:math';
 
 import 'package:auth/auth.dart';
@@ -920,26 +927,83 @@ final class InstanceSecrets implements SecretStore {
 
 /// The [DatabaseKeySource] of an instance: 32 random bytes from `Random.secure()`, created at
 /// the first start and kept in the secret store (15 6.3).
+///
+/// The key is created only while the database file [database] does not exist
+/// (docs/decisions.d/FIX-client-db-key.md): a stored file was encrypted with a key that a new
+/// one never replaces, so a missing key then throws [LocalStoreKeyError] with
+/// [LocalStoreKeyReason.keyMissing] and stores nothing. A read the secret store refuses (the
+/// iOS keychain of a locked device answers `errSecInteractionNotAllowed`, a timeout) is thrown
+/// as it is and never read as "not found". Every path logs a fixed reason code, never the key.
 final class SecureDatabaseKeySource implements DatabaseKeySource {
-  /// Creates the source over [secrets]; [random] replaces the secure source in tests.
-  SecureDatabaseKeySource(this._secrets, {Random? random})
-    : _random = random ?? Random.secure();
+  /// Creates the source over [secrets] for the database file [database]; [random] replaces
+  /// the secure source in tests, [log] the developer log.
+  SecureDatabaseKeySource(
+    this._secrets, {
+    required this.database,
+    Random? random,
+    void Function(String line)? log,
+  }) : _random = random ?? Random.secure(),
+       _log = log ?? _developerLog;
 
   /// The key name of the database key in the instance's secrets.
   static const String keyName = 'database_key';
 
+  /// The database file the key belongs to.
+  final File database;
+
   final SecretStore _secrets;
   final Random _random;
+  final void Function(String line) _log;
+
+  static void _developerLog(String line) =>
+      developer.log(line, name: 'database_key');
 
   @override
   Future<Uint8List> obtainKey() async {
-    final stored = await _secrets.read(keyName);
+    final String? stored;
+    try {
+      stored = await _secrets.read(keyName);
+    } on Object catch (error) {
+      // The type and a numeric keychain status only (`errSecInteractionNotAllowed` is -25308);
+      // Android puts a stack trace into `details`, which stays out of the log.
+      final details = error is PlatformException ? error.details : null;
+      final status = details is int ? ' $details' : '';
+      _log('db_key.read_failed: ${error.runtimeType}$status');
+      rethrow;
+    }
     if (stored != null) return base64Decode(stored);
+    if (await _databaseExists()) {
+      _log('db_key.missing_with_database: no new key is created');
+      throw const LocalStoreKeyError(LocalStoreKeyReason.keyMissing);
+    }
     final key = Uint8List.fromList(
       List<int>.generate(databaseKeyBytes, (_) => _random.nextInt(256)),
     );
     await _secrets.write(keyName, base64Encode(key));
+    _log('db_key.created');
     return key;
+  }
+
+  /// Whether anything lies at the path of [database] or its `-wal` and `-shm` files. A failed
+  /// `stat` also answers "not found", so absence is only taken from a listing of the folder;
+  /// a folder that cannot be listed throws (a [FileSystemException]) instead of answering
+  /// "absent". A missing folder holds no database.
+  Future<bool> _databaseExists() async {
+    final names = {
+      for (final suffix in ['', '-wal', '-shm']) '${database.path}$suffix',
+    };
+    for (final path in names) {
+      final type = await FileSystemEntity.type(path, followLinks: false);
+      if (type != FileSystemEntityType.notFound) return true;
+    }
+    try {
+      await for (final entry in database.parent.list(followLinks: false)) {
+        if (names.contains(entry.path)) return true;
+      }
+    } on PathNotFoundException {
+      return false;
+    }
+    return false;
   }
 }
 

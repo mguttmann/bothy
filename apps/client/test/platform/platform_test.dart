@@ -185,10 +185,20 @@ void main() {
       'the database key is 32 random bytes created once and then reused',
       () async {
         final secrets = InstanceSecrets(MemorySecureBackend(), 'a');
-        final source = SecureDatabaseKeySource(secrets, random: Random(1));
+        final source = SecureDatabaseKeySource(
+          secrets,
+          database: File('${Directory.systemTemp.path}/no-such-dir/local.db'),
+          random: Random(1),
+        );
         final first = await source.obtainKey();
         expect(first, hasLength(32));
-        expect(await SecureDatabaseKeySource(secrets).obtainKey(), first);
+        expect(
+          await SecureDatabaseKeySource(
+            secrets,
+            database: File('${Directory.systemTemp.path}/no-such-dir/local.db'),
+          ).obtainKey(),
+          first,
+        );
         expect(
           base64Decode((await secrets.read(SecureDatabaseKeySource.keyName))!),
           first,

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // A local database the device can no longer open (docs/decisions.d/AUD-client-onboarding-01.md;
-// 15 6.3, 9): the secret store lost the database key and created a new one, or the file does
-// not belong to the stored key. The real controller, auth session, encrypted local database
+// 15 6.3, 9; docs/decisions.d/FIX-client-db-key.md): the secret store lost the database key,
+// which the app never replaces while the file exists, or the file does not belong to the stored
+// key, or the device cannot read the file at the moment. The real controller, auth session, encrypted local database
 // and engine run against the fake server.
 
 import 'dart:convert';
@@ -131,4 +132,109 @@ void main() {
       expect(f.server.violations, isEmpty);
     },
   );
+
+  // FIX-client-db-key: the key of an existing database is never replaced, and a database the
+  // device cannot read at the moment is neither "unreadable" nor deleted.
+  String keyName() =>
+      'instance/${f.server.world.instanceId}/${SecureDatabaseKeySource.keyName}';
+
+  Future<void> signedInAndQuit() async {
+    final control = await connected(c, f);
+    await login(control);
+    await eventually(
+      'live',
+      () => state().services?.engine.state.phase == ConnectionPhase.live,
+    );
+    await quit();
+  }
+
+  Future<void> restart() async {
+    c = appContainer(f);
+    c.read(onboardingControllerProvider);
+    await eventually(
+      'the start settles',
+      () => !state().starting && !state().busy,
+    );
+  }
+
+  /// Sets [mode] on the -wal and -shm files (created empty when missing): the database file
+  /// opens and the key check fails with SQLITE_CANTOPEN, as the files of a locked iPhone do.
+  void chmod(String mode) {
+    for (final suffix in ['-wal', '-shm']) {
+      final file = File('${database().path}$suffix');
+      if (!file.existsSync()) file.writeAsBytesSync([]);
+      Process.runSync('chmod', [mode, file.path]);
+    }
+  }
+
+  test('a stored session whose database key is gone gets no new key, only the reset', () async {
+    await signedInAndQuit();
+    f.secure.values.remove(keyName());
+    final stored = database().lengthSync();
+    await restart();
+    expect(
+      (state().step, state().serverStatus),
+      (OnboardingStep.server, ServerStatus.localDataUnreadable),
+    );
+    expect(
+      f.secure.values,
+      isNot(contains(keyName())),
+      reason: 'a new key never opens the stored file',
+    );
+    expect(database().lengthSync(), stored);
+    await c.read(onboardingControllerProvider.notifier).resetLocalData();
+    expect(state().step, OnboardingStep.signedIn);
+    expect(f.secure.values, contains(keyName()));
+  });
+
+  test('a database key the locked keychain refuses keeps the key and the file, '
+      'and "Connect" opens them once the device is unlocked', () async {
+    await signedInAndQuit();
+    final key = f.secure.values[keyName()];
+    final stored = database().lengthSync();
+    f.secure.lockedKeys.add(keyName());
+    await restart();
+    expect(
+      (state().step, state().serverStatus),
+      (OnboardingStep.server, ServerStatus.keychainUnavailable),
+    );
+    expect(f.secure.values[keyName()], key);
+    expect(database().lengthSync(), stored);
+    f.secure.lockedKeys.clear();
+    await c
+        .read(onboardingControllerProvider.notifier)
+        .connect(f.server.baseUri.toString());
+    expect(state().step, OnboardingStep.signedIn);
+    expect(f.secure.values[keyName()], key);
+  });
+
+  for (final session in [true, false]) {
+    test('a database file the device cannot read at the moment is no key error '
+        'and is never deleted (session: $session)', () async {
+      if (session) {
+        await signedInAndQuit();
+      } else {
+        await connected(c, f);
+        expect(state().step, OnboardingStep.login);
+        await quit();
+      }
+      final key = f.secure.values[keyName()];
+      final stored = database().lengthSync();
+      chmod('000');
+      addTearDown(() => chmod('600'));
+      if (session) {
+        await restart();
+      } else {
+        c = appContainer(f);
+        await connected(c, f);
+      }
+      expect(
+        (state().step, state().serverStatus),
+        (OnboardingStep.server, ServerStatus.openFailed),
+      );
+      expect(f.secure.values[keyName()], key);
+      chmod('600');
+      expect(database().lengthSync(), stored, reason: 'nothing is deleted');
+    }, testOn: 'mac-os || linux');
+  }
 }

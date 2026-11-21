@@ -10,6 +10,7 @@
 library;
 
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:io' as io;
 import 'dart:io' show Directory, Platform;
 import 'dart:math';
@@ -550,8 +551,9 @@ final class InstanceServices {
   /// the sync engine (not started), whose every gateway attempt first asks the version gate
   /// ([versions], starting from [version], the decision of E1's discovery; brief M7-13).
   ///
-  /// A database that the stored key does not open is created anew while no session is stored
-  /// and throws [LocalStoreKeyError] while one is.
+  /// A database that the stored key does not open, or whose key is gone, is created anew while
+  /// no session is stored and throws [LocalStoreKeyError] while one is; a database the device
+  /// cannot read at the moment throws [LocalStoreUnavailableError] and is never deleted.
   ///
   /// Throws [DeviceKeyLost], before anything of the instance is open, when the stored session
   /// belongs to device keys this device no longer has (08 5.4); the caller ends the account
@@ -586,19 +588,30 @@ final class InstanceServices {
     // earlier start get it again here.
     final protected = [folder.path, dbPath, '$dbPath-wal', '$dbPath-shm'];
     await ports.protectFiles(protected);
-    final databaseKey = SecureDatabaseKeySource(secrets);
+    final databaseKey = SecureDatabaseKeySource(
+      secrets,
+      database: io.File(dbPath),
+    );
     LocalDatabase database;
     try {
       database = await ports.openDatabase(io.File(dbPath), databaseKey);
-    } on LocalStoreKeyError {
-      // The stored key does not open the stored database: the secret store lost the key and
-      // created a new one, or the file is not the one of this key. With a session the caller
+    } on LocalStoreKeyError catch (error) {
+      // The stored key does not open the stored database, or the secret store has no key for
+      // it (the key source creates none while the file exists, FIX-client-db-key); a file the
+      // device cannot read at the moment is a LocalStoreUnavailableError instead, which goes
+      // to the caller unchanged and deletes nothing. With a session the caller
       // offers the reset, because the unsent work of the person goes with the file
       // ([discardLocalData]). Without one nothing in the folder belongs to an account of this
       // app identity, so it is created anew and E1 leads on to the login
       // (docs/decisions.d/AUD-client-onboarding-01.md, AUD-CO1/4, which also names the limit:
       // app identities that share the data root but not their secrets).
-      if (await _sessionStored(secrets, instance)) rethrow;
+      final session = await _sessionStored(secrets, instance);
+      developer.log(
+        'local_db.key_error: ${error.reason.code}, '
+        '${session ? 'session stored, reset offered' : 'no session, created anew'}',
+        name: 'bootstrap',
+      );
+      if (session) rethrow;
       await discardLocalData(ports, instance);
       await folder.create(recursive: true);
       await ports.protectFiles(protected);

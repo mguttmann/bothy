@@ -26,7 +26,10 @@ const String expectedCipher = 'chacha20';
 /// and keeps them in secure storage (M4-18 for desktop, M5 for mobile); this package never
 /// stores the key.
 abstract interface class DatabaseKeySource {
-  /// Returns the 32-byte key of the database. Throws whatever the secure storage throws.
+  /// Returns the 32-byte key of the database. Throws whatever the secure storage throws, and
+  /// [LocalStoreKeyError] with [LocalStoreKeyReason.keyMissing] when no key is stored while the
+  /// database file exists: a new key never opens that file, so the source never creates one
+  /// then (FIX-client-db-key).
   Future<Uint8List> obtainKey();
 }
 
@@ -39,9 +42,10 @@ abstract interface class DatabaseKeySource {
 /// opens the file, that the cipher is `chacha20` and that FTS5 is compiled in. The returned
 /// database is open and migrated.
 ///
-/// Throws [LocalStoreKeyError] when the key does not open the file and [LocalStoreSetupError]
-/// when the key does not have 32 bytes or the SQLite library lacks encryption or FTS5. No
-/// message contains the key.
+/// Throws [LocalStoreKeyError] when the key does not open the file (or the key source found no
+/// key for an existing file), [LocalStoreUnavailableError] when SQLite cannot read the file at
+/// the moment ([openErrorOf]) and [LocalStoreSetupError] when the key does not have 32 bytes or
+/// the SQLite library lacks encryption or FTS5. No message contains the key.
 ///
 /// Example: `final db = await openLocalStore(file: File(path), keys: secureKeys);`
 Future<LocalDatabase> openLocalStore({
@@ -66,7 +70,11 @@ Future<LocalDatabase> openLocalStore({
     await db.customSelect('SELECT 1').get();
   } on Object catch (error) {
     await db.close();
-    throw _unwrap(error);
+    final cause = _unwrap(error);
+    // An open that fails before the key check (the file cannot be opened at all) is
+    // classified the same way.
+    if (cause is SqliteException) throw openErrorOf(cause);
+    throw cause;
   } finally {
     keyCopy.fillRange(0, keyCopy.length, 0);
   }
@@ -98,11 +106,11 @@ void _setUp(Database database, Uint8List key) {
   for (final byte in key) {
     hex.write(byte.toRadixString(16).padLeft(2, '0'));
   }
-  database.execute('PRAGMA key = "x\'$hex\'"');
   try {
+    database.execute('PRAGMA key = "x\'$hex\'"');
     database.select('SELECT count(*) FROM sqlite_master');
-  } on SqliteException {
-    throw const LocalStoreKeyError();
+  } on SqliteException catch (error) {
+    throw openErrorOf(error);
   }
   final cipher = database.select('PRAGMA cipher');
   if (cipher.isEmpty || cipher.first.values.first != expectedCipher) {
@@ -114,6 +122,19 @@ void _setUp(Database database, Uint8List key) {
   _checkFeatures(database);
   database.execute('PRAGMA journal_mode = WAL');
 }
+
+/// The error of an open that SQLite refused with [error] (FIX-client-db-key): only
+/// `SQLITE_NOTADB` and `SQLITE_CORRUPT`, the answers to a key that does not decrypt the file,
+/// are a [LocalStoreKeyError]; every other code (busy, locked, I/O, cannot open, permission,
+/// the iOS file protection of a locked device) is a [LocalStoreUnavailableError], which the
+/// caller retries and never answers with a reset.
+Exception openErrorOf(SqliteException error) => switch (error.resultCode) {
+  _sqliteNotADb || _sqliteCorrupt => const LocalStoreKeyError(),
+  final code => LocalStoreUnavailableError(code),
+};
+
+const int _sqliteCorrupt = 11;
+const int _sqliteNotADb = 26;
 
 /// Fails when FTS5 is not compiled in (14 6, Design note 5).
 void _checkFeatures(Database database) {

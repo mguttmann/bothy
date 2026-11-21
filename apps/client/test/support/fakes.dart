@@ -25,6 +25,7 @@ import 'package:client/platform/terminal_guard.dart';
 import 'package:client/share/share_android.dart';
 import 'package:client/share/share_apple.dart';
 import 'package:domain/domain.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:local_store/local_store.dart';
 import 'package:sync_engine/sync_engine.dart';
 
@@ -44,8 +45,20 @@ class MemorySecureBackend implements SecureBackend {
   /// The stored values.
   final Map<String, String> values = {};
 
+  /// Keys whose reads fail as the iOS keychain of a locked device answers an item of
+  /// `WhenUnlockedThisDeviceOnly` (`errSecInteractionNotAllowed`).
+  final Set<String> lockedKeys = {};
+
   @override
-  Future<String?> read(String key) async => values[key];
+  Future<String?> read(String key) async {
+    if (lockedKeys.contains(key)) {
+      throw PlatformException(
+        code: 'Unexpected security result code',
+        details: -25308,
+      );
+    }
+    return values[key];
+  }
 
   @override
   Future<void> write(String key, String value) async => values[key] = value;

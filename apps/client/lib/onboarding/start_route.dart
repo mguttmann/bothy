@@ -8,7 +8,8 @@ library;
 import 'package:api_client/api_client.dart' show DeviceStateEnum;
 import 'package:device_key/device_key.dart' show DeviceKeyException;
 import 'package:flutter/services.dart' show PlatformException;
-import 'package:local_store/local_store.dart' show LocalStoreKeyError;
+import 'package:local_store/local_store.dart'
+    show LocalStoreKeyError, LocalStoreUnavailableError;
 
 import '../app/discovery.dart';
 import '../app/router.dart' show OnboardingStep;
@@ -68,9 +69,11 @@ enum ServerStatus {
 /// The E1 status of a failure to open the services of an instance: the device keys
 /// ([DeviceKeyException]) and the keychain of the secrets (a [PlatformException] of
 /// `flutter_secure_storage`, code [keychainErrorCode]) are [ServerStatus.keychainUnavailable],
-/// a database the stored key does not open ([LocalStoreKeyError]) is
+/// a database the stored key does not open or whose key is gone ([LocalStoreKeyError]) is
 /// [ServerStatus.localDataUnreadable], everything else (the instance folder, its file
-/// protection, any other failure of the database) [ServerStatus.openFailed]. Never
+/// protection, a database the device cannot read at the moment
+/// ([LocalStoreUnavailableError], FIX-client-db-key), any other failure of the database)
+/// [ServerStatus.openFailed], which "Connect" retries without deleting anything. Never
 /// [ServerStatus.noInstance]: the address was not the problem.
 ServerStatus openFailureStatus(Object error) {
   if (error is DeviceKeyException ||

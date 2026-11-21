@@ -43,6 +43,7 @@ void main() {
       dir = Directory.systemTemp.createTempSync('db-key');
       keys = SecureDatabaseKeySource(
         InstanceSecrets(MemorySecureBackend(), 'instance-a'),
+        database: File('${dir.path}/local.db'),
       );
       final file = File('${dir.path}/local.db');
       final db = await openLocalStore(
@@ -87,6 +88,7 @@ void main() {
       // Another device: its own, empty secure storage creates a key of its own.
       final elsewhere = SecureDatabaseKeySource(
         InstanceSecrets(MemorySecureBackend(), 'instance-a'),
+        database: File('${dir.path}/elsewhere.db'),
       );
       await expectLater(
         openLocalStore(file: copy, keys: elsewhere, inBackground: false),
@@ -152,7 +154,10 @@ void main() {
         FlutterSecureBackend(appId: 'com.example.chat'),
         'instance-a',
       );
-      await SecureDatabaseKeySource(secrets).obtainKey();
+      await SecureDatabaseKeySource(
+        secrets,
+        database: File('${Directory.systemTemp.path}/no-such-dir/local.db'),
+      ).obtainKey();
       await secrets.write('auth/https://chat.example.com/refresh_token', 'r');
     }
 
