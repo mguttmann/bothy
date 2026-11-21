@@ -195,6 +195,11 @@ Found by the red team in round 6:
     effect on the team flow is not checked for every system line code; the note could name the
     message that caused the refusal.
 
+Found by the red team in round 8:
+
+11. No test sends a real `Invocation-Token` header through the authenticator up to the link of
+    `run_answers`; the team tests set the binding through the server's own acting-for source.
+
 ## 8. Alternatives rejected
 
 - **Point to point handoff records** (the first version of this draft): one hop at a time with a

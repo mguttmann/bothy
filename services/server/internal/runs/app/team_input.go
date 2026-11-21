@@ -89,8 +89,10 @@ func (s *Service) TeamInput(ctx context.Context, messageID ids.ID) error {
 // author), the authority of the input and, for a member reply, the source member.
 type teamSource struct {
 	message, author, authority ids.ID
-	kind                       string
-	member                     *TeamMemberRow
+	// version is the version of message the use case checked; the copy takes only that one.
+	version int64
+	kind    string
+	member  *TeamMemberRow
 	// mentioned are the handles the source mentions, for the flag addressed; parsed reports that
 	// they were read.
 	mentioned []string
@@ -118,7 +120,7 @@ func (s *Service) ownerInput(ctx context.Context, b *teamBox, m messaging.Trigge
 	if err != nil {
 		return err
 	}
-	src := teamSource{message: m.ID, author: m.Author.ID, authority: m.Author.ID, kind: domain.TeamSourceOwner}
+	src := teamSource{message: m.ID, version: m.Version, author: m.Author.ID, authority: m.Author.ID, kind: domain.TeamSourceOwner}
 	for _, member := range members {
 		if _, err := s.teamDeliver(ctx, b, team, member, members, &src); err != nil {
 			return err
@@ -143,7 +145,9 @@ func (s *Service) memberReply(ctx context.Context, b *teamBox, m messaging.Trigg
 	if err != nil {
 		return err
 	}
-	if !owned {
+	// The link vouches for the reply as its run wrote it: an edit afterwards is bound to no run
+	// (red team round 8), so an edited reply speaks for no person, as in a run context.
+	if !owned || m.Edited {
 		return s.refuseInput(ctx, b, team, member,
 			&teamSource{authority: team.SponsorID, kind: domain.TeamSourceMember, member: &member}, domain.TeamRefusalSource, "")
 	}
@@ -206,7 +210,9 @@ func (s *Service) mirrorReply(ctx context.Context, b *teamBox, team TeamRow, m m
 		return messaging.Copied{}, false, s.refuseInput(ctx, b, team, member,
 			&teamSource{authority: team.SponsorID, kind: domain.TeamSourceMember, member: &member}, domain.TeamRefusalReaders, "")
 	}
-	copied, err := b.d.Messages.CopyMessage(ctx, messaging.CopyCmd{SourceMessageID: m.ID, ThreadID: ch.MainThreadID, AuthorID: member.AgentID})
+	copied, err := b.d.Messages.CopyMessage(ctx, messaging.CopyCmd{
+		SourceMessageID: m.ID, SourceVersion: m.Version, ThreadID: ch.MainThreadID, AuthorID: member.AgentID,
+	})
 	if err != nil {
 		return messaging.Copied{}, false, err
 	}
@@ -228,7 +234,7 @@ func (s *Service) handOn(ctx context.Context, b *teamBox, team TeamRow, member T
 		byHandle[x.Handle] = x
 	}
 	src := teamSource{
-		message: copied.ID, author: member.AgentID, authority: team.SponsorID, kind: domain.TeamSourceMember, member: &member,
+		message: copied.ID, version: copied.Version, author: member.AgentID, authority: team.SponsorID, kind: domain.TeamSourceMember, member: &member,
 		mentioned: domain.MentionedHandles(copied.ContentMD), parsed: true,
 	}
 	for _, h := range src.mentioned {
@@ -310,7 +316,9 @@ func (s *Service) teamDeliver(ctx context.Context, b *teamBox, team TeamRow, mem
 	if reason != "" {
 		return false, s.refuseInput(ctx, b, team, member, src, reason, "")
 	}
-	copied, err := b.d.Messages.CopyMessage(ctx, messaging.CopyCmd{SourceMessageID: src.message, ThreadID: member.WorkThreadID, AuthorID: src.author})
+	copied, err := b.d.Messages.CopyMessage(ctx, messaging.CopyCmd{
+		SourceMessageID: src.message, SourceVersion: src.version, ThreadID: member.WorkThreadID, AuthorID: src.author,
+	})
 	if err != nil {
 		return false, err
 	}
