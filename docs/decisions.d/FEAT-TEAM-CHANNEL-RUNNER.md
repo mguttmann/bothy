@@ -25,3 +25,5 @@ hosted agent (same code path as the runner's own agent); the agent's display nam
 unquoted in the team part and the member's lead-in (a label only, as for a person's lead-in);
 `docs/spec/09-agents.md` 17 (Hermes mirror, item 5) still says the server opens runs only for a
 person's message, a command or an interaction, which `wake` and `team` runs no longer match.
+Red team round 3 adds: some lines of the 18.5 addendum and of the README paragraph "Owner
+codes" are longer than the usual wrap (format only).
