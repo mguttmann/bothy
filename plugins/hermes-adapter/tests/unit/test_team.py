@@ -265,6 +265,40 @@ async def test_the_answer_hands_over_by_its_mention(tmp_path: Path) -> None:
     assert answer["run_id"] == str(triggered.run_id)
 
 
+@pytest.mark.parametrize("finalized", [True, False])
+async def test_a_streamed_answer_goes_out_once_as_written(tmp_path: Path, finalized: bool) -> None:
+    """Hermes' edit transport sends a preview with its cursor and edits it to the end; the
+    run posts one message with the final text and never edits it (09 3.9.4: an edited answer
+    hands nothing on)."""
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        ev = rt.events
+        key = await ev.on_answer(turn.thread_id, "Tests \u2589", None, preview=True)
+        assert key is not None
+        assert await ev.on_edit(turn.thread_id, key, "Tests pass. @dev \u2589", False)
+        if finalized:
+            assert await ev.on_edit(turn.thread_id, key, "Tests pass. @dev please deploy.", True)
+            # A later edit of the posted answer still works as before.
+            assert await ev.on_edit(turn.thread_id, key, "Tests pass. @dev please deploy.", False)
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await _member_input(r)
+        await r.until(lambda: r.finished(triggered.run_id))
+    assert r.fake.run_state(triggered.run_id).state == "completed"
+    texts = [m["content_md"] for m in r.fake.messages]
+    if finalized:
+        assert texts == ["Tests pass. @dev please deploy."]
+        # An edit to the same text changes nothing and is never sent.
+        assert r.requests("updateMessage") == []
+    else:
+        # Hermes never finalized: the last preview goes out at the end, without the cursor.
+        assert texts == ["Tests pass. @dev"]
+        assert r.requests("updateMessage") == []
+    assert r.fake.messages[0]["run_id"] == str(triggered.run_id)
+
+
 # ---- follow-ups ---------------------------------------------------------------------------------
 
 

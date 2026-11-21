@@ -7,3 +7,9 @@
   an approval; the owner's messages are passed on as before. The agent hands work on by
   mentioning a handle in its final answer, and every request of the run carries the run's own
   token, so the server can hand that answer on.
+
+### Fixed
+
+- With Hermes' edit streaming (`streaming.transport: edit`) an answer is posted once with its
+  finished text instead of a partial text that is edited afterwards, and an edit that changes
+  nothing is not sent; an edited answer is never handed on in a team channel.

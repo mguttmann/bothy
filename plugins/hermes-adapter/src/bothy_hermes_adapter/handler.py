@@ -102,6 +102,7 @@ from bothy_sdk.generated.models import (
     TranscriptSubmit,
 )
 from bothy_sdk.generated.types import File, Unset
+from bothy_sdk.ids import uuid7
 from bothy_sdk.long_answers import send_long_message
 from bothy_sdk.runs import RunHandle
 from bothy_sdk.sources import Envelope
@@ -198,6 +199,8 @@ DEFAULT_CURRENCY: Final = "USD"
 pinned version ships (docs/DECISIONS.md D-M2-33-7)."""
 
 _STOP_STATUSES: Final = frozenset({403, 409, 412})
+_PREVIEW: Final = "preview-"
+_CURSOR: Final = "\u2589"
 
 TOOL_REFUSED: Final = (
     "Refused by the chat platform: no run is open in this chat, so no tool may run now and "
@@ -256,6 +259,10 @@ class _Turn:
     user_name: str = ""
     answers: dict[str, tuple[UUID, int]] = field(default_factory=dict)
     edits: dict[str, str] = field(default_factory=dict)
+    # The text each answer has on the server now (an edit to the same text is never sent), and
+    # the previews of Hermes' edit transport not posted yet: key -> (last text, reply_to).
+    posted: dict[str, str] = field(default_factory=dict)
+    previews: dict[str, tuple[str, str | None]] = field(default_factory=dict)
     usage: list[Usage] = field(default_factory=list)
     steered: list[UUID] = field(default_factory=list)
     card: OpenCard | None = None
@@ -2089,8 +2096,16 @@ class HermesHandler(AgentHandler):
                 turn.live.draft(text)
         return True
 
-    async def on_answer(self, thread_id: UUID, text: str, reply_to: str | None) -> str | None:
+    async def on_answer(
+        self, thread_id: UUID, text: str, reply_to: str | None, *, preview: bool = False
+    ) -> str | None:
         """The answer (``send``): one message of the run with a stored ``client_msg_id``.
+
+        A ``preview`` is the first send of Hermes' edit transport (``expect_edits``): a partial
+        text with a cursor that Hermes edits up to its final text. It is shown as the draft and
+        posted once, with the text of the edit that finalizes it (or its last text at the end of
+        the run), so the answer is never edited after it was written: the server hands on only
+        an unedited answer (09 3.9.4, FEAT-TEAM-CHANNEL-ADAPTER D-TCA-8).
 
         Returns:
             The ID Hermes may edit later, or ``None`` when no run of this adapter is active in the
@@ -2098,6 +2113,19 @@ class HermesHandler(AgentHandler):
         """
         turn = self._active(thread_id)
         if turn is None or turn.live is None:
+            return None
+        if preview:
+            key = f"{_PREVIEW}{uuid7()}"
+            turn.previews[key] = (text, reply_to)
+            self._touch(turn)
+            with self._bound(turn):
+                turn.live.draft(text)
+            return key
+        return await self._post_answer(turn, text, reply_to)
+
+    async def _post_answer(self, turn: _Turn, text: str, reply_to: str | None) -> str | None:
+        """Post one answer of the run; returns its key, ``None`` when nothing was stored."""
+        if turn.live is None:
             return None
         # Recorded before the send: whatever the outbox does with it, a later copy from Hermes'
         # delivery ledger is the same answer (`recovered_duplicate`).
@@ -2121,6 +2149,7 @@ class HermesHandler(AgentHandler):
             return None
         key = str(entry.message_id)
         turn.answers[key] = (entry.message_id, int(entry.message_version or 1))
+        turn.posted[key] = text
         return key
 
     async def recovered_duplicate(self, thread_id: UUID | None, content: str) -> bool:
@@ -2151,6 +2180,8 @@ class HermesHandler(AgentHandler):
             Whether the message is an own answer of the active run.
         """
         turn = self._active(thread_id)
+        if turn is not None and message_id in turn.previews:
+            return await self._edit_preview(turn, message_id, text, finalize)
         if turn is None or message_id not in turn.answers:
             return False
         turn.edits[message_id] = text
@@ -2159,17 +2190,55 @@ class HermesHandler(AgentHandler):
                 await self._flush_edits(turn, only=message_id)
         return True
 
+    async def _edit_preview(self, turn: _Turn, key: str, text: str, finalize: bool) -> bool:
+        """An edit of a preview: the new draft, or at ``finalize`` the one post of the answer."""
+        _, reply_to = turn.previews[key]
+        if not finalize:
+            turn.previews[key] = (text, reply_to)
+            self._touch(turn)
+            if turn.live is not None:
+                with self._bound(turn):
+                    turn.live.draft(text)
+            return True
+        del turn.previews[key]
+        with self._bound(turn):
+            posted = await self._post_answer(turn, text, reply_to)
+        if posted is None:
+            return False
+        # Hermes keeps editing under its own key: it names the posted answer from now on.
+        turn.answers[key] = turn.answers.pop(posted)
+        turn.posted[key] = turn.posted.pop(posted)
+        return True
+
+    async def _post_previews(self, turn: _Turn) -> None:
+        """Previews Hermes never finalized: their last text without the cursor, once each."""
+        for key, (text, reply_to) in list(turn.previews.items()):
+            del turn.previews[key]
+            final = _without_cursor(text)
+            if not final:
+                continue
+            with self._bound(turn):
+                posted = await self._post_answer(turn, final, reply_to)
+            if posted is not None:
+                turn.answers[key] = turn.answers.pop(posted)
+                turn.posted[key] = turn.posted.pop(posted)
+
     async def _flush_edits(self, turn: _Turn, only: str | None = None) -> None:
+        if only is None:
+            await self._post_previews(turn)
         for key in [only] if only is not None else list(turn.edits):
             text = turn.edits.pop(key, None) if key is not None else None
             if text is None or key is None:
                 continue
+            body = self._cut(turn, text)
+            if turn.posted.get(key) == body:
+                continue  # the same text: an edit would only mark the answer edited
             message_id, version = turn.answers[key]
             try:
                 result = await turn.handle.client.call(
                     update_message.asyncio_detailed,
                     message_id=message_id,
-                    body=MessageUpdate(content_md=self._cut(turn, text)),
+                    body=MessageUpdate(content_md=body),
                     if_match=f'"{version}"',
                 )
             except ProblemError as exc:
@@ -2177,6 +2246,7 @@ class HermesHandler(AgentHandler):
                 continue
             new_version = getattr(result, "version", None)
             turn.answers[key] = (message_id, int(new_version) if new_version else version + 1)
+            turn.posted[key] = body
 
     def _cut(self, turn: _Turn, text: str) -> str:
         cut, was_cut = cut_utf8(text.encode("utf-8"), self.settings.max_message_bytes)
@@ -2461,6 +2531,11 @@ def _utcnow() -> datetime:
     from datetime import UTC  # noqa: PLC0415 - keeps the module header short
 
     return datetime.now(UTC)
+
+
+def _without_cursor(text: str) -> str:
+    """A preview's text without Hermes' streaming cursor (default ``" \u2589"``) at its end."""
+    return text.rstrip().removesuffix(_CURSOR).rstrip()
 
 
 def _content(message: Message) -> str:

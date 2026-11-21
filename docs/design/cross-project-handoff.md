@@ -145,7 +145,8 @@ with the app slice.
   means); accept `trigger_kind = team`; owner codes stay tied to the input message (origin
   `human`, author an owner); labels for member messages. Mentions need no command: the final
   reply's `@handle` is parsed by the server. Later a command `bothy-team say` to post mid-run.
-- **Hermes adapter:** accept `trigger_kind = 'team'` and the team block, and the same prompt hint.
+- **Hermes adapter:** accept `trigger_kind = 'team'` and the team block, and the same prompt hint
+  (built in FEAT-TEAM-CHANNEL-ADAPTER, 09 17.14).
 - **Apps:** team mode switch, member dialog with handles, `/team add|remove|list|stop`, header
   with member states and stop all, relayed replies with handle and live box link, brake notes.
 

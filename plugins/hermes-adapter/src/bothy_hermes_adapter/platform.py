@@ -972,20 +972,22 @@ class ServerPlatform(BasePlatformAdapter):
         if reply_to is not None and reply_to in self._control_messages:
             return SendResult(success=False, error="the command has ended")
         interim = bool((metadata or {}).get("_interim_send"))
+        # Hermes' edit transport sends a preview it edits up to the final text (D-TCA-8).
+        preview = bool((metadata or {}).get("expect_edits"))
         if reply_to is not None and reply_to in self._turn_messages:
             run = self._turn_messages[reply_to]
             if thread is None or run is None or self.handler.active_run(thread) != run:
                 return SendResult(success=False, error="no active run in this thread")
             if self.handler.on_interim(thread, content, marked=interim):
                 return SendResult(success=False, error=_INTERIM)
-            message_id = await self.handler.on_answer(thread, content, reply_to)
+            message_id = await self.handler.on_answer(thread, content, reply_to, preview=preview)
             if message_id is None:
                 return SendResult(success=False, error="no active run in this thread")
             return SendResult(success=True, message_id=message_id)
         if thread is not None and self._turn_send(str(chat_id), thread, env_thread):
             if self.handler.on_interim(thread, content, marked=interim):
                 return SendResult(success=False, error=_INTERIM)
-            message_id = await self.handler.on_answer(thread, content, reply_to)
+            message_id = await self.handler.on_answer(thread, content, reply_to, preview=preview)
             if message_id is None:
                 return SendResult(success=False, error=_NO_RUN)
             return SendResult(success=True, message_id=message_id)

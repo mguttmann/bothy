@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 from bothy_sdk.ids import uuid7
-from fake_hermes_kit import HermesRig, HermesWorld, gateway_log, hermes_rig
+from fake_hermes_kit import HermesRig, HermesWorld, Profile, gateway_log, hermes_rig
 from hermes_harness.fake_model import ScriptTurn
 
 from bothy_hermes_adapter.team import member_label
@@ -92,14 +92,25 @@ def _own_token_answers(rig: HermesRig, run_id: Any) -> list[str]:
     return out
 
 
-@pytest.mark.parametrize("source", ["member", "owner"])
-async def test_team_run_and_followups_reach_hermes(world: HermesWorld, source: str) -> None:
+@pytest.mark.parametrize(
+    ("source", "transport"),
+    [("member", None), ("owner", None), ("member", "edit")],
+    ids=["member", "owner", "member-edit-transport"],
+)
+async def test_team_run_and_followups_reach_hermes(
+    world: HermesWorld, source: str, transport: str | None
+) -> None:
+    """With Hermes' edit transport the answer is a preview Hermes edits; it still goes out once,
+    unedited, so the server can hand it on (D-TCA-8)."""
     script = [
         ScriptTurn(tool_calls=(TODO,), hold="first"),
         ScriptTurn(text=("Tests pass. ", "@dev please deploy."), paced=True),
     ]
     texts = [ASK, MEMBER_FOLLOWUP, OWNER_FOLLOWUP]
-    async with hermes_rig(world, script, texts=texts) as rig:
+    profile = Profile(
+        config={"streaming": {"enabled": True, "transport": transport}} if transport else {}
+    )
+    async with hermes_rig(world, script, texts=texts, profile=profile) as rig:
         alex = str(rig.fake.world.alex.id)
         author = "texter" if source == "member" else "alex"
         triggered = await rig.fake.trigger(
