@@ -214,6 +214,7 @@ nav:
       - Background work of a Hermes run: design/hermes-background-work.md
       - Mirror of Hermes sessions outside Bothy: design/hermes-session-mirror.md
       - Claude Code runner on background sessions: design/runner-background-sessions.md
+      - "Team channels: agents of several projects": design/cross-project-handoff.md
   - Operations:
       - Configuration: operations/configuration.md
       - Installation with Compose: operations/install-compose.md
