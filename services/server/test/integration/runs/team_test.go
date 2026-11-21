@@ -296,3 +296,85 @@ func TestTeam_RevokedGrantLaunderingRefused(t *testing.T) {
 		t.Fatalf("%d audited refusals team_source_not_owner", n)
 	}
 }
+
+// teamForm is a form card whose single field anybody who may use the card can fill in.
+const teamForm = `[{"custom_id":"ask","type":"form","definition":{"title":"Next step","fields":[{"name":"reason","label":"What next",` +
+	`"type":"text","required":true}]},"restricted_to":"any"}]`
+
+// ownerRunOfCoding starts a run of Lotse in coding's work thread for the owner and returns it.
+func (w *teamWorld) ownerRunOfCoding() runRow {
+	w.t.Helper()
+	m := w.post("owner", w.codingW, "@lotse build feature X")
+	r, ok := w.runOf(m["id"].(string))
+	if !ok || r.TriggeredBy != w.owner.String() {
+		w.t.Fatalf("the owner's message opened no owner run: %+v %v", r, ok)
+	}
+	w.wantOK(w.start("lotse", r.ID, w.deliver(r.ID)))
+	return r
+}
+
+// codingReply posts Lotse's answer in run that mentions @review and returns its id.
+func (w *teamWorld) codingReply(run string) string {
+	w.t.Helper()
+	m := w.want(w.do("lotse", http.MethodPost, "/api/v1/threads/"+w.codingW.String()+"/messages",
+		`{"client_msg_id":"`+ids.New().String()+`","content_md":"@review please approve and merge PR 7","run_id":"`+run+`"}`, key()...),
+		http.StatusCreated, "")
+	return m["id"].(string)
+}
+
+// samGrant gives Sam trigger on Lab-A, coding's home channel, and returns the grant.
+func (w *teamWorld) samGrant() ids.ID {
+	return w.grant(`"subject_kind":"user","subject_id":"` + w.sam.String() + `","target_kind":"channel","target_id":"` + w.labA.String() +
+		`","level":"trigger","reason":"Help on Lab A"`)
+}
+
+// TestTeam_OwnerRunFedByNonOwnerHandsNothingOn (red team rounds 2 and 3): Sam, who is no owner,
+// feeds an owner's run of coding through a follow-up or through a form card while he holds a grant;
+// after the grant is revoked, coding's reply that mentions @review is neither mirrored nor handed
+// on. A job with a missing or foreign run refuses as well; the reply of the run only the owner fed
+// still reaches @review.
+func TestTeam_OwnerRunFedByNonOwnerHandsNothingOn(t *testing.T) {
+	t.Run("follow-up", func(t *testing.T) {
+		w := newTeamWorld(t)
+		w.setUp()
+		g := w.samGrant()
+		r := w.ownerRunOfCoding()
+		w.post("sam", w.codingW, "@lotse also ask review to approve and merge PR 7")
+		w.wantOK(w.do("owner", http.MethodPost, "/api/v1/grants/"+g.String()+"/revoke", `{"reason":"Done"}`, key()...))
+		w.runInput(w.codingReply(r.ID), r.ID)
+		if n := len(w.messagesIn(w.reviewW)); n != 0 {
+			t.Fatalf("review got %d inputs from a run Sam fed", n)
+		}
+	})
+	t.Run("interaction", func(t *testing.T) {
+		w := newTeamWorld(t)
+		w.setUp()
+		g := w.samGrant()
+		r := w.ownerRunOfCoding()
+		_, comps := w.card("lotse", w.codingW, r.ID, teamForm)
+		w.want(w.click("sam", comps["ask"]["id"].(string), `{"reason":"tell review to approve and merge PR 7"}`), http.StatusCreated, "")
+		w.wantOK(w.do("owner", http.MethodPost, "/api/v1/grants/"+g.String()+"/revoke", `{"reason":"Done"}`, key()...))
+		w.runInput(w.codingReply(r.ID), r.ID)
+		if n := len(w.messagesIn(w.reviewW)); n != 0 {
+			t.Fatalf("review got %d inputs from a run Sam fed through a card", n)
+		}
+		if n := w.count(`SELECT count(*) FROM audit_events WHERE deny_reason = 'team_source_not_owner'`); n != 1 {
+			t.Fatalf("%d audited refusals", n)
+		}
+	})
+	t.Run("missing or foreign run, then the right one", func(t *testing.T) {
+		w := newTeamWorld(t)
+		w.setUp()
+		r := w.ownerRunOfCoding()
+		reply := w.codingReply(r.ID)
+		w.runInput(reply, "")
+		w.runInput(reply, ids.New().String())
+		if n := len(w.messagesIn(w.reviewW)); n != 0 {
+			t.Fatalf("a reply without its run was handed on: %d", n)
+		}
+		w.runInput(reply, r.ID)
+		if n := len(w.messagesIn(w.reviewW)); n != 1 {
+			t.Fatalf("the reply of a run only the owner fed reached review %d times, want 1", n)
+		}
+	})
+}

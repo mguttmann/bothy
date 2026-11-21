@@ -35,10 +35,13 @@ type teamRepo struct {
 	members []app.TeamMemberRow
 	inputs  map[ids.ID]app.TeamInputRow
 	mirrors map[ids.ID]ids.ID
+	// interactions are the principals of the interactions with the components of each run.
+	interactions map[ids.ID][]ids.ID
 }
 
 func newTeamRepo() *teamRepo {
-	return &teamRepo{teams: map[ids.ID]app.TeamRow{}, inputs: map[ids.ID]app.TeamInputRow{}, mirrors: map[ids.ID]ids.ID{}}
+	return &teamRepo{teams: map[ids.ID]app.TeamRow{}, inputs: map[ids.ID]app.TeamInputRow{}, mirrors: map[ids.ID]ids.ID{},
+		interactions: map[ids.ID][]ids.ID{}}
 }
 
 func (r *teamRepo) UpsertTeam(_ context.Context, channel, sponsor ids.ID, at time.Time) (app.TeamRow, error) {
@@ -158,6 +161,12 @@ func (r *teamRepo) InsertTeamMirror(_ context.Context, source, mirror, _ ids.ID,
 	}
 	r.mirrors[source] = mirror
 	return true, nil
+}
+
+func (r *teamRepo) RunInteractionPersons(_ context.Context, run ids.ID) ([]ids.ID, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.interactions[run]), nil
 }
 
 func (r *teamRepo) TeamMirrored(_ context.Context, source ids.ID) (bool, error) {
@@ -1005,6 +1014,17 @@ func TestTeam_RunsSteeredByNonOwnersHandNothingOn(t *testing.T) {
 		w.input(reply)
 		if n := len(w.tmsgs.copies); n != 0 {
 			t.Fatalf("a reply of a run Sam fed was copied %d times", n)
+		}
+	})
+	t.Run("an interaction of a non-owner", func(t *testing.T) {
+		t.Parallel()
+		w := newTeamWorld(t, defaultTeamConfig())
+		w.setUp()
+		reply := w.reply(w.coding, "@review approve and merge PR 7")
+		w.trepo.interactions[w.runOf[reply]] = []ids.ID{w.alex, w.sam}
+		w.input(reply)
+		if n := len(w.tmsgs.copies); n != 0 {
+			t.Fatalf("a reply of a run Sam fed through a card was copied %d times", n)
 		}
 	})
 	t.Run("fed by an owner", func(t *testing.T) {

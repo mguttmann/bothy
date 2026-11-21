@@ -601,6 +601,9 @@ exceptions:
   - query: runs.PendingWakesOfAgent
     category: after_authorize
     reason: "the pending wake-ups of the calling agent itself after run.wake.list_pending (agent-self) allowed; run_wakes has no channel_id and every row is the agent's own (07 7.4 rule 1, AR-04)"
+  - query: runs.RunInteractionPersons
+    category: system_job
+    reason: "the job runs.team_input reads, without a principal, only the principal ids of the interactions with the components of the one run a member's reply answers, to check that only owners steered it; nothing of the rows leaves the job (FEAT-TEAM-CHANNEL-SERVER, 09 3.9.4)"
   - query: runs.ThreadWakes
     category: thread_scope
     reason: "listThreadWakes reads the wake-ups of the one thread whose channel is in Scope(run.wake.read).ChannelIDs, checked before the read; run_wakes has no channel_id (D-M2-05-9, AR-04)"

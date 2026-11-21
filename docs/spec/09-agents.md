@@ -424,9 +424,9 @@ mention, as a follow-up of its running run or a new `team` run. Several mentions
 allowed here (3.4 step 3 refuses them elsewhere, because those runs share one thread).
 
 A reply is mirrored and handed on only when the run it answers was started and fed only by active
-owners: its `triggered_by` (for a team run the authority of its input) and the person of every
-follow-up it took (the author of a person's message, the authority of a team input) are active
-owners at the moment of the job. Otherwise nothing is copied, a note names the member and the
+owners: its `triggered_by` (for a team run the authority of its input), the person of every
+follow-up it took (the author of a person's message, the authority of a team input) and the
+principal of every interaction with its components are active owners at the moment of the job. Otherwise nothing is copied, a note names the member and the
 reason `team_source_not_owner`, and the refusal is audited. A person with a grant who wrote in a
 work thread therefore never steers a member into triggering another member with the sponsor's
 rights, also after the grant was revoked.
