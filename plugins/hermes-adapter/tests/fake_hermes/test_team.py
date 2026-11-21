@@ -164,3 +164,22 @@ async def test_text_before_a_tool_call_hands_nothing_on_with_the_edit_transport(
         assert rig.fake.run_state(triggered.run_id).state == "completed", gateway_log(rig)
         assert _own_token_answers(rig, triggered.run_id) == ["All done, nothing to hand on."]
         assert rig.requests("updateMessage") == []
+
+
+async def test_text_before_a_tool_call_that_becomes_the_answer_goes_out(world: HermesWorld) -> None:
+    """An empty reply after the tool round makes Hermes answer with the earlier text: with the
+    edit transport it still goes out once, unedited (red team round 3, D-TCA-8)."""
+    script = [
+        ScriptTurn(text=("Tests pass. ", "@dev please deploy."), tool_calls=(TODO,), paced=True),
+        ScriptTurn(),
+    ]
+    profile = Profile(config={"streaming": {"enabled": True, "transport": "edit"}})
+    async with hermes_rig(world, script, texts=[ASK], profile=profile) as rig:
+        triggered = await rig.fake.trigger(
+            ASK, trigger_kind="team", author="texter", authority="alex", team=_team(rig, "member")
+        )
+        await _end(rig, triggered.run_id)
+        assert rig.fake.run_state(triggered.run_id).state == "completed", gateway_log(rig)
+        answers = _own_token_answers(rig, triggered.run_id)
+        assert answers.count(ANSWER) == 1, answers
+        assert rig.requests("updateMessage") == []

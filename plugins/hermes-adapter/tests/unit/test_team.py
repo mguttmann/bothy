@@ -309,7 +309,10 @@ async def test_a_streamed_segment_before_a_tool_call_is_progress(tmp_path: Path)
         ev.on_model_reply(turn.thread_id, 1, "First I ask @dev to check the logs.")
         key = await ev.on_answer(turn.thread_id, "First I ask \u2589", None, preview=True)
         assert key is not None
-        assert await ev.on_edit(turn.thread_id, key, "First I ask @dev to check the logs.", True)
+        # Not delivered: Hermes still sends the text if it becomes the final answer.
+        assert not await ev.on_edit(
+            turn.thread_id, key, "First I ask @dev to check the logs.", True
+        )
         ev.on_model_reply(turn.thread_id, 0)
         last = await ev.on_answer(turn.thread_id, "All \u2589", None, preview=True)
         assert last is not None

@@ -2204,9 +2204,11 @@ class HermesHandler(AgentHandler):
         if self._progress(turn, text):
             # The text in front of a tool call, which the edit transport closes with a
             # finalizing edit: progress in the live box, never an answer (D-ADAPTER-INTERIM-1).
+            # Reported as not delivered, like `on_interim`: Hermes then still sends the text when
+            # it becomes the turn's final answer (an empty reply after the tool round).
             with self._bound(turn):
                 turn.live.draft(text)  # type: ignore[union-attr] # _active checked the live box
-            return True
+            return False
         with self._bound(turn):
             posted = await self._post_answer(turn, text, reply_to)
         if posted is None:
