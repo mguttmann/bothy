@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The built-in commands of 09 10.1 (brief M4-21 Design note 4): `/stop`, `/status`, `/new`,
-/// `/resume`, `/title`, `/close`. Their names are fixed English identifiers, their descriptions
+/// `/resume`, `/title`, `/close`, and the client command `/team` of a team channel (09 3.9.1,
+/// reserved name; offered to owners in a text channel only). Their names are fixed English identifiers, their descriptions
 /// are translated, and they are control commands: they never go to a model and never through
 /// `invokeCommand` (they have no `command_id`); each runs its own operation.
 library;
@@ -28,7 +29,11 @@ enum BuiltinCommand {
   title('title'),
 
   /// Marks the thread done (`thread.close`, `closeThread`).
-  close('close');
+  close('close'),
+
+  /// Manages the team of the channel: `list`, `add`, `remove @handle`, `stop` (09 3.9.1,
+  /// 3.9.7; `getChannelTeam`, `addTeamMember`, `removeTeamMember`, `stopChannelTeam`).
+  team('team');
 
   const BuiltinCommand(this.name);
 
@@ -43,6 +48,7 @@ enum BuiltinCommand {
     resume => l.commandBuiltinResume,
     title => l.commandBuiltinTitle,
     close => l.commandBuiltinClose,
+    team => l.commandBuiltinTeam,
   };
 
   /// The built-in named [name] (without the slash) in any letter case, or null. The names
@@ -65,6 +71,7 @@ typedef BuiltinAvailability = ({
   bool session,
   bool title,
   bool close,
+  bool team,
 });
 
 /// The built-ins that [allowed] permits, in the order of 09 10.1; `/status` only reads and is
@@ -76,6 +83,7 @@ List<BuiltinCommand> availableBuiltins(BuiltinAvailability allowed) => [
   if (allowed.session) BuiltinCommand.resume,
   if (allowed.title) BuiltinCommand.title,
   if (allowed.close) BuiltinCommand.close,
+  if (allowed.team) BuiltinCommand.team,
 ];
 
 /// Runs the built-ins; the history column implements it with the outbox operations and the
@@ -99,6 +107,9 @@ abstract interface class BuiltinCommandRunner {
 
   /// `/close`: marks the thread done (`closeThread`).
   Future<void> close();
+
+  /// `/team <sub-command>`: the team of the channel (09 3.9.1).
+  Future<void> team(String argument);
 }
 
 /// Runs [command] with the text [argument] after its name on [runner].
@@ -113,4 +124,5 @@ Future<void> runBuiltin(
   BuiltinCommand.resume => runner.resume(),
   BuiltinCommand.title => runner.title(argument.trim()),
   BuiltinCommand.close => runner.close(),
+  BuiltinCommand.team => runner.team(argument),
 };

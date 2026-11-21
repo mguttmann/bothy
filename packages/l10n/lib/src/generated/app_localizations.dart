@@ -18411,6 +18411,300 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change the features of {name}'**
   String stepUpPurposeAgentFeatures(String name);
+
+  /// Entry of the channel menu for owners that opens the team dialog of a text channel (09 3.9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Team channel...'**
+  String get teamMenu;
+
+  /// Title of the team dialog of a channel (09 3.9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Team channel'**
+  String get teamTitle;
+
+  /// Label of the switch that turns the team mode of a channel on or off (09 3.9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Team mode'**
+  String get teamSwitch;
+
+  /// The sentence under the team switch (09 3.9.3, 3.9.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Agents of several projects work together here. Every owner message reaches every member; a member hands work on by mentioning another member\'s handle in its reply.'**
+  String get teamExplanation;
+
+  /// Heading of the member list in the team dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Members'**
+  String get teamMembers;
+
+  /// Shown in the team dialog when the team channel has no member.
+  ///
+  /// In en, this message translates to:
+  /// **'No members yet.'**
+  String get teamNoMembers;
+
+  /// Second line of a member in the team dialog: the member's agent and its home channel.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} in {home}'**
+  String teamMemberLine(String agent, String home);
+
+  /// Button and screen reader label that removes a member from the team channel.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove @{handle}'**
+  String teamRemove(String handle);
+
+  /// Heading of the form that adds a member to the team channel.
+  ///
+  /// In en, this message translates to:
+  /// **'Add member'**
+  String get teamAddTitle;
+
+  /// Label of the agent choice of the add form.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get teamAddAgent;
+
+  /// Label of the choice of the channel the member works in (its home channel, 09 3.9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Home channel'**
+  String get teamAddHome;
+
+  /// Shown in the add form when the chosen agent is the effective operator of no suitable channel.
+  ///
+  /// In en, this message translates to:
+  /// **'This agent operates no channel that can be its home.'**
+  String get teamAddHomeNone;
+
+  /// Label of the handle field of the add form.
+  ///
+  /// In en, this message translates to:
+  /// **'Handle'**
+  String get teamAddHandle;
+
+  /// Hint under the handle field of the add form (09 3.9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Lower-case letters, digits, - and _'**
+  String get teamAddHandleHint;
+
+  /// Error under the handle field when the handle does not match the pattern.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with a letter or digit; use only lower-case letters, digits, - and _.'**
+  String get teamAddHandleInvalid;
+
+  /// Button that adds the member.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get teamAddSubmit;
+
+  /// Button that stops every member run and pauses member mentions (09 3.9.7).
+  ///
+  /// In en, this message translates to:
+  /// **'Stop all'**
+  String get teamStopAll;
+
+  /// Screen reader label of the stop all button.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop every member and pause member mentions'**
+  String get teamStopAllSemantics;
+
+  /// Message after stop all (09 3.9.7).
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped. Member mentions are paused until an owner writes again.'**
+  String get teamStopped;
+
+  /// Shown when the server refused a team operation, with the reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused: {reason}'**
+  String teamRefused(String reason);
+
+  /// Shown when a team operation got no answer.
+  ///
+  /// In en, this message translates to:
+  /// **'No connection. Try again.'**
+  String get teamOffline;
+
+  /// Button that closes the team dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get teamClose;
+
+  /// Screen reader label of the member bar under the header of a team channel.
+  ///
+  /// In en, this message translates to:
+  /// **'Team members'**
+  String get teamHeader;
+
+  /// State of a member without an active run (header of a team channel).
+  ///
+  /// In en, this message translates to:
+  /// **'idle'**
+  String get teamStateIdle;
+
+  /// State of a member whose agent works on a request in its work thread.
+  ///
+  /// In en, this message translates to:
+  /// **'working'**
+  String get teamStateRunning;
+
+  /// State of a member while member mentions of the channel are paused.
+  ///
+  /// In en, this message translates to:
+  /// **'paused'**
+  String get teamStatePaused;
+
+  /// Screen reader label of a member in the header: handle and state.
+  ///
+  /// In en, this message translates to:
+  /// **'@{handle}, {state}'**
+  String teamMemberSemantics(String handle, String state);
+
+  /// Pause note in the header of a team channel (09 3.9.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Paused: the turn budget is used up. Write a message to go on.'**
+  String get teamPausedTurnBudget;
+
+  /// Pause note in the header of a team channel (09 3.9.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Paused: two members kept handing work back and forth. Write a message to go on.'**
+  String get teamPausedPingpong;
+
+  /// Pause note in the header of a team channel (09 3.9.7).
+  ///
+  /// In en, this message translates to:
+  /// **'Paused: an owner stopped the team. Write a message to go on.'**
+  String get teamPausedStopped;
+
+  /// Pause note for a pause reason this app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused. Write a message to go on.'**
+  String get teamPausedOther;
+
+  /// Label of a member's mirrored reply in a team channel, for example from @coding (09 3.9.4).
+  ///
+  /// In en, this message translates to:
+  /// **'from {handles}'**
+  String teamFromMember(String handles);
+
+  /// Label of an owner's message in a team channel, which reaches every member (09 3.9.3).
+  ///
+  /// In en, this message translates to:
+  /// **'to all members'**
+  String get teamToAllMembers;
+
+  /// Description of the client command /team in the suggestion list (09 3.9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Manage the team of this channel: list, add, remove, stop'**
+  String get commandBuiltinTeam;
+
+  /// Shown when /team was used with an unknown sub-command.
+  ///
+  /// In en, this message translates to:
+  /// **'Use /team list, /team add, /team remove @handle or /team stop.'**
+  String get teamUsage;
+
+  /// Shown when /team remove names a handle that is no member.
+  ///
+  /// In en, this message translates to:
+  /// **'No member @{handle} in this channel.'**
+  String teamUnknownHandle(String handle);
+
+  /// Shown after /team remove removed a member.
+  ///
+  /// In en, this message translates to:
+  /// **'@{handle} removed.'**
+  String teamRemoved(String handle);
+
+  /// Shown when /team remove or /team stop is used in a channel without team mode.
+  ///
+  /// In en, this message translates to:
+  /// **'This channel is no team channel.'**
+  String get teamNotEnabled;
+
+  /// Reason team_handle_taken of a refused add.
+  ///
+  /// In en, this message translates to:
+  /// **'another member has this handle'**
+  String get teamReasonHandleTaken;
+
+  /// Reason team_member_exists of a refused add.
+  ///
+  /// In en, this message translates to:
+  /// **'this agent is already a member with this home channel'**
+  String get teamReasonMemberExists;
+
+  /// Reason team_max_members of a refused add.
+  ///
+  /// In en, this message translates to:
+  /// **'the team has the most members it may have'**
+  String get teamReasonMaxMembers;
+
+  /// Reason team_home_not_operated of a refused add.
+  ///
+  /// In en, this message translates to:
+  /// **'the agent does not operate this home channel'**
+  String get teamReasonHomeNotOperated;
+
+  /// Reason team_home_is_team of a refused add.
+  ///
+  /// In en, this message translates to:
+  /// **'the home channel is a team channel itself'**
+  String get teamReasonHomeIsTeam;
+
+  /// Reason team_readers_not_owners (09 3.9.1 readers rule).
+  ///
+  /// In en, this message translates to:
+  /// **'a person who is no owner can read this channel or the home channel'**
+  String get teamReasonReadersNotOwners;
+
+  /// Reason team_not_enabled of a refused add.
+  ///
+  /// In en, this message translates to:
+  /// **'this channel is no team channel'**
+  String get teamReasonNotEnabled;
+
+  /// Reason dm_channel of a refused team operation.
+  ///
+  /// In en, this message translates to:
+  /// **'a direct message cannot take part'**
+  String get teamReasonDm;
+
+  /// Reason channel_kind of a refused team operation.
+  ///
+  /// In en, this message translates to:
+  /// **'only a text channel can be a team channel'**
+  String get teamReasonChannelKind;
+
+  /// Reason channel_archived of a refused team operation.
+  ///
+  /// In en, this message translates to:
+  /// **'the channel is archived'**
+  String get teamReasonArchived;
+
+  /// Reason channel_read_only of a refused team operation.
+  ///
+  /// In en, this message translates to:
+  /// **'the channel is read-only'**
+  String get teamReasonReadOnly;
 }
 
 class _AppLocalizationsDelegate

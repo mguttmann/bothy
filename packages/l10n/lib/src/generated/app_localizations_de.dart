@@ -11624,4 +11624,181 @@ class AppLocalizationsDe extends AppLocalizations {
   String stepUpPurposeAgentFeatures(String name) {
     return 'Funktionen von $name ändern';
   }
+
+  @override
+  String get teamMenu => 'Teamkanal...';
+
+  @override
+  String get teamTitle => 'Teamkanal';
+
+  @override
+  String get teamSwitch => 'Teammodus';
+
+  @override
+  String get teamExplanation =>
+      'Hier arbeiten Agenten mehrerer Projekte zusammen. Jede Nachricht eines Owners erreicht alle Mitglieder; ein Mitglied gibt Arbeit weiter, indem es in seiner Antwort das Handle eines anderen Mitglieds erwähnt.';
+
+  @override
+  String get teamMembers => 'Mitglieder';
+
+  @override
+  String get teamNoMembers => 'Noch keine Mitglieder.';
+
+  @override
+  String teamMemberLine(String agent, String home) {
+    return '$agent in $home';
+  }
+
+  @override
+  String teamRemove(String handle) {
+    return '@$handle entfernen';
+  }
+
+  @override
+  String get teamAddTitle => 'Mitglied hinzufügen';
+
+  @override
+  String get teamAddAgent => 'Agent';
+
+  @override
+  String get teamAddHome => 'Heimatkanal';
+
+  @override
+  String get teamAddHomeNone =>
+      'Dieser Agent bedient keinen Kanal, der seine Heimat sein kann.';
+
+  @override
+  String get teamAddHandle => 'Handle';
+
+  @override
+  String get teamAddHandleHint => 'Kleinbuchstaben, Ziffern, - und _';
+
+  @override
+  String get teamAddHandleInvalid =>
+      'Beginne mit einem Buchstaben oder einer Ziffer; verwende nur Kleinbuchstaben, Ziffern, - und _.';
+
+  @override
+  String get teamAddSubmit => 'Hinzufügen';
+
+  @override
+  String get teamStopAll => 'Alle stoppen';
+
+  @override
+  String get teamStopAllSemantics =>
+      'Alle Mitglieder stoppen und Erwähnungen zwischen Mitgliedern pausieren';
+
+  @override
+  String get teamStopped =>
+      'Gestoppt. Erwähnungen zwischen Mitgliedern sind pausiert, bis ein Owner wieder schreibt.';
+
+  @override
+  String teamRefused(String reason) {
+    return 'Abgelehnt: $reason';
+  }
+
+  @override
+  String get teamOffline => 'Keine Verbindung. Versuche es noch einmal.';
+
+  @override
+  String get teamClose => 'Schließen';
+
+  @override
+  String get teamHeader => 'Teammitglieder';
+
+  @override
+  String get teamStateIdle => 'bereit';
+
+  @override
+  String get teamStateRunning => 'arbeitet';
+
+  @override
+  String get teamStatePaused => 'pausiert';
+
+  @override
+  String teamMemberSemantics(String handle, String state) {
+    return '@$handle, $state';
+  }
+
+  @override
+  String get teamPausedTurnBudget =>
+      'Pausiert: Das Budget an Zügen ist aufgebraucht. Schreibe eine Nachricht, um weiterzumachen.';
+
+  @override
+  String get teamPausedPingpong =>
+      'Pausiert: Zwei Mitglieder haben sich die Arbeit zu oft hin und her gegeben. Schreibe eine Nachricht, um weiterzumachen.';
+
+  @override
+  String get teamPausedStopped =>
+      'Pausiert: Ein Owner hat das Team gestoppt. Schreibe eine Nachricht, um weiterzumachen.';
+
+  @override
+  String get teamPausedOther =>
+      'Pausiert. Schreibe eine Nachricht, um weiterzumachen.';
+
+  @override
+  String teamFromMember(String handles) {
+    return 'von $handles';
+  }
+
+  @override
+  String get teamToAllMembers => 'an alle Mitglieder';
+
+  @override
+  String get commandBuiltinTeam =>
+      'Team dieses Kanals verwalten: list, add, remove, stop';
+
+  @override
+  String get teamUsage =>
+      'Verwende /team list, /team add, /team remove @handle oder /team stop.';
+
+  @override
+  String teamUnknownHandle(String handle) {
+    return 'Kein Mitglied @$handle in diesem Kanal.';
+  }
+
+  @override
+  String teamRemoved(String handle) {
+    return '@$handle entfernt.';
+  }
+
+  @override
+  String get teamNotEnabled => 'Dieser Kanal ist kein Teamkanal.';
+
+  @override
+  String get teamReasonHandleTaken => 'ein anderes Mitglied hat dieses Handle';
+
+  @override
+  String get teamReasonMemberExists =>
+      'dieser Agent ist mit diesem Heimatkanal schon Mitglied';
+
+  @override
+  String get teamReasonMaxMembers =>
+      'das Team hat schon die höchste erlaubte Zahl an Mitgliedern';
+
+  @override
+  String get teamReasonHomeNotOperated =>
+      'der Agent bedient diesen Heimatkanal nicht';
+
+  @override
+  String get teamReasonHomeIsTeam => 'der Heimatkanal ist selbst ein Teamkanal';
+
+  @override
+  String get teamReasonReadersNotOwners =>
+      'eine Person, die kein Owner ist, kann diesen Kanal oder den Heimatkanal lesen';
+
+  @override
+  String get teamReasonNotEnabled => 'dieser Kanal ist kein Teamkanal';
+
+  @override
+  String get teamReasonDm => 'eine Direktnachricht kann nicht teilnehmen';
+
+  @override
+  String get teamReasonChannelKind =>
+      'nur ein Textkanal kann ein Teamkanal sein';
+
+  @override
+  String get teamReasonArchived => 'der Kanal ist archiviert';
+
+  @override
+  String get teamReasonReadOnly => 'der Kanal ist schreibgeschützt';
 }

@@ -11560,4 +11560,181 @@ class AppLocalizationsEn extends AppLocalizations {
   String stepUpPurposeAgentFeatures(String name) {
     return 'Change the features of $name';
   }
+
+  @override
+  String get teamMenu => 'Team channel...';
+
+  @override
+  String get teamTitle => 'Team channel';
+
+  @override
+  String get teamSwitch => 'Team mode';
+
+  @override
+  String get teamExplanation =>
+      'Agents of several projects work together here. Every owner message reaches every member; a member hands work on by mentioning another member\'s handle in its reply.';
+
+  @override
+  String get teamMembers => 'Members';
+
+  @override
+  String get teamNoMembers => 'No members yet.';
+
+  @override
+  String teamMemberLine(String agent, String home) {
+    return '$agent in $home';
+  }
+
+  @override
+  String teamRemove(String handle) {
+    return 'Remove @$handle';
+  }
+
+  @override
+  String get teamAddTitle => 'Add member';
+
+  @override
+  String get teamAddAgent => 'Agent';
+
+  @override
+  String get teamAddHome => 'Home channel';
+
+  @override
+  String get teamAddHomeNone =>
+      'This agent operates no channel that can be its home.';
+
+  @override
+  String get teamAddHandle => 'Handle';
+
+  @override
+  String get teamAddHandleHint => 'Lower-case letters, digits, - and _';
+
+  @override
+  String get teamAddHandleInvalid =>
+      'Start with a letter or digit; use only lower-case letters, digits, - and _.';
+
+  @override
+  String get teamAddSubmit => 'Add';
+
+  @override
+  String get teamStopAll => 'Stop all';
+
+  @override
+  String get teamStopAllSemantics =>
+      'Stop every member and pause member mentions';
+
+  @override
+  String get teamStopped =>
+      'Stopped. Member mentions are paused until an owner writes again.';
+
+  @override
+  String teamRefused(String reason) {
+    return 'Refused: $reason';
+  }
+
+  @override
+  String get teamOffline => 'No connection. Try again.';
+
+  @override
+  String get teamClose => 'Close';
+
+  @override
+  String get teamHeader => 'Team members';
+
+  @override
+  String get teamStateIdle => 'idle';
+
+  @override
+  String get teamStateRunning => 'working';
+
+  @override
+  String get teamStatePaused => 'paused';
+
+  @override
+  String teamMemberSemantics(String handle, String state) {
+    return '@$handle, $state';
+  }
+
+  @override
+  String get teamPausedTurnBudget =>
+      'Paused: the turn budget is used up. Write a message to go on.';
+
+  @override
+  String get teamPausedPingpong =>
+      'Paused: two members kept handing work back and forth. Write a message to go on.';
+
+  @override
+  String get teamPausedStopped =>
+      'Paused: an owner stopped the team. Write a message to go on.';
+
+  @override
+  String get teamPausedOther => 'Paused. Write a message to go on.';
+
+  @override
+  String teamFromMember(String handles) {
+    return 'from $handles';
+  }
+
+  @override
+  String get teamToAllMembers => 'to all members';
+
+  @override
+  String get commandBuiltinTeam =>
+      'Manage the team of this channel: list, add, remove, stop';
+
+  @override
+  String get teamUsage =>
+      'Use /team list, /team add, /team remove @handle or /team stop.';
+
+  @override
+  String teamUnknownHandle(String handle) {
+    return 'No member @$handle in this channel.';
+  }
+
+  @override
+  String teamRemoved(String handle) {
+    return '@$handle removed.';
+  }
+
+  @override
+  String get teamNotEnabled => 'This channel is no team channel.';
+
+  @override
+  String get teamReasonHandleTaken => 'another member has this handle';
+
+  @override
+  String get teamReasonMemberExists =>
+      'this agent is already a member with this home channel';
+
+  @override
+  String get teamReasonMaxMembers =>
+      'the team has the most members it may have';
+
+  @override
+  String get teamReasonHomeNotOperated =>
+      'the agent does not operate this home channel';
+
+  @override
+  String get teamReasonHomeIsTeam =>
+      'the home channel is a team channel itself';
+
+  @override
+  String get teamReasonReadersNotOwners =>
+      'a person who is no owner can read this channel or the home channel';
+
+  @override
+  String get teamReasonNotEnabled => 'this channel is no team channel';
+
+  @override
+  String get teamReasonDm => 'a direct message cannot take part';
+
+  @override
+  String get teamReasonChannelKind =>
+      'only a text channel can be a team channel';
+
+  @override
+  String get teamReasonArchived => 'the channel is archived';
+
+  @override
+  String get teamReasonReadOnly => 'the channel is read-only';
 }

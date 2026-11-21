@@ -27,6 +27,7 @@ import '../export/channel_export.dart';
 import '../new_project/rename_project_dialog.dart';
 import '../notifications_settings/providers.dart';
 import '../sidebar/sidebar_drag.dart' show SidebarMoves, sidebarMoveMenuItems;
+import '../team/team_dialog.dart' show teamMenuItems;
 import '../thread/providers.dart';
 import 'autonomous_runs_dialog.dart';
 import 'level_menu.dart';
@@ -144,7 +145,7 @@ class ChannelMenu extends StatelessWidget {
 
 /// The entries of the menu of [channel]: the level submenus, with the capability `export` in
 /// the channel view "Export history", and with `manage` "Let agents continue on their own..."
-/// (01 6.21 item 5).
+/// (01 6.21 item 5), and for an owner in a text channel "Team channel..." (09 3.9.1).
 List<Widget> channelMenuItems(
   BuildContext context,
   WidgetRef ref,
@@ -176,6 +177,8 @@ List<Widget> channelMenuItems(
       ),
     // 01 6.21 item 5 (AR-08): the channel switch for a person with `manage`.
     ...autonomousRunsMenuItems(context, ref, channel),
+    // 09 3.9.1: the team dialog of a text channel, for owners only.
+    ...teamMenuItems(context, ref, channel),
   ];
 }
 

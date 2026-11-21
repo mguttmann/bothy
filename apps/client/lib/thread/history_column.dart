@@ -47,11 +47,17 @@ import '../forum/providers.dart'
 import '../keyboard/app_shortcuts.dart';
 import '../keyboard/intents.dart';
 import '../menus/thread_menu.dart';
+import '../notifications_settings/providers.dart' show isOwnerProvider;
 import '../running/providers.dart' show mayStop;
 import '../search/thread_search.dart';
 import '../session_column/session_column.dart';
 import '../sidebar/chat_seen_marker.dart';
 import '../sidebar/providers.dart';
+import '../team/providers.dart';
+import '../team/team_header.dart';
+import '../team/team_label_line.dart';
+import '../team/team_model.dart' show teamMessageLabel;
+import '../team/team_port.dart' show TeamView;
 import '../telemetry/telemetry_providers.dart';
 import 'collapsing_header.dart';
 import 'delete_confirm.dart';
@@ -106,6 +112,26 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
   late final VisibleThreads _visible;
   bool _loadingOlder = false;
   bool _threadRequested = false;
+
+  /// The newest message of the open thread when the team was read last (09 3.9).
+  int? _teamSeq;
+
+  /// Reads the team of a team channel again when a new message arrived in the open thread: a
+  /// pause and a stop post a note there, an owner's message lifts the pause (09 3.9.6).
+  void _refreshTeam(TeamView? team, Thread thread) {
+    final seq = thread.lastMessageSeq.value;
+    if (team == null) {
+      _teamSeq = null;
+      return;
+    }
+    final last = _teamSeq;
+    _teamSeq = seq;
+    if (last == null || last == seq) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.invalidate(channelTeamProvider(thread.channelId.value));
+    });
+  }
+
   bool _jumpLoaded = false;
   bool _newestVisible = true;
   ThreadSeq? _markedSeq;
@@ -514,6 +540,13 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
     final principals = ref.watch(principalsByIdProvider).value ?? const {};
     final me = ref.watch(myPrincipalIdProvider);
     final permissions = ref.watch(threadPermissionsProvider(channelId));
+    // 09 3.9: the team of a team channel, read for an owner only (the bar under the header
+    // and the labels of member replies and owner messages).
+    final team = channel != null && channel.kind == ChannelKind.text
+        ? ref.watch(channelTeamProvider(channelId)).value
+        : null;
+    _refreshTeam(team, thread);
+    final owner = ref.watch(isOwnerProvider).value ?? false;
     // Kept alive while the column shows: the read state decides "Mark as unread" and the
     // read position written next (Design note 2).
     ref.watch(threadReadStateProvider(_thread));
@@ -568,6 +601,7 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
         triggers: access?.level == AccessLevel.trigger && !permissions.readOnly,
         canEditTitle: canEditTitle && !main,
         canWrite: permissions.canWrite,
+        team: owner && channel != null && teamCapable(channel),
       ),
     );
     final header = ThreadHeaderData(
@@ -641,6 +675,7 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
           started: started,
           principals: principals,
           me: me,
+          team: team,
           time: time(message.createdAt),
           collapseLines: config.messageCollapseLines,
           highlighted: item.key == jumpKey,
@@ -807,6 +842,13 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
                 )
               else
                 threadHeader,
+              // 09 3.9: the members of a team channel with their states and "Stop all".
+              if (team != null && channel != null)
+                TeamHeaderBar(
+                  key: ValueKey('team.bar.${channel.id.value}'),
+                  channel: channel,
+                  team: team,
+                ),
               // F-PROJEKT-BEREIT: a chat of a project forum that is not ready says why.
               if (channel != null &&
                   channel.kind == ChannelKind.forum &&
@@ -884,6 +926,7 @@ class _MessageRow extends ConsumerWidget {
     required this.started,
     required this.principals,
     required this.me,
+    required this.team,
     required this.time,
     required this.collapseLines,
     required this.highlighted,
@@ -901,6 +944,9 @@ class _MessageRow extends ConsumerWidget {
   final List<Thread> started;
   final Map<PrincipalId, Principal> principals;
   final PrincipalId? me;
+
+  /// The team of the team channel the message is in, or null (09 3.9).
+  final TeamView? team;
   final String time;
   final int collapseLines;
   final bool highlighted;
@@ -913,6 +959,26 @@ class _MessageRow extends ConsumerWidget {
 
   /// The text of the history's selection on the desktop, null on the phone.
   final ValueListenable<String>? selection;
+
+  /// The lines below the content: the team label (09 3.9.3, 3.9.4) and the cause beside the
+  /// red X with "Trigger again" for its author (F-PROJEKT-BEREIT); null for none.
+  Widget? _notice() {
+    final label = team == null ? null : teamMessageLabel(team!, message);
+    final retrigger = offersRetrigger(message)
+        ? RetriggerNotice(message: message, mine: message.authorId == me)
+        : null;
+    if (label == null) return retrigger;
+    final line = TeamLabelLine(
+      key: ValueKey('team.label.${message.id.value}'),
+      label: label,
+    );
+    if (retrigger == null) return line;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [line, retrigger],
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -958,10 +1024,7 @@ class _MessageRow extends ConsumerWidget {
       components: card,
       longPressMenu: ref.watch(appPortsProvider).formFactor.isPhone,
       selection: selection,
-      // The cause beside the red X and "Trigger again" for its author (F-PROJEKT-BEREIT).
-      notice: offersRetrigger(message)
-          ? RetriggerNotice(message: message, mine: message.authorId == me)
-          : null,
+      notice: _notice(),
       started: [
         for (final t in started)
           ThreadStarterLine(thread: t, onOpen: () => onOpenThread(t)),

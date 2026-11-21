@@ -17241,5 +17241,250 @@
         "example": "Support"
       }
     }
+  },
+  "teamMenu": "Team channel...",
+  "@teamMenu": {
+    "description": "Entry of the channel menu for owners that opens the team dialog of a text channel (09 3.9.1)."
+  },
+  "teamTitle": "Team channel",
+  "@teamTitle": {
+    "description": "Title of the team dialog of a channel (09 3.9.1)."
+  },
+  "teamSwitch": "Team mode",
+  "@teamSwitch": {
+    "description": "Label of the switch that turns the team mode of a channel on or off (09 3.9.1)."
+  },
+  "teamExplanation": "Agents of several projects work together here. Every owner message reaches every member; a member hands work on by mentioning another member's handle in its reply.",
+  "@teamExplanation": {
+    "description": "The sentence under the team switch (09 3.9.3, 3.9.4)."
+  },
+  "teamMembers": "Members",
+  "@teamMembers": {
+    "description": "Heading of the member list in the team dialog."
+  },
+  "teamNoMembers": "No members yet.",
+  "@teamNoMembers": {
+    "description": "Shown in the team dialog when the team channel has no member."
+  },
+  "teamMemberLine": "{agent} in {home}",
+  "@teamMemberLine": {
+    "description": "Second line of a member in the team dialog: the member's agent and its home channel.",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Coder"
+      },
+      "home": {
+        "type": "String",
+        "example": "website"
+      }
+    }
+  },
+  "teamRemove": "Remove @{handle}",
+  "@teamRemove": {
+    "description": "Button and screen reader label that removes a member from the team channel.",
+    "placeholders": {
+      "handle": {
+        "type": "String",
+        "example": "coding"
+      }
+    }
+  },
+  "teamAddTitle": "Add member",
+  "@teamAddTitle": {
+    "description": "Heading of the form that adds a member to the team channel."
+  },
+  "teamAddAgent": "Agent",
+  "@teamAddAgent": {
+    "description": "Label of the agent choice of the add form."
+  },
+  "teamAddHome": "Home channel",
+  "@teamAddHome": {
+    "description": "Label of the choice of the channel the member works in (its home channel, 09 3.9.1)."
+  },
+  "teamAddHomeNone": "This agent operates no channel that can be its home.",
+  "@teamAddHomeNone": {
+    "description": "Shown in the add form when the chosen agent is the effective operator of no suitable channel."
+  },
+  "teamAddHandle": "Handle",
+  "@teamAddHandle": {
+    "description": "Label of the handle field of the add form."
+  },
+  "teamAddHandleHint": "Lower-case letters, digits, - and _",
+  "@teamAddHandleHint": {
+    "description": "Hint under the handle field of the add form (09 3.9.1)."
+  },
+  "teamAddHandleInvalid": "Start with a letter or digit; use only lower-case letters, digits, - and _.",
+  "@teamAddHandleInvalid": {
+    "description": "Error under the handle field when the handle does not match the pattern."
+  },
+  "teamAddSubmit": "Add",
+  "@teamAddSubmit": {
+    "description": "Button that adds the member."
+  },
+  "teamStopAll": "Stop all",
+  "@teamStopAll": {
+    "description": "Button that stops every member run and pauses member mentions (09 3.9.7)."
+  },
+  "teamStopAllSemantics": "Stop every member and pause member mentions",
+  "@teamStopAllSemantics": {
+    "description": "Screen reader label of the stop all button."
+  },
+  "teamStopped": "Stopped. Member mentions are paused until an owner writes again.",
+  "@teamStopped": {
+    "description": "Message after stop all (09 3.9.7)."
+  },
+  "teamRefused": "Refused: {reason}",
+  "@teamRefused": {
+    "description": "Shown when the server refused a team operation, with the reason.",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "teamOffline": "No connection. Try again.",
+  "@teamOffline": {
+    "description": "Shown when a team operation got no answer."
+  },
+  "teamClose": "Close",
+  "@teamClose": {
+    "description": "Button that closes the team dialog."
+  },
+  "teamHeader": "Team members",
+  "@teamHeader": {
+    "description": "Screen reader label of the member bar under the header of a team channel."
+  },
+  "teamStateIdle": "idle",
+  "@teamStateIdle": {
+    "description": "State of a member without an active run (header of a team channel)."
+  },
+  "teamStateRunning": "working",
+  "@teamStateRunning": {
+    "description": "State of a member whose agent works on a request in its work thread."
+  },
+  "teamStatePaused": "paused",
+  "@teamStatePaused": {
+    "description": "State of a member while member mentions of the channel are paused."
+  },
+  "teamMemberSemantics": "@{handle}, {state}",
+  "@teamMemberSemantics": {
+    "description": "Screen reader label of a member in the header: handle and state.",
+    "placeholders": {
+      "handle": {
+        "type": "String",
+        "example": "coding"
+      },
+      "state": {
+        "type": "String",
+        "example": "idle"
+      }
+    }
+  },
+  "teamPausedTurnBudget": "Paused: the turn budget is used up. Write a message to go on.",
+  "@teamPausedTurnBudget": {
+    "description": "Pause note in the header of a team channel (09 3.9.6)."
+  },
+  "teamPausedPingpong": "Paused: two members kept handing work back and forth. Write a message to go on.",
+  "@teamPausedPingpong": {
+    "description": "Pause note in the header of a team channel (09 3.9.6)."
+  },
+  "teamPausedStopped": "Paused: an owner stopped the team. Write a message to go on.",
+  "@teamPausedStopped": {
+    "description": "Pause note in the header of a team channel (09 3.9.7)."
+  },
+  "teamPausedOther": "Paused. Write a message to go on.",
+  "@teamPausedOther": {
+    "description": "Pause note for a pause reason this app does not know."
+  },
+  "teamFromMember": "from {handles}",
+  "@teamFromMember": {
+    "description": "Label of a member's mirrored reply in a team channel, for example from @coding (09 3.9.4).",
+    "placeholders": {
+      "handles": {
+        "type": "String",
+        "example": "@coding"
+      }
+    }
+  },
+  "teamToAllMembers": "to all members",
+  "@teamToAllMembers": {
+    "description": "Label of an owner's message in a team channel, which reaches every member (09 3.9.3)."
+  },
+  "commandBuiltinTeam": "Manage the team of this channel: list, add, remove, stop",
+  "@commandBuiltinTeam": {
+    "description": "Description of the client command /team in the suggestion list (09 3.9.1)."
+  },
+  "teamUsage": "Use /team list, /team add, /team remove @handle or /team stop.",
+  "@teamUsage": {
+    "description": "Shown when /team was used with an unknown sub-command."
+  },
+  "teamUnknownHandle": "No member @{handle} in this channel.",
+  "@teamUnknownHandle": {
+    "description": "Shown when /team remove names a handle that is no member.",
+    "placeholders": {
+      "handle": {
+        "type": "String",
+        "example": "coding"
+      }
+    }
+  },
+  "teamRemoved": "@{handle} removed.",
+  "@teamRemoved": {
+    "description": "Shown after /team remove removed a member.",
+    "placeholders": {
+      "handle": {
+        "type": "String",
+        "example": "coding"
+      }
+    }
+  },
+  "teamNotEnabled": "This channel is no team channel.",
+  "@teamNotEnabled": {
+    "description": "Shown when /team remove or /team stop is used in a channel without team mode."
+  },
+  "teamReasonHandleTaken": "another member has this handle",
+  "@teamReasonHandleTaken": {
+    "description": "Reason team_handle_taken of a refused add."
+  },
+  "teamReasonMemberExists": "this agent is already a member with this home channel",
+  "@teamReasonMemberExists": {
+    "description": "Reason team_member_exists of a refused add."
+  },
+  "teamReasonMaxMembers": "the team has the most members it may have",
+  "@teamReasonMaxMembers": {
+    "description": "Reason team_max_members of a refused add."
+  },
+  "teamReasonHomeNotOperated": "the agent does not operate this home channel",
+  "@teamReasonHomeNotOperated": {
+    "description": "Reason team_home_not_operated of a refused add."
+  },
+  "teamReasonHomeIsTeam": "the home channel is a team channel itself",
+  "@teamReasonHomeIsTeam": {
+    "description": "Reason team_home_is_team of a refused add."
+  },
+  "teamReasonReadersNotOwners": "a person who is no owner can read this channel or the home channel",
+  "@teamReasonReadersNotOwners": {
+    "description": "Reason team_readers_not_owners (09 3.9.1 readers rule)."
+  },
+  "teamReasonNotEnabled": "this channel is no team channel",
+  "@teamReasonNotEnabled": {
+    "description": "Reason team_not_enabled of a refused add."
+  },
+  "teamReasonDm": "a direct message cannot take part",
+  "@teamReasonDm": {
+    "description": "Reason dm_channel of a refused team operation."
+  },
+  "teamReasonChannelKind": "only a text channel can be a team channel",
+  "@teamReasonChannelKind": {
+    "description": "Reason channel_kind of a refused team operation."
+  },
+  "teamReasonArchived": "the channel is archived",
+  "@teamReasonArchived": {
+    "description": "Reason channel_archived of a refused team operation."
+  },
+  "teamReasonReadOnly": "the channel is read-only",
+  "@teamReasonReadOnly": {
+    "description": "Reason channel_read_only of a refused team operation."
   }
 }

@@ -75,6 +75,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/notifications_settings/` | D9 (M4-33): the page inside Settings > Notifications, the tree of levels with inheritance, the quiet hours editor, the effective level of 13 3.1 for display, the providers of the notification settings |
 | `lib/terminal/` | the terminal (M4-36): the group "Hosts" of the sidebar, the view of a host with its tabs, the ports of `terminal_ui` (WebSocket transport with DPoP `identify`, pins in `host_key_pins`, host events of the engine, the REST adapter), the table "In the terminal" and the providers |
 | `lib/menus/` | the menus of a space, a channel and a thread (M4-33): level, "Mute until", "Export history" |
+| `lib/team/` | team channels for owners (FEAT-TEAM-CHANNEL-APP, 01 6.23, 09 3.9): the port over the six team operations (`team_port.dart`), the controller of the dialog and of `/team`, the member bar under the thread header, the labels of member replies and owner messages, and the providers (`channelTeamProvider`) |
 | `lib/export/` | the channel export (M4-33): range dialog, save dialog, the stream into the file with progress and cancel |
 | `lib/notifications/` | local notifications (M4-30): the content of a toast, the router from `notification.created` to a toast or nothing, the presenter over `flutter_local_notifications` and their providers; the in-app banner of the phone (`in_app_banner.dart`, AUD-client-app-01) |
 | `lib/desktop/` | the desktop window (M4-30): close to the notification area on Windows, Quit, the window part of `idle`, the tray icon with Open and Quit, "Start at login" |
@@ -1222,6 +1223,17 @@ shows none of it (docs/decisions.d/AR-08.md). Tests: `test/agents/autonomous_run
 `test/menus/autonomous_runs_menu_test.dart` per platform, `test/agents/autonomous_runs_fake_server_test.dart`
 headless against the fake server, `integration_test/autonomous_runs_test.dart` (desktop) and the
 group "autonomous runs" of the phone suite.
+
+### Team channels (FEAT-TEAM-CHANNEL-APP)
+
+An owner's channel menu of a text channel has "Team channel..." (`team/team_dialog.dart`): the
+team mode switch, the members with "Remove", the add form (agent, one of the channels it operates,
+handle) and "Stop all", each an online call through `TeamPort` (`team/team_port.dart`) with the
+server's reason shown on a refusal (docs/decisions.d/FEAT-TEAM-CHANNEL-APP.md). The history column
+reads the team with `channelTeamProvider` (`getChannelTeam`, owners and text channels only) and
+then shows `TeamHeaderBar` under the thread header, "from @handle" under a member's mirrored reply
+and "to all members" under a person's message (`TeamLabelLine`), and offers the built-in `/team`
+(`team/team_command.dart`). Tests: `test/team/`.
 
 ## Keyboard shortcuts and focus
 
