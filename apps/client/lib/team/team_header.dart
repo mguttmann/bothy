@@ -48,8 +48,20 @@ class TeamHeaderBar extends ConsumerWidget {
     return TeamHeaderView(
       team: team,
       states: states,
-      onStopAll: () => unawaited(stopTeam(context, ref, channel.id)),
-      onManage: () => unawaited(showTeamDialog(context, ref, channel)),
+      onStopAll: () => unawaited(
+        stopTeam(
+          context,
+          ProviderScope.containerOf(context, listen: false),
+          channel.id,
+        ),
+      ),
+      onManage: () => unawaited(
+        showTeamDialog(
+          context,
+          ProviderScope.containerOf(context, listen: false),
+          channel,
+        ),
+      ),
     );
   }
 }
@@ -57,18 +69,18 @@ class TeamHeaderBar extends ConsumerWidget {
 /// Stops every member run of [channel] (09 3.9.7) and says the outcome in a snack bar.
 Future<void> stopTeam(
   BuildContext context,
-  WidgetRef ref,
+  ProviderContainer container,
   ChannelId channel,
 ) async {
-  final port = ref.read(teamPortProvider);
+  final port = container.read(teamPortProvider);
   if (port == null) return;
   final l = AppLocalizations.of(context);
   final messenger = ScaffoldMessenger.maybeOf(context);
   final controller = TeamController(
     channel: channel,
     port: port,
-    newKey: ref.read(teamKeysProvider),
-    onChanged: () => ref.invalidate(channelTeamProvider(channel.value)),
+    newKey: container.read(teamKeysProvider),
+    onChanged: () => container.invalidate(channelTeamProvider(channel.value)),
   );
   final ok = await controller.stopAll();
   final failure = controller.failure;

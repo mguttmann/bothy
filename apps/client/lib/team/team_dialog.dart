@@ -26,19 +26,24 @@ import 'team_text.dart';
 
 /// Opens the team dialog of [channel] for the signed-in owner, with [handle] filled into the
 /// add form (`/team add <handle>`). Does nothing without a session.
+///
+/// Takes the [container] instead of a `WidgetRef`: a menu entry runs after its menu closed,
+/// when the `WidgetRef` of the menu is already unmounted, so callers take the container while
+/// they build ([ProviderScope.containerOf]).
 Future<void> showTeamDialog(
   BuildContext context,
-  WidgetRef ref,
+  ProviderContainer container,
   Channel channel, {
   String? handle,
 }) async {
-  final port = ref.read(teamPortProvider);
+  final port = container.read(teamPortProvider);
   if (port == null) return;
   final controller = TeamController(
     channel: channel.id,
     port: port,
-    newKey: ref.read(teamKeysProvider),
-    onChanged: () => ref.invalidate(channelTeamProvider(channel.id.value)),
+    newKey: container.read(teamKeysProvider),
+    onChanged: () =>
+        container.invalidate(channelTeamProvider(channel.id.value)),
   );
   unawaited(controller.load());
   try {
@@ -95,6 +100,9 @@ class _TeamDialogState extends State<TeamDialog> {
   );
   PrincipalId? _agent;
   ChannelId? _home;
+
+  /// Counts the members added here; a new value gives the agent field a fresh start.
+  int _added = 0;
 
   TeamController get _c => widget.controller;
 
@@ -154,6 +162,7 @@ class _TeamDialogState extends State<TeamDialog> {
       setState(() {
         _agent = null;
         _home = null;
+        _added++;
         _handle.clear();
       });
     }
@@ -253,7 +262,8 @@ class _TeamDialogState extends State<TeamDialog> {
                 Text(l.teamAddTitle, style: dsTextStyle(DsType.label)),
                 const SizedBox(height: DsSpace.s8),
                 DsDropdownField<PrincipalId>(
-                  key: const ValueKey('team.add.agent'),
+                  // A new key after an add: the field keeps its text otherwise.
+                  key: ValueKey('team.add.agent.$_added'),
                   label: l.teamAddAgent,
                   enableFilter: true,
                   entries: [
@@ -365,10 +375,12 @@ List<Widget> teamMenuItems(
   if (!teamCapable(channel) || !(ref.watch(isOwnerProvider).value ?? false)) {
     return const [];
   }
+  // Taken now: the entry runs after the menu closed and its ref is gone.
+  final container = ProviderScope.containerOf(context, listen: false);
   return [
     DsMenuItem(
       key: const ValueKey('menu.team'),
-      onPressed: () => unawaited(showTeamDialog(context, ref, channel)),
+      onPressed: () => unawaited(showTeamDialog(context, container, channel)),
       child: Text(AppLocalizations.of(context).teamMenu),
     ),
   ];

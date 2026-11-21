@@ -218,6 +218,22 @@ Found by the red team in round 10:
 17. The runs README lists the tables of `PersonalData` without `team_mirrors` and `run_answers`
     (neither holds personal data of its own; 20 section 2).
 
+### 7.2 Open minors of the app slice
+
+Found by the review of FEAT-TEAM-CHANNEL-APP without a shown harm; the next slice that touches the
+team channels in the app takes them along:
+
+1. Switching team mode off has no confirmation, although it removes every member.
+2. A failed read of the team hides the member bar until the thread opens again; no later message
+   reads it again.
+3. "to all members" also shows under a person's messages from before team mode was switched on.
+4. `TeamView` has no equality, so every read of the team rebuilds the message rows.
+5. No test covers the real `channelTeamProvider` (owner gating, the read again after a new
+   message), `stopTeam` of the bar and `ThreadCommandRunner.team` end to end.
+6. Not built in this slice: push notifications for brake notes (section 4), the live box link of a
+   relayed reply (section 6), labels of the input copies in a member's work thread (D-TEAM-APP-5),
+   and a sync event for team changes (D-TEAM-APP-1).
+
 ## 8. Alternatives rejected
 
 - **Point to point handoff records** (the first version of this draft): one hop at a time with a

@@ -106,6 +106,18 @@ void main() {
     expect(port.calls.skip(1), ['add coding key-1', 'add coder key-2']);
   });
 
+  test('the same add after a refusal gets a new key, the server stored the refusal', () async {
+    final port = FakeTeamPort(team());
+    final c = controllerOf(port);
+    await c.load();
+    port.failures.add(
+      const TeamFailure.problem('conflict', reason: 'team_handle_taken'),
+    );
+    await c.add(agent: robin, home: channelId(2), handle: 'qa');
+    expect(await c.add(agent: robin, home: channelId(2), handle: 'qa'), isTrue);
+    expect(port.calls.skip(1), ['add qa key-1', 'add qa key-2']);
+  });
+
   test('remove drops the member; stop all pauses the team', () async {
     final port = FakeTeamPort(
       team(

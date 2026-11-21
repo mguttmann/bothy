@@ -73,7 +73,8 @@ final class TeamController extends ChangeNotifier {
   });
 
   /// Adds [agent] working in [home] as [handle]. A repeated press for the same three values
-  /// sends the same idempotency key, so an answer lost on the way adds nobody twice.
+  /// after a lost answer sends the same idempotency key, so it adds nobody twice; after a
+  /// refusal of the server the next press is a new request.
   Future<bool> add({
     required PrincipalId agent,
     required ChannelId home,
@@ -96,6 +97,14 @@ final class TeamController extends ChangeNotifier {
       _team = _team?.withMember(member);
       _addKey = null;
       _addKeyFor = null;
+    }).then((ok) {
+      // The server stores a refusal under its key (04 5.2): only a lost answer may repeat the
+      // key, a refused add asks anew with a new one.
+      if (!ok && !(_failure?.offline ?? true)) {
+        _addKey = null;
+        _addKeyFor = null;
+      }
+      return ok;
     });
   }
 

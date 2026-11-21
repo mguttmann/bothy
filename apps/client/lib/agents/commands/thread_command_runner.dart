@@ -237,7 +237,12 @@ final class ThreadCommandRunner implements BuiltinCommandRunner {
       l: AppLocalizations.of(context),
       openDialog: ({handle}) async {
         if (context.mounted) {
-          await showTeamDialog(context, ref, channel, handle: handle);
+          await showTeamDialog(
+            context,
+            ProviderScope.containerOf(context, listen: false),
+            channel,
+            handle: handle,
+          );
         }
       },
       say: (text) => messenger?.showSnackBar(SnackBar(content: Text(text))),

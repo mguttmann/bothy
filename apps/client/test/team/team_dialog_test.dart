@@ -135,7 +135,7 @@ void main() {
     await open(tester, port);
     final submit = find.byKey(const ValueKey('team.add.submit'));
     expect(canPress(tester, 'team.add.submit'), isFalse);
-    await choose(tester, 'team.add.agent', robin);
+    await choose(tester, 'team.add.agent.0', robin);
     await tester.enterText(
       find.byKey(const ValueKey('team.add.handle')),
       'coding',
@@ -146,6 +146,11 @@ void main() {
     expect(port.calls.last, 'add coding key-1');
     expect(port.current!.members.single.homeChannelId, channelId(2));
     expect(find.text('@coding'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('team.add.agent.1')),
+      findsOneWidget,
+      reason: 'the agent field starts empty again',
+    );
     expect(
       tester
           .widget<TextField>(find.byKey(const ValueKey('team.add.handle')))
@@ -160,7 +165,7 @@ void main() {
   ) async {
     final port = FakeTeamPort(team());
     await open(tester, port, handle: 'docs');
-    await choose(tester, 'team.add.agent', nova);
+    await choose(tester, 'team.add.agent.0', nova);
     expect(canPress(tester, 'team.add.submit'), isFalse);
     await choose(tester, 'team.add.home.${nova.value}', channelId(4));
     expect(canPress(tester, 'team.add.submit'), isTrue);
@@ -200,7 +205,7 @@ void main() {
     );
     await controller.load();
     await tester.pumpAndSettle();
-    await choose(tester, 'team.add.agent', silent);
+    await choose(tester, 'team.add.agent.0', silent);
     expect(find.byKey(const ValueKey('team.add.noHome')), findsOneWidget);
   });
 
@@ -208,7 +213,7 @@ void main() {
     tester,
   ) async {
     final (_, l) = await open(tester, FakeTeamPort(team()), handle: 'Coding');
-    await choose(tester, 'team.add.agent', robin);
+    await choose(tester, 'team.add.agent.0', robin);
     expect(find.text(l.teamAddHandleInvalid), findsOneWidget);
     expect(canPress(tester, 'team.add.submit'), isFalse);
   });
@@ -219,7 +224,7 @@ void main() {
         const TeamFailure.problem('conflict', reason: 'team_handle_taken'),
       );
     final (_, l) = await open(tester, port, locale: const Locale('de'));
-    await choose(tester, 'team.add.agent', robin);
+    await choose(tester, 'team.add.agent.0', robin);
     await tester.enterText(find.byKey(const ValueKey('team.add.handle')), 'qa');
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('team.add.submit')));

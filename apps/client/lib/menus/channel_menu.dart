@@ -102,6 +102,8 @@ class ChannelMenu extends StatelessWidget {
       final access = ref.watch(channelAccessProvider(channel.id.value)).value;
       final label = newChatLabel;
       final start = onNewChat;
+      // Taken now: an entry runs after the menu closed and its ref is gone (D-TEAM-APP-6).
+      final container = ProviderScope.containerOf(context, listen: false);
       final rename =
           channel.kind == ChannelKind.forum &&
           channel.projectBound &&
@@ -117,7 +119,7 @@ class ChannelMenu extends StatelessWidget {
           DsMenuItem(
             key: const ValueKey('menu.renameProject'),
             onPressed: () =>
-                unawaited(showRenameProjectDialog(context, ref, channel)),
+                unawaited(showRenameProjectDialog(context, container, channel)),
             child: Text(AppLocalizations.of(context).channelMenuRenameProject),
           ),
         ...channelMenuItems(context, ref, channel),
