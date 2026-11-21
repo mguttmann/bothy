@@ -94,6 +94,46 @@ void main() {
     });
   }
 
+  test(
+    'a directory at the database path counts as an existing database',
+    () async {
+      Directory(db.path).createSync();
+      await expectLater(
+        source().obtainKey(),
+        throwsA(isA<LocalStoreKeyError>()),
+      );
+      expect(backend.values, isEmpty);
+    },
+  );
+
+  test(
+    'a folder whose entries cannot be read is no proof of absence: no key',
+    () async {
+      db.writeAsBytesSync([1]);
+      Process.runSync('chmod', ['000', dir.path]);
+      addTearDown(() => Process.runSync('chmod', ['700', dir.path]));
+      await expectLater(source().obtainKey(), throwsA(anything));
+      expect(backend.values, isEmpty, reason: 'no key is stored');
+    },
+    testOn: 'mac-os || linux',
+  );
+
+  test('a read failure logs only a numeric keychain status', () async {
+    final failing = _ThrowingBackend(
+      PlatformException(code: 'x', details: 'java.lang.Exception: at a.b(C)'),
+    );
+    final lines = <String>[];
+    await expectLater(
+      SecureDatabaseKeySource(
+        InstanceSecrets(failing, 'instance-a'),
+        database: db,
+        log: lines.add,
+      ).obtainKey(),
+      throwsA(isA<PlatformException>()),
+    );
+    expect(lines, ['db_key.read_failed: PlatformException']);
+  });
+
   test('a database the device cannot read at the moment is no reset case', () {
     expect(
       openFailureStatus(const LocalStoreUnavailableError(14)),
@@ -104,4 +144,13 @@ void main() {
       ServerStatus.localDataUnreadable,
     );
   });
+}
+
+class _ThrowingBackend extends MemorySecureBackend {
+  _ThrowingBackend(this.error);
+
+  final Object error;
+
+  @override
+  Future<String?> read(String key) async => throw error;
 }

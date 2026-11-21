@@ -8,7 +8,13 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
-import 'dart:io' show File;
+import 'dart:io'
+    show
+        File,
+        FileSystemEntity,
+        FileSystemEntityType,
+        FileSystemException,
+        PathNotFoundException;
 import 'dart:math';
 
 import 'package:auth/auth.dart';
@@ -958,13 +964,15 @@ final class SecureDatabaseKeySource implements DatabaseKeySource {
     try {
       stored = await _secrets.read(keyName);
     } on Object catch (error) {
-      // The type and the keychain status only (`errSecInteractionNotAllowed` is -25308).
-      final status = error is PlatformException ? ' ${error.details}' : '';
+      // The type and a numeric keychain status only (`errSecInteractionNotAllowed` is -25308);
+      // Android puts a stack trace into `details`, which stays out of the log.
+      final details = error is PlatformException ? error.details : null;
+      final status = details is int ? ' $details' : '';
       _log('db_key.read_failed: ${error.runtimeType}$status');
       rethrow;
     }
     if (stored != null) return base64Decode(stored);
-    if (await database.exists()) {
+    if (await _databaseExists()) {
       _log('db_key.missing_with_database: no new key is created');
       throw const LocalStoreKeyError(LocalStoreKeyReason.keyMissing);
     }
@@ -974,6 +982,28 @@ final class SecureDatabaseKeySource implements DatabaseKeySource {
     await _secrets.write(keyName, base64Encode(key));
     _log('db_key.created');
     return key;
+  }
+
+  /// Whether anything lies at the path of [database] or its `-wal` and `-shm` files. A failed
+  /// `stat` also answers "not found", so absence is only taken from a listing of the folder;
+  /// a folder that cannot be listed throws (a [FileSystemException]) instead of answering
+  /// "absent". A missing folder holds no database.
+  Future<bool> _databaseExists() async {
+    final names = {
+      for (final suffix in ['', '-wal', '-shm']) '${database.path}$suffix',
+    };
+    for (final path in names) {
+      final type = await FileSystemEntity.type(path, followLinks: false);
+      if (type != FileSystemEntityType.notFound) return true;
+    }
+    try {
+      await for (final entry in database.parent.list(followLinks: false)) {
+        if (names.contains(entry.path)) return true;
+      }
+    } on PathNotFoundException {
+      return false;
+    }
+    return false;
   }
 }
 
