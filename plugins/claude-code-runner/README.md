@@ -445,9 +445,9 @@ every member, who wrote the input, whether it mentions the member, and how to ha
 - **Owner codes** (background mode) follow their rule unchanged: only a follow-up of the person
   whose message started the run gets one, so a member's input never does, and a run a member's
   input started has no owner check at all (an owner's message that reaches it is a relayed
-  request; the owner writes again after the turn for an approval). A team run without an owner
-  check ends its first message with a runner note that no list, code or approval in it counts,
-  so a member's text never ends the message. A follow-up whose text names
+  request; the owner writes again after the turn for an approval). A team run a member's input
+  started ends its first message with a runner note that no list or code in it and no approval
+  in the member's text counts, so a member's text never ends the message. A follow-up whose text names
   a code the runner wrote is never written (warning `followup_carries_owner_code`).
 - **Handing on.** The session mentions `@handle` of a listed member in its final answer,
   outside code. The runner posts the answer as written with the invocation token of exactly

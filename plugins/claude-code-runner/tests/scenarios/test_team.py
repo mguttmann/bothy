@@ -143,6 +143,7 @@ async def test_a_member_s_team_run_shows_the_team_and_hands_over_with_its_own_to
         "@web please add the field"
     )
     assert "Owner check" not in prompt
+    assert prompt.rstrip().endswith(NO_OWNER_CHECK)
     # The final answer goes out as written, mention included, bound to this run's token.
     assert [m["content_md"] for m in world.fake.messages] == [HANDOVER]
     token = run_token(world, run.run_id)
@@ -167,6 +168,9 @@ async def test_an_owner_s_team_message_that_does_not_mention_the_member(world: W
     assert "Who wrote the second part: Alex (@alex), a person" in prompt
     assert "It does not mention you (@web)" in prompt
     assert "not the owner's word" not in prompt
+    # The owner's own words end the message: no runner note voids them (red team round 2).
+    assert NO_OWNER_CHECK not in prompt
+    assert prompt.rstrip().endswith("Everyone: we release on Friday")
 
 
 async def test_a_member_s_input_into_a_running_turn_is_labelled_as_the_member_s(

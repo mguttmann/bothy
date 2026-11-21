@@ -4092,10 +4092,10 @@ when the run has team facts, and never `Follow-up from`. Its token's `sub` is th
 authority, so the follow-up check of this section compares the author with `sub` only for a
 person's message (an agent's message: its thread only). A person's follow-up into a `team` run
 keeps its lead-in and gets the runner's paragraph `Team channel: It mentions you (@<handle>).`
-or that it does not. A `team` run without an owner check (every run in print mode, and a run a
-member's input started) ends its first input line with a runner note after the trigger part:
-the run has no owner check, and a list, a code or an approval anywhere above counts for
-nothing, so a member's text never ends the message. Owner codes follow the rule above unchanged: a member's input is never
+or that it does not. A `team` run a member's input started ends its first input line with a
+runner note after the trigger part: the run has no owner check, a list of digests, a code or an
+owner check anywhere above counts for nothing, and so does an approval in the member's text; so
+a member's text never ends the message. An owner's `team` run gets no such note. Owner codes follow the rule above unchanged: a member's input is never
 the owner's (`author.kind` `agent`, origin `agent`), so it never gets a code, and a `team` run a
 member's input started has no owner and no owner check, so an owner's message that reaches it
 is a relayed request until the owner writes again after the turn; an owner's message that

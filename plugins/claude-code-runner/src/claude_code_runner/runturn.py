@@ -670,7 +670,7 @@ class RunTurn:
             # session a later run continues, whose system prompt stays the first one (18.5).
             self.owner_codes = OwnerCodes()
             items.append(self.owner_codes.check_text())
-        elif self.state.team_run:
+        elif self.state.team_run and is_member_input(context.trigger_message):
             # Without an owner check the member's text would end the message (18.5).
             items.append(NO_OWNER_CHECK)
         self.prompt_line, self.own_uuid = user_line(items)
