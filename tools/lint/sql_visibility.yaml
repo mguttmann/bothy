@@ -422,6 +422,9 @@ exceptions:
   - query: runs.EarlierSessionRun
     category: after_authorize
     reason: "the run context reads, for the one run whose run.context.read authorize allowed, whether an earlier started run of its thread used its session row and the triggering message of the latest such run; only a boolean and an id leave (09 4.6, M2-13)"
+  - query: runs.SessionFeeders
+    category: after_authorize
+    reason: "the run context records, for the one run whose run.context.read authorize allowed, the principals recorded for the earlier started runs of its session row in its thread; only principal ids leave, into run_feeders of that run, never to the caller (09 3.9.4, FEAT-TEAM-CHANNEL-SERVER)"
   - query: runs.DeliveredFollowupsOfSession
     category: after_authorize
     reason: "the run context reads which of its already selected messages a run of the same session in the one thread of the run whose run.context.read authorize allowed received as follow-ups; only message ids leave (09 4.6, M2-13)"

@@ -430,9 +430,13 @@ team run the authority of its input), the person of every follow-up it took (the
 person's message, the authority of a team input, none for any other message), the principal of
 every interaction with its components, the person of every delivery into it (4.2, also a control
 command and a wake input) and the writer of every message its run context gave it, of any origin
-and in the trigger, thread and channel window alike (the authority of a team input, the author of
-a person's message, none for every other message, such as another agent's or an app's; only the
-messages of the member's own agent are left out). The run passes when
+and author and in the trigger, thread and channel window alike: the authority of a team input,
+the author of a person's message, the whole record of the run an agent's message answers (03
+`run_answers`, the member's own answers included; none for a run without its trigger row), and
+none for every other message, such as an agent's message written outside a run of its thread (the
+member's own note written in a run elsewhere included) or an app's; and what the run takes over
+with its session (9.1): in mode `resume` every principal recorded for the earlier runs of the
+session row in the thread, in mode `bind` none. The run passes when
 its trigger is on the record and every principal recorded is an active owner at the moment of the
 job; a recorded input that speaks for no person, and a run older than the record, fail. Otherwise
 nothing is copied, a note names the member, the reason `team_source_not_owner` and the inputs it

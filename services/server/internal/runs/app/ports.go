@@ -253,6 +253,12 @@ type Repository interface {
 	RecordFeeders(ctx context.Context, runID ids.ID, source string, principals []ids.ID) error
 	// Feeders reads every recorded feeder of the run (03 run_feeders).
 	Feeders(ctx context.Context, runID ids.ID) ([]Feeder, error)
+	// RecordAnswer stores in 03 run_answers that the agent's message messageID answers the run
+	// runID (an answer whose run_id the check accepted, or a live box anchor); a row already
+	// stored changes nothing. The rows never change; they go with their run.
+	RecordAnswer(ctx context.Context, messageID, runID ids.ID) error
+	// AnswerRun reads the run the message answers (03 run_answers); found is false for none.
+	AnswerRun(ctx context.Context, messageID ids.ID) (runID ids.ID, found bool, err error)
 	// RecordDelivery stores the columns of an allowed delivery and raises version by one; the
 	// caller holds the row lock and calls it only when a column changes. Errors: not_found for an
 	// unknown run.

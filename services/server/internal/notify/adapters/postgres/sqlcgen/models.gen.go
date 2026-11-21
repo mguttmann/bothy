@@ -1004,6 +1004,12 @@ type Run struct {
 	TriggeringWakeID        pgtype.UUID
 }
 
+type RunAnswer struct {
+	MessageID pgtype.UUID
+	RunID     pgtype.UUID
+	CreatedAt pgtype.Timestamptz
+}
+
 type RunAutonomy struct {
 	ThreadID    pgtype.UUID
 	PersonID    pgtype.UUID

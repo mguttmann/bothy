@@ -4,7 +4,9 @@ package postgres
 
 import (
 	"context"
+	"errors"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -46,4 +48,28 @@ func (r *Repository) Feeders(ctx context.Context, runID ids.ID) ([]app.Feeder, e
 		}
 	}
 	return out, nil
+}
+
+// RecordAnswer implements app.Repository.
+func (r *Repository) RecordAnswer(ctx context.Context, messageID, runID ids.ID) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	if err := q.InsertRunAnswer(ctx, sqlcgen.InsertRunAnswerParams{MessageID: uuid(messageID), RunID: uuid(runID)}); err != nil {
+		return mapError(err, "recording the run of an answer")
+	}
+	return nil
+}
+
+// AnswerRun implements app.Repository.
+func (r *Repository) AnswerRun(ctx context.Context, messageID ids.ID) (ids.ID, bool, error) {
+	run, err := r.read(ctx).RunAnswer(ctx, uuid(messageID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ids.ID{}, false, nil
+	}
+	if err != nil {
+		return ids.ID{}, false, mapError(err, "reading the run of an answer")
+	}
+	return idOf(run), true, nil
 }

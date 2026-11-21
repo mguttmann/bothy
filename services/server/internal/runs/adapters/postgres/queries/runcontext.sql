@@ -33,3 +33,22 @@ JOIN runs r ON r.id = f.run_id
 WHERE r.thread_id = @thread_id AND r.agent_session_id = @session_id AND f.state IN ('delivered', 'absorbed')
   AND f.message_id = ANY(@message_ids::uuid[])
 ORDER BY f.message_id;
+
+-- name: SessionFeeders :many
+-- What a run that resumes a session takes over (09 3.9.4, FEAT-TEAM-CHANNEL-SERVER): every
+-- principal recorded in run_feeders for a started run of the agent's session row in the thread
+-- queued before the run, and one NULL when such a run has no trigger row (a record older than
+-- run_feeders). The same earlier runs as EarlierSessionRun.
+SELECT DISTINCT f.principal_id FROM run_feeders f
+JOIN runs e ON e.id = f.run_id
+WHERE e.thread_id = @thread_id AND e.agent_id = @agent_id AND e.agent_session_id = @session_id
+  AND e.started_at IS NOT NULL AND e.id <> @run_id
+  AND (e.queued_at, e.id) < (@queued_at::timestamptz, @run_id::uuid)
+UNION
+SELECT NULL::uuid WHERE EXISTS (
+    SELECT 1 FROM runs e
+    WHERE e.thread_id = @thread_id AND e.agent_id = @agent_id AND e.agent_session_id = @session_id
+      AND e.started_at IS NOT NULL AND e.id <> @run_id
+      AND (e.queued_at, e.id) < (@queued_at::timestamptz, @run_id::uuid)
+      AND NOT EXISTS (SELECT 1 FROM run_feeders t WHERE t.run_id = e.id AND t.source = 'trigger')
+);

@@ -811,7 +811,7 @@ Checked by go-arch-lint (ADR 0008).
 
 ## Tables
 
-`runs`, `run_steps`, `run_followups`, `run_wakes`, `run_autonomy`, `message_components`, `interactions`, `team_channels`, `team_members`, `team_inputs`, `team_mirrors`, `run_feeders`.
+`runs`, `run_steps`, `run_followups`, `run_wakes`, `run_autonomy`, `message_components`, `interactions`, `team_channels`, `team_members`, `team_inputs`, `team_mirrors`, `run_feeders`, `run_answers`.
 
 `run_wakes` and `run_autonomy` (wake-ups and the counts of autonomous inputs, 09 5.8) come with
 AR-04 (migrations 00097 to 00100; the channel switch with 00101).
@@ -901,8 +901,9 @@ The server side of [09-agents.md](../../../../docs/spec/09-agents.md) 3.9; rulin
 - The record of who fed a run (`run_feeders`, R-DM-63, ruling D-TEAM-12): the triggers of migration
   00108 record the trigger, the follow-ups and the interactions when they are stored;
   `Prepare` records the person of every allowed delivery into a run (`domain.FeedSourceOf`) and
-  `Context` the writers of its messages of every origin except the run's own agent
-  (`recordContextFeeders`, `domain.ContextFeeder`); `ownerRun` reads only this record
+  `Context` the writers of its messages of every origin and author, an agent's message through
+  the record of the run it answers (`recordContextFeeders`, `domain.ContextFeeders`, the link
+  `run_answers` that `answer` writes in the acceptance, migration 00109); `ownerRun` reads only this record
   (`Repository.Feeders`, `adapters/postgres/feeders.go` with `queries/run_feeders.sql`).
 
 Lock order: the `team_channels` row, then the runs of the work threads (03 6.3). The copies run in
