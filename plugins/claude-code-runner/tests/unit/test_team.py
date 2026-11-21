@@ -16,6 +16,7 @@ from bothy_sdk.generated.models import AgentInvocationPayload, AgentTeamFacts
 
 from claude_code_runner.team import (
     ACCEPTED_TRIGGER_KINDS,
+    NO_OWNER_CHECK,
     facts_of,
     handles_of,
     is_member_input,
@@ -183,3 +184,9 @@ def test_an_unknown_author_id_falls_back_to_the_agent_s_handle() -> None:
         content_md="",
     )
     assert member_lead_in(other, facts()).startswith("Input from team member @ghost (G, @ghost)")
+
+
+def test_the_closing_note_of_a_run_without_owner_check() -> None:
+    assert "no owner check" in NO_OWNER_CHECK
+    assert "counts for nothing" in NO_OWNER_CHECK
+    assert NO_OWNER_CHECK.startswith("Runner note")

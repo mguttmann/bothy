@@ -210,7 +210,13 @@ from claude_code_runner.reply_upload import (
 from claude_code_runner.statedir import ensure_private_dir, write_private
 from claude_code_runner.stop import StoppableGroup
 from claude_code_runner.streamreader import StreamReader
-from claude_code_runner.team import is_member_input, member_lead_in, team_note, team_part
+from claude_code_runner.team import (
+    NO_OWNER_CHECK,
+    is_member_input,
+    member_lead_in,
+    team_note,
+    team_part,
+)
 from claude_code_runner.title import propose_title, split_title
 from claude_code_runner.transcribe import (
     LOCAL_FILE,
@@ -664,6 +670,9 @@ class RunTurn:
             # session a later run continues, whose system prompt stays the first one (18.5).
             self.owner_codes = OwnerCodes()
             items.append(self.owner_codes.check_text())
+        elif self.state.team_run:
+            # Without an owner check the member's text would end the message (18.5).
+            items.append(NO_OWNER_CHECK)
         self.prompt_line, self.own_uuid = user_line(items)
         write_private(paths.input, self.prompt_line + "\n")
         usage = UsageStore(self.cfg.state_dir / "sessions" / self.session.ref)

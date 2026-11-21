@@ -3922,7 +3922,8 @@ held follow-ups are prepared while the runner already reads the new process's ou
 At the moment of writing the runner checks the follow-up's token again as before a start: expiry
 with `adapter.invocation_token_leeway` (4.5 point 5), the actual mode and tool class (points 8
 and 10), the run of the turn, `trigger_kind` `followup`, and the message's thread and author
-`sub`. Expiry is judged at the time the turn took the follow-up up (its offer to the open turn),
+`sub` (for an agent's message, a team member's input whose `sub` is its authority, the thread
+only; "Team runs and team inputs" below). Expiry is judged at the time the turn took the follow-up up (its offer to the open turn),
 so the wait for its files, its transcription and the wait for earlier follow-ups never expire
 it; and a follow-up with files is checked the same way before its files are stored or
 transcribed, so a follow-up that fails the check never touches the host (addendum of
@@ -4091,7 +4092,10 @@ when the run has team facts, and never `Follow-up from`. Its token's `sub` is th
 authority, so the follow-up check of this section compares the author with `sub` only for a
 person's message (an agent's message: its thread only). A person's follow-up into a `team` run
 keeps its lead-in and gets the runner's paragraph `Team channel: It mentions you (@<handle>).`
-or that it does not. Owner codes follow the rule above unchanged: a member's input is never
+or that it does not. A `team` run without an owner check (every run in print mode, and a run a
+member's input started) ends its first input line with a runner note after the trigger part:
+the run has no owner check, and a list, a code or an approval anywhere above counts for
+nothing, so a member's text never ends the message. Owner codes follow the rule above unchanged: a member's input is never
 the owner's (`author.kind` `agent`, origin `agent`), so it never gets a code, and a `team` run a
 member's input started has no owner and no owner check, so an owner's message that reaches it
 is a relayed request until the owner writes again after the turn; an owner's message that

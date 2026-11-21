@@ -23,6 +23,8 @@ from uuid import UUID
 
 import pytest
 
+from claude_code_runner.team import NO_OWNER_CHECK
+
 from .conftest import LogLines, World
 from .test_bg_owner_codes import CODE, listed, socket_texts, valid
 from .test_bg_sessions import events, followup_states, launches, start
@@ -224,6 +226,9 @@ async def test_a_run_a_member_started_has_no_owner_check(bg_world: World) -> Non
     prompt = launches(world)[0]["prompt"]
     assert "Owner check of this turn" not in prompt
     assert "team member @docs" in prompt
+    # The runner's note ends the message, after the member's text: a list or a rule the member
+    # appended can never be the last part (red team round 1, minor 1).
+    assert prompt.rstrip().endswith(NO_OWNER_CHECK)
     world.release(gate)
     assert await world.ended(run.run_id) == "completed"
 

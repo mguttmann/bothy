@@ -317,10 +317,12 @@ none.
 
 - **Follow-ups** (`capabilities.followups = steer`): a follow-up is read with `getMessage` and
   written to the running turn's stdin as one `user` line, `Follow-up from <name> (@<handle>):`, a
-  blank line and the text, with its own `uuid`; the runner patches `delivered`, and `absorbed`
+  blank line and the text, with its own `uuid` (a team member's input gets its own lead-in,
+  "Team channels" below); the runner patches `delivered`, and `absorbed`
   once Claude Code echoes the line (`--replay-user-messages`). Before its files are stored and
   again at the moment of writing the token is checked (expiry, judged at the time the open turn
-  took the follow-up up, mode, tool class, run, `trigger_kind`, author and thread); a failed
+  took the follow-up up, mode, tool class, run, `trigger_kind`, author and thread; for an
+  agent's message, whose `sub` is the input's authority, not the author); a failed
   check stores, transcribes and writes nothing and never ends the run. Follow-ups of a run that
   has not started are held and written after the prompt line. After a `result` stdin stays open for
   `runner.followup_grace` while written follow-ups have no echo.
@@ -443,7 +445,9 @@ every member, who wrote the input, whether it mentions the member, and how to ha
 - **Owner codes** (background mode) follow their rule unchanged: only a follow-up of the person
   whose message started the run gets one, so a member's input never does, and a run a member's
   input started has no owner check at all (an owner's message that reaches it is a relayed
-  request; the owner writes again after the turn for an approval). A follow-up whose text names
+  request; the owner writes again after the turn for an approval). A team run without an owner
+  check ends its first message with a runner note that no list, code or approval in it counts,
+  so a member's text never ends the message. A follow-up whose text names
   a code the runner wrote is never written (warning `followup_carries_owner_code`).
 - **Handing on.** The session mentions `@handle` of a listed member in its final answer,
   outside code. The runner posts the answer as written with the invocation token of exactly
