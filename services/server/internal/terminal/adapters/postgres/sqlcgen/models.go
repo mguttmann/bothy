@@ -1013,6 +1013,13 @@ type RunAutonomy struct {
 	UpdatedAt   pgtype.Timestamptz
 }
 
+type RunFeeder struct {
+	RunID       pgtype.UUID
+	PrincipalID pgtype.UUID
+	Source      string
+	CreatedAt   pgtype.Timestamptz
+}
+
 type RunFollowup struct {
 	RunID     pgtype.UUID
 	MessageID pgtype.UUID

@@ -5,6 +5,7 @@ package domain
 import (
 	"encoding/json"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -107,11 +108,13 @@ func DeliveryMatrix(eventType string, state State) (DeliveryRule, error) {
 // interaction.created, command.invoked (04 section 15.3, 05 section 6) and agent.wake_input (04
 // 15.9, stage AR).
 func InvocationBearing(eventType string) bool {
-	switch eventType {
-	case EventAgentInvocation, EventAgentFollowup, EventInteractionCreated, EventCommandInvoked, EventAgentWakeInput:
-		return true
-	}
-	return false
+	return slices.Contains(InvocationBearingTypes(), eventType)
+}
+
+// InvocationBearingTypes returns every invocation-bearing event type, the inputs an agent receives
+// for a run.
+func InvocationBearingTypes() []string {
+	return []string{EventAgentInvocation, EventAgentFollowup, EventInteractionCreated, EventCommandInvoked, EventAgentWakeInput}
 }
 
 // The deny reasons of authorize (07 4.1) the delivery maps to their own run reason.

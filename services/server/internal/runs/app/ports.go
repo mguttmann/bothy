@@ -120,6 +120,13 @@ type TransitionWrite struct {
 	Cost *CostColumns
 }
 
+// Feeder is one row of 03 run_feeders: a principal who fed a run through source (domain.Feed*);
+// PrincipalID is zero for an input that speaks for no person.
+type Feeder struct {
+	PrincipalID ids.ID
+	Source      string
+}
+
 // DeliveryWrite is the input of Repository.RecordDelivery: the columns an allowed delivery
 // stores (M2-08 design note 3 h). JTI replaces invocation_jti and sets renewed_from_jti to
 // RenewedFromJTI (NULL when zero, so a delivery clears it); a zero JTI keeps both (a delivery
@@ -240,6 +247,12 @@ type Repository interface {
 	// waits for the commit of the answer, or the answer waits and sees the end state. found is
 	// false for an unknown id. It needs a unit of work.
 	LockRunForAnswer(ctx context.Context, id ids.ID) (run domain.AnswerRun, found bool, err error)
+	// RecordFeeders records the principals of one source of 03 run_feeders for the run, a zero
+	// principal for an input that speaks for no person; a row already stored changes nothing. The
+	// rows are append-only: nothing the server does removes them except the run's deletion.
+	RecordFeeders(ctx context.Context, runID ids.ID, source string, principals []ids.ID) error
+	// Feeders reads every recorded feeder of the run (03 run_feeders).
+	Feeders(ctx context.Context, runID ids.ID) ([]Feeder, error)
 	// RecordDelivery stores the columns of an allowed delivery and raises version by one; the
 	// caller holds the row lock and calls it only when a column changes. Errors: not_found for an
 	// unknown run.

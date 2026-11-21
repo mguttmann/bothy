@@ -189,19 +189,6 @@ func count32(n int) int32 {
 	return int32(n) // #nosec G115 -- bounded to [0, maxInt32] above
 }
 
-// RunInteractionPersons implements app.TeamRepository.
-func (r *Repository) RunInteractionPersons(ctx context.Context, runID ids.ID) ([]ids.ID, error) {
-	rows, err := r.read(ctx).RunInteractionPersons(ctx, uuid(runID))
-	if err != nil {
-		return nil, mapError(err, "reading the persons of the interactions of a run")
-	}
-	out := make([]ids.ID, len(rows))
-	for i, row := range rows {
-		out[i] = idOf(row)
-	}
-	return out, nil
-}
-
 // oneTeam converts a single team result; no row is not found.
 func oneTeam(row sqlcgen.TeamChannel, err error, what string) (app.TeamRow, bool, error) {
 	if errors.Is(err, pgx.ErrNoRows) {

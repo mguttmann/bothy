@@ -97,9 +97,6 @@ type TeamRepository interface {
 	InsertTeamMirror(ctx context.Context, sourceMessageID, mirrorMessageID, memberID ids.ID, at time.Time) (bool, error)
 	// TeamMirrored reports whether the reply was mirrored.
 	TeamMirrored(ctx context.Context, sourceMessageID ids.ID) (bool, error)
-	// RunInteractionPersons returns the principals whose interactions reached the components of
-	// the run.
-	RunInteractionPersons(ctx context.Context, runID ids.ID) ([]ids.ID, error)
 }
 
 // TeamMessages is the part of messaging the team channels write through (messaging app Service):

@@ -47,6 +47,37 @@ type repo struct {
 	patches int
 	// locks counts the row locks (LockRun).
 	locks int
+	// feeders is run_feeders: InsertRun records the trigger as the database trigger of 00108 does;
+	// the follow-ups and interactions are recorded by the tests that need them.
+	feeders map[ids.ID][]app.Feeder
+}
+
+// RecordFeeders implements app.Repository; a row already stored changes nothing.
+func (r *repo) RecordFeeders(_ context.Context, run ids.ID, source string, principals []ids.ID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.recordLocked(run, source, principals...)
+	return nil
+}
+
+// recordLocked adds feeders under r.mu.
+func (r *repo) recordLocked(run ids.ID, source string, principals ...ids.ID) {
+	if r.feeders == nil {
+		r.feeders = map[ids.ID][]app.Feeder{}
+	}
+	for _, p := range principals {
+		f := app.Feeder{PrincipalID: p, Source: source}
+		if !slices.Contains(r.feeders[run], f) {
+			r.feeders[run] = append(r.feeders[run], f)
+		}
+	}
+}
+
+// Feeders implements app.Repository.
+func (r *repo) Feeders(_ context.Context, run ids.ID) ([]app.Feeder, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.feeders[run]), nil
 }
 
 // LockRunForAnswer implements app.Repository: the four columns of the answer check (M2-19).
@@ -76,6 +107,7 @@ func (r *repo) InsertRun(_ context.Context, n app.NewRun) (app.RunRow, bool, err
 		InvocationHeldUntil: n.InvocationHeldUntil, StateReason: n.StateReason,
 	}
 	r.runs = append(r.runs, row)
+	r.recordLocked(row.ID, domain.FeedTrigger, row.TriggeredBy)
 	return row, true, nil
 }
 

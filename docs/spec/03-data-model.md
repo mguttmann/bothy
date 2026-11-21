@@ -1954,6 +1954,31 @@ PK: `source_message_id`. FK: `source_message_id` -> `messages(id)` ON DELETE CAS
 `mirror_message_id` -> `messages(id)` ON DELETE CASCADE; `member_id` -> `team_members(id)` ON
 DELETE SET NULL. Unique: `(mirror_message_id)`. Retention: `content`.
 
+#### `run_feeders`
+
+Purpose: the record of who fed a run, the only thing the check of a member's reply reads (09
+3.9.4, red team round 4 of FEAT-TEAM-CHANNEL-SERVER, R-DM-63). Module: `runs`.
+
+| Field | Type | Null | Default | Rules / notes |
+|---|---|---|---|---|
+| `run_id` | `uuid` | no | | |
+| `principal_id` | `uuid` | yes | | the person an input speaks for; NULL for an input that speaks for no person (an agent's or an app's follow-up) |
+| `source` | `text` | no | | `CHECK (source IN ('trigger','followup','interaction','command','wake_input','context'))` |
+| `created_at` | `timestamptz` | no | `now()` | |
+
+FK: `run_id` -> `runs(id)` ON DELETE CASCADE; `principal_id` -> `principals(id)` ON DELETE
+RESTRICT. Unique: `NULLS NOT DISTINCT (run_id, principal_id, source)`. Indexes: `(principal_id)`
+for the foreign key. Written by database triggers when an input is stored (`trigger`:
+`runs.triggered_by` at insert; `followup`: every `run_followups` row at insert and when it moves
+to the follow-on run, with the authority of a team input, the author of a message of origin
+`human`, NULL otherwise; `interaction`: the principal of every interaction with a component whose
+`run_id` is set) and by the runs module for the inputs that are no rows: every allowed delivery
+of an invocation-bearing event into a run (the person of its check, 09 4.2) and every writer of a
+message the run context gives the run (author of a message that is no agent or system message,
+the authority of a team input). `bothy_app` may only read and insert: deleting a message, a card
+or an interaction and revoking a grant never remove a row; rows go only with their run.
+Retention: `content` (with the run).
+
 ### 4.9 Costs (`billing`)
 
 #### `price_table`
@@ -3073,6 +3098,7 @@ section 4 applies, and the gate fails.
 | R-DM-60 | A wake-up is a row of `run_wakes` with the person of its source run; a fired wake-up creates a run with `trigger_kind = 'wake'` and `triggering_wake_id`, and the counts of autonomous inputs are rows of `run_autonomy` per thread and person (addendum of 2026-11-06, 09 5.8). | Only the server can start a run and apply the trigger and billing rules at fire time; a count per thread and person keeps another person's message from extending an owner's chain. |
 | R-DM-61 | `threads.title_version` is the value of `version` at the last change of `title` or `title_source` (1 for a new thread and for every thread from before the column); every statement that writes `title` writes it. The precondition of `setThreadTitle` holds for an `If-Match` from `title_version` up to `version` ([06-api.md](06-api.md) section 8 item 2, addendum of 2026-11-10). | Every message raises `version` (section 6.2) without a thread event, so in an active thread no client holds the current version, and an exact match refused the first title edit of every such thread. What the precondition protects is the title: an edit based on a version from `title_version` on saw the current title, an older one did not and still gets `412`. |
 | R-DM-62 | A team channel is a row of `team_channels`; its members are rows of `team_members`, each with one work thread; every message the server copies into a work thread is a row of `team_inputs` with its authority, and every mirrored reply a row of `team_mirrors`; a run of a member has `trigger_kind = 'team'` and its input as `triggering_message_id` (addendum of 2026-11-21, [09-agents.md](09-agents.md) 3.9). | The run, the follow-ups, the run context and the session need the input in the run's own thread; the check before every delivery needs the authority of an input whose author may be an agent, which the message itself cannot carry; the two unique keys make the job that copies idempotent. |
+| R-DM-63 | Every input a run takes is recorded in `run_feeders` with the person it speaks for when it is stored or given to the run, and the record is append-only for the server (addendum of 2026-11-21, [09-agents.md](09-agents.md) 3.9.4). | The check that a member's reply hands on only what owners fed reads this record; a check over the input rows themselves let a deleted card or follow-up drop a person out of it (red team rounds 2 to 4). |
 
 ## 9. Configuration values of this chapter
 

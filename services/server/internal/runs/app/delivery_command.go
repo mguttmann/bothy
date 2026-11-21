@@ -95,5 +95,5 @@ func (s *Service) prepareInvoked(ctx context.Context, in runs.DeliveryInput, iss
 	}
 	end(decisionAllow)
 	return outcome{out: runs.DeliveryOutcome{Send: true, InvocationToken: tok.Token.Reveal()}, checked: true, allowed: true,
-		handle: agent.Handle}, nil
+		handle: agent.Handle, fedRun: f.RunID, fedBy: f.InvokedBy}, nil
 }

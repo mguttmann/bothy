@@ -179,6 +179,16 @@ that touches the team channels takes them along:
 6. Deleting an owner's message or a member's reply leaves its copies in the work threads and the
    team channel.
 
+Found by the red team in rounds 3 and 4 (outside the lines the fix of round 4 touched):
+
+7. No test holds that `teamHook` writes the reply's `run_id` into the arguments of
+   `runs.team_input`: the fake schedulers of the unit and integration tests drop it, and the tests
+   pass the run by hand.
+8. A job `runs.team_input` scheduled before this release carries no run and is refused with the
+   note `team_source_not_owner` (safe, but the note names the wrong reason).
+9. The audit entry of a `team_source_not_owner` refusal names the sponsor as the actor, not the
+   person who fed the run.
+
 ## 8. Alternatives rejected
 
 - **Point to point handoff records** (the first version of this draft): one hop at a time with a
