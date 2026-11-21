@@ -231,6 +231,33 @@ func (q *Queries) LockTeamChannel(ctx context.Context, channelID pgtype.UUID) (T
 	return i, err
 }
 
+const runInteractionPersons = `-- name: RunInteractionPersons :many
+SELECT DISTINCT i.principal_id FROM interactions i JOIN message_components c ON c.id = i.component_id
+WHERE c.run_id = $1
+`
+
+// The principals whose interactions reached the components of one run (09 3.9.4): every input a
+// run took through a card, read by the job runs.team_input for the run a member's reply answers.
+func (q *Queries) RunInteractionPersons(ctx context.Context, runID pgtype.UUID) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, runInteractionPersons, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var principal_id pgtype.UUID
+		if err := rows.Scan(&principal_id); err != nil {
+			return nil, err
+		}
+		items = append(items, principal_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const teamInputDelivered = `-- name: TeamInputDelivered :one
 SELECT EXISTS (SELECT 1 FROM team_inputs WHERE source_message_id = $1 AND member_id = $2)
 `

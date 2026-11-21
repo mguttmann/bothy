@@ -84,3 +84,9 @@ ON CONFLICT DO NOTHING;
 -- name: GetTeamMirror :one
 -- The mirror of one reply.
 SELECT * FROM team_mirrors WHERE source_message_id = sqlc.arg(source_message_id);
+
+-- name: RunInteractionPersons :many
+-- The principals whose interactions reached the components of one run (09 3.9.4): every input a
+-- run took through a card, read by the job runs.team_input for the run a member's reply answers.
+SELECT DISTINCT i.principal_id FROM interactions i JOIN message_components c ON c.id = i.component_id
+WHERE c.run_id = sqlc.arg(run_id);

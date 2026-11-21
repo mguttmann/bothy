@@ -155,35 +155,50 @@ func (s *Service) memberReply(ctx context.Context, b *teamBox, m messaging.Trigg
 
 // ownerRun reports whether only active owners steered the run runID a member's reply answers (09
 // 3.9.4): it is a run of the member's agent in its work thread, its triggering person (for a team
-// run the authority of its input) is an active owner, and every follow-up it took is an active
-// owner's message or a team input whose authority is an active owner. A run that a person who is
-// no owner started or fed, also one whose grant was revoked since, never hands work on with the
-// sponsor's rights.
+// run the authority of its input) is an active owner, every follow-up it took is an active owner's
+// message or a team input whose authority is an active owner, and every interaction with its
+// components is an active owner's. A run that a person who is no owner started or fed, also one
+// whose grant was revoked since, never hands work on with the sponsor's rights.
 func (s *Service) ownerRun(ctx context.Context, b *teamBox, runID ids.ID, member TeamMemberRow) (bool, error) {
 	run, found, err := s.d.Repo.Run(ctx, runID)
 	if err != nil || !found || run.AgentID != member.AgentID || run.ThreadID != member.WorkThreadID {
 		return false, err
 	}
-	if ok, err := b.d.Owners.IsActiveOwner(ctx, run.TriggeredBy); err != nil || !ok {
-		return false, err
-	}
-	if s.fu == nil {
-		return true, nil
-	}
-	rows, err := s.fu.rows.RunFollowups(ctx, runID)
+	persons, err := s.runInputPersons(ctx, b, run)
 	if err != nil {
 		return false, err
 	}
-	for _, r := range rows {
-		person, err := s.followupPerson(ctx, r.MessageID)
-		if err != nil || person.IsZero() {
-			return false, err
-		}
-		if ok, err := b.d.Owners.IsActiveOwner(ctx, person); err != nil || !ok {
+	for _, p := range persons {
+		if ok, err := b.d.Owners.IsActiveOwner(ctx, p); err != nil || p.IsZero() || !ok {
 			return false, err
 		}
 	}
 	return true, nil
+}
+
+// runInputPersons returns every person whose input the run took: its triggering person, the
+// person of each follow-up (zero for a follow-up that speaks for nobody) and the principal of each
+// interaction with its components. A wake input always speaks for the run's own person (5.8.3).
+func (s *Service) runInputPersons(ctx context.Context, b *teamBox, run RunRow) ([]ids.ID, error) {
+	persons := []ids.ID{run.TriggeredBy}
+	if s.fu != nil {
+		rows, err := s.fu.rows.RunFollowups(ctx, run.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range rows {
+			p, err := s.followupPerson(ctx, r.MessageID)
+			if err != nil {
+				return nil, err
+			}
+			persons = append(persons, p)
+		}
+	}
+	ix, err := b.d.Repo.RunInteractionPersons(ctx, run.ID)
+	if err != nil {
+		return nil, err
+	}
+	return append(persons, ix...), nil
 }
 
 // followupPerson returns the person a follow-up message speaks for: the authority of a team input,
