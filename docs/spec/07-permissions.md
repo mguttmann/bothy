@@ -788,8 +788,8 @@ mode as for any run. The rules that keep this safe:
    in the runner (09 3.9.9).
 4. A member's reply is handed on only when the run it answers was started and fed only by active
    owners, read from the append-only record of the run in 03 `run_feeders` (its trigger, every
-   follow-up, interaction and delivery it took and every writer of its run context other than the
-member's own agent, another agent included, 09 3.9.4); a
+   follow-up, interaction and delivery it took and every writer of its run context, an agent's
+message through the record of the run it answers, 09 3.9.4); a
    run a person who is no owner started or fed, also after that person lost the grant or deleted
    the input, never triggers another member.
 5. The safety brake of 09 3.9.6 ends loops between members; any owner message resets it.

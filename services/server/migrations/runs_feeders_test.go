@@ -92,6 +92,7 @@ func TestMigration_EveryRunReferenceIsClassified(t *testing.T) {
 		"run_followups.run_id":        "input: run_followups_record_feeder records the follow-up's person",
 		"message_components.run_id":   "input: interactions_record_feeder records the principal of every interaction with the component",
 		"run_feeders.run_id":          "the record itself",
+		"run_answers.run_id":          "no input: the run an agent's message answers; a context that gives the message to a run copies that run's record",
 		"run_steps.run_id":            "no input: the steps the agent reports",
 		"messages.run_id":             "no input: the anchor of the run's live box",
 		"cost_entries.run_id":         "no input: the cost booked for the run",
@@ -244,5 +245,54 @@ func TestMigration_RunFeedersDown(t *testing.T) {
 	}
 	if n := left(); n != all {
 		t.Errorf("up again: %d objects, want %d", n, all)
+	}
+}
+
+// TestMigration_RunAnswersTable holds run_answers (00109, red team round 6) against
+// docs/spec/03-data-model.md section 4.8, and its down step removes it.
+func TestMigration_RunAnswersTable(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := pgtest.New(t)
+	conn := db.SuperConn(t)
+	cols := []principalColumn{
+		{"message_id", "uuid", false, ""}, {"run_id", "uuid", false, ""}, {"created_at", "timestamp with time zone", false, "now()"},
+	}
+	if got := principalColumns(t, conn, "run_answers"); !reflect.DeepEqual(got, cols) {
+		t.Errorf("run_answers columns:\n got %+v\nwant %+v", got, cols)
+	}
+	cons := principalConstraints(t, conn, "run_answers")
+	slices.Sort(cons)
+	want := []string{"FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE", "PRIMARY KEY (message_id)"}
+	if !reflect.DeepEqual(cons, want) {
+		t.Errorf("run_answers constraints:\n got %q\nwant %q", cons, want)
+	}
+	pool := db.OpenPool(t, db.Config(pg.RoleOwner).ForMigrate(5*time.Second))
+	sqlDB := pool.OpenSQL()
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	provider, err := goose.NewProvider(goose.DialectPostgres, sqlDB, migrations.FS, goose.WithDisableGlobalRegistry(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	exists := func() bool {
+		t.Helper()
+		var ok bool
+		if err := sqlDB.QueryRowContext(ctx, `SELECT to_regclass('run_answers') IS NOT NULL`).Scan(&ok); err != nil {
+			t.Fatal(err)
+		}
+		return ok
+	}
+	before := migrationVersion(t, "runs_run_answers") - 1
+	if _, err := provider.DownTo(ctx, before); err != nil {
+		t.Fatalf("down to %d: %v", before, err)
+	}
+	if exists() {
+		t.Error("down left run_answers")
+	}
+	if _, err := provider.Up(ctx); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+	if !exists() {
+		t.Error("up again did not create run_answers")
 	}
 }

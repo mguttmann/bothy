@@ -51,32 +51,41 @@ func FeedSourceOf(eventType string) string {
 // principalUser is principals.kind of a person (03 principals).
 const principalUser = "user"
 
-// ContextElement is what the record needs of one message a run context gives a run: its author
-// and, for a team input, the input's authority.
+// ContextElement is what the record needs of one message a run context gives a run: its author,
+// for a team input the input's authority, and for an agent's answer the record of the run it
+// answers (03 run_answers).
 type ContextElement struct {
 	AuthorID   ids.ID
 	AuthorKind string
 	// TeamInput reports a team input (03 team_inputs); Authority is its authority then.
 	TeamInput bool
 	Authority ids.ID
+	// Answer reports a message linked in run_answers; AnswerRecord holds the principals recorded
+	// for that run (zero for one that speaks for no person) and AnswerTriggered whether its
+	// record has its trigger row.
+	Answer          bool
+	AnswerRecord    []ids.ID
+	AnswerTriggered bool
 }
 
-// ContextFeeder returns the principal run_feeders records, source context, for an element of the
-// run context of a run of runAgent, and whether it records one (09 3.9.4, red team round 5 of
-// FEAT-TEAM-CHANNEL-SERVER). Every element is recorded whatever its origin (human, agent, app,
-// import, system) and wherever it lies (trigger, thread or channel window): a team input with its
-// authority, a person's message with its author, and every other message (another agent's that
-// is no team input, an app's, one without a person as author) as an input that speaks for no
-// person (zero, stored as NULL), which the owner check refuses. Only a message of runAgent itself
-// is left out: what an earlier run of the agent wrote is the limitation of ruling D-TEAM-11.
-func ContextFeeder(e ContextElement, runAgent ids.ID) (ids.ID, bool) {
+// ContextFeeders returns the principals run_feeders records, source context, for an element of a
+// run context (09 3.9.4, red team rounds 5 and 6 of FEAT-TEAM-CHANNEL-SERVER). Every element is
+// recorded whatever its origin (human, agent, app, import, system), its author (the run's own
+// agent included) and its place (trigger, thread or channel window): a team input with its
+// authority, a person's message with its author, an agent's answer with the whole record of the
+// run it answers (an incomplete record, one without its trigger row, as an input that speaks for
+// no person), and every other message (an agent's message written outside a run of its thread,
+// an app's, one without a person as author) as an input that speaks for no person (zero, stored
+// as NULL), which the owner check refuses. A text an agent wrote thus speaks for whoever fed the
+// run that wrote it.
+func ContextFeeders(e ContextElement) []ids.ID {
 	switch {
 	case e.TeamInput:
-		return e.Authority, true
-	case !e.AuthorID.IsZero() && e.AuthorID == runAgent:
-		return ids.ID{}, false
+		return []ids.ID{e.Authority}
 	case e.AuthorKind == principalUser:
-		return e.AuthorID, true
+		return []ids.ID{e.AuthorID}
+	case e.Answer && e.AnswerTriggered:
+		return append([]ids.ID{}, e.AnswerRecord...)
 	}
-	return ids.ID{}, true
+	return []ids.ID{{}}
 }

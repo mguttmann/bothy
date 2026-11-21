@@ -189,6 +189,14 @@ Found by the red team in rounds 3 and 4 (outside the lines the fix of round 4 to
 9. The audit entry of a `team_source_not_owner` refusal names the sponsor as the actor, not the
    person who fed the run.
 
+Found by the red team in round 6:
+
+10. The context record refuses by default (D-TEAM-12): a system line or server note whose author
+    is neither a person nor linked to a run (for example a wake note or a command reply without a
+    run) refuses every later run of the work thread that reads it in its window. Safe, but its
+    effect on the team flow is not checked for every system line code; the note could name the
+    message that caused the refusal.
+
 ## 8. Alternatives rejected
 
 - **Point to point handoff records** (the first version of this draft): one hop at a time with a

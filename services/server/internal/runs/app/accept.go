@@ -161,10 +161,15 @@ func (s *Service) acceptTrigger(ctx context.Context, ev messaging.MessagePosted)
 }
 
 // answer is the first branch of accept: an agent's answer that names a run in run_id is checked
-// (M2-19); every other message passes.
+// (M2-19) and, like a live box anchor, linked to its run in run_answers; every other message
+// passes.
 func (s *Service) answer(ctx context.Context, ev messaging.MessagePosted) error {
-	if ev.RunID == nil || ev.Kind == kindRun {
+	if ev.RunID == nil {
 		return nil
+	}
+	if ev.Kind == kindRun {
+		// The live box anchor of a run the server opened (M2-05).
+		return s.d.Repo.RecordAnswer(ctx, ev.MessageID, *ev.RunID)
 	}
 	if ev.Origin != originAgent {
 		// messaging never builds this event; a run_id of another origin is a defect.
@@ -173,7 +178,11 @@ func (s *Service) answer(ctx context.Context, ev messaging.MessagePosted) error 
 	if ev.Kind == kindSystem {
 		return nil
 	}
-	return s.checkAnswer(ctx, ev)
+	if err := s.checkAnswer(ctx, ev); err != nil {
+		return err
+	}
+	// The run context gives this text the record of the run it answers (03 run_answers, 09 3.9.4).
+	return s.d.Repo.RecordAnswer(ctx, ev.MessageID, *ev.RunID)
 }
 
 // redecide asks settle's caller for another round with run as the locked active run of the

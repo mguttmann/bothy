@@ -50,6 +50,8 @@ type repo struct {
 	// feeders is run_feeders: InsertRun records the trigger as the database trigger of 00108 does;
 	// the follow-ups and interactions are recorded by the tests that need them.
 	feeders map[ids.ID][]app.Feeder
+	// answers is run_answers: message to the run it answers.
+	answers map[ids.ID]ids.ID
 }
 
 // RecordFeeders implements app.Repository; a row already stored changes nothing.
@@ -78,6 +80,27 @@ func (r *repo) Feeders(_ context.Context, run ids.ID) ([]app.Feeder, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return slices.Clone(r.feeders[run]), nil
+}
+
+// RecordAnswer implements app.Repository.
+func (r *repo) RecordAnswer(_ context.Context, message, run ids.ID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.answers == nil {
+		r.answers = map[ids.ID]ids.ID{}
+	}
+	if _, ok := r.answers[message]; !ok {
+		r.answers[message] = run
+	}
+	return nil
+}
+
+// AnswerRun implements app.Repository.
+func (r *repo) AnswerRun(_ context.Context, message ids.ID) (ids.ID, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	run, ok := r.answers[message]
+	return run, ok, nil
 }
 
 // LockRunForAnswer implements app.Repository: the four columns of the answer check (M2-19).

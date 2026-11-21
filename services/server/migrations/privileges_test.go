@@ -221,6 +221,9 @@ var appPrivileges = map[string][]string{
 	// 03 run_feeders (FEAT-TEAM-CHANNEL-SERVER): the record of who fed a run is append-only for the
 	// server; rows go only with their run (ON DELETE CASCADE).
 	"run_feeders": {"SELECT", "INSERT"},
+	// 03 run_answers (FEAT-TEAM-CHANNEL-SERVER): the run an agent's message answers never changes;
+	// rows go only with their run (ON DELETE CASCADE).
+	"run_answers": {"SELECT", "INSERT"},
 	// 03 team_channels and team_members (FEAT-TEAM-CHANNEL-SERVER): switched off and removed by a
 	// delete; team_inputs and team_mirrors go only with their messages (ON DELETE CASCADE).
 	"team_channels": {"SELECT", "INSERT", "UPDATE", "DELETE"},
