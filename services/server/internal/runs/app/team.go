@@ -5,7 +5,6 @@ package app
 import (
 	"context"
 	"errors"
-	"slices"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -125,17 +124,15 @@ func (s *Service) authorizeChannel(ctx context.Context, a actor.Actor, act autho
 	return nil
 }
 
-// auditTeam writes the audit entry of a team operation or decision: allow without reason, deny
-// with reason, resource the team channel, as the actor a.
-func (s *Service) auditTeam(ctx context.Context, a actor.Actor, act authorize.Action, reason string, channelID ids.ID, attrs auditing.Attrs) error {
+// auditTeam writes the allow entry of a team operation or a pause, resource the team channel, as
+// the actor a; the denials of the operations are audited by authz.
+func (s *Service) auditTeam(ctx context.Context, a actor.Actor, act authorize.Action, channelID ids.ID, attrs auditing.Attrs) error {
 	if s.d.Audit == nil {
 		return errs.New(errs.CodeInternalError, "runs: the team channels have no audit recorder")
 	}
-	e := auditing.Entry{Action: string(act), Decision: auditing.DecisionAllow, ResourceKind: resourceChannel, ResourceID: channelID, Attrs: attrs}
-	if reason != "" {
-		e.Decision, e.Reason = auditing.DecisionDeny, auditing.Reason(reason)
-	}
-	return s.d.Audit.Record(actor.WithActor(ctx, a), e)
+	return s.d.Audit.Record(actor.WithActor(ctx, a), auditing.Entry{
+		Action: string(act), Decision: auditing.DecisionAllow, ResourceKind: resourceChannel, ResourceID: channelID, Attrs: attrs,
+	})
 }
 
 // Get implements runs.Teams (getChannelTeam, team.read).
@@ -199,27 +196,40 @@ func (t *Teams) Enable(ctx context.Context, channelID ids.ID) (runs.Team, error)
 	a := caller(ctx)
 	var out runs.Team
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		if err := s.authorizeChannel(ctx, a, authorize.ActionTeamUpdate, channelID); err != nil {
-			return err
-		}
-		ch, err := s.d.Channels.TriggerChannel(ctx, channelID)
-		if err != nil {
-			return err
-		}
-		if reason := teamChannelRefusal(ch); reason != "" {
-			return teamConflict(reason)
-		}
-		row, err := b.d.Repo.UpsertTeam(ctx, channelID, a.ID, s.now())
-		if err != nil {
-			return err
-		}
-		if err := s.auditTeam(ctx, a, authorize.ActionTeamUpdate, "", channelID, auditing.Attrs{attrOperation: auditing.Code(opEnable)}); err != nil {
-			return err
-		}
-		out, err = s.teamView(ctx, b, row)
+		var err error
+		out, err = s.enableTx(ctx, b, a, channelID)
 		return err
 	})
 	return out, err
+}
+
+// enableTx is Enable inside its unit of work.
+func (s *Service) enableTx(ctx context.Context, b *teamBox, a actor.Actor, channelID ids.ID) (runs.Team, error) {
+	if err := s.authorizeChannel(ctx, a, authorize.ActionTeamUpdate, channelID); err != nil {
+		return runs.Team{}, err
+	}
+	ch, err := s.d.Channels.TriggerChannel(ctx, channelID)
+	if err != nil {
+		return runs.Team{}, err
+	}
+	if reason := teamChannelRefusal(ch); reason != "" {
+		return runs.Team{}, teamConflict(reason)
+	}
+	only, err := s.sameReaders(ctx, b, channelID)
+	if err != nil {
+		return runs.Team{}, err
+	}
+	if !only {
+		return runs.Team{}, teamConflict(domain.TeamRefusalReaders)
+	}
+	row, err := b.d.Repo.UpsertTeam(ctx, channelID, a.ID, s.now())
+	if err != nil {
+		return runs.Team{}, err
+	}
+	if err := s.auditTeam(ctx, a, authorize.ActionTeamUpdate, channelID, auditing.Attrs{attrOperation: auditing.Code(opEnable)}); err != nil {
+		return runs.Team{}, err
+	}
+	return s.teamView(ctx, b, row)
 }
 
 // teamChannelRefusal returns the reason a channel cannot be a team channel: a DM, a forum, an
@@ -256,7 +266,7 @@ func (t *Teams) Disable(ctx context.Context, channelID ids.ID) error {
 		if err != nil || !deleted {
 			return err
 		}
-		return s.auditTeam(ctx, a, authorize.ActionTeamUpdate, "", channelID, auditing.Attrs{attrOperation: auditing.Code(opDisable)})
+		return s.auditTeam(ctx, a, authorize.ActionTeamUpdate, channelID, auditing.Attrs{attrOperation: auditing.Code(opDisable)})
 	})
 }
 
@@ -320,7 +330,7 @@ func (s *Service) addMemberTx(ctx context.Context, b *teamBox, a actor.Actor, in
 	if err := b.d.Repo.InsertTeamMember(ctx, m); err != nil {
 		return TeamMemberRow{}, err
 	}
-	return m, s.auditTeam(ctx, a, authorize.ActionTeamUpdate, "", in.ChannelID, auditing.Attrs{
+	return m, s.auditTeam(ctx, a, authorize.ActionTeamUpdate, in.ChannelID, auditing.Attrs{
 		attrOperation: auditing.Code(opAdd), attrMemberID: auditing.ID(m.ID), attrAgentID: auditing.ID(in.AgentID),
 	})
 }
@@ -383,20 +393,25 @@ func (s *Service) homeChannel(ctx context.Context, b *teamBox, team TeamRow, in 
 	return home, nil
 }
 
-// sameReaders reports whether the persons who may read the two channels are the same set (the
-// readers rule of 09 3.9.1).
-func (s *Service) sameReaders(ctx context.Context, b *teamBox, a, c ids.ID) (bool, error) {
-	ra, err := b.d.Readers.Readers(ctx, a)
-	if err != nil {
-		return false, err
+// sameReaders reports whether only active owners may read the given channels (the readers rule
+// of 09 3.9.1 for the first slice): every person authz.Recipients.Readers names for any of them is
+// an active owner. Owners read every channel that is no DM, so the channels then have the same
+// readers, and no text crosses to a person who could not read it at its source. A person with a
+// grant on a channel, who could steer a member's agent there, makes the rule fail.
+func (s *Service) sameReaders(ctx context.Context, b *teamBox, channels ...ids.ID) (bool, error) {
+	for _, ch := range channels {
+		readers, err := b.d.Readers.Readers(ctx, ch)
+		if err != nil {
+			return false, err
+		}
+		for _, p := range readers {
+			owner, err := b.d.Owners.IsActiveOwner(ctx, p)
+			if err != nil || !owner {
+				return false, err
+			}
+		}
 	}
-	rc, err := b.d.Readers.Readers(ctx, c)
-	if err != nil {
-		return false, err
-	}
-	slices.SortFunc(ra, compareIDs)
-	slices.SortFunc(rc, compareIDs)
-	return slices.Equal(slices.Compact(ra), slices.Compact(rc)), nil
+	return true, nil
 }
 
 // workThreadNote is the text of the system note a work thread in a text channel starts from.
@@ -454,7 +469,7 @@ func (t *Teams) RemoveMember(ctx context.Context, channelID, memberID ids.ID) er
 		if !deleted {
 			return invisible()
 		}
-		return s.auditTeam(ctx, a, authorize.ActionTeamUpdate, "", channelID, auditing.Attrs{
+		return s.auditTeam(ctx, a, authorize.ActionTeamUpdate, channelID, auditing.Attrs{
 			attrOperation: auditing.Code(opRemove), attrMemberID: auditing.ID(memberID),
 		})
 	})
@@ -517,7 +532,7 @@ func (s *Service) stopTx(ctx context.Context, b *teamBox, a actor.Actor, channel
 	if err := s.teamNote(ctx, b, channelID, a.ID, "Team stopped by an owner: every member run was stopped and member mentions are paused until an owner writes again."); err != nil {
 		return nil, err
 	}
-	return stopped, s.auditTeam(ctx, a, authorize.ActionTeamStop, "", channelID, auditing.Attrs{attrStopped: auditing.Int(int64(len(stopped)))})
+	return stopped, s.auditTeam(ctx, a, authorize.ActionTeamStop, channelID, auditing.Attrs{attrStopped: auditing.Int(int64(len(stopped)))})
 }
 
 // teamNote posts a system note in the main thread of the team channel (09 3.9.5 to 3.9.7),

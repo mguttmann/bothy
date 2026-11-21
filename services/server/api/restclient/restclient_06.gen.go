@@ -13,6 +13,21 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// AddOwnerWithResponse Make a person owner
+//
+// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /owners (the `AddOwner` operationId).
+func (c *ClientWithResponses) AddOwnerWithResponse(ctx context.Context, params *AddOwnerParams, body AddOwnerJSONRequestBody, reqEditors ...RequestEditorFn) (*AddOwnerResponse, error) {
+	rsp, err := c.AddOwner(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAddOwnerResponse(rsp)
+}
+
 // RevokeOwnerWithBodyWithResponse Remove the owner role
 //
 // Fails with `last_owner` when no other active owner remains and with `i1_violation` when I1 would

@@ -161,6 +161,24 @@ Later: talk rules (`team_talk_rules`, `/team allow|deny`) and their matrix in th
 `bothy-team say` mid-run; attachments in relayed inputs; push notifications for brake notes; all
 runs inside the team channel (3.2 alternative); members who are people other than owners.
 
+### 7.1 Open minors of the server slice
+
+Found by the red team of FEAT-TEAM-CHANNEL-SERVER (round 1) without a shown harm; the next slice
+that touches the team channels takes them along:
+
+1. `followOnTeamRun` does not consult the brake: a follow-on run from inputs delivered before a
+   pause or stop still starts (only when the stop ended the run otherwise than `user_cancelled`).
+2. The check before a delivery tests `agent.invoke` for the authority but not whether the sponsor
+   is still an active owner; 07 SR4 addendum and 09 3.9.5 should say the same.
+3. `enableChannelTeam` does not refuse a channel that is already the home channel of a member.
+4. `Recipients.Readers` names only persons; apps and agents with a read grant on a home channel
+   see the owner's copied texts.
+5. Removing a member deletes its open inputs (`team_inputs.member_id` cascades), so their
+   follow-ups are then checked for the agent and refused; the "member removed" branch of
+   `followOnTeamRun` is unused.
+6. Deleting an owner's message or a member's reply leaves its copies in the work threads and the
+   team channel.
+
 ## 8. Alternatives rejected
 
 - **Point to point handoff records** (the first version of this draft): one hop at a time with a

@@ -305,13 +305,13 @@ type ServerInterface interface {
 	EnableChannelTeam(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
 	// AddTeamMember Add a member to a team channel
 	// (POST /channels/{channel_id}/team/members)
-	AddTeamMember(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
+	AddTeamMember(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params AddTeamMemberParams)
 	// RemoveTeamMember Remove a member from a team channel
 	// (DELETE /channels/{channel_id}/team/members/{member_id})
 	RemoveTeamMember(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, memberId MemberIdPath)
 	// StopChannelTeam Stop every run of a team channel
 	// (POST /channels/{channel_id}/team/stop)
-	StopChannelTeam(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
+	StopChannelTeam(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params StopChannelTeamParams)
 	// ListTemplates List own and channel templates
 	// (GET /channels/{channel_id}/templates)
 	ListTemplates(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
@@ -4955,8 +4955,32 @@ func (siw *ServerInterfaceWrapper) AddTeamMember(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AddTeamMemberParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.AddTeamMember(w, r, channelId)
+		siw.Handler.AddTeamMember(w, r, channelId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5016,8 +5040,32 @@ func (siw *ServerInterfaceWrapper) StopChannelTeam(w http.ResponseWriter, r *htt
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params StopChannelTeamParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.StopChannelTeam(w, r, channelId)
+		siw.Handler.StopChannelTeam(w, r, channelId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {

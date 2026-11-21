@@ -375,17 +375,7 @@ func (f *Followups) followOn(ctx context.Context, ended runs.RunSummary, cands [
 	}
 	agent := agents[ended.AgentID]
 	for i, m := range cands {
-		msg := facts[m]
-		in, team, err := s.teamInputOf(ctx, m)
-		if err != nil {
-			return err
-		}
-		as := triggerFacts{person: msg.Author.ID, origin: msg.Origin, mentions: slices.Contains(msg.MentionedIDs, ended.AgentID)}
-		if team {
-			// A team input starts a team run for its authority (09 3.9.5).
-			as = triggerFacts{person: in.AuthorityID, origin: originHuman, mentions: true, team: true}
-		}
-		allowed, err := f.checkTrigger(ctx, ended, info, msg, as, version, agent.Status == agentActive)
+		in, as, allowed, err := f.checkCandidate(ctx, ended, info, facts[m], version, agent.Status == agentActive)
 		if err != nil {
 			return err
 		}
@@ -398,17 +388,7 @@ func (f *Followups) followOn(ctx context.Context, ended runs.RunSummary, cands [
 		if a, ok := actor.FromContext(ctx); !ok || a.ID.IsZero() {
 			ctx = actor.WithActor(ctx, actor.Actor{ID: ended.AgentID, Kind: actor.KindAgent})
 		}
-		var sum runs.RunSummary
-		if team {
-			sum, err = s.followOnTeamRun(ctx, ended, in, agent.BillingMode)
-		} else {
-			// The follow-on run is held like an acceptance while an attachment of its triggering
-			// message is not final; without a MessagePosted it asks files unconditionally (M3-07).
-			sum, err = s.invokeOrHold(ctx, OpenCmd{
-				ThreadID: ended.ThreadID, AgentID: ended.AgentID, TriggeredBy: msg.Author.ID, TriggeringMessageID: m,
-				TriggerKind: triggerKindMessage, BillingModeExpected: agent.BillingMode,
-			}, true)
-		}
+		sum, err := f.openFollowOn(ctx, ended, in, as, m, agent.BillingMode)
 		var exists *ActiveRunExistsError
 		if errors.As(err, &exists) {
 			// The ended run is no longer active and the acceptances of the thread wait at the run
@@ -455,6 +435,46 @@ func (f *Followups) checkTrigger(ctx context.Context, ended runs.RunSummary, inf
 		attrRunID: auditing.ID(ended.ID), attrMessageID: auditing.ID(msg.ID), attrAgentID: auditing.ID(ended.AgentID),
 		attrStage: auditing.Code(stageRunEnd), attrTriggerKind: auditing.Code(kind),
 	})
+}
+
+// checkCandidate reads the facts of the candidate msg (candidateFacts) and checks them
+// (checkTrigger); allowed reports whether the candidate may start the follow-on run.
+func (f *Followups) checkCandidate(ctx context.Context, ended runs.RunSummary, info chat.ThreadInfo, msg messaging.TriggerMessage,
+	version int64, agentActive bool) (TeamInputRow, triggerFacts, bool, error) {
+	in, as, err := f.candidateFacts(ctx, ended, msg)
+	if err != nil {
+		return TeamInputRow{}, triggerFacts{}, false, err
+	}
+	allowed, err := f.checkTrigger(ctx, ended, info, msg, as, version, agentActive)
+	return in, as, allowed, err
+}
+
+// candidateFacts returns the facts a candidate msg of the follow-on run of ended is checked with:
+// its author, origin and mention, or for a team input the input and its authority (09 3.9.5).
+func (f *Followups) candidateFacts(ctx context.Context, ended runs.RunSummary, msg messaging.TriggerMessage) (TeamInputRow, triggerFacts, error) {
+	in, team, err := f.s.teamInputOf(ctx, msg.ID)
+	if err != nil {
+		return TeamInputRow{}, triggerFacts{}, err
+	}
+	if team {
+		return in, triggerFacts{person: in.AuthorityID, origin: originHuman, mentions: true, team: true}, nil
+	}
+	return in, triggerFacts{person: msg.Author.ID, origin: msg.Origin, mentions: slices.Contains(msg.MentionedIDs, ended.AgentID)}, nil
+}
+
+// openFollowOn opens the follow-on run of ended for the allowed candidate message: a team run for a
+// team input, otherwise a message run of the author, held like an acceptance while an attachment
+// of its triggering message is not final (without a MessagePosted it asks files unconditionally,
+// M3-07).
+func (f *Followups) openFollowOn(ctx context.Context, ended runs.RunSummary, in TeamInputRow, as triggerFacts, message ids.ID,
+	mode string) (runs.RunSummary, error) {
+	if as.team {
+		return f.s.followOnTeamRun(ctx, ended, in, mode)
+	}
+	return f.s.invokeOrHold(ctx, OpenCmd{
+		ThreadID: ended.ThreadID, AgentID: ended.AgentID, TriggeredBy: as.person, TriggeringMessageID: message,
+		TriggerKind: triggerKindMessage, BillingModeExpected: mode,
+	}, true)
 }
 
 // triggerFacts are the facts agent.invoke checks a candidate of a follow-on run with: the author of

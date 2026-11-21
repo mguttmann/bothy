@@ -12224,7 +12224,7 @@ type ClientWithResponsesInterface interface {
 
 	// EnableChannelTeamWithResponse Switch a channel to team mode
 	//
-	// Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-only channel `channel_archived` or `channel_read_only`. Audited.
+	// Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-only channel `channel_archived` or `channel_read_only`, a channel that a person who is no active owner may read `team_readers_not_owners`. Audited.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -12233,21 +12233,21 @@ type ClientWithResponsesInterface interface {
 
 	// AddTeamMemberWithBodyWithResponse Add a member to a team channel
 	//
-	// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_readers_differ` when the readers of the two channels differ, `dm_channel` or `channel_archived` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+	// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_home_is_team` when the home channel is a team channel, `team_readers_not_owners` when a person who is no active owner may read the team channel or the home channel, `dm_channel`, `channel_archived` or `channel_read_only` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /channels/{channel_id}/team/members (the `AddTeamMember` operationId).
-	AddTeamMemberWithBodyWithResponse(ctx context.Context, channelId ChannelIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddTeamMemberResponse, error)
+	AddTeamMemberWithBodyWithResponse(ctx context.Context, channelId ChannelIdPath, params *AddTeamMemberParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddTeamMemberResponse, error)
 
 	// AddTeamMemberWithResponse Add a member to a team channel
 	//
-	// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_readers_differ` when the readers of the two channels differ, `dm_channel` or `channel_archived` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+	// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_home_is_team` when the home channel is a team channel, `team_readers_not_owners` when a person who is no active owner may read the team channel or the home channel, `dm_channel`, `channel_archived` or `channel_read_only` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /channels/{channel_id}/team/members (the `AddTeamMember` operationId).
-	AddTeamMemberWithResponse(ctx context.Context, channelId ChannelIdPath, body AddTeamMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*AddTeamMemberResponse, error)
+	AddTeamMemberWithResponse(ctx context.Context, channelId ChannelIdPath, params *AddTeamMemberParams, body AddTeamMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*AddTeamMemberResponse, error)
 
 	// RemoveTeamMemberWithResponse Remove a member from a team channel
 	//
@@ -12265,7 +12265,7 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /channels/{channel_id}/team/stop (the `StopChannelTeam` operationId).
-	StopChannelTeamWithResponse(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*StopChannelTeamResponse, error)
+	StopChannelTeamWithResponse(ctx context.Context, channelId ChannelIdPath, params *StopChannelTeamParams, reqEditors ...RequestEditorFn) (*StopChannelTeamResponse, error)
 
 	// ListTemplatesWithResponse List own and channel templates
 	//
@@ -23700,14 +23700,4 @@ type CompleteStepUpWithDeviceKeyResponse struct {
 	Headers429 *CompleteStepUpWithDeviceKeyResponse429Headers
 	// HeadersDefault the parsed response headers for an HTTP default response
 	HeadersDefault *CompleteStepUpWithDeviceKeyResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r CompleteStepUpWithDeviceKeyResponse) GetJSON200() *StepUpResult {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r CompleteStepUpWithDeviceKeyResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
 }

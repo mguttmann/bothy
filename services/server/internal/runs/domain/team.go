@@ -33,7 +33,7 @@ const (
 	// TeamRefusalSponsor: the authority of the input is no active owner now.
 	TeamRefusalSponsor = "team_sponsor_not_owner"
 	// TeamRefusalReaders: the readers of the team channel and the member's home channel differ.
-	TeamRefusalReaders = "team_readers_differ"
+	TeamRefusalReaders = "team_readers_not_owners"
 )
 
 // ValidHandle reports whether h is a handle of a team member (09 3.9.1, 03 team_members): lower
@@ -69,24 +69,31 @@ func MentionedHandles(text string) []string {
 	var out []string
 	seen := map[string]bool{}
 	for _, part := range outsideCode(text) {
-		for i := 0; i < len(part); i++ {
-			if part[i] != '@' || (i > 0 && (handleChar(part[i-1]) || part[i-1] == '@')) {
-				continue
-			}
-			j := i + 1
-			for j < len(part) && handleChar(part[j]) {
-				j++
-			}
-			if j == i+1 {
-				continue
-			}
-			h := strings.ToLower(part[i+1 : j])
+		for _, h := range handlesIn(part) {
 			if !seen[h] {
 				seen[h] = true
 				out = append(out, h)
 			}
-			i = j - 1
 		}
+	}
+	return out
+}
+
+// handlesIn returns the handles one part of text outside code mentions, lower case, in order.
+func handlesIn(part string) []string {
+	var out []string
+	for i := 0; i < len(part); i++ {
+		if part[i] != '@' || (i > 0 && (handleChar(part[i-1]) || part[i-1] == '@')) {
+			continue
+		}
+		j := i + 1
+		for j < len(part) && handleChar(part[j]) {
+			j++
+		}
+		if j > i+1 {
+			out = append(out, strings.ToLower(part[i+1:j]))
+		}
+		i = j - 1
 	}
 	return out
 }

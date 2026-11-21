@@ -18,7 +18,7 @@ func TestValidHandle(t *testing.T) {
 		want bool
 	}{
 		{"coding", true}, {"qa-2", true}, {"a_b", true}, {"7", true},
-		{"", false}, {"-a", false}, {"_a", false}, {"Coding", false}, {"a b", false}, {"a.b", false}, {"ä", false},
+		{"", false}, {"-a", false}, {"_a", false}, {"Coding", false}, {"a b", false}, {"a.b", false}, {"a+b", false},
 		{strings.Repeat("a", 32), true}, {strings.Repeat("a", 33), false},
 	} {
 		if got := ValidHandle(tc.h, 32); got != tc.want {

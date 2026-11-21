@@ -722,7 +722,12 @@ func TestTeam_RefusedInputs(t *testing.T) {
 		arrange func(w *teamWorld)
 		reason  string
 	}{
-		"sponsor no owner":     {func(w *teamWorld) { w.owners.set[w.alex] = false }, domain.TeamRefusalSponsor},
+		"sponsor no owner": {func(w *teamWorld) {
+			// Sam took over the sponsorship while an owner and is no owner any more.
+			t := w.trepo.teams[w.team]
+			t.SponsorID = w.sam
+			w.trepo.teams[w.team] = t
+		}, domain.TeamRefusalSponsor},
 		"agent.invoke":         {func(w *teamWorld) { w.authz.decide = denyInvoke }, "level_insufficient"},
 		"readers differ":       {func(w *teamWorld) { w.readers.set[w.homeB] = []ids.ID{w.alex, w.sam} }, domain.TeamRefusalReaders},
 		"run of another agent": {func(w *teamWorld) { w.putRun(w.reviewWork, w.lotse, domain.StateRunning) }, "run_active_other_agent"},
@@ -900,5 +905,42 @@ func TestTeam_RemoveAndDisable(t *testing.T) {
 	w.ownerMessage(w.alex, "hello")
 	if len(w.sched.list) != 0 {
 		t.Fatalf("a channel without team mode scheduled %v", w.sched.list)
+	}
+}
+
+// TestTeam_NonOwnerReadersAreRefused (red team round 1): a team channel or a home channel that a
+// person who is no owner may read is refused at enableChannelTeam and addTeamMember, and a grant
+// added later stops every copy, so a person who could write in a work thread can never steer a
+// member into triggering another member with the sponsor's rights.
+func TestTeam_NonOwnerReadersAreRefused(t *testing.T) {
+	t.Parallel()
+	reasonOf := func(err error) string {
+		if e, ok := errs.As(err); ok {
+			return e.Reason
+		}
+		return ""
+	}
+	w := newTeamWorld(t, defaultTeamConfig())
+	w.readers.set[w.team] = []ids.ID{w.alex, w.sam}
+	if _, err := w.svc.Teams().Enable(asUser(w.alex), w.team); reasonOf(err) != domain.TeamRefusalReaders {
+		t.Fatalf("Enable of a channel Sam reads: %v", err)
+	}
+	delete(w.readers.set, w.team)
+	w.setUp()
+	// Sam gets a grant on homeA and the team channel after the members were added.
+	w.readers.set[w.homeA] = []ids.ID{w.alex, w.sam}
+	w.input(w.reply(w.coding, "@review steered by Sam"))
+	if n := len(w.tmsgs.copiesInto(w.teamMain)) + len(w.tmsgs.copiesInto(w.reviewWork)); n != 0 {
+		t.Fatalf("a reply from a home channel Sam reads was copied %d times", n)
+	}
+	if len(w.runsIn(w.reviewWork)) != 0 {
+		t.Fatal("a reply from a home channel Sam reads started a run")
+	}
+	w.input(w.ownerMessage(w.alex, "@coding go"))
+	if n := len(w.tmsgs.copiesInto(w.codingWork)); n != 0 {
+		t.Fatalf("an owner message reached a home channel Sam reads: %d copies", n)
+	}
+	if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 1 {
+		t.Fatalf("review, whose home only owners read, got %d copies, want 1", n)
 	}
 }

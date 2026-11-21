@@ -4012,10 +4012,11 @@ func (sh *strictHandler) EnableChannelTeam(w http.ResponseWriter, r *http.Reques
 }
 
 // AddTeamMember operation middleware
-func (sh *strictHandler) AddTeamMember(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
+func (sh *strictHandler) AddTeamMember(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params AddTeamMemberParams) {
 	var request AddTeamMemberRequestObject
 
 	request.ChannelId = channelId
+	request.Params = params
 
 	var body AddTeamMemberJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -4072,10 +4073,11 @@ func (sh *strictHandler) RemoveTeamMember(w http.ResponseWriter, r *http.Request
 }
 
 // StopChannelTeam operation middleware
-func (sh *strictHandler) StopChannelTeam(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
+func (sh *strictHandler) StopChannelTeam(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params StopChannelTeamParams) {
 	var request StopChannelTeamRequestObject
 
 	request.ChannelId = channelId
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.StopChannelTeam(ctx, request.(StopChannelTeamRequestObject))

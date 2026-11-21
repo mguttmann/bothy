@@ -81,9 +81,9 @@ const (
 	ReasonRunNotFailed Reason = "run_not_failed"
 	// The refusals of a team input (09 3.9.5, FEAT-TEAM-CHANNEL-SERVER): no authorize result, the
 	// reasons of the audit entries of runs.
-	ReasonTeamSponsorNotOwner Reason = "team_sponsor_not_owner"
-	ReasonTeamReadersDiffer   Reason = "team_readers_differ"
-	ReasonTeamPaused          Reason = "team_paused"
+	ReasonTeamSponsorNotOwner  Reason = "team_sponsor_not_owner"
+	ReasonTeamReadersNotOwners Reason = "team_readers_not_owners"
+	ReasonTeamPaused           Reason = "team_paused"
 )
 
 // reasons is the list of 07 section 4.1 in table order.
@@ -155,7 +155,7 @@ var reasons = []Reason{
 	ReasonDefinitionNeedsHost,
 	ReasonRunNotFailed,
 	ReasonTeamSponsorNotOwner,
-	ReasonTeamReadersDiffer,
+	ReasonTeamReadersNotOwners,
 	ReasonTeamPaused,
 }
 

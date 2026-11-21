@@ -811,7 +811,7 @@ Checked by go-arch-lint (ADR 0008).
 
 ## Tables
 
-`runs`, `run_steps`, `run_followups`, `run_wakes`, `run_autonomy`, `message_components`, `interactions`.
+`runs`, `run_steps`, `run_followups`, `run_wakes`, `run_autonomy`, `message_components`, `interactions`, `team_channels`, `team_members`, `team_inputs`, `team_mirrors`.
 
 `run_wakes` and `run_autonomy` (wake-ups and the counts of autonomous inputs, 09 5.8) come with
 AR-04 (migrations 00097 to 00100; the channel switch with 00101).
@@ -820,7 +820,7 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 
 ## Actions (05-actions.md)
 
-`agent.invoke`, `run.read`, `run.overview.read`, `run.context.read`, `run.start`, `run.token.renew`, `run.update`, `run.finish`, `run.cancel`, `run.followup.create`, `component.update`, `interaction.create`, `interaction.respond`, `command.autocomplete`, `command.autocomplete.respond`, `command.invoke`, `run.wake.create`, `run.wake.recover`, `run.wake.list_pending`, `run.wake.check`, `run.wake.fire`, `run.wake.cancel`, `run.wake.read`, `run.launch.check` (AR-04).
+`agent.invoke`, `run.read`, `run.overview.read`, `run.context.read`, `run.start`, `run.token.renew`, `run.update`, `run.finish`, `run.cancel`, `run.followup.create`, `component.update`, `interaction.create`, `interaction.respond`, `command.autocomplete`, `command.autocomplete.respond`, `command.invoke`, `run.wake.create`, `run.wake.recover`, `run.wake.list_pending`, `run.wake.check`, `run.wake.fire`, `run.wake.cancel`, `run.wake.read`, `run.launch.check` (AR-04), `team.read`, `team.update`, `team.stop` (FEAT-TEAM-CHANNEL-SERVER).
 
 ## Events and WebSocket ops
 
@@ -872,11 +872,11 @@ statistics source; both queries stand in `tools/lint/sql_visibility.yaml` with t
 
 ## Personal data (M7-06)
 
-`adapters/postgres.PersonalData` (`NewPersonalData(pool)`) is the participant of runs in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Tables: `runs`, `run_steps`, `run_followups`, `run_wakes`, `run_autonomy`, `message_components`, `interactions`.
+`adapters/postgres.PersonalData` (`NewPersonalData(pool)`) is the participant of runs in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Tables: `runs`, `run_steps`, `run_followups`, `run_wakes`, `run_autonomy`, `message_components`, `interactions`, `team_channels`, `team_members`, `team_inputs`.
 
 - Export: `runs.jsonl`, one line per run the person triggered (`triggered_by`): ID, thread and agent ID, trigger kind, state, `queued_at`, `started_at`, `finished_at`, `cost_micros`, `currency`, `cost_is_estimate` and the numeric members of the metrics (`docs/api/gdpr-export/v1/lines/runs.schema.json`). Left out are the status line, the last text excerpt, the summary, the plan, the state reason, the last API retry and the run steps: the agent writes them from the whole thread, so they can carry contents of other people (Art. 15(4) GDPR). `runs` has no channel column and the participant reads no table of chat, so a run names only its thread ID. `interactions.jsonl`, one line per own interaction: ID, component and message ID, state, `created_at` and the submitted values, never the response of the app or agent (`lines/interactions.schema.json`).
-- Wake-ups are not exported: their label, condition and result are written by the agent from the whole thread. `run_autonomy` holds only counts.
-- Erase: nothing in any step. The rows go with their thread or message (20 section 2), `run_wakes` with their thread or source run and `run_autonomy` with the thread or the person (ON DELETE CASCADE); with `privacy.account_deletion_content = delete` the message deletion deletes the components of each deleted message, and their interactions follow by cascade.
+- Wake-ups are not exported: their label, condition and result are written by the agent from the whole thread. `run_autonomy` holds only counts. The team tables hold IDs only (sponsor, adder, authority) and are not exported.
+- Erase: nothing in any step. The rows go with their thread or message (20 section 2), `run_wakes` with their thread or source run and `run_autonomy` with the thread or the person (ON DELETE CASCADE); the team tables keep the sponsor, the adder and the authority as pseudonymous IDs like `runs.triggered_by`; with `privacy.account_deletion_content = delete` the message deletion deletes the components of each deleted message, and their interactions follow by cascade.
 - The two reads (`PersonalDataRuns`, `PersonalDataInteractions`) carry no visibility predicate: they run in the job `privacy.export` without a principal and are named by the person.
 
 ## Team channels (FEAT-TEAM-CHANNEL-SERVER)

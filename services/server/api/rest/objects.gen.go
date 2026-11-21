@@ -17159,6 +17159,7 @@ func (response EnableChannelTeamdefaultApplicationProblemPlusJSONResponse) Visit
 
 type AddTeamMemberRequestObject struct {
 	ChannelId ChannelIdPath `json:"channel_id"`
+	Params    AddTeamMemberParams
 	Body      *AddTeamMemberJSONRequestBody
 }
 
@@ -17520,6 +17521,7 @@ func (response RemoveTeamMemberdefaultApplicationProblemPlusJSONResponse) VisitR
 
 type StopChannelTeamRequestObject struct {
 	ChannelId ChannelIdPath `json:"channel_id"`
+	Params    StopChannelTeamParams
 }
 
 type StopChannelTeamResponseObject interface {

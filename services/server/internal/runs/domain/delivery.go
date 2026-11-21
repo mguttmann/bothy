@@ -450,11 +450,7 @@ func setTrigger(p *invocationPayload, in InvocationPayloadInput) error {
 		}
 		p.TriggerKind, p.InteractionID = string(TriggerInteraction), in.InteractionID.String()
 	case TriggerTeam:
-		if in.MessageID.IsZero() || !in.InteractionID.IsZero() || commandSet || in.Team == nil {
-			return errPayload
-		}
-		p.TriggerKind, p.MessageID, p.Team = string(TriggerTeam), in.MessageID.String(), in.Team.payloadOf()
-		return nil
+		return setTeamTrigger(p, in, commandSet)
 	case TriggerFollowup, TriggerAutocomplete:
 		// agent.invocation carries message, command and interaction runs.
 		return errPayload
@@ -506,6 +502,17 @@ func setWakeTrigger(p *invocationPayload, in InvocationPayloadInput, commandSet 
 		return errPayload
 	}
 	p.TriggerKind, p.WakeID, p.Wake = string(TriggerWake), in.Wake.ID.String(), in.Wake.payloadOf()
+	return nil
+}
+
+// setTeamTrigger sets the trigger of a team run: the input message and the team facts, no
+// interaction, command or wake-up (09 3.9.9). Errors: the members of another trigger kind, no
+// message or no team facts.
+func setTeamTrigger(p *invocationPayload, in InvocationPayloadInput, commandSet bool) error {
+	if in.MessageID.IsZero() || !in.InteractionID.IsZero() || commandSet || in.Team == nil {
+		return errPayload
+	}
+	p.TriggerKind, p.MessageID, p.Team = string(TriggerTeam), in.MessageID.String(), in.Team.payloadOf()
 	return nil
 }
 
