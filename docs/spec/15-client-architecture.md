@@ -299,7 +299,11 @@ work; `host_key_pins` likewise, because they are trust anchors. A test checks th
 ### 6.3 Encryption and cleanup
 
 - Key: 256 bits of randomness at the first start, in secure storage (section 9), never in plain text
-  on disk.
+  on disk. As built (FIX-client-db-key, FIX-DBK/1 and FIX-DBK/2): a key is created only while the
+  database file does not exist; a missing key for an existing file is `LocalStoreKeyError`
+  (`keyMissing`), a read the secure storage refuses (a locked device) is no "not found", and only
+  `SQLITE_NOTADB` and `SQLITE_CORRUPT` count as a wrong key, every other SQLite error of the open
+  is `LocalStoreUnavailableError`, which the app retries and never answers with a reset.
 - iOS: file with protection class `NSFileProtectionComplete`; the extensions do not need the database
   (study C recommended "complete"). As built (M5-02, D-M5-02-7): the instance folder, the database
   file and its `-wal` and `-shm` files get the class before the first open (new files in the
@@ -632,7 +636,10 @@ protection of a lost or borrowed device. It is stored for this device only and, 
 `WhenUnlockedThisDeviceOnly`, so it is readable only while the device is unlocked, unlike the
 tokens (`AfterFirstUnlockThisDeviceOnly`, which the extensions need); on Android it lies in the
 Keystore-wrapped store that the backup rules exclude. A copy of the database file is unreadable
-without that key (`apps/client/test/lock/database_key_test.dart`). The phone app lock
+without that key (`apps/client/test/lock/database_key_test.dart`). A start while the device is
+locked therefore finds the session but not the key or the file; it ends on E1 with "Try again"
+and opens the database after the unlock, the classes stay (docs/decisions.d/FIX-client-db-key.md,
+FIX-DBK/3). The phone app lock
 (`apps/client/lib/lock/`) hides every content behind E6 at a cold start and after
 `client.app_lock_after` without use, with the privacy cover and the recent apps protection always
 on, and unlocks through `local_auth` (iOS `LAPolicy.deviceOwnerAuthentication`, Android
@@ -733,13 +740,15 @@ instance and show E1 with their text, a device the server still holds for confir
 and a found instance replaces the remembered description. A waiting device and a build that an
 instance refused as too old (`app/refused_min_version`, until discovery finds an instance again)
 ask before they open anything, as "Connect" does. A database that the stored key does not open
-(`LocalStoreKeyError`: the secret store lost the key and created a new one, or the file is not
-the one of the key) is created anew while no session is stored, so E1 leads on to the login; with
+(`LocalStoreKeyError`: the secret store lost the key, which the app does not replace while the
+file exists, or the file is not the one of the key) is created anew while no session is stored, so E1 leads on to the login; with
 a stored session nothing is deleted, E1 says that the local data cannot be read and offers "Reset
 local data", which deletes the folder of the instance and keeps the session, the device keys and
 the secrets, so the engine loads everything again; what only the unreadable file held is lost
 with it (the outbox, the drafts, the view states of the device and the pinned host keys of the
-terminal). A wipe step that fails is logged; the app remembers the instance and
+terminal). A database the device cannot read at the moment (`LocalStoreUnavailableError`, for
+example a locked iPhone) shows "Try again" and is never deleted (FIX-client-db-key). A wipe step
+that fails is logged; the app remembers the instance and
 the scope of its device keys outside the instance's secrets (`app/unfinished_wipe`), E7 says
 that not everything was deleted, and the app deletes the rest at its next start and before it
 composes the services of an instance again. The entry goes with the rest, or when a session

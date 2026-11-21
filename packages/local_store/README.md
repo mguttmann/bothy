@@ -26,7 +26,9 @@ Further rules checked by `make arch`:
 start and keeps them in secure storage (M4-18 for desktop, M5 for mobile). The first statement on
 the connection is `PRAGMA key = "x'<64 hex>'"`, the raw key form that SQLite3MultipleCiphers
 takes without a key derivation; then the opener checks `SELECT count(*) FROM sqlite_master`
-(a wrong key raises `LocalStoreKeyError`, whose message never contains the key), that
+(a wrong key, `SQLITE_NOTADB` or `SQLITE_CORRUPT`, raises `LocalStoreKeyError`, whose message
+never contains the key; every other SQLite error of the open, such as a file the device cannot
+read at the moment, raises `LocalStoreUnavailableError`, see `openErrorOf`), that
 `PRAGMA cipher` reports `chacha20` and that FTS5 is compiled in (otherwise
 `LocalStoreSetupError`). The hex text exists only inside the setup call. `openInMemoryForTests()`
 opens an unencrypted in-memory database with the same feature checks.

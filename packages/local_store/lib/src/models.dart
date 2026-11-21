@@ -710,15 +710,67 @@ final class ContiguousWindow {
       Object.hash(Object.hashAll(messages), gapBefore, gapAfter);
 }
 
-/// The key of the key source does not open the database file. The message never contains the
-/// key.
+/// Why the local database cannot be read with the key of the key source (FIX-client-db-key).
+enum LocalStoreKeyReason {
+  /// The key does not decrypt the file (`SQLITE_NOTADB`, `SQLITE_CORRUPT`).
+  wrongKey('wrong_key'),
+
+  /// The secret store has no key while the database file of the key exists: the key source
+  /// creates no new one, because a new key never opens the file.
+  keyMissing('key_missing');
+
+  const LocalStoreKeyReason(this.code);
+
+  /// The fixed reason code for logs; never a secret.
+  final String code;
+}
+
+/// The key of the key source does not open the database file, or the key is gone while the
+/// file exists ([reason]). The message never contains the key.
+///
+/// A file the device cannot read at the moment is no key error but a
+/// [LocalStoreUnavailableError].
 final class LocalStoreKeyError implements Exception {
-  /// Creates the error.
-  const LocalStoreKeyError();
+  /// Creates the error with its [reason].
+  const LocalStoreKeyError([this.reason = LocalStoreKeyReason.wrongKey]);
+
+  /// Why the key does not open the file.
+  final LocalStoreKeyReason reason;
 
   @override
   String toString() =>
-      'LocalStoreKeyError: the key does not open the local database';
+      'LocalStoreKeyError: the key does not open the local database (${reason.code})';
+}
+
+/// The database file cannot be read at the moment (FIX-client-db-key): SQLite answered with a
+/// code other than `SQLITE_NOTADB` and `SQLITE_CORRUPT`, for example the iOS file protection of
+/// a locked device (`SQLITE_CANTOPEN`, `SQLITE_IOERR`, `SQLITE_PERM`, `SQLITE_AUTH`) or a busy
+/// or locked file. Nothing about the key or the file is wrong, so the caller tries again later
+/// and never deletes the file for it.
+final class LocalStoreUnavailableError implements Exception {
+  /// Creates the error with the primary SQLite result code [resultCode].
+  const LocalStoreUnavailableError(this.resultCode);
+
+  /// The primary SQLite result code (the extended code masked with `0xFF`).
+  final int resultCode;
+
+  static const Map<int, String> _names = {
+    3: 'perm',
+    5: 'busy',
+    6: 'locked',
+    7: 'nomem',
+    10: 'ioerr',
+    13: 'full',
+    14: 'cantopen',
+    23: 'auth',
+  };
+
+  /// The fixed reason code for logs; never a secret.
+  String get code => _names[resultCode] ?? 'other';
+
+  @override
+  String toString() =>
+      'LocalStoreUnavailableError: sqlite $resultCode ($code), try again later';
 }
 
 /// The SQLite library lacks a feature the store needs (encryption or FTS5), or the key source

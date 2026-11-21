@@ -8,6 +8,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'dart:io' show File;
 import 'dart:math';
 
 import 'package:auth/auth.dart';
@@ -920,25 +921,58 @@ final class InstanceSecrets implements SecretStore {
 
 /// The [DatabaseKeySource] of an instance: 32 random bytes from `Random.secure()`, created at
 /// the first start and kept in the secret store (15 6.3).
+///
+/// The key is created only while the database file [database] does not exist
+/// (docs/decisions.d/FIX-client-db-key.md): a stored file was encrypted with a key that a new
+/// one never replaces, so a missing key then throws [LocalStoreKeyError] with
+/// [LocalStoreKeyReason.keyMissing] and stores nothing. A read the secret store refuses (the
+/// iOS keychain of a locked device answers `errSecInteractionNotAllowed`, a timeout) is thrown
+/// as it is and never read as "not found". Every path logs a fixed reason code, never the key.
 final class SecureDatabaseKeySource implements DatabaseKeySource {
-  /// Creates the source over [secrets]; [random] replaces the secure source in tests.
-  SecureDatabaseKeySource(this._secrets, {Random? random})
-    : _random = random ?? Random.secure();
+  /// Creates the source over [secrets] for the database file [database]; [random] replaces
+  /// the secure source in tests, [log] the developer log.
+  SecureDatabaseKeySource(
+    this._secrets, {
+    required this.database,
+    Random? random,
+    void Function(String line)? log,
+  }) : _random = random ?? Random.secure(),
+       _log = log ?? _developerLog;
 
   /// The key name of the database key in the instance's secrets.
   static const String keyName = 'database_key';
 
+  /// The database file the key belongs to.
+  final File database;
+
   final SecretStore _secrets;
   final Random _random;
+  final void Function(String line) _log;
+
+  static void _developerLog(String line) =>
+      developer.log(line, name: 'database_key');
 
   @override
   Future<Uint8List> obtainKey() async {
-    final stored = await _secrets.read(keyName);
+    final String? stored;
+    try {
+      stored = await _secrets.read(keyName);
+    } on Object catch (error) {
+      // The type and the keychain status only (`errSecInteractionNotAllowed` is -25308).
+      final status = error is PlatformException ? ' ${error.details}' : '';
+      _log('db_key.read_failed: ${error.runtimeType}$status');
+      rethrow;
+    }
     if (stored != null) return base64Decode(stored);
+    if (await database.exists()) {
+      _log('db_key.missing_with_database: no new key is created');
+      throw const LocalStoreKeyError(LocalStoreKeyReason.keyMissing);
+    }
     final key = Uint8List.fromList(
       List<int>.generate(databaseKeyBytes, (_) => _random.nextInt(256)),
     );
     await _secrets.write(keyName, base64Encode(key));
+    _log('db_key.created');
     return key;
   }
 }
