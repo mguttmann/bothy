@@ -172,7 +172,7 @@
       "method": "on_processing_complete"
     }
   ],
-  "inputs_sha256": "a46fe617d5c9ef8f86b532b3d07b8e6b1f49abe2a38637bfb48c4781b9b3b5a3",
+  "inputs_sha256": "d0b380ad5ff9c774f029ab821f10015a55ff43dcda45bcd537095c4118e4cb40",
   "model_requests": [
     {
       "credential": "none",
@@ -184,7 +184,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:0ce53a3f6befc7511d1de55704d58f591929e132968103bd7ac9d2a36af40be8:5184",
+        "sha256:2afef67df290d6b538f47cf72b405af29e8e19497c70377e9420613157ce7287:5009",
         "sha256:266d5c8789166e7a74817866b97360a713aee0852f2b0b617fe1125397f43594:40"
       ],
       "roles": [
@@ -228,11 +228,6 @@
       "tool_call_ids": [],
       "tools": [],
       "turn": null
-    },
-    {
-      "credential": "none",
-      "route": "openai.models",
-      "scripted": false
     }
   ],
   "pattern": [
@@ -315,7 +310,7 @@
     }
   ],
   "pin": {
-    "commit": "f7e2898aaefc8f967dbf7345e3999a65672fe60e",
+    "commit": "242315ce571cde721e717a544cf8ae6c343315cf",
     "tag": null
   },
   "scenario": "text_without_draft"

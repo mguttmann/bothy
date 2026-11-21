@@ -3016,7 +3016,7 @@ it, a row that names `a8b0bc15053c` holds unchanged since that commit. Evidence 
 `plugins/hermes-adapter/tests/fixtures/recording/`; `observations.json` computes the verdict of
 every row from the facts, and a test keeps table and evidence equal.
 
-Current pin: upstream main commit `f7e2898aaefc`, recorded on 2026-11-18 (D-HERMES-PIN-1).
+Current pin: upstream main commit `242315ce571c`, recorded on 2026-11-21 (D-HERMES-PIN-1).
 
 | Item | Result | Evidence | Consequence |
 |---|---|---|---|
