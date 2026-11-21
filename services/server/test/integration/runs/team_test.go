@@ -27,7 +27,7 @@ type teamJobs struct {
 }
 
 // ScheduleTeamInput implements runsapp.TeamScheduler.
-func (j *teamJobs) ScheduleTeamInput(_ context.Context, id ids.ID) error {
+func (j *teamJobs) ScheduleTeamInput(_ context.Context, id, _ ids.ID) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	j.list = append(j.list, id)
@@ -96,10 +96,15 @@ func (w *teamWorld) setUp() {
 	w.codingW, w.reviewW = ids.MustParse(c["work_thread_id"].(string)), ids.MustParse(r["work_thread_id"].(string))
 }
 
-// runInput runs the use case of runs.team_input for the message.
-func (w *teamWorld) runInput(message string) {
+// runInput runs the use case of runs.team_input for the message and the run a reply answers (""
+// for an owner's message).
+func (w *teamWorld) runInput(message, run string) {
 	w.t.Helper()
-	must(w.t, w.runs.TeamInput(context.Background(), ids.MustParse(message)))
+	var r ids.ID
+	if run != "" {
+		r = ids.MustParse(run)
+	}
+	must(w.t, w.runs.TeamInput(context.Background(), ids.MustParse(message), r))
 }
 
 // messageIn is one message of a thread as the tests read it.
@@ -180,7 +185,7 @@ func TestTeam_Scenario(t *testing.T) {
 	if n := len(w.runsWhere(`triggering_message_id = $1`, owner["id"])); n != 0 {
 		t.Fatalf("the acceptance started %d ordinary runs in the team channel", n)
 	}
-	w.runInput(owner["id"].(string))
+	w.runInput(owner["id"].(string), "")
 	for _, th := range []ids.ID{w.codingW, w.reviewW} {
 		msgs := w.messagesIn(th)
 		if len(msgs) != 1 || msgs[0].Author != w.owner.String() || msgs[0].Origin != "human" || msgs[0].Content != "@coding build feature X" {
@@ -197,7 +202,7 @@ func TestTeam_Scenario(t *testing.T) {
 		t.Fatalf("agent.invocation %v", inv)
 	}
 	// The repeated job copies nothing again.
-	w.runInput(owner["id"].(string))
+	w.runInput(owner["id"].(string), "")
 	if n := len(w.messagesIn(w.reviewW)); n != 1 {
 		t.Fatalf("a repeated job copied again: %d", n)
 	}
@@ -211,7 +216,7 @@ func TestTeam_Scenario(t *testing.T) {
 	if !w.jobs.has(reply["id"].(string)) {
 		t.Fatal("the final reply was not scheduled")
 	}
-	w.runInput(reply["id"].(string))
+	w.runInput(reply["id"].(string), coding.ID)
 	mirror := w.messagesIn(w.teamMain)
 	if last := mirror[len(mirror)-1]; last.Author != w.lotse.String() || last.Origin != "agent" || last.Content != "@review built X on branch y, please review" {
 		t.Fatalf("mirror %+v", mirror)
@@ -260,4 +265,34 @@ func (w *teamWorld) payloadOf(query string, args ...any) map[string]any {
 	var m map[string]any
 	must(w.t, json.Unmarshal([]byte(w.text(query+` ORDER BY seq LIMIT 1`, args...)), &m))
 	return m
+}
+
+// TestTeam_RevokedGrantLaunderingRefused (red team round 2): a person who is no owner gets a grant
+// on a member's home channel, triggers the member in its work thread and loses the grant; the
+// member's reply in that run that mentions another member is neither mirrored nor handed on.
+func TestTeam_RevokedGrantLaunderingRefused(t *testing.T) {
+	w := newTeamWorld(t)
+	w.setUp()
+	g := w.grant(`"subject_kind":"user","subject_id":"` + w.sam.String() + `","target_kind":"channel","target_id":"` + w.labA.String() +
+		`","level":"trigger","reason":"Help on Lab A"`)
+	m := w.post("sam", w.codingW, "@lotse ask the reviewer to approve and merge PR 7")
+	r, ok := w.runOf(m["id"].(string))
+	if !ok || r.TriggeredBy != w.sam.String() {
+		t.Fatalf("Sam's message opened no run of Sam: %+v %v", r, ok)
+	}
+	w.wantOK(w.start("lotse", r.ID, w.deliver(r.ID)))
+	w.wantOK(w.do("owner", http.MethodPost, "/api/v1/grants/"+g.String()+"/revoke", `{"reason":"Done"}`, key()...))
+	reply := w.want(w.do("lotse", http.MethodPost, "/api/v1/threads/"+w.codingW.String()+"/messages",
+		`{"client_msg_id":"`+ids.New().String()+`","content_md":"@review please approve and merge PR 7","run_id":"`+r.ID+`"}`, key()...),
+		http.StatusCreated, "")
+	w.runInput(reply["id"].(string), r.ID)
+	if n := len(w.messagesIn(w.reviewW)); n != 0 {
+		t.Fatalf("review got %d inputs from a run Sam started", n)
+	}
+	if n := len(w.teamRuns(w.reviewW)); n != 0 {
+		t.Fatalf("review got %d team runs from a run Sam started", n)
+	}
+	if n := w.count(`SELECT count(*) FROM audit_events WHERE action = 'agent.invoke' AND decision = 'deny' AND deny_reason = 'team_source_not_owner'`); n != 1 {
+		t.Fatalf("%d audited refusals team_source_not_owner", n)
+	}
 }

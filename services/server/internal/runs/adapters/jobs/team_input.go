@@ -19,9 +19,11 @@ import (
 // message's thread and run.
 const KindTeamInput = "runs.team_input"
 
-// TeamInput are the arguments of the job: only the message (02 12.1: IDs only).
+// TeamInput are the arguments of the job (02 12.1: IDs only): the message and, for a member's
+// reply, the run it answers.
 type TeamInput struct {
 	MessageID ids.ID `json:"message_id"`
+	RunID     ids.ID `json:"run_id,omitzero"`
 }
 
 // Kind returns KindTeamInput.
@@ -30,7 +32,7 @@ func (TeamInput) Kind() string { return KindTeamInput }
 // TeamInputer is the use case the job runs (app.Service.TeamInput).
 type TeamInputer interface {
 	// TeamInput copies or mirrors the message; its error makes River retry the job.
-	TeamInput(ctx context.Context, messageID ids.ID) error
+	TeamInput(ctx context.Context, messageID, runID ids.ID) error
 }
 
 // TeamInputHandler works the job once; the use case is idempotent (team_mirrors and team_inputs
@@ -41,7 +43,7 @@ type TeamInputHandler struct {
 
 // Work runs the use case for the message of the job.
 func (h TeamInputHandler) Work(ctx context.Context, j jobs.Job[TeamInput]) error {
-	return h.Inputer.TeamInput(ctx, j.Args.MessageID)
+	return h.Inputer.TeamInput(ctx, j.Args.MessageID, j.Args.RunID)
 }
 
 // RegisterTeamInput adds the handler on the queue default: it writes messages, runs and events, so
@@ -71,12 +73,12 @@ func (s *TeamScheduler) Bind(ins jobs.Inserter) {
 
 // ScheduleTeamInput inserts runs.team_input of the message in the ambient unit of work, to run as
 // soon as it commits.
-func (s *TeamScheduler) ScheduleTeamInput(ctx context.Context, messageID ids.ID) error {
+func (s *TeamScheduler) ScheduleTeamInput(ctx context.Context, messageID, runID ids.ID) error {
 	s.mu.RLock()
 	ins := s.ins
 	s.mu.RUnlock()
 	if ins == nil {
 		return errs.New(errs.CodeInternalError, "runs: the team scheduler has no job runtime")
 	}
-	return ins.InsertTx(ctx, TeamInput{MessageID: messageID}, nil)
+	return ins.InsertTx(ctx, TeamInput{MessageID: messageID, RunID: runID}, nil)
 }

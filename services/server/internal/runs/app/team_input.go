@@ -33,14 +33,14 @@ func (s *Service) teamHook(ctx context.Context, ev messaging.MessagePosted) (boo
 		if err != nil || !found || m.AgentID != ev.AuthorID {
 			return false, err
 		}
-		return false, b.d.Schedule.ScheduleTeamInput(ctx, ev.MessageID)
+		return false, b.d.Schedule.ScheduleTeamInput(ctx, ev.MessageID, *ev.RunID)
 	}
 	team, err := s.isTeamChannel(ctx, b, ev.ChannelID)
 	if err != nil || !team {
 		return false, err
 	}
 	if ev.Origin == originHuman {
-		return true, b.d.Schedule.ScheduleTeamInput(ctx, ev.MessageID)
+		return true, b.d.Schedule.ScheduleTeamInput(ctx, ev.MessageID, ids.ID{})
 	}
 	return true, nil
 }
@@ -54,13 +54,13 @@ func (s *Service) isTeamChannel(ctx context.Context, b *teamBox, channelID ids.I
 	return found, err
 }
 
-// TeamInput is the use case of the job runs.team_input (09 3.9.3, 3.9.4) in one unit of work: the
-// message is read again; an active owner's message in a team channel goes to every member, a
+// TeamInput is the use case of the job runs.team_input (09 3.9.3, 3.9.4) in one unit of work, for
+// a member's reply with the run it answers (runID): the message is read again; an active owner's message in a team channel goes to every member, a
 // member's reply in its work thread is mirrored and goes to the members it mentions. A deleted
 // message, a team that is gone and a message that is neither are nothing; a repeated job changes
 // nothing (team_mirrors, team_inputs). Business refusals post notes and audit entries; only
 // infrastructure errors return an error, which makes the job retry.
-func (s *Service) TeamInput(ctx context.Context, messageID ids.ID) error {
+func (s *Service) TeamInput(ctx context.Context, messageID, runID ids.ID) error {
 	b, err := s.teamBox()
 	if err != nil {
 		return err
@@ -80,7 +80,7 @@ func (s *Service) TeamInput(ctx context.Context, messageID ids.ID) error {
 		if err != nil || !found || m.Origin != originAgent || member.AgentID != m.Author.ID {
 			return err
 		}
-		return s.memberReply(ctx, b, m, member)
+		return s.memberReply(ctx, b, m, member, runID)
 	})
 }
 
@@ -129,7 +129,7 @@ func (s *Service) ownerInput(ctx context.Context, b *teamBox, m messaging.Trigge
 // memberReply mirrors a member's final reply into the main thread of the team channel and hands
 // it to every member it mentions (09 3.9.4), each through the brake and the checks of 3.9.5, with
 // the sponsor as authority.
-func (s *Service) memberReply(ctx context.Context, b *teamBox, m messaging.TriggerMessage, member TeamMemberRow) error {
+func (s *Service) memberReply(ctx context.Context, b *teamBox, m messaging.TriggerMessage, member TeamMemberRow, runID ids.ID) error {
 	mirrored, err := b.d.Repo.TeamMirrored(ctx, m.ID)
 	if err != nil || mirrored {
 		return err
@@ -138,11 +138,66 @@ func (s *Service) memberReply(ctx context.Context, b *teamBox, m messaging.Trigg
 	if err != nil || !found {
 		return err
 	}
+	owned, err := s.ownerRun(ctx, b, runID, member)
+	if err != nil {
+		return err
+	}
+	if !owned {
+		return s.refuseInput(ctx, b, team, member,
+			&teamSource{authority: team.SponsorID, kind: domain.TeamSourceMember, member: &member}, domain.TeamRefusalSource, "")
+	}
 	copied, ok, err := s.mirrorReply(ctx, b, team, m, member)
 	if err != nil || !ok {
 		return err
 	}
 	return s.handOn(ctx, b, team, member, copied)
+}
+
+// ownerRun reports whether only active owners steered the run runID a member's reply answers (09
+// 3.9.4): it is a run of the member's agent in its work thread, its triggering person (for a team
+// run the authority of its input) is an active owner, and every follow-up it took is an active
+// owner's message or a team input whose authority is an active owner. A run that a person who is
+// no owner started or fed, also one whose grant was revoked since, never hands work on with the
+// sponsor's rights.
+func (s *Service) ownerRun(ctx context.Context, b *teamBox, runID ids.ID, member TeamMemberRow) (bool, error) {
+	run, found, err := s.d.Repo.Run(ctx, runID)
+	if err != nil || !found || run.AgentID != member.AgentID || run.ThreadID != member.WorkThreadID {
+		return false, err
+	}
+	if ok, err := b.d.Owners.IsActiveOwner(ctx, run.TriggeredBy); err != nil || !ok {
+		return false, err
+	}
+	if s.fu == nil {
+		return true, nil
+	}
+	rows, err := s.fu.rows.RunFollowups(ctx, runID)
+	if err != nil {
+		return false, err
+	}
+	for _, r := range rows {
+		person, err := s.followupPerson(ctx, r.MessageID)
+		if err != nil || person.IsZero() {
+			return false, err
+		}
+		if ok, err := b.d.Owners.IsActiveOwner(ctx, person); err != nil || !ok {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+// followupPerson returns the person a follow-up message speaks for: the authority of a team input,
+// the author of a person's message; zero for every other message.
+func (s *Service) followupPerson(ctx context.Context, messageID ids.ID) (ids.ID, error) {
+	in, team, err := s.teamInputOf(ctx, messageID)
+	if err != nil || team {
+		return in.AuthorityID, err
+	}
+	m, err := s.d.Messages.TriggerMessageOf(ctx, messageID)
+	if err != nil || m.Origin != originHuman {
+		return ids.ID{}, err
+	}
+	return m.Author.ID, nil
 }
 
 // mirrorReply copies the reply into the main thread of the team channel as the member's agent and

@@ -423,6 +423,14 @@ source gets the reply as an input (3.9.2) with the sponsor as authority, in the 
 mention, as a follow-up of its running run or a new `team` run. Several mentions in one reply are
 allowed here (3.4 step 3 refuses them elsewhere, because those runs share one thread).
 
+A reply is mirrored and handed on only when the run it answers was started and fed only by active
+owners: its `triggered_by` (for a team run the authority of its input) and the person of every
+follow-up it took (the author of a person's message, the authority of a team input) are active
+owners at the moment of the job. Otherwise nothing is copied, a note names the member and the
+reason `team_source_not_owner`, and the refusal is audited. A person with a grant who wrote in a
+work thread therefore never steers a member into triggering another member with the sponsor's
+rights, also after the grant was revoked.
+
 Mirror and inputs run in the job `runs.team_input` after the reply's commit, never in the unit of
 work of the reply, so the locks of the reply's thread and run are never held while the team
 channel and the other work threads are written. The job is idempotent: a reply is mirrored once
