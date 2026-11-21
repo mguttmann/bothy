@@ -895,7 +895,7 @@ class HermesHandler(AgentHandler):
         self._own_turn_ended(turn)
         if turn.live is not None:
             turn.live.end(failed=outcome is not TurnOutcome.COMPLETED)
-        await self._flush_edits(turn)
+        await self._flush_edits(turn, completed=outcome is TurnOutcome.COMPLETED)
         await self._report_session(turn, switched)
         if outcome is TurnOutcome.COMPLETED and turn.abort_reason is None:
             self._absorb(turn)
@@ -912,7 +912,7 @@ class HermesHandler(AgentHandler):
             turn.ended = True
             if turn.live is not None:
                 turn.live.end(failed=outcome is not TurnOutcome.COMPLETED)
-            await self._flush_edits(turn)
+            await self._flush_edits(turn, completed=not cancel)
             if cancel:
                 # A run never ends while work it covers goes on unseen (R-AG-44).
                 await self._cancel_work(turn)
@@ -1390,7 +1390,7 @@ class HermesHandler(AgentHandler):
             return
         if turn.live is not None:
             turn.live.end(failed=outcome is not TurnOutcome.COMPLETED)
-        await self._flush_edits(turn)
+        await self._flush_edits(turn, completed=outcome is TurnOutcome.COMPLETED)
         if outcome is TurnOutcome.COMPLETED:
             with contextlib.suppress(ValueError):
                 run.patch.followup_absorbed(message_id)
@@ -2201,6 +2201,12 @@ class HermesHandler(AgentHandler):
                     turn.live.draft(text)
             return True
         del turn.previews[key]
+        if self._progress(turn, text):
+            # The text in front of a tool call, which the edit transport closes with a
+            # finalizing edit: progress in the live box, never an answer (D-ADAPTER-INTERIM-1).
+            with self._bound(turn):
+                turn.live.draft(text)  # type: ignore[union-attr] # _active checked the live box
+            return True
         with self._bound(turn):
             posted = await self._post_answer(turn, text, reply_to)
         if posted is None:
@@ -2210,12 +2216,17 @@ class HermesHandler(AgentHandler):
         turn.posted[key] = turn.posted.pop(posted)
         return True
 
-    async def _post_previews(self, turn: _Turn) -> None:
-        """Previews Hermes never finalized: their last text without the cursor, once each."""
+    async def _post_previews(self, turn: _Turn, *, completed: bool) -> None:
+        """Previews Hermes never finalized: their last text without the cursor, once each.
+
+        Only for a turn that completed: a stopped, aborted or failed turn posts no partial text,
+        which would read as a finished answer (and hand work on in a team channel, 09 3.9.4).
+        """
+        post = completed and turn.abort_reason is None and not turn.dropped
         for key, (text, reply_to) in list(turn.previews.items()):
             del turn.previews[key]
             final = _without_cursor(text)
-            if not final:
+            if not post or not final or self._progress(turn, final):
                 continue
             with self._bound(turn):
                 posted = await self._post_answer(turn, final, reply_to)
@@ -2223,9 +2234,17 @@ class HermesHandler(AgentHandler):
                 turn.answers[key] = turn.answers.pop(posted)
                 turn.posted[key] = turn.posted.pop(posted)
 
-    async def _flush_edits(self, turn: _Turn, only: str | None = None) -> None:
+    @staticmethod
+    def _progress(turn: _Turn, text: str) -> bool:
+        """Whether a text is the open loop's text in front of a tool call (as `on_interim`)."""
+        body = text.strip()
+        return bool(turn.hermes_open and body and body in turn.tool_text)
+
+    async def _flush_edits(
+        self, turn: _Turn, only: str | None = None, *, completed: bool = True
+    ) -> None:
         if only is None:
-            await self._post_previews(turn)
+            await self._post_previews(turn, completed=completed)
         for key in [only] if only is not None else list(turn.edits):
             text = turn.edits.pop(key, None) if key is not None else None
             if text is None or key is None:

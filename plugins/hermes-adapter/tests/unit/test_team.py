@@ -299,6 +299,60 @@ async def test_a_streamed_answer_goes_out_once_as_written(tmp_path: Path, finali
     assert r.fake.messages[0]["run_id"] == str(triggered.run_id)
 
 
+async def test_a_streamed_segment_before_a_tool_call_is_progress(tmp_path: Path) -> None:
+    """The edit transport closes the text in front of a tool call with a finalizing edit: it is
+    progress (D-ADAPTER-INTERIM-1), never an answer that could hand work on (09 3.9.4)."""
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        ev = rt.events
+        ev.on_turn_started(turn.thread_id)
+        ev.on_model_reply(turn.thread_id, 1, "First I ask @dev to check the logs.")
+        key = await ev.on_answer(turn.thread_id, "First I ask \u2589", None, preview=True)
+        assert key is not None
+        assert await ev.on_edit(turn.thread_id, key, "First I ask @dev to check the logs.", True)
+        ev.on_model_reply(turn.thread_id, 0)
+        last = await ev.on_answer(turn.thread_id, "All \u2589", None, preview=True)
+        assert last is not None
+        assert await ev.on_edit(turn.thread_id, last, "All done, nothing to hand on.", True)
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await _member_input(r)
+        await r.until(lambda: r.finished(triggered.run_id))
+    assert [m["content_md"] for m in r.fake.messages] == ["All done, nothing to hand on."]
+    assert r.requests("updateMessage") == []
+
+
+@pytest.mark.parametrize("ending", ["abort", "failed"])
+async def test_an_open_preview_of_a_run_that_did_not_complete_is_never_posted(
+    tmp_path: Path, ending: str
+) -> None:
+    gate = asyncio.Event()
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        key = await rt.events.on_answer(turn.thread_id, "Half an answer \u2589", None, preview=True)
+        assert key is not None
+        if ending == "abort":
+            await gate.wait()
+            # Hermes closes its stream after the stop; the run takes nothing any more.
+            assert not await rt.events.on_edit(turn.thread_id, key, "Half an answer", True)
+            return TurnOutcome.CANCELLED
+        return TurnOutcome.FAILED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await _member_input(r)
+        if ending == "abort":
+            await r.until(lambda: rt.turns)
+            turn = r.handler._by_run[triggered.run_id]
+            turn.abort_reason = "billing_mode_mismatch"
+            gate.set()
+        await r.until(lambda: r.finished(triggered.run_id))
+    assert r.fake.run_state(triggered.run_id).state == "failed"
+    assert r.fake.messages == []
+
+
 # ---- follow-ups ---------------------------------------------------------------------------------
 
 

@@ -144,3 +144,23 @@ async def test_team_run_and_followups_reach_hermes(
         assert _own_token_answers(rig, triggered.run_id) == [ANSWER]
         # The answer stays as written: an edited answer would hand nothing on (09 3.9.4).
         assert rig.requests("updateMessage") == []
+
+
+async def test_text_before_a_tool_call_hands_nothing_on_with_the_edit_transport(
+    world: HermesWorld,
+) -> None:
+    """The edit transport closes the text in front of a tool call with a finalizing edit; it is
+    progress, so only the final answer is a message (D-ADAPTER-INTERIM-1, D-TCA-8)."""
+    script = [
+        ScriptTurn(text=("First I ask @dev to check the logs.",), tool_calls=(TODO,), paced=True),
+        ScriptTurn(text=("All done, ", "nothing to hand on."), paced=True),
+    ]
+    profile = Profile(config={"streaming": {"enabled": True, "transport": "edit"}})
+    async with hermes_rig(world, script, texts=[ASK], profile=profile) as rig:
+        triggered = await rig.fake.trigger(
+            ASK, trigger_kind="team", author="texter", authority="alex", team=_team(rig, "member")
+        )
+        await _end(rig, triggered.run_id)
+        assert rig.fake.run_state(triggered.run_id).state == "completed", gateway_log(rig)
+        assert _own_token_answers(rig, triggered.run_id) == ["All done, nothing to hand on."]
+        assert rig.requests("updateMessage") == []

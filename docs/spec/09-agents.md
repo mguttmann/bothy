@@ -3537,8 +3537,10 @@ serves `team` runs by the contract of 3.9.9:
   `@handle` mentions. No command is needed. With Hermes' edit transport
   (`streaming.transport: edit`) the first send of an answer is a preview Hermes marks
   `expect_edits` and edits up to its final text: the adapter shows it as the draft and posts the
-  answer at the edit that finalizes it (or the last text without the cursor at the end of the
-  run); an edit to the text the answer already has is not sent (D-TCA-8).
+  answer at the edit that finalizes it (or the last text without the cursor at the end of a
+  completed turn; a stopped, aborted or failed turn posts none); a finalized preview that is the
+  text in front of a tool call stays progress as in 17.3 (D-ADAPTER-INTERIM-1); an edit to the
+  text the answer already has is not sent (D-TCA-8).
 
 Evidence: `plugins/hermes-adapter/tests/unit/test_team.py` (owner and member input, a member's
 text with the source `owner`, a run without the member `team`, unknown trigger kinds, the
@@ -3548,7 +3550,8 @@ team run beside a concurrent run whose Hermes task
 reports for the team thread, with stage steps, a steered follow-up and an edit, where every
 request about a run carries a token of exactly that run) and the Fake-Hermes test
 `tests/fake_hermes/test_team.py` against the pinned version (member and owner input, and a member
-input with the edit transport, whose answer goes out once and unedited).
+input with the edit transport, whose answer goes out once and unedited, and whose text in front
+of a tool call stays progress).
 
 ## 18. Reference adapter: Claude-Code-Runner (development forums)
 
