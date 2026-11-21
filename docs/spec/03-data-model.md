@@ -3056,6 +3056,7 @@ section 4 applies, and the gate fails.
 | [erd-8-audit-privacy.mmd](../architecture/erd-8-audit-privacy.mmd) | `audit`, `privacy` |
 | [erd-9-import-status-statistics.mmd](../architecture/erd-9-import-status-statistics.mmd) | `importer`, `status`, `stats` |
 | [erd-10-notification.mmd](../architecture/erd-10-notification.mmd) | `notify`, `gateway` |
+| [erd-11-team-channels.mmd](../architecture/erd-11-team-channels.mmd) | `runs` (team channels, `run_feeders`, `run_answers`) |
 
 ## 8. Decisions of this chapter
 

@@ -1,0 +1,78 @@
+%% ERD part 11: the team channels and the record of who fed a run (module runs).
+%% Source: 03-data-model.md, 4.8 (team_channels to run_answers).
+%% Pure log columns (created_by and similar) point to principals(id) and are not drawn.
+%% Tables of other parts only with their key.
+erDiagram
+  direction TB
+  team_channels {
+    uuid channel_id PK, FK
+    uuid sponsor_id FK "authority of member inputs"
+    integer member_turns
+    text pause_reason "turn_budget, pingpong, stopped"
+  }
+  team_members {
+    uuid id PK
+    uuid channel_id FK
+    uuid agent_id FK
+    uuid home_channel_id FK
+    uuid work_thread_id FK
+    text handle "UK with channel_id"
+  }
+  team_inputs {
+    uuid message_id PK, FK "the input"
+    uuid member_id FK
+    uuid source_message_id FK
+    text source "owner, member"
+    uuid source_member_id FK
+    uuid authority_id FK
+  }
+  team_mirrors {
+    uuid source_message_id PK, FK "the reply"
+    uuid mirror_message_id FK
+    uuid member_id FK
+  }
+  run_feeders {
+    uuid run_id FK
+    uuid principal_id FK "NULL: speaks for no person"
+    text source "trigger, followup, interaction, command, wake_input, context"
+  }
+  run_answers {
+    uuid message_id PK "no FK"
+    uuid run_id FK
+  }
+  channels {
+    uuid id PK
+  }
+  threads {
+    uuid id PK
+  }
+  agents {
+    uuid principal_id PK
+  }
+  messages {
+    uuid id PK
+  }
+  principals {
+    uuid id PK
+  }
+  runs {
+    uuid id PK
+  }
+
+  channels ||--o| team_channels : "team mode"
+  principals ||--o{ team_channels : "sponsor"
+  team_channels ||--o{ team_members : "members"
+  agents ||--o{ team_members : "member agent"
+  channels ||--o{ team_members : "home channel"
+  threads ||--o{ team_members : "work thread"
+  messages ||--o| team_inputs : "is input"
+  messages ||--o{ team_inputs : "source"
+  team_members ||--o{ team_inputs : "receives"
+  team_members |o--o{ team_inputs : "source member"
+  principals ||--o{ team_inputs : "authority"
+  messages ||--o| team_mirrors : "reply"
+  messages ||--o| team_mirrors : "mirror"
+  team_members |o--o{ team_mirrors : "mirrored for"
+  runs ||--o{ run_feeders : "fed by"
+  principals |o--o{ run_feeders : "speaks for"
+  runs ||--o{ run_answers : "answered by"
