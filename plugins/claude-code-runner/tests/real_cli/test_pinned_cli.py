@@ -13,7 +13,8 @@ and every text of the CLI's own "too old" pattern is one the runner recognises. 
 runs it against a newer CLI with ``CLAUDE_CODE_RUNNER_TESTED_VERSION`` set to that version
 (FIX-RUNNER-TESTED-CLI): the CLI is then held against the recordings of the pin, and the probe
 and ``check-config`` take it with the configuration entry the chain writes. Its field table may
-name members the recording does not know, never lose one it knows (FIX-RUNNER-CONTRACT-TOLERANT).
+name members the recording does not know, never lose one it knows; of the task types it may
+lose only those the runner does not map (FIX-RUNNER-CONTRACT-TOLERANT).
 """
 
 from __future__ import annotations

@@ -26,3 +26,8 @@ Open minors (for the next run in this area of the runner):
   only report additions inside the recorded messages.
 - The `state` values of the workflow agent entries (`livebox._AGENT_END`) are not part of the
   field table, so neither the pin nor a tested CLI is held against them.
+- `test_livebox.py` holds `READ_TASK_TYPES` against the recorded task types and one invented
+  type; if `LiveBox` came to map a type of its own that the recording does not name, the list
+  would stay short unnoticed.
+- The version row of spec 09 section 18.2 lists the pins only up to 2.1.325; the code pins
+  2.1.326 (D-FIX-RUNNER-CLI-PIN-326-1).
