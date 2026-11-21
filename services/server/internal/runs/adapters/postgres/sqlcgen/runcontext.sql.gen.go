@@ -100,3 +100,57 @@ func (q *Queries) EarlierSessionRun(ctx context.Context, arg EarlierSessionRunPa
 	err := row.Scan(&i.Used, &i.TriggerMessageID)
 	return i, err
 }
+
+const sessionFeeders = `-- name: SessionFeeders :many
+SELECT DISTINCT f.principal_id FROM run_feeders f
+JOIN runs e ON e.id = f.run_id
+WHERE e.thread_id = $1 AND e.agent_id = $2 AND e.agent_session_id = $3
+  AND e.started_at IS NOT NULL AND e.id <> $4
+  AND (e.queued_at, e.id) < ($5::timestamptz, $4::uuid)
+UNION
+SELECT NULL::uuid WHERE EXISTS (
+    SELECT 1 FROM runs e
+    WHERE e.thread_id = $1 AND e.agent_id = $2 AND e.agent_session_id = $3
+      AND e.started_at IS NOT NULL AND e.id <> $4
+      AND (e.queued_at, e.id) < ($5::timestamptz, $4::uuid)
+      AND NOT EXISTS (SELECT 1 FROM run_feeders t WHERE t.run_id = e.id AND t.source = 'trigger')
+)
+`
+
+type SessionFeedersParams struct {
+	ThreadID  pgtype.UUID
+	AgentID   pgtype.UUID
+	SessionID pgtype.UUID
+	RunID     pgtype.UUID
+	QueuedAt  pgtype.Timestamptz
+}
+
+// What a run that resumes a session takes over (09 3.9.4, FEAT-TEAM-CHANNEL-SERVER): every
+// principal recorded in run_feeders for a started run of the agent's session row in the thread
+// queued before the run, and one NULL when such a run has no trigger row (a record older than
+// run_feeders). The same earlier runs as EarlierSessionRun.
+func (q *Queries) SessionFeeders(ctx context.Context, arg SessionFeedersParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, sessionFeeders,
+		arg.ThreadID,
+		arg.AgentID,
+		arg.SessionID,
+		arg.RunID,
+		arg.QueuedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var principal_id pgtype.UUID
+		if err := rows.Scan(&principal_id); err != nil {
+			return nil, err
+		}
+		items = append(items, principal_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

@@ -75,6 +75,8 @@ import 'package:api_client/src/generated/model/agent_session_changed_event.dart'
 import 'package:api_client/src/generated/model/agent_session_changed_payload.dart';
 import 'package:api_client/src/generated/model/agent_session_list.dart';
 import 'package:api_client/src/generated/model/agent_session_report.dart';
+import 'package:api_client/src/generated/model/agent_team_facts.dart';
+import 'package:api_client/src/generated/model/agent_team_member.dart';
 import 'package:api_client/src/generated/model/agent_template.dart';
 import 'package:api_client/src/generated/model/agent_template_list.dart';
 import 'package:api_client/src/generated/model/agent_triggerers.dart';
@@ -612,6 +614,11 @@ import 'package:api_client/src/generated/model/step_up_passkey_request.dart';
 import 'package:api_client/src/generated/model/step_up_password_request.dart';
 import 'package:api_client/src/generated/model/step_up_result.dart';
 import 'package:api_client/src/generated/model/target_kind.dart';
+import 'package:api_client/src/generated/model/team.dart';
+import 'package:api_client/src/generated/model/team_member.dart';
+import 'package:api_client/src/generated/model/team_member_create.dart';
+import 'package:api_client/src/generated/model/team_pause_reason.dart';
+import 'package:api_client/src/generated/model/team_stop_result.dart';
 import 'package:api_client/src/generated/model/template.dart';
 import 'package:api_client/src/generated/model/template_create.dart';
 import 'package:api_client/src/generated/model/template_list.dart';
@@ -757,6 +764,8 @@ part 'serializers.g.dart';
   AgentSessionChangedPayload,
   AgentSessionList,
   AgentSessionReport,
+  AgentTeamFacts,
+  AgentTeamMember,
   AgentTemplate,
   AgentTemplateList,
   AgentTriggerers,
@@ -1296,6 +1305,11 @@ part 'serializers.g.dart';
   StepUpPasswordRequest,
   StepUpResult,
   TargetKind,
+  Team,
+  TeamMember,
+  TeamMemberCreate,
+  TeamPauseReason,
+  TeamStopResult,
   Template,
   TemplateCreate,
   TemplateList,
@@ -1719,6 +1733,14 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(JsonPatchOperation)]),
             () => ListBuilder<JsonPatchOperation>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AgentTeamMember)]),
+            () => ListBuilder<AgentTeamMember>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(TeamMember)]),
+            () => ListBuilder<TeamMember>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(Component)]),

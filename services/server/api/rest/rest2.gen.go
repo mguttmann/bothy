@@ -296,6 +296,24 @@ type StrictServerInterface interface {
 	// MoveForumTag Change the position of a forum tag
 	// (POST /channels/{channel_id}/tags/{tag_id}/move)
 	MoveForumTag(ctx context.Context, request MoveForumTagRequestObject) (MoveForumTagResponseObject, error)
+	// DisableChannelTeam Switch team mode off
+	// (DELETE /channels/{channel_id}/team)
+	DisableChannelTeam(ctx context.Context, request DisableChannelTeamRequestObject) (DisableChannelTeamResponseObject, error)
+	// GetChannelTeam Read the team of a team channel
+	// (GET /channels/{channel_id}/team)
+	GetChannelTeam(ctx context.Context, request GetChannelTeamRequestObject) (GetChannelTeamResponseObject, error)
+	// EnableChannelTeam Switch a channel to team mode
+	// (PUT /channels/{channel_id}/team)
+	EnableChannelTeam(ctx context.Context, request EnableChannelTeamRequestObject) (EnableChannelTeamResponseObject, error)
+	// AddTeamMember Add a member to a team channel
+	// (POST /channels/{channel_id}/team/members)
+	AddTeamMember(ctx context.Context, request AddTeamMemberRequestObject) (AddTeamMemberResponseObject, error)
+	// RemoveTeamMember Remove a member from a team channel
+	// (DELETE /channels/{channel_id}/team/members/{member_id})
+	RemoveTeamMember(ctx context.Context, request RemoveTeamMemberRequestObject) (RemoveTeamMemberResponseObject, error)
+	// StopChannelTeam Stop every run of a team channel
+	// (POST /channels/{channel_id}/team/stop)
+	StopChannelTeam(ctx context.Context, request StopChannelTeamRequestObject) (StopChannelTeamResponseObject, error)
 	// ListTemplates List own and channel templates
 	// (GET /channels/{channel_id}/templates)
 	ListTemplates(ctx context.Context, request ListTemplatesRequestObject) (ListTemplatesResponseObject, error)
@@ -3908,6 +3926,172 @@ func (sh *strictHandler) MoveForumTag(w http.ResponseWriter, r *http.Request, ch
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(MoveForumTagResponseObject); ok {
 		if err := validResponse.VisitMoveForumTagResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DisableChannelTeam operation middleware
+func (sh *strictHandler) DisableChannelTeam(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
+	var request DisableChannelTeamRequestObject
+
+	request.ChannelId = channelId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DisableChannelTeam(ctx, request.(DisableChannelTeamRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DisableChannelTeam")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DisableChannelTeamResponseObject); ok {
+		if err := validResponse.VisitDisableChannelTeamResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetChannelTeam operation middleware
+func (sh *strictHandler) GetChannelTeam(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
+	var request GetChannelTeamRequestObject
+
+	request.ChannelId = channelId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetChannelTeam(ctx, request.(GetChannelTeamRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetChannelTeam")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetChannelTeamResponseObject); ok {
+		if err := validResponse.VisitGetChannelTeamResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EnableChannelTeam operation middleware
+func (sh *strictHandler) EnableChannelTeam(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
+	var request EnableChannelTeamRequestObject
+
+	request.ChannelId = channelId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.EnableChannelTeam(ctx, request.(EnableChannelTeamRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "EnableChannelTeam")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EnableChannelTeamResponseObject); ok {
+		if err := validResponse.VisitEnableChannelTeamResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AddTeamMember operation middleware
+func (sh *strictHandler) AddTeamMember(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params AddTeamMemberParams) {
+	var request AddTeamMemberRequestObject
+
+	request.ChannelId = channelId
+	request.Params = params
+
+	var body AddTeamMemberJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AddTeamMember(ctx, request.(AddTeamMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddTeamMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddTeamMemberResponseObject); ok {
+		if err := validResponse.VisitAddTeamMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveTeamMember operation middleware
+func (sh *strictHandler) RemoveTeamMember(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, memberId MemberIdPath) {
+	var request RemoveTeamMemberRequestObject
+
+	request.ChannelId = channelId
+	request.MemberId = memberId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RemoveTeamMember(ctx, request.(RemoveTeamMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveTeamMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveTeamMemberResponseObject); ok {
+		if err := validResponse.VisitRemoveTeamMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StopChannelTeam operation middleware
+func (sh *strictHandler) StopChannelTeam(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params StopChannelTeamParams) {
+	var request StopChannelTeamRequestObject
+
+	request.ChannelId = channelId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StopChannelTeam(ctx, request.(StopChannelTeamRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StopChannelTeam")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StopChannelTeamResponseObject); ok {
+		if err := validResponse.VisitStopChannelTeamResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

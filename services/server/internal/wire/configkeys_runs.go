@@ -68,6 +68,16 @@ func runsConfigKeys() []config.Key {
 			Doc: "Consecutive autonomous inputs per thread and person; 0 means no chain cap."},
 		{Name: "run.autonomous_idle_max", Kind: config.KindInt, Default: "3", Min: "1", Max: "1000", Chapter: chapter09,
 			Doc: "Consecutive idle autonomous inputs per thread and person; at least 1, cannot be switched off."},
+		// FEAT-TEAM-CHANNEL-SERVER: the team channels (09 3.9 and 21). The brake defaults are high on
+		// purpose: the brake catches loops, it is no cost limit (owner answer of 2026-11-21).
+		{Name: "team.turn_budget", Kind: config.KindInt, Default: "200", Min: "1", Max: "100000", Chapter: chapter09,
+			Doc: "Member inputs per team channel since an owner's last message; the next one pauses the channel."},
+		{Name: "team.pingpong_max", Kind: config.KindInt, Default: "40", Min: "1", Max: "100000", Chapter: chapter09,
+			Doc: "Longest alternation of inputs between the same two members without an owner message; a longer one pauses the channel."},
+		{Name: "team.max_members", Kind: config.KindInt, Default: "20", Min: "1", Max: "1000", Chapter: chapter09,
+			Doc: "Members per team channel."},
+		{Name: "team.handle_max_chars", Kind: config.KindInt, Default: "32", Min: "1", Max: "64", Chapter: chapter09,
+			Doc: "Longest handle of a team member."},
 	}
 }
 

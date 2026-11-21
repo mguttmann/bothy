@@ -15,6 +15,9 @@ const RunTriggerKindEnum _$runTriggerKindEnum_interaction =
 const RunTriggerKindEnum _$runTriggerKindEnum_wake = const RunTriggerKindEnum._(
   'wake',
 );
+const RunTriggerKindEnum _$runTriggerKindEnum_team = const RunTriggerKindEnum._(
+  'team',
+);
 const RunTriggerKindEnum _$runTriggerKindEnum_unknownDefaultOpenApi =
     const RunTriggerKindEnum._('unknownDefaultOpenApi');
 
@@ -28,6 +31,8 @@ RunTriggerKindEnum _$runTriggerKindEnumValueOf(String name) {
       return _$runTriggerKindEnum_interaction;
     case 'wake':
       return _$runTriggerKindEnum_wake;
+    case 'team':
+      return _$runTriggerKindEnum_team;
     case 'unknownDefaultOpenApi':
       return _$runTriggerKindEnum_unknownDefaultOpenApi;
     default:
@@ -41,6 +46,7 @@ final BuiltSet<RunTriggerKindEnum> _$runTriggerKindEnumValues =
       _$runTriggerKindEnum_command,
       _$runTriggerKindEnum_interaction,
       _$runTriggerKindEnum_wake,
+      _$runTriggerKindEnum_team,
       _$runTriggerKindEnum_unknownDefaultOpenApi,
     ]);
 
@@ -54,6 +60,7 @@ class _$RunTriggerKindEnumSerializer
     'command': 'command',
     'interaction': 'interaction',
     'wake': 'wake',
+    'team': 'team',
     'unknownDefaultOpenApi': 'unknown_default_open_api',
   };
   static const Map<Object, String> _fromWire = const <Object, String>{
@@ -61,6 +68,7 @@ class _$RunTriggerKindEnumSerializer
     'command': 'command',
     'interaction': 'interaction',
     'wake': 'wake',
+    'team': 'team',
     'unknown_default_open_api': 'unknownDefaultOpenApi',
   };
 

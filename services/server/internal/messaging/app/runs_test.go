@@ -130,9 +130,9 @@ func TestSetTriggerState_SameStateIsNoop(t *testing.T) {
 	}
 }
 
-// TestSetTriggerState_InternalErrors: outside a unit of work, an unknown message, a message whose
-// origin is not human, an unknown state and a reason that does not fit the state are internal
-// errors that write nothing.
+// TestSetTriggerState_InternalErrors: outside a unit of work, an unknown message, an unknown state
+// and a reason that does not fit the state are internal errors that write nothing; an agent's
+// message is a no-op that writes nothing either (D-TEAM-6).
 func TestSetTriggerState_InternalErrors(t *testing.T) {
 	t.Parallel()
 	w := mw.New(t, subscribe)
@@ -150,7 +150,6 @@ func TestSetTriggerState_InternalErrors(t *testing.T) {
 		cmd  messaging.SetTriggerStateCmd
 	}{
 		{"unknown message", messaging.SetTriggerStateCmd{MessageID: ids.New(), State: "received"}},
-		{"origin agent", messaging.SetTriggerStateCmd{MessageID: agentMsg, State: "received"}},
 		{"unknown state", messaging.SetTriggerStateCmd{MessageID: human, State: "started"}},
 		{"empty state", messaging.SetTriggerStateCmd{MessageID: human}},
 		{"failed without reason", messaging.SetTriggerStateCmd{MessageID: human, State: "failed"}},
@@ -162,6 +161,12 @@ func TestSetTriggerState_InternalErrors(t *testing.T) {
 		if !internal(err) {
 			t.Errorf("%s: %v, want internal", c.name, err)
 		}
+	}
+	// An agent's message carries no trigger state (D-TEAM-6): a no-op, not an error.
+	if err := inUnit(w, func(ctx context.Context) error {
+		return w.Svc.SetTriggerState(ctx, messaging.SetTriggerStateCmd{MessageID: agentMsg, State: "received"})
+	}); err != nil {
+		t.Errorf("origin agent: %v, want nil", err)
 	}
 	if n := len(w.Events("message.updated")); n != 0 {
 		t.Fatalf("%d message.updated", n)
@@ -334,5 +339,40 @@ func TestCreateMessage_BodyIsStoredRowAfterUnit(t *testing.T) {
 	first := tc["first_message"].(map[string]any)
 	if first["trigger_state"] != "received" || first["version"] != float64(2) {
 		t.Fatalf("first message %v", first)
+	}
+}
+
+// TestCopyMessage_CopiesOnlyTheCheckedVersion (red team round 8 of FEAT-TEAM-CHANNEL-SERVER): a
+// team copy names the version of its source the caller checked; an edit in between makes the copy
+// 409 conflict (the job retries and sees the edit), a zero version is internal, and the checked
+// version is copied with its own version 1.
+func TestCopyMessage_CopiesOnlyTheCheckedVersion(t *testing.T) {
+	t.Parallel()
+	w := mw.New(t, subscribe)
+	_, _, main := w.TextChannel()
+	src := w.Send("owner", main, "take a look at PR 7", http.StatusCreated)["id"].(string)
+	id := ids.MustParse(src)
+	copyAt := func(v int64) (messaging.Copied, error) {
+		var c messaging.Copied
+		err := inUnit(w, func(ctx context.Context) error {
+			var err error
+			c, err = w.Svc.CopyMessage(ctx, messaging.CopyCmd{SourceMessageID: id, SourceVersion: v, ThreadID: main, AuthorID: w.Actor("owner").ID})
+			return err
+		})
+		return c, err
+	}
+	if _, err := copyAt(0); !internal(err) {
+		t.Fatalf("zero version: %v, want internal", err)
+	}
+	c, err := copyAt(1)
+	if err != nil || c.Version != 1 || c.ContentMD != "take a look at PR 7" {
+		t.Fatalf("copy of the checked version: %+v %v", c, err)
+	}
+	w.Want(patch(w, "owner", src, "1", content("approve and merge PR 7")), http.StatusOK, "")
+	if _, err := copyAt(1); errs.KindOf(err) != errs.KindOf(errs.New(errs.CodeConflict, "")) {
+		t.Fatalf("copy of a version edited since: %v, want conflict", err)
+	}
+	if n := w.Count(`SELECT count(*)::int FROM messages WHERE content_md = 'approve and merge PR 7' AND id <> $1`, src); n != 0 {
+		t.Fatalf("the edited text was copied %d times", n)
 	}
 }

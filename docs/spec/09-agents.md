@@ -144,6 +144,12 @@ record that an agent action created on behalf of the person of its source run an
 that person as `triggered_by`. It is no agent message, so "two agents can never trigger each
 other" still holds; the loop protection for wake-ups is the set of caps of 5.8.6.
 
+Team channels (addendum of 2026-11-21, 3.9): in a channel an owner switched to team mode, a
+member agent's final reply that mentions another member starts or feeds that member's run, on
+behalf of the owner who sponsors the channel and checked for that owner. This is the one place
+where agents trigger each other; it exists only where an owner made a channel for it, and the
+safety brake of 3.9.6 is its loop protection. Everywhere else agent messages never trigger.
+
 ### 3.3 Channel switches
 
 All switches are typed columns of `channels` (03) and can be changed only with `manage`
@@ -332,6 +338,224 @@ operator that never worked in the thread as gone; a copy would leave the failed 
 duplicate and need attachments that belong to two messages, which 03 `message_attachments` does
 not allow.
 
+### 3.9 Team channels
+
+Addendum of 2026-11-21 (FEAT-TEAM-CHANNEL-SERVER; design
+[cross-project-handoff.md](../design/cross-project-handoff.md), approved by the owner on
+2026-11-21). A team channel lets the agents of several projects work together: an owner adds
+agents as members, a member hands work to another member by mentioning its handle in its final
+reply, and every owner message reaches every member. Outside team channels 3.2 to 3.8 apply
+unchanged: no agent message triggers anything there.
+
+#### 3.9.1 Team channel and members
+
+- An active owner switches a text channel to team mode (`enableChannelTeam`, action `team.update`)
+  and becomes its sponsor (03 `team_channels.sponsor_id`). Another owner switching it on again
+  takes over the sponsorship; switching it off (`disableChannelTeam`) removes the team mode and
+  every member, the work threads and their messages stay. A DM channel, a forum, an archived and a
+  read-only channel cannot be team channels (`409 conflict` with `reason` `dm_channel`,
+  `channel_kind`, `channel_archived` or `channel_read_only`).
+- A member is an agent working in a home channel (03 `team_members`): a project forum for a
+  Claude Code runner, any other text channel or forum for another agent. The home channel must be
+  operated by the agent (it is the channel's effective operator, 3.1), otherwise `409 conflict`
+  with `reason` `team_home_not_operated`; it must not be a team channel (`team_home_is_team`), a
+  DM (`dm_channel`), archived (`channel_archived`) or read-only (`channel_read_only`), and an
+  inactive agent is `agent_disabled`. The same agent may be a member twice with two home
+  channels.
+- Every member has a handle unique in the team channel: lower-case letters, digits, `-` and `_`,
+  starting with a letter or digit, at most `team.handle_max_chars` characters (`400
+  validation_failed` on `/handle`); a taken handle is `409 conflict` with `reason`
+  `team_handle_taken`, the same agent and home channel twice `team_member_exists`, more than
+  `team.max_members` members `team_max_members`.
+- Adding a member creates its work thread in the home channel (one per member and team channel,
+  owner answer 4): a forum post in a forum, a thread on a system note of the home channel's main
+  thread in a text channel. The thread's operator is the agent (R-DM-12), so runs there resume the
+  member's session (section 9).
+- Readers rule (first slice: only owners read team channels and the home channels of their
+  members, 07 SR4 addendum): every person `authz.Recipients.Readers` names for the team channel and
+  for a member's home channel must be an active owner. `enableChannelTeam` and `addTeamMember`
+  refuse otherwise with `409 conflict` and `reason` `team_readers_not_owners`, and every copy in
+  either direction (3.9.2, 3.9.4) checks it again and is refused when a grant was added since.
+  Reason: text crosses between the channels in both directions, and a person who may write in a
+  home channel could steer the member's agent into mentioning another member, whose run then acts
+  for the sponsor; with owners as the only readers neither can happen.
+- `removeTeamMember` removes a member; its work thread stays, its running run keeps running.
+- `getChannelTeam` (action `team.read`) returns the team: sponsor, brake state and members.
+- The command name `team` is reserved (10.1); `/team add|remove|list|stop` is a client command
+  over these operations.
+
+#### 3.9.2 Inputs: the copy in the work thread
+
+The server never runs a member's run inside the team channel. It copies what a member must see
+into the member's work thread as an **input**: a text message of the same content, silent, with no
+resolved mentions, and records it in 03 `team_inputs` with its source message, its source
+(`owner` or `member`) and its authority. The run context (4.6), the follow-ups (section 7) and the
+session (section 9) therefore work as for any message of the work thread.
+
+| Source | Author of the input | `origin` | Authority (`triggered_by`, check principal) |
+|---|---|---|---|
+| a message of an active owner in the team channel | that owner | `human` | that owner |
+| a member's final reply that mentions the member | the source member's agent | `agent` | the sponsor of the team channel |
+
+An input is a team trigger, never decided by 3.4: the acceptance of the work thread ignores it.
+`trigger_state` follows an input of origin `human` as in section 6; an input of origin `agent` has
+none (03 `messages`).
+
+#### 3.9.3 Owner messages reach every member
+
+A text message of an active owner in any thread of the team channel goes to every member (owner
+answers 1 and 2): the server copies it into each work thread; a member whose work thread has an
+active run of the member's agent gets it as a follow-up (section 7), every other member a new run
+with `trigger_kind = 'team'`. Mentions in it mark the mentioned members as addressed
+(`team.addressed` of the invocation, 3.9.9); they never narrow who gets it. The message resets the
+safety brake of the channel (3.9.6). A message of a person who is not an active owner, a voice
+message and a message without text trigger nothing in a team channel.
+
+#### 3.9.4 Final replies and mentions between members
+
+A member's final reply is an answer message (`origin = agent`, kind `text`, with `run_id`, 4.11)
+of the member's agent in its work thread. The server copies every such reply into the main thread
+of the team channel as a message of that agent (a **mirror**, 03 `team_mirrors`), so every reader
+of the team channel sees it. Then it reads the handles the reply mentions: `@handle` at the start
+or after a character that is no letter, digit, `-`, `_` or `@`, ending before such a character, not
+inside a code span or a fenced code block, case-insensitive. Every mentioned member other than the
+source gets the reply as an input (3.9.2) with the sponsor as authority, in the order of its first
+mention, as a follow-up of its running run or a new `team` run. Several mentions in one reply are
+allowed here (3.4 step 3 refuses them elsewhere, because those runs share one thread).
+
+A reply is mirrored and handed on only when the run it answers was started and fed only by active
+owners. The run a reply answers is the one 03 `run_answers` links it to, never the `run_id` the
+agent names: the acceptance links an answer only when its request carried the invocation token of
+exactly the named run (07 SR9), so a reply without that token, or with the token of another run,
+is refused like a run fed by a non-owner, and so is a reply edited after it was written (the
+link vouches for the text as written); the copies take only the version of the source the job
+checked. The SDK outbox sends every entry of a run with that
+run's newest token (`Outbox` `token_for`), which the Hermes adapter and the Claude Code runner
+use for their answers. The check reads only the record of the run in 03 `run_feeders` (R-DM-63), which is written
+when an input is stored or given to the run and never shrinks: its trigger (`triggered_by`, for a
+team run the authority of its input), the person of every follow-up it took (the author of a
+person's message, the authority of a team input, none for any other message), the principal of
+every interaction with its components, the person of every delivery into it (4.2, also a control
+command and a wake input) and the writer of every message its run context gave it, of any origin
+and author and in the trigger, thread and channel window alike: the authority of a team input,
+the author of a person's message, the whole record of the run an agent's message answers (03
+`run_answers`, the member's own answers included; none for a run without its trigger row), and
+none for every other message, such as an agent's message written outside a run of its thread or
+without the token of the run it names (the member's own note written in a run elsewhere
+included), an agent's message of any kind edited after it was written (the edit is bound to no
+run, while a person's edit is the author's own; a live box anchor cannot be edited) or an app's; and what the run takes over
+with its session (9.1): in mode `resume` every principal recorded for the earlier runs of the
+session row in the thread, in mode `bind` none. The run passes when
+its trigger is on the record and every principal recorded is an active owner at the moment of the
+job; a recorded input that speaks for no person, and a run older than the record, fail. Otherwise
+nothing is copied, a note names the member, the reason `team_source_not_owner` and the inputs it
+covers, and the refusal is audited. A message of another author stays in the context window of
+the later runs of the work thread, so it refuses each of them while it lies in their window.
+Deleting the message, the card or the interaction and revoking a grant remove nobody from the
+record, so a person with a grant who wrote in a work thread never steers a member into
+triggering another member with the sponsor's rights, also after the grant was revoked.
+
+Mirror and inputs run in the job `runs.team_input` after the reply's commit, never in the unit of
+work of the reply, so the locks of the reply's thread and run are never held while the team
+channel and the other work threads are written. The job is idempotent: a reply is mirrored once
+and every source message gives at most one input per member.
+
+#### 3.9.5 Checks of a team trigger
+
+Every input that would start or feed a run is checked like the fire of a wake-up (5.8.3):
+
+1. The authority is an active owner at this moment (the sponsor for member inputs, the writing
+   owner for owner messages); otherwise the input is refused with `team_sponsor_not_owner`.
+2. The readers rule of 3.9.1 holds for the team channel and the home channel.
+3. `agent.invoke` for the work thread in filter mode for the check principal of the authority
+   (`actor.Recheck`, 05 section 5 "Check without a request"), with origin `human`, the member's
+   agent counted as mentioned and the active run's agent: SR1 (I1, I2), SR2, SR3, project
+   readiness, archived and read-only channels and the active-run rule apply as if the owner had
+   written in the work thread. A follow-up into the member's active run is checked the same way,
+   with that run's agent; an active run of another agent in the work thread refuses the input with
+   `run_active_other_agent`.
+4. For a member input the safety brake (3.9.6), before points 1 to 3.
+
+A refused input is not copied; the server posts a `system` note in the team channel naming the
+member and the reason and writes an audit entry (`agent.invoke`, decision `deny`, stage `team`).
+A refusal of the brake posts the note of its pause instead (3.9.6).
+An allowed one is audited with decision `allow` and stage `team`, with the source member.
+
+The check before every delivery (4.4, 04 15.3) repeats point 3 for the run's authority: a `team`
+run and a follow-up whose message is an input are re-checked for the authority recorded in 03
+`team_inputs`, never for the author of the input, and a run from deferred follow-ups (7) starts as
+a `team` run when its first candidate is an input.
+
+#### 3.9.6 Safety brake
+
+The brake stops agents that trigger each other in circles; it is no cost limit, and its defaults
+are high (owner answer 3). It counts member inputs (3.9.4) per team channel in 03
+`team_channels`; an owner message (3.9.3) resets every count and lifts every pause.
+
+- **Turn budget:** at most `team.turn_budget` member inputs since an owner's last message. The
+  next one pauses the channel with `pause_reason = turn_budget`.
+- **Ping-pong:** an input from member A to member B right after one from B to A continues an
+  alternation; any other input starts a new one at 1. An alternation longer than
+  `team.pingpong_max` pauses the channel with `pause_reason = pingpong`; the note names both
+  members. The whole channel pauses, because the pair may pull in a third member.
+- While the channel is paused, every member input is refused with the pause reason; owner
+  messages still reach every member.
+- Every pause posts one `system` note in the team channel and is audited (`team.update`, attribute
+  `pause_reason`).
+- `team` runs and inputs do not count in `run_autonomy` (5.8.6); the brake replaces the chain caps
+  for them.
+
+#### 3.9.7 Stop all
+
+`stopChannelTeam` (action `team.stop`) stops every active run in the work threads of the team's
+members as `cancelRun` by the caller would (section 8: a queued run ends at once, a running or
+waiting one gets a cancel request) and pauses the channel with `pause_reason = stopped` until an
+owner writes again. It posts a note and is audited; it answers the runs it stopped.
+
+#### 3.9.8 What stays unchanged
+
+- Outside team channels an agent message never triggers (SR4); 3.4 decides every message there as
+  before.
+- Inside a team channel 3.4 decides nothing: a person's mention of an agent there starts no
+  ordinary run.
+- A person who writes in a work thread triggers the member there by 3.4 as in any thread, and the
+  member's answer is mirrored like every final reply.
+
+#### 3.9.9 What the runner and the adapter receive
+
+This is the contract the runner and the Hermes adapter build against.
+
+- A new `team` run arrives as `agent.invocation` with `trigger_kind = team`, `message_id` = the
+  input in the work thread, `thread_id` = the work thread, `triggered_by` = the authority, and the
+  member `team`:
+
+  | Member | Meaning |
+  |---|---|
+  | `channel_id` | the team channel |
+  | `member_id`, `handle` | the receiving member |
+  | `source` | `owner` (an owner's message) or `member` (a member's reply) |
+  | `source_handle` | the handle of the source member, for `source = member` |
+  | `addressed` | the input mentions the receiving member's handle |
+  | `members` | every member: `member_id`, `handle`, `agent_id`, `home_channel_id` |
+
+- Its invocation token has `trigger_kind = team`, `message_id` = the input and `sub` = the
+  authority. It renews like the token of a message run (4.5.1).
+- An input into a running run arrives as an ordinary `agent.followup` with the input as
+  `message_id`; its token has `sub` = the authority. Follow-ups carry no `team` member; the member
+  list of the run's invocation stays valid for the run.
+- `getRunContext` works for a `team` run as for a message run: the input is the triggering message
+  and lies in the work thread.
+- **Owner authority:** an input is the owner's own word exactly when its message has
+  `origin = human` and its author is an active owner. The runner attaches owner codes (18.5) by
+  that rule alone, as for every message run, and never because of `triggered_by`, the token's
+  `sub` or the `team` member: a member input has `origin = agent` and the source member's agent as
+  author, so it never gets an owner code, and the runner labels it "from member @handle" and tells
+  the session that it is a colleague's request, not the owner's word.
+- A member hands work to another member by writing `@handle` in its final reply (outside code); no
+  command is needed. A reply without a mention is mirrored and triggers nothing.
+- An adapter that does not know `trigger_kind = team` refuses such a run as it refuses any unknown
+  trigger kind; nothing outside team channels changes for it.
+
 ## 4. Adapter contract
 
 ### 4.1 Overview
@@ -448,7 +672,7 @@ invocation token (https://www.rfc-editor.org/rfc/rfc8725.html, retrieved 2026-10
 | `tool_class` | configured tool class from `agents.tool_class` at delivery time (SR2, section 2.4) | 05 |
 | `dev_environment_id` | Dev environment of the run; only in the dev environment milestone | 05 |
 | `permission_version` | Permission version at delivery time | 05 |
-| `trigger_kind` | `message`, `followup`, `interaction`, `command`, `autocomplete`, `wake` (5.8.3, AR-04) | new |
+| `trigger_kind` | `message`, `followup`, `interaction`, `command`, `autocomplete`, `wake` (5.8.3, AR-04), `team` (a run of a team channel member, 3.9.9; the triggering object is `message_id`) | new |
 
 **Check in the adapter.** The adapter processes an event with a token only if all items
 hold. If only item 5 fails because `exp` has passed, it fetches a fresh token (4.5.1).
@@ -1732,6 +1956,7 @@ They never go to a model as a prompt (control commands).
 | `/resume` | bind an external session, with a selection | `agent_session.bind` |
 | `/title` | set the title (source becomes `manual`) | `thread.title.update` |
 | `/close` | thread done | `thread.close` |
+| `/team` | `add`, `remove`, `list` and `stop` of a team channel (3.9; addendum of 2026-11-21) | `team.update`, `team.read`, `team.stop` |
 
 A fixed word such as "done" in the text does not close a thread. Reason: otherwise words in running
 text trigger actions unintentionally; the command and the button are unambiguous. The displayed names and
@@ -5550,6 +5775,10 @@ configuration of the respective program outside the server.
 | `run.wake_label_max_chars` | Server | `120` | longest label of a wake-up in Unicode characters; longer is `too_long` (5.8.1, 03 `run_wakes`) |
 | `run.autonomous_chain_max` | Server | `25` | consecutive autonomous inputs per thread and person; `0` means no chain cap; at the cap `refused` with a note (5.8.6, ruling D-AR-01-1) |
 | `run.autonomous_idle_max` | Server | `3` | consecutive idle autonomous inputs per thread and person; minimum `1`, cannot be switched off (5.8.6) |
+| `team.turn_budget` | Server | `200` | member inputs per team channel since an owner's last message; the next one pauses the channel (3.9.6, owner answer of 2026-11-21: high, only to catch loops) |
+| `team.pingpong_max` | Server | `40` | longest alternation of inputs between the same two members without an owner message; a longer one pauses the channel (3.9.6) |
+| `team.max_members` | Server | `20` | members per team channel (3.9.1) |
+| `team.handle_max_chars` | Server | `32` | longest handle of a team member (3.9.1) |
 | `thread.placeholder_titles` | Server | `["Neuer Chat", "Chat", "Ohne Titel", "Test", "New chat", "Untitled"]` | placeholders for the title detection; the empty title is always a placeholder (12 point 2), a list entry is never empty |
 | `adapter.invocation_token_leeway` | Adapter | `10s` | clock tolerance for `exp` and `iat`; at most the server's `auth.clock_leeway` (4.5) |
 | `adapter.jwks_refresh_min_interval` | Adapter | `60s` | reload JWKS at most this often |

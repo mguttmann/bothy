@@ -112,7 +112,7 @@ type resolver func(s *Service, ctx context.Context, run RunRow, in runs.Delivery
 // interaction.created and the trigger kind interaction come with M2-15.
 var resolvers = map[string]map[string]resolver{
 	domain.EventAgentInvocation: {triggerKindMessage: resolveInvocationMessage, triggerKindCommand: resolveInvocationCommand,
-		triggerKindInteraction: resolveInvocationInteraction, triggerKindWake: resolveInvocationWake},
+		triggerKindInteraction: resolveInvocationInteraction, triggerKindWake: resolveInvocationWake, triggerKindTeam: resolveInvocationTeam},
 	domain.EventAgentFollowup:      {"": resolveFollowup},
 	domain.EventAgentWakeInput:     {"": resolveWakeInput},
 	domain.EventCommandInvoked:     {},
@@ -219,7 +219,8 @@ func resolveInvocationMessage(s *Service, ctx context.Context, run RunRow, _ run
 	}, nil
 }
 
-// resolveFollowup is agent.followup: the author of the follow-up message of the payload.
+// resolveFollowup is agent.followup: the author of the follow-up message of the payload, or the
+// authority of a team input (09 3.9.5).
 func resolveFollowup(s *Service, ctx context.Context, run RunRow, in runs.DeliveryInput) (trigger, error) {
 	id, err := domain.FollowupMessageID(in.Payload)
 	if err != nil {
@@ -228,6 +229,14 @@ func resolveFollowup(s *Service, ctx context.Context, run RunRow, in runs.Delive
 	m, err := s.d.Messages.TriggerMessageOf(ctx, id)
 	if err != nil {
 		return trigger{}, err
+	}
+	input, team, err := s.teamInputOf(ctx, m.ID)
+	if err != nil {
+		return trigger{}, err
+	}
+	if team {
+		// A team input is checked for its authority, never for its author (09 3.9.5).
+		return teamFollowupTrigger(input, m), nil
 	}
 	return trigger{
 		person: m.Author.ID, object: m.ID, message: m.ID, human: m.Origin == originHuman, origin: m.Origin,
@@ -273,6 +282,9 @@ type outcome struct {
 	handle  string
 	// channel is the channel of a denied delivery (invocations_denied, M6-13).
 	channel ids.ID
+	// fedRun and fedBy are the run an allowed delivery feeds and the person it speaks for, which
+	// Prepare records in run_feeders; fedRun is zero for a command.invoked without a run.
+	fedRun, fedBy ids.ID
 }
 
 // Prepare implements runs.Delivery (M2-08 design note 3) in one unit of work: the run row is
@@ -281,7 +293,9 @@ type outcome struct {
 // re-check principal of the trigger at the pinned permission version; a denial applies its
 // consequence, writes one audit entry and sends nothing; an allow issues a fresh token, stores the
 // recorded jti and the configured billing mode and moves trigger_state from received to queued on
-// the first delivery of agent.invocation. The counter and the span are recorded after the commit.
+// the first delivery of agent.invocation, and records the person of every allowed delivery into a
+// run in run_feeders (domain.FeedSourceOf, 09 3.9.4). The counter and the span are recorded after
+// the commit.
 //
 // Errors: internal for a type that bears no invocation, a run that is missing or belongs to another
 // agent, a missing collaborator; the errors of the database, the authorizer and the signer.
@@ -314,11 +328,7 @@ func (s *Service) Prepare(ctx context.Context, in runs.DeliveryInput) (runs.Deli
 	var res outcome
 	err := s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		var err error
-		if in.Type == domain.EventCommandInvoked {
-			res, err = s.prepareInvoked(ctx, in, box.issuer)
-		} else {
-			res, err = s.prepare(ctx, in, box.issuer)
-		}
+		res, err = s.prepareAndRecord(ctx, in, box.issuer)
 		return err
 	})
 	if err != nil {
@@ -329,6 +339,23 @@ func (s *Service) Prepare(ctx context.Context, in runs.DeliveryInput) (runs.Deli
 		s.measureDenied(res.channel, in.AgentID)
 	}
 	return res.out, nil
+}
+
+// prepareAndRecord is Prepare inside its unit of work: command.invoked takes its own path, every
+// other event prepare; the person of an allowed delivery into a run is recorded in run_feeders
+// before it is sent, whatever path accepted the input (FEAT-TEAM-CHANNEL-SERVER).
+func (s *Service) prepareAndRecord(ctx context.Context, in runs.DeliveryInput, issuer TokenIssuer) (outcome, error) {
+	var res outcome
+	var err error
+	if in.Type == domain.EventCommandInvoked {
+		res, err = s.prepareInvoked(ctx, in, issuer)
+	} else {
+		res, err = s.prepare(ctx, in, issuer)
+	}
+	if err != nil || !res.allowed || res.fedRun.IsZero() {
+		return res, err
+	}
+	return res, s.d.Repo.RecordFeeders(ctx, res.fedRun, domain.FeedSourceOf(in.Type), []ids.ID{res.fedBy})
 }
 
 // maintenanceReadOnly is the value read_only of server.maintenance_mode.
@@ -601,7 +628,8 @@ func (s *Service) allow(ctx context.Context, in runs.DeliveryInput, run RunRow, 
 			return outcome{}, err
 		}
 	}
-	return outcome{out: runs.DeliveryOutcome{Send: true, InvocationToken: tok.Token.Reveal()}, checked: true, allowed: true}, nil
+	return outcome{out: runs.DeliveryOutcome{Send: true, InvocationToken: tok.Token.Reveal()}, checked: true, allowed: true,
+		fedRun: run.ID, fedBy: tr.person}, nil
 }
 
 // setInteraction moves the interaction id from received to state at a delivery (dispatched on

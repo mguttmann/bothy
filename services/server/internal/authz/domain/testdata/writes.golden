@@ -145,6 +145,8 @@ space.reorder
 space.restore
 space.update
 status.manage
+team.stop
+team.update
 template.manage
 terminal.attach
 terminal.close

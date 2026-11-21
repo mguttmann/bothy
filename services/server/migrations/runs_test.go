@@ -78,10 +78,11 @@ func TestMigration_RunsAndRunSteps(t *testing.T) {
 	slices.Sort(cons)
 	wantCons := []string{
 		"CHECK (((state <> ALL (ARRAY['completed'::text, 'failed'::text, 'cancelled'::text])) OR (finished_at IS NOT NULL)))",
-		"CHECK ((((triggering_message_id IS NULL) OR (trigger_kind = 'message'::text)) AND ((triggering_command_id IS NULL) OR (trigger_kind = 'command'::text)) AND ((triggering_interaction_id IS NULL) OR (trigger_kind = 'interaction'::text))))",
+		// 00106 (FEAT-TEAM-CHANNEL-SERVER, R-DM-62): a team run carries its input as triggering message.
+		"CHECK ((((triggering_message_id IS NULL) OR (trigger_kind = ANY (ARRAY['message'::text, 'team'::text]))) AND ((triggering_command_id IS NULL) OR (trigger_kind = 'command'::text)) AND ((triggering_interaction_id IS NULL) OR (trigger_kind = 'interaction'::text))))",
 		"CHECK ((billing_mode_expected = ANY (ARRAY['personal'::text, 'organization'::text])))",
 		"CHECK ((state = ANY (ARRAY['queued'::text, 'running'::text, 'waiting_input'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))",
-		"CHECK ((trigger_kind = ANY (ARRAY['message'::text, 'command'::text, 'interaction'::text, 'wake'::text])))",
+		"CHECK ((trigger_kind = ANY (ARRAY['message'::text, 'command'::text, 'interaction'::text, 'wake'::text, 'team'::text])))",
 		"CHECK (((triggering_wake_id IS NULL) OR (trigger_kind = 'wake'::text)))",
 		"FOREIGN KEY (triggering_wake_id) REFERENCES run_wakes(id) ON DELETE SET NULL",
 		"FOREIGN KEY (agent_id) REFERENCES agents(principal_id) ON DELETE RESTRICT",

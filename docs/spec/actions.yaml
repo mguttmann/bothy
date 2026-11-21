@@ -2220,6 +2220,39 @@ actions:
   rights_change: false
   rl_class: rl.agent_runtime
   effect: read
+- id: team.read
+  section: agents
+  description: read the team of a team channel with its members and brake state ([09-agents.md](09-agents.md) 3.9.1)
+  resource: channel
+  right: owner
+  owner: true
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: team.update
+  section: agents
+  description: switch team mode on or off, add or remove a member of a team channel ([09-agents.md](09-agents.md) 3.9.1)
+  resource: channel
+  right: owner
+  owner: true
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: team.stop
+  section: agents
+  description: stop every run of the members of a team channel and pause its member inputs ([09-agents.md](09-agents.md) 3.9.7)
+  resource: channel
+  right: owner
+  owner: true
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.write
+  effect: write
 - id: component.update
   section: agents
   description: deactivate or change own components

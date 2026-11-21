@@ -24,7 +24,7 @@ part 'run.g.dart';
 /// * [channelId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [agentId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [agentSessionId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [triggerKind] - `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`.
+/// * [triggerKind] - `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`. `team` is a run of a team channel member; its input in the work thread is `triggering_message_id` (09 3.9.2).
 /// * [triggeringMessageId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [triggeringCommandId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [triggeringInteractionId] - UUIDv7 (RFC 9562), lowercase canonical form.
@@ -71,10 +71,10 @@ abstract class Run implements Built<Run, RunBuilder> {
   @BuiltValueField(wireName: r'agent_session_id')
   String? get agentSessionId;
 
-  /// `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`.
+  /// `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`. `team` is a run of a team channel member; its input in the work thread is `triggering_message_id` (09 3.9.2).
   @BuiltValueField(wireName: r'trigger_kind')
   RunTriggerKindEnum? get triggerKind;
-  // enum triggerKindEnum {  message,  command,  interaction,  wake,  };
+  // enum triggerKindEnum {  message,  command,  interaction,  wake,  team,  };
 
   /// UUIDv7 (RFC 9562), lowercase canonical form.
   @BuiltValueField(wireName: r'triggering_message_id')
@@ -665,7 +665,7 @@ class _$RunSerializer implements PrimitiveSerializer<Run> {
   }
 }
 
-/// `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`.
+/// `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`. `team` is a run of a team channel member; its input in the work thread is `triggering_message_id` (09 3.9.2).
 class RunTriggerKindEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'message')
   static const RunTriggerKindEnum message = _$runTriggerKindEnum_message;
@@ -676,6 +676,8 @@ class RunTriggerKindEnum extends EnumClass {
       _$runTriggerKindEnum_interaction;
   @BuiltValueEnumConst(wireName: r'wake')
   static const RunTriggerKindEnum wake = _$runTriggerKindEnum_wake;
+  @BuiltValueEnumConst(wireName: r'team')
+  static const RunTriggerKindEnum team = _$runTriggerKindEnum_team;
   @BuiltValueEnumConst(wireName: r'unknown_default_open_api', fallback: true)
   static const RunTriggerKindEnum unknownDefaultOpenApi =
       _$runTriggerKindEnum_unknownDefaultOpenApi;

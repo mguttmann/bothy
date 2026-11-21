@@ -14,6 +14,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
 )
 
 // runsState is the part of the server state the runs module fills.
@@ -47,6 +48,7 @@ func runsWiring() moduleWiring {
 				m.QueuedExpiry, m.RunsLifecycle, m.ComponentExpiry, m.InvocationHolds = rn.Service, rn.Service, rn.Service, rn.Service
 				m.AppDispatch = rn.Service
 				m.WakeDue = rn.Service
+				m.TeamInput = rn.Service
 			}
 			// runs.stall_check runs every agent.presence_timeout (M2-09, D-M2-09-19).
 			m.StallInterval = s.values.Duration(keyPresenceTimeout)
@@ -115,6 +117,9 @@ func (s *server) startRuns(context.Context) error {
 	if err := s.bindWakes(rn, pool, az, m); err != nil {
 		return err
 	}
+	if err := s.bindTeams(rn, pool, az, m); err != nil {
+		return err
+	}
 	pub, err := s.runsPublisher(gatewaypg.NewSignalSender(pool))
 	if err != nil {
 		return err
@@ -150,6 +155,24 @@ func (s *server) bindWakes(rn *Runs, pool *pg.Pool, az authorize.Authorizer, m *
 		return err
 	}
 	return rn.RegisterWakeGauge()
+}
+
+// bindTeams binds the team channels (FEAT-TEAM-CHANNEL-SERVER) to rn in every role: the
+// acceptance schedules runs.team_input in the api role, the job runs in the worker role.
+func (s *server) bindTeams(rn *Runs, pool *pg.Pool, az authorize.Authorizer, m *Messaging) error {
+	cfg, err := TeamsConfig(s.values)
+	if err != nil {
+		return err
+	}
+	owners, ok := az.(authorize.Owners)
+	if !ok {
+		return errors.New("wire: the Authorizer of runs does not answer the owner role")
+	}
+	readers, ok := az.(runsapp.TeamReaders)
+	if !ok {
+		return errors.New("wire: the Authorizer of runs does not answer the readers of a channel")
+	}
+	return rn.BindTeams(cfg, pool, TeamDeps{Messages: m.Service, Readers: readers, Owners: owners})
 }
 
 // runsPublisher returns the publisher of the run.updated events a process without a gateway hub

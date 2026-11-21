@@ -51,6 +51,7 @@ come from the core contract ([00](../spec/00-glossary.md), [03](../spec/03-data-
 | Audit and privacy | Modules `audit` and `privacy`. | [erd-8-audit-privacy.mmd](erd-8-audit-privacy.mmd) | [light](erd-8-audit-privacy.svg), [dark](erd-8-audit-privacy.dark.svg) |
 | Import, status, statistics | Modules `importer`, `status` and `stats`. | [erd-9-import-status-statistics.mmd](erd-9-import-status-statistics.mmd) | [light](erd-9-import-status-statistics.svg), [dark](erd-9-import-status-statistics.dark.svg) |
 | Notification | Module `notify`. | [erd-10-notification.mmd](erd-10-notification.mmd) | [light](erd-10-notification.svg), [dark](erd-10-notification.dark.svg) |
+| Team channels | Module `runs`: team channels and the record of who fed a run. | [erd-11-team-channels.mmd](erd-11-team-channels.mmd) | [light](erd-11-team-channels.svg), [dark](erd-11-team-channels.dark.svg) |
 
 ## Gallery
 
@@ -171,6 +172,11 @@ scheme, the dark rendering (`<name>.dark.svg`) in the dark scheme.
 
 ![Notification](erd-10-notification.svg#only-light)
 ![Notification](erd-10-notification.dark.svg#only-dark)
+
+### Team channels
+
+![Team channels](erd-11-team-channels.svg#only-light)
+![Team channels](erd-11-team-channels.dark.svg#only-dark)
 
 ## Conventions
 

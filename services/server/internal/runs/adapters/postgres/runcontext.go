@@ -42,3 +42,21 @@ func (r *Repository) DeliveredFollowups(ctx context.Context, threadID, sessionID
 	}
 	return out, nil
 }
+
+// SessionFeeders implements app.ContextRepository; a NULL principal is the zero ID.
+func (r *Repository) SessionFeeders(ctx context.Context, row app.RunRow, sessionID ids.ID) ([]ids.ID, error) {
+	rows, err := r.read(ctx).SessionFeeders(ctx, sqlcgen.SessionFeedersParams{ThreadID: uuid(row.ThreadID), AgentID: uuid(row.AgentID),
+		SessionID: uuid(sessionID), RunID: uuid(row.ID), QueuedAt: pgtype.Timestamptz{Time: row.QueuedAt, Valid: true}})
+	if err != nil {
+		return nil, mapError(err, "reading the record of the earlier runs of a session")
+	}
+	out := make([]ids.ID, 0, len(rows))
+	for _, p := range rows {
+		var id ids.ID
+		if p.Valid {
+			id = idOf(p)
+		}
+		out = append(out, id)
+	}
+	return out, nil
+}

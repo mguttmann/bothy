@@ -31,6 +31,10 @@ import 'package:api_client/src/generated/model/problem.dart';
 import 'package:api_client/src/generated/model/project_binding.dart';
 import 'package:api_client/src/generated/model/project_binding_put.dart';
 import 'package:api_client/src/generated/model/reason_body.dart';
+import 'package:api_client/src/generated/model/team.dart';
+import 'package:api_client/src/generated/model/team_member.dart';
+import 'package:api_client/src/generated/model/team_member_create.dart';
+import 'package:api_client/src/generated/model/team_stop_result.dart';
 import 'package:api_client/src/generated/model/template.dart';
 import 'package:api_client/src/generated/model/template_create.dart';
 import 'package:api_client/src/generated/model/template_list.dart';
@@ -42,6 +46,124 @@ class ChannelsApi {
   final Serializers _serializers;
 
   const ChannelsApi(this._dio, this._serializers);
+
+  /// Add a member to a team channel
+  /// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (&#x60;team.update&#x60;). &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;team_not_enabled&#x60; for a channel without team mode, &#x60;team_handle_taken&#x60;, &#x60;team_member_exists&#x60;, &#x60;team_max_members&#x60;, &#x60;team_home_not_operated&#x60; when the agent is not the effective operator of the home channel, &#x60;team_home_is_team&#x60; when the home channel is a team channel, &#x60;team_readers_not_owners&#x60; when a person who is no active owner may read the team channel or the home channel, &#x60;dm_channel&#x60;, &#x60;channel_archived&#x60; or &#x60;channel_read_only&#x60; for the home channel; an inactive agent is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;agent_disabled&#x60;. Audited.
+  ///
+  /// Parameters:
+  /// * [channelId]
+  /// * [teamMemberCreate]
+  /// * [idempotencyKey] - UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [TeamMember] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<TeamMember>> addTeamMember({
+    required String channelId,
+    required TeamMemberCreate teamMemberCreate,
+    String? idempotencyKey,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/channels/{channel_id}/team/members'.replaceAll(
+      '{'
+      r'channel_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        channelId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(TeamMemberCreate);
+      _bodyData = _serializers.serialize(
+        teamMemberCreate,
+        specifiedType: _type,
+      );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    TeamMember? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(TeamMember),
+            ) as TeamMember;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<TeamMember>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
 
   /// Archive a channel
   /// Final; there is no unarchive. The channel becomes read-only for everyone, owners included (&#x60;403 channel_read_only&#x60; with &#x60;reason: channel_archived&#x60;); reading stays for those who could read before. Archiving is a permission change with &#x60;access.changed&#x60;; archived channels leave &#x60;listSpaceChannels&#x60; (07, 4.5).
@@ -926,6 +1048,161 @@ class ChannelsApi {
     return _response;
   }
 
+  /// Switch team mode off
+  /// Removes the team mode and every member of the channel (09 3.9.1); work threads and messages stay, running runs keep running. Owners only (&#x60;team.update&#x60;); a channel that is no team channel answers &#x60;204&#x60; without a change. Audited.
+  ///
+  /// Parameters:
+  /// * [channelId]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future]
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<void>> disableChannelTeam({
+    required String channelId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/channels/{channel_id}/team'.replaceAll(
+      '{'
+      r'channel_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        channelId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'DELETE',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    return _response;
+  }
+
+  /// Switch a channel to team mode
+  /// Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it makes the caller the sponsor and keeps members and brake state. Owners only (&#x60;team.update&#x60;). A DM channel is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;dm_channel&#x60;, a forum &#x60;channel_kind&#x60;, an archived or read-only channel &#x60;channel_archived&#x60; or &#x60;channel_read_only&#x60;, a channel that a person who is no active owner may read &#x60;team_readers_not_owners&#x60;. Audited.
+  ///
+  /// Parameters:
+  /// * [channelId]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Team] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Team>> enableChannelTeam({
+    required String channelId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/channels/{channel_id}/team'.replaceAll(
+      '{'
+      r'channel_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        channelId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'PUT',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Team? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(Team),
+            ) as Team;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Team>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Read a channel
   ///
   ///
@@ -1191,6 +1468,98 @@ class ChannelsApi {
     }
 
     return Response<DeletionInfo>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Read the team of a team channel
+  /// The team of a team channel (09 3.9.1): sponsor, brake state and members with their handles and work threads. Owners only (&#x60;team.read&#x60;); a channel that is no team channel or that the caller cannot read is &#x60;404 not_found&#x60;.
+  ///
+  /// Parameters:
+  /// * [channelId]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Team] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Team>> getChannelTeam({
+    required String channelId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/channels/{channel_id}/team'.replaceAll(
+      '{'
+      r'channel_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        channelId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Team? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(Team),
+            ) as Team;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Team>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -2103,6 +2472,82 @@ class ChannelsApi {
     );
   }
 
+  /// Remove a member from a team channel
+  /// Removes the member (09 3.9.1); its work thread stays and a running run keeps running. Owners only (&#x60;team.update&#x60;); an unknown member is &#x60;404 not_found&#x60;. Audited.
+  ///
+  /// Parameters:
+  /// * [channelId]
+  /// * [memberId]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future]
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<void>> removeTeamMember({
+    required String channelId,
+    required String memberId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/channels/{channel_id}/team/members/{member_id}'
+        .replaceAll(
+          '{'
+          r'channel_id'
+          '}',
+          encodeQueryParameter(
+            _serializers,
+            channelId,
+            const FullType(String),
+          ).toString(),
+        )
+        .replaceAll(
+          '{'
+          r'member_id'
+          '}',
+          encodeQueryParameter(
+            _serializers,
+            memberId,
+            const FullType(String),
+          ).toString(),
+        );
+    final _options = Options(
+      method: r'DELETE',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    return _response;
+  }
+
   /// Undo the deletion of a channel
   /// Undoes a pending deletion before &#x60;undo_until&#x60;: clears &#x60;deleted_at&#x60; and the archive the deletion set, drops a folder request, as a rights change with &#x60;access.changed&#x60;, and publishes &#x60;channel.updated&#x60;. A channel that is not deleted is answered without effect; after &#x60;undo_until&#x60; &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;undo_window_passed&#x60;; in a deleted space &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;space_deleted&#x60;.
   ///
@@ -2531,6 +2976,103 @@ class ChannelsApi {
     }
 
     return Response<Channel>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Stop every run of a team channel
+  /// Stops every active run in the work threads of the team&#39;s members as &#x60;cancelRun&#x60; by the caller would, and pauses member inputs with &#x60;pause_reason&#x60; &#x60;stopped&#x60; until an owner writes in the team channel again (09 3.9.7). Owners only (&#x60;team.stop&#x60;); a channel without team mode is &#x60;404 not_found&#x60;. Posts a note in the team channel; audited.
+  ///
+  /// Parameters:
+  /// * [channelId]
+  /// * [idempotencyKey] - UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [TeamStopResult] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<TeamStopResult>> stopChannelTeam({
+    required String channelId,
+    String? idempotencyKey,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/channels/{channel_id}/team/stop'.replaceAll(
+      '{'
+      r'channel_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        channelId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    TeamStopResult? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(TeamStopResult),
+            ) as TeamStopResult;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<TeamStopResult>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

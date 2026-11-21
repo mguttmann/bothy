@@ -19,6 +19,9 @@ const AgentInvocationPayloadTriggerKindEnum
 _$agentInvocationPayloadTriggerKindEnum_wake =
     const AgentInvocationPayloadTriggerKindEnum._('wake');
 const AgentInvocationPayloadTriggerKindEnum
+_$agentInvocationPayloadTriggerKindEnum_team =
+    const AgentInvocationPayloadTriggerKindEnum._('team');
+const AgentInvocationPayloadTriggerKindEnum
 _$agentInvocationPayloadTriggerKindEnum_unknownDefaultOpenApi =
     const AgentInvocationPayloadTriggerKindEnum._('unknownDefaultOpenApi');
 
@@ -33,6 +36,8 @@ _$agentInvocationPayloadTriggerKindEnumValueOf(String name) {
       return _$agentInvocationPayloadTriggerKindEnum_command;
     case 'wake':
       return _$agentInvocationPayloadTriggerKindEnum_wake;
+    case 'team':
+      return _$agentInvocationPayloadTriggerKindEnum_team;
     case 'unknownDefaultOpenApi':
       return _$agentInvocationPayloadTriggerKindEnum_unknownDefaultOpenApi;
     default:
@@ -48,6 +53,7 @@ _$agentInvocationPayloadTriggerKindEnumValues =
         _$agentInvocationPayloadTriggerKindEnum_interaction,
         _$agentInvocationPayloadTriggerKindEnum_command,
         _$agentInvocationPayloadTriggerKindEnum_wake,
+        _$agentInvocationPayloadTriggerKindEnum_team,
         _$agentInvocationPayloadTriggerKindEnum_unknownDefaultOpenApi,
       ],
     );
@@ -106,6 +112,7 @@ class _$AgentInvocationPayloadTriggerKindEnumSerializer
     'interaction': 'interaction',
     'command': 'command',
     'wake': 'wake',
+    'team': 'team',
     'unknownDefaultOpenApi': 'unknown_default_open_api',
   };
   static const Map<Object, String> _fromWire = const <Object, String>{
@@ -113,6 +120,7 @@ class _$AgentInvocationPayloadTriggerKindEnumSerializer
     'interaction': 'interaction',
     'command': 'command',
     'wake': 'wake',
+    'team': 'team',
     'unknown_default_open_api': 'unknownDefaultOpenApi',
   };
 
@@ -193,6 +201,8 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
   @override
   final String? messageId;
   @override
+  final AgentTeamFacts? team;
+  @override
   final String? interactionId;
   @override
   final String? wakeId;
@@ -228,6 +238,7 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
     this.spaceId,
     required this.triggerKind,
     this.messageId,
+    this.team,
     this.interactionId,
     this.wakeId,
     this.wake,
@@ -260,6 +271,7 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
         spaceId == other.spaceId &&
         triggerKind == other.triggerKind &&
         messageId == other.messageId &&
+        team == other.team &&
         interactionId == other.interactionId &&
         wakeId == other.wakeId &&
         wake == other.wake &&
@@ -283,6 +295,7 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
     _$hash = $jc(_$hash, spaceId.hashCode);
     _$hash = $jc(_$hash, triggerKind.hashCode);
     _$hash = $jc(_$hash, messageId.hashCode);
+    _$hash = $jc(_$hash, team.hashCode);
     _$hash = $jc(_$hash, interactionId.hashCode);
     _$hash = $jc(_$hash, wakeId.hashCode);
     _$hash = $jc(_$hash, wake.hashCode);
@@ -308,6 +321,7 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
           ..add('spaceId', spaceId)
           ..add('triggerKind', triggerKind)
           ..add('messageId', messageId)
+          ..add('team', team)
           ..add('interactionId', interactionId)
           ..add('wakeId', wakeId)
           ..add('wake', wake)
@@ -352,6 +366,10 @@ class AgentInvocationPayloadBuilder
   String? _messageId;
   String? get messageId => _$this._messageId;
   set messageId(String? messageId) => _$this._messageId = messageId;
+
+  AgentTeamFactsBuilder? _team;
+  AgentTeamFactsBuilder get team => _$this._team ??= AgentTeamFactsBuilder();
+  set team(AgentTeamFactsBuilder? team) => _$this._team = team;
 
   String? _interactionId;
   String? get interactionId => _$this._interactionId;
@@ -425,6 +443,7 @@ class AgentInvocationPayloadBuilder
       _spaceId = $v.spaceId;
       _triggerKind = $v.triggerKind;
       _messageId = $v.messageId;
+      _team = $v.team?.toBuilder();
       _interactionId = $v.interactionId;
       _wakeId = $v.wakeId;
       _wake = $v.wake?.toBuilder();
@@ -483,6 +502,7 @@ class AgentInvocationPayloadBuilder
               'triggerKind',
             ),
             messageId: messageId,
+            team: _team?.build(),
             interactionId: interactionId,
             wakeId: wakeId,
             wake: _wake?.build(),
@@ -503,6 +523,9 @@ class AgentInvocationPayloadBuilder
     } catch (_) {
       late String _$failedField;
       try {
+        _$failedField = 'team';
+        _team?.build();
+
         _$failedField = 'wake';
         _wake?.build();
 

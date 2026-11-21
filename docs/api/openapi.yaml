@@ -7165,6 +7165,286 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /channels/{channel_id}/team:
+    get:
+      operationId: getChannelTeam
+      summary: Read the team of a team channel
+      tags: [Channels]
+      description: |-
+        The team of a team channel (09 3.9.1): sponsor, brake state and members with their handles and work threads. Owners only (`team.read`); a channel that is no team channel or that the caller cannot read is `404 not_found`.
+      x-authz-action: team.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/ChannelIdPath'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    sponsor_id: 0192f4a0-7b1c-7a10-9d2e-1c3f5a7b9d01
+                    member_turns: 3
+                    turn_budget: 200
+                    members:
+                    - id: 0192f4a0-7b1c-7c31-8a4b-2d6e8f0a1c22
+                      handle: coding
+                      agent_id: 0192f4a0-7b1c-7d42-9b5c-3e7f9a1b2d33
+                      home_channel_id: 0192f4a0-7b1c-7e53-8c6d-4f8a0b2c3e44
+                      work_thread_id: 0192f4a0-7b1c-7f64-9d7e-5a9b1c3d4f55
+                      created_at: '2026-11-21T09:30:00.000Z'
+                    created_at: '2026-11-21T09:00:00.000Z'
+                    version: 4
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: enableChannelTeam
+      summary: Switch a channel to team mode
+      tags: [Channels]
+      description: |-
+        Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-only channel `channel_archived` or `channel_read_only`, a channel that a person who is no active owner may read `team_readers_not_owners`. Audited.
+      x-authz-action: team.update
+      x-rate-limit-class: rl.write
+      parameters:
+      - $ref: '#/components/parameters/ChannelIdPath'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    sponsor_id: 0192f4a0-7b1c-7a10-9d2e-1c3f5a7b9d01
+                    member_turns: 0
+                    turn_budget: 200
+                    members: []
+                    created_at: '2026-11-21T09:00:00.000Z'
+                    version: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: disableChannelTeam
+      summary: Switch team mode off
+      tags: [Channels]
+      description: |-
+        Removes the team mode and every member of the channel (09 3.9.1); work threads and messages stay, running runs keep running. Owners only (`team.update`); a channel that is no team channel answers `204` without a change. Audited.
+      x-authz-action: team.update
+      x-rate-limit-class: rl.write
+      parameters:
+      - $ref: '#/components/parameters/ChannelIdPath'
+      responses:
+        '204':
+          description: No content.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /channels/{channel_id}/team/members:
+    post:
+      operationId: addTeamMember
+      summary: Add a member to a team channel
+      tags: [Channels]
+      description: |-
+        Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_home_is_team` when the home channel is a team channel, `team_readers_not_owners` when a person who is no active owner may read the team channel or the home channel, `dm_channel`, `channel_archived` or `channel_read_only` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+      x-authz-action: team.update
+      x-rate-limit-class: rl.write
+      parameters:
+      - $ref: '#/components/parameters/ChannelIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamMemberCreate'
+            examples:
+              default:
+                summary: Request
+                value:
+                  agent_id: 0192f4a0-7b1c-7d42-9b5c-3e7f9a1b2d33
+                  home_channel_id: 0192f4a0-7b1c-7e53-8c6d-4f8a0b2c3e44
+                  handle: coding
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMember'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    id: 0192f4a0-7b1c-7c31-8a4b-2d6e8f0a1c22
+                    handle: coding
+                    agent_id: 0192f4a0-7b1c-7d42-9b5c-3e7f9a1b2d33
+                    home_channel_id: 0192f4a0-7b1c-7e53-8c6d-4f8a0b2c3e44
+                    work_thread_id: 0192f4a0-7b1c-7f64-9d7e-5a9b1c3d4f55
+                    created_at: '2026-11-21T09:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /channels/{channel_id}/team/members/{member_id}:
+    delete:
+      operationId: removeTeamMember
+      summary: Remove a member from a team channel
+      tags: [Channels]
+      description: |-
+        Removes the member (09 3.9.1); its work thread stays and a running run keeps running. Owners only (`team.update`); an unknown member is `404 not_found`. Audited.
+      x-authz-action: team.update
+      x-rate-limit-class: rl.write
+      parameters:
+      - $ref: '#/components/parameters/ChannelIdPath'
+      - $ref: '#/components/parameters/MemberIdPath'
+      responses:
+        '204':
+          description: No content.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /channels/{channel_id}/team/stop:
+    post:
+      operationId: stopChannelTeam
+      summary: Stop every run of a team channel
+      tags: [Channels]
+      description: |-
+        Stops every active run in the work threads of the team's members as `cancelRun` by the caller would, and pauses member inputs with `pause_reason` `stopped` until an owner writes in the team channel again (09 3.9.7). Owners only (`team.stop`); a channel without team mode is `404 not_found`. Posts a note in the team channel; audited.
+      x-authz-action: team.stop
+      x-rate-limit-class: rl.write
+      parameters:
+      - $ref: '#/components/parameters/ChannelIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamStopResult'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    stopped_run_ids:
+                    - 0192f4a0-7b1c-7a75-8e8f-6b0c2d4e5a66
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /channels/{channel_id}/project-binding:
     put:
       operationId: putProjectBinding
@@ -23446,6 +23726,12 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/Uuid'
+    MemberIdPath:
+      name: member_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Uuid'
     TemplateIdPath:
       name: template_id
       in: path
@@ -29000,8 +29286,8 @@ components:
           $ref: '#/components/schemas/Uuid'
         trigger_kind:
           type: string
-          enum: [message, command, interaction, wake]
-          description: '`wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`.'
+          enum: [message, command, interaction, wake, team]
+          description: '`wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`. `team` is a run of a team channel member; its input in the work thread is `triggering_message_id` (09 3.9.2).'
         triggering_message_id:
           $ref: '#/components/schemas/Uuid'
         triggering_command_id:
@@ -31301,10 +31587,13 @@ components:
           $ref: '#/components/schemas/Uuid'
         trigger_kind:
           type: string
-          enum: [message, interaction, command, wake]
+          enum: [message, interaction, command, wake, team]
         message_id:
           $ref: '#/components/schemas/Uuid'
-          description: Triggering message; the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2).
+          description: Triggering message, for `trigger_kind = team` the input in the member's work thread (09 3.9.2); the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2).
+        team:
+          $ref: '#/components/schemas/AgentTeamFacts'
+          description: The team facts of a member's run; set exactly for `trigger_kind = team` (09 3.9.9).
         interaction_id:
           $ref: '#/components/schemas/Uuid'
         wake_id:
@@ -34144,6 +34433,119 @@ components:
       properties:
         allow_autonomous_runs:
           type: boolean
+    Team:
+      type: object
+      description: The team of a team channel (09 3.9.1); `pause_reason` is absent while member inputs flow.
+      required: [channel_id, sponsor_id, member_turns, turn_budget, members, created_at, version]
+      properties:
+        channel_id:
+          $ref: '#/components/schemas/Uuid'
+        sponsor_id:
+          $ref: '#/components/schemas/Uuid'
+          description: The active owner on whose behalf member inputs run (09 3.9.2).
+        member_turns:
+          type: integer
+          format: int32
+          description: Member inputs since an owner's last message (09 3.9.6).
+        turn_budget:
+          type: integer
+          format: int32
+          description: The value of `team.turn_budget` now.
+        pause_reason:
+          $ref: '#/components/schemas/TeamPauseReason'
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMember'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        version:
+          type: integer
+          format: int64
+    TeamPauseReason:
+      type: string
+      enum: [turn_budget, pingpong, stopped]
+      description: Why member inputs are paused (09 3.9.6, 3.9.7); an owner message lifts every pause.
+    TeamMember:
+      type: object
+      description: A member of a team channel (09 3.9.1).
+      required: [id, handle, agent_id, home_channel_id, work_thread_id, created_at]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        handle:
+          type: string
+          examples: [coding]
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+        home_channel_id:
+          $ref: '#/components/schemas/Uuid'
+        work_thread_id:
+          $ref: '#/components/schemas/Uuid'
+          description: The member's thread in its home channel, where its inputs and runs live.
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+    TeamMemberCreate:
+      type: object
+      additionalProperties: false
+      required: [agent_id, home_channel_id, handle]
+      properties:
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+        home_channel_id:
+          $ref: '#/components/schemas/Uuid'
+          description: A channel the agent operates (its effective operator); a project forum for a runner.
+        handle:
+          type: string
+          minLength: 1
+          pattern: '^[a-z0-9][a-z0-9_-]*$'
+          description: Unique in the team channel, at most `team.handle_max_chars` characters.
+          examples: [coding]
+    TeamStopResult:
+      type: object
+      required: [stopped_run_ids]
+      properties:
+        stopped_run_ids:
+          type: array
+          description: The runs the stop ended or asked to end.
+          items:
+            $ref: '#/components/schemas/Uuid'
+    AgentTeamFacts:
+      type: object
+      description: The team facts of a `team` run (09 3.9.9). The owner's authority never comes from here; it comes only from the input message (origin `human` and an owner as author).
+      required: [channel_id, member_id, handle, source, addressed, members]
+      properties:
+        channel_id:
+          $ref: '#/components/schemas/Uuid'
+        member_id:
+          $ref: '#/components/schemas/Uuid'
+        handle:
+          type: string
+        source:
+          type: string
+          enum: [owner, member]
+        source_handle:
+          type: string
+          description: The handle of the source member; set exactly for `source = member`.
+        addressed:
+          type: boolean
+          description: The input mentions the receiving member's handle.
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentTeamMember'
+    AgentTeamMember:
+      type: object
+      required: [member_id, handle, agent_id, home_channel_id]
+      properties:
+        member_id:
+          $ref: '#/components/schemas/Uuid'
+        handle:
+          type: string
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+        home_channel_id:
+          $ref: '#/components/schemas/Uuid'
     RunSummaryPage:
       type: object
       description: One page. `next_cursor` is absent on the last page.

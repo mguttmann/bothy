@@ -375,8 +375,7 @@ func (f *Followups) followOn(ctx context.Context, ended runs.RunSummary, cands [
 	}
 	agent := agents[ended.AgentID]
 	for i, m := range cands {
-		msg := facts[m]
-		allowed, err := f.checkTrigger(ctx, ended, info, msg, version, agent.Status == agentActive)
+		in, as, allowed, err := f.checkCandidate(ctx, ended, info, facts[m], version, agent.Status == agentActive)
 		if err != nil {
 			return err
 		}
@@ -389,12 +388,7 @@ func (f *Followups) followOn(ctx context.Context, ended runs.RunSummary, cands [
 		if a, ok := actor.FromContext(ctx); !ok || a.ID.IsZero() {
 			ctx = actor.WithActor(ctx, actor.Actor{ID: ended.AgentID, Kind: actor.KindAgent})
 		}
-		// The follow-on run is held like an acceptance while an attachment of its triggering
-		// message is not final; without a MessagePosted it asks files unconditionally (M3-07).
-		sum, err := s.invokeOrHold(ctx, OpenCmd{
-			ThreadID: ended.ThreadID, AgentID: ended.AgentID, TriggeredBy: msg.Author.ID, TriggeringMessageID: m,
-			TriggerKind: triggerKindMessage, BillingModeExpected: agent.BillingMode,
-		}, true)
+		sum, err := f.openFollowOn(ctx, ended, in, as, m, agent.BillingMode)
 		var exists *ActiveRunExistsError
 		if errors.As(err, &exists) {
 			// The ended run is no longer active and the acceptances of the thread wait at the run
@@ -409,17 +403,17 @@ func (f *Followups) followOn(ctx context.Context, ended runs.RunSummary, cands [
 	return nil
 }
 
-// checkTrigger decides agent.invoke for the candidate msg of the follow-on run of ended (design
-// note 8 a and b) and applies a denial: the row becomes discarded, trigger_state failed with the
+// checkTrigger decides agent.invoke for the candidate msg of the follow-on run of ended with the
+// facts as (design note 8 a and b; the authority of a team input, 09 3.9.5) and applies a denial: the row becomes discarded, trigger_state failed with the
 // delivery's reason mapping, one audit entry with stage run_end.
 func (f *Followups) checkTrigger(ctx context.Context, ended runs.RunSummary, info chat.ThreadInfo, msg messaging.TriggerMessage,
-	version int64, agentActive bool) (bool, error) {
+	as triggerFacts, version int64, agentActive bool) (bool, error) {
 	s := f.s
 	r := authorize.Resource{
 		Kind: authorize.ResourceThread, ID: ended.ThreadID, ChannelID: info.ChannelID, SpaceID: info.SpaceID, OwnerID: info.CreatedBy,
-		Invoke: &authorize.InvokeFacts{AgentID: ended.AgentID, TriggerOrigin: msg.Origin, MentionsAgent: slices.Contains(msg.MentionedIDs, ended.AgentID)},
+		Invoke: &authorize.InvokeFacts{AgentID: ended.AgentID, TriggerOrigin: as.origin, MentionsAgent: as.mentions},
 	}
-	d, err := s.d.Authorizer.Authorize(authorize.WithPermissionVersion(authorize.Filter(ctx), version), actor.Recheck(msg.Author.ID),
+	d, err := s.d.Authorizer.Authorize(authorize.WithPermissionVersion(authorize.Filter(ctx), version), actor.Recheck(as.person),
 		authorize.ActionAgentInvoke, r)
 	if err != nil || d.Allowed() {
 		return d.Allowed(), err
@@ -433,10 +427,63 @@ func (f *Followups) checkTrigger(ctx context.Context, ended runs.RunSummary, inf
 	}); err != nil {
 		return false, err
 	}
-	return false, s.auditDenial(ctx, msg.Author.ID, string(d.Reason), ended.ThreadID, auditing.Attrs{
+	kind := triggerKindMessage
+	if as.team {
+		kind = triggerKindTeam
+	}
+	return false, s.auditDenial(ctx, as.person, string(d.Reason), ended.ThreadID, auditing.Attrs{
 		attrRunID: auditing.ID(ended.ID), attrMessageID: auditing.ID(msg.ID), attrAgentID: auditing.ID(ended.AgentID),
-		attrStage: auditing.Code(stageRunEnd), attrTriggerKind: auditing.Code(triggerKindMessage),
+		attrStage: auditing.Code(stageRunEnd), attrTriggerKind: auditing.Code(kind),
 	})
+}
+
+// checkCandidate reads the facts of the candidate msg (candidateFacts) and checks them
+// (checkTrigger); allowed reports whether the candidate may start the follow-on run.
+func (f *Followups) checkCandidate(ctx context.Context, ended runs.RunSummary, info chat.ThreadInfo, msg messaging.TriggerMessage,
+	version int64, agentActive bool) (TeamInputRow, triggerFacts, bool, error) {
+	in, as, err := f.candidateFacts(ctx, ended, msg)
+	if err != nil {
+		return TeamInputRow{}, triggerFacts{}, false, err
+	}
+	allowed, err := f.checkTrigger(ctx, ended, info, msg, as, version, agentActive)
+	return in, as, allowed, err
+}
+
+// candidateFacts returns the facts a candidate msg of the follow-on run of ended is checked with:
+// its author, origin and mention, or for a team input the input and its authority (09 3.9.5).
+func (f *Followups) candidateFacts(ctx context.Context, ended runs.RunSummary, msg messaging.TriggerMessage) (TeamInputRow, triggerFacts, error) {
+	in, team, err := f.s.teamInputOf(ctx, msg.ID)
+	if err != nil {
+		return TeamInputRow{}, triggerFacts{}, err
+	}
+	if team {
+		return in, triggerFacts{person: in.AuthorityID, origin: originHuman, mentions: true, team: true}, nil
+	}
+	return in, triggerFacts{person: msg.Author.ID, origin: msg.Origin, mentions: slices.Contains(msg.MentionedIDs, ended.AgentID)}, nil
+}
+
+// openFollowOn opens the follow-on run of ended for the allowed candidate message: a team run for a
+// team input, otherwise a message run of the author, held like an acceptance while an attachment
+// of its triggering message is not final (without a MessagePosted it asks files unconditionally,
+// M3-07).
+func (f *Followups) openFollowOn(ctx context.Context, ended runs.RunSummary, in TeamInputRow, as triggerFacts, message ids.ID,
+	mode string) (runs.RunSummary, error) {
+	if as.team {
+		return f.s.followOnTeamRun(ctx, ended, in, mode)
+	}
+	return f.s.invokeOrHold(ctx, OpenCmd{
+		ThreadID: ended.ThreadID, AgentID: ended.AgentID, TriggeredBy: as.person, TriggeringMessageID: message,
+		TriggerKind: triggerKindMessage, BillingModeExpected: mode,
+	}, true)
+}
+
+// triggerFacts are the facts agent.invoke checks a candidate of a follow-on run with: the author of
+// a message and its origin and mention, or the authority of a team input (09 3.9.5).
+type triggerFacts struct {
+	person   ids.ID
+	origin   string
+	mentions bool
+	team     bool
 }
 
 // moveRest moves the remaining candidates of the ended run to the follow-on run sum (design note

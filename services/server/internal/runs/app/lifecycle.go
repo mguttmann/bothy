@@ -65,6 +65,9 @@ func openTrigger(cmd OpenCmd) bool {
 			cmd.TriggeringInteractionID.IsZero()
 	case triggerKindMessage:
 		return cmd.TriggeringCommandID.IsZero() && cmd.TriggeringInteractionID.IsZero()
+	case triggerKindTeam:
+		// A team run's trigger is its input in the work thread (09 3.9.2).
+		return !cmd.TriggeringMessageID.IsZero() && cmd.TriggeringCommandID.IsZero() && cmd.TriggeringInteractionID.IsZero()
 	case triggerKindCommand:
 		return !cmd.TriggeringCommandID.IsZero() && cmd.TriggeringMessageID.IsZero() && cmd.TriggeringInteractionID.IsZero()
 	case triggerKindInteraction:

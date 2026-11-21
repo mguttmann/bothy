@@ -329,6 +329,10 @@ func TestWake_CheckFireAndWakeInput(t *testing.T) {
 	if !out.Send {
 		t.Fatal("the wake input was not sent")
 	}
+	// The delivered wake input is on the record of the run (03 run_feeders, FEAT-TEAM-CHANNEL-SERVER).
+	if n := w.count(`SELECT count(*) FROM run_feeders WHERE run_id = $1 AND source = 'wake_input' AND principal_id = $2`, r.ID, w.owner.String()); n != 1 {
+		t.Fatalf("run_feeders rows of the wake input %d, want 1", n)
+	}
 	c := claimsOf(t, out.InvocationToken)
 	if c["trigger_kind"] != "wake" || c["wake_id"] != id || c["run_id"] != r.ID || c["thread_id"] != r.Thread || c["sub"] != w.owner.String() {
 		t.Fatalf("token claims %v", c)

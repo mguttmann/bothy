@@ -294,6 +294,24 @@ type ServerInterface interface {
 	// MoveForumTag Change the position of a forum tag
 	// (POST /channels/{channel_id}/tags/{tag_id}/move)
 	MoveForumTag(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, tagId TagIdPath, params MoveForumTagParams)
+	// DisableChannelTeam Switch team mode off
+	// (DELETE /channels/{channel_id}/team)
+	DisableChannelTeam(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
+	// GetChannelTeam Read the team of a team channel
+	// (GET /channels/{channel_id}/team)
+	GetChannelTeam(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
+	// EnableChannelTeam Switch a channel to team mode
+	// (PUT /channels/{channel_id}/team)
+	EnableChannelTeam(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
+	// AddTeamMember Add a member to a team channel
+	// (POST /channels/{channel_id}/team/members)
+	AddTeamMember(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params AddTeamMemberParams)
+	// RemoveTeamMember Remove a member from a team channel
+	// (DELETE /channels/{channel_id}/team/members/{member_id})
+	RemoveTeamMember(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, memberId MemberIdPath)
+	// StopChannelTeam Stop every run of a team channel
+	// (POST /channels/{channel_id}/team/stop)
+	StopChannelTeam(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params StopChannelTeamParams)
 	// ListTemplates List own and channel templates
 	// (GET /channels/{channel_id}/templates)
 	ListTemplates(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
@@ -4835,6 +4853,219 @@ func (siw *ServerInterfaceWrapper) MoveForumTag(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.MoveForumTag(w, r, channelId, tagId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DisableChannelTeam operation middleware
+func (siw *ServerInterfaceWrapper) DisableChannelTeam(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DisableChannelTeam(w, r, channelId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetChannelTeam operation middleware
+func (siw *ServerInterfaceWrapper) GetChannelTeam(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetChannelTeam(w, r, channelId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EnableChannelTeam operation middleware
+func (siw *ServerInterfaceWrapper) EnableChannelTeam(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EnableChannelTeam(w, r, channelId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddTeamMember operation middleware
+func (siw *ServerInterfaceWrapper) AddTeamMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AddTeamMemberParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddTeamMember(w, r, channelId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveTeamMember operation middleware
+func (siw *ServerInterfaceWrapper) RemoveTeamMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "member_id" -------------
+	var memberId MemberIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member_id", r.PathValue("member_id"), &memberId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveTeamMember(w, r, channelId, memberId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StopChannelTeam operation middleware
+func (siw *ServerInterfaceWrapper) StopChannelTeam(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params StopChannelTeamParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StopChannelTeam(w, r, channelId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -15307,6 +15538,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/channels/{channel_id}/operator", wrapper.SetChannelOperator)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/channels/{channel_id}/read-only", wrapper.SetChannelReadOnly)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/channels/{channel_id}/autonomous-runs", wrapper.SetChannelAutonomousRuns)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/channels/{channel_id}/team", wrapper.DisableChannelTeam)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/team", wrapper.GetChannelTeam)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/channels/{channel_id}/team", wrapper.EnableChannelTeam)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/team/members", wrapper.AddTeamMember)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/channels/{channel_id}/team/members/{member_id}", wrapper.RemoveTeamMember)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/team/stop", wrapper.StopChannelTeam)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/channels/{channel_id}/project-binding", wrapper.DeleteProjectBinding)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/channels/{channel_id}/project-binding", wrapper.PutProjectBinding)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/tags", wrapper.ListForumTags)

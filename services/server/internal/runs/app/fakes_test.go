@@ -47,6 +47,60 @@ type repo struct {
 	patches int
 	// locks counts the row locks (LockRun).
 	locks int
+	// feeders is run_feeders: InsertRun records the trigger as the database trigger of 00108 does;
+	// the follow-ups and interactions are recorded by the tests that need them.
+	feeders map[ids.ID][]app.Feeder
+	// answers is run_answers: message to the run it answers.
+	answers map[ids.ID]ids.ID
+}
+
+// RecordFeeders implements app.Repository; a row already stored changes nothing.
+func (r *repo) RecordFeeders(_ context.Context, run ids.ID, source string, principals []ids.ID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.recordLocked(run, source, principals...)
+	return nil
+}
+
+// recordLocked adds feeders under r.mu.
+func (r *repo) recordLocked(run ids.ID, source string, principals ...ids.ID) {
+	if r.feeders == nil {
+		r.feeders = map[ids.ID][]app.Feeder{}
+	}
+	for _, p := range principals {
+		f := app.Feeder{PrincipalID: p, Source: source}
+		if !slices.Contains(r.feeders[run], f) {
+			r.feeders[run] = append(r.feeders[run], f)
+		}
+	}
+}
+
+// Feeders implements app.Repository.
+func (r *repo) Feeders(_ context.Context, run ids.ID) ([]app.Feeder, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.feeders[run]), nil
+}
+
+// RecordAnswer implements app.Repository.
+func (r *repo) RecordAnswer(_ context.Context, message, run ids.ID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.answers == nil {
+		r.answers = map[ids.ID]ids.ID{}
+	}
+	if _, ok := r.answers[message]; !ok {
+		r.answers[message] = run
+	}
+	return nil
+}
+
+// AnswerRun implements app.Repository.
+func (r *repo) AnswerRun(_ context.Context, message ids.ID) (ids.ID, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	run, ok := r.answers[message]
+	return run, ok, nil
 }
 
 // LockRunForAnswer implements app.Repository: the four columns of the answer check (M2-19).
@@ -76,6 +130,7 @@ func (r *repo) InsertRun(_ context.Context, n app.NewRun) (app.RunRow, bool, err
 		InvocationHeldUntil: n.InvocationHeldUntil, StateReason: n.StateReason,
 	}
 	r.runs = append(r.runs, row)
+	r.recordLocked(row.ID, domain.FeedTrigger, row.TriggeredBy)
 	return row, true, nil
 }
 
@@ -889,8 +944,14 @@ func (t *threads) Create(_ context.Context, _ actor.Actor, cmd chat.CreateThread
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	id := ids.New()
-	main := t.infos[cmd.Parent.ThreadID]
-	t.infos[id] = chat.ThreadInfo{ID: id, ChannelID: cmd.ChannelID, SpaceID: main.SpaceID, ChannelKind: main.ChannelKind, Kind: "thread", State: "open"}
+	ch := t.chans[cmd.ChannelID]
+	info := chat.ThreadInfo{ID: id, ChannelID: cmd.ChannelID, SpaceID: ch.SpaceID, ChannelKind: ch.Kind, Kind: "thread", State: "open",
+		OperatorAgentID: ch.EffectiveOperatorID}
+	if cmd.Parent != nil {
+		main := t.infos[cmd.Parent.ThreadID]
+		info.SpaceID, info.ChannelKind, info.OperatorAgentID = main.SpaceID, main.ChannelKind, ids.ID{}
+	}
+	t.infos[id] = info
 	return chat.Thread{ID: id, ChannelID: cmd.ChannelID, Kind: "thread"}, nil
 }
 
@@ -1169,7 +1230,7 @@ func (w *world) deps() app.Deps {
 		Agents: w.agents, Cursors: cursors{}, Errors: w.errs, Log: slog.New(slog.NewJSONHandler(w.log, nil)), Clock: w.clk, Metrics: w.metrics,
 		Versions: versions{}, Audit: w.audit, Telemetry: w.telemetry, Expiry: expiryJournal{w.j},
 		Publisher: w.pub, Steps: w.steps, FollowupRows: w.fus, Files: w.files, Holds: holdJournal{w.j}, Sessions: w.agentSessions(),
-		Transcripts: w.modes, ThreadOperators: w.threads,
+		Transcripts: w.modes, ThreadOperators: w.threads, CancelTimeouts: cancelJournal{w.j},
 	}
 	if w.gate != nil {
 		d = w.gate.wrap(d)
@@ -1285,6 +1346,14 @@ type expiryJournal struct{ j *journal }
 
 func (e expiryJournal) ScheduleQueuedExpiry(_ context.Context, run ids.ID, at time.Time) error {
 	e.j.add("expiry", expiryAt{run, at})
+	return nil
+}
+
+// cancelJournal records the scheduled runs.cancel_timeout jobs as "cancel-timeout".
+type cancelJournal struct{ j *journal }
+
+func (c cancelJournal) Schedule(_ context.Context, run ids.ID, at time.Time) error {
+	c.j.add("cancel-timeout", expiryAt{run, at})
 	return nil
 }
 

@@ -1004,6 +1004,12 @@ type Run struct {
 	TriggeringWakeID        pgtype.UUID
 }
 
+type RunAnswer struct {
+	MessageID pgtype.UUID
+	RunID     pgtype.UUID
+	CreatedAt pgtype.Timestamptz
+}
+
 type RunAutonomy struct {
 	ThreadID    pgtype.UUID
 	PersonID    pgtype.UUID
@@ -1011,6 +1017,13 @@ type RunAutonomy struct {
 	IdleCount   int32
 	EndedReason pgtype.Text
 	UpdatedAt   pgtype.Timestamptz
+}
+
+type RunFeeder struct {
+	RunID       pgtype.UUID
+	PrincipalID pgtype.UUID
+	Source      string
+	CreatedAt   pgtype.Timestamptz
 }
 
 type RunFollowup struct {
@@ -1138,6 +1151,47 @@ type StatusIncidentUpdate struct {
 	BodyMd     string
 	CreatedBy  pgtype.UUID
 	CreatedAt  pgtype.Timestamptz
+}
+
+type TeamChannel struct {
+	ChannelID     pgtype.UUID
+	SponsorID     pgtype.UUID
+	MemberTurns   int32
+	PingpongFrom  pgtype.UUID
+	PingpongTo    pgtype.UUID
+	PingpongCount int32
+	PauseReason   pgtype.Text
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+	Version       int64
+}
+
+type TeamInput struct {
+	MessageID       pgtype.UUID
+	MemberID        pgtype.UUID
+	SourceMessageID pgtype.UUID
+	Source          string
+	SourceMemberID  pgtype.UUID
+	AuthorityID     pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+}
+
+type TeamMember struct {
+	ID            pgtype.UUID
+	ChannelID     pgtype.UUID
+	AgentID       pgtype.UUID
+	HomeChannelID pgtype.UUID
+	WorkThreadID  pgtype.UUID
+	Handle        string
+	CreatedBy     pgtype.UUID
+	CreatedAt     pgtype.Timestamptz
+}
+
+type TeamMirror struct {
+	SourceMessageID pgtype.UUID
+	MirrorMessageID pgtype.UUID
+	MemberID        pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
 }
 
 type TerminalSession struct {
