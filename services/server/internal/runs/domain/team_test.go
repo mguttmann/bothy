@@ -126,3 +126,21 @@ func TestNextBrake(t *testing.T) {
 		}
 	})
 }
+
+// TestTeamRefusalNote: the note names the member and the reason code and says why for every
+// refusal of this module (red team round 5 minor: a note with only team_source_not_owner).
+func TestTeamRefusalNote(t *testing.T) {
+	for _, c := range []struct{ reason, why string }{
+		{TeamRefusalSponsor, "sponsor of the team channel is not an active owner"},
+		{TeamRefusalReaders, "can read the team channel"},
+		{TeamRefusalSource, "a message of another person, agent or app in its context"},
+	} {
+		got := TeamRefusalNote("coding", c.reason)
+		if !strings.HasPrefix(got, "Team input for @coding refused: "+c.reason+" (") || !strings.Contains(got, c.why) {
+			t.Errorf("%s: %q", c.reason, got)
+		}
+	}
+	if got := TeamRefusalNote("coding", "other_reason"); got != "Team input for @coding refused: other_reason." {
+		t.Errorf("unknown reason: %q", got)
+	}
+}

@@ -40,6 +40,24 @@ const (
 	TeamRefusalSource = "team_source_not_owner"
 )
 
+// TeamRefusalNote returns the text of the note a refused team input posts in the team channel's
+// main thread (09 3.9.5): the member, the reason and, for the reasons of this module, what an
+// owner can do about it. The reason stays in the text as the code the audit entry names.
+func TeamRefusalNote(handle, reason string) string {
+	text := "Team input for @" + handle + " refused: " + reason
+	switch reason {
+	case TeamRefusalSponsor:
+		text += " (the sponsor of the team channel is not an active owner)"
+	case TeamRefusalReaders:
+		text += " (a person who is not an active owner can read the team channel or the member's home channel)"
+	case TeamRefusalSource:
+		text += " (the run it answers was started or fed by someone who is not an active owner: its trigger, a follow-up," +
+			" a card interaction, a command, a wake-up, or a message of another person, agent or app in its context;" +
+			" such a message refuses every later run that reads it in its context window)"
+	}
+	return text + "."
+}
+
 // ValidHandle reports whether h is a handle of a team member (09 3.9.1, 03 team_members): lower
 // case letters a to z, digits, '-' and '_', starting with a letter or digit, at most maxChars
 // characters.

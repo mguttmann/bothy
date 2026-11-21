@@ -7,11 +7,14 @@ import (
 	"reflect"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/pressly/goose/v3"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/migrations"
 )
 
 // The migration of the feeder record (FEAT-TEAM-CHANNEL-SERVER, R-DM-63, docs/spec/09-agents.md
@@ -199,5 +202,47 @@ func TestMigration_RunFeedersRecordEveryStoredInput(t *testing.T) {
 	}
 	if got := feeders(next); len(got) != 0 {
 		t.Errorf("feeders of a deleted run %v", got)
+	}
+}
+
+// TestMigration_RunFeedersDown: the down step of 00108 removes the table, its triggers and their
+// functions, and up creates them again (red team round 5 minor).
+func TestMigration_RunFeedersDown(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := pgtest.New(t)
+	pool := db.OpenPool(t, db.Config(pg.RoleOwner).ForMigrate(5*time.Second))
+	sqlDB := pool.OpenSQL()
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	provider, err := goose.NewProvider(goose.DialectPostgres, sqlDB, migrations.FS, goose.WithDisableGlobalRegistry(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	left := func() int {
+		t.Helper()
+		var n int
+		if err := sqlDB.QueryRowContext(ctx, `SELECT (to_regclass('run_feeders') IS NOT NULL)::int
+			+ (SELECT count(*)::int FROM pg_trigger WHERE tgname LIKE '%\_record\_feeder')
+			+ (SELECT count(*)::int FROM pg_proc WHERE proname LIKE '%\_record\_feeder')`).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	all := left()
+	if all != 1+2*len(inputTriggers) {
+		t.Fatalf("before down: %d objects, want the table and %d triggers with their functions", all, len(inputTriggers))
+	}
+	before := migrationVersion(t, "runs_run_feeders") - 1
+	if _, err := provider.DownTo(ctx, before); err != nil {
+		t.Fatalf("down to %d: %v", before, err)
+	}
+	if n := left(); n != 0 {
+		t.Errorf("down left %d objects of 00108", n)
+	}
+	if _, err := provider.Up(ctx); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+	if n := left(); n != all {
+		t.Errorf("up again: %d objects, want %d", n, all)
 	}
 }
