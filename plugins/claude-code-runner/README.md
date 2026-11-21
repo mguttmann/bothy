@@ -301,7 +301,9 @@ recorded turn). The level-one switch test holds the recorded table against the i
 equal at the pin, and as a floor against a tested newer CLI, which may add members (named in a
 warning) but keeps every recorded schema member and the compared values (task status,
 command states, workflow type)
-(D-FIX-RUNNER-CONTRACT-TOLERANT-1).
+(D-FIX-RUNNER-CONTRACT-TOLERANT-1); of the recorded task types it keeps only the ones the runner
+maps (`local_agent`, `local_workflow`) and may drop the others, named in a warning
+(D-FIX-RUNNER-CONTRACT-TOLERANT-3).
 2.1.321 adds members the runner does not read (`run_id`, `parent_task_id` and `awaited` of a
 task, `wakeup_source` of a queued input, the cache write durations of `modelUsage`) and names the
 model in `system/init` and `modelUsage` without the selector in square brackets. 2.1.325 adds
@@ -1215,8 +1217,10 @@ tested_claude_code_pin = "<PINNED_CLAUDE_CODE_VERSION of the running code>"
 ```
 
 The field table of the subset is a floor there: members the new CLI adds pass and are named
-in a warning; a recorded schema member it lost, a changed status or command state value or a
-changed workflow type fails (FIX-RUNNER-CONTRACT-TOLERANT).
+in a warning, and so do recorded task types it no longer names that the runner does not map
+(any besides `local_agent` and `local_workflow`); a recorded schema member it lost, a lost
+mapped task type, a changed status or command state value or a changed workflow type fails
+(FIX-RUNNER-CONTRACT-TOLERANT).
 
 The probe then reports the CLI `online`, `check-config` prints `runtime ok`, and background
 mode runs on it. Every other version stays `runtime_version_untested` and fails background

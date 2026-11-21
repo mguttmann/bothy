@@ -165,7 +165,7 @@ def test_a_newer_cli_that_adds_members_passes_and_names_them() -> None:
         task_types=["local_agent", "local_workflow", "remote_agent"],
         background_task=["task_id", "task_type", "off_host"],
     )
-    lost, added = record.field_changes(RECORDED, fresh)
+    lost, added, dropped = record.field_changes(RECORDED, fresh)
     assert lost == []
     assert added == [
         "system/init: new_member",
@@ -173,19 +173,20 @@ def test_a_newer_cli_that_adds_members_passes_and_names_them() -> None:
         "background_task: off_host",
         "task_types: remote_agent",
     ]
+    assert dropped == []
 
 
 def test_a_newer_cli_without_a_member_the_runner_reads_fails() -> None:
     # ``apiKeySource`` is read by the runner (READ_TOKENS); a rename is a loss plus an addition.
     fresh = _table(["cwd", "api_key_source", "model"])
-    lost, added = record.field_changes(RECORDED, fresh)
+    lost, added, _ = record.field_changes(RECORDED, fresh)
     assert lost == ["system/init: apiKeySource"]
     assert added == ["system/init: api_key_source"]
 
 
 def test_a_newer_cli_without_any_recorded_schema_member_fails() -> None:
     fresh = _table(["cwd", "apiKeySource"], usage=[])
-    lost, _ = record.field_changes(RECORDED, fresh)
+    lost, _, _ = record.field_changes(RECORDED, fresh)
     assert lost == ["system/init: model", "usage: total_tokens"]
 
 
@@ -195,7 +196,7 @@ def test_a_changed_value_list_or_workflow_type_fails() -> None:
         task_status=["completed", "failed", "killed"],
         workflow_task_type="workflow",
     )
-    lost, _ = record.field_changes(RECORDED, fresh)
+    lost, _, _ = record.field_changes(RECORDED, fresh)
     assert lost == [
         "task_status: ['completed', 'failed'] became ['completed', 'failed', 'killed']",
         "workflow_task_type: 'local_workflow' became 'workflow'",
@@ -204,8 +205,26 @@ def test_a_changed_value_list_or_workflow_type_fails() -> None:
 
 def test_a_message_schema_the_cli_no_longer_has_fails() -> None:
     fresh = _table([]) | {"messages": {}}
-    lost, _ = record.field_changes(RECORDED, fresh)
+    lost, _, _ = record.field_changes(RECORDED, fresh)
     assert lost == ["system/init: the message schema"]
+
+
+def test_a_newer_cli_without_a_task_type_the_runner_does_not_map_passes_and_names_it() -> None:
+    # 2.1.329 dropped ``local_memory_import``; the runner gives every type besides the ones it
+    # maps a ``background_job`` step, so a type that no longer occurs changes nothing it does.
+    recorded = RECORDED | {"task_types": ["local_agent", "local_memory_import", "local_workflow"]}
+    fresh = _table(["cwd", "apiKeySource", "model"])
+    lost, added, dropped = record.field_changes(recorded, fresh)
+    assert (lost, added, dropped) == ([], [], ["task_types: local_memory_import"])
+
+
+@pytest.mark.parametrize("task_type", ["local_agent", "local_workflow"])
+def test_a_newer_cli_without_a_task_type_the_runner_maps_fails(task_type: str) -> None:
+    others = [t for t in ("local_agent", "local_workflow") if t != task_type]
+    fresh = _table(["cwd", "apiKeySource", "model"], task_types=[*others, "local_bash"])
+    lost, _, dropped = record.field_changes(RECORDED, fresh)
+    assert lost == [f"task_types: {task_type}"]
+    assert dropped == []
 
 
 def test_the_fields_document_names_what_only_the_recorded_turn_wrote() -> None:
