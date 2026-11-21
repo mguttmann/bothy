@@ -200,6 +200,16 @@ Found by the red team in round 8:
 11. No test sends a real `Invocation-Token` header through the authenticator up to the link of
     `run_answers`; the team tests set the binding through the server's own acting-for source.
 
+Found by the red team in round 9:
+
+12. 03 `run_answers` and `run_feeders` do not say that an agent's message edited after it was
+    written speaks for no person despite its link (09 3.9.4 and D-TEAM-12 do).
+13. The example in the doc comment of `CopyMessage` omits `SourceVersion`, which is required.
+14. When the Hermes adapter edits its own answer (`on_edit` with finalize) before the job runs,
+    the owner's reply is not handed on (fail closed); the interplay has no test.
+15. No test drives an edit between `TriggerMessageOf` and `CopyMessage` in the reply path; the
+    version pin is held by the messaging test and the owner broadcast probe of the red team.
+
 ## 8. Alternatives rejected
 
 - **Point to point handoff records** (the first version of this draft): one hop at a time with a
