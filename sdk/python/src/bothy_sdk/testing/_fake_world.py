@@ -891,14 +891,17 @@ class World:
 
     # Invocation-Token header (SR9) --------------------------------------------------------
 
-    def bind(self, values: list[str], operation_id: str) -> None:
+    def bind(self, values: list[str], operation_id: str) -> UUID | None:
         """Check the ``Invocation-Token`` header of a request.
+
+        Returns:
+            The run the header's token names, ``None`` without a header.
 
         Raises:
             FakeProblem: ``403 invocation_token_invalid`` with ``invalid`` or ``run_inactive``.
         """
         if not values:
-            return
+            return None
         invalid = FakeProblem("invocation_token_invalid", reason="invalid")
         if len(values) != 1 or not values[0]:
             raise invalid
@@ -915,7 +918,7 @@ class World:
         run = self.runs.get(UUID(claims["run_id"]))
         if run is None:
             raise invalid
-        # 07 SR9: only message and command tokens name the run's triggering person; an
+        # 07 SR9: only message, team and command tokens name the run's triggering person; an
         # interaction or follow-up token names the person who acted.
         triggering = claims.get("trigger_kind") in ("message", "team", "command")
         if triggering and claims["sub"] != str(run.triggered_by):
@@ -930,6 +933,7 @@ class World:
             "finishRun",
         ):
             raise FakeProblem("invocation_token_invalid", reason="run_inactive")
+        return run.id
 
     # Run operations -----------------------------------------------------------------------
 

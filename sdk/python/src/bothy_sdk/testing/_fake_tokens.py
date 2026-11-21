@@ -27,8 +27,8 @@ from bothy_sdk.testing._fake_base import b64url, b64url_decode, compact_json, st
 TYP = "agent-invocation+jwt"
 TRIGGER_OBJECT = {
     "message": "message_id",
-    "followup": "message_id",
     "team": "message_id",
+    "followup": "message_id",
     "interaction": "interaction_id",
     "command": "command_id",
     "autocomplete": "command_id",

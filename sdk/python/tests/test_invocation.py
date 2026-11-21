@@ -392,6 +392,8 @@ def test_expectation_rows() -> None:
             obj,
         ),
         "message without id": ({"trigger_kind": "message"}, "message_id", None),
+        "team": ({"trigger_kind": "team", "message_id": str(obj)}, "message_id", obj),
+        "team without id": ({"trigger_kind": "team"}, "message_id", None),
     }
     for name, (extra, claim, trigger) in rows.items():
         event = _payload(AgentInvocationPayload, {**base, **extra})

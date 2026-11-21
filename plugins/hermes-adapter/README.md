@@ -39,6 +39,7 @@ installation.
 | `src/bothy_hermes_adapter/actual_mode.py`, `tool_class.py` | the actual billing mode (17.8) and the tool class (17.11) |
 | `src/bothy_hermes_adapter/media.py` | files of the answer (check, upload session, message kind), the audio attachments to transcribe and the other attachments for Hermes' media cache with the note for one not passed on (17.3, 17.6) |
 | `src/bothy_hermes_adapter/context_format.py` | format rules, channel instructions and the run context for the user side of a turn (17.6) |
+| `src/bothy_hermes_adapter/team.py` | team runs: the member `team` of the invocation, who wrote an input (owner or member), the team lines of the user side and the member label (17.14) |
 | `src/bothy_hermes_adapter/hermes_commands.py` | the command table of the pinned version, the control and skill commands the adapter declares (17.3) |
 | `src/bothy_hermes_adapter/mirror.py` | the mirror of sessions of other platforms into a forum (17.13), imported at the first such hook |
 | `src/bothy_hermes_adapter/reports.py` | reports without a run: targets, a new forum post or the main thread, the standalone sender (17.9) |
@@ -260,6 +261,19 @@ end `cancelled` with the run, and the file's `run` `ended` line removes the regi
 file does not keep the run open: the command does, as the tool call's process or as background
 work.
 
+## Team channels
+
+A team channel lets the owner's agents work together (09 3.9, 17.14). The adapter serves a
+`team` run like a message run in the member's work thread and adds the team to every turn: its
+own handle, the members, who wrote the input and whether it mentions this member. Only a message
+an owner wrote is the owner's word; a member's input and every follow-up of another agent reach
+Hermes behind the line `[von Mitglied @x: ...]`, as a colleague's request that approves nothing.
+An owner's message that reaches a running run is steered as before. To hand work on, the agent
+mentions a handle (`@dev`) in its final answer; the server reads the mention. Every request of
+the run, the answer included, carries the run's own token, which the server needs to hand an
+answer on. A `team` run without its team facts, and any trigger kind the adapter does not know,
+ends `failed` with `adapter_error` before the start.
+
 ## Mirror of sessions outside Bothy
 
 Sessions of the same Hermes profile that do not start in Bothy (a session another program drives
@@ -380,10 +394,13 @@ connects only after Hermes finished its startup restore.
 - `tests/unit`: the logic against the SDK's FakeServer with a fake runtime: intake, start
   answers, restart, live box, answer, costs, title, follow-ups, cards, stop, sessions, heartbeat,
   the `Invocation-Token` header, logs without content, configuration, the installer's plan, the
-  command table, control and skill commands, reports and the standalone sender.
+  command table, control and skill commands, reports and the standalone sender; team runs with
+  owner and member inputs, labelled member follow-ups and the run's own token on every request
+  beside a concurrent run (`test_team.py`).
 - `tests/fake_hermes`: the pinned Hermes in a subprocess (throwaway home, fake model on
   `127.0.0.1`, the FakeServer, under the macOS sandbox, an empty managed scope): plugin discovery,
-  a full turn, AG-08 and AZ-P6 (no turn without a matching token), AG-11 and the unknown mode,
+  a full turn, a team run with labelled member input and follow-ups, AG-08 and AZ-P6 (no turn
+  without a matching token), AG-11 and the unknown mode,
   the reported mode equals the credential the model endpoint receives, AG-13 (steer, queue,
   stop), AG-15 (concurrent clicks resolve once), a card answered by a click before a delegation
   (the run holds the work and ends with its costs), a typed answer to a card (absorbed), a voice

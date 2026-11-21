@@ -554,7 +554,8 @@ This is the contract the runner and the Hermes adapter build against.
 - A member hands work to another member by writing `@handle` in its final reply (outside code); no
   command is needed. A reply without a mention is mirrored and triggers nothing.
 - An adapter that does not know `trigger_kind = team` refuses such a run as it refuses any unknown
-  trigger kind; nothing outside team channels changes for it.
+  trigger kind; nothing outside team channels changes for it. The Hermes adapter serves `team`
+  runs since 2026-11-21 (17.14).
 - The Claude Code runner builds this contract as described in 18.5 "Team runs and team inputs"
   (FEAT-TEAM-CHANNEL-RUNNER).
 
@@ -3489,6 +3490,57 @@ compression, an unreachable server, a wrong channel, a full queue, a person's me
 command in a mirror post) and the Fake-Hermes test `tests/fake_hermes/test_session_mirror.py` (a
 `hermes -z` session with a tool call and its resume with `hermes -r <session> -z` against the
 pinned version).
+
+### 17.14 Team channels
+
+Addendum of 2026-11-21 (FEAT-TEAM-CHANNEL-ADAPTER, decisions
+[FEAT-TEAM-CHANNEL-ADAPTER.md](../decisions.d/FEAT-TEAM-CHANNEL-ADAPTER.md)). The Hermes adapter
+serves `team` runs by the contract of 3.9.9:
+
+- **Trigger kind.** `prepare` accepts `trigger_kind = team` and reads the run context as for a
+  message run (the input lies in the work thread); the answer quotes the input like a trigger
+  message. A `team` run without its member `team`, or with a handle not in the form of 3.9.1, is
+  refused before the start (`failed`, `adapter_error`), and so is every trigger kind the adapter
+  does not know (`wake` included): the adapter never crashes on one. The SDK compares a `team`
+  token's `message_id` with the payload (4.5 point 6, `expectation_for`).
+- **Team context.** The user side of every turn of the run (17.6) carries, after the channel
+  instructions, the team lines: the own handle, every member's handle, who wrote the input (the
+  owner, or the member `@x`), whether the input mentions this member, that only a message an
+  owner wrote is the owner's word, and that a member hands work over by mentioning a handle in
+  its final reply, outside code. Handles are printed only in the form of 3.9.1; any other text
+  becomes `unknown`.
+- **Owner or member.** An input is the owner's word exactly when its message has
+  `origin = human` (and the server's `source` is `owner`); `triggered_by`, the token's `sub` and
+  the member `team` never make it one. A member's input, and every follow-up whose message is not
+  of origin `human` (outside team channels no agent message is a follow-up, 07 SR4), reaches
+  Hermes behind the line `[von Mitglied @x: ...]`, which says it is a colleague's request, not
+  the owner's word, and approves nothing: in the run's first turn, in a follow-up steered into a
+  running turn (17.5), in a follow-up's own turn while the run holds work (17.12) and in a typed
+  answer to an open card. The handle comes from the run's member list by the author's agent, else
+  from the agent's own handle. A text never approves a Hermes prompt (17.5, the approval is
+  denied), so a member's text cannot either. Hermes takes every turn of the run, a member's own
+  follow-up turn included, from the run's person (the token's `sub`, the authority of 3.9.2),
+  whom Hermes' admission checks (17.7); the label, not the sender, tells the model who wrote it.
+- **Owner messages** of the team channel that reach a running run are ordinary follow-ups of
+  origin `human` and are steered as before (17.5), without a label.
+- **The run's own token.** Every request of a turn goes out with the token of its own run: the
+  answers, cards and files through the SDK outbox, which binds each entry to the newest token of
+  its run (`Outbox.token_for`), and every other request (live box, steps of background work, the
+  stage files of 17.12 point 9, edits, uploads, the end of the run) inside the run's binding
+  (`RunHandle.bound`), also when Hermes reports on a task of another run. The server links an
+  answer to its run only with that run's token (3.9.4), so only such an answer hands work on. The
+  registry files of external jobs and stages are local and send nothing; a job no open run covers
+  is posted without a run (17.12 point 8) and hands nothing on.
+- **Handover.** The adapter passes the final answer as Hermes wrote it; the server reads the
+  `@handle` mentions (3.9.4). No command is needed.
+
+Evidence: `plugins/hermes-adapter/tests/unit/test_team.py` (owner and member input, a member's
+text with the source `owner`, a run without the member `team`, unknown trigger kinds, the
+handover answer, labelled member follow-ups in a `team` run and in a message run, a card answered
+by a member, a held run's own turn, and a team run beside a concurrent run whose Hermes task
+reports for the team thread, with stage steps, a steered follow-up and an edit, where every
+request about a run carries a token of exactly that run) and the Fake-Hermes test
+`tests/fake_hermes/test_team.py` against the pinned version.
 
 ## 18. Reference adapter: Claude-Code-Runner (development forums)
 

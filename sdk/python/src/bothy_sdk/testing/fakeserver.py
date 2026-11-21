@@ -283,6 +283,8 @@ class FakeServer:
         self.timings: Mapping[str, float] = timings_with_defaults(timings)
         self.requests: list[RecordedRequest] = []
         self.frames: list[dict[str, Any]] = []
+        # Fingerprint of every accepted ``Invocation-Token`` header -> the run its token names.
+        self._token_runs: dict[str, UUID] = {}
         self._faults: dict[str, deque[Fault]] = defaultdict(deque)
         self._deprecated: dict[str, str] = {}
         self._idempotency: dict[tuple[str, str], tuple[str, _Answer | None]] = {}
@@ -457,7 +459,7 @@ class FakeServer:
             text: The message content.
             channel_id: A served channel (`add_forum`); Allgemein when omitted.
             author: The handle of the triggering person (``alex``, ``sam`` or ``robin``).
-            trigger_kind: ``message`` or ``interaction`` (the token names that object).
+            trigger_kind: ``message``, ``team`` or ``interaction`` (the token names that object).
             attachments: Files of `add_file` attached to the message.
             thread_id: An existing thread to post in; a new thread when omitted.
             context: A ``RunContext`` to serve for the run (``thread_context``,
@@ -1157,6 +1159,21 @@ class FakeServer:
         await _settle()
         return UUID(envelope["id"])
 
+    def token_run(self, token_fingerprint: str) -> UUID | None:
+        """The run an accepted ``Invocation-Token`` header named (07 SR9).
+
+        `RecordedRequest.headers` hold the header's `fingerprint`; this answers which run the
+        token was issued for, the run the real server binds the request to (09 3.9.4: an
+        answer speaks for a run only with that run's own token).
+
+        Args:
+            token_fingerprint: The header's fingerprint.
+
+        Returns:
+            The run, or ``None`` for a header the server never accepted.
+        """
+        return self._token_runs.get(token_fingerprint)
+
     def forge_token(self, run_id: UUID, variant: str) -> Secret:
         """A forged token for the run, built from its newest delivered token.
 
@@ -1419,7 +1436,9 @@ class FakeServer:
                 proofs=request.headers.getall("DPoP", []),
             )
             if operation_id not in _DELIVERY:
-                self.world.bind(binding, operation_id)
+                bound = self.world.bind(binding, operation_id)
+                if bound is not None:
+                    self._token_runs[fingerprint(binding[0])] = bound
 
     async def _serve(
         self, operation_id: str, params: dict[str, str], request: web.Request, body: Any
