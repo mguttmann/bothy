@@ -429,13 +429,17 @@ when an input is stored or given to the run and never shrinks: its trigger (`tri
 team run the authority of its input), the person of every follow-up it took (the author of a
 person's message, the authority of a team input, none for any other message), the principal of
 every interaction with its components, the person of every delivery into it (4.2, also a control
-command and a wake input) and the writer of every message its run context gave it (the author of a
-message that is no agent or system message, the authority of a team input). The run passes when
+command and a wake input) and the writer of every message its run context gave it, of any origin
+and in the trigger, thread and channel window alike (the authority of a team input, the author of
+a person's message, none for every other message, such as another agent's or an app's; only the
+messages of the member's own agent are left out). The run passes when
 its trigger is on the record and every principal recorded is an active owner at the moment of the
 job; a recorded input that speaks for no person, and a run older than the record, fail. Otherwise
-nothing is copied, a note names the member and the reason `team_source_not_owner`, and the refusal
-is audited. Deleting the message, the card or the interaction and revoking a grant remove nobody
-from the record, so a person with a grant who wrote in a work thread never steers a member into
+nothing is copied, a note names the member, the reason `team_source_not_owner` and the inputs it
+covers, and the refusal is audited. A message of another author stays in the context window of
+the later runs of the work thread, so it refuses each of them while it lies in their window.
+Deleting the message, the card or the interaction and revoking a grant remove nobody from the
+record, so a person with a grant who wrote in a work thread never steers a member into
 triggering another member with the sponsor's rights, also after the grant was revoked.
 
 Mirror and inputs run in the job `runs.team_input` after the reply's commit, never in the unit of

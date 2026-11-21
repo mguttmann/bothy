@@ -1962,7 +1962,7 @@ Purpose: the record of who fed a run, the only thing the check of a member's rep
 | Field | Type | Null | Default | Rules / notes |
 |---|---|---|---|---|
 | `run_id` | `uuid` | no | | |
-| `principal_id` | `uuid` | yes | | the person an input speaks for; NULL for an input that speaks for no person (an agent's or an app's follow-up) |
+| `principal_id` | `uuid` | yes | | the person an input speaks for; NULL for an input that speaks for no person (an agent's or an app's follow-up or context message) |
 | `source` | `text` | no | | `CHECK (source IN ('trigger','followup','interaction','command','wake_input','context'))` |
 | `created_at` | `timestamptz` | no | `now()` | |
 
@@ -1974,8 +1974,9 @@ to the follow-on run, with the authority of a team input, the author of a messag
 `human`, NULL otherwise; `interaction`: the principal of every interaction with a component whose
 `run_id` is set) and by the runs module for the inputs that are no rows: every allowed delivery
 of an invocation-bearing event into a run (the person of its check, 09 4.2) and every writer of a
-message the run context gives the run (author of a message that is no agent or system message,
-the authority of a team input). `bothy_app` may only read and insert: deleting a message, a card
+message the run context gives the run, of any origin (the authority of a team input, the author of
+a person's message, NULL for every other message, such as another agent's or an app's; the
+messages of the run's own agent are not recorded). `bothy_app` may only read and insert: deleting a message, a card
 or an interaction and revoking a grant never remove a row; rows go only with their run.
 Retention: `content` (with the run).
 

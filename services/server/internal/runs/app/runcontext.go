@@ -99,7 +99,7 @@ func (s *Service) Context(ctx context.Context, runID ids.ID) (runs.RunContext, e
 	if err != nil {
 		return runs.RunContext{}, err
 	}
-	if err := s.recordContextFeeders(ctx, out); err != nil {
+	if err := s.recordContextFeeders(ctx, row.AgentID, out); err != nil {
 		return runs.RunContext{}, err
 	}
 	return out, nil
@@ -107,30 +107,29 @@ func (s *Service) Context(ctx context.Context, runID ids.ID) (runs.RunContext, e
 
 // recordContextFeeders records in run_feeders, source context, who wrote the messages the context
 // gives the run (09 3.9.4), in its own unit of work, also in maintenance mode, because the context
-// belongs to running the run: the author of every element that is no agent's or system message
-// and the authority of a team input. Another agent message is not recorded: its own run was
-// checked when it was handed on, and what an earlier run left in the work thread is the
-// limitation of ruling D-TEAM-11.
-func (s *Service) recordContextFeeders(ctx context.Context, out runs.RunContext) error {
+// belongs to running the run. Every element (trigger, thread and channel window; any origin) that
+// agent, the run's agent, did not write is recorded by domain.ContextFeeder: a team input with its
+// authority, a person's message with its author, every other message (another agent's, an app's)
+// as an input that speaks for no person, so the owner check refuses the run. A message of another
+// agent has passed no check of who steered it (red team round 5). What an earlier run of the agent
+// itself left in the thread is the limitation of ruling D-TEAM-11.
+func (s *Service) recordContextFeeders(ctx context.Context, agent ids.ID, out runs.RunContext) error {
 	elements := append([]runs.ContextMessage{out.TriggerMessage}, out.ThreadContext...)
 	elements = append(elements, out.ChannelContext...)
 	return s.d.UoW.Do(txn.WithWriteInMaintenance(ctx), func(ctx context.Context) error {
 		var by []ids.ID
 		for _, m := range elements {
-			switch m.Origin {
-			case originSystem:
-				continue
-			case originAgent:
+			e := domain.ContextElement{AuthorID: m.Author.ID, AuthorKind: m.Author.Kind}
+			if m.Author.ID != agent {
 				in, team, err := s.teamInputOf(ctx, m.MessageID)
 				if err != nil {
 					return err
 				}
-				if team {
-					by = append(by, in.AuthorityID)
-				}
-				continue
+				e.TeamInput, e.Authority = team, in.AuthorityID
 			}
-			by = append(by, m.Author.ID)
+			if p, ok := domain.ContextFeeder(e, agent); ok {
+				by = append(by, p)
+			}
 		}
 		return s.d.Repo.RecordFeeders(ctx, out.RunID, domain.FeedContext, by)
 	})

@@ -371,7 +371,7 @@ func (s *Service) teamRefusal(ctx context.Context, b *teamBox, team TeamRow, mem
 // refuseInput writes the refusal of an input: a note in the team channel naming the member and the
 // reason, and the audit entry.
 func (s *Service) refuseInput(ctx context.Context, b *teamBox, team TeamRow, member TeamMemberRow, src *teamSource, reason, detail string) error {
-	if err := s.teamNote(ctx, b, team.ChannelID, member.AgentID, "Team input for @"+member.Handle+" refused: "+reason+"."); err != nil {
+	if err := s.teamNote(ctx, b, team.ChannelID, member.AgentID, domain.TeamRefusalNote(member.Handle, reason)); err != nil {
 		return err
 	}
 	return s.auditTeamInput(ctx, team, member, src, reason, detail)
