@@ -415,6 +415,7 @@ reveals nothing (never with `404`).
 | `team_sponsor_not_owner` | no `authorize` result | Reason of the audit entry of `agent.invoke` (stage `team`) of a refused team input whose authority is no active owner now ([09-agents.md](09-agents.md) 3.9.5, FEAT-TEAM-CHANNEL-SERVER) |
 | `team_readers_not_owners` | no `authorize` result | Reason of the audit entry of `agent.invoke` (stage `team`) of a refused team input when a person who is no active owner may read the team channel or the member's home channel (09 3.9.1, 3.9.5); problem code `conflict` (`409`) with the same `reason` at `enableChannelTeam` and `addTeamMember` |
 | `team_paused` | no `authorize` result | Reason of the audit entry of `agent.invoke` (stage `team`) of a member input that the safety brake refused, with the attribute `pause_reason` (`turn_budget`, `pingpong` or `stopped`; 09 3.9.6) |
+| `team_source_not_owner` | no `authorize` result | Reason of the audit entry of `agent.invoke` (stage `team`) of a member's reply that is not handed on because the run it answers was started or fed by a person who is no active owner now ([09-agents.md](09-agents.md) 3.9.4) |
 
 ### 4.2 Flow
 
@@ -785,8 +786,11 @@ mode as for any run. The rules that keep this safe:
 3. A member's reply reaches another member only as an input of `origin = agent` authored by the
    source agent; it never becomes a message of a person and never carries the owner's authority
    in the runner (09 3.9.9).
-4. The safety brake of 09 3.9.6 ends loops between members; any owner message resets it.
-5. Outside team channels this addendum changes nothing: agent, app, import and system messages
+4. A member's reply is handed on only when the run it answers was started and fed only by active
+   owners (its `triggered_by` and every follow-up it took); a run a person who is no owner started
+   or fed, also after that person lost the grant, never triggers another member.
+5. The safety brake of 09 3.9.6 ends loops between members; any owner message resets it.
+6. Outside team channels this addendum changes nothing: agent, app, import and system messages
    never trigger.
 
 ### SR5 Administration only by humans with confirmation

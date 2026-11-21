@@ -32,8 +32,12 @@ const (
 	TeamPauseStopped    = "stopped"
 	// TeamRefusalSponsor: the authority of the input is no active owner now.
 	TeamRefusalSponsor = "team_sponsor_not_owner"
-	// TeamRefusalReaders: the readers of the team channel and the member's home channel differ.
+	// TeamRefusalReaders: a person who is no active owner may read the team channel or the
+	// member's home channel.
 	TeamRefusalReaders = "team_readers_not_owners"
+	// TeamRefusalSource: the run a member's reply answers was started or fed by a person who is
+	// no active owner.
+	TeamRefusalSource = "team_source_not_owner"
 )
 
 // ValidHandle reports whether h is a handle of a team member (09 3.9.1, 03 team_members): lower

@@ -84,6 +84,7 @@ const (
 	ReasonTeamSponsorNotOwner  Reason = "team_sponsor_not_owner"
 	ReasonTeamReadersNotOwners Reason = "team_readers_not_owners"
 	ReasonTeamPaused           Reason = "team_paused"
+	ReasonTeamSourceNotOwner   Reason = "team_source_not_owner"
 )
 
 // reasons is the list of 07 section 4.1 in table order.
@@ -157,6 +158,7 @@ var reasons = []Reason{
 	ReasonTeamSponsorNotOwner,
 	ReasonTeamReadersNotOwners,
 	ReasonTeamPaused,
+	ReasonTeamSourceNotOwner,
 }
 
 // Reasons returns the closed list of reason codes of 07 section 4.1 in table order, as a copy.

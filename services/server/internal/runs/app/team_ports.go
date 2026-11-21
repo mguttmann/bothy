@@ -113,9 +113,10 @@ type TeamReaders interface {
 }
 
 // TeamScheduler inserts the job runs.team_input of a message in the unit of work of ctx
-// (adapters/jobs over jobs.Inserter.InsertTx).
+// (adapters/jobs over jobs.Inserter.InsertTx); runID is the run a member's reply answers, zero for
+// an owner's message.
 type TeamScheduler interface {
-	ScheduleTeamInput(ctx context.Context, messageID ids.ID) error
+	ScheduleTeamInput(ctx context.Context, messageID, runID ids.ID) error
 }
 
 // TeamDeps are the collaborators of the team channels; bind them with BindTeams. Without them a
