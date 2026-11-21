@@ -424,7 +424,12 @@ mention, as a follow-up of its running run or a new `team` run. Several mentions
 allowed here (3.4 step 3 refuses them elsewhere, because those runs share one thread).
 
 A reply is mirrored and handed on only when the run it answers was started and fed only by active
-owners. The check reads only the record of the run in 03 `run_feeders` (R-DM-63), which is written
+owners. The run a reply answers is the one 03 `run_answers` links it to, never the `run_id` the
+agent names: the acceptance links an answer only when its request carried the invocation token of
+exactly the named run (07 SR9), so a reply without that token, or with the token of another run,
+is refused like a run fed by a non-owner. The SDK outbox sends every entry of a run with that
+run's newest token (`Outbox` `token_for`), which the Hermes adapter and the Claude Code runner
+use for their answers. The check reads only the record of the run in 03 `run_feeders` (R-DM-63), which is written
 when an input is stored or given to the run and never shrinks: its trigger (`triggered_by`, for a
 team run the authority of its input), the person of every follow-up it took (the author of a
 person's message, the authority of a team input, none for any other message), the principal of
@@ -433,10 +438,10 @@ command and a wake input) and the writer of every message its run context gave i
 and author and in the trigger, thread and channel window alike: the authority of a team input,
 the author of a person's message, the whole record of the run an agent's message answers (03
 `run_answers`, the member's own answers included; none for a run without its trigger row), and
-none for every other message, such as an agent's message written outside a run of its thread (the
-member's own note written in a run elsewhere included), an agent's message edited after it was
-written (an answer or a team copy; the edit is bound to no run, while a person's edit is the
-author's own) or an app's; and what the run takes over
+none for every other message, such as an agent's message written outside a run of its thread or
+without the token of the run it names (the member's own note written in a run elsewhere
+included), an agent's message of any kind edited after it was written (the edit is bound to no
+run, while a person's edit is the author's own; a live box anchor cannot be edited) or an app's; and what the run takes over
 with its session (9.1): in mode `resume` every principal recorded for the earlier runs of the
 session row in the thread, in mode `bind` none. The run passes when
 its trigger is on the record and every principal recorded is an active owner at the moment of the

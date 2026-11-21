@@ -386,7 +386,7 @@ func contextElement(m messaging.Message) runs.ContextMessage {
 		Author: runs.ContextAuthor{ID: m.Author.ID, Kind: m.Author.Kind, Handle: m.Author.Handle, DisplayName: m.Author.DisplayName,
 			AvatarFileID: m.Author.AvatarFileID},
 		Origin: m.Origin, Kind: m.Kind, ContentMD: m.ContentMD, Attachments: []runs.ContextAttachment{}, ReplyToMessageID: m.ReplyToID,
-		Edited: !m.EditedAt.IsZero() && m.Kind != kindRun,
+		Edited: !m.EditedAt.IsZero(),
 	}
 }
 

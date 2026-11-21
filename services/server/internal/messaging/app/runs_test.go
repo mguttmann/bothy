@@ -130,9 +130,9 @@ func TestSetTriggerState_SameStateIsNoop(t *testing.T) {
 	}
 }
 
-// TestSetTriggerState_InternalErrors: outside a unit of work, an unknown message, a message whose
-// origin is not human, an unknown state and a reason that does not fit the state are internal
-// errors that write nothing.
+// TestSetTriggerState_InternalErrors: outside a unit of work, an unknown message, an unknown state
+// and a reason that does not fit the state are internal errors that write nothing; an agent's
+// message is a no-op that writes nothing either (D-TEAM-6).
 func TestSetTriggerState_InternalErrors(t *testing.T) {
 	t.Parallel()
 	w := mw.New(t, subscribe)
@@ -150,7 +150,6 @@ func TestSetTriggerState_InternalErrors(t *testing.T) {
 		cmd  messaging.SetTriggerStateCmd
 	}{
 		{"unknown message", messaging.SetTriggerStateCmd{MessageID: ids.New(), State: "received"}},
-		{"origin agent", messaging.SetTriggerStateCmd{MessageID: agentMsg, State: "received"}},
 		{"unknown state", messaging.SetTriggerStateCmd{MessageID: human, State: "started"}},
 		{"empty state", messaging.SetTriggerStateCmd{MessageID: human}},
 		{"failed without reason", messaging.SetTriggerStateCmd{MessageID: human, State: "failed"}},
@@ -162,6 +161,12 @@ func TestSetTriggerState_InternalErrors(t *testing.T) {
 		if !internal(err) {
 			t.Errorf("%s: %v, want internal", c.name, err)
 		}
+	}
+	// An agent's message carries no trigger state (D-TEAM-6): a no-op, not an error.
+	if err := inUnit(w, func(ctx context.Context) error {
+		return w.Svc.SetTriggerState(ctx, messaging.SetTriggerStateCmd{MessageID: agentMsg, State: "received"})
+	}); err != nil {
+		t.Errorf("origin agent: %v, want nil", err)
 	}
 	if n := len(w.Events("message.updated")); n != 0 {
 		t.Fatalf("%d message.updated", n)

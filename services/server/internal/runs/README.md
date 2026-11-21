@@ -903,7 +903,9 @@ The server side of [09-agents.md](../../../../docs/spec/09-agents.md) 3.9; rulin
   `Prepare` records the person of every allowed delivery into a run (`domain.FeedSourceOf`) and
   `Context` the writers of its messages of every origin and author, an agent's message through
   the record of the run it answers (`recordContextFeeders`, `domain.ContextFeeders`, the link
-  `run_answers` that `answer` writes in the acceptance, migration 00109); `ownerRun` reads only this record
+  `run_answers` that `answer` writes in the acceptance only for a request with the invocation
+  token of the named run, migration 00109); `ownerRun` takes the reply's run from that link and
+  reads only this record
   (`Repository.Feeders`, `adapters/postgres/feeders.go` with `queries/run_feeders.sql`).
 
 Lock order: the `team_channels` row, then the runs of the work threads (03 6.3). The copies run in

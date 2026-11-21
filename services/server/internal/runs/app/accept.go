@@ -161,8 +161,12 @@ func (s *Service) acceptTrigger(ctx context.Context, ev messaging.MessagePosted)
 }
 
 // answer is the first branch of accept: an agent's answer that names a run in run_id is checked
-// (M2-19) and, like a live box anchor, linked to its run in run_answers; every other message
-// passes.
+// (M2-19) and linked to its run in run_answers only when the request carried the invocation token
+// of exactly that run (ActingRunID, 07 SR9); the live box anchor the server writes for its run is
+// linked always. run_id alone is the agent's own claim: an agent steered in another run could name
+// a concurrent run of the thread, so an answer without that token is accepted without a link and
+// speaks for no person in a later run context and for no run in a team channel (09 3.9.4); every
+// other message passes.
 func (s *Service) answer(ctx context.Context, ev messaging.MessagePosted) error {
 	if ev.RunID == nil {
 		return nil
@@ -180,6 +184,9 @@ func (s *Service) answer(ctx context.Context, ev messaging.MessagePosted) error 
 	}
 	if err := s.checkAnswer(ctx, ev); err != nil {
 		return err
+	}
+	if ev.ActingRunID == nil || *ev.ActingRunID != *ev.RunID {
+		return nil
 	}
 	// The run context gives this text the record of the run it answers (03 run_answers, 09 3.9.4).
 	return s.d.Repo.RecordAnswer(ctx, ev.MessageID, *ev.RunID)

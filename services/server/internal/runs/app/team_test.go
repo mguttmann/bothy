@@ -273,7 +273,7 @@ type teamSched struct {
 	list []ids.ID
 }
 
-func (s *teamSched) ScheduleTeamInput(_ context.Context, message, _ ids.ID) error {
+func (s *teamSched) ScheduleTeamInput(_ context.Context, message ids.ID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.list = append(s.list, message)
@@ -409,10 +409,16 @@ func (w *teamWorld) replyTo(m app.TeamMemberRow, text string) ids.ID {
 	return id
 }
 
-// input runs the job runs.team_input for the message without a principal.
+// input runs the job runs.team_input for the message without a principal. A reply of runOf is
+// linked to its run first, as the acceptance links an answer sent with the run's invocation token.
 func (w *teamWorld) input(message ids.ID) {
 	w.t.Helper()
-	if err := w.svc.TeamInput(context.Background(), message, w.runOf[message]); err != nil {
+	if run, ok := w.runOf[message]; ok {
+		if err := w.repo.RecordAnswer(context.Background(), message, run); err != nil {
+			w.t.Fatal(err)
+		}
+	}
+	if err := w.svc.TeamInput(context.Background(), message); err != nil {
 		w.t.Fatal(err)
 	}
 }
