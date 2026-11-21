@@ -48,11 +48,12 @@ class ChannelsApi {
   const ChannelsApi(this._dio, this._serializers);
 
   /// Add a member to a team channel
-  /// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (&#x60;team.update&#x60;). &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;team_not_enabled&#x60; for a channel without team mode, &#x60;team_handle_taken&#x60;, &#x60;team_member_exists&#x60;, &#x60;team_max_members&#x60;, &#x60;team_home_not_operated&#x60; when the agent is not the effective operator of the home channel, &#x60;team_home_is_team&#x60; when the home channel is a team channel, &#x60;team_readers_differ&#x60; when the readers of the two channels differ, &#x60;dm_channel&#x60;, &#x60;channel_archived&#x60; or &#x60;channel_read_only&#x60; for the home channel; an inactive agent is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;agent_disabled&#x60;. Audited.
+  /// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (&#x60;team.update&#x60;). &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;team_not_enabled&#x60; for a channel without team mode, &#x60;team_handle_taken&#x60;, &#x60;team_member_exists&#x60;, &#x60;team_max_members&#x60;, &#x60;team_home_not_operated&#x60; when the agent is not the effective operator of the home channel, &#x60;team_home_is_team&#x60; when the home channel is a team channel, &#x60;team_readers_not_owners&#x60; when a person who is no active owner may read the team channel or the home channel, &#x60;dm_channel&#x60;, &#x60;channel_archived&#x60; or &#x60;channel_read_only&#x60; for the home channel; an inactive agent is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;agent_disabled&#x60;. Audited.
   ///
   /// Parameters:
   /// * [channelId]
   /// * [teamMemberCreate]
+  /// * [idempotencyKey] - UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -65,6 +66,7 @@ class ChannelsApi {
   Future<Response<TeamMember>> addTeamMember({
     required String channelId,
     required TeamMemberCreate teamMemberCreate,
+    String? idempotencyKey,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -84,7 +86,10 @@ class ChannelsApi {
     );
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
           {
@@ -1107,7 +1112,7 @@ class ChannelsApi {
   }
 
   /// Switch a channel to team mode
-  /// Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it makes the caller the sponsor and keeps members and brake state. Owners only (&#x60;team.update&#x60;). A DM channel is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;dm_channel&#x60;, a forum &#x60;channel_kind&#x60;, an archived or read-only channel &#x60;channel_archived&#x60; or &#x60;channel_read_only&#x60;. Audited.
+  /// Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it makes the caller the sponsor and keeps members and brake state. Owners only (&#x60;team.update&#x60;). A DM channel is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;dm_channel&#x60;, a forum &#x60;channel_kind&#x60;, an archived or read-only channel &#x60;channel_archived&#x60; or &#x60;channel_read_only&#x60;, a channel that a person who is no active owner may read &#x60;team_readers_not_owners&#x60;. Audited.
   ///
   /// Parameters:
   /// * [channelId]
@@ -2987,6 +2992,7 @@ class ChannelsApi {
   ///
   /// Parameters:
   /// * [channelId]
+  /// * [idempotencyKey] - UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -2998,6 +3004,7 @@ class ChannelsApi {
   /// Throws [DioException] if API call or serialization fails
   Future<Response<TeamStopResult>> stopChannelTeam({
     required String channelId,
+    String? idempotencyKey,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -3017,7 +3024,10 @@ class ChannelsApi {
     );
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
           {

@@ -9,15 +9,18 @@ from ...client import AuthenticatedClient, Client
 from ...models.problem import Problem
 from ...models.team_member import TeamMember
 from ...models.team_member_create import TeamMemberCreate
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     channel_id: UUID,
     *,
     body: TeamMemberCreate,
+    idempotency_key: UUID | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
+    if not isinstance(idempotency_key, Unset):
+        headers["Idempotency-Key"] = idempotency_key
 
     _kwargs: dict[str, Any] = {
         "method": "post",
@@ -93,18 +96,21 @@ def sync_detailed(
     *,
     client: AuthenticatedClient | Client,
     body: TeamMemberCreate,
+    idempotency_key: UUID | Unset = UNSET,
 ) -> Response[Problem | TeamMember]:
     """Add a member to a team channel
 
      Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1).
     Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without
     team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated`
-    when the agent is not the effective operator of the home channel, `team_readers_differ` when the
-    readers of the two channels differ, `dm_channel` or `channel_archived` for the home channel; an
-    inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+    when the agent is not the effective operator of the home channel, `team_home_is_team` when the home
+    channel is a team channel, `team_readers_not_owners` when a person who is no active owner may read
+    the team channel or the home channel, `dm_channel`, `channel_archived` or `channel_read_only` for
+    the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (TeamMemberCreate):
 
     Raises:
@@ -118,6 +124,7 @@ def sync_detailed(
     kwargs = _get_kwargs(
         channel_id=channel_id,
         body=body,
+        idempotency_key=idempotency_key,
     )
 
     response = client.get_httpx_client().request(
@@ -132,18 +139,21 @@ def sync(
     *,
     client: AuthenticatedClient | Client,
     body: TeamMemberCreate,
+    idempotency_key: UUID | Unset = UNSET,
 ) -> Problem | TeamMember | None:
     """Add a member to a team channel
 
      Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1).
     Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without
     team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated`
-    when the agent is not the effective operator of the home channel, `team_readers_differ` when the
-    readers of the two channels differ, `dm_channel` or `channel_archived` for the home channel; an
-    inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+    when the agent is not the effective operator of the home channel, `team_home_is_team` when the home
+    channel is a team channel, `team_readers_not_owners` when a person who is no active owner may read
+    the team channel or the home channel, `dm_channel`, `channel_archived` or `channel_read_only` for
+    the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (TeamMemberCreate):
 
     Raises:
@@ -158,6 +168,7 @@ def sync(
         channel_id=channel_id,
         client=client,
         body=body,
+        idempotency_key=idempotency_key,
     ).parsed
 
 
@@ -166,18 +177,21 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient | Client,
     body: TeamMemberCreate,
+    idempotency_key: UUID | Unset = UNSET,
 ) -> Response[Problem | TeamMember]:
     """Add a member to a team channel
 
      Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1).
     Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without
     team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated`
-    when the agent is not the effective operator of the home channel, `team_readers_differ` when the
-    readers of the two channels differ, `dm_channel` or `channel_archived` for the home channel; an
-    inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+    when the agent is not the effective operator of the home channel, `team_home_is_team` when the home
+    channel is a team channel, `team_readers_not_owners` when a person who is no active owner may read
+    the team channel or the home channel, `dm_channel`, `channel_archived` or `channel_read_only` for
+    the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (TeamMemberCreate):
 
     Raises:
@@ -191,6 +205,7 @@ async def asyncio_detailed(
     kwargs = _get_kwargs(
         channel_id=channel_id,
         body=body,
+        idempotency_key=idempotency_key,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -203,18 +218,21 @@ async def asyncio(
     *,
     client: AuthenticatedClient | Client,
     body: TeamMemberCreate,
+    idempotency_key: UUID | Unset = UNSET,
 ) -> Problem | TeamMember | None:
     """Add a member to a team channel
 
      Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1).
     Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without
     team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated`
-    when the agent is not the effective operator of the home channel, `team_readers_differ` when the
-    readers of the two channels differ, `dm_channel` or `channel_archived` for the home channel; an
-    inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+    when the agent is not the effective operator of the home channel, `team_home_is_team` when the home
+    channel is a team channel, `team_readers_not_owners` when a person who is no active owner may read
+    the team channel or the home channel, `dm_channel`, `channel_archived` or `channel_read_only` for
+    the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (TeamMemberCreate):
 
     Raises:
@@ -230,5 +248,6 @@ async def asyncio(
             channel_id=channel_id,
             client=client,
             body=body,
+            idempotency_key=idempotency_key,
         )
     ).parsed

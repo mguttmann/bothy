@@ -7,6 +7,16 @@ import (
 	"net/http"
 )
 
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CompleteStepUpWithDeviceKeyResponse) GetJSON200() *StepUpResult {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CompleteStepUpWithDeviceKeyResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
 func (r CompleteStepUpWithDeviceKeyResponse) GetApplicationproblemJSON401() *Unauthorized {
 	return r.ApplicationproblemJSON401
@@ -25847,18 +25857,5 @@ type RetriggerMessageResponse404Headers struct {
 
 // RetriggerMessageResponse409Headers the declared response headers of an HTTP 409 response for RetriggerMessage
 type RetriggerMessageResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RetriggerMessageResponse429Headers the declared response headers of an HTTP 429 response for RetriggerMessage
-type RetriggerMessageResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// RetriggerMessageResponseDefaultHeaders the declared response headers of an HTTP default response for RetriggerMessage
-type RetriggerMessageResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
 }

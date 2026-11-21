@@ -65,8 +65,8 @@ func (r *Repository) SaveTeamBrake(ctx context.Context, channelID ids.ID, b doma
 		return app.TeamRow{}, err
 	}
 	row, err := q.UpdateTeamBrake(ctx, sqlcgen.UpdateTeamBrakeParams{
-		MemberTurns: int32(min(b.MemberTurns, maxInt32)), PingpongFrom: optionalUUID(b.From), PingpongTo: optionalUUID(b.To),
-		PingpongCount: int32(min(b.PingpongCount, maxInt32)), PauseReason: optionalText(b.PauseReason), At: ts(at), ChannelID: uuid(channelID),
+		MemberTurns: count32(b.MemberTurns), PingpongFrom: optionalUUID(b.From), PingpongTo: optionalUUID(b.To),
+		PingpongCount: count32(b.PingpongCount), PauseReason: optionalText(b.PauseReason), At: ts(at), ChannelID: uuid(channelID),
 	})
 	if err != nil {
 		return app.TeamRow{}, mapError(err, "storing the brake of a team")
@@ -175,6 +175,18 @@ func (r *Repository) TeamMirrored(ctx context.Context, sourceMessageID ids.ID) (
 		return false, nil
 	}
 	return err == nil, mapError(err, "reading a team mirror")
+}
+
+// count32 converts a count of the brake to its integer column: the configured limits keep it far
+// below the bound, which only guards the conversion.
+func count32(n int) int32 {
+	switch {
+	case n < 0:
+		return 0
+	case n > maxInt32:
+		return maxInt32
+	}
+	return int32(n) // #nosec G115 -- bounded to [0, maxInt32] above
 }
 
 // oneTeam converts a single team result; no row is not found.

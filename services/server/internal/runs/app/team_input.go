@@ -25,7 +25,7 @@ import (
 func (s *Service) teamHook(ctx context.Context, ev messaging.MessagePosted) (bool, error) {
 	b := s.teams.Load()
 	if b == nil || ev.Kind != kindText {
-		_, team, err := s.isTeamChannel(ctx, b, ev.ChannelID)
+		team, err := s.isTeamChannel(ctx, b, ev.ChannelID)
 		return team, err
 	}
 	if ev.Origin == originAgent && ev.RunID != nil {
@@ -35,7 +35,7 @@ func (s *Service) teamHook(ctx context.Context, ev messaging.MessagePosted) (boo
 		}
 		return false, b.d.Schedule.ScheduleTeamInput(ctx, ev.MessageID)
 	}
-	_, team, err := s.isTeamChannel(ctx, b, ev.ChannelID)
+	team, err := s.isTeamChannel(ctx, b, ev.ChannelID)
 	if err != nil || !team {
 		return false, err
 	}
@@ -46,11 +46,12 @@ func (s *Service) teamHook(ctx context.Context, ev messaging.MessagePosted) (boo
 }
 
 // isTeamChannel reports whether the channel is a team channel; false without bound team channels.
-func (s *Service) isTeamChannel(ctx context.Context, b *teamBox, channelID ids.ID) (TeamRow, bool, error) {
+func (s *Service) isTeamChannel(ctx context.Context, b *teamBox, channelID ids.ID) (bool, error) {
 	if b == nil {
-		return TeamRow{}, false, nil
+		return false, nil
 	}
-	return b.d.Repo.Team(ctx, channelID)
+	_, found, err := b.d.Repo.Team(ctx, channelID)
+	return found, err
 }
 
 // TeamInput is the use case of the job runs.team_input (09 3.9.3, 3.9.4) in one unit of work: the
@@ -137,28 +138,42 @@ func (s *Service) memberReply(ctx context.Context, b *teamBox, m messaging.Trigg
 	if err != nil || !found {
 		return err
 	}
-	ch, err := s.d.Channels.TriggerChannel(ctx, team.ChannelID)
-	if err != nil {
+	copied, ok, err := s.mirrorReply(ctx, b, team, m, member)
+	if err != nil || !ok {
 		return err
 	}
-	if ch.MainThreadID.IsZero() || ch.Archived {
-		return nil
+	return s.handOn(ctx, b, team, member, copied)
+}
+
+// mirrorReply copies the reply into the main thread of the team channel as the member's agent and
+// records the mirror; ok is false for an archived team channel or one whose readers are not only
+// owners, which is refused with a note and an audit entry.
+func (s *Service) mirrorReply(ctx context.Context, b *teamBox, team TeamRow, m messaging.TriggerMessage, member TeamMemberRow) (messaging.Copied, bool, error) {
+	ch, err := s.d.Channels.TriggerChannel(ctx, team.ChannelID)
+	if err != nil || ch.MainThreadID.IsZero() || ch.Archived {
+		return messaging.Copied{}, false, err
 	}
 	same, err := s.sameReaders(ctx, b, team.ChannelID, member.HomeChannelID)
 	if err != nil {
-		return err
+		return messaging.Copied{}, false, err
 	}
 	if !same {
-		return s.refuseInput(ctx, b, team, member, &teamSource{authority: team.SponsorID, kind: domain.TeamSourceMember, member: &member},
-			domain.TeamRefusalReaders, "")
+		return messaging.Copied{}, false, s.refuseInput(ctx, b, team, member,
+			&teamSource{authority: team.SponsorID, kind: domain.TeamSourceMember, member: &member}, domain.TeamRefusalReaders, "")
 	}
 	copied, err := b.d.Messages.CopyMessage(ctx, messaging.CopyCmd{SourceMessageID: m.ID, ThreadID: ch.MainThreadID, AuthorID: member.AgentID})
 	if err != nil {
-		return err
+		return messaging.Copied{}, false, err
 	}
 	if _, err := b.d.Repo.InsertTeamMirror(ctx, m.ID, copied.ID, member.ID, s.now()); err != nil {
-		return err
+		return messaging.Copied{}, false, err
 	}
+	return copied, true, nil
+}
+
+// handOn gives the mirrored reply to every other member it mentions, in the order of the first
+// mention.
+func (s *Service) handOn(ctx context.Context, b *teamBox, team TeamRow, member TeamMemberRow, copied messaging.Copied) error {
 	members, err := b.d.Repo.TeamMembers(ctx, team.ChannelID)
 	if err != nil {
 		return err
@@ -212,7 +227,7 @@ func (s *Service) brakeRefusal(ctx context.Context, b *teamBox, team TeamRow, ta
 		if err := s.teamNote(ctx, b, team.ChannelID, team.SponsorID, pauseNote(reason, src.member.Handle, target.Handle)); err != nil {
 			return TeamRow{}, err
 		}
-		if err := s.auditTeam(ctx, actor.Recheck(team.SponsorID), authorize.ActionTeamUpdate, "", team.ChannelID, auditing.Attrs{
+		if err := s.auditTeam(ctx, actor.Recheck(team.SponsorID), authorize.ActionTeamUpdate, team.ChannelID, auditing.Attrs{
 			attrOperation: auditing.Code(opPause), attrPauseReason: auditing.Code(reason),
 		}); err != nil {
 			return TeamRow{}, err
@@ -274,7 +289,7 @@ func (s *Service) teamDeliver(ctx context.Context, b *teamBox, team TeamRow, mem
 		if err := s.fu.store(ctx, copied.ID, *active); err != nil {
 			return false, err
 		}
-	} else if err := s.openTeamRun(ctx, b, member, members, in, src); err != nil {
+	} else if err := s.openTeamRun(ctx, member, members, in, src); err != nil {
 		return false, err
 	}
 	return true, s.auditTeamInput(ctx, team, member, src, "", "")
@@ -356,7 +371,7 @@ func (s *Service) auditTeamInput(ctx context.Context, team TeamRow, member TeamM
 // trigger_kind team, the authority as triggered_by, the input as triggering message, and
 // agent.invocation with the team facts. Another run that won the thread meanwhile is a conflict;
 // the job retries.
-func (s *Service) openTeamRun(ctx context.Context, b *teamBox, member TeamMemberRow, members []TeamMemberRow, in TeamInputRow, src *teamSource) error {
+func (s *Service) openTeamRun(ctx context.Context, member TeamMemberRow, members []TeamMemberRow, in TeamInputRow, src *teamSource) error {
 	facts, err := s.d.Agents.RunFacts(ctx, []ids.ID{member.AgentID})
 	if err != nil {
 		return err

@@ -1254,28 +1254,28 @@ type ClientInterface interface {
 
 	// EnableChannelTeam Switch a channel to team mode
 	//
-	// Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-only channel `channel_archived` or `channel_read_only`. Audited.
+	// Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-only channel `channel_archived` or `channel_read_only`, a channel that a person who is no active owner may read `team_readers_not_owners`. Audited.
 	//
 	// Corresponds with PUT /channels/{channel_id}/team (the `EnableChannelTeam` operationId).
 	EnableChannelTeam(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// AddTeamMemberWithBody Add a member to a team channel
 	//
-	// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_readers_differ` when the readers of the two channels differ, `dm_channel` or `channel_archived` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+	// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_home_is_team` when the home channel is a team channel, `team_readers_not_owners` when a person who is no active owner may read the team channel or the home channel, `dm_channel`, `channel_archived` or `channel_read_only` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /channels/{channel_id}/team/members (the `AddTeamMember` operationId).
-	AddTeamMemberWithBody(ctx context.Context, channelId ChannelIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	AddTeamMemberWithBody(ctx context.Context, channelId ChannelIdPath, params *AddTeamMemberParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// AddTeamMember Add a member to a team channel
 	//
-	// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_readers_differ` when the readers of the two channels differ, `dm_channel` or `channel_archived` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+	// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_home_is_team` when the home channel is a team channel, `team_readers_not_owners` when a person who is no active owner may read the team channel or the home channel, `dm_channel`, `channel_archived` or `channel_read_only` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /channels/{channel_id}/team/members (the `AddTeamMember` operationId).
-	AddTeamMember(ctx context.Context, channelId ChannelIdPath, body AddTeamMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	AddTeamMember(ctx context.Context, channelId ChannelIdPath, params *AddTeamMemberParams, body AddTeamMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RemoveTeamMember Remove a member from a team channel
 	//
@@ -1289,7 +1289,7 @@ type ClientInterface interface {
 	// Stops every active run in the work threads of the team's members as `cancelRun` by the caller would, and pauses member inputs with `pause_reason` `stopped` until an owner writes in the team channel again (09 3.9.7). Owners only (`team.stop`); a channel without team mode is `404 not_found`. Posts a note in the team channel; audited.
 	//
 	// Corresponds with POST /channels/{channel_id}/team/stop (the `StopChannelTeam` operationId).
-	StopChannelTeam(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+	StopChannelTeam(ctx context.Context, channelId ChannelIdPath, params *StopChannelTeamParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListTemplates List own and channel templates
 	//
@@ -7022,7 +7022,7 @@ func (c *Client) GetChannelTeam(ctx context.Context, channelId ChannelIdPath, re
 
 // EnableChannelTeam Switch a channel to team mode
 //
-// Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-only channel `channel_archived` or `channel_read_only`. Audited.
+// Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-only channel `channel_archived` or `channel_read_only`, a channel that a person who is no active owner may read `team_readers_not_owners`. Audited.
 //
 // Corresponds with PUT /channels/{channel_id}/team (the `EnableChannelTeam` operationId).
 func (c *Client) EnableChannelTeam(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7039,13 +7039,13 @@ func (c *Client) EnableChannelTeam(ctx context.Context, channelId ChannelIdPath,
 
 // AddTeamMemberWithBody Add a member to a team channel
 //
-// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_readers_differ` when the readers of the two channels differ, `dm_channel` or `channel_archived` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_home_is_team` when the home channel is a team channel, `team_readers_not_owners` when a person who is no active owner may read the team channel or the home channel, `dm_channel`, `channel_archived` or `channel_read_only` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
 //
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /channels/{channel_id}/team/members (the `AddTeamMember` operationId).
-func (c *Client) AddTeamMemberWithBody(ctx context.Context, channelId ChannelIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewAddTeamMemberRequestWithBody(c.Server, channelId, contentType, body)
+func (c *Client) AddTeamMemberWithBody(ctx context.Context, channelId ChannelIdPath, params *AddTeamMemberParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAddTeamMemberRequestWithBody(c.Server, channelId, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -7058,13 +7058,13 @@ func (c *Client) AddTeamMemberWithBody(ctx context.Context, channelId ChannelIdP
 
 // AddTeamMember Add a member to a team channel
 //
-// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_readers_differ` when the readers of the two channels differ, `dm_channel` or `channel_archived` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_home_is_team` when the home channel is a team channel, `team_readers_not_owners` when a person who is no active owner may read the team channel or the home channel, `dm_channel`, `channel_archived` or `channel_read_only` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
 //
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with POST /channels/{channel_id}/team/members (the `AddTeamMember` operationId).
-func (c *Client) AddTeamMember(ctx context.Context, channelId ChannelIdPath, body AddTeamMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewAddTeamMemberRequest(c.Server, channelId, body)
+func (c *Client) AddTeamMember(ctx context.Context, channelId ChannelIdPath, params *AddTeamMemberParams, body AddTeamMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAddTeamMemberRequest(c.Server, channelId, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -7097,8 +7097,8 @@ func (c *Client) RemoveTeamMember(ctx context.Context, channelId ChannelIdPath, 
 // Stops every active run in the work threads of the team's members as `cancelRun` by the caller would, and pauses member inputs with `pause_reason` `stopped` until an owner writes in the team channel again (09 3.9.7). Owners only (`team.stop`); a channel without team mode is `404 not_found`. Posts a note in the team channel; audited.
 //
 // Corresponds with POST /channels/{channel_id}/team/stop (the `StopChannelTeam` operationId).
-func (c *Client) StopChannelTeam(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewStopChannelTeamRequest(c.Server, channelId)
+func (c *Client) StopChannelTeam(ctx context.Context, channelId ChannelIdPath, params *StopChannelTeamParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStopChannelTeamRequest(c.Server, channelId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -18826,18 +18826,18 @@ func NewEnableChannelTeamRequest(server string, channelId ChannelIdPath) (*http.
 }
 
 // NewAddTeamMemberRequest calls the generic AddTeamMember builder with application/json body
-func NewAddTeamMemberRequest(server string, channelId ChannelIdPath, body AddTeamMemberJSONRequestBody) (*http.Request, error) {
+func NewAddTeamMemberRequest(server string, channelId ChannelIdPath, params *AddTeamMemberParams, body AddTeamMemberJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewAddTeamMemberRequestWithBody(server, channelId, "application/json", bodyReader)
+	return NewAddTeamMemberRequestWithBody(server, channelId, params, "application/json", bodyReader)
 }
 
 // NewAddTeamMemberRequestWithBody constructs an http.Request for the AddTeamMember method, with any body, and a specified content type
-func NewAddTeamMemberRequestWithBody(server string, channelId ChannelIdPath, contentType string, body io.Reader) (*http.Request, error) {
+func NewAddTeamMemberRequestWithBody(server string, channelId ChannelIdPath, params *AddTeamMemberParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -18868,6 +18868,21 @@ func NewAddTeamMemberRequestWithBody(server string, channelId ChannelIdPath, con
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
 
 	return req, nil
 }
@@ -18914,7 +18929,7 @@ func NewRemoveTeamMemberRequest(server string, channelId ChannelIdPath, memberId
 }
 
 // NewStopChannelTeamRequest constructs an http.Request for the StopChannelTeam method
-func NewStopChannelTeamRequest(server string, channelId ChannelIdPath) (*http.Request, error) {
+func NewStopChannelTeamRequest(server string, channelId ChannelIdPath, params *StopChannelTeamParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -18942,6 +18957,21 @@ func NewStopChannelTeamRequest(server string, channelId ChannelIdPath) (*http.Re
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
 	}
 
 	return req, nil

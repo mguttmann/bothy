@@ -89,7 +89,8 @@ def sync_detailed(
      Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it
     makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM
     channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-
-    only channel `channel_archived` or `channel_read_only`. Audited.
+    only channel `channel_archived` or `channel_read_only`, a channel that a person who is no active
+    owner may read `team_readers_not_owners`. Audited.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -123,7 +124,8 @@ def sync(
      Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it
     makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM
     channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-
-    only channel `channel_archived` or `channel_read_only`. Audited.
+    only channel `channel_archived` or `channel_read_only`, a channel that a person who is no active
+    owner may read `team_readers_not_owners`. Audited.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -152,7 +154,8 @@ async def asyncio_detailed(
      Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it
     makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM
     channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-
-    only channel `channel_archived` or `channel_read_only`. Audited.
+    only channel `channel_archived` or `channel_read_only`, a channel that a person who is no active
+    owner may read `team_readers_not_owners`. Audited.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -184,7 +187,8 @@ async def asyncio(
      Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it
     makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM
     channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-
-    only channel `channel_archived` or `channel_read_only`. Audited.
+    only channel `channel_archived` or `channel_read_only`, a channel that a person who is no active
+    owner may read `team_readers_not_owners`. Audited.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

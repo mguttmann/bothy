@@ -8,12 +8,17 @@ import httpx
 from ...client import AuthenticatedClient, Client
 from ...models.problem import Problem
 from ...models.team_stop_result import TeamStopResult
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     channel_id: UUID,
+    *,
+    idempotency_key: UUID | Unset = UNSET,
 ) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
+    if not isinstance(idempotency_key, Unset):
+        headers["Idempotency-Key"] = idempotency_key
 
     _kwargs: dict[str, Any] = {
         "method": "post",
@@ -22,6 +27,7 @@ def _get_kwargs(
         ),
     }
 
+    _kwargs["headers"] = headers
     return _kwargs
 
 
@@ -78,6 +84,7 @@ def sync_detailed(
     channel_id: UUID,
     *,
     client: AuthenticatedClient | Client,
+    idempotency_key: UUID | Unset = UNSET,
 ) -> Response[Problem | TeamStopResult]:
     """Stop every run of a team channel
 
@@ -88,6 +95,7 @@ def sync_detailed(
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -99,6 +107,7 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         channel_id=channel_id,
+        idempotency_key=idempotency_key,
     )
 
     response = client.get_httpx_client().request(
@@ -112,6 +121,7 @@ def sync(
     channel_id: UUID,
     *,
     client: AuthenticatedClient | Client,
+    idempotency_key: UUID | Unset = UNSET,
 ) -> Problem | TeamStopResult | None:
     """Stop every run of a team channel
 
@@ -122,6 +132,7 @@ def sync(
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -134,6 +145,7 @@ def sync(
     return sync_detailed(
         channel_id=channel_id,
         client=client,
+        idempotency_key=idempotency_key,
     ).parsed
 
 
@@ -141,6 +153,7 @@ async def asyncio_detailed(
     channel_id: UUID,
     *,
     client: AuthenticatedClient | Client,
+    idempotency_key: UUID | Unset = UNSET,
 ) -> Response[Problem | TeamStopResult]:
     """Stop every run of a team channel
 
@@ -151,6 +164,7 @@ async def asyncio_detailed(
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -162,6 +176,7 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         channel_id=channel_id,
+        idempotency_key=idempotency_key,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -173,6 +188,7 @@ async def asyncio(
     channel_id: UUID,
     *,
     client: AuthenticatedClient | Client,
+    idempotency_key: UUID | Unset = UNSET,
 ) -> Problem | TeamStopResult | None:
     """Stop every run of a team channel
 
@@ -183,6 +199,7 @@ async def asyncio(
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -196,5 +213,6 @@ async def asyncio(
         await asyncio_detailed(
             channel_id=channel_id,
             client=client,
+            idempotency_key=idempotency_key,
         )
     ).parsed

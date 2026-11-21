@@ -139,7 +139,7 @@ func TestTeam_OwnerOperations(t *testing.T) {
 	// Allgemein is read by Alex and the group Leser, the team channel only by owners.
 	m := w.want(w.do("owner", http.MethodPost, w.teamPath("/members"),
 		`{"agent_id":"`+w.lotse.String()+`","home_channel_id":"`+w.allgemein.String()+`","handle":"support"}`), http.StatusConflict, "conflict")
-	if m["reason"] != "team_readers_differ" {
+	if m["reason"] != "team_readers_not_owners" {
 		t.Fatalf("a home channel with other readers: %v", m)
 	}
 	m = w.want(w.do("owner", http.MethodPost, w.teamPath("/members"),

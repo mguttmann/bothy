@@ -9,6 +9,19 @@ import (
 	"net/http"
 )
 
+// RetriggerMessageResponse429Headers the declared response headers of an HTTP 429 response for RetriggerMessage
+type RetriggerMessageResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// RetriggerMessageResponseDefaultHeaders the declared response headers of an HTTP default response for RetriggerMessage
+type RetriggerMessageResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
 type RetriggerMessageResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -19781,7 +19794,7 @@ func (c *ClientWithResponses) GetChannelTeamWithResponse(ctx context.Context, ch
 
 // EnableChannelTeamWithResponse Switch a channel to team mode
 //
-// Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-only channel `channel_archived` or `channel_read_only`. Audited.
+// Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-only channel `channel_archived` or `channel_read_only`, a channel that a person who is no active owner may read `team_readers_not_owners`. Audited.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -19796,13 +19809,13 @@ func (c *ClientWithResponses) EnableChannelTeamWithResponse(ctx context.Context,
 
 // AddTeamMemberWithBodyWithResponse Add a member to a team channel
 //
-// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_readers_differ` when the readers of the two channels differ, `dm_channel` or `channel_archived` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_home_is_team` when the home channel is a team channel, `team_readers_not_owners` when a person who is no active owner may read the team channel or the home channel, `dm_channel`, `channel_archived` or `channel_read_only` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /channels/{channel_id}/team/members (the `AddTeamMember` operationId).
-func (c *ClientWithResponses) AddTeamMemberWithBodyWithResponse(ctx context.Context, channelId ChannelIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddTeamMemberResponse, error) {
-	rsp, err := c.AddTeamMemberWithBody(ctx, channelId, contentType, body, reqEditors...)
+func (c *ClientWithResponses) AddTeamMemberWithBodyWithResponse(ctx context.Context, channelId ChannelIdPath, params *AddTeamMemberParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddTeamMemberResponse, error) {
+	rsp, err := c.AddTeamMemberWithBody(ctx, channelId, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -19811,13 +19824,13 @@ func (c *ClientWithResponses) AddTeamMemberWithBodyWithResponse(ctx context.Cont
 
 // AddTeamMemberWithResponse Add a member to a team channel
 //
-// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_readers_differ` when the readers of the two channels differ, `dm_channel` or `channel_archived` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_home_is_team` when the home channel is a team channel, `team_readers_not_owners` when a person who is no active owner may read the team channel or the home channel, `dm_channel`, `channel_archived` or `channel_read_only` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /channels/{channel_id}/team/members (the `AddTeamMember` operationId).
-func (c *ClientWithResponses) AddTeamMemberWithResponse(ctx context.Context, channelId ChannelIdPath, body AddTeamMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*AddTeamMemberResponse, error) {
-	rsp, err := c.AddTeamMember(ctx, channelId, body, reqEditors...)
+func (c *ClientWithResponses) AddTeamMemberWithResponse(ctx context.Context, channelId ChannelIdPath, params *AddTeamMemberParams, body AddTeamMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*AddTeamMemberResponse, error) {
+	rsp, err := c.AddTeamMember(ctx, channelId, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -19846,8 +19859,8 @@ func (c *ClientWithResponses) RemoveTeamMemberWithResponse(ctx context.Context, 
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /channels/{channel_id}/team/stop (the `StopChannelTeam` operationId).
-func (c *ClientWithResponses) StopChannelTeamWithResponse(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*StopChannelTeamResponse, error) {
-	rsp, err := c.StopChannelTeam(ctx, channelId, reqEditors...)
+func (c *ClientWithResponses) StopChannelTeamWithResponse(ctx context.Context, channelId ChannelIdPath, params *StopChannelTeamParams, reqEditors ...RequestEditorFn) (*StopChannelTeamResponse, error) {
+	rsp, err := c.StopChannelTeam(ctx, channelId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -22903,21 +22916,6 @@ func (c *ClientWithResponses) ListOwnersWithResponse(ctx context.Context, reqEdi
 // Corresponds with POST /owners (the `AddOwner` operationId).
 func (c *ClientWithResponses) AddOwnerWithBodyWithResponse(ctx context.Context, params *AddOwnerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddOwnerResponse, error) {
 	rsp, err := c.AddOwnerWithBody(ctx, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseAddOwnerResponse(rsp)
-}
-
-// AddOwnerWithResponse Make a person owner
-//
-// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /owners (the `AddOwner` operationId).
-func (c *ClientWithResponses) AddOwnerWithResponse(ctx context.Context, params *AddOwnerParams, body AddOwnerJSONRequestBody, reqEditors ...RequestEditorFn) (*AddOwnerResponse, error) {
-	rsp, err := c.AddOwner(ctx, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}

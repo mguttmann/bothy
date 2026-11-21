@@ -7224,7 +7224,7 @@ paths:
       summary: Switch a channel to team mode
       tags: [Channels]
       description: |-
-        Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-only channel `channel_archived` or `channel_read_only`. Audited.
+        Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-only channel `channel_archived` or `channel_read_only`, a channel that a person who is no active owner may read `team_readers_not_owners`. Audited.
       x-authz-action: team.update
       x-rate-limit-class: rl.write
       parameters:
@@ -7307,11 +7307,12 @@ paths:
       summary: Add a member to a team channel
       tags: [Channels]
       description: |-
-        Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_home_is_team` when the home channel is a team channel, `team_readers_differ` when the readers of the two channels differ, `dm_channel`, `channel_archived` or `channel_read_only` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+        Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_home_is_team` when the home channel is a team channel, `team_readers_not_owners` when a person who is no active owner may read the team channel or the home channel, `dm_channel`, `channel_archived` or `channel_read_only` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
       x-authz-action: team.update
       x-rate-limit-class: rl.write
       parameters:
       - $ref: '#/components/parameters/ChannelIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -7410,6 +7411,7 @@ paths:
       x-rate-limit-class: rl.write
       parameters:
       - $ref: '#/components/parameters/ChannelIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
           description: OK.

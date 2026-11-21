@@ -371,12 +371,14 @@ unchanged: no agent message triggers anything there.
   owner answer 4): a forum post in a forum, a thread on a system note of the home channel's main
   thread in a text channel. The thread's operator is the agent (R-DM-12), so runs there resume the
   member's session (section 9).
-- Readers rule (first slice: only owners read team channels, 07 SR4 addendum): a member is added
-  only when the persons who may read the team channel and those who may read the home channel are
-  the same set (`authz.Recipients.Readers` of both channels), otherwise `409 conflict` with
-  `reason` `team_readers_differ`. Every relay (3.9.2) checks it again and refuses a relay whose
-  channels differ by then. Reason: text crosses between the channels in both directions, so no
-  text may reach a person who could not read it at its source.
+- Readers rule (first slice: only owners read team channels and the home channels of their
+  members, 07 SR4 addendum): every person `authz.Recipients.Readers` names for the team channel and
+  for a member's home channel must be an active owner. `enableChannelTeam` and `addTeamMember`
+  refuse otherwise with `409 conflict` and `reason` `team_readers_not_owners`, and every copy in
+  either direction (3.9.2, 3.9.4) checks it again and is refused when a grant was added since.
+  Reason: text crosses between the channels in both directions, and a person who may write in a
+  home channel could steer the member's agent into mentioning another member, whose run then acts
+  for the sponsor; with owners as the only readers neither can happen.
 - `removeTeamMember` removes a member; its work thread stays, its running run keeps running.
 - `getChannelTeam` (action `team.read`) returns the team: sponsor, brake state and members.
 - The command name `team` is reserved (10.1); `/team add|remove|list|stop` is a client command
