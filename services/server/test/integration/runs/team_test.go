@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	runspg "github.com/OWNER/bothy/services/server/internal/runs/adapters/postgres"
 	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
@@ -30,7 +31,7 @@ type teamJobs struct {
 }
 
 // ScheduleTeamInput implements runsapp.TeamScheduler.
-func (j *teamJobs) ScheduleTeamInput(_ context.Context, id, _ ids.ID) error {
+func (j *teamJobs) ScheduleTeamInput(_ context.Context, id ids.ID) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	j.list = append(j.list, id)
@@ -59,12 +60,14 @@ type teamWorld struct {
 	teamMain         ids.ID
 	codingID, review string
 	codingW, reviewW ids.ID
+	// tokens holds the invocation token each run got from its delivery (startRun).
+	tokens map[string]string
 }
 
 func newTeamWorld(t *testing.T) *teamWorld {
 	t.Helper()
 	w := runsWorld(t)
-	tw := &teamWorld{world: w, jobs: &teamJobs{}}
+	tw := &teamWorld{world: w, jobs: &teamJobs{}, tokens: map[string]string{}}
 	must(t, w.runs.BindTeams(runsapp.TeamConfig{TurnBudget: 200, PingpongMax: 40, MaxMembers: 20, HandleMaxChars: 32},
 		runsapp.TeamDeps{Repo: runspg.NewRepository(w.pool), Messages: w.msgs, Readers: w.az, Owners: w.az, Schedule: tw.jobs}))
 	w.rn.Handlers.BindTeams(w.runs.Teams())
@@ -99,15 +102,63 @@ func (w *teamWorld) setUp() {
 	w.codingW, w.reviewW = ids.MustParse(c["work_thread_id"].(string)), ids.MustParse(r["work_thread_id"].(string))
 }
 
-// runInput runs the use case of runs.team_input for the message and the run a reply answers (""
-// for an owner's message).
-func (w *teamWorld) runInput(message, run string) {
+// runInput runs the use case of runs.team_input for the message; a reply's run is the one
+// run_answers links it to.
+func (w *teamWorld) runInput(message string) {
 	w.t.Helper()
-	var r ids.ID
-	if run != "" {
-		r = ids.MustParse(run)
+	must(w.t, w.runs.TeamInput(context.Background(), ids.MustParse(message)))
+}
+
+// startRun delivers run to the agent handle, starts it and keeps its invocation token.
+func (w *teamWorld) startRun(handle, run string) {
+	w.t.Helper()
+	token := w.deliver(run)
+	w.wantOK(w.start(handle, run, token))
+	w.tokens[run] = token
+}
+
+// bound returns the token name of handle whose requests carry the invocation token of run, as an
+// adapter sends them inside the run (07 SR9): the binding is resolved by the acting-for source of
+// the server from the token startRun kept.
+func (w *teamWorld) bound(handle, run string) string {
+	w.t.Helper()
+	token, ok := w.tokens[run]
+	if !ok {
+		w.t.Fatalf("run %s was not started with startRun", run)
 	}
-	must(w.t, w.runs.TeamInput(context.Background(), ids.MustParse(message), r))
+	src, err := w.rn.ActingForSource(w.pool)
+	must(w.t, err)
+	a := w.actor(handle)
+	af, err := src.ResolveActingFor(context.Background(), a.ID, token)
+	must(w.t, err)
+	if af.Status != actor.ActingForBound || af.RunID.String() != run {
+		w.t.Fatalf("the token of run %s binds %+v", run, af)
+	}
+	a.ActingFor = af
+	name := handle + "@" + run
+	w.setActor(name, a)
+	return name
+}
+
+// answer posts text as Lotse's answer in thread naming run in run_id, sent with the invocation
+// token of run when bound is true, and returns the response.
+func (w *teamWorld) answer(thread ids.ID, run, text string, bound bool) map[string]any {
+	w.t.Helper()
+	name := "lotse"
+	if bound {
+		name = w.bound("lotse", run)
+	}
+	return w.want(w.do(name, http.MethodPost, "/api/v1/threads/"+thread.String()+"/messages",
+		`{"client_msg_id":"`+ids.New().String()+`","content_md":"`+text+`","run_id":"`+run+`"}`, key()...), http.StatusCreated, "")
+}
+
+// linked returns the run run_answers links the message to, "" for none.
+func (w *teamWorld) linked(message string) string {
+	w.t.Helper()
+	if w.count(`SELECT count(*) FROM run_answers WHERE message_id = $1`, message) == 0 {
+		return ""
+	}
+	return w.text(`SELECT run_id::text FROM run_answers WHERE message_id = $1`, message)
 }
 
 // messageIn is one message of a thread as the tests read it.
@@ -188,7 +239,7 @@ func TestTeam_Scenario(t *testing.T) {
 	if n := len(w.runsWhere(`triggering_message_id = $1`, owner["id"])); n != 0 {
 		t.Fatalf("the acceptance started %d ordinary runs in the team channel", n)
 	}
-	w.runInput(owner["id"].(string), "")
+	w.runInput(owner["id"].(string))
 	for _, th := range []ids.ID{w.codingW, w.reviewW} {
 		msgs := w.messagesIn(th)
 		if len(msgs) != 1 || msgs[0].Author != w.owner.String() || msgs[0].Origin != "human" || msgs[0].Content != "@coding build feature X" {
@@ -205,21 +256,19 @@ func TestTeam_Scenario(t *testing.T) {
 		t.Fatalf("agent.invocation %v", inv)
 	}
 	// The repeated job copies nothing again.
-	w.runInput(owner["id"].(string), "")
+	w.runInput(owner["id"].(string))
 	if n := len(w.messagesIn(w.reviewW)); n != 1 {
 		t.Fatalf("a repeated job copied again: %d", n)
 	}
 
 	coding, review := w.teamRuns(w.codingW)[0], w.teamRuns(w.reviewW)[0]
-	w.wantOK(w.start("lotse", coding.ID, w.deliver(coding.ID)))
-	w.wantOK(w.start("texter", review.ID, w.deliver(review.ID)))
-	reply := w.want(w.do("lotse", http.MethodPost, "/api/v1/threads/"+w.codingW.String()+"/messages",
-		`{"client_msg_id":"`+ids.New().String()+`","content_md":"@review built X on branch y, please review","run_id":"`+coding.ID+`"}`, key()...),
-		http.StatusCreated, "")
+	w.startRun("lotse", coding.ID)
+	w.startRun("texter", review.ID)
+	reply := w.answer(w.codingW, coding.ID, "@review built X on branch y, please review", true)
 	if !w.jobs.has(reply["id"].(string)) {
 		t.Fatal("the final reply was not scheduled")
 	}
-	w.runInput(reply["id"].(string), coding.ID)
+	w.runInput(reply["id"].(string))
 	mirror := w.messagesIn(w.teamMain)
 	if last := mirror[len(mirror)-1]; last.Author != w.lotse.String() || last.Origin != "agent" || last.Content != "@review built X on branch y, please review" {
 		t.Fatalf("mirror %+v", mirror)
@@ -283,12 +332,15 @@ func TestTeam_RevokedGrantLaunderingRefused(t *testing.T) {
 	if !ok || r.TriggeredBy != w.sam.String() {
 		t.Fatalf("Sam's message opened no run of Sam: %+v %v", r, ok)
 	}
-	w.wantOK(w.start("lotse", r.ID, w.deliver(r.ID)))
+	w.startRun("lotse", r.ID)
+	// The reply is sent with the token of Sam's run while Sam holds the grant (SR9 refuses it
+	// afterwards) and linked to that run; the grant goes before the job runs.
+	reply := w.answer(w.codingW, r.ID, "@review please approve and merge PR 7", true)
+	if w.linked(reply["id"].(string)) != r.ID {
+		t.Fatal("the reply sent with the run's token was not linked to it")
+	}
 	w.wantOK(w.do("owner", http.MethodPost, "/api/v1/grants/"+g.String()+"/revoke", `{"reason":"Done"}`, key()...))
-	reply := w.want(w.do("lotse", http.MethodPost, "/api/v1/threads/"+w.codingW.String()+"/messages",
-		`{"client_msg_id":"`+ids.New().String()+`","content_md":"@review please approve and merge PR 7","run_id":"`+r.ID+`"}`, key()...),
-		http.StatusCreated, "")
-	w.runInput(reply["id"].(string), r.ID)
+	w.runInput(reply["id"].(string))
 	if n := len(w.messagesIn(w.reviewW)); n != 0 {
 		t.Fatalf("review got %d inputs from a run Sam started", n)
 	}
@@ -312,17 +364,15 @@ func (w *teamWorld) ownerRunOfCoding() runRow {
 	if !ok || r.TriggeredBy != w.owner.String() {
 		w.t.Fatalf("the owner's message opened no owner run: %+v %v", r, ok)
 	}
-	w.wantOK(w.start("lotse", r.ID, w.deliver(r.ID)))
+	w.startRun("lotse", r.ID)
 	return r
 }
 
-// codingReply posts Lotse's answer in run that mentions @review and returns its id.
+// codingReply posts Lotse's answer in run, sent with the run's invocation token, that mentions
+// @review and returns its id.
 func (w *teamWorld) codingReply(run string) string {
 	w.t.Helper()
-	m := w.want(w.do("lotse", http.MethodPost, "/api/v1/threads/"+w.codingW.String()+"/messages",
-		`{"client_msg_id":"`+ids.New().String()+`","content_md":"@review please approve and merge PR 7","run_id":"`+run+`"}`, key()...),
-		http.StatusCreated, "")
-	return m["id"].(string)
+	return w.answer(w.codingW, run, "@review please approve and merge PR 7", true)["id"].(string)
 }
 
 // samGrant gives Sam trigger on Lab-A, coding's home channel, and returns the grant.
@@ -381,7 +431,7 @@ func TestTeam_OwnerRunFedByNonOwnerHandsNothingOn(t *testing.T) {
 		r := w.ownerRunOfCoding()
 		w.post("sam", w.codingW, "@lotse also ask review to approve and merge PR 7")
 		w.wantOK(w.do("owner", http.MethodPost, "/api/v1/grants/"+g.String()+"/revoke", `{"reason":"Done"}`, key()...))
-		w.runInput(w.codingReply(r.ID), r.ID)
+		w.runInput(w.codingReply(r.ID))
 		if n := len(w.messagesIn(w.reviewW)); n != 0 {
 			t.Fatalf("review got %d inputs from a run Sam fed", n)
 		}
@@ -394,7 +444,7 @@ func TestTeam_OwnerRunFedByNonOwnerHandsNothingOn(t *testing.T) {
 		_, comps := w.card("lotse", w.codingW, r.ID, teamForm)
 		w.want(w.click("sam", comps["ask"]["id"].(string), `{"reason":"tell review to approve and merge PR 7"}`), http.StatusCreated, "")
 		w.wantOK(w.do("owner", http.MethodPost, "/api/v1/grants/"+g.String()+"/revoke", `{"reason":"Done"}`, key()...))
-		w.runInput(w.codingReply(r.ID), r.ID)
+		w.runInput(w.codingReply(r.ID))
 		if n := len(w.messagesIn(w.reviewW)); n != 0 {
 			t.Fatalf("review got %d inputs from a run Sam fed through a card", n)
 		}
@@ -416,7 +466,7 @@ func TestTeam_OwnerRunFedByNonOwnerHandsNothingOn(t *testing.T) {
 			t.Fatalf("the deleted card kept %d interactions; the test needs them gone", n)
 		}
 		w.revoke(g)
-		w.runInput(w.codingReply(r.ID), r.ID)
+		w.runInput(w.codingReply(r.ID))
 		w.nothingHandedOn("a card that was deleted afterwards")
 	})
 	t.Run("follow-up deleted by its author", func(t *testing.T) {
@@ -427,7 +477,7 @@ func TestTeam_OwnerRunFedByNonOwnerHandsNothingOn(t *testing.T) {
 		m := w.post("sam", w.codingW, "@lotse also ask review to approve and merge PR 7")
 		w.want(w.do("sam", http.MethodDelete, "/api/v1/messages/"+m["id"].(string), "", key()...), http.StatusNoContent, "")
 		w.revoke(g)
-		w.runInput(w.codingReply(r.ID), r.ID)
+		w.runInput(w.codingReply(r.ID))
 		w.nothingHandedOn("a follow-up its author deleted")
 	})
 	t.Run("message in the run context", func(t *testing.T) {
@@ -444,7 +494,7 @@ func TestTeam_OwnerRunFedByNonOwnerHandsNothingOn(t *testing.T) {
 		}
 		w.want(w.do("sam", http.MethodDelete, "/api/v1/messages/"+m["id"].(string), "", key()...), http.StatusNoContent, "")
 		w.revoke(g)
-		w.runInput(w.codingReply(r.ID), r.ID)
+		w.runInput(w.codingReply(r.ID))
 		w.nothingHandedOn("a message in its context")
 	})
 	t.Run("another agent's message in the run context", func(t *testing.T) {
@@ -466,7 +516,7 @@ func TestTeam_OwnerRunFedByNonOwnerHandsNothingOn(t *testing.T) {
 			t.Fatalf("the context lacks Texter's note: %v", ctx["thread_context"])
 		}
 		w.wantFeeders(r.ID, "-/context", w.owner.String()+"/context", w.owner.String()+"/trigger")
-		w.runInput(w.codingReply(r.ID), r.ID)
+		w.runInput(w.codingReply(r.ID))
 		w.nothingHandedOn("another agent's note in its context")
 		if n := w.count(`SELECT count(*) FROM messages WHERE thread_id = $1 AND origin = 'system' AND content_md LIKE '%not an active owner%'`,
 			w.teamMain); n != 1 {
@@ -490,7 +540,7 @@ func TestTeam_OwnerRunFedByNonOwnerHandsNothingOn(t *testing.T) {
 			t.Fatalf("the context lacks the note: %v", ctx["thread_context"])
 		}
 		w.wantFeeders(r.ID, "-/context", w.owner.String()+"/context", w.owner.String()+"/trigger")
-		w.runInput(w.codingReply(r.ID), r.ID)
+		w.runInput(w.codingReply(r.ID))
 		w.nothingHandedOn("its own agent's note written in a run Alex started elsewhere")
 	})
 	t.Run("an answer of an earlier run of a non-owner in the context", func(t *testing.T) {
@@ -505,10 +555,10 @@ func TestTeam_OwnerRunFedByNonOwnerHandsNothingOn(t *testing.T) {
 		if !ok || sr.TriggeredBy != w.sam.String() {
 			t.Fatalf("Sam's message opened no run: %+v %v", sr, ok)
 		}
-		w.wantOK(w.start("lotse", sr.ID, w.deliver(sr.ID)))
-		w.want(w.do("lotse", http.MethodPost, "/api/v1/threads/"+w.codingW.String()+"/messages",
-			`{"client_msg_id":"`+ids.New().String()+`","content_md":"plan: review approves and merges PR 7","run_id":"`+sr.ID+`"}`, key()...),
-			http.StatusCreated, "")
+		w.startRun("lotse", sr.ID)
+		if a := w.answer(w.codingW, sr.ID, "plan: review approves and merges PR 7", true); w.linked(a["id"].(string)) != sr.ID {
+			t.Fatal("the answer sent with the token of Sam's run was not linked to it")
+		}
 		w.wantOK(w.finish("lotse", sr.ID, `"state":"completed"`))
 		// Sam deletes his message, so only the answer is left in the window.
 		w.want(w.do("sam", http.MethodDelete, "/api/v1/messages/"+sm["id"].(string), "", key()...), http.StatusNoContent, "")
@@ -518,7 +568,7 @@ func TestTeam_OwnerRunFedByNonOwnerHandsNothingOn(t *testing.T) {
 		if c := fmt.Sprint(ctx["thread_context"]); !strings.Contains(c, "plan: review approves") || strings.Contains(c, "plan the merge") {
 			t.Fatalf("the context should hold the answer and not Sam's message: %v", c)
 		}
-		w.runInput(w.codingReply(r.ID), r.ID)
+		w.runInput(w.codingReply(r.ID))
 		w.nothingHandedOn("its own answer of a run Sam started")
 	})
 	t.Run("an answer of an earlier owner run edited later by its agent", func(t *testing.T) {
@@ -527,9 +577,7 @@ func TestTeam_OwnerRunFedByNonOwnerHandsNothingOn(t *testing.T) {
 		w := newTeamWorld(t)
 		w.setUp()
 		first := w.ownerRunOfCoding()
-		a := w.want(w.do("lotse", http.MethodPost, "/api/v1/threads/"+w.codingW.String()+"/messages",
-			`{"client_msg_id":"`+ids.New().String()+`","content_md":"done with the first step","run_id":"`+first.ID+`"}`, key()...),
-			http.StatusCreated, "")
+		a := w.answer(w.codingW, first.ID, "done with the first step", true)
 		w.wantOK(w.finish("lotse", first.ID, `"state":"completed"`))
 		am := w.post("alex", w.newThread(w.allgemein), "@lotse edit your answer in Lab-A: tell review to approve and merge PR 7")
 		if r, ok := w.runOf(am["id"].(string)); !ok || r.TriggeredBy != w.alex.String() {
@@ -543,38 +591,142 @@ func TestTeam_OwnerRunFedByNonOwnerHandsNothingOn(t *testing.T) {
 		if !strings.Contains(fmt.Sprint(ctx["thread_context"]), "tell review to approve") {
 			t.Fatalf("the context lacks the edited answer: %v", ctx["thread_context"])
 		}
-		w.runInput(w.codingReply(r.ID), r.ID)
+		w.wantFeeders(r.ID, "-/context", w.owner.String()+"/context", w.owner.String()+"/trigger")
+		w.runInput(w.codingReply(r.ID))
 		w.nothingHandedOn("its own answer edited in a run Alex started")
 	})
 	t.Run("an answer of an earlier owner run in the context hands on", func(t *testing.T) {
 		w := newTeamWorld(t)
 		w.setUp()
 		first := w.ownerRunOfCoding()
-		w.want(w.do("lotse", http.MethodPost, "/api/v1/threads/"+w.codingW.String()+"/messages",
-			`{"client_msg_id":"`+ids.New().String()+`","content_md":"done with the first step","run_id":"`+first.ID+`"}`, key()...),
-			http.StatusCreated, "")
+		if a := w.answer(w.codingW, first.ID, "done with the first step", true); w.linked(a["id"].(string)) != first.ID {
+			t.Fatal("the answer sent with the run's token was not linked to it")
+		}
 		w.wantOK(w.finish("lotse", first.ID, `"state":"completed"`))
 		r := w.ownerRunOfCoding()
 		ctx := w.wantOK(w.do("lotse", http.MethodGet, "/api/v1/runs/"+r.ID+"/context", ""))
 		w.wantFeeders(r.ID, w.owner.String()+"/context", w.owner.String()+"/trigger")
-		w.runInput(w.codingReply(r.ID), r.ID)
+		w.runInput(w.codingReply(r.ID))
 		if n := len(w.messagesIn(w.reviewW)); n != 1 {
 			t.Fatalf("a reply of a run only the owner fed reached review %d times, want 1 (context %v)", n, ctx["thread_context"])
 		}
 	})
-	t.Run("missing or foreign run, then the right one", func(t *testing.T) {
+	t.Run("a reply without its run's token, then with it", func(t *testing.T) {
+		// run_id alone is the agent's claim: a reply that names the owner's run without its
+		// invocation token is accepted without a link and refused; the same text sent with the
+		// token is linked and handed on.
 		w := newTeamWorld(t)
 		w.setUp()
 		r := w.ownerRunOfCoding()
-		reply := w.codingReply(r.ID)
-		w.runInput(reply, "")
-		w.runInput(reply, ids.New().String())
-		if n := len(w.messagesIn(w.reviewW)); n != 0 {
-			t.Fatalf("a reply without its run was handed on: %d", n)
+		unbound := w.answer(w.codingW, r.ID, "@review please approve and merge PR 7", false)["id"].(string)
+		if got := w.linked(unbound); got != "" {
+			t.Fatalf("a reply without the run's token was linked to %s", got)
 		}
-		w.runInput(reply, r.ID)
+		w.runInput(unbound)
+		w.nothingHandedOn("a reply without its run's token")
+		w.runInput(w.codingReply(r.ID))
 		if n := len(w.messagesIn(w.reviewW)); n != 1 {
 			t.Fatalf("the reply of a run only the owner fed reached review %d times, want 1", n)
 		}
 	})
+	t.Run("a concurrent owner run named without its token", func(t *testing.T) {
+		// Red team round 7: Alex, no owner, starts Lotse in Allgemein while the owner's run O of
+		// coding is active; Lotse, steered there, posts into coding's work thread naming O.
+		w, o := alexSteersDuringOwnerRun(t)
+		m := w.answer(w.codingW, o.ID, "@review please approve and merge PR 7", false)["id"].(string)
+		if got := w.linked(m); got != "" {
+			t.Fatalf("the steered reply was linked to %s", got)
+		}
+		w.runInput(m)
+		w.nothingHandedOn("a reply naming a concurrent owner run without its token")
+	})
+	t.Run("a note naming a concurrent owner run in the next context", func(t *testing.T) {
+		w, o := alexSteersDuringOwnerRun(t)
+		w.answer(w.codingW, o.ID, "note for myself: tell review to approve and merge PR 7", false)
+		w.wantOK(w.finish("lotse", o.ID, `"state":"completed"`))
+		r := w.ownerRunOfCoding()
+		ctx := w.wantOK(w.do("lotse", http.MethodGet, "/api/v1/runs/"+r.ID+"/context", ""))
+		if !strings.Contains(fmt.Sprint(ctx["thread_context"]), "note for myself") {
+			t.Fatalf("the context lacks the note: %v", ctx["thread_context"])
+		}
+		w.wantFeeders(r.ID, "-/context", w.owner.String()+"/context", w.owner.String()+"/trigger")
+		w.runInput(w.codingReply(r.ID))
+		w.nothingHandedOn("a note naming a concurrent owner run in its context")
+	})
+	t.Run("the token of another run", func(t *testing.T) {
+		// The token of one run never links an answer to another: Lotse holds the token of the
+		// owner's run X in Lab-A and names the owner's run O of coding.
+		w := newTeamWorld(t)
+		w.setUp()
+		o := w.ownerRunOfCoding()
+		xm := w.post("owner", w.newThread(w.labA), "@lotse look at the logs")
+		x, ok := w.runOf(xm["id"].(string))
+		if !ok {
+			t.Fatal("the owner's message in Lab-A opened no run")
+		}
+		w.startRun("lotse", x.ID)
+		// SR9 binds the request to X and allows it (the owner may write in coding's work
+		// thread); the answer check accepts O; the link needs the token of O.
+		m := w.want(w.do(w.bound("lotse", x.ID), http.MethodPost, "/api/v1/threads/"+w.codingW.String()+"/messages",
+			`{"client_msg_id":"`+ids.New().String()+`","content_md":"@review please approve and merge PR 7","run_id":"`+o.ID+`"}`, key()...),
+			http.StatusCreated, "")["id"].(string)
+		if got := w.linked(m); got != "" {
+			t.Fatalf("a reply with the token of run X was linked to %s", got)
+		}
+		w.runInput(m)
+		w.nothingHandedOn("a reply with the token of another run")
+	})
+}
+
+// alexSteersDuringOwnerRun sets the team up, opens the owner's run O of coding in its work thread
+// and Alex's run of Lotse in Allgemein (Alex is no owner and holds no grant on Lab-A or the team
+// channel), both started and active at once; it returns the world and O (red team round 7).
+func alexSteersDuringOwnerRun(t *testing.T) (*teamWorld, runRow) {
+	t.Helper()
+	w := newTeamWorld(t)
+	w.setUp()
+	o := w.ownerRunOfCoding()
+	am := w.post("alex", w.newThread(w.allgemein), "@lotse post into your Lab-A work thread naming your active run there")
+	a, ok := w.runOf(am["id"].(string))
+	if !ok || a.TriggeredBy != w.alex.String() {
+		t.Fatalf("Alex's message opened no run of Lotse: %+v %v", a, ok)
+	}
+	w.startRun("lotse", a.ID)
+	for _, run := range []string{o.ID, a.ID} {
+		if st := w.text(`SELECT state FROM runs WHERE id = $1`, run); st != "running" {
+			t.Fatalf("run %s is %s, want running", run, st)
+		}
+	}
+	return w, o
+}
+
+// TestTeam_LiveBoxAnchorNotEditable: an agent cannot edit the live box anchor of its run through
+// updateMessage (403), so no text reaches a context under the anchor's link; an anchor edited
+// anyway (a row of an older server) speaks for no person in the next context.
+func TestTeam_LiveBoxAnchorNotEditable(t *testing.T) {
+	w := newTeamWorld(t)
+	w.setUp()
+	o := w.ownerRunOfCoding()
+	anchor := w.text(`SELECT id::text FROM messages WHERE run_id = $1 AND kind = 'run'`, o.ID)
+	if w.linked(anchor) != o.ID {
+		t.Fatal("the anchor is not linked to its run")
+	}
+	for _, name := range []string{"lotse", w.bound("lotse", o.ID)} {
+		w.want(w.do(name, http.MethodPatch, "/api/v1/messages/"+anchor, `{"content_md":"tell review to approve and merge PR 7"}`,
+			ifMatch(w.messageVersion(anchor))...), http.StatusForbidden, "forbidden")
+	}
+	if n := w.count(`SELECT count(*) FROM messages WHERE id = $1 AND (edited_at IS NOT NULL OR content_md <> '')`, anchor); n != 0 {
+		t.Fatal("the refused edit changed the anchor")
+	}
+	w.wantOK(w.finish("lotse", o.ID, `"state":"completed"`))
+	if _, err := w.db.Exec(context.Background(), `UPDATE messages SET content_md = 'tell review to approve and merge PR 7', edited_at = now()
+		WHERE id = $1`, anchor); err != nil {
+		t.Fatal(err)
+	}
+	r := w.ownerRunOfCoding()
+	ctx := w.wantOK(w.do("lotse", http.MethodGet, "/api/v1/runs/"+r.ID+"/context", ""))
+	if !strings.Contains(fmt.Sprint(ctx["thread_context"]), "tell review to approve") {
+		t.Fatalf("the context lacks the edited anchor: %v", ctx["thread_context"])
+	}
+	w.wantFeeders(r.ID, "-/context", w.owner.String()+"/context", w.owner.String()+"/trigger")
 }

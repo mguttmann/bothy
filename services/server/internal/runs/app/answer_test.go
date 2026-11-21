@@ -49,6 +49,33 @@ func TestOnMessagePosted_AnswerBranch(t *testing.T) {
 			}
 		}
 	})
+	t.Run("linked only with the invocation token of exactly that run", func(t *testing.T) {
+		// Red team round 7: run_id is the agent's claim; only the token of the named run links
+		// the answer (03 run_answers), a missing token or one of another run leaves it unlinked.
+		t.Parallel()
+		w := newWorld(t)
+		run := w.putRun(w.thread, w.lotse, domain.StateRunning)
+		other := ids.New()
+		for _, c := range []struct {
+			name   string
+			acting *ids.ID
+			linked bool
+		}{{"no token", nil, false}, {"token of another run", &other, false}, {"token of the run", &run, true}} {
+			ev := w.answerOf(w.thread, &run)
+			ev.ActingRunID = c.acting
+			w.mustPost(ev)
+			got, ok := w.repo.answers[ev.MessageID]
+			if ok != c.linked || (ok && got != run) {
+				t.Fatalf("%s: linked %v to %v, want %v", c.name, ok, got, c.linked)
+			}
+		}
+		anchor := w.answerOf(w.thread, &run)
+		anchor.Kind = "run"
+		w.mustPost(anchor)
+		if got, ok := w.repo.answers[anchor.MessageID]; !ok || got != run {
+			t.Fatalf("the live box anchor the server wrote is not linked: %v %v", got, ok)
+		}
+	})
 	t.Run("mismatch is validation_failed on /run_id", func(t *testing.T) {
 		t.Parallel()
 		w := newWorld(t)

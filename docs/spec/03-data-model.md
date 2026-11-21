@@ -1995,11 +1995,14 @@ its run (09 3.9.4, red team round 6 of FEAT-TEAM-CHANNEL-SERVER, R-DM-64). Modul
 
 PK: `message_id`. FK: `run_id` -> `runs(id)` ON DELETE CASCADE. Indexes: `(run_id)` for the
 foreign key. Written by the acceptance of runs in the unit of work of the message: every agent
-message whose `run_id` the answer check accepted (09 4.11) and every live box anchor. An answer's
-`run_id` is not stored on the message (only the anchor has `messages.run_id`), so this is the only
-link. It vouches only for the text as written: an agent's message edited afterwards (`edited_at`
-set; a live box anchor, which only its own active run patches, excepted) speaks for no person in
-`run_feeders`. `bothy_app` may only read and insert. Retention: `content` (with the run).
+message whose `run_id` the answer check accepted (09 4.11) and whose request carried the
+invocation token of exactly that run (07 SR9, `actor.ActingFor` bound to the same run; red team
+round 7), and every live box anchor the server writes for its run. `run_id` alone is the agent's
+own claim, so an answer without that token stays unlinked. An answer's `run_id` is not stored on
+the message (only the anchor has `messages.run_id`), so this is the only link. It vouches only for
+the text as written: any message edited afterwards (`edited_at` set) whose author is no person
+speaks for no person in `run_feeders`, whatever its kind; a live box anchor cannot be edited at
+all (`updateMessage` answers `403`). `bothy_app` may only read and insert. Retention: `content` (with the run).
 
 ### 4.9 Costs (`billing`)
 
@@ -3120,7 +3123,7 @@ section 4 applies, and the gate fails.
 | R-DM-60 | A wake-up is a row of `run_wakes` with the person of its source run; a fired wake-up creates a run with `trigger_kind = 'wake'` and `triggering_wake_id`, and the counts of autonomous inputs are rows of `run_autonomy` per thread and person (addendum of 2026-11-06, 09 5.8). | Only the server can start a run and apply the trigger and billing rules at fire time; a count per thread and person keeps another person's message from extending an owner's chain. |
 | R-DM-61 | `threads.title_version` is the value of `version` at the last change of `title` or `title_source` (1 for a new thread and for every thread from before the column); every statement that writes `title` writes it. The precondition of `setThreadTitle` holds for an `If-Match` from `title_version` up to `version` ([06-api.md](06-api.md) section 8 item 2, addendum of 2026-11-10). | Every message raises `version` (section 6.2) without a thread event, so in an active thread no client holds the current version, and an exact match refused the first title edit of every such thread. What the precondition protects is the title: an edit based on a version from `title_version` on saw the current title, an older one did not and still gets `412`. |
 | R-DM-62 | A team channel is a row of `team_channels`; its members are rows of `team_members`, each with one work thread; every message the server copies into a work thread is a row of `team_inputs` with its authority, and every mirrored reply a row of `team_mirrors`; a run of a member has `trigger_kind = 'team'` and its input as `triggering_message_id` (addendum of 2026-11-21, [09-agents.md](09-agents.md) 3.9). | The run, the follow-ups, the run context and the session need the input in the run's own thread; the check before every delivery needs the authority of an input whose author may be an agent, which the message itself cannot carry; the two unique keys make the job that copies idempotent. |
-| R-DM-64 | Every agent message whose `run_id` the answer check accepted, and every live box anchor, is linked to its run in `run_answers` in the unit of work of the message (addendum of 2026-11-21, [09-agents.md](09-agents.md) 3.9.4). | A run context gives an agent's text the record of the run that wrote it; without the link the member's own text, steered by a non-owner in another channel or an earlier run, passed the owner check (red team round 6). |
+| R-DM-64 | Every agent message whose `run_id` the answer check accepted and whose request carried the invocation token of that very run, and every live box anchor, is linked to its run in `run_answers` in the unit of work of the message (addendum of 2026-11-21, [09-agents.md](09-agents.md) 3.9.4). | A run context gives an agent's text the record of the run that wrote it; without the link the member's own text, steered by a non-owner in another channel or an earlier run, passed the owner check (red team round 6); the token binding, because an agent steered in another run could name a concurrent owner run of the thread in `run_id` (red team round 7). |
 | R-DM-63 | Every input a run takes is recorded in `run_feeders` with the person it speaks for when it is stored or given to the run, and the record is append-only for the server (addendum of 2026-11-21, [09-agents.md](09-agents.md) 3.9.4). | The check that a member's reply hands on only what owners fed reads this record; a check over the input rows themselves let a deleted card or follow-up drop a person out of it (red team rounds 2 to 4). |
 
 ## 9. Configuration values of this chapter

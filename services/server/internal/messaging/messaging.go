@@ -97,6 +97,11 @@ type MessagePosted struct {
 	// rules (M2-19 design note 3), which runs checks before the commit (design note 4); nil
 	// otherwise. It is never stored for an agent message.
 	RunID *ids.ID
+	// ActingRunID is the run of the Invocation-Token binding of the request that wrote the
+	// message (actor.ActingFor with status bound, 07 guard rule SR9); nil for a request without a
+	// bound token and for a message the server writes itself. runs links an agent's answer to the
+	// run of RunID only when both name the same run (03 run_answers, 09 3.9.4).
+	ActingRunID *ids.ID
 	// MentionedIDs are the resolved mentions, sorted, without duplicates.
 	MentionedIDs []ids.ID
 	// Silent suppresses notifications.
