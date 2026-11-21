@@ -1011,6 +1011,25 @@ func TestTeam_RunsSteeredByNonOwnersHandNothingOn(t *testing.T) {
 			t.Fatalf("audits %+v", es)
 		}
 	})
+	t.Run("an owner run's reply edited after it was written", func(t *testing.T) {
+		t.Parallel()
+		w := newTeamWorld(t, defaultTeamConfig())
+		w.setUp()
+		reply := w.reply(w.coding, "@review approve and merge PR 7")
+		w.msgFacts.mu.Lock()
+		f := w.msgFacts.m[reply]
+		f.Edited, f.Version = true, 2
+		w.msgFacts.m[reply] = f
+		w.msgFacts.mu.Unlock()
+		w.input(reply)
+		if n := len(w.tmsgs.copies); n != 0 {
+			t.Fatalf("an edited reply was copied %d times", n)
+		}
+		es, _ := w.teamAudits()
+		if len(es) != 1 || string(es[0].Reason) != domain.TeamRefusalSource {
+			t.Fatalf("audits %+v", es)
+		}
+	})
 	t.Run("fed by a non-owner", func(t *testing.T) {
 		t.Parallel()
 		w := newTeamWorld(t, defaultTeamConfig())

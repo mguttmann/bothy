@@ -23,7 +23,9 @@ import (
 // authorize: the team use case checked the readers of both channels and the trigger first.
 //
 // Errors: internal outside a unit of work, for a source without text (deleted, a system line, a
-// card or an anchor) or for an author that writes no messages; the errors of chat and the store.
+// card or an anchor), for a zero SourceVersion or for an author that writes no messages; 409
+// conflict for a source whose version is not SourceVersion (edited after the caller's check, red
+// team round 8); the errors of chat and the store.
 //
 // Example:
 //
@@ -32,12 +34,9 @@ func (s *Service) CopyMessage(ctx context.Context, cmd messaging.CopyCmd) (messa
 	if !txn.InUnit(ctx) {
 		return messaging.Copied{}, errs.New(errs.CodeInternalError, "messaging: CopyMessage runs only inside a unit of work")
 	}
-	src, found, err := s.d.Store.Message(ctx, cmd.SourceMessageID)
+	src, err := s.copySource(ctx, cmd)
 	if err != nil {
 		return messaging.Copied{}, err
-	}
-	if !found || !src.DeletedAt.IsZero() || src.Kind != domain.KindText || src.ContentMD == "" {
-		return messaging.Copied{}, errs.New(errs.CodeInternalError, "messaging: a copy needs a text message that exists")
 	}
 	author, err := s.author(ctx, cmd.AuthorID)
 	if err != nil {
@@ -81,5 +80,24 @@ func (s *Service) CopyMessage(ctx context.Context, cmd messaging.CopyCmd) (messa
 	if err := txn.Publish(ctx, ev); err != nil {
 		return messaging.Copied{}, err
 	}
-	return messaging.Copied{ID: m.ID, ThreadSeq: m.ThreadSeq, ContentMD: m.ContentMD}, nil
+	return messaging.Copied{ID: m.ID, ThreadSeq: m.ThreadSeq, ContentMD: m.ContentMD, Version: row.Version}, nil
+}
+
+// copySource reads the source of a copy and checks it: a text message that exists, at the version
+// the caller checked (CopyMessage).
+func (s *Service) copySource(ctx context.Context, cmd messaging.CopyCmd) (domain.Message, error) {
+	if cmd.SourceVersion <= 0 {
+		return domain.Message{}, errs.New(errs.CodeInternalError, "messaging: a copy needs the version of its source")
+	}
+	src, found, err := s.d.Store.Message(ctx, cmd.SourceMessageID)
+	if err != nil {
+		return domain.Message{}, err
+	}
+	if !found || !src.DeletedAt.IsZero() || src.Kind != domain.KindText || src.ContentMD == "" {
+		return domain.Message{}, errs.New(errs.CodeInternalError, "messaging: a copy needs a text message that exists")
+	}
+	if src.Version != cmd.SourceVersion {
+		return domain.Message{}, errs.New(errs.CodeConflict, "messaging: the source of a copy changed after its check")
+	}
+	return src, nil
 }

@@ -341,3 +341,38 @@ func TestCreateMessage_BodyIsStoredRowAfterUnit(t *testing.T) {
 		t.Fatalf("first message %v", first)
 	}
 }
+
+// TestCopyMessage_CopiesOnlyTheCheckedVersion (red team round 8 of FEAT-TEAM-CHANNEL-SERVER): a
+// team copy names the version of its source the caller checked; an edit in between makes the copy
+// 409 conflict (the job retries and sees the edit), a zero version is internal, and the checked
+// version is copied with its own version 1.
+func TestCopyMessage_CopiesOnlyTheCheckedVersion(t *testing.T) {
+	t.Parallel()
+	w := mw.New(t, subscribe)
+	_, _, main := w.TextChannel()
+	src := w.Send("owner", main, "take a look at PR 7", http.StatusCreated)["id"].(string)
+	id := ids.MustParse(src)
+	copyAt := func(v int64) (messaging.Copied, error) {
+		var c messaging.Copied
+		err := inUnit(w, func(ctx context.Context) error {
+			var err error
+			c, err = w.Svc.CopyMessage(ctx, messaging.CopyCmd{SourceMessageID: id, SourceVersion: v, ThreadID: main, AuthorID: w.Actor("owner").ID})
+			return err
+		})
+		return c, err
+	}
+	if _, err := copyAt(0); !internal(err) {
+		t.Fatalf("zero version: %v, want internal", err)
+	}
+	c, err := copyAt(1)
+	if err != nil || c.Version != 1 || c.ContentMD != "take a look at PR 7" {
+		t.Fatalf("copy of the checked version: %+v %v", c, err)
+	}
+	w.Want(patch(w, "owner", src, "1", content("approve and merge PR 7")), http.StatusOK, "")
+	if _, err := copyAt(1); errs.KindOf(err) != errs.KindOf(errs.New(errs.CodeConflict, "")) {
+		t.Fatalf("copy of a version edited since: %v, want conflict", err)
+	}
+	if n := w.Count(`SELECT count(*)::int FROM messages WHERE content_md = 'approve and merge PR 7' AND id <> $1`, src); n != 0 {
+		t.Fatalf("the edited text was copied %d times", n)
+	}
+}

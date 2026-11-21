@@ -427,7 +427,9 @@ A reply is mirrored and handed on only when the run it answers was started and f
 owners. The run a reply answers is the one 03 `run_answers` links it to, never the `run_id` the
 agent names: the acceptance links an answer only when its request carried the invocation token of
 exactly the named run (07 SR9), so a reply without that token, or with the token of another run,
-is refused like a run fed by a non-owner. The SDK outbox sends every entry of a run with that
+is refused like a run fed by a non-owner, and so is a reply edited after it was written (the
+link vouches for the text as written); the copies take only the version of the source the job
+checked. The SDK outbox sends every entry of a run with that
 run's newest token (`Outbox` `token_for`), which the Hermes adapter and the Claude Code runner
 use for their answers. The check reads only the record of the run in 03 `run_feeders` (R-DM-63), which is written
 when an input is stored or given to the run and never shrinks: its trigger (`triggered_by`, for a

@@ -356,6 +356,9 @@ const SystemAgentSessionResumeFailed = "agent_session.resume_failed"
 // into and the principal who becomes the copy's author (09 3.9.2).
 type CopyCmd struct {
 	SourceMessageID, ThreadID, AuthorID ids.ID
+	// SourceVersion is the version of the source the caller checked; a source at another version
+	// (edited in between) is 409 conflict, so the copy never carries text the check did not see.
+	SourceVersion int64
 }
 
 // Copied is the result of CopyMessage: the copy and the content it carries, which the team use
@@ -364,6 +367,8 @@ type Copied struct {
 	ID        ids.ID
 	ThreadSeq int64
 	ContentMD string
+	// Version is the version of the copy (1), for a copy made from it in the same unit.
+	Version int64
 }
 
 // SystemLine is the input of Messages.AppendSystemLine (M2-12 design note 12): a system line with
@@ -405,6 +410,10 @@ type TriggerMessage struct {
 	// HasAttachments reports messages.has_attachments (M3-07): a trigger of the message again
 	// (retriggerMessage, F-PROJEKT-BEREIT) holds its invocation like the acceptance did.
 	HasAttachments bool
+	// Version is messages.version; Edited reports edited_at set (the message was edited after it
+	// was written). The team job copies only the version it checked (CopyCmd.SourceVersion).
+	Version int64
+	Edited  bool
 }
 
 // AnchorRef names a live box anchor of a run (09 section 5.4: the only message with run_id, kind

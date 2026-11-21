@@ -23,6 +23,6 @@
 - The command name `team` is reserved; agent messages outside team channels still never trigger.
 - A member's reply hands on only when it was sent with the invocation token of the run it names
   in `run_id`; the `run_id` alone no longer links an agent's message to a run. Adapters that send
-  through the SDK outbox already do this.
+  through the SDK outbox already do this. A reply edited after it was written is not handed on.
 - `updateMessage` refuses to edit a live box anchor (`kind = run`) with `403`, like a system
   line.
