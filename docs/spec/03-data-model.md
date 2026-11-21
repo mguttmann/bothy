@@ -1997,7 +1997,9 @@ PK: `message_id`. FK: `run_id` -> `runs(id)` ON DELETE CASCADE. Indexes: `(run_i
 foreign key. Written by the acceptance of runs in the unit of work of the message: every agent
 message whose `run_id` the answer check accepted (09 4.11) and every live box anchor. An answer's
 `run_id` is not stored on the message (only the anchor has `messages.run_id`), so this is the only
-link. `bothy_app` may only read and insert. Retention: `content` (with the run).
+link. It vouches only for the text as written: an agent's message edited afterwards (`edited_at`
+set; a live box anchor, which only its own active run patches, excepted) speaks for no person in
+`run_feeders`. `bothy_app` may only read and insert. Retention: `content` (with the run).
 
 ### 4.9 Costs (`billing`)
 

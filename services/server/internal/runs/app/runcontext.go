@@ -144,7 +144,7 @@ func (s *Service) recordContextFeeders(ctx context.Context, b contextBuild, out 
 // elementFeeders returns the principals one element of the context of runID records
 // (domain.ContextFeeders); none for an answer of runID itself, whose record is being written.
 func (s *Service) elementFeeders(ctx context.Context, runID ids.ID, m runs.ContextMessage) ([]ids.ID, error) {
-	e := domain.ContextElement{AuthorID: m.Author.ID, AuthorKind: m.Author.Kind}
+	e := domain.ContextElement{AuthorID: m.Author.ID, AuthorKind: m.Author.Kind, Edited: m.Edited}
 	in, team, err := s.teamInputOf(ctx, m.MessageID)
 	if err != nil {
 		return nil, err
@@ -386,6 +386,7 @@ func contextElement(m messaging.Message) runs.ContextMessage {
 		Author: runs.ContextAuthor{ID: m.Author.ID, Kind: m.Author.Kind, Handle: m.Author.Handle, DisplayName: m.Author.DisplayName,
 			AvatarFileID: m.Author.AvatarFileID},
 		Origin: m.Origin, Kind: m.Kind, ContentMD: m.ContentMD, Attachments: []runs.ContextAttachment{}, ReplyToMessageID: m.ReplyToID,
+		Edited: !m.EditedAt.IsZero() && m.Kind != kindRun,
 	}
 }
 

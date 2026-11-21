@@ -440,6 +440,9 @@ type ContextMessage struct {
 	ReplyToMessageID ids.ID
 	// AlreadyDelivered marks a follow-up this session already received (mode resume).
 	AlreadyDelivered bool
+	// Edited reports a message edited after it was written (a live box anchor, which only its run
+	// patches, never counts); the record of 09 3.9.4 reads it, the schema has no member for it.
+	Edited bool
 }
 
 // PatchOp is one RFC 6902 operation as sent by the adapter (09 5.3).
