@@ -82,6 +82,8 @@ class FollowupCheck:
         author_id: The author of the message read with ``getMessage``, ``None`` before the read.
         message_thread_id: The thread of the message read, ``None`` before the read.
         written: The message IDs already written to this run's turn.
+        author_is_agent: The message read is an agent's (a team member's input, 09 3.9.9): its
+            token's ``sub`` is the input's authority, never its author, so the two differ.
     """
 
     claims: InvocationClaims | None
@@ -96,6 +98,7 @@ class FollowupCheck:
     author_id: UUID | None = None
     message_thread_id: UUID | None = None
     written: Collection[UUID] = ()
+    author_is_agent: bool = False
 
 
 def followup_verdict(check: FollowupCheck) -> tuple[FollowupVerdict, str]:  # noqa: PLR0911 - one answer per check
@@ -104,7 +107,8 @@ def followup_verdict(check: FollowupCheck) -> tuple[FollowupVerdict, str]:  # no
     The token is checked again with the points of 09 4.5 that M2-34 applies before a start:
     expiry with ``adapter.invocation_token_leeway`` (point 5), the actual mode and tool class
     (points 8 and 10); plus the run of the turn, ``trigger_kind`` ``followup``, and the message's
-    thread and author ``sub``.
+    thread and author ``sub`` (for an agent's message, a team member's input whose ``sub`` is
+    its authority, the thread only).
 
     Args:
         check: The inputs.
@@ -125,7 +129,9 @@ def followup_verdict(check: FollowupCheck) -> tuple[FollowupVerdict, str]:  # no
         return FollowupVerdict.SKIP, "followup_check_failed"
     if claims.thread_id != check.thread_id or claims.message_id != check.message_id:
         return FollowupVerdict.SKIP, "followup_check_failed"
-    if check.author_id != claims.sub or check.message_thread_id != check.thread_id:
+    if check.message_thread_id != check.thread_id:
+        return FollowupVerdict.SKIP, "followup_check_failed"
+    if check.author_id != claims.sub and not check.author_is_agent:
         return FollowupVerdict.SKIP, "followup_check_failed"
     actual = Actual(check.billing_mode, check.tool_class)
     if compare_actual(claims, actual) is not TokenVerdict.VALID:
@@ -141,6 +147,8 @@ def build_followup_line(  # noqa: PLR0913 - the parts of one line
     transcripts: Sequence[tuple[str, str]] = (),
     *,
     owner_code: str | None = None,
+    lead_in: str | None = None,
+    note: str = "",
 ) -> bytes:
     r"""Build the stdin line of one follow-up (design note 3).
 
@@ -155,9 +163,15 @@ def build_followup_line(  # noqa: PLR0913 - the parts of one line
             (FIX-followup-transcribe).
         owner_code: The owner code of a follow-up of the run's owner in a background session
             (`claude_code_runner.ownercode`), in the lead-in; ``None`` for every other line.
+        lead_in: A lead-in that replaces ``Follow-up from ...``: the one of a team member's
+            input (`claude_code_runner.team.member_lead_in`), which never carries a code.
+        note: A paragraph of the runner after the lead-in (`claude_code_runner.team.team_note`).
 
     Returns:
         One JSON line of type ``user`` with its line break.
+
+    Raises:
+        ValueError: Both ``lead_in`` and ``owner_code`` are given.
 
     Examples:
         >>> import json
@@ -165,10 +179,17 @@ def build_followup_line(  # noqa: PLR0913 - the parts of one line
         >>> json.loads(line)["message"]["content"][0]["text"]
         'Follow-up from sam (@sam):\n\nAttachments:\n- a.png (image/png): x'
     """
+    if lead_in is not None and owner_code is not None:
+        raise ValueError("a team member's input never carries an owner code")
     name = str(author.get("display_name") or author.get("handle") or "")
     handle = str(author.get("handle") or "")
-    lead_in = LEAD_IN if owner_code is None else OWNER_LEAD_IN
-    parts = [lead_in.format(name=name, handle=handle, code=owner_code)]
+    if lead_in is not None:
+        parts = [lead_in]
+    else:
+        lead = LEAD_IN if owner_code is None else OWNER_LEAD_IN
+        parts = [lead.format(name=name, handle=handle, code=owner_code)]
+    if note:
+        parts.append(note)
     if text.strip() or not (files or transcripts):
         parts.append(text)
     parts.extend(

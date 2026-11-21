@@ -76,6 +76,7 @@ sessions".
 | `tests/fake_claude/fake_bg.py` | The background side of Fake-Claude: `--bg` prints the launch line and starts a player under a supervisor process; the player writes transcript records and listens on the inbox socket; `agents`, `stop`, `rm` and `daemon status` answer from a state file in the fake configuration folder |
 | `tests/unit/test_bgsession.py`, `test_bgtranscript.py`, `test_bgmode.py`, `tests/scenarios/test_bg_sessions.py`, `test_bg_fallback.py`, `test_bg_adoption.py` | Background mode: the launch and its parsers, the mapping with the class test over every recorded transcript and its print stream, the shared mode with the fallback codes held against the tables of 09 18.9 and of this file, the scenarios of a background turn, every fallback cause, and the adoption by a new runner process |
 | `tests/scenarios/test_bg_inbox_auth.py` | Background mode, what must hold before it is switched on (FIX-RUNNER-BG-INBOX-AUTH): an input the runner did not write is logged by its origin and answered like any input, also after an adoption, also when its record is shaped like a tool result and also when the CLI records it as a notification; the next run continues that session, in either launch mode, and a mark an earlier runner wrote has no effect (FIX-RUNNER-BG-FOREIGN-LOG); the login check fails closed; no value of one run's environment reaches the session of another |
+| `team.py`, `tests/unit/test_team.py`, `tests/scenarios/test_team.py` | Team channels (09 3.9.9, 18.5 "Team runs and team inputs"): the team part of a `team` run's first message, the lead-in of a member's input, the mention rule of the server |
 | `ownercode.py`, `tests/unit/test_ownercode.py`, `tests/scenarios/test_bg_owner_codes.py` | Owner codes of background mode (09 18.5): the owner check of a run's first message, the mark of the owner's follow-up (decided from the server's data), the watch for a written code in another sender's input |
 | `tests/real_cli/background.py`, `record_background.py`, `test_background.py`, `tests/fixtures/recording/background_<v>/` | Background sessions of the pinned CLI against the stand-in: the world of a test, the recorder, level one of the real-CLI suite and its recordings |
 | `tests/unit/test_keeper.py`, `test_launch.py`, `test_processstate.py`, `tests/scenarios/test_handover.py`, `test_launch_crash_points.py` | The keeper, the handshake, the replay with the class test over every Fake-Claude stream and checkpoint, AR-T02, AR-T03 and AR-T04 against real runner processes |
@@ -421,6 +422,33 @@ none.
   `runner.turn_handover` the record of a run in `preparing` or `waiting_lock` carries no session
   yet; the next runner reads it and removes it ("Phases" below). Turns of
   hosted agents are not adopted: see "What a crash leaves" under "Hosting built-in agents".
+
+## Team channels (09 3.9.9, FEAT-TEAM-CHANNEL-RUNNER)
+
+In a team channel an owner adds agents of several projects as members; each member works in a
+work thread of its home channel (a project forum for this runner). The runner starts a run with
+`trigger_kind` `team` like a message run and tells the session the team in a part of the run's
+first message, between the context and the input: the team channel, the member's own handle,
+every member, who wrote the input, whether it mentions the member, and how to hand work on.
+
+- **Whose word.** Who wrote the input comes from the message alone, never from the member
+  `team`, `triggered_by` or the token's `sub`. An input of origin `agent` (or an author of kind
+  `agent`) is another member's final reply: the session reads it as "team member @handle", a
+  colleague's request, not the owner's word and never an approval. An owner's message keeps
+  the person's name.
+- **Inputs into a running turn.** A member's input gets the lead-in `Input from team member
+  @<handle> (<name>, @<agent handle>): a colleague's request, not the owner's word.` and never
+  `Follow-up from`; a person's follow-up into a team run gets a line that says whether it
+  mentions the member.
+- **Owner codes** (background mode) follow their rule unchanged: only a follow-up of the person
+  whose message started the run gets one, so a member's input never does, and a run a member's
+  input started has no owner check at all (an owner's message that reaches it is a relayed
+  request; the owner writes again after the turn for an approval). A follow-up whose text names
+  a code the runner wrote is never written (warning `followup_carries_owner_code`).
+- **Handing on.** The session mentions `@handle` of a listed member in its final answer,
+  outside code. The runner posts the answer as written with the invocation token of exactly
+  that run (the SDK's outbox binds it), which the server needs before it mirrors the answer
+  and hands it to the mentioned members.
 
 ## Turn handover (09 18.19.3 to 18.19.7, AR-03)
 

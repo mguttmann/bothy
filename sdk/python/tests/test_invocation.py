@@ -385,6 +385,7 @@ def test_expectation_rows() -> None:
     }
     rows = {
         "message": ({"trigger_kind": "message", "message_id": str(obj)}, "message_id", obj),
+        "team": ({"trigger_kind": "team", "message_id": str(obj)}, "message_id", obj),
         "interaction": (
             {"trigger_kind": "interaction", "interaction_id": str(obj)},
             "interaction_id",

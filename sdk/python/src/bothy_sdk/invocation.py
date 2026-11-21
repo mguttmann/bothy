@@ -153,7 +153,8 @@ class InvocationClaims:
         jti: The token ID.
         iat: Issued at (seconds since the epoch).
         exp: Expiry (seconds since the epoch).
-        trigger_kind: ``message``, ``followup``, ``interaction``, ``command`` or ``autocomplete``.
+        trigger_kind: ``message``, ``team``, ``followup``, ``interaction``, ``command`` or
+            ``autocomplete``.
         thread_id: The thread.
         channel_id: The channel.
         space_id: The space of the channel.
@@ -294,8 +295,9 @@ def _opt(value: UUID | Unset) -> UUID | None:
 def expectation_for(envelope_type: str, event: object) -> Expectation:
     """Return what point 6 compares for an event (Design note 8 of M2-29).
 
-    Rows: ``agent.invocation`` (run, thread, and by ``trigger_kind`` ``message_id``,
-    ``interaction_id`` or ``command_id``), ``agent.followup`` (run, thread, ``message_id``),
+    Rows: ``agent.invocation`` (run, thread, and by ``trigger_kind`` ``message_id`` for
+    ``message`` and ``team``, ``interaction_id`` or ``command_id``), ``agent.followup`` (run,
+    thread, ``message_id``),
     ``interaction.created`` (``interaction.id``, its ``run_id`` and ``thread_id``),
     ``command.invoked`` (``command_id``, ``run_id`` and ``thread_id`` when present),
     ``command.autocomplete_requested`` (``command_id``, its thread when present, no run).
@@ -320,6 +322,8 @@ def expectation_for(envelope_type: str, event: object) -> Expectation:
         kind = str(payload.trigger_kind.value)
         claim, trigger = {
             "message": ("message_id", _opt(payload.message_id)),
+            # A team run names its input in the work thread (09 3.9.9).
+            "team": ("message_id", _opt(payload.message_id)),
             "interaction": ("interaction_id", _opt(payload.interaction_id)),
             # M2-16 put command_id into the payload; without it the check fails closed.
             "command": ("command_id", _opt(payload.command_id)),

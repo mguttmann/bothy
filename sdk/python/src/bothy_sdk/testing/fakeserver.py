@@ -446,6 +446,8 @@ class FakeServer:
         forged: str | None = None,
         command: str | None = None,
         options: Mapping[str, str] | None = None,
+        authority: str | None = None,
+        team: Mapping[str, Any] | None = None,
     ) -> Triggered:
         """A person posts ``text``: a queued run and its ``agent.invocation``.
 
@@ -473,6 +475,11 @@ class FakeServer:
             command: The name of a registered command of Lotse: a model command run
                 (``trigger_kind = command``) whose payload names it with ``options``.
             options: The option values of ``command`` by name.
+            authority: ``trigger_kind = team`` only: the handle of the run's ``triggered_by``
+                and the token's ``sub`` (the sponsor for a member's input); ``author`` when
+                omitted. ``author`` may then be the agent ``texter`` (an input of origin
+                ``agent``).
+            team: ``trigger_kind = team`` only: the payload's member ``team`` (09 3.9.9).
 
         Returns:
             The run, thread and message.
@@ -501,6 +508,8 @@ class FakeServer:
             history=history,
             files=files,
             session_mode=session_mode,
+            authority=authority,
+            team=team,
         )
         if forged is not None:
             # Set before the first delivery: the deliverers run only after the next await.
@@ -809,7 +818,8 @@ class FakeServer:
         Args:
             run_id: The run.
             text: The message content.
-            author: ``alex``, ``robin`` or ``sam``; ``sub`` of the token.
+            author: ``alex``, ``robin`` or ``sam``, or the agent ``texter`` (a team input of
+                origin ``agent``, 09 3.9.9); ``sub`` of the token unless ``claims`` names one.
             claims: Claims that replace those of every token of this event (still signed with
                 the server key), for example ``{"billing_mode": "personal"}``,
                 ``{"tool_class": "chat"}`` or ``{"sub": "<another principal>"}``.
@@ -820,7 +830,7 @@ class FakeServer:
         Returns:
             The follow-up message ID.
         """
-        person = {"alex": self.world.alex, "robin": self.world.robin, "sam": self.world.sam}[author]
+        person = self.world.by_handle[author]
         message_id = self.world.followup(run_id, text, author=person, claims=claims, files=files)
         await _settle()
         return message_id

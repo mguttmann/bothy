@@ -86,6 +86,7 @@ from bothy_sdk.generated.models import (
     AgentSession,
     AgentSessionReport,
     AgentSessionReportBindFailed,
+    AgentTeamFacts,
     BillingEvidence,
     CostReport,
     JsonPatchOperation,
@@ -209,6 +210,7 @@ from claude_code_runner.reply_upload import (
 from claude_code_runner.statedir import ensure_private_dir, write_private
 from claude_code_runner.stop import StoppableGroup
 from claude_code_runner.streamreader import StreamReader
+from claude_code_runner.team import is_member_input, member_lead_in, team_note, team_part
 from claude_code_runner.title import propose_title, split_title
 from claude_code_runner.transcribe import (
     LOCAL_FILE,
@@ -358,6 +360,8 @@ class RunState:
         max_budget_usd: ``--max-budget-usd`` of a hosted definition (26 5.8), if any.
         cost_cap: The same cap as a number, to recognise a run it stopped.
         notice: The live box status line once per run (skipped channel skills, 26 5.9).
+        team_run: The run's trigger kind is ``team`` (09 3.9.9).
+        team: The payload's team facts of a ``team`` run, if the server sent them.
     """
 
     run_id: UUID
@@ -386,6 +390,8 @@ class RunState:
     max_budget_usd: str | None = None
     cost_cap: float | None = None
     notice: str | None = None
+    team_run: bool = False
+    team: AgentTeamFacts | None = None
 
     def close(self) -> None:
         """Release the slot and the locks (locks in reverse order)."""
@@ -650,6 +656,9 @@ class RunTurn:
         await self._transcribe(context)
         rendered = render_context(context, file_texts=self.state.file_texts)
         items = context_items(rendered)
+        if self.state.team_run:
+            # Before the trigger part: who wrote it and what the team is (09 3.9.9).
+            items.insert(1, team_part(context.trigger_message, self.state.team))
         if self._background() and is_owner_trigger(context.trigger_message):
             # The owner check ends the first message of every run, so it also reaches a
             # session a later run continues, whose system prompt stays the first one (18.5).
@@ -1892,7 +1901,7 @@ class RunTurn:
             order.offered -= 1
             mine.set()
 
-    async def _write_followup(  # noqa: PLR0911, PLR0912 - one exit per check
+    async def _write_followup(  # noqa: PLR0911, PLR0912, PLR0915 - one exit per check
         self,
         inv: Invocation,
         ids: Mapping[str, Any],
@@ -1933,6 +1942,10 @@ class RunTurn:
             if prepared is None:  # the run ended during the transcription
                 _log("followup_not_deliverable", **ids)
                 return
+            if self._carries_written_code(message, prepared):
+                # A text that names a code the runner wrote is never passed on (18.5).
+                _warn("followup_carries_owner_code", **ids)
+                return
             line = self._followup_line(process, message, line_uuid, prepared)
             # The record knows the line before the CLI can: a runner that adopts the turn maps
             # its echo to the follow-up and patches it absorbed (design note 12 f 3).
@@ -1969,8 +1982,20 @@ class RunTurn:
     def _followup_line(
         self, process: object, message: Message, line_uuid: str, prepared: _Prepared
     ) -> bytes:
-        """The line of one follow-up, with an owner code when it is the run owner's (18.5)."""
-        code = self._owner_code(process, message)
+        """The line of one follow-up, with an owner code when it is the run owner's (18.5).
+
+        A team member's input (an agent's message, 09 3.9.9) gets the member's lead-in and never
+        a code; a person's follow-up into a team run says whether it mentions the member.
+        """
+        facts = self.state.team
+        if is_member_input(message):
+            code = None
+            lead: str | None = member_lead_in(message, facts)
+            note = ""
+        else:
+            code = self._owner_code(process, message)
+            lead = None
+            note = team_note(message, facts) if self.state.team_run else ""
         line = build_followup_line(
             message.author.to_dict(),
             message.content_md,
@@ -1978,12 +2003,25 @@ class RunTurn:
             prepared.files,
             prepared.transcripts,
             owner_code=code,
+            lead_in=lead,
+            note=note,
         )
         if code is not None:
             # Noted before the line can be read anywhere (18.5 "Owner codes").
             self.owner_lines.add(line_uuid, code, prompt_text(line) or "")
             _log("followup_owner_marked", **self.ids, message_id=message.id)
         return line
+
+    def _carries_written_code(self, message: Message, prepared: _Prepared) -> bool:
+        """Whether a follow-up's text names an owner code the runner wrote (18.5, 09 3.9.9).
+
+        Once written, a code is readable by every program of the host user, also by another
+        member's agent, whose final reply reaches this run as an input. A line the runner writes
+        is no input of another sender, so the transcript watch never judges it; this check keeps
+        such a text from reaching the session inside the runner's own line.
+        """
+        texts = [message.content_md, *prepared.files, *(t for _, t in prepared.transcripts)]
+        return any(self.owner_lines.carries_code(text) for text in texts)
 
     def _owner_code(self, process: object, message: Message) -> str | None:
         """The owner code of a follow-up, when it is the run owner's into a background session.
@@ -2018,6 +2056,7 @@ class RunTurn:
             author_id=message.author.id,
             message_thread_id=message.thread_id,
             written=set(self.followups.by_message),
+            author_is_agent=is_member_input(message),
         )
         return followup_verdict(check)
 

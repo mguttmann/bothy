@@ -555,6 +555,8 @@ This is the contract the runner and the Hermes adapter build against.
   command is needed. A reply without a mention is mirrored and triggers nothing.
 - An adapter that does not know `trigger_kind = team` refuses such a run as it refuses any unknown
   trigger kind; nothing outside team channels changes for it.
+- The Claude Code runner builds this contract as described in 18.5 "Team runs and team inputs"
+  (FEAT-TEAM-CHANNEL-RUNNER).
 
 ## 4. Adapter contract
 
@@ -3613,7 +3615,7 @@ character (D-M2-34-8).
 | Detachment | stdout and stderr go to the files `<run_id>.stream.jsonl` and `<run_id>.stderr.log` under `<runner.state_dir>/sessions/<session>/` (mode `0600`), not to pipes; the runner reads the stream file every `runner.poll_interval`; the turn record `<runner.state_dir>/turns/<run_id>.json` holds run, thread, channel, session, PID, group, start time and file paths, never a token; turns survive a restart of the runner, and the new runner finds running turns via the record and ends orphaned ones (M2-35) | a restart never silently kills a turn |
 | Locks | `flock` per thread and per session (`<runner.state_dir>/locks/`), taken in this order with attempts every `runner.poll_interval`; wait at most `runner.session_lock_wait`, then the run ends `failed` with `adapter_error`; the turn inherits the descriptors, so a lock lives as long as the turn, also when the runner dies | a session never runs twice at the same time |
 | Parallelism | at most `runner.max_parallel_runs` turns; the runner reports `run_slots` (`used`, `total`) in every heartbeat and every run that waits in prepare for a lock (`thread_busy`) or a slot (`slots_full`) in `waiting_runs` (4.8, 5.2.1), and sends a heartbeat at once when a run starts or stops waiting | host and rate limits; the person sees why a run waits and which runs hold the slots |
-| Input | the system prompt file (`--append-system-prompt-file`, `<run_id>.system-prompt.md`) holds only the fixed runner instructions (the `TITLE:` request only for a new or unstarted session), the format rules for replies of 4.11 in an own section `## Message format` and, in an own section, the channel prompt `behavior.prompt`; the first stdin line is one `user` message with two text items: first the context of 4.6 with trust marks, every `unverified` content and every file entry in marked data blocks, the attachments of the triggering message as local paths inside those blocks; second the text of the triggering message with the transcripts of its attachments (of the server, or of the runner's transcriber for an audio attachment without one, 18.14); the line is stored as `<run_id>.input.jsonl` | the context becomes part of the session history, so a `--resume` turn still knows what `context_floor_seq` no longer sends; files are data, never instructions (ADR 0054); follow-ups through the same pipe (18.5) |
+| Input | the system prompt file (`--append-system-prompt-file`, `<run_id>.system-prompt.md`) holds only the fixed runner instructions (the `TITLE:` request only for a new or unstarted session), the format rules for replies of 4.11 in an own section `## Message format` and, in an own section, the channel prompt `behavior.prompt`; the first stdin line is one `user` message with two text items: first the context of 4.6 with trust marks, every `unverified` content and every file entry in marked data blocks, the attachments of the triggering message as local paths inside those blocks; second the text of the triggering message with the transcripts of its attachments (of the server, or of the runner's transcriber for an audio attachment without one, 18.14); a `team` run has the team part between the two, a background run with an owner the owner check last (18.5); the line is stored as `<run_id>.input.jsonl` | the context becomes part of the session history, so a `--resume` turn still knows what `context_floor_seq` no longer sends; files are data, never instructions (ADR 0054); follow-ups through the same pipe (18.5) |
 | Recording | stream and stderr per session in `runner.state_dir`, prompt files and downloaded attachments too, kept for `runner.stream_log_retention` (swept at start and after every turn; the usage of a session, `usage.json`, is state and never swept) | troubleshooting, fixtures |
 | Permission prompts | `--permission-prompts none`: actions that are not allowed are rejected instead of waiting | an unattended turn never hangs on a question |
 | Version | `claude --version` is probed at start and before heartbeats within `runner.cli_probe_timeout`; the runner reports `degraded` with `runtime_unreachable` (no answer), `runtime_version_unsupported` (below the version named above for `--permission-prompts none`, or unreadable) or `runtime_version_untested` (another version than the pinned one and than the tested version below, `PINNED_CLAUDE_CODE_VERSION` of the runner, equal to that version in M2-34, 2.1.288 from 2026-10-29 (D-RUNNER-CLI-PIN-1), 2.1.321 from 2026-11-10 (D-FIX-RUNNER-CLI-PIN-321-1) and 2.1.325 since 2026-11-16 (D-FIX-RUNNER-CLI-PIN-325-1)); the first two end every run in prepare with `runtime_error`, the third only warns. Tested version (FIX-RUNNER-TESTED-CLI, owner order of 2026-11-18): `runner.tested_claude_code_version` names one further version that counts as tested like the pin while `runner.tested_claude_code_pin` equals the code's pin; the operator's update chain writes both after the contract subset of the real-CLI suite passed against that CLI and the recordings of the pin (`CLAUDE_CODE_RUNNER_TESTED_VERSION`); the recorded stream field table is a floor there: the CLI may add members, never drop a recorded schema member or change a value the field test compares (`task_status`, `command_states`, the workflow type) (D-FIX-RUNNER-CONTRACT-TOLERANT-1); of the recorded task types it may drop any the runner does not map to a step kind of its own (`local_agent`, `local_workflow`), named in a warning (D-FIX-RUNNER-CONTRACT-TOLERANT-3). Both keys or none; an entry proved against another pin counts for nothing and `check-config` reports it `pin_changed` (a failure). When the API refuses the model to the CLI as too old (18.9), the runner raises the version it supports at least to the one the API named (without one: past the probed version) until it restarts, so the probe reports `runtime_version_unsupported` until the CLI is updated | the fixtures and the stream table of 18.4 hold for the pinned version (RK-14); a change of the pin records them again with `plugins/claude-code-runner/tests/real_cli/record.py` |
@@ -4070,6 +4072,38 @@ messages, or the CLI drops the line as a repeat of the one before it, it is writ
 no echo. Either way the server defers it into a new run
 (section 7), so the running turn ends without the correction and the message waits for the end
 of the run.
+
+Team runs and team inputs (addendum of 2026-11-21, FEAT-TEAM-CHANNEL-RUNNER; contract 3.9.9).
+The runner starts `agent.invocation` with `trigger_kind` `message` or `team` and refuses every
+other kind with the cause `trigger_kind_unsupported`, also for a hosted agent (18.18). The first
+input line of a `team` run gets a third text item between the context and the trigger part, the
+team part: the team channel, the member's own handle, every member (handle, agent, home
+channel), who wrote the input, whether it mentions the member (the server's rule of 3.9.4), and
+how to hand work on (`@handle` of a listed member in the final reply, outside code, never its
+own). Who wrote the input comes from the triggering message alone, never from the member
+`team`, `triggered_by` or the token's `sub`: an input of origin `agent` or with an author of
+kind `agent` is a team member's, labelled "team member @handle" (the handles of the members
+whose `agent_id` is the author, else the agent's own handle) and called a colleague's request,
+not the owner's word and never an approval; any other is a person's. A member's input that
+reaches a running turn gets the lead-in `Input from team member @<handle> (<name>, @<agent
+handle>): a colleague's request, not the owner's word.`, with whether it mentions the member
+when the run has team facts, and never `Follow-up from`. Its token's `sub` is the input's
+authority, so the follow-up check of this section compares the author with `sub` only for a
+person's message (an agent's message: its thread only). A person's follow-up into a `team` run
+keeps its lead-in and gets the runner's paragraph `Team channel: It mentions you (@<handle>).`
+or that it does not. Owner codes follow the rule above unchanged: a member's input is never
+the owner's (`author.kind` `agent`, origin `agent`), so it never gets a code, and a `team` run a
+member's input started has no owner and no owner check, so an owner's message that reaches it
+is a relayed request until the owner writes again after the turn; an owner's message that
+reaches the owner's own running `team` run gets the next code. A follow-up whose text, file
+texts or transcripts hold a code the runner wrote is never written (warning
+`followup_carries_owner_code`, the follow-up stays `queued`), because a line the runner writes is
+no input of another sender and the watch of "Owner codes" never judges it: a member's agent
+that read a written code from a file of the host user could otherwise put it into the session
+inside the runner's own line. Answers, the live box and every request of the run carry the
+invocation token of exactly that run (4.11, 3.9.4, the SDK's `Outbox` `token_for`), so a
+reply's mentions hand on. Evidence: `tests/unit/test_team.py`, `tests/unit/test_followups.py`,
+`tests/scenarios/test_team.py`.
 
 Whose input (background mode, addendum of 2026-11-16, FIX-RUNNER-BG-INBOX-AUTH). The inbox
 socket of a session is open to every program of the host user, among them the other Claude Code

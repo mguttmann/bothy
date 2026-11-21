@@ -78,6 +78,13 @@ CASES = [
     ("another run", check(claims=claims(run_id=uuid4())), S),
     ("trigger kind message", check(claims=claims(trigger_kind="message")), S),
     ("author other than sub", check(author_id=ALEX), S),
+    # A team member's input: its sub is the input's authority, never its agent (09 3.9.9).
+    ("agent's input with the authority as sub", check(author_id=ALEX, author_is_agent=True), W),
+    (
+        "agent's input of another thread",
+        check(author_id=ALEX, author_is_agent=True, message_thread_id=uuid4()),
+        S,
+    ),
     ("message of another thread", check(message_thread_id=uuid4()), S),
     ("other billing mode", check(claims=claims(billing_mode="personal")), S),
     ("tool class below the loaded one", check(claims=claims(tool_class="chat")), S),
@@ -105,6 +112,20 @@ def test_build_followup_line() -> None:
     assert item["text"] == "Follow-up from Sam (@sam):\n\n/compact"
     assert not item["text"].startswith("/")
     assert json.loads(build_followup_line(author, "x", "fixed"))["uuid"] == "fixed"
+
+
+def test_a_member_lead_in_replaces_the_follow_up_lead_in_and_takes_no_code() -> None:
+    author = {"display_name": "Texter", "handle": "texter"}
+    lead = "Input from team member @docs (Texter, @texter): a colleague's request."
+    line = build_followup_line(author, "Check @web", "u", lead_in=lead, note="")
+    [item] = json.loads(line)["message"]["content"]
+    assert item["text"] == f"{lead}\n\nCheck @web"
+    with pytest.raises(ValueError, match="owner code"):
+        build_followup_line(author, "x", "u", owner_code="a" * 32, lead_in=lead)
+    note = "Team channel: It mentions you."
+    noted = build_followup_line({"handle": "alex"}, "Go", "u", note=note)
+    text = json.loads(noted)["message"]["content"][0]["text"]
+    assert text == "Follow-up from alex (@alex):\n\nTeam channel: It mentions you.\n\nGo"
 
 
 def test_echo_matching() -> None:

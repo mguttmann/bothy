@@ -28,6 +28,7 @@ TYP = "agent-invocation+jwt"
 TRIGGER_OBJECT = {
     "message": "message_id",
     "followup": "message_id",
+    "team": "message_id",
     "interaction": "interaction_id",
     "command": "command_id",
     "autocomplete": "command_id",
