@@ -73,6 +73,7 @@ var withParent = map[string]string{
 	"team_inputs":         "messages",
 	"team_mirrors":        "messages",
 	"run_feeders":         "runs",
+	"run_answers":         "runs",
 	"dm_participants":     "channels",
 }
 
