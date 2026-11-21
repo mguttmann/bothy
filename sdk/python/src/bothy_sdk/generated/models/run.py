@@ -45,7 +45,8 @@ class Run:
         queued_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         agent_session_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         trigger_kind (RunTriggerKind | Unset): `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-
-            up in `triggering_wake_id`.
+            up in `triggering_wake_id`. `team` is a run of a team channel member; its input in the work thread is
+            `triggering_message_id` (09 3.9.2).
         triggering_message_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         triggering_command_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         triggering_interaction_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.

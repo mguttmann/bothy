@@ -412,6 +412,9 @@ reveals nothing (never with `404`).
 | `run_not_running` | no `authorize` result | Reason of the audit entry of `run.launch.check` for a run that is not `running` (2.14 item 4, 09 18.19.6, AR-04); problem code `conflict` (`409`) with the same `reason` |
 | `definition_needs_host` | no `authorize` result | Reason of the audit entry of `agent.tool_class.set` when a class below `host` is refused because the current definition of the built-in agent has a `stdio` MCP server ([26-builtin-agents.md](26-builtin-agents.md) 4.4 item 5, R-BA-06); problem code `conflict` (`409`) with `reason: definition_needs_host` |
 | `run_not_failed` | no `authorize` result | Reason of the audit entry of `run.wake.recover` for a source run that ended `cancelled` or `completed`: lost work of such a run gets no recovery wake-up, the wake-up is stored `refused` with the note and the notification of 09 5.8.4 (09 18.19.9, issue 567); problem code `conflict` (`409`) with the same `reason` |
+| `team_sponsor_not_owner` | no `authorize` result | Reason of the audit entry of `agent.invoke` (stage `team`) of a refused team input whose authority is no active owner now ([09-agents.md](09-agents.md) 3.9.5, FEAT-TEAM-CHANNEL-SERVER) |
+| `team_readers_differ` | no `authorize` result | Reason of the audit entry of `agent.invoke` (stage `team`) of a refused team input when the readers of the team channel and of the member's home channel differ (09 3.9.1, 3.9.5); problem code `conflict` (`409`) with the same `reason` at `addTeamMember` |
+| `team_paused` | no `authorize` result | Reason of the audit entry of `agent.invoke` (stage `team`) of a member input that the safety brake refused, with the attribute `pause_reason` (`turn_budget`, `pingpong` or `stopped`; 09 3.9.6) |
 
 ### 4.2 Flow
 
@@ -761,6 +764,29 @@ owners, regardless of which grants exist.
   and incoming webhooks never do (05, section 5, item 1).
 - Agents and apps have at most `write` and only `upload` as a capability (section 2.1).
 - Reason: bot loops are ruled out, and the trigger set from I1 stays human.
+
+Addendum of 2026-11-21 (team channels, [09-agents.md](09-agents.md) 3.9): in a channel an active
+owner switched to team mode, the final reply of a member agent that mentions another member's
+handle starts or feeds that member's run. The run is never the agent's: its `triggered_by` and the
+check principal of every check before it and before every delivery are the channel's sponsor, an
+active owner (`actor.Recheck`, 05 section 5 "Check without a request"); a sponsor who is no
+longer an active owner triggers nothing. So I1 stays human (the sponsor is in T(A) or the check
+refuses), SR1 to SR3 and the project rules apply as if the sponsor had written in the member's
+work thread, and the agent gains no right: it acts with its own tool class, binding and billing
+mode as for any run. The rules that keep this safe:
+
+1. Only active owners switch team mode on, add or remove members and stop the team (actions
+   `team.update` and `team.stop`, owner-only); only they read the team (`team.read`).
+2. Readers rule: a member is added only when the people who may read the team channel and those
+   who may read the member's home channel are the same set (`Recipients.Readers` of both), and
+   every copy between the two channels checks it again, so no text reaches a person who could not
+   read it at its source.
+3. A member's reply reaches another member only as an input of `origin = agent` authored by the
+   source agent; it never becomes a message of a person and never carries the owner's authority
+   in the runner (09 3.9.9).
+4. The safety brake of 09 3.9.6 ends loops between members; any owner message resets it.
+5. Outside team channels this addendum changes nothing: agent, app, import and system messages
+   never trigger.
 
 ### SR5 Administration only by humans with confirmation
 

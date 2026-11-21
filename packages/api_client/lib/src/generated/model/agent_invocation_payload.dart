@@ -6,6 +6,7 @@
 import 'package:api_client/src/generated/model/command_option_value.dart';
 import 'package:api_client/src/generated/model/agent_wake_facts.dart';
 import 'package:built_collection/built_collection.dart';
+import 'package:api_client/src/generated/model/agent_team_facts.dart';
 import 'package:api_client/src/generated/model/billing_mode.dart';
 import 'package:api_client/src/generated/model/principal_ref.dart';
 import 'package:api_client/src/generated/model/agent_session.dart';
@@ -22,7 +23,8 @@ part 'agent_invocation_payload.g.dart';
 /// * [channelId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [spaceId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [triggerKind]
-/// * [messageId] - Triggering message; the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2).
+/// * [messageId] - Triggering message, for `trigger_kind = team` the input in the member's work thread (09 3.9.2); the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2).
+/// * [team] - The team facts of a member's run; set exactly for `trigger_kind = team` (09 3.9.9).
 /// * [interactionId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [wakeId] - The wake-up of a wake run; set exactly for `trigger_kind = wake` (09 5.8.3, 5.8.5).
 /// * [wake] - The wake-up's kind, reason, label and result, which the first input names; set exactly for `trigger_kind = wake`.
@@ -56,11 +58,15 @@ abstract class AgentInvocationPayload
 
   @BuiltValueField(wireName: r'trigger_kind')
   AgentInvocationPayloadTriggerKindEnum get triggerKind;
-  // enum triggerKindEnum {  message,  interaction,  command,  wake,  };
+  // enum triggerKindEnum {  message,  interaction,  command,  wake,  team,  };
 
-  /// Triggering message; the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2).
+  /// Triggering message, for `trigger_kind = team` the input in the member's work thread (09 3.9.2); the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2).
   @BuiltValueField(wireName: r'message_id')
   String? get messageId;
+
+  /// The team facts of a member's run; set exactly for `trigger_kind = team` (09 3.9.9).
+  @BuiltValueField(wireName: r'team')
+  AgentTeamFacts? get team;
 
   /// UUIDv7 (RFC 9562), lowercase canonical form.
   @BuiltValueField(wireName: r'interaction_id')
@@ -172,6 +178,13 @@ class _$AgentInvocationPayloadSerializer
       yield serializers.serialize(
         object.messageId,
         specifiedType: const FullType(String),
+      );
+    }
+    if (object.team != null) {
+      yield r'team';
+      yield serializers.serialize(
+        object.team,
+        specifiedType: const FullType(AgentTeamFacts),
       );
     }
     if (object.interactionId != null) {
@@ -329,6 +342,14 @@ class _$AgentInvocationPayloadSerializer
           if (valueDes == null) continue;
           result.messageId = valueDes;
           break;
+        case r'team':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(AgentTeamFacts),
+          ) as AgentTeamFacts?;
+          if (valueDes == null) continue;
+          result.team.replace(valueDes);
+          break;
         case r'interaction_id':
           final valueDes = serializers.deserialize(
             value,
@@ -469,6 +490,9 @@ class AgentInvocationPayloadTriggerKindEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'wake')
   static const AgentInvocationPayloadTriggerKindEnum wake =
       _$agentInvocationPayloadTriggerKindEnum_wake;
+  @BuiltValueEnumConst(wireName: r'team')
+  static const AgentInvocationPayloadTriggerKindEnum team =
+      _$agentInvocationPayloadTriggerKindEnum_team;
   @BuiltValueEnumConst(wireName: r'unknown_default_open_api', fallback: true)
   static const AgentInvocationPayloadTriggerKindEnum unknownDefaultOpenApi =
       _$agentInvocationPayloadTriggerKindEnum_unknownDefaultOpenApi;

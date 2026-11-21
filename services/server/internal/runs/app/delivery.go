@@ -112,7 +112,7 @@ type resolver func(s *Service, ctx context.Context, run RunRow, in runs.Delivery
 // interaction.created and the trigger kind interaction come with M2-15.
 var resolvers = map[string]map[string]resolver{
 	domain.EventAgentInvocation: {triggerKindMessage: resolveInvocationMessage, triggerKindCommand: resolveInvocationCommand,
-		triggerKindInteraction: resolveInvocationInteraction, triggerKindWake: resolveInvocationWake},
+		triggerKindInteraction: resolveInvocationInteraction, triggerKindWake: resolveInvocationWake, triggerKindTeam: resolveInvocationTeam},
 	domain.EventAgentFollowup:      {"": resolveFollowup},
 	domain.EventAgentWakeInput:     {"": resolveWakeInput},
 	domain.EventCommandInvoked:     {},
@@ -219,7 +219,8 @@ func resolveInvocationMessage(s *Service, ctx context.Context, run RunRow, _ run
 	}, nil
 }
 
-// resolveFollowup is agent.followup: the author of the follow-up message of the payload.
+// resolveFollowup is agent.followup: the author of the follow-up message of the payload, or the
+// authority of a team input (09 3.9.5).
 func resolveFollowup(s *Service, ctx context.Context, run RunRow, in runs.DeliveryInput) (trigger, error) {
 	id, err := domain.FollowupMessageID(in.Payload)
 	if err != nil {
@@ -228,6 +229,14 @@ func resolveFollowup(s *Service, ctx context.Context, run RunRow, in runs.Delive
 	m, err := s.d.Messages.TriggerMessageOf(ctx, id)
 	if err != nil {
 		return trigger{}, err
+	}
+	input, team, err := s.teamInputOf(ctx, m.ID)
+	if err != nil {
+		return trigger{}, err
+	}
+	if team {
+		// A team input is checked for its authority, never for its author (09 3.9.5).
+		return teamFollowupTrigger(input, m), nil
 	}
 	return trigger{
 		person: m.Author.ID, object: m.ID, message: m.ID, human: m.Origin == originHuman, origin: m.Origin,

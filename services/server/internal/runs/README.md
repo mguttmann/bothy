@@ -1,6 +1,6 @@
 # Module `runs`
 
-Status: the trigger decision as pure functions in `domain/` (M2-04); runs, the state machine, the acceptance of a triggering message and the run reads (M2-05). The invocation tokens and the reference verifier of the adapter check (M2-06). The delivery check `runs.Delivery` with the fresh token and the job `runs.queued_expiry` (M2-08). Start, renewal, end and cancellation of runs, the revocation and disabled-agent subscribers and the jobs `runs.cancel_timeout` and `runs.stall_check` (M2-09). The booking of costs in the finish, the cost columns and the metric `bothy.run.cost` (M2-22). Components and interactions: the tables `message_components` and `interactions`, the port `Interactions`, the source ports of `messaging` in `adapters/messagingsource`, the job `runs.component_expiry` and the resolvers of `interaction.created` and of `agent.invocation` with `trigger_kind = interaction` (M2-15). Patches (M2-10) and follow-ups (M2-11) build on `app.Open`, `app.Transition`, the end-of-run function `endRun` and `app.Service.Prepare`. The hold of an agent invocation while an attachment of the triggering message is not final, `ReleaseInvocation`, the subscriber of `files.FileFinalized`, the job `runs.invocation_hold_timeout` and the owner's switch `supports_files_out` (M3-07). Commands and interactions of apps: the source port `AppDispatcher`, the app branches of `CommandExec`, `Interactions` and the autocompletion, `Interactions.DisableAuthoredBy` and the job `runs.app_dispatch` (M2-25). Voice messages at acceptance, the hold window of a pending transcript and the attachments of the run context (M3-09). Wake-ups, wake runs and wake inputs, the caps of autonomous inputs, `run.launch.check` and the job `runs.wake_due` (AR-04, section "Wake-ups and autonomous inputs (AR-04)").
+Status: the trigger decision as pure functions in `domain/` (M2-04); runs, the state machine, the acceptance of a triggering message and the run reads (M2-05). The invocation tokens and the reference verifier of the adapter check (M2-06). The delivery check `runs.Delivery` with the fresh token and the job `runs.queued_expiry` (M2-08). Start, renewal, end and cancellation of runs, the revocation and disabled-agent subscribers and the jobs `runs.cancel_timeout` and `runs.stall_check` (M2-09). The booking of costs in the finish, the cost columns and the metric `bothy.run.cost` (M2-22). Components and interactions: the tables `message_components` and `interactions`, the port `Interactions`, the source ports of `messaging` in `adapters/messagingsource`, the job `runs.component_expiry` and the resolvers of `interaction.created` and of `agent.invocation` with `trigger_kind = interaction` (M2-15). Patches (M2-10) and follow-ups (M2-11) build on `app.Open`, `app.Transition`, the end-of-run function `endRun` and `app.Service.Prepare`. The hold of an agent invocation while an attachment of the triggering message is not final, `ReleaseInvocation`, the subscriber of `files.FileFinalized`, the job `runs.invocation_hold_timeout` and the owner's switch `supports_files_out` (M3-07). Commands and interactions of apps: the source port `AppDispatcher`, the app branches of `CommandExec`, `Interactions` and the autocompletion, `Interactions.DisableAuthoredBy` and the job `runs.app_dispatch` (M2-25). Voice messages at acceptance, the hold window of a pending transcript and the attachments of the run context (M3-09). Wake-ups, wake runs and wake inputs, the caps of autonomous inputs, `run.launch.check` and the job `runs.wake_due` (AR-04, section "Wake-ups and autonomous inputs (AR-04)"). Team channels: the owner operations, the inputs and mirrors, the team runs, the brake and the job `runs.team_input` (FEAT-TEAM-CHANNEL-SERVER, section "Team channels").
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); where they differ, the chapter applies.
 
 ## Purpose
@@ -878,3 +878,27 @@ statistics source; both queries stand in `tools/lint/sql_visibility.yaml` with t
 - Wake-ups are not exported: their label, condition and result are written by the agent from the whole thread. `run_autonomy` holds only counts.
 - Erase: nothing in any step. The rows go with their thread or message (20 section 2), `run_wakes` with their thread or source run and `run_autonomy` with the thread or the person (ON DELETE CASCADE); with `privacy.account_deletion_content = delete` the message deletion deletes the components of each deleted message, and their interactions follow by cascade.
 - The two reads (`PersonalDataRuns`, `PersonalDataInteractions`) carry no visibility predicate: they run in the job `privacy.export` without a principal and are named by the person.
+
+## Team channels (FEAT-TEAM-CHANNEL-SERVER)
+
+The server side of [09-agents.md](../../../../docs/spec/09-agents.md) 3.9; rulings in
+[FEAT-TEAM-CHANNEL-SERVER](../../../../docs/decisions.d/FEAT-TEAM-CHANNEL-SERVER.md).
+
+- `team.go` (root): the port `Teams` with `Team`, `TeamMember` and `AddTeamMember`.
+- `domain/team.go`: `TriggerTeam`, `ValidHandle`, `MentionedHandles` (handles outside code) and the
+  brake `NextBrake` and `ResetBrake` as pure functions.
+- `app/team_ports.go`: `TeamConfig` (`team.*` keys), the rows, `TeamRepository`, `TeamMessages`
+  (the copies and notes of messaging), `TeamReaders` (`authz.Recipients`), `TeamScheduler` and
+  `TeamDeps`; `BindTeams` binds them, without it nothing is a team channel.
+- `app/team.go`: the owner operations (`team.read`, `team.update`, `team.stop`), the work thread
+  and the readers rule; `app/team_input.go`: the hook of the acceptance (`teamHook`, which also
+  keeps 3.4 out of team channels), the job's use case `TeamInput` (owner broadcast, mirror, member
+  inputs, brake, checks, notes, audit), `openTeamRun` with `emitTeamInvocation`, and the resolvers
+  of the delivery check that use the authority of an input (`resolveInvocationTeam`,
+  `teamFollowupTrigger`, `followOnTeamRun`).
+- `adapters/postgres/team.go` with `queries/team.sql`, `adapters/jobs/team_input.go` (the job
+  `runs.team_input` and `TeamScheduler`), `adapters/httpapi/team.go` (the six operations).
+
+Lock order: the `team_channels` row, then the runs of the work threads (03 6.3). The copies run in
+the job, never in the unit of work of the message that caused them, so the locks of a reply's
+thread and run are never held while other threads are written (ruling D-TEAM-4).

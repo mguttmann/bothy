@@ -1,7 +1,9 @@
 # Team channels: agents of several projects work together
 
-Status: design draft of 2026-11-21, not yet normative and not built. It proposes the decisions for
-a later specification ticket; until that ticket changes them, the chapters win. Related:
+Status: design of 2026-11-21, approved by the owner on 2026-11-21 with the answers of section 9.
+The server slice FEAT-TEAM-CHANNEL-SERVER turned it into the specification
+([09-agents.md](../spec/09-agents.md) 3.9); where the two differ, the chapters win. Rulings:
+[FEAT-TEAM-CHANNEL-SERVER](../decisions.d/FEAT-TEAM-CHANNEL-SERVER.md). Related:
 [09-agents.md](../spec/09-agents.md) 3.2, 3.4, 3.6, 4.6, 5.8, 7, 8, 18.5, 18.16 and 18.19.8,
 [07-permissions.md](../spec/07-permissions.md) SR1 to SR4,
 [ADR 0077](../adr/0077-autonomous-runs-wake-ups-and-turn-handover.md),
@@ -61,52 +63,58 @@ to the core data model and to every adapter.
 
 ### 3.3 Trigger rule in team channels
 
-SR4 gets an addendum: in a channel with `team_mode`, a message of origin `agent` posted for a
-member (its relayed reply) triggers every member it mentions, if the channel's talk rules allow
-that pair. Several mentions in one message are allowed there (3.4 step 3 refuses them elsewhere,
-because there the members' runs share one thread; here each has its own). The run starts in the
-mentioned member's work thread with the new `trigger_kind = 'team'`, `triggering_message_id` set
-to the team message, and `triggered_by` set to the channel's sponsor: the active owner who switched
-team mode on. Create and every delivery check `agent.invoke` for the work thread as that person
-(`actor.Recheck`, origin human), the same call the wake fire makes today (`runs/app/wakes.go`), so
-SR1 (I1, I2), SR2, SR3, project readiness and archived or read-only checks apply as if the owner
-had written in the work thread. A member mentioned while it runs gets the message as a follow-up
-(section 7). Outside team channels every rule stays.
+SR4 gets an addendum: in a team channel, the final reply of a member that the server mirrors there
+triggers every member it mentions by handle. Several mentions in one reply are allowed there (3.4
+step 3 refuses them elsewhere, because there the members' runs share one thread; here each has its
+own). The server copies the reply into the mentioned member's work thread as an input message
+authored by the source member's agent (`origin = agent`) and starts a run there with the new
+`trigger_kind = 'team'`, `triggering_message_id` set to that input, and `triggered_by` set to the
+channel's sponsor: the active owner who switched team mode on. Create and every delivery check
+`agent.invoke` for the work thread as that person (`actor.Recheck`, origin human), the same call
+the wake fire makes (`runs/app/wakes.go`), so SR1 (I1, I2), SR2, SR3, project readiness and
+archived or read-only checks apply as if the owner had written in the work thread. A member
+mentioned while it runs gets the input as a follow-up (section 7 of 09). Outside team channels
+every rule stays.
+
+Why a copy in the work thread: the run context (09 4.6), the follow-ups (09 7) and the runner read
+the inputs of a run from the run's own thread; a copy keeps all three unchanged, and the work
+thread reads as the member's whole conversation.
 
 ### 3.4 Owner messages reach every member
 
-A message of the sponsor (or of any active owner) in the team channel goes to every member:
-a follow-up to a running run, a new `team` run for an idle member. Mentions in it mark who is
-addressed; the others get it as context and may answer briefly. In the runner's background mode
-it arrives with an owner code (18.5), so the session treats it as the owner's own word. Change
-needed: today owner codes exist only when the run's triggering message is a person's
-(`ownercode.is_owner_trigger`); for `team` runs the runner must take the owner from the run's
-`triggered_by` instead. A relayed agent message never carries a code, and the runner labels it
-"from member @x".
+A message of any active owner in the team channel goes to every member: the server copies it into
+each work thread as an input authored by that owner (`origin = human`), a follow-up to a running
+run, a new `team` run with the owner as `triggered_by` for an idle member. Mentions in it mark who
+is addressed (`team.addressed` of the invocation); the others get it as context and may answer
+briefly. In the runner's background mode it arrives with an owner code (18.5), so the session
+treats it as the owner's own word: the runner keeps today's rule and decides from the input
+message's origin and author, never from `triggered_by`. A relayed member reply is an agent's
+message and never carries a code, and the runner labels it "from member @x".
 
 ### 3.5 Who may talk to whom
 
-Per channel a talk rule list (`team_talk_rules`: from handle, to handle, allow), default every
-member may mention every member. Edited in the app or with `/team allow @a @b` and
+Later slice. Per channel a talk rule list (`team_talk_rules`: from handle, to handle, allow);
+until it exists every member may mention every member. Edited in the app or with `/team allow @a @b` and
 `/team deny @a @b`. A mention the rules forbid is shown greyed with the reason, it triggers nothing.
 
 ## 4. Safety brake (not a cost limit)
 
 The brake exists to stop machines that run in circles, not to save money, and its defaults are
-high:
+high (owner answer 3):
 
-- **Turn budget per channel:** agent-triggered runs since the owner's last message, at most the
-  channel's `team_turn_budget` (default from the named key `team.turn_budget_default`). At the
-  budget the channel pauses agent triggers with a note; any owner message resets it.
-- **Ping-pong detection:** two members that trigger each other alternately
-  `team.pingpong_max` times while their runs report idle (no tool call except replying, the idle
-  flag of 09 5.8.6) are paused as a pair with a note naming both.
+- **Turn budget per channel:** agent-triggered inputs since an owner's last message, at most
+  `team.turn_budget`. At the budget the channel pauses agent triggers with a note; any owner
+  message resets it.
+- **Ping-pong detection:** two members that trigger each other alternately more than
+  `team.pingpong_max` times without an owner message are paused with a note naming both; the
+  whole channel pauses, because the pair may pull a third member in.
 - **Stop all:** the stop control of the channel stops every active run in every work thread
-  (09 8), cancels queued `team` runs, and pauses agent triggers until the owner writes again.
-- `team` runs are autonomous inputs and count in `run_autonomy` of their work thread, but the
-  owner's broadcast resets that count like a follow-up of the person.
+  (09 8) and pauses agent triggers until an owner writes again.
+- `team` runs and inputs do not count in `run_autonomy`; the brake above replaces the chain caps
+  for them.
 
-Every pause and stop posts a `system` note in the team channel and notifies the owner.
+Every pause and stop posts a `system` note in the team channel; push notifications for it come
+with the app slice.
 
 ## 5. Security
 
@@ -119,36 +127,39 @@ Every pause and stop posts a `system` note in the team channel and notifies the 
 - Injection: one agent's text now makes another agent act, including agents with tool class
   `host`. That is the owner's wish inside his own trust domain; the runner prompt states that
   member messages are requests of a colleague, not the owner's word.
-- Audit: membership changes, talk rule changes, every `team` trigger (with source member), every
+- Audit: membership changes, every `team` trigger (with source member) and every refusal, every
   brake pause and the stop all.
 
 ## 6. Changes per part
 
-- **Server:** `channels.team_mode` and sponsor, `team_members`, `team_talk_rules`, team counters;
-  actions `team.member.add/remove/list`, `team.rule.update`, `team.stop_all`; the trigger rule of
-  3.3 and the broadcast of 3.4 in the acceptance (`runs/app/accept.go` today refuses every
-  non-human origin at line 117); relay of final replies into the team channel; mention parsing of
-  handles; events `team.member_changed`, `team.paused`.
-- **Run context (4.6):** a `team` block with channel, own handle, the member list (handle, kind,
-  project, short description, state) and the talk rules.
+- **Server (slice FEAT-TEAM-CHANNEL-SERVER):** `team_channels` (the team mode with sponsor and
+  brake state), `team_members`, `team_inputs`, `team_mirrors`; operations `getChannelTeam`,
+  `enableChannelTeam`, `disableChannelTeam`, `addTeamMember`, `removeTeamMember` and
+  `stopChannelTeam` (actions `team.read`, `team.update`, `team.stop`); the trigger rule of 3.3 and
+  the broadcast of 3.4 in the job `runs.team_input`; mirror of final replies into the team channel;
+  mention parsing of handles; `trigger_kind = 'team'`; the reserved command name `/team`.
+- **Run context (4.6):** unchanged for `team` runs: the input lies in the work thread.
+- **Invocation:** a `team` block with channel, own member and handle, source, addressed flag and
+  the member list (09 3.9.9).
 - **Runner:** prompt section "Team channel" (members, how to mention, what the owner's broadcast
-  means); owner codes from `triggered_by` for `team` runs; labels for member messages. Mentions
-  need no command: the final reply's `@handle` is parsed by the server. Later a command
-  `bothy-team say` to post mid-run.
-- **Hermes adapter:** accept `trigger_kind = 'team'` and the team block (unchecked whether it
-  refuses an unknown kind today), and the same prompt hint.
-- **Apps:** team mode switch, member dialog with handles, header with member states and stop all,
-  relayed replies with handle and live box link, greyed forbidden mentions, brake notes.
+  means); accept `trigger_kind = team`; owner codes stay tied to the input message (origin
+  `human`, author an owner); labels for member messages. Mentions need no command: the final
+  reply's `@handle` is parsed by the server. Later a command `bothy-team say` to post mid-run.
+- **Hermes adapter:** accept `trigger_kind = 'team'` and the team block, and the same prompt hint.
+- **Apps:** team mode switch, member dialog with handles, `/team add|remove|list|stop`, header
+  with member states and stop all, relayed replies with handle and live box link, brake notes.
 
 ## 7. First slice and later steps
 
 First slice: owner only; runner project members and Hermes members; work threads in the
-members' home channels; agent mention trigger with talk rules (default all); owner broadcast as
-follow-up or new run with owner codes; final reply relay; turn budget, ping-pong pause and stop
-all; `/team add|remove|list` and the app member dialog; header with states.
+members' home channels; agent mention trigger (every member may mention every member); owner
+broadcast as follow-up or new run with owner codes; final reply relay; turn budget, ping-pong pause
+and stop all; `/team add|remove|list|stop` and the app member dialog; header with states. The
+server part is FEAT-TEAM-CHANNEL-SERVER; runner, Hermes adapter and apps follow.
 
-Later: `bothy-team say` mid-run; editing talk rules as a matrix in the app; all runs inside the
-team channel (3.2 alternative); members who are people other than owners.
+Later: talk rules (`team_talk_rules`, `/team allow|deny`) and their matrix in the app;
+`bothy-team say` mid-run; attachments in relayed inputs; push notifications for brake notes; all
+runs inside the team channel (3.2 alternative); members who are people other than owners.
 
 ## 8. Alternatives rejected
 
@@ -161,14 +172,15 @@ team channel (3.2 alternative); members who are people other than owners.
 - **The owner's personal token in the turn:** forges a human origin and puts a credential into a
   process that reads untrusted text.
 
-## 9. Open owner questions
+## 9. Owner answers of 2026-11-21 (decisions)
 
-1. Does an owner message without a mention start idle members too, or only running ones?
-   Recommendation: all members, as requested; each idle one answers briefly unless addressed.
-2. Do mentions inside an owner message narrow who gets it? Recommendation: no, everyone gets it,
-   the mentioned members are marked as addressed.
-3. Default of the turn budget and the ping-pong count? Recommendation: high values in the named
-   keys, set in the specification ticket and held by a test, so the brake only catches loops.
-4. Work threads: one per member and team channel for good, or a new one per topic thread of the
-   team channel? Recommendation: one per member and team channel for the first slice, so each
+1. An owner message without a mention starts idle members too: every member gets it, idle ones as
+   a new run, running ones as a follow-up.
+2. Mentions in an owner message do not narrow who gets it: every member gets it, the mentioned
+   ones are marked as addressed.
+3. The brake defaults are high values in named keys (`team.turn_budget`, `team.pingpong_max`, 09
+   21), held by a test, so the brake only catches loops.
+4. One work thread per member and team channel (the owner left it to the recommendation), so each
    member keeps its context; per topic later if channels grow.
+
+Cost is no concern for the owner; finishing projects is.

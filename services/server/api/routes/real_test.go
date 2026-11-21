@@ -953,6 +953,30 @@ func (stubServer) RecoverRunWake(context.Context, rest.RecoverRunWakeRequestObje
 	return nil, nil
 }
 
+func (stubServer) GetChannelTeam(context.Context, rest.GetChannelTeamRequestObject) (rest.GetChannelTeamResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) EnableChannelTeam(context.Context, rest.EnableChannelTeamRequestObject) (rest.EnableChannelTeamResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DisableChannelTeam(context.Context, rest.DisableChannelTeamRequestObject) (rest.DisableChannelTeamResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) AddTeamMember(context.Context, rest.AddTeamMemberRequestObject) (rest.AddTeamMemberResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RemoveTeamMember(context.Context, rest.RemoveTeamMemberRequestObject) (rest.RemoveTeamMemberResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) StopChannelTeam(context.Context, rest.StopChannelTeamRequestObject) (rest.StopChannelTeamResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) SetChannelAutonomousRuns(context.Context, rest.SetChannelAutonomousRunsRequestObject) (rest.SetChannelAutonomousRunsResponseObject, error) {
 	return nil, nil
 }
@@ -1821,6 +1845,13 @@ func TestRealTable_Enabled(t *testing.T) {
 		"deleteThread":       {"POST /api/v1/threads/{thread_id}/delete", "thread.delete", "rl.write"},
 		"restoreThread":      {"POST /api/v1/threads/{thread_id}/restore", "thread.restore", "rl.write"},
 		"getThreadDeletion":  {"GET /api/v1/threads/{thread_id}/deletion", "thread.read", "rl.read"},
+		// FEAT-TEAM-CHANNEL-SERVER
+		"getChannelTeam":     {"GET /api/v1/channels/{channel_id}/team", "team.read", "rl.read"},
+		"enableChannelTeam":  {"PUT /api/v1/channels/{channel_id}/team", "team.update", "rl.write"},
+		"disableChannelTeam": {"DELETE /api/v1/channels/{channel_id}/team", "team.update", "rl.write"},
+		"addTeamMember":      {"POST /api/v1/channels/{channel_id}/team/members", "team.update", "rl.write"},
+		"removeTeamMember":   {"DELETE /api/v1/channels/{channel_id}/team/members/{member_id}", "team.update", "rl.write"},
+		"stopChannelTeam":    {"POST /api/v1/channels/{channel_id}/team/stop", "team.stop", "rl.write"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

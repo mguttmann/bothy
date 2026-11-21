@@ -98,6 +98,9 @@ Serializers _$serializers =
           ..add(AgentSessionReport.serializer)
           ..add(AgentSessionReportBindFailedEnum.serializer)
           ..add(AgentStatusEnum.serializer)
+          ..add(AgentTeamFacts.serializer)
+          ..add(AgentTeamFactsSource_Enum.serializer)
+          ..add(AgentTeamMember.serializer)
           ..add(AgentTemplate.serializer)
           ..add(AgentTemplateList.serializer)
           ..add(AgentTemplateSource_Enum.serializer)
@@ -777,6 +780,11 @@ Serializers _$serializers =
           ..add(StepUpPasswordRequest.serializer)
           ..add(StepUpResult.serializer)
           ..add(TargetKind.serializer)
+          ..add(Team.serializer)
+          ..add(TeamMember.serializer)
+          ..add(TeamMemberCreate.serializer)
+          ..add(TeamPauseReason.serializer)
+          ..add(TeamStopResult.serializer)
           ..add(Template.serializer)
           ..add(TemplateCreate.serializer)
           ..add(TemplateList.serializer)
@@ -999,6 +1007,10 @@ Serializers _$serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(AgentSession)]),
             () => ListBuilder<AgentSession>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(AgentTeamMember)]),
+            () => ListBuilder<AgentTeamMember>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(AgentTemplate)]),
@@ -1894,6 +1906,10 @@ Serializers _$serializers =
             () => ListBuilder<String>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(CommandRegister)]),
             () => ListBuilder<CommandRegister>(),
           )
@@ -2022,6 +2038,10 @@ Serializers _$serializers =
               const FullType(WebhookSubscriptionSignatureSchemesEnum),
             ]),
             () => ListBuilder<WebhookSubscriptionSignatureSchemesEnum>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(TeamMember)]),
+            () => ListBuilder<TeamMember>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(Template)]),

@@ -24,8 +24,9 @@ import (
 // SetTriggerState implements messaging.Messages (M2-05, 09 section 6, brief note 7): one UPDATE
 // that writes only a different state or reason, then message.updated with the stored
 // representation (a tombstone keeps its form). No row is read back as the reason: an unknown
-// message or one whose origin is not human is internal, the same state and reason is a no-op
-// without an event (D-M2-05-17).
+// message or one whose origin is neither human nor agent is internal, the same state and reason
+// and every state for an agent's message (a team input, docs/spec/09-agents.md 3.9.2) are a
+// no-op without an event (D-M2-05-17).
 func (s *Service) SetTriggerState(ctx context.Context, cmd messaging.SetTriggerStateCmd) error {
 	if !txn.InUnit(ctx) {
 		return errs.New(errs.CodeInternalError, "messaging: SetTriggerState runs only inside a unit of work")
@@ -42,9 +43,12 @@ func (s *Service) SetTriggerState(ctx context.Context, cmd messaging.SetTriggerS
 		if err != nil {
 			return err
 		}
-		if !found || m.Origin != domain.OriginHuman {
+		if !found || (m.Origin != domain.OriginHuman && m.Origin != domain.OriginAgent) {
 			return errs.New(errs.CodeInternalError, "messaging: a trigger state for a missing message or one not written by a person")
 		}
+		// A message of an agent never carries a trigger state (03 messages); the follow-ups of a
+		// team input copied from a member's reply (docs/spec/09-agents.md 3.9.2) ask for one like
+		// every follow-up, which changes nothing.
 		return nil
 	}
 	info, err := s.d.Threads.Info(ctx, row.ThreadID)

@@ -159,6 +159,9 @@ type JobModules struct {
 	AppDispatch runsjobs.AppDispatcher
 	// WakeDue is the use case of runs.wake_due (AR-04); nil only where no job runs.
 	WakeDue runsjobs.WakeDuer
+	// TeamInput is the use case of runs.team_input (FEAT-TEAM-CHANNEL-SERVER); nil only where no
+	// job runs.
+	TeamInput runsjobs.TeamInputer
 	// TerminalSweep is the use case of terminal.sweep (M2-46).
 	TerminalSweep terminaljobs.Sweeper
 	// TerminalSweepInterval is terminal.sweep_interval.
@@ -312,8 +315,9 @@ func registerLateJobs(reg *jobs.Registry, m *JobModules) error {
 
 // registerRunsJobs registers the jobs of runs into reg: runs.queued_expiry (M2-08),
 // runs.cancel_timeout and runs.stall_check (M2-09), runs.component_expiry (M2-15),
-// runs.invocation_hold_timeout (M3-07) and runs.app_dispatch (M2-25); the error is the first
-// rejected registration.
+// runs.invocation_hold_timeout (M3-07), runs.wake_due (AR-04), runs.team_input
+// (FEAT-TEAM-CHANNEL-SERVER) and runs.app_dispatch (M2-25); the error is the first rejected
+// registration.
 func registerRunsJobs(reg *jobs.Registry, m *JobModules) error {
 	if err := runsjobs.Register(reg, m.QueuedExpiry); err != nil {
 		return err
@@ -328,6 +332,9 @@ func registerRunsJobs(reg *jobs.Registry, m *JobModules) error {
 		return err
 	}
 	if err := runsjobs.RegisterWakeDue(reg, m.WakeDue); err != nil {
+		return err
+	}
+	if err := runsjobs.RegisterTeamInput(reg, m.TeamInput); err != nil {
 		return err
 	}
 	return runsjobs.RegisterAppDispatch(reg, m.AppDispatch)

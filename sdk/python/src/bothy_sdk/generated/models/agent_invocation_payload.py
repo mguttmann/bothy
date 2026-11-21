@@ -18,6 +18,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.agent_session import AgentSession
+    from ..models.agent_team_facts import AgentTeamFacts
     from ..models.agent_wake_facts import AgentWakeFacts
     from ..models.command_option_value import CommandOptionValue
     from ..models.principal_ref import PrincipalRef
@@ -40,6 +41,8 @@ class AgentInvocationPayload:
             person.
         space_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         message_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+        team (AgentTeamFacts | Unset): The team facts of a `team` run (09 3.9.9). The owner's authority never comes from
+            here; it comes only from the input message (origin `human` and an owner as author).
         interaction_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         wake_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         wake (AgentWakeFacts | Unset): The wake-up of a wake run or a wake input; the runner writes its label, reason
@@ -65,6 +68,7 @@ class AgentInvocationPayload:
     billing_mode: BillingMode
     space_id: UUID | Unset = UNSET
     message_id: UUID | Unset = UNSET
+    team: AgentTeamFacts | Unset = UNSET
     interaction_id: UUID | Unset = UNSET
     wake_id: UUID | Unset = UNSET
     wake: AgentWakeFacts | Unset = UNSET
@@ -97,6 +101,10 @@ class AgentInvocationPayload:
         message_id: str | Unset = UNSET
         if not isinstance(self.message_id, Unset):
             message_id = str(self.message_id)
+
+        team: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.team, Unset):
+            team = self.team.to_dict()
 
         interaction_id: str | Unset = UNSET
         if not isinstance(self.interaction_id, Unset):
@@ -153,6 +161,8 @@ class AgentInvocationPayload:
             field_dict["space_id"] = space_id
         if message_id is not UNSET:
             field_dict["message_id"] = message_id
+        if team is not UNSET:
+            field_dict["team"] = team
         if interaction_id is not UNSET:
             field_dict["interaction_id"] = interaction_id
         if wake_id is not UNSET:
@@ -179,6 +189,7 @@ class AgentInvocationPayload:
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         from ..models.agent_session import AgentSession
+        from ..models.agent_team_facts import AgentTeamFacts
         from ..models.agent_wake_facts import AgentWakeFacts
         from ..models.command_option_value import CommandOptionValue
         from ..models.principal_ref import PrincipalRef
@@ -209,6 +220,13 @@ class AgentInvocationPayload:
             message_id = UNSET
         else:
             message_id = UUID(_message_id)
+
+        _team = d.pop("team", UNSET)
+        team: AgentTeamFacts | Unset
+        if isinstance(_team, Unset):
+            team = UNSET
+        else:
+            team = AgentTeamFacts.from_dict(_team)
 
         _interaction_id = d.pop("interaction_id", UNSET)
         interaction_id: UUID | Unset
@@ -281,6 +299,7 @@ class AgentInvocationPayload:
             billing_mode=billing_mode,
             space_id=space_id,
             message_id=message_id,
+            team=team,
             interaction_id=interaction_id,
             wake_id=wake_id,
             wake=wake,

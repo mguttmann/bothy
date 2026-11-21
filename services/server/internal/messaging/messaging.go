@@ -110,6 +110,10 @@ type MessagePosted struct {
 	// HasAttachments reports that the message was created with at least one attachment (M3-07);
 	// runs holds the agent invocation while one of them is not final (04 section 15.3 point 1).
 	HasAttachments bool
+	// Relay marks a copy the server made for a team channel (CopyMessage, docs/spec/09-agents.md
+	// 3.9.2): an input in a member's work thread or the mirror of a reply in the team channel. The
+	// acceptance of runs never decides it as a trigger; the team use case that copies it decides.
+	Relay bool
 	// CreatedAt is the creation time.
 	CreatedAt time.Time
 }
@@ -342,6 +346,20 @@ type RunAnchorCmd struct {
 // messages, R-DM-42, 09 9.5 item 4), the Code runs passes to AppendSystemLine when the runtime no
 // longer knew the bound session.
 const SystemAgentSessionResumeFailed = "agent_session.resume_failed"
+
+// CopyCmd is the input of CopyMessage: the message whose content is copied, the thread it goes
+// into and the principal who becomes the copy's author (09 3.9.2).
+type CopyCmd struct {
+	SourceMessageID, ThreadID, AuthorID ids.ID
+}
+
+// Copied is the result of CopyMessage: the copy and the content it carries, which the team use
+// case reads for the handles it mentions.
+type Copied struct {
+	ID        ids.ID
+	ThreadSeq int64
+	ContentMD string
+}
 
 // SystemLine is the input of Messages.AppendSystemLine (M2-12 design note 12): a system line with
 // Code in ThreadID whose author is AuthorID. Code is a system_code of 03 messages, for example

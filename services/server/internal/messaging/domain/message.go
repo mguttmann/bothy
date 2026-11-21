@@ -302,6 +302,19 @@ func SystemNote(text string, thread, channel, author ids.ID, seq int64) Message 
 	}
 }
 
+// TeamCopy returns the copy of a message's content by author with origin at seq in the thread (a
+// team input in a member's work thread or the mirror of a member's reply in the team channel,
+// docs/spec/09-agents.md 3.9.2 and 3.9.4): kind text, silent, no reply and no attachments, a new
+// server client_msg_id and the hash of its own canonical form, whose context names the source.
+// The acceptance of runs never decides it as a trigger (MessagePosted.Relay).
+func TeamCopy(text string, source, thread, channel, author ids.ID, origin Origin, seq int64) Message {
+	return Message{
+		ID: ids.New(), ThreadID: thread, ChannelID: channel, ThreadSeq: seq, AuthorID: author, ClientMsgID: ids.New(),
+		PayloadSHA256: RequestHash(HashInput{Context: "team-copy:" + source.String(), Kind: string(KindText), Content: text}),
+		Origin:        origin, Kind: KindText, ContentMD: text, ContentFormat: ContentFormat, Silent: true, Version: 1,
+	}
+}
+
 // RunAnchor returns the live box anchor of run by agent at seq in the thread (09 section 5.4,
 // M2-05): kind run, origin agent, empty content, silent (the anchor notifies nobody), a new server
 // client_msg_id and the hash of its own canonical form, whose context names the run.

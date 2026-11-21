@@ -70,6 +70,8 @@ var withParent = map[string]string{
 	"run_followups":       "runs",
 	"run_wakes":           "runs",
 	"run_autonomy":        "threads",
+	"team_inputs":         "messages",
+	"team_mirrors":        "messages",
 	"dm_participants":     "channels",
 }
 

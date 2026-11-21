@@ -425,6 +425,14 @@ kind `text`, silent, the content `text` of runs, the agent as author, the next `
 through `chat.AppendToThread` without reopening, `message.created` and `MessagePosted` like a
 system line; it never triggers and creates no hint. It returns the note's id and `thread_seq`.
 
+`CopyMessage(ctx, CopyCmd{SourceMessageID, ThreadID, AuthorID})` (FEAT-TEAM-CHANNEL-SERVER, 09
+3.9.2 and 3.9.4) writes the copy of a team channel in the caller's unit of work: the source's text
+as a new silent text message of the author with the author's own origin (`human` for a person,
+`agent` for an agent), without reply, mentions and attachments, the next `thread_seq` without
+reopening, `message.created` and `MessagePosted` with `Relay` set, which the acceptance of runs
+never decides. It never authorizes; runs checked the readers and the trigger first.
+`SetTriggerState` on a message of origin `agent` (an input copied from a member's reply) is a no-op.
+
 `AppendSystemLine(ctx, SystemLine{ThreadID, AuthorID, Code})` writes a system line inside the
 caller's unit of work and never authorizes; runs calls it from `OnSessionAttached` when an
 adapter reports `bind_failed: session_missing` (09 9.5 item 4), with the code

@@ -5514,6 +5514,54 @@
       "doc": "Largest WebSocket frame of the gateway; a larger one closes the connection with 4002."
     },
     {
+      "name": "team.handle_max_chars",
+      "env": "BOTHY_TEAM__HANDLE_MAX_CHARS",
+      "kind": "int",
+      "default": "32",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "64",
+      "chapter": "09-agents.md",
+      "doc": "Longest handle of a team member."
+    },
+    {
+      "name": "team.max_members",
+      "env": "BOTHY_TEAM__MAX_MEMBERS",
+      "kind": "int",
+      "default": "20",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "1000",
+      "chapter": "09-agents.md",
+      "doc": "Members per team channel."
+    },
+    {
+      "name": "team.pingpong_max",
+      "env": "BOTHY_TEAM__PINGPONG_MAX",
+      "kind": "int",
+      "default": "40",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "100000",
+      "chapter": "09-agents.md",
+      "doc": "Longest alternation of inputs between the same two members without an owner message; a longer one pauses the channel."
+    },
+    {
+      "name": "team.turn_budget",
+      "env": "BOTHY_TEAM__TURN_BUDGET",
+      "kind": "int",
+      "default": "200",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "100000",
+      "chapter": "09-agents.md",
+      "doc": "Member inputs per team channel since an owner's last message; the next one pauses the channel."
+    },
+    {
       "name": "telemetry.dashboard_url",
       "env": "BOTHY_TELEMETRY__DASHBOARD_URL",
       "kind": "string",

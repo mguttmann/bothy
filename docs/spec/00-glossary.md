@@ -172,6 +172,8 @@ Code names are English and apply in API, database and code.
 | Step-up | `step_up` | Fresh confirmation by the person (passkey, step-up device key with biometrics or PIN, password with TOTP, or a new OIDC login) that administrative actions require. |
 | Sync epoch | `sync_epoch` | Identifier of the timeline of the event log; new after every restore, clients store it with the cursor. |
 | System action | `system action` | Action in the catalogue that only the server itself executes (job, server command), for example `grant.expire`. |
+| Team channel | `team_channels` | A text channel in team mode: owners add agents as members, a member's final reply that mentions another member's handle starts or feeds that member's run, and an owner's message reaches every member (09 3.9). |
+| Team run | `trigger_kind = 'team'` | A run of a team channel member in its work thread, started by an input the server copied there (09 3.9.2). |
 | Template | `message_template` | Stored text for frequent inputs, personal or per channel. |
 | Terminal profile | `terminal profile` | Start of a session defined in the configuration of the host service (`shell`, `claude`, fixed commands); the server knows only name and kind. |
 | Terminal session | `terminal_session` | One PTY on a host for a person, with state `opening`, `active`, `detached` or `closed`; only the device and the host know the content. |
@@ -183,7 +185,7 @@ Code names are English and apply in API, database and code.
 | Tombstone | `tombstone` | Kept row of a deleted message without content; keeps the thread sequence gapless. |
 | Tool class | `tool_class` | What the runtime of an agent may do: `chat` < `scoped` < `host`; configured on the agent, reported in the heartbeat. |
 | Transcript | `transcript` | Text of a voice message, created by the agent or a transcription service. |
-| Trigger kind | `trigger_kind` | Origin of a run or a token: `message`, `followup`, `interaction`, `command`, `autocomplete`, `wake`. |
+| Trigger kind | `trigger_kind` | Origin of a run or a token: `message`, `followup`, `interaction`, `command`, `autocomplete`, `wake`, `team`. |
 | Trigger state | `trigger_state` | State on the triggering message: `received`, `queued`, `working`, `done`, `failed`, `cancelled`, `followup_delivered`; replaces status emoji; the reason is in `trigger_state_reason`. |
 | Turn handover | `runner.turn_handover` | A restart of the Claude Code runner that leaves live turns running for the next runner to adopt with full rights (09 18.19.3). |
 | TV mode | `tv mode` | Full-screen display of the visualizations without controls, in the session of a person, costs hidden by default. |

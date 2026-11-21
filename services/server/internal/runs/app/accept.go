@@ -103,15 +103,25 @@ func (a *Acceptor) OnMessageDeleted(ctx context.Context, ev messaging.MessageDel
 	return s.deleteComponentsOf(ctx, ev.MessageID)
 }
 
-// accept is the acceptance of one new message. The owner's switch supports_files_out comes before
-// every other branch (M3-07); then the answer check of M2-19 (design note 2 f): an agent message
-// that names a run is checked and may veto the unit; then every message whose origin is not human,
-// or whose kind is neither text nor voice (M3-09), returns without trigger work (AG-01, 07 SR4).
+// accept is the acceptance of one new message. A copy of a team channel returns at once. The
+// owner's switch supports_files_out comes before every other branch (M3-07); then the answer check
+// of M2-19 (design note 2 f): an agent message that names a run is checked and may veto the unit;
+// then the hook of the team channels (09 3.9); then every message whose origin is not human, or
+// whose kind is neither text nor voice (M3-09), returns without trigger work (AG-01, 07 SR4).
 func (s *Service) accept(ctx context.Context, ev messaging.MessagePosted) error {
+	if ev.Relay {
+		// A copy of a team channel (09 3.9.2): the team use case that wrote it decided it.
+		return nil
+	}
 	if err := s.checkFilesOut(ctx, ev); err != nil {
 		return err
 	}
 	if err := s.answer(ctx, ev); err != nil {
+		return err
+	}
+	// In a team channel 3.4 decides nothing; an owner's message and a member's reply go to the job
+	// runs.team_input (09 3.9.3, 3.9.4).
+	if team, err := s.teamHook(ctx, ev); err != nil || team {
 		return err
 	}
 	if ev.Origin != originHuman || (ev.Kind != kindText && ev.Kind != kindVoice) {

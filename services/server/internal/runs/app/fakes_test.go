@@ -889,8 +889,14 @@ func (t *threads) Create(_ context.Context, _ actor.Actor, cmd chat.CreateThread
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	id := ids.New()
-	main := t.infos[cmd.Parent.ThreadID]
-	t.infos[id] = chat.ThreadInfo{ID: id, ChannelID: cmd.ChannelID, SpaceID: main.SpaceID, ChannelKind: main.ChannelKind, Kind: "thread", State: "open"}
+	ch := t.chans[cmd.ChannelID]
+	info := chat.ThreadInfo{ID: id, ChannelID: cmd.ChannelID, SpaceID: ch.SpaceID, ChannelKind: ch.Kind, Kind: "thread", State: "open",
+		OperatorAgentID: ch.EffectiveOperatorID}
+	if cmd.Parent != nil {
+		main := t.infos[cmd.Parent.ThreadID]
+		info.SpaceID, info.ChannelKind, info.OperatorAgentID = main.SpaceID, main.ChannelKind, ids.ID{}
+	}
+	t.infos[id] = info
 	return chat.Thread{ID: id, ChannelID: cmd.ChannelID, Kind: "thread"}, nil
 }
 
@@ -1169,7 +1175,7 @@ func (w *world) deps() app.Deps {
 		Agents: w.agents, Cursors: cursors{}, Errors: w.errs, Log: slog.New(slog.NewJSONHandler(w.log, nil)), Clock: w.clk, Metrics: w.metrics,
 		Versions: versions{}, Audit: w.audit, Telemetry: w.telemetry, Expiry: expiryJournal{w.j},
 		Publisher: w.pub, Steps: w.steps, FollowupRows: w.fus, Files: w.files, Holds: holdJournal{w.j}, Sessions: w.agentSessions(),
-		Transcripts: w.modes, ThreadOperators: w.threads,
+		Transcripts: w.modes, ThreadOperators: w.threads, CancelTimeouts: cancelJournal{w.j},
 	}
 	if w.gate != nil {
 		d = w.gate.wrap(d)
@@ -1285,6 +1291,14 @@ type expiryJournal struct{ j *journal }
 
 func (e expiryJournal) ScheduleQueuedExpiry(_ context.Context, run ids.ID, at time.Time) error {
 	e.j.add("expiry", expiryAt{run, at})
+	return nil
+}
+
+// cancelJournal records the scheduled runs.cancel_timeout jobs as "cancel-timeout".
+type cancelJournal struct{ j *journal }
+
+func (c cancelJournal) Schedule(_ context.Context, run ids.ID, at time.Time) error {
+	c.j.add("cancel-timeout", expiryAt{run, at})
 	return nil
 }
 
