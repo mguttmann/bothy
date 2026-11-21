@@ -57,6 +57,8 @@ const principalUser = "user"
 type ContextElement struct {
 	AuthorID   ids.ID
 	AuthorKind string
+	// Edited reports a message edited after it was written (only its author edits it).
+	Edited bool
 	// TeamInput reports a team input (03 team_inputs); Authority is its authority then.
 	TeamInput bool
 	Authority ids.ID
@@ -77,9 +79,12 @@ type ContextElement struct {
 // no person), and every other message (an agent's message written outside a run of its thread,
 // an app's, one without a person as author) as an input that speaks for no person (zero, stored
 // as NULL), which the owner check refuses. A text an agent wrote thus speaks for whoever fed the
-// run that wrote it.
+// run that wrote it; an agent's message edited afterwards (a team copy or an answer, red team round
+// 7) speaks for no person, because the edit is bound to no run.
 func ContextFeeders(e ContextElement) []ids.ID {
 	switch {
+	case e.Edited && e.AuthorKind != principalUser:
+		return []ids.ID{{}}
 	case e.TeamInput:
 		return []ids.ID{e.Authority}
 	case e.AuthorKind == principalUser:

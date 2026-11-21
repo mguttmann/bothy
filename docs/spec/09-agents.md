@@ -434,7 +434,9 @@ and author and in the trigger, thread and channel window alike: the authority of
 the author of a person's message, the whole record of the run an agent's message answers (03
 `run_answers`, the member's own answers included; none for a run without its trigger row), and
 none for every other message, such as an agent's message written outside a run of its thread (the
-member's own note written in a run elsewhere included) or an app's; and what the run takes over
+member's own note written in a run elsewhere included), an agent's message edited after it was
+written (an answer or a team copy; the edit is bound to no run, while a person's edit is the
+author's own) or an app's; and what the run takes over
 with its session (9.1): in mode `resume` every principal recorded for the earlier runs of the
 session row in the thread, in mode `bind` none. The run passes when
 its trigger is on the record and every principal recorded is an active owner at the moment of the
