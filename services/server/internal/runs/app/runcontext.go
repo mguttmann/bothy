@@ -11,6 +11,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
@@ -57,7 +58,8 @@ type ContextRepository interface {
 // triggering message is gone and a triggering message the agent may not read give the not_found of
 // an unknown run; a trigger that is not a message is internal; then the thread, the channel
 // switches, the session plan, the windows, cutting and budget, the trust of every element from
-// authorize.TriggerHolders, and already_delivered. Any source error ends the request with its
+// authorize.TriggerHolders, and already_delivered; before the answer the writers of its messages
+// are recorded in run_feeders (recordContextFeeders). Any source error ends the request with its
 // kind and never turns into a context with weaker trust (fail closed, 09 1 point 4).
 func (s *Service) Context(ctx context.Context, runID ids.ID) (runs.RunContext, error) {
 	if s.d.ContextMessages == nil || s.d.TriggerHolders == nil || s.d.ContextRows == nil ||
@@ -93,7 +95,45 @@ func (s *Service) Context(ctx context.Context, runID ids.ID) (runs.RunContext, e
 	if err != nil {
 		return runs.RunContext{}, err
 	}
-	return s.buildContext(ctx, b)
+	out, err := s.buildContext(ctx, b)
+	if err != nil {
+		return runs.RunContext{}, err
+	}
+	if err := s.recordContextFeeders(ctx, out); err != nil {
+		return runs.RunContext{}, err
+	}
+	return out, nil
+}
+
+// recordContextFeeders records in run_feeders, source context, who wrote the messages the context
+// gives the run (09 3.9.4), in its own unit of work, also in maintenance mode, because the context
+// belongs to running the run: the author of every element that is no agent's or system message
+// and the authority of a team input. Another agent message is not recorded: its own run was
+// checked when it was handed on, and what an earlier run left in the work thread is the
+// limitation of ruling D-TEAM-11.
+func (s *Service) recordContextFeeders(ctx context.Context, out runs.RunContext) error {
+	elements := append([]runs.ContextMessage{out.TriggerMessage}, out.ThreadContext...)
+	elements = append(elements, out.ChannelContext...)
+	return s.d.UoW.Do(txn.WithWriteInMaintenance(ctx), func(ctx context.Context) error {
+		var by []ids.ID
+		for _, m := range elements {
+			switch m.Origin {
+			case originSystem:
+				continue
+			case originAgent:
+				in, team, err := s.teamInputOf(ctx, m.MessageID)
+				if err != nil {
+					return err
+				}
+				if team {
+					by = append(by, in.AuthorityID)
+				}
+				continue
+			}
+			by = append(by, m.Author.ID)
+		}
+		return s.d.Repo.RecordFeeders(ctx, out.RunID, domain.FeedContext, by)
+	})
 }
 
 // contextBuild collects the facts of one context.

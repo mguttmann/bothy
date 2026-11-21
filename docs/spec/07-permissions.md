@@ -787,8 +787,10 @@ mode as for any run. The rules that keep this safe:
    source agent; it never becomes a message of a person and never carries the owner's authority
    in the runner (09 3.9.9).
 4. A member's reply is handed on only when the run it answers was started and fed only by active
-   owners (its `triggered_by`, every follow-up it took and every interaction with its
-   components); a run a person who is no owner started or fed, also after that person lost the grant, never triggers another member.
+   owners, read from the append-only record of the run in 03 `run_feeders` (its trigger, every
+   follow-up, interaction and delivery it took and every writer of its run context, 09 3.9.4); a
+   run a person who is no owner started or fed, also after that person lost the grant or deleted
+   the input, never triggers another member.
 5. The safety brake of 09 3.9.6 ends loops between members; any owner message resets it.
 6. Outside team channels this addendum changes nothing: agent, app, import and system messages
    never trigger.

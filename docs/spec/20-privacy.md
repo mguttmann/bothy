@@ -81,6 +81,7 @@ personal data, also of third parties and also special categories under Art. 9),
 | `team_members` | indirect | which agent works for a team channel, its handle, added by | `config` | with the team, the channel, the agent or the work thread; the adder stays with a pseudonymous ID |
 | `team_inputs` | indirect | the person on whose behalf a copied message runs (09 3.9.2) | `content` | with the copied message or the member |
 | `team_mirrors` | no | assignment of a mirrored reply | `content` | with the reply or its copy |
+| `run_feeders` | indirect | the persons whose inputs a run took (09 3.9.4, R-DM-63) | `content` | with the run; the person stays with a pseudonymous ID |
 | `message_components` | content | definition, used by | `content` | with the message |
 | `interactions` | content | form values, principal | `content` | with the message |
 | `price_table` | no | prices | `cost` | `retention.cost` |

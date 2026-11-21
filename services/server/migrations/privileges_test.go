@@ -218,6 +218,15 @@ var appPrivileges = map[string][]string{
 	// 03 run_followups (M2-11): a follow-up changes state and moves to the follow-on run; rows
 	// end only with their run or message (ON DELETE CASCADE).
 	"run_followups": {"SELECT", "INSERT", "UPDATE"},
+	// 03 run_feeders (FEAT-TEAM-CHANNEL-SERVER): the record of who fed a run is append-only for the
+	// server; rows go only with their run (ON DELETE CASCADE).
+	"run_feeders": {"SELECT", "INSERT"},
+	// 03 team_channels and team_members (FEAT-TEAM-CHANNEL-SERVER): switched off and removed by a
+	// delete; team_inputs and team_mirrors go only with their messages (ON DELETE CASCADE).
+	"team_channels": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"team_members":  {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"team_inputs":   {"SELECT", "INSERT"},
+	"team_mirrors":  {"SELECT", "INSERT"},
 	// 03 agent_sessions (M2-12): a session ends with ended_at and end_reason, never with a
 	// delete; the rows are the session history of the thread.
 	"agent_sessions": {"SELECT", "INSERT", "UPDATE"},

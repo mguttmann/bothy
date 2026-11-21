@@ -339,7 +339,9 @@ func newEmptyWorldWithChat(t *testing.T, search searchlang.Map, chatCfg chatapp.
 		OrphanTimeout: 15 * time.Minute, StallAfter: 10 * time.Minute, ReasonMaxChars: 500, ExcerptMaxChars: 500, MaxStepsPersisted: 2000,
 		StatusLineMaxChars: 500, SummaryMaxChars: 2000,
 		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10, EventPayloadMaxBytes: 65536, MaxContentBytes: 4096,
-		InvocationHoldMax: 2 * time.Minute, TranscriptHoldMax: 5 * time.Minute}, pool, uow, w.az, wire.RunsDeps{
+		InvocationHoldMax: 2 * time.Minute, TranscriptHoldMax: 5 * time.Minute,
+		// The run context serves the feeder tests of FEAT-TEAM-CHANNEL-SERVER (run_feeders, source context).
+		ContextMaxBytes: 65536, ContextMessageMaxBytes: 4096}, pool, uow, w.az, wire.RunsDeps{
 		Events: appender, Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service, Metrics: w.metrics,
 		Expiry: noExpiry{}, Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Audit: w.rec, CancelTimeouts: w.cancels,
 		Heartbeats: w.heartbeats,

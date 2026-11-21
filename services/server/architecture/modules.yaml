@@ -216,7 +216,7 @@ modules:
     # bothy.terminal.relay.unpaired (M2-44).
     adapter_vendors: [otel, pgx, websocket]
   runs:
-    tables: [runs, run_steps, run_followups, run_wakes, run_autonomy, message_components, interactions, team_channels, team_members, team_inputs, team_mirrors]
+    tables: [runs, run_steps, run_followups, run_wakes, run_autonomy, message_components, interactions, team_channels, team_members, team_inputs, team_mirrors, run_feeders]
     actions: [agent.invoke, run.read, run.overview.read, run.context.read, run.start,
               run.token.renew, run.update, run.finish, run.cancel, run.followup.create,
               component.update, interaction.create,

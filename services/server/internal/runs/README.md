@@ -811,7 +811,7 @@ Checked by go-arch-lint (ADR 0008).
 
 ## Tables
 
-`runs`, `run_steps`, `run_followups`, `run_wakes`, `run_autonomy`, `message_components`, `interactions`, `team_channels`, `team_members`, `team_inputs`, `team_mirrors`.
+`runs`, `run_steps`, `run_followups`, `run_wakes`, `run_autonomy`, `message_components`, `interactions`, `team_channels`, `team_members`, `team_inputs`, `team_mirrors`, `run_feeders`.
 
 `run_wakes` and `run_autonomy` (wake-ups and the counts of autonomous inputs, 09 5.8) come with
 AR-04 (migrations 00097 to 00100; the channel switch with 00101).
@@ -872,7 +872,7 @@ statistics source; both queries stand in `tools/lint/sql_visibility.yaml` with t
 
 ## Personal data (M7-06)
 
-`adapters/postgres.PersonalData` (`NewPersonalData(pool)`) is the participant of runs in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Tables: `runs`, `run_steps`, `run_followups`, `run_wakes`, `run_autonomy`, `message_components`, `interactions`, `team_channels`, `team_members`, `team_inputs`.
+`adapters/postgres.PersonalData` (`NewPersonalData(pool)`) is the participant of runs in the privacy requests (`kernel/personaldata`, docs/spec/20-privacy.md sections 2, 4.4 and 5.2). Tables: `runs`, `run_steps`, `run_followups`, `run_wakes`, `run_autonomy`, `message_components`, `interactions`, `team_channels`, `team_members`, `team_inputs`, `run_feeders`.
 
 - Export: `runs.jsonl`, one line per run the person triggered (`triggered_by`): ID, thread and agent ID, trigger kind, state, `queued_at`, `started_at`, `finished_at`, `cost_micros`, `currency`, `cost_is_estimate` and the numeric members of the metrics (`docs/api/gdpr-export/v1/lines/runs.schema.json`). Left out are the status line, the last text excerpt, the summary, the plan, the state reason, the last API retry and the run steps: the agent writes them from the whole thread, so they can carry contents of other people (Art. 15(4) GDPR). `runs` has no channel column and the participant reads no table of chat, so a run names only its thread ID. `interactions.jsonl`, one line per own interaction: ID, component and message ID, state, `created_at` and the submitted values, never the response of the app or agent (`lines/interactions.schema.json`).
 - Wake-ups are not exported: their label, condition and result are written by the agent from the whole thread. `run_autonomy` holds only counts. The team tables hold IDs only (sponsor, adder, authority) and are not exported.
@@ -898,6 +898,11 @@ The server side of [09-agents.md](../../../../docs/spec/09-agents.md) 3.9; rulin
   `teamFollowupTrigger`, `followOnTeamRun`).
 - `adapters/postgres/team.go` with `queries/team.sql`, `adapters/jobs/team_input.go` (the job
   `runs.team_input` and `TeamScheduler`), `adapters/httpapi/team.go` (the six operations).
+- The record of who fed a run (`run_feeders`, R-DM-63, ruling D-TEAM-12): the triggers of migration
+  00108 record the trigger, the follow-ups and the interactions when they are stored;
+  `Prepare` records the person of every allowed delivery into a run (`domain.FeedSourceOf`) and
+  `Context` the writers of its messages (`recordContextFeeders`); `ownerRun` reads only this record
+  (`Repository.Feeders`, `adapters/postgres/feeders.go` with `queries/run_feeders.sql`).
 
 Lock order: the `team_channels` row, then the runs of the work threads (03 6.3). The copies run in
 the job, never in the unit of work of the message that caused them, so the locks of a reply's

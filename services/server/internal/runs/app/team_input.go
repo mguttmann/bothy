@@ -153,66 +153,33 @@ func (s *Service) memberReply(ctx context.Context, b *teamBox, m messaging.Trigg
 	return s.handOn(ctx, b, team, member, copied)
 }
 
-// ownerRun reports whether only active owners steered the run runID a member's reply answers (09
-// 3.9.4): it is a run of the member's agent in its work thread, its triggering person (for a team
-// run the authority of its input) is an active owner, every follow-up it took is an active owner's
-// message or a team input whose authority is an active owner, and every interaction with its
-// components is an active owner's. A run that a person who is no owner started or fed, also one
-// whose grant was revoked since, never hands work on with the sponsor's rights.
+// ownerRun reports whether only active owners fed the run runID a member's reply answers (09
+// 3.9.4): it is a run of the member's agent in its work thread, its record in run_feeders has its
+// trigger, and every principal recorded there (the trigger, every follow-up, interaction, command
+// and wake input it took, every writer of its context) is an active owner now. The record is
+// written when an input is stored or delivered and never shrinks, so neither deleting a message,
+// a card or an interaction nor revoking a grant takes a person out of it; a run without its
+// trigger row predates the record and is refused (fail closed).
 func (s *Service) ownerRun(ctx context.Context, b *teamBox, runID ids.ID, member TeamMemberRow) (bool, error) {
 	run, found, err := s.d.Repo.Run(ctx, runID)
 	if err != nil || !found || run.AgentID != member.AgentID || run.ThreadID != member.WorkThreadID {
 		return false, err
 	}
-	persons, err := s.runInputPersons(ctx, b, run)
+	feeders, err := s.d.Repo.Feeders(ctx, run.ID)
 	if err != nil {
 		return false, err
 	}
-	for _, p := range persons {
-		if ok, err := b.d.Owners.IsActiveOwner(ctx, p); err != nil || p.IsZero() || !ok {
+	triggered := false
+	for _, f := range feeders {
+		if f.PrincipalID.IsZero() {
+			return false, nil
+		}
+		if ok, err := b.d.Owners.IsActiveOwner(ctx, f.PrincipalID); err != nil || !ok {
 			return false, err
 		}
+		triggered = triggered || f.Source == domain.FeedTrigger
 	}
-	return true, nil
-}
-
-// runInputPersons returns every person whose input the run took: its triggering person, the
-// person of each follow-up (zero for a follow-up that speaks for nobody) and the principal of each
-// interaction with its components. A wake input always speaks for the run's own person (5.8.3).
-func (s *Service) runInputPersons(ctx context.Context, b *teamBox, run RunRow) ([]ids.ID, error) {
-	persons := []ids.ID{run.TriggeredBy}
-	if s.fu != nil {
-		rows, err := s.fu.rows.RunFollowups(ctx, run.ID)
-		if err != nil {
-			return nil, err
-		}
-		for _, r := range rows {
-			p, err := s.followupPerson(ctx, r.MessageID)
-			if err != nil {
-				return nil, err
-			}
-			persons = append(persons, p)
-		}
-	}
-	ix, err := b.d.Repo.RunInteractionPersons(ctx, run.ID)
-	if err != nil {
-		return nil, err
-	}
-	return append(persons, ix...), nil
-}
-
-// followupPerson returns the person a follow-up message speaks for: the authority of a team input,
-// the author of a person's message; zero for every other message.
-func (s *Service) followupPerson(ctx context.Context, messageID ids.ID) (ids.ID, error) {
-	in, team, err := s.teamInputOf(ctx, messageID)
-	if err != nil || team {
-		return in.AuthorityID, err
-	}
-	m, err := s.d.Messages.TriggerMessageOf(ctx, messageID)
-	if err != nil || m.Origin != originHuman {
-		return ids.ID{}, err
-	}
-	return m.Author.ID, nil
+	return triggered, nil
 }
 
 // mirrorReply copies the reply into the main thread of the team channel as the member's agent and

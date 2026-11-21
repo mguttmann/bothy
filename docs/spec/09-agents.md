@@ -424,12 +424,19 @@ mention, as a follow-up of its running run or a new `team` run. Several mentions
 allowed here (3.4 step 3 refuses them elsewhere, because those runs share one thread).
 
 A reply is mirrored and handed on only when the run it answers was started and fed only by active
-owners: its `triggered_by` (for a team run the authority of its input), the person of every
-follow-up it took (the author of a person's message, the authority of a team input) and the
-principal of every interaction with its components are active owners at the moment of the job. Otherwise nothing is copied, a note names the member and the
-reason `team_source_not_owner`, and the refusal is audited. A person with a grant who wrote in a
-work thread therefore never steers a member into triggering another member with the sponsor's
-rights, also after the grant was revoked.
+owners. The check reads only the record of the run in 03 `run_feeders` (R-DM-63), which is written
+when an input is stored or given to the run and never shrinks: its trigger (`triggered_by`, for a
+team run the authority of its input), the person of every follow-up it took (the author of a
+person's message, the authority of a team input, none for any other message), the principal of
+every interaction with its components, the person of every delivery into it (4.2, also a control
+command and a wake input) and the writer of every message its run context gave it (the author of a
+message that is no agent or system message, the authority of a team input). The run passes when
+its trigger is on the record and every principal recorded is an active owner at the moment of the
+job; a recorded input that speaks for no person, and a run older than the record, fail. Otherwise
+nothing is copied, a note names the member and the reason `team_source_not_owner`, and the refusal
+is audited. Deleting the message, the card or the interaction and revoking a grant remove nobody
+from the record, so a person with a grant who wrote in a work thread never steers a member into
+triggering another member with the sponsor's rights, also after the grant was revoked.
 
 Mirror and inputs run in the job `runs.team_input` after the reply's commit, never in the unit of
 work of the reply, so the locks of the reply's thread and run are never held while the team

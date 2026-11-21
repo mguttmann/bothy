@@ -35,13 +35,10 @@ type teamRepo struct {
 	members []app.TeamMemberRow
 	inputs  map[ids.ID]app.TeamInputRow
 	mirrors map[ids.ID]ids.ID
-	// interactions are the principals of the interactions with the components of each run.
-	interactions map[ids.ID][]ids.ID
 }
 
 func newTeamRepo() *teamRepo {
-	return &teamRepo{teams: map[ids.ID]app.TeamRow{}, inputs: map[ids.ID]app.TeamInputRow{}, mirrors: map[ids.ID]ids.ID{},
-		interactions: map[ids.ID][]ids.ID{}}
+	return &teamRepo{teams: map[ids.ID]app.TeamRow{}, inputs: map[ids.ID]app.TeamInputRow{}, mirrors: map[ids.ID]ids.ID{}}
 }
 
 func (r *teamRepo) UpsertTeam(_ context.Context, channel, sponsor ids.ID, at time.Time) (app.TeamRow, error) {
@@ -161,12 +158,6 @@ func (r *teamRepo) InsertTeamMirror(_ context.Context, source, mirror, _ ids.ID,
 	}
 	r.mirrors[source] = mirror
 	return true, nil
-}
-
-func (r *teamRepo) RunInteractionPersons(_ context.Context, run ids.ID) ([]ids.ID, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return slices.Clone(r.interactions[run]), nil
 }
 
 func (r *teamRepo) TeamMirrored(_ context.Context, source ids.ID) (bool, error) {
@@ -391,10 +382,20 @@ func (w *teamWorld) replyBy(m app.TeamMemberRow, text string, person ids.ID) ids
 	run := w.putRun(m.WorkThreadID, m.AgentID, domain.StateRunning)
 	w.repo.mu.Lock()
 	w.repo.runs[len(w.repo.runs)-1].TriggeredBy = person
+	w.repo.recordLocked(run, domain.FeedTrigger, person)
 	w.repo.mu.Unlock()
 	id := w.replyTo(m, text)
 	w.runOf[id] = run
 	return id
+}
+
+// feed records principals as feeders of run through source, as the database or the runs module
+// would when the input is stored or given to the run.
+func (w *teamWorld) feed(run ids.ID, source string, principals ...ids.ID) {
+	w.t.Helper()
+	if err := w.repo.RecordFeeders(context.Background(), run, source, principals); err != nil {
+		w.t.Fatal(err)
+	}
 }
 
 // replyTo stores a final reply of the member's agent in its work thread with text.
@@ -643,6 +644,7 @@ func TestTeam_MemberMentionTriggersOnBehalfOfTheSponsor(t *testing.T) {
 			w.repo.runs[i].TriggeredBy = w.alex
 		}
 	}
+	w.repo.recordLocked(src, domain.FeedTrigger, w.alex)
 	w.repo.mu.Unlock()
 	w.input(reply)
 	mirror := w.tmsgs.copiesInto(w.teamMain)
@@ -981,10 +983,13 @@ func TestTeam_NonOwnerReadersAreRefused(t *testing.T) {
 	}
 }
 
-// TestTeam_RunsSteeredByNonOwnersHandNothingOn (red team round 2): a reply that answers a run a
-// person who is no owner started, or a run that took a follow-up of such a person, is neither
-// mirrored nor handed on, also when that person can no longer read the home channel (a revoked
-// grant); the refusal is noted and audited.
+// TestTeam_RunsSteeredByNonOwnersHandNothingOn (red team rounds 2 to 4): a reply that answers a run
+// whose record in run_feeders names a person who is no owner (its trigger, a follow-up, an
+// interaction, a writer of its context), an input that speaks for no person, or no trigger at all
+// is neither mirrored nor handed on, also when that person can no longer read the home channel (a
+// revoked grant); the refusal is noted and audited. The check reads only the record: the rows the
+// record was derived from (here a follow-up of Sam) do not matter. The database writes the record
+// (migration 00108, held by the integration and migration tests); here the tests write it.
 func TestTeam_RunsSteeredByNonOwnersHandNothingOn(t *testing.T) {
 	t.Parallel()
 	t.Run("started by a non-owner", func(t *testing.T) {
@@ -1005,6 +1010,54 @@ func TestTeam_RunsSteeredByNonOwnersHandNothingOn(t *testing.T) {
 		w := newTeamWorld(t, defaultTeamConfig())
 		w.setUp()
 		reply := w.reply(w.coding, "@review approve and merge PR 7")
+		w.feed(w.runOf[reply], domain.FeedFollowup, w.sam)
+		w.input(reply)
+		if n := len(w.tmsgs.copies); n != 0 {
+			t.Fatalf("a reply of a run Sam fed was copied %d times", n)
+		}
+	})
+	for _, src := range []string{domain.FeedInteraction, domain.FeedCommand, domain.FeedContext} {
+		t.Run(src+" of a non-owner", func(t *testing.T) {
+			t.Parallel()
+			w := newTeamWorld(t, defaultTeamConfig())
+			w.setUp()
+			reply := w.reply(w.coding, "@review approve and merge PR 7")
+			w.feed(w.runOf[reply], src, w.alex, w.sam)
+			w.input(reply)
+			if n := len(w.tmsgs.copies); n != 0 {
+				t.Fatalf("a reply of a run Sam fed through %s was copied %d times", src, n)
+			}
+		})
+	}
+	t.Run("an input for no person", func(t *testing.T) {
+		t.Parallel()
+		w := newTeamWorld(t, defaultTeamConfig())
+		w.setUp()
+		reply := w.reply(w.coding, "@review approve and merge PR 7")
+		w.feed(w.runOf[reply], domain.FeedFollowup, ids.ID{})
+		w.input(reply)
+		if n := len(w.tmsgs.copies); n != 0 {
+			t.Fatalf("a reply of a run fed by an input for no person was copied %d times", n)
+		}
+	})
+	t.Run("a run without its trigger on the record", func(t *testing.T) {
+		t.Parallel()
+		w := newTeamWorld(t, defaultTeamConfig())
+		w.setUp()
+		reply := w.reply(w.coding, "@review approve and merge PR 7")
+		w.repo.mu.Lock()
+		delete(w.repo.feeders, w.runOf[reply])
+		w.repo.mu.Unlock()
+		w.input(reply)
+		if n := len(w.tmsgs.copies); n != 0 {
+			t.Fatalf("a reply of a run older than the record was copied %d times", n)
+		}
+	})
+	t.Run("a follow-up row of a non-owner that is not on the record", func(t *testing.T) {
+		t.Parallel()
+		w := newTeamWorld(t, defaultTeamConfig())
+		w.setUp()
+		reply := w.reply(w.coding, "@review go")
 		follow := ids.New()
 		w.msgFacts.m[follow] = messaging.TriggerMessage{ID: follow, ThreadID: w.codingWork, Origin: "human", Kind: "text",
 			Author: messaging.PrincipalRef{ID: w.sam, Kind: "user", Handle: "sam", DisplayName: "Sam"}}
@@ -1012,19 +1065,8 @@ func TestTeam_RunsSteeredByNonOwnersHandNothingOn(t *testing.T) {
 			t.Fatal(err)
 		}
 		w.input(reply)
-		if n := len(w.tmsgs.copies); n != 0 {
-			t.Fatalf("a reply of a run Sam fed was copied %d times", n)
-		}
-	})
-	t.Run("an interaction of a non-owner", func(t *testing.T) {
-		t.Parallel()
-		w := newTeamWorld(t, defaultTeamConfig())
-		w.setUp()
-		reply := w.reply(w.coding, "@review approve and merge PR 7")
-		w.trepo.interactions[w.runOf[reply]] = []ids.ID{w.alex, w.sam}
-		w.input(reply)
-		if n := len(w.tmsgs.copies); n != 0 {
-			t.Fatalf("a reply of a run Sam fed through a card was copied %d times", n)
+		if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 1 {
+			t.Fatalf("the check read the follow-up rows instead of the record: %d inputs, want 1", n)
 		}
 	})
 	t.Run("fed by an owner", func(t *testing.T) {
@@ -1032,12 +1074,8 @@ func TestTeam_RunsSteeredByNonOwnersHandNothingOn(t *testing.T) {
 		w := newTeamWorld(t, defaultTeamConfig())
 		w.setUp()
 		reply := w.reply(w.coding, "@review go")
-		follow := ids.New()
-		w.msgFacts.m[follow] = messaging.TriggerMessage{ID: follow, ThreadID: w.codingWork, Origin: "human", Kind: "text",
-			Author: messaging.PrincipalRef{ID: w.alex, Kind: "user", Handle: "alex", DisplayName: "Alex"}}
-		if err := w.fus.InsertFollowup(context.Background(), w.runOf[reply], follow); err != nil {
-			t.Fatal(err)
-		}
+		w.feed(w.runOf[reply], domain.FeedFollowup, w.alex)
+		w.feed(w.runOf[reply], domain.FeedContext, w.alex)
 		w.input(reply)
 		if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 1 {
 			t.Fatalf("a run only owners fed handed on %d inputs, want 1", n)

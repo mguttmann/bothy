@@ -22,14 +22,15 @@ import (
 
 // The values of MessagePosted that can trigger (09 section 3.2).
 const (
-	originHuman = "human"
-	originAgent = "agent"
-	kindText    = "text"
-	kindVoice   = "voice"
-	kindRun     = "run"
-	kindSystem  = "system"
-	channelDM   = "dm"
-	agentActive = "active"
+	originHuman  = "human"
+	originAgent  = "agent"
+	originSystem = "system"
+	kindText     = "text"
+	kindVoice    = "voice"
+	kindRun      = "run"
+	kindSystem   = "system"
+	channelDM    = "dm"
+	agentActive  = "active"
 )
 
 // The deny reasons of 07 4.1 the acceptance handles itself (the values of kernel/auditing.Reason).
