@@ -3,10 +3,14 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
+from real_cli.record import READ_TASK_TYPES, RECORDING
+
+from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
 from claude_code_runner.livebox import LiveBox, step_title
 
 NOW = datetime(2026, 10, 21, 9, 0, tzinfo=UTC)
@@ -146,6 +150,20 @@ def test_own_echo_ignored_and_tool_progress_no_change() -> None:
     live.apply({"type": "tool_progress", "tool_use_id": "a"})
     assert patch.values == {}
     assert patch.steps == {}
+
+
+def test_the_contract_holds_exactly_the_task_types_the_box_maps() -> None:
+    """``READ_TASK_TYPES`` of the contract test (CONTRACT-TOLERANT-3) are the types with a step
+    kind of their own; every other recorded type, and one no CLI names yet, is a background job."""
+    path = RECORDING / f"stream_fields_{PINNED_CLAUDE_CODE_VERSION}.json"
+    recorded = json.loads(path.read_text("utf-8"))["task_types"]
+    live, patch = box()
+    for n, task_type in enumerate([*recorded, "a_type_no_cli_names"]):
+        message = {"type": "system", "subtype": "task_started", "task_id": f"t{n}"}
+        live.apply(message | {"description": task_type, "task_type": task_type})
+    own = {s["name"] for s in patch.steps.values() if s["kind"] != "background_job"}
+    assert own == set(READ_TASK_TYPES)
+    assert len(patch.steps) == len(recorded) + 1
 
 
 def test_tasks_ambient_and_background() -> None:

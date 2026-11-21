@@ -13,7 +13,8 @@ and every text of the CLI's own "too old" pattern is one the runner recognises. 
 runs it against a newer CLI with ``CLAUDE_CODE_RUNNER_TESTED_VERSION`` set to that version
 (FIX-RUNNER-TESTED-CLI): the CLI is then held against the recordings of the pin, and the probe
 and ``check-config`` take it with the configuration entry the chain writes. Its field table may
-name members the recording does not know, never lose one it knows (FIX-RUNNER-CONTRACT-TOLERANT).
+name members the recording does not know, never lose one it knows; of the task types it may
+lose only those the runner does not map (FIX-RUNNER-CONTRACT-TOLERANT).
 """
 
 from __future__ import annotations
@@ -236,19 +237,20 @@ def test_check_config_reports_the_pinned_cli_ok(
 
 
 @pytest.mark.filterwarnings("default:stream members the recording does not know:UserWarning")
+@pytest.mark.filterwarnings("default:task types the runner does not map:UserWarning")
 def test_recorded_stream_fields_equal_the_installed_cli(data: bytes) -> None:
     """The field table of the recording is the one the installed CLI's file holds.
 
     At the pin the table is equal: the schema members, then what only the recorded turn wrote.
     A tested newer CLI (``CLAUDE_CODE_RUNNER_TESTED_VERSION``) keeps every recorded schema member
     and the values the test compares (task status, command states, workflow type); members it
-    adds are named in a warning
-    (FIX-RUNNER-CONTRACT-TOLERANT).
+    adds and recorded task types it drops that the runner does not map (``READ_TASK_TYPES``)
+    are named in a warning (FIX-RUNNER-CONTRACT-TOLERANT).
     """
     path = RECORDING / f"stream_fields_{PINNED_CLAUDE_CODE_VERSION}.json"
     recorded = json.loads(path.read_text("utf-8"))
     fresh = read_fields(data)
-    lost, added = field_changes(recorded, fresh)
+    lost, added, dropped = field_changes(recorded, fresh)
     assert lost == []
     if expected_version() == PINNED_CLAUDE_CODE_VERSION:
         for name, members in fresh["messages"].items():
@@ -257,10 +259,14 @@ def test_recorded_stream_fields_equal_the_installed_cli(data: bytes) -> None:
         assert {key: recorded[key] for key in fresh if key != "messages"} == {
             key: value for key, value in fresh.items() if key != "messages"
         }
-        assert added == []
-    elif added:
-        known = f"stream members the recording does not know: {', '.join(added)}"
-        warnings.warn(known, UserWarning, stacklevel=1)
+        assert (added, dropped) == ([], [])
+    else:
+        if added:
+            known = f"stream members the recording does not know: {', '.join(added)}"
+            warnings.warn(known, UserWarning, stacklevel=1)
+        if dropped:
+            gone = f"task types the runner does not map, no longer named: {', '.join(dropped)}"
+            warnings.warn(gone, UserWarning, stacklevel=1)
 
 
 def test_every_text_of_the_too_old_pattern_is_recognised(data: bytes) -> None:

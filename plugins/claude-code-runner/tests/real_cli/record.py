@@ -251,7 +251,10 @@ def read_fields(data: bytes) -> dict[str, Any]:
         the value lists of the task status and the command state, and the task types.
     """
     schemas = {name: _schema(data, name) for name in SCHEMAS}
-    prefixes = re.search(rb'\{local_bash:"\w"(?:,[a-z_]+:"\w")+\}', data)
+    # The table of one-letter id prefixes per task type, found by the workflow type the runner
+    # maps, not by a type a newer CLI may drop (CONTRACT-TOLERANT-3).
+    workflow = re.escape(WORKFLOW_TASK_TYPE.encode())
+    prefixes = re.search(rb'\{(?:[a-z_]+:"\w",)*' + workflow + rb':"\w"(?:,[a-z_]+:"\w")*\}', data)
     if prefixes is None:
         raise ValueError("no task type table in the CLI's file")
     task_types = sorted(_members(prefixes.group(0)))
@@ -289,27 +292,36 @@ GROWING_LISTS = ("background_task", "usage", "task_types")
 """The member and type lists of the field table besides the messages that a newer CLI may extend.
 The value lists ``task_status`` and ``command_states`` and the workflow type stay equal: the
 runner maps each value, and a new one would end no step (09 18.4)."""
+READ_TASK_TYPES = ("local_agent", WORKFLOW_TASK_TYPE)
+"""The task types the runner maps to a step kind of their own (``LiveBox``, held by
+``test_livebox.py``); every other type becomes a ``background_job`` step, so a newer CLI may
+drop it (CONTRACT-TOLERANT-3). Named here, not imported from the runner: the update chain runs
+these tests on the code of an older runner."""
 
 
 def field_changes(
     recorded: Mapping[str, Any], fresh: Mapping[str, Any]
-) -> tuple[list[str], list[str]]:
+) -> tuple[list[str], list[str], list[str]]:
     """Compare the field table of a CLI with the recording of the pin (CONTRACT-TOLERANT).
 
     A recorded schema member that the CLI no longer names is lost: that covers every member the
     runner reads, and a renamed member is a loss and an addition. Members only the recorded turn
     wrote (``written_only``) are not part of a schema and are held by the token tests instead.
-    A member the recording does not know is an addition, which the stream reader ignores.
+    A member the recording does not know is an addition, which the stream reader ignores. A
+    recorded task type the CLI no longer names is lost only when the runner maps it
+    (`READ_TASK_TYPES`); any other is dropped, since it only no longer occurs.
 
     Args:
         recorded: ``stream_fields_<pin>.json``.
         fresh: `read_fields` of the CLI under test.
 
     Returns:
-        The losses and the additions, each as ``"<table>: <member>"``; only losses fail.
+        The losses, the additions and the dropped task types the runner does not map, each as
+        ``"<table>: <member>"``; only losses fail.
     """
     lost: list[str] = []
     added: list[str] = []
+    dropped: list[str] = []
     written_only = recorded.get("written_only", {})
     for name, known in recorded["messages"].items():
         now = fresh["messages"].get(name)
@@ -324,11 +336,15 @@ def field_changes(
             continue
         was = recorded.get(key)
         if key in GROWING_LISTS and isinstance(was, list):
-            lost += [f"{key}: {m}" for m in was if m not in value]
+            for m in was:
+                if m in value:
+                    continue
+                unread = key == "task_types" and m not in READ_TASK_TYPES
+                (dropped if unread else lost).append(f"{key}: {m}")
             added += [f"{key}: {m}" for m in value if m not in was]
         elif was != value:
             lost.append(f"{key}: {was!r} became {value!r}")
-    return lost, added
+    return lost, added, dropped
 
 
 def fields_document(data: bytes, tree: list[dict[str, Any]], today: str) -> dict[str, Any]:
