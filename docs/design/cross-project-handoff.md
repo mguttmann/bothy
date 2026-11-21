@@ -210,6 +210,13 @@ Found by the red team in round 9:
 15. No test drives an edit between `TriggerMessageOf` and `CopyMessage` in the reply path; the
     version pin is held by the messaging test and the owner broadcast probe of the red team.
 
+Found by the red team in round 10:
+
+16. The ERD of the team channels draws `threads ||--o{ team_members`; `work_thread_id` is unique,
+    so `||--o|` would be more precise.
+17. The runs README lists the tables of `PersonalData` without `team_mirrors` and `run_answers`
+    (neither holds personal data of its own; 20 section 2).
+
 ## 8. Alternatives rejected
 
 - **Point to point handoff records** (the first version of this draft): one hop at a time with a
