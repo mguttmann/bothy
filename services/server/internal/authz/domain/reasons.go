@@ -79,6 +79,11 @@ const (
 	ReasonDefinitionNeedsHost  Reason = "definition_needs_host"
 	// ReasonRunNotFailed: run.wake.recover for a run that ended cancelled or completed (09 18.19.9).
 	ReasonRunNotFailed Reason = "run_not_failed"
+	// The refusals of a team input (09 3.9.5, FEAT-TEAM-CHANNEL-SERVER): no authorize result, the
+	// reasons of the audit entries of runs.
+	ReasonTeamSponsorNotOwner Reason = "team_sponsor_not_owner"
+	ReasonTeamReadersDiffer   Reason = "team_readers_differ"
+	ReasonTeamPaused          Reason = "team_paused"
 )
 
 // reasons is the list of 07 section 4.1 in table order.
@@ -149,6 +154,9 @@ var reasons = []Reason{
 	ReasonRunNotRunning,
 	ReasonDefinitionNeedsHost,
 	ReasonRunNotFailed,
+	ReasonTeamSponsorNotOwner,
+	ReasonTeamReadersDiffer,
+	ReasonTeamPaused,
 }
 
 // Reasons returns the closed list of reason codes of 07 section 4.1 in table order, as a copy.

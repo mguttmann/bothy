@@ -32,6 +32,9 @@ type Runs struct {
 	interactions runs.Interactions
 	// wakes are the wake-up operations (AR-04), bound with BindWakes; nil answers internal_error.
 	wakes runs.Wakes
+	// teams are the team operations (FEAT-TEAM-CHANNEL-SERVER), bound with BindTeams; nil answers
+	// internal_error.
+	teams runs.Teams
 }
 
 // Ports are the incoming ports of runs the handlers call: the runs (M2-05, M2-09) and the

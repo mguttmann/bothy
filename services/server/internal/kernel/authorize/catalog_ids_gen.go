@@ -411,6 +411,12 @@ const (
 	ActionStatusRead Action = "status.read"
 	// ActionSyncSnapshotRead is the action sync.snapshot.read.
 	ActionSyncSnapshotRead Action = "sync.snapshot.read"
+	// ActionTeamRead is the action team.read.
+	ActionTeamRead Action = "team.read"
+	// ActionTeamStop is the action team.stop.
+	ActionTeamStop Action = "team.stop"
+	// ActionTeamUpdate is the action team.update.
+	ActionTeamUpdate Action = "team.update"
 	// ActionTemplateManage is the action template.manage.
 	ActionTemplateManage Action = "template.manage"
 	// ActionTemplateRead is the action template.read.
@@ -684,6 +690,9 @@ var actionByID = map[string]Action{
 	"status.public.read":           ActionStatusPublicRead,
 	"status.read":                  ActionStatusRead,
 	"sync.snapshot.read":           ActionSyncSnapshotRead,
+	"team.read":                    ActionTeamRead,
+	"team.stop":                    ActionTeamStop,
+	"team.update":                  ActionTeamUpdate,
 	"template.manage":              ActionTemplateManage,
 	"template.read":                ActionTemplateRead,
 	"terminal.attach":              ActionTerminalAttach,
@@ -922,6 +931,9 @@ var actionList = []Action{
 	ActionStatusPublicRead,
 	ActionStatusRead,
 	ActionSyncSnapshotRead,
+	ActionTeamRead,
+	ActionTeamStop,
+	ActionTeamUpdate,
 	ActionTemplateManage,
 	ActionTemplateRead,
 	ActionTerminalAttach,

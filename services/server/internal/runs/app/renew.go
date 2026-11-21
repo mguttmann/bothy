@@ -224,6 +224,12 @@ func renewalInput(row RunRow, c domain.InvocationClaims) (runs.DeliveryInput, er
 	switch domain.TriggerKind(c.TriggerKind) {
 	case domain.TriggerMessage:
 		in.Type = domain.EventAgentInvocation
+	case domain.TriggerTeam:
+		// The token of a team run renews like the one of a message run (09 3.9.9).
+		if row.TriggerKind != triggerKindTeam {
+			return runs.DeliveryInput{}, errs.New(errs.CodeInvocationTokenInvalid, "").WithReason("invalid")
+		}
+		in.Type = domain.EventAgentInvocation
 	case domain.TriggerFollowup:
 		msg, err := ids.Parse(c.MessageID)
 		if err != nil {

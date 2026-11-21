@@ -938,6 +938,12 @@ Generated from openapi.yaml.
 | PUT | `/api/v1/channels/{channel_id}/operator` | `setChannelOperator` | `channel.operator.set` | Set or inherit the operator of a channel |
 | PUT | `/api/v1/channels/{channel_id}/read-only` | `setChannelReadOnly` | `channel.read_only.set` | Switch the read-only state of a channel |
 | PUT | `/api/v1/channels/{channel_id}/autonomous-runs` | `setChannelAutonomousRuns` | `channel.autonomous_runs.set` | Switch autonomous runs of a channel |
+| GET | `/api/v1/channels/{channel_id}/team` | `getChannelTeam` | `team.read` | Read the team of a team channel |
+| PUT | `/api/v1/channels/{channel_id}/team` | `enableChannelTeam` | `team.update` | Switch a channel to team mode |
+| DELETE | `/api/v1/channels/{channel_id}/team` | `disableChannelTeam` | `team.update` | Switch team mode off |
+| POST | `/api/v1/channels/{channel_id}/team/members` | `addTeamMember` | `team.update` | Add a member to a team channel |
+| DELETE | `/api/v1/channels/{channel_id}/team/members/{member_id}` | `removeTeamMember` | `team.update` | Remove a member from a team channel |
+| POST | `/api/v1/channels/{channel_id}/team/stop` | `stopChannelTeam` | `team.stop` | Stop every run of a team channel |
 | PUT | `/api/v1/channels/{channel_id}/project-binding` | `putProjectBinding` | `channel.project.bind` | Bind a forum to a project |
 | DELETE | `/api/v1/channels/{channel_id}/project-binding` | `deleteProjectBinding` | `channel.project.bind` | Remove the project binding |
 | GET | `/api/v1/channels/{channel_id}/tags` | `listForumTags` | `channel.read` | List forum tags |

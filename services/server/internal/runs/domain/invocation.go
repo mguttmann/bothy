@@ -43,10 +43,10 @@ const (
 	TriggerWake TriggerKind = "wake"
 )
 
-// TriggerKinds returns the trigger kinds in the order of 05 section 5, followed by wake (stage AR,
-// 00 glossary "Trigger kind").
+// TriggerKinds returns the trigger kinds in the order of 05 section 5, followed by wake (stage AR)
+// and team (team channels, 09 3.9.9; 00 glossary "Trigger kind").
 func TriggerKinds() []TriggerKind {
-	return []TriggerKind{TriggerMessage, TriggerFollowup, TriggerInteraction, TriggerCommand, TriggerAutocomplete, TriggerWake}
+	return []TriggerKind{TriggerMessage, TriggerFollowup, TriggerInteraction, TriggerCommand, TriggerAutocomplete, TriggerWake, TriggerTeam}
 }
 
 // The values of the claims level, billing_mode and tool_class: exactly the enums Level,
@@ -248,7 +248,7 @@ func (c InvocationClaims) validateIDs(issued bool) error {
 func (c InvocationClaims) validateTrigger() error {
 	var object string
 	switch TriggerKind(c.TriggerKind) {
-	case TriggerMessage, TriggerFollowup:
+	case TriggerMessage, TriggerFollowup, TriggerTeam:
 		object = c.MessageID
 	case TriggerInteraction:
 		object = c.InteractionID

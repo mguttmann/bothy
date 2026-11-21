@@ -81,7 +81,7 @@ func (s *Service) Context(ctx context.Context, runID ids.ID) (runs.RunContext, e
 	if !row.State.Active() {
 		return runs.RunContext{}, invisible()
 	}
-	if row.TriggerKind != string(domain.TriggerMessage) {
+	if row.TriggerKind != string(domain.TriggerMessage) && row.TriggerKind != string(domain.TriggerTeam) {
 		s.d.Log.LogAttrs(ctx, slog.LevelError, msgContextTriggerKind, slog.String(logKeyRunID, row.ID.String()),
 			slog.String(logKeyTriggerKind, row.TriggerKind))
 		return runs.RunContext{}, errs.New(errs.CodeInternalError, "runs: the run context of this trigger kind is not defined")

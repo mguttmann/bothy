@@ -365,6 +365,8 @@ type Service struct {
 	fu *Followups
 	// wakes are the wake-ups of stage AR, bound with BindWakes; nil leaves them off (AR-04).
 	wakes atomic.Pointer[wakeBox]
+	// teams holds the team channels once BindTeams ran (FEAT-TEAM-CHANNEL-SERVER).
+	teams atomic.Pointer[teamBox]
 }
 
 // publisherBox holds the bound publisher of run.updated.

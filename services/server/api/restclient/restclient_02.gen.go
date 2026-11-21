@@ -1238,6 +1238,59 @@ type ClientInterface interface {
 	// Corresponds with POST /channels/{channel_id}/tags/{tag_id}/move (the `MoveForumTag` operationId).
 	MoveForumTag(ctx context.Context, channelId ChannelIdPath, tagId TagIdPath, params *MoveForumTagParams, body MoveForumTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DisableChannelTeam Switch team mode off
+	//
+	// Removes the team mode and every member of the channel (09 3.9.1); work threads and messages stay, running runs keep running. Owners only (`team.update`); a channel that is no team channel answers `204` without a change. Audited.
+	//
+	// Corresponds with DELETE /channels/{channel_id}/team (the `DisableChannelTeam` operationId).
+	DisableChannelTeam(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetChannelTeam Read the team of a team channel
+	//
+	// The team of a team channel (09 3.9.1): sponsor, brake state and members with their handles and work threads. Owners only (`team.read`); a channel that is no team channel or that the caller cannot read is `404 not_found`.
+	//
+	// Corresponds with GET /channels/{channel_id}/team (the `GetChannelTeam` operationId).
+	GetChannelTeam(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EnableChannelTeam Switch a channel to team mode
+	//
+	// Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-only channel `channel_archived` or `channel_read_only`. Audited.
+	//
+	// Corresponds with PUT /channels/{channel_id}/team (the `EnableChannelTeam` operationId).
+	EnableChannelTeam(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AddTeamMemberWithBody Add a member to a team channel
+	//
+	// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_readers_differ` when the readers of the two channels differ, `dm_channel` or `channel_archived` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/team/members (the `AddTeamMember` operationId).
+	AddTeamMemberWithBody(ctx context.Context, channelId ChannelIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AddTeamMember Add a member to a team channel
+	//
+	// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_readers_differ` when the readers of the two channels differ, `dm_channel` or `channel_archived` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /channels/{channel_id}/team/members (the `AddTeamMember` operationId).
+	AddTeamMember(ctx context.Context, channelId ChannelIdPath, body AddTeamMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RemoveTeamMember Remove a member from a team channel
+	//
+	// Removes the member (09 3.9.1); its work thread stays and a running run keeps running. Owners only (`team.update`); an unknown member is `404 not_found`. Audited.
+	//
+	// Corresponds with DELETE /channels/{channel_id}/team/members/{member_id} (the `RemoveTeamMember` operationId).
+	RemoveTeamMember(ctx context.Context, channelId ChannelIdPath, memberId MemberIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StopChannelTeam Stop every run of a team channel
+	//
+	// Stops every active run in the work threads of the team's members as `cancelRun` by the caller would, and pauses member inputs with `pause_reason` `stopped` until an owner writes in the team channel again (09 3.9.7). Owners only (`team.stop`); a channel without team mode is `404 not_found`. Posts a note in the team channel; audited.
+	//
+	// Corresponds with POST /channels/{channel_id}/team/stop (the `StopChannelTeam` operationId).
+	StopChannelTeam(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListTemplates List own and channel templates
 	//
 	// Corresponds with GET /channels/{channel_id}/templates (the `ListTemplates` operationId).
@@ -6923,6 +6976,129 @@ func (c *Client) MoveForumTagWithBody(ctx context.Context, channelId ChannelIdPa
 // Corresponds with POST /channels/{channel_id}/tags/{tag_id}/move (the `MoveForumTag` operationId).
 func (c *Client) MoveForumTag(ctx context.Context, channelId ChannelIdPath, tagId TagIdPath, params *MoveForumTagParams, body MoveForumTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewMoveForumTagRequest(c.Server, channelId, tagId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DisableChannelTeam Switch team mode off
+//
+// Removes the team mode and every member of the channel (09 3.9.1); work threads and messages stay, running runs keep running. Owners only (`team.update`); a channel that is no team channel answers `204` without a change. Audited.
+//
+// Corresponds with DELETE /channels/{channel_id}/team (the `DisableChannelTeam` operationId).
+func (c *Client) DisableChannelTeam(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDisableChannelTeamRequest(c.Server, channelId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetChannelTeam Read the team of a team channel
+//
+// The team of a team channel (09 3.9.1): sponsor, brake state and members with their handles and work threads. Owners only (`team.read`); a channel that is no team channel or that the caller cannot read is `404 not_found`.
+//
+// Corresponds with GET /channels/{channel_id}/team (the `GetChannelTeam` operationId).
+func (c *Client) GetChannelTeam(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetChannelTeamRequest(c.Server, channelId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EnableChannelTeam Switch a channel to team mode
+//
+// Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-only channel `channel_archived` or `channel_read_only`. Audited.
+//
+// Corresponds with PUT /channels/{channel_id}/team (the `EnableChannelTeam` operationId).
+func (c *Client) EnableChannelTeam(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEnableChannelTeamRequest(c.Server, channelId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AddTeamMemberWithBody Add a member to a team channel
+//
+// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_readers_differ` when the readers of the two channels differ, `dm_channel` or `channel_archived` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /channels/{channel_id}/team/members (the `AddTeamMember` operationId).
+func (c *Client) AddTeamMemberWithBody(ctx context.Context, channelId ChannelIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAddTeamMemberRequestWithBody(c.Server, channelId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AddTeamMember Add a member to a team channel
+//
+// Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_readers_differ` when the readers of the two channels differ, `dm_channel` or `channel_archived` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /channels/{channel_id}/team/members (the `AddTeamMember` operationId).
+func (c *Client) AddTeamMember(ctx context.Context, channelId ChannelIdPath, body AddTeamMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAddTeamMemberRequest(c.Server, channelId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RemoveTeamMember Remove a member from a team channel
+//
+// Removes the member (09 3.9.1); its work thread stays and a running run keeps running. Owners only (`team.update`); an unknown member is `404 not_found`. Audited.
+//
+// Corresponds with DELETE /channels/{channel_id}/team/members/{member_id} (the `RemoveTeamMember` operationId).
+func (c *Client) RemoveTeamMember(ctx context.Context, channelId ChannelIdPath, memberId MemberIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRemoveTeamMemberRequest(c.Server, channelId, memberId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StopChannelTeam Stop every run of a team channel
+//
+// Stops every active run in the work threads of the team's members as `cancelRun` by the caller would, and pauses member inputs with `pause_reason` `stopped` until an owner writes in the team channel again (09 3.9.7). Owners only (`team.stop`); a channel without team mode is `404 not_found`. Posts a note in the team channel; audited.
+//
+// Corresponds with POST /channels/{channel_id}/team/stop (the `StopChannelTeam` operationId).
+func (c *Client) StopChannelTeam(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStopChannelTeamRequest(c.Server, channelId)
 	if err != nil {
 		return nil, err
 	}
@@ -18547,6 +18723,230 @@ func NewMoveForumTagRequestWithBody(server string, channelId ChannelIdPath, tagI
 	return req, nil
 }
 
+// NewDisableChannelTeamRequest constructs an http.Request for the DisableChannelTeam method
+func NewDisableChannelTeamRequest(server string, channelId ChannelIdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "channel_id", channelId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/channels/%s/team", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetChannelTeamRequest constructs an http.Request for the GetChannelTeam method
+func NewGetChannelTeamRequest(server string, channelId ChannelIdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "channel_id", channelId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/channels/%s/team", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewEnableChannelTeamRequest constructs an http.Request for the EnableChannelTeam method
+func NewEnableChannelTeamRequest(server string, channelId ChannelIdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "channel_id", channelId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/channels/%s/team", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewAddTeamMemberRequest calls the generic AddTeamMember builder with application/json body
+func NewAddTeamMemberRequest(server string, channelId ChannelIdPath, body AddTeamMemberJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewAddTeamMemberRequestWithBody(server, channelId, "application/json", bodyReader)
+}
+
+// NewAddTeamMemberRequestWithBody constructs an http.Request for the AddTeamMember method, with any body, and a specified content type
+func NewAddTeamMemberRequestWithBody(server string, channelId ChannelIdPath, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "channel_id", channelId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/channels/%s/team/members", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRemoveTeamMemberRequest constructs an http.Request for the RemoveTeamMember method
+func NewRemoveTeamMemberRequest(server string, channelId ChannelIdPath, memberId MemberIdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "channel_id", channelId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "member_id", memberId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/channels/%s/team/members/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewStopChannelTeamRequest constructs an http.Request for the StopChannelTeam method
+func NewStopChannelTeamRequest(server string, channelId ChannelIdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "channel_id", channelId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/channels/%s/team/stop", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListTemplatesRequest constructs an http.Request for the ListTemplates method
 func NewListTemplatesRequest(server string, channelId ChannelIdPath) (*http.Request, error) {
 	var err error
@@ -20982,621 +21382,4 @@ func NewRevokeGrantRequestWithBody(server string, grantId GrantIdPath, params *R
 	}
 
 	return req, nil
-}
-
-// NewListGroupsRequest constructs an http.Request for the ListGroups method
-func NewListGroupsRequest(server string, params *ListGroupsParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/groups")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.MemberId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "member_id", *params.MemberId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreateGroupRequest calls the generic CreateGroup builder with application/json body
-func NewCreateGroupRequest(server string, params *CreateGroupParams, body CreateGroupJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateGroupRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewCreateGroupRequestWithBody constructs an http.Request for the CreateGroup method, with any body, and a specified content type
-func NewCreateGroupRequestWithBody(server string, params *CreateGroupParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/groups")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewDeleteGroupRequest constructs an http.Request for the DeleteGroup method
-func NewDeleteGroupRequest(server string, groupId GroupIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "group_id", groupId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/groups/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetGroupRequest constructs an http.Request for the GetGroup method
-func NewGetGroupRequest(server string, groupId GroupIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "group_id", groupId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/groups/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewUpdateGroupRequest calls the generic UpdateGroup builder with application/json body
-func NewUpdateGroupRequest(server string, groupId GroupIdPath, params *UpdateGroupParams, body UpdateGroupJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewUpdateGroupRequestWithBody(server, groupId, params, "application/json", bodyReader)
-}
-
-// NewUpdateGroupRequestWithBody constructs an http.Request for the UpdateGroup method, with any body, and a specified content type
-func NewUpdateGroupRequestWithBody(server string, groupId GroupIdPath, params *UpdateGroupParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "group_id", groupId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/groups/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewListGroupMembersRequest constructs an http.Request for the ListGroupMembers method
-func NewListGroupMembersRequest(server string, groupId GroupIdPath, params *ListGroupMembersParams) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "group_id", groupId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/groups/%s/members", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewAddGroupMemberRequest calls the generic AddGroupMember builder with application/json body
-func NewAddGroupMemberRequest(server string, groupId GroupIdPath, params *AddGroupMemberParams, body AddGroupMemberJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewAddGroupMemberRequestWithBody(server, groupId, params, "application/json", bodyReader)
-}
-
-// NewAddGroupMemberRequestWithBody constructs an http.Request for the AddGroupMember method, with any body, and a specified content type
-func NewAddGroupMemberRequestWithBody(server string, groupId GroupIdPath, params *AddGroupMemberParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "group_id", groupId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/groups/%s/members", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewRemoveGroupMemberRequest constructs an http.Request for the RemoveGroupMember method
-func NewRemoveGroupMemberRequest(server string, groupId GroupIdPath, userId UserIdPath) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "group_id", groupId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "user_id", userId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/groups/%s/members/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewPostIncomingWebhookWithBearerRequest calls the generic PostIncomingWebhookWithBearer builder with application/json body
-func NewPostIncomingWebhookWithBearerRequest(server string, webhookId WebhookIdPath, body PostIncomingWebhookWithBearerJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPostIncomingWebhookWithBearerRequestWithBody(server, webhookId, "application/json", bodyReader)
-}
-
-// NewPostIncomingWebhookWithBearerRequestWithBody constructs an http.Request for the PostIncomingWebhookWithBearer method, with any body, and a specified content type
-func NewPostIncomingWebhookWithBearerRequestWithBody(server string, webhookId WebhookIdPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "webhook_id", webhookId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/hooks/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewPostIncomingWebhookRequest calls the generic PostIncomingWebhook builder with application/json body
-func NewPostIncomingWebhookRequest(server string, webhookId WebhookIdPath, token TokenPath, body PostIncomingWebhookJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPostIncomingWebhookRequestWithBody(server, webhookId, token, "application/json", bodyReader)
-}
-
-// NewPostIncomingWebhookRequestWithBody constructs an http.Request for the PostIncomingWebhook method, with any body, and a specified content type
-func NewPostIncomingWebhookRequestWithBody(server string, webhookId WebhookIdPath, token TokenPath, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "webhook_id", webhookId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "token", token, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/hooks/%s/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewListHostsRequest constructs an http.Request for the ListHosts method
-func NewListHostsRequest(server string, params *ListHostsParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/hosts")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		// queryValues collects non-styled parameters (passthrough, JSON)
-		// that are safe to round-trip through url.Values.Encode().
-		queryValues := queryURL.Query()
-		// rawQueryFragments collects pre-encoded query fragments from
-		// styled parameters, preserving literal commas as delimiters
-		// per the OpenAPI spec (e.g. "color=blue,black,brown").
-		var rawQueryFragments []string
-
-		if params.Cursor != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if encoded := queryValues.Encode(); encoded != "" {
-			rawQueryFragments = append(rawQueryFragments, encoded)
-		}
-		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreateHostRequest calls the generic CreateHost builder with application/json body
-func NewCreateHostRequest(server string, params *CreateHostParams, body CreateHostJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateHostRequestWithBody(server, params, "application/json", bodyReader)
 }

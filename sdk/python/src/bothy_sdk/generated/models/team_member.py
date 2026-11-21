@@ -1,0 +1,104 @@
+from __future__ import annotations
+
+import datetime
+from collections.abc import Mapping
+from typing import Any, Self, TypeVar
+from uuid import UUID
+
+from attrs import define as _attrs_define
+from attrs import field as _attrs_field
+
+T = TypeVar("T", bound="TeamMember")
+
+
+@_attrs_define
+class TeamMember:
+    """A member of a team channel (09 3.9.1).
+
+    Attributes:
+        id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        handle (str):
+        agent_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        home_channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        work_thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
+        created_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+    """
+
+    id: UUID
+    handle: str
+    agent_id: UUID
+    home_channel_id: UUID
+    work_thread_id: UUID
+    created_at: datetime.datetime
+    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        id = str(self.id)
+
+        handle = self.handle
+
+        agent_id = str(self.agent_id)
+
+        home_channel_id = str(self.home_channel_id)
+
+        work_thread_id = str(self.work_thread_id)
+
+        created_at = self.created_at.isoformat()
+
+        field_dict: dict[str, Any] = {}
+        field_dict.update(self.additional_properties)
+        field_dict.update(
+            {
+                "id": id,
+                "handle": handle,
+                "agent_id": agent_id,
+                "home_channel_id": home_channel_id,
+                "work_thread_id": work_thread_id,
+                "created_at": created_at,
+            }
+        )
+
+        return field_dict
+
+    @classmethod
+    def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
+        d = dict(src_dict)
+        id = UUID(d.pop("id"))
+
+        handle = d.pop("handle")
+
+        agent_id = UUID(d.pop("agent_id"))
+
+        home_channel_id = UUID(d.pop("home_channel_id"))
+
+        work_thread_id = UUID(d.pop("work_thread_id"))
+
+        created_at = datetime.datetime.fromisoformat(d.pop("created_at"))
+
+        team_member = cls(
+            id=id,
+            handle=handle,
+            agent_id=agent_id,
+            home_channel_id=home_channel_id,
+            work_thread_id=work_thread_id,
+            created_at=created_at,
+        )
+
+        team_member.additional_properties = d
+        return team_member
+
+    @property
+    def additional_keys(self) -> list[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties

@@ -547,6 +547,9 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `run.wake.cancel` | cancel a pending wake-up ([09-agents.md](09-agents.md) 5.8.2, AR-04) | thread | agent-self of the wake-up's agent, the wake-up's person, or `manage` on the channel | no | no | yes | no | `rl.write` |
 | `run.wake.read` | list the wake-ups of a thread ([09-agents.md](09-agents.md) 5.8.2, AR-04) | thread | `read` on the thread | no | no | no | no | `rl.read` |
 | `run.launch.check` | allow or refuse a launch by a runner that did not accept the run ([09-agents.md](09-agents.md) 18.19.6, AR-04) | run | agent-self of the run's agent | no | no | denials | no | `rl.agent_runtime` |
+| `team.read` | read the team of a team channel with its members and brake state ([09-agents.md](09-agents.md) 3.9.1) | channel | owner | yes | no | no | no | `rl.read` |
+| `team.update` | switch team mode on or off, add or remove a member of a team channel ([09-agents.md](09-agents.md) 3.9.1) | channel | owner | yes | no | yes | no | `rl.write` |
+| `team.stop` | stop every run of the members of a team channel and pause its member inputs ([09-agents.md](09-agents.md) 3.9.7) | channel | owner | yes | no | yes | no | `rl.write` |
 | `component.update` | deactivate or change own components | component | author of the message (agent-self or app-self) | no | no | no | no | `rl.write` |
 | `interaction.create` | use a component (single-use rule per message); respect `required_capability` and `restricted_to` (`any`, `run_starter`, `owner`); for components of an agent additionally `agent.invoke` | component | trigger | no | no | yes for `approve_actions`, otherwise denials | no | `rl.interaction` |
 | `interaction.respond` | the owner acknowledges or answers an interaction | interaction | agent-self or app-self | no | no | no | no | `rl.agent_runtime` |
@@ -720,7 +723,7 @@ section 3.11). Claims:
 | `aud` | principal ID of the agent |
 | `sub` | principal ID of the triggering person |
 | `jti`, `iat`, `exp` | UUIDv7 of the token, issuance, expiry (`iat + agent.invocation_token_ttl`) |
-| `trigger_kind` | `message`, `followup`, `interaction`, `command`, `autocomplete` or `wake` (a wake run or a wake input, [09-agents.md](09-agents.md) 5.8.3; addendum of 2026-11-06, AR-04) |
+| `trigger_kind` | `message`, `followup`, `interaction`, `command`, `autocomplete` or `wake` (a wake run or a wake input, [09-agents.md](09-agents.md) 5.8.3; addendum of 2026-11-06, AR-04) or `team` (a run of a team channel member, its triggering object the input message in `message_id`, 09 3.9.9; addendum of 2026-11-21) |
 | `run_id` | run; missing for `trigger_kind = autocomplete` and for `command.invoked` when the owner of the control command has no active run in the thread at execution time (`command.invoke`); otherwise payload and token of `command.invoked` carry this run, never the run of another agent (R-AZ-25) |
 | `message_id` or `interaction_id` or `command_id` | triggering object |
 | `wake_id` | the wake-up of `trigger_kind = wake`, instead of a message ([04-sync-protocol.md](04-sync-protocol.md) 15.9; addendum of 2026-11-06, AR-04) |

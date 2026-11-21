@@ -14,6 +14,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - addOwner
   - addReaction
   - addStatusIncidentUpdate
+  - addTeamMember
   - answerAgentInterview
   - answerAutocomplete
   - answerSearchAssist
@@ -107,11 +108,13 @@ enabled:             # operationIds that have a handler; sorted ascending
   - deleteThreadDraft
   - deleteWebhookSubscription
   - disableAgent
+  - disableChannelTeam
   - disableUser
   - downloadFile
   - downloadGdprExport
   - downloadThumbnail
   - enableAgent
+  - enableChannelTeam
   - enableUser
   - endViewAs
   - explainChannelAccess
@@ -128,6 +131,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getChannel
   - getChannelBehavior
   - getChannelDeletion
+  - getChannelTeam
   - getCommand
   - getConsoleSession
   - getConsumerState
@@ -279,6 +283,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - removeCommand
   - removeGroupMember
   - removeReaction
+  - removeTeamMember
   - renewInvocationToken
   - reopenThread
   - reportAgentSession
@@ -324,6 +329,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - startImport
   - startRun
   - stepUpWithPassword
+  - stopChannelTeam
   - submitClientMetrics
   - submitCostReconciliation
   - submitCspReport
