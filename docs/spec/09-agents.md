@@ -437,16 +437,16 @@ stage `team_context` and posts no note. The member's next run reads it in its ru
 like any message of its work thread: role `other`, trust `unverified`, recorded in 03 `run_feeders`
 with the sponsor as for every team input, so it never makes a later reply fail the check below and
 never becomes the owner's word. A member added later gets the history of the team channel as
-context inputs when it is added (`addTeamMember`, in its unit of work): the newest 200 text
-messages of the main thread that are a message of an active owner or an unedited mirror, oldest
-first, each with the sponsor as authority, also a message of an owner who is not the sponsor (the
-table of 3.9.2, last row); system notes, texts of anyone else, edited mirrors and replies that were
-refused (never mirrored) are never copied and never count towards the 200. The server reads at
-most ten times that many persons' messages and mirrors of the main thread for it, so a long run of
-other texts never makes the add scan the whole thread; an eligible message beyond them is not
-copied. The checks of 3.9.5
-points 1 to 3 run once for the history; one audit entry with stage `team_context` and source
-`history` records it.
+context inputs when it is added (`addTeamMember`, in its unit of work): the newest text messages
+of the main thread that are a message of an active owner or an unedited mirror, up to the fixed
+history cap (the server constant `teamHistoryMax`), oldest first, each with the sponsor as
+authority, also a message of an owner who is not the sponsor (the table of 3.9.2, last row);
+system notes, texts of anyone else, edited mirrors and replies that were refused (never mirrored)
+are never copied and never count towards the cap. The server reads the main thread in pages of
+that size, at most the fixed number of pages `teamHistoryPages`, so a long run of other texts
+never makes the add scan the whole thread; an eligible message beyond them is not copied. The
+checks of 3.9.5 points 1 to 3 run once for the history; one audit entry with stage `team_context`
+and source `history` records it.
 
 A reply is mirrored and handed on only when the run it answers was started and fed only by active
 owners. The run a reply answers is the one 03 `run_answers` links it to, never the `run_id` the
