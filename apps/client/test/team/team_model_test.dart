@@ -155,7 +155,7 @@ void main() {
       for (final ok in ['coding', 'qa-2', 'a_b', '9x']) {
         expect(teamHandlePattern.hasMatch(ok), isTrue, reason: ok);
       }
-      for (final bad in ['', '-a', '_a', 'Coding', 'a b', '@a', 'ä']) {
+      for (final bad in ['', '-a', '_a', 'Coding', 'a b', '@a', 'é']) {
         expect(teamHandlePattern.hasMatch(bad), isFalse, reason: bad);
       }
     },
