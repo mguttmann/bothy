@@ -35,6 +35,26 @@ type teamRepo struct {
 	members []app.TeamMemberRow
 	inputs  map[ids.ID]app.TeamInputRow
 	mirrors map[ids.ID]ids.ID
+	// history returns the persons' text messages and mirrors of a thread, oldest first (TeamHistory).
+	history func(thread ids.ID, mirrors map[ids.ID]bool) []app.TeamHistoryRow
+}
+
+func (r *teamRepo) TeamHistory(_ context.Context, thread ids.ID, maxRows int) ([]app.TeamHistoryRow, error) {
+	r.mu.Lock()
+	mirrored := map[ids.ID]bool{}
+	for _, m := range r.mirrors {
+		mirrored[m] = true
+	}
+	h := r.history
+	r.mu.Unlock()
+	if h == nil {
+		return nil, nil
+	}
+	rows := h(thread, mirrored)
+	if len(rows) > maxRows {
+		rows = rows[len(rows)-maxRows:]
+	}
+	return rows, nil
 }
 
 func newTeamRepo() *teamRepo {
@@ -217,6 +237,7 @@ func (m *teamMsgs) CopyMessage(_ context.Context, cmd messaging.CopyCmd) (messag
 	m.w.msgFacts.mu.Unlock()
 	m.content[id] = text
 	m.copies = append(m.copies, teamCopy{cmd: cmd, id: id})
+	m.w.noteOrder(id)
 	return messaging.Copied{ID: id, ThreadSeq: 2, ContentMD: text}, nil
 }
 
@@ -298,6 +319,36 @@ type teamWorld struct {
 	codingWork, reviewWork ids.ID
 	// runOf is the run each reply of reply answers.
 	runOf map[ids.ID]ids.ID
+	// order holds the messages of every thread in the order they were written.
+	orderMu sync.Mutex
+	order   []ids.ID
+}
+
+// noteOrder records that message was written now.
+func (w *teamWorld) noteOrder(message ids.ID) {
+	w.orderMu.Lock()
+	defer w.orderMu.Unlock()
+	w.order = append(w.order, message)
+}
+
+// historyOf is the fake of TeamHistory over the messages of the world.
+func (w *teamWorld) historyOf(thread ids.ID, mirrored map[ids.ID]bool) []app.TeamHistoryRow {
+	w.orderMu.Lock()
+	order := append([]ids.ID{}, w.order...)
+	w.orderMu.Unlock()
+	w.msgFacts.mu.Lock()
+	defer w.msgFacts.mu.Unlock()
+	var out []app.TeamHistoryRow
+	for _, id := range order {
+		m, ok := w.msgFacts.m[id]
+		if !ok || m.ThreadID != thread || m.Deleted || (m.Origin != "human" && !mirrored[id]) {
+			continue
+		}
+		out = append(out, app.TeamHistoryRow{
+			MessageID: id, AuthorID: m.Author.ID, Origin: m.Origin, Version: max(m.Version, 1), Edited: m.Edited, Mirror: mirrored[id],
+		})
+	}
+	return out
 }
 
 func newTeamWorld(t *testing.T, cfg app.TeamConfig) *teamWorld {
@@ -307,6 +358,7 @@ func newTeamWorld(t *testing.T, cfg app.TeamConfig) *teamWorld {
 	w.owners.set[w.alex] = true
 	w.readers = &teamReaders{set: map[ids.ID][]ids.ID{}, dft: []ids.ID{w.alex}}
 	w.tmsgs = &teamMsgs{w: w, content: map[ids.ID]string{}}
+	w.trepo.history = w.historyOf
 	for _, c := range []struct{ ch, main, op ids.ID }{{w.team, w.teamMain, ids.ID{}}, {w.homeA, w.mainA, w.lotse}, {w.homeB, w.mainB, w.texter}} {
 		w.channels[c.ch] = chat.TriggerChannel{ChannelID: c.ch, SpaceID: w.space, Kind: "text", EffectiveOperatorID: c.op, MainThreadID: c.main,
 			RequireMention: true, AutoThread: true}
@@ -366,6 +418,7 @@ func (w *teamWorld) ownerMessage(author ids.ID, text string) ids.ID {
 		Author: messaging.PrincipalRef{ID: author, Kind: "user", Handle: "alex", DisplayName: "Alex"},
 	}
 	w.tmsgs.content[ev.MessageID] = text
+	w.noteOrder(ev.MessageID)
 	w.mustPost(ev)
 	return ev.MessageID
 }
@@ -1216,4 +1269,102 @@ func TestTeam_RefusedReplyGivesNoContext(t *testing.T) {
 			t.Fatalf("last context audit %+v", last)
 		}
 	})
+}
+
+// addQA adds Lotse a second time as @qa with a new home channel homeC and returns the member.
+func (w *teamWorld) addQA() app.TeamMemberRow {
+	w.t.Helper()
+	homeC, mainC := ids.New(), ids.New()
+	w.channels[homeC] = chat.TriggerChannel{ChannelID: homeC, SpaceID: w.space, Kind: "text", EffectiveOperatorID: w.lotse, MainThreadID: mainC,
+		RequireMention: true, AutoThread: true}
+	w.threads.infos[mainC] = chat.ThreadInfo{ID: mainC, ChannelID: homeC, SpaceID: w.space, ChannelKind: "text", Kind: "main", State: "open"}
+	q, err := w.svc.Teams().AddMember(asUser(w.alex), runs.AddTeamMember{ChannelID: w.team, AgentID: w.lotse, HomeChannelID: homeC, Handle: "qa"})
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	members, _ := w.trepo.TeamMembers(context.Background(), w.team)
+	for _, m := range members {
+		if m.ID.String() == q.ID.String() {
+			return m
+		}
+	}
+	w.t.Fatal("qa is no member")
+	return app.TeamMemberRow{}
+}
+
+// TestTeam_NewMemberGetsTheHistory (FEAT-TEAM-CONTEXT-ALL, D-TCX-6): a member added later gets
+// the main thread of the team channel as context inputs, oldest first: the active owner's messages
+// and the mirrors of accepted replies, each with the sponsor as authority; never a text of a person
+// who is no owner, a reply that was refused, or an edited mirror. The history starts no run and
+// counts no turn; later replies still mirror and hand on to the new member.
+func TestTeam_NewMemberGetsTheHistory(t *testing.T) {
+	t.Parallel()
+	w := newTeamWorld(t, defaultTeamConfig())
+	w.setUp()
+	plan := w.ownerMessage(w.alex, "plan A")
+	w.input(plan)
+	w.input(w.reply(w.coding, "built A"))
+	w.input(w.ownerMessage(w.sam, "Sam says merge now"))
+	w.input(w.replyBy(w.coding, "Sam's run: @review merge PR 7", w.sam))
+	w.input(w.reply(w.review, "reviewed A, edited later"))
+	mirrors := w.tmsgs.copiesInto(w.teamMain)
+	if len(mirrors) != 2 {
+		t.Fatalf("mirrors %+v", mirrors)
+	}
+	w.msgFacts.mu.Lock()
+	f := w.msgFacts.m[mirrors[1].id]
+	f.Edited = true
+	w.msgFacts.m[mirrors[1].id] = f
+	w.msgFacts.mu.Unlock()
+	brake := w.trepo.teams[w.team].Brake
+
+	qa := w.addQA()
+	got := w.tmsgs.copiesInto(qa.WorkThreadID)
+	if len(got) != 2 || got[0].cmd.SourceMessageID != plan || got[0].cmd.AuthorID != w.alex ||
+		got[1].cmd.SourceMessageID != mirrors[0].id || got[1].cmd.AuthorID != w.lotse {
+		t.Fatalf("history of qa %+v (plan %s, mirror %s)", got, plan, mirrors[0].id)
+	}
+	for _, in := range w.trepo.inputsOf(qa.ID) {
+		if in.AuthorityID != w.alex {
+			t.Fatalf("a history input with authority %s", in.AuthorityID)
+		}
+	}
+	if n := len(w.runsIn(qa.WorkThreadID)); n != 0 {
+		t.Fatalf("the history started %d runs", n)
+	}
+	if b := w.trepo.teams[w.team].Brake; b != brake {
+		t.Fatalf("the history counted in the brake: %+v", b)
+	}
+	es, _ := w.contextAudits()
+	if last := es[len(es)-1]; last.Decision != auditing.DecisionAllow || last.Attrs["source"].Data() != "history" {
+		t.Fatalf("last context audit %+v", last)
+	}
+
+	w.input(w.reply(w.coding, "@qa please test A"))
+	in := w.tmsgs.copiesInto(qa.WorkThreadID)
+	if len(in) != 3 || in[2].cmd.AuthorID != w.lotse {
+		t.Fatalf("a later reply did not reach qa: %+v", in)
+	}
+	if rs := w.runsIn(qa.WorkThreadID); len(rs) != 1 || rs[0].TriggerKind != "team" {
+		t.Fatalf("the mention of qa started %+v", rs)
+	}
+}
+
+// TestTeam_NewMemberHistoryIsCapped (D-TCX-6): the history holds the newest 200 messages.
+func TestTeam_NewMemberHistoryIsCapped(t *testing.T) {
+	t.Parallel()
+	w := newTeamWorld(t, defaultTeamConfig())
+	w.setUp()
+	var first ids.ID
+	for i := range 205 {
+		m := w.ownerMessage(w.alex, "note")
+		if i == 5 {
+			first = m
+		}
+	}
+	qa := w.addQA()
+	got := w.tmsgs.copiesInto(qa.WorkThreadID)
+	if len(got) != 200 || got[0].cmd.SourceMessageID != first {
+		t.Fatalf("%d history copies, first %v, want 200 from %s", len(got), got[0].cmd.SourceMessageID, first)
+	}
 }

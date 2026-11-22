@@ -434,8 +434,13 @@ to 3 of 3.9.5 apply to it (an active run of another agent excepted); a refusal i
 stage `team_context` and posts no note. The member's next run reads it in its run context (4.6)
 like any message of its work thread: role `other`, trust `unverified`, recorded in 03 `run_feeders`
 with the sponsor as for every team input, so it never makes a later reply fail the check below and
-never becomes the owner's word. A member added later gets only the replies mirrored after it was
-added.
+never becomes the owner's word. A member added later gets the history of the team channel as
+context inputs when it is added (`addTeamMember`, in its unit of work): of the newest 200 text
+messages of the main thread that are a person's or a mirror, oldest first, every message of an
+active owner and every unedited mirror, each with the sponsor as authority; system notes, texts of
+anyone else and replies that were refused (never mirrored) are never copied. The checks of 3.9.5
+points 1 to 3 run once for the history; one audit entry with stage `team_context` and source
+`history` records it.
 
 A reply is mirrored and handed on only when the run it answers was started and fed only by active
 owners. The run a reply answers is the one 03 `run_answers` links it to, never the `run_id` the

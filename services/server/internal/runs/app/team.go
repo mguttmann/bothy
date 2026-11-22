@@ -331,6 +331,9 @@ func (s *Service) addMemberTx(ctx context.Context, b *teamBox, a actor.Actor, in
 	if err := b.d.Repo.InsertTeamMember(ctx, m); err != nil {
 		return TeamMemberRow{}, err
 	}
+	if err := s.backfillHistory(ctx, b, team, m); err != nil {
+		return TeamMemberRow{}, err
+	}
 	return m, s.auditTeam(ctx, a, authorize.ActionTeamUpdate, in.ChannelID, auditing.Attrs{
 		attrOperation: auditing.Code(opAdd), attrMemberID: auditing.ID(m.ID), attrAgentID: auditing.ID(in.AgentID),
 	})

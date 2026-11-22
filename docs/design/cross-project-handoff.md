@@ -108,7 +108,8 @@ no turn of the brake; only the mentioned members are triggered, as before. The n
 member then has the whole picture in its run context. Storing it as a team input keeps the
 provenance rule intact: the run context records the sponsor for it, never a NULL that would
 silence the member's later replies, and its origin `agent` keeps it from ever reading as the
-owner's word. Rulings: [FEAT-TEAM-CONTEXT-ALL](../decisions.d/FEAT-TEAM-CONTEXT-ALL.md).
+owner's word. A member added later gets the team channel's history (the owners' messages and
+the mirrors of accepted replies) the same way when it is added. Rulings: [FEAT-TEAM-CONTEXT-ALL](../decisions.d/FEAT-TEAM-CONTEXT-ALL.md).
 
 ## 4. Safety brake (not a cost limit)
 
