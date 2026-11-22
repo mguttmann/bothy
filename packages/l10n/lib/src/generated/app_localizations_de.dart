@@ -11629,6 +11629,27 @@ class AppLocalizationsDe extends AppLocalizations {
   String get teamMenu => 'Teamkanal...';
 
   @override
+  String get teamCreateMenu => 'Teamkanal anlegen...';
+
+  @override
+  String teamCreateTitle(String name) {
+    return 'Neuer Teamkanal in $name';
+  }
+
+  @override
+  String get teamCreateName => 'Name';
+
+  @override
+  String get teamCreateHint =>
+      'Ein Textkanal mit eingeschaltetem Teammodus; danach fügst du die Mitglieder hinzu.';
+
+  @override
+  String get teamCreateSubmit => 'Anlegen';
+
+  @override
+  String get teamCreateCancel => 'Abbrechen';
+
+  @override
   String get teamTitle => 'Teamkanal';
 
   @override

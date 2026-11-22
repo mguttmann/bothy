@@ -231,6 +231,69 @@ func (q *Queries) LockTeamChannel(ctx context.Context, channelID pgtype.UUID) (T
 	return i, err
 }
 
+const teamHistory = `-- name: TeamHistory :many
+SELECT m.id, m.origin, m.author_principal_id, m.version, m.thread_seq, (m.edited_at IS NOT NULL)::boolean AS edited,
+    tm.member_id AS mirror_member_id, (tm.mirror_message_id IS NOT NULL)::boolean AS mirror
+FROM messages m
+LEFT JOIN team_mirrors tm ON tm.mirror_message_id = m.id
+WHERE m.thread_id = $1 AND m.thread_seq < $2::bigint
+    AND m.deleted_at IS NULL AND m.kind = 'text' AND m.content_md <> ''
+    AND (m.origin = 'human' OR tm.mirror_message_id IS NOT NULL)
+ORDER BY m.thread_seq DESC
+LIMIT $3
+`
+
+type TeamHistoryParams struct {
+	ThreadID  pgtype.UUID
+	BeforeSeq int64
+	MaxRows   int32
+}
+
+type TeamHistoryRow struct {
+	ID                pgtype.UUID
+	Origin            string
+	AuthorPrincipalID pgtype.UUID
+	Version           int64
+	ThreadSeq         int64
+	Edited            bool
+	MirrorMemberID    pgtype.UUID
+	Mirror            bool
+}
+
+// One page of the history of a team channel's main thread that a new member gets as context (09
+// 3.9.4, FEAT-TEAM-CONTEXT-ALL): text messages with text before the sequence before_seq that are
+// not deleted and are either a person's or the mirror of a member reply (team_mirrors), newest
+// first, at most the limit. The use case keeps only active owners' messages and unedited mirrors
+// and reads further pages until it has its cap of them.
+func (q *Queries) TeamHistory(ctx context.Context, arg TeamHistoryParams) ([]TeamHistoryRow, error) {
+	rows, err := q.db.Query(ctx, teamHistory, arg.ThreadID, arg.BeforeSeq, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TeamHistoryRow
+	for rows.Next() {
+		var i TeamHistoryRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Origin,
+			&i.AuthorPrincipalID,
+			&i.Version,
+			&i.ThreadSeq,
+			&i.Edited,
+			&i.MirrorMemberID,
+			&i.Mirror,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const teamInputDelivered = `-- name: TeamInputDelivered :one
 SELECT EXISTS (SELECT 1 FROM team_inputs WHERE source_message_id = $1 AND member_id = $2)
 `

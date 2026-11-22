@@ -422,6 +422,9 @@ exceptions:
   - query: runs.EarlierSessionRun
     category: after_authorize
     reason: "the run context reads, for the one run whose run.context.read authorize allowed, whether an earlier started run of its thread used its session row and the triggering message of the latest such run; only a boolean and an id leave (09 4.6, M2-13)"
+  - query: runs.TeamHistory
+    category: after_authorize
+    reason: "addTeamMember reads, for the one team channel whose team.update authorize allowed, the persons' text messages and member mirrors of its main thread page by page, newest first, to copy them as context into the new member's work thread; the use case keeps only active owners' messages and unedited mirrors, and nothing leaves to the caller (09 3.9.4, FEAT-TEAM-CONTEXT-ALL)"
   - query: runs.SessionFeeders
     category: after_authorize
     reason: "the run context records, for the one run whose run.context.read authorize allowed, the principals recorded for the earlier started runs of its session row in its thread; only principal ids leave, into run_feeders of that run, never to the caller (09 3.9.4, FEAT-TEAM-CHANNEL-SERVER)"

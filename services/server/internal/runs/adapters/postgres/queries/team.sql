@@ -84,3 +84,19 @@ ON CONFLICT DO NOTHING;
 -- name: GetTeamMirror :one
 -- The mirror of one reply.
 SELECT * FROM team_mirrors WHERE source_message_id = sqlc.arg(source_message_id);
+
+-- name: TeamHistory :many
+-- One page of the history of a team channel's main thread that a new member gets as context (09
+-- 3.9.4, FEAT-TEAM-CONTEXT-ALL): text messages with text before the sequence before_seq that are
+-- not deleted and are either a person's or the mirror of a member reply (team_mirrors), newest
+-- first, at most the limit. The use case keeps only active owners' messages and unedited mirrors
+-- and reads further pages until it has its cap of them.
+SELECT m.id, m.origin, m.author_principal_id, m.version, m.thread_seq, (m.edited_at IS NOT NULL)::boolean AS edited,
+    tm.member_id AS mirror_member_id, (tm.mirror_message_id IS NOT NULL)::boolean AS mirror
+FROM messages m
+LEFT JOIN team_mirrors tm ON tm.mirror_message_id = m.id
+WHERE m.thread_id = sqlc.arg(thread_id) AND m.thread_seq < sqlc.arg(before_seq)::bigint
+    AND m.deleted_at IS NULL AND m.kind = 'text' AND m.content_md <> ''
+    AND (m.origin = 'human' OR tm.mirror_message_id IS NOT NULL)
+ORDER BY m.thread_seq DESC
+LIMIT sqlc.arg(max_rows);

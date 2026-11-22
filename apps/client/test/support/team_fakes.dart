@@ -61,6 +61,16 @@ final class FakeTeamPort implements TeamPort {
   /// The runs [stopAll] answers.
   List<String> stopped = const ['run-1'];
 
+  /// The channel [createTextChannel] answers.
+  ChannelId created = channelId(7);
+
+  /// The failure the next [createTextChannel] throws, or null; it never takes one of
+  /// [failures].
+  TeamFailure? createFailure;
+
+  /// The channels [enable] was called for, in order.
+  final List<ChannelId> enabled = [];
+
   void _fail() {
     if (failures.isNotEmpty) throw failures.removeAt(0);
   }
@@ -76,8 +86,22 @@ final class FakeTeamPort implements TeamPort {
   @override
   Future<TeamView> enable(ChannelId channel) async {
     calls.add('enable');
+    enabled.add(channel);
     _fail();
     return current ??= team();
+  }
+
+  @override
+  Future<ChannelId> createTextChannel(
+    SpaceId space,
+    String name, {
+    required String idempotencyKey,
+  }) async {
+    calls.add('create ${space.value} $name $idempotencyKey');
+    final failure = createFailure;
+    createFailure = null;
+    if (failure != null) throw failure;
+    return created;
   }
 
   @override

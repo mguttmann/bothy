@@ -177,6 +177,22 @@ func (r *Repository) TeamMirrored(ctx context.Context, sourceMessageID ids.ID) (
 	return err == nil, mapError(err, "reading a team mirror")
 }
 
+// TeamHistory implements app.TeamRepository.
+func (r *Repository) TeamHistory(ctx context.Context, threadID ids.ID, beforeSeq int64, maxRows int) ([]app.TeamHistoryRow, error) {
+	rows, err := r.read(ctx).TeamHistory(ctx, sqlcgen.TeamHistoryParams{ThreadID: uuid(threadID), BeforeSeq: beforeSeq, MaxRows: count32(maxRows)})
+	if err != nil {
+		return nil, mapError(err, "reading the history of a team channel")
+	}
+	out := make([]app.TeamHistoryRow, len(rows))
+	for i, row := range rows {
+		out[i] = app.TeamHistoryRow{
+			MessageID: idOf(row.ID), AuthorID: idOf(row.AuthorPrincipalID), MirrorMemberID: idOf(row.MirrorMemberID), Origin: row.Origin,
+			Version: row.Version, Seq: row.ThreadSeq, Edited: row.Edited, Mirror: row.Mirror,
+		}
+	}
+	return out, nil
+}
+
 // count32 converts a count of the brake to its integer column: the configured limits keep it far
 // below the bound, which only guards the conversion.
 func count32(n int) int32 {

@@ -47,6 +47,16 @@ Stream<AccessView?> channelAccess(Ref ref, String channelId) {
       : db.structureDao.watchChannelAccess(ChannelId.parse(channelId));
 }
 
+/// The caller's level and capabilities in [spaceId] as the server reported them, or null while
+/// none was reported.
+@riverpod
+Stream<AccessView?> spaceAccess(Ref ref, String spaceId) {
+  final db = ref.watch(localDatabaseProvider);
+  return db == null
+      ? Stream.value(null)
+      : db.structureDao.watchSpaceAccess(SpaceId.parse(spaceId));
+}
+
 /// Every stored principal by ID (names, handles and the mention suggestions).
 @riverpod
 Stream<Map<PrincipalId, Principal>> principalsById(Ref ref) {

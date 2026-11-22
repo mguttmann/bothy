@@ -28,7 +28,8 @@ give it with his own message.
 
 ## 2. User flow
 
-1. The owner creates a channel "Team" in the space and switches it to team mode. He adds members
+1. The owner creates a channel "Team" in the space and switches it to team mode, in the app in one
+   step with "Create team channel..." of the space menu (01 6.23 item 6). He adds members
    in the app ("Add project", "Add agent") or in the channel (`/team add project coding`,
    `/team add @hermes-qa`, `/team list`, `/team remove`). Each member gets a handle
    (`@coding`, `@review`, `@qa`, `@coordinator`).
@@ -97,6 +98,20 @@ Later slice. Per channel a talk rule list (`team_talk_rules`: from handle, to ha
 until it exists every member may mention every member. Edited in the app or with `/team allow @a @b` and
 `/team deny @a @b`. A mention the rules forbid is shown greyed with the reason, it triggers nothing.
 
+### 3.6 Every member sees the whole conversation (addendum of 2026-11-22)
+
+Owner request of 2026-11-22: what the owner discusses with one member can matter to another, so
+every member sees every mirrored reply and the owner can ask "here is what I agreed with him, what
+is your view, or take it over". Since FEAT-TEAM-CONTEXT-ALL each mirrored reply also reaches every
+member it does not mention as a context input in its work thread (09 3.9.4): the same copy and
+`team_inputs` row as a member input, with the sponsor as authority, but no run, no follow-up and
+no turn of the brake; only the mentioned members are triggered, as before. The next run of any
+member then has the whole picture in its run context. Storing it as a team input keeps the
+provenance rule intact: the run context records the sponsor for it, never a NULL that would
+silence the member's later replies, and its origin `agent` keeps it from ever reading as the
+owner's word. A member added later gets the team channel's history (the owners' messages and
+the mirrors of accepted replies) the same way when it is added. Rulings: [FEAT-TEAM-CONTEXT-ALL](../decisions.d/FEAT-TEAM-CONTEXT-ALL.md).
+
 ## 4. Safety brake (not a cost limit)
 
 The brake exists to stop machines that run in circles, not to save money, and its defaults are
@@ -147,7 +162,8 @@ with the app slice.
   reply's `@handle` is parsed by the server. Later a command `bothy-team say` to post mid-run.
 - **Hermes adapter:** accept `trigger_kind = 'team'` and the team block, and the same prompt hint
   (built in FEAT-TEAM-CHANNEL-ADAPTER, 09 17.14).
-- **Apps:** team mode switch, member dialog with handles, `/team add|remove|list|stop`, header
+- **Apps:** "Create team channel..." in the space menu (FEAT-TEAM-CHANNEL-CREATE), team mode
+  switch, member dialog with handles, `/team add|remove|list|stop`, header
   with member states and stop all, relayed replies with handle and live box link, brake notes.
 
 ## 7. First slice and later steps

@@ -747,3 +747,121 @@ func TestTeam_LiveBoxAnchorNotEditable(t *testing.T) {
 	}
 	w.wantFeeders(r.ID, "-/context", w.owner.String()+"/context", w.owner.String()+"/trigger")
 }
+
+// TestTeam_ContextCopiesKeepTheTeamTalking (FEAT-TEAM-CONTEXT-ALL): coding's reply that mentions
+// nobody reaches review as a context copy (an agent's message, no run, no follow-up, no turn of
+// the brake); review's next run, which the owner starts, reads it in its context as an unverified
+// message of another agent, records the sponsor for it in run_feeders, and its reply that mentions
+// @coding is still mirrored and handed on.
+func TestTeam_ContextCopiesKeepTheTeamTalking(t *testing.T) {
+	w := newTeamWorld(t)
+	w.setUp()
+	r := w.ownerRunOfCoding()
+	reply := w.answer(w.codingW, r.ID, "built X on branch y, nothing for anyone yet", true)
+	w.runInput(reply["id"].(string))
+	in := w.messagesIn(w.reviewW)
+	if len(in) != 1 || in[0].Author != w.lotse.String() || in[0].Origin != "agent" || in[0].Content != "built X on branch y, nothing for anyone yet" {
+		t.Fatalf("context copies of review %+v", in)
+	}
+	if got := w.text(`SELECT authority_id::text || '/' || source FROM team_inputs WHERE message_id = $1`, in[0].ID); got != w.owner.String()+"/member" {
+		t.Fatalf("team input of the context copy %q", got)
+	}
+	if n := w.count(`SELECT count(*) FROM runs WHERE thread_id = $1`, w.reviewW); n != 0 {
+		t.Fatalf("a context copy started %d runs", n)
+	}
+	if n := w.count(`SELECT count(*) FROM run_followups WHERE message_id = $1`, in[0].ID); n != 0 {
+		t.Fatalf("a context copy became %d follow-ups", n)
+	}
+	if n := w.count(`SELECT member_turns FROM team_channels WHERE channel_id = $1`, w.team); n != 0 {
+		t.Fatalf("a context copy counted %d turns", n)
+	}
+
+	m := w.post("owner", w.reviewW, "@texter what do you think of coding's work?")
+	rr, ok := w.runOf(m["id"].(string))
+	if !ok || rr.TriggeredBy != w.owner.String() {
+		t.Fatalf("the owner's message opened no owner run of review: %+v %v", rr, ok)
+	}
+	w.startRun("texter", rr.ID)
+	ctx := w.wantOK(w.do("texter", http.MethodGet, "/api/v1/runs/"+rr.ID+"/context", ""))
+	var copyEl map[string]any
+	for _, e := range ctx["thread_context"].([]any) {
+		if el := e.(map[string]any); el["message_id"] == in[0].ID {
+			copyEl = el
+		}
+	}
+	if copyEl == nil || copyEl["role"] != "other" || copyEl["trust"] != "unverified" || copyEl["origin"] != "agent" {
+		t.Fatalf("the context copy in the run context: %v (context %v)", copyEl, ctx["thread_context"])
+	}
+	// The copy speaks for the sponsor like any team input: no "-/context" that would refuse the reply.
+	w.wantFeeders(rr.ID, w.owner.String()+"/context", w.owner.String()+"/trigger")
+	name := w.bound("texter", rr.ID)
+	ans := w.want(w.do(name, http.MethodPost, "/api/v1/threads/"+w.reviewW.String()+"/messages",
+		`{"client_msg_id":"`+ids.New().String()+`","content_md":"@coding looks good, fix the naming","run_id":"`+rr.ID+`"}`, key()...), http.StatusCreated, "")
+	w.runInput(ans["id"].(string))
+	if n := w.count(`SELECT count(*) FROM audit_events WHERE deny_reason = 'team_source_not_owner'`); n != 0 {
+		t.Fatalf("a context copy silenced review: %d refusals", n)
+	}
+	got := w.messagesIn(w.codingW)
+	if last := got[len(got)-1]; last.Author != w.texter.String() || last.Origin != "agent" || last.Content != "@coding looks good, fix the naming" {
+		t.Fatalf("review's reply did not reach coding: %+v", got)
+	}
+	mirror := w.messagesIn(w.teamMain)
+	if last := mirror[len(mirror)-1]; last.Author != w.texter.String() {
+		t.Fatalf("review's reply was not mirrored: %+v", mirror)
+	}
+}
+
+// TestTeam_NewMemberGetsTheHistory (FEAT-TEAM-CONTEXT-ALL, D-TCX-6): @qa, added later, gets the
+// team channel's main thread as context, oldest first: the mirror of coding's accepted reply and
+// the owner's message, never the refusal note of an unlinked reply, nor that reply, nor an edited
+// mirror; nothing starts a run. A later mention of @qa starts its team run, whose context records
+// only the owner, and its reply that mentions @review still hands on.
+func TestTeam_NewMemberGetsTheHistory(t *testing.T) {
+	w := newTeamWorld(t)
+	w.setUp()
+	r := w.ownerRunOfCoding()
+	w.runInput(w.answer(w.codingW, r.ID, "built A", true)["id"].(string))
+	w.runInput(w.post("owner", w.teamMain, "plan B for everyone")["id"].(string))
+	w.runInput(w.answer(w.codingW, r.ID, "unlinked reply", false)["id"].(string))
+	if n := w.count(`SELECT count(*) FROM messages WHERE thread_id = $1 AND origin = 'system'`, w.teamMain); n == 0 {
+		t.Fatal("the unlinked reply posted no note; the test needs one in the history")
+	}
+	w.runInput(w.answer(w.codingW, r.ID, "to be edited", true)["id"].(string))
+	w.sql(`UPDATE messages SET edited_at = now() WHERE thread_id = $1 AND content_md = 'to be edited'`, w.teamMain)
+
+	labC := w.channel(w.labs, "text", "Lab-C")
+	w.wantOK(w.setChannelOperator(labC, `{"mode":"agent","agent_id":"`+w.lotse.String()+`","reason":"Lab C agent"}`))
+	qa := w.addMember(w.lotse, labC, "qa")
+	qaW := ids.MustParse(qa["work_thread_id"].(string))
+	got := w.messagesIn(qaW)
+	if len(got) != 2 || got[0].Content != "built A" || got[0].Author != w.lotse.String() || got[0].Origin != "agent" ||
+		got[1].Content != "plan B for everyone" || got[1].Author != w.owner.String() || got[1].Origin != "human" {
+		t.Fatalf("history of qa %+v", got)
+	}
+	if n := w.count(`SELECT count(*) FROM team_inputs WHERE member_id = $1 AND authority_id = $2`, qa["id"], w.owner); n != 2 {
+		t.Fatalf("%d history inputs with the sponsor as authority, want 2", n)
+	}
+	if n := w.count(`SELECT count(*) FROM runs WHERE thread_id = $1`, qaW); n != 0 {
+		t.Fatalf("the history started %d runs", n)
+	}
+
+	w.runInput(w.answer(w.codingW, r.ID, "@qa please test A", true)["id"].(string))
+	rs := w.teamRuns(qaW)
+	if len(rs) != 1 {
+		t.Fatalf("the mention of qa started %+v", rs)
+	}
+	w.startRun("lotse", rs[0].ID)
+	ctx := w.wantOK(w.do("lotse", http.MethodGet, "/api/v1/runs/"+rs[0].ID+"/context", ""))
+	if !strings.Contains(fmt.Sprint(ctx["thread_context"]), "plan B for everyone") {
+		t.Fatalf("the context of qa lacks the history: %v", ctx["thread_context"])
+	}
+	w.wantFeeders(rs[0].ID, w.owner.String()+"/context", w.owner.String()+"/trigger")
+	reviewBefore := len(w.messagesIn(w.reviewW))
+	w.runInput(w.answer(qaW, rs[0].ID, "@review tested A", true)["id"].(string))
+	if n := len(w.messagesIn(w.reviewW)); n != reviewBefore+1 {
+		t.Fatalf("qa's reply reached review %d times", n-reviewBefore)
+	}
+	if n := w.count(`SELECT count(*) FROM audit_events WHERE deny_reason = 'team_source_not_owner'`); n != 1 {
+		t.Fatalf("%d refusals team_source_not_owner, want only the unlinked reply's", n)
+	}
+}

@@ -17246,6 +17246,36 @@
   "@teamMenu": {
     "description": "Entry of the channel menu for owners that opens the team dialog of a text channel (09 3.9.1)."
   },
+  "teamCreateMenu": "Create team channel...",
+  "@teamCreateMenu": {
+    "description": "Entry of the space menu for owners with manage on the space that creates a text channel in team mode (01 6.23 item 6)."
+  },
+  "teamCreateTitle": "New team channel in {name}",
+  "@teamCreateTitle": {
+    "description": "Title of the dialog that creates a team channel in a space; name is the space's name (01 6.23 item 6).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Engineering"
+      }
+    }
+  },
+  "teamCreateName": "Name",
+  "@teamCreateName": {
+    "description": "Label of the name field of the dialog that creates a team channel."
+  },
+  "teamCreateHint": "A text channel with team mode on; you add the members next.",
+  "@teamCreateHint": {
+    "description": "Hint below the name field of the dialog that creates a team channel."
+  },
+  "teamCreateSubmit": "Create",
+  "@teamCreateSubmit": {
+    "description": "Button of the dialog that creates the team channel and switches team mode on."
+  },
+  "teamCreateCancel": "Cancel",
+  "@teamCreateCancel": {
+    "description": "Button that closes the dialog that creates a team channel without creating it."
+  },
   "teamTitle": "Team channel",
   "@teamTitle": {
     "description": "Title of the team dialog of a channel (09 3.9.1)."

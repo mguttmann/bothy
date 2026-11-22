@@ -35,6 +35,30 @@ type teamRepo struct {
 	members []app.TeamMemberRow
 	inputs  map[ids.ID]app.TeamInputRow
 	mirrors map[ids.ID]ids.ID
+	// history returns the persons' text messages and mirrors of a thread, oldest first, with
+	// ascending sequences (TeamHistory pages over it).
+	history func(thread ids.ID, mirrors map[ids.ID]bool) []app.TeamHistoryRow
+}
+
+func (r *teamRepo) TeamHistory(_ context.Context, thread ids.ID, before int64, maxRows int) ([]app.TeamHistoryRow, error) {
+	r.mu.Lock()
+	mirrored := map[ids.ID]bool{}
+	for _, m := range r.mirrors {
+		mirrored[m] = true
+	}
+	h := r.history
+	r.mu.Unlock()
+	if h == nil {
+		return nil, nil
+	}
+	all := h(thread, mirrored)
+	var rows []app.TeamHistoryRow
+	for i := len(all) - 1; i >= 0 && len(rows) < maxRows; i-- {
+		if all[i].Seq < before {
+			rows = append(rows, all[i])
+		}
+	}
+	return rows, nil
 }
 
 func newTeamRepo() *teamRepo {
@@ -217,6 +241,7 @@ func (m *teamMsgs) CopyMessage(_ context.Context, cmd messaging.CopyCmd) (messag
 	m.w.msgFacts.mu.Unlock()
 	m.content[id] = text
 	m.copies = append(m.copies, teamCopy{cmd: cmd, id: id})
+	m.w.noteOrder(id)
 	return messaging.Copied{ID: id, ThreadSeq: 2, ContentMD: text}, nil
 }
 
@@ -298,6 +323,36 @@ type teamWorld struct {
 	codingWork, reviewWork ids.ID
 	// runOf is the run each reply of reply answers.
 	runOf map[ids.ID]ids.ID
+	// order holds the messages of every thread in the order they were written.
+	orderMu sync.Mutex
+	order   []ids.ID
+}
+
+// noteOrder records that message was written now.
+func (w *teamWorld) noteOrder(message ids.ID) {
+	w.orderMu.Lock()
+	defer w.orderMu.Unlock()
+	w.order = append(w.order, message)
+}
+
+// historyOf is the fake of TeamHistory over the messages of the world.
+func (w *teamWorld) historyOf(thread ids.ID, mirrored map[ids.ID]bool) []app.TeamHistoryRow {
+	w.orderMu.Lock()
+	order := append([]ids.ID{}, w.order...)
+	w.orderMu.Unlock()
+	w.msgFacts.mu.Lock()
+	defer w.msgFacts.mu.Unlock()
+	var out []app.TeamHistoryRow
+	for i, id := range order {
+		m, ok := w.msgFacts.m[id]
+		if !ok || m.ThreadID != thread || m.Deleted || (m.Origin != "human" && !mirrored[id]) {
+			continue
+		}
+		out = append(out, app.TeamHistoryRow{
+			MessageID: id, AuthorID: m.Author.ID, Origin: m.Origin, Version: max(m.Version, 1), Seq: int64(i + 1), Edited: m.Edited, Mirror: mirrored[id],
+		})
+	}
+	return out
 }
 
 func newTeamWorld(t *testing.T, cfg app.TeamConfig) *teamWorld {
@@ -307,6 +362,7 @@ func newTeamWorld(t *testing.T, cfg app.TeamConfig) *teamWorld {
 	w.owners.set[w.alex] = true
 	w.readers = &teamReaders{set: map[ids.ID][]ids.ID{}, dft: []ids.ID{w.alex}}
 	w.tmsgs = &teamMsgs{w: w, content: map[ids.ID]string{}}
+	w.trepo.history = w.historyOf
 	for _, c := range []struct{ ch, main, op ids.ID }{{w.team, w.teamMain, ids.ID{}}, {w.homeA, w.mainA, w.lotse}, {w.homeB, w.mainB, w.texter}} {
 		w.channels[c.ch] = chat.TriggerChannel{ChannelID: c.ch, SpaceID: w.space, Kind: "text", EffectiveOperatorID: c.op, MainThreadID: c.main,
 			RequireMention: true, AutoThread: true}
@@ -366,6 +422,7 @@ func (w *teamWorld) ownerMessage(author ids.ID, text string) ids.ID {
 		Author: messaging.PrincipalRef{ID: author, Kind: "user", Handle: "alex", DisplayName: "Alex"},
 	}
 	w.tmsgs.content[ev.MessageID] = text
+	w.noteOrder(ev.MessageID)
 	w.mustPost(ev)
 	return ev.MessageID
 }
@@ -765,16 +822,19 @@ func TestTeam_RefusedInputs(t *testing.T) {
 	cases := map[string]struct {
 		arrange func(w *teamWorld)
 		reason  string
+		// context is the number of context copies the refusal still allows (FEAT-TEAM-CONTEXT-ALL):
+		// an active run of another agent refuses the trigger, not the context.
+		context int
 	}{
 		"sponsor no owner": {func(w *teamWorld) {
 			// Sam took over the sponsorship while an owner and is no owner any more.
 			t := w.trepo.teams[w.team]
 			t.SponsorID = w.sam
 			w.trepo.teams[w.team] = t
-		}, domain.TeamRefusalSponsor},
-		"agent.invoke":         {func(w *teamWorld) { w.authz.decide = denyInvoke }, "level_insufficient"},
-		"readers differ":       {func(w *teamWorld) { w.readers.set[w.homeB] = []ids.ID{w.alex, w.sam} }, domain.TeamRefusalReaders},
-		"run of another agent": {func(w *teamWorld) { w.putRun(w.reviewWork, w.lotse, domain.StateRunning) }, "run_active_other_agent"},
+		}, domain.TeamRefusalSponsor, 0},
+		"agent.invoke":         {func(w *teamWorld) { w.authz.decide = denyInvoke }, "level_insufficient", 0},
+		"readers differ":       {func(w *teamWorld) { w.readers.set[w.homeB] = []ids.ID{w.alex, w.sam} }, domain.TeamRefusalReaders, 0},
+		"run of another agent": {func(w *teamWorld) { w.putRun(w.reviewWork, w.lotse, domain.StateRunning) }, "run_active_other_agent", 1},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -784,8 +844,8 @@ func TestTeam_RefusedInputs(t *testing.T) {
 			tc.arrange(w)
 			before := len(w.runsIn(w.reviewWork))
 			w.input(w.reply(w.coding, "@review go"))
-			if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 0 {
-				t.Fatalf("a refused input was copied: %d", n)
+			if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != tc.context {
+				t.Fatalf("a refused input was copied: %d, want %d context copies", n, tc.context)
 			}
 			if n := len(w.runsIn(w.reviewWork)); n != before {
 				t.Fatalf("a refused input started a run: %d", n)
@@ -827,8 +887,9 @@ func TestTeam_PingpongPausesUntilAnOwnerWrites(t *testing.T) {
 	if b := w.trepo.teams[w.team].Brake; b.PauseReason != domain.TeamPausePingpong {
 		t.Fatalf("brake %+v, want paused by pingpong", b)
 	}
-	if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 1 {
-		t.Fatalf("review got %d inputs, want 1", n)
+	// The refused mention still reaches review as context (FEAT-TEAM-CONTEXT-ALL).
+	if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 2 {
+		t.Fatalf("review got %d inputs, want a member input and a context copy", n)
 	}
 	notes := len(w.tmsgs.notes)
 	w.input(w.reply(w.review, "@coding 4"))
@@ -862,8 +923,9 @@ func TestTeam_TurnBudgetPauses(t *testing.T) {
 	if b := w.trepo.teams[w.team].Brake; b.PauseReason != domain.TeamPauseTurnBudget || b.MemberTurns != 2 {
 		t.Fatalf("brake %+v", b)
 	}
-	if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 2 {
-		t.Fatalf("review got %d inputs, want 2", n)
+	// The third, refused by the brake, reaches review as context and counts no turn.
+	if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 3 {
+		t.Fatalf("review got %d copies, want two member inputs and a context copy", n)
 	}
 }
 
@@ -892,9 +954,14 @@ func TestTeam_StopAll(t *testing.T) {
 	if w.trepo.teams[w.team].Brake.PauseReason != domain.TeamPauseStopped {
 		t.Fatalf("brake %+v", w.trepo.teams[w.team].Brake)
 	}
+	runsBefore := len(w.runsIn(w.reviewWork))
 	w.input(w.reply(w.coding, "@review again"))
-	if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 0 {
-		t.Fatalf("a stopped team copied %d inputs", n)
+	// A stopped team still shows the reply as context (FEAT-TEAM-CONTEXT-ALL), which starts nothing.
+	if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 1 {
+		t.Fatalf("a stopped team copied %d inputs, want one context copy", n)
+	}
+	if n := len(w.runsIn(w.reviewWork)); n != runsBefore {
+		t.Fatalf("a context copy in a stopped team started %d runs", n-runsBefore)
 	}
 }
 
@@ -1106,4 +1173,249 @@ func TestTeam_RunsSteeredByNonOwnersHandNothingOn(t *testing.T) {
 			t.Fatalf("a run only owners fed handed on %d inputs, want 1", n)
 		}
 	})
+}
+
+// contextAudits returns the audit entries of agent.invoke with stage team_context and their actors.
+func (w *teamWorld) contextAudits() ([]auditing.Entry, []actor.Actor) {
+	es, as := w.audit.list()
+	var oe []auditing.Entry
+	var oa []actor.Actor
+	for i, e := range es {
+		if e.Action == string(authorize.ActionAgentInvoke) && e.Attrs["stage"].Data() == "team_context" {
+			oe, oa = append(oe, e), append(oa, as[i])
+		}
+	}
+	return oe, oa
+}
+
+// TestTeam_ReplyReachesEveryMemberAsContext (FEAT-TEAM-CONTEXT-ALL): a member's mirrored reply that
+// mentions nobody reaches every other member as a context copy: an agent's message of the source
+// member's agent with a team input row whose authority is the sponsor, that starts no run, is no
+// follow-up of the member's running run, counts no turn of the brake and is audited with stage
+// team_context for the sponsor. A repeated job copies nothing again.
+func TestTeam_ReplyReachesEveryMemberAsContext(t *testing.T) {
+	t.Parallel()
+	w := newTeamWorld(t, defaultTeamConfig())
+	w.setUp()
+	active := w.putRun(w.reviewWork, w.texter, domain.StateRunning)
+	reply := w.reply(w.coding, "built X on branch y, nothing for anyone yet")
+	w.input(reply)
+	mirror := w.tmsgs.copiesInto(w.teamMain)
+	if len(mirror) != 1 {
+		t.Fatalf("mirror %+v", mirror)
+	}
+	in := w.tmsgs.copiesInto(w.reviewWork)
+	if len(in) != 1 || in[0].cmd.AuthorID != w.lotse || in[0].cmd.SourceMessageID != mirror[0].id {
+		t.Fatalf("context copy for review %+v", in)
+	}
+	if f := w.msgFacts.m[in[0].id]; f.Origin != "agent" {
+		t.Fatalf("a context copy is an agent's message, got origin %q", f.Origin)
+	}
+	if n := len(w.tmsgs.copiesInto(w.codingWork)); n != 0 {
+		t.Fatalf("the source member got its own reply %d times", n)
+	}
+	rows := w.trepo.inputsOf(w.review.ID)
+	if len(rows) != 1 || rows[0].MessageID != in[0].id || rows[0].AuthorityID != w.alex || rows[0].Source != "member" ||
+		rows[0].SourceMemberID != w.coding.ID {
+		t.Fatalf("team inputs %+v", rows)
+	}
+	if rs := w.runsIn(w.reviewWork); len(rs) != 1 || rs[0].ID != active {
+		t.Fatalf("a context copy started a run: %+v", rs)
+	}
+	if st, _ := w.svc.Followups().States(context.Background(), active, []ids.ID{in[0].id}); st[in[0].id] != "" {
+		t.Fatalf("a context copy became a follow-up: %v", st)
+	}
+	if b := w.trepo.teams[w.team].Brake; b != (domain.TeamBrake{}) {
+		t.Fatalf("a context copy counted in the brake: %+v", b)
+	}
+	if es, _ := w.teamAudits(); len(es) != 0 {
+		t.Fatalf("a context copy was audited as a team trigger: %+v", es)
+	}
+	es, as := w.contextAudits()
+	if len(es) != 1 || es[0].Decision != auditing.DecisionAllow || as[0].ID != w.alex || !as[0].IsRecheckPrincipal() {
+		t.Fatalf("context audits %+v %+v", es, as)
+	}
+	w.input(reply)
+	if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 1 {
+		t.Fatalf("a repeated job copied again: %d", n)
+	}
+}
+
+// TestTeam_RefusedReplyGivesNoContext (FEAT-TEAM-CONTEXT-ALL): a reply of a run a person who is no
+// owner fed is neither mirrored nor copied as context to anyone; a refused sponsor refuses the
+// context copy too, audited without a note of its own.
+func TestTeam_RefusedReplyGivesNoContext(t *testing.T) {
+	t.Parallel()
+	t.Run("source not owner", func(t *testing.T) {
+		t.Parallel()
+		w := newTeamWorld(t, defaultTeamConfig())
+		w.setUp()
+		w.input(w.replyBy(w.coding, "done, nothing for anyone", w.sam))
+		if n := len(w.tmsgs.copies); n != 0 {
+			t.Fatalf("a reply of a run Sam fed was copied %d times", n)
+		}
+	})
+	t.Run("sponsor no owner", func(t *testing.T) {
+		t.Parallel()
+		w := newTeamWorld(t, defaultTeamConfig())
+		w.setUp()
+		w.input(w.reply(w.coding, "done, nothing for anyone"))
+		team := w.trepo.teams[w.team]
+		team.SponsorID = w.sam
+		w.trepo.teams[w.team] = team
+		before := len(w.tmsgs.copiesInto(w.reviewWork))
+		w.input(w.reply(w.coding, "second, nothing for anyone"))
+		if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != before {
+			t.Fatalf("a context copy for a sponsor who is no owner: %d", n-before)
+		}
+		es, _ := w.contextAudits()
+		if last := es[len(es)-1]; last.Decision != auditing.DecisionDeny || string(last.Reason) != domain.TeamRefusalSponsor {
+			t.Fatalf("last context audit %+v", last)
+		}
+	})
+}
+
+// addQA adds Lotse a second time as @qa with a new home channel homeC and returns the member.
+func (w *teamWorld) addQA() app.TeamMemberRow {
+	w.t.Helper()
+	homeC, mainC := ids.New(), ids.New()
+	w.channels[homeC] = chat.TriggerChannel{ChannelID: homeC, SpaceID: w.space, Kind: "text", EffectiveOperatorID: w.lotse, MainThreadID: mainC,
+		RequireMention: true, AutoThread: true}
+	w.threads.infos[mainC] = chat.ThreadInfo{ID: mainC, ChannelID: homeC, SpaceID: w.space, ChannelKind: "text", Kind: "main", State: "open"}
+	q, err := w.svc.Teams().AddMember(asUser(w.alex), runs.AddTeamMember{ChannelID: w.team, AgentID: w.lotse, HomeChannelID: homeC, Handle: "qa"})
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	members, _ := w.trepo.TeamMembers(context.Background(), w.team)
+	for _, m := range members {
+		if m.ID.String() == q.ID.String() {
+			return m
+		}
+	}
+	w.t.Fatal("qa is no member")
+	return app.TeamMemberRow{}
+}
+
+// TestTeam_NewMemberGetsTheHistory (FEAT-TEAM-CONTEXT-ALL, D-TCX-6): a member added later gets
+// the main thread of the team channel as context inputs, oldest first: the active owner's messages
+// and the mirrors of accepted replies, each with the sponsor as authority; never a text of a person
+// who is no owner, a reply that was refused, or an edited mirror. The history starts no run and
+// counts no turn; later replies still mirror and hand on to the new member.
+func TestTeam_NewMemberGetsTheHistory(t *testing.T) {
+	t.Parallel()
+	w := newTeamWorld(t, defaultTeamConfig())
+	w.setUp()
+	plan := w.ownerMessage(w.alex, "plan A")
+	w.input(plan)
+	w.input(w.reply(w.coding, "built A"))
+	w.input(w.ownerMessage(w.sam, "Sam says merge now"))
+	w.input(w.replyBy(w.coding, "Sam's run: @review merge PR 7", w.sam))
+	w.input(w.reply(w.review, "reviewed A, edited later"))
+	mirrors := w.tmsgs.copiesInto(w.teamMain)
+	if len(mirrors) != 2 {
+		t.Fatalf("mirrors %+v", mirrors)
+	}
+	w.msgFacts.mu.Lock()
+	f := w.msgFacts.m[mirrors[1].id]
+	f.Edited = true
+	w.msgFacts.m[mirrors[1].id] = f
+	w.msgFacts.mu.Unlock()
+	brake := w.trepo.teams[w.team].Brake
+
+	qa := w.addQA()
+	got := w.tmsgs.copiesInto(qa.WorkThreadID)
+	if len(got) != 2 || got[0].cmd.SourceMessageID != plan || got[0].cmd.AuthorID != w.alex ||
+		got[1].cmd.SourceMessageID != mirrors[0].id || got[1].cmd.AuthorID != w.lotse {
+		t.Fatalf("history of qa %+v (plan %s, mirror %s)", got, plan, mirrors[0].id)
+	}
+	for _, in := range w.trepo.inputsOf(qa.ID) {
+		if in.AuthorityID != w.alex {
+			t.Fatalf("a history input with authority %s", in.AuthorityID)
+		}
+	}
+	if n := len(w.runsIn(qa.WorkThreadID)); n != 0 {
+		t.Fatalf("the history started %d runs", n)
+	}
+	if b := w.trepo.teams[w.team].Brake; b != brake {
+		t.Fatalf("the history counted in the brake: %+v", b)
+	}
+	es, _ := w.contextAudits()
+	if last := es[len(es)-1]; last.Decision != auditing.DecisionAllow || last.Attrs["source"].Data() != "history" {
+		t.Fatalf("last context audit %+v", last)
+	}
+
+	w.input(w.reply(w.coding, "@qa please test A"))
+	in := w.tmsgs.copiesInto(qa.WorkThreadID)
+	if len(in) != 3 || in[2].cmd.AuthorID != w.lotse {
+		t.Fatalf("a later reply did not reach qa: %+v", in)
+	}
+	if rs := w.runsIn(qa.WorkThreadID); len(rs) != 1 || rs[0].TriggerKind != "team" {
+		t.Fatalf("the mention of qa started %+v", rs)
+	}
+}
+
+// TestTeam_NewMemberHistoryIsCapped (D-TCX-6): the history holds the newest 200 messages.
+func TestTeam_NewMemberHistoryIsCapped(t *testing.T) {
+	t.Parallel()
+	w := newTeamWorld(t, defaultTeamConfig())
+	w.setUp()
+	var first ids.ID
+	for i := range 205 {
+		m := w.ownerMessage(w.alex, "note")
+		if i == 5 {
+			first = m
+		}
+	}
+	qa := w.addQA()
+	got := w.tmsgs.copiesInto(qa.WorkThreadID)
+	if len(got) != 200 || got[0].cmd.SourceMessageID != first {
+		t.Fatalf("%d history copies, first %v, want 200 from %s", len(got), got[0].cmd.SourceMessageID, first)
+	}
+}
+
+// TestTeam_NewMemberHistoryCapCountsOnlyCopies (D-TCX-6, PR 1763 review): the cap counts the
+// messages a new member gets, not the messages read: texts of a person who is no owner between
+// them never push an older owner message out of the history.
+func TestTeam_NewMemberHistoryCapCountsOnlyCopies(t *testing.T) {
+	t.Parallel()
+	w := newTeamWorld(t, defaultTeamConfig())
+	w.setUp()
+	var first ids.ID
+	for i := range 205 {
+		m := w.ownerMessage(w.alex, "note")
+		if i == 5 {
+			first = m
+		}
+		w.ownerMessage(w.sam, "chatter of a non-owner")
+	}
+	qa := w.addQA()
+	got := w.tmsgs.copiesInto(qa.WorkThreadID)
+	if len(got) != 200 || got[0].cmd.SourceMessageID != first {
+		t.Fatalf("%d history copies, want 200 from %s", len(got), first)
+	}
+	for _, c := range got {
+		if c.cmd.AuthorID != w.alex {
+			t.Fatalf("a history copy of %s", c.cmd.AuthorID)
+		}
+	}
+}
+
+// TestTeam_NewMemberHistoryReadsBoundedPages (D-TCX-6, PR 1763 review): the history reads at most
+// ten pages of 200 rows, so a long run of texts of a person who is no owner never makes the add
+// scan the whole thread; an owner message beyond those pages is not copied, the add still succeeds.
+func TestTeam_NewMemberHistoryReadsBoundedPages(t *testing.T) {
+	t.Parallel()
+	w := newTeamWorld(t, defaultTeamConfig())
+	w.setUp()
+	old := w.ownerMessage(w.alex, "beyond the pages")
+	w.ownerMessage(w.alex, "also beyond the pages")
+	for range 1999 {
+		w.ownerMessage(w.sam, "chatter of a non-owner")
+	}
+	recent := w.ownerMessage(w.alex, "recent")
+	qa := w.addQA()
+	got := w.tmsgs.copiesInto(qa.WorkThreadID)
+	if len(got) != 1 || got[0].cmd.SourceMessageID != recent {
+		t.Fatalf("%d history copies, want only %s (not %s)", len(got), recent, old)
+	}
 }

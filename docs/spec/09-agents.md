@@ -350,7 +350,8 @@ unchanged: no agent message triggers anything there.
 #### 3.9.1 Team channel and members
 
 - An active owner switches a text channel to team mode (`enableChannelTeam`, action `team.update`)
-  and becomes its sponsor (03 `team_channels.sponsor_id`). Another owner switching it on again
+  and becomes its sponsor (03 `team_channels.sponsor_id`); the apps also create such a channel
+  and switch it on in one step (`createChannel`, then `enableChannelTeam`; 01 6.23 item 6). Another owner switching it on again
   takes over the sponsorship; switching it off (`disableChannelTeam`) removes the team mode and
   every member, the work threads and their messages stay. A DM channel, a forum, an archived and a
   read-only channel cannot be team channels (`409 conflict` with `reason` `dm_channel`,
@@ -396,6 +397,8 @@ session (section 9) therefore work as for any message of the work thread.
 |---|---|---|---|
 | a message of an active owner in the team channel | that owner | `human` | that owner |
 | a member's final reply that mentions the member | the source member's agent | `agent` | the sponsor of the team channel |
+| a member's final reply that does not mention the member (a **context input**, 3.9.4) | the source member's agent | `agent` | the sponsor of the team channel |
+| a message of the history a member gets when it is added (context inputs, 3.9.4) | its author: the owner, or the source member's agent for a mirror | `human` or `agent` | the sponsor of the team channel, for an owner's message too: the checks run once, for the sponsor |
 
 An input is a team trigger, never decided by 3.4: the acceptance of the work thread ignores it.
 `trigger_state` follows an input of origin `human` as in section 6; an input of origin `agent` has
@@ -422,6 +425,29 @@ inside a code span or a fenced code block, case-insensitive. Every mentioned mem
 source gets the reply as an input (3.9.2) with the sponsor as authority, in the order of its first
 mention, as a follow-up of its running run or a new `team` run. Several mentions in one reply are
 allowed here (3.4 step 3 refuses them elsewhere, because those runs share one thread).
+
+Addendum of 2026-11-22 (FEAT-TEAM-CONTEXT-ALL, owner request: every member sees the whole
+conversation): every other member, the source excepted, gets the mirrored reply as a **context
+input**: the same copy and `team_inputs` row with the sponsor as authority, but it starts no run,
+is no follow-up of a running run, is not counted by the brake (3.9.6) and is delivered while the
+channel is paused or stopped. A mentioned member whose input the brake refused gets it as a
+context input instead; a member that already has an input of the reply gets nothing more. Points 1
+to 3 of 3.9.5 apply to it (an active run of another agent excepted); a refusal is audited with
+stage `team_context` and posts no note. The member's next run reads it in its run context (4.6)
+like any message of its work thread: role `other`, trust `unverified`, recorded in 03 `run_feeders`
+with the sponsor as for every team input, so it never makes a later reply fail the check below and
+never becomes the owner's word. A member added later gets the history of the team channel as
+context inputs when it is added (`addTeamMember`, in its unit of work): the newest text messages
+of the main thread that are a message of an active owner or an unedited mirror, up to the fixed
+history cap (the server constant `teamHistoryMax`), oldest first, each with the sponsor as
+authority, also a message of an owner who is not the sponsor (the table of 3.9.2, last row);
+system notes, texts of anyone else, edited mirrors and replies that were refused (never mirrored)
+are never copied and never count towards the cap. The server reads the main thread in pages of
+that size, at most the fixed number of pages `teamHistoryPages`, so a long run of other texts
+never makes the add scan the whole thread; an eligible message beyond them is not copied. The
+checks of 3.9.5 points 1 to 3 run once for the history; one audit entry with stage `team_context`
+and source `history` records it. A main thread without any person's text message or mirror has no
+history: nothing is checked, copied or audited.
 
 A reply is mirrored and handed on only when the run it answers was started and fed only by active
 owners. The run a reply answers is the one 03 `run_answers` links it to, never the `run_id` the
@@ -504,6 +530,7 @@ are high (owner answer 3). It counts member inputs (3.9.4) per team channel in 0
   `pause_reason`).
 - `team` runs and inputs do not count in `run_autonomy` (5.8.6); the brake replaces the chain caps
   for them.
+- Context inputs (3.9.4) trigger nothing and are not counted, also not while the channel is paused.
 
 #### 3.9.7 Stop all
 
@@ -552,7 +579,10 @@ This is the contract the runner and the Hermes adapter build against.
   author, so it never gets an owner code, and the runner labels it "from member @handle" and tells
   the session that it is a colleague's request, not the owner's word.
 - A member hands work to another member by writing `@handle` in its final reply (outside code); no
-  command is needed. A reply without a mention is mirrored and triggers nothing.
+  command is needed. A reply without a mention is mirrored and triggers nothing; every other
+  member gets it as a context input (3.9.4), which arrives as no event: the member's next run reads
+  it in `thread_context` as a message of another agent (role `other`, trust `unverified`), so no
+  runner or adapter change is needed and it never gets an owner code.
 - An adapter that does not know `trigger_kind = team` refuses such a run as it refuses any unknown
   trigger kind; nothing outside team channels changes for it. The Hermes adapter serves `team`
   runs since 2026-11-21 (17.14).

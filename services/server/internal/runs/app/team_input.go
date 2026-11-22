@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"errors"
+	"math"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
@@ -246,7 +247,95 @@ func (s *Service) handOn(ctx context.Context, b *teamBox, team TeamRow, member T
 			return err
 		}
 	}
+	// Every other member sees the reply too, as context that starts and feeds no run (09 3.9.4,
+	// FEAT-TEAM-CONTEXT-ALL); a mentioned member the brake refused gets it the same way.
+	for _, target := range members {
+		if target.ID == member.ID {
+			continue
+		}
+		if err := s.contextInput(ctx, b, team, target, &src); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// contextInput copies a mirrored member reply into the work thread of a member as a context input
+// (09 3.9.4, FEAT-TEAM-CONTEXT-ALL): the same copy and team_inputs row as a member input, with the
+// sponsor as authority, but no follow-up, no run and no turn of the brake. A later run of the member
+// reads it in its run context, where it is recorded with the sponsor like any team input. A member
+// that already has an input of the source is nothing; the checks of 3.9.5 points 1 to 3 still
+// apply, and a refusal is audited (stage team_context) without a note, so a member whose home
+// channel is archived never blocks the mirror or the inputs of the others.
+func (s *Service) contextInput(ctx context.Context, b *teamBox, team TeamRow, member TeamMemberRow, src *teamSource) error {
+	done, err := b.d.Repo.TeamInputDelivered(ctx, src.message, member.ID)
+	if err != nil || done {
+		return err
+	}
+	reason, err := s.contextRefusal(ctx, b, team, member, src)
+	if err != nil || reason != "" {
+		return err
+	}
+	if err := s.copyContext(ctx, b, member, src); err != nil {
+		return err
+	}
+	return s.auditContextInput(ctx, team, member, src, "")
+}
+
+// contextRefusal applies the checks of 09 3.9.5 points 1 to 3 to a context input for member: an
+// active run of another agent does not refuse it. A refusal is audited and returned.
+func (s *Service) contextRefusal(ctx context.Context, b *teamBox, team TeamRow, member TeamMemberRow, src *teamSource) (string, error) {
+	reason, _, err := s.teamRefusal(ctx, b, team, member, src)
+	if err != nil || reason == "" || reason == string(auditing.ReasonRunActiveOtherAgent) {
+		return "", err
+	}
+	return reason, s.auditContextInput(ctx, team, member, src, reason)
+}
+
+// copyContext copies the source into the member's work thread and records the input; a source that
+// already reached the member is nothing.
+func (s *Service) copyContext(ctx context.Context, b *teamBox, member TeamMemberRow, src *teamSource) error {
+	done, err := b.d.Repo.TeamInputDelivered(ctx, src.message, member.ID)
+	if err != nil || done {
+		return err
+	}
+	copied, err := b.d.Messages.CopyMessage(ctx, messaging.CopyCmd{
+		SourceMessageID: src.message, SourceVersion: src.version, ThreadID: member.WorkThreadID, AuthorID: src.author,
+	})
+	if err != nil {
+		return err
+	}
+	in := TeamInputRow{
+		MessageID: copied.ID, MemberID: member.ID, SourceMessageID: src.message, Source: src.kind, AuthorityID: src.authority,
+		CreatedAt: s.now(),
+	}
+	if src.member != nil {
+		in.SourceMemberID = src.member.ID
+	}
+	_, err = b.d.Repo.InsertTeamInput(ctx, in)
+	return err
+}
+
+// auditContextInput writes the audit entry of a context input: as auditTeamInput, with stage
+// team_context.
+func (s *Service) auditContextInput(ctx context.Context, team TeamRow, member TeamMemberRow, src *teamSource, reason string) error {
+	if s.d.Audit == nil {
+		return errs.New(errs.CodeInternalError, "runs: the team channels have no audit recorder")
+	}
+	e := auditing.Entry{
+		Action: string(authorize.ActionAgentInvoke), Decision: auditing.DecisionAllow, ResourceKind: resourceThread, ResourceID: member.WorkThreadID,
+		Attrs: auditing.Attrs{
+			attrStage: auditing.Code(stageTeamContext), attrTeamChannelID: auditing.ID(team.ChannelID), attrMemberID: auditing.ID(member.ID),
+			attrAgentID: auditing.ID(member.AgentID), attrSource: auditing.Code(src.kind),
+		},
+	}
+	if src.member != nil && !src.member.ID.IsZero() {
+		e.Attrs[attrSourceMemberID] = auditing.ID(src.member.ID)
+	}
+	if reason != "" {
+		e.Decision, e.Reason = auditing.DecisionDeny, auditing.Reason(reason)
+	}
+	return s.d.Audit.Record(actor.WithActor(ctx, actor.Recheck(src.authority)), e)
 }
 
 // memberInput passes one member input through the brake (09 3.9.6) and delivers it; the brake
@@ -583,3 +672,111 @@ func (s *Service) followOnTeamRun(ctx context.Context, ended runs.RunSummary, in
 	}
 	return sum, s.emitTeamInvocation(ctx, sum, in.MessageID, mode, teamFacts(member, members, src))
 }
+
+// teamHistoryMax is the most messages of a team channel's main thread a new member gets as
+// context (D-TCX-6): the bound of channel.history_backfill_limit_max, so it covers every run
+// context window the channel can be set to.
+const teamHistoryMax = 200
+
+// teamHistoryPages bounds the pages of teamHistoryMax rows backfillHistory reads, so a main thread
+// full of texts of persons who are no owner never makes addTeamMember scan the whole thread inside
+// its unit of work; the history then holds what those pages gave.
+const teamHistoryPages = 10
+
+// backfillHistory gives a new member the history of the team channel as context inputs (09 3.9.4,
+// FEAT-TEAM-CONTEXT-ALL, D-TCX-6), inside the unit of work of addTeamMember: the newest
+// teamHistoryMax messages of the main thread that are an active owner's text message or the
+// unedited mirror of a member reply, oldest first, each copied like contextInput with the sponsor
+// as authority. A system note, a text of anyone else, an edited mirror and a reply that was refused
+// (never mirrored) are skipped and never count towards the cap. A refusal of the checks of 3.9.5
+// skips the whole history, audited.
+func (s *Service) backfillHistory(ctx context.Context, b *teamBox, team TeamRow, member TeamMemberRow) error {
+	ch, err := s.d.Channels.TriggerChannel(ctx, team.ChannelID)
+	if err != nil || ch.MainThreadID.IsZero() {
+		return err
+	}
+	picked, read, err := s.historySources(ctx, b, team, ch.MainThreadID)
+	if err != nil || !read {
+		return err
+	}
+	check := &teamSource{authority: team.SponsorID, kind: sourceHistory}
+	reason, err := s.contextRefusal(ctx, b, team, member, check)
+	if err != nil || reason != "" {
+		return err
+	}
+	for i := len(picked) - 1; i >= 0; i-- {
+		if err := s.copyContext(ctx, b, member, picked[i]); err != nil {
+			return err
+		}
+	}
+	return s.auditContextInput(ctx, team, member, check, "")
+}
+
+// historySources reads the main thread page by page, newest first, at most teamHistoryPages
+// pages, and returns the newest teamHistoryMax messages a new member may get among them, newest
+// first; read is false for a thread without any person's text message or mirror.
+func (s *Service) historySources(ctx context.Context, b *teamBox, team TeamRow, thread ids.ID) ([]*teamSource, bool, error) {
+	var picked []*teamSource
+	owners := map[ids.ID]bool{}
+	read := false
+	before := int64(math.MaxInt64)
+	for range teamHistoryPages {
+		rows, err := b.d.Repo.TeamHistory(ctx, thread, before, teamHistoryMax)
+		if err != nil {
+			return nil, false, err
+		}
+		read = read || len(rows) > 0
+		if picked, err = s.pickHistory(ctx, b, team, rows, owners, picked); err != nil {
+			return nil, false, err
+		}
+		if len(picked) == teamHistoryMax || len(rows) < teamHistoryMax {
+			return picked, read, nil
+		}
+		before = rows[len(rows)-1].Seq
+	}
+	return picked, read, nil
+}
+
+// pickHistory appends the messages of one page a new member may get to picked, up to
+// teamHistoryMax.
+func (s *Service) pickHistory(ctx context.Context, b *teamBox, team TeamRow, rows []TeamHistoryRow, owners map[ids.ID]bool, picked []*teamSource) ([]*teamSource, error) {
+	for _, r := range rows {
+		if len(picked) == teamHistoryMax {
+			break
+		}
+		src, ok, err := s.historySource(ctx, b, team, r, owners)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			picked = append(picked, src)
+		}
+	}
+	return picked, nil
+}
+
+// historySource returns the source of one message of the history (backfillHistory); ok is false
+// for a message no member may get: a person who is no active owner, an edited mirror, anything
+// else that is no mirror. owners caches whether an author is an active owner.
+func (s *Service) historySource(ctx context.Context, b *teamBox, team TeamRow, r TeamHistoryRow, owners map[ids.ID]bool) (*teamSource, bool, error) {
+	src := &teamSource{message: r.MessageID, version: r.Version, author: r.AuthorID, authority: team.SponsorID, kind: domain.TeamSourceOwner}
+	switch {
+	case r.Mirror && !r.Edited && r.Origin == originAgent:
+		src.kind, src.member = domain.TeamSourceMember, &TeamMemberRow{ID: r.MirrorMemberID}
+		return src, true, nil
+	case !r.Mirror && r.Origin == originHuman:
+		owner, known := owners[r.AuthorID]
+		if !known {
+			var err error
+			if owner, err = b.d.Owners.IsActiveOwner(ctx, r.AuthorID); err != nil {
+				return nil, false, err
+			}
+			owners[r.AuthorID] = owner
+		}
+		return src, owner, nil
+	}
+	return nil, false, nil
+}
+
+// sourceHistory is the audit source of the history a new member gets (D-TCX-6).
+const sourceHistory = "history"

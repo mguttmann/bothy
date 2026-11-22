@@ -18418,6 +18418,42 @@ abstract class AppLocalizations {
   /// **'Team channel...'**
   String get teamMenu;
 
+  /// Entry of the space menu for owners with manage on the space that creates a text channel in team mode (01 6.23 item 6).
+  ///
+  /// In en, this message translates to:
+  /// **'Create team channel...'**
+  String get teamCreateMenu;
+
+  /// Title of the dialog that creates a team channel in a space; name is the space's name (01 6.23 item 6).
+  ///
+  /// In en, this message translates to:
+  /// **'New team channel in {name}'**
+  String teamCreateTitle(String name);
+
+  /// Label of the name field of the dialog that creates a team channel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get teamCreateName;
+
+  /// Hint below the name field of the dialog that creates a team channel.
+  ///
+  /// In en, this message translates to:
+  /// **'A text channel with team mode on; you add the members next.'**
+  String get teamCreateHint;
+
+  /// Button of the dialog that creates the team channel and switches team mode on.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get teamCreateSubmit;
+
+  /// Button that closes the dialog that creates a team channel without creating it.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get teamCreateCancel;
+
   /// Title of the team dialog of a channel (09 3.9.1).
   ///
   /// In en, this message translates to:

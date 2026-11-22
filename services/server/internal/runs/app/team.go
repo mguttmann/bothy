@@ -54,6 +54,7 @@ const (
 	attrOperation      = "operation"
 	attrStopped        = "stopped_runs"
 	stageTeam          = "team"
+	stageTeamContext   = "team_context"
 	resourceChannel    = "channel"
 )
 
@@ -328,6 +329,9 @@ func (s *Service) addMemberTx(ctx context.Context, b *teamBox, a actor.Actor, in
 		Handle: in.Handle, CreatedBy: a.ID, CreatedAt: s.now(),
 	}
 	if err := b.d.Repo.InsertTeamMember(ctx, m); err != nil {
+		return TeamMemberRow{}, err
+	}
+	if err := s.backfillHistory(ctx, b, team, m); err != nil {
 		return TeamMemberRow{}, err
 	}
 	return m, s.auditTeam(ctx, a, authorize.ActionTeamUpdate, in.ChannelID, auditing.Attrs{
