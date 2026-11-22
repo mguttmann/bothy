@@ -179,7 +179,7 @@ async def test_an_owner_s_team_message_that_does_not_mention_the_member(world: W
 async def test_a_silent_reply_to_a_member_s_request_hands_back_a_visible_answer(
     world: World,
 ) -> None:
-    # FIX-TEAM-HANDOFF-NOT-NOTHING: live 2026-11-22 a member asked @reviewagent for paths and a
+    # FIX-TEAM-HANDOFF-NOT-NOTHING: report of 2026-11-22: a member asked another for paths and a
     # commit and the session answered only NOTHING_TO_ADD, which the server never mirrors.
     world.scenario(fixture="plain", result_override={"result": SILENT_REPLY})
     await world.start()
