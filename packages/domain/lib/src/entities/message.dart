@@ -148,6 +148,7 @@ final class Message {
     this.triggerState,
     this.triggerStateAt,
     this.triggerStateReason,
+    this.teamHandle,
     this.editedAt,
     this.deletedAt,
   });
@@ -203,6 +204,10 @@ final class Message {
   /// Reason code for `failed` and `cancelled`.
   final String? triggerStateReason;
 
+  /// Handle of the team member whose reply a team copy carries (API `Message.team_handle`,
+  /// 09 3.9.2); absent on every other message.
+  final String? teamHandle;
+
   /// No notification.
   final bool silent;
 
@@ -243,6 +248,7 @@ final class Message {
     TriggerState? triggerState,
     DateTime? triggerStateAt,
     String? triggerStateReason,
+    String? teamHandle,
     bool? silent,
     List<PrincipalId>? mentionIds,
     bool? pinned,
@@ -268,6 +274,7 @@ final class Message {
     triggerState: triggerState ?? this.triggerState,
     triggerStateAt: triggerStateAt ?? this.triggerStateAt,
     triggerStateReason: triggerStateReason ?? this.triggerStateReason,
+    teamHandle: teamHandle ?? this.teamHandle,
     silent: silent ?? this.silent,
     mentionIds: mentionIds ?? this.mentionIds,
     pinned: pinned ?? this.pinned,
@@ -297,6 +304,7 @@ final class Message {
       other.triggerState == triggerState &&
       other.triggerStateAt == triggerStateAt &&
       other.triggerStateReason == triggerStateReason &&
+      other.teamHandle == teamHandle &&
       other.silent == silent &&
       listEquals(other.mentionIds, mentionIds) &&
       other.pinned == pinned &&
@@ -324,6 +332,7 @@ final class Message {
     triggerState,
     triggerStateAt,
     triggerStateReason,
+    teamHandle,
     silent,
     Object.hashAll(mentionIds),
     pinned,

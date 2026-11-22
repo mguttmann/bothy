@@ -7,7 +7,9 @@ Standard library only; `fake_claude.main` calls it for the commands of backgroun
   ``backgrounded · <short id> · <name>``, starts the fake supervisor when none runs
   (``Starting background service…`` on stderr) and a detached player, the session process.
   The refusals of the pinned CLI are scripted (``bg_refuse``: ``untrusted``, ``bypass``, ``add_dir``
-  for a launch with ``--add-dir``, ``error``), a launch without a process (``bg_no_process``), and
+  for a launch with ``--add-dir``, ``error``; ``bg_trust_check`` refuses like ``untrusted`` while
+  the working folder has no trust entry in the global configuration file), a launch without a
+  process (``bg_no_process``), and
   the copy the CLI starts for a resume whose session still has an entry.
 * ``agents --json --all``, ``stop <id>``, ``rm <id>`` and ``daemon status`` answer from the
   state file ``<config dir>/fake-bg/state.json`` of the fake ``HOME``.
@@ -148,6 +150,20 @@ def _read_json(path: str | None) -> Any:
         return None
 
 
+def _workspace_trusted() -> bool:
+    """The check of the pinned CLI (``bg_trust_check``): the working folder's own trust entry.
+
+    ``projects["<real path>"].hasTrustDialogAccepted`` in ``$CLAUDE_CONFIG_DIR/.claude.json``,
+    else ``$HOME/.claude.json`` (design 2.2 item 5; the CLI also counts a trusted parent of a
+    plain folder, which no scenario needs).
+    """
+    base = os.environ.get("CLAUDE_CONFIG_DIR") or os.environ.get("HOME") or ""
+    document = _read_json(str(Path(base) / ".claude.json")) if base else None
+    projects = document.get("projects") if isinstance(document, dict) else None
+    entry = projects.get(os.path.realpath(os.getcwd())) if isinstance(projects, dict) else None
+    return isinstance(entry, dict) and entry.get("hasTrustDialogAccepted") is True
+
+
 # ---- the launch command ------------------------------------------------------------------------
 
 
@@ -171,6 +187,8 @@ def launch(fake: Any) -> int:  # noqa: PLR0912 - one branch per scripted behavio
         index=index,
     )
     refuse = scenario.get("bg_refuse")
+    if scenario.get("bg_trust_check") and not _workspace_trusted():
+        refuse = "untrusted"
     if refuse == "untrusted":
         sys.stderr.write(
             f"Workspace not trusted. Run `claude` in {os.getcwd()} once and accept the trust "

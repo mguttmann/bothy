@@ -13446,6 +13446,11 @@ type Message struct {
 	// SystemCode Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then. `agent_session.resume_failed` is written once when the runtime no longer knew the bound session and the agent started a new one (09 9.5, 03 R-DM-42); its `author` is the run's agent. A system line never reopens a done thread.
 	SystemCode *MessageSystemCode `json:"system_code,omitempty"`
 
+	// TeamHandle Set only on a team copy whose source is a team member (09 3.9.2, FIX-TEAM-MEMBER-ATTRIBUTION) - the mirror of a member's reply in the team channel and a member's input in another member's work thread - and names that one member, the member of the work thread the reply came from. `author` is the member's agent, which can be several members of one team channel, so clients and runtimes name the member by this handle, never by the agent. Absent on every other message, also on an owner's message copied into a work thread.
+	//
+	// Examples: coding
+	TeamHandle *string `json:"team_handle,omitempty"`
+
 	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
 	ThreadId Uuid `json:"thread_id"`
 
@@ -16683,6 +16688,12 @@ type SidebarChannelPut struct {
 	// Hidden true archives the channel in the caller's own sidebar (sets `hidden_at`, kept when it is already set), false brings it back (clears `hidden_at`); absent keeps the stored state (01 6.22).
 	Hidden *bool `json:"hidden,omitempty"`
 
+	// Pinned true pins the channel to the top of its space in the caller's own sidebar (sets `pinned_at`, kept when it is already set), false unpins it (clears `pinned_at`); absent keeps the stored state (01 6.24).
+	Pinned *bool `json:"pinned,omitempty"`
+
+	// PinnedThreads New list of the posts of the channel pinned to the top of the forum in the caller's own sidebar, in pin order, unique IDs; absent keeps the stored list, an empty list unpins every post (01 6.24). At most `sidebar.order_max_items`.
+	PinnedThreads *[]Uuid `json:"pinned_threads,omitempty"`
+
 	// ThreadOrder New personal order of the posts of the channel, unique IDs; absent keeps the stored order, an empty list returns to the default order. At most `sidebar.order_max_items`.
 	ThreadOrder *[]Uuid `json:"thread_order,omitempty"`
 }
@@ -16694,6 +16705,12 @@ type SidebarChannelState struct {
 
 	// HiddenAt Set while the caller has archived the channel in the own sidebar (01 6.22); absent while it shows in the normal list.
 	HiddenAt *Timestamp `json:"hidden_at,omitempty"`
+
+	// PinnedAt Set while the caller has pinned the channel to the top of its space in the own sidebar (01 6.24); absent while it is not pinned. Pinned channels show in the order of this time, oldest first.
+	PinnedAt *Timestamp `json:"pinned_at,omitempty"`
+
+	// PinnedThreads The posts of the channel the caller pinned to the top of the forum in the own sidebar, in the order they were pinned (01 6.24); empty for none. Absent from servers before this member, which means none. At most `sidebar.order_max_items`.
+	PinnedThreads *[]Uuid `json:"pinned_threads,omitempty"`
 
 	// ThreadOrder Personal order of the open posts of the channel; empty uses the default order. At most `sidebar.order_max_items`.
 	ThreadOrder []Uuid `json:"thread_order"`

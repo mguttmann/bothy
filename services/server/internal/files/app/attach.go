@@ -163,6 +163,10 @@ func (s *Service) DeleteForMessage(ctx context.Context, messageID ids.ID) error 
 	if err := needUnit(ctx, "DeleteForMessage"); err != nil {
 		return err
 	}
+	// A team copy holds relays only: they go, the files stay with their source (D-TCAT-3).
+	if err := s.d.Repo.DeleteRelaysOfMessage(ctx, messageID); err != nil {
+		return err
+	}
 	fileIDs, err := s.d.Repo.LockMessageFiles(ctx, messageID)
 	if err != nil || len(fileIDs) == 0 {
 		return err
@@ -170,7 +174,41 @@ func (s *Service) DeleteForMessage(ctx context.Context, messageID ids.ID) error 
 	if _, err := s.d.Repo.DeleteMessageAttachments(ctx, messageID); err != nil {
 		return err
 	}
+	// The source goes: its files leave every team copy too.
+	if err := s.d.Repo.DeleteRelaysOfFiles(ctx, fileIDs); err != nil {
+		return err
+	}
 	return s.markDeleted(ctx, Deletion{FileIDs: fileIDs})
+}
+
+// Relay implements files.Attachments (FIX-TEAM-CHANNEL-ATTACHMENTS D-TCAT-1): the live files of the
+// source, locked in ascending id, become relays of the copy at their positions in one insert; the
+// copy's attachments are read back in their attached form. A source without live files inserts
+// nothing.
+func (s *Service) Relay(ctx context.Context, cmd files.RelayCmd) ([]files.Attachment, error) {
+	if err := needUnit(ctx, "Relay"); err != nil {
+		return nil, err
+	}
+	sources, err := s.d.Repo.LockRelaySources(ctx, cmd.SourceMessageID)
+	if err != nil {
+		return nil, err
+	}
+	if len(sources) == 0 {
+		return []files.Attachment{}, nil
+	}
+	rows := make([]AttachmentRecord, 0, len(sources))
+	for _, src := range sources {
+		rows = append(rows, AttachmentRecord{MessageID: cmd.MessageID, FileID: src.FileID, ThreadID: cmd.ThreadID, ChannelID: cmd.ChannelID,
+			Position: src.Position})
+	}
+	if err := s.d.Repo.InsertRelays(ctx, rows); err != nil {
+		return nil, err
+	}
+	list, err := s.ForMessages(ctx, []ids.ID{cmd.MessageID})
+	if err != nil {
+		return nil, err
+	}
+	return list[cmd.MessageID], nil
 }
 
 // MessageOf implements files.Attachments: the attachment row of fileID by its unique key.

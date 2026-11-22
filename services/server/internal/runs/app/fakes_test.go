@@ -1456,6 +1456,10 @@ func (a *attachments) DeleteForMessage(context.Context, ids.ID) error {
 	return errs.New(errs.CodeInternalError, "runs never deletes attachments")
 }
 
+func (a *attachments) Relay(context.Context, files.RelayCmd) ([]files.Attachment, error) {
+	return nil, errs.New(errs.CodeInternalError, "runs never relays; messaging does")
+}
+
 func (a *attachments) MessageOf(_ context.Context, file ids.ID) (files.AttachmentRef, bool, error) {
 	a.j.add("files:message-of", file)
 	a.mu.Lock()

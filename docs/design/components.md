@@ -58,7 +58,8 @@ Pin, More).
 | Variant | Data | Rendering |
 |---|---|---|
 | Text | `kind = text` | Markdown in `type.body` or `density.message-font-size` |
-| Continuation message | same author within `ui.message_group_window` | without avatar and header; timestamp on hover |
+| Continuation message | same author and same team member (`team_handle`) within `ui.message_group_window` | without avatar and header; timestamp on hover |
+| Team member | `team_handle` set (01 6.23 item 3) | the handle as the name, avatar from the handle on one of eight category tiles (gorse and granite added to the six), after the badge the agent's name in `type.caption`, `color.text.secondary` ("via Claude Code") |
 | Voice message | `kind = voice` | play button, duration, progress; transcript below as soon as `transcript_status = done` |
 | Live box anchor | `kind = run` | renders the live box (section 2) at this position |
 | Card | `kind = card` | content plus components (section 8) in `color.surface.raised` |
@@ -327,6 +328,12 @@ indented like a channel row with the arrow (`action.expand` or `action.collapse`
 `type.label`, `color.text.on-sidebar-secondary`, collapsed by default and hidden while the space
 has none. The rows in the section are normal channel rows with their states; their menu has
 "Restore" instead. The rows carry the same entry as a screen reader action.
+
+Pin (addendum of 2026-11-22, 01 6.24): the menu of a channel or forum and of a forum post (sidebar,
+post list and the "More" button of its history) has "Pin to top", or "Unpin" while it is pinned,
+after the notification entries. A pinned row leads its space or forum and shows `action.pin`
+(`icon.size.sm`, in the color of the row's name) after the name; its screen reader label adds
+"pinned". A pinned row does not lift, and its "Move up" and "Move down" are disabled.
 
 Delete (addendum of 2026-11-01, 01 6.18): the menus of a space, a channel or forum and a chat row
 end with a divider and "Delete space...", "Delete channel...", "Delete project..." (a forum with a

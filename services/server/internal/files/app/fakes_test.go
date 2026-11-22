@@ -86,6 +86,8 @@ type repo struct {
 	calls       []string
 	// textsDeleted are the deleted files whose extract rows DeleteTextExtractsOfDeleted removed.
 	textsDeleted []ids.ID
+	// relays are the message_attachment_relays rows (FIX-TEAM-CHANNEL-ATTACHMENTS).
+	relays []app.AttachmentRecord
 }
 
 func newRepo() *repo {
@@ -423,10 +425,11 @@ func (s *store) PresignUploadPart(ctx context.Context, _, _ string, _ int, _ int
 	return app.PresignedPart{}, app.ErrNotSupported
 }
 
-// authorizer decides by a rule per action; nil rules allow. It records every resource it was
-// asked about.
+// authorizer decides by a rule per action; nil rules allow. A channel in allowIn is allowed for
+// every action whatever the rule says. It records every resource it was asked about.
 type authorizer struct {
 	rules     map[authorize.Action]authorize.Decision
+	allowIn   map[ids.ID]bool
 	mu        sync.Mutex
 	resources []authorize.Resource
 }
@@ -434,7 +437,11 @@ type authorizer struct {
 func (a *authorizer) Authorize(_ context.Context, _ authorize.Principal, act authorize.Action, r authorize.Resource) (authorize.Decision, error) {
 	a.mu.Lock()
 	a.resources = append(a.resources, r)
+	allowed := a.allowIn[r.ChannelID]
 	a.mu.Unlock()
+	if allowed {
+		return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil
+	}
 	if d, ok := a.rules[act]; ok {
 		return d, nil
 	}

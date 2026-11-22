@@ -159,8 +159,8 @@ type SidebarState struct {
 	UpdatedByDeviceID ids.ID
 }
 
-// SidebarChannelState is the personal post order of one channel and its personal archive (schema
-// SidebarChannelState, M4-51 and PROJ-ARCHIVE).
+// SidebarChannelState is the personal post order of one channel, its personal archive and its
+// personal pins (schema SidebarChannelState, M4-51, PROJ-ARCHIVE and FEAT-PIN-CHANNELS).
 type SidebarChannelState struct {
 	ChannelID ids.ID
 	// ThreadOrder is the personal order of the posts; empty is the default order.
@@ -168,7 +168,12 @@ type SidebarChannelState struct {
 	// HiddenAt is set while the person has archived the channel in the own sidebar (01 6.22);
 	// zero while it shows.
 	HiddenAt time.Time
-	Version  int64
+	// PinnedAt is set while the person has pinned the channel to the top of its space (01 6.24);
+	// zero while it is not pinned.
+	PinnedAt time.Time
+	// PinnedThreads are the posts the person pinned to the top of the forum, in pin order.
+	PinnedThreads []ids.ID
+	Version       int64
 	// UpdatedByDeviceID is the device of the last change; zero for none.
 	UpdatedByDeviceID ids.ID
 }

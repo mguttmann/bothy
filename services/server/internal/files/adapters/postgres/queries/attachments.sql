@@ -39,14 +39,23 @@ SELECT sqlc.arg(message_id)::uuid, unnest(sqlc.arg(file_ids)::uuid[]), unnest(sq
 -- name: ListMessageAttachments :many
 -- ForMessages (design note 6): the attachments of messages the caller already read, with their
 -- files, by message and position; transcript_text for the run context (M3-09 design note 12 d).
+-- The relays of a team copy (message_attachment_relays, FIX-TEAM-CHANNEL-ATTACHMENTS) are its
+-- attachments like original rows; a message has either kind, never both.
 SELECT a.message_id, a.position, a.thread_id, a.channel_id,
        f.id, f.object_key, f.sha256, f.size_bytes, f.mime_type, f.declared_mime_type, f.original_name, f.uploaded_by,
        f.purpose, f.scope_channel_id, f.upload_state, f.scan_status, f.width, f.height, f.duration_ms,
        f.transcript_status, f.transcript_language, f.transcript_source, f.created_at,
        (f.deleted_at IS NOT NULL)::boolean AS deleted, f.transcript_text
-FROM message_attachments a
+FROM (
+    SELECT o.message_id, o.file_id, o.position, o.thread_id, o.channel_id
+    FROM message_attachments o
+    WHERE o.message_id = ANY(sqlc.arg(message_ids)::uuid[])
+    UNION ALL
+    SELECT r.message_id, r.file_id, r.position, r.thread_id, r.channel_id
+    FROM message_attachment_relays r
+    WHERE r.message_id = ANY(sqlc.arg(message_ids)::uuid[])
+) a
 JOIN files f ON f.id = a.file_id
-WHERE a.message_id = ANY(sqlc.arg(message_ids)::uuid[])
 ORDER BY a.message_id, a.position;
 
 -- name: ListThumbnailsOfFiles :many
@@ -79,16 +88,62 @@ DELETE FROM message_attachments WHERE message_id = sqlc.arg(message_id);
 
 -- name: ListAttachmentStates :many
 -- Pending (design note 11 a; M3-09 design note 3): the state and the transcript status of every
--- attached file of one message.
+-- attached file of one message, original or relayed (FIX-TEAM-CHANNEL-ATTACHMENTS).
 SELECT f.upload_state, f.scan_status, (f.deleted_at IS NOT NULL)::boolean AS deleted, f.transcript_status
-FROM message_attachments a
-JOIN files f ON f.id = a.file_id
-WHERE a.message_id = sqlc.arg(message_id);
+FROM files f
+WHERE f.id IN (
+    SELECT a.file_id FROM message_attachments a WHERE a.message_id = sqlc.arg(message_id)
+    UNION ALL
+    SELECT r.file_id FROM message_attachment_relays r WHERE r.message_id = sqlc.arg(message_id)
+);
 
 -- name: MoveThreadAttachments :exec
 -- The subscriber of chat.ThreadMoved (design note 8): the copies of one thread follow it to the
 -- target channel, over the index (thread_id); no version, no event.
 UPDATE message_attachments SET channel_id = sqlc.arg(channel_id) WHERE thread_id = sqlc.arg(thread_id);
+
+-- name: MoveThreadRelays :exec
+-- The subscriber of chat.ThreadMoved: the relays of the team copies of one thread follow it like
+-- the attachments (FIX-TEAM-CHANNEL-ATTACHMENTS), over the index (thread_id).
+UPDATE message_attachment_relays SET channel_id = sqlc.arg(channel_id) WHERE thread_id = sqlc.arg(thread_id);
+
+-- name: ListRelaySources :many
+-- Relay (FIX-TEAM-CHANNEL-ATTACHMENTS): the files of the source of a team copy with their
+-- positions, original or relayed, the files rows locked FOR UPDATE OF files in ascending id
+-- (03 6.3), so a concurrent deletion of the source waits; deleted files are skipped.
+SELECT s.file_id, s.position
+FROM (
+    SELECT a.file_id, a.position FROM message_attachments a WHERE a.message_id = sqlc.arg(message_id)
+    UNION ALL
+    SELECT r.file_id, r.position FROM message_attachment_relays r WHERE r.message_id = sqlc.arg(message_id)
+) s
+JOIN files f ON f.id = s.file_id
+WHERE f.deleted_at IS NULL
+ORDER BY f.id
+FOR UPDATE OF f;
+
+-- name: InsertRelays :exec
+-- Relay: one row per file of the source on the copy, with the source's positions and the copy's
+-- thread and channel. The two arrays have one entry per row.
+INSERT INTO message_attachment_relays (message_id, file_id, position, thread_id, channel_id)
+SELECT sqlc.arg(message_id)::uuid, unnest(sqlc.arg(file_ids)::uuid[]), unnest(sqlc.arg(positions)::smallint[]),
+       sqlc.arg(thread_id)::uuid, sqlc.arg(channel_id)::uuid;
+
+-- name: ListRelaysOfFile :many
+-- file.read of a relayed file (FIX-TEAM-CHANNEL-ATTACHMENTS D-TCAT-2): the places of the team copies
+-- one file is relayed to, by the index (file_id), oldest copy first.
+SELECT message_id, file_id, position, thread_id, channel_id
+FROM message_attachment_relays
+WHERE file_id = sqlc.arg(file_id)
+ORDER BY message_id;
+
+-- name: DeleteRelaysOfMessage :execrows
+-- DeleteForMessage of a team copy: its relays (the files stay with their source).
+DELETE FROM message_attachment_relays WHERE message_id = sqlc.arg(message_id);
+
+-- name: DeleteRelaysOfFiles :execrows
+-- DeleteForMessage of a source: the relays of the files it deletes, on every copy.
+DELETE FROM message_attachment_relays WHERE file_id = ANY(sqlc.arg(file_ids)::uuid[]);
 
 -- name: CountFilesOfThreads :one
 -- The number of files attached to the messages of threads (DeletionInfo.contents.files of chat,

@@ -607,6 +607,22 @@ void main() {
         ),
         findsOneWidget,
       );
+      // FEAT-PIN-CHANNELS (01 6.24): a pinned post shows the pin and says so.
+      await show(
+        tester,
+        const DsSidebarThreadRowData(
+          id: 't',
+          title: 'Export format',
+          pinned: true,
+        ),
+      );
+      expect(
+        find.bySemanticsLabel(
+          'Export format, ${l.threadRowStateOpen}, ${l.channelRowPinned}',
+        ),
+        findsOneWidget,
+      );
+      expect(_glyphs(tester), contains(DsIcons.actionPin));
       handle.dispose();
     });
 

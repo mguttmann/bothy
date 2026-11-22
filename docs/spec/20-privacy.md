@@ -56,7 +56,7 @@ personal data, also of third parties and also special categories under Art. 9),
 | `commands`, `channel_skill_bindings`, `project_bindings`, `forum_tags` | no | configuration | `config` / `content` | on change |
 | `spaces` | indirect | name, created by | `content` | archiving; contents after `retention.content` |
 | `user_space_states` | indirect | personal sidebar | `personal_sync` | with the account |
-| `user_channel_states` | indirect | personal sidebar (post order of a forum, own archive of a channel) | `personal_sync` | with the account |
+| `user_channel_states` | indirect | personal sidebar (post order of a forum, own archive of a channel, own pins of a channel and of posts) | `personal_sync` | with the account |
 | `channels` | content | name, topic, channel prompt | `content` | archiving; after `retention.content` |
 | `dm_participants` | indirect | who writes with whom | `content` | with the DM channel |
 | `threads` | content | title, times, created by | `content` | `retention.content` |
@@ -72,6 +72,7 @@ personal data, also of third parties and also special categories under Art. 9),
 | `file_upload_sessions`, `file_upload_parts` | indirect | declared size and checksum, parts | `transient` | with completion or expiry of the session |
 | `file_text_extracts` | content | text extracted from files | `content` | with the file |
 | `message_attachments` | no | assignment | `content` | with the message |
+| `message_attachment_relays` | no | assignment of a file to a team copy of its message (FIX-TEAM-CHANNEL-ATTACHMENTS) | `content` | with the copy, the source or the file |
 | `runs` | content | trigger, status line, last text excerpt, metrics | `content` | with the thread |
 | `run_steps` | content | tool names, details (can contain paths, commands, data) | `content` | with the run |
 | `run_followups` | indirect | assignment | `content` | with the run |

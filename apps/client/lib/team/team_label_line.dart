@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The line under a message of a team channel (09 3.9.3, 3.9.4): "from @handle" under a
-/// member's mirrored reply, "to all members" under an owner's message, which reaches every
-/// member.
+/// member's mirrored reply, "to @handle" under an owner's message that mentions members (it
+/// reaches only them) and "to all members" under an owner's message without such a mention
+/// (owner ruling of 2026-11-22).
 library;
 
 import 'package:design_system/design_system.dart';
@@ -15,6 +16,9 @@ import 'team_model.dart';
 String teamLabelText(AppLocalizations l, TeamMessageLabel label) =>
     switch (label) {
       FromMember(:final handles) => l.teamFromMember(
+        [for (final h in handles) '@$h'].join(', '),
+      ),
+      ToMembers(:final handles) => l.teamToMembers(
         [for (final h in handles) '@$h'].join(', '),
       ),
       ToAllMembers() => l.teamToAllMembers,

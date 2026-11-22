@@ -268,11 +268,17 @@ A team channel lets the owner's agents work together (09 3.9, 17.14). The adapte
 own handle, the members, who wrote the input and whether it mentions this member. Only a message
 an owner wrote is the owner's word; a member's input and every follow-up of another agent reach
 Hermes behind the line `[von Mitglied @x: ...]`, as a colleague's request that approves nothing.
-An owner's message that reaches a running run is steered as before. To hand work on, the agent
+`@x` is the one member the input came from: the server's `source_handle` for the trigger and the
+message's `team_handle` for a follow-up (FIX-TEAM-MEMBER-ATTRIBUTION); the author's agent, which
+can be several members, stands in only when the server sends neither. An owner's message that reaches a running run is steered as before. To hand work on, the agent
 mentions a handle (`@dev`) in its final answer; the server reads the mention. Every request of
 the run, the answer included, carries the run's own token, which the server needs to hand an
 answer on. A `team` run without its team facts, and any trigger kind the adapter does not know,
-ends `failed` with `adapter_error` before the start.
+ends `failed` with `adapter_error` before the start. The team lines also carry the quiet rules
+(a mention only to hand work over, `NOTHING_TO_ADD` when the agent has nothing new to contribute,
+which the server does not mirror; FIX-TEAM-CHANNEL-NOISE). Hermes' status lines (a memory
+plugin's recall line, lifecycle and fallback notices) reach the adapter through
+`send_or_update_status` and are shown as the run's draft, never as a message, in every channel.
 
 ## Mirror of sessions outside Bothy
 

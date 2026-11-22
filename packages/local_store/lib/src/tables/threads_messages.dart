@@ -177,6 +177,10 @@ class Messages extends Table {
   /// 03 `messages.created_at`.
   DateTimeColumn get createdAt => dateTime()();
 
+  /// 03 `messages.team_handle` (FIX-TEAM-MEMBER-ATTRIBUTION); last, where the migration to
+  /// version 17 adds it.
+  TextColumn get teamHandle => text().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }

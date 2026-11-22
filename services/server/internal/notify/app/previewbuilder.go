@@ -126,7 +126,8 @@ func (b *PreviewBuilder) Message(ctx context.Context, id ids.ID) (messaging.Prev
 }
 
 // Fields returns the fields of mode for m (13 6.4 table): none gives nothing; names the space,
-// channel and thread names of the place and the display name of the author; full adds the excerpt
+// channel and thread names of the place and the display name of the author (the member's handle
+// for a team copy, FIX-TEAM-MEMBER-AUTHOR-DISPLAY); full adds the excerpt
 // (domain.Excerpt with the display names of the mentioned principals), the number of attachments
 // and the first image. Attachments are read only when m has any.
 //
@@ -150,6 +151,11 @@ func (b *PreviewBuilder) Fields(ctx context.Context, mode domain.PreviewMode, m 
 		return PreviewFields{}, err
 	}
 	out.SenderDisplayName = views[m.AuthorID].DisplayName
+	if m.TeamHandle != "" {
+		// A team copy is the member's reply, so the member is its sender, not the agent that
+		// writes for it (FIX-TEAM-MEMBER-AUTHOR-DISPLAY).
+		out.SenderDisplayName = m.TeamHandle
+	}
 	if !mode.ShowsContent() {
 		return out, nil
 	}

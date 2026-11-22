@@ -65,6 +65,32 @@ func (q *Queries) DeleteMessageAttachments(ctx context.Context, messageID pgtype
 	return result.RowsAffected(), nil
 }
 
+const deleteRelaysOfFiles = `-- name: DeleteRelaysOfFiles :execrows
+DELETE FROM message_attachment_relays WHERE file_id = ANY($1::uuid[])
+`
+
+// DeleteForMessage of a source: the relays of the files it deletes, on every copy.
+func (q *Queries) DeleteRelaysOfFiles(ctx context.Context, fileIds []pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteRelaysOfFiles, fileIds)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteRelaysOfMessage = `-- name: DeleteRelaysOfMessage :execrows
+DELETE FROM message_attachment_relays WHERE message_id = $1
+`
+
+// DeleteForMessage of a team copy: its relays (the files stay with their source).
+func (q *Queries) DeleteRelaysOfMessage(ctx context.Context, messageID pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteRelaysOfMessage, messageID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getAttachmentByFile = `-- name: GetAttachmentByFile :one
 SELECT message_id, file_id, position, thread_id, channel_id
 FROM message_attachments
@@ -115,11 +141,41 @@ func (q *Queries) InsertAttachments(ctx context.Context, arg InsertAttachmentsPa
 	return err
 }
 
+const insertRelays = `-- name: InsertRelays :exec
+INSERT INTO message_attachment_relays (message_id, file_id, position, thread_id, channel_id)
+SELECT $1::uuid, unnest($2::uuid[]), unnest($3::smallint[]),
+       $4::uuid, $5::uuid
+`
+
+type InsertRelaysParams struct {
+	MessageID pgtype.UUID
+	FileIds   []pgtype.UUID
+	Positions []int16
+	ThreadID  pgtype.UUID
+	ChannelID pgtype.UUID
+}
+
+// Relay: one row per file of the source on the copy, with the source's positions and the copy's
+// thread and channel. The two arrays have one entry per row.
+func (q *Queries) InsertRelays(ctx context.Context, arg InsertRelaysParams) error {
+	_, err := q.db.Exec(ctx, insertRelays,
+		arg.MessageID,
+		arg.FileIds,
+		arg.Positions,
+		arg.ThreadID,
+		arg.ChannelID,
+	)
+	return err
+}
+
 const listAttachmentStates = `-- name: ListAttachmentStates :many
 SELECT f.upload_state, f.scan_status, (f.deleted_at IS NOT NULL)::boolean AS deleted, f.transcript_status
-FROM message_attachments a
-JOIN files f ON f.id = a.file_id
-WHERE a.message_id = $1
+FROM files f
+WHERE f.id IN (
+    SELECT a.file_id FROM message_attachments a WHERE a.message_id = $1
+    UNION ALL
+    SELECT r.file_id FROM message_attachment_relays r WHERE r.message_id = $1
+)
 `
 
 type ListAttachmentStatesRow struct {
@@ -130,7 +186,7 @@ type ListAttachmentStatesRow struct {
 }
 
 // Pending (design note 11 a; M3-09 design note 3): the state and the transcript status of every
-// attached file of one message.
+// attached file of one message, original or relayed (FIX-TEAM-CHANNEL-ATTACHMENTS).
 func (q *Queries) ListAttachmentStates(ctx context.Context, messageID pgtype.UUID) ([]ListAttachmentStatesRow, error) {
 	rows, err := q.db.Query(ctx, listAttachmentStates, messageID)
 	if err != nil {
@@ -162,9 +218,16 @@ SELECT a.message_id, a.position, a.thread_id, a.channel_id,
        f.purpose, f.scope_channel_id, f.upload_state, f.scan_status, f.width, f.height, f.duration_ms,
        f.transcript_status, f.transcript_language, f.transcript_source, f.created_at,
        (f.deleted_at IS NOT NULL)::boolean AS deleted, f.transcript_text
-FROM message_attachments a
+FROM (
+    SELECT o.message_id, o.file_id, o.position, o.thread_id, o.channel_id
+    FROM message_attachments o
+    WHERE o.message_id = ANY($1::uuid[])
+    UNION ALL
+    SELECT r.message_id, r.file_id, r.position, r.thread_id, r.channel_id
+    FROM message_attachment_relays r
+    WHERE r.message_id = ANY($1::uuid[])
+) a
 JOIN files f ON f.id = a.file_id
-WHERE a.message_id = ANY($1::uuid[])
 ORDER BY a.message_id, a.position
 `
 
@@ -198,6 +261,8 @@ type ListMessageAttachmentsRow struct {
 
 // ForMessages (design note 6): the attachments of messages the caller already read, with their
 // files, by message and position; transcript_text for the run context (M3-09 design note 12 d).
+// The relays of a team copy (message_attachment_relays, FIX-TEAM-CHANNEL-ATTACHMENTS) are its
+// attachments like original rows; a message has either kind, never both.
 func (q *Queries) ListMessageAttachments(ctx context.Context, messageIds []pgtype.UUID) ([]ListMessageAttachmentsRow, error) {
 	rows, err := q.db.Query(ctx, listMessageAttachments, messageIds)
 	if err != nil {
@@ -233,6 +298,82 @@ func (q *Queries) ListMessageAttachments(ctx context.Context, messageIds []pgtyp
 			&i.CreatedAt,
 			&i.Deleted,
 			&i.TranscriptText,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRelaySources = `-- name: ListRelaySources :many
+SELECT s.file_id, s.position
+FROM (
+    SELECT a.file_id, a.position FROM message_attachments a WHERE a.message_id = $1
+    UNION ALL
+    SELECT r.file_id, r.position FROM message_attachment_relays r WHERE r.message_id = $1
+) s
+JOIN files f ON f.id = s.file_id
+WHERE f.deleted_at IS NULL
+ORDER BY f.id
+FOR UPDATE OF f
+`
+
+type ListRelaySourcesRow struct {
+	FileID   pgtype.UUID
+	Position int16
+}
+
+// Relay (FIX-TEAM-CHANNEL-ATTACHMENTS): the files of the source of a team copy with their
+// positions, original or relayed, the files rows locked FOR UPDATE OF files in ascending id
+// (03 6.3), so a concurrent deletion of the source waits; deleted files are skipped.
+func (q *Queries) ListRelaySources(ctx context.Context, messageID pgtype.UUID) ([]ListRelaySourcesRow, error) {
+	rows, err := q.db.Query(ctx, listRelaySources, messageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRelaySourcesRow
+	for rows.Next() {
+		var i ListRelaySourcesRow
+		if err := rows.Scan(&i.FileID, &i.Position); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRelaysOfFile = `-- name: ListRelaysOfFile :many
+SELECT message_id, file_id, position, thread_id, channel_id
+FROM message_attachment_relays
+WHERE file_id = $1
+ORDER BY message_id
+`
+
+// file.read of a relayed file (FIX-TEAM-CHANNEL-ATTACHMENTS D-TCAT-2): the places of the team copies
+// one file is relayed to, by the index (file_id), oldest copy first.
+func (q *Queries) ListRelaysOfFile(ctx context.Context, fileID pgtype.UUID) ([]MessageAttachmentRelay, error) {
+	rows, err := q.db.Query(ctx, listRelaysOfFile, fileID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MessageAttachmentRelay
+	for rows.Next() {
+		var i MessageAttachmentRelay
+		if err := rows.Scan(
+			&i.MessageID,
+			&i.FileID,
+			&i.Position,
+			&i.ThreadID,
+			&i.ChannelID,
 		); err != nil {
 			return nil, err
 		}
@@ -414,5 +555,21 @@ type MoveThreadAttachmentsParams struct {
 // target channel, over the index (thread_id); no version, no event.
 func (q *Queries) MoveThreadAttachments(ctx context.Context, arg MoveThreadAttachmentsParams) error {
 	_, err := q.db.Exec(ctx, moveThreadAttachments, arg.ChannelID, arg.ThreadID)
+	return err
+}
+
+const moveThreadRelays = `-- name: MoveThreadRelays :exec
+UPDATE message_attachment_relays SET channel_id = $1 WHERE thread_id = $2
+`
+
+type MoveThreadRelaysParams struct {
+	ChannelID pgtype.UUID
+	ThreadID  pgtype.UUID
+}
+
+// The subscriber of chat.ThreadMoved: the relays of the team copies of one thread follow it like
+// the attachments (FIX-TEAM-CHANNEL-ATTACHMENTS), over the index (thread_id).
+func (q *Queries) MoveThreadRelays(ctx context.Context, arg MoveThreadRelaysParams) error {
+	_, err := q.db.Exec(ctx, moveThreadRelays, arg.ChannelID, arg.ThreadID)
 	return err
 }

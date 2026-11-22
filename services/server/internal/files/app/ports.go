@@ -215,9 +215,21 @@ type Repository interface {
 	// DeleteMessageAttachments deletes the attachment rows of messageID and returns how many. It
 	// needs a unit of work.
 	DeleteMessageAttachments(ctx context.Context, messageID ids.ID) (int, error)
-	// AttachmentStates returns the state of every attached file of messageID. It needs a unit of
-	// work.
+	// AttachmentStates returns the state of every attached file of messageID, original or
+	// relayed. It needs a unit of work.
 	AttachmentStates(ctx context.Context, messageID ids.ID) ([]domain.StateFacts, error)
+	// LockRelaySources locks the files of messageID that are not deleted, original or relayed,
+	// FOR UPDATE and returns them with their positions in ascending file id
+	// (FIX-TEAM-CHANNEL-ATTACHMENTS). It needs a unit of work.
+	LockRelaySources(ctx context.Context, messageID ids.ID) ([]RelaySource, error)
+	// InsertRelays inserts the relays of one team copy in one statement. It needs a unit of work.
+	InsertRelays(ctx context.Context, rows []AttachmentRecord) error
+	// RelaysOf returns the relays of fileID, oldest copy first; none for a file relayed nowhere.
+	RelaysOf(ctx context.Context, fileID ids.ID) ([]AttachmentRecord, error)
+	// DeleteRelaysOfMessage deletes the relays of messageID. It needs a unit of work.
+	DeleteRelaysOfMessage(ctx context.Context, messageID ids.ID) error
+	// DeleteRelaysOfFiles deletes every relay of fileIDs. It needs a unit of work.
+	DeleteRelaysOfFiles(ctx context.Context, fileIDs []ids.ID) error
 
 	// SearchReadStore answers the read operations for the search coordinator (M3-14).
 	SearchReadStore
@@ -252,6 +264,12 @@ type AttachmentRecord struct {
 	Position                               int
 }
 
+// RelaySource is one file of the source of a team copy with its position there.
+type RelaySource struct {
+	FileID   ids.ID
+	Position int
+}
+
 // AttachedFile is an attachment row with its file and the file's thumbnails.
 type AttachedFile struct {
 	Row  AttachmentRecord
@@ -268,6 +286,9 @@ type ThreadAttachments interface {
 	// MoveThreadAttachments sets channel_id = channelID on every row of threadID, without a
 	// version and without an event. It needs a unit of work.
 	MoveThreadAttachments(ctx context.Context, threadID, channelID ids.ID) error
+	// MoveThreadRelays sets channel_id = channelID on every relay of threadID
+	// (FIX-TEAM-CHANNEL-ATTACHMENTS), like MoveThreadAttachments. It needs a unit of work.
+	MoveThreadRelays(ctx context.Context, threadID, channelID ids.ID) error
 }
 
 // FreeSpace reports the free bytes of the file system of file.fs.root (adapters/fs); only the

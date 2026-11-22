@@ -81,6 +81,11 @@ erDiagram
     smallint position PK
     uuid file_id FK, UK
   }
+  message_attachment_relays {
+    uuid message_id PK, FK
+    smallint position PK
+    uuid file_id FK
+  }
   principals {
     uuid id PK
   }
@@ -124,3 +129,5 @@ erDiagram
   files ||--o| file_text_extracts : "file text"
   messages ||--o{ message_attachments : "attachments"
   files ||--o| message_attachments : "attached to"
+  messages ||--o{ message_attachment_relays : "relayed files"
+  files ||--o{ message_attachment_relays : "relayed to"

@@ -249,8 +249,9 @@ func TestDeleteForMessage(t *testing.T) {
 	if err := del(p.message); err != nil {
 		t.Fatal(err)
 	}
-	if calls := e.repo.callList(); !reflect.DeepEqual(calls, []string{"LockMessageFiles", "DeleteMessageAttachments", "MarkFilesDeleted", "DeleteTextExtractsOfDeleted"}) {
-		t.Errorf("calls %v: files first, then the rows, then deleted_at, then the extracted texts (M3-15)", calls)
+	if calls := e.repo.callList(); !reflect.DeepEqual(calls, []string{"DeleteRelaysOfMessage", "LockMessageFiles", "DeleteMessageAttachments", "DeleteRelaysOfFiles",
+		"MarkFilesDeleted", "DeleteTextExtractsOfDeleted"}) {
+		t.Errorf("calls %v: the relays of a team copy, the files, then the rows and the relays of the files, then deleted_at, then the extracted texts (M3-15)", calls)
 	}
 	if got := e.repo.textsDeleted; len(got) != 2 {
 		t.Errorf("extracted texts deleted for %v; want both files", got)
@@ -267,7 +268,7 @@ func TestDeleteForMessage(t *testing.T) {
 		t.Errorf("%d events, %d FileFinalized", len(e.events.list), e.finalCount(f1.ID))
 	}
 	e.repo.calls = nil
-	if err := del(ids.New()); err != nil || !reflect.DeepEqual(e.repo.callList(), []string{"LockMessageFiles"}) {
+	if err := del(ids.New()); err != nil || !reflect.DeepEqual(e.repo.callList(), []string{"DeleteRelaysOfMessage", "LockMessageFiles"}) {
 		t.Errorf("no attachments: %v, calls %v", err, e.repo.callList())
 	}
 }
@@ -447,5 +448,9 @@ func TestSubscribersOnThreadMoved(t *testing.T) {
 	}
 	if !slices.Equal(rows.moves, [][2]ids.ID{{ev.ThreadID, ev.ToChannelID}}) {
 		t.Errorf("moves %v", rows.moves)
+	}
+	// The relays of the team copies of the thread follow it (FIX-TEAM-CHANNEL-ATTACHMENTS).
+	if !slices.Equal(rows.relayMoves, [][2]ids.ID{{ev.ThreadID, ev.ToChannelID}}) {
+		t.Errorf("relay moves %v", rows.relayMoves)
 	}
 }

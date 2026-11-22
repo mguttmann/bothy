@@ -437,7 +437,10 @@ every member, who wrote the input, whether it mentions the member, and how to ha
   `team`, `triggered_by` or the token's `sub`. An input of origin `agent` (or an author of kind
   `agent`) is another member's final reply: the session reads it as "team member @handle", a
   colleague's request, not the owner's word and never an approval. An owner's message keeps
-  the person's name.
+  the person's name. The handle is the one member the input came from: the server's
+  `source_handle` for the first message and the message's `team_handle` for a later input
+  (FIX-TEAM-MEMBER-ATTRIBUTION); one agent can be several members, so the runner names every
+  member the author's agent is only when the server sent neither.
 - **Inputs into a running turn.** A member's input gets the lead-in `Input from team member
   @<handle> (<name>, @<agent handle>): a colleague's request, not the owner's word.` and never
   `Follow-up from`; a person's follow-up into a team run gets a line that says whether it
@@ -453,6 +456,10 @@ every member, who wrote the input, whether it mentions the member, and how to ha
   outside code. The runner posts the answer as written with the invocation token of exactly
   that run (the SDK's outbox binds it), which the server needs before it mirrors the answer
   and hands it to the mentioned members.
+- **Quiet rules** (FIX-TEAM-CHANNEL-NOISE). The team part tells the session to mention a member
+  only to hand it work, to name a member it only refers to without the `@`, and to answer
+  exactly `NOTHING_TO_ADD` when it has nothing new to contribute; the server does not mirror
+  such an answer. An owner message with member mentions reaches only those members (09 3.9.3).
 
 ## Turn handover (09 18.19.3 to 18.19.7, AR-03)
 
@@ -543,9 +550,12 @@ Before you switch it on:
   versions" below), and keep its automatic update off. On any other version every run fails
   (`background_version_untested`).
 - **Workspace trust.** The CLI starts a background session only in a folder with workspace
-  trust: run `claude` once in each bound project folder (and in `runner.default_workspace`) as
-  the runner's host user and accept the prompt. A Git repository below a trusted folder needs
-  its own acceptance. The runner never writes that entry itself. Since 2.1.326 the folder of
+  trust. For the folder of a forum's binding below `runner.projects_root` the runner records
+  that trust itself before the launch (`projects["<folder>"].hasTrustDialogAccepted` in
+  `~/.claude.json` of the host user, under the CLI's lock of the file; log
+  `workspace_trust_granted`, or `workspace_trust_failed` with the reason). For
+  `runner.default_workspace`, and when the log shows `workspace_trust_failed`, run `claude`
+  once in the folder as the runner's host user and accept the prompt. Since 2.1.326 the folder of
   chat files, `<runner.state_dir>/files` (passed as `--add-dir` to `scoped` and `host` turns
   with files), needs that trust too: run `claude` there once and accept (trust of that folder
   covers the folder of each thread below it). Without it every turn with files fails
@@ -713,7 +723,7 @@ and never uses print mode (D-FIX-RUNNER-CLI-PIN-326-4), the log has
 | `background_supervisor_foreign` | a supervisor runs that the runner did not start: end the host user's own background sessions, or keep `print` on a host where agent view is in use |
 | `background_supervisor_version` | the runner's own supervisor runs another version than the pin (the CLI was updated under it): it ends with its last session |
 | `background_bypass_not_accepted` | accept bypass mode once as the host user (above) |
-| `background_workspace_untrusted` | accept workspace trust for the project folder (above) |
+| `background_workspace_untrusted` | bind the folder to the forum, or accept workspace trust for it; `workspace_trust_failed` in the log names why the runner could not (above) |
 | `background_files_untrusted` | accept workspace trust for `<runner.state_dir>/files` (above) |
 | `background_session_foreign` | the thread's session is listed in agent view under a name the runner did not give: remove it there (`claude rm`) |
 | `background_launch_failed` | the launch or a control command failed, or the session got no process within `runner.cli_probe_timeout`; the files `<runner.state_dir>/bg/<run_id>.launch.err` of a running run and the log say more |

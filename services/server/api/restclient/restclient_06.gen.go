@@ -13,6 +13,47 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// ListMessageRevisionsWithResponse Read earlier versions
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /messages/{message_id}/revisions (the `ListMessageRevisions` operationId).
+func (c *ClientWithResponses) ListMessageRevisionsWithResponse(ctx context.Context, messageId MessageIdPath, reqEditors ...RequestEditorFn) (*ListMessageRevisionsResponse, error) {
+	rsp, err := c.ListMessageRevisions(ctx, messageId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMessageRevisionsResponse(rsp)
+}
+
+// ListOwnersWithResponse List owners
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /owners (the `ListOwners` operationId).
+func (c *ClientWithResponses) ListOwnersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOwnersResponse, error) {
+	rsp, err := c.ListOwners(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListOwnersResponse(rsp)
+}
+
+// AddOwnerWithBodyWithResponse Make a person owner
+//
+// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /owners (the `AddOwner` operationId).
+func (c *ClientWithResponses) AddOwnerWithBodyWithResponse(ctx context.Context, params *AddOwnerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddOwnerResponse, error) {
+	rsp, err := c.AddOwnerWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAddOwnerResponse(rsp)
+}
+
 // AddOwnerWithResponse Make a person owner
 //
 // Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.

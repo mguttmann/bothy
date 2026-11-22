@@ -183,12 +183,11 @@ func (s *Service) readable(ctx context.Context, a actor.Actor, fileID ids.ID, is
 	if !found || f.Deleted {
 		return FileRecord{}, notFound()
 	}
-	r, err := s.readResource(ctx, f)
+	ref, err := s.attachmentRef(ctx, f.ID)
 	if err != nil {
 		return FileRecord{}, err
 	}
-	r.IssueTicket = issue
-	d, err := s.decide(ctx, a, authorize.ActionFileRead, r)
+	d, err := s.decideRead(ctx, a, f, ref, issue)
 	if err != nil {
 		return FileRecord{}, err
 	}

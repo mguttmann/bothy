@@ -139,6 +139,37 @@ func TestPreviewBuilder_FieldsByMode(t *testing.T) {
 	}
 }
 
+// TestPreviewBuilder_TeamMemberIsTheSender (FIX-TEAM-MEMBER-AUTHOR-DISPLAY): a team copy names
+// the member it came from (team_handle) as the sender of its preview, not the agent that writes
+// for the member; a message without a handle keeps the author's display name.
+func TestPreviewBuilder_TeamMemberIsTheSender(t *testing.T) {
+	agent, mirror, plain := ids.New(), ids.New(), ids.New()
+	b, err := app.NewPreviewBuilder(app.PreviewConfig{DefaultMode: "names", MaxChars: 240}, app.PreviewBuilderDeps{
+		Messages: previewMessages{
+			mirror: {ID: mirror, AuthorID: agent, Kind: "text", ContentMD: "Built it", TeamHandle: "codingagent"},
+			plain:  {ID: plain, AuthorID: agent, Kind: "text", ContentMD: "Built it"},
+		},
+		Names:       previewNames{ChannelName: "team"},
+		Principals:  previewPrincipals{agent: {ID: agent, Handle: "claude", DisplayName: "Claude Code"}},
+		Settings:    previewSettings{},
+		Attachments: &previewAttachments{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	for _, mode := range []domain.PreviewMode{domain.PreviewFull, domain.PreviewNames} {
+		m, _, _ := b.Message(ctx, mirror)
+		if f, err := b.Fields(ctx, mode, m); err != nil || f.SenderDisplayName != "codingagent" {
+			t.Errorf("%s: a mirror's sender is %q (%v), want the member codingagent", mode, f.SenderDisplayName, err)
+		}
+		m, _, _ = b.Message(ctx, plain)
+		if f, err := b.Fields(ctx, mode, m); err != nil || f.SenderDisplayName != "Claude Code" {
+			t.Errorf("%s: a message without a handle names %q (%v), want the agent", mode, f.SenderDisplayName, err)
+		}
+	}
+}
+
 // TestPreviewBuilder_HintFields checks the preview fields of notification.created (13 6.3, M3-22
 // design note 9 f), the one rule of the job notify.gateway_send and of an api node that builds a
 // hint again from a signal: the fields of the recipient's mode without the image; nothing for the

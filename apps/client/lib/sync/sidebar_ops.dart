@@ -2,7 +2,9 @@
 
 /// The write of the personal sidebar: the order of a space and the own channel order of a space
 /// (`putMySidebarSpace`), the own thread order of a channel (`putMySidebarChannel`, M4-51) and
-/// the personal archive of a channel (`hidden`, the same operation, 01 6.22) through the outbox (components.md 7; 04 14; brief M4-19 Design note 2). The collapse of a
+/// the personal archive of a channel (`hidden`, the same operation, 01 6.22) and the personal
+/// pins of a channel and its posts (`pinned`, `pinned_threads`, the same operation, 01 6.24)
+/// through the outbox (components.md 7; 04 14; brief M4-19 Design note 2). The collapse of a
 /// space stays on its device (01 6.7, R-PR-24) and is never written here.
 library;
 
@@ -19,7 +21,7 @@ import '../sidebar/sidebar_order.dart';
 /// | Kind | Payload | Lane |
 /// |---|---|---|
 /// | `putMySidebarSpace` | `space_id`, `collapsed`, optional `sort_key`, optional `channel_order` | `sidebar:<space_id>` |
-/// | `putMySidebarChannel` | `channel_id`, optional `thread_order`, optional `hidden` | `sidebar-channel:<channel_id>` |
+/// | `putMySidebarChannel` | `channel_id`, optional `thread_order`, `hidden`, `pinned`, `pinned_threads` | `sidebar-channel:<channel_id>` |
 ///
 /// Writes of one space or one channel run in order (the last one wins, 04 14), different ones
 /// in parallel. The `Idempotency-Key` is the entry's ID (06 7).
@@ -81,13 +83,20 @@ abstract final class SidebarOps {
       final body = decodePayload(e.payload);
       final order = body['thread_order'];
       final hidden = body['hidden'];
+      final pinned = body['pinned'];
+      final pinnedThreads = body['pinned_threads'];
       final response = await prefs.putMySidebarChannel(
         channelId: _channelOf(body),
         // An absent member keeps the stored value on the server (06 R-API-31): an archive
-        // write sends only `hidden`, an order write only `thread_order`.
+        // write sends only `hidden`, an order write only `thread_order`, a pin write only
+        // `pinned` or `pinned_threads`.
         sidebarChannelPut: SidebarChannelPut((b) {
           if (order is List) b.threadOrder = ListBuilder(order.cast<String>());
           if (hidden is bool) b.hidden = hidden;
+          if (pinned is bool) b.pinned = pinned;
+          if (pinnedThreads is List) {
+            b.pinnedThreads = ListBuilder(pinnedThreads.cast<String>());
+          }
         }),
         extra: ctx.extra,
       );
@@ -200,6 +209,48 @@ final class SidebarWriter {
       OutboxRequest(
         kind: SidebarOps.putMySidebarChannel,
         payload: {'channel_id': channel.value, 'hidden': hidden},
+      ),
+    );
+  }
+
+  /// Pins [channel] to the top of its space in the person's own sidebar ([pinned] true) or
+  /// unpins it (false), 01 6.24: the local row at once (pinned from now until the server's time
+  /// arrives), then `putMySidebarChannel` with `pinned` alone.
+  Future<void> setPinned(ChannelId channel, {required bool pinned}) async {
+    await _db.structureDao.putUserChannelPinnedLocally(
+      channel,
+      pinnedAt: pinned ? DateTime.now().toUtc() : null,
+    );
+    await _engine.outbox.enqueue(
+      OutboxRequest(
+        kind: SidebarOps.putMySidebarChannel,
+        payload: {'channel_id': channel.value, 'pinned': pinned},
+      ),
+    );
+  }
+
+  /// Pins the post [thread] to the top of the forum [channel] in the person's own sidebar, after
+  /// the posts pinned before it, or unpins it when it is pinned (01 6.24): the local row at once,
+  /// then `putMySidebarChannel` with the whole list `pinned_threads` alone.
+  Future<void> togglePinnedThread(ChannelId channel, ThreadId thread) async {
+    final rows = await _db.structureDao.watchUserChannelStates().first;
+    final now =
+        rows.where((s) => s.channelId == channel).firstOrNull?.pinnedThreads ??
+        const <ThreadId>[];
+    final next = now.contains(thread)
+        ? [
+            for (final t in now)
+              if (t != thread) t,
+          ]
+        : [...now, thread];
+    await _db.structureDao.putUserChannelPinnedThreadsLocally(channel, next);
+    await _engine.outbox.enqueue(
+      OutboxRequest(
+        kind: SidebarOps.putMySidebarChannel,
+        payload: {
+          'channel_id': channel.value,
+          'pinned_threads': [for (final t in next) t.value],
+        },
       ),
     );
   }

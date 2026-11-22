@@ -1003,6 +1003,30 @@ class ServerPlatform(BasePlatformAdapter):
             return SendResult(success=False, error="the server was not reachable")
         return SendResult(success=True, message_id=str(posted) if posted else None)
 
+    async def send_or_update_status(
+        self,
+        chat_id: str,
+        status_key: str,
+        content: str,
+        *,
+        metadata: dict[str, Any] | None = None,
+    ) -> SendResult:
+        """A status line of Hermes' status callback: progress, never a message.
+
+        Hermes routes every status of a turn here instead of ``send`` when the adapter has this
+        method: a memory plugin's recall line ("recalled 43 memories"), a lifecycle
+        notice, a fallback or compression notice. Posted with ``send`` it became a message of the
+        run, mirrored into a team channel and handed to every member as context; now it is the
+        run's draft like other progress (D-ADAPTER-INTERIM-1), and outside a run it is dropped
+        (FIX-TEAM-CHANNEL-NOISE D-TCN-5).
+        """
+        thread = _uuid_of((metadata or {}).get("thread_id")) or _uuid_of(
+            get_session_env(_THREAD_VAR, "")
+        )
+        if thread is not None and thread not in self._control and self.handler is not None:
+            self.handler.on_interim(thread, content, marked=True)
+        return SendResult(success=True, message_id=None)
+
     def _turn_send(self, chat_id: str, thread: uuid.UUID, env_thread: uuid.UUID | None) -> bool:
         """Whether a send into ``thread`` belongs to a turn of that thread (09 14 versus 17.3).
 

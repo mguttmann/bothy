@@ -228,4 +228,70 @@ void main() {
       'hidden': false,
     });
   });
+
+  test('setPinned and togglePinnedThread change the row at once, then send '
+      'only pinned or pinned_threads; the answer brings both '
+      '(FEAT-PIN-CHANNELS)', () async {
+    final routes = {
+      'PUT /me/sidebar/channels/${ch1.value}': <String, Object?>{
+        'channel_id': ch1.value,
+        'thread_order': [t1.value],
+        'pinned_at': '2026-11-22T09:30:00.000Z',
+        'pinned_threads': [t2.value],
+        'version': 5,
+        'updated_by_device_id': otherDevice,
+      },
+    };
+    final adapter = _Adapter(routes);
+    final executors = OutboxExecutors();
+    SidebarOps.register(executors, client(adapter), db);
+
+    await writer.setPinned(ch1, pinned: true);
+    var row = (await db.structureDao.watchUserChannelStates().first).single;
+    expect(row.pinned, isTrue, reason: 'the local row changes at once');
+    final entry = (await db.outboxDao.allEntries()).single;
+    expect(entry.kind, SidebarOps.putMySidebarChannel);
+    expect(jsonDecode(entry.payload), {
+      'channel_id': ch1.value,
+      'pinned': true,
+    });
+    expect(executors.laneOf(entry), 'sidebar-channel:${ch1.value}');
+    expect((await run(executors, entry)).status, 200);
+    expect(adapter.seen.single.$2, {'pinned': true});
+    row = (await db.structureDao.watchUserChannelStates().first).single;
+    expect(row.pinnedAt, DateTime.utc(2026, 11, 22, 9, 30));
+    expect(row.pinnedThreads, [t2]);
+    expect(row.version, const ResourceVersion(5));
+    await db.outboxDao.delete(entry.id);
+
+    // Pinning a post appends it to the pinned posts; pinning it again unpins it.
+    await writer.togglePinnedThread(ch1, t1);
+    row = (await db.structureDao.watchUserChannelStates().first).single;
+    expect(row.pinnedThreads, [t2, t1]);
+    expect(row.pinned, isTrue, reason: 'the channel pin stays');
+    var sent = await db.outboxDao.allEntries();
+    expect(jsonDecode(sent.single.payload), {
+      'channel_id': ch1.value,
+      'pinned_threads': [t2.value, t1.value],
+    });
+    await db.outboxDao.delete(sent.single.id);
+    await writer.togglePinnedThread(ch1, t2);
+    row = (await db.structureDao.watchUserChannelStates().first).single;
+    expect(row.pinnedThreads, [t1]);
+    sent = await db.outboxDao.allEntries();
+    expect(jsonDecode(sent.single.payload), {
+      'channel_id': ch1.value,
+      'pinned_threads': [t1.value],
+    });
+    await db.outboxDao.delete(sent.single.id);
+
+    await writer.setPinned(ch1, pinned: false);
+    row = (await db.structureDao.watchUserChannelStates().first).single;
+    expect(row.pinned, isFalse);
+    expect(row.pinnedThreads, [t1], reason: 'the pinned posts stay');
+    expect(jsonDecode((await db.outboxDao.allEntries()).single.payload), {
+      'channel_id': ch1.value,
+      'pinned': false,
+    });
+  });
 }

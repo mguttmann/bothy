@@ -171,7 +171,9 @@ final class UserSpaceState {
 }
 
 /// Personal sidebar state of one channel, synchronized across devices (03
-/// `user_channel_states`): the own order of the open posts of a forum (D-M4-51-2).
+/// `user_channel_states`): the own order of the open posts of a forum (D-M4-51-2), the own archive
+/// of the channel (PROJ-ARCHIVE) and the own pins of the channel and of its posts
+/// (FEAT-PIN-CHANNELS).
 final class UserChannelState {
   /// Creates a [UserChannelState].
   const UserChannelState({
@@ -180,6 +182,8 @@ final class UserChannelState {
     required this.version,
     this.updatedByDeviceId,
     this.hiddenAt,
+    this.pinnedAt,
+    this.pinnedThreads = const [],
   });
 
   /// Channel.
@@ -191,6 +195,17 @@ final class UserChannelState {
 
   /// Whether the person archived the channel in the own sidebar.
   bool get hidden => hiddenAt != null;
+
+  /// When the person pinned the channel to the top of its space in the own sidebar (01 6.24,
+  /// FEAT-PIN-CHANNELS); null while it is not pinned. Pinned channels show oldest pin first.
+  final DateTime? pinnedAt;
+
+  /// Whether the person pinned the channel to the top of its space.
+  bool get pinned => pinnedAt != null;
+
+  /// The posts of the channel the person pinned to the top of the forum, in the order they were
+  /// pinned (01 6.24); empty for none.
+  final List<ThreadId> pinnedThreads;
 
   /// Own order of the threads of the channel; empty means the default order. Threads not in
   /// the list come first (D-M4-51-3).
@@ -214,6 +229,8 @@ final class UserChannelState {
     version: version ?? this.version,
     updatedByDeviceId: updatedByDeviceId ?? this.updatedByDeviceId,
     hiddenAt: hiddenAt,
+    pinnedAt: pinnedAt,
+    pinnedThreads: pinnedThreads,
   );
 
   @override
@@ -223,7 +240,9 @@ final class UserChannelState {
       listEquals(other.threadOrder, threadOrder) &&
       other.version == version &&
       other.updatedByDeviceId == updatedByDeviceId &&
-      other.hiddenAt == hiddenAt;
+      other.hiddenAt == hiddenAt &&
+      other.pinnedAt == pinnedAt &&
+      listEquals(other.pinnedThreads, pinnedThreads);
 
   @override
   int get hashCode => Object.hash(
@@ -232,6 +251,8 @@ final class UserChannelState {
     version,
     updatedByDeviceId,
     hiddenAt,
+    pinnedAt,
+    Object.hashAll(pinnedThreads),
   );
 }
 

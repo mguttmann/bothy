@@ -1167,7 +1167,7 @@ final class ChannelThreadsProvider
   }
 }
 
-String _$channelThreadsHash() => r'dd89b01506c78e59d6e760e079cb14b92224cef9';
+String _$channelThreadsHash() => r'86d9f368e2a120ed818f13e3586f25b41f67ee3d';
 
 /// The thread group of [channelId] (01 6.8 items 2 to 6; `selectSidebarThreads`): its stored
 /// threads, the counters per thread, its runs, the selected thread of the route, the person,
@@ -1445,6 +1445,59 @@ final class HiddenChannelsProvider
 
 String _$hiddenChannelsHash() => r'8d89da7dc9ef97cf217d474f584712e3c598968b';
 
+/// The channels the person pinned to the top of their space in the own sidebar (01 6.24,
+/// `user_channel_states.pinned_at`), oldest pin first; synchronized to every device of the
+/// person.
+
+@ProviderFor(pinnedChannels)
+final pinnedChannelsProvider = PinnedChannelsProvider._();
+
+/// The channels the person pinned to the top of their space in the own sidebar (01 6.24,
+/// `user_channel_states.pinned_at`), oldest pin first; synchronized to every device of the
+/// person.
+
+final class PinnedChannelsProvider
+    extends
+        $FunctionalProvider<List<ChannelId>, List<ChannelId>, List<ChannelId>>
+    with $Provider<List<ChannelId>> {
+  /// The channels the person pinned to the top of their space in the own sidebar (01 6.24,
+  /// `user_channel_states.pinned_at`), oldest pin first; synchronized to every device of the
+  /// person.
+  PinnedChannelsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'pinnedChannelsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$pinnedChannelsHash();
+
+  @$internal
+  @override
+  $ProviderElement<List<ChannelId>> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  List<ChannelId> create(Ref ref) {
+    return pinnedChannels(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<ChannelId> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<ChannelId>>(value),
+    );
+  }
+}
+
+String _$pinnedChannelsHash() => r'2a758d1004efef648a43334b4f273f75da977e65';
+
 /// Every channel and forum of [spaceId] in the person's manual order (the global one in the
 /// person's `channel_order`, rows not in it first, 01 6.16 item 3), the archived ones of 01 6.22
 /// included; direct messages and channels archived for everyone are not part of the tree.
@@ -1618,7 +1671,7 @@ final class ArchivedChannelsOfSpaceProvider
 }
 
 String _$archivedChannelsOfSpaceHash() =>
-    r'ff62bf9c453ffef5c4fab5a7d03a8d290376a145';
+    r'b5e28acae41996fc4e2eef4e9149b367d09361c1';
 
 /// The channels of [spaceId] the person archived in the own sidebar (01 6.22), in the manual
 /// order, each with the row of [ChannelsOfSpace]; they show in the section "Archived (n)" at the
@@ -1655,7 +1708,9 @@ final class ArchivedChannelsOfSpaceFamily extends $Family
 ///
 /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
 /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
-/// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4).
+/// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4). The
+/// channels the person pinned ([pinnedChannelsProvider], 01 6.24) come first in either order, by
+/// the time of their pin; a pin or unpin applies at once, also while the sidebar holds.
 
 @ProviderFor(ChannelsOfSpace)
 final channelsOfSpaceProvider = ChannelsOfSpaceFamily._();
@@ -1669,7 +1724,9 @@ final channelsOfSpaceProvider = ChannelsOfSpaceFamily._();
 ///
 /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
 /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
-/// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4).
+/// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4). The
+/// channels the person pinned ([pinnedChannelsProvider], 01 6.24) come first in either order, by
+/// the time of their pin; a pin or unpin applies at once, also while the sidebar holds.
 final class ChannelsOfSpaceProvider
     extends $NotifierProvider<ChannelsOfSpace, List<SidebarChannel>> {
   /// The channel rows of [spaceId] in the normal list: counters ([channelCounts]), active run,
@@ -1681,7 +1738,9 @@ final class ChannelsOfSpaceProvider
   ///
   /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
   /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
-  /// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4).
+  /// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4). The
+  /// channels the person pinned ([pinnedChannelsProvider], 01 6.24) come first in either order, by
+  /// the time of their pin; a pin or unpin applies at once, also while the sidebar holds.
   ChannelsOfSpaceProvider._({
     required ChannelsOfSpaceFamily super.from,
     required String super.argument,
@@ -1726,7 +1785,7 @@ final class ChannelsOfSpaceProvider
   }
 }
 
-String _$channelsOfSpaceHash() => r'e0166556a447a6ca8402526adee9c87c56f6e58f';
+String _$channelsOfSpaceHash() => r'1676bc3767d1ff61b38d110e02f0c4712ee0c042';
 
 /// The channel rows of [spaceId] in the normal list: counters ([channelCounts]), active run,
 /// muted state, the thread group with its collapse state on this device (01 6.8) and the status
@@ -1737,7 +1796,9 @@ String _$channelsOfSpaceHash() => r'e0166556a447a6ca8402526adee9c87c56f6e58f';
 ///
 /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
 /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
-/// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4).
+/// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4). The
+/// channels the person pinned ([pinnedChannelsProvider], 01 6.24) come first in either order, by
+/// the time of their pin; a pin or unpin applies at once, also while the sidebar holds.
 
 final class ChannelsOfSpaceFamily extends $Family
     with
@@ -1766,7 +1827,9 @@ final class ChannelsOfSpaceFamily extends $Family
   ///
   /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
   /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
-  /// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4).
+  /// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4). The
+  /// channels the person pinned ([pinnedChannelsProvider], 01 6.24) come first in either order, by
+  /// the time of their pin; a pin or unpin applies at once, also while the sidebar holds.
 
   ChannelsOfSpaceProvider call(String spaceId) =>
       ChannelsOfSpaceProvider._(argument: spaceId, from: this);
@@ -1784,7 +1847,9 @@ final class ChannelsOfSpaceFamily extends $Family
 ///
 /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
 /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
-/// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4).
+/// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4). The
+/// channels the person pinned ([pinnedChannelsProvider], 01 6.24) come first in either order, by
+/// the time of their pin; a pin or unpin applies at once, also while the sidebar holds.
 
 abstract class _$ChannelsOfSpace extends $Notifier<List<SidebarChannel>> {
   late final _$args = ref.$arg as String;

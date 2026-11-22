@@ -893,7 +893,10 @@ The server side of [09-agents.md](../../../../docs/spec/09-agents.md) 3.9; rulin
 - `app/team.go`: the owner operations (`team.read`, `team.update`, `team.stop`), the work thread
   and the readers rule; `app/team_input.go`: the hook of the acceptance (`teamHook`, which also
   keeps 3.4 out of team channels), the job's use case `TeamInput` (owner broadcast, mirror, member
-  inputs, brake, checks, notes, audit), `openTeamRun` with `emitTeamInvocation`, and the resolvers
+  inputs, brake, checks, notes, audit; `waitForFiles` holds a message whose attachments are not
+  final and schedules the job again `teamFilesRecheck` later with `ScheduleTeamInputAt`, until
+  they are final or `file.invocation_hold_max` passed since the message was written,
+  FIX-TEAM-CHANNEL-ATTACHMENTS), `openTeamRun` with `emitTeamInvocation`, and the resolvers
   of the delivery check that use the authority of an input (`resolveInvocationTeam`,
   `teamFollowupTrigger`, `followOnTeamRun`).
 - `adapters/postgres/team.go` with `queries/team.sql`, `adapters/jobs/team_input.go` (the job

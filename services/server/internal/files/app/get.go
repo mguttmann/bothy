@@ -31,7 +31,7 @@ func (s *Service) Get(ctx context.Context, fileID ids.ID) (files.File, error) {
 	if err != nil {
 		return files.File{}, err
 	}
-	d, err := s.decide(ctx, a, authorize.ActionFileRead, fileResource(f, ref))
+	d, err := s.decideRead(ctx, a, f, ref, false)
 	if err != nil {
 		return files.File{}, err
 	}

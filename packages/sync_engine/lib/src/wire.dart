@@ -175,6 +175,7 @@ MessageBundle messageFromJson(Json j) {
     triggerState: _opt(optStr(j, 'trigger_state'), TriggerState.fromCode),
     triggerStateAt: optTime(j, 'trigger_state_at'),
     triggerStateReason: optStr(j, 'trigger_state_reason'),
+    teamHandle: optStr(j, 'team_handle'),
     silent: flag(j, 'silent'),
     mentionIds: [
       for (final m in strList(j, 'mention_ids')) PrincipalId.parse(m),
@@ -633,14 +634,19 @@ UserSpaceState sidebarFromJson(Json j) => UserSpaceState(
   updatedByDeviceId: _opt(optStr(j, 'updated_by_device_id'), DeviceId.parse),
 );
 
-/// Maps an API `SidebarChannelState`: the own thread order of a channel (M4-51) and its
-/// personal archive in the sidebar (`hidden_at`, PROJ-ARCHIVE; absent is shown).
+/// Maps an API `SidebarChannelState`: the own thread order of a channel (M4-51), its personal
+/// archive in the sidebar (`hidden_at`, PROJ-ARCHIVE; absent is shown) and its personal pins
+/// (`pinned_at` and `pinned_threads`, FEAT-PIN-CHANNELS; absent is not pinned).
 UserChannelState sidebarChannelFromJson(Json j) => UserChannelState(
   channelId: ChannelId.parse(str(j, 'channel_id')),
   threadOrder: [for (final t in strList(j, 'thread_order')) ThreadId.parse(t)],
   version: ResourceVersion(integer(j, 'version')),
   updatedByDeviceId: _opt(optStr(j, 'updated_by_device_id'), DeviceId.parse),
   hiddenAt: optTime(j, 'hidden_at'),
+  pinnedAt: optTime(j, 'pinned_at'),
+  pinnedThreads: [
+    for (final t in strList(j, 'pinned_threads')) ThreadId.parse(t),
+  ],
 );
 
 /// Maps an API `NotificationPreference`.

@@ -724,6 +724,15 @@ at the bottom of the space while it is expanded on this device (`space_view_stat
 A channel move writes `SidebarSpaceNode.manualOrder`, the archived channels in their places
 included, so "Restore" brings a channel back to its earlier place.
 
+The personal pins (01 6.24, FEAT-PIN-CHANNELS, docs/decisions.d/FEAT-PIN-CHANNELS.md):
+`channelPinMenuItems` and `postPinMenuItems` of `lib/menus/pin_menu.dart` are the entries "Pin to
+top" and "Unpin" of the channel menu, the post menu and the More menu of a header;
+`SidebarWriter.setPinned` writes `pinned` and `SidebarWriter.togglePinnedThread` the whole
+`pinned_threads` through the outbox after the local row. `ChannelsOfSpace` puts the channels of
+`pinnedChannelsProvider` (by pin time, `pinOrder`) first with `pinnedFirst` after its manual or
+automatic order and after the hold, and `selectSidebarThreads` does the same for the pinned posts
+of a forum (`pinned`); a pinned row shows `action.pin` and neither lifts nor moves.
+
 ### Status dots (M4-52)
 
 A chat row shows a status mark only for agent news the person has not seen (01 6.17, R-PR-31,
@@ -1231,12 +1240,21 @@ team mode switch, the members with "Remove", the add form (agent, one of the cha
 handle) and "Stop all", each an online call through `TeamPort` (`team/team_port.dart`) with the
 server's reason shown on a refusal (docs/decisions.d/FEAT-TEAM-CHANNEL-APP.md). The history column
 reads the team with `channelTeamProvider` (`getChannelTeam`, owners and text channels only) and
-then shows `TeamHeaderBar` under the thread header, "from @handle" under a member's mirrored reply
-and "to all members" under a person's message (`TeamLabelLine`), and offers the built-in `/team`
+then shows `TeamHeaderBar` under the thread header, "from @handle" under a mirror stored without
+`team_handle` and "to all members" under a person's message (`TeamLabelLine`). A message with
+`team_handle` shows the member as its author with its agent as a small note (`messageData`,
+`authorNameOf` in `thread/message_tile.dart`) and never groups with another member's message
+(domain `isContinuation`; FIX-TEAM-MEMBER-AUTHOR-DISPLAY), and offers the built-in `/team`
 (`team/team_command.dart`). The space menu has "Create team channel..." for an owner with `manage`
 on the space (`team/team_create_dialog.dart`, FEAT-TEAM-CHANNEL-CREATE): it creates a text channel
 through `TeamPort.createTextChannel`, switches team mode on and opens the team dialog. Tests:
 `test/team/`.
+
+FIX-TEAM-CHANNEL-APP: the add form offers an agent of `listAgents` filtered as typed, only the
+channels it operates and is no member with yet, and a handle suggested from that channel. A
+person's message that mentions members (`mentionedHandles`, the server's rule) shows "to @handle"
+instead of "to all members", and the composer of a team channel offers every member after `@`
+(`ComposerController.teamMembers`); docs/decisions.d/FIX-TEAM-CHANNEL-APP.md.
 
 ## Keyboard shortcuts and focus
 

@@ -1,6 +1,6 @@
 # local_store
 
-The encrypted local database of the apps: drift on SQLite3MultipleCiphers, schema version 16
+The encrypted local database of the apps: drift on SQLite3MultipleCiphers, schema version 18
 with the mirror tables and the local-only tables, data access objects that hand out the domain
 types of `packages/domain`, removal and wipe, the cache cleanup and offline search
 (docs/spec/15-client-architecture.md 6, ADR 0029, R-CL-08). The interface reads only from this
@@ -43,12 +43,12 @@ hooks:
       source: sqlite3mc
 ```
 
-## Tables (schema version 16)
+## Tables (schema version 18)
 
 | Group | File | Tables |
 |---|---|---|
-| Structure | `lib/src/tables/structure.dart` | `spaces`, `user_space_states` (with the personal channel order of a space in `channel_order` since version 12, M4-51), `user_channel_states` (version 12, M4-51: the personal thread order of a channel; version 15, PROJ-ARCHIVE: `hidden_at`, the personal archive of the channel in the sidebar, 01 6.22), `channels` (effective operator, caller's `level` and `capabilities`, the derived `project_bound` of the API `Channel` since version 6, M4-40, R-DM-54; `allow_autonomous_runs` since version 14, AR-08, null from a server before stage AR; no `prompt`), `channel_operators`, `forum_tags` |
-| Threads and messages | `lib/src/tables/threads_messages.dart` | `threads` (local `last_accessed_at`), `thread_tags`, `messages` (`trigger_state`, `thread_seq`, tombstone fields, no `client_payload_sha256`), `reactions_summary`, `my_mentions`, `message_components` |
+| Structure | `lib/src/tables/structure.dart` | `spaces`, `user_space_states` (with the personal channel order of a space in `channel_order` since version 12, M4-51), `user_channel_states` (version 12, M4-51: the personal thread order of a channel; version 15, PROJ-ARCHIVE: `hidden_at`, the personal archive of the channel in the sidebar, 01 6.22; version 18, FEAT-PIN-CHANNELS: `pinned_at` and `pinned_threads`, the personal pins of the channel and of its posts, 01 6.24), `channels` (effective operator, caller's `level` and `capabilities`, the derived `project_bound` of the API `Channel` since version 6, M4-40, R-DM-54; `allow_autonomous_runs` since version 14, AR-08, null from a server before stage AR; no `prompt`), `channel_operators`, `forum_tags` |
+| Threads and messages | `lib/src/tables/threads_messages.dart` | `threads` (local `last_accessed_at`), `thread_tags`, `messages` (`trigger_state`, `thread_seq`, tombstone fields, no `client_payload_sha256`; `team_handle` since version 17, FIX-TEAM-MEMBER-ATTRIBUTION, null in a row stored before), `reactions_summary`, `my_mentions`, `message_components` |
 | Files | `lib/src/tables/files.dart` | `files`, `message_attachments` |
 | Runs and agents | `lib/src/tables/runs_agents.dart` | `runs` (summary of `run.state_changed`), `run_wakes` (version 14, AR-08: every column of 03 `run_wakes`, the wake-ups of the threads this device holds, deleted with their thread), `agents`, `principals` |
 | Personal | `lib/src/tables/personal.dart` | `read_states`, `drafts`, `user_settings`, `notification_preferences`, `quiet_hours` |

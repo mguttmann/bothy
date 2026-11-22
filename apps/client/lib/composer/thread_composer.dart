@@ -34,6 +34,7 @@ import '../phone/compose/voice_button.dart';
 import '../phone/compose/voice_recorder.dart';
 import '../settings/settings_providers.dart';
 import '../sync/agent_ops.dart';
+import '../team/providers.dart' show channelTeamProvider;
 import '../telemetry/telemetry_providers.dart';
 import '../thread/providers.dart';
 import '../thread/thread_actions.dart';
@@ -45,6 +46,7 @@ import 'attachment_chips.dart';
 import 'composer_controller.dart';
 import 'draft_sync.dart';
 import 'long_text.dart';
+import 'mention_suggestions.dart';
 import 'templates_menu.dart';
 
 /// The composer of [threadId] in [channelId], named [targetName] in the placeholder.
@@ -439,8 +441,9 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
     } else if (s.id.startsWith('builtin.') || s.id.startsWith('command.')) {
       next = '${s.command} ';
     } else {
-      final p = principals[PrincipalId.parse(s.id)];
-      if (p != null) composer.acceptSuggestion(p);
+      for (final m in composer.suggestions) {
+        if (m.id == s.id) return composer.acceptSuggestion(m);
+      }
       return;
     }
     composer.text.value = TextEditingValue(
@@ -500,8 +503,21 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
     final me = ref.watch(myPrincipalIdProvider);
     final principals = ref.watch(principalsByIdProvider).value ?? const {};
     final limits = ref.watch(instanceLimitsProvider).value;
+    // 01 6.23 item 6: in a team channel `@` offers the members of the team (only an owner
+    // gets a team here, channelTeamProvider).
+    final team = ref.watch(channelTeamProvider(channel)).value;
     composer
       ..principals = principals
+      ..teamMembers = team == null
+          ? null
+          : [
+              for (final m in team.members)
+                MentionSuggestion(
+                  id: 'team.${m.handle}',
+                  handle: m.handle,
+                  name: principals[m.agentId]?.displayName,
+                ),
+            ]
       ..limits = limits
       ..pasteRule = PasteRule(
         maxChars: config.composerPasteFileChars,
@@ -716,11 +732,11 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
                       typingNames: typing,
                       suggestions: composer.suggestions.isNotEmpty
                           ? [
-                              for (final p in composer.suggestions)
+                              for (final m in composer.suggestions)
                                 DsSuggestion(
-                                  id: p.id.value,
-                                  command: '@${p.handle}',
-                                  description: p.displayName,
+                                  id: m.id,
+                                  command: '@${m.handle}',
+                                  description: m.name,
                                 ),
                             ]
                           : slash.suggestions.isNotEmpty

@@ -54,6 +54,26 @@ func TestMentionedHandles(t *testing.T) {
 	}
 }
 
+// TestIsSilentTeamReply holds the silent reply of 09 3.9.4 (FIX-TEAM-CHANNEL-NOISE): only a reply
+// that is the marker alone, in any case and with emphasis, code marks or a full stop around it, is
+// silent; a reply that says more is a reply.
+func TestIsSilentTeamReply(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		text string
+		want bool
+	}{
+		{TeamSilentReply, true}, {"NOTHING_TO_ADD", true}, {"  nothing_to_add\n", true}, {"**NOTHING_TO_ADD**", true},
+		{"`NOTHING_TO_ADD`", true}, {"NOTHING_TO_ADD.", true}, {"_NOTHING_TO_ADD_", true},
+		{"", false}, {"   ", false}, {"NOTHING TO ADD", false}, {"NOTHING_TO_ADD for now, @qa please check", false},
+		{"I have nothing to add.", false}, {"NOTHING_TO_ADD\n\nBut one more thing", false}, {"NO_REPLY", false},
+	} {
+		if got := IsSilentTeamReply(tc.text); got != tc.want {
+			t.Errorf("IsSilentTeamReply(%q) = %v, want %v", tc.text, got, tc.want)
+		}
+	}
+}
+
 // TestNextBrake holds the turn budget, the ping-pong rule and the pause of 09 3.9.6.
 func TestNextBrake(t *testing.T) {
 	t.Parallel()

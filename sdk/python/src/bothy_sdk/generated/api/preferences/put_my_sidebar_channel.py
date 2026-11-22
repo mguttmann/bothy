@@ -89,18 +89,20 @@ def sync_detailed(
     client: AuthenticatedClient | Client,
     body: SidebarChannelPut,
 ) -> Response[Problem | SidebarChannelState]:
-    """Reorder the posts of a channel or archive it for oneself
+    """Reorder the posts of a channel, archive or pin it for oneself
 
      Stores the caller's personal state of a channel the caller can read, version + 1, last write wins,
     no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order,
-    absent keeps the stored order) and whether the channel is archived in the caller's sidebar
-    (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at
-    most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that
-    changes nothing returns the stored state without a new version and without an event, so archiving
-    twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it
-    changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A
-    channel the caller cannot read and an unknown one give the same 404. Writes
-    `sidebar_channel.updated` for the caller.
+    absent keeps the stored order), whether the channel is archived in the caller's sidebar (`hidden`;
+    absent keeps the stored state), whether it is pinned to the top of its space (`pinned`; absent keeps
+    the stored state) and the posts pinned to the top of the forum (`pinned_threads`; an empty list
+    unpins every post, absent keeps the stored list). The server checks the form of the lists (unique
+    items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A
+    body that changes nothing returns the stored state without a new version and without an event, so
+    archiving or pinning twice keeps the first `hidden_at` or `pinned_at`. A body without a known member
+    is 400. Archiving and pinning are personal: they change neither the channel, its rights, its runs
+    nor the caller's notifications (01 6.22, 6.24). A channel the caller cannot read and an unknown one
+    give the same 404. Writes `sidebar_channel.updated` for the caller.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -132,18 +134,20 @@ def sync(
     client: AuthenticatedClient | Client,
     body: SidebarChannelPut,
 ) -> Problem | SidebarChannelState | None:
-    """Reorder the posts of a channel or archive it for oneself
+    """Reorder the posts of a channel, archive or pin it for oneself
 
      Stores the caller's personal state of a channel the caller can read, version + 1, last write wins,
     no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order,
-    absent keeps the stored order) and whether the channel is archived in the caller's sidebar
-    (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at
-    most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that
-    changes nothing returns the stored state without a new version and without an event, so archiving
-    twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it
-    changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A
-    channel the caller cannot read and an unknown one give the same 404. Writes
-    `sidebar_channel.updated` for the caller.
+    absent keeps the stored order), whether the channel is archived in the caller's sidebar (`hidden`;
+    absent keeps the stored state), whether it is pinned to the top of its space (`pinned`; absent keeps
+    the stored state) and the posts pinned to the top of the forum (`pinned_threads`; an empty list
+    unpins every post, absent keeps the stored list). The server checks the form of the lists (unique
+    items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A
+    body that changes nothing returns the stored state without a new version and without an event, so
+    archiving or pinning twice keeps the first `hidden_at` or `pinned_at`. A body without a known member
+    is 400. Archiving and pinning are personal: they change neither the channel, its rights, its runs
+    nor the caller's notifications (01 6.22, 6.24). A channel the caller cannot read and an unknown one
+    give the same 404. Writes `sidebar_channel.updated` for the caller.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -170,18 +174,20 @@ async def asyncio_detailed(
     client: AuthenticatedClient | Client,
     body: SidebarChannelPut,
 ) -> Response[Problem | SidebarChannelState]:
-    """Reorder the posts of a channel or archive it for oneself
+    """Reorder the posts of a channel, archive or pin it for oneself
 
      Stores the caller's personal state of a channel the caller can read, version + 1, last write wins,
     no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order,
-    absent keeps the stored order) and whether the channel is archived in the caller's sidebar
-    (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at
-    most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that
-    changes nothing returns the stored state without a new version and without an event, so archiving
-    twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it
-    changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A
-    channel the caller cannot read and an unknown one give the same 404. Writes
-    `sidebar_channel.updated` for the caller.
+    absent keeps the stored order), whether the channel is archived in the caller's sidebar (`hidden`;
+    absent keeps the stored state), whether it is pinned to the top of its space (`pinned`; absent keeps
+    the stored state) and the posts pinned to the top of the forum (`pinned_threads`; an empty list
+    unpins every post, absent keeps the stored list). The server checks the form of the lists (unique
+    items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A
+    body that changes nothing returns the stored state without a new version and without an event, so
+    archiving or pinning twice keeps the first `hidden_at` or `pinned_at`. A body without a known member
+    is 400. Archiving and pinning are personal: they change neither the channel, its rights, its runs
+    nor the caller's notifications (01 6.22, 6.24). A channel the caller cannot read and an unknown one
+    give the same 404. Writes `sidebar_channel.updated` for the caller.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -211,18 +217,20 @@ async def asyncio(
     client: AuthenticatedClient | Client,
     body: SidebarChannelPut,
 ) -> Problem | SidebarChannelState | None:
-    """Reorder the posts of a channel or archive it for oneself
+    """Reorder the posts of a channel, archive or pin it for oneself
 
      Stores the caller's personal state of a channel the caller can read, version + 1, last write wins,
     no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order,
-    absent keeps the stored order) and whether the channel is archived in the caller's sidebar
-    (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at
-    most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that
-    changes nothing returns the stored state without a new version and without an event, so archiving
-    twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it
-    changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A
-    channel the caller cannot read and an unknown one give the same 404. Writes
-    `sidebar_channel.updated` for the caller.
+    absent keeps the stored order), whether the channel is archived in the caller's sidebar (`hidden`;
+    absent keeps the stored state), whether it is pinned to the top of its space (`pinned`; absent keeps
+    the stored state) and the posts pinned to the top of the forum (`pinned_threads`; an empty list
+    unpins every post, absent keeps the stored list). The server checks the form of the lists (unique
+    items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A
+    body that changes nothing returns the stored state without a new version and without an event, so
+    archiving or pinning twice keeps the first `hidden_at` or `pinned_at`. A body without a known member
+    is 400. Archiving and pinning are personal: they change neither the channel, its rights, its runs
+    nor the caller's notifications (01 6.22, 6.24). A channel the caller cannot read and an unknown one
+    give the same 404. Writes `sidebar_channel.updated` for the caller.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

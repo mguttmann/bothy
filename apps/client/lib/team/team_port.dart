@@ -190,6 +190,25 @@ abstract interface class TeamPort {
     ChannelId channel, {
     required String idempotencyKey,
   });
+
+  /// The active agents the caller sees on the server (`listAgents`, every page), the choices of
+  /// the add form (docs/decisions.d/FIX-TEAM-CHANNEL-APP.md).
+  Future<List<TeamAgent>> agents();
+}
+
+/// An agent the add form offers (`Agent` of `listAgents`).
+final class TeamAgent {
+  /// Creates the agent.
+  const TeamAgent({required this.id, required this.handle, required this.name});
+
+  /// The agent's principal.
+  final PrincipalId id;
+
+  /// The agent's handle, the fallback of the suggested member handle.
+  final String handle;
+
+  /// The display name.
+  final String name;
 }
 
 /// [TeamPort] over the generated client of the signed-in session.
@@ -282,6 +301,27 @@ final class ApiTeamPort implements TeamPort {
       idempotencyKey: idempotencyKey,
     )).data!;
     return result.stoppedRunIds.toList();
+  });
+
+  @override
+  Future<List<TeamAgent>> agents() => _guard(() async {
+    final out = <TeamAgent>[];
+    String? cursor;
+    do {
+      final page = (await _api.getAgentsApi().listAgents(cursor: cursor)).data!;
+      for (final a in page.items) {
+        if (a.status != wire.AgentStatusEnum.active) continue;
+        out.add(
+          TeamAgent(
+            id: PrincipalId.parse(a.id),
+            handle: a.handle,
+            name: a.displayName,
+          ),
+        );
+      }
+      cursor = page.nextCursor;
+    } while (cursor != null);
+    return out;
   });
 
   static Future<T> _guard<T>(Future<T> Function() call) async {

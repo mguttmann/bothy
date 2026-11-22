@@ -11,12 +11,21 @@ class _$SidebarChannelPut extends SidebarChannelPut {
   final BuiltList<String>? threadOrder;
   @override
   final bool? hidden;
+  @override
+  final bool? pinned;
+  @override
+  final BuiltList<String>? pinnedThreads;
 
   factory _$SidebarChannelPut([
     void Function(SidebarChannelPutBuilder)? updates,
   ]) => (SidebarChannelPutBuilder()..update(updates))._build();
 
-  _$SidebarChannelPut._({this.threadOrder, this.hidden}) : super._();
+  _$SidebarChannelPut._({
+    this.threadOrder,
+    this.hidden,
+    this.pinned,
+    this.pinnedThreads,
+  }) : super._();
   @override
   SidebarChannelPut rebuild(void Function(SidebarChannelPutBuilder) updates) =>
       (toBuilder()..update(updates)).build();
@@ -30,7 +39,9 @@ class _$SidebarChannelPut extends SidebarChannelPut {
     if (identical(other, this)) return true;
     return other is SidebarChannelPut &&
         threadOrder == other.threadOrder &&
-        hidden == other.hidden;
+        hidden == other.hidden &&
+        pinned == other.pinned &&
+        pinnedThreads == other.pinnedThreads;
   }
 
   @override
@@ -38,6 +49,8 @@ class _$SidebarChannelPut extends SidebarChannelPut {
     var _$hash = 0;
     _$hash = $jc(_$hash, threadOrder.hashCode);
     _$hash = $jc(_$hash, hidden.hashCode);
+    _$hash = $jc(_$hash, pinned.hashCode);
+    _$hash = $jc(_$hash, pinnedThreads.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -46,7 +59,9 @@ class _$SidebarChannelPut extends SidebarChannelPut {
   String toString() {
     return (newBuiltValueToStringHelper(r'SidebarChannelPut')
           ..add('threadOrder', threadOrder)
-          ..add('hidden', hidden))
+          ..add('hidden', hidden)
+          ..add('pinned', pinned)
+          ..add('pinnedThreads', pinnedThreads))
         .toString();
   }
 }
@@ -65,6 +80,16 @@ class SidebarChannelPutBuilder
   bool? get hidden => _$this._hidden;
   set hidden(bool? hidden) => _$this._hidden = hidden;
 
+  bool? _pinned;
+  bool? get pinned => _$this._pinned;
+  set pinned(bool? pinned) => _$this._pinned = pinned;
+
+  ListBuilder<String>? _pinnedThreads;
+  ListBuilder<String> get pinnedThreads =>
+      _$this._pinnedThreads ??= ListBuilder<String>();
+  set pinnedThreads(ListBuilder<String>? pinnedThreads) =>
+      _$this._pinnedThreads = pinnedThreads;
+
   SidebarChannelPutBuilder() {
     SidebarChannelPut._defaults(this);
   }
@@ -74,6 +99,8 @@ class SidebarChannelPutBuilder
     if ($v != null) {
       _threadOrder = $v.threadOrder?.toBuilder();
       _hidden = $v.hidden;
+      _pinned = $v.pinned;
+      _pinnedThreads = $v.pinnedThreads?.toBuilder();
       _$v = null;
     }
     return this;
@@ -100,12 +127,17 @@ class SidebarChannelPutBuilder
           _$SidebarChannelPut._(
             threadOrder: _threadOrder?.build(),
             hidden: hidden,
+            pinned: pinned,
+            pinnedThreads: _pinnedThreads?.build(),
           );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'threadOrder';
         _threadOrder?.build();
+
+        _$failedField = 'pinnedThreads';
+        _pinnedThreads?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'SidebarChannelPut',

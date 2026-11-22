@@ -14,7 +14,7 @@ import (
 const getMessage = `-- name: GetMessage :one
 SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle
 FROM messages WHERE id = $1
 `
 
@@ -44,6 +44,7 @@ type GetMessageRow struct {
 	DeletedBy           pgtype.UUID
 	CreatedAt           pgtype.Timestamptz
 	HasAttachments      bool
+	TeamHandle          pgtype.Text
 }
 
 func (q *Queries) GetMessage(ctx context.Context, id pgtype.UUID) (GetMessageRow, error) {
@@ -75,6 +76,7 @@ func (q *Queries) GetMessage(ctx context.Context, id pgtype.UUID) (GetMessageRow
 		&i.DeletedBy,
 		&i.CreatedAt,
 		&i.HasAttachments,
+		&i.TeamHandle,
 	)
 	return i, err
 }
@@ -82,7 +84,7 @@ func (q *Queries) GetMessage(ctx context.Context, id pgtype.UUID) (GetMessageRow
 const getMessageByClientID = `-- name: GetMessageByClientID :one
 SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle
 FROM messages WHERE author_principal_id = $1 AND client_msg_id = $2
 `
 
@@ -117,6 +119,7 @@ type GetMessageByClientIDRow struct {
 	DeletedBy           pgtype.UUID
 	CreatedAt           pgtype.Timestamptz
 	HasAttachments      bool
+	TeamHandle          pgtype.Text
 }
 
 // The idempotency lookup of 04 section 5.1 point 4.
@@ -149,6 +152,7 @@ func (q *Queries) GetMessageByClientID(ctx context.Context, arg GetMessageByClie
 		&i.DeletedBy,
 		&i.CreatedAt,
 		&i.HasAttachments,
+		&i.TeamHandle,
 	)
 	return i, err
 }
@@ -157,13 +161,13 @@ const insertMessage = `-- name: InsertMessage :one
 
 INSERT INTO messages (id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256,
                       origin, kind, system_code, content_md, content_format, reply_to_message_id, run_id, silent, version,
-                      created_at, search_language, has_attachments)
+                      created_at, search_language, has_attachments, team_handle)
 VALUES ($1, $2, $3, $4, $5, $6, $7,
         $8, $9, $10, $11, $12, $13, $14, $15, 1,
-        $16, $17::text::regconfig, $18)
+        $16, $17::text::regconfig, $18, $19)
 RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle
 `
 
 type InsertMessageParams struct {
@@ -185,6 +189,7 @@ type InsertMessageParams struct {
 	CreatedAt           pgtype.Timestamptz
 	SearchLanguage      string
 	HasAttachments      bool
+	TeamHandle          pgtype.Text
 }
 
 type InsertMessageRow struct {
@@ -213,13 +218,14 @@ type InsertMessageRow struct {
 	DeletedBy           pgtype.UUID
 	CreatedAt           pgtype.Timestamptz
 	HasAttachments      bool
+	TeamHandle          pgtype.Text
 }
 
 // SPDX-License-Identifier: Apache-2.0
 // Queries on messages (messaging, docs/spec/03-data-model.md section 4.6).
 //
 // The columns are listed instead of "*": no read carries search_language or the generated
-// search_vector (docs/DECISIONS.md D-M3-13-10). has_attachments ends every list (M3-07), so the
+// search_vector (docs/DECISIONS.md D-M3-13-10). has_attachments and team_handle end every list (M3-07, FIX-TEAM-MEMBER-ATTRIBUTION), so the
 // generated row types keep converting to messageRow of repository.go. Every INSERT names search_language, the language
 // of 14 3.1 (M3-13); the static test TestMessageInsertsSetSearchLanguage holds it.
 // A new message; thread_seq comes from threads.last_message_seq under the row lock (03 section
@@ -228,7 +234,8 @@ type InsertMessageRow struct {
 // set exactly for the live box anchor of a run (kind run, M2-05); the deferred foreign key lets
 // the anchor and its run be written in either order. has_attachments is true exactly for a message
 // sent with at least one attachment (M3-07, 03 messages); files inserts the rows of
-// message_attachments right after it in the same transaction.
+// message_attachments right after it in the same transaction. team_handle is set exactly for a
+// team copy whose source is a member (FIX-TEAM-MEMBER-ATTRIBUTION, 09 3.9.2).
 func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (InsertMessageRow, error) {
 	row := q.db.QueryRow(ctx, insertMessage,
 		arg.ID,
@@ -249,6 +256,7 @@ func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (I
 		arg.CreatedAt,
 		arg.SearchLanguage,
 		arg.HasAttachments,
+		arg.TeamHandle,
 	)
 	var i InsertMessageRow
 	err := row.Scan(
@@ -277,6 +285,7 @@ func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (I
 		&i.DeletedBy,
 		&i.CreatedAt,
 		&i.HasAttachments,
+		&i.TeamHandle,
 	)
 	return i, err
 }
@@ -284,7 +293,7 @@ func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (I
 const lockCardMessage = `-- name: LockCardMessage :one
 SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle
 FROM messages WHERE id = $1 FOR UPDATE
 `
 
@@ -314,6 +323,7 @@ type LockCardMessageRow struct {
 	DeletedBy           pgtype.UUID
 	CreatedAt           pgtype.Timestamptz
 	HasAttachments      bool
+	TeamHandle          pgtype.Text
 }
 
 // The card message of a component change locked by runs (M2-15, Messages.LockCard): runs
@@ -348,6 +358,7 @@ func (q *Queries) LockCardMessage(ctx context.Context, id pgtype.UUID) (LockCard
 		&i.DeletedBy,
 		&i.CreatedAt,
 		&i.HasAttachments,
+		&i.TeamHandle,
 	)
 	return i, err
 }
@@ -355,7 +366,7 @@ func (q *Queries) LockCardMessage(ctx context.Context, id pgtype.UUID) (LockCard
 const lockVisibleMessage = `-- name: LockVisibleMessage :one
 SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle
 FROM messages WHERE id = $1 AND channel_id = ANY($2::uuid[]) FOR UPDATE
 `
 
@@ -390,6 +401,7 @@ type LockVisibleMessageRow struct {
 	DeletedBy           pgtype.UUID
 	CreatedAt           pgtype.Timestamptz
 	HasAttachments      bool
+	TeamHandle          pgtype.Text
 }
 
 // The visible message locked for an edit or a deletion (M1-58 lock order: thread row first,
@@ -423,6 +435,7 @@ func (q *Queries) LockVisibleMessage(ctx context.Context, arg LockVisibleMessage
 		&i.DeletedBy,
 		&i.CreatedAt,
 		&i.HasAttachments,
+		&i.TeamHandle,
 	)
 	return i, err
 }
@@ -464,7 +477,7 @@ UPDATE messages SET version = version + 1
 WHERE id = $1
 RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle
 `
 
 type RaiseMessageVersionRow struct {
@@ -493,6 +506,7 @@ type RaiseMessageVersionRow struct {
 	DeletedBy           pgtype.UUID
 	CreatedAt           pgtype.Timestamptz
 	HasAttachments      bool
+	TeamHandle          pgtype.Text
 }
 
 // A change of the components of the locked card (M2-15, Messages.ComponentsChanged): the next
@@ -527,6 +541,7 @@ func (q *Queries) RaiseMessageVersion(ctx context.Context, id pgtype.UUID) (Rais
 		&i.DeletedBy,
 		&i.CreatedAt,
 		&i.HasAttachments,
+		&i.TeamHandle,
 	)
 	return i, err
 }
@@ -538,7 +553,7 @@ WHERE id = $4 AND origin = 'human'
   AND (trigger_state IS DISTINCT FROM $1::text OR trigger_state_reason IS DISTINCT FROM $2::text)
 RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle
 `
 
 type SetTriggerStateParams struct {
@@ -574,6 +589,7 @@ type SetTriggerStateRow struct {
 	DeletedBy           pgtype.UUID
 	CreatedAt           pgtype.Timestamptz
 	HasAttachments      bool
+	TeamHandle          pgtype.Text
 }
 
 // The trigger state of a message of a person (M2-05, 09 section 6): the three columns and the
@@ -615,6 +631,7 @@ func (q *Queries) SetTriggerState(ctx context.Context, arg SetTriggerStateParams
 		&i.DeletedBy,
 		&i.CreatedAt,
 		&i.HasAttachments,
+		&i.TeamHandle,
 	)
 	return i, err
 }
@@ -625,7 +642,7 @@ UPDATE messages SET content_md = '', has_attachments = false, deleted_at = $1, d
 WHERE id = $3 AND channel_id = ANY($4::uuid[]) AND deleted_at IS NULL
 RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle
 `
 
 type TombstoneMessageParams struct {
@@ -661,6 +678,7 @@ type TombstoneMessageRow struct {
 	DeletedBy           pgtype.UUID
 	CreatedAt           pgtype.Timestamptz
 	HasAttachments      bool
+	TeamHandle          pgtype.Text
 }
 
 // The deletion of the locked message (03 section 6.5): the row and thread_seq stay, the content
@@ -702,6 +720,7 @@ func (q *Queries) TombstoneMessage(ctx context.Context, arg TombstoneMessagePara
 		&i.DeletedBy,
 		&i.CreatedAt,
 		&i.HasAttachments,
+		&i.TeamHandle,
 	)
 	return i, err
 }
@@ -711,7 +730,7 @@ UPDATE messages SET content_md = $1, edited_at = $2, version = version + 1
 WHERE id = $3 AND channel_id = ANY($4::uuid[]) AND deleted_at IS NULL
 RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle
 `
 
 type UpdateMessageContentParams struct {
@@ -747,6 +766,7 @@ type UpdateMessageContentRow struct {
 	DeletedBy           pgtype.UUID
 	CreatedAt           pgtype.Timestamptz
 	HasAttachments      bool
+	TeamHandle          pgtype.Text
 }
 
 // An edit of the locked message: the new content, edited_at and the next version.
@@ -784,6 +804,7 @@ func (q *Queries) UpdateMessageContent(ctx context.Context, arg UpdateMessageCon
 		&i.DeletedBy,
 		&i.CreatedAt,
 		&i.HasAttachments,
+		&i.TeamHandle,
 	)
 	return i, err
 }

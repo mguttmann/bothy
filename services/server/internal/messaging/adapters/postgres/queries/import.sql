@@ -16,4 +16,4 @@ VALUES (@id, @thread_id, @channel_id, @thread_seq, @author_principal_id, @client
         sqlc.narg(edited_at), @created_at, sqlc.arg(search_language)::text::regconfig, @has_attachments)
 RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments;
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle;

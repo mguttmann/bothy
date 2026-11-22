@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The drift database of the apps, schema version 16 (docs/spec/15-client-architecture.md 6, ADR
+/// The drift database of the apps, schema version 18 (docs/spec/15-client-architecture.md 6, ADR
 /// 0029): the mirror tables of 15 6.1 and the local-only tables, `host_key_pins` (M4-36) and
 /// the sidebar view state `channel_view_states`, `shell_view_state` (M4-40, M4-42) and
 /// `space_view_states` (FIX-device-mirroring-2) included; version 11 adds the code block wrap
@@ -10,7 +10,9 @@
 /// of threads (`run_wakes`) and the channel switch `channels.allow_autonomous_runs` (AR-08),
 /// version 15 the personal archive of a channel (PROJ-ARCHIVE), version 16 the companion table
 /// of the search index (`search_rows`) and the indexes of the lookups by `client_msg_id`,
-/// channel and thread (AUD-pkg-local-store-01).
+/// channel and thread (AUD-pkg-local-store-01), version 17 the column `messages.team_handle`
+/// (FIX-TEAM-MEMBER-ATTRIBUTION), version 18 the personal pins of a channel and its posts
+/// (FEAT-PIN-CHANNELS).
 library;
 
 import 'dart:io';
@@ -102,7 +104,7 @@ class LocalDatabase extends _$LocalDatabase {
   final DateTime Function() clock;
 
   @override
-  int get schemaVersion => 16;
+  int get schemaVersion => 18;
 
   /// Closes the database and releases its file, also while watched queries come and go.
   ///
@@ -263,6 +265,27 @@ class LocalDatabase extends _$LocalDatabase {
         await m.createIndex(schema.messageAttachmentsChannel);
         await m.createIndex(schema.runsChannel);
         await m.createIndex(schema.filesScopeChannel);
+      },
+      // Version 17 (FIX-TEAM-MEMBER-ATTRIBUTION): the nullable column `messages.team_handle`,
+      // null in every kept row; no row moves and the cursor stays. A stored team copy keeps no
+      // handle until the server sends it again; the label falls back to the member list.
+      from16To17: (m, schema) =>
+          m.addColumn(schema.messages, schema.messages.teamHandle),
+      // Version 18 (FEAT-PIN-CHANNELS): the columns `user_channel_states.pinned_at` and
+      // `pinned_threads` of the mirror, null and empty (not pinned) in every kept row; no row
+      // moves. The cursor goes and every row drops to version 0, so the next connection loads a
+      // whole snapshot whose rows replace the kept ones with the pins other devices wrote before
+      // this upgrade, also at the version this device already holds (04 7.3).
+      from17To18: (m, schema) async {
+        await m.addColumn(
+          schema.userChannelStates,
+          schema.userChannelStates.pinnedAt,
+        );
+        await m.addColumn(
+          schema.userChannelStates,
+          schema.userChannelStates.pinnedThreads,
+        );
+        await MigrationRules.reloadRows(m, 'user_channel_states');
       },
     ),
   );

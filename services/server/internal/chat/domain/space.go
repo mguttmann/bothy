@@ -194,16 +194,24 @@ type SidebarChannelState struct {
 	// HiddenAt is set while the person has archived the channel in the own sidebar (01 6.22,
 	// PROJ-ARCHIVE); zero while it shows in the normal list.
 	HiddenAt time.Time
+	// PinnedAt is set while the person has pinned the channel to the top of its space in the own
+	// sidebar (01 6.24, FEAT-PIN-CHANNELS); zero while it is not pinned.
+	PinnedAt time.Time
+	// PinnedThreads are the posts of the channel the person pinned to the top of the forum, in
+	// the order they were pinned (FEAT-PIN-CHANNELS); empty for none.
+	PinnedThreads []ids.ID
 	// Version counts the writes of the row.
 	Version int64
 	// UpdatedByDeviceID is the device of the last write; zero for none (personal tokens).
 	UpdatedByDeviceID ids.ID
 }
 
-// Same reports whether st and other hold the same personal state: the same post order and the
-// same archive state (PROJ-ARCHIVE); version and device do not count.
+// Same reports whether st and other hold the same personal state: the same post order, the
+// same archive state (PROJ-ARCHIVE) and the same pins (FEAT-PIN-CHANNELS); version and device do
+// not count.
 func (st SidebarChannelState) Same(other SidebarChannelState) bool {
-	return slices.Equal(st.ThreadOrder, other.ThreadOrder) && st.HiddenAt.Equal(other.HiddenAt)
+	return slices.Equal(st.ThreadOrder, other.ThreadOrder) && st.HiddenAt.Equal(other.HiddenAt) &&
+		st.PinnedAt.Equal(other.PinnedAt) && slices.Equal(st.PinnedThreads, other.PinnedThreads)
 }
 
 // CheckSidebarOrder checks a personal order list of the sidebar (M4-51, D-M4-51-8): every ID at

@@ -123,6 +123,75 @@ void main() {
     expect(find.text('The build is green.'), findsOneWidget);
   });
 
+  testWidgets('a team member names its agent small after the badge', (
+    tester,
+  ) async {
+    // FIX-TEAM-MEMBER-AUTHOR-DISPLAY: the member's handle is the author, the agent a note.
+    final l = await en();
+    await pumpDs(
+      tester,
+      _message(
+        const DsMessageData(
+          id: 'm1',
+          authorName: 'codingagent',
+          authorVia: 'Claude Code',
+          origin: DsMessageOrigin.agent,
+          kind: DsMessageKind.text,
+          timeLabel: '10:42',
+          content: 'Done.',
+        ),
+      ),
+    );
+    expect(find.text(dsIsolate('codingagent')), findsOneWidget);
+    expect(find.text(l.messageOriginAgent), findsOneWidget);
+    expect(
+      find.text(l.messageAuthorVia(dsIsolate('Claude Code'))),
+      findsOneWidget,
+    );
+    final name = tester
+        .widget<Text>(find.text(dsIsolate('codingagent')))
+        .style!;
+    final via = tester
+        .widget<Text>(find.text(l.messageAuthorVia(dsIsolate('Claude Code'))))
+        .style!;
+    expect(via.fontSize!, lessThan(name.fontSize!));
+  });
+
+  testWidgets('a message without a member names no agent note', (tester) async {
+    final l = await en();
+    await pumpDs(tester, _message(_with(origin: DsMessageOrigin.agent)));
+    expect(find.textContaining(l.messageAuthorVia('')), findsNothing);
+  });
+
+  testWidgets('five team handles get five avatar colors', (tester) async {
+    const handles = [
+      'codingagent',
+      'reviewagent',
+      'docsagent',
+      'testagent',
+      'webagent',
+    ];
+    await pumpDs(
+      tester,
+      Column(
+        children: [
+          for (final h in handles)
+            DsAvatar(name: h, origin: DsMessageOrigin.agent, teamMember: true),
+        ],
+      ),
+    );
+    final colors = {
+      for (final c in tester.widgetList<Container>(
+        find.descendant(
+          of: find.byType(DsAvatar),
+          matching: find.byType(Container),
+        ),
+      ))
+        (c.decoration! as BoxDecoration).color,
+    };
+    expect(colors, hasLength(handles.length));
+  });
+
   testWidgets('origin badges for agent, app, import and system', (
     tester,
   ) async {

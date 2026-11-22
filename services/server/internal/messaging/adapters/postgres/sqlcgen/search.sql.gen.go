@@ -14,7 +14,7 @@ import (
 const hitMessages = `-- name: HitMessages :many
 SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle
 FROM messages m
 WHERE m.id = ANY($1::uuid[]) AND m.channel_id = ANY($2::uuid[]) AND m.deleted_at IS NULL
 `
@@ -50,6 +50,7 @@ type HitMessagesRow struct {
 	DeletedBy           pgtype.UUID
 	CreatedAt           pgtype.Timestamptz
 	HasAttachments      bool
+	TeamHandle          pgtype.Text
 }
 
 // The live messages @message_ids of the channels @channel_ids (the channels of the kept hits) for
@@ -91,6 +92,7 @@ func (q *Queries) HitMessages(ctx context.Context, arg HitMessagesParams) ([]Hit
 			&i.DeletedBy,
 			&i.CreatedAt,
 			&i.HasAttachments,
+			&i.TeamHandle,
 		); err != nil {
 			return nil, err
 		}

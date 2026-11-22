@@ -30,6 +30,7 @@ content_tables:
   - files
   - file_thumbnails
   - message_attachments
+  - message_attachment_relays
   - file_text_extracts
   - runs
   - run_steps
@@ -179,6 +180,12 @@ exceptions:
   - query: files.ListAttachmentStates
     category: after_authorize
     reason: "the states of the attachments of one message whose creation or run was already decided (Pending, M3-07); only a boolean leaves the use case"
+  - query: files.ListRelaySources
+    category: after_authorize
+    reason: "the files of the source of a team copy, locked inside the unit of work of the copy that the team use case wrote after the checks of 09 3.9.5 (Relay, FIX-TEAM-CHANNEL-ATTACHMENTS); only ids and positions leave"
+  - query: files.ListRelaysOfFile
+    category: authorize_resolution
+    reason: "resolves the team copies one file is relayed to by its id, for the file.read descriptors of their places when the original row denied; the file is served only after file.read allowed it on one of them (FIX-TEAM-CHANNEL-ATTACHMENTS D-TCAT-2)"
   - query: files.GetFileForDelivery
     category: authorize_resolution
     reason: "resolves one file by its id (scope channel, uploader, purpose, states) for authorize; downloads, tickets and transcripts serve it only after file.read allowed it (M3-05)"

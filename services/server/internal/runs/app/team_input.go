@@ -5,8 +5,12 @@ package app
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"math"
+	"slices"
+	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -100,16 +104,16 @@ type teamSource struct {
 	parsed    bool
 }
 
-// ownerInput copies an owner's message in the team channel to every member (09 3.9.3): the brake
-// resets, every member gets a follow-up or a new team run. A message of a person who is not an
-// active owner is nothing.
+// ownerInput copies an owner's message in the team channel to the members it addresses (09 3.9.3,
+// FIX-TEAM-CHANNEL-NOISE): a message that mentions members goes only to them, one that mentions no
+// member to every member; the brake resets, every recipient gets a follow-up or a new team run. A
+// message of a person who is not an active owner is nothing.
 func (s *Service) ownerInput(ctx context.Context, b *teamBox, m messaging.TriggerMessage) error {
 	team, found, err := b.d.Repo.LockTeam(ctx, m.ChannelID)
 	if err != nil || !found {
 		return err
 	}
-	owner, err := b.d.Owners.IsActiveOwner(ctx, m.Author.ID)
-	if err != nil || !owner {
+	if ready, err := s.ownerReady(ctx, b, m); err != nil || !ready {
 		return err
 	}
 	if team.Brake != domain.ResetBrake() {
@@ -121,13 +125,79 @@ func (s *Service) ownerInput(ctx context.Context, b *teamBox, m messaging.Trigge
 	if err != nil {
 		return err
 	}
-	src := teamSource{message: m.ID, version: m.Version, author: m.Author.ID, authority: m.Author.ID, kind: domain.TeamSourceOwner}
-	for _, member := range members {
+	src := teamSource{
+		message: m.ID, version: m.Version, author: m.Author.ID, authority: m.Author.ID, kind: domain.TeamSourceOwner,
+		mentioned: domain.MentionedHandles(m.ContentMD),
+	}
+	for _, member := range addressedMembers(members, src.mentioned) {
 		if _, err := s.teamDeliver(ctx, b, team, member, members, &src); err != nil {
 			return err
 		}
 	}
+	// Every member the message does not address still sees it, as a context input that starts no
+	// run (FEAT-TEAM-CONTEXT-ALL); a member that got the input already is skipped.
+	for _, member := range members {
+		if err := s.contextInput(ctx, b, team, member, &src); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// ownerReady reports whether an owner's message is copied now: its author is an active owner and
+// its files do not hold it (waitForFiles).
+func (s *Service) ownerReady(ctx context.Context, b *teamBox, m messaging.TriggerMessage) (bool, error) {
+	owner, err := b.d.Owners.IsActiveOwner(ctx, m.Author.ID)
+	if err != nil || !owner {
+		return false, err
+	}
+	wait, err := s.waitForFiles(ctx, b, m)
+	return !wait, err
+}
+
+// teamFilesRecheck is how long the job runs.team_input waits before it looks at the files of its
+// message again (FIX-TEAM-CHANNEL-ATTACHMENTS D-TCAT-4): a screenshot is usually final within a
+// few seconds of its upload.
+const teamFilesRecheck = 2 * time.Second
+
+// msgTeamFilesNotFinal is the Info line of a team input copied after file.invocation_hold_max with
+// files that are still not final; it carries only bothy.message.id.
+const msgTeamFilesNotFinal = "runs: a team input was copied before its files were final; " +
+	"file.invocation_hold_max passed, the members get the files in their current state"
+
+// waitForFiles holds the copies of a message whose attachments are not final yet (D-TCAT-4): the
+// job is scheduled again teamFilesRecheck later and reports wait, so nothing is copied now. A
+// message without attachments, one whose files are final (or only a transcript is pending) and one
+// older than file.invocation_hold_max go on; the last logs one Info line.
+func (s *Service) waitForFiles(ctx context.Context, b *teamBox, m messaging.TriggerMessage) (bool, error) {
+	if !m.HasAttachments || s.d.Files == nil {
+		return false, nil
+	}
+	reason, err := s.d.Files.Pending(ctx, m.ID)
+	if err != nil || reason != files.PendingFiles {
+		return false, err
+	}
+	now := s.now()
+	if !now.Before(m.CreatedAt.Add(s.cfg.InvocationHoldMax)) {
+		s.d.Log.LogAttrs(ctx, slog.LevelInfo, msgTeamFilesNotFinal, slog.String(logKeyMessageID, m.ID.String()))
+		return false, nil
+	}
+	return true, b.d.Schedule.ScheduleTeamInputAt(ctx, m.ID, now.Add(teamFilesRecheck))
+}
+
+// addressedMembers returns the members an owner's message reaches (09 3.9.3): the members whose
+// handle it mentions, in the order they were added, or every member when it mentions none.
+func addressedMembers(members []TeamMemberRow, mentioned []string) []TeamMemberRow {
+	var out []TeamMemberRow
+	for _, m := range members {
+		if slices.Contains(mentioned, m.Handle) {
+			out = append(out, m)
+		}
+	}
+	if len(out) == 0 {
+		return members
+	}
+	return out
 }
 
 // memberReply mirrors a member's final reply into the main thread of the team channel and hands
@@ -136,6 +206,14 @@ func (s *Service) ownerInput(ctx context.Context, b *teamBox, m messaging.Trigge
 func (s *Service) memberReply(ctx context.Context, b *teamBox, m messaging.TriggerMessage, member TeamMemberRow) error {
 	mirrored, err := b.d.Repo.TeamMirrored(ctx, m.ID)
 	if err != nil || mirrored {
+		return err
+	}
+	// A member with nothing to add says so with the silent reply: it is neither mirrored nor
+	// handed on, so it posts and starts nothing (FIX-TEAM-CHANNEL-NOISE).
+	if domain.IsSilentTeamReply(m.ContentMD) {
+		return nil
+	}
+	if wait, err := s.waitForFiles(ctx, b, m); err != nil || wait {
 		return err
 	}
 	team, found, err := b.d.Repo.LockTeam(ctx, member.ChannelID)
@@ -212,7 +290,7 @@ func (s *Service) mirrorReply(ctx context.Context, b *teamBox, team TeamRow, m m
 			&teamSource{authority: team.SponsorID, kind: domain.TeamSourceMember, member: &member}, domain.TeamRefusalReaders, "")
 	}
 	copied, err := b.d.Messages.CopyMessage(ctx, messaging.CopyCmd{
-		SourceMessageID: m.ID, SourceVersion: m.Version, ThreadID: ch.MainThreadID, AuthorID: member.AgentID,
+		SourceMessageID: m.ID, SourceVersion: m.Version, ThreadID: ch.MainThreadID, AuthorID: member.AgentID, TeamHandle: member.Handle,
 	})
 	if err != nil {
 		return messaging.Copied{}, false, err
@@ -299,9 +377,12 @@ func (s *Service) copyContext(ctx context.Context, b *teamBox, member TeamMember
 	if err != nil || done {
 		return err
 	}
-	copied, err := b.d.Messages.CopyMessage(ctx, messaging.CopyCmd{
-		SourceMessageID: src.message, SourceVersion: src.version, ThreadID: member.WorkThreadID, AuthorID: src.author,
-	})
+	cmd := messaging.CopyCmd{SourceMessageID: src.message, SourceVersion: src.version, ThreadID: member.WorkThreadID, AuthorID: src.author}
+	if src.member != nil {
+		// A context copy of a mirror names the one member it came from (FIX-TEAM-MEMBER-ATTRIBUTION).
+		cmd.TeamHandle = src.member.Handle
+	}
+	copied, err := b.d.Messages.CopyMessage(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -405,9 +486,11 @@ func (s *Service) teamDeliver(ctx context.Context, b *teamBox, team TeamRow, mem
 	if reason != "" {
 		return false, s.refuseInput(ctx, b, team, member, src, reason, "")
 	}
-	copied, err := b.d.Messages.CopyMessage(ctx, messaging.CopyCmd{
-		SourceMessageID: src.message, SourceVersion: src.version, ThreadID: member.WorkThreadID, AuthorID: src.author,
-	})
+	cmd := messaging.CopyCmd{SourceMessageID: src.message, SourceVersion: src.version, ThreadID: member.WorkThreadID, AuthorID: src.author}
+	if src.member != nil {
+		cmd.TeamHandle = src.member.Handle
+	}
+	copied, err := b.d.Messages.CopyMessage(ctx, cmd)
 	if err != nil {
 		return false, err
 	}
@@ -419,10 +502,6 @@ func (s *Service) teamDeliver(ctx context.Context, b *teamBox, team TeamRow, mem
 	}
 	if _, err := b.d.Repo.InsertTeamInput(ctx, in); err != nil {
 		return false, err
-	}
-	if !src.parsed {
-		// An owner's message is read once, at its first copy, for the members it addresses.
-		src.mentioned, src.parsed = domain.MentionedHandles(copied.ContentMD), true
 	}
 	if active != nil {
 		if s.fu == nil {
@@ -763,6 +842,15 @@ func (s *Service) historySource(ctx context.Context, b *teamBox, team TeamRow, r
 	switch {
 	case r.Mirror && !r.Edited && r.Origin == originAgent:
 		src.kind, src.member = domain.TeamSourceMember, &TeamMemberRow{ID: r.MirrorMemberID}
+		members, err := b.d.Repo.TeamMembers(ctx, team.ChannelID)
+		if err != nil {
+			return nil, false, err
+		}
+		for _, m := range members {
+			if m.ID == r.MirrorMemberID {
+				src.member.Handle = m.Handle
+			}
+		}
 		return src, true, nil
 	case !r.Mirror && r.Origin == originHuman:
 		owner, known := owners[r.AuthorID]

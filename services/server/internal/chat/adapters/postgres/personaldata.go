@@ -65,6 +65,8 @@ type sidebarChannelJSON struct {
 	ChannelID         string     `json:"channel_id"`
 	ThreadOrder       []string   `json:"thread_order"`
 	HiddenAt          *time.Time `json:"hidden_at,omitempty"`
+	PinnedAt          *time.Time `json:"pinned_at,omitempty"`
+	PinnedThreads     []string   `json:"pinned_threads"`
 	UpdatedByDeviceID string     `json:"updated_by_device_id,omitempty"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 }
@@ -116,10 +118,14 @@ func (p *PersonalData) Export(ctx context.Context, e personaldata.Export, w pers
 	outChans := make([]sidebarChannelJSON, 0, len(chans))
 	for _, r := range chans {
 		row := sidebarChannelJSON{ChannelID: idOf(r.ChannelID).String(), ThreadOrder: idStrings(r.ThreadOrder),
-			UpdatedByDeviceID: optionalDevice(r.UpdatedByDeviceID), UpdatedAt: timeOf(r.UpdatedAt).UTC()}
+			PinnedThreads: idStrings(r.PinnedThreads), UpdatedByDeviceID: optionalDevice(r.UpdatedByDeviceID), UpdatedAt: timeOf(r.UpdatedAt).UTC()}
 		if r.HiddenAt.Valid {
 			at := r.HiddenAt.Time.UTC()
 			row.HiddenAt = &at
+		}
+		if r.PinnedAt.Valid {
+			at := r.PinnedAt.Time.UTC()
+			row.PinnedAt = &at
 		}
 		outChans = append(outChans, row)
 	}

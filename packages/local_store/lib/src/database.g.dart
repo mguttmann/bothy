@@ -1633,6 +1633,29 @@ class $UserChannelStatesTable extends UserChannelStates
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _pinnedAtMeta = const VerificationMeta(
+    'pinnedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> pinnedAt = GeneratedColumn<DateTime>(
+    'pinned_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pinnedThreadsMeta = const VerificationMeta(
+    'pinnedThreads',
+  );
+  @override
+  late final GeneratedColumn<String> pinnedThreads = GeneratedColumn<String>(
+    'pinned_threads',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     channelId,
@@ -1640,6 +1663,8 @@ class $UserChannelStatesTable extends UserChannelStates
     version,
     updatedByDeviceId,
     hiddenAt,
+    pinnedAt,
+    pinnedThreads,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1693,6 +1718,21 @@ class $UserChannelStatesTable extends UserChannelStates
         hiddenAt.isAcceptableOrUnknown(data['hidden_at']!, _hiddenAtMeta),
       );
     }
+    if (data.containsKey('pinned_at')) {
+      context.handle(
+        _pinnedAtMeta,
+        pinnedAt.isAcceptableOrUnknown(data['pinned_at']!, _pinnedAtMeta),
+      );
+    }
+    if (data.containsKey('pinned_threads')) {
+      context.handle(
+        _pinnedThreadsMeta,
+        pinnedThreads.isAcceptableOrUnknown(
+          data['pinned_threads']!,
+          _pinnedThreadsMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1722,6 +1762,14 @@ class $UserChannelStatesTable extends UserChannelStates
         DriftSqlType.dateTime,
         data['${effectivePrefix}hidden_at'],
       ),
+      pinnedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}pinned_at'],
+      ),
+      pinnedThreads: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pinned_threads'],
+      )!,
     );
   }
 
@@ -1748,12 +1796,22 @@ class UserChannelStateRow extends DataClass
   /// 03 `user_channel_states.hidden_at` (PROJ-ARCHIVE, 01 6.22): set while the person archived
   /// the channel in the own sidebar; null while it shows.
   final DateTime? hiddenAt;
+
+  /// 03 `user_channel_states.pinned_at` (FEAT-PIN-CHANNELS, 01 6.24): set while the person
+  /// pinned the channel to the top of its space; null while it is not pinned.
+  final DateTime? pinnedAt;
+
+  /// 03 `user_channel_states.pinned_threads` as a JSON array of thread IDs, in pin order
+  /// (FEAT-PIN-CHANNELS, 01 6.24).
+  final String pinnedThreads;
   const UserChannelStateRow({
     required this.channelId,
     required this.threadOrder,
     required this.version,
     this.updatedByDeviceId,
     this.hiddenAt,
+    this.pinnedAt,
+    required this.pinnedThreads,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1767,6 +1825,10 @@ class UserChannelStateRow extends DataClass
     if (!nullToAbsent || hiddenAt != null) {
       map['hidden_at'] = Variable<DateTime>(hiddenAt);
     }
+    if (!nullToAbsent || pinnedAt != null) {
+      map['pinned_at'] = Variable<DateTime>(pinnedAt);
+    }
+    map['pinned_threads'] = Variable<String>(pinnedThreads);
     return map;
   }
 
@@ -1781,6 +1843,10 @@ class UserChannelStateRow extends DataClass
       hiddenAt: hiddenAt == null && nullToAbsent
           ? const Value.absent()
           : Value(hiddenAt),
+      pinnedAt: pinnedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pinnedAt),
+      pinnedThreads: Value(pinnedThreads),
     );
   }
 
@@ -1797,6 +1863,8 @@ class UserChannelStateRow extends DataClass
         json['updatedByDeviceId'],
       ),
       hiddenAt: serializer.fromJson<DateTime?>(json['hiddenAt']),
+      pinnedAt: serializer.fromJson<DateTime?>(json['pinnedAt']),
+      pinnedThreads: serializer.fromJson<String>(json['pinnedThreads']),
     );
   }
   @override
@@ -1808,6 +1876,8 @@ class UserChannelStateRow extends DataClass
       'version': serializer.toJson<int>(version),
       'updatedByDeviceId': serializer.toJson<String?>(updatedByDeviceId),
       'hiddenAt': serializer.toJson<DateTime?>(hiddenAt),
+      'pinnedAt': serializer.toJson<DateTime?>(pinnedAt),
+      'pinnedThreads': serializer.toJson<String>(pinnedThreads),
     };
   }
 
@@ -1817,6 +1887,8 @@ class UserChannelStateRow extends DataClass
     int? version,
     Value<String?> updatedByDeviceId = const Value.absent(),
     Value<DateTime?> hiddenAt = const Value.absent(),
+    Value<DateTime?> pinnedAt = const Value.absent(),
+    String? pinnedThreads,
   }) => UserChannelStateRow(
     channelId: channelId ?? this.channelId,
     threadOrder: threadOrder ?? this.threadOrder,
@@ -1825,6 +1897,8 @@ class UserChannelStateRow extends DataClass
         ? updatedByDeviceId.value
         : this.updatedByDeviceId,
     hiddenAt: hiddenAt.present ? hiddenAt.value : this.hiddenAt,
+    pinnedAt: pinnedAt.present ? pinnedAt.value : this.pinnedAt,
+    pinnedThreads: pinnedThreads ?? this.pinnedThreads,
   );
   UserChannelStateRow copyWithCompanion(UserChannelStatesCompanion data) {
     return UserChannelStateRow(
@@ -1837,6 +1911,10 @@ class UserChannelStateRow extends DataClass
           ? data.updatedByDeviceId.value
           : this.updatedByDeviceId,
       hiddenAt: data.hiddenAt.present ? data.hiddenAt.value : this.hiddenAt,
+      pinnedAt: data.pinnedAt.present ? data.pinnedAt.value : this.pinnedAt,
+      pinnedThreads: data.pinnedThreads.present
+          ? data.pinnedThreads.value
+          : this.pinnedThreads,
     );
   }
 
@@ -1847,14 +1925,23 @@ class UserChannelStateRow extends DataClass
           ..write('threadOrder: $threadOrder, ')
           ..write('version: $version, ')
           ..write('updatedByDeviceId: $updatedByDeviceId, ')
-          ..write('hiddenAt: $hiddenAt')
+          ..write('hiddenAt: $hiddenAt, ')
+          ..write('pinnedAt: $pinnedAt, ')
+          ..write('pinnedThreads: $pinnedThreads')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(channelId, threadOrder, version, updatedByDeviceId, hiddenAt);
+  int get hashCode => Object.hash(
+    channelId,
+    threadOrder,
+    version,
+    updatedByDeviceId,
+    hiddenAt,
+    pinnedAt,
+    pinnedThreads,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1863,7 +1950,9 @@ class UserChannelStateRow extends DataClass
           other.threadOrder == this.threadOrder &&
           other.version == this.version &&
           other.updatedByDeviceId == this.updatedByDeviceId &&
-          other.hiddenAt == this.hiddenAt);
+          other.hiddenAt == this.hiddenAt &&
+          other.pinnedAt == this.pinnedAt &&
+          other.pinnedThreads == this.pinnedThreads);
 }
 
 class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
@@ -1872,6 +1961,8 @@ class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
   final Value<int> version;
   final Value<String?> updatedByDeviceId;
   final Value<DateTime?> hiddenAt;
+  final Value<DateTime?> pinnedAt;
+  final Value<String> pinnedThreads;
   final Value<int> rowid;
   const UserChannelStatesCompanion({
     this.channelId = const Value.absent(),
@@ -1879,6 +1970,8 @@ class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
     this.version = const Value.absent(),
     this.updatedByDeviceId = const Value.absent(),
     this.hiddenAt = const Value.absent(),
+    this.pinnedAt = const Value.absent(),
+    this.pinnedThreads = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   UserChannelStatesCompanion.insert({
@@ -1887,6 +1980,8 @@ class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
     required int version,
     this.updatedByDeviceId = const Value.absent(),
     this.hiddenAt = const Value.absent(),
+    this.pinnedAt = const Value.absent(),
+    this.pinnedThreads = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : channelId = Value(channelId),
        version = Value(version);
@@ -1896,6 +1991,8 @@ class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
     Expression<int>? version,
     Expression<String>? updatedByDeviceId,
     Expression<DateTime>? hiddenAt,
+    Expression<DateTime>? pinnedAt,
+    Expression<String>? pinnedThreads,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1904,6 +2001,8 @@ class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
       if (version != null) 'version': version,
       if (updatedByDeviceId != null) 'updated_by_device_id': updatedByDeviceId,
       if (hiddenAt != null) 'hidden_at': hiddenAt,
+      if (pinnedAt != null) 'pinned_at': pinnedAt,
+      if (pinnedThreads != null) 'pinned_threads': pinnedThreads,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1914,6 +2013,8 @@ class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
     Value<int>? version,
     Value<String?>? updatedByDeviceId,
     Value<DateTime?>? hiddenAt,
+    Value<DateTime?>? pinnedAt,
+    Value<String>? pinnedThreads,
     Value<int>? rowid,
   }) {
     return UserChannelStatesCompanion(
@@ -1922,6 +2023,8 @@ class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
       version: version ?? this.version,
       updatedByDeviceId: updatedByDeviceId ?? this.updatedByDeviceId,
       hiddenAt: hiddenAt ?? this.hiddenAt,
+      pinnedAt: pinnedAt ?? this.pinnedAt,
+      pinnedThreads: pinnedThreads ?? this.pinnedThreads,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1944,6 +2047,12 @@ class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
     if (hiddenAt.present) {
       map['hidden_at'] = Variable<DateTime>(hiddenAt.value);
     }
+    if (pinnedAt.present) {
+      map['pinned_at'] = Variable<DateTime>(pinnedAt.value);
+    }
+    if (pinnedThreads.present) {
+      map['pinned_threads'] = Variable<String>(pinnedThreads.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1958,6 +2067,8 @@ class UserChannelStatesCompanion extends UpdateCompanion<UserChannelStateRow> {
           ..write('version: $version, ')
           ..write('updatedByDeviceId: $updatedByDeviceId, ')
           ..write('hiddenAt: $hiddenAt, ')
+          ..write('pinnedAt: $pinnedAt, ')
+          ..write('pinnedThreads: $pinnedThreads, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5555,6 +5666,17 @@ class $MessagesTable extends Messages
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _teamHandleMeta = const VerificationMeta(
+    'teamHandle',
+  );
+  @override
+  late final GeneratedColumn<String> teamHandle = GeneratedColumn<String>(
+    'team_handle',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -5581,6 +5703,7 @@ class $MessagesTable extends Messages
     editedAt,
     deletedAt,
     createdAt,
+    teamHandle,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -5791,6 +5914,12 @@ class $MessagesTable extends Messages
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('team_handle')) {
+      context.handle(
+        _teamHandleMeta,
+        teamHandle.isAcceptableOrUnknown(data['team_handle']!, _teamHandleMeta),
+      );
+    }
     return context;
   }
 
@@ -5896,6 +6025,10 @@ class $MessagesTable extends Messages
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      teamHandle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}team_handle'],
+      ),
     );
   }
 
@@ -5977,6 +6110,10 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
 
   /// 03 `messages.created_at`.
   final DateTime createdAt;
+
+  /// 03 `messages.team_handle` (FIX-TEAM-MEMBER-ATTRIBUTION); last, where the migration to
+  /// version 17 adds it.
+  final String? teamHandle;
   const MessageRow({
     required this.id,
     required this.threadId,
@@ -6002,6 +6139,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     this.editedAt,
     this.deletedAt,
     required this.createdAt,
+    this.teamHandle,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -6046,6 +6184,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || teamHandle != null) {
+      map['team_handle'] = Variable<String>(teamHandle);
+    }
     return map;
   }
 
@@ -6091,6 +6232,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           ? const Value.absent()
           : Value(deletedAt),
       createdAt: Value(createdAt),
+      teamHandle: teamHandle == null && nullToAbsent
+          ? const Value.absent()
+          : Value(teamHandle),
     );
   }
 
@@ -6126,6 +6270,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       editedAt: serializer.fromJson<DateTime?>(json['editedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      teamHandle: serializer.fromJson<String?>(json['teamHandle']),
     );
   }
   @override
@@ -6156,6 +6301,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       'editedAt': serializer.toJson<DateTime?>(editedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'teamHandle': serializer.toJson<String?>(teamHandle),
     };
   }
 
@@ -6184,6 +6330,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     Value<DateTime?> editedAt = const Value.absent(),
     Value<DateTime?> deletedAt = const Value.absent(),
     DateTime? createdAt,
+    Value<String?> teamHandle = const Value.absent(),
   }) => MessageRow(
     id: id ?? this.id,
     threadId: threadId ?? this.threadId,
@@ -6215,6 +6362,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     editedAt: editedAt.present ? editedAt.value : this.editedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
     createdAt: createdAt ?? this.createdAt,
+    teamHandle: teamHandle.present ? teamHandle.value : this.teamHandle,
   );
   MessageRow copyWithCompanion(MessagesCompanion data) {
     return MessageRow(
@@ -6262,6 +6410,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       editedAt: data.editedAt.present ? data.editedAt.value : this.editedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      teamHandle: data.teamHandle.present
+          ? data.teamHandle.value
+          : this.teamHandle,
     );
   }
 
@@ -6291,7 +6442,8 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           ..write('version: $version, ')
           ..write('editedAt: $editedAt, ')
           ..write('deletedAt: $deletedAt, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('teamHandle: $teamHandle')
           ..write(')'))
         .toString();
   }
@@ -6322,6 +6474,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     editedAt,
     deletedAt,
     createdAt,
+    teamHandle,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -6350,7 +6503,8 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           other.version == this.version &&
           other.editedAt == this.editedAt &&
           other.deletedAt == this.deletedAt &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.teamHandle == this.teamHandle);
 }
 
 class MessagesCompanion extends UpdateCompanion<MessageRow> {
@@ -6378,6 +6532,7 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
   final Value<DateTime?> editedAt;
   final Value<DateTime?> deletedAt;
   final Value<DateTime> createdAt;
+  final Value<String?> teamHandle;
   final Value<int> rowid;
   const MessagesCompanion({
     this.id = const Value.absent(),
@@ -6404,6 +6559,7 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
     this.editedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.teamHandle = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   MessagesCompanion.insert({
@@ -6431,6 +6587,7 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
     this.editedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
     required DateTime createdAt,
+    this.teamHandle = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        threadId = Value(threadId),
@@ -6473,6 +6630,7 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
     Expression<DateTime>? editedAt,
     Expression<DateTime>? deletedAt,
     Expression<DateTime>? createdAt,
+    Expression<String>? teamHandle,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -6501,6 +6659,7 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
       if (editedAt != null) 'edited_at': editedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (createdAt != null) 'created_at': createdAt,
+      if (teamHandle != null) 'team_handle': teamHandle,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -6530,6 +6689,7 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
     Value<DateTime?>? editedAt,
     Value<DateTime?>? deletedAt,
     Value<DateTime>? createdAt,
+    Value<String?>? teamHandle,
     Value<int>? rowid,
   }) {
     return MessagesCompanion(
@@ -6557,6 +6717,7 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
       editedAt: editedAt ?? this.editedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       createdAt: createdAt ?? this.createdAt,
+      teamHandle: teamHandle ?? this.teamHandle,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -6636,6 +6797,9 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (teamHandle.present) {
+      map['team_handle'] = Variable<String>(teamHandle.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -6669,6 +6833,7 @@ class MessagesCompanion extends UpdateCompanion<MessageRow> {
           ..write('editedAt: $editedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('createdAt: $createdAt, ')
+          ..write('teamHandle: $teamHandle, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();

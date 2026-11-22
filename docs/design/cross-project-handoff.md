@@ -87,7 +87,8 @@ A message of any active owner in the team channel goes to every member: the serv
 each work thread as an input authored by that owner (`origin = human`), a follow-up to a running
 run, a new `team` run with the owner as `triggered_by` for an idle member. Mentions in it mark who
 is addressed (`team.addressed` of the invocation); the others get it as context and may answer
-briefly. In the runner's background mode it arrives with an owner code (18.5), so the session
+briefly. Since 2026-11-22 a message with member mentions goes only to the mentioned members (owner
+answer 2 in section 9 was replaced, 09 3.9.3). In the runner's background mode it arrives with an owner code (18.5), so the session
 treats it as the owner's own word: the runner keeps today's rule and decides from the input
 message's origin and author, never from `triggered_by`. A relayed member reply is an agent's
 message and never carries a code, and the runner labels it "from member @x".
@@ -175,7 +176,7 @@ and stop all; `/team add|remove|list|stop` and the app member dialog; header wit
 server part is FEAT-TEAM-CHANNEL-SERVER; runner, Hermes adapter and apps follow.
 
 Later: talk rules (`team_talk_rules`, `/team allow|deny`) and their matrix in the app;
-`bothy-team say` mid-run; attachments in relayed inputs; push notifications for brake notes; all
+`bothy-team say` mid-run; attachments in relayed inputs (built since by FIX-TEAM-CHANNEL-ATTACHMENTS); push notifications for brake notes; all
 runs inside the team channel (3.2 alternative); members who are people other than owners.
 
 ### 7.1 Open minors of the server slice
@@ -234,6 +235,19 @@ Found by the red team in round 10:
 17. The runs README lists the tables of `PersonalData` without `team_mirrors` and `run_answers`
     (neither holds personal data of its own; 20 section 2).
 
+Found while building FIX-TEAM-CHANNEL-ATTACHMENTS:
+
+18. Deleting the source of a team copy removes the copy's relayed files (D-TCAT-3) but leaves the
+    copy's `messages.has_attachments` true, so a search with `has_file` still finds the copy (only
+    owners read work threads and the team channel).
+19. A relay raises no `file.updated` in the copy's thread; a reader of a copy sees a file's later
+    state when it reads the message again.
+20. `decideRead` asks `file.read` on the original place first, so every allowed read through a
+    relay also records a deny in the audit aggregation and the decision metric.
+21. After a rollback to the previous binary, a deleted copy keeps its relays (the old
+    `DeleteForMessage` does not know them); after the next upgrade they still allow `file.read` in
+    the work thread, whose readers are owners and the member's agent.
+
 ### 7.2 Open minors of the app slice
 
 Found by the review of FEAT-TEAM-CHANNEL-APP without a shown harm; the next slice that touches the
@@ -249,6 +263,18 @@ team channels in the app takes them along:
 6. Not built in this slice: push notifications for brake notes (section 4), the live box link of a
    relayed reply (section 6), labels of the input copies in a member's work thread (D-TEAM-APP-5),
    and a sync event for team changes (D-TEAM-APP-1).
+
+Found by the review of FIX-TEAM-CHANNEL-APP without a shown harm, for the same next slice:
+
+1. The composer computes the member suggestions when the text changes; a team that loads after
+   `@` was typed shows its members only after the next key.
+2. The composer starts a mention only after a character that is no letter, digit or one of
+   `_ . - @ /` (03 content format), while the server's team rule also counts `@` after `.` or `/`;
+   such a mention gets no suggestion, its label follows the server's rule.
+3. In a team channel without members `@` offers nothing, also no people.
+4. A member's agent name in the composer list comes from the stored principals only; an agent the
+   device never stored shows its handle alone, although the dialog knows the name from
+   `listAgents`.
 
 ## 8. Alternatives rejected
 
@@ -266,7 +292,10 @@ team channels in the app takes them along:
 1. An owner message without a mention starts idle members too: every member gets it, idle ones as
    a new run, running ones as a follow-up.
 2. Mentions in an owner message do not narrow who gets it: every member gets it, the mentioned
-   ones are marked as addressed.
+   ones are marked as addressed. Replaced by the owner on 2026-11-22 ("somehow too many answer in
+   the chat, even when they were not addressed", translated): an owner message that mentions members
+   goes only to them, one without a member mention to every member (09 3.9.3,
+   [FIX-TEAM-CHANNEL-NOISE](../decisions.d/FIX-TEAM-CHANNEL-NOISE.md)).
 3. The brake defaults are high values in named keys (`team.turn_budget`, `team.pingpong_max`, 09
    21), held by a test, so the brake only catches loops.
 4. One work thread per member and team channel (the owner left it to the recommendation), so each

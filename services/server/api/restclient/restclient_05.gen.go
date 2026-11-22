@@ -9,6 +9,57 @@ import (
 	"net/http"
 )
 
+// StatusCode returns HTTPResponse.StatusCode
+func (r AddReactionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r AddReactionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RetriggerMessageResponse200Headers the declared response headers of an HTTP 200 response for RetriggerMessage
+type RetriggerMessageResponse200Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// RetriggerMessageResponse400Headers the declared response headers of an HTTP 400 response for RetriggerMessage
+type RetriggerMessageResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// RetriggerMessageResponse401Headers the declared response headers of an HTTP 401 response for RetriggerMessage
+type RetriggerMessageResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// RetriggerMessageResponse403Headers the declared response headers of an HTTP 403 response for RetriggerMessage
+type RetriggerMessageResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// RetriggerMessageResponse404Headers the declared response headers of an HTTP 404 response for RetriggerMessage
+type RetriggerMessageResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// RetriggerMessageResponse409Headers the declared response headers of an HTTP 409 response for RetriggerMessage
+type RetriggerMessageResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // RetriggerMessageResponse429Headers the declared response headers of an HTTP 429 response for RetriggerMessage
 type RetriggerMessageResponse429Headers struct {
 	CorrelationId   *CorrelationId
@@ -22641,9 +22692,9 @@ func (c *ClientWithResponses) GetMySidebarWithResponse(ctx context.Context, reqE
 	return ParseGetMySidebarResponse(rsp)
 }
 
-// PutMySidebarChannelWithBodyWithResponse Reorder the posts of a channel or archive it for oneself
+// PutMySidebarChannelWithBodyWithResponse Reorder the posts of a channel, archive or pin it for oneself
 //
-// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order) and whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order), whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state), whether it is pinned to the top of its space (`pinned`; absent keeps the stored state) and the posts pinned to the top of the forum (`pinned_threads`; an empty list unpins every post, absent keeps the stored list). The server checks the form of the lists (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving or pinning twice keeps the first `hidden_at` or `pinned_at`. A body without a known member is 400. Archiving and pinning are personal: they change neither the channel, its rights, its runs nor the caller's notifications (01 6.22, 6.24). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -22656,9 +22707,9 @@ func (c *ClientWithResponses) PutMySidebarChannelWithBodyWithResponse(ctx contex
 	return ParsePutMySidebarChannelResponse(rsp)
 }
 
-// PutMySidebarChannelWithResponse Reorder the posts of a channel or archive it for oneself
+// PutMySidebarChannelWithResponse Reorder the posts of a channel, archive or pin it for oneself
 //
-// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order) and whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order), whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state), whether it is pinned to the top of its space (`pinned`; absent keeps the stored state) and the posts pinned to the top of the forum (`pinned_threads`; an empty list unpins every post, absent keeps the stored list). The server checks the form of the lists (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving or pinning twice keeps the first `hidden_at` or `pinned_at`. A body without a known member is 400. Archiving and pinning are personal: they change neither the channel, its rights, its runs nor the caller's notifications (01 6.22, 6.24). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -22879,45 +22930,4 @@ func (c *ClientWithResponses) RetriggerMessageWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseRetriggerMessageResponse(rsp)
-}
-
-// ListMessageRevisionsWithResponse Read earlier versions
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /messages/{message_id}/revisions (the `ListMessageRevisions` operationId).
-func (c *ClientWithResponses) ListMessageRevisionsWithResponse(ctx context.Context, messageId MessageIdPath, reqEditors ...RequestEditorFn) (*ListMessageRevisionsResponse, error) {
-	rsp, err := c.ListMessageRevisions(ctx, messageId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListMessageRevisionsResponse(rsp)
-}
-
-// ListOwnersWithResponse List owners
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /owners (the `ListOwners` operationId).
-func (c *ClientWithResponses) ListOwnersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOwnersResponse, error) {
-	rsp, err := c.ListOwners(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListOwnersResponse(rsp)
-}
-
-// AddOwnerWithBodyWithResponse Make a person owner
-//
-// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /owners (the `AddOwner` operationId).
-func (c *ClientWithResponses) AddOwnerWithBodyWithResponse(ctx context.Context, params *AddOwnerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddOwnerResponse, error) {
-	rsp, err := c.AddOwnerWithBody(ctx, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseAddOwnerResponse(rsp)
 }

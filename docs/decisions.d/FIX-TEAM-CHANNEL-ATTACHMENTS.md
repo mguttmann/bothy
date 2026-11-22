@@ -1,0 +1,31 @@
+# FIX-TEAM-CHANNEL-ATTACHMENTS Team copies carry the attachments of their source
+
+Owner report of 2026-11-22: "please fix it so that all agents here can also read screenshots when I
+post them here" (the team channel). The owner's first message in the live team channel carried two
+JPEG screenshots (`clean`, `complete`); the Hermes member answered that it did not see a
+screenshot, and the Claude Code members got the text only. Evidence on the live server: the copy
+of that message in each member's work thread (the triggering message of the team runs) had
+`attachments: []`, while the source in the team channel had both files. `CopyMessage` copied the
+text only ("without reply, mentions and attachments", deferred by D-TEAM-10 "attachments in
+copies"). The runner (`fetch_attachments` of `trigger_message.attachments`, follow-up files of
+`getMessage`) and the adapter (`files_for_hermes`, follow-up files) already handle attachments of
+the messages they read; they had none to handle. Wanted: every member that gets an owner's message
+or a member's reply, also as a context input, gets its files: the runner as local files with path,
+Hermes as media.
+Specification: [09-agents.md](../spec/09-agents.md) 3.9.2, 3.9.3,
+[03-data-model.md](../spec/03-data-model.md) `message_attachments`,
+[12-files.md](../spec/12-files.md) section 10.
+
+| No | Date | Ruling | Reason |
+|---|---|---|---|
+| D-TCAT-1 | 2026-11-22 | A team copy relays the attachments of its source: `CopyMessage` writes the copy with `has_attachments` and `files.Attachments.Relay` inserts one row per live file of the source into the new table `message_attachment_relays` (migration 00112), with the copy's thread and channel and the source's positions; a copy of a copy (the input made from a mirror) relays the files of the mirror, which are the reply's. The file is shared, never duplicated. `message_attachments` keeps exactly one row per file, so where a file is attached (`MessageOf`, the resource of `file.delete`, the scope of `file.updated`), the search, the export, the cleanup and the deletion count stay as they are. | A relay puts the file on the copy through the paths that already read attachments by message: the representation of the copy, the run context, `getMessage` of a follow-up and `Pending` read relays next to the original rows. Copying the bytes into a new file was weighed and rejected: the object store has no copy operation, keys are bound to the file id, and a copy would need its own scan, image cleaning and thumbnails. A marker column on `message_attachments` was weighed and rejected: the previous binary would read the relay rows as original ones after a rollback (upgrade.md rule M1) and delete the owner's file with a copy. |
+| D-TCAT-2 | 2026-11-22 | `file.read` (download, file ticket, transcript, `getFile`) decides on the original row first; when that denies, it decides on each relay of the file with the copy's thread and channel, and the first allow wins; with every place denied the answer of the original row stands. No other action reads relays. | The member's agent may read the file only because the team use case put a copy into its work thread after the checks of 09 3.9.5 (an active owner's authority, the readers rule, `agent.invoke`); reading the copy's place with the normal decision keeps exactly that right and nothing more. `file.delete` stays on the original row, so an agent never deletes an owner's file. |
+| D-TCAT-3 | 2026-11-22 | Deleting a copy removes its relays only; deleting the source (the message of the original row) removes every relay of its files and marks the files deleted as before; the purge of a file row takes its relays with it (ON DELETE CASCADE). | The file belongs to the source's author; the copies only point at it. When the source goes, its files go everywhere, and no relay blocks the purge. |
+| D-TCAT-4 | 2026-11-22 | `runs.team_input` waits for the files: when the message has an attachment that is not final (`files.Attachments.Pending` = files), the job schedules itself again after `teamFilesRecheck` (2 s) and copies nothing, until the attachments are final or `file.invocation_hold_max` has passed since the message was written (`messages.created_at`, carried as `messaging.TriggerMessage.CreatedAt`); then it copies with the files in their current state and logs one Info line with the message id. | A screenshot is usually still being cleaned (12 3.4) when the job runs right after the commit; a team run started then would get `file_not_ready`. A team run does not go through the hold of `invokeOrHold`, so the job waits instead, with the same window as the hold and the same "current state" release. |
+| D-TCAT-5 | 2026-11-22 | An owner's message of attachments only (empty text) in a team channel is copied like any owner's message: it mentions no member, so it goes to every member. A voice message still triggers nothing. | Before this change such a message made `CopyMessage` fail with an internal error on every attempt of the job. The owner wants the agents to see what he posts; a screenshot without words is such a post. |
+| D-TCAT-6 | 2026-11-22 | In a team run the runner stores the attachments of the thread context messages (never `channel_context`, the main thread of a text home channel, which holds no team input; review finding) that were not delivered to the session before (`already_delivered` not true) as local files, like the trigger's, and the Hermes adapter passes them to Hermes as media. Outside team runs both keep the trigger's files only. | A member that got a message as a context input sees it only in the context of its next run; without this its files would be listed by name only. In a team work thread only owners and the members' agents write (readers rule, 09 3.9.1), so the files of its context come from the same sources as its inputs; elsewhere other people's files stay out of Hermes's media as before. |
+
+Not covered: a relay row raises no `file.updated` for the copy's thread; the readers of a copy see
+a file's later state when they read the message again (the runner and the adapter poll
+`getMessage` for a follow-up's files, 12 10 rule 1). A run that is already running and gets a team
+input as a follow-up gets its files through the follow-up path.

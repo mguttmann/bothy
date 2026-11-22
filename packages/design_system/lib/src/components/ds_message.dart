@@ -269,6 +269,7 @@ class DsMessageState extends State<DsMessage> {
                   name: d.authorName,
                   origin: d.origin,
                   size: DsSize.avatarSm,
+                  teamMember: d.authorVia != null,
                 )
               : null,
         ),
@@ -286,7 +287,11 @@ class DsMessageState extends State<DsMessage> {
           if (widget.isContinuation)
             const SizedBox(width: DsSize.avatarMd)
           else
-            DsAvatar(name: d.authorName, origin: d.origin),
+            DsAvatar(
+              name: d.authorName,
+              origin: d.origin,
+              teamMember: d.authorVia != null,
+            ),
           SizedBox(width: gutter - DsSize.avatarMd),
         ] else if (gutter > 0)
           SizedBox(width: gutter),
@@ -444,6 +449,13 @@ class DsMessageState extends State<DsMessage> {
               text: badge,
               background: colors.surfaceSunken,
               foreground: colors.textSecondary,
+            ),
+          // A team member's agent, small after the badge (FIX-TEAM-MEMBER-AUTHOR-DISPLAY).
+          if (d.authorVia case final via?)
+            Text(
+              dsL10n(context).messageAuthorVia(dsIsolate(via)),
+              style: dsTextStyle(DsType.caption)
+                  .copyWith(color: colors.textSecondary),
             ),
           ExcludeSemantics(
             child: Text(
@@ -856,6 +868,9 @@ class _HoverBar extends StatelessWidget {
 
 /// The avatar of a message author: a person round, an agent as a rounded square
 /// (`radius.md`), an app with a small badge; initials on a category tile chosen from the name.
+/// A team member ([teamMember]) chooses from eight tiles instead of six, so the members of a
+/// team channel, which are often one agent, rarely share a color (FIX-TEAM-MEMBER-AUTHOR-DISPLAY);
+/// every other avatar keeps its six-tile color.
 ///
 /// [size] is `size.avatar-md` beside the content, `size.avatar-sm` in the header line of a
 /// narrow gutter (the phone, brief M5-17); the small one scales its initial down to fit.
@@ -866,10 +881,14 @@ class DsAvatar extends StatelessWidget {
     required this.name,
     required this.origin,
     this.size = DsSize.avatarMd,
+    this.teamMember = false,
   });
 
   /// The display name.
   final String name;
+
+  /// Whether [name] is the handle of a team member, which picks from the eight tiles.
+  final bool teamMember;
 
   /// The origin; decides the shape.
   final DsMessageOrigin origin;
@@ -887,6 +906,10 @@ class DsAvatar extends StatelessWidget {
       (colors.categoryAmberChipBg, colors.categoryAmberChipFg),
       (colors.categoryMossChipBg, colors.categoryMossChipFg),
       (colors.categoryRowanChipBg, colors.categoryRowanChipFg),
+      if (teamMember) ...[
+        (colors.categoryGorseChipBg, colors.categoryGorseChipFg),
+        (colors.categoryGraniteChipBg, colors.categoryGraniteChipFg),
+      ],
     ];
     final (bg, fg) =
         tiles[name.runes.fold<int>(0, (a, b) => a + b) % tiles.length];

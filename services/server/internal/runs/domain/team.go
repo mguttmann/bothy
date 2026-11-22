@@ -40,6 +40,21 @@ const (
 	TeamRefusalSource = "team_source_not_owner"
 )
 
+// TeamSilentReply is the whole final reply of a member that has nothing to add (09 3.9.4,
+// FIX-TEAM-CHANNEL-NOISE): such a reply is neither mirrored into the team channel nor handed on.
+// The runner and the Hermes adapter tell their sessions to answer with it; it is no silence marker
+// of Hermes, so Hermes posts it like any answer.
+const TeamSilentReply = "NOTHING_TO_ADD"
+
+// IsSilentTeamReply reports whether text is the silent reply alone: TeamSilentReply in any case,
+// with white space, emphasis or code marks ('*', '_', '`') and a closing full stop around it. A
+// reply that says anything more is no silent reply.
+func IsSilentTeamReply(text string) bool {
+	core := strings.TrimRight(strings.TrimSpace(text), ".")
+	core = strings.Trim(core, "*_` \t\r\n")
+	return strings.EqualFold(core, TeamSilentReply)
+}
+
 // TeamRefusalNote returns the text of the note a refused team input posts in the team channel's
 // main thread (09 3.9.5): the member, the reason and, for the reasons of this module, what an
 // owner can do about it. The reason stays in the text as the code the audit entry names.

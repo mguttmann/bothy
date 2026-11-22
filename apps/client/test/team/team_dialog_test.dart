@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // The team dialog over a fake API (09 3.9.1, 3.9.7; design cross-project-handoff.md MVP item
-// 6): the switch, the member list, adding with agent, home channel and handle, removing, stop
+// 6): the switch, the member list, adding with agent, home channel and handle (the agents of
+// the server, filtered as typed, the free home channels and a suggested handle), removing, stop
 // all, and the server's reason of a refusal, in English and German.
 
 import 'package:client/team/team_controller.dart';
@@ -232,6 +233,119 @@ void main() {
     expect(find.text(l.teamRefused(l.teamReasonHandleTaken)), findsOneWidget);
     expect(l.teamReasonHandleTaken, 'ein anderes Mitglied hat dieses Handle');
     expect(find.text('@qa'), findsNothing);
+  });
+
+  testWidgets('the agents come from the server and filter as typed', (
+    tester,
+  ) async {
+    final quill = PrincipalId.parse(uuid(0xaa));
+    final port = FakeTeamPort(team())
+      ..agentList = [
+        TeamAgent(id: nova, handle: 'nova', name: 'Nova'),
+        TeamAgent(id: quill, handle: 'quill', name: 'Quill'),
+        TeamAgent(id: robin, handle: 'robin', name: 'Robin'),
+      ];
+    await open(tester, port);
+    final field = tester.widget<DsDropdownField<PrincipalId>>(
+      find.byKey(const ValueKey('team.add.agent.0')),
+    );
+    expect(field.entries.map((e) => e.value), [
+      nova,
+      quill,
+      robin,
+    ], reason: 'Quill is no stored principal, the server names it');
+    expect(field.enableFilter, isTrue);
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(const ValueKey('team.add.agent.0')),
+        matching: find.byType(TextField),
+      ),
+      'q',
+    );
+    await tester.pumpAndSettle();
+    final shown = [
+      for (final t in tester.widgetList<Text>(
+        find
+            .descendant(
+              of: find.byType(MenuItemButton),
+              matching: find.byType(Text),
+            )
+            .hitTestable(),
+      ))
+        plain(t.data ?? ''),
+    ];
+    expect(shown, ['Quill']);
+  });
+
+  testWidgets(
+    'the handle is suggested from the home channel and stays editable',
+    (tester) async {
+      final port = FakeTeamPort(team(members: [member(1, 'api', homeN: 3)]));
+      await open(tester, port);
+      final handle = find.byKey(const ValueKey('team.add.handle'));
+      String text() => tester.widget<TextField>(handle).controller!.text;
+      await choose(tester, 'team.add.agent.0', robin);
+      expect(text(), 'website', reason: 'Robin\'s only free home is website');
+      await choose(tester, 'team.add.agent.0', nova);
+      expect(text(), isEmpty, reason: 'Nova has two homes and none is chosen');
+      await choose(tester, 'team.add.home.${nova.value}', channelId(4));
+      expect(text(), 'api-2', reason: 'api is taken by a member');
+      await tester.enterText(handle, 'backend');
+      await tester.pumpAndSettle();
+      await choose(tester, 'team.add.home.${nova.value}', channelId(3));
+      expect(text(), 'backend', reason: 'an edited handle is never replaced');
+      await tester.tap(find.byKey(const ValueKey('team.add.submit')));
+      await tester.pumpAndSettle();
+      expect(port.calls.last, 'add backend key-1');
+    },
+  );
+
+  testWidgets('the handle of /team add stays', (tester) async {
+    final port = FakeTeamPort(team());
+    await open(tester, port, handle: 'coding');
+    await choose(tester, 'team.add.agent.0', robin);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('team.add.handle')))
+          .controller!
+          .text,
+      'coding',
+    );
+  });
+
+  testWidgets('an agent and home channel that are a member are not offered', (
+    tester,
+  ) async {
+    final port = FakeTeamPort(
+      team(
+        members: [
+          member(1, 'coding'),
+          member(2, 'docs', agent: nova, homeN: 3, threadN: 3),
+        ],
+      ),
+    );
+    await open(tester, port);
+    final agents = tester
+        .widget<DsDropdownField<PrincipalId>>(
+          find.byKey(const ValueKey('team.add.agent.0')),
+        )
+        .entries
+        .map((e) => e.value);
+    expect(agents, isNot(contains(robin)), reason: 'website is taken');
+    expect(agents, contains(nova));
+    await choose(tester, 'team.add.agent.0', nova);
+    final homes = tester
+        .widget<DsDropdownField<ChannelId>>(
+          find.byKey(ValueKey('team.add.home.${nova.value}')),
+        )
+        .entries
+        .map((e) => e.value);
+    expect(homes, [channelId(4)]);
+    expect(
+      canPress(tester, 'team.add.submit'),
+      isTrue,
+      reason: 'api is chosen at once',
+    );
   });
 
   testWidgets('stop all stops the members', (tester) async {

@@ -22,6 +22,9 @@ from typing import Any
 from uuid import UUID
 
 import pytest
+from bothy_sdk.ids import uuid7
+from bothy_sdk.testing import Fault
+from bothy_sdk.testing.fakeserver import ContextFile, ContextMessage
 
 from claude_code_runner.team import NO_OWNER_CHECK
 
@@ -258,3 +261,74 @@ async def test_a_member_s_input_that_names_a_written_code_is_not_passed_on(
     assert world.fake.followup_state(run.run_id, member) == "queued"
     world.release(gate)
     assert await world.ended(run.run_id) == "completed"
+
+
+# ---- files of the context (FIX-TEAM-CHANNEL-ATTACHMENTS) --------------------------------------
+
+
+async def context_run(world: World, history: tuple[ContextMessage, ...], *, kind: str) -> Any:
+    """A run of Lotse in a work thread whose context holds ``history`` before the trigger."""
+    return await world.fake.trigger(
+        "@web what do you see on the screenshot?",
+        channel_id=world.forum_a,
+        author="alex",
+        trigger_kind=kind,
+        team=team(world, "owner") if kind == "team" else None,
+        history=history,
+    )
+
+
+async def test_a_team_run_stores_the_files_of_its_context_inputs(world: World) -> None:
+    # D-TCAT-6: a member that got the owner's screenshot as a context input reads it in its next
+    # team run as a local file with its path, like a file of the trigger; a file the session got
+    # before (already_delivered) is not fetched again.
+    world.scenario(fixture="plain")
+    await world.start()
+    shot = ContextFile(uuid7(), "shot.png", "image/png", b"png bytes")
+    seen = ContextFile(uuid7(), "seen.png", "image/png", b"seen bytes")
+    history = (
+        ContextMessage(
+            author="alex", text="Here is the screenshot of the last chat", files=(shot,)
+        ),
+        ContextMessage(author="alex", text="Seen before", files=(seen,), already_delivered=True),
+    )
+    run = await context_run(world, history, kind="team")
+    assert await world.ended(run.run_id) == "completed"
+    folder = world.state / "files" / str(run.thread_id)
+    assert (folder / str(shot.file_id)).read_bytes() == b"png bytes"
+    assert f"local file: {folder / str(shot.file_id)}" in first_text(world)
+    assert not (folder / str(seen.file_id)).exists()
+    assert len(world.requests("downloadFile")) == 1
+
+
+async def test_a_run_outside_a_team_keeps_the_files_of_its_context_unfetched(
+    world: World,
+) -> None:
+    # Outside team runs only the trigger's files are fetched, as before.
+    world.scenario(fixture="plain")
+    await world.start()
+    shot = ContextFile(uuid7(), "shot.png", "image/png", b"png bytes")
+    history = (ContextMessage(author="alex", text="A screenshot", files=(shot,)),)
+    run = await context_run(world, history, kind="message")
+    assert await world.ended(run.run_id) == "completed"
+    assert world.requests("downloadFile") == []
+    assert "shot.png" in first_text(world)
+
+
+async def test_a_context_file_that_cannot_be_fetched_is_named_and_logged(
+    world: World, logs: LogLines
+) -> None:
+    # Error path: the server refuses the download; the run goes on, the turn names the file as
+    # unavailable with the problem code, and the runner logs the code only.
+    world.scenario(fixture="plain")
+    await world.start()
+    world.fake.inject("downloadFile", Fault.problem("not_found"))
+    shot = ContextFile(uuid7(), "shot.png", "image/png", b"png bytes")
+    history = (ContextMessage(author="alex", text="A screenshot", files=(shot,)),)
+    run = await context_run(world, history, kind="team")
+    assert await world.ended(run.run_id) == "completed"
+    assert "unavailable: not_found" in first_text(world)
+    assert not (world.state / "files" / str(run.thread_id) / str(shot.file_id)).exists()
+    assert events(logs, "attachment_unavailable") == [
+        {"event": "attachment_unavailable", "code": "not_found"}
+    ]

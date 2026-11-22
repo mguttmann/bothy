@@ -7,6 +7,40 @@ import (
 	"net/http"
 )
 
+// CompleteStepUpWithDeviceKeyResponseDefaultHeaders the declared response headers of an HTTP default response for CompleteStepUpWithDeviceKey
+type CompleteStepUpWithDeviceKeyResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type CompleteStepUpWithDeviceKeyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *StepUpResult
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *CompleteStepUpWithDeviceKeyResponse200Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *CompleteStepUpWithDeviceKeyResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CompleteStepUpWithDeviceKeyResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *CompleteStepUpWithDeviceKeyResponse403Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *CompleteStepUpWithDeviceKeyResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *CompleteStepUpWithDeviceKeyResponseDefaultHeaders
+}
+
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r CompleteStepUpWithDeviceKeyResponse) GetJSON200() *StepUpResult {
 	return r.JSON200
@@ -25807,55 +25841,4 @@ func (r AddReactionResponse) Status() string {
 		return r.HTTPResponse.Status
 	}
 	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r AddReactionResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r AddReactionResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// RetriggerMessageResponse200Headers the declared response headers of an HTTP 200 response for RetriggerMessage
-type RetriggerMessageResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// RetriggerMessageResponse400Headers the declared response headers of an HTTP 400 response for RetriggerMessage
-type RetriggerMessageResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RetriggerMessageResponse401Headers the declared response headers of an HTTP 401 response for RetriggerMessage
-type RetriggerMessageResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// RetriggerMessageResponse403Headers the declared response headers of an HTTP 403 response for RetriggerMessage
-type RetriggerMessageResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RetriggerMessageResponse404Headers the declared response headers of an HTTP 404 response for RetriggerMessage
-type RetriggerMessageResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RetriggerMessageResponse409Headers the declared response headers of an HTTP 409 response for RetriggerMessage
-type RetriggerMessageResponse409Headers struct {
-	CorrelationId *CorrelationId
 }

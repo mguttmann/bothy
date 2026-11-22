@@ -34,6 +34,7 @@ const (
 const (
 	msgPublishFailed = "run.updated not published, the next patch or getRun heals the live box"
 	logKeyRunID      = "bothy.run.id"
+	logKeyMessageID  = "bothy.message.id"
 	logKeyErrorType  = "error.type"
 )
 

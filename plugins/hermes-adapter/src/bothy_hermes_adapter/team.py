@@ -38,6 +38,8 @@ from uuid import UUID
 from bothy_sdk.generated.types import Unset
 
 __all__ = [
+    "QUIET_RULES",
+    "SILENT_REPLY",
     "UNKNOWN_HANDLE",
     "Speaker",
     "TeamFacts",
@@ -48,6 +50,21 @@ __all__ = [
     "team_facts",
     "team_lines",
 ]
+
+SILENT_REPLY: Final = "NOTHING_TO_ADD"
+"""The whole final reply of a member with nothing to add: the server neither mirrors it into the
+team channel nor hands it on (09 3.9.4, FIX-TEAM-CHANNEL-NOISE). It is no silence marker of
+Hermes, so Hermes posts it like any answer."""
+
+QUIET_RULES: Final = (
+    "Write @handle only when you hand that member work and expect it to act or answer, and say "
+    "what you expect back. When you only refer to a member, write its handle without the @. Never "
+    "mention a member to say that a message was not for it, that you stay out, that you agree or "
+    "that you are waiting. If you have nothing new to contribute (the message is not for you, or "
+    "you would only acknowledge it, repeat a status or say that you wait), your whole final reply "
+    f"is exactly {SILENT_REPLY}: it is not shown in the team channel and hands nothing on."
+)
+"""The rules that keep a team channel quiet (FIX-TEAM-CHANNEL-NOISE)."""
 
 UNKNOWN_HANDLE: Final = "unknown"
 """The handle printed for a member whose handle is missing or not in the server's form."""
@@ -194,18 +211,23 @@ def input_speaker(facts: TeamFacts, origin: Any, author: Any) -> Speaker:
     return Speaker(owner=False, handle=handle)
 
 
-def followup_speaker(facts: TeamFacts | None, origin: Any, author: Any) -> Speaker | None:
+def followup_speaker(
+    facts: TeamFacts | None, origin: Any, author: Any, team_handle: Any = None
+) -> Speaker | None:
     """Who wrote a follow-up, when it is a member's request; ``None`` for a person's message.
 
-    Follow-ups carry no member ``team`` (09 3.9.9); the run's facts name the handle of the
-    author's agent when the run is a ``team`` run, otherwise the agent's own handle stands in.
-    Every follow-up whose origin is not ``human`` gets the label: outside team channels no agent
-    message is a follow-up at all (07 SR4), so only a member's input can be one.
+    Follow-ups carry no member ``team`` (09 3.9.9); the message's ``team_handle`` names the one
+    member the reply came from (FIX-TEAM-MEMBER-ATTRIBUTION). Without it the run's facts name
+    the handle of the author's agent when that agent is exactly one member, otherwise the
+    agent's own handle stands in. Every follow-up whose origin is not ``human`` gets the label:
+    outside team channels no agent message is a follow-up at all (07 SR4), so only a member's
+    input can be one.
 
     Args:
         facts: The run's team facts, ``None`` for a run of another trigger kind.
         origin: The follow-up message's ``origin``.
         author: The follow-up message's author.
+        team_handle: The follow-up message's ``team_handle``, absent on older servers.
 
     Returns:
         The member speaker, or ``None`` for a message of origin ``human``.
@@ -213,7 +235,7 @@ def followup_speaker(facts: TeamFacts | None, origin: Any, author: Any) -> Speak
     if _human(origin):
         return None
     agent_id = _uuid(getattr(author, "id", None))
-    handle = facts.handle_of(agent_id) if facts is not None else None
+    handle = _clean(team_handle) or (facts.handle_of(agent_id) if facts is not None else None)
     return Speaker(
         owner=False,
         handle=handle or _clean(getattr(author, "handle", None)) or UNKNOWN_HANDLE,
@@ -265,7 +287,8 @@ def team_lines(facts: TeamFacts, speaker: Speaker) -> Sequence[str]:
     addressed = (
         "That message mentions you."
         if facts.addressed
-        else "That message does not mention you; it reached every member."
+        else "That message does not mention you; an owner message without a mention reaches "
+        "every member, so answer only with what you contribute."
     )
     return (
         f"Team channel: you are the member @{facts.handle} of a team channel, where the owner's "
@@ -279,6 +302,7 @@ def team_lines(facts: TeamFacts, speaker: Speaker) -> Sequence[str]:
         "To hand work to a member, mention its handle (for example @"
         f"{_other(facts)}) in your final reply, outside code. Every final reply is shown in the "
         "team channel; a reply without a mention hands nothing over.",
+        QUIET_RULES,
     )
 
 

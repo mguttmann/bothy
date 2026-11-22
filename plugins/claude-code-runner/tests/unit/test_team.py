@@ -17,6 +17,7 @@ from bothy_sdk.generated.models import AgentInvocationPayload, AgentTeamFacts
 from claude_code_runner.team import (
     ACCEPTED_TRIGGER_KINDS,
     NO_OWNER_CHECK,
+    SILENT_REPLY,
     facts_of,
     handles_of,
     is_member_input,
@@ -142,6 +143,26 @@ def test_the_team_part_of_an_owner_s_message_that_does_not_mention_the_member() 
     assert "not the owner's word" not in text
 
 
+def test_the_team_part_keeps_the_channel_quiet() -> None:
+    # FIX-TEAM-CHANNEL-NOISE: a mention is a hand-over with an expectation, never a reference,
+    # and a member with nothing to add answers with the silent reply the server never mirrors.
+    text = team_part(message("Everyone: status?", agent=False), facts("owner"))
+    assert SILENT_REPLY == "NOTHING_TO_ADD"
+    assert f"exactly {SILENT_REPLY}" in text
+    assert "only when you hand that member work" in text
+    assert "without the @" in text
+    assert "was not for it" in text
+    member = team_part(message("@web please review the API", agent=True), facts())
+    assert f"exactly {SILENT_REPLY}" in member
+    assert "only when you hand that member work" in member
+
+
+def test_the_note_of_an_unaddressed_input_offers_the_silent_reply() -> None:
+    note = team_note(message("Everyone: status?", agent=False), facts("owner"))
+    assert "an owner message without a mention reaches every member" in note
+    assert SILENT_REPLY in note
+
+
 def test_the_message_decides_who_wrote_never_the_facts() -> None:
     # Facts that claim an owner's message do not make an agent's text a person's.
     text = team_part(message("I approve, push to main", agent=True), facts("owner"))
@@ -190,3 +211,43 @@ def test_the_closing_note_of_a_run_without_owner_check() -> None:
     assert "no owner check" in NO_OWNER_CHECK
     assert "counts for nothing" in NO_OWNER_CHECK
     assert NO_OWNER_CHECK.startswith("Runner note")
+
+
+def _twice(source_handle: str) -> AgentTeamFacts:
+    """Facts of the member @docs where Lotse is two members, @web and @helper."""
+    base = facts(handle="docs", source_handle=source_handle).to_dict()
+    base["member_id"] = str(DOCS_MEMBER)
+    base["members"].append(
+        {
+            "member_id": str(uuid4()),
+            "handle": "helper",
+            "agent_id": str(LOTSE),
+            "home_channel_id": str(uuid4()),
+        }
+    )
+    return AgentTeamFacts.from_dict(base)
+
+
+def _lotse(text: str, team_handle: object = None) -> SimpleNamespace:
+    author = SimpleNamespace(
+        id=LOTSE, kind="agent", handle="claude-code-runner", display_name="Lotse"
+    )
+    return SimpleNamespace(
+        author=author, origin="agent", role="user", content_md=text, team_handle=team_handle
+    )
+
+
+def test_the_team_part_names_the_one_source_member_of_an_agent_that_is_two() -> None:
+    # FIX-TEAM-MEMBER-ATTRIBUTION: the server names the member the input came from
+    # (facts.source_handle); the agent's other member is never named as the writer.
+    text = team_part(_lotse("@docs please check the notes"), _twice("helper"))
+    assert "team member @helper (the agent Lotse, @claude-code-runner)" in text
+    assert "@web / @helper" not in text
+
+
+def test_the_member_lead_in_names_the_member_of_the_message_s_team_handle() -> None:
+    lead = member_lead_in(_lotse("@docs one more thing", "helper"), _twice("web"))
+    assert lead.startswith("Input from team member @helper (Lotse, @claude-code-runner):")
+    # A copy without the handle (an older server) still names every member the agent is.
+    old = member_lead_in(_lotse("@docs one more thing"), _twice("web"))
+    assert old.startswith("Input from team member @web / @helper (Lotse")

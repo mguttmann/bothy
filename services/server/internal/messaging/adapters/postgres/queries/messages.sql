@@ -2,7 +2,7 @@
 -- Queries on messages (messaging, docs/spec/03-data-model.md section 4.6).
 --
 -- The columns are listed instead of "*": no read carries search_language or the generated
--- search_vector (docs/DECISIONS.md D-M3-13-10). has_attachments ends every list (M3-07), so the
+-- search_vector (docs/DECISIONS.md D-M3-13-10). has_attachments and team_handle end every list (M3-07, FIX-TEAM-MEMBER-ATTRIBUTION), so the
 -- generated row types keep converting to messageRow of repository.go. Every INSERT names search_language, the language
 -- of 14 3.1 (M3-13); the static test TestMessageInsertsSetSearchLanguage holds it.
 
@@ -13,28 +13,29 @@
 -- set exactly for the live box anchor of a run (kind run, M2-05); the deferred foreign key lets
 -- the anchor and its run be written in either order. has_attachments is true exactly for a message
 -- sent with at least one attachment (M3-07, 03 messages); files inserts the rows of
--- message_attachments right after it in the same transaction.
+-- message_attachments right after it in the same transaction. team_handle is set exactly for a
+-- team copy whose source is a member (FIX-TEAM-MEMBER-ATTRIBUTION, 09 3.9.2).
 INSERT INTO messages (id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256,
                       origin, kind, system_code, content_md, content_format, reply_to_message_id, run_id, silent, version,
-                      created_at, search_language, has_attachments)
+                      created_at, search_language, has_attachments, team_handle)
 VALUES (@id, @thread_id, @channel_id, @thread_seq, @author_principal_id, @client_msg_id, @client_payload_sha256,
         @origin, @kind, @system_code, @content_md, @content_format, @reply_to_message_id, sqlc.narg(run_id), @silent, 1,
-        @created_at, sqlc.arg(search_language)::text::regconfig, @has_attachments)
+        @created_at, sqlc.arg(search_language)::text::regconfig, @has_attachments, sqlc.narg(team_handle))
 RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments;
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle;
 
 -- name: GetMessage :one
 SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle
 FROM messages WHERE id = @id;
 
 -- name: GetMessageByClientID :one
 -- The idempotency lookup of 04 section 5.1 point 4.
 SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle
 FROM messages WHERE author_principal_id = @author_principal_id AND client_msg_id = @client_msg_id;
 
 -- name: LockVisibleMessage :one
@@ -42,7 +43,7 @@ FROM messages WHERE author_principal_id = @author_principal_id AND client_msg_id
 -- then the message row).
 SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle
 FROM messages WHERE id = @id AND channel_id = ANY(@visible::uuid[]) FOR UPDATE;
 
 -- name: UpdateMessageContent :one
@@ -51,7 +52,7 @@ UPDATE messages SET content_md = @content_md, edited_at = @edited_at, version = 
 WHERE id = @id AND channel_id = ANY(@visible::uuid[]) AND deleted_at IS NULL
 RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments;
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle;
 
 -- name: TombstoneMessage :one
 -- The deletion of the locked message (03 section 6.5): the row and thread_seq stay, the content
@@ -64,7 +65,7 @@ UPDATE messages SET content_md = '', has_attachments = false, deleted_at = @dele
 WHERE id = @id AND channel_id = ANY(@visible::uuid[]) AND deleted_at IS NULL
 RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments;
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle;
 
 -- name: SetTriggerState :one
 -- The trigger state of a message of a person (M2-05, 09 section 6): the three columns and the
@@ -78,7 +79,7 @@ WHERE id = @id AND origin = 'human'
   AND (trigger_state IS DISTINCT FROM @trigger_state::text OR trigger_state_reason IS DISTINCT FROM sqlc.narg(trigger_state_reason)::text)
 RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments;
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle;
 
 -- name: LockCardMessage :one
 -- The card message of a component change locked by runs (M2-15, Messages.LockCard): runs
@@ -86,7 +87,7 @@ RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg
 -- run names it; the lock order is threads, runs, messages, then message_components.
 SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle
 FROM messages WHERE id = @id FOR UPDATE;
 
 -- name: MessageAuthors :many
@@ -103,4 +104,4 @@ UPDATE messages SET version = version + 1
 WHERE id = @id
 RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments;
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle;

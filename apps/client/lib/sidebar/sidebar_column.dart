@@ -552,15 +552,21 @@ class SidebarColumn extends ConsumerWidget {
         final node = nodes.where((n) => n.entry.space.id == space).firstOrNull;
         if (node == null) return;
         // The whole manual order, the archived channels in their places included, so a
-        // restored channel comes back where it was (01 6.22 item 3).
+        // restored channel comes back where it was (01 6.22 item 3). The pinned channels lead
+        // the list and never move (01 6.24): the move counts only the rows below them, so a
+        // pinned channel keeps its manual place for its unpin.
+        final pinned = node.channels.where((c) => c.pinned).length;
         unawaited(
           writer()?.orderChannels(
             space,
             moveAmong(
               node.manualOrder,
-              [for (final c in node.channels) c.channel.id],
+              [
+                for (final c in node.channels)
+                  if (!c.pinned) c.channel.id,
+              ],
               channel,
-              to,
+              to - pinned,
             ),
             collapsed: node.entry.storedCollapsed,
           ),
@@ -584,12 +590,16 @@ class SidebarColumn extends ConsumerWidget {
             forum,
             moveAmong(
               [
-                for (final e in group.candidates)
+                // Without the pins: an unpinned post returns to its place (01 6.24).
+                for (final e in group.order)
                   if (e.thread.state == ThreadState.open) e.thread.id,
               ],
-              [for (final e in group.rows) e.thread.id],
+              [
+                for (final e in group.rows)
+                  if (!e.pinned) e.thread.id,
+              ],
               thread,
-              to,
+              to - group.rows.where((e) => e.pinned).length,
             ),
           ),
         );

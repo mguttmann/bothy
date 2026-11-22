@@ -2,7 +2,9 @@
 
 /// The team dialog of a text channel (09 3.9.1, 3.9.7; design cross-project-handoff.md MVP item
 /// 6): the team mode switch, the member list with "Remove", the form that adds an agent with its
-/// home channel and a handle, and "Stop all". Owners only: the channel menu and `/team` offer it
+/// home channel and a handle, and "Stop all". The form offers the agents of the server
+/// (`listAgents`) filtered as typed, then the home channels the agent operates and is no member
+/// with yet, and suggests a handle from the home channel (docs/decisions.d/FIX-TEAM-CHANNEL-APP.md). Owners only: the channel menu and `/team` offer it
 /// to an owner alone, and the server refuses everyone else (`team.update`, `team.stop`). Every
 /// operation answers at once; a refusal stays in the dialog with the server's reason.
 library;
@@ -22,6 +24,7 @@ import '../thread/providers.dart'
 import 'providers.dart';
 import 'team_controller.dart';
 import 'team_model.dart';
+import 'team_port.dart';
 import 'team_text.dart';
 
 /// Opens the team dialog of [channel] for the signed-in owner, with [handle] filled into the
@@ -90,7 +93,8 @@ class TeamDialog extends StatefulWidget {
   /// The team's state and operations.
   final TeamController controller;
 
-  /// The stored principals: the agents to choose from and the names of the members.
+  /// The stored principals: the names of the members, and the agents to choose from while the
+  /// server's list ([TeamController.agents]) is missing.
   final Map<PrincipalId, Principal> principals;
 
   /// The channels the person sees: the home channels to choose from and their names.
@@ -113,6 +117,9 @@ class _TeamDialogState extends State<TeamDialog> {
   /// Counts the members added here; a new value gives the agent field a fresh start.
   int _added = 0;
 
+  /// The handle this form suggested last; a handle the person typed is never replaced.
+  String _suggested = '';
+
   TeamController get _c => widget.controller;
 
   @override
@@ -133,17 +140,61 @@ class _TeamDialogState extends State<TeamDialog> {
     if (mounted) setState(() {});
   }
 
-  List<Principal> get _agents {
-    final agents =
+  /// The agents to choose from: the server's active agents, or the stored ones while that list
+  /// is missing, by name; without an agent whose every home channel is already a member.
+  List<TeamAgent> _agents(TeamView team) {
+    final all =
+        _c.agents ??
         [
           for (final p in widget.principals.values)
-            if (p.kind == PrincipalKind.agent) p,
-        ]..sort(
-          (a, b) => a.displayName.toLowerCase().compareTo(
-            b.displayName.toLowerCase(),
-          ),
-        );
-    return agents;
+            if (p.kind == PrincipalKind.agent)
+              TeamAgent(id: p.id, handle: p.handle, name: p.displayName),
+        ];
+    return [
+      for (final a in all)
+        if (teamHomeCandidates(
+              widget.channels,
+              a.id,
+              team: _c.channel,
+            ).isEmpty ||
+            teamFreeHomeCandidates(widget.channels, a.id, team).isNotEmpty)
+          a,
+    ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  }
+
+  /// The home channels [agent] may still be added with.
+  List<Channel> _homes(PrincipalId agent) {
+    final team = _c.team;
+    return team == null
+        ? const []
+        : teamFreeHomeCandidates(widget.channels, agent, team);
+  }
+
+  /// Fills in the suggested handle of the chosen home channel (or clears the last suggestion
+  /// without one), unless the person typed a handle of their own.
+  void _suggestHandle() {
+    final current = _handle.text.trim();
+    if (current.isNotEmpty && current != _suggested) return;
+    final home = _home;
+    final agent = _agent;
+    var next = '';
+    if (home != null && agent != null) {
+      String? fallback;
+      for (final a in _c.agents ?? const <TeamAgent>[]) {
+        if (a.id == agent) fallback = a.handle;
+      }
+      fallback ??= widget.principals[agent]?.handle;
+      next = suggestTeamHandle(
+        _channelName(home),
+        fallback: fallback,
+        taken: [
+          for (final m in _c.team?.members ?? const <TeamMemberView>[])
+            m.handle,
+        ],
+      );
+    }
+    _suggested = next;
+    _handle.text = next;
   }
 
   String _channelName(ChannelId id) {
@@ -153,8 +204,13 @@ class _TeamDialogState extends State<TeamDialog> {
     return id.value;
   }
 
-  String _agentName(PrincipalId id) =>
-      widget.principals[id]?.displayName ?? id.value;
+  String _agentName(PrincipalId id) {
+    if (widget.principals[id] case final p?) return p.displayName;
+    for (final a in _c.agents ?? const <TeamAgent>[]) {
+      if (a.id == id) return a.name;
+    }
+    return id.value;
+  }
 
   bool get _handleValid => teamHandlePattern.hasMatch(_handle.text.trim());
 
@@ -172,6 +228,7 @@ class _TeamDialogState extends State<TeamDialog> {
         _agent = null;
         _home = null;
         _added++;
+        _suggested = '';
         _handle.clear();
       });
     }
@@ -196,9 +253,7 @@ class _TeamDialogState extends State<TeamDialog> {
     final secondary = dsTextStyle(DsType.bodySm)
         .copyWith(color: colors.textSecondary);
     final agent = _agent;
-    final homes = agent == null
-        ? const <Channel>[]
-        : teamHomeCandidates(widget.channels, agent, team: _c.channel);
+    final homes = agent == null ? const <Channel>[] : _homes(agent);
     final handleText = _handle.text.trim();
     return AlertDialog(
       key: const ValueKey('team.dialog'),
@@ -276,26 +331,20 @@ class _TeamDialogState extends State<TeamDialog> {
                   label: l.teamAddAgent,
                   enableFilter: true,
                   entries: [
-                    for (final a in _agents)
-                      DropdownMenuEntry(
-                        value: a.id,
-                        label: dsIsolate(a.displayName),
-                      ),
+                    for (final a in _agents(team))
+                      DropdownMenuEntry(value: a.id, label: dsIsolate(a.name)),
                   ],
                   initialSelection: _agent,
                   onSelected: (id) => setState(() {
                     _agent = id;
                     final candidates = id == null
                         ? const <Channel>[]
-                        : teamHomeCandidates(
-                            widget.channels,
-                            id,
-                            team: _c.channel,
-                          );
+                        : _homes(id);
                     // One candidate is chosen at once; several wait for the person.
                     _home = candidates.length == 1
                         ? candidates.single.id
                         : null;
+                    _suggestHandle();
                   }),
                 ),
                 const SizedBox(height: DsSpace.s8),
@@ -319,7 +368,10 @@ class _TeamDialogState extends State<TeamDialog> {
                         ),
                     ],
                     initialSelection: _home,
-                    onSelected: (id) => setState(() => _home = id),
+                    onSelected: (id) => setState(() {
+                      _home = id;
+                      _suggestHandle();
+                    }),
                   ),
                 const SizedBox(height: DsSpace.s8),
                 TextField(

@@ -43,13 +43,31 @@ abstract final class MigrationRules {
   }
 
   /// Clears `sync_state.cursor` and `sync_epoch` and keeps every other row, so the next
-  /// connection loads a whole snapshot (04 7.3); a step uses it alone when it adds a mirror
-  /// column that only the snapshot fills for the rows it keeps (M4-40: `channels.project_bound`).
-  /// Without a `sync_state` row nothing changes: the first connection loads the snapshot anyway.
+  /// connection loads a whole snapshot (04 7.3). Without a `sync_state` row nothing changes: the
+  /// first connection loads the snapshot anyway. Alone it does not refill a new mirror column of
+  /// a kept row: the snapshot brings the row at the version the device already holds, and the
+  /// version rule skips it; such a step uses [reloadRows] (FEAT-PIN-CHANNELS).
   static Future<void> resetCursor(Migrator migrator) =>
       migrator.database.customStatement(
         'UPDATE sync_state SET cursor = NULL, sync_epoch = NULL',
       );
+
+  /// Sets the version of every row of the mirror table [tableName] to 0 and clears the cursor
+  /// ([resetCursor]), so the next snapshot replaces each kept row by the version rule (04 9 item
+  /// 3) and fills a mirror column the step adds (FEAT-PIN-CHANNELS: a row an older app stored at
+  /// version 3 without `pinned_at` gets the pin of the snapshot at version 3). [tableName] must be
+  /// a mirror table with a `version` column, never a preserved one.
+  static Future<void> reloadRows(Migrator migrator, String tableName) async {
+    if (preservedTables.contains(tableName)) {
+      throw ArgumentError(
+        '$tableName keeps its rows on every migration (15 6.2)',
+      );
+    }
+    await migrator.database.customStatement(
+      'UPDATE $tableName SET version = 0',
+    );
+    await resetCursor(migrator);
+  }
 
   /// Migrates [tables] row by row into their new layout (`Migrator.alterTable`); new columns
   /// take their defaults.

@@ -43,8 +43,8 @@ func (s Settings) ListSidebarChannels(ctx context.Context) ([]sync.SidebarChanne
 	}
 	out := make([]sync.SidebarChannelState, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, sync.SidebarChannelState{ChannelID: r.ChannelID, ThreadOrder: r.ThreadOrder, HiddenAt: r.HiddenAt, Version: r.Version,
-			UpdatedByDeviceID: r.UpdatedByDeviceID})
+		out = append(out, sync.SidebarChannelState{ChannelID: r.ChannelID, ThreadOrder: r.ThreadOrder, HiddenAt: r.HiddenAt,
+			PinnedAt: r.PinnedAt, PinnedThreads: r.PinnedThreads, Version: r.Version, UpdatedByDeviceID: r.UpdatedByDeviceID})
 	}
 	return out, nil
 }

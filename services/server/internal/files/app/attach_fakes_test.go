@@ -80,7 +80,11 @@ func (r *repo) MessageAttachments(_ context.Context, messageIDs []ids.ID) ([]app
 	defer r.mu.Unlock()
 	r.calls = append(r.calls, "MessageAttachments")
 	var out []app.AttachedFile
+	rows := slices.Clone(r.relays)
 	for _, row := range r.attachments {
+		rows = append(rows, row)
+	}
+	for _, row := range rows {
 		if slices.Contains(messageIDs, row.MessageID) {
 			f := r.files[row.FileID]
 			f.Thumbnails = append([]app.ThumbnailRecord(nil), r.thumbs[row.FileID]...)
@@ -188,7 +192,11 @@ func (r *repo) AttachmentStates(ctx context.Context, messageID ids.ID) ([]domain
 	defer r.mu.Unlock()
 	r.calls = append(r.calls, "AttachmentStates")
 	var out []domain.StateFacts
+	rows := slices.Clone(r.relays)
 	for _, row := range r.attachments {
+		rows = append(rows, row)
+	}
+	for _, row := range rows {
 		if row.MessageID == messageID {
 			f := r.files[row.FileID]
 			out = append(out, domain.StateFacts{UploadState: f.UploadState, ScanStatus: f.ScanStatus, Deleted: f.Deleted,
@@ -196,6 +204,79 @@ func (r *repo) AttachmentStates(ctx context.Context, messageID ids.ID) ([]domain
 		}
 	}
 	return out, nil
+}
+
+// LockRelaySources implements app.Repository for the fake: the live files of the message, original
+// or relayed, in ascending id.
+func (r *repo) LockRelaySources(ctx context.Context, messageID ids.ID) ([]app.RelaySource, error) {
+	if err := needUnit(ctx); err != nil {
+		return nil, err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.calls = append(r.calls, "LockRelaySources")
+	rows := slices.Clone(r.relays)
+	for _, row := range r.attachments {
+		rows = append(rows, row)
+	}
+	var out []app.RelaySource
+	for _, row := range rows {
+		if row.MessageID == messageID && !r.files[row.FileID].Deleted {
+			out = append(out, app.RelaySource{FileID: row.FileID, Position: row.Position})
+		}
+	}
+	slices.SortFunc(out, func(a, b app.RelaySource) int { return compareIDs(a.FileID, b.FileID) })
+	return out, nil
+}
+
+// InsertRelays implements app.Repository for the fake.
+func (r *repo) InsertRelays(ctx context.Context, rows []app.AttachmentRecord) error {
+	if err := needUnit(ctx); err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.calls = append(r.calls, "InsertRelays")
+	r.relays = append(r.relays, rows...)
+	return nil
+}
+
+// RelaysOf implements app.Repository for the fake: oldest copy first.
+func (r *repo) RelaysOf(_ context.Context, fileID ids.ID) ([]app.AttachmentRecord, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []app.AttachmentRecord
+	for _, row := range r.relays {
+		if row.FileID == fileID {
+			out = append(out, row)
+		}
+	}
+	slices.SortFunc(out, func(a, b app.AttachmentRecord) int { return compareIDs(a.MessageID, b.MessageID) })
+	return out, nil
+}
+
+// DeleteRelaysOfMessage implements app.Repository for the fake.
+func (r *repo) DeleteRelaysOfMessage(ctx context.Context, messageID ids.ID) error {
+	if err := needUnit(ctx); err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.calls = append(r.calls, "DeleteRelaysOfMessage")
+	r.relays = slices.DeleteFunc(r.relays, func(row app.AttachmentRecord) bool { return row.MessageID == messageID })
+	return nil
+}
+
+// DeleteRelaysOfFiles implements app.Repository for the fake.
+func (r *repo) DeleteRelaysOfFiles(ctx context.Context, fileIDs []ids.ID) error {
+	if err := needUnit(ctx); err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.calls = append(r.calls, "DeleteRelaysOfFiles")
+	r.relays = slices.DeleteFunc(r.relays, func(row app.AttachmentRecord) bool { return slices.Contains(fileIDs, row.FileID) })
+	return nil
 }
 
 // callList returns the recorded calls of the attachment methods.
@@ -207,7 +288,7 @@ func (r *repo) callList() []string {
 
 // threadRows is the fake of app.ThreadAttachments.
 type threadRows struct {
-	moves [][2]ids.ID
+	moves, relayMoves [][2]ids.ID
 }
 
 func (t *threadRows) MoveThreadAttachments(ctx context.Context, threadID, channelID ids.ID) error {
@@ -215,5 +296,13 @@ func (t *threadRows) MoveThreadAttachments(ctx context.Context, threadID, channe
 		return err
 	}
 	t.moves = append(t.moves, [2]ids.ID{threadID, channelID})
+	return nil
+}
+
+func (t *threadRows) MoveThreadRelays(ctx context.Context, threadID, channelID ids.ID) error {
+	if err := needUnit(ctx); err != nil {
+		return err
+	}
+	t.relayMoves = append(t.relayMoves, [2]ids.ID{threadID, channelID})
 	return nil
 }

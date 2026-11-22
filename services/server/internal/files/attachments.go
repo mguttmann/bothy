@@ -36,8 +36,10 @@ type Attachments interface {
 	ForMessages(ctx context.Context, messageIDs []ids.ID) (map[ids.ID][]Attachment, error)
 	// DeleteForMessage removes the attachments of a message deleted in the same unit of work and
 	// marks their files deleted (12 section 12): the files rows FOR UPDATE in ascending id, then
-	// the rows of message_attachments, then files.deleted_at at the clock time. It writes no
-	// file.updated (docs/decisions.d/M3-07.md D-M3-07). A message without attachments writes nothing.
+	// the rows of message_attachments and the relays of these files on team copies, then
+	// files.deleted_at at the clock time. A team copy loses only its relays; the files stay with
+	// their source (FIX-TEAM-CHANNEL-ATTACHMENTS D-TCAT-3). It writes no file.updated
+	// (docs/decisions.d/M3-07.md D-M3-07). A message without attachments writes nothing.
 	DeleteForMessage(ctx context.Context, messageID ids.ID) error
 	// MessageOf reports where a file is attached; ok is false for an unattached file.
 	MessageOf(ctx context.Context, fileID ids.ID) (ref AttachmentRef, ok bool, err error)
@@ -46,6 +48,24 @@ type Attachments interface {
 	// else PendingTranscript when an attachment has transcript_status pending, else PendingNone;
 	// PendingNone for a message without attachments.
 	Pending(ctx context.Context, messageID ids.ID) (PendingReason, error)
+	// Relay puts the files of the source message on a team copy of it inserted in the same unit
+	// of work (docs/spec/09-agents.md 3.9.2, FIX-TEAM-CHANNEL-ATTACHMENTS): one row of
+	// message_attachment_relays per file of the source that is not deleted, original or relayed
+	// itself, at the source's position, with the copy's thread and channel. The files rows are
+	// locked FOR UPDATE in ascending id first, so a concurrent deletion of the source waits. A
+	// source without live files inserts nothing. It returns the copy's attachments in position
+	// order in their attached form. It never authorizes: the team use case checked the copy.
+	//
+	// Example:
+	//
+	//	list, err := att.Relay(ctx, files.RelayCmd{SourceMessageID: src, MessageID: copied, ThreadID: work, ChannelID: home})
+	Relay(ctx context.Context, cmd RelayCmd) ([]Attachment, error)
+}
+
+// RelayCmd is the input of Attachments.Relay: the source message whose files are relayed and the
+// copy with its thread and channel (the channel AppendToThread returned under the thread lock).
+type RelayCmd struct {
+	SourceMessageID, MessageID, ThreadID, ChannelID ids.ID
 }
 
 // AttachCmd is the input of Attachments.Attach.

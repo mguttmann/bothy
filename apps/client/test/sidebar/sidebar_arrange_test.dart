@@ -35,6 +35,57 @@ void main() {
     });
   });
 
+  group('pinnedFirst (FEAT-PIN-CHANNELS)', () {
+    test('pinned rows come first in the order of the pins, the others keep '
+        'their order', () {
+      expect(pinnedFirst(['a', 'b', 'c', 'd', 'e'], ['d', 'b'], (s) => s), [
+        'd',
+        'b',
+        'a',
+        'c',
+        'e',
+      ]);
+    });
+
+    test('no pins keep the order; pins that name no row are ignored', () {
+      expect(pinnedFirst(['a', 'b'], const [], (s) => s), ['a', 'b']);
+      expect(pinnedFirst(['a', 'b'], ['x', 'b', 'b'], (s) => s), ['b', 'a']);
+    });
+  });
+
+  group('pinOrder (FEAT-PIN-CHANNELS)', () {
+    test('the pinned channels by the time of their pin, oldest first, equal '
+        'times by ID; unpinned ones are left out', () {
+      final at = DateTime.utc(2026, 11, 22, 9);
+      final states = [
+        UserChannelState(
+          channelId: channelId(3),
+          threadOrder: const [],
+          version: const ResourceVersion(1),
+          pinnedAt: at.add(const Duration(minutes: 5)),
+        ),
+        UserChannelState(
+          channelId: channelId(2),
+          threadOrder: const [],
+          version: const ResourceVersion(1),
+          pinnedAt: at,
+        ),
+        UserChannelState(
+          channelId: channelId(1),
+          threadOrder: const [],
+          version: const ResourceVersion(1),
+          pinnedAt: at,
+        ),
+        UserChannelState(
+          channelId: channelId(4),
+          threadOrder: const [],
+          version: const ResourceVersion(1),
+        ),
+      ];
+      expect(pinOrder(states), [channelId(1), channelId(2), channelId(3)]);
+    });
+  });
+
   group('orderByActivity', () {
     test('newest first; equal times keep the given order', () {
       final at = {

@@ -5,6 +5,7 @@ package jobs
 import (
 	"context"
 	stdsync "sync"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -73,11 +74,21 @@ func (s *TeamScheduler) Bind(ins jobs.Inserter) {
 // ScheduleTeamInput inserts runs.team_input of the message in the ambient unit of work, to run as
 // soon as it commits.
 func (s *TeamScheduler) ScheduleTeamInput(ctx context.Context, messageID ids.ID) error {
+	return s.ScheduleTeamInputAt(ctx, messageID, time.Time{})
+}
+
+// ScheduleTeamInputAt inserts runs.team_input of the message in the ambient unit of work, to run
+// at at (the zero time: as soon as it commits); the job waiting for the files of its message
+// schedules itself again this way (FIX-TEAM-CHANNEL-ATTACHMENTS D-TCAT-4).
+func (s *TeamScheduler) ScheduleTeamInputAt(ctx context.Context, messageID ids.ID, at time.Time) error {
 	s.mu.RLock()
 	ins := s.ins
 	s.mu.RUnlock()
 	if ins == nil {
 		return errs.New(errs.CodeInternalError, "runs: the team scheduler has no job runtime")
 	}
-	return ins.InsertTx(ctx, TeamInput{MessageID: messageID}, nil)
+	if at.IsZero() {
+		return ins.InsertTx(ctx, TeamInput{MessageID: messageID}, nil)
+	}
+	return ins.InsertTx(ctx, TeamInput{MessageID: messageID}, &jobs.InsertOptions{ScheduledAt: at})
 }

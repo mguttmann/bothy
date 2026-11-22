@@ -8,7 +8,8 @@
 /// M4-44). Both menus end with "Delete channel..." or, for a project forum, "Delete project..."
 /// for a person with `manage` (01 6.18 item 1, D-DEL-14). In the sidebar the entry above it
 /// archives the channel for the person alone ("Archive project" for a project forum, else
-/// "Archive") or, in the section "Archived", restores it ("Restore"; 01 6.22).
+/// "Archive") or, in the section "Archived", restores it ("Restore"; 01 6.22). Both menus have
+/// "Pin to top" or "Unpin" (01 6.24); in the sidebar not for a row of the section "Archived".
 library;
 
 import 'dart:async';
@@ -31,6 +32,7 @@ import '../team/team_dialog.dart' show teamMenuItems;
 import '../thread/providers.dart';
 import 'autonomous_runs_dialog.dart';
 import 'level_menu.dart';
+import 'pin_menu.dart';
 
 /// The personal archive entry of a sidebar row (01 6.22): whether the channel is [archived] in
 /// the person's own sidebar and [onSet], called with the requested archived state.
@@ -123,6 +125,9 @@ class ChannelMenu extends StatelessWidget {
             child: Text(AppLocalizations.of(context).channelMenuRenameProject),
           ),
         ...channelMenuItems(context, ref, channel),
+        // 01 6.24: a row of the section "Archived" shows no pin; its pin waits for the restore.
+        if (!(archive?.archived ?? false))
+          ...channelPinMenuItems(context, ref, channel),
         if (moves case final moves?) ...[
           const Divider(),
           ...sidebarMoveMenuItems(context, moves),

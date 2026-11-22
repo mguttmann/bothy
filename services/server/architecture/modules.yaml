@@ -152,7 +152,7 @@ modules:
     depends_on: [identity, authz, chat]
     adapter_vendors: [otel, pgx, yaml]   # sqlc code and the repository (M1-51); adapters/otelmetrics observes the presence gauges (M2-20); adapters/templatefs reads template.yaml (A1-06)
   files:
-    tables: [files, file_upload_sessions, file_upload_parts, file_thumbnails, message_attachments,
+    tables: [files, file_upload_sessions, file_upload_parts, file_thumbnails, message_attachments, message_attachment_relays,
              file_text_extracts]
     actions: [file.upload, file.read, file.delete, file.transcribe, file.transcript.submit]
     events: [file.updated]

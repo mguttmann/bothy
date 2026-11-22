@@ -65,6 +65,30 @@ void main() {
     );
   });
 
+  test('two team members of one agent never share a group', () {
+    // FIX-TEAM-MEMBER-AUTHOR-DISPLAY: the mirrors of two members are messages of the same
+    // agent; each member keeps its own header.
+    final coding = message(1).copyWith(teamHandle: 'codingagent');
+    expect(
+      isContinuation(
+        coding,
+        message(2).copyWith(teamHandle: 'reviewagent'),
+        window,
+      ),
+      isFalse,
+    );
+    expect(isContinuation(message(1), coding, window), isFalse);
+    expect(isContinuation(coding, message(2), window), isFalse);
+    expect(
+      isContinuation(
+        coding,
+        message(2).copyWith(teamHandle: 'codingagent'),
+        window,
+      ),
+      isTrue,
+    );
+  });
+
   test('unknown kinds group only with unknown kinds', () {
     expect(
       isContinuation(

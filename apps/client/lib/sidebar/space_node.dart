@@ -209,12 +209,16 @@ class _SpaceNodeState extends State<SpaceNode> {
     final spacesArranged = arrangement.isAuto(SidebarLevel.spaces);
     final channelsArranged = arrangement.isAuto(SidebarLevel.channels);
     final count = node.channels.length;
+    // 01 6.24: the pinned channels lead the space; they do not move, and the others move only
+    // among themselves.
+    final pinned = node.channels.where((c) => c.pinned).length;
     SidebarMoves? channelMoves(ChannelId id, int i) {
       final move = onMoveChannel;
       if (move == null) return null;
       if (channelsArranged) return const SidebarMoves(arranged: true);
+      if (i < pinned) return const SidebarMoves();
       return SidebarMoves(
-        up: i > 0 ? () => move(id, i - 1) : null,
+        up: i > pinned ? () => move(id, i - 1) : null,
         down: i < count - 1 ? () => move(id, i + 1) : null,
       );
     }
@@ -286,7 +290,8 @@ class _SpaceNodeState extends State<SpaceNode> {
                   index: i,
                 ),
                 label: c.channel.name,
-                enabled: onMoveChannel != null && !channelsArranged,
+                enabled:
+                    onMoveChannel != null && !channelsArranged && !c.pinned,
                 arranged: onMoveChannel != null && channelsArranged,
                 touch: touch,
                 onDrop: (id, to) => onMoveChannel!(ChannelId.parse(id), to),

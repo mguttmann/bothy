@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// What the app derives from a team (09 3.9; design cross-project-handoff.md MVP item 6): the
-/// state of a member in the header, who a message in the team channel speaks for, and the
-/// parsing of the client command `/team add|remove|list|stop` (09 3.9.1, reserved name 10.1).
+/// state of a member in the header, who a message in the team channel speaks for or goes to
+/// (the server's mention rule of 09 3.9.4), the parsing of the client command
+/// `/team add|remove|list|stop` (09 3.9.1, reserved name 10.1), the home channels an agent may
+/// still be added with and the handle the add form suggests.
 library;
 
 import 'package:domain/domain.dart';
@@ -62,30 +64,182 @@ final class FromMember extends TeamMessageLabel {
   final List<String> handles;
 }
 
-/// An owner's text message, which reaches every member (09 3.9.3).
+/// An owner's text message without a mention of a member, which reaches every member (09 3.9.3;
+/// owner ruling of 2026-11-22).
 final class ToAllMembers extends TeamMessageLabel {
   /// Creates the label.
   const ToAllMembers();
 }
 
+/// An owner's text message that mentions members: "to @a, @b". It reaches only the members it
+/// mentions (owner ruling of 2026-11-22, docs/decisions.d/FIX-TEAM-CHANNEL-APP.md).
+final class ToMembers extends TeamMessageLabel {
+  /// Creates the label with the mentioned member [handles].
+  const ToMembers(this.handles);
+
+  /// The handles of the mentioned members, in the order of their first mention.
+  final List<String> handles;
+}
+
 /// The label of [message] in the team channel of [team], or null for none: a text message of
-/// an agent that is a member is a mirror ([FromMember]); a text message of a person is an
-/// owner's broadcast ([ToAllMembers]), because only owners read a team channel (readers rule,
-/// 09 3.9.1). A voice message, a deleted message and every other origin get no label, since
-/// they trigger nothing.
+/// an agent that is a member is a mirror, labelled [FromMember] only when it carries no
+/// `team_handle` (with one, the member is its author, FIX-TEAM-MEMBER-AUTHOR-DISPLAY); a text message of a person is an
+/// owner's message, because only owners read a team channel (readers rule, 09 3.9.1). It goes
+/// to the members it mentions ([ToMembers], the mention rule of [mentionedHandles]) and to every
+/// member without such a mention ([ToAllMembers]). A voice message, a deleted message and every
+/// other origin get no label, since they trigger nothing.
 TeamMessageLabel? teamMessageLabel(TeamView team, Message message) {
   if (message.deletedAt != null || message.kind != MessageKind.text) {
     return null;
   }
   switch (message.origin) {
     case MessageOrigin.agent:
+      // A mirror with its member's handle shows that member as its author, so it needs no
+      // line (FIX-TEAM-MEMBER-AUTHOR-DISPLAY); a copy stored without it names every member
+      // that agent is.
+      if (message.teamHandle != null) return null;
       final handles = teamHandlesOf(team, message.authorId);
       return handles.isEmpty ? null : FromMember(handles);
     case MessageOrigin.human:
-      return message.contentMd.trim().isEmpty ? null : const ToAllMembers();
+      if (message.contentMd.trim().isEmpty) return null;
+      final handles = [
+        for (final h in mentionedHandles(message.contentMd))
+          if (team.byHandle(h) case final m?) m.handle,
+      ];
+      return handles.isEmpty ? const ToAllMembers() : ToMembers(handles);
     case _:
       return null;
   }
+}
+
+/// The handles [text] mentions, lower case, in the order of their first mention and without
+/// duplicates: the server's rule of 09 3.9.4 (Go `MentionedHandles` in
+/// services/server/internal/runs/domain/team.go). `@handle` counts at the start or after a
+/// character that is no ASCII letter, digit, `-`, `_` or `@`, and runs up to the first
+/// character that cannot be part of a handle; text inside a code span or a fenced code block
+/// does not count. The caller keeps only the handles of members.
+List<String> mentionedHandles(String text) {
+  final out = <String>[];
+  final seen = <String>{};
+  for (final part in _outsideCode(text)) {
+    for (final h in _handlesIn(part)) {
+      if (seen.add(h)) out.add(h);
+    }
+  }
+  return out;
+}
+
+bool _handleChar(int c) =>
+    (c >= 0x61 && c <= 0x7a) || // a-z
+    (c >= 0x41 && c <= 0x5a) || // A-Z
+    (c >= 0x30 && c <= 0x39) || // 0-9
+    c == 0x2d || // -
+    c == 0x5f; // _
+
+const int _at = 0x40;
+const int _backtick = 0x60;
+
+List<String> _handlesIn(String part) {
+  final out = <String>[];
+  for (var i = 0; i < part.length; i++) {
+    final c = part.codeUnitAt(i);
+    if (c != _at) continue;
+    if (i > 0) {
+      final before = part.codeUnitAt(i - 1);
+      if (_handleChar(before) || before == _at) continue;
+    }
+    var j = i + 1;
+    while (j < part.length && _handleChar(part.codeUnitAt(j))) {
+      j++;
+    }
+    if (j > i + 1) out.add(part.substring(i + 1, j).toLowerCase());
+    i = j - 1;
+  }
+  return out;
+}
+
+/// The parts of [text] outside fenced code blocks (a line starting with three or more
+/// backticks or tildes opens one, the same fence closes it) and outside code spans.
+List<String> _outsideCode(String text) {
+  final parts = <String>[];
+  var fence = '';
+  for (final line in text.split('\n')) {
+    final trimmed = line.replaceFirst(RegExp('^ +'), '');
+    final f = _fenceOf(trimmed);
+    if (f.isNotEmpty) {
+      if (fence.isEmpty) {
+        fence = f;
+        continue;
+      }
+      if (trimmed.startsWith(fence) &&
+          trimmed
+              .replaceFirst(RegExp('^${RegExp.escape(fence[0])}+'), '')
+              .trim()
+              .isEmpty) {
+        fence = '';
+        continue;
+      }
+    }
+    if (fence.isNotEmpty) continue;
+    parts.addAll(_outsideSpans(line));
+  }
+  return parts;
+}
+
+String _fenceOf(String line) {
+  for (final c in ['`', '~']) {
+    var n = 0;
+    while (n < line.length && line[n] == c) {
+      n++;
+    }
+    if (n >= 3) return line.substring(0, n);
+  }
+  return '';
+}
+
+/// The parts of one [line] outside its code spans: a run of backticks opens a span that the
+/// next run of the same length closes; an unclosed run is text.
+List<String> _outsideSpans(String line) {
+  final parts = <String>[];
+  var start = 0;
+  var i = 0;
+  while (i < line.length) {
+    if (line.codeUnitAt(i) != _backtick) {
+      i++;
+      continue;
+    }
+    final n = _backticks(line, i);
+    final end = _closingRun(line, i + n, n);
+    if (end < 0) {
+      i += n;
+      continue;
+    }
+    parts.add(line.substring(start, i));
+    i = end + n;
+    start = i;
+  }
+  return parts..add(line.substring(start));
+}
+
+int _backticks(String s, int i) {
+  var n = 0;
+  while (i + n < s.length && s.codeUnitAt(i + n) == _backtick) {
+    n++;
+  }
+  return n;
+}
+
+int _closingRun(String s, int from, int n) {
+  for (var j = from; j < s.length;) {
+    if (s.codeUnitAt(j) != _backtick) {
+      j++;
+      continue;
+    }
+    final m = _backticks(s, j);
+    if (m == n) return j;
+    j += m;
+  }
+  return -1;
 }
 
 /// The pattern of a handle (09 3.9.1); the length limit is the server's.
@@ -172,3 +326,52 @@ List<Channel> teamHomeCandidates(
         c.operator.effectiveAgentId == agent)
       c,
 ];
+
+/// The home channels [agent] may still be added with to [team]: [teamHomeCandidates] without
+/// the channels in which the agent is already a member (`team_member_exists`, 09 3.9.1).
+List<Channel> teamFreeHomeCandidates(
+  Iterable<Channel> channels,
+  PrincipalId agent,
+  TeamView team,
+) => [
+  for (final c in teamHomeCandidates(channels, agent, team: team.channelId))
+    if (!team.members.any((m) => m.agentId == agent && m.homeChannelId == c.id))
+      c,
+];
+
+/// The longest handle the add form suggests: the default of `team.handle_max_chars` (09 3.9.1,
+/// 09 config table). The server checks its own value.
+const int teamHandleSuggestMax = 32;
+
+/// The handle the add form suggests for [name] (the home channel's name), or for [fallback]
+/// (the agent's handle) when [name] leaves nothing: lower case, every run of characters outside
+/// the handle pattern a `-`, without leading characters other than a letter or digit and
+/// without trailing `-`, at most [teamHandleSuggestMax] characters, and unique among the
+/// [taken] handles in any letter case by a suffix `-2`, `-3` and so on. Empty when neither
+/// name leaves a character.
+String suggestTeamHandle(
+  String name, {
+  String? fallback,
+  required Iterable<String> taken,
+}) {
+  String reduce(String s) => s
+      .toLowerCase()
+      .replaceAll(RegExp('[^a-z0-9_-]+'), '-')
+      .replaceFirst(RegExp('^[^a-z0-9]+'), '')
+      .replaceFirst(RegExp(r'-+$'), '');
+  String cut(String s, int max) {
+    final c = s.length > max ? s.substring(0, max) : s;
+    return c.replaceFirst(RegExp(r'-+$'), '');
+  }
+
+  var base = reduce(name);
+  if (base.isEmpty && fallback != null) base = reduce(fallback);
+  if (base.isEmpty) return '';
+  final used = {for (final t in taken) t.toLowerCase()};
+  var handle = cut(base, teamHandleSuggestMax);
+  for (var n = 2; used.contains(handle); n++) {
+    final suffix = '-$n';
+    handle = '${cut(base, teamHandleSuggestMax - suffix.length)}$suffix';
+  }
+  return handle;
+}

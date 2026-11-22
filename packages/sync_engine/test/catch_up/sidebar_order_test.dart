@@ -39,10 +39,14 @@ void main() {
     required List<String> threadOrder,
     String? device,
     String? hiddenAt,
+    String? pinnedAt,
+    List<String>? pinnedThreads,
   }) => {
     'channel_id': channel,
     'thread_order': threadOrder,
     'hidden_at': ?hiddenAt,
+    'pinned_at': ?pinnedAt,
+    'pinned_threads': ?pinnedThreads,
     'version': version,
     'updated_by_device_id': ?device,
   };
@@ -257,5 +261,64 @@ void main() {
         ],
     );
     expect(s.sidebarChannels.single.hidden, isTrue);
+  });
+
+  test('the personal pins of a channel (FEAT-PIN-CHANNELS): pinned_at and '
+      'pinned_threads map, an older server without them means none, and '
+      'sidebar_channel.updated of another device pins and unpins', () async {
+    const at = '2026-11-22T09:30:00.000Z';
+    final pinned = sidebarChannelFromJson(
+      channelState(
+        channelId(1),
+        version: 2,
+        threadOrder: [],
+        pinnedAt: at,
+        pinnedThreads: [threadId(2), threadId(1)],
+      ),
+    );
+    expect(pinned.pinnedAt, DateTime.utc(2026, 11, 22, 9, 30));
+    expect(pinned.pinnedThreads, [
+      ThreadId.parse(threadId(2)),
+      ThreadId.parse(threadId(1)),
+    ]);
+    final older = sidebarChannelFromJson(
+      channelState(channelId(1), version: 2, threadOrder: []),
+    );
+    expect(older.pinned, isFalse);
+    expect(older.pinnedThreads, isEmpty);
+
+    await w.connect(cursor: 40);
+    await w.dispatch([
+      sidebarChannelUpdated(
+        41,
+        channelState(
+          channelId(1),
+          version: 3,
+          threadOrder: [threadId(1)],
+          device: otherDevice,
+          pinnedAt: at,
+          pinnedThreads: [threadId(1)],
+        ),
+      ),
+    ]);
+    await w.push('cursor', {'seq': 41});
+    expect((await channelRows()).single.pinned, isTrue);
+    expect((await channelRows()).single.pinnedThreads, [t1]);
+
+    await w.dispatch([
+      sidebarChannelUpdated(
+        42,
+        channelState(
+          channelId(1),
+          version: 4,
+          threadOrder: [threadId(1)],
+          device: otherDevice,
+          pinnedThreads: [],
+        ),
+      ),
+    ]);
+    await w.push('cursor', {'seq': 42});
+    expect((await channelRows()).single.pinned, isFalse);
+    expect((await channelRows()).single.pinnedThreads, isEmpty);
   });
 }

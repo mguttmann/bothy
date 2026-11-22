@@ -115,7 +115,8 @@ turn_handover = false
 # (`claude --bg`), a research preview of Claude Code; a run the mode is not available for (an
 # organization run and every run of a hosted agent among them) ends failed with its cause in
 # the thread and never uses print mode. Read the README section "Background sessions" first:
-# the mode needs the pinned CLI version, workspace trust for every bound folder and, for tool
+# the mode needs the pinned CLI version, workspace trust for the folder of chat files and for
+# runner.default_workspace (the runner records it for bound folders itself) and, for tool
 # class host, the recorded acceptance of bypass mode. Without the key nothing changes.
 launch_mode = "print"
 # Channel ids that use background mode; empty means every channel. With entries, only runs in

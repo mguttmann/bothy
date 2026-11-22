@@ -85,6 +85,6 @@ ORDER BY o.rn;
 -- search_language nor search_vector (D-M3-13-10).
 SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments, team_handle
 FROM messages m
 WHERE m.id = ANY(@message_ids::uuid[]) AND m.channel_id = ANY(@channel_ids::uuid[]) AND m.deleted_at IS NULL;

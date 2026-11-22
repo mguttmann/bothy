@@ -90,7 +90,7 @@ func (r *Repository) InsertMessage(ctx context.Context, m domain.Message) (domai
 		Origin: string(m.Origin), Kind: string(m.Kind), SystemCode: pgtype.Text{String: m.SystemCode, Valid: m.SystemCode != ""},
 		ContentMd: m.ContentMD, ContentFormat: m.ContentFormat, ReplyToMessageID: optionalUUID(m.ReplyToID), RunID: optionalUUID(m.RunID),
 		Silent: m.Silent, CreatedAt: pgtype.Timestamptz{Time: m.CreatedAt, Valid: true}, SearchLanguage: m.SearchLanguage,
-		HasAttachments: m.HasAttachments,
+		HasAttachments: m.HasAttachments, TeamHandle: pgtype.Text{String: m.TeamHandle, Valid: m.TeamHandle != ""},
 	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == clientIDConstraint {
@@ -131,8 +131,8 @@ func (r *Repository) Mentions(ctx context.Context, message ids.ID) ([]ids.ID, er
 }
 
 // messageRow is the column list every query of messages.sql returns: the columns of messages
-// without search_language and search_vector (docs/DECISIONS.md D-M3-13-10), has_attachments last
-// (M3-07). The row types sqlc generates per query have exactly these fields, so each converts to
+// without search_language and search_vector (docs/DECISIONS.md D-M3-13-10), has_attachments
+// (M3-07) and team_handle (FIX-TEAM-MEMBER-ATTRIBUTION) last. The row types sqlc generates per query have exactly these fields, so each converts to
 // it.
 type messageRow struct {
 	ID                  pgtype.UUID
@@ -160,6 +160,7 @@ type messageRow struct {
 	DeletedBy           pgtype.UUID
 	CreatedAt           pgtype.Timestamptz
 	HasAttachments      bool
+	TeamHandle          pgtype.Text
 }
 
 // LockMessage implements app.Store.
@@ -354,7 +355,7 @@ func toMessage(row messageRow) domain.Message {
 		ContentFormat: row.ContentFormat, ReplyToID: idOf(row.ReplyToMessageID), RunID: idOf(row.RunID), TriggerState: row.TriggerState.String,
 		TriggerStateReason: row.TriggerStateReason.String, TriggerStateAt: timeOf(row.TriggerStateAt), Silent: row.Silent, Version: row.Version,
 		EditedAt: timeOf(row.EditedAt), DeletedAt: timeOf(row.DeletedAt), DeletedBy: idOf(row.DeletedBy), CreatedAt: timeOf(row.CreatedAt),
-		HasAttachments: row.HasAttachments, ImportItemID: idOf(row.ImportItemID),
+		HasAttachments: row.HasAttachments, ImportItemID: idOf(row.ImportItemID), TeamHandle: row.TeamHandle.String,
 	}
 }
 

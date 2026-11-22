@@ -192,6 +192,88 @@ func (r *Repository) AttachmentStates(ctx context.Context, messageID ids.ID) ([]
 	return out, nil
 }
 
+// LockRelaySources implements app.Repository: the live files of the source FOR UPDATE OF files in
+// ascending id, with their positions (FIX-TEAM-CHANNEL-ATTACHMENTS).
+func (r *Repository) LockRelaySources(ctx context.Context, messageID ids.ID) ([]app.RelaySource, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := q.ListRelaySources(ctx, uuid(messageID))
+	if err != nil {
+		return nil, mapError(err, "locking the files of the source of a team copy")
+	}
+	out := make([]app.RelaySource, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, app.RelaySource{FileID: idOf(row.FileID), Position: int(row.Position)})
+	}
+	return out, nil
+}
+
+// InsertRelays implements app.Repository: the relays of one team copy in one statement. Rows of
+// several messages, threads or channels are an internal error.
+func (r *Repository) InsertRelays(ctx context.Context, rows []app.AttachmentRecord) error {
+	q, err := r.write(ctx)
+	if err != nil || len(rows) == 0 {
+		return err
+	}
+	first := rows[0]
+	arg := sqlcgen.InsertRelaysParams{MessageID: uuid(first.MessageID), ThreadID: uuid(first.ThreadID), ChannelID: uuid(first.ChannelID),
+		FileIds: make([]pgtype.UUID, 0, len(rows)), Positions: make([]int16, 0, len(rows))}
+	for _, row := range rows {
+		if row.MessageID != first.MessageID || row.ThreadID != first.ThreadID || row.ChannelID != first.ChannelID {
+			return errs.New(errs.CodeInternalError, "files: InsertRelays with rows of several messages")
+		}
+		arg.FileIds = append(arg.FileIds, uuid(row.FileID))
+		arg.Positions = append(arg.Positions, int16(row.Position)) //nolint:gosec // G115: at most message.max_attachments
+	}
+	return mapError(q.InsertRelays(ctx, arg), "inserting the relays of a team copy")
+}
+
+// RelaysOf implements app.Repository.
+func (r *Repository) RelaysOf(ctx context.Context, fileID ids.ID) ([]app.AttachmentRecord, error) {
+	rows, err := r.read(ctx).ListRelaysOfFile(ctx, uuid(fileID))
+	if err != nil {
+		return nil, mapError(err, "reading the relays of a file")
+	}
+	out := make([]app.AttachmentRecord, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, app.AttachmentRecord{MessageID: idOf(row.MessageID), FileID: idOf(row.FileID), ThreadID: idOf(row.ThreadID),
+			ChannelID: idOf(row.ChannelID), Position: int(row.Position)})
+	}
+	return out, nil
+}
+
+// DeleteRelaysOfMessage implements app.Repository.
+func (r *Repository) DeleteRelaysOfMessage(ctx context.Context, messageID ids.ID) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = q.DeleteRelaysOfMessage(ctx, uuid(messageID))
+	return mapError(err, "deleting the relays of a team copy")
+}
+
+// DeleteRelaysOfFiles implements app.Repository.
+func (r *Repository) DeleteRelaysOfFiles(ctx context.Context, fileIDs []ids.ID) error {
+	q, err := r.write(ctx)
+	if err != nil || len(fileIDs) == 0 {
+		return err
+	}
+	_, err = q.DeleteRelaysOfFiles(ctx, uuids(fileIDs))
+	return mapError(err, "deleting the relays of files")
+}
+
+// MoveThreadRelays implements app.ThreadAttachments; it needs the transaction of the move.
+func (r *Repository) MoveThreadRelays(ctx context.Context, threadID, channelID ids.ID) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	return mapError(q.MoveThreadRelays(ctx, sqlcgen.MoveThreadRelaysParams{ThreadID: uuid(threadID), ChannelID: uuid(channelID)}),
+		"moving the relays of a thread")
+}
+
 // MoveThreadAttachments implements app.ThreadAttachments; it needs the transaction of the move.
 func (r *Repository) MoveThreadAttachments(ctx context.Context, threadID, channelID ids.ID) error {
 	q, err := r.write(ctx)

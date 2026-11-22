@@ -70,6 +70,15 @@ func (l *LazyAttachments) MessageOf(ctx context.Context, fileID ids.ID) (files.A
 	return a.MessageOf(ctx, fileID)
 }
 
+// Relay implements files.Attachments.
+func (l *LazyAttachments) Relay(ctx context.Context, cmd files.RelayCmd) ([]files.Attachment, error) {
+	a, err := l.get()
+	if err != nil {
+		return nil, err
+	}
+	return a.Relay(ctx, cmd)
+}
+
 // Pending implements files.Attachments.
 func (l *LazyAttachments) Pending(ctx context.Context, messageID ids.ID) (files.PendingReason, error) {
 	a, err := l.get()

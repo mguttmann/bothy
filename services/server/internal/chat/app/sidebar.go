@@ -124,6 +124,10 @@ func (s *Service) ListSidebarStates(ctx context.Context, a actor.Actor) ([]chat.
 // hidden_at to the clock's time unless it is already set, false clears it. A command that
 // changes nothing (the same order, archiving an archived channel, restoring a shown one) returns
 // the stored state without a write and without an event.
+//
+// FEAT-PIN-CHANNELS (01 6.24): Pinned works like Hidden on pinned_at; PinnedThreads replaces the
+// pinned posts under the list rule of domain.CheckSidebarOrder on /pinned_threads, and its IDs
+// are not checked against existing threads either.
 func (s *Service) PutSidebarChannel(ctx context.Context, a actor.Actor, channelID ids.ID, cmd chat.SidebarChannelPutCmd) (chat.SidebarChannelState, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {
@@ -161,7 +165,7 @@ func (s *Service) writeSidebarChannel(ctx context.Context, a actor.Actor, space,
 		return domain.SidebarChannelState{}, err
 	}
 	if !stored {
-		prev = domain.SidebarChannelState{UserID: a.ID, ChannelID: channelID, ThreadOrder: []ids.ID{}}
+		prev = domain.SidebarChannelState{UserID: a.ID, ChannelID: channelID, ThreadOrder: []ids.ID{}, PinnedThreads: []ids.ID{}}
 	}
 	next, err := s.nextSidebarChannel(prev, cmd)
 	if err != nil {
@@ -180,7 +184,9 @@ func (s *Service) writeSidebarChannel(ctx context.Context, a actor.Actor, space,
 
 // nextSidebarChannel applies cmd to the stored row prev (PROJ-ARCHIVE): a given thread_order
 // replaces the order after domain.CheckSidebarOrder (empty is the default order), Hidden true
-// keeps an earlier hidden_at or takes the clock's time, false clears it; nil members keep prev.
+// keeps an earlier hidden_at or takes the clock's time, false clears it; Pinned does the same on
+// pinned_at and a given pinned_threads replaces the pinned posts (FEAT-PIN-CHANNELS); nil members
+// keep prev.
 func (s *Service) nextSidebarChannel(prev domain.SidebarChannelState, cmd chat.SidebarChannelPutCmd) (domain.SidebarChannelState, error) {
 	next := prev
 	if cmd.ThreadOrder != nil {
@@ -189,15 +195,31 @@ func (s *Service) nextSidebarChannel(prev domain.SidebarChannelState, cmd chat.S
 		}
 		next.ThreadOrder = append([]ids.ID{}, *cmd.ThreadOrder...)
 	}
-	if cmd.Hidden != nil {
-		switch {
-		case !*cmd.Hidden:
-			next.HiddenAt = time.Time{}
-		case prev.HiddenAt.IsZero():
-			next.HiddenAt = s.d.Clock.Now()
+	if cmd.PinnedThreads != nil {
+		if err := domain.CheckSidebarOrder("/pinned_threads", *cmd.PinnedThreads, s.cfg.SidebarOrderMaxItems); err != nil {
+			return domain.SidebarChannelState{}, err
 		}
+		next.PinnedThreads = append([]ids.ID{}, *cmd.PinnedThreads...)
 	}
+	next.HiddenAt = s.stampOf(prev.HiddenAt, cmd.Hidden)
+	next.PinnedAt = s.stampOf(prev.PinnedAt, cmd.Pinned)
 	return next, nil
+}
+
+// stampOf is the new value of a personal mark such as hidden_at or pinned_at (PROJ-ARCHIVE,
+// FEAT-PIN-CHANNELS): nil keeps prev, false clears it, true keeps an earlier time or takes the
+// clock's time.
+func (s *Service) stampOf(prev time.Time, set *bool) time.Time {
+	switch {
+	case set == nil:
+		return prev
+	case !*set:
+		return time.Time{}
+	case prev.IsZero():
+		return s.d.Clock.Now()
+	default:
+		return prev
+	}
 }
 
 // ListSidebarChannelStates implements chat.Structure (M4-51): the channel rows of the person a for

@@ -142,19 +142,30 @@ type SidebarChannelState struct {
 	// HiddenAt is set while the person has archived the channel in the own sidebar (01 6.22);
 	// zero while it shows in the normal list.
 	HiddenAt time.Time
+	// PinnedAt is set while the person has pinned the channel to the top of its space (01 6.24,
+	// FEAT-PIN-CHANNELS); zero while it is not pinned.
+	PinnedAt time.Time
+	// PinnedThreads are the posts the person pinned to the top of the forum, in pin order;
+	// never nil.
+	PinnedThreads []ids.ID
 	// Version counts the changes of the row.
 	Version int64
 	// UpdatedByDeviceID is the device of the last change; zero for none.
 	UpdatedByDeviceID ids.ID
 }
 
-// SidebarChannelPutCmd is the body of putMySidebarChannel (schema SidebarChannelPut, M4-51 and
-// PROJ-ARCHIVE); a nil member keeps the stored value.
+// SidebarChannelPutCmd is the body of putMySidebarChannel (schema SidebarChannelPut, M4-51,
+// PROJ-ARCHIVE and FEAT-PIN-CHANNELS); a nil member keeps the stored value.
 type SidebarChannelPutCmd struct {
 	// ThreadOrder replaces the stored post order; an empty list is the default order.
 	ThreadOrder *[]ids.ID
 	// Hidden archives the channel in the caller's own sidebar (true) or restores it (false).
 	Hidden *bool
+	// Pinned pins the channel to the top of its space in the caller's sidebar (true) or unpins
+	// it (false).
+	Pinned *bool
+	// PinnedThreads replaces the pinned posts of the channel, in pin order; empty unpins all.
+	PinnedThreads *[]ids.ID
 }
 
 // ChannelOperator is the operator of a channel (schema ChannelOperator): Mode is inherit, none or
@@ -331,11 +342,12 @@ type Structure interface {
 	// ListSidebarStates returns the sidebar rows of the person a for the spaces a may read that
 	// are not archived, ascending by space id (getMySidebar, M1-61).
 	ListSidebarStates(ctx context.Context, a actor.Actor) ([]SidebarState, error)
-	// PutSidebarChannel sets the caller's personal post order of the channel and whether it is
-	// archived in the caller's sidebar (sidebar.update, people only, M4-51 and PROJ-ARCHIVE), last
-	// write wins; a command that changes nothing returns the stored state without a write.
-	// Errors: validation_failed on /thread_order, not_found for a channel the caller cannot read,
-	// forbidden subject_kind_not_allowed.
+	// PutSidebarChannel sets the caller's personal post order of the channel, whether it is
+	// archived or pinned in the caller's sidebar and its pinned posts (sidebar.update, people
+	// only, M4-51, PROJ-ARCHIVE and FEAT-PIN-CHANNELS), last write wins; a command that changes
+	// nothing returns the stored state without a write. Errors: validation_failed on
+	// /thread_order or /pinned_threads, not_found for a channel the caller cannot read, forbidden
+	// subject_kind_not_allowed.
 	PutSidebarChannel(ctx context.Context, a actor.Actor, channelID ids.ID, cmd SidebarChannelPutCmd) (SidebarChannelState, error)
 	// ListSidebarChannelStates returns the channel rows of the person a for the channels a may
 	// read that are not archived and lie in a space that is not archived, ascending by channel id

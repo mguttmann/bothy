@@ -2,8 +2,8 @@
 
 /// Mention suggestions of the composer (brief M4-20 Design note 3; 01 6.7; 03 content format;
 /// 07 4.6): the token at the cursor and the people and agents of the local database that match
-/// it. The local database holds only principals the person may see, so nothing here decides
-/// visibility (15 1 principle 1).
+/// it, or in a team channel the members of the team (01 6.23 item 6). The local database holds
+/// only principals the person may see, so nothing here decides visibility (15 1 principle 1).
 library;
 
 import 'package:domain/domain.dart';
@@ -57,6 +57,39 @@ List<Principal> suggestMentions(
   ]..sort((a, b) => a.handle.compareTo(b.handle));
   return found.length > limit ? found.sublist(0, limit) : found;
 }
+
+/// One mention suggestion: the `@handle` it inserts and the name beside it.
+final class MentionSuggestion {
+  /// Creates the suggestion.
+  const MentionSuggestion({required this.id, required this.handle, this.name});
+
+  /// The suggestion of the principal [p].
+  MentionSuggestion.of(Principal p)
+    : id = p.id.value,
+      handle = p.handle,
+      name = p.displayName;
+
+  /// A stable ID within the list: a principal's ID, or `team.<handle>` for a team member.
+  final String id;
+
+  /// The handle the suggestion inserts, without `@`.
+  final String handle;
+
+  /// The name shown beside the handle, or null.
+  final String? name;
+}
+
+/// The members of a team channel in [members] whose handle or name starts with [prefix] (lower
+/// case), sorted by handle, all of them: right after `@` every member (01 6.23 item 6).
+List<MentionSuggestion> suggestTeamMembers(
+  Iterable<MentionSuggestion> members,
+  String prefix,
+) => [
+  for (final m in members)
+    if (m.handle.toLowerCase().startsWith(prefix) ||
+        (m.name?.toLowerCase().startsWith(prefix) ?? false))
+      m,
+]..sort((a, b) => a.handle.compareTo(b.handle));
 
 /// [text] with the token of [query] (up to [cursor]) replaced by `@handle` and a space;
 /// returns the new text and the new cursor.

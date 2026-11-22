@@ -108,6 +108,8 @@ class _$Message extends Message {
   @override
   final String? triggerStateReason;
   @override
+  final String? teamHandle;
+  @override
   final bool silent;
   @override
   final BuiltList<Attachment> attachments;
@@ -151,6 +153,7 @@ class _$Message extends Message {
     this.triggerState,
     this.triggerStateAt,
     this.triggerStateReason,
+    this.teamHandle,
     required this.silent,
     required this.attachments,
     required this.mentionIds,
@@ -191,6 +194,7 @@ class _$Message extends Message {
         triggerState == other.triggerState &&
         triggerStateAt == other.triggerStateAt &&
         triggerStateReason == other.triggerStateReason &&
+        teamHandle == other.teamHandle &&
         silent == other.silent &&
         attachments == other.attachments &&
         mentionIds == other.mentionIds &&
@@ -224,6 +228,7 @@ class _$Message extends Message {
     _$hash = $jc(_$hash, triggerState.hashCode);
     _$hash = $jc(_$hash, triggerStateAt.hashCode);
     _$hash = $jc(_$hash, triggerStateReason.hashCode);
+    _$hash = $jc(_$hash, teamHandle.hashCode);
     _$hash = $jc(_$hash, silent.hashCode);
     _$hash = $jc(_$hash, attachments.hashCode);
     _$hash = $jc(_$hash, mentionIds.hashCode);
@@ -259,6 +264,7 @@ class _$Message extends Message {
           ..add('triggerState', triggerState)
           ..add('triggerStateAt', triggerStateAt)
           ..add('triggerStateReason', triggerStateReason)
+          ..add('teamHandle', teamHandle)
           ..add('silent', silent)
           ..add('attachments', attachments)
           ..add('mentionIds', mentionIds)
@@ -352,6 +358,10 @@ class MessageBuilder implements Builder<Message, MessageBuilder> {
   set triggerStateReason(String? triggerStateReason) =>
       _$this._triggerStateReason = triggerStateReason;
 
+  String? _teamHandle;
+  String? get teamHandle => _$this._teamHandle;
+  set teamHandle(String? teamHandle) => _$this._teamHandle = teamHandle;
+
   bool? _silent;
   bool? get silent => _$this._silent;
   set silent(bool? silent) => _$this._silent = silent;
@@ -430,6 +440,7 @@ class MessageBuilder implements Builder<Message, MessageBuilder> {
       _triggerState = $v.triggerState;
       _triggerStateAt = $v.triggerStateAt;
       _triggerStateReason = $v.triggerStateReason;
+      _teamHandle = $v.teamHandle;
       _silent = $v.silent;
       _attachments = $v.attachments.toBuilder();
       _mentionIds = $v.mentionIds.toBuilder();
@@ -514,6 +525,7 @@ class MessageBuilder implements Builder<Message, MessageBuilder> {
             triggerState: triggerState,
             triggerStateAt: triggerStateAt,
             triggerStateReason: triggerStateReason,
+            teamHandle: teamHandle,
             silent: BuiltValueNullFieldError.checkNotNull(
               silent,
               r'Message',

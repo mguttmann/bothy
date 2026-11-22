@@ -32,6 +32,9 @@ const Map<String, List<String>> expected = {
     'updated_by_device_id',
     // PROJ-ARCHIVE: the personal archive of the channel in the sidebar (01 6.22).
     'hidden_at',
+    // FEAT-PIN-CHANNELS: the personal pins of the channel and its posts (01 6.24).
+    'pinned_at',
+    'pinned_threads',
   ],
   // 03 `channels` without `prompt` and the behaviour fields; `effective_operator_agent_id`:
   // API `ChannelOperator.effective_agent_id`; `main_thread_id`, `dm_participant_ids`,
@@ -94,7 +97,7 @@ const Map<String, List<String>> expected = {
     'silent',
     'mention_ids',
     'pinned',
-    'version', 'edited_at', 'deleted_at', 'created_at',
+    'version', 'edited_at', 'deleted_at', 'created_at', 'team_handle',
   ],
   // 03 `reactions` summarized per emoji.
   'reactions_summary': ['message_id', 'emoji', 'count', 'me'],
@@ -354,8 +357,8 @@ void main() {
     return [for (final r in rows) r.read<String>('name')];
   }
 
-  test('schema version 16 has exactly the tables of 15 6.1', () async {
-    expect(db.schemaVersion, 16);
+  test('schema version 18 has exactly the tables of 15 6.1', () async {
+    expect(db.schemaVersion, 18);
     final rows = await db
         .customSelect(
           "SELECT name FROM sqlite_master WHERE type = 'table' "

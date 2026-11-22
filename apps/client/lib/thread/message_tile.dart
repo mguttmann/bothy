@@ -21,9 +21,9 @@ import '../composer/mention_suggestions.dart';
 import 'message_menu.dart';
 import 'select_text_view.dart';
 
-/// [message] as `DsMessageData` for the reader [me]: the author's name from [principals]
-/// (a missing one shows the handle-less placeholder of the system), [timeLabel] formatted by
-/// the caller, the [reactions], the quoted [replied] message, and the tokens of `mention_ids`
+/// [message] as `DsMessageData` for the reader [me]: the author's name ([authorNameOf]: a team
+/// member's handle with its agent as `authorVia`, else the display name from [principals]),
+/// [timeLabel] formatted by the caller, the [reactions], the quoted [replied] message, and the tokens of `mention_ids`
 /// as mentions (03 content format item 4). Only a server message of kind `system` is a
 /// system line (SEC-OUT-3). The thread's [runs] tell a follow-up's state (`triggerOf`).
 DsMessageData messageData(
@@ -37,8 +37,7 @@ DsMessageData messageData(
   String? failureText,
   Iterable<RunSummary> runs = const [],
 }) {
-  final author = principals[message.authorId];
-  final name = author?.displayName ?? message.authorId.value;
+  final name = authorNameOf(message, principals);
   final reply = replied;
   final systemLine =
       message.kind == MessageKind.system &&
@@ -46,6 +45,11 @@ DsMessageData messageData(
   return DsMessageData(
     id: message.id.value,
     authorName: name,
+    // A team member's message names its agent small after the badge
+    // (FIX-TEAM-MEMBER-AUTHOR-DISPLAY).
+    authorVia: message.teamHandle == null
+        ? null
+        : agentNameOf(message, principals),
     origin: DsMessageOrigin.fromCode(message.origin.code),
     // A `system` kind from anything but the server renders as text (SEC-OUT-3).
     kind: systemLine
@@ -63,9 +67,7 @@ DsMessageData messageData(
     triggerReason: message.triggerStateReason,
     delivery: delivery,
     failureText: failureText,
-    replyToName: reply == null
-        ? null
-        : principals[reply.authorId]?.displayName ?? reply.authorId.value,
+    replyToName: reply == null ? null : authorNameOf(reply, principals),
     replyExcerpt: reply == null ? null : excerpt(reply.contentMd),
     reactions: [
       for (final r in reactions) DsReaction(r.emoji, r.count, mine: r.me),
@@ -74,6 +76,17 @@ DsMessageData messageData(
     systemName: systemLine ? name : null,
   );
 }
+
+/// The name [message] is shown under: the handle of the team member it came from
+/// (`team_handle`, 09 3.9.2; FIX-TEAM-MEMBER-AUTHOR-DISPLAY), else the display name of its
+/// author from [principals], else the author's ID.
+String authorNameOf(Message message, Map<PrincipalId, Principal> principals) =>
+    message.teamHandle ?? agentNameOf(message, principals);
+
+/// The display name of the author of [message] from [principals], else the author's ID; for a
+/// team member's message the agent that writes for the member.
+String agentNameOf(Message message, Map<PrincipalId, Principal> principals) =>
+    principals[message.authorId]?.displayName ?? message.authorId.value;
 
 /// The first line of [text] for a quote line; the reply line cuts it with an ellipsis.
 String excerpt(String text) => text.trim().split('\n').first.trim();
