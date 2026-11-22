@@ -20,9 +20,15 @@ private final class GatedStore: KeyStore, @unchecked Sendable {
     /// Lets one waiting step-up read go on.
     func open() { gate.signal() }
 
-    /// Waits until a step-up read is held back; false after `seconds`.
-    func waitUntilHeld(seconds: Double) -> Bool {
-        reached.wait(timeout: .now() + seconds) == .success
+    /// Waits until a step-up read is held back; false after `seconds`. The wait runs on a
+    /// dispatch thread, never on a thread of the cooperative pool: blocking that pool kept the
+    /// step-up task from starting on a simulator with few threads, and the test failed.
+    func waitUntilHeld(seconds: Double) async -> Bool {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            DispatchQueue.global().async {
+                continuation.resume(returning: self.reached.wait(timeout: .now() + seconds) == .success)
+            }
+        }
     }
 
     func add(_ item: KeyItem) throws {
@@ -95,7 +101,7 @@ private func makeQueues(_ store: GatedStore) -> DeviceKeyQueues {
 
     // The step-up signature starts and waits, as it does while the system prompt is open.
     let confirmation = Task { try await queues.sign(scope: scope, purpose: .stepUp, data: Data("challenge".utf8)) }
-    #expect(store.waitUntilHeld(seconds: 5))
+    #expect(await store.waitUntilHeld(seconds: 5))
 
     // A DPoP proof of a request, a refresh or a gateway reauth must not wait behind it.
     let proof = await within(seconds: 5) {
