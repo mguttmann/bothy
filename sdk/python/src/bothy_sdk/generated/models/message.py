@@ -65,6 +65,11 @@ class Message:
             `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`, `project_not_ready`,
             `operator_cannot_serve_project`. A message that failed with `project_not_ready`, `operator_cannot_serve_project`
             or `operator_not_in_channel` can be triggered again with `retriggerMessage` once the cause is fixed.
+        team_handle (str | Unset): Set only on a team copy whose source is a team member (09 3.9.2, FIX-TEAM-MEMBER-
+            ATTRIBUTION) - the mirror of a member's reply in the team channel and a member's input in another member's work
+            thread - and names that one member, the member of the work thread the reply came from. `author` is the member's
+            agent, which can be several members of one team channel, so clients and runtimes name the member by this handle,
+            never by the agent. Absent on every other message, also on an owner's message copied into a work thread.
         my_reactions (list[str] | Unset): Emoji the caller reacted with. Only in REST responses, never in events.
         edited_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         deleted_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -95,6 +100,7 @@ class Message:
     trigger_state: TriggerState | Unset = UNSET
     trigger_state_at: datetime.datetime | Unset = UNSET
     trigger_state_reason: str | Unset = UNSET
+    team_handle: str | Unset = UNSET
     my_reactions: list[str] | Unset = UNSET
     edited_at: datetime.datetime | Unset = UNSET
     deleted_at: datetime.datetime | Unset = UNSET
@@ -173,6 +179,8 @@ class Message:
 
         trigger_state_reason = self.trigger_state_reason
 
+        team_handle = self.team_handle
+
         my_reactions: list[str] | Unset = UNSET
         if not isinstance(self.my_reactions, Unset):
             my_reactions = self.my_reactions
@@ -223,6 +231,8 @@ class Message:
             field_dict["trigger_state_at"] = trigger_state_at
         if trigger_state_reason is not UNSET:
             field_dict["trigger_state_reason"] = trigger_state_reason
+        if team_handle is not UNSET:
+            field_dict["team_handle"] = team_handle
         if my_reactions is not UNSET:
             field_dict["my_reactions"] = my_reactions
         if edited_at is not UNSET:
@@ -335,6 +345,8 @@ class Message:
 
         trigger_state_reason = d.pop("trigger_state_reason", UNSET)
 
+        team_handle = d.pop("team_handle", UNSET)
+
         my_reactions = cast(list[str], d.pop("my_reactions", UNSET))
 
         _edited_at = d.pop("edited_at", UNSET)
@@ -377,6 +389,7 @@ class Message:
             trigger_state=trigger_state,
             trigger_state_at=trigger_state_at,
             trigger_state_reason=trigger_state_reason,
+            team_handle=team_handle,
             my_reactions=my_reactions,
             edited_at=edited_at,
             deleted_at=deleted_at,

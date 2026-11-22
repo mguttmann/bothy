@@ -172,6 +172,7 @@ type attFiles struct {
 	attached    []files.AttachCmd
 	forMessages [][]ids.ID
 	deleted     []ids.ID
+	relayed     []files.RelayCmd
 	byMessage   map[ids.ID][]files.Attachment
 }
 
@@ -236,6 +237,23 @@ func (*attFiles) MessageOf(context.Context, ids.ID) (files.AttachmentRef, bool, 
 
 func (*attFiles) Pending(context.Context, ids.ID) (files.PendingReason, error) {
 	panic("messaging never calls Pending")
+}
+
+// Relay puts the attachments of the source on the copy (FIX-TEAM-CHANNEL-ATTACHMENTS) and records
+// the call.
+func (f *attFiles) Relay(ctx context.Context, cmd files.RelayCmd) ([]files.Attachment, error) {
+	if !txn.InUnit(ctx) {
+		return nil, errs.New(errs.CodeInternalError, "Relay outside a unit of work")
+	}
+	f.trace.add("relay")
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.relayed = append(f.relayed, cmd)
+	out := slices.Clone(f.byMessage[cmd.SourceMessageID])
+	if len(out) > 0 {
+		f.byMessage[cmd.MessageID] = out
+	}
+	return slices.Clone(out), nil
 }
 
 // counts returns the number of Attach and ForMessages calls.
@@ -413,6 +431,7 @@ type attWorld struct {
 	trace                     *attTrace
 	alex                      actor.Actor
 	thread, channel, newChann ids.ID
+	uow                       attUoW
 }
 
 // attMaxAttachments is message.max_attachments of the fake world.
@@ -438,7 +457,8 @@ func newAttWorld(t *testing.T, withFiles bool) *attWorld {
 		t.Fatal(err)
 	}
 	reg.Seal()
-	deps := app.Deps{Store: w.store, UoW: attUoW{reg: reg}, Authorizer: w.authz, Events: w.events, Redactor: w.redactor,
+	w.uow = attUoW{reg: reg}
+	deps := app.Deps{Store: w.store, UoW: w.uow, Authorizer: w.authz, Events: w.events, Redactor: w.redactor,
 		Audit: struct{ auditing.Recorder }{}, Threads: w.threads, Directory: attDirectory{}, Cursors: struct{ app.Cursors }{}, Symbols: anySymbol{}}
 	if withFiles {
 		deps.Files = w.files

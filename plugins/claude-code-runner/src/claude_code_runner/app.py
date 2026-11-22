@@ -71,7 +71,7 @@ from claude_code_runner.adoption import (
     process_matches,
     read_turn_record,
 )
-from claude_code_runner.attachments import fetch_attachments
+from claude_code_runner.attachments import fetch_attachments, run_attachments
 from claude_code_runner.authcheck import auth_status, decide, evidence
 from claude_code_runner.bgmode import UNAVAILABLE, BackgroundMode
 from claude_code_runner.bgpaths import bg_files, remove_bg_files
@@ -1296,6 +1296,7 @@ class RunnerHandler(AgentHandler):
         if self.probe.blocking:
             refuse("runtime_unavailable", "runtime_error", ids)
         state.cwd = self._working_folder(binding, ids)
+        state.bound = binding is not None
         session = payload.agent_session
         state.agent_session = session if isinstance(session, AgentSession) else None
         mode = getattr(payload.session_mode, "value", None)
@@ -1328,7 +1329,7 @@ class RunnerHandler(AgentHandler):
         state.context = await self._context(run, ids)
         files_dir = self.config.state_dir / "files" / str(state.thread_id)
         state.file_texts, state.stored_files = await fetch_attachments(
-            run.client, state.context.trigger_message.attachments, files_dir
+            run.client, run_attachments(state.context, state.team_run), files_dir
         )
         await self.precheck(state, inv.claims.billing_mode, ids)
         log("run_prepared", **ids)

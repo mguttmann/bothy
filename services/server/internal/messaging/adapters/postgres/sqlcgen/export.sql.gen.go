@@ -71,7 +71,7 @@ const listExportThreadMessages = `-- name: ListExportThreadMessages :many
 SELECT m.id, m.thread_id, m.channel_id, m.thread_seq, m.author_principal_id, m.client_msg_id, m.client_payload_sha256, m.origin,
     m.kind, m.system_code, m.content_md, m.content_format, m.reply_to_message_id, m.run_id, m.trigger_state,
     m.trigger_state_reason, m.trigger_state_at, m.silent, m.import_item_id, m.version, m.edited_at, m.deleted_at, m.deleted_by,
-    m.created_at, m.has_attachments
+    m.created_at, m.has_attachments, m.team_handle
 FROM messages m
 WHERE m.thread_id = $1 AND m.channel_id = $2 AND m.channel_id = ANY($3::uuid[])
   AND m.created_at >= $4 AND m.created_at < $5 AND m.thread_seq > $6
@@ -115,6 +115,7 @@ type ListExportThreadMessagesRow struct {
 	DeletedBy           pgtype.UUID
 	CreatedAt           pgtype.Timestamptz
 	HasAttachments      bool
+	TeamHandle          pgtype.Text
 }
 
 // The next @row_limit messages of the thread in the range after @after_seq, tombstones included
@@ -163,6 +164,7 @@ func (q *Queries) ListExportThreadMessages(ctx context.Context, arg ListExportTh
 			&i.DeletedBy,
 			&i.CreatedAt,
 			&i.HasAttachments,
+			&i.TeamHandle,
 		); err != nil {
 			return nil, err
 		}

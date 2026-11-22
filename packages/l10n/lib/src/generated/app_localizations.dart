@@ -1208,6 +1208,12 @@ abstract class AppLocalizations {
   /// **'AGENT'**
   String get messageOriginAgent;
 
+  /// Small note after the name and badge of a team member's message: the agent that writes for that member, for example via Claude Code (components.md section 1, FIX-TEAM-MEMBER-AUTHOR-DISPLAY).
+  ///
+  /// In en, this message translates to:
+  /// **'via {agent}'**
+  String messageAuthorVia(String agent);
+
   /// Badge after the name of a message written by an app (`origin = app`, components.md section 1, SEC-OUT-3).
   ///
   /// In en, this message translates to:
@@ -1524,6 +1530,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'muted'**
   String get channelRowMuted;
+
+  /// Part of the screen reader label of a channel or forum post the person pinned to the top of its list in the sidebar (01 section 6.24).
+  ///
+  /// In en, this message translates to:
+  /// **'pinned'**
+  String get channelRowPinned;
 
   /// Screen reader label of the dot of a collapsed space with unread items (components.md section 7).
   ///
@@ -18166,6 +18178,18 @@ abstract class AppLocalizations {
   /// **'Restore'**
   String get channelMenuRestore;
 
+  /// Menu entry of a channel, forum or forum post (sidebar menu and the More menu of its header) that pins it to the top of its list in the person's own sidebar, above the manual or automatic order (01 section 6.24).
+  ///
+  /// In en, this message translates to:
+  /// **'Pin to top'**
+  String get sidebarPin;
+
+  /// Menu entry of a pinned channel, forum or forum post that returns it to its place in the manual or automatic order of the person's own sidebar (01 section 6.24).
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get sidebarUnpin;
+
   /// Row at the bottom of a space in the sidebar that collapses or expands the channels and project forums the person archived for themselves (01 section 6.22); collapsed by default.
   ///
   /// In en, this message translates to:
@@ -18640,11 +18664,17 @@ abstract class AppLocalizations {
   /// **'from {handles}'**
   String teamFromMember(String handles);
 
-  /// Label of an owner's message in a team channel, which reaches every member (09 3.9.3).
+  /// Label of an owner's message in a team channel that mentions no member, which reaches every member (09 3.9.3).
   ///
   /// In en, this message translates to:
   /// **'to all members'**
   String get teamToAllMembers;
+
+  /// Label of an owner's message in a team channel that mentions members, which reaches only them, for example to @coding, @qa (owner ruling 2026-11-22).
+  ///
+  /// In en, this message translates to:
+  /// **'to {handles}'**
+  String teamToMembers(String handles);
 
   /// Description of the client command /team in the suggestion list (09 3.9.1).
   ///

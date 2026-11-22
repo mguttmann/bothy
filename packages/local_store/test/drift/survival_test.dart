@@ -87,8 +87,10 @@ final Map<String, List<Map<String, Object?>>> _rowsV1 = {
 /// `shell_view_state.code_blocks_unwrapped`), version 12 (M4-51, the personal channel and
 /// thread orders), version 13 (M4-52, `thread_seen_states`), version 14 (AR-08, `run_wakes` and
 /// `channels.allow_autonomous_runs`), version 15 (PROJ-ARCHIVE, `user_channel_states.hidden_at`
-/// and `space_view_states.archived_expanded`) and version 16 (AUD-pkg-local-store-01,
-/// `search_rows` and indexes) left the preserved tables as they were.
+/// and `space_view_states.archived_expanded`), version 16 (AUD-pkg-local-store-01,
+/// `search_rows` and indexes), version 17 (FIX-TEAM-MEMBER-ATTRIBUTION,
+/// `messages.team_handle`) and version 18 (FEAT-PIN-CHANNELS, `user_channel_states.pinned_at`
+/// and `pinned_threads`) left the preserved tables as they were.
 final Map<String, List<Map<String, Object?>>> _rowsV4 = {
   ..._rowsV1,
   'host_key_pins': [
@@ -142,6 +144,8 @@ final Map<int, Map<String, List<Map<String, Object?>>>> _fixtureRows = {
   14: _rowsV4,
   15: _rowsV4,
   16: _rowsV4,
+  17: _rowsV4,
+  18: _rowsV4,
 };
 
 void _insert(Database raw, Map<String, List<Map<String, Object?>>> rows) {

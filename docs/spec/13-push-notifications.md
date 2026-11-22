@@ -697,7 +697,9 @@ section 8 for the person at the time of the fetch. The mode is the stored `notif
 unset value, or one that is not exactly `full`, `names` or `none`, counts as
 `notify.default_preview_mode`. `names` and `full` add `space_name`, `channel_name` and
 `thread_title`, each only when the place has it (a DM channel has neither space nor channel name,
-a thread may have no title), and `sender_display_name` of the author, also for agents and apps.
+a thread may have no title), and `sender_display_name` of the author, also for agents and apps;
+for a team copy (`messages.team_handle` set, 09 3.9.2) it is the member's handle, not the agent's
+name (FIX-TEAM-MEMBER-AUTHOR-DISPLAY).
 `full` adds `excerpt` (absent when empty, for example a voice message), `attachment_count`
 (absent when zero) and `image_url`: a fetch ticket of the person's session for the thumbnail
 `small` of the first attachment in position order whose MIME type starts with `image/`. Any error

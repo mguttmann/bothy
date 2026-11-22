@@ -276,3 +276,86 @@ func TestSidebarChannelHidden(t *testing.T) {
 		t.Fatalf("the list must carry hidden_at: %+v, %v", list, err)
 	}
 }
+
+// TestSidebarChannelPinned (FEAT-PIN-CHANNELS, 01 6.24): pinned true pins the channel for the
+// caller (pinned_at set, version + 1, sidebar_channel.updated with pinned_at), the post order
+// stays; pinning again keeps the first pinned_at and changes nothing (no event); pinned false
+// clears it (absent in the payload). pinned_threads replaces the pinned posts of a forum in the
+// given order under the list rule of /pinned_threads (a duplicate is 400), the same list again
+// changes nothing, and writes of other members keep both.
+func TestSidebarChannelPinned(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := context.Background()
+	sp := e.create(t, "Dev", ids.ID{})
+	forum := e.channel(t, sp.ID, "forum", "Projects")
+	yes, no := true, false
+	p1, p2 := ids.New(), ids.New()
+	type statePayload struct {
+		State struct {
+			ThreadOrder   []string `json:"thread_order"`
+			PinnedAt      *string  `json:"pinned_at"`
+			PinnedThreads []string `json:"pinned_threads"`
+			Version       int64    `json:"version"`
+		} `json:"state"`
+	}
+	last := func() statePayload {
+		t.Helper()
+		var p statePayload
+		if err := json.Unmarshal(e.events.evs[len(e.events.evs)-1].Payload, &p); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	if _, err := e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{ThreadOrder: &[]ids.ID{p1}}); err != nil {
+		t.Fatal(err)
+	}
+	st, err := e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{Pinned: &yes})
+	if err != nil || st.PinnedAt.IsZero() || st.Version != 2 || !slices.Equal(st.ThreadOrder, []ids.ID{p1}) || st.PinnedThreads == nil || len(st.PinnedThreads) != 0 {
+		t.Fatalf("pin %+v, %v", st, err)
+	}
+	pinnedAt := st.PinnedAt
+	if p := last(); p.State.PinnedAt == nil || *p.State.PinnedAt != pinnedAt.UTC().Truncate(time.Millisecond).Format("2006-01-02T15:04:05.000Z") ||
+		p.State.Version != 2 || p.State.PinnedThreads == nil || len(p.State.PinnedThreads) != 0 {
+		t.Fatalf("pin payload %+v", p)
+	}
+	n := len(e.events.evs)
+	st, err = e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{Pinned: &yes})
+	if err != nil || !st.PinnedAt.Equal(pinnedAt) || st.Version != 2 || len(e.events.evs) != n {
+		t.Fatalf("pin again must change nothing: %+v, %v", st, err)
+	}
+	st, err = e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{PinnedThreads: &[]ids.ID{p2, p1}})
+	if err != nil || !slices.Equal(st.PinnedThreads, []ids.ID{p2, p1}) || !st.PinnedAt.Equal(pinnedAt) || st.Version != 3 ||
+		!slices.Equal(st.ThreadOrder, []ids.ID{p1}) {
+		t.Fatalf("pin posts %+v, %v", st, err)
+	}
+	if p := last(); !slices.Equal(p.State.PinnedThreads, []string{p2.String(), p1.String()}) || p.State.Version != 3 {
+		t.Fatalf("pin posts payload %+v", p)
+	}
+	n = len(e.events.evs)
+	st, err = e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{PinnedThreads: &[]ids.ID{p2, p1}})
+	if err != nil || st.Version != 3 || len(e.events.evs) != n {
+		t.Fatalf("the same pinned posts must change nothing: %+v, %v", st, err)
+	}
+	_, err = e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{PinnedThreads: &[]ids.ID{p1, p1}})
+	wantField(t, err, "/pinned_threads", "duplicate")
+	st, err = e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{Hidden: &yes})
+	if err != nil || !st.PinnedAt.Equal(pinnedAt) || !slices.Equal(st.PinnedThreads, []ids.ID{p2, p1}) || st.Version != 4 {
+		t.Fatalf("an archive must keep the pins: %+v, %v", st, err)
+	}
+	st, err = e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{Pinned: &no, PinnedThreads: &[]ids.ID{}})
+	if err != nil || !st.PinnedAt.IsZero() || len(st.PinnedThreads) != 0 || st.HiddenAt.IsZero() || st.Version != 5 {
+		t.Fatalf("unpin %+v, %v", st, err)
+	}
+	if p := last(); p.State.PinnedAt != nil || p.State.Version != 5 {
+		t.Fatalf("unpin payload must leave pinned_at out: %+v", p)
+	}
+	if _, err := e.svc.PutSidebarChannel(ctx, e.owner, forum.ID, chat.SidebarChannelPutCmd{Pinned: &yes}); err != nil {
+		t.Fatal(err)
+	}
+	e.az.scope = authorize.Scope{InstanceWide: true}
+	list, err := e.svc.ListSidebarChannelStates(ctx, e.owner)
+	if err != nil || !slices.ContainsFunc(list, func(s chat.SidebarChannelState) bool { return s.ChannelID == forum.ID && !s.PinnedAt.IsZero() }) {
+		t.Fatalf("the list must carry pinned_at: %+v, %v", list, err)
+	}
+}

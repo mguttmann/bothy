@@ -120,6 +120,35 @@ void main() {
     expect(hidden, isNot(ucs));
     expect(hidden.copyWith(version: const ResourceVersion(2)).hiddenAt, at);
   });
+  test('UserChannelState carries the personal pins (FEAT-PIN-CHANNELS)', () {
+    final at = DateTime.utc(2026, 11, 22, 9);
+    final pinned = UserChannelState(
+      channelId: channel1,
+      threadOrder: [thread1, thread2],
+      version: v1,
+      updatedByDeviceId: device,
+      pinnedAt: at,
+      pinnedThreads: [thread2],
+    );
+    expect(ucs.pinned, isFalse);
+    expect(ucs.pinnedThreads, isEmpty);
+    expect(pinned.pinned, isTrue);
+    expect(pinned, isNot(ucs));
+    final copy = pinned.copyWith(version: const ResourceVersion(2));
+    expect(copy.pinnedAt, at);
+    expect(copy.pinnedThreads, [thread2]);
+    expect(
+      UserChannelState(
+        channelId: channel1,
+        threadOrder: [thread1, thread2],
+        version: v1,
+        updatedByDeviceId: device,
+        pinnedAt: at,
+        pinnedThreads: [thread1],
+      ),
+      isNot(pinned),
+    );
+  });
 
   ChannelOperator mkOp() => ChannelOperator(
     mode: OperatorMode.agent,

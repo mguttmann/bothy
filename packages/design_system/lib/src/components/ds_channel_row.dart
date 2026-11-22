@@ -99,8 +99,9 @@ bool _touch(BuildContext context) =>
 /// (`color.surface.sidebar-hover`, over the whole row) and focus (ring
 /// `color.focus.ring-on-sidebar`). The most urgent unseen agent state of the channel's chats
 /// ([DsChannelRowData.status], 01 6.17 item 6) shows as a [DsChatStatusMark] before the mention
-/// counter and replaces the unread bar. The label reads "{Name}, {kind}, {n} unread, {m}
-/// mentions, run active, muted, {status words}"; Enter or a tap calls [onOpen].
+/// counter and replaces the unread bar. A channel the reader pinned (01 6.24) shows the
+/// `action.pin` icon after its name. The label reads "{Name}, {kind}, {n} unread, {m} mentions,
+/// pinned, run active, muted, {status words}"; Enter or a tap calls [onOpen].
 ///
 /// A channel with thread rows passes [groupExpanded]: the leading slot
 /// ([dsChannelArrowSlot]) then holds its own arrow (`action.expand` when expanded,
@@ -237,6 +238,7 @@ class DsChannelRowState extends State<DsChannelRow> {
       dsChannelKindName(l, d.kind, projectBound: d.projectBound),
       if (d.unreadCount > 0) l.threadRowUnread(d.unreadCount),
       if (d.mentionCount > 0) l.threadRowMentions(d.mentionCount),
+      if (d.pinned) l.channelRowPinned,
       if (d.runActive) l.channelRowRunActive,
       if (d.muted) l.channelRowMuted,
       if (status != null) dsChatStatusLabel(l, status),
@@ -300,6 +302,15 @@ class DsChannelRowState extends State<DsChannelRow> {
                 ),
               ),
             ),
+            if (d.pinned) ...[
+              const SizedBox(width: DsSpace.s6),
+              DsIcon(
+                DsIcons.actionPin,
+                size: DsIconSizeRole.sm,
+                color: color,
+                decorative: true,
+              ),
+            ],
             if (d.runActive) ...[
               const SizedBox(width: DsSpace.s6),
               _RunDot(color: c.categorySpruceOnSidebar),

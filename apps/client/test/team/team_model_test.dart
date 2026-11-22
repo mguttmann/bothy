@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// What the app derives from a team (09 3.9): member states, message labels, the parsing of
-// `/team` and the home channel choices.
+// What the app derives from a team (09 3.9): member states, message labels, the mentioned
+// handles, the parsing of `/team`, the home channel choices and the suggested handle.
 
 import 'package:client/team/providers.dart' show teamCapable;
 import 'package:client/team/team_model.dart';
@@ -90,8 +90,48 @@ void main() {
       expect((label! as FromMember).handles, ['coding', 'coding-docs']);
     });
 
-    test('an owner text message reaches every member', () {
+    test(
+      'a mirror with its team handle gets no line, its member is the author',
+      () {
+        final twice = t.withMember(
+          member(3, 'coding-docs', homeN: 3, threadN: 4),
+        );
+        final label = teamMessageLabel(
+          twice,
+          msg(
+            1,
+            author: robin,
+            origin: MessageOrigin.agent,
+          ).copyWith(teamHandle: 'coding-docs'),
+        );
+        expect(label, isNull);
+      },
+    );
+
+    test('an owner text message without a member mention goes to all', () {
       expect(teamMessageLabel(t, msg(1, author: alex)), isA<ToAllMembers>());
+      expect(
+        teamMessageLabel(t, msg(2, author: alex, text: 'ask @nobody')),
+        isA<ToAllMembers>(),
+        reason: 'a handle of no member narrows nothing',
+      );
+      expect(
+        teamMessageLabel(t, msg(3, author: alex, text: 'run `@qa` now')),
+        isA<ToAllMembers>(),
+        reason: 'a mention in a code span is no mention',
+      );
+    });
+
+    test('an owner text message that mentions members goes to them', () {
+      final label = teamMessageLabel(
+        t,
+        msg(1, author: alex, text: '@QA check this, then @nobody and @coding'),
+      );
+      expect(label, isA<ToMembers>());
+      expect((label! as ToMembers).handles, [
+        'qa',
+        'coding',
+      ], reason: 'the members in the order of their first mention');
     });
 
     test(
@@ -122,6 +162,33 @@ void main() {
         );
       },
     );
+  });
+
+  group('mentioned handles (09 3.9.4, Go TestMentionedHandles)', () {
+    for (final (name, text, want) in [
+      ('none', 'no mention here', <String>[]),
+      ('one', '@review I built X, please take over', ['review']),
+      (
+        'order and duplicates',
+        '@qa and @Review, then @review again and @qa',
+        ['qa', 'review'],
+      ),
+      ('punctuation', '(@coding), @qa: done. @ops!', ['coding', 'qa', 'ops']),
+      ('email is no mention', 'mail alex@example.com or @@qa', <String>[]),
+      ('bare at', '@ and @ alone', <String>[]),
+      ('code span', 'run `@coding fix` then @qa', ['qa']),
+      ('double backtick span', 'see ``a ` @coding`` and @qa', ['qa']),
+      ('unclosed backtick', 'a ` @coding', ['coding']),
+      (
+        'fenced block',
+        'before @qa\n```\n@coding inside\n```\nafter @ops',
+        ['qa', 'ops'],
+      ),
+      ('tilde fence', '~~~go\n@coding\n~~~\n@qa', ['qa']),
+      ('unclosed fence hides the rest', '@qa\n```\n@coding', ['qa']),
+    ]) {
+      test(name, () => expect(mentionedHandles(text), want));
+    }
   });
 
   group('/team', () {
@@ -195,6 +262,53 @@ void main() {
       team: channelId(1),
     );
     expect(homes.map((c) => c.id), [channelId(2), channelId(3)]);
+  });
+
+  test('home channels: a pair that is already a member is not offered', () {
+    final chans = [
+      channel(1),
+      channel(2, operator: robin),
+      channel(3, operator: robin),
+    ];
+    final t = team(members: [member(1, 'coding')]);
+    expect(teamFreeHomeCandidates(chans, robin, t).map((c) => c.id), [
+      channelId(3),
+    ], reason: 'Robin in channel 2 is the member coding');
+    expect(
+      teamFreeHomeCandidates(chans, nova, t),
+      isEmpty,
+      reason: 'Nova operates nothing here',
+    );
+  });
+
+  group('suggested handle', () {
+    test('from a name: lower case, reduced to the handle pattern', () {
+      expect(suggestTeamHandle('Website', taken: const []), 'website');
+      expect(suggestTeamHandle('My API v2!', taken: const []), 'my-api-v2');
+      expect(suggestTeamHandle('--Docs__', taken: const []), 'docs__');
+      expect(suggestTeamHandle('Café Ops', taken: const []), 'caf-ops');
+    });
+
+    test('the fallback when the name leaves nothing, else empty', () {
+      expect(
+        suggestTeamHandle('!!!', fallback: 'Nova', taken: const []),
+        'nova',
+      );
+      expect(suggestTeamHandle('', taken: const []), '');
+    });
+
+    test('unique among the members in any letter case', () {
+      expect(suggestTeamHandle('qa', taken: const ['QA']), 'qa-2');
+      expect(suggestTeamHandle('qa', taken: const ['qa', 'qa-2']), 'qa-3');
+    });
+
+    test('at most the default team.handle_max_chars', () {
+      final h = suggestTeamHandle('a' * 40, taken: const []);
+      expect(h.length, 32);
+      expect(teamHandlePattern.hasMatch(h), isTrue);
+      final unique = suggestTeamHandle('a' * 40, taken: ['a' * 32]);
+      expect(unique, '${'a' * 30}-2');
+    });
   });
 
   test('only an open text channel can be a team channel', () {

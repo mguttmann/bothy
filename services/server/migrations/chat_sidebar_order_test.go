@@ -40,6 +40,9 @@ func TestChatSidebarOrderMigration_Schema(t *testing.T) {
 		{"updated_at", ts, false, "now()"},
 		// PROJ-ARCHIVE (migration 00102): the personal archive of the channel, shown by default.
 		{"hidden_at", ts, true, ""},
+		// FEAT-PIN-CHANNELS (migration 00111): the personal pins of the channel and of its posts.
+		{"pinned_at", ts, true, ""},
+		{"pinned_threads", "ARRAY", false, "'{}'::uuid[]"},
 	}
 	if got := principalColumns(t, conn, "user_channel_states"); !reflect.DeepEqual(got, want) {
 		t.Errorf("user_channel_states columns:\n got %+v\nwant %+v", got, want)

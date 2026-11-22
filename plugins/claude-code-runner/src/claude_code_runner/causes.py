@@ -170,9 +170,10 @@ CAUSES: dict[str, str] = {
         "send the message again"
     ),
     "background_workspace_untrusted": (
-        "Claude Code on the runner host does not trust this project folder, so it starts no "
-        "background session there. Open Claude Code in that folder once on the runner host, "
-        "accept the trust prompt and send the message again"
+        "Claude Code on the runner host does not trust this project folder. The runner trusts "
+        "only a folder bound to the forum itself; its log says why it could not "
+        "(workspace_trust_failed). Bind the folder to the forum, or open Claude Code there once "
+        "on the runner host and accept the trust prompt, then send the message again"
     ),
     "background_files_untrusted": (
         "Claude Code on the runner host does not trust the runner's folder of chat files, so "

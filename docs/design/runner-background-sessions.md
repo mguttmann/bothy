@@ -634,7 +634,8 @@ the heartbeat (4.10).
 - The status line of the live box is "Background sessions are not available (`<code>`); this
   run uses print mode.". The fallback holds for the rest of the run: a later process of the
   same run (a recovery) uses print mode too.
-- The runner never writes the CLI's trust entry or its acceptance of bypass mode. Both are
+- The runner never writes the CLI's trust entry or its acceptance of bypass mode (the trust
+  entry of a bound project folder: superseded by FIX-RUNNER-NEW-PROJECT-TRUST). Both are
   one-time steps of the operator in the host user's own CLI configuration; the README names
   them.
 - Alternative: end such a run `failed`. Refused: the mode is an optimisation, and both modes

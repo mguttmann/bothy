@@ -677,6 +677,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageOriginAgent => 'AGENT';
 
   @override
+  String messageAuthorVia(String agent) {
+    return 'via $agent';
+  }
+
+  @override
   String get messageOriginApp => 'APP';
 
   @override
@@ -922,6 +927,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get channelRowMuted => 'muted';
+
+  @override
+  String get channelRowPinned => 'pinned';
 
   @override
   String get spaceRowUnread => 'Unread';
@@ -11403,6 +11411,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get channelMenuRestore => 'Restore';
 
   @override
+  String get sidebarPin => 'Pin to top';
+
+  @override
+  String get sidebarUnpin => 'Unpin';
+
+  @override
   String sidebarArchived(int count) {
     return 'Archived ($count)';
   }
@@ -11698,6 +11712,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get teamToAllMembers => 'to all members';
+
+  @override
+  String teamToMembers(String handles) {
+    return 'to $handles';
+  }
 
   @override
   String get commandBuiltinTeam =>

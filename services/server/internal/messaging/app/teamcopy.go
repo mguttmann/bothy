@@ -7,8 +7,10 @@ import (
 	"errors"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 	"github.com/OWNER/bothy/services/server/internal/messaging/domain"
@@ -17,13 +19,17 @@ import (
 // CopyMessage writes the copy a team channel needs inside the caller's unit of work
 // (docs/spec/09-agents.md 3.9.2 and 3.9.4, FEAT-TEAM-CHANNEL-SERVER): the content of the source
 // message as a new text message of the author in the thread, with the author's own origin (human
-// for a person, agent for an agent), silent, without reply, mentions and attachments, appended
-// without reopening a closed thread. message.created goes without the client_msg_id echo, then
-// MessagePosted with Relay set, which the acceptance of runs never decides as a trigger. It does not
-// authorize: the team use case checked the readers of both channels and the trigger first.
+// for a person, agent for an agent), silent, without reply and mentions, appended without
+// reopening a closed thread. The files of a source with attachments go onto the copy as relays
+// (files.Attachments.Relay, FIX-TEAM-CHANNEL-ATTACHMENTS), so the copy has has_attachments and
+// lists them; a source of attachments only is copied with empty text. message.created goes
+// without the client_msg_id echo, then MessagePosted with Relay set, which the acceptance of runs
+// never decides as a trigger. It does not authorize: the team use case checked the readers of
+// both channels and the trigger first.
 //
-// Errors: internal outside a unit of work, for a source without text (deleted, a system line, a
-// card or an anchor), for a zero SourceVersion or for an author that writes no messages; 409
+// Errors: internal outside a unit of work, for a source with neither text nor attachments
+// (deleted, a system line, a card or an anchor), for a zero SourceVersion or for an author that
+// writes no messages; 409
 // conflict for a source whose version is not SourceVersion (edited after the caller's check, red
 // team round 8); the errors of chat and the store.
 //
@@ -58,8 +64,10 @@ func (s *Service) CopyMessage(ctx context.Context, cmd messaging.CopyCmd) (messa
 		return messaging.Copied{}, err
 	}
 	info := appended.Thread
-	c := domain.TeamCopy(src.ContentMD, src.ID, info.ID, info.ChannelID, cmd.AuthorID, origin, appended.Seq)
+	c := domain.TeamCopy(src.ContentMD, src.ID, info.ID, info.ChannelID, cmd.AuthorID, origin, appended.Seq, cmd.TeamHandle)
 	c.CreatedAt = s.now()
+	// The copy carries the files of its source as relays (FIX-TEAM-CHANNEL-ATTACHMENTS D-TCAT-1).
+	c.HasAttachments = src.HasAttachments && s.d.Files != nil
 	if c.SearchLanguage, err = s.searchLanguage(ctx, a); err != nil {
 		return messaging.Copied{}, err
 	}
@@ -72,6 +80,9 @@ func (s *Service) CopyMessage(ctx context.Context, cmd messaging.CopyCmd) (messa
 	}
 	s.countCreated(ctx, row)
 	m := view(row, author, nil)
+	if m.Attachments, err = s.relay(ctx, row, src.ID); err != nil {
+		return messaging.Copied{}, err
+	}
 	if err := s.emitCreated(ctx, info, m, false); err != nil {
 		return messaging.Copied{}, err
 	}
@@ -81,6 +92,19 @@ func (s *Service) CopyMessage(ctx context.Context, cmd messaging.CopyCmd) (messa
 		return messaging.Copied{}, err
 	}
 	return messaging.Copied{ID: m.ID, ThreadSeq: m.ThreadSeq, ContentMD: m.ContentMD, Version: row.Version}, nil
+}
+
+// relay puts the files of source on the copy row when it has attachments (FIX-TEAM-CHANNEL-ATTACHMENTS
+// D-TCAT-1) and returns them in the representation's form; a copy without them gets an empty list.
+func (s *Service) relay(ctx context.Context, row domain.Message, source ids.ID) ([]messaging.Attachment, error) {
+	if !row.HasAttachments {
+		return []messaging.Attachment{}, nil
+	}
+	relayed, err := s.d.Files.Relay(ctx, files.RelayCmd{SourceMessageID: source, MessageID: row.ID, ThreadID: row.ThreadID, ChannelID: row.ChannelID})
+	if err != nil {
+		return nil, err
+	}
+	return attachmentsOf(relayed), nil
 }
 
 // copySource reads the source of a copy and checks it: a text message that exists, at the version
@@ -93,7 +117,8 @@ func (s *Service) copySource(ctx context.Context, cmd messaging.CopyCmd) (domain
 	if err != nil {
 		return domain.Message{}, err
 	}
-	if !found || !src.DeletedAt.IsZero() || src.Kind != domain.KindText || src.ContentMD == "" {
+	// A message of attachments only has no text and is copied for its files (D-TCAT-5).
+	if !found || !src.DeletedAt.IsZero() || src.Kind != domain.KindText || (src.ContentMD == "" && !src.HasAttachments) {
 		return domain.Message{}, errs.New(errs.CodeInternalError, "messaging: a copy needs a text message that exists")
 	}
 	if src.Version != cmd.SourceVersion {

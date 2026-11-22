@@ -14,6 +14,10 @@ class _$SidebarChannelState extends SidebarChannelState {
   @override
   final DateTime? hiddenAt;
   @override
+  final DateTime? pinnedAt;
+  @override
+  final BuiltList<String>? pinnedThreads;
+  @override
   final int version;
   @override
   final String? updatedByDeviceId;
@@ -26,6 +30,8 @@ class _$SidebarChannelState extends SidebarChannelState {
     required this.channelId,
     required this.threadOrder,
     this.hiddenAt,
+    this.pinnedAt,
+    this.pinnedThreads,
     required this.version,
     this.updatedByDeviceId,
   }) : super._();
@@ -45,6 +51,8 @@ class _$SidebarChannelState extends SidebarChannelState {
         channelId == other.channelId &&
         threadOrder == other.threadOrder &&
         hiddenAt == other.hiddenAt &&
+        pinnedAt == other.pinnedAt &&
+        pinnedThreads == other.pinnedThreads &&
         version == other.version &&
         updatedByDeviceId == other.updatedByDeviceId;
   }
@@ -55,6 +63,8 @@ class _$SidebarChannelState extends SidebarChannelState {
     _$hash = $jc(_$hash, channelId.hashCode);
     _$hash = $jc(_$hash, threadOrder.hashCode);
     _$hash = $jc(_$hash, hiddenAt.hashCode);
+    _$hash = $jc(_$hash, pinnedAt.hashCode);
+    _$hash = $jc(_$hash, pinnedThreads.hashCode);
     _$hash = $jc(_$hash, version.hashCode);
     _$hash = $jc(_$hash, updatedByDeviceId.hashCode);
     _$hash = $jf(_$hash);
@@ -67,6 +77,8 @@ class _$SidebarChannelState extends SidebarChannelState {
           ..add('channelId', channelId)
           ..add('threadOrder', threadOrder)
           ..add('hiddenAt', hiddenAt)
+          ..add('pinnedAt', pinnedAt)
+          ..add('pinnedThreads', pinnedThreads)
           ..add('version', version)
           ..add('updatedByDeviceId', updatedByDeviceId))
         .toString();
@@ -91,6 +103,16 @@ class SidebarChannelStateBuilder
   DateTime? get hiddenAt => _$this._hiddenAt;
   set hiddenAt(DateTime? hiddenAt) => _$this._hiddenAt = hiddenAt;
 
+  DateTime? _pinnedAt;
+  DateTime? get pinnedAt => _$this._pinnedAt;
+  set pinnedAt(DateTime? pinnedAt) => _$this._pinnedAt = pinnedAt;
+
+  ListBuilder<String>? _pinnedThreads;
+  ListBuilder<String> get pinnedThreads =>
+      _$this._pinnedThreads ??= ListBuilder<String>();
+  set pinnedThreads(ListBuilder<String>? pinnedThreads) =>
+      _$this._pinnedThreads = pinnedThreads;
+
   int? _version;
   int? get version => _$this._version;
   set version(int? version) => _$this._version = version;
@@ -110,6 +132,8 @@ class SidebarChannelStateBuilder
       _channelId = $v.channelId;
       _threadOrder = $v.threadOrder.toBuilder();
       _hiddenAt = $v.hiddenAt;
+      _pinnedAt = $v.pinnedAt;
+      _pinnedThreads = $v.pinnedThreads?.toBuilder();
       _version = $v.version;
       _updatedByDeviceId = $v.updatedByDeviceId;
       _$v = null;
@@ -143,6 +167,8 @@ class SidebarChannelStateBuilder
             ),
             threadOrder: threadOrder.build(),
             hiddenAt: hiddenAt,
+            pinnedAt: pinnedAt,
+            pinnedThreads: _pinnedThreads?.build(),
             version: BuiltValueNullFieldError.checkNotNull(
               version,
               r'SidebarChannelState',
@@ -155,6 +181,9 @@ class SidebarChannelStateBuilder
       try {
         _$failedField = 'threadOrder';
         threadOrder.build();
+
+        _$failedField = 'pinnedThreads';
+        _pinnedThreads?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'SidebarChannelState',

@@ -131,6 +131,9 @@ type TeamReaders interface {
 // run_answers, never from the request.
 type TeamScheduler interface {
 	ScheduleTeamInput(ctx context.Context, messageID ids.ID) error
+	// ScheduleTeamInputAt inserts the job to run at at; the job waiting for the files of its
+	// message schedules itself again with it (FIX-TEAM-CHANNEL-ATTACHMENTS D-TCAT-4).
+	ScheduleTeamInputAt(ctx context.Context, messageID ids.ID, at time.Time) error
 }
 
 // TeamDeps are the collaborators of the team channels; bind them with BindTeams. Without them a

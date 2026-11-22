@@ -1851,8 +1851,8 @@ export interface paths {
         };
         get?: never;
         /**
-         * Reorder the posts of a channel or archive it for oneself
-         * @description Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order) and whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+         * Reorder the posts of a channel, archive or pin it for oneself
+         * @description Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order), whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state), whether it is pinned to the top of its space (`pinned`; absent keeps the stored state) and the posts pinned to the top of the forum (`pinned_threads`; an empty list unpins every post, absent keeps the stored list). The server checks the form of the lists (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving or pinning twice keeps the first `hidden_at` or `pinned_at`. A body without a known member is 400. Archiving and pinning are personal: they change neither the channel, its rights, its runs nor the caller's notifications (01 6.22, 6.24). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
          */
         put: operations["putMySidebarChannel"];
         post?: never;
@@ -8038,6 +8038,10 @@ export interface components {
             thread_order: components["schemas"]["Uuid"][];
             /** @description Set while the caller has archived the channel in the own sidebar (01 6.22); absent while it shows in the normal list. */
             hidden_at?: components["schemas"]["Timestamp"];
+            /** @description Set while the caller has pinned the channel to the top of its space in the own sidebar (01 6.24); absent while it is not pinned. Pinned channels show in the order of this time, oldest first. */
+            pinned_at?: components["schemas"]["Timestamp"];
+            /** @description The posts of the channel the caller pinned to the top of the forum in the own sidebar, in the order they were pinned (01 6.24); empty for none. Absent from servers before this member, which means none. At most `sidebar.order_max_items`. */
+            pinned_threads?: components["schemas"]["Uuid"][];
             /** Format: int64 */
             version: number;
             updated_by_device_id?: components["schemas"]["Uuid"];
@@ -8047,6 +8051,10 @@ export interface components {
             thread_order?: components["schemas"]["Uuid"][];
             /** @description true archives the channel in the caller's own sidebar (sets `hidden_at`, kept when it is already set), false brings it back (clears `hidden_at`); absent keeps the stored state (01 6.22). */
             hidden?: boolean;
+            /** @description true pins the channel to the top of its space in the caller's own sidebar (sets `pinned_at`, kept when it is already set), false unpins it (clears `pinned_at`); absent keeps the stored state (01 6.24). */
+            pinned?: boolean;
+            /** @description New list of the posts of the channel pinned to the top of the forum in the caller's own sidebar, in pin order, unique IDs; absent keeps the stored list, an empty list unpins every post (01 6.24). At most `sidebar.order_max_items`. */
+            pinned_threads?: components["schemas"]["Uuid"][];
         };
         ForumTag: {
             id: components["schemas"]["Uuid"];
@@ -8261,6 +8269,11 @@ export interface components {
             trigger_state_at?: components["schemas"]["Timestamp"];
             /** @description Reason when `trigger_state` is `failed` or `cancelled`, e.g. `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`, `project_not_ready`, `operator_cannot_serve_project`. A message that failed with `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel` can be triggered again with `retriggerMessage` once the cause is fixed. */
             trigger_state_reason?: string;
+            /**
+             * @description Set only on a team copy whose source is a team member (09 3.9.2, FIX-TEAM-MEMBER-ATTRIBUTION) - the mirror of a member's reply in the team channel and a member's input in another member's work thread - and names that one member, the member of the work thread the reply came from. `author` is the member's agent, which can be several members of one team channel, so clients and runtimes name the member by this handle, never by the agent. Absent on every other message, also on an owner's message copied into a work thread.
+             * @example coding
+             */
+            readonly team_handle?: string;
             silent: boolean;
             /** @description Attachments in position order (the order of `attachment_file_ids` at sending); empty for a message without attachments and for a deleted message. */
             attachments: components["schemas"]["Attachment"][];

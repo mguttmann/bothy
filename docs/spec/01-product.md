@@ -2331,11 +2331,16 @@ only owners read a team channel (09 3.9.1), and a person who is no owner sees no
    "Team channel..." for an owner. Its dialog has the switch "Team mode" (`enableChannelTeam`,
    `disableChannelTeam`) with a sentence on what it does; while it is on, the members with handle,
    agent and home channel, a remove button per member (`removeTeamMember`), a form to add a member
-   (agent, home channel and handle, `addTeamMember`) and "Stop all" (`stopChannelTeam`). The home
+   (agent, home channel and handle, `addTeamMember`) and "Stop all" (`stopChannelTeam`). The agent
+   choice lists the active agents of the server (`listAgents`) and filters them from the first
+   typed letter; an agent whose every home channel is already a member is not offered. The home
    channel choice lists the channels the chosen agent operates (not a direct message, not archived,
-   not read-only, not the team channel); with exactly one it is chosen at once. A handle that does
-   not match the pattern of 09 3.9.1 cannot be sent. A refusal stays in the dialog with the
-   server's reason.
+   not read-only, not the team channel) in which it is no member yet; with exactly one it is chosen
+   at once. The handle is filled in from the chosen home channel's name (lower case, reduced to the
+   pattern of 09 3.9.1, made unique among the members with `-2`, `-3`, the agent's handle when the
+   name leaves nothing) and stays editable; a handle the owner typed is never replaced. A handle
+   that does not match the pattern of 09 3.9.1 cannot be sent. A refusal stays in the dialog with
+   the server's reason.
 2. **Member bar.** Under the thread header of every thread of a team channel a bar shows each
    member as `@handle` with its state: "working" while the member's agent has an active run in its
    work thread, "paused" while member mentions of the channel are paused and the member does not
@@ -2343,9 +2348,25 @@ only owners read a team channel (09 3.9.1), and a person who is no owner sees no
    goes on. "Stop all" is enabled while a member works; the settings button opens the dialog of
    item 1. Screen readers read each member as "@handle, state".
 3. **Messages.** A text reply of a member's agent in the team channel (a mirror, 09 3.9.4) shows
-   "from @handle" under its content (every handle of that agent when it is a member twice); a text
-   message of a person shows "to all members", because an owner's message reaches every member
-   (09 3.9.3). Notes of the server stay notes.
+   the member it came from as its author (`team_handle`, 09 3.9.2; FIX-TEAM-MEMBER-ATTRIBUTION;
+   owner word of 2026-11-22, FIX-TEAM-MEMBER-AUTHOR-DISPLAY): the member's handle as the name, an
+   avatar chosen from the handle, the badge "AGENT" and the agent's display name small after it
+   ("via Claude Code"), also when its agent is a member twice. Messages of two members are never
+   one group (`ui.message_group_window`, 14), even when one agent writes for both. The same holds
+   for every message with `team_handle` (a member's input in another member's work thread), for
+   the name of a reply's quote line, a pinned message and the preview of a notification (13 6.4).
+   Only a mirror stored without `team_handle` shows the agent as its author with "from @handle"
+   under its content, naming every handle of that agent. A mirror shows the attachments of the
+   reply like any message's attachments, and the members get the attachments of an owner's message
+   with it (09 3.9.2, FIX-TEAM-CHANNEL-ATTACHMENTS). A text
+   message of a person that mentions members by `@handle` (the mention rule of 09 3.9.4) shows "to
+   @a, @b" with the mentioned members in the order of their first mention, because it reaches only
+   them; one without a member mention shows "to all members", because it reaches every member
+   (owner ruling of 2026-11-22). Notes of the server stay notes. In the composer of every thread of
+   a team channel `@` lists every member at once (handle and agent name) instead of the people and
+   agents of the usual mention suggestions (6.7); further letters filter by handle or name, and a
+   tap, a click, Enter or Tab inserts `@handle ` at the cursor; on the desktop arrow up and down
+   move through the list and Escape closes it.
 4. **Command.** The composer of a text channel offers the client command `/team` to an owner:
    `/team` and `/team list` open the dialog, `/team add [handle]` opens it with the handle filled
    in, `/team remove @handle` removes the member, `/team stop` stops every member run; another
@@ -2361,6 +2382,36 @@ only owners read a team channel (09 3.9.1), and a person who is no owner sees no
    item 1 for the new channel, where the owner adds members. A refusal stays in the dialog with
    the server's reason; a channel created before a refused switch stays, and the next press only
    switches it on.
+
+### 6.24 Pinning channels and posts
+
+Addendum of 2026-11-22 (R-PR-39, rulings in docs/decisions.d/FEAT-PIN-CHANNELS.md). Reason: owner
+request of 2026-11-22; a team channel sat far down in its space, and the person wants it to stay at
+the top while "Arrange channels and projects automatically" stays on for the rest. Applies to the
+desktop sidebar (D1) and to the phone sidebar (M1), in every space.
+
+1. **Entry.** The menu of a channel or forum in the sidebar (right click, the menu key and
+   Shift+F10 on macOS and Windows, a long press on iOS and Android) and the More menu of the header
+   of its main history have "Pin to top"; while it is pinned the entry reads "Unpin". The menu of a
+   forum post in the sidebar, in the post list and in the More menu of its header has the same
+   entry for the post. Direct messages, channels archived for everyone, main threads and done
+   posts that are not pinned have no such entry; a row in the section "Archived" (6.22) shows none
+   either.
+2. **Where it goes.** A pinned channel shows at the top of its space group, above every other
+   channel, and a pinned post at the top of its forum group, above every other post, both with a
+   small pin after the name and the word "pinned" for screen readers. Several pinned channels of
+   a space keep the order in which they were pinned, oldest first; several pinned posts of a forum
+   likewise. A pinned post never hides behind "Show more" (6.8 item 3).
+3. **Order of the rest.** Pins come before the manual order (6.16 items 2 and 3) and before the
+   arrangement by activity (6.16 item 4); the rest of the level keeps its order unchanged. A pin
+   and an unpin apply at once, also while the sidebar holds its rows; an unpinned channel returns
+   to the place its order gives it. In a manual level a pinned row does not lift and has "Move
+   up" and "Move down" disabled; the other rows move only among themselves below the pins.
+4. **Personal and kept.** A pin is the person's own and follows the person to every device (04 14,
+   `user_channel_states.pinned_at` and `pinned_threads` in 03); nobody else sees it, and it never
+   changes the channel, its rights, its order for others or the person's notifications. Archiving
+   a channel for oneself (6.22) keeps its pin, which applies again after "Restore". Pinning is not
+   the pin of a message (6.7, `pin.create`), which marks a message for everyone in a thread.
 
 ## 7. Keyboard shortcuts
 
@@ -2641,12 +2692,13 @@ Rules:
 | R-PR-36 | Owners create a built-in agent with "New agent" from a template, an interview with the builder agent or an empty form, see and edit everything in one preview before anything is created, and confirm visible steps with step-up; the entry shows only when a runner hosts agents (6.20, addendum of 2026-11-06). | Owner request 2026-11-05: Bothy should be worth trying without another agent runtime; the preview is the only place where a person sees what a model drafted before it runs on their host ([26-builtin-agents.md](26-builtin-agents.md)). |
 | R-PR-37 | A thread shows its pending wake-ups with cancel, the end state of each finished run, and every end of a wake-up and every cap as a note of the thread (6.21, addendum of 2026-11-06). | A session that runs on alone must never end silently; the person sees what will wake the thread and can stop it. |
 | R-PR-38 | A person archives a channel or a project forum for themselves from its sidebar menu ("Archive project" for a forum with a project binding, else "Archive"); it moves into a collapsed "Archived (n)" section at the bottom of its space group, "Restore" brings it back to its earlier place, and nothing is deleted, made read only or changed for anyone else; the state follows the person to every device (6.22, addendum of 2026-11-08). | Owner request 2026-11-08: finished projects should leave the sidebar like done threads, without losing anything (docs/decisions.d/PROJ-ARCHIVE.md). |
+| R-PR-39 | A person pins a channel or forum to the top of its space and a forum post to the top of its forum from its menu ("Pin to top", "Unpin"; the sidebar menu and the More menu of the header); pinned rows lead their list with a pin, oldest pin first, before the manual order and before the arrangement by activity, which stays unchanged for the rest; the pin is personal and follows the person to every device (6.24, addendum of 2026-11-22). | Owner request 2026-11-22: a team channel stayed far down in a space arranged by activity; one channel must stay on top while the automatic arrangement stays on, in every space (docs/decisions.d/FEAT-PIN-CHANNELS.md). |
 
 ## 14. Configuration values of this chapter
 
 | Name | Default | Meaning |
 |---|---|---|
-| `ui.message_group_window` | `5m` | messages of the same author within this time get no header of their own |
+| `ui.message_group_window` | `5m` | messages of the same author (and the same team member, 6.23 item 3) within this time get no header of their own |
 | `ui.message_collapse_lines` | `24` | from this many lines on, a message is collapsed |
 | `ui.livebox_visible_steps` | `6` | visible steps in the running live box |
 | `ui.composer_max_lines` | `12` | the input grows up to this many lines |

@@ -293,6 +293,79 @@ void main() {
     },
   );
 
+  test(
+    'the personal pins of a channel and its posts: set, no change, clear and '
+    'the snapshot (FEAT-PIN-CHANNELS)',
+    () async {
+      final alex = h.device();
+      await signedIn(h, alex);
+      final prefs = alex.api.getPreferencesApi();
+      int events() => h.server.world.log
+          .where((e) => e.type == 'sidebar_channel.updated')
+          .length;
+      final before = events();
+
+      final pinned = (await prefs.putMySidebarChannel(
+        channelId: h.seed.general,
+        sidebarChannelPut: SidebarChannelPut((b) => b..pinned = true),
+      )).data!;
+      expect(pinned.pinnedAt, isNotNull);
+      expect(pinned.pinnedThreads?.toList(), isEmpty);
+      expect(pinned.version, 1);
+      expect(events(), before + 1);
+
+      final again = (await prefs.putMySidebarChannel(
+        channelId: h.seed.general,
+        sidebarChannelPut: SidebarChannelPut((b) => b..pinned = true),
+      )).data!;
+      expect(again.pinnedAt, pinned.pinnedAt);
+      expect(again.version, 1, reason: 'no change, no new version');
+      expect(events(), before + 1, reason: 'no change, no event');
+
+      final posts = [h.seed.releaseNotes];
+      final withPosts = (await prefs.putMySidebarChannel(
+        channelId: h.seed.general,
+        sidebarChannelPut: SidebarChannelPut(
+          (b) => b..pinnedThreads = ListBuilder(posts),
+        ),
+      )).data!;
+      expect(withPosts.pinnedThreads?.toList(), posts);
+      expect(withPosts.pinnedAt, pinned.pinnedAt, reason: 'the pin stays');
+      expect(withPosts.version, 2);
+      expect(
+        (h.server.world.snapshot(h.seed.alex.id)['sidebar_channels']! as List)
+            .single,
+        allOf(contains('pinned_at'), containsPair('pinned_threads', posts)),
+      );
+
+      final twice = await failure(
+        prefs.putMySidebarChannel(
+          channelId: h.seed.general,
+          sidebarChannelPut: SidebarChannelPut(
+            (b) => b..pinnedThreads = ListBuilder([...posts, ...posts]),
+          ),
+        ),
+      );
+      expect(
+        ((twice?.response?.data as Map)['errors'] as List).single,
+        allOf(
+          containsPair('pointer', '/pinned_threads'),
+          containsPair('code', 'duplicate'),
+        ),
+      );
+
+      final unpinned = (await prefs.putMySidebarChannel(
+        channelId: h.seed.general,
+        sidebarChannelPut: SidebarChannelPut((b) => b..pinned = false),
+      )).data!;
+      expect(unpinned.pinnedAt, isNull);
+      expect(unpinned.pinnedThreads?.toList(), posts);
+      expect(unpinned.version, 3);
+      expect(events(), before + 3);
+      expect(h.server.violations, isEmpty);
+    },
+  );
+
   test('forum tags and a post with its first message', () async {
     final alex = h.device();
     await signedIn(h, alex);

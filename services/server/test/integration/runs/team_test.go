@@ -38,6 +38,11 @@ func (j *teamJobs) ScheduleTeamInput(_ context.Context, id ids.ID) error {
 	return nil
 }
 
+// ScheduleTeamInputAt implements runsapp.TeamScheduler: a later job is recorded like one for now.
+func (j *teamJobs) ScheduleTeamInputAt(ctx context.Context, id ids.ID, _ time.Time) error {
+	return j.ScheduleTeamInput(ctx, id)
+}
+
 // has reports whether the message was scheduled.
 func (j *teamJobs) has(id string) bool {
 	j.mu.Lock()
@@ -232,7 +237,7 @@ func TestTeam_OwnerOperations(t *testing.T) {
 func TestTeam_Scenario(t *testing.T) {
 	w := newTeamWorld(t)
 	w.setUp()
-	owner := w.post("owner", w.teamMain, "@coding build feature X")
+	owner := w.post("owner", w.teamMain, "@coding @review build feature X")
 	if !w.jobs.has(owner["id"].(string)) {
 		t.Fatal("the owner message was not scheduled")
 	}
@@ -242,7 +247,7 @@ func TestTeam_Scenario(t *testing.T) {
 	w.runInput(owner["id"].(string))
 	for _, th := range []ids.ID{w.codingW, w.reviewW} {
 		msgs := w.messagesIn(th)
-		if len(msgs) != 1 || msgs[0].Author != w.owner.String() || msgs[0].Origin != "human" || msgs[0].Content != "@coding build feature X" {
+		if len(msgs) != 1 || msgs[0].Author != w.owner.String() || msgs[0].Origin != "human" || msgs[0].Content != "@coding @review build feature X" {
 			t.Fatalf("inputs of %s: %+v", th, msgs)
 		}
 		rs := w.teamRuns(th)
@@ -292,6 +297,26 @@ func TestTeam_Scenario(t *testing.T) {
 	if n := w.count(`SELECT count(*) FROM audit_events WHERE action = 'agent.invoke' AND decision = 'allow' AND actor_principal_id = $1`, w.owner); n < 3 {
 		t.Fatalf("%d allowed team inputs audited for the sponsor, want 3", n)
 	}
+	// An owner message that mentions only @coding reaches only coding (FIX-TEAM-CHANNEL-NOISE).
+	only := w.post("owner", w.teamMain, "@coding one more thing")
+	w.runInput(only["id"].(string))
+	got := func(th ids.ID) int {
+		n := 0
+		for _, m := range w.messagesIn(th) {
+			if m.Content == "@coding one more thing" {
+				n++
+			}
+		}
+		return n
+	}
+	// review sees it only as a context input: a copy, but no follow-up of its running run.
+	if got(w.codingW) != 1 || got(w.reviewW) != 1 {
+		t.Fatalf("copies of a message for @coding: coding %d, review %d, want 1 and 1", got(w.codingW), got(w.reviewW))
+	}
+	if n := w.count(`SELECT count(*) FROM run_followups f JOIN messages m ON m.id = f.message_id
+		WHERE m.thread_id = $1 AND m.content_md = '@coding one more thing'`, w.reviewW); n != 0 {
+		t.Fatalf("review got the message for @coding as %d follow-ups", n)
+	}
 
 	stopped := w.wantOK(w.do("owner", http.MethodPost, w.teamPath("/stop"), ""))
 	if ids := stopped["stopped_run_ids"].([]any); len(ids) != 2 {
@@ -308,6 +333,61 @@ func TestTeam_Scenario(t *testing.T) {
 		`{"client_msg_id":"`+ids.New().String()+`","content_md":"@texter please take over"}`, key()...), http.StatusCreated, "")
 	if after := w.count(`SELECT count(*) FROM runs`); after != before {
 		t.Fatalf("an agent message started %d runs", after-before)
+	}
+}
+
+// TestTeam_SameAgentMembersAreNamedByTheirOwnHandle (FIX-TEAM-MEMBER-ATTRIBUTION): Lotse is two
+// members, @coding in Lab-A and @helper in Lab-C. A reply of @coding that mentions @helper and itself
+// is mirrored and handed to @helper with team_handle coding (the member of the work thread the
+// reply came from, never the agent's other handle), in the column, in getMessage and in
+// message.created; nothing goes back to @coding. An owner's copy carries no team_handle.
+func TestTeam_SameAgentMembersAreNamedByTheirOwnHandle(t *testing.T) {
+	w := newTeamWorld(t)
+	w.setUp()
+	labC := w.channel(w.labs, "text", "Lab-C")
+	w.wantOK(w.setChannelOperator(labC, `{"mode":"agent","agent_id":"`+w.lotse.String()+`","reason":"Lab C agent"}`))
+	helperW := ids.MustParse(w.addMember(w.lotse, labC, "helper")["work_thread_id"].(string))
+	owner := w.post("owner", w.teamMain, "@coding prepare the release")
+	w.runInput(owner["id"].(string))
+	coding := w.teamRuns(w.codingW)[0]
+	w.startRun("lotse", coding.ID)
+	reply := w.answer(w.codingW, coding.ID, "@helper please check the notes, @coding is done", true)
+	w.runInput(reply["id"].(string))
+
+	mirror := w.messagesIn(w.teamMain)
+	last := mirror[len(mirror)-1]
+	// helper also sees the owner's message for @coding as a context input (FEAT-TEAM-CONTEXT-ALL);
+	// the agent's input is the one of origin agent.
+	var in []messageIn
+	for _, m := range w.messagesIn(helperW) {
+		if m.Origin == "agent" {
+			in = append(in, m)
+		}
+	}
+	if len(in) != 1 || in[0].Author != w.lotse.String() {
+		t.Fatalf("agent inputs of helper %+v", in)
+	}
+	for _, id := range []string{last.ID, in[0].ID} {
+		if got := w.text(`SELECT coalesce(team_handle, '') FROM messages WHERE id = $1`, id); got != "coding" {
+			t.Fatalf("team_handle of copy %s is %q, want coding", id, got)
+		}
+		m := w.wantOK(w.do("owner", http.MethodGet, "/api/v1/messages/"+id, ""))
+		if m["team_handle"] != "coding" {
+			t.Fatalf("getMessage of copy %s: team_handle %v", id, m["team_handle"])
+		}
+		ev := w.payloadOf(`SELECT payload::text FROM event_log WHERE type = 'message.created' AND resource_id = $1`, id)
+		if got := ev["message"].(map[string]any)["team_handle"]; got != "coding" {
+			t.Fatalf("message.created of copy %s: team_handle %v", id, got)
+		}
+	}
+	if back := w.messagesIn(w.codingW); len(back) != 2 || back[1].ID != reply["id"] {
+		t.Fatalf("coding's reply went back to coding: %+v", back)
+	}
+	if got := w.text(`SELECT coalesce(team_handle, '') FROM messages WHERE thread_id = $1 AND origin = 'human'`, w.codingW); got != "" {
+		t.Fatalf("the owner's copy carries team_handle %q", got)
+	}
+	if m := w.wantOK(w.do("owner", http.MethodGet, "/api/v1/messages/"+owner["id"].(string), "")); m["team_handle"] != nil {
+		t.Fatalf("an owner message has team_handle %v", m["team_handle"])
 	}
 }
 

@@ -307,10 +307,11 @@ class ChannelThreads extends _$ChannelThreads {
     _inFull = inFull;
     final held = ref.watch(sidebarHoldProvider) && !toggled;
     // 01 6.16: with "Arrange chats automatically" off a forum follows the person's order; a
-    // forum without one stays by activity, held as before.
+    // forum without one stays by activity, held as before. 01 6.24: the pinned posts come first.
+    final state = ref.watch(userChannelStatesProvider).value?[channel.id];
     final order = ref.watch(sidebarArrangementProvider).autoChats
         ? null
-        : ref.watch(userChannelStatesProvider).value?[channel.id]?.threadOrder;
+        : state?.threadOrder;
     final manual = order == null || order.isEmpty ? null : order;
     final prefs = ref.watch(notificationPreferencesProvider).value ?? const [];
     final now = ref.watch(appPortsProvider).clock.now();
@@ -337,8 +338,10 @@ class ChannelThreads extends _$ChannelThreads {
       },
       channelMuted: isMuted(channel.id, prefs, now: now),
       statuses: ref.watch(channelStatusesProvider(channelId)),
+      pinned: state?.pinnedThreads ?? const [],
     );
-    _shown = [for (final r in group.rows) r.thread.id];
+    // Held without the pins, so an unpinned post returns to its place at once (01 6.24).
+    _shown = group.heldOrder;
     return group;
   }
 }
@@ -395,6 +398,16 @@ Set<ChannelId> hiddenChannels(Ref ref) => {
     if (s.hidden) s.channelId,
 };
 
+/// The channels the person pinned to the top of their space in the own sidebar (01 6.24,
+/// `user_channel_states.pinned_at`), oldest pin first; synchronized to every device of the
+/// person.
+@riverpod
+List<ChannelId> pinnedChannels(Ref ref) => pinOrder(
+  (ref.watch(userChannelStatesProvider).value ??
+          const <ChannelId, UserChannelState>{})
+      .values,
+);
+
 /// Every channel and forum of [spaceId] in the person's manual order (the global one in the
 /// person's `channel_order`, rows not in it first, 01 6.16 item 3), the archived ones of 01 6.22
 /// included; direct messages and channels archived for everyone are not part of the tree.
@@ -419,8 +432,8 @@ List<Channel> manualChannelsOfSpace(Ref ref, String spaceId) {
 /// The row of [c] with what it shows (01 6.8, 6.17 item 6): counters ([channelCounts]), active
 /// run, muted state, its thread group with the collapse state of this device and the status
 /// mark. An archived channel (01 6.22) builds the same row, so its unread items and mentions
-/// still show.
-SidebarChannel _sidebarChannel(Ref ref, Channel c) {
+/// still show; only a row of the normal list shows its pin (01 6.24, [pinnable]).
+SidebarChannel _sidebarChannel(Ref ref, Channel c, {bool pinnable = true}) {
   ref.watch(counterTicksProvider);
   final engine = ref.watch(syncEngineProvider);
   final reads = ref.watch(allReadStatesProvider).value ?? const [];
@@ -442,6 +455,7 @@ SidebarChannel _sidebarChannel(Ref ref, Channel c) {
     ),
     runActive: runs.any((r) => r.channelId == c.id),
     muted: isMuted(c.id, prefs, now: now),
+    pinned: pinnable && ref.watch(pinnedChannelsProvider).contains(c.id),
     group: ref.watch(channelThreadsProvider(c.id.value)),
     expanded: !collapsed.contains(c.id),
     newChatRows: ref.watch(newChatRowsProvider(c.id.value)),
@@ -458,7 +472,7 @@ List<SidebarChannel> archivedChannelsOfSpace(Ref ref, String spaceId) {
   if (hidden.isEmpty) return const [];
   return [
     for (final c in ref.watch(manualChannelsOfSpaceProvider(spaceId)))
-      if (hidden.contains(c.id)) _sidebarChannel(ref, c),
+      if (hidden.contains(c.id)) _sidebarChannel(ref, c, pinnable: false),
   ];
 }
 
@@ -471,7 +485,9 @@ List<SidebarChannel> archivedChannelsOfSpace(Ref ref, String spaceId) {
 ///
 /// The order is the global one in the person's `channel_order` (rows not in it first, 01 6.16
 /// item 3), or, with "Arrange channels and projects automatically", the newest activity first
-/// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4).
+/// with that order breaking ties, held while [sidebarHoldProvider] holds (D-M4-51-4). The
+/// channels the person pinned ([pinnedChannelsProvider], 01 6.24) come first in either order, by
+/// the time of their pin; a pin or unpin applies at once, also while the sidebar holds.
 @riverpod
 class ChannelsOfSpace extends _$ChannelsOfSpace {
   /// The channels of the last build in their order; kept while the sidebar holds them.
@@ -498,6 +514,12 @@ class ChannelsOfSpace extends _$ChannelsOfSpace {
     } else {
       _shown = const [];
     }
+    // The hold keeps the order without pins, so an unpinned row returns to its place at once.
+    ordered = pinnedFirst(
+      ordered,
+      ref.watch(pinnedChannelsProvider),
+      (c) => c.id,
+    );
     return [for (final c in ordered) _sidebarChannel(ref, c)];
   }
 }

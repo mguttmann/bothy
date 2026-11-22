@@ -188,10 +188,12 @@ func sidebarREST(st sync.SidebarState) rest.SidebarState {
 }
 
 // sidebarChannelREST converts a channel row of the sidebar (schema SidebarChannelState, M4-51);
-// thread_order is always an array, hidden_at only while the channel is archived (PROJ-ARCHIVE).
+// thread_order and pinned_threads are always arrays, hidden_at only while the channel is archived
+// (PROJ-ARCHIVE), pinned_at only while it is pinned (FEAT-PIN-CHANNELS).
 func sidebarChannelREST(st sync.SidebarChannelState) rest.SidebarChannelState {
-	return rest.SidebarChannelState{ChannelId: rest.Uuid(st.ChannelID), ThreadOrder: restIDs(st.ThreadOrder), HiddenAt: optionalTime(st.HiddenAt), Version: st.Version,
-		UpdatedByDeviceId: optionalID(st.UpdatedByDeviceID)}
+	pinned := restIDs(st.PinnedThreads)
+	return rest.SidebarChannelState{ChannelId: rest.Uuid(st.ChannelID), ThreadOrder: restIDs(st.ThreadOrder), HiddenAt: optionalTime(st.HiddenAt),
+		PinnedAt: optionalTime(st.PinnedAt), PinnedThreads: &pinned, Version: st.Version, UpdatedByDeviceId: optionalID(st.UpdatedByDeviceID)}
 }
 
 // restIDs converts IDs into a list of the API, never nil.

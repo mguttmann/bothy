@@ -79,7 +79,8 @@ Widget _mentionBadge(BuildContext context, int count) {
 ///
 /// One screen reader node with the label "{Title}, {State}, {n} unread, {m} mentions" (the
 /// state is the run state word while the icon shows, else "Open" or "Done"; counts only above
-/// 0; "muted" and then the words of the status mark at the end) and the selected flag; Flutter has no tree role
+/// 0; "muted", "pinned" and then the words of the status mark at the end; a post the reader
+/// pinned, 01 6.24, shows the `action.pin` icon after its title) and the selected flag; Flutter has no tree role
 /// or level, so the tree is the order of the rows below their channel. Enter or a tap calls
 /// [onOpen]. The row cannot be dragged (01 6.8 item 10).
 ///
@@ -170,6 +171,7 @@ class DsSidebarThreadRowState extends State<DsSidebarThreadRow> {
       if (d.unreadCount > 0) l.threadRowUnread(d.unreadCount),
       if (d.mentionCount > 0) l.threadRowMentions(d.mentionCount),
       if (d.muted) l.channelRowMuted,
+      if (d.pinned) l.channelRowPinned,
       if (status != null) dsChatStatusLabel(l, status),
     ].join(', ');
     final color = nameColor;
@@ -226,6 +228,15 @@ class DsSidebarThreadRowState extends State<DsSidebarThreadRow> {
             ],
           ),
         ),
+        if (d.pinned) ...[
+          const SizedBox(width: DsSpace.s6),
+          DsIcon(
+            DsIcons.actionPin,
+            size: DsIconSizeRole.sm,
+            color: color,
+            decorative: true,
+          ),
+        ],
         if (status != null) ...[
           const SizedBox(width: DsSpace.s6),
           DsChatStatusMark(status),

@@ -202,6 +202,50 @@ final class StructureDao {
         );
   });
 
+  /// Writes whether the person pinned [channelId] to the top of its space at once on this
+  /// device, before the server confirms it (FEAT-PIN-CHANNELS, 01 6.24): [pinnedAt] null unpins
+  /// it. As [putUserChannelHiddenLocally], everything else of the row stays; a missing row starts
+  /// at version 0 with the default order.
+  Future<void> putUserChannelPinnedLocally(
+    ChannelId channelId, {
+    required DateTime? pinnedAt,
+  }) => _putUserChannelLocally(
+    channelId,
+    UserChannelStatesCompanion(pinnedAt: Value(pinnedAt?.toUtc())),
+  );
+
+  /// Writes the posts of [channelId] the person pinned to the top of the forum, in pin order,
+  /// at once on this device, before the server confirms it (FEAT-PIN-CHANNELS, 01 6.24); an
+  /// empty [threads] unpins every post. Everything else of the row stays, as in
+  /// [putUserChannelPinnedLocally].
+  Future<void> putUserChannelPinnedThreadsLocally(
+    ChannelId channelId,
+    List<ThreadId> threads,
+  ) => _putUserChannelLocally(
+    channelId,
+    UserChannelStatesCompanion(pinnedThreads: Value(encodeTexts(threads))),
+  );
+
+  /// Writes the members of [change] into the row of [channelId], or inserts a row at version 0
+  /// with them.
+  Future<void> _putUserChannelLocally(
+    ChannelId channelId,
+    UserChannelStatesCompanion change,
+  ) => _db.transaction(() async {
+    final updated = await (_db.update(
+      _db.userChannelStates,
+    )..where((t) => t.channelId.equals(channelId.value))).write(change);
+    if (updated > 0) return;
+    await _db
+        .into(_db.userChannelStates)
+        .insert(
+          change.copyWith(
+            channelId: Value(channelId.value),
+            version: const Value(0),
+          ),
+        );
+  });
+
   /// The sidebar states of all channels that have one (M4-51).
   Stream<List<UserChannelState>> watchUserChannelStates() =>
       _db.select(_db.userChannelStates).map(userChannelStateFromRow).watch();

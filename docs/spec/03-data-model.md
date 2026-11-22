@@ -1009,9 +1009,10 @@ NULL` for the foreign key check when a device is deleted. Retention: `personal_s
 
 #### `user_channel_states`
 
-Purpose: personal sidebar state per channel (the own order of the open posts of a forum, and
-whether the person archived the channel in the own sidebar), across devices (M4-51; archive:
-addendum of 2026-11-08, PROJ-ARCHIVE). Module: `chat`.
+Purpose: personal sidebar state per channel (the own order of the open posts of a forum,
+whether the person archived the channel in the own sidebar, and the person's own pins of the
+channel and of its posts), across devices (M4-51; archive: addendum of 2026-11-08, PROJ-ARCHIVE;
+pins: addendum of 2026-11-22, FEAT-PIN-CHANNELS, migration 00111). Module: `chat`.
 
 | Field | Type | Null | Default | Rules / notes |
 |---|---|---|---|---|
@@ -1019,6 +1020,8 @@ addendum of 2026-11-08, PROJ-ARCHIVE). Module: `chat`.
 | `channel_id` | `uuid` | no | | |
 | `thread_order` | `uuid[]` | no | `'{}'` | personal order of the posts; empty = the default order (last activity, newest first); posts not in the list come first in the default order; at most `sidebar.order_max_items` unique IDs, which the server does not check against existing or visible threads |
 | `hidden_at` | `timestamptz` | yes | | set while the person has archived the channel in the own sidebar (01 6.22), NULL while it shows in the normal list; set by `putMySidebarChannel` with `hidden: true` (kept when already set), cleared with `hidden: false`; personal only: it changes neither the channel, its rights, its runs nor the person's notifications, and the person's `channel_order` (`user_space_states`) is not touched, so a restored channel returns to its place |
+| `pinned_at` | `timestamptz` | yes | | set while the person has pinned the channel to the top of its space in the own sidebar (01 6.24), NULL while it is not pinned; set by `putMySidebarChannel` with `pinned: true` (kept when already set), cleared with `pinned: false`; pinned channels show oldest `pinned_at` first, equal times by channel ID; personal only, like `hidden_at` |
+| `pinned_threads` | `uuid[]` | no | `'{}'` | the posts of the channel the person pinned to the top of the forum in the own sidebar, in the order they were pinned (01 6.24); replaced as a whole by `putMySidebarChannel` with `pinned_threads`; at most `sidebar.order_max_items` unique IDs, which the server does not check against existing or visible threads |
 | `version` | `bigint` | no | `1` | for the rule see [04-sync-protocol.md](04-sync-protocol.md) |
 | `updated_by_device_id` | `uuid` | yes | | |
 | `updated_at` | `timestamptz` | no | `now()` | |
@@ -1320,6 +1323,7 @@ Module: `messaging`.
 | `trigger_state_at` | `timestamptz` | yes | | |
 | `silent` | `boolean` | no | `false` | no notification (for example import) |
 | `has_attachments` | `boolean` | no | `false` | `true` exactly when the message was created with at least one attachment and is not deleted. Attachments arise only with the message and disappear only with its deletion (editing does not change them, `file.delete` applies only to files that are not attached), so `messaging` sets the value in the transaction of the creation; deletion sets it to `false`. Filter `has_file` of the search ([14-search.md](14-search.md), section 4.4); R-DM-43 |
+| `team_handle` | `text` | yes | | the handle of the team member whose reply a team copy carries: set by `messaging` in the INSERT of the mirror of a member's reply and of a member's input in another member's work thread, from the member of the work thread the reply was written in; NULL for every other message, also for an owner's input. Not content: a tombstone keeps it ([09-agents.md](09-agents.md) 3.9.2, addendum of 2026-11-22, FIX-TEAM-MEMBER-ATTRIBUTION, migration 00110 with a backfill from `team_mirrors` and `team_inputs`) |
 | `import_item_id` | `uuid` | yes | | origin on import |
 | `version` | `bigint` | no | `1` | rises on edit, deletion, state change; reactions and pinning do not raise it ([04-sync-protocol.md](04-sync-protocol.md), section 9) |
 | `edited_at` | `timestamptz` | yes | | |
@@ -1585,6 +1589,32 @@ copies deliberately have no foreign key of their own: the row hangs on its messa
 foreign keys of `messages` (ON DELETE RESTRICT); a foreign key to `threads` or `channels` would
 only check existence. That the copies equal the values of the message is ensured by attaching and
 by the transaction of the move, as for `messages.channel_id` (R-DM-43).
+
+#### `message_attachment_relays`
+
+Purpose: the files of a message relayed to a team copy of it ([09-agents.md](09-agents.md)
+3.9.2, FIX-TEAM-CHANNEL-ATTACHMENTS, migration 00112). Module: `files`. The file stays one file
+with its one row in `message_attachments`; a relay puts it on the copy.
+
+| Field | Type | Null | Default | Rules / notes |
+|---|---|---|---|---|
+| `message_id` | `uuid` | no | | the team copy |
+| `file_id` | `uuid` | no | | a file of the copy's source (original or relayed there) |
+| `position` | `smallint` | no | | the file's position in the source |
+| `thread_id` | `uuid` | no | | copy of the copy's `messages.thread_id` |
+| `channel_id` | `uuid` | no | | copy of the copy's `messages.channel_id`; changed along on a move |
+
+PK: `(message_id, position)`. FK: `message_id` -> `messages(id)` ON DELETE CASCADE; `file_id`
+-> `files(id)` ON DELETE CASCADE. Unique: `(message_id, file_id)`. Indexes: `(file_id)` for
+`file.read` of a relayed file and the deletion of its source, `(thread_id)` for following a move.
+Retention: `content`.
+`messaging` writes a team copy with `has_attachments` and `files` inserts the relays in the same
+transaction (`files.Attachments.Relay`). The representation of the copy, the run context and
+`Pending` read the relays like attachments. `file.read` decides on the original row first and,
+when that denies, on the place of each relay ([12-files.md](12-files.md), section 10); no other
+action reads relays. Deleting the copy removes its relays; deleting the source removes every relay
+of its files before they are marked deleted; the purge of a file row takes its relays along. The
+copies of thread and channel follow R-DM-43.
 
 #### `file_upload_sessions`
 

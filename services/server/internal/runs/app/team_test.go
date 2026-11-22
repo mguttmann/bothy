@@ -235,7 +235,7 @@ func (m *teamMsgs) CopyMessage(_ context.Context, cmd messaging.CopyCmd) (messag
 	}
 	m.w.msgFacts.mu.Lock()
 	m.w.msgFacts.m[id] = messaging.TriggerMessage{
-		ID: id, ThreadID: cmd.ThreadID, ChannelID: info.ChannelID, Origin: origin, Kind: "text",
+		ID: id, ThreadID: cmd.ThreadID, ChannelID: info.ChannelID, Origin: origin, Kind: "text", ContentMD: text,
 		Author: messaging.PrincipalRef{ID: cmd.AuthorID, Kind: kind, Handle: "h", DisplayName: "H"},
 	}
 	m.w.msgFacts.mu.Unlock()
@@ -294,14 +294,23 @@ func (o *teamOwners) IsActiveOwner(_ context.Context, p ids.ID) (bool, error) {
 
 // teamSched records the scheduled runs.team_input jobs.
 type teamSched struct {
-	mu   sync.Mutex
-	list []ids.ID
+	mu    sync.Mutex
+	list  []ids.ID
+	later []expiryAt
 }
 
 func (s *teamSched) ScheduleTeamInput(_ context.Context, message ids.ID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.list = append(s.list, message)
+	return nil
+}
+
+// ScheduleTeamInputAt records a job scheduled for later in later (FIX-TEAM-CHANNEL-ATTACHMENTS).
+func (s *teamSched) ScheduleTeamInputAt(_ context.Context, message ids.ID, at time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.later = append(s.later, expiryAt{message, at})
 	return nil
 }
 
@@ -418,7 +427,7 @@ func (w *teamWorld) ownerMessage(author ids.ID, text string) ids.ID {
 	ev := w.posted(w.teamMain)
 	ev.AuthorID = author
 	w.msgFacts.m[ev.MessageID] = messaging.TriggerMessage{
-		ID: ev.MessageID, ThreadID: w.teamMain, ChannelID: w.team, Origin: "human", Kind: "text",
+		ID: ev.MessageID, ThreadID: w.teamMain, ChannelID: w.team, Origin: "human", Kind: "text", ContentMD: text,
 		Author: messaging.PrincipalRef{ID: author, Kind: "user", Handle: "alex", DisplayName: "Alex"},
 	}
 	w.tmsgs.content[ev.MessageID] = text
@@ -459,7 +468,7 @@ func (w *teamWorld) feed(run ids.ID, source string, principals ...ids.ID) {
 func (w *teamWorld) replyTo(m app.TeamMemberRow, text string) ids.ID {
 	id := ids.New()
 	w.msgFacts.m[id] = messaging.TriggerMessage{
-		ID: id, ThreadID: m.WorkThreadID, ChannelID: m.HomeChannelID, Origin: "agent", Kind: "text",
+		ID: id, ThreadID: m.WorkThreadID, ChannelID: m.HomeChannelID, Origin: "agent", Kind: "text", ContentMD: text,
 		Author: messaging.PrincipalRef{ID: m.AgentID, Kind: "agent", Handle: m.Handle, DisplayName: m.Handle},
 	}
 	w.tmsgs.content[id] = text
@@ -623,14 +632,15 @@ func TestTeam_AddMemberRules(t *testing.T) {
 	}
 }
 
-// TestTeam_OwnerMessageReachesEveryMember: an owner's message in the team channel triggers no
-// ordinary run, schedules the job, and the job copies it into every work thread as the owner's
-// message and starts a team run there for the owner; the mentioned member is addressed.
+// TestTeam_OwnerMessageReachesEveryMember: an owner's message without a mention of a member in the
+// team channel triggers no ordinary run, schedules the job, and the job copies it into every work
+// thread as the owner's message and starts a team run there for the owner; no member is addressed.
+// A mention of a handle that is no member's and a handle inside code mention no member.
 func TestTeam_OwnerMessageReachesEveryMember(t *testing.T) {
 	t.Parallel()
 	w := newTeamWorld(t, defaultTeamConfig())
 	w.setUp()
-	msg := w.ownerMessage(w.alex, "@coding build feature X")
+	msg := w.ownerMessage(w.alex, "Status, everyone? Ask @nobody and see `@coding`.")
 	if len(w.repo.runs) != 0 || w.j.count("authz:agent.invoke:request") != 0 {
 		t.Fatalf("the acceptance decided a team channel message: runs %d", len(w.repo.runs))
 	}
@@ -653,7 +663,7 @@ func TestTeam_OwnerMessageReachesEveryMember(t *testing.T) {
 			t.Fatalf("%s: invocations %v", m.Handle, inv)
 		}
 		team := inv[0]["team"].(map[string]any)
-		if team["handle"] != m.Handle || team["source"] != "owner" || team["addressed"] != (m.Handle == "coding") ||
+		if team["handle"] != m.Handle || team["source"] != "owner" || team["addressed"] != false ||
 			len(team["members"].([]any)) != 2 {
 			t.Fatalf("%s: team facts %v", m.Handle, team)
 		}
@@ -669,6 +679,42 @@ func TestTeam_OwnerMessageReachesEveryMember(t *testing.T) {
 	es, actors := w.teamAudits()
 	if len(es) != 2 || es[0].Decision != auditing.DecisionAllow || !actors[0].IsRecheckPrincipal() || actors[0].ID != w.alex {
 		t.Fatalf("audits %+v by %+v", es, actors)
+	}
+}
+
+// TestTeam_OwnerMentionReachesOnlyTheMentionedMembers: an owner's message that mentions members
+// reaches only them (FIX-TEAM-CHANNEL-NOISE, owner word of 2026-11-22): the mentioned member gets
+// the copy and a team run as addressed, every other member gets nothing and starts nothing; the
+// brake still resets.
+func TestTeam_OwnerMentionReachesOnlyTheMentionedMembers(t *testing.T) {
+	t.Parallel()
+	w := newTeamWorld(t, defaultTeamConfig())
+	w.setUp()
+	if _, err := w.trepo.SaveTeamBrake(context.Background(), w.team, domain.TeamBrake{MemberTurns: 3}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	w.input(w.ownerMessage(w.alex, "@Review please look at branch y"))
+	in := w.tmsgs.copiesInto(w.reviewWork)
+	rs := w.runsIn(w.reviewWork)
+	if len(in) != 1 || len(rs) != 1 || rs[0].TriggeredBy != w.alex || rs[0].TriggeringMessageID != in[0].id {
+		t.Fatalf("review: copies %+v runs %+v", in, rs)
+	}
+	if team := w.invocations(w.reviewWork)[0]["team"].(map[string]any); team["addressed"] != true || team["source"] != "owner" {
+		t.Fatalf("review: team facts %v", team)
+	}
+	// The unmentioned member sees the message as a context input (FEAT-TEAM-CONTEXT-ALL): one
+	// copy, no run, no follow-up.
+	if c, r := w.tmsgs.copiesInto(w.codingWork), w.runsIn(w.codingWork); len(c) != 1 || len(r) != 0 || c[0].cmd.AuthorID != w.alex {
+		t.Fatalf("an unmentioned member: copies %+v runs %+v, want one context copy and no run", c, r)
+	}
+	if in := w.trepo.inputsOf(w.coding.ID); len(in) != 1 || in[0].Source != "owner" || in[0].AuthorityID != w.alex {
+		t.Fatalf("an unmentioned member has inputs %+v", in)
+	}
+	if team, _, _ := w.trepo.Team(context.Background(), w.team); team.Brake != domain.ResetBrake() {
+		t.Fatalf("the brake did not reset: %+v", team.Brake)
+	}
+	if es, _ := w.teamAudits(); len(es) != 1 || es[0].Attrs["member_id"].Data() != w.review.ID.String() {
+		t.Fatalf("audits %+v", es)
 	}
 }
 
@@ -742,6 +788,101 @@ func TestTeam_MemberMentionTriggersOnBehalfOfTheSponsor(t *testing.T) {
 	w.mustPost(relay)
 	if len(w.sched.list) != 1 {
 		t.Fatalf("a relay was scheduled: %v", w.sched.list)
+	}
+}
+
+// TestTeam_SameAgentMembersAreNamedByTheirOwnHandle: one agent that is two members (@coding in
+// homeA and @helper in homeC, FIX-TEAM-MEMBER-ATTRIBUTION) has a reply of one member mirrored and
+// handed on under the handle of that member alone, taken from the work thread of the reply, never
+// from the agent; a reply that mentions its own member besides the other goes only to the other.
+func TestTeam_SameAgentMembersAreNamedByTheirOwnHandle(t *testing.T) {
+	t.Parallel()
+	w := newTeamWorld(t, defaultTeamConfig())
+	w.setUp()
+	homeC, mainC := ids.New(), ids.New()
+	w.channels[homeC] = chat.TriggerChannel{ChannelID: homeC, SpaceID: w.space, Kind: "text", EffectiveOperatorID: w.lotse, MainThreadID: mainC,
+		RequireMention: true, AutoThread: true}
+	w.threads.infos[mainC] = chat.ThreadInfo{ID: mainC, ChannelID: homeC, SpaceID: w.space, ChannelKind: "text", Kind: "main", State: "open"}
+	b, err := w.svc.Teams().AddMember(asUser(w.alex), runs.AddTeamMember{ChannelID: w.team, AgentID: w.lotse, HomeChannelID: homeC, Handle: "helper"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	members, _ := w.trepo.TeamMembers(context.Background(), w.team)
+	helper := members[2]
+
+	w.input(w.reply(w.coding, "@helper please check the release notes. Signed @coding."))
+	mirror := w.tmsgs.copiesInto(w.teamMain)
+	if len(mirror) != 1 || mirror[0].cmd.TeamHandle != "coding" {
+		t.Fatalf("the mirror of coding's reply is not named @coding: %+v", mirror)
+	}
+	in := w.tmsgs.copiesInto(b.WorkThreadID)
+	if len(in) != 1 || in[0].cmd.TeamHandle != "coding" || in[0].cmd.AuthorID != w.lotse {
+		t.Fatalf("the input for helper is not named @coding: %+v", in)
+	}
+	if c := w.tmsgs.copiesInto(w.codingWork); len(c) != 0 {
+		t.Fatalf("coding's reply went back to coding: %+v", c)
+	}
+	team := w.invocations(b.WorkThreadID)[0]["team"].(map[string]any)
+	if team["source_handle"] != "coding" || team["handle"] != "helper" {
+		t.Fatalf("team facts of helper's run %v", team)
+	}
+
+	w.input(w.reply(helper, "@coding the notes are fine; @helper is done."))
+	mirror = w.tmsgs.copiesInto(w.teamMain)
+	if len(mirror) != 2 || mirror[1].cmd.TeamHandle != "helper" {
+		t.Fatalf("the mirror of helper's reply is not named @helper: %+v", mirror)
+	}
+	back := w.tmsgs.copiesInto(w.codingWork)
+	if len(back) != 1 || back[0].cmd.TeamHandle != "helper" {
+		t.Fatalf("the input for coding is not named @helper: %+v", back)
+	}
+	if n := len(w.tmsgs.copiesInto(b.WorkThreadID)); n != 1 {
+		t.Fatalf("helper's reply went back to helper: %d inputs", n)
+	}
+	// An owner's message names no member.
+	w.input(w.ownerMessage(w.alex, "@coding status?"))
+	if c := w.tmsgs.copiesInto(w.codingWork); len(c) != 2 || c[1].cmd.TeamHandle != "" {
+		t.Fatalf("an owner input carries a member handle: %+v", c)
+	}
+}
+
+// TestTeam_SilentReplyIsNeitherMirroredNorHandedOn: a member's reply that is only the silent reply
+// (09 3.9.4, FIX-TEAM-CHANNEL-NOISE) is not mirrored into the team channel and hands nothing on;
+// no note and no audit entry is written, also for a run a non-owner fed. A reply that says more
+// is mirrored and handed on as before.
+func TestTeam_SilentReplyIsNeitherMirroredNorHandedOn(t *testing.T) {
+	t.Parallel()
+	w := newTeamWorld(t, defaultTeamConfig())
+	w.setUp()
+	notes := len(w.tmsgs.notes)
+	w.input(w.reply(w.coding, "**"+domain.TeamSilentReply+"**"))
+	w.input(w.replyBy(w.review, domain.TeamSilentReply, w.sam))
+	if len(w.tmsgs.copies) != 0 || len(w.tmsgs.notes) != notes {
+		t.Fatalf("a silent reply was copied or noted: copies %+v notes %v", w.tmsgs.copies, w.tmsgs.notes)
+	}
+	if es, _ := w.teamAudits(); len(es) != 0 {
+		t.Fatalf("a silent reply was audited: %+v", es)
+	}
+	w.input(w.reply(w.coding, domain.TeamSilentReply+" from me, but @review please check y"))
+	if m := w.tmsgs.copiesInto(w.teamMain); len(m) != 1 {
+		t.Fatalf("a reply that says more was not mirrored: %+v", m)
+	}
+	if in := w.tmsgs.copiesInto(w.reviewWork); len(in) != 1 {
+		t.Fatalf("a reply that says more was not handed on: %+v", in)
+	}
+}
+
+// TestTeam_ContextCopyOfAMirrorNamesItsMember: a reply that mentions nobody reaches the other
+// member as a context input (FEAT-TEAM-CONTEXT-ALL) whose copy names the source member's handle
+// (FIX-TEAM-MEMBER-ATTRIBUTION), like the mirror.
+func TestTeam_ContextCopyOfAMirrorNamesItsMember(t *testing.T) {
+	t.Parallel()
+	w := newTeamWorld(t, defaultTeamConfig())
+	w.setUp()
+	w.input(w.reply(w.coding, "built X on branch y"))
+	in := w.tmsgs.copiesInto(w.reviewWork)
+	if len(in) != 1 || in[0].cmd.TeamHandle != "coding" || len(w.runsIn(w.reviewWork)) != 0 {
+		t.Fatalf("context copy %+v runs %d, want one copy named coding and no run", in, len(w.runsIn(w.reviewWork)))
 	}
 }
 
@@ -1047,7 +1188,7 @@ func TestTeam_NonOwnerReadersAreRefused(t *testing.T) {
 	if len(w.runsIn(w.reviewWork)) != 0 {
 		t.Fatal("a reply from a home channel Sam reads started a run")
 	}
-	w.input(w.ownerMessage(w.alex, "@coding go"))
+	w.input(w.ownerMessage(w.alex, "go, everyone"))
 	if n := len(w.tmsgs.copiesInto(w.codingWork)); n != 0 {
 		t.Fatalf("an owner message reached a home channel Sam reads: %d copies", n)
 	}

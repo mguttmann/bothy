@@ -225,7 +225,10 @@ type Message struct {
 	// Attachments are the attachments in position order with the file state at the time of the
 	// read (M3-07); never nil, empty for a message without attachments and for a tombstone.
 	Attachments []Attachment
-	Version     int64
+	// TeamHandle is messages.team_handle (FIX-TEAM-MEMBER-ATTRIBUTION): the handle of the team
+	// member whose reply a team copy carries, "" for every other message.
+	TeamHandle string
+	Version    int64
 	// EditedAt and DeletedAt are zero while not edited or deleted.
 	EditedAt, DeletedAt, CreatedAt time.Time
 }
@@ -359,6 +362,10 @@ type CopyCmd struct {
 	// SourceVersion is the version of the source the caller checked; a source at another version
 	// (edited in between) is 409 conflict, so the copy never carries text the check did not see.
 	SourceVersion int64
+	// TeamHandle is the handle of the team member whose reply the copy carries
+	// (messages.team_handle, FIX-TEAM-MEMBER-ATTRIBUTION): set for the mirror of a member's reply
+	// and for a member's input in another member's work thread, empty for an owner's message.
+	TeamHandle string
 }
 
 // Copied is the result of CopyMessage: the copy and the content it carries, which the team use
@@ -414,6 +421,12 @@ type TriggerMessage struct {
 	// was written). The team job copies only the version it checked (CopyCmd.SourceVersion).
 	Version int64
 	Edited  bool
+	// ContentMD is the content of the message (empty for a tombstone); the team job reads the
+	// handles an owner's message mentions from it before it copies (09 3.9.3).
+	ContentMD string
+	// CreatedAt is messages.created_at; the team job waits for the files of a message at most
+	// file.invocation_hold_max from it (FIX-TEAM-CHANNEL-ATTACHMENTS D-TCAT-4).
+	CreatedAt time.Time
 }
 
 // AnchorRef names a live box anchor of a run (09 section 5.4: the only message with run_id, kind
@@ -442,6 +455,9 @@ type PreviewMessage struct {
 	Deleted bool
 	// MentionIDs are the principals of the message's mentions rows, sorted; nil for none.
 	MentionIDs []ids.ID
+	// TeamHandle is messages.team_handle, the team member a team copy came from; empty for
+	// every other message. The preview names it as the sender (FIX-TEAM-MEMBER-AUTHOR-DISPLAY).
+	TeamHandle string
 }
 
 // Messages is the incoming port of sending (M1-56) and reading (M1-57). The caller a is the principal of the request;

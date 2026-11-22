@@ -362,6 +362,75 @@ asyncio.run(main())
 """
 
 
+# Hermes' own status routing (`gateway.run._send_or_update_status_coro`, the path of every
+# status_callback, such as the recall line of a memory plugin) against `ServerPlatform`.
+_STATUS_PROBE = """
+import asyncio, json, uuid
+from gateway.config import PlatformConfig
+from gateway.run import _send_or_update_status_coro
+from bothy_hermes_adapter.platform import ServerPlatform
+
+C, T = uuid.uuid4(), uuid.uuid4()
+
+
+class Handler:
+    def __init__(self):
+        self.calls = []
+
+    def active_run(self, thread):
+        return uuid.uuid4()
+
+    def on_interim(self, thread, text, *, marked):
+        self.calls.append(["interim", text, marked, str(thread) == str(T)])
+        return True
+
+    async def on_answer(self, thread, text, reply_to, *, preview=False):
+        self.calls.append(["answer", text])
+        return "a-1"
+
+    async def on_report(self, chat, thread, text):
+        self.calls.append(["report", text])
+        return "r-1"
+
+    async def recovered_duplicate(self, thread, content):
+        return False
+
+
+async def main():
+    p = ServerPlatform(PlatformConfig(), "webhook")
+    p._loop = asyncio.get_running_loop()
+    h = p.handler = Handler()
+    line = "\\N{EYE}\\ufe0f Memory \\u2014 recalled 43 memories"
+    key = "s:run:1:lifecycle"
+    r1 = await _send_or_update_status_coro(p, str(C), key, line, {"thread_id": str(T)})
+    r2 = await _send_or_update_status_coro(p, str(C), key, line, None)
+    print(json.dumps({"results": [r1.success, r2.success], "calls": h.calls}))
+
+
+asyncio.run(main())
+"""
+
+
+def test_a_status_line_is_progress_never_a_message(world: HermesWorld) -> None:
+    """FIX-TEAM-CHANNEL-NOISE D-TCN-5: Hermes' status lines (here a memory plugin's recall line)
+    reach the adapter through ``send_or_update_status`` and become the run's draft; they are
+    never an answer of the run (mirrored into a team channel) and never a report."""
+    out = subprocess.run(
+        [str(world.python), "-c", _STATUS_PROBE],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**_bare_env(), "HOME": str(world.root / "probe-home")},
+    )
+    assert out.returncode == 0, out.stderr[-3000:]
+    sent = json.loads(out.stdout.strip().splitlines()[-1])
+    assert sent["results"] == [True, True]
+    calls = sent["calls"]
+    assert [c[0] for c in calls] == ["interim"], calls
+    assert calls[0][2:] == [True, True]
+    assert "recalled 43 memories" in calls[0][1]
+
+
 def test_late_turn_answer_is_never_posted(world: HermesWorld) -> None:
     """D-HERMES-CRON-COMMANDS-5: a cancelled or aborted turn's late answer is no report.
 

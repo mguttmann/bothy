@@ -256,10 +256,10 @@ for reconciliation. Fields that can only be read with `manage` (channel prompt, 
 
 | Local table | Server table | Note |
 |---|---|---|
-| `spaces`, `user_space_states`, `user_channel_states` | same name | sidebar; `user_channel_states` holds the own thread order of a channel (M4-51) and its personal archive `hidden_at` (01 6.22, PROJ-ARCHIVE) |
+| `spaces`, `user_space_states`, `user_channel_states` | same name | sidebar; `user_channel_states` holds the own thread order of a channel (M4-51) and its personal archive `hidden_at` (01 6.22, PROJ-ARCHIVE) and its personal pins `pinned_at` and `pinned_threads` (01 6.24, FEAT-PIN-CHANNELS; schema version 18) |
 | `channels`, `forum_tags`, `channel_operators` | `channels` (without `prompt`), `forum_tags` | effective operator as a column |
 | `threads`, `thread_tags` | same name | `last_message_seq`, state, title source |
-| `messages` | `messages` | without `client_payload_sha256`; with `trigger_state` |
+| `messages` | `messages` | without `client_payload_sha256`; with `trigger_state` and `team_handle` (schema version 17, FIX-TEAM-MEMBER-ATTRIBUTION) |
 | `message_attachments`, `files` | same name | metadata; bytes in the file cache |
 | `reactions_summary` | `reactions` | per message and emoji: count and "me" |
 | `my_mentions` | `mentions` | only mentions of the person themselves |

@@ -256,6 +256,68 @@ void main() {
     },
   );
 
+  test('the personal pins of a channel and its posts: local writes keep the '
+      'order, the archive, the version and the device; the server state '
+      'carries them (FEAT-PIN-CHANNELS)', () async {
+    final dao = db.structureDao;
+    final forum = ChannelId.parse(uuid(0x611));
+    final fresh = ChannelId.parse(uuid(0x612));
+    final device = DeviceId.parse(uuid(0x613));
+    final at = DateTime.utc(2026, 11, 22, 9, 30);
+    final server = UserChannelState(
+      channelId: forum,
+      threadOrder: [threadId(2), threadId(1)],
+      version: const ResourceVersion(4),
+      updatedByDeviceId: device,
+      hiddenAt: at,
+    );
+    await dao.upsertUserChannelStateIfNewer(server);
+
+    await dao.putUserChannelPinnedLocally(forum, pinnedAt: at);
+    await dao.putUserChannelPinnedThreadsLocally(forum, [
+      threadId(3),
+      threadId(1),
+    ]);
+    final pinned = (await dao.watchUserChannelStates().first).single;
+    expect(pinned.pinnedAt, at);
+    expect(pinned.pinnedThreads, [threadId(3), threadId(1)]);
+    expect(pinned.threadOrder, server.threadOrder);
+    expect(pinned.hiddenAt, at);
+    expect(pinned.version, server.version);
+    expect(pinned.updatedByDeviceId, device);
+
+    await dao.putUserChannelPinnedLocally(forum, pinnedAt: null);
+    await dao.putUserChannelPinnedThreadsLocally(forum, const []);
+    expect((await dao.watchUserChannelStates().first).single, server);
+
+    // A channel without a row starts at version 0 with the default order.
+    await dao.putUserChannelPinnedLocally(fresh, pinnedAt: at);
+    await dao.putUserChannelPinnedThreadsLocally(fresh, [threadId(4)]);
+    final row = (await dao.watchUserChannelStates().first).firstWhere(
+      (s) => s.channelId == fresh,
+    );
+    expect(row.version, const ResourceVersion(0));
+    expect(row.threadOrder, isEmpty);
+    expect(row.pinned, isTrue);
+    expect(row.pinnedThreads, [threadId(4)]);
+
+    // The server's state of another device wins by version and brings its pins.
+    final other = UserChannelState(
+      channelId: forum,
+      threadOrder: server.threadOrder,
+      version: const ResourceVersion(5),
+      pinnedAt: at,
+      pinnedThreads: [threadId(2)],
+    );
+    expect(await dao.upsertUserChannelStateIfNewer(other), isTrue);
+    expect(
+      (await dao.watchUserChannelStates().first).firstWhere(
+        (s) => s.channelId == forum,
+      ),
+      other,
+    );
+  });
+
   test('a resync discards the personal sidebar orders: they are mirror '
       'tables (M4-51)', () {
     expect([

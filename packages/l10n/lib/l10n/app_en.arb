@@ -913,6 +913,16 @@
   "@messageOriginAgent": {
     "description": "Badge after the name of a message written by an agent (`origin = agent`, components.md section 1, SEC-OUT-3)."
   },
+  "messageAuthorVia": "via {agent}",
+  "@messageAuthorVia": {
+    "description": "Small note after the name and badge of a team member's message: the agent that writes for that member, for example via Claude Code (components.md section 1, FIX-TEAM-MEMBER-AUTHOR-DISPLAY).",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Claude Code"
+      }
+    }
+  },
   "messageOriginApp": "APP",
   "@messageOriginApp": {
     "description": "Badge after the name of a message written by an app (`origin = app`, components.md section 1, SEC-OUT-3)."
@@ -1298,6 +1308,10 @@
   "channelRowMuted": "muted",
   "@channelRowMuted": {
     "description": "Part of the screen reader label of a muted channel (components.md section 7)."
+  },
+  "channelRowPinned": "pinned",
+  "@channelRowPinned": {
+    "description": "Part of the screen reader label of a channel or forum post the person pinned to the top of its list in the sidebar (01 section 6.24)."
   },
   "spaceRowUnread": "Unread",
   "@spaceRowUnread": {
@@ -16990,6 +17004,14 @@
   "@channelMenuRestore": {
     "description": "Menu entry and accessibility action of a row in the section \"Archived\" of the sidebar that brings the channel back to its earlier place in the normal list (01 section 6.22)."
   },
+  "sidebarPin": "Pin to top",
+  "@sidebarPin": {
+    "description": "Menu entry of a channel, forum or forum post (sidebar menu and the More menu of its header) that pins it to the top of its list in the person's own sidebar, above the manual or automatic order (01 section 6.24)."
+  },
+  "sidebarUnpin": "Unpin",
+  "@sidebarUnpin": {
+    "description": "Menu entry of a pinned channel, forum or forum post that returns it to its place in the manual or automatic order of the person's own sidebar (01 section 6.24)."
+  },
   "sidebarArchived": "Archived ({count})",
   "@sidebarArchived": {
     "description": "Row at the bottom of a space in the sidebar that collapses or expands the channels and project forums the person archived for themselves (01 section 6.22); collapsed by default.",
@@ -17439,7 +17461,17 @@
   },
   "teamToAllMembers": "to all members",
   "@teamToAllMembers": {
-    "description": "Label of an owner's message in a team channel, which reaches every member (09 3.9.3)."
+    "description": "Label of an owner's message in a team channel that mentions no member, which reaches every member (09 3.9.3)."
+  },
+  "teamToMembers": "to {handles}",
+  "@teamToMembers": {
+    "description": "Label of an owner's message in a team channel that mentions members, which reaches only them, for example to @coding, @qa (owner ruling 2026-11-22).",
+    "placeholders": {
+      "handles": {
+        "type": "String",
+        "example": "@coding, @qa"
+      }
+    }
   },
   "commandBuiltinTeam": "Manage the team of this channel: list, add, remove, stop",
   "@commandBuiltinTeam": {

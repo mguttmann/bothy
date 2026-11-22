@@ -203,7 +203,7 @@ func view(m domain.Message, author messaging.PrincipalRef, mentions []ids.ID) me
 		Origin: string(m.Origin), Kind: string(m.Kind), SystemCode: m.SystemCode, ContentMD: m.ContentMD,
 		ContentFormat: int(m.ContentFormat), ReplyToID: m.ReplyToID, RunID: m.RunID, TriggerState: m.TriggerState,
 		TriggerStateReason: m.TriggerStateReason, TriggerStateAt: m.TriggerStateAt, Silent: m.Silent, MentionIDs: mentions,
-		HasAttachments: m.HasAttachments && m.DeletedAt.IsZero(), Attachments: []messaging.Attachment{},
+		HasAttachments: m.HasAttachments && m.DeletedAt.IsZero(), Attachments: []messaging.Attachment{}, TeamHandle: m.TeamHandle,
 		Reactions: []messaging.ReactionCount{}, MyReactions: []string{}, Components: []messaging.Component{}, Version: m.Version,
 		EditedAt: m.EditedAt, DeletedAt: m.DeletedAt, CreatedAt: m.CreatedAt,
 	}
@@ -316,6 +316,7 @@ type messageJSON struct {
 	TriggerState     string              `json:"trigger_state,omitempty"`
 	TriggerStateAt   string              `json:"trigger_state_at,omitempty"`
 	TriggerReason    string              `json:"trigger_state_reason,omitempty"`
+	TeamHandle       string              `json:"team_handle,omitempty"`
 	Silent           bool                `json:"silent"`
 	Attachments      []attachmentJSON    `json:"attachments"`
 	MentionIDs       []string            `json:"mention_ids"`
@@ -346,7 +347,7 @@ func messageBody(m messaging.Message) messageJSON {
 		},
 		ClientMsgID: m.ClientMsgID.String(), Origin: m.Origin, Kind: m.Kind, SystemCode: m.SystemCode, ContentMD: m.ContentMD,
 		ContentFormat: m.ContentFormat, ReplyToMessageID: optionalID(m.ReplyToID), RunID: optionalID(m.RunID), TriggerState: m.TriggerState,
-		TriggerStateAt: stamp(m.TriggerStateAt), TriggerReason: m.TriggerStateReason, Silent: m.Silent, Attachments: attachmentsBody(m.Attachments),
+		TriggerStateAt: stamp(m.TriggerStateAt), TriggerReason: m.TriggerStateReason, TeamHandle: m.TeamHandle, Silent: m.Silent, Attachments: attachmentsBody(m.Attachments),
 		MentionIDs: mentions, Reactions: reactions, Pinned: m.Pinned, Components: componentsBody(m.Components), Version: m.Version, EditedAt: stamp(m.EditedAt),
 		DeletedAt: stamp(m.DeletedAt), CreatedAt: stamp(m.CreatedAt),
 	}

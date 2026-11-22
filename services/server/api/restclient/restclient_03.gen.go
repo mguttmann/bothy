@@ -16,6 +16,57 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// NewRevokeGrantRequestWithBody constructs an http.Request for the RevokeGrant method, with any body, and a specified content type
+func NewRevokeGrantRequestWithBody(server string, grantId GrantIdPath, params *RevokeGrantParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "grant_id", grantId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/grants/%s/revoke", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewListGroupsRequest constructs an http.Request for the ListGroups method
 func NewListGroupsRequest(server string, params *ListGroupsParams) (*http.Request, error) {
 	var err error
@@ -13925,18 +13976,18 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /me/sidebar (the `GetMySidebar` operationId).
 	GetMySidebarWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMySidebarResponse, error)
 
-	// PutMySidebarChannelWithBodyWithResponse Reorder the posts of a channel or archive it for oneself
+	// PutMySidebarChannelWithBodyWithResponse Reorder the posts of a channel, archive or pin it for oneself
 	//
-	// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order) and whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+	// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order), whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state), whether it is pinned to the top of its space (`pinned`; absent keeps the stored state) and the posts pinned to the top of the forum (`pinned_threads`; an empty list unpins every post, absent keeps the stored list). The server checks the form of the lists (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving or pinning twice keeps the first `hidden_at` or `pinned_at`. A body without a known member is 400. Archiving and pinning are personal: they change neither the channel, its rights, its runs nor the caller's notifications (01 6.22, 6.24). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /me/sidebar/channels/{channel_id} (the `PutMySidebarChannel` operationId).
 	PutMySidebarChannelWithBodyWithResponse(ctx context.Context, channelId ChannelIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutMySidebarChannelResponse, error)
 
-	// PutMySidebarChannelWithResponse Reorder the posts of a channel or archive it for oneself
+	// PutMySidebarChannelWithResponse Reorder the posts of a channel, archive or pin it for oneself
 	//
-	// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order) and whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state). The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving twice keeps the first `hidden_at`. A body without either member is 400. Archiving is personal: it changes neither the channel, its rights, its runs nor the caller's notifications (01 6.22). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+	// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order), whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state), whether it is pinned to the top of its space (`pinned`; absent keeps the stored state) and the posts pinned to the top of the forum (`pinned_threads`; an empty list unpins every post, absent keeps the stored list). The server checks the form of the lists (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving or pinning twice keeps the first `hidden_at` or `pinned_at`. A body without a known member is 400. Archiving and pinning are personal: they change neither the channel, its rights, its runs nor the caller's notifications (01 6.22, 6.24). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -23666,38 +23717,4 @@ type CompleteStepUpWithDeviceKeyResponse429Headers struct {
 	RateLimit       *string
 	RateLimitPolicy *string
 	RetryAfter      *int
-}
-
-// CompleteStepUpWithDeviceKeyResponseDefaultHeaders the declared response headers of an HTTP default response for CompleteStepUpWithDeviceKey
-type CompleteStepUpWithDeviceKeyResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type CompleteStepUpWithDeviceKeyResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *StepUpResult
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *CompleteStepUpWithDeviceKeyResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *CompleteStepUpWithDeviceKeyResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *CompleteStepUpWithDeviceKeyResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *CompleteStepUpWithDeviceKeyResponse403Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *CompleteStepUpWithDeviceKeyResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *CompleteStepUpWithDeviceKeyResponseDefaultHeaders
 }

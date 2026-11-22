@@ -723,6 +723,7 @@ final class DsMessageData {
     required this.origin,
     required this.kind,
     required this.timeLabel,
+    this.authorVia,
     this.content = '',
     this.mentionsMe = false,
     this.edited = false,
@@ -746,6 +747,10 @@ final class DsMessageData {
 
   /// The display name of the author (a foreign name, isolated when drawn).
   final String authorName;
+
+  /// The agent that writes for the author, shown small after the badge, or null: set for the
+  /// message of a team member, whose handle is [authorName] (FIX-TEAM-MEMBER-AUTHOR-DISPLAY).
+  final String? authorVia;
 
   /// `origin`.
   final DsMessageOrigin origin;
@@ -1091,7 +1096,12 @@ final class DsChannelRowData {
     this.muted = false,
     this.projectBound = false,
     this.status,
+    this.pinned = false,
   });
+
+  /// Whether the reader pinned the channel to the top of its space (01 6.24); shows
+  /// `action.pin` after the name.
+  final bool pinned;
 
   /// The channel ID.
   final String id;
@@ -1140,7 +1150,12 @@ final class DsSidebarThreadRowData {
     this.muted = false,
     this.done = false,
     this.status,
+    this.pinned = false,
   });
+
+  /// Whether the reader pinned the post to the top of its forum (01 6.24); shows `action.pin`
+  /// after the title.
+  final bool pinned;
 
   /// The thread ID.
   final String id;

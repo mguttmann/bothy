@@ -253,6 +253,10 @@ func MessageREST(m messaging.Message) rest.Message {
 		cut := true
 		out.ContentTruncated = &cut
 	}
+	if m.TeamHandle != "" {
+		h := m.TeamHandle
+		out.TeamHandle = &h
+	}
 	return out
 }
 

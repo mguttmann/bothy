@@ -76,6 +76,21 @@ func TestForPreview(t *testing.T) {
 		m.ContentMD != "**hi** @sam" || m.ContentFormat != 1 || m.HasAttachments || m.Deleted || len(m.MentionIDs) != 1 || m.MentionIDs[0] != sam {
 		t.Fatalf("ForPreview = %+v", m)
 	}
+	if m.TeamHandle != "" {
+		t.Fatalf("a message of a person has the team handle %q", m.TeamHandle)
+	}
+	// A team copy carries the member it came from (FIX-TEAM-MEMBER-AUTHOR-DISPLAY).
+	var copied messaging.Copied
+	if err := inUnit(w, func(ctx context.Context) error {
+		var err error
+		copied, err = w.Svc.CopyMessage(ctx, messaging.CopyCmd{SourceMessageID: id, SourceVersion: 1, ThreadID: main, AuthorID: w.OwnerID, TeamHandle: "codingagent"})
+		return err
+	}); err != nil {
+		t.Fatalf("CopyMessage: %v", err)
+	}
+	if c, found, err := w.Svc.ForPreview(ctx, copied.ID); err != nil || !found || c.TeamHandle != "codingagent" {
+		t.Fatalf("team copy: %+v %v %v", c, found, err)
+	}
 	w.Tombstone(id)
 	if m, found, err := w.Svc.ForPreview(ctx, id); err != nil || !found || !m.Deleted || m.ContentMD != "" || m.MentionIDs != nil {
 		t.Fatalf("tombstone: %+v %v %v", m, found, err)

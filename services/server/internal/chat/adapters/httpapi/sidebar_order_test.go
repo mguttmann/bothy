@@ -230,6 +230,78 @@ func TestSidebarPutChannelHidden(t *testing.T) {
 	w.want(w.do("alex", http.MethodGet, "/api/v1/channels/"+forum.String(), ""), http.StatusOK, "")
 }
 
+// TestSidebarPutChannelPinned (FEAT-PIN-CHANNELS, 01 6.24, 06 R-API-31): pinned true pins the
+// channel in the caller's own sidebar (pinned_at set, version + 1, the post order kept,
+// sidebar_channel.updated with pinned_at), pinning again keeps the first pinned_at; pinned_threads
+// stores the pinned posts in the given order, a duplicate is 400 on /pinned_threads; pinned false
+// from another device unpins it (pinned_at absent, pinned_threads kept); a person who cannot read
+// the channel gets 404 and no row; the stored list carries both members; another person's row is
+// untouched.
+func TestSidebarPutChannelPinned(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t)
+	alex := w.person("alex", false)
+	phone := w.session("alex-phone", alex, time.Time{})
+	w.person("sam", false)
+	support := w.create("Support")
+	w.grant(alex, support, "read")
+	forum := w.channel(support, "forum", "bugs")
+	p1, p2 := ids.New(), ids.New()
+	w.want(w.do("alex", http.MethodPut, sidebarChannelPath(forum), `{"thread_order":`+idList(p1)+`}`), http.StatusOK, "")
+	w.want(w.do("owner", http.MethodPut, sidebarChannelPath(forum), `{"thread_order":[]}`), http.StatusOK, "")
+
+	m := w.want(w.do("alex", http.MethodPut, sidebarChannelPath(forum), `{"pinned":true}`), http.StatusOK, "")
+	pinnedAt, _ := m["pinned_at"].(string)
+	if pinnedAt == "" || m["version"] != float64(2) || !slices.Equal(strs(m["thread_order"]), []string{p1.String()}) ||
+		m["pinned_threads"] == nil || len(strs(m["pinned_threads"])) != 0 {
+		t.Fatalf("pin %v", m)
+	}
+	m = w.want(w.do("alex", http.MethodPut, sidebarChannelPath(forum), `{"pinned":true}`), http.StatusOK, "")
+	if m["pinned_at"] != pinnedAt || m["version"] != float64(2) {
+		t.Fatalf("pin again must change nothing: %v", m)
+	}
+	m = w.want(w.do("alex", http.MethodPut, sidebarChannelPath(forum), `{"pinned_threads":`+idList(p2, p1)+`}`), http.StatusOK, "")
+	if !slices.Equal(strs(m["pinned_threads"]), []string{p2.String(), p1.String()}) || m["pinned_at"] != pinnedAt || m["version"] != float64(3) {
+		t.Fatalf("pin posts %v", m)
+	}
+	w.want(w.do("alex", http.MethodPut, sidebarChannelPath(forum), `{"pinned_threads":`+idList(p1, p1)+`}`),
+		http.StatusBadRequest, "validation_failed")
+	for _, body := range []string{`{"pinned":null}`, `{"pinned":"yes"}`} {
+		w.want(w.do("alex", http.MethodPut, sidebarChannelPath(forum), body), http.StatusBadRequest, "validation_failed")
+	}
+	m = w.want(w.do("alex-phone", http.MethodPut, sidebarChannelPath(forum), `{"pinned":false}`), http.StatusOK, "")
+	if _, has := m["pinned_at"]; has || m["version"] != float64(4) || m["updated_by_device_id"] != phone.String() ||
+		!slices.Equal(strs(m["pinned_threads"]), []string{p2.String(), p1.String()}) {
+		t.Fatalf("unpin %v", m)
+	}
+	// Sam cannot read the space: the same 404 as an unknown channel, and no row for Sam.
+	w.want(w.do("sam", http.MethodPut, sidebarChannelPath(forum), `{"pinned":true}`), http.StatusNotFound, "not_found")
+	if n := w.count(`SELECT count(*) FROM user_channel_states WHERE pinned_at IS NOT NULL OR pinned_threads <> '{}'`); n != 1 {
+		t.Fatalf("%d rows with pins, want only Alex's", n)
+	}
+
+	var alexEvents []event
+	for _, e := range w.events("sidebar_channel.updated") {
+		if e.Audience == alex.String() {
+			alexEvents = append(alexEvents, e)
+		}
+	}
+	if len(alexEvents) != 4 {
+		t.Fatalf("sidebar_channel.updated for Alex: %d events, want 4 (order, pin, pin posts, unpin)", len(alexEvents))
+	}
+	if st, _ := alexEvents[1].Payload["state"].(map[string]any); st == nil || !sameTime(t, st["pinned_at"], pinnedAt) || st["version"] != float64(2) {
+		t.Fatalf("pin event %+v", alexEvents[1].Payload)
+	}
+	if st, _ := alexEvents[3].Payload["state"].(map[string]any); st == nil || st["pinned_at"] != nil || st["version"] != float64(4) {
+		t.Fatalf("unpin event %+v", alexEvents[3].Payload)
+	}
+	w.want(w.do("alex", http.MethodPut, sidebarChannelPath(forum), `{"pinned":true}`), http.StatusOK, "")
+	got, err := w.svc.ListSidebarChannelStates(context.Background(), w.actor("alex"))
+	if err != nil || len(got) != 1 || got[0].PinnedAt.IsZero() || !slices.Equal(got[0].PinnedThreads, []ids.ID{p2, p1}) {
+		t.Fatalf("the list must carry the pins: %+v, %v", got, err)
+	}
+}
+
 // sameTime reports whether the JSON time v names the same instant as want.
 func sameTime(t *testing.T, v any, want string) bool {
 	t.Helper()

@@ -1163,7 +1163,13 @@ Rules when a message is sent with `attachment_file_ids` (`createMessage`, and `c
 3. A file is attached to at most one message (03, unique index on
    `message_attachments(file_id)`, R-DM-22). Reason: deleting a message deletes its files
    unambiguously, without reference counting. Forwarding creates a new file. An ID listed twice
-   in one request fails as already attached.
+   in one request fails as already attached. The one exception is a team copy
+   ([09-agents.md](09-agents.md) 3.9.2, FIX-TEAM-CHANNEL-ATTACHMENTS): the server relays the files
+   of the source to the copy in 03 `message_attachment_relays`, so the copy lists them without a
+   second file and without a second row in `message_attachments`. `file.read` (download, file
+   ticket, transcript, `getFile`) decides on the place of the original row first and, when that
+   denies, on the place of each relay; the first allow serves the file. Deleting the copy removes
+   its relays; deleting the source deletes the files as above, with every relay.
 4. A successful send with `clear_draft: true` removes the files from `drafts.file_ids`, because
    the draft is deleted in the same transaction.
 

@@ -317,7 +317,7 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
       case MessageAction.reply:
         _composer.currentState?.startReply(
           message,
-          principals[message.authorId]?.displayName ?? '',
+          message.teamHandle ?? principals[message.authorId]?.displayName ?? '',
         );
       case MessageAction.startThread:
         await actions.startThread(thread.channelId, message);

@@ -16,9 +16,10 @@ from typing import Any
 from uuid import UUID
 
 import pytest
-from adapter_kit import FakeRuntime, Rig, card_script, rig
+from adapter_kit import FakeRuntime, Rig, captured_logs, card_script, rig
 from bothy_sdk.ids import uuid7
-from bothy_sdk.testing.fakeserver import FakeServer
+from bothy_sdk.testing.fakeserver import ContextFile, ContextMessage, FakeServer
+from bothy_sdk.testing.faults import Fault
 
 from bothy_hermes_adapter import stages
 from bothy_hermes_adapter.handler import PrepareRefused
@@ -32,6 +33,7 @@ from bothy_hermes_adapter.runtime import (
 )
 from bothy_hermes_adapter.stages import StageRegistry
 from bothy_hermes_adapter.team import (
+    SILENT_REPLY,
     Speaker,
     followup_speaker,
     input_speaker,
@@ -164,6 +166,25 @@ def test_only_an_input_of_origin_human_is_the_owners_word() -> None:
     )
 
 
+def test_a_follow_up_names_the_member_of_its_team_handle() -> None:
+    # FIX-TEAM-MEMBER-ATTRIBUTION: Texter is two members, @dev and @docs; the copy's team_handle
+    # names the one member the reply came from, never the agent's own handle.
+    payload = _facts_payload(source_handle="dev")
+    payload.team.members.append(SimpleNamespace(handle="docs", agent_id=UUID(int=2)))
+    facts = team_facts(payload)
+    assert facts is not None
+    agent = SimpleNamespace(id=UUID(int=2), handle="texter")
+    assert followup_speaker(facts, "agent", agent, "docs") == Speaker(owner=False, handle="docs")
+    assert followup_speaker(None, "agent", agent, "docs") == Speaker(owner=False, handle="docs")
+    # A handle not in the server's form is ignored; without one the old fallback holds.
+    assert followup_speaker(facts, "agent", agent, "Bad Handle") == Speaker(
+        owner=False, handle="texter"
+    )
+    assert followup_speaker(facts, "agent", agent) == Speaker(owner=False, handle="texter")
+    # A person's message stays the person's, whatever handle it carries.
+    assert followup_speaker(facts, "human", agent, "docs") is None
+
+
 def test_lines_name_handle_members_source_and_the_handover() -> None:
     facts = team_facts(_facts_payload(source_handle="dev", addressed=False))
     assert facts is not None
@@ -176,6 +197,23 @@ def test_lines_name_handle_members_source_and_the_handover() -> None:
     assert "mention its handle (for example @dev) in your final reply" in text
     owner = "\n".join(team_lines(facts, Speaker(owner=True)))
     assert "a message the owner wrote" in owner
+
+
+def test_lines_keep_the_team_channel_quiet() -> None:
+    """FIX-TEAM-CHANNEL-NOISE: a mention is a hand-over, a reference names a member without the
+    @, and a member with nothing to add answers with the silent reply alone."""
+    facts = team_facts(_facts_payload(source_handle="dev", addressed=False))
+    assert facts is not None
+    assert SILENT_REPLY == "NOTHING_TO_ADD"
+    for speaker in (Speaker(owner=True), Speaker(owner=False, handle="dev")):
+        text = "\n".join(team_lines(facts, speaker))
+        assert "only when you hand that member work" in text
+        assert "without the @" in text
+        assert "was not for it" in text
+        assert f"exactly {SILENT_REPLY}" in text
+    assert "an owner message without a mention reaches every member" in "\n".join(
+        team_lines(facts, Speaker(owner=True))
+    )
 
 
 # ---- team runs -----------------------------------------------------------------------------------
@@ -566,3 +604,73 @@ async def test_every_request_of_a_team_run_carries_its_own_token(tmp_path: Path)
     ops = {q.operation_id for q in r.fake.requests if q.headers.get("invocation-token")}
     assert {"createMessage", "patchRun", "updateMessage", "finishRun"} <= ops
     assert checked > 0
+
+
+# ---- files of the context (FIX-TEAM-CHANNEL-ATTACHMENTS D-TCAT-6) -------------------------------
+
+JPEG = b"\xff\xd8\xff\xe0 the owner's screenshot"
+
+
+async def test_a_team_run_gives_hermes_the_files_of_its_context_inputs(tmp_path: Path) -> None:
+    # The owner's screenshot reached @qa as a context input; @qa's next team run gives it to Hermes
+    # as media next to the trigger's own file. A file the session already holds is left out.
+    runtime = FakeRuntime()
+    async with rig(tmp_path, runtime=runtime) as r:
+        shot = ContextFile(uuid7(), "screen.jpg", "image/jpeg", JPEG)
+        seen = ContextFile(uuid7(), "seen.jpg", "image/jpeg", b"\xff\xd8 seen")
+        own = ContextFile(uuid7(), "own.jpg", "image/jpeg", b"\xff\xd8 own")
+        history = (
+            ContextMessage(author="robin", text="Here is the screenshot", files=(shot,)),
+            ContextMessage(author="robin", text="Old one", files=(seen,), already_delivered=True),
+        )
+        triggered = await r.fake.trigger(
+            "@qa what do you see?",
+            trigger_kind="team",
+            author="robin",
+            team=_team(r.fake, source="owner"),
+            history=history,
+            files=(own,),
+        )
+        await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
+        assert r.fake.run_state(triggered.run_id).state == "completed"
+        assert [name for _, name, _ in runtime.cached] == ["own.jpg", "screen.jpg"]
+        assert len(runtime.turns[-1].media) == 2
+
+
+async def test_a_run_outside_a_team_gives_hermes_only_the_trigger_s_files(tmp_path: Path) -> None:
+    runtime = FakeRuntime()
+    async with rig(tmp_path, runtime=runtime) as r:
+        shot = ContextFile(uuid7(), "screen.jpg", "image/jpeg", JPEG)
+        history = (ContextMessage(author="alex", text="Here is the screenshot", files=(shot,)),)
+        triggered = await r.fake.trigger("What do you see?", history=history)
+        await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
+        assert runtime.cached == []
+        assert runtime.turns[-1].media == ()
+
+
+async def test_a_context_file_that_cannot_be_loaded_reaches_hermes_as_a_note(
+    tmp_path: Path,
+) -> None:
+    # Error path: the server refuses the download of the context input's file; the turn goes on
+    # with a note naming the file, and the log names the code only.
+    runtime = FakeRuntime()
+    async with rig(tmp_path, runtime=runtime) as r:
+        r.fake.inject("downloadFile", Fault.problem("not_found"))
+        shot = ContextFile(uuid7(), "screen.jpg", "image/jpeg", JPEG)
+        history = (ContextMessage(author="robin", text="Here is the screenshot", files=(shot,)),)
+        with captured_logs() as logs:
+            triggered = await r.fake.trigger(
+                "@qa what do you see?",
+                trigger_kind="team",
+                author="robin",
+                team=_team(r.fake, source="owner"),
+                history=history,
+            )
+            await r.until(lambda: r.finished(triggered.run_id), "the end of the run")
+        assert r.fake.run_state(triggered.run_id).state == "completed"
+        turn = runtime.turns[-1]
+        assert turn.media == ()
+        assert "'screen.jpg'" in turn.user_text
+        assert "could not be loaded" in turn.user_text
+        assert "code=not_found" in logs.text()
+        assert "screen.jpg" not in logs.text()

@@ -113,8 +113,8 @@ type Store interface {
 	// when the person has none.
 	SidebarChannelState(ctx context.Context, user, channel ids.ID) (st domain.SidebarChannelState, found bool, err error)
 	// PutSidebarChannelState inserts or replaces the row of st.UserID and st.ChannelID with
-	// version + 1 (M4-51), thread_order and hidden_at as given (zero is NULL). It returns the
-	// stored row.
+	// version + 1 (M4-51), thread_order, hidden_at, pinned_at and pinned_threads as given (a zero
+	// time is NULL). It returns the stored row.
 	PutSidebarChannelState(ctx context.Context, st domain.SidebarChannelState) (domain.SidebarChannelState, error)
 	// SidebarChannelStates returns the channel rows of user for channels that are not archived
 	// and lie in a space that is not archived: all of them (all), else those in visible or in a

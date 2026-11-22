@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Attachments of the triggering message as local files (09 4.6, 18.10, design note 10).
 
-Only attachments with ``scan_status`` ``clean`` or ``skipped`` are fetched with
+A ``team`` run also stores the attachments of the context messages its session has not seen
+(`run_attachments`, FIX-TEAM-CHANNEL-ATTACHMENTS). Only attachments with ``scan_status``
+``clean`` or ``skipped`` are fetched with
 ``downloadFile`` into ``<runner.state_dir>/files/<thread_id>/<file_id>`` (mode ``0600``). The
 context helper gets, as the text of each such file, only ``local file: <path>`` (or
 ``unavailable: <problem code>``), so the path stands inside the file's data block and no file
@@ -25,7 +27,12 @@ import httpx
 from bothy_sdk.client import Client
 from bothy_sdk.errors import ProblemError
 from bothy_sdk.generated.api.files import download_file
-from bothy_sdk.generated.models import Attachment, RunContextAttachment
+from bothy_sdk.generated.models import (
+    Attachment,
+    RunContext,
+    RunContextAttachment,
+    RunContextMessage,
+)
 
 from claude_code_runner.statedir import ensure_private_dir, write_private
 
@@ -35,6 +42,7 @@ __all__ = [
     "fetch_attachments",
     "fetch_followup_files",
     "followup_files_final",
+    "run_attachments",
 ]
 
 _LOG = logging.getLogger("claude_code_runner")
@@ -80,6 +88,43 @@ async def fetch_attachments(
         texts[item.file_id] = f"local file: {path}"
         stored += 1
     return texts, stored
+
+
+def run_attachments(context: RunContext, team_run: bool) -> list[RunContextAttachment]:
+    """The attachments a run stores as local files (09 4.6, FIX-TEAM-CHANNEL-ATTACHMENTS).
+
+    Always the triggering message's. A ``team`` run adds those of its thread context messages
+    (never ``channel_context``) that were not delivered to the session before
+    (``already_delivered`` not true): a member that got a message as a context input reads
+    it first in its next run, and in a team work thread only owners and the members' agents
+    write (09 3.9.1). A file listed twice is fetched once.
+
+    Args:
+        context: The run context.
+        team_run: The run's trigger kind is ``team``.
+
+    Returns:
+        The attachments, the trigger's first.
+    """
+    items = list(context.trigger_message.attachments)
+    if team_run:
+        # Only the work thread holds team inputs; channel_context (the main thread of a text home
+        # channel before the work thread) holds none.
+        for message in _listed(context.thread_context):
+            if message.already_delivered is not True:
+                items.extend(message.attachments)
+    seen: set[UUID] = set()
+    out: list[RunContextAttachment] = []
+    for item in items:
+        if item.file_id not in seen:
+            seen.add(item.file_id)
+            out.append(item)
+    return out
+
+
+def _listed(messages: object) -> list[RunContextMessage]:
+    """A context list, or none when the member is unset."""
+    return list(messages) if isinstance(messages, list) else []
 
 
 def _code(status: str) -> str:

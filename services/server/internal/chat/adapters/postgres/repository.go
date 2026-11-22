@@ -226,7 +226,8 @@ func (r *Repository) PutSidebarChannelState(ctx context.Context, st domain.Sideb
 	}
 	row, err := q.UpsertSidebarChannelState(ctx, sqlcgen.UpsertSidebarChannelStateParams{
 		UserID: uuid(st.UserID), ChannelID: uuid(st.ChannelID), ThreadOrder: uuids(st.ThreadOrder),
-		HiddenAt: optionalTime(st.HiddenAt), UpdatedByDeviceID: optionalUUID(st.UpdatedByDeviceID),
+		HiddenAt: optionalTime(st.HiddenAt), PinnedAt: optionalTime(st.PinnedAt), PinnedThreads: uuids(st.PinnedThreads),
+		UpdatedByDeviceID: optionalUUID(st.UpdatedByDeviceID),
 	})
 	if err != nil {
 		return domain.SidebarChannelState{}, mapError(err, "writing a sidebar channel state")
@@ -303,7 +304,8 @@ func toSidebar(row sqlcgen.UserSpaceState) domain.SidebarState {
 func toSidebarChannel(row sqlcgen.UserChannelState) domain.SidebarChannelState {
 	return domain.SidebarChannelState{
 		UserID: idOf(row.UserID), ChannelID: idOf(row.ChannelID), ThreadOrder: idsOf(row.ThreadOrder),
-		HiddenAt: timeOf(row.HiddenAt), Version: row.Version, UpdatedByDeviceID: idOf(row.UpdatedByDeviceID),
+		HiddenAt: timeOf(row.HiddenAt), PinnedAt: timeOf(row.PinnedAt), PinnedThreads: idsOf(row.PinnedThreads),
+		Version: row.Version, UpdatedByDeviceID: idOf(row.UpdatedByDeviceID),
 	}
 }
 

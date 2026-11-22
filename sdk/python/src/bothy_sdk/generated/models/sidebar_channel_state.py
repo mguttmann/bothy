@@ -22,6 +22,10 @@ class SidebarChannelState:
             most `sidebar.order_max_items`.
         version (int):
         hidden_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+        pinned_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+        pinned_threads (list[UUID] | Unset): The posts of the channel the caller pinned to the top of the forum in the
+            own sidebar, in the order they were pinned (01 6.24); empty for none. Absent from servers before this member,
+            which means none. At most `sidebar.order_max_items`.
         updated_by_device_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
     """
 
@@ -29,6 +33,8 @@ class SidebarChannelState:
     thread_order: list[UUID]
     version: int
     hidden_at: datetime.datetime | Unset = UNSET
+    pinned_at: datetime.datetime | Unset = UNSET
+    pinned_threads: list[UUID] | Unset = UNSET
     updated_by_device_id: UUID | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -46,6 +52,17 @@ class SidebarChannelState:
         if not isinstance(self.hidden_at, Unset):
             hidden_at = self.hidden_at.isoformat()
 
+        pinned_at: str | Unset = UNSET
+        if not isinstance(self.pinned_at, Unset):
+            pinned_at = self.pinned_at.isoformat()
+
+        pinned_threads: list[str] | Unset = UNSET
+        if not isinstance(self.pinned_threads, Unset):
+            pinned_threads = []
+            for pinned_threads_item_data in self.pinned_threads:
+                pinned_threads_item = str(pinned_threads_item_data)
+                pinned_threads.append(pinned_threads_item)
+
         updated_by_device_id: str | Unset = UNSET
         if not isinstance(self.updated_by_device_id, Unset):
             updated_by_device_id = str(self.updated_by_device_id)
@@ -61,6 +78,10 @@ class SidebarChannelState:
         )
         if hidden_at is not UNSET:
             field_dict["hidden_at"] = hidden_at
+        if pinned_at is not UNSET:
+            field_dict["pinned_at"] = pinned_at
+        if pinned_threads is not UNSET:
+            field_dict["pinned_threads"] = pinned_threads
         if updated_by_device_id is not UNSET:
             field_dict["updated_by_device_id"] = updated_by_device_id
 
@@ -87,6 +108,22 @@ class SidebarChannelState:
         else:
             hidden_at = datetime.datetime.fromisoformat(_hidden_at)
 
+        _pinned_at = d.pop("pinned_at", UNSET)
+        pinned_at: datetime.datetime | Unset
+        if isinstance(_pinned_at, Unset):
+            pinned_at = UNSET
+        else:
+            pinned_at = datetime.datetime.fromisoformat(_pinned_at)
+
+        _pinned_threads = d.pop("pinned_threads", UNSET)
+        pinned_threads: list[UUID] | Unset = UNSET
+        if _pinned_threads is not UNSET:
+            pinned_threads = []
+            for pinned_threads_item_data in _pinned_threads:
+                pinned_threads_item = UUID(pinned_threads_item_data)
+
+                pinned_threads.append(pinned_threads_item)
+
         _updated_by_device_id = d.pop("updated_by_device_id", UNSET)
         updated_by_device_id: UUID | Unset
         if isinstance(_updated_by_device_id, Unset):
@@ -99,6 +136,8 @@ class SidebarChannelState:
             thread_order=thread_order,
             version=version,
             hidden_at=hidden_at,
+            pinned_at=pinned_at,
+            pinned_threads=pinned_threads,
             updated_by_device_id=updated_by_device_id,
         )
 

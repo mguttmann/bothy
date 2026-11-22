@@ -114,6 +114,17 @@ Normative: [12-files.md](../../../../docs/spec/12-files.md) sections 2, 10 and 1
 - **Query exceptions (AZ-P12).** In `tools/lint/sql_visibility.yaml`: `after_authorize` for `files.LockAttachTargets` and `files.AttachedFileIDs` (the files the author listed after `message.create` was allowed), `files.ListMessageAttachments` and `files.ListThumbnailsOfFiles` (messages the caller already read, the files of one attach), `files.ListAttachmentStates` (one message whose creation or run was decided) and `files.LockMessageAttachmentFiles` (after `message.delete`); `authorize_resolution` for `files.GetAttachmentByFile` (the row by file id that builds the `file.read` descriptor and that `MessageOf` and `recordFileChange` reuse). The inserts, the delete, the move and `MarkFilesDeleted` are writes.
 - **Tests.** `domain/attach_test.go`, `app/attach_test.go` (fakes), `adapters/postgres/attachments_test.go` (pgtest: rows and copies, every refusal, the concurrent attach of one file, deletion, the thread move with a veto), `migrations/attachments_test.go`.
 
+## Relayed attachments of team copies (FIX-TEAM-CHANNEL-ATTACHMENTS)
+
+Normative: [09-agents.md](../../../../docs/spec/09-agents.md) 3.9.2, [12-files.md](../../../../docs/spec/12-files.md) section 10 rule 3, 03 4.7 `message_attachment_relays`, the rulings D-TCA in [docs/decisions.d/FIX-TEAM-CHANNEL-ATTACHMENTS.md](../../../../docs/decisions.d/FIX-TEAM-CHANNEL-ATTACHMENTS.md).
+
+- **Table.** `message_attachment_relays` (migration `00112_files_message_attachment_relays.sql`, retention class `content`): the columns of `message_attachments` for a team copy; PK `(message_id, position)`, UNIQUE `(message_id, file_id)`, indexes `(file_id)` and `(thread_id)`; the rows go with the copy and with the file row (both `ON DELETE CASCADE`). `message_attachments` keeps its one row per file, so `MessageOf`, `recordFileChange`, the search, the export, the cleanup and the deletion count read only original rows.
+- **Port.** `Attachments.Relay(ctx, RelayCmd{SourceMessageID, MessageID, ThreadID, ChannelID})`, called by `messaging.CopyMessage` in its unit of work: the live files of the source (original or relayed rows) locked `FOR UPDATE OF files` in ascending id (`files.ListRelaySources`), one insert at the source's positions with the copy's place (`files.InsertRelays`), the copy's attachments read back with `ForMessages`. `ForMessages` and `Pending` read the relays of a message next to its original rows.
+- **Reading.** `app/resource.go` `decideRead` decides `file.read` on the original row and, when that denies an attached file, on the place of each relay (`files.ListRelaysOfFile`, oldest copy first); the first allow wins, otherwise the original row's answer stands. Downloads, tickets, the transcript read and `getFile` use it; `file.delete` and the transcript request stay on the original row.
+- **Deletion and move.** `DeleteForMessage` deletes the relays of the message first (a copy keeps the files of its source) and, for the files of an original row, every relay of those files before they are marked deleted. `OnThreadMoved` moves the relays of the thread after its attachments (`files.MoveThreadRelays`).
+- **Query exceptions (AZ-P12).** `after_authorize` for `files.ListRelaySources` (inside the copy's unit of work after the team checks), `authorize_resolution` for `files.ListRelaysOfFile` (the places of the `file.read` descriptors).
+- **Tests.** `app/relay_test.go` (fakes), `adapters/postgres/relays_test.go` (pgtest), `migrations/attachment_relays_test.go`, `test/attachments/team_test.go` (the whole server: an owner's screenshot in a team channel downloaded by the member's agent).
+
 ## Voice messages and transcripts (M3-09)
 
 - Voice check (`domain.VoiceCheck`, 12 8.1): `Attach` with `AttachCmd.Voice` checks the one locked file after the checks of M3-07, in this order: not final `409 file_not_ready`, not deliverable `409 file_blocked`, not a voice format `400 validation_failed` with `errors[].code` `voice_format_unsupported` (MP4 audio, `audio/x-m4a` and `audio/mp4` as the type detection names them, for every author; `audio/mpeg` also for agents), an MP4 with a video track or without an `mvhd` duration `voice_format_unsupported`, above `voice.max_duration` `voice_too_long`. The AAC codec is not checked (D-M3-09-5).
@@ -232,7 +243,7 @@ Checked by go-arch-lint (ADR 0008).
 
 ## Tables
 
-`files`, `file_upload_sessions`, `file_upload_parts`, `file_thumbnails`, `message_attachments`, `file_text_extracts`.
+`files`, `file_upload_sessions`, `file_upload_parts`, `file_thumbnails`, `message_attachments`, `message_attachment_relays`, `file_text_extracts`.
 
 Only this module writes and reads these tables by SQL (03-data-model.md, principle 12).
 

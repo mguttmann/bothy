@@ -9,7 +9,7 @@ library;
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 
-import 'sidebar_arrange.dart' show applyPersonalOrder;
+import 'sidebar_arrange.dart' show applyPersonalOrder, pinnedFirst;
 
 /// The limits of the selection, from `AppConfig`: never a literal in code (brief M4-40 rule 9).
 final class SidebarThreadLimits {
@@ -78,7 +78,11 @@ final class SidebarThread {
     this.waitingForMe = false,
     this.muted = false,
     this.status,
+    this.pinned = false,
   });
+
+  /// Whether the person pinned the post to the top of its forum (01 6.24).
+  final bool pinned;
 
   /// The agent status the person has not seen yet (01 6.17), or null.
   final DsChatStatus? status;
@@ -119,6 +123,7 @@ final class SidebarThread {
       muted: muted,
       done: thread.state == ThreadState.closed,
       status: status,
+      pinned: pinned,
     );
   }
 }
@@ -133,7 +138,18 @@ final class SidebarThreadGroup {
     required this.channelCounts,
     required this.allPostsCounts,
     this.more,
-  });
+    List<SidebarThread>? order,
+    List<ThreadId>? heldOrder,
+  }) : order = order ?? candidates,
+       heldOrder = heldOrder ?? const [];
+
+  /// [candidates] without the pins of 01 6.24: the manual order or the order by activity. A move
+  /// writes this order, so an unpinned post returns to its place in it (D-PIN-5).
+  final List<SidebarThread> order;
+
+  /// The IDs of [rows] in their order without the pins (01 6.24): what the sidebar holds while
+  /// the pointer is in it, so an unpin applies at once (D-PIN-4).
+  final List<ThreadId> heldOrder;
 
   /// The rows in their order (01 6.8 item 4): in a text channel by creation time, in a forum by
   /// last activity, newest first.
@@ -200,6 +216,10 @@ const Set<RunState> _activeStates = {
 /// [mutedThreads] the threads the person muted (a muted channel mutes its threads), [statuses]
 /// the unseen status of each chat (01 6.17, `unseenStatuses`). Never throws.
 ///
+/// [pinned] are the posts the person pinned to the top of the forum, in pin order (01 6.24):
+/// they come first, before the order by activity, the held order and the manual order, so they
+/// never hide behind "Show more" and a pin applies at once. Text channels ignore it.
+///
 /// Example:
 /// ```dart
 /// final group = selectSidebarThreads(channel: forum, threads: stored, counts: counts,
@@ -223,7 +243,11 @@ SidebarThreadGroup selectSidebarThreads({
   List<ThreadId> heldOrder = const [],
   List<ThreadId>? manualOrder,
   Map<ThreadId, DsChatStatus> statuses = const {},
+  List<ThreadId> pinned = const [],
 }) {
+  final forum = channel.kind == ChannelKind.forum;
+  final pins = forum ? pinned : const <ThreadId>[];
+  final pinSet = pins.toSet();
   final active = <ThreadId, RunSummary>{};
   final last = <ThreadId, RunSummary>{};
   for (final r in runs) {
@@ -253,10 +277,10 @@ SidebarThreadGroup selectSidebarThreads({
           c.mentions > 0,
       muted: channelMuted || mutedThreads.contains(t.id),
       status: statuses[t.id],
+      pinned: pinSet.contains(t.id),
     );
   }
 
-  final forum = channel.kind == ChannelKind.forum;
   final manual = forum ? manualOrder : null;
   final since = now.subtract(limits.window);
   bool qualifies(SidebarThread e) {
@@ -281,9 +305,10 @@ SidebarThreadGroup selectSidebarThreads({
     for (final e in own)
       if (qualifies(e)) e,
   ]..sort(forum ? _byActivity : (a, b) => _byPriority(a, b, selected));
-  final candidates = manual == null
+  final base = manual == null
       ? sorted
       : applyPersonalOrder(sorted, manual, (e) => e.thread.id);
+  final candidates = pinnedFirst(base, pins, (e) => e.thread.id);
   final Set<ThreadId> chosen;
   SidebarMorePosts? more;
   if (forum) {
@@ -310,22 +335,23 @@ SidebarThreadGroup selectSidebarThreads({
     final bound = limits.perChannel < 0 ? 0 : limits.perChannel;
     chosen = {for (final e in candidates.take(bound)) e.thread.id};
   }
-  final List<SidebarThread> rows;
+  final List<SidebarThread> unpinned;
   if (manual != null) {
-    // A manual group keeps the order of [candidates]; a kept row that no longer qualifies
+    // A manual group keeps the order of [base]; a kept row that no longer qualifies
     // (selected before, done now) stays where it was by activity, after them.
-    rows = [
-      for (final e in candidates)
+    unpinned = [
+      for (final e in base)
         if (_shownIn(e, chosen, keep)) e,
       for (final e in own)
-        if (!candidates.contains(e) && keep.contains(e.thread.id)) e,
+        if (!base.contains(e) && keep.contains(e.thread.id)) e,
     ];
   } else {
-    rows = [
+    unpinned = [
       for (final e in own)
         if (_shownIn(e, chosen, keep)) e,
     ]..sort(forum ? _heldThenActivity(heldOrder) : _byCreation);
   }
+  final rows = pinnedFirst(unpinned, pins, (e) => e.thread.id);
 
   var total = ThreadCounts.zero;
   for (final c in counts.values) {
@@ -340,6 +366,8 @@ SidebarThreadGroup selectSidebarThreads({
   return SidebarThreadGroup(
     rows: rows,
     candidates: candidates,
+    order: base,
+    heldOrder: [for (final e in unpinned) e.thread.id],
     channelCounts: !grouped ? total : (forum ? ThreadCounts.zero : rest),
     allPostsCounts: grouped && forum ? rest : null,
     more: more,

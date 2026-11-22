@@ -56,11 +56,28 @@ final class TeamController extends ChangeNotifier {
   /// The refusal of the last operation, or null.
   TeamFailure? get failure => _failure;
 
-  /// Reads the team. A failed read keeps what was shown and sets [failure].
+  List<TeamAgent>? _agents;
+
+  /// The active agents of the server for the add form, or null before [load] or when their
+  /// read failed (the dialog then offers the stored agents).
+  List<TeamAgent>? get agents => _agents;
+
+  /// Reads the team and, beside it, the agents of the add form. A failed read of the team keeps
+  /// what was shown and sets [failure]; a failed read of the agents only leaves [agents] null.
   Future<void> load() => _run(() async {
+    final agents = _readAgents();
     _team = await port.read(channel);
     _loaded = true;
+    _agents = await agents;
   }, changes: false);
+
+  Future<List<TeamAgent>?> _readAgents() async {
+    try {
+      return await port.agents();
+    } on TeamFailure {
+      return null;
+    }
+  }
 
   /// Switches team mode on ([on] true, the caller becomes the sponsor) or off.
   Future<bool> setEnabled({required bool on}) => _run(() async {

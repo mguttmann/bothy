@@ -35,13 +35,16 @@ SELECT * FROM user_channel_states WHERE user_id = @user_id AND channel_id = @cha
 
 -- name: UpsertSidebarChannelState :one
 -- Last write wins per channel (M4-51): the personal post order of the person for the channel and
--- the personal archive (hidden_at, NULL = shown; PROJ-ARCHIVE), version + 1, the device of the
--- write.
-INSERT INTO user_channel_states (user_id, channel_id, thread_order, hidden_at, updated_by_device_id)
-VALUES (@user_id, @channel_id, @thread_order::uuid[], sqlc.narg(hidden_at), sqlc.narg(updated_by_device_id))
+-- the personal archive (hidden_at, NULL = shown; PROJ-ARCHIVE), the personal pins (pinned_at,
+-- NULL = not pinned, and pinned_threads; FEAT-PIN-CHANNELS), version + 1, the device of the write.
+INSERT INTO user_channel_states (user_id, channel_id, thread_order, hidden_at, pinned_at, pinned_threads, updated_by_device_id)
+VALUES (@user_id, @channel_id, @thread_order::uuid[], sqlc.narg(hidden_at), sqlc.narg(pinned_at), @pinned_threads::uuid[],
+        sqlc.narg(updated_by_device_id))
 ON CONFLICT (user_id, channel_id) DO UPDATE
 SET thread_order = EXCLUDED.thread_order,
     hidden_at = EXCLUDED.hidden_at,
+    pinned_at = EXCLUDED.pinned_at,
+    pinned_threads = EXCLUDED.pinned_threads,
     version = user_channel_states.version + 1,
     updated_by_device_id = EXCLUDED.updated_by_device_id,
     updated_at = now()

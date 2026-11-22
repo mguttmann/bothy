@@ -17,11 +17,14 @@
 // `run_wakes` and the column `channels.allow_autonomous_runs` with a cleared cursor, version 15 (PROJ-ARCHIVE) the
 // columns `user_channel_states.hidden_at` and `space_view_states.archived_expanded` with a cleared cursor, version 16
 // (AUD-pkg-local-store-01) the local-only table `search_rows`, filled from the rows of `search_index`, and the indexes
-// of lookups by `client_msg_id`, channel and thread, with the cursor kept; each keeps
-// every row of the mirror. The preserved
+// of lookups by `client_msg_id`, channel and thread, with the cursor kept, version 17
+// (FIX-TEAM-MEMBER-ATTRIBUTION) the nullable column `messages.team_handle` with the cursor kept,
+// version 18 (FEAT-PIN-CHANNELS) the columns `user_channel_states.pinned_at` and `pinned_threads`
+// with a cleared cursor; each keeps every row of the mirror. The preserved
 // tables are checked by
 // `survival_test.dart`.
 
+import 'package:domain/domain.dart';
 import 'package:drift/drift.dart';
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:local_store/src/database.dart';
@@ -36,6 +39,8 @@ import 'generated/schema_v13.dart' as v13;
 import 'generated/schema_v14.dart' as v14;
 import 'generated/schema_v15.dart' as v15;
 import 'generated/schema_v16.dart' as v16;
+import 'generated/schema_v17.dart' as v17;
+import 'generated/schema_v18.dart' as v18;
 import 'generated/schema_v2.dart' as v2;
 import 'generated/schema_v3.dart' as v3;
 import 'generated/schema_v4.dart' as v4;
@@ -727,5 +732,168 @@ void main() {
         ], reason: 'nothing of the mirror changes, so no resync follows');
       },
     );
+  });
+
+  test('the migration 16 to 17 keeps every message without a team handle and '
+      'keeps the cursor', () async {
+    const state = v16.SyncStateData(
+      id: 1,
+      cursor: 900,
+      syncEpoch: 'epoch-4',
+      headSeq: 900,
+      permissionVersion: 8,
+      lastSnapshotAt: 41,
+    );
+    const message = v16.MessagesData(
+      id: 'm1',
+      threadId: 't1',
+      channelId: 'c1',
+      threadSeq: 1,
+      authorPrincipalId: 'a1',
+      clientMsgId: 'k1',
+      origin: 'agent',
+      kind: 'text',
+      contentMd: '@helper please check',
+      contentFormat: 1,
+      contentTruncated: 0,
+      silent: 1,
+      mentionIds: '[]',
+      pinned: 0,
+      version: 1,
+      createdAt: '2026-11-22T10:00:00.000Z',
+    );
+    await verifier.testWithDataIntegrity(
+      oldVersion: 16,
+      newVersion: 17,
+      createOld: v16.DatabaseAtV16.new,
+      createNew: v17.DatabaseAtV17.new,
+      openTestedDatabase: LocalDatabase.new,
+      createItems: (batch, oldDb) {
+        batch
+          ..insertAll(oldDb.syncState, [state])
+          ..insertAll(oldDb.messages, [message]);
+      },
+      validateItems: (newDb) async {
+        expect(await newDb.select(newDb.messages).get(), [
+          const v17.MessagesData(
+            id: 'm1',
+            threadId: 't1',
+            channelId: 'c1',
+            threadSeq: 1,
+            authorPrincipalId: 'a1',
+            clientMsgId: 'k1',
+            origin: 'agent',
+            kind: 'text',
+            contentMd: '@helper please check',
+            contentFormat: 1,
+            contentTruncated: 0,
+            silent: 1,
+            mentionIds: '[]',
+            pinned: 0,
+            version: 1,
+            createdAt: '2026-11-22T10:00:00.000Z',
+          ),
+        ]);
+        expect(await newDb.select(newDb.syncState).get(), [
+          const v17.SyncStateData(
+            id: 1,
+            cursor: 900,
+            syncEpoch: 'epoch-4',
+            headSeq: 900,
+            permissionVersion: 8,
+            lastSnapshotAt: 41,
+          ),
+        ], reason: 'nothing else of the mirror changes, so no resync follows');
+      },
+    );
+  });
+
+  test(
+    'the migration 17 to 18 keeps the channel rows unpinned and clears cursor '
+    'and epoch',
+    () async {
+      const row = v17.UserChannelStatesData(
+        channelId: 'c',
+        threadOrder: '["t"]',
+        version: 3,
+        updatedByDeviceId: 'd',
+        hiddenAt: '2026-11-08T09:00:00.000Z',
+      );
+      const state = v17.SyncStateData(
+        id: 1,
+        cursor: 900,
+        syncEpoch: 'epoch-4',
+        headSeq: 900,
+        permissionVersion: 8,
+        lastSnapshotAt: 41,
+      );
+      await verifier.testWithDataIntegrity(
+        oldVersion: 17,
+        newVersion: 18,
+        createOld: v17.DatabaseAtV17.new,
+        createNew: v18.DatabaseAtV18.new,
+        openTestedDatabase: LocalDatabase.new,
+        createItems: (batch, oldDb) {
+          batch
+            ..insertAll(oldDb.userChannelStates, [row])
+            ..insertAll(oldDb.syncState, [state]);
+        },
+        validateItems: (newDb) async {
+          expect(await newDb.select(newDb.userChannelStates).get(), [
+            const v18.UserChannelStatesData(
+              channelId: 'c',
+              threadOrder: '["t"]',
+              version: 0,
+              updatedByDeviceId: 'd',
+              hiddenAt: '2026-11-08T09:00:00.000Z',
+              pinnedThreads: '[]',
+            ),
+          ]);
+          expect(await newDb.select(newDb.syncState).get(), [
+            const v18.SyncStateData(
+              id: 1,
+              headSeq: 900,
+              permissionVersion: 8,
+              lastSnapshotAt: 41,
+            ),
+          ], reason: 'the next connection loads the pins of other devices');
+        },
+      );
+    },
+  );
+
+  // Review of FEAT-PIN-CHANNELS: an older app stored a row at version 3 without the pin the
+  // server already held; after the upgrade the snapshot brings the same version with the pin.
+  test('after the migration 17 to 18 a snapshot row at the version the device '
+      'held brings its pin', () async {
+    final schema = await verifier.schemaAt(17);
+    final old = v17.DatabaseAtV17(schema.newConnection());
+    await old
+        .into(old.userChannelStates)
+        .insert(
+          const v17.UserChannelStatesData(
+            channelId: '0192f4a0-7b1c-7000-8000-000000000201',
+            threadOrder: '[]',
+            version: 3,
+          ),
+        );
+    await old.close();
+    final db = LocalDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 18);
+    final at = DateTime.utc(2026, 11, 22, 9);
+    final applied = await db.structureDao.upsertUserChannelStateIfNewer(
+      UserChannelState(
+        channelId: ChannelId.parse('0192f4a0-7b1c-7000-8000-000000000201'),
+        threadOrder: const [],
+        version: const ResourceVersion(3),
+        pinnedAt: at,
+      ),
+    );
+    expect(applied, isTrue);
+    expect(
+      (await db.structureDao.watchUserChannelStates().first).single.pinnedAt,
+      at,
+    );
+    await db.close();
   });
 }

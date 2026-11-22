@@ -96,7 +96,9 @@ class _PinsSectionState extends ConsumerState<PinsSection> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    dsIsolate(principals[m.authorId]?.displayName ?? ''),
+                    dsIsolate(
+                      m.teamHandle ?? principals[m.authorId]?.displayName ?? '',
+                    ),
                     style: dsTextStyle(DsType.caption)
                         .copyWith(color: colors.textSecondary),
                   ),

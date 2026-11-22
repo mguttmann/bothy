@@ -514,7 +514,7 @@ class HermesHandler(AgentHandler):
             fetch=self._fetcher(run),
             attachment_limit=self.settings.attachment_text_max_bytes,
         )
-        if audio_to_transcribe(ctx) or files_for_hermes(ctx):
+        if audio_to_transcribe(ctx) or files_for_hermes(ctx, team=team is not None):
             # Transcribed and loaded after the start, before the turn (09 13): the run is
             # running meanwhile.
             self._inbound[run.run_id] = (ctx, channel)
@@ -723,7 +723,10 @@ class HermesHandler(AgentHandler):
         return BuiltContext(user_side=built.user_side, user_text=text)
 
     async def _media(self, run: RunHandle, ctx: RunContext) -> _InboundMedia:
-        """The trigger's attachments in Hermes's media cache, and a note for each one that is not.
+        """The run's attachments in Hermes's media cache, and a note for each one that is not.
+
+        The trigger's attachments, and in a team run those of the context messages the session
+        has not seen (`files_for_hermes`, FIX-TEAM-CHANNEL-ATTACHMENTS).
 
         An attachment the server does not serve, one over Hermes's limit, one the server refuses
         to hand out and one Hermes refuses to cache become a note; nothing is loaded for the
@@ -736,7 +739,8 @@ class HermesHandler(AgentHandler):
         notes: list[str] = []
         texts: list[str] = []
         inlined: set[UUID] = set()
-        for item in await self._load_files(run, files_for_hermes(ctx)):
+        team = run.run_id in self._teams
+        for item in await self._load_files(run, files_for_hermes(ctx, team=team)):
             if item.cached is None:
                 notes.append(undelivered_note(item.attachment, item.reason or "unavailable"))
                 continue
@@ -2565,7 +2569,7 @@ def _content(message: Message) -> str:
 
 def _speaker(turn: _Turn, message: Message) -> Speaker | None:
     """The member who wrote a follow-up, ``None`` for a person's message (09 3.9.9)."""
-    return followup_speaker(turn.team, message.origin, message.author)
+    return followup_speaker(turn.team, message.origin, message.author, message.team_handle)
 
 
 def _labelled(label: str | None, text: str) -> str:

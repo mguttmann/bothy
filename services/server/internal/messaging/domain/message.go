@@ -133,6 +133,10 @@ type Message struct {
 	// created with at least one attachment and is not deleted (the CHECK
 	// messages_has_attachments_deleted_check holds the second half).
 	HasAttachments bool
+	// TeamHandle is messages.team_handle (FIX-TEAM-MEMBER-ATTRIBUTION, 09 3.9.2): the handle of the
+	// team member whose reply a team copy carries; empty for every other message. One agent can
+	// be several members, so the author alone does not name the member.
+	TeamHandle string
 	// RunID is the run of a live box anchor (KindRun, M2-05); zero for every other message.
 	RunID ids.ID
 	// ImportItemID is the import_items row of an imported message (origin import, M8-11); zero for
@@ -307,11 +311,11 @@ func SystemNote(text string, thread, channel, author ids.ID, seq int64) Message 
 // docs/spec/09-agents.md 3.9.2 and 3.9.4): kind text, silent, no reply and no attachments, a new
 // server client_msg_id and the hash of its own canonical form, whose context names the source.
 // The acceptance of runs never decides it as a trigger (MessagePosted.Relay).
-func TeamCopy(text string, source, thread, channel, author ids.ID, origin Origin, seq int64) Message {
+func TeamCopy(text string, source, thread, channel, author ids.ID, origin Origin, seq int64, handle string) Message {
 	return Message{
 		ID: ids.New(), ThreadID: thread, ChannelID: channel, ThreadSeq: seq, AuthorID: author, ClientMsgID: ids.New(),
 		PayloadSHA256: RequestHash(HashInput{Context: "team-copy:" + source.String(), Kind: string(KindText), Content: text}),
-		Origin:        origin, Kind: KindText, ContentMD: text, ContentFormat: ContentFormat, Silent: true, Version: 1,
+		Origin:        origin, Kind: KindText, ContentMD: text, ContentFormat: ContentFormat, Silent: true, Version: 1, TeamHandle: handle,
 	}
 }
 

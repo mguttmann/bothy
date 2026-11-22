@@ -149,18 +149,23 @@ func (h *Spaces) PutMySidebarSpace(ctx context.Context, req rest.PutMySidebarSpa
 }
 
 // PutMySidebarChannel implements rest.StrictServerInterface (PUT /me/sidebar/channels/{channel_id},
-// M4-51 and PROJ-ARCHIVE). A body with neither thread_order nor hidden (null counts as absent) is
-// 400 validation_failed on /thread_order (06 R-API-31); an absent member keeps the stored value;
-// the use case checks the rest.
+// M4-51, PROJ-ARCHIVE and FEAT-PIN-CHANNELS). A body with none of thread_order, hidden, pinned and
+// pinned_threads (null counts as absent) is 400 validation_failed on /thread_order (06 R-API-31);
+// an absent member keeps the stored value; the use case checks the rest.
 func (h *Spaces) PutMySidebarChannel(ctx context.Context, req rest.PutMySidebarChannelRequestObject) (rest.PutMySidebarChannelResponseObject, error) {
-	if req.Body.ThreadOrder == nil && req.Body.Hidden == nil {
-		return nil, errs.New(errs.CodeValidationFailed, "thread_order or hidden is required").
-			WithFields(errs.FieldError{Pointer: "/thread_order", Code: domain.FieldRequired, Detail: "thread_order or hidden is required"})
+	b := req.Body
+	if b.ThreadOrder == nil && b.Hidden == nil && b.Pinned == nil && b.PinnedThreads == nil {
+		return nil, errs.New(errs.CodeValidationFailed, "thread_order, hidden, pinned or pinned_threads is required").
+			WithFields(errs.FieldError{Pointer: "/thread_order", Code: domain.FieldRequired, Detail: "thread_order, hidden, pinned or pinned_threads is required"})
 	}
-	cmd := chat.SidebarChannelPutCmd{Hidden: req.Body.Hidden}
-	if req.Body.ThreadOrder != nil {
-		order := idsOf(*req.Body.ThreadOrder)
+	cmd := chat.SidebarChannelPutCmd{Hidden: b.Hidden, Pinned: b.Pinned}
+	if b.ThreadOrder != nil {
+		order := idsOf(*b.ThreadOrder)
 		cmd.ThreadOrder = &order
+	}
+	if b.PinnedThreads != nil {
+		pinned := idsOf(*b.PinnedThreads)
+		cmd.PinnedThreads = &pinned
 	}
 	st, err := h.structure.PutSidebarChannel(ctx, principal(ctx), ids.ID(req.ChannelId), cmd)
 	if err != nil {
@@ -221,10 +226,13 @@ func SidebarREST(st chat.SidebarState) rest.SidebarState {
 }
 
 // SidebarChannelREST converts a channel row of the sidebar (schema SidebarChannelState, M4-51);
-// thread_order is always present, hidden_at only while the channel is archived (PROJ-ARCHIVE).
+// thread_order and pinned_threads are always present, hidden_at only while the channel is archived
+// (PROJ-ARCHIVE), pinned_at only while it is pinned (FEAT-PIN-CHANNELS).
 func SidebarChannelREST(st chat.SidebarChannelState) rest.SidebarChannelState {
+	pinned := restIDs(st.PinnedThreads)
 	return rest.SidebarChannelState{
-		ChannelId: rest.Uuid(st.ChannelID), ThreadOrder: restIDs(st.ThreadOrder), HiddenAt: optionalTime(st.HiddenAt), Version: st.Version,
+		ChannelId: rest.Uuid(st.ChannelID), ThreadOrder: restIDs(st.ThreadOrder), HiddenAt: optionalTime(st.HiddenAt),
+		PinnedAt: optionalTime(st.PinnedAt), PinnedThreads: &pinned, Version: st.Version,
 		UpdatedByDeviceId: optionalID(st.UpdatedByDeviceID),
 	}
 }

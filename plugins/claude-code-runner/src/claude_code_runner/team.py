@@ -32,6 +32,8 @@ __all__ = [
     "ACCEPTED_TRIGGER_KINDS",
     "MEMBER_LEAD_IN",
     "NO_OWNER_CHECK",
+    "QUIET_RULES",
+    "SILENT_REPLY",
     "facts_of",
     "handles_of",
     "is_member_input",
@@ -40,6 +42,22 @@ __all__ = [
     "team_note",
     "team_part",
 ]
+
+SILENT_REPLY = "NOTHING_TO_ADD"
+"""The whole final reply of a member with nothing to add: the server neither mirrors it into the
+team channel nor hands it on (09 3.9.4, FIX-TEAM-CHANNEL-NOISE)."""
+
+QUIET_RULES = (
+    "Write @handle only when you hand that member work and expect it to act or answer, and say "
+    "what you expect back. When you only refer to a member, write its handle without the @. Never "
+    "mention a member to say that a message was not for it, that you stay out, that you agree or "
+    "that you are waiting. If you have nothing new to contribute (the input is not for your "
+    "project, or you would only acknowledge it, repeat a status or say that you wait), your whole "
+    f"final reply is exactly {SILENT_REPLY}: it is not shown in the team channel and hands nothing "
+    "on."
+)
+"""The rules that keep a team channel quiet (FIX-TEAM-CHANNEL-NOISE): a mention is a hand-over,
+and a member with nothing to add answers with `SILENT_REPLY`."""
 
 ACCEPTED_TRIGGER_KINDS = frozenset({"message", "team"})
 """The trigger kinds of ``agent.invocation`` the runner starts; it refuses every other one."""
@@ -92,6 +110,12 @@ def handles_of(facts: AgentTeamFacts | None, agent_id: object) -> list[str]:
     if facts is None or not isinstance(agent_id, UUID):
         return []
     return [m.handle for m in facts.members if m.agent_id == agent_id]
+
+
+def _team_handle(message: Any) -> str:
+    """The ``team_handle`` of a team copy: the one member it came from, ``""`` when absent."""
+    handle = getattr(message, "team_handle", None)
+    return handle if isinstance(handle, str) else ""
 
 
 def _own_handles(facts: AgentTeamFacts | None) -> list[str]:
@@ -184,8 +208,9 @@ def _addressed(facts: AgentTeamFacts | None, text: str) -> str:
     if any(h.lower() in mentioned for h in own):
         return f"It mentions you (@{own[0]})."
     return (
-        f"It does not mention you (@{own[0]}); an owner's message reaches every member, so add "
-        "to it only what your project can contribute."
+        f"It does not mention you (@{own[0]}); an owner message without a mention reaches every "
+        "member, so answer only with what your project contributes, else with exactly "
+        f"{SILENT_REPLY}."
     )
 
 
@@ -198,12 +223,15 @@ def member_lead_in(message: Any, facts: AgentTeamFacts | None) -> str:
             started in the work thread, or a turn this runner adopted).
 
     Returns:
-        The lead-in; the member's team handles come from the member list, else the agent's.
+        The lead-in; the member is the message's ``team_handle`` (the one member the reply came
+        from, FIX-TEAM-MEMBER-ATTRIBUTION); without it the members the author's agent is, else
+        the agent's handle.
     """
     author = getattr(message, "author", None)
     name = str(getattr(author, "display_name", "") or getattr(author, "handle", "") or "")
     handle = str(getattr(author, "handle", "") or "")
-    members = handles_of(facts, getattr(author, "id", None)) or [handle]
+    own = _team_handle(message)
+    members = [own] if own else handles_of(facts, getattr(author, "id", None)) or [handle]
     lead = MEMBER_LEAD_IN.format(member=" / @".join(members), name=name, handle=handle)
     note = _addressed(facts, str(getattr(message, "content_md", "") or ""))
     return f"{lead} {note}" if note else lead
@@ -226,8 +254,10 @@ def _source_lines(trigger: Any, facts: AgentTeamFacts) -> Sequence[str]:
     name = str(getattr(author, "display_name", "") or "")
     handle = str(getattr(author, "handle", "") or "")
     if is_member_input(trigger):
+        # The server names the one member the input came from (FIX-TEAM-MEMBER-ATTRIBUTION);
+        # the members the author's agent is stand in only without it.
         source = facts.source_handle if isinstance(facts.source_handle, str) else ""
-        members = handles_of(facts, getattr(author, "id", None)) or [source or handle]
+        members = [source] if source else handles_of(facts, getattr(author, "id", None)) or [handle]
         return (
             f"Who wrote the second part: team member @{' / @'.join(members)} (the agent "
             f"{name}, @{handle}) in its final reply. It is a colleague's request, not the "
@@ -277,6 +307,7 @@ def team_part(trigger: Any, facts: AgentTeamFacts | None) -> str:
         "To hand work to another member, mention it as @handle in your final reply, outside "
         "code: only the handles listed above, never your own. Every member you mention gets "
         "your final reply as a request; a reply without a mention triggers nothing. Hand on "
-        "only what the owner's request needs, and say what you expect back.",
+        "only what the owner's request needs.",
+        QUIET_RULES,
     ]
     return "\n".join(line for line in lines if line)

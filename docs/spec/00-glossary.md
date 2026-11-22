@@ -172,7 +172,7 @@ Code names are English and apply in API, database and code.
 | Step-up | `step_up` | Fresh confirmation by the person (passkey, step-up device key with biometrics or PIN, password with TOTP, or a new OIDC login) that administrative actions require. |
 | Sync epoch | `sync_epoch` | Identifier of the timeline of the event log; new after every restore, clients store it with the cursor. |
 | System action | `system action` | Action in the catalogue that only the server itself executes (job, server command), for example `grant.expire`. |
-| Team channel | `team_channels` | A text channel in team mode: owners add agents as members, a member's final reply that mentions another member's handle starts or feeds that member's run, and an owner's message reaches every member (09 3.9). |
+| Team channel | `team_channels` | A text channel in team mode: owners add agents as members, a member's final reply that mentions another member's handle starts or feeds that member's run, and an owner's message reaches the members it mentions, or every member when it mentions none (09 3.9). |
 | Team run | `trigger_kind = 'team'` | A run of a team channel member in its work thread, started by an input the server copied there (09 3.9.2). |
 | Template | `message_template` | Stored text for frequent inputs, personal or per channel. |
 | Terminal profile | `terminal profile` | Start of a session defined in the configuration of the host service (`shell`, `claude`, fixed commands); the server knows only name and kind. |

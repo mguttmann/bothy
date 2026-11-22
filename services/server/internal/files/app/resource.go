@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/OWNER/bothy/services/server/internal/files"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
@@ -46,4 +47,34 @@ func (s *Service) readResource(ctx context.Context, f FileRecord) (authorize.Res
 		return authorize.Resource{}, err
 	}
 	return fileResource(f, ref), nil
+}
+
+// decideRead decides file.read on f (FIX-TEAM-CHANNEL-ATTACHMENTS D-TCAT-2): on its descriptor
+// (fileResource with ref, the original row), and when that denies an attached file, on the place
+// of each team copy the file is relayed to, oldest first; the first allow wins. With every place
+// denied the decision of the original row is returned. issue sets the descriptor fact of
+// createFileTicket on every descriptor.
+func (s *Service) decideRead(ctx context.Context, a actor.Actor, f FileRecord, ref *files.AttachmentRef, issue bool) (authorize.Decision, error) {
+	r := fileResource(f, ref)
+	r.IssueTicket = issue
+	d, err := s.decide(ctx, a, authorize.ActionFileRead, r)
+	if err != nil || d.Allowed() || ref == nil {
+		return d, err
+	}
+	relays, err := s.d.Repo.RelaysOf(ctx, f.ID)
+	if err != nil {
+		return authorize.Decision{}, err
+	}
+	for _, row := range relays {
+		rr := fileResource(f, &files.AttachmentRef{MessageID: row.MessageID, ThreadID: row.ThreadID, ChannelID: row.ChannelID, Position: row.Position})
+		rr.IssueTicket = issue
+		rd, err := s.decide(ctx, a, authorize.ActionFileRead, rr)
+		if err != nil {
+			return authorize.Decision{}, err
+		}
+		if rd.Allowed() {
+			return rd, nil
+		}
+	}
+	return d, nil
 }

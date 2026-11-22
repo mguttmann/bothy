@@ -58,7 +58,12 @@ final class SidebarChannel {
     this.expanded = true,
     this.newChatRows = const [],
     this.status,
+    this.pinned = false,
   });
+
+  /// Whether the person pinned the channel to the top of its space (01 6.24): it shows first in
+  /// its space with a pin, and it does not lift for a manual move.
+  final bool pinned;
 
   /// The status mark of the row (01 6.17 item 6): the most urgent unseen status of the
   /// channel's chats, or of its main history alone when "Show status on projects" is off; null
@@ -137,6 +142,7 @@ final class SidebarChannel {
     runActive: runActive,
     muted: muted,
     status: status,
+    pinned: pinned,
   );
 }
 

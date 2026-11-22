@@ -2,8 +2,8 @@
 
 /// The menu of a thread in the post list and the thread header (brief M4-33 Scope): its
 /// notification level with "Following" for a thread the server follows for the person (13 3.2)
-/// and "Mute until", ending with "Delete chat..." for its creator or a person with `manage`
-/// (01 6.18 items 1 and 2, D-DEL-14).
+/// and "Mute until", "Pin to top" or "Unpin" for a forum post (01 6.24), ending with "Delete
+/// chat..." for its creator or a person with `manage` (01 6.18 items 1 and 2, D-DEL-14).
 library;
 
 import 'dart:async';
@@ -24,6 +24,7 @@ import '../thread/providers.dart'
 import '../thread/thread_header.dart' show ThreadHeaderAction, ThreadHeaderInfo;
 import 'channel_menu.dart';
 import 'level_menu.dart';
+import 'pin_menu.dart';
 
 /// The level target of [thread] in [channel] from the current [LevelContext].
 LevelMenuTarget threadMenuTarget(
@@ -76,6 +77,8 @@ class ThreadMenu extends StatelessWidget {
     label: AppLocalizations.of(context).notifyMenuOf(title),
     menuChildren: (context, ref) => [
       ...levelMenuItems(context, ref, threadMenuTarget(ref, thread, channel)),
+      // 01 6.24: "Pin to top" or "Unpin" of a forum post.
+      ...postPinMenuItems(context, ref, thread, channel),
       if (moves case final moves?) ...[
         const Divider(),
         ...sidebarMoveMenuItems(context, moves),
@@ -167,10 +170,12 @@ class TargetMenuButton extends ConsumerWidget {
     final entries = id == null
         ? [
             ...channelMenuItems(context, ref, channel),
+            ...channelPinMenuItems(context, ref, channel),
             ...channelDeleteItems(context, ref, channel),
           ]
         : [
             ...levelMenuItems(context, ref, threadMenuTarget(ref, id, channel)),
+            ...postPinMenuItems(context, ref, id, channel),
             ...threadDeleteItems(
               context,
               ref,

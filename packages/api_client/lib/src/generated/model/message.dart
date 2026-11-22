@@ -36,6 +36,7 @@ part 'message.g.dart';
 /// * [triggerState]
 /// * [triggerStateAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [triggerStateReason] - Reason when `trigger_state` is `failed` or `cancelled`, e.g. `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`, `project_not_ready`, `operator_cannot_serve_project`. A message that failed with `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel` can be triggered again with `retriggerMessage` once the cause is fixed.
+/// * [teamHandle] - Set only on a team copy whose source is a team member (09 3.9.2, FIX-TEAM-MEMBER-ATTRIBUTION) - the mirror of a member's reply in the team channel and a member's input in another member's work thread - and names that one member, the member of the work thread the reply came from. `author` is the member's agent, which can be several members of one team channel, so clients and runtimes name the member by this handle, never by the agent. Absent on every other message, also on an owner's message copied into a work thread.
 /// * [silent]
 /// * [attachments] - Attachments in position order (the order of `attachment_file_ids` at sending); empty for a message without attachments and for a deleted message.
 /// * [mentionIds] - Principals resolved from the mention tokens of `content_md`, sorted. Clients render a token as a mention only for these.
@@ -115,6 +116,10 @@ abstract class Message implements Built<Message, MessageBuilder> {
   /// Reason when `trigger_state` is `failed` or `cancelled`, e.g. `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`, `project_not_ready`, `operator_cannot_serve_project`. A message that failed with `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel` can be triggered again with `retriggerMessage` once the cause is fixed.
   @BuiltValueField(wireName: r'trigger_state_reason')
   String? get triggerStateReason;
+
+  /// Set only on a team copy whose source is a team member (09 3.9.2, FIX-TEAM-MEMBER-ATTRIBUTION) - the mirror of a member's reply in the team channel and a member's input in another member's work thread - and names that one member, the member of the work thread the reply came from. `author` is the member's agent, which can be several members of one team channel, so clients and runtimes name the member by this handle, never by the agent. Absent on every other message, also on an owner's message copied into a work thread.
+  @BuiltValueField(wireName: r'team_handle')
+  String? get teamHandle;
 
   @BuiltValueField(wireName: r'silent')
   bool get silent;
@@ -274,6 +279,13 @@ class _$MessageSerializer implements PrimitiveSerializer<Message> {
       yield r'trigger_state_reason';
       yield serializers.serialize(
         object.triggerStateReason,
+        specifiedType: const FullType(String),
+      );
+    }
+    if (object.teamHandle != null) {
+      yield r'team_handle';
+      yield serializers.serialize(
+        object.teamHandle,
         specifiedType: const FullType(String),
       );
     }
@@ -490,6 +502,14 @@ class _$MessageSerializer implements PrimitiveSerializer<Message> {
           ) as String?;
           if (valueDes == null) continue;
           result.triggerStateReason = valueDes;
+          break;
+        case r'team_handle':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.teamHandle = valueDes;
           break;
         case r'silent':
           final valueDes = serializers.deserialize(

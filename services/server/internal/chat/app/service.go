@@ -389,11 +389,14 @@ type sidebarJSON struct {
 }
 
 // sidebarChannelJSON is the schema SidebarChannelState, the payload member state of
-// sidebar_channel.updated (M4-51); thread_order is always present, empty as [].
+// sidebar_channel.updated (M4-51); thread_order and pinned_threads are always present, empty as
+// [], hidden_at and pinned_at only while set.
 type sidebarChannelJSON struct {
 	ChannelID         string   `json:"channel_id"`
 	ThreadOrder       []string `json:"thread_order"`
 	HiddenAt          string   `json:"hidden_at,omitempty"`
+	PinnedAt          string   `json:"pinned_at,omitempty"`
+	PinnedThreads     []string `json:"pinned_threads"`
 	Version           int64    `json:"version"`
 	UpdatedByDeviceID string   `json:"updated_by_device_id,omitempty"`
 }
@@ -458,7 +461,8 @@ func (s *Service) emitSidebarChannel(ctx context.Context, space ids.ID, st domai
 	payload, err := json.Marshal(struct {
 		State sidebarChannelJSON `json:"state"`
 	}{sidebarChannelJSON{
-		ChannelID: st.ChannelID.String(), ThreadOrder: idStrings(st.ThreadOrder), HiddenAt: stamp(st.HiddenAt), Version: st.Version,
+		ChannelID: st.ChannelID.String(), ThreadOrder: idStrings(st.ThreadOrder), HiddenAt: stamp(st.HiddenAt),
+		PinnedAt: stamp(st.PinnedAt), PinnedThreads: idStrings(st.PinnedThreads), Version: st.Version,
 		UpdatedByDeviceID: optionalID(st.UpdatedByDeviceID),
 	}})
 	if err != nil {
@@ -508,8 +512,13 @@ func sidebarChannelView(st domain.SidebarChannelState) chat.SidebarChannelState 
 	if order == nil {
 		order = []ids.ID{}
 	}
+	pinned := st.PinnedThreads
+	if pinned == nil {
+		pinned = []ids.ID{}
+	}
 	return chat.SidebarChannelState{
-		ChannelID: st.ChannelID, ThreadOrder: order, HiddenAt: st.HiddenAt, Version: st.Version, UpdatedByDeviceID: st.UpdatedByDeviceID,
+		ChannelID: st.ChannelID, ThreadOrder: order, HiddenAt: st.HiddenAt, PinnedAt: st.PinnedAt, PinnedThreads: pinned,
+		Version: st.Version, UpdatedByDeviceID: st.UpdatedByDeviceID,
 	}
 }
 

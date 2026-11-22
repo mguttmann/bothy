@@ -165,6 +165,26 @@ void main() {
         contains(DsIcons.actionMute),
       );
 
+      // FEAT-PIN-CHANNELS (01 6.24): a pinned channel shows the pin and says so.
+      await show(
+        const DsChannelRowData(id: 'c', name: 'general', pinned: true),
+      );
+      expect(
+        tester.widgetList<DsIcon>(find.byType(DsIcon)).map((i) => i.glyph),
+        contains(DsIcons.actionPin),
+      );
+      expect(
+        find.bySemanticsLabel(
+          'general, ${l.channelKindNameText}, ${l.channelRowPinned}',
+        ),
+        findsOneWidget,
+      );
+      await show(const DsChannelRowData(id: 'c', name: 'general'));
+      expect(
+        tester.widgetList<DsIcon>(find.byType(DsIcon)).map((i) => i.glyph),
+        isNot(contains(DsIcons.actionPin)),
+      );
+
       s = await show(
         const DsChannelRowData(id: 'c', name: 'general'),
         selected: true,

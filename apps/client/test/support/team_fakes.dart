@@ -149,4 +149,11 @@ final class FakeTeamPort implements TeamPort {
     current = current?.paused(TeamPause.stopped);
     return stopped;
   }
+
+  /// The agents [agents] answers; null fails the read, so the dialog offers the stored agents.
+  List<TeamAgent>? agentList;
+
+  @override
+  Future<List<TeamAgent>> agents() async =>
+      agentList ?? (throw const TeamFailure.offline());
 }

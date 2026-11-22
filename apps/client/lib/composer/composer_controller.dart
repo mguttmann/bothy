@@ -147,6 +147,10 @@ final class ComposerController extends ChangeNotifier {
   /// The stored principals (mention suggestions).
   Map<PrincipalId, Principal> principals = const {};
 
+  /// The members of the team channel this composer writes in, or null outside a team channel;
+  /// set, they are the mention suggestions instead of [principals] (01 6.23 item 6).
+  List<MentionSuggestion>? teamMembers;
+
   /// The refusal of the last send, or null.
   ComposerError? error;
 
@@ -157,7 +161,7 @@ final class ComposerController extends ChangeNotifier {
   String? replyName;
 
   /// The mention suggestions for the token at the cursor.
-  List<Principal> suggestions = const [];
+  List<MentionSuggestion> suggestions = const [];
 
   ResourceVersion? _draftVersion;
   bool _focused = false;
@@ -255,9 +259,15 @@ final class ComposerController extends ChangeNotifier {
         ? text.selection.baseOffset
         : text.text.length;
     final query = mentionQuery(text.text, cursor);
+    final team = teamMembers;
     suggestions = query == null
         ? const []
-        : suggestMentions(principals.values, query.prefix);
+        : team != null
+        ? suggestTeamMembers(team, query.prefix)
+        : [
+            for (final p in suggestMentions(principals.values, query.prefix))
+              MentionSuggestion.of(p),
+          ];
   }
 
   /// Applies the stored [draft] (another device's change, or the draft at opening) unless the
@@ -308,8 +318,8 @@ final class ComposerController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Accepts the suggestion [principal]: the token becomes `@handle `.
-  void acceptSuggestion(Principal principal) {
+  /// Accepts the suggestion [suggestion]: the token becomes `@handle `.
+  void acceptSuggestion(MentionSuggestion suggestion) {
     final cursor = text.selection.isValid
         ? text.selection.baseOffset
         : text.text.length;
@@ -319,7 +329,7 @@ final class ComposerController extends ChangeNotifier {
       text.text,
       cursor,
       query,
-      principal.handle,
+      suggestion.handle,
     );
     _setText(next, offset: at);
     suggestions = const [];

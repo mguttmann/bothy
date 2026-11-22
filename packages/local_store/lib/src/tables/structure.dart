@@ -104,6 +104,14 @@ class UserChannelStates extends Table {
   /// the channel in the own sidebar; null while it shows.
   DateTimeColumn get hiddenAt => dateTime().nullable()();
 
+  /// 03 `user_channel_states.pinned_at` (FEAT-PIN-CHANNELS, 01 6.24): set while the person
+  /// pinned the channel to the top of its space; null while it is not pinned.
+  DateTimeColumn get pinnedAt => dateTime().nullable()();
+
+  /// 03 `user_channel_states.pinned_threads` as a JSON array of thread IDs, in pin order
+  /// (FEAT-PIN-CHANNELS, 01 6.24).
+  TextColumn get pinnedThreads => text().withDefault(const Constant('[]'))();
+
   @override
   Set<Column<Object>> get primaryKey => {channelId};
 }

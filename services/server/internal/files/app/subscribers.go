@@ -38,5 +38,9 @@ func NewSubscribers(rows ThreadAttachments) (*Subscribers, error) {
 // rows of sync and then message_attachments (03 6.3). A rollback of the move rolls the copies back
 // with it.
 func (s *Subscribers) OnThreadMoved(ctx context.Context, ev chat.ThreadMoved) error {
-	return s.rows.MoveThreadAttachments(ctx, ev.ThreadID, ev.ToChannelID)
+	if err := s.rows.MoveThreadAttachments(ctx, ev.ThreadID, ev.ToChannelID); err != nil {
+		return err
+	}
+	// The relays of the team copies of the thread follow it the same way (FIX-TEAM-CHANNEL-ATTACHMENTS).
+	return s.rows.MoveThreadRelays(ctx, ev.ThreadID, ev.ToChannelID)
 }

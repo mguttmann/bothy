@@ -112,6 +112,7 @@ from claude_code_runner.attachments import (
     fetch_attachments,
     fetch_followup_files,
     followup_files_final,
+    run_attachments,
 )
 from claude_code_runner.bgmode import BackgroundMode
 from claude_code_runner.bgpaths import bg_files, remove_bg_files
@@ -245,6 +246,7 @@ from claude_code_runner.usage import (
     subtract_baseline,
     transcript_totals,
 )
+from claude_code_runner.workspacetrust import global_config_file, grant_trust
 
 if TYPE_CHECKING:
     from claude_code_runner.config import RunnerConfig
@@ -345,6 +347,7 @@ class RunState:
         locks: The thread lock and the session lock (descriptors).
         slot: The pool of ``runner.max_parallel_runs`` while the run holds one of its slots.
         cwd: The resolved project folder.
+        bound: ``cwd`` is the folder of the forum's binding, not ``runner.default_workspace``.
         session: The Claude Code session of the first process.
         session_mode: ``new``, ``resume`` or ``bind`` of the payload (09 9.1).
         agent_session: The payload's agent session row, if any.
@@ -376,6 +379,7 @@ class RunState:
     locks: list[int] = field(default_factory=list)
     slot: SlotPool | None = None
     cwd: Path | None = None
+    bound: bool = False
     session: SessionChoice | None = None
     session_mode: str = "new"
     agent_session: AgentSession | None = None
@@ -3039,7 +3043,7 @@ class RunTurn:
         self.state.context = await self.handle.load_context()
         files_dir = self.cfg.state_dir / "files" / str(self.state.thread_id)
         self.state.file_texts, self.state.stored_files = await fetch_attachments(
-            self.handle.client, self.state.context.trigger_message.attachments, files_dir
+            self.handle.client, run_attachments(self.state.context, self.state.team_run), files_dir
         )
 
     async def _adopt_process(
@@ -3318,6 +3322,7 @@ class RunTurn:
             checked = await self._background_checks(bg, attempt)
             if not isinstance(checked, bool):
                 return checked
+            await self._trust_workspace(bg)
             offset = _size(transcript) if transcript is not None else 0
             argv = await self._prepare_launch(attempt, inputs, name, offset)
             self.bg_launching = True
@@ -3341,6 +3346,35 @@ class RunTurn:
         )
         reader = self._transcript_reader(started, mapper, offset)
         return await self._follow(started, attempt, offset, 0, reader=reader), True
+
+    async def _trust_workspace(self, bg: BackgroundMode) -> None:
+        """Record workspace trust of a bound project folder before a launch (18.2).
+
+        Only the folder of the forum's binding, and only below ``runner.projects_root``
+        (`grant_trust`, ruling D-FIX-RUNNER-NEW-PROJECT-TRUST-1). The log has
+        ``workspace_trust_granted`` when the runner wrote the entry and
+        ``workspace_trust_failed`` with the code when it could not; then the launch refuses and
+        the run ends with ``background_workspace_untrusted``.
+        """
+        cwd = self.state.cwd
+        if cwd is None or not self.state.bound:
+            return
+        config_file = global_config_file(bg.env)
+        if config_file is None:
+            _warn("workspace_trust_failed", code="config_missing", **self.ids)
+            return
+        outcome = await asyncio.to_thread(
+            grant_trust,
+            config_file,
+            cwd,
+            self.cfg.projects_root,
+            wait=self.cfg.cli_probe_timeout,
+            config_dir=bg.config_dir,
+        )
+        if outcome == "granted":
+            _log("workspace_trust_granted", **self.ids)
+        elif outcome != "trusted":
+            _warn("workspace_trust_failed", code=outcome, **self.ids)
 
     def _side(self, session: BgSession) -> Callable[[str], list[dict[str, Any]]]:
         """The inputs the session's own agents took, by their files (`side_inputs`).

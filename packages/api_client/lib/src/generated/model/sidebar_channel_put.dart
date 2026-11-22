@@ -14,6 +14,8 @@ part 'sidebar_channel_put.g.dart';
 /// Properties:
 /// * [threadOrder] - New personal order of the posts of the channel, unique IDs; absent keeps the stored order, an empty list returns to the default order. At most `sidebar.order_max_items`.
 /// * [hidden] - true archives the channel in the caller's own sidebar (sets `hidden_at`, kept when it is already set), false brings it back (clears `hidden_at`); absent keeps the stored state (01 6.22).
+/// * [pinned] - true pins the channel to the top of its space in the caller's own sidebar (sets `pinned_at`, kept when it is already set), false unpins it (clears `pinned_at`); absent keeps the stored state (01 6.24).
+/// * [pinnedThreads] - New list of the posts of the channel pinned to the top of the forum in the caller's own sidebar, in pin order, unique IDs; absent keeps the stored list, an empty list unpins every post (01 6.24). At most `sidebar.order_max_items`.
 @BuiltValue()
 abstract class SidebarChannelPut
     implements Built<SidebarChannelPut, SidebarChannelPutBuilder> {
@@ -24,6 +26,14 @@ abstract class SidebarChannelPut
   /// true archives the channel in the caller's own sidebar (sets `hidden_at`, kept when it is already set), false brings it back (clears `hidden_at`); absent keeps the stored state (01 6.22).
   @BuiltValueField(wireName: r'hidden')
   bool? get hidden;
+
+  /// true pins the channel to the top of its space in the caller's own sidebar (sets `pinned_at`, kept when it is already set), false unpins it (clears `pinned_at`); absent keeps the stored state (01 6.24).
+  @BuiltValueField(wireName: r'pinned')
+  bool? get pinned;
+
+  /// New list of the posts of the channel pinned to the top of the forum in the caller's own sidebar, in pin order, unique IDs; absent keeps the stored list, an empty list unpins every post (01 6.24). At most `sidebar.order_max_items`.
+  @BuiltValueField(wireName: r'pinned_threads')
+  BuiltList<String>? get pinnedThreads;
 
   SidebarChannelPut._();
 
@@ -63,6 +73,20 @@ class _$SidebarChannelPutSerializer
       yield serializers.serialize(
         object.hidden,
         specifiedType: const FullType(bool),
+      );
+    }
+    if (object.pinned != null) {
+      yield r'pinned';
+      yield serializers.serialize(
+        object.pinned,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.pinnedThreads != null) {
+      yield r'pinned_threads';
+      yield serializers.serialize(
+        object.pinnedThreads,
+        specifiedType: const FullType(BuiltList, [FullType(String)]),
       );
     }
   }
@@ -109,6 +133,24 @@ class _$SidebarChannelPutSerializer
           ) as bool?;
           if (valueDes == null) continue;
           result.hidden = valueDes;
+          break;
+        case r'pinned':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(bool),
+          ) as bool?;
+          if (valueDes == null) continue;
+          result.pinned = valueDes;
+          break;
+        case r'pinned_threads':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(BuiltList, [
+              FullType(String),
+            ]),
+          ) as BuiltList<String>?;
+          if (valueDes == null) continue;
+          result.pinnedThreads.replace(valueDes);
           break;
         default:
           unhandled.add(key);

@@ -12,7 +12,7 @@ import (
 )
 
 const getSidebarChannelState = `-- name: GetSidebarChannelState :one
-SELECT user_id, channel_id, thread_order, version, updated_by_device_id, updated_at, hidden_at FROM user_channel_states WHERE user_id = $1 AND channel_id = $2
+SELECT user_id, channel_id, thread_order, version, updated_by_device_id, updated_at, hidden_at, pinned_at, pinned_threads FROM user_channel_states WHERE user_id = $1 AND channel_id = $2
 `
 
 type GetSidebarChannelStateParams struct {
@@ -33,12 +33,14 @@ func (q *Queries) GetSidebarChannelState(ctx context.Context, arg GetSidebarChan
 		&i.UpdatedByDeviceID,
 		&i.UpdatedAt,
 		&i.HiddenAt,
+		&i.PinnedAt,
+		&i.PinnedThreads,
 	)
 	return i, err
 }
 
 const listSidebarChannelStates = `-- name: ListSidebarChannelStates :many
-SELECT st.user_id, st.channel_id, st.thread_order, st.version, st.updated_by_device_id, st.updated_at, st.hidden_at FROM user_channel_states st
+SELECT st.user_id, st.channel_id, st.thread_order, st.version, st.updated_by_device_id, st.updated_at, st.hidden_at, st.pinned_at, st.pinned_threads FROM user_channel_states st
 JOIN channels c ON c.id = st.channel_id
 LEFT JOIN spaces sp ON sp.id = c.space_id
 WHERE st.user_id = $1 AND c.archived_at IS NULL AND sp.archived_at IS NULL
@@ -79,6 +81,8 @@ func (q *Queries) ListSidebarChannelStates(ctx context.Context, arg ListSidebarC
 			&i.UpdatedByDeviceID,
 			&i.UpdatedAt,
 			&i.HiddenAt,
+			&i.PinnedAt,
+			&i.PinnedThreads,
 		); err != nil {
 			return nil, err
 		}
@@ -137,15 +141,18 @@ func (q *Queries) ListSidebarStates(ctx context.Context, arg ListSidebarStatesPa
 }
 
 const upsertSidebarChannelState = `-- name: UpsertSidebarChannelState :one
-INSERT INTO user_channel_states (user_id, channel_id, thread_order, hidden_at, updated_by_device_id)
-VALUES ($1, $2, $3::uuid[], $4, $5)
+INSERT INTO user_channel_states (user_id, channel_id, thread_order, hidden_at, pinned_at, pinned_threads, updated_by_device_id)
+VALUES ($1, $2, $3::uuid[], $4, $5, $6::uuid[],
+        $7)
 ON CONFLICT (user_id, channel_id) DO UPDATE
 SET thread_order = EXCLUDED.thread_order,
     hidden_at = EXCLUDED.hidden_at,
+    pinned_at = EXCLUDED.pinned_at,
+    pinned_threads = EXCLUDED.pinned_threads,
     version = user_channel_states.version + 1,
     updated_by_device_id = EXCLUDED.updated_by_device_id,
     updated_at = now()
-RETURNING user_id, channel_id, thread_order, version, updated_by_device_id, updated_at, hidden_at
+RETURNING user_id, channel_id, thread_order, version, updated_by_device_id, updated_at, hidden_at, pinned_at, pinned_threads
 `
 
 type UpsertSidebarChannelStateParams struct {
@@ -153,18 +160,22 @@ type UpsertSidebarChannelStateParams struct {
 	ChannelID         pgtype.UUID
 	ThreadOrder       []pgtype.UUID
 	HiddenAt          pgtype.Timestamptz
+	PinnedAt          pgtype.Timestamptz
+	PinnedThreads     []pgtype.UUID
 	UpdatedByDeviceID pgtype.UUID
 }
 
 // Last write wins per channel (M4-51): the personal post order of the person for the channel and
-// the personal archive (hidden_at, NULL = shown; PROJ-ARCHIVE), version + 1, the device of the
-// write.
+// the personal archive (hidden_at, NULL = shown; PROJ-ARCHIVE), the personal pins (pinned_at,
+// NULL = not pinned, and pinned_threads; FEAT-PIN-CHANNELS), version + 1, the device of the write.
 func (q *Queries) UpsertSidebarChannelState(ctx context.Context, arg UpsertSidebarChannelStateParams) (UserChannelState, error) {
 	row := q.db.QueryRow(ctx, upsertSidebarChannelState,
 		arg.UserID,
 		arg.ChannelID,
 		arg.ThreadOrder,
 		arg.HiddenAt,
+		arg.PinnedAt,
+		arg.PinnedThreads,
 		arg.UpdatedByDeviceID,
 	)
 	var i UserChannelState
@@ -176,6 +187,8 @@ func (q *Queries) UpsertSidebarChannelState(ctx context.Context, arg UpsertSideb
 		&i.UpdatedByDeviceID,
 		&i.UpdatedAt,
 		&i.HiddenAt,
+		&i.PinnedAt,
+		&i.PinnedThreads,
 	)
 	return i, err
 }

@@ -58,6 +58,7 @@ func (s *Service) ForPreview(ctx context.Context, messageID ids.ID) (messaging.P
 	out := messaging.PreviewMessage{
 		ID: m.ID, ThreadID: m.ThreadID, ChannelID: m.ChannelID, AuthorID: m.AuthorID, Kind: string(m.Kind),
 		ContentMD: m.ContentMD, ContentFormat: int(m.ContentFormat), HasAttachments: m.HasAttachments, Deleted: !m.DeletedAt.IsZero(),
+		TeamHandle: m.TeamHandle,
 	}
 	if out.Deleted {
 		out.ContentMD, out.HasAttachments = "", false

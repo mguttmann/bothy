@@ -758,9 +758,18 @@ type Message struct {
 	SearchLanguage      interface{}
 	SearchVector        interface{}
 	HasAttachments      bool
+	TeamHandle          pgtype.Text
 }
 
 type MessageAttachment struct {
+	MessageID pgtype.UUID
+	FileID    pgtype.UUID
+	Position  int16
+	ThreadID  pgtype.UUID
+	ChannelID pgtype.UUID
+}
+
+type MessageAttachmentRelay struct {
 	MessageID pgtype.UUID
 	FileID    pgtype.UUID
 	Position  int16
@@ -1270,6 +1279,8 @@ type UserChannelState struct {
 	UpdatedByDeviceID pgtype.UUID
 	UpdatedAt         pgtype.Timestamptz
 	HiddenAt          pgtype.Timestamptz
+	PinnedAt          pgtype.Timestamptz
+	PinnedThreads     []pgtype.UUID
 }
 
 type UserIdentity struct {

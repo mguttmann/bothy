@@ -81,6 +81,45 @@ List<T> applyPersonalOrder<T, K>(
   return [...unplaced, ...placed];
 }
 
+/// [rows] with the pinned ones first (01 6.24, FEAT-PIN-CHANNELS): the rows whose ID [idOf]
+/// gives is in [pinned] in the order of [pinned], then every other row in the order of [rows].
+/// IDs of [pinned] that name no row are ignored. Pins come after the manual or automatic order
+/// and after the hold of 01 6.8 item 4, so a pin or unpin applies at once.
+///
+/// Example: `pinnedFirst(['a', 'b', 'c'], ['c'], (s) => s)` is `['c', 'a', 'b']`.
+List<T> pinnedFirst<T, K>(List<T> rows, List<K> pinned, K Function(T) idOf) {
+  if (pinned.isEmpty) return rows;
+  final place = <K, int>{};
+  for (final (i, id) in pinned.indexed) {
+    place.putIfAbsent(id, () => i);
+  }
+  final top = [
+    for (final r in rows)
+      if (place.containsKey(idOf(r))) r,
+  ]..sort((a, b) => place[idOf(a)]!.compareTo(place[idOf(b)]!));
+  return [
+    ...top,
+    for (final r in rows)
+      if (!place.containsKey(idOf(r))) r,
+  ];
+}
+
+/// The channels the person pinned (01 6.24) from their sidebar [states], by the time of the
+/// pin, oldest first; equal times by channel ID, so every device shows the same order.
+List<ChannelId> pinOrder(Iterable<UserChannelState> states) {
+  final pinned = [
+    for (final s in states)
+      if (s.pinnedAt != null) s,
+  ];
+  pinned.sort((a, b) {
+    final byTime = a.pinnedAt!.compareTo(b.pinnedAt!);
+    return byTime != 0
+        ? byTime
+        : a.channelId.value.compareTo(b.channelId.value);
+  });
+  return [for (final s in pinned) s.channelId];
+}
+
 /// [rows] ordered by their activity [at], newest first; equal times keep the order of [rows]
 /// (the manual order breaks ties, D-M4-51-4).
 List<T> orderByActivity<T>(List<T> rows, DateTime Function(T) at) {

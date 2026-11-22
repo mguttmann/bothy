@@ -2198,16 +2198,18 @@ final class FakeWorld {
         value,
   ];
 
-  /// Stores the own thread order of [principalId] for [channelId] and its personal archive
-  /// from a `SidebarChannelPut` [body] (`putMySidebarChannel`, M4-51 and PROJ-ARCHIVE): an
-  /// absent member keeps the stored value, `hidden: true` keeps an earlier `hidden_at` or takes
-  /// the world's time, `false` clears it; version + 1, last write wins, and the personal
-  /// `sidebar_channel.updated`. A body that changes nothing returns the stored state without a
-  /// new version or an event (06 R-API-31). The IDs are not checked against threads (D-M4-51-8).
+  /// Stores the own thread order of [principalId] for [channelId], its personal archive and its
+  /// personal pins from a `SidebarChannelPut` [body] (`putMySidebarChannel`, M4-51, PROJ-ARCHIVE
+  /// and FEAT-PIN-CHANNELS): an absent member keeps the stored value, `hidden: true` keeps an
+  /// earlier `hidden_at` or takes the world's time, `false` clears it, `pinned` does the same on
+  /// `pinned_at`, `pinned_threads` replaces the pinned posts; version + 1, last write wins, and
+  /// the personal `sidebar_channel.updated`. A body that changes nothing returns the stored state
+  /// without a new version or an event (06 R-API-31). The IDs are not checked against threads
+  /// (D-M4-51-8).
   ///
   /// Throws [FakeProblem]: `404` for a channel the principal does not see, `400
-  /// validation_failed` for a body with neither `thread_order` nor `hidden` (`required`) or a
-  /// repeated ID in the order (`duplicate`), both on `/thread_order`.
+  /// validation_failed` for a body without a known member (`required` on `/thread_order`) or a
+  /// repeated ID in a list (`duplicate` on `/thread_order` or `/pinned_threads`).
   JsonMap putSidebarChannel(
     String principalId,
     String channelId,
@@ -2218,8 +2220,16 @@ final class FakeWorld {
       throw const FakeProblem(404, 'not_found');
     }
     final order = _uniqueOrder(body['thread_order'], '/thread_order');
+    final pinnedThreads = _uniqueOrder(
+      body['pinned_threads'],
+      '/pinned_threads',
+    );
     final hide = body['hidden'];
-    if (order == null && hide is! bool) {
+    final pin = body['pinned'];
+    if (order == null &&
+        pinnedThreads == null &&
+        hide is! bool &&
+        pin is! bool) {
       throw const FakeProblem(
         400,
         'validation_failed',
@@ -2234,24 +2244,35 @@ final class FakeWorld {
       for (final id in (previous?['thread_order'] as List?) ?? const [])
         id as String,
     ];
+    final oldPinnedThreads = [
+      for (final id in (previous?['pinned_threads'] as List?) ?? const [])
+        id as String,
+    ];
     final oldHidden = previous?['hidden_at'] as String?;
+    final oldPinned = previous?['pinned_at'] as String?;
     final newOrder = order ?? oldOrder;
-    final newHidden = switch (hide) {
-      true => oldHidden ?? stamp(),
+    final newPinnedThreads = pinnedThreads ?? oldPinnedThreads;
+    String? mark(Object? set, String? old) => switch (set) {
+      true => old ?? stamp(),
       false => null,
-      _ => oldHidden,
+      _ => old,
     };
-    final sameOrder =
-        newOrder.length == oldOrder.length &&
-        Iterable<int>.generate(newOrder.length)
-            .every((i) => newOrder[i] == oldOrder[i]);
-    if (previous != null && sameOrder && newHidden == oldHidden) {
-      return previous;
-    }
-    if (previous == null && order == null && newHidden == null) {
+    final newHidden = mark(hide, oldHidden);
+    final newPinned = mark(pin, oldPinned);
+    bool same(List<String> a, List<String> b) =>
+        a.length == b.length &&
+        Iterable<int>.generate(a.length).every((i) => a[i] == b[i]);
+    final unchanged =
+        same(newOrder, oldOrder) &&
+        same(newPinnedThreads, oldPinnedThreads) &&
+        newHidden == oldHidden &&
+        newPinned == oldPinned;
+    if (previous != null && unchanged) return previous;
+    if (previous == null && unchanged) {
       return {
         'channel_id': channelId,
         'thread_order': <String>[],
+        'pinned_threads': <String>[],
         'version': 0,
       };
     }
@@ -2259,6 +2280,8 @@ final class FakeWorld {
       'channel_id': channelId,
       'thread_order': newOrder,
       'hidden_at': ?newHidden,
+      'pinned_at': ?newPinned,
+      'pinned_threads': newPinnedThreads,
       'version': ((previous?['version'] as int?) ?? 0) + 1,
       'updated_by_device_id': ?deviceId,
     };

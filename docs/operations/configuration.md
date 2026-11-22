@@ -133,7 +133,7 @@ Source: [01-product.md](../spec/01-product.md), section 14.
 
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
-| `ui.message_group_window` |  | App |  | `5m` | messages of the same author within this time get no header of their own |  |
+| `ui.message_group_window` |  | App |  | `5m` | messages of the same author (and the same team member, 6.23 item 3) within this time get no header of their own |  |
 | `ui.message_collapse_lines` |  | App |  | `24` | from this many lines on, a message is collapsed |  |
 | `ui.livebox_visible_steps` |  | App |  | `6` | visible steps in the running live box |  |
 | `ui.composer_max_lines` |  | App |  | `12` | the input grows up to this many lines |  |

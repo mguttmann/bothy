@@ -375,19 +375,44 @@ def _mime(item: RunContextAttachment) -> str:
     return str(item.mime_type).split(";", 1)[0].strip().lower()
 
 
-def files_for_hermes(ctx: RunContext) -> list[RunContextAttachment]:
-    """The attachments of the triggering message that go into Hermes's media cache (09 17.6).
+def files_for_hermes(ctx: RunContext, *, team: bool = False) -> list[RunContextAttachment]:
+    """The attachments that go into Hermes's media cache (09 17.6).
 
-    Every attachment but audio, which reaches Hermes as a transcript (`audio_to_transcribe`).
-    Attachments of context messages and of follow-ups do not count.
+    Every attachment of the triggering message but audio, which reaches Hermes as a transcript
+    (`audio_to_transcribe`). A ``team`` run adds the non-audio attachments of its thread context
+    messages (never ``channel_context``) that were not delivered to the session before
+    (``already_delivered`` not true): a member that got a message as a context input sees it
+    first in its next run, and in a team work thread only owners and the members' agents write
+    (FIX-TEAM-CHANNEL-ATTACHMENTS D-TCAT-6).
+    Attachments of other context messages and of follow-ups do not count here. A file listed
+    twice goes once.
 
     Args:
         ctx: The run context.
+        team: The run is a ``team`` run.
 
     Returns:
-        The attachments in their order.
+        The attachments, the trigger's first, each in its order.
     """
-    return [a for a in ctx.trigger_message.attachments if not _mime(a).startswith("audio/")]
+    items = list(ctx.trigger_message.attachments)
+    if team:
+        # Only the work thread holds team inputs; channel_context (the main thread of a text home
+        # channel before the work thread) holds none and stays out.
+        for message in _context_list(ctx.thread_context):
+            if message.already_delivered is not True:
+                items.extend(message.attachments)
+    seen: set[UUID] = set()
+    out: list[RunContextAttachment] = []
+    for item in items:
+        if item.file_id not in seen and not _mime(item).startswith("audio/"):
+            seen.add(item.file_id)
+            out.append(item)
+    return out
+
+
+def _context_list(messages: object) -> list[Any]:
+    """A context list of the run context, or none when the member is unset."""
+    return list(messages) if isinstance(messages, list) else []
 
 
 def scan_refusal(item: RunContextAttachment) -> str | None:

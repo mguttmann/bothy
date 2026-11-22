@@ -229,7 +229,8 @@ class _ChannelEntryState extends State<ChannelEntry> {
         index: i,
       ),
       label: r.thread.title,
-      enabled: !widget.chatsArranged,
+      // 01 6.24: a pinned post stays on top; it neither lifts nor takes a drop.
+      enabled: !widget.chatsArranged && !r.pinned,
       arranged: widget.chatsArranged,
       touch: widget.touch,
       onDrop: (id, to) => move(ThreadId.parse(id), to),
@@ -237,14 +238,18 @@ class _ChannelEntryState extends State<ChannelEntry> {
     );
   }
 
-  SidebarMoves? _postMoves(ThreadId id, int i, int count) {
+  /// "Move up" and "Move down" of the post at index [i] of [count] post rows, the first
+  /// [pinned] of them pinned (01 6.24): a pinned post does not move, and an unpinned one moves
+  /// only among the unpinned ones.
+  SidebarMoves? _postMoves(ThreadId id, int i, int count, int pinned) {
     final move = widget.onMoveThread;
     if (move == null || widget.entry.channel.kind != ChannelKind.forum) {
       return null;
     }
     if (widget.chatsArranged) return const SidebarMoves(arranged: true);
+    if (i < pinned) return const SidebarMoves();
     return SidebarMoves(
-      up: i > 0 ? () => move(id, i - 1) : null,
+      up: i > pinned ? () => move(id, i - 1) : null,
       down: i < count - 1 ? () => move(id, i + 1) : null,
     );
   }
@@ -368,7 +373,12 @@ class _ChannelEntryState extends State<ChannelEntry> {
                       onOpen: () => w.onOpenThread!(r.thread.id),
                       focusNode: _threadNode(r.thread.id),
                       onKeyEvent: _onRowKey,
-                      moves: _postMoves(r.thread.id, i, rows.length),
+                      moves: _postMoves(
+                        r.thread.id,
+                        i,
+                        rows.length,
+                        rows.where((p) => p.pinned).length,
+                      ),
                     ),
                     r,
                   ),

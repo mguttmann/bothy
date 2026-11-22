@@ -97,7 +97,7 @@ from claude_code_runner.adoption import (
     process_id,
     read_turn_record,
 )
-from claude_code_runner.attachments import fetch_attachments
+from claude_code_runner.attachments import fetch_attachments, run_attachments
 from claude_code_runner.bgmode import BackgroundMode
 from claude_code_runner.causes import TOOL_CLASS_MISMATCH, cause, definition_refused
 from claude_code_runner.channel_skills import resolve_channel_skills
@@ -834,7 +834,7 @@ class HostedHandler(AgentHandler):
         state.context = await self._context(run, ids)
         files_dir = self._state_dir / "files" / str(state.thread_id)
         state.file_texts, state.stored_files = await fetch_attachments(
-            run.client, state.context.trigger_message.attachments, files_dir
+            run.client, run_attachments(state.context, state.team_run), files_dir
         )
         await self._runtime().precheck(state, inv.claims.billing_mode, ids)
         _log("run_prepared", **ids)
