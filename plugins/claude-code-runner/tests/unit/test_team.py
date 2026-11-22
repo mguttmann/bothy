@@ -18,6 +18,7 @@ from claude_code_runner.team import (
     ACCEPTED_TRIGGER_KINDS,
     NO_OWNER_CHECK,
     SILENT_REPLY,
+    UNANSWERED_MEMBER,
     facts_of,
     handles_of,
     is_member_input,
@@ -320,3 +321,10 @@ def test_a_silent_reply_to_an_owner_s_request_is_replaced_without_a_mention() ->
 def test_other_replies_go_out_as_written(trigger: Any, team: str | None, reply: str) -> None:
     team_facts = facts(team) if team is not None else None
     assert team_reply(reply, trigger, team_facts) == reply
+
+
+def test_a_silent_reply_to_the_runner_s_own_notice_stays_silent() -> None:
+    # Red team: the notice mentions the requester; its silent answer must not send a notice
+    # back, or two members ping-pong notices until the brake stops the channel.
+    notice = message(UNANSWERED_MEMBER.format(handle="web"), agent=True)
+    assert team_reply(SILENT_REPLY, notice, facts()) == SILENT_REPLY

@@ -753,3 +753,44 @@ async def test_a_silent_answer_to_an_unaddressed_owner_message_stays(tmp_path: P
         await r.until(lambda: r.finished(triggered.run_id))
     (answer,) = r.fake.messages[-1:]
     assert answer["content_md"] == SILENT_REPLY
+
+
+async def test_a_silent_answer_to_a_notice_stays_silent(tmp_path: Path) -> None:
+    """Red team: the notice mentions the requester; a silent answer to it must not post a notice
+    back, or two members ping-pong notices until the brake stops the channel."""
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        await rt.events.on_answer(turn.thread_id, SILENT_REPLY, None)
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    facts = team_facts(_facts_payload(source_handle="dev"))
+    notice = team_reply(SILENT_REPLY, facts, Speaker(owner=False, handle="qa"))
+    assert notice.startswith("@qa: ")
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await _member_input(r, notice)
+        await r.until(lambda: r.finished(triggered.run_id))
+    (answer,) = r.fake.messages[-1:]
+    assert answer["content_md"] == SILENT_REPLY
+
+
+async def test_a_later_silent_edit_never_undoes_the_notice(tmp_path: Path) -> None:
+    """Red team: Hermes' edit transport edits the posted answer again with the same text; the
+    silent text must not overwrite the notice (an edited answer hands nothing on)."""
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        ev = rt.events
+        key = await ev.on_answer(turn.thread_id, "NOTH \u2589", None, preview=True)
+        assert key is not None
+        assert await ev.on_edit(turn.thread_id, key, SILENT_REPLY, True)
+        assert await ev.on_edit(turn.thread_id, key, SILENT_REPLY, False)
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await _member_input(r)
+        await r.until(lambda: r.finished(triggered.run_id))
+        assert r.requests("updateMessage") == []
+    assert r.fake.run_state(triggered.run_id).state == "completed"
+    (answer,) = r.fake.messages[-1:]
+    assert answer["content_md"].startswith("@dev: ")

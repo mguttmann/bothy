@@ -66,6 +66,10 @@ QUIET_RULES = (
 and a member with nothing to add answers with `SILENT_REPLY`, but never to a request that
 mentions it (FIX-TEAM-HANDOFF-NOT-NOTHING)."""
 
+NOTICE_MARK = "the session replied only that it had nothing to add.)"
+"""The end of the runner's and the Hermes adapter's notice below: an input that carries it is a
+notice, and a silent reply to it stays silent, so two members never ping-pong notices."""
+
 UNANSWERED_MEMBER = (
     "@{handle}: I got your request, but this run ended without an answer to it, so nothing of it "
     "is done yet. Send it again or ask the owner. (Written by the runner: the session replied "
@@ -273,6 +277,8 @@ def team_reply(reply: str, trigger: Any, facts: AgentTeamFacts | None) -> str:
     text = str(getattr(trigger, "content_md", "") or "")
     if facts is None or not is_silent_reply(reply) or not _mentions_own(facts, text):
         return reply
+    if NOTICE_MARK in text:
+        return reply  # the notice of another member asks for nothing
     if not is_member_input(trigger):
         return UNANSWERED_OWNER
     author = getattr(trigger, "author", None)

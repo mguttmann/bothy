@@ -173,6 +173,7 @@ from bothy_hermes_adapter.runtime import (
 from bothy_hermes_adapter.stages import StageCursor, StageRegistry, StageSteps
 from bothy_hermes_adapter.store import CallbackStore
 from bothy_hermes_adapter.team import (
+    NOTICE_MARK,
     Speaker,
     TeamFacts,
     followup_speaker,
@@ -257,6 +258,7 @@ class _Turn:
     # Hermes takes the run's turns from (the token's ``sub`` and its name).
     team: TeamFacts | None = None
     speaker: Speaker | None = None
+    notice_input: bool = False
     user_id: UUID | None = None
     user_name: str = ""
     answers: dict[str, tuple[UUID, int]] = field(default_factory=dict)
@@ -362,6 +364,9 @@ class HermesHandler(AgentHandler):
         self._inbound: dict[UUID, tuple[RunContext, ChannelBehavior | None]] = {}
         # The team facts and the input's speaker of a ``team`` run, from prepare to execute.
         self._teams: dict[UUID, tuple[TeamFacts, Speaker]] = {}
+        # Team runs whose input is another member's notice of an unanswered request: a silent
+        # answer to it stays silent (FIX-TEAM-HANDOFF-NOT-NOTHING).
+        self._notices: set[UUID] = set()
         self._channels: dict[UUID, tuple[int, ChannelBehavior]] = {}
         # Runs that stop their work now, by thread: the run's start in wall time. Such a run
         # still covers its jobs until they are stopped (09 17.12 point 8).
@@ -509,6 +514,8 @@ class HermesHandler(AgentHandler):
         if team is not None:
             trigger = ctx.trigger_message
             self._teams[run.run_id] = (team, input_speaker(team, trigger.origin, trigger.author))
+            if NOTICE_MARK in str(trigger.content_md or ""):
+                self._notices.add(run.run_id)
         self._anchors[run.run_id] = await self._trigger_in_thread(payload, run)
         self._prepared[run.run_id] = await build_context(
             ctx,
@@ -659,6 +666,7 @@ class HermesHandler(AgentHandler):
             quotes=self._anchors.pop(run.run_id, False),
             team=team[0] if team is not None else None,
             speaker=team[1] if team is not None else None,
+            notice_input=self._pop_notice(run.run_id),
             user_id=inv.claims.sub,
             user_name=str(payload.triggered_by.display_name),
         )
@@ -1544,6 +1552,7 @@ class HermesHandler(AgentHandler):
         self._anchors.pop(turn.run_id, None)
         self._inbound.pop(turn.run_id, None)
         self._teams.pop(turn.run_id, None)
+        self._notices.discard(turn.run_id)
         self._spawn(self.store.drop_card(turn.run_id))
 
     def _spawn(self, coro: Any) -> None:
@@ -2137,7 +2146,8 @@ class HermesHandler(AgentHandler):
         # Recorded before the send: whatever the outbox does with it, a later copy from Hermes'
         # delivery ledger is the same answer (`recovered_duplicate`).
         await self.store.put_answer(turn.thread_id, text)
-        if not turn.answers:
+        sent = text
+        if not turn.answers and not turn.notice_input:
             # The run's first answer: a silent reply to a request that mentions this member is
             # never lost (FIX-TEAM-HANDOFF-NOT-NOTHING).
             text = team_reply(text, turn.team, turn.speaker)
@@ -2160,8 +2170,17 @@ class HermesHandler(AgentHandler):
             return None
         key = str(entry.message_id)
         turn.answers[key] = (entry.message_id, int(entry.message_version or 1))
-        turn.posted[key] = text
+        # Hermes' own text: a later edit to the same text (the silent reply a notice replaced)
+        # is never sent, so it never turns the notice back into silence.
+        turn.posted[key] = sent
         return key
+
+    def _pop_notice(self, run_id: UUID) -> bool:
+        """Whether the run's input is a member's notice of an unanswered request (once)."""
+        if run_id in self._notices:
+            self._notices.discard(run_id)
+            return True
+        return False
 
     async def recovered_duplicate(self, thread_id: UUID | None, content: str) -> bool:
         """Whether ``content`` is a reply Hermes sends again that this adapter took over already.

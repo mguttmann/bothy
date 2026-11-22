@@ -38,6 +38,7 @@ from uuid import UUID
 from bothy_sdk.generated.types import Unset
 
 __all__ = [
+    "NOTICE_MARK",
     "QUIET_RULES",
     "SILENT_REPLY",
     "UNKNOWN_HANDLE",
@@ -73,6 +74,10 @@ QUIET_RULES: Final = (
 )
 """The rules that keep a team channel quiet (FIX-TEAM-CHANNEL-NOISE), never silent towards a
 request that mentions the member (FIX-TEAM-HANDOFF-NOT-NOTHING)."""
+
+NOTICE_MARK: Final = "the session replied only that it had nothing to add.)"
+"""The end of the adapter's and the Claude Code runner's notice below: an input that carries it
+is a notice, and a silent reply to it stays silent, so two members never ping-pong notices."""
 
 _UNANSWERED_MEMBER: Final = (
     "@{handle}: I got your request, but this run ended without an answer to it, so nothing of it "

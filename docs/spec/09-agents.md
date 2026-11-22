@@ -481,7 +481,8 @@ nothing (FIX-TEAM-CHANNEL-NOISE). The reply stays in the member's work thread. A
 mentions a member is never answered with it: the quiet rules (3.9.9) say so, and the Claude Code
 runner and the Hermes adapter replace a silent first answer to a `team` run whose input mentions
 the member by a short visible answer that mentions the member who asked (an owner is not
-mentioned), so the server mirrors it and hands it back (FIX-TEAM-HANDOFF-NOT-NOTHING).
+mentioned), so the server mirrors it and hands it back (FIX-TEAM-HANDOFF-NOT-NOTHING). A silent
+answer to such a notice stays silent, so two members never send notices back and forth.
 
 A reply is mirrored and handed on only when the run it answers was started and fed only by active
 owners. The run a reply answers is the one 03 `run_answers` links it to, never the `run_id` the
