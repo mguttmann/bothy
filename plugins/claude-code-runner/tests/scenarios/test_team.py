@@ -190,6 +190,30 @@ async def test_a_silent_reply_to_a_member_s_request_hands_back_a_visible_answer(
     assert answer.startswith("@docs: ")
 
 
+async def test_a_silent_reply_in_a_started_session_still_hands_back(world: World) -> None:
+    # The member's work thread keeps one session over its runs: the safeguard holds for the
+    # first answer of every run, not only for the first run of a new session.
+    world.scenario(fixture="plain", result_override={"result": "I wait for the owner's go."})
+    await world.start()
+    first = await team_run(world, "@web please review", source="member")
+    assert await world.ended(first.run_id) == "completed"
+    world.scenario(fixture="resume", result_override={"result": SILENT_REPLY})
+    second = await world.fake.trigger(
+        "@web what do you need back from me?",
+        channel_id=world.forum_a,
+        thread_id=first.thread_id,
+        author="texter",
+        authority="robin",
+        trigger_kind="team",
+        team=team(world, "member"),
+    )
+    assert await world.ended(second.run_id) == "completed"
+    answers = [m["content_md"] for m in world.fake.messages]
+    assert answers[0] == "I wait for the owner's go."
+    assert not is_silent_reply(answers[-1])
+    assert answers[-1].startswith("@docs: ")
+
+
 async def test_a_silent_reply_to_an_unaddressed_owner_message_stays_silent(world: World) -> None:
     world.scenario(fixture="plain", result_override={"result": SILENT_REPLY})
     await world.start()

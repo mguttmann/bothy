@@ -2240,7 +2240,11 @@ class RunTurn:
         title, reply = split_title(str(text), planned.first)
         if title and not self.title:
             self.title = title
-        if planned.first and self.state.team_run and self.state.context is not None:
+        # The run's first answer is the one of its lowest planned line: lines are read in order
+        # and stay planned, so this holds also in a started session (whose answers carry no
+        # title) and for a line read again.
+        run_first = line == min(self.ledger.answers)
+        if run_first and self.state.team_run and self.state.context is not None:
             # A silent reply to a request that mentions this member is never lost
             # (FIX-TEAM-HANDOFF-NOT-NOTHING).
             reply = team_reply(reply, self.state.context.trigger_message, self.state.team)
