@@ -179,6 +179,7 @@ from bothy_hermes_adapter.team import (
     input_speaker,
     team_facts,
     team_lines,
+    team_reply,
 )
 from bothy_hermes_adapter.tool_class import classify
 
@@ -255,6 +256,7 @@ class _Turn:
     # The team facts of a ``team`` run (09 3.9.9), ``None`` for any other run; the person
     # Hermes takes the run's turns from (the token's ``sub`` and its name).
     team: TeamFacts | None = None
+    speaker: Speaker | None = None
     user_id: UUID | None = None
     user_name: str = ""
     answers: dict[str, tuple[UUID, int]] = field(default_factory=dict)
@@ -656,6 +658,7 @@ class HermesHandler(AgentHandler):
             anchored=kind in ("message", "team"),
             quotes=self._anchors.pop(run.run_id, False),
             team=team[0] if team is not None else None,
+            speaker=team[1] if team is not None else None,
             user_id=inv.claims.sub,
             user_name=str(payload.triggered_by.display_name),
         )
@@ -2134,6 +2137,10 @@ class HermesHandler(AgentHandler):
         # Recorded before the send: whatever the outbox does with it, a later copy from Hermes'
         # delivery ledger is the same answer (`recovered_duplicate`).
         await self.store.put_answer(turn.thread_id, text)
+        if not turn.answers:
+            # The run's first answer: a silent reply to a request that mentions this member is
+            # never lost (FIX-TEAM-HANDOFF-NOT-NOTHING).
+            text = team_reply(text, turn.team, turn.speaker)
         with self._bound(turn):
             turn.live.answer()
             # One message, never several (M4-47): above max_message_bytes the head stays the

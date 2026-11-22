@@ -276,7 +276,9 @@ the run, the answer included, carries the run's own token, which the server need
 answer on. A `team` run without its team facts, and any trigger kind the adapter does not know,
 ends `failed` with `adapter_error` before the start. The team lines also carry the quiet rules
 (a mention only to hand work over, `NOTHING_TO_ADD` when the agent has nothing new to contribute,
-which the server does not mirror; FIX-TEAM-CHANNEL-NOISE). Hermes' status lines (a memory
+which the server does not mirror; FIX-TEAM-CHANNEL-NOISE), never towards a request that mentions
+the agent: a first answer that is only `NOTHING_TO_ADD` to an input that mentions the agent goes
+out as a short visible answer that mentions the member who asked (FIX-TEAM-HANDOFF-NOT-NOTHING). Hermes' status lines (a memory
 plugin's recall line, lifecycle and fallback notices) reach the adapter through
 `send_or_update_status` and are shown as the run's draft, never as a message, in every channel.
 
