@@ -260,7 +260,7 @@ def test_the_member_lead_in_names_the_member_of_the_message_s_team_handle() -> N
 
 
 def test_an_addressed_request_never_offers_the_silent_reply() -> None:
-    # Live 2026-11-22: @agentconductor asked @reviewagent for two paths and a commit; the quiet
+    # Report of 2026-11-22: one member asked another for two paths and a commit; the quiet
     # rules allowed NOTHING_TO_ADD for "say that you wait", so the hand-over was lost.
     text = team_part(message("@web what do you need back from me?", agent=True), facts())
     assert f"never answer {SILENT_REPLY}" in text

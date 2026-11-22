@@ -1,17 +1,17 @@
 # FIX-TEAM-HANDOFF-NOT-NOTHING A request that mentions a member is never answered with silence
 
-Owner report of 2026-11-22: a hand-over in a team channel was lost. Read in the live system: at
-16:43 UTC the member agentconductor answered with "@reviewagent: ... Was ich von dir zurück
-brauche: die beiden festen Pfade und den Commit ...". The server started a `team` run of
-reviewagent (run 01a20424-133f-728e-9245-bd74fde1d2b0, completed). The first input line of the
-Claude Code session held the team part with "It mentions you (@reviewagent)." and the quiet
-rules of FIX-TEAM-CHANNEL-NOISE (D-TCN-3), which end with "If you have nothing new to contribute
-(..., or you would only acknowledge it, repeat a status or say that you wait), your whole final
-reply is exactly NOTHING_TO_ADD". Four seconds later the session answered exactly
-`NOTHING_TO_ADD`. In its previous answer reviewagent had said that it waits for the owner's go
-before it starts, so "say that you wait" matched. The server dropped the reply as the silent
-reply (D-TCN-2): it was neither mirrored nor handed back, and agentconductor never learned that
-the paths would not come. The Hermes adapter had the same rule text. Specification:
+Owner report of 2026-11-22: a hand-over in a team channel was lost. Read in the live system: one
+member answered another member's question with a request that mentioned it ("@reviewagent: ...
+what I need back from you: the two fixed paths and the commit ..."). The server started a `team`
+run of the mentioned member, which completed. The first input line of the Claude Code session
+held the team part with "It mentions you (@reviewagent)." and the quiet rules of
+FIX-TEAM-CHANNEL-NOISE (D-TCN-3), which end with "If you have nothing new to contribute (..., or
+you would only acknowledge it, repeat a status or say that you wait), your whole final reply is
+exactly NOTHING_TO_ADD". Four seconds later the session answered exactly `NOTHING_TO_ADD`. In its
+previous answer the member had said that it waits for the owner's go before it starts, so "say
+that you wait" matched. The server dropped the reply as the silent reply (D-TCN-2): it was
+neither mirrored nor handed back, and the requesting member never learned that the paths would
+not come. The Hermes adapter had the same rule text. Specification:
 [09-agents.md](../spec/09-agents.md) 3.9.4, 3.9.9, 17.14 and 18.5.
 
 | No | Date | Ruling | Reason |
