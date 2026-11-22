@@ -446,7 +446,8 @@ are never copied and never count towards the cap. The server reads the main thre
 that size, at most the fixed number of pages `teamHistoryPages`, so a long run of other texts
 never makes the add scan the whole thread; an eligible message beyond them is not copied. The
 checks of 3.9.5 points 1 to 3 run once for the history; one audit entry with stage `team_context`
-and source `history` records it.
+and source `history` records it. A main thread without any person's text message or mirror has no
+history: nothing is checked, copied or audited.
 
 A reply is mirrored and handed on only when the run it answers was started and fed only by active
 owners. The run a reply answers is the one 03 `run_answers` links it to, never the `run_id` the
