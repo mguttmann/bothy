@@ -24,6 +24,8 @@ export {
   type SendWebhookOptions,
   type TimingKey,
   type Timings,
+  type TriggerOptions,
+  type UploadView,
 } from "./fakeserver.js";
 export { Fault, FaultKind } from "./faults.js";
 export {

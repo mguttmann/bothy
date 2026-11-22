@@ -813,11 +813,9 @@ describe("InvocationVerifier", () => {
     );
   });
 
-  it("refuses a command trigger without a counterpart in the payload", async () => {
-    const env = new Env();
-    const { issuer } = env;
-    const commandInvocation = uuidv7();
-    const event = {
+  /** An `agent.invocation` of a model command as the server builds it (M2-16). */
+  function commandInvocation(issuer: Issuer, members: Json): Json {
+    return {
       type: "agent.invocation",
       payload: {
         run_id: issuer.grant.run_id,
@@ -826,9 +824,48 @@ describe("InvocationVerifier", () => {
         trigger_kind: "command",
         triggered_by: principal(),
         billing_mode: "organization",
-        command_invocation_id: commandInvocation,
+        command_name: "escalate",
+        options: [],
+        ...members,
       },
     };
+  }
+
+  it("accepts a command trigger whose command_id is the payload's", async () => {
+    const env = new Env();
+    const { issuer } = env;
+    const commandId = uuidv7();
+    const invocationId = uuidv7();
+    const event = commandInvocation(issuer, {
+      command_id: commandId.toUpperCase(),
+      command_invocation_id: invocationId,
+    });
+    const expectation = expectationFor("agent.invocation", event);
+    // The token names the command (09 10.4), compared in the canonical lower-case form.
+    expect([expectation.triggerClaim, expectation.triggerId]).toEqual([
+      "command_id",
+      commandId,
+    ]);
+    const command = { trigger_kind: "command", message_id: null };
+    // A token that names the invocation instead of the command is refused.
+    const other = issuer.token({ ...command, command_id: invocationId });
+    expect(await env.verdict(other, expectation)).toBe(TokenVerdict.INVALID);
+    const tok = issuer.token({ ...command, command_id: commandId });
+    const check = await env.verifier.check(tok, expectation, ACTUAL);
+    expect(check.verdict).toBe(TokenVerdict.VALID);
+    expect([check.claims?.triggerKind, check.claims?.commandId]).toEqual([
+      "command",
+      commandId,
+    ]);
+  });
+
+  it("refuses a command trigger without a command_id in the payload", async () => {
+    const env = new Env();
+    const { issuer } = env;
+    const invocationId = uuidv7();
+    const event = commandInvocation(issuer, {
+      command_invocation_id: invocationId,
+    });
     const expectation = expectationFor("agent.invocation", event);
     expect([expectation.triggerClaim, expectation.triggerId]).toEqual([
       "command_id",
@@ -838,12 +875,12 @@ describe("InvocationVerifier", () => {
     const tok = issuer.token({
       trigger_kind: "command",
       message_id: null,
-      command_id: commandInvocation,
+      command_id: invocationId,
     });
     const check = await env.verifier.check(tok, expectation, ACTUAL);
     expect(check.verdict).toBe(TokenVerdict.INVALID);
     // Nothing was remembered: the same token against a complete expectation still passes.
-    const full: Expectation = { ...expectation, triggerId: commandInvocation };
+    const full: Expectation = { ...expectation, triggerId: invocationId };
     expect(await env.verdict(tok, full)).toBe(TokenVerdict.VALID);
   });
 

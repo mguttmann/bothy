@@ -13,7 +13,7 @@ import { createHash } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import { createApiClient, type ApiClient } from "../src/client.js";
+import { createApiClient, unwrap, type ApiClient } from "../src/client.js";
 import { silentLogger } from "../src/logger.js";
 import {
   OVERFLOW_NAME,
@@ -21,6 +21,7 @@ import {
   splitForLimit,
 } from "../src/outbox/index.js";
 import { Outbox, OutboxState } from "../src/outbox/index.js";
+import { FakeServer } from "../src/testing/fakeserver.js";
 
 type Json = Record<string, unknown>;
 
@@ -335,5 +336,60 @@ describe("sendLongMessage", () => {
     expect(String(server.messages[0]?.content_md)).toContain(
       "could not be attached",
     );
+  });
+});
+
+describe("sendLongMessage against the FakeServer", () => {
+  it("uploads the rest in parts and attaches it to the one message", async () => {
+    const fake = new FakeServer();
+    await fake.start();
+    try {
+      fake.limits.message_max_content_bytes = 200;
+      fake.uploadPartSize = 64;
+      const api = createApiClient({
+        baseUrl: fake.baseUrl,
+        token: fake.credentials.apiToken,
+        dpopKey: fake.credentials.dpop,
+        clock: fake.clock,
+        logger: silentLogger,
+        settings: fake.sdkSettings,
+      });
+      const channels = await unwrap(
+        api.GET("/agents/me/channels"),
+        "listServedChannels",
+      );
+      const channelId = channels.items[0]?.channel_id ?? "";
+      const { threadId } = await fake.trigger();
+      const text = Array.from(
+        { length: 40 },
+        (_, i) => `line ${i} of a long answer`,
+      ).join("\n");
+      const entry = await sendLongMessage(
+        api,
+        new Outbox(api),
+        threadId,
+        channelId,
+        text,
+      );
+      expect(entry.state).toBe(OutboxState.SENT);
+      expect(fake.messages).toHaveLength(1);
+      const sent = fake.messages[0] ?? {};
+      const head = String(sent.content_md);
+      expect(bytes(head)).toBeLessThanOrEqual(200);
+      const ids = sent.attachment_file_ids as string[];
+      expect(ids).toHaveLength(1);
+      const upload = fake.upload(ids[0] ?? "");
+      expect([upload?.name, upload?.state]).toEqual([
+        OVERFLOW_NAME,
+        "complete",
+      ]);
+      expect(upload?.attachedTo).toBeDefined();
+      expect(upload?.parts).toBeGreaterThan(1);
+      // Nothing is lost: head and attachment are the whole answer.
+      const rest = Buffer.from(upload?.content ?? []).toString("utf8");
+      expect(head + rest).toBe(text);
+    } finally {
+      await fake.stop();
+    }
   });
 });

@@ -82,6 +82,24 @@ const NIL_UUID = "00000000-0000-0000-0000-000000000000";
 /** One answer line of `sdkserver`, decoded. */
 type Answer = Record<string, unknown>;
 
+/** The answer of an API operation performed with {@link RealServer.call}. */
+export interface CallResult {
+  /** The HTTP status. */
+  readonly status: number;
+  /** The JSON body; empty when the answer had none. */
+  readonly body: Readonly<Record<string, unknown>>;
+}
+
+/** The parts of an API request of {@link RealServer.call}. */
+export interface CallOptions {
+  /** The path parameters. */
+  readonly path?: Readonly<Record<string, string>>;
+  /** The query parameters. */
+  readonly query?: Readonly<Record<string, string>>;
+  /** The JSON body. */
+  readonly body?: unknown;
+}
+
 /** The lines of a stream in order; `undefined` once the stream ended. */
 class Lines {
   readonly #queue: string[] = [];
@@ -167,6 +185,8 @@ export class RealServer implements ScenarioServer {
   agentId = NIL_UUID;
   /** Texter, set by {@link RealServer.start}. */
   otherAgentId = NIL_UUID;
+  /** The channel Support/Allgemein that Lotse operates, set by {@link RealServer.start}. */
+  channelId = NIL_UUID;
   /** Lotse's API token and DPoP key, set by {@link RealServer.start}. */
   credentials: Credentials = { apiToken: new Secret("unset") };
 
@@ -246,6 +266,10 @@ export class RealServer implements ScenarioServer {
     this.instanceId = text(ready, "instance_id");
     this.agentId = text(ready, "agent_id");
     this.otherAgentId = text(ready, "other_agent_id");
+    const world = ready.world;
+    if (typeof world !== "object" || world === null)
+      throw new Error("sdkserver answer without world");
+    this.channelId = text(world as Answer, "channel_id");
     this.credentials = {
       apiToken: await this.#readToken(text(ready, "token_file")),
       dpop: key,
@@ -265,6 +289,37 @@ export class RealServer implements ScenarioServer {
       threadId: text(a, "thread_id"),
       messageId: text(a, "message_id"),
     };
+  }
+
+  /**
+   * Performs an operation of `docs/api/openapi.yaml` through the real HTTP chain as Alex or the
+   * owner (the op `call` of the program).
+   *
+   * @param as - `alex` or `owner` (the owner with a fresh step-up).
+   * @param operationId - The `operationId`.
+   * @param options - Path parameters, query and JSON body.
+   * @returns Status and JSON body; the answer file of the program is removed.
+   */
+  async call(
+    as: "alex" | "owner",
+    operationId: string,
+    options: CallOptions = {},
+  ): Promise<CallResult> {
+    const a = await this.#call({
+      op: "call",
+      as,
+      operation_id: operationId,
+      path_params: options.path ?? {},
+      query: options.query ?? {},
+      ...(options.body === undefined ? {} : { body: options.body }),
+    });
+    const file = text(a, "file");
+    const raw = JSON.parse(await readFile(file, "utf8")) as {
+      status: number;
+      body?: Record<string, unknown>;
+    };
+    await unlink(file);
+    return { status: raw.status, body: raw.body ?? {} };
   }
 
   /**

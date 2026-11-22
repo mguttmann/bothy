@@ -32,6 +32,22 @@ import { isRunEnded, RunPatcher } from "./patcher.js";
 
 type S = components["schemas"];
 
+const SERVER_ERROR = 500;
+// Refused before the run was touched: the request never reached the run.
+const NOT_STORED: ReadonlySet<number> = new Set([401, 429]);
+
+/**
+ * Tells whether a failed `finishRun` left the end unstored: no answer arrived, or the server
+ * answered `5xx`, `401` or `429`. Any other answer is the server's decision about the end.
+ */
+function endNotStored(error: unknown): boolean {
+  if (error instanceof TransportError) return true;
+  return (
+    error instanceof ProblemError &&
+    (error.status >= SERVER_ERROR || NOT_STORED.has(error.status))
+  );
+}
+
 /**
  * The outbox a {@link RunHandle} replies through; the outbox of `outbox` fits. The handle adds
  * `runId` to the options.
@@ -101,7 +117,10 @@ export class RunHandle {
   tokenJti: string | undefined;
   /** The outbox for replies. */
   readonly outbox: RunOutbox | undefined;
-  /** `true` once {@link RunHandle.finish} ran. */
+  /**
+   * `true` once {@link RunHandle.finish} ran; `false` again when the server did not store the
+   * end (see {@link RunHandle.finishPending}).
+   */
   finished = false;
   /** `true` while the run waits for input. */
   waiting = false;
@@ -110,6 +129,13 @@ export class RunHandle {
   private readonly onWaiting: (() => Promise<void>) | undefined;
   private readonly cancelController = new AbortController();
   private patcher: RunPatcher | undefined;
+  // The first end asked for; it is the run's end, also when it has to be sent again.
+  private end:
+    | {
+        readonly state: S["RunFinish"]["state"];
+        readonly options: FinishOptions;
+      }
+    | undefined;
 
   /**
    * Creates the handle of a run that has not started yet.
@@ -301,16 +327,30 @@ export class RunHandle {
   }
 
   /**
+   * `true` while {@link RunHandle.finish} was called and the server did not store the end: no
+   * answer arrived, or it answered `5xx`, `401` or `429`. The run is then still running on the
+   * server; the adapter keeps it and sends the end again ({@link RunHandle.retryFinish}).
+   */
+  get finishPending(): boolean {
+    return this.end !== undefined && !this.finished;
+  }
+
+  /**
    * Ends the run (`finishRun`) after sending pending patches.
    *
    * A final flush refused by the server or without an answer is dropped, and a `finishRun` answered with `run_inactive` or
    * `run_not_active` counts as already ended, not as an error; the server answers a repeated
    * equal end state with `200`. A second call does nothing.
    *
+   * When the server did not store the end (no answer, `5xx`, `401` or `429`), the call throws
+   * and the handle stays unfinished with {@link RunHandle.finishPending} set. The first end
+   * asked for is the run's end: a later call sends that end again, whatever it asks for.
+   *
    * @param state - `completed`, `failed` or `cancelled`.
    * @param options - `reason`, `summary`, `metrics` and `costs`.
    * @returns A promise that resolves when the run has ended.
-   * @throws {@link ProblemError} for another refusal of the server.
+   * @throws {@link ProblemError} for another refusal of the server; `TransportError` when no
+   *   answer arrived.
    */
   async finish(
     state: S["RunFinish"]["state"],
@@ -318,7 +358,11 @@ export class RunHandle {
   ): Promise<void> {
     if (this.finished) return;
     this.finished = true;
-    if (this.patcher !== undefined) {
+    const again = this.end !== undefined;
+    this.end ??= { state, options };
+    const end = this.end;
+    // The patcher was flushed and stopped by the first call.
+    if (!again && this.patcher !== undefined) {
       try {
         await this.patcher.flush();
       } catch (error) {
@@ -328,11 +372,11 @@ export class RunHandle {
       }
       await this.patcher.aclose();
     }
-    const body: S["RunFinish"] = { state };
-    if (options.reason !== undefined) body.reason = options.reason;
-    if (options.summary !== undefined) body.summary = options.summary;
-    if (options.metrics !== undefined) body.metrics = options.metrics;
-    if (options.costs?.length) body.costs = [...options.costs];
+    const body: S["RunFinish"] = { state: end.state };
+    if (end.options.reason !== undefined) body.reason = end.options.reason;
+    if (end.options.summary !== undefined) body.summary = end.options.summary;
+    if (end.options.metrics !== undefined) body.metrics = end.options.metrics;
+    if (end.options.costs?.length) body.costs = [...end.options.costs];
     try {
       await unwrap(
         this.client.POST("/runs/{run_id}/finish", {
@@ -342,11 +386,29 @@ export class RunHandle {
         "finishRun",
       );
     } catch (error) {
-      if (!(error instanceof ProblemError) || !isRunEnded(error)) throw error;
-      this.client.logger.info(`run ${this.runId} already ended on the server`, {
-        run: this.runId,
-        code: error.code,
-      });
+      if (error instanceof ProblemError && isRunEnded(error)) {
+        this.client.logger.info(
+          `run ${this.runId} already ended on the server`,
+          { run: this.runId, code: error.code },
+        );
+        return;
+      }
+      // Without a decision of the server the run is still running there: not finished.
+      if (endNotStored(error)) this.finished = false;
+      throw error;
     }
+  }
+
+  /**
+   * Sends the end again that {@link RunHandle.finish} asked for and the server did not store;
+   * does nothing when no end is pending.
+   *
+   * @returns A promise that resolves when the run has ended.
+   * @throws {@link ProblemError} for a refusal of the server; `TransportError` when no answer
+   *   arrived (the end stays pending).
+   */
+  async retryFinish(): Promise<void> {
+    if (this.end !== undefined)
+      await this.finish(this.end.state, this.end.options);
   }
 }

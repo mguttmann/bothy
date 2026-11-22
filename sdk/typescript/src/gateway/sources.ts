@@ -496,7 +496,8 @@ type PollOutcome =
  *
  * It polls again at once after a non-empty page and waits `sdk.poll_interval` after an empty
  * one; it sends the agent heartbeat with `sendHeartbeat` every `HeartbeatAck.interval_ms` (the
- * first at once, `sdk.poll_interval` until an answer names the interval). A failed poll waits
+ * first at once, `sdk.poll_interval` until an answer names the interval; an answer without a
+ * finite interval above zero keeps the current one). A failed poll waits
  * with full jitter between zero and `min(sync.reconnect_backoff_cap,
  * sync.reconnect_backoff_base * 2^n)`; `401` and `403` stop it for good.
  */
@@ -651,7 +652,11 @@ export class PollingSource implements EventSource {
             this.client.POST("/agents/me/heartbeat", { body }),
             "sendHeartbeat",
           );
-          interval = ack.interval_ms;
+          // A missing or senseless interval keeps the current one, so the loop never spins
+          // (the rule of `HeartbeatSender.beatOnce`).
+          const next: unknown = ack.interval_ms;
+          if (typeof next === "number" && Number.isFinite(next) && next > 0)
+            interval = next;
         } catch {
           // A failed heartbeat is retried in the next interval.
           this.logger.info("heartbeat failed; retrying in the next interval");
