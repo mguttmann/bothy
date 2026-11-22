@@ -132,6 +132,7 @@ from claude_code_runner.searchassist import SearchAssistant
 from claude_code_runner.secrets import SecretError, resolve
 from claude_code_runner.statedir import ensure_private_dir, sweep
 from claude_code_runner.stop import stop_group
+from claude_code_runner.team import ACCEPTED_TRIGGER_KINDS, facts_of
 from claude_code_runner.transcribe import Transcriber
 from claude_code_runner.trash import FolderTrash, GitRunner, TrashPlaces
 from claude_code_runner.turn import remove_turn_record, write_turn_record
@@ -1280,8 +1281,10 @@ class RunnerHandler(AgentHandler):
         self._runs[run.run_id] = state
         ids = {"run_id": run.run_id, "thread_id": state.thread_id, "channel_id": state.channel_id}
         self._phase(state, "preparing")  # with the key: written when the run is accepted
-        if str(payload.trigger_kind) != "message":
+        if str(payload.trigger_kind) not in ACCEPTED_TRIGGER_KINDS:
             refuse("trigger_kind_unsupported", "adapter_error", ids)
+        state.team_run = str(payload.trigger_kind) == "team"
+        state.team = facts_of(payload)
         binding = await self._binding(payload)
         default = self.config.default_workspace
         if binding is None and not self._serves(payload.channel_id):

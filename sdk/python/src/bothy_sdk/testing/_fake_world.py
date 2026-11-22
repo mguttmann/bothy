@@ -433,7 +433,7 @@ class World:
         }
         return UUID(message["id"])
 
-    def trigger(  # noqa: PLR0913 - the parts of a trigger a scenario chooses
+    def trigger(  # noqa: PLR0912, PLR0913 - the parts of a trigger a scenario chooses
         self,
         text: str,
         *,
@@ -447,8 +447,15 @@ class World:
         files: tuple[ContextFile, ...] = (),
         session_mode: str | object | None = AUTO_SESSION,
         command: tuple[dict[str, Any], Mapping[str, str]] | None = None,
+        authority: Person | str | None = None,
+        team: Mapping[str, Any] | None = None,
     ) -> RunRecord:
         """A message (in a new thread or ``thread_id``), a queued run and its ``agent.invocation``.
+
+        ``trigger_kind = team`` makes the message a team input (09 3.9.9): ``author`` writes it
+        (an agent's input has origin ``agent``), ``authority`` is the run's ``triggered_by`` and
+        the token's ``sub`` (the author when omitted), and ``team`` is the payload's member
+        ``team``.
 
         ``trigger_kind = interaction`` names an interaction instead of the message in the
         payload and the token (a run an interaction opens, M2-15). ``history`` are messages
@@ -458,6 +465,7 @@ class World:
         session (09 3.6); a mode sends that mode with the current session, if any (09 9.1).
         """
         person = self.by_handle[author] if isinstance(author, str) else (author or self.alex)
+        acting = self.by_handle[authority] if isinstance(authority, str) else (authority or person)
         channel = channel_id or self.channel_id
         # An unserved channel is a guest run's (09 3.6): Lotse is mentioned, not the operator.
         if channel not in self.channels and channel not in self.unserved:
@@ -477,14 +485,14 @@ class World:
             *attachments,
             *(f.file_id for f in files),
         ]
-        obj = message["id"] if trigger_kind == "message" else str(uuid7())
+        obj = message["id"] if trigger_kind in ("message", "team") else str(uuid7())
         invocation = obj
         if command is not None:
             obj = str(command[0]["id"])  # the token names the command (09 10.4)
         run = RunRecord(
             id=uuid7(),
             thread_id=thread_id,
-            triggered_by=person.id,
+            triggered_by=acting.id,
             triggering_message_id=UUID(message["id"]),
             queued_at=self.now(),
             billing_mode_expected=self.billing_mode,
@@ -501,7 +509,7 @@ class World:
             "channel_id": str(channel),
             "space_id": str(self.space_id),
             "trigger_kind": trigger_kind,
-            "triggered_by": person.ref(),
+            "triggered_by": acting.ref(),
             "billing_mode": self.billing_mode,
             "settings_version": (self.channels.get(channel) or self.unserved[channel])["behavior"][
                 "settings_version"
@@ -510,6 +518,8 @@ class World:
         payload[
             TRIGGER_OBJECT[trigger_kind] if trigger_kind != "command" else "command_invocation_id"
         ] = invocation
+        if team is not None:
+            payload["team"] = dict(team)
         if command is not None:
             definition, values = command
             payload["command_id"] = definition["id"]
@@ -529,7 +539,7 @@ class World:
             payload,
             resource={"kind": "run", "id": str(run.id)},
             thread_id=thread_id,
-            actor=person,
+            actor=acting,
         )
         self.append("agent.invocation", envelope)
         return run
@@ -881,14 +891,17 @@ class World:
 
     # Invocation-Token header (SR9) --------------------------------------------------------
 
-    def bind(self, values: list[str], operation_id: str) -> None:
+    def bind(self, values: list[str], operation_id: str) -> UUID | None:
         """Check the ``Invocation-Token`` header of a request.
+
+        Returns:
+            The run the header's token names, ``None`` without a header.
 
         Raises:
             FakeProblem: ``403 invocation_token_invalid`` with ``invalid`` or ``run_inactive``.
         """
         if not values:
-            return
+            return None
         invalid = FakeProblem("invocation_token_invalid", reason="invalid")
         if len(values) != 1 or not values[0]:
             raise invalid
@@ -905,9 +918,9 @@ class World:
         run = self.runs.get(UUID(claims["run_id"]))
         if run is None:
             raise invalid
-        # 07 SR9: only message and command tokens name the run's triggering person; an
+        # 07 SR9: only message, team and command tokens name the run's triggering person; an
         # interaction or follow-up token names the person who acted.
-        triggering = claims.get("trigger_kind") in ("message", "command")
+        triggering = claims.get("trigger_kind") in ("message", "team", "command")
         if triggering and claims["sub"] != str(run.triggered_by):
             raise invalid
         if claims["thread_id"] != str(run.thread_id):
@@ -920,6 +933,7 @@ class World:
             "finishRun",
         ):
             raise FakeProblem("invocation_token_invalid", reason="run_inactive")
+        return run.id
 
     # Run operations -----------------------------------------------------------------------
 
@@ -1006,7 +1020,7 @@ class World:
         )
         if not known or run.started_jti == jti:
             raise FakeProblem("invocation_token_invalid", reason="superseded")
-        if claims["trigger_kind"] not in ("message", "followup"):
+        if claims["trigger_kind"] not in ("message", "team", "followup"):
             raise FakeProblem("internal_error")
         obj = TRIGGER_OBJECT[claims["trigger_kind"]]
         fresh = self._claims(
@@ -1180,7 +1194,7 @@ class World:
         (09 4.6). A follow-up comes after the trigger, so an adapter reads it with ``getMessage``.
         """
         run = self.run_or_404(run_id)
-        if run.trigger_kind != "message":
+        if run.trigger_kind not in ("message", "team"):
             # The real server defines the context for a triggering message only (09 4.6) and
             # answers any other trigger kind with 500 (runs/app/runcontext.go).
             raise FakeProblem("internal_error")

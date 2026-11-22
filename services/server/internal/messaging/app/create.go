@@ -496,6 +496,10 @@ func (s *Service) posted(a actor.Actor, info chat.ThreadInfo, m messaging.Messag
 		d := a.DeviceID
 		ev.AuthorDeviceID = &d
 	}
+	if a.ActingFor.Status == actor.ActingForBound && !a.ActingFor.RunID.IsZero() {
+		r := a.ActingFor.RunID
+		ev.ActingRunID = &r
+	}
 	if !m.ReplyToID.IsZero() {
 		r := m.ReplyToID
 		ev.ReplyToID = &r

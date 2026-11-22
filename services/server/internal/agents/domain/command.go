@@ -22,7 +22,7 @@ import (
 
 // reservedCommandNames are the built-in commands of 09 section 10.1 in the order of its table.
 // TestReservedNamesMatchChapter09 holds them equal to the chapter.
-var reservedCommandNames = []string{"stop", "status", "new", "resume", "title", "close"}
+var reservedCommandNames = []string{"stop", "status", "new", "resume", "title", "close", "team"}
 
 // ReservedCommandNames returns the names of the built-in commands, in a new slice.
 func ReservedCommandNames() []string { return slices.Clone(reservedCommandNames) }

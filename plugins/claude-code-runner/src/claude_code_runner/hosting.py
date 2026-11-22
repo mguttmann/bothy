@@ -128,6 +128,7 @@ from claude_code_runner.reply_upload import remove_run_files
 from claude_code_runner.runturn import RunState, RunTurn
 from claude_code_runner.statedir import hosted_dir, is_private_dir, sweep
 from claude_code_runner.stop import stop_group
+from claude_code_runner.team import ACCEPTED_TRIGGER_KINDS, facts_of
 from claude_code_runner.toolclass import ORDER, lower
 from claude_code_runner.transcribe import Transcriber
 from claude_code_runner.turn import remove_turn_record
@@ -805,8 +806,10 @@ class HostedHandler(AgentHandler):
         state = RunState(run.run_id, payload.thread_id, payload.channel_id)
         self._runs[run.run_id] = state
         ids = {"run_id": run.run_id, "agent_id": self.agent_id, "thread_id": state.thread_id}
-        if str(payload.trigger_kind) != "message":
+        if str(payload.trigger_kind) not in ACCEPTED_TRIGGER_KINDS:
             _refuse("trigger_kind_unsupported", "adapter_error", ids)
+        state.team_run = str(payload.trigger_kind) == "team"
+        state.team = facts_of(payload)
         session = payload.agent_session
         state.agent_session = session if isinstance(session, AgentSession) else None
         mode = getattr(payload.session_mode, "value", None)

@@ -103,15 +103,25 @@ func (a *Acceptor) OnMessageDeleted(ctx context.Context, ev messaging.MessageDel
 	return s.deleteComponentsOf(ctx, ev.MessageID)
 }
 
-// accept is the acceptance of one new message. The owner's switch supports_files_out comes before
-// every other branch (M3-07); then the answer check of M2-19 (design note 2 f): an agent message
-// that names a run is checked and may veto the unit; then every message whose origin is not human,
-// or whose kind is neither text nor voice (M3-09), returns without trigger work (AG-01, 07 SR4).
+// accept is the acceptance of one new message. A copy of a team channel returns at once. The
+// owner's switch supports_files_out comes before every other branch (M3-07); then the answer check
+// of M2-19 (design note 2 f): an agent message that names a run is checked and may veto the unit;
+// then the hook of the team channels (09 3.9); then every message whose origin is not human, or
+// whose kind is neither text nor voice (M3-09), returns without trigger work (AG-01, 07 SR4).
 func (s *Service) accept(ctx context.Context, ev messaging.MessagePosted) error {
+	if ev.Relay {
+		// A copy of a team channel (09 3.9.2): the team use case that wrote it decided it.
+		return nil
+	}
 	if err := s.checkFilesOut(ctx, ev); err != nil {
 		return err
 	}
 	if err := s.answer(ctx, ev); err != nil {
+		return err
+	}
+	// In a team channel 3.4 decides nothing; an owner's message and a member's reply go to the job
+	// runs.team_input (09 3.9.3, 3.9.4).
+	if team, err := s.teamHook(ctx, ev); err != nil || team {
 		return err
 	}
 	if ev.Origin != originHuman || (ev.Kind != kindText && ev.Kind != kindVoice) {
@@ -151,10 +161,19 @@ func (s *Service) acceptTrigger(ctx context.Context, ev messaging.MessagePosted)
 }
 
 // answer is the first branch of accept: an agent's answer that names a run in run_id is checked
-// (M2-19); every other message passes.
+// (M2-19) and linked to its run in run_answers only when the request carried the invocation token
+// of exactly that run (ActingRunID, 07 SR9); the live box anchor the server writes for its run is
+// linked always. run_id alone is the agent's own claim: an agent steered in another run could name
+// a concurrent run of the thread, so an answer without that token is accepted without a link and
+// speaks for no person in a later run context and for no run in a team channel (09 3.9.4); every
+// other message passes.
 func (s *Service) answer(ctx context.Context, ev messaging.MessagePosted) error {
-	if ev.RunID == nil || ev.Kind == kindRun {
+	if ev.RunID == nil {
 		return nil
+	}
+	if ev.Kind == kindRun {
+		// The live box anchor of a run the server opened (M2-05).
+		return s.d.Repo.RecordAnswer(ctx, ev.MessageID, *ev.RunID)
 	}
 	if ev.Origin != originAgent {
 		// messaging never builds this event; a run_id of another origin is a defect.
@@ -163,7 +182,14 @@ func (s *Service) answer(ctx context.Context, ev messaging.MessagePosted) error 
 	if ev.Kind == kindSystem {
 		return nil
 	}
-	return s.checkAnswer(ctx, ev)
+	if err := s.checkAnswer(ctx, ev); err != nil {
+		return err
+	}
+	if ev.ActingRunID == nil || *ev.ActingRunID != *ev.RunID {
+		return nil
+	}
+	// The run context gives this text the record of the run it answers (03 run_answers, 09 3.9.4).
+	return s.d.Repo.RecordAnswer(ctx, ev.MessageID, *ev.RunID)
 }
 
 // redecide asks settle's caller for another round with run as the locked active run of the

@@ -89,6 +89,12 @@ func (s *Service) Update(ctx context.Context, c messaging.UpdateCommand) (messag
 		// A system line is the server's, even though its author column names a person.
 		return messaging.Message{}, errs.New(errs.CodeForbidden, "a system line cannot be edited")
 	}
+	if m.Kind == domain.KindRun {
+		// A live box anchor is the server's too: its box changes only through run.update of its
+		// run (09 5.4), and an edited anchor would carry text its run never wrote while it stays
+		// linked to that run (03 run_answers).
+		return messaging.Message{}, errs.New(errs.CodeForbidden, "a live box anchor cannot be edited")
+	}
 	var out messaging.Message
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		var err error

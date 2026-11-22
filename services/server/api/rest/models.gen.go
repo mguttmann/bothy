@@ -581,6 +581,7 @@ const (
 	AgentInvocationPayloadTriggerKindCommand     AgentInvocationPayloadTriggerKind = "command"
 	AgentInvocationPayloadTriggerKindInteraction AgentInvocationPayloadTriggerKind = "interaction"
 	AgentInvocationPayloadTriggerKindMessage     AgentInvocationPayloadTriggerKind = "message"
+	AgentInvocationPayloadTriggerKindTeam        AgentInvocationPayloadTriggerKind = "team"
 	AgentInvocationPayloadTriggerKindWake        AgentInvocationPayloadTriggerKind = "wake"
 )
 
@@ -592,6 +593,8 @@ func (e AgentInvocationPayloadTriggerKind) Valid() bool {
 	case AgentInvocationPayloadTriggerKindInteraction:
 		return true
 	case AgentInvocationPayloadTriggerKindMessage:
+		return true
+	case AgentInvocationPayloadTriggerKindTeam:
 		return true
 	case AgentInvocationPayloadTriggerKindWake:
 		return true
@@ -741,6 +744,24 @@ const (
 func (e AgentSessionReportBindFailed) Valid() bool {
 	switch e {
 	case SessionMissing:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentTeamFactsSource.
+const (
+	AgentTeamFactsSourceMember AgentTeamFactsSource = "member"
+	AgentTeamFactsSourceOwner  AgentTeamFactsSource = "owner"
+)
+
+// Valid indicates whether the value is a known member of the AgentTeamFactsSource enum.
+func (e AgentTeamFactsSource) Valid() bool {
+	switch e {
+	case AgentTeamFactsSourceMember:
+		return true
+	case AgentTeamFactsSourceOwner:
 		return true
 	default:
 		return false
@@ -4046,6 +4067,7 @@ const (
 	RunTriggerKindCommand     RunTriggerKind = "command"
 	RunTriggerKindInteraction RunTriggerKind = "interaction"
 	RunTriggerKindMessage     RunTriggerKind = "message"
+	RunTriggerKindTeam        RunTriggerKind = "team"
 	RunTriggerKindWake        RunTriggerKind = "wake"
 )
 
@@ -4057,6 +4079,8 @@ func (e RunTriggerKind) Valid() bool {
 	case RunTriggerKindInteraction:
 		return true
 	case RunTriggerKindMessage:
+		return true
+	case RunTriggerKindTeam:
 		return true
 	case RunTriggerKindWake:
 		return true
@@ -5454,6 +5478,27 @@ func (e TargetKind) Valid() bool {
 	case TargetKindInstance:
 		return true
 	case TargetKindSpace:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TeamPauseReason.
+const (
+	Pingpong   TeamPauseReason = "pingpong"
+	Stopped    TeamPauseReason = "stopped"
+	TurnBudget TeamPauseReason = "turn_budget"
+)
+
+// Valid indicates whether the value is a known member of the TeamPauseReason enum.
+func (e TeamPauseReason) Valid() bool {
+	switch e {
+	case Pingpong:
+		return true
+	case Stopped:
+		return true
+	case TurnBudget:
 		return true
 	default:
 		return false
@@ -7707,7 +7752,7 @@ type AgentInvocationPayload struct {
 	// InteractionId UUIDv7 (RFC 9562), lowercase canonical form.
 	InteractionId *Uuid `json:"interaction_id,omitempty"`
 
-	// MessageId Triggering message; the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2).
+	// MessageId Triggering message, for `trigger_kind = team` the input in the member's work thread (09 3.9.2); the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2).
 	MessageId *Uuid `json:"message_id,omitempty"`
 
 	// Options Parsed option values in the order of the command definition; set exactly for `trigger_kind = command`.
@@ -7724,6 +7769,9 @@ type AgentInvocationPayload struct {
 
 	// SpaceId UUIDv7 (RFC 9562), lowercase canonical form.
 	SpaceId *Uuid `json:"space_id,omitempty"`
+
+	// Team The team facts of a member's run; set exactly for `trigger_kind = team` (09 3.9.9).
+	Team *AgentTeamFacts `json:"team,omitempty"`
 
 	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
 	ThreadId    Uuid                              `json:"thread_id"`
@@ -8042,6 +8090,40 @@ type AgentSessionReport struct {
 
 // AgentSessionReportBindFailed The bound session no longer exists in the runtime and the adapter started a new one (09, 9.5 item 4); only for a started session, otherwise 409 `conflict` with `reason` `session_not_bound`.
 type AgentSessionReportBindFailed string
+
+// AgentTeamFacts The team facts of a `team` run (09 3.9.9). The owner's authority never comes from here; it comes only from the input message (origin `human` and an owner as author).
+type AgentTeamFacts struct {
+	// Addressed The input mentions the receiving member's handle.
+	Addressed bool `json:"addressed"`
+
+	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
+	ChannelId Uuid   `json:"channel_id"`
+	Handle    string `json:"handle"`
+
+	// MemberId UUIDv7 (RFC 9562), lowercase canonical form.
+	MemberId Uuid                 `json:"member_id"`
+	Members  []AgentTeamMember    `json:"members"`
+	Source   AgentTeamFactsSource `json:"source"`
+
+	// SourceHandle The handle of the source member; set exactly for `source = member`.
+	SourceHandle *string `json:"source_handle,omitempty"`
+}
+
+// AgentTeamFactsSource defines model for AgentTeamFacts.Source.
+type AgentTeamFactsSource string
+
+// AgentTeamMember defines model for AgentTeamMember.
+type AgentTeamMember struct {
+	// AgentId UUIDv7 (RFC 9562), lowercase canonical form.
+	AgentId Uuid   `json:"agent_id"`
+	Handle  string `json:"handle"`
+
+	// HomeChannelId UUIDv7 (RFC 9562), lowercase canonical form.
+	HomeChannelId Uuid `json:"home_channel_id"`
+
+	// MemberId UUIDv7 (RFC 9562), lowercase canonical form.
+	MemberId Uuid `json:"member_id"`
+}
 
 // AgentTemplate One agent template (26 7.1): its catalogue entry and the template as a definition draft. A shipped template comes from `templates/agents/<slug>/` of the release, a private one from the folder `agents.templates_dir` of the installation.
 type AgentTemplate struct {
@@ -15199,7 +15281,7 @@ type Run struct {
 	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
 	ThreadId Uuid `json:"thread_id"`
 
-	// TriggerKind `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`.
+	// TriggerKind `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`. `team` is a run of a team channel member; its input in the work thread is `triggering_message_id` (09 3.9.2).
 	TriggerKind *RunTriggerKind `json:"trigger_kind,omitempty"`
 
 	// TriggeredBy UUIDv7 (RFC 9562), lowercase canonical form.
@@ -15219,7 +15301,7 @@ type Run struct {
 	Version          int64 `json:"version"`
 }
 
-// RunTriggerKind `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`.
+// RunTriggerKind `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`. `team` is a run of a team channel member; its input in the work thread is `triggering_message_id` (09 3.9.2).
 type RunTriggerKind string
 
 // RunApiRetry Last retry of a model API call, shown in the live box while set.
@@ -17830,6 +17912,73 @@ type StepUpResult struct {
 // TargetKind `host` is a connected host for the terminal; it has no level and only the capability `terminal` (24, 8.1).
 type TargetKind string
 
+// Team The team of a team channel (09 3.9.1); `pause_reason` is absent while member inputs flow.
+type Team struct {
+	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
+	ChannelId Uuid `json:"channel_id"`
+
+	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	CreatedAt Timestamp `json:"created_at"`
+
+	// MemberTurns Member inputs since an owner's last message (09 3.9.6).
+	MemberTurns int32        `json:"member_turns"`
+	Members     []TeamMember `json:"members"`
+
+	// PauseReason Why member inputs are paused (09 3.9.6, 3.9.7); an owner message lifts every pause.
+	PauseReason *TeamPauseReason `json:"pause_reason,omitempty"`
+
+	// SponsorId The active owner on whose behalf member inputs run (09 3.9.2).
+	SponsorId Uuid `json:"sponsor_id"`
+
+	// TurnBudget The value of `team.turn_budget` now.
+	TurnBudget int32 `json:"turn_budget"`
+	Version    int64 `json:"version"`
+}
+
+// TeamMember A member of a team channel (09 3.9.1).
+type TeamMember struct {
+	// AgentId UUIDv7 (RFC 9562), lowercase canonical form.
+	AgentId Uuid `json:"agent_id"`
+
+	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	CreatedAt Timestamp `json:"created_at"`
+
+	// Handle Examples: coding
+	Handle string `json:"handle"`
+
+	// HomeChannelId UUIDv7 (RFC 9562), lowercase canonical form.
+	HomeChannelId Uuid `json:"home_channel_id"`
+
+	// Id UUIDv7 (RFC 9562), lowercase canonical form.
+	Id Uuid `json:"id"`
+
+	// WorkThreadId The member's thread in its home channel, where its inputs and runs live.
+	WorkThreadId Uuid `json:"work_thread_id"`
+}
+
+// TeamMemberCreate defines model for TeamMemberCreate.
+type TeamMemberCreate struct {
+	// AgentId UUIDv7 (RFC 9562), lowercase canonical form.
+	AgentId Uuid `json:"agent_id"`
+
+	// Handle Unique in the team channel, at most `team.handle_max_chars` characters.
+	//
+	// Examples: coding
+	Handle string `json:"handle"`
+
+	// HomeChannelId A channel the agent operates (its effective operator); a project forum for a runner.
+	HomeChannelId Uuid `json:"home_channel_id"`
+}
+
+// TeamPauseReason Why member inputs are paused (09 3.9.6, 3.9.7); an owner message lifts every pause.
+type TeamPauseReason string
+
+// TeamStopResult defines model for TeamStopResult.
+type TeamStopResult struct {
+	// StoppedRunIds The runs the stop ended or asked to end.
+	StoppedRunIds []Uuid `json:"stopped_run_ids"`
+}
+
 // Template defines model for Template.
 type Template struct {
 	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
@@ -19297,6 +19446,9 @@ type KeyPath = string
 // Limit Page size. Default `api.page_size_default`; larger values than `api.page_size_max` are capped.
 type Limit = PageLimit
 
+// MemberIdPath UUIDv7 (RFC 9562), lowercase canonical form.
+type MemberIdPath = Uuid
+
 // MessageIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type MessageIdPath = Uuid
 
@@ -19877,6 +20029,18 @@ type UpdateForumTagParams struct {
 
 // MoveForumTagParams defines parameters for MoveForumTag.
 type MoveForumTagParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// AddTeamMemberParams defines parameters for AddTeamMember.
+type AddTeamMemberParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// StopChannelTeamParams defines parameters for StopChannelTeam.
+type StopChannelTeamParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
@@ -21140,6 +21304,9 @@ type UpdateForumTagJSONRequestBody = ForumTagUpdate
 
 // MoveForumTagJSONRequestBody defines body for MoveForumTag for application/json ContentType.
 type MoveForumTagJSONRequestBody = MovePosition
+
+// AddTeamMemberJSONRequestBody defines body for AddTeamMember for application/json ContentType.
+type AddTeamMemberJSONRequestBody = TeamMemberCreate
 
 // CreateChannelTemplateJSONRequestBody defines body for CreateChannelTemplate for application/json ContentType.
 type CreateChannelTemplateJSONRequestBody = TemplateCreate

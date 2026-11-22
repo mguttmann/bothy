@@ -17,7 +17,12 @@ import 'package:l10n/l10n.dart';
 import '../../app/providers/ports.dart';
 import '../../app/providers/session.dart';
 import '../../running/stop_run.dart';
+import '../../sidebar/providers.dart' show storedChannelOfRouteProvider;
 import '../../sync/agent_ops.dart';
+import '../../team/providers.dart';
+import '../../team/team_command.dart';
+import '../../team/team_dialog.dart';
+import '../../team/team_model.dart' show parseTeamCommand;
 import '../../thread/providers.dart';
 import '../../thread/thread_actions.dart';
 import '../agent_reads.dart';
@@ -28,7 +33,8 @@ import 'builtin_commands.dart';
 
 /// Whether each built-in is allowed in [thread] by the server's answers: Stop like the live
 /// box (an active run the person may stop), the session commands with the level `trigger`,
-/// the title like the header's title action, Done for a writer while the thread is open.
+/// the title like the header's title action, Done for a writer while the thread is open,
+/// `/team` for an owner in a channel that can be a team channel ([teamCapable]).
 BuiltinAvailability builtinAvailability({
   required Thread thread,
   required RunSummary? activeRun,
@@ -36,6 +42,7 @@ BuiltinAvailability builtinAvailability({
   required bool triggers,
   required bool canEditTitle,
   required bool canWrite,
+  bool team = false,
 }) => (
   stop: activeRun != null && canStop,
   session: triggers,
@@ -44,6 +51,7 @@ BuiltinAvailability builtinAvailability({
       canWrite &&
       thread.kind != ThreadKind.main &&
       thread.state != ThreadState.closed,
+  team: team,
 );
 
 /// [BuiltinCommandRunner] of [thread] for the history column of [context].
@@ -211,6 +219,35 @@ final class ThreadCommandRunner implements BuiltinCommandRunner {
     if (engine != null) {
       await ThreadActions(engine).setDone(thread, reopen: false);
     }
+  }
+
+  @override
+  Future<void> team(String argument) async {
+    final port = ref.read(teamPortProvider);
+    final channel = ref
+        .read(storedChannelOfRouteProvider(thread.channelId.value))
+        .value;
+    if (port == null || channel == null) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    await runTeamCommand(
+      parseTeamCommand(argument),
+      channel: channel.id,
+      port: port,
+      newKey: ref.read(teamKeysProvider),
+      l: AppLocalizations.of(context),
+      openDialog: ({handle}) async {
+        if (context.mounted) {
+          await showTeamDialog(
+            context,
+            ProviderScope.containerOf(context, listen: false),
+            channel,
+            handle: handle,
+          );
+        }
+      },
+      say: (text) => messenger?.showSnackBar(SnackBar(content: Text(text))),
+      onChanged: () => ref.invalidate(channelTeamProvider(channel.id.value)),
+    );
   }
 }
 

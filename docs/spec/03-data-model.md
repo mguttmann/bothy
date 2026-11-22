@@ -1657,8 +1657,8 @@ Purpose: one agent turn; at the same time the live box. Module: `runs`.
 | `thread_id` | `uuid` | no | | |
 | `agent_id` | `uuid` | no | | |
 | `agent_session_id` | `uuid` | yes | | set at start or at the first `agent_session.report`; NULL for guest runs |
-| `trigger_kind` | `text` | no | | `CHECK (trigger_kind IN ('message','command','interaction','wake'))`; `wake` is a run started by a wake-up ([09-agents.md](09-agents.md) 5.8, addendum of 2026-11-06, R-DM-60) |
-| `triggering_message_id` | `uuid` | yes | | set when `trigger_kind = 'message'`; for a run from deferred follow-ups the first of these messages |
+| `trigger_kind` | `text` | no | | `CHECK (trigger_kind IN ('message','command','interaction','wake','team'))`; `wake` is a run started by a wake-up ([09-agents.md](09-agents.md) 5.8, addendum of 2026-11-06, R-DM-60); `team` is a run of a team channel member started by an input in its work thread (09 3.9, addendum of 2026-11-21, R-DM-62) |
+| `triggering_message_id` | `uuid` | yes | | set when `trigger_kind` is `message` or `team` (the input, 09 3.9.2); for a run from deferred follow-ups the first of these messages |
 | `triggering_command_id` | `uuid` | yes | | set exactly when `trigger_kind = 'command'` |
 | `triggering_interaction_id` | `uuid` | yes | | set exactly when `trigger_kind = 'interaction'` (interaction without a waiting run) |
 | `triggering_wake_id` | `uuid` | yes | | set exactly when `trigger_kind = 'wake'` (addendum of 2026-11-06) |
@@ -1698,7 +1698,8 @@ SET NULL; `triggering_message_id` -> `messages(id)` ON DELETE SET NULL;
 `dev_environment_id` -> `dev_environments(id)` ON DELETE RESTRICT.
 Checks: `billing_mode_expected IN ('personal','organization')`; final states have
 `finished_at`; at most one of the four columns `triggering_*` is set, and only the one matching
-`trigger_kind` (it may later become empty through `ON DELETE SET NULL`).
+`trigger_kind`, where `triggering_message_id` matches `message` and `team` (it may later become
+empty through `ON DELETE SET NULL`).
 Unique: `invocation_jti`; partial index `(thread_id) WHERE state IN ('queued','running',
 'waiting_input')` (at most one active run per thread, R-DM-14).
 Indexes: `(thread_id, queued_at DESC)` for the run history; `(state, agent_id) WHERE state
@@ -1869,6 +1870,139 @@ PK: `id`. FK: `component_id` -> `message_components(id)` ON DELETE CASCADE; `mes
 `messages(id)` ON DELETE CASCADE; `principal_id` -> `principals(id)` ON DELETE RESTRICT.
 Unique: `(principal_id, client_interaction_id)`. Indexes: `(component_id)`; `(state) WHERE
 state IN ('received','dispatched')` for delivery. Retention: `content`.
+
+#### `team_channels`
+
+Purpose: the team mode of a channel with its sponsor and the state of its safety brake ([09-agents.md](09-agents.md)
+3.9, addendum of 2026-11-21, R-DM-62). A row exists exactly while the channel is a team channel.
+Module: `runs`.
+
+| Field | Type | Null | Default | Rules / notes |
+|---|---|---|---|---|
+| `channel_id` | `uuid` | no | | the team channel, a text channel |
+| `sponsor_id` | `uuid` | no | | the active owner who switched team mode on last; the authority of member inputs (09 3.9.2) |
+| `member_turns` | `integer` | no | `0` | member inputs since an owner's last message (09 3.9.6) |
+| `pingpong_from` | `uuid` | yes | | source member of the last member input |
+| `pingpong_to` | `uuid` | yes | | target member of the last member input |
+| `pingpong_count` | `integer` | no | `0` | length of the current alternation between `pingpong_from` and `pingpong_to` |
+| `pause_reason` | `text` | yes | | `CHECK (pause_reason IN ('turn_budget','pingpong','stopped'))`; NULL while member inputs flow |
+| `created_at` | `timestamptz` | no | `now()` | |
+| `updated_at` | `timestamptz` | no | `now()` | |
+| `version` | `bigint` | no | `1` | |
+
+PK: `channel_id`. FK: `channel_id` -> `channels(id)` ON DELETE CASCADE; `sponsor_id` ->
+`principals(id)` ON DELETE RESTRICT. Checks: `member_turns >= 0 AND pingpong_count >= 0`. An owner
+message sets `member_turns`, `pingpong_count` to `0`, the two `pingpong_*` columns and
+`pause_reason` to NULL. Retention: `config`.
+
+#### `team_members`
+
+Purpose: an agent working for a team channel from its home channel, with its handle and its work
+thread (09 3.9.1). Module: `runs`.
+
+| Field | Type | Null | Default | Rules / notes |
+|---|---|---|---|---|
+| `id` | `uuid` | no | | |
+| `channel_id` | `uuid` | no | | the team channel |
+| `agent_id` | `uuid` | no | | |
+| `home_channel_id` | `uuid` | no | | the channel the agent operates and works in (a project forum for a runner) |
+| `work_thread_id` | `uuid` | no | | the member's thread in the home channel; inputs and runs live there |
+| `handle` | `text` | no | | lower case, `team.handle_max_chars` at most, unique per team channel |
+| `created_by` | `uuid` | no | | the owner who added the member |
+| `created_at` | `timestamptz` | no | `now()` | |
+
+PK: `id`. FK: `channel_id` -> `team_channels(channel_id)` ON DELETE CASCADE; `agent_id` ->
+`agents(principal_id)` ON DELETE CASCADE; `home_channel_id` -> `channels(id)` ON DELETE CASCADE;
+`work_thread_id` -> `threads(id)` ON DELETE CASCADE; `created_by` -> `principals(id)` ON DELETE
+RESTRICT. Unique: `(channel_id, handle)`; `(channel_id, agent_id, home_channel_id)`;
+`(work_thread_id)`. Checks: `handle ~ '^[a-z0-9][a-z0-9_-]*$'`. Retention: `config`.
+
+#### `team_inputs`
+
+Purpose: a message the server copied into a member's work thread (09 3.9.2) with its source and
+its authority; the check before every delivery reads the authority here. Module: `runs`.
+
+| Field | Type | Null | Default | Rules / notes |
+|---|---|---|---|---|
+| `message_id` | `uuid` | no | | the input in the work thread |
+| `member_id` | `uuid` | no | | the receiving member |
+| `source_message_id` | `uuid` | no | | the owner's message or the mirror of the member's reply in the team channel |
+| `source` | `text` | no | | `CHECK (source IN ('owner','member'))` |
+| `source_member_id` | `uuid` | yes | | the source member of `source = member`; NULL after its removal |
+| `authority_id` | `uuid` | no | | `triggered_by` and check principal of the runs and follow-ups of the input |
+| `created_at` | `timestamptz` | no | `now()` | |
+
+PK: `message_id`. FK: `message_id` -> `messages(id)` ON DELETE CASCADE; `member_id` ->
+`team_members(id)` ON DELETE CASCADE; `source_message_id` -> `messages(id)` ON DELETE CASCADE;
+`source_member_id` -> `team_members(id)` ON DELETE SET NULL; `authority_id` -> `principals(id)` ON
+DELETE RESTRICT. Unique: `(source_message_id, member_id)` (a source reaches a member once).
+Retention: `content`.
+
+#### `team_mirrors`
+
+Purpose: the copy of a member's final reply in the team channel (09 3.9.4); it makes the job
+`runs.team_input` idempotent and names the member of a mirror. Module: `runs`.
+
+| Field | Type | Null | Default | Rules / notes |
+|---|---|---|---|---|
+| `source_message_id` | `uuid` | no | | the reply in the work thread |
+| `mirror_message_id` | `uuid` | no | | the copy in the team channel |
+| `member_id` | `uuid` | yes | | the member; NULL after its removal |
+| `created_at` | `timestamptz` | no | `now()` | |
+
+PK: `source_message_id`. FK: `source_message_id` -> `messages(id)` ON DELETE CASCADE;
+`mirror_message_id` -> `messages(id)` ON DELETE CASCADE; `member_id` -> `team_members(id)` ON
+DELETE SET NULL. Unique: `(mirror_message_id)`. Retention: `content`.
+
+#### `run_feeders`
+
+Purpose: the record of who fed a run, the only thing the check of a member's reply reads (09
+3.9.4, red team round 4 of FEAT-TEAM-CHANNEL-SERVER, R-DM-63). Module: `runs`.
+
+| Field | Type | Null | Default | Rules / notes |
+|---|---|---|---|---|
+| `run_id` | `uuid` | no | | |
+| `principal_id` | `uuid` | yes | | the person an input speaks for; NULL for an input that speaks for no person (an agent's or an app's follow-up or context message) |
+| `source` | `text` | no | | `CHECK (source IN ('trigger','followup','interaction','command','wake_input','context'))` |
+| `created_at` | `timestamptz` | no | `now()` | |
+
+FK: `run_id` -> `runs(id)` ON DELETE CASCADE; `principal_id` -> `principals(id)` ON DELETE
+RESTRICT. Unique: `NULLS NOT DISTINCT (run_id, principal_id, source)`. Indexes: `(principal_id)`
+for the foreign key. Written by database triggers when an input is stored (`trigger`:
+`runs.triggered_by` at insert; `followup`: every `run_followups` row at insert and when it moves
+to the follow-on run, with the authority of a team input, the author of a message of origin
+`human`, NULL otherwise; `interaction`: the principal of every interaction with a component whose
+`run_id` is set) and by the runs module for the inputs that are no rows: every allowed delivery
+of an invocation-bearing event into a run (the person of its check, 09 4.2) and every writer of a
+message the run context gives the run, of any origin and any author, the run's own agent included
+(the authority of a team input, the author of a person's message, every principal recorded for
+the run an agent's message answers in `run_answers`, NULL for that run without its trigger row and
+for every other message, such as an agent's message written outside a run of its thread or an
+app's). `bothy_app` may only read and insert: deleting a message, a card or an interaction and
+revoking a grant never remove a row; rows go only with their run. Retention: `content` (with the
+run).
+
+#### `run_answers`
+
+Purpose: the run an agent's message answers, so a run context can give that message the record of
+its run (09 3.9.4, red team round 6 of FEAT-TEAM-CHANNEL-SERVER, R-DM-64). Module: `runs`.
+
+| Field | Type | Null | Default | Rules / notes |
+|---|---|---|---|---|
+| `message_id` | `uuid` | no | | the agent's message; no foreign key, a deleted message keeps its link |
+| `run_id` | `uuid` | no | | the run it answers |
+| `created_at` | `timestamptz` | no | `now()` | |
+
+PK: `message_id`. FK: `run_id` -> `runs(id)` ON DELETE CASCADE. Indexes: `(run_id)` for the
+foreign key. Written by the acceptance of runs in the unit of work of the message: every agent
+message whose `run_id` the answer check accepted (09 4.11) and whose request carried the
+invocation token of exactly that run (07 SR9, `actor.ActingFor` bound to the same run; red team
+round 7), and every live box anchor the server writes for its run. `run_id` alone is the agent's
+own claim, so an answer without that token stays unlinked. An answer's `run_id` is not stored on
+the message (only the anchor has `messages.run_id`), so this is the only link. It vouches only for
+the text as written: any message edited afterwards (`edited_at` set) whose author is no person
+speaks for no person in `run_feeders`, whatever its kind; a live box anchor cannot be edited at
+all (`updateMessage` answers `403`). `bothy_app` may only read and insert. Retention: `content` (with the run).
 
 ### 4.9 Costs (`billing`)
 
@@ -2922,6 +3056,7 @@ section 4 applies, and the gate fails.
 | [erd-8-audit-privacy.mmd](../architecture/erd-8-audit-privacy.mmd) | `audit`, `privacy` |
 | [erd-9-import-status-statistics.mmd](../architecture/erd-9-import-status-statistics.mmd) | `importer`, `status`, `stats` |
 | [erd-10-notification.mmd](../architecture/erd-10-notification.mmd) | `notify`, `gateway` |
+| [erd-11-team-channels.mmd](../architecture/erd-11-team-channels.mmd) | `runs` (team channels, `run_feeders`, `run_answers`) |
 
 ## 8. Decisions of this chapter
 
@@ -2988,6 +3123,9 @@ section 4 applies, and the gate fails.
 | R-DM-59 | Definitions of built-in agents are rows of `agent_definitions`, one per version, never updated; the highest version is the current one (addendum of 2026-11-06, 26 4.1). | Audit and undo need the older versions; `operator_config` stays closed and small (09 2.2), and an insert-only table needs no lock beyond the agent row. |
 | R-DM-60 | A wake-up is a row of `run_wakes` with the person of its source run; a fired wake-up creates a run with `trigger_kind = 'wake'` and `triggering_wake_id`, and the counts of autonomous inputs are rows of `run_autonomy` per thread and person (addendum of 2026-11-06, 09 5.8). | Only the server can start a run and apply the trigger and billing rules at fire time; a count per thread and person keeps another person's message from extending an owner's chain. |
 | R-DM-61 | `threads.title_version` is the value of `version` at the last change of `title` or `title_source` (1 for a new thread and for every thread from before the column); every statement that writes `title` writes it. The precondition of `setThreadTitle` holds for an `If-Match` from `title_version` up to `version` ([06-api.md](06-api.md) section 8 item 2, addendum of 2026-11-10). | Every message raises `version` (section 6.2) without a thread event, so in an active thread no client holds the current version, and an exact match refused the first title edit of every such thread. What the precondition protects is the title: an edit based on a version from `title_version` on saw the current title, an older one did not and still gets `412`. |
+| R-DM-62 | A team channel is a row of `team_channels`; its members are rows of `team_members`, each with one work thread; every message the server copies into a work thread is a row of `team_inputs` with its authority, and every mirrored reply a row of `team_mirrors`; a run of a member has `trigger_kind = 'team'` and its input as `triggering_message_id` (addendum of 2026-11-21, [09-agents.md](09-agents.md) 3.9). | The run, the follow-ups, the run context and the session need the input in the run's own thread; the check before every delivery needs the authority of an input whose author may be an agent, which the message itself cannot carry; the two unique keys make the job that copies idempotent. |
+| R-DM-64 | Every agent message whose `run_id` the answer check accepted and whose request carried the invocation token of that very run, and every live box anchor, is linked to its run in `run_answers` in the unit of work of the message (addendum of 2026-11-21, [09-agents.md](09-agents.md) 3.9.4). | A run context gives an agent's text the record of the run that wrote it; without the link the member's own text, steered by a non-owner in another channel or an earlier run, passed the owner check (red team round 6); the token binding, because an agent steered in another run could name a concurrent owner run of the thread in `run_id` (red team round 7). |
+| R-DM-63 | Every input a run takes is recorded in `run_feeders` with the person it speaks for when it is stored or given to the run, and the record is append-only for the server (addendum of 2026-11-21, [09-agents.md](09-agents.md) 3.9.4). | The check that a member's reply hands on only what owners fed reads this record; a check over the input rows themselves let a deleted card or follow-up drop a person out of it (red team rounds 2 to 4). |
 
 ## 9. Configuration values of this chapter
 

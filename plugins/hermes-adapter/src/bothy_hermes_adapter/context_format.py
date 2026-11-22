@@ -111,6 +111,8 @@ class UserSideContext:
 
     Attributes:
         channel: The operator's channel instruction lines.
+        team: The team channel lines of a ``team`` run (`bothy_hermes_adapter.team`), after
+            the channel instructions in every turn of the run.
         run_context: The run context of a message run, ``None`` for a command run.
         file_texts: The fetched attachment texts by file.
         boundary: The data block boundary; only for tests.
@@ -120,6 +122,7 @@ class UserSideContext:
     run_context: RunContext | None = field(default=None, repr=False)
     file_texts: Mapping[UUID, str] = field(default_factory=dict, repr=False)
     boundary: str | None = field(default=None, repr=False)
+    team: tuple[str, ...] = field(default=(), repr=False)
 
     def compose(self, profile_prompt: str = "", max_chars: int | None = None) -> ComposedUserSide:
         """The user side within ``max_chars`` characters, the newest context first (D-FHUSC-3).
@@ -134,6 +137,8 @@ class UserSideContext:
         sections = ["\n".join([FORMAT_HEADING, MESSAGE_FORMAT_RULES])]
         if self.channel:
             sections.append("\n".join(self.channel))
+        if self.team:
+            sections.append("\n".join(self.team))
         if profile_prompt.strip():
             sections.append("\n".join([_PROFILE_HEADING, profile_prompt.strip()]))
         instructions = "\n\n".join(sections)

@@ -86,8 +86,9 @@ func subIsRunStarter(kind string) bool {
 	switch TriggerKind(kind) {
 	case TriggerInteraction, TriggerFollowup:
 		return false
-	case TriggerMessage, TriggerCommand, TriggerAutocomplete, TriggerWake:
-		// A wake token's sub is the wake-up's person, the run's triggering person (09 5.8.3).
+	case TriggerMessage, TriggerCommand, TriggerAutocomplete, TriggerWake, TriggerTeam:
+		// A wake token's sub is the wake-up's person, the run's triggering person (09 5.8.3); a
+		// team token's sub is the authority of the input, runs.triggered_by (09 3.9.9).
 		return true
 	}
 	return true

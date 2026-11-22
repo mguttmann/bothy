@@ -54,6 +54,9 @@ enum RunTriggerKind implements Coded {
   /// A fired wake-up (09 5.8.3, stage AR).
   wake('wake'),
 
+  /// An input of a team channel (09 3.9).
+  team('team'),
+
   /// A value of a newer server.
   unknown('');
 

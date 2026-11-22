@@ -57,7 +57,8 @@ CAUSES: dict[str, str] = {
         "the runner the operator of a forum to chat with Claude Code there"
     ),
     "trigger_kind_unsupported": (
-        "Claude Code runs on messages only; this kind of trigger is not supported"
+        "Claude Code runs on messages and team channel inputs only; this kind of trigger is not "
+        "supported"
     ),
     "outside_root": (
         "The project folder of this forum is not a folder under runner.projects_root. "

@@ -20,13 +20,15 @@ import 'new_project_port.dart';
 import 'project_sync_dialog.dart' show serverFailureText;
 
 /// Opens the dialog for [forum] with the client of the signed-in session; returns the new name
-/// after a rename, null when the person cancelled. Does nothing without a session.
+/// after a rename, null when the person cancelled. Does nothing without a session. Takes the
+/// [container], because a menu entry runs after its menu closed and the menu's `WidgetRef` is
+/// unmounted by then (docs/decisions.d/FEAT-TEAM-CHANNEL-APP.md D-TEAM-APP-6).
 Future<String?> showRenameProjectDialog(
   BuildContext context,
-  WidgetRef ref,
+  ProviderContainer container,
   Channel forum,
 ) async {
-  final services = ref.read(signedInServicesProvider);
+  final services = container.read(signedInServicesProvider);
   if (services == null) return null;
   final dialog = RenameProjectDialog(
     forum: forum.id,

@@ -77,6 +77,12 @@ personal data, also of third parties and also special categories under Art. 9),
 | `run_followups` | indirect | assignment | `content` | with the run |
 | `run_wakes` | content | the person a wake-up acts for, the agent's label, condition and result (stage AR, 09 5.8) | `content` | with the thread or the source run |
 | `run_autonomy` | indirect | counts of autonomous inputs per thread and person (stage AR, 09 5.8.6) | `content` | with the thread or the person |
+| `team_channels` | indirect | the owner who sponsors a team channel and its brake counts ([09-agents.md](09-agents.md) 3.9) | `config` | with the channel or when team mode is switched off; the sponsor stays with a pseudonymous ID |
+| `team_members` | indirect | which agent works for a team channel, its handle, added by | `config` | with the team, the channel, the agent or the work thread; the adder stays with a pseudonymous ID |
+| `team_inputs` | indirect | the person on whose behalf a copied message runs (09 3.9.2) | `content` | with the copied message or the member |
+| `team_mirrors` | no | assignment of a mirrored reply | `content` | with the reply or its copy |
+| `run_feeders` | indirect | the persons whose inputs a run took (09 3.9.4, R-DM-63) | `content` | with the run; the person stays with a pseudonymous ID |
+| `run_answers` | no | assignment of an agent's message to the run it answers (09 3.9.4, R-DM-64) | `content` | with the run |
 | `message_components` | content | definition, used by | `content` | with the message |
 | `interactions` | content | form values, principal | `content` | with the message |
 | `price_table` | no | prices | `cost` | `retention.cost` |

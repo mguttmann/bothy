@@ -5,6 +5,7 @@ package app_test
 import (
 	"context"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -382,4 +383,67 @@ func TestPrepare_NewThreadAndOrigin(t *testing.T) {
 	if got := w.triggerStates(w.message); strings.Join(got, " ") != "received:" {
 		t.Fatalf("trigger states %v", got)
 	}
+}
+
+// TestPrepare_RecordsTheFeederOfEveryAllowedDelivery (FEAT-TEAM-CHANNEL-SERVER): an allowed
+// delivery records the person it speaks for in run_feeders with the source of its event type, a
+// control command with a run included; a denied delivery and a command without a run record
+// nothing.
+func TestPrepare_RecordsTheFeederOfEveryAllowedDelivery(t *testing.T) {
+	t.Parallel()
+	sam := ids.New()
+	command := func(w *deliveryWorld, run ids.ID) runs.DeliveryInput {
+		cmd := ids.New()
+		p, err := domain.CommandInvokedPayload(domain.CommandInvokedInput{
+			InvocationID: ids.New(), CommandID: cmd, CommandName: "stop", ChannelID: w.channel, ThreadID: w.thread, RunID: run,
+			InvokedBy: domain.PrincipalRefPayload{ID: sam.String(), Kind: "user", Handle: "sam", DisplayName: "Sam"}, Options: nil,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return runs.DeliveryInput{AgentID: w.lotse, EventID: ids.New(), Seq: 9, Type: domain.EventCommandInvoked, ResourceKind: "command",
+			ResourceID: cmd, Payload: p}
+	}
+	t.Run("agent.invocation", func(t *testing.T) {
+		t.Parallel()
+		w := newDeliveryWorld(t)
+		w.prepare(w.input(domain.EventAgentInvocation))
+		got, _ := w.repo.Feeders(context.Background(), w.run.ID)
+		if want := []app.Feeder{{PrincipalID: w.alex, Source: domain.FeedTrigger}}; !reflect.DeepEqual(got, want) {
+			t.Fatalf("feeders %+v, want %+v", got, want)
+		}
+	})
+	t.Run("command.invoked into the run", func(t *testing.T) {
+		t.Parallel()
+		w := newDeliveryWorld(t)
+		if out := w.prepare(command(w, w.run.ID)); !out.Send {
+			t.Fatalf("outcome %+v", out)
+		}
+		got, _ := w.repo.Feeders(context.Background(), w.run.ID)
+		if !slices.Contains(got, app.Feeder{PrincipalID: sam, Source: domain.FeedCommand}) {
+			t.Fatalf("feeders %+v lack Sam's command", got)
+		}
+	})
+	t.Run("command.invoked without a run", func(t *testing.T) {
+		t.Parallel()
+		w := newDeliveryWorld(t)
+		w.prepare(command(w, ids.ID{}))
+		for run, fs := range w.repo.feeders {
+			for _, f := range fs {
+				if f.Source == domain.FeedCommand {
+					t.Fatalf("a command without a run recorded %+v for %s", f, run)
+				}
+			}
+		}
+	})
+	t.Run("denied", func(t *testing.T) {
+		t.Parallel()
+		w := newDeliveryWorld(t)
+		w.deny("no_grant")
+		w.prepare(command(w, w.run.ID))
+		got, _ := w.repo.Feeders(context.Background(), w.run.ID)
+		if slices.ContainsFunc(got, func(f app.Feeder) bool { return f.Source == domain.FeedCommand }) {
+			t.Fatalf("a denied command was recorded: %+v", got)
+		}
+	})
 }

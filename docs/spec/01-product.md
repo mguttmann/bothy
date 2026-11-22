@@ -2320,6 +2320,41 @@ only.
 5. **Automatic arrangement.** A channel arranged by activity (6.16 item 4) stays in the section while
    archived; activity does not bring it back.
 
+### 6.23 Team channels
+
+Addendum of 2026-11-21 (FEAT-TEAM-CHANNEL-APP; server contract [09-agents.md](09-agents.md) 3.9,
+design [cross-project-handoff.md](../design/cross-project-handoff.md) MVP items 2 and 6; rulings in
+docs/decisions.d/FEAT-TEAM-CHANNEL-APP.md). Applies to the desktop and the phone, for owners only:
+only owners read a team channel (09 3.9.1), and a person who is no owner sees none of this.
+
+1. **Switch and members.** The menu of a text channel that is neither archived nor read-only has
+   "Team channel..." for an owner. Its dialog has the switch "Team mode" (`enableChannelTeam`,
+   `disableChannelTeam`) with a sentence on what it does; while it is on, the members with handle,
+   agent and home channel, a remove button per member (`removeTeamMember`), a form to add a member
+   (agent, home channel and handle, `addTeamMember`) and "Stop all" (`stopChannelTeam`). The home
+   channel choice lists the channels the chosen agent operates (not a direct message, not archived,
+   not read-only, not the team channel); with exactly one it is chosen at once. A handle that does
+   not match the pattern of 09 3.9.1 cannot be sent. A refusal stays in the dialog with the
+   server's reason.
+2. **Member bar.** Under the thread header of every thread of a team channel a bar shows each
+   member as `@handle` with its state: "working" while the member's agent has an active run in its
+   work thread, "paused" while member mentions of the channel are paused and the member does not
+   work, else "idle". While the channel is paused a line names the reason and says that a message
+   goes on. "Stop all" is enabled while a member works; the settings button opens the dialog of
+   item 1. Screen readers read each member as "@handle, state".
+3. **Messages.** A text reply of a member's agent in the team channel (a mirror, 09 3.9.4) shows
+   "from @handle" under its content (every handle of that agent when it is a member twice); a text
+   message of a person shows "to all members", because an owner's message reaches every member
+   (09 3.9.3). Notes of the server stay notes.
+4. **Command.** The composer of a text channel offers the client command `/team` to an owner:
+   `/team` and `/team list` open the dialog, `/team add [handle]` opens it with the handle filled
+   in, `/team remove @handle` removes the member, `/team stop` stops every member run; another
+   sub-command shows how to use it. `/team` never goes to a model.
+5. **Freshness.** The app reads the team when a text channel opens (`getChannelTeam`, `404` for a
+   channel without team mode), after every own change and when a new message arrives in the open
+   thread of the team channel (a pause and a stop post a note there). The member states follow the
+   runs live (`run.state_changed`).
+
 ## 7. Keyboard shortcuts
 
 Shortcuts apply on desktop. They avoid system assignments (Cmd+H, Cmd+M, Cmd+Q, Alt+F4,

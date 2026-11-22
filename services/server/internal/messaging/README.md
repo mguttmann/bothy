@@ -270,7 +270,8 @@ inside the writing transaction; a subscriber error rolls everything back. It car
 thread kind and sequence, author and origin, `AuthorDeviceID` (people only), the reply target,
 the sorted mentions, `Silent`, `ClearDraft`, `CreatedThread`, `ReopenedThread` and
 `HasAttachments` (M3-07: runs holds the agent invocation while an attachment is not final),
-never content.
+`RunID` and `ActingRunID` (the run of the request's bound `Invocation-Token`, 07 SR9; runs links
+an agent's answer to its run only when both name the same run, 03 `run_answers`), never content.
 `Kind` is `text`, `system` or `run` (the anchor). sync subscribes since M1-61 (it deletes the
 author's draft for `ClearDraft`, so `draft.deleted` follows `message.created`); runs since M2-05
 (the acceptance); notify in M3.
@@ -424,6 +425,14 @@ ended chain of autonomous inputs (09 5.8.4, 5.8.6) in the caller's unit of work:
 kind `text`, silent, the content `text` of runs, the agent as author, the next `thread_seq`
 through `chat.AppendToThread` without reopening, `message.created` and `MessagePosted` like a
 system line; it never triggers and creates no hint. It returns the note's id and `thread_seq`.
+
+`CopyMessage(ctx, CopyCmd{SourceMessageID, ThreadID, AuthorID})` (FEAT-TEAM-CHANNEL-SERVER, 09
+3.9.2 and 3.9.4) writes the copy of a team channel in the caller's unit of work: the source's text
+as a new silent text message of the author with the author's own origin (`human` for a person,
+`agent` for an agent), without reply, mentions and attachments, the next `thread_seq` without
+reopening, `message.created` and `MessagePosted` with `Relay` set, which the acceptance of runs
+never decides. It never authorizes; runs checked the readers and the trigger first.
+`SetTriggerState` on a message of origin `agent` (an input copied from a member's reply) is a no-op.
 
 `AppendSystemLine(ctx, SystemLine{ThreadID, AuthorID, Code})` writes a system line inside the
 caller's unit of work and never authorizes; runs calls it from `OnSessionAttached` when an
@@ -601,7 +610,7 @@ manage` (`message.delete`).
 
 `updateMessage` (precedence `428` > `404` > `403` > `410` > `412` > `413` > `400`): the HTTP chain
 answers a missing `If-Match` with `428` before any lookup; then `authorize(message.update)` (a
-read-only channel is `403 channel_read_only`, a system line `403`); in the unit of work the
+read-only channel is `403 channel_read_only`, a system line and a live box anchor `403`); in the unit of work the
 message row lock, `410 message_deleted`, `412 version_conflict` with the current message in
 `current` (an `If-Match` that is not a version never matches), the content rules of sending and
 the mentions resolved again from the resulting content (a given `mention_ids` must equal them).

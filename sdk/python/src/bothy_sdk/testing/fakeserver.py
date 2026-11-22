@@ -283,6 +283,8 @@ class FakeServer:
         self.timings: Mapping[str, float] = timings_with_defaults(timings)
         self.requests: list[RecordedRequest] = []
         self.frames: list[dict[str, Any]] = []
+        # Fingerprint of every accepted ``Invocation-Token`` header -> the run its token names.
+        self._token_runs: dict[str, UUID] = {}
         self._faults: dict[str, deque[Fault]] = defaultdict(deque)
         self._deprecated: dict[str, str] = {}
         self._idempotency: dict[tuple[str, str], tuple[str, _Answer | None]] = {}
@@ -446,6 +448,8 @@ class FakeServer:
         forged: str | None = None,
         command: str | None = None,
         options: Mapping[str, str] | None = None,
+        authority: str | None = None,
+        team: Mapping[str, Any] | None = None,
     ) -> Triggered:
         """A person posts ``text``: a queued run and its ``agent.invocation``.
 
@@ -455,7 +459,7 @@ class FakeServer:
             text: The message content.
             channel_id: A served channel (`add_forum`); Allgemein when omitted.
             author: The handle of the triggering person (``alex``, ``sam`` or ``robin``).
-            trigger_kind: ``message`` or ``interaction`` (the token names that object).
+            trigger_kind: ``message``, ``team`` or ``interaction`` (the token names that object).
             attachments: Files of `add_file` attached to the message.
             thread_id: An existing thread to post in; a new thread when omitted.
             context: A ``RunContext`` to serve for the run (``thread_context``,
@@ -473,6 +477,11 @@ class FakeServer:
             command: The name of a registered command of Lotse: a model command run
                 (``trigger_kind = command``) whose payload names it with ``options``.
             options: The option values of ``command`` by name.
+            authority: ``trigger_kind = team`` only: the handle of the run's ``triggered_by``
+                and the token's ``sub`` (the sponsor for a member's input); ``author`` when
+                omitted. ``author`` may then be the agent ``texter`` (an input of origin
+                ``agent``).
+            team: ``trigger_kind = team`` only: the payload's member ``team`` (09 3.9.9).
 
         Returns:
             The run, thread and message.
@@ -501,6 +510,8 @@ class FakeServer:
             history=history,
             files=files,
             session_mode=session_mode,
+            authority=authority,
+            team=team,
         )
         if forged is not None:
             # Set before the first delivery: the deliverers run only after the next await.
@@ -809,7 +820,8 @@ class FakeServer:
         Args:
             run_id: The run.
             text: The message content.
-            author: ``alex``, ``robin`` or ``sam``; ``sub`` of the token.
+            author: ``alex``, ``robin`` or ``sam``, or the agent ``texter`` (a team input of
+                origin ``agent``, 09 3.9.9); ``sub`` of the token unless ``claims`` names one.
             claims: Claims that replace those of every token of this event (still signed with
                 the server key), for example ``{"billing_mode": "personal"}``,
                 ``{"tool_class": "chat"}`` or ``{"sub": "<another principal>"}``.
@@ -820,7 +832,7 @@ class FakeServer:
         Returns:
             The follow-up message ID.
         """
-        person = {"alex": self.world.alex, "robin": self.world.robin, "sam": self.world.sam}[author]
+        person = self.world.by_handle[author]
         message_id = self.world.followup(run_id, text, author=person, claims=claims, files=files)
         await _settle()
         return message_id
@@ -1147,6 +1159,21 @@ class FakeServer:
         await _settle()
         return UUID(envelope["id"])
 
+    def token_run(self, token_fingerprint: str) -> UUID | None:
+        """The run an accepted ``Invocation-Token`` header named (07 SR9).
+
+        `RecordedRequest.headers` hold the header's `fingerprint`; this answers which run the
+        token was issued for, the run the real server binds the request to (09 3.9.4: an
+        answer speaks for a run only with that run's own token).
+
+        Args:
+            token_fingerprint: The header's fingerprint.
+
+        Returns:
+            The run, or ``None`` for a header the server never accepted.
+        """
+        return self._token_runs.get(token_fingerprint)
+
     def forge_token(self, run_id: UUID, variant: str) -> Secret:
         """A forged token for the run, built from its newest delivered token.
 
@@ -1409,7 +1436,9 @@ class FakeServer:
                 proofs=request.headers.getall("DPoP", []),
             )
             if operation_id not in _DELIVERY:
-                self.world.bind(binding, operation_id)
+                bound = self.world.bind(binding, operation_id)
+                if bound is not None:
+                    self._token_runs[fingerprint(binding[0])] = bound
 
     async def _serve(
         self, operation_id: str, params: dict[str, str], request: web.Request, body: Any

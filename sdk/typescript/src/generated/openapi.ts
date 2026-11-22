@@ -2078,6 +2078,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/channels/{channel_id}/team": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the team of a team channel
+         * @description The team of a team channel (09 3.9.1): sponsor, brake state and members with their handles and work threads. Owners only (`team.read`); a channel that is no team channel or that the caller cannot read is `404 not_found`.
+         */
+        get: operations["getChannelTeam"];
+        /**
+         * Switch a channel to team mode
+         * @description Switches a text channel to team mode with the caller as its sponsor (09 3.9.1); on a team channel it makes the caller the sponsor and keeps members and brake state. Owners only (`team.update`). A DM channel is `409 conflict` with `reason` `dm_channel`, a forum `channel_kind`, an archived or read-only channel `channel_archived` or `channel_read_only`, a channel that a person who is no active owner may read `team_readers_not_owners`. Audited.
+         */
+        put: operations["enableChannelTeam"];
+        post?: never;
+        /**
+         * Switch team mode off
+         * @description Removes the team mode and every member of the channel (09 3.9.1); work threads and messages stay, running runs keep running. Owners only (`team.update`); a channel that is no team channel answers `204` without a change. Audited.
+         */
+        delete: operations["disableChannelTeam"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/channels/{channel_id}/team/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a member to a team channel
+         * @description Adds an agent with its home channel and a handle and creates its work thread there (09 3.9.1). Owners only (`team.update`). `409 conflict` with `reason` `team_not_enabled` for a channel without team mode, `team_handle_taken`, `team_member_exists`, `team_max_members`, `team_home_not_operated` when the agent is not the effective operator of the home channel, `team_home_is_team` when the home channel is a team channel, `team_readers_not_owners` when a person who is no active owner may read the team channel or the home channel, `dm_channel`, `channel_archived` or `channel_read_only` for the home channel; an inactive agent is `409 conflict` with `reason` `agent_disabled`. Audited.
+         */
+        post: operations["addTeamMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/channels/{channel_id}/team/members/{member_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a member from a team channel
+         * @description Removes the member (09 3.9.1); its work thread stays and a running run keeps running. Owners only (`team.update`); an unknown member is `404 not_found`. Audited.
+         */
+        delete: operations["removeTeamMember"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/channels/{channel_id}/team/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop every run of a team channel
+         * @description Stops every active run in the work threads of the team's members as `cancelRun` by the caller would, and pauses member inputs with `pause_reason` `stopped` until an owner writes in the team channel again (09 3.9.7). Owners only (`team.stop`); a channel without team mode is `404 not_found`. Posts a note in the team channel; audited.
+         */
+        post: operations["stopChannelTeam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/channels/{channel_id}/project-binding": {
         parameters: {
             query?: never;
@@ -9153,10 +9241,10 @@ export interface components {
             agent_id: components["schemas"]["Uuid"];
             agent_session_id?: components["schemas"]["Uuid"];
             /**
-             * @description `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`.
+             * @description `wake` is a run started by a fired wake-up (09 5.8.3); it names the wake-up in `triggering_wake_id`. `team` is a run of a team channel member; its input in the work thread is `triggering_message_id` (09 3.9.2).
              * @enum {string}
              */
-            trigger_kind?: "message" | "command" | "interaction" | "wake";
+            trigger_kind?: "message" | "command" | "interaction" | "wake" | "team";
             triggering_message_id?: components["schemas"]["Uuid"];
             triggering_command_id?: components["schemas"]["Uuid"];
             triggering_interaction_id?: components["schemas"]["Uuid"];
@@ -10421,9 +10509,11 @@ export interface components {
             channel_id: components["schemas"]["Uuid"];
             space_id?: components["schemas"]["Uuid"];
             /** @enum {string} */
-            trigger_kind: "message" | "interaction" | "command" | "wake";
-            /** @description Triggering message; the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2). */
+            trigger_kind: "message" | "interaction" | "command" | "wake" | "team";
+            /** @description Triggering message, for `trigger_kind = team` the input in the member's work thread (09 3.9.2); the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2). */
             message_id?: components["schemas"]["Uuid"];
+            /** @description The team facts of a member's run; set exactly for `trigger_kind = team` (09 3.9.9). */
+            team?: components["schemas"]["AgentTeamFacts"];
             interaction_id?: components["schemas"]["Uuid"];
             /** @description The wake-up of a wake run; set exactly for `trigger_kind = wake` (09 5.8.3, 5.8.5). */
             wake_id?: components["schemas"]["Uuid"];
@@ -12302,6 +12392,76 @@ export interface components {
         ChannelAutonomousRunsSet: {
             allow_autonomous_runs: boolean;
         };
+        /** @description The team of a team channel (09 3.9.1); `pause_reason` is absent while member inputs flow. */
+        Team: {
+            channel_id: components["schemas"]["Uuid"];
+            /** @description The active owner on whose behalf member inputs run (09 3.9.2). */
+            sponsor_id: components["schemas"]["Uuid"];
+            /**
+             * Format: int32
+             * @description Member inputs since an owner's last message (09 3.9.6).
+             */
+            member_turns: number;
+            /**
+             * Format: int32
+             * @description The value of `team.turn_budget` now.
+             */
+            turn_budget: number;
+            pause_reason?: components["schemas"]["TeamPauseReason"];
+            members: components["schemas"]["TeamMember"][];
+            created_at: components["schemas"]["Timestamp"];
+            /** Format: int64 */
+            version: number;
+        };
+        /**
+         * @description Why member inputs are paused (09 3.9.6, 3.9.7); an owner message lifts every pause.
+         * @enum {string}
+         */
+        TeamPauseReason: "turn_budget" | "pingpong" | "stopped";
+        /** @description A member of a team channel (09 3.9.1). */
+        TeamMember: {
+            id: components["schemas"]["Uuid"];
+            /** @example coding */
+            handle: string;
+            agent_id: components["schemas"]["Uuid"];
+            home_channel_id: components["schemas"]["Uuid"];
+            /** @description The member's thread in its home channel, where its inputs and runs live. */
+            work_thread_id: components["schemas"]["Uuid"];
+            created_at: components["schemas"]["Timestamp"];
+        };
+        TeamMemberCreate: {
+            agent_id: components["schemas"]["Uuid"];
+            /** @description A channel the agent operates (its effective operator); a project forum for a runner. */
+            home_channel_id: components["schemas"]["Uuid"];
+            /**
+             * @description Unique in the team channel, at most `team.handle_max_chars` characters.
+             * @example coding
+             */
+            handle: string;
+        };
+        TeamStopResult: {
+            /** @description The runs the stop ended or asked to end. */
+            stopped_run_ids: components["schemas"]["Uuid"][];
+        };
+        /** @description The team facts of a `team` run (09 3.9.9). The owner's authority never comes from here; it comes only from the input message (origin `human` and an owner as author). */
+        AgentTeamFacts: {
+            channel_id: components["schemas"]["Uuid"];
+            member_id: components["schemas"]["Uuid"];
+            handle: string;
+            /** @enum {string} */
+            source: "owner" | "member";
+            /** @description The handle of the source member; set exactly for `source = member`. */
+            source_handle?: string;
+            /** @description The input mentions the receiving member's handle. */
+            addressed: boolean;
+            members: components["schemas"]["AgentTeamMember"][];
+        };
+        AgentTeamMember: {
+            member_id: components["schemas"]["Uuid"];
+            handle: string;
+            agent_id: components["schemas"]["Uuid"];
+            home_channel_id: components["schemas"]["Uuid"];
+        };
         /** @description One page. `next_cursor` is absent on the last page. */
         RunSummaryPage: {
             items: components["schemas"]["RunSummary"][];
@@ -13331,6 +13491,7 @@ export interface components {
         KeyPath: string;
         ProviderIdPath: components["schemas"]["Uuid"];
         TagIdPath: components["schemas"]["Uuid"];
+        MemberIdPath: components["schemas"]["Uuid"];
         TemplateIdPath: components["schemas"]["Uuid"];
         WebhookIdPath: components["schemas"]["Uuid"];
         TokenPath: string;
@@ -17790,6 +17951,201 @@ export interface operations {
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
             428: components["responses"]["PreconditionRequired"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getChannelTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_id: components["parameters"]["ChannelIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Team"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    enableChannelTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_id: components["parameters"]["ChannelIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Team"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    disableChannelTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_id: components["parameters"]["ChannelIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No content. */
+            204: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    addTeamMember: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                channel_id: components["parameters"]["ChannelIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeamMemberCreate"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamMember"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    removeTeamMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_id: components["parameters"]["ChannelIdPath"];
+                member_id: components["parameters"]["MemberIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No content. */
+            204: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    stopChannelTeam: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                channel_id: components["parameters"]["ChannelIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamStopResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

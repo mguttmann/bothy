@@ -102,6 +102,7 @@ from bothy_sdk.generated.models import (
     TranscriptSubmit,
 )
 from bothy_sdk.generated.types import File, Unset
+from bothy_sdk.ids import uuid7
 from bothy_sdk.long_answers import send_long_message
 from bothy_sdk.runs import RunHandle
 from bothy_sdk.sources import Envelope
@@ -171,6 +172,14 @@ from bothy_hermes_adapter.runtime import (
 )
 from bothy_hermes_adapter.stages import StageCursor, StageRegistry, StageSteps
 from bothy_hermes_adapter.store import CallbackStore
+from bothy_hermes_adapter.team import (
+    Speaker,
+    TeamFacts,
+    followup_speaker,
+    input_speaker,
+    team_facts,
+    team_lines,
+)
 from bothy_hermes_adapter.tool_class import classify
 
 __all__ = [
@@ -190,6 +199,8 @@ DEFAULT_CURRENCY: Final = "USD"
 pinned version ships (docs/DECISIONS.md D-M2-33-7)."""
 
 _STOP_STATUSES: Final = frozenset({403, 409, 412})
+_PREVIEW: Final = "preview-"
+_CURSOR: Final = "\u2589"
 
 TOOL_REFUSED: Final = (
     "Refused by the chat platform: no run is open in this chat, so no tool may run now and "
@@ -241,8 +252,17 @@ class _Turn:
     session_version: int | None
     mode_used: str
     live: LiveBox | None = None
+    # The team facts of a ``team`` run (09 3.9.9), ``None`` for any other run; the person
+    # Hermes takes the run's turns from (the token's ``sub`` and its name).
+    team: TeamFacts | None = None
+    user_id: UUID | None = None
+    user_name: str = ""
     answers: dict[str, tuple[UUID, int]] = field(default_factory=dict)
     edits: dict[str, str] = field(default_factory=dict)
+    # The text each answer has on the server now (an edit to the same text is never sent), and
+    # the previews of Hermes' edit transport not posted yet: key -> (last text, reply_to).
+    posted: dict[str, str] = field(default_factory=dict)
+    previews: dict[str, tuple[str, str | None]] = field(default_factory=dict)
     usage: list[Usage] = field(default_factory=list)
     steered: list[UUID] = field(default_factory=list)
     card: OpenCard | None = None
@@ -338,6 +358,8 @@ class HermesHandler(AgentHandler):
         self._prepared: dict[UUID, BuiltContext] = {}
         self._anchors: dict[UUID, bool] = {}
         self._inbound: dict[UUID, tuple[RunContext, ChannelBehavior | None]] = {}
+        # The team facts and the input's speaker of a ``team`` run, from prepare to execute.
+        self._teams: dict[UUID, tuple[TeamFacts, Speaker]] = {}
         self._channels: dict[UUID, tuple[int, ChannelBehavior]] = {}
         # Runs that stop their work now, by thread: the run's start in wall time. Such a run
         # still covers its jobs until they are stopped (09 17.12 point 8).
@@ -446,8 +468,9 @@ class HermesHandler(AgentHandler):
             Start options with the billing evidence.
 
         Raises:
-            PrepareRefused: An ``interaction`` trigger, or a command that is no Hermes skill
-                command now, which this adapter does not serve.
+            PrepareRefused: An ``interaction`` trigger, a command that is no Hermes skill
+                command now, a ``team`` run without its member ``team``, or a trigger kind this
+                adapter does not know, which it does not serve.
         """
         payload = inv.payload
         if self._mirror is not None and await self._in_mirror_post(run.thread_id):
@@ -456,10 +479,18 @@ class HermesHandler(AgentHandler):
             return StartOptions(billing_evidence=BillingEvidence.from_dict(actual.evidence))
         kind = str(getattr(payload, "trigger_kind", "message"))
         skill_text = None
+        team: TeamFacts | None = None
         if kind == "command":
             skill_text = self._skill_text(payload)
             if skill_text is None:
                 _LOG.warning("run %s refused: not a skill command", run.run_id)
+                raise PrepareRefused(kind)
+        elif kind == "team":
+            # 09 3.9.9: the input lies in the work thread, so the run reads its context as a
+            # message run does; the member ``team`` says who the agent is in the team.
+            team = team_facts(payload)
+            if team is None:
+                _LOG.warning("run %s refused: team run without its team facts", run.run_id)
                 raise PrepareRefused(kind)
         elif kind != "message":
             _LOG.warning("run %s refused: trigger kind %s", run.run_id, kind)
@@ -473,6 +504,9 @@ class HermesHandler(AgentHandler):
             actual = self.actual_mode()
             return StartOptions(billing_evidence=BillingEvidence.from_dict(actual.evidence))
         ctx = await run.load_context()
+        if team is not None:
+            trigger = ctx.trigger_message
+            self._teams[run.run_id] = (team, input_speaker(team, trigger.origin, trigger.author))
         self._anchors[run.run_id] = await self._trigger_in_thread(payload, run)
         self._prepared[run.run_id] = await build_context(
             ctx,
@@ -603,6 +637,10 @@ class HermesHandler(AgentHandler):
             inbound_media = await self._media(run, ctx)
             media = inbound_media.media
             built = _with_media(built, inbound_media)
+        team = self._teams.pop(run.run_id, None)
+        if team is not None:
+            built = _with_team(built, *team)
+        kind = str(getattr(payload, "trigger_kind", "message"))
         turn = _Turn(
             run_id=run.run_id,
             thread_id=run.thread_id,
@@ -615,8 +653,11 @@ class HermesHandler(AgentHandler):
             session_version=_int_or_none(getattr(session, "version", None)),
             mode_used=inv.claims.billing_mode,
             live=LiveBox(run.patch, self._now),
-            anchored=str(getattr(payload, "trigger_kind", "message")) == "message",
+            anchored=kind in ("message", "team"),
             quotes=self._anchors.pop(run.run_id, False),
+            team=team[0] if team is not None else None,
+            user_id=inv.claims.sub,
+            user_name=str(payload.triggered_by.display_name),
         )
         self._turns[run.thread_id] = turn
         self._by_run[run.run_id] = turn
@@ -854,7 +895,7 @@ class HermesHandler(AgentHandler):
         self._own_turn_ended(turn)
         if turn.live is not None:
             turn.live.end(failed=outcome is not TurnOutcome.COMPLETED)
-        await self._flush_edits(turn)
+        await self._flush_edits(turn, completed=outcome is TurnOutcome.COMPLETED)
         await self._report_session(turn, switched)
         if outcome is TurnOutcome.COMPLETED and turn.abort_reason is None:
             self._absorb(turn)
@@ -871,7 +912,7 @@ class HermesHandler(AgentHandler):
             turn.ended = True
             if turn.live is not None:
                 turn.live.end(failed=outcome is not TurnOutcome.COMPLETED)
-            await self._flush_edits(turn)
+            await self._flush_edits(turn, completed=not cancel)
             if cancel:
                 # A run never ends while work it covers goes on unseen (R-AG-44).
                 await self._cancel_work(turn)
@@ -1317,14 +1358,21 @@ class HermesHandler(AgentHandler):
         self._touch(turn)
         author = message.author
         content = turn.prepared.pop(message_id, None)
+        user_id, user_name = author.id, str(getattr(author, "display_name", "") or "")
+        if _speaker(turn, message) is not None and turn.user_id is not None:
+            # A member's input speaks for no person of its own: Hermes takes the turn from the
+            # run's person, as a steered text, and the label names the member (09 3.9.9).
+            user_id, user_name = turn.user_id, turn.user_name
         request = TurnRequest(
             run_id=turn.run_id,
             thread_id=turn.thread_id,
             channel_id=turn.channel_id,
-            user_id=author.id,
-            user_name=str(getattr(author, "display_name", "") or ""),
+            user_id=user_id,
+            user_name=user_name,
             message_id=message_id,
-            user_text=_content(message) if content is None else content.turn_text,
+            user_text=_said(
+                turn, message, _content(message) if content is None else content.turn_text
+            ),
             user_side=turn.built.user_side,
             context_taken=True,
             media=() if content is None else content.media,
@@ -1342,7 +1390,7 @@ class HermesHandler(AgentHandler):
             return
         if turn.live is not None:
             turn.live.end(failed=outcome is not TurnOutcome.COMPLETED)
-        await self._flush_edits(turn)
+        await self._flush_edits(turn, completed=outcome is TurnOutcome.COMPLETED)
         if outcome is TurnOutcome.COMPLETED:
             with contextlib.suppress(ValueError):
                 run.patch.followup_absorbed(message_id)
@@ -1488,6 +1536,7 @@ class HermesHandler(AgentHandler):
         self._prepared.pop(turn.run_id, None)
         self._anchors.pop(turn.run_id, None)
         self._inbound.pop(turn.run_id, None)
+        self._teams.pop(turn.run_id, None)
         self._spawn(self.store.drop_card(turn.run_id))
 
     def _spawn(self, coro: Any) -> None:
@@ -1576,7 +1625,9 @@ class HermesHandler(AgentHandler):
             turn.pending.append(message)
             self._touch(turn)
             return
-        text = content.steer_text if content is not None else _content(message)
+        text = _said(
+            turn, message, content.steer_text if content is not None else _content(message)
+        )
         if await self._into_turn(turn, text, message_id):
             if content is not None and content.later is not None:
                 # Steered without a file that may still come: the follow-on run brings it all.
@@ -1724,6 +1775,7 @@ class HermesHandler(AgentHandler):
         text = _content(message)
         if content is not None and content.worth:
             text = content.steer_text
+        text = _said(turn, message, text)
         whole = content is None or content.later is None
         if card.request.kind is CardKind.CLARIFY:
             answered = await self.runtime.answer_card(card, text)
@@ -2044,8 +2096,16 @@ class HermesHandler(AgentHandler):
                 turn.live.draft(text)
         return True
 
-    async def on_answer(self, thread_id: UUID, text: str, reply_to: str | None) -> str | None:
+    async def on_answer(
+        self, thread_id: UUID, text: str, reply_to: str | None, *, preview: bool = False
+    ) -> str | None:
         """The answer (``send``): one message of the run with a stored ``client_msg_id``.
+
+        A ``preview`` is the first send of Hermes' edit transport (``expect_edits``): a partial
+        text with a cursor that Hermes edits up to its final text. It is shown as the draft and
+        posted once, with the text of the edit that finalizes it (or its last text at the end of
+        the run), so the answer is never edited after it was written: the server hands on only
+        an unedited answer (09 3.9.4, FEAT-TEAM-CHANNEL-ADAPTER D-TCA-8).
 
         Returns:
             The ID Hermes may edit later, or ``None`` when no run of this adapter is active in the
@@ -2053,6 +2113,19 @@ class HermesHandler(AgentHandler):
         """
         turn = self._active(thread_id)
         if turn is None or turn.live is None:
+            return None
+        if preview:
+            key = f"{_PREVIEW}{uuid7()}"
+            turn.previews[key] = (text, reply_to)
+            self._touch(turn)
+            with self._bound(turn):
+                turn.live.draft(text)
+            return key
+        return await self._post_answer(turn, text, reply_to)
+
+    async def _post_answer(self, turn: _Turn, text: str, reply_to: str | None) -> str | None:
+        """Post one answer of the run; returns its key, ``None`` when nothing was stored."""
+        if turn.live is None:
             return None
         # Recorded before the send: whatever the outbox does with it, a later copy from Hermes'
         # delivery ledger is the same answer (`recovered_duplicate`).
@@ -2076,6 +2149,7 @@ class HermesHandler(AgentHandler):
             return None
         key = str(entry.message_id)
         turn.answers[key] = (entry.message_id, int(entry.message_version or 1))
+        turn.posted[key] = text
         return key
 
     async def recovered_duplicate(self, thread_id: UUID | None, content: str) -> bool:
@@ -2106,6 +2180,8 @@ class HermesHandler(AgentHandler):
             Whether the message is an own answer of the active run.
         """
         turn = self._active(thread_id)
+        if turn is not None and message_id in turn.previews:
+            return await self._edit_preview(turn, message_id, text, finalize)
         if turn is None or message_id not in turn.answers:
             return False
         turn.edits[message_id] = text
@@ -2114,17 +2190,76 @@ class HermesHandler(AgentHandler):
                 await self._flush_edits(turn, only=message_id)
         return True
 
-    async def _flush_edits(self, turn: _Turn, only: str | None = None) -> None:
+    async def _edit_preview(self, turn: _Turn, key: str, text: str, finalize: bool) -> bool:
+        """An edit of a preview: the new draft, or at ``finalize`` the one post of the answer."""
+        _, reply_to = turn.previews[key]
+        if not finalize:
+            turn.previews[key] = (text, reply_to)
+            self._touch(turn)
+            if turn.live is not None:
+                with self._bound(turn):
+                    turn.live.draft(text)
+            return True
+        del turn.previews[key]
+        if self._progress(turn, text):
+            # The text in front of a tool call, which the edit transport closes with a
+            # finalizing edit: progress in the live box, never an answer (D-ADAPTER-INTERIM-1).
+            # Reported as not delivered, like `on_interim`: Hermes then still sends the text when
+            # it becomes the turn's final answer (an empty reply after the tool round).
+            with self._bound(turn):
+                turn.live.draft(text)  # type: ignore[union-attr] # _active checked the live box
+            return False
+        with self._bound(turn):
+            posted = await self._post_answer(turn, text, reply_to)
+        if posted is None:
+            return False
+        # Hermes keeps editing under its own key: it names the posted answer from now on.
+        turn.answers[key] = turn.answers.pop(posted)
+        turn.posted[key] = turn.posted.pop(posted)
+        return True
+
+    async def _post_previews(self, turn: _Turn, *, completed: bool) -> None:
+        """Previews Hermes never finalized: their last text without the cursor, once each.
+
+        Only for a turn that completed: a stopped, aborted or failed turn posts no partial text,
+        which would read as a finished answer (and hand work on in a team channel, 09 3.9.4).
+        """
+        post = completed and turn.abort_reason is None and not turn.dropped
+        for key, (text, reply_to) in list(turn.previews.items()):
+            del turn.previews[key]
+            final = _without_cursor(text)
+            if not post or not final or self._progress(turn, final):
+                continue
+            with self._bound(turn):
+                posted = await self._post_answer(turn, final, reply_to)
+            if posted is not None:
+                turn.answers[key] = turn.answers.pop(posted)
+                turn.posted[key] = turn.posted.pop(posted)
+
+    @staticmethod
+    def _progress(turn: _Turn, text: str) -> bool:
+        """Whether a text is the open loop's text in front of a tool call (as `on_interim`)."""
+        body = text.strip()
+        return bool(turn.hermes_open and body and body in turn.tool_text)
+
+    async def _flush_edits(
+        self, turn: _Turn, only: str | None = None, *, completed: bool = True
+    ) -> None:
+        if only is None:
+            await self._post_previews(turn, completed=completed)
         for key in [only] if only is not None else list(turn.edits):
             text = turn.edits.pop(key, None) if key is not None else None
             if text is None or key is None:
                 continue
+            body = self._cut(turn, text)
+            if turn.posted.get(key) == body:
+                continue  # the same text: an edit would only mark the answer edited
             message_id, version = turn.answers[key]
             try:
                 result = await turn.handle.client.call(
                     update_message.asyncio_detailed,
                     message_id=message_id,
-                    body=MessageUpdate(content_md=self._cut(turn, text)),
+                    body=MessageUpdate(content_md=body),
                     if_match=f'"{version}"',
                 )
             except ProblemError as exc:
@@ -2132,6 +2267,7 @@ class HermesHandler(AgentHandler):
                 continue
             new_version = getattr(result, "version", None)
             turn.answers[key] = (message_id, int(new_version) if new_version else version + 1)
+            turn.posted[key] = body
 
     def _cut(self, turn: _Turn, text: str) -> str:
         cut, was_cut = cut_utf8(text.encode("utf-8"), self.settings.max_message_bytes)
@@ -2418,8 +2554,36 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def _without_cursor(text: str) -> str:
+    """A preview's text without Hermes' streaming cursor (default ``" \u2589"``) at its end."""
+    return text.rstrip().removesuffix(_CURSOR).rstrip()
+
+
 def _content(message: Message) -> str:
     return message.content_md if isinstance(message.content_md, str) else ""
+
+
+def _speaker(turn: _Turn, message: Message) -> Speaker | None:
+    """The member who wrote a follow-up, ``None`` for a person's message (09 3.9.9)."""
+    return followup_speaker(turn.team, message.origin, message.author)
+
+
+def _labelled(label: str | None, text: str) -> str:
+    if label is None:
+        return text
+    return f"{label}\n\n{text}" if text.strip() else label
+
+
+def _said(turn: _Turn, message: Message, text: str) -> str:
+    """A follow-up's text for Hermes: a member's request behind its label (09 3.9.9)."""
+    speaker = _speaker(turn, message)
+    return _labelled(speaker.label if speaker is not None else None, text)
+
+
+def _with_team(built: BuiltContext, facts: TeamFacts, speaker: Speaker) -> BuiltContext:
+    """A ``team`` run's texts: the team lines on the user side, a member's input labelled."""
+    side = replace(built.user_side, team=tuple(team_lines(facts, speaker)))
+    return BuiltContext(user_side=side, user_text=_labelled(speaker.label, built.user_text))
 
 
 def _log_task_failure(task: asyncio.Task[Any]) -> None:

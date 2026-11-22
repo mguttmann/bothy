@@ -169,7 +169,7 @@ func grantOf(kind domain.TriggerKind) domain.InvocationGrant {
 		BillingMode: "organization", ToolClass: "scoped", PermissionVersion: 7,
 	}
 	switch kind {
-	case domain.TriggerMessage, domain.TriggerFollowup:
+	case domain.TriggerMessage, domain.TriggerFollowup, domain.TriggerTeam:
 		g.MessageID = ids.New()
 	case domain.TriggerInteraction:
 		g.InteractionID = ids.New()
@@ -207,6 +207,7 @@ func TestInvocationClaims_ShapePerTriggerKind(t *testing.T) {
 		domain.TriggerCommand:      {"run_id", "command_id"},
 		domain.TriggerAutocomplete: {"command_id"},
 		domain.TriggerWake:         {"run_id", "wake_id"},
+		domain.TriggerTeam:         {"run_id", "message_id"},
 	}
 	enums := map[string][]string{
 		"level": openapiEnum(t, "Level"), "billing_mode": openapiEnum(t, "BillingMode"), "tool_class": openapiEnum(t, "ToolClass"),

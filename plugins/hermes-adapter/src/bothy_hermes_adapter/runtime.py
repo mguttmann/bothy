@@ -550,8 +550,13 @@ class RuntimeEvents(Protocol):
         """The draft text so far."""
         ...
 
-    async def on_answer(self, thread_id: UUID, text: str, reply_to: str | None) -> str | None:
-        """An answer message; returns the ID Hermes may edit later, ``None`` on failure."""
+    async def on_answer(
+        self, thread_id: UUID, text: str, reply_to: str | None, *, preview: bool = False
+    ) -> str | None:
+        """An answer message; returns the ID Hermes may edit later, ``None`` on failure.
+
+        ``preview`` marks the first send of Hermes' edit transport (``expect_edits``).
+        """
         ...
 
     async def on_edit(self, thread_id: UUID, message_id: str, text: str, finalize: bool) -> bool:

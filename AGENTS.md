@@ -29,8 +29,10 @@ is.
 
 ## How work lands on `main`
 
-- Use a dedicated branch and pull request for each ticket or fix, created from the current
-  `main`.
+- Use one branch and pull request per independent ticket or fix, created from the current
+  `main`; related changes (several parts of a feature or several interdependent tickets) are
+  built and checked locally in parallel and land in one shared pull request with one CI round
+  (owner decision 2026-11-21).
   The ticket briefs live in `docs/briefs/`. This section takes precedence over older
   instructions in `docs/PLAN.md` and the briefs that say to merge locally and never open a
   pull request.

@@ -41,6 +41,7 @@ func (sc *Scenario) runs() {
 	}
 	sc.runLifecycle(run)
 	sc.runWakes(run, thread)
+	sc.runTeam()
 	sc.agentSessions(thread)
 	sc.costs(thread)
 	sc.runContext(run)
@@ -151,4 +152,24 @@ func (sc *Scenario) runWakes(run, thread string) {
 	allgemein := "/channels/" + sc.W.Channels["Support/Allgemein"]
 	sc.matched(owner, allgemein, req{method: http.MethodPut, path: allgemein + "/autonomous-runs",
 		body: map[string]any{"allow_autonomous_runs": false}}, http.StatusOK)
+}
+
+// runTeam drives the team channel operations of FEAT-TEAM-CHANNEL-SERVER without a team: Support
+// is read by persons who are no owners, so switching Support/Allgemein to team mode is refused;
+// the reads and changes of a team that does not exist answer 404 or 409, and switching team mode
+// off is no change.
+func (sc *Scenario) runTeam() {
+	sc.T.Helper()
+	owner, lotse := sc.W.Owner, sc.W.Agents["Lotse"]
+	refused := []int{http.StatusBadRequest, http.StatusForbidden, http.StatusNotFound, http.StatusConflict}
+	team := "/channels/" + sc.W.Channels["Support/Allgemein"] + "/team"
+	sc.call(owner, req{method: http.MethodPut, path: team}, append([]int{http.StatusOK}, refused...)...)
+	sc.get(owner, team, append([]int{http.StatusOK}, refused...)...)
+	sc.call(owner, req{method: http.MethodPost, path: team + "/members", body: map[string]any{
+		"agent_id": lotse.PrincipalID, "home_channel_id": sc.W.Channels["Support/Allgemein"], "handle": "canary"},
+		header: header("Idempotency-Key", newID())}, append([]int{http.StatusCreated}, refused...)...)
+	sc.call(owner, req{method: http.MethodDelete, path: team + "/members/" + newID()}, refused...)
+	sc.call(owner, req{method: http.MethodPost, path: team + "/stop", header: header("Idempotency-Key", newID())},
+		append([]int{http.StatusOK}, refused...)...)
+	sc.call(owner, req{method: http.MethodDelete, path: team}, http.StatusNoContent)
 }

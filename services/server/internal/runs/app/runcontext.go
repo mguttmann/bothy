@@ -11,6 +11,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
@@ -50,6 +51,10 @@ type ContextRepository interface {
 	// DeliveredFollowups returns the messages among messageIDs that a run of the session row in
 	// threadID received as follow-ups (run_followups in delivered or absorbed).
 	DeliveredFollowups(ctx context.Context, threadID, sessionID ids.ID, messageIDs []ids.ID) ([]ids.ID, error)
+	// SessionFeeders returns every principal run_feeders records for the earlier started runs of
+	// row's agent in row's thread with agent_session_id = sessionID (those of EarlierSessionRun),
+	// and a zero principal when one of them has no trigger row.
+	SessionFeeders(ctx context.Context, row RunRow, sessionID ids.ID) ([]ids.ID, error)
 }
 
 // Context implements runs.Runs (getRunContext, run.context.read; M2-13 design note 1). Order: the
@@ -57,7 +62,8 @@ type ContextRepository interface {
 // triggering message is gone and a triggering message the agent may not read give the not_found of
 // an unknown run; a trigger that is not a message is internal; then the thread, the channel
 // switches, the session plan, the windows, cutting and budget, the trust of every element from
-// authorize.TriggerHolders, and already_delivered. Any source error ends the request with its
+// authorize.TriggerHolders, and already_delivered; before the answer the writers of its messages
+// are recorded in run_feeders (recordContextFeeders). Any source error ends the request with its
 // kind and never turns into a context with weaker trust (fail closed, 09 1 point 4).
 func (s *Service) Context(ctx context.Context, runID ids.ID) (runs.RunContext, error) {
 	if s.d.ContextMessages == nil || s.d.TriggerHolders == nil || s.d.ContextRows == nil ||
@@ -81,7 +87,7 @@ func (s *Service) Context(ctx context.Context, runID ids.ID) (runs.RunContext, e
 	if !row.State.Active() {
 		return runs.RunContext{}, invisible()
 	}
-	if row.TriggerKind != string(domain.TriggerMessage) {
+	if row.TriggerKind != string(domain.TriggerMessage) && row.TriggerKind != string(domain.TriggerTeam) {
 		s.d.Log.LogAttrs(ctx, slog.LevelError, msgContextTriggerKind, slog.String(logKeyRunID, row.ID.String()),
 			slog.String(logKeyTriggerKind, row.TriggerKind))
 		return runs.RunContext{}, errs.New(errs.CodeInternalError, "runs: the run context of this trigger kind is not defined")
@@ -93,7 +99,106 @@ func (s *Service) Context(ctx context.Context, runID ids.ID) (runs.RunContext, e
 	if err != nil {
 		return runs.RunContext{}, err
 	}
-	return s.buildContext(ctx, b)
+	out, err := s.buildContext(ctx, b)
+	if err != nil {
+		return runs.RunContext{}, err
+	}
+	if err := s.recordContextFeeders(ctx, b, out); err != nil {
+		return runs.RunContext{}, err
+	}
+	return out, nil
+}
+
+// recordContextFeeders records in run_feeders, source context, who wrote the messages the context
+// gives the run (09 3.9.4), in its own unit of work, also in maintenance mode, because the context
+// belongs to running the run. Every element (trigger, thread and channel window; any origin and
+// author, the run's own agent included) is recorded by domain.ContextFeeders: a team input with
+// its authority, a person's message with its author, an agent's answer with the record of the run
+// it answers (contextAnswer), every other message as an input that speaks for no person, so the
+// owner check refuses the run. An agent's text has passed no check of who steered it except
+// through the run it answers (red team rounds 5 and 6). The session the run takes over is recorded
+// too (sessionFeeders), because resume leaves its inputs and the agent's own messages out of the
+// context while the model still holds them.
+func (s *Service) recordContextFeeders(ctx context.Context, b contextBuild, out runs.RunContext) error {
+	runID := b.row.ID
+	elements := append([]runs.ContextMessage{out.TriggerMessage}, out.ThreadContext...)
+	elements = append(elements, out.ChannelContext...)
+	return s.d.UoW.Do(txn.WithWriteInMaintenance(ctx), func(ctx context.Context) error {
+		var by []ids.ID
+		for _, m := range elements {
+			p, err := s.elementFeeders(ctx, runID, m)
+			if err != nil {
+				return err
+			}
+			by = append(by, p...)
+		}
+		carried, err := s.sessionFeeders(ctx, b)
+		if err != nil {
+			return err
+		}
+		by = append(by, carried...)
+		return s.d.Repo.RecordFeeders(ctx, out.RunID, domain.FeedContext, by)
+	})
+}
+
+// elementFeeders returns the principals one element of the context of runID records
+// (domain.ContextFeeders); none for an answer of runID itself, whose record is being written.
+func (s *Service) elementFeeders(ctx context.Context, runID ids.ID, m runs.ContextMessage) ([]ids.ID, error) {
+	e := domain.ContextElement{AuthorID: m.Author.ID, AuthorKind: m.Author.Kind, Edited: m.Edited}
+	in, team, err := s.teamInputOf(ctx, m.MessageID)
+	if err != nil {
+		return nil, err
+	}
+	e.TeamInput, e.Authority = team, in.AuthorityID
+	if !team {
+		self, err := s.contextAnswer(ctx, runID, m.MessageID, &e)
+		if err != nil || self {
+			return nil, err
+		}
+	}
+	return domain.ContextFeeders(e), nil
+}
+
+// sessionFeeders returns what the run takes over with its session (09 3.9.4, red team round 6):
+// in mode resume the record of every earlier run of the session row in the thread; in mode bind
+// a zero principal, because a bound session holds history from outside the thread that no record
+// names; nothing for a new session and a guest.
+func (s *Service) sessionFeeders(ctx context.Context, b contextBuild) ([]ids.ID, error) {
+	switch b.plan.Mode {
+	case domain.SessionResume:
+		if b.session.IsZero() {
+			return []ids.ID{{}}, nil
+		}
+		return s.d.ContextRows.SessionFeeders(ctx, b.row, b.session)
+	case domain.SessionBind:
+		return []ids.ID{{}}, nil
+	case domain.SessionNew, domain.SessionGuest:
+		return nil, nil
+	}
+	return []ids.ID{{}}, nil
+}
+
+// contextAnswer fills the answer part of e for the message messageID with the record of the run
+// it answers (03 run_answers); self reports an answer of runID itself, whose record is the one
+// being written.
+func (s *Service) contextAnswer(ctx context.Context, runID, messageID ids.ID, e *domain.ContextElement) (self bool, err error) {
+	answered, found, err := s.d.Repo.AnswerRun(ctx, messageID)
+	if err != nil || !found {
+		return false, err
+	}
+	if answered == runID {
+		return true, nil
+	}
+	feeders, err := s.d.Repo.Feeders(ctx, answered)
+	if err != nil {
+		return false, err
+	}
+	e.Answer = true
+	for _, f := range feeders {
+		e.AnswerRecord = append(e.AnswerRecord, f.PrincipalID)
+		e.AnswerTriggered = e.AnswerTriggered || f.Source == domain.FeedTrigger
+	}
+	return false, nil
 }
 
 // contextBuild collects the facts of one context.
@@ -281,6 +386,7 @@ func contextElement(m messaging.Message) runs.ContextMessage {
 		Author: runs.ContextAuthor{ID: m.Author.ID, Kind: m.Author.Kind, Handle: m.Author.Handle, DisplayName: m.Author.DisplayName,
 			AvatarFileID: m.Author.AvatarFileID},
 		Origin: m.Origin, Kind: m.Kind, ContentMD: m.ContentMD, Attachments: []runs.ContextAttachment{}, ReplyToMessageID: m.ReplyToID,
+		Edited: !m.EditedAt.IsZero(),
 	}
 }
 

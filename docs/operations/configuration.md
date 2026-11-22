@@ -462,6 +462,10 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `run.wake_label_max_chars` | `BOTHY_RUN__WAKE_LABEL_MAX_CHARS` | Server | int | `120` | longest label of a wake-up in Unicode characters; longer is `too_long` (5.8.1, 03 `run_wakes`) | active |
 | `run.autonomous_chain_max` | `BOTHY_RUN__AUTONOMOUS_CHAIN_MAX` | Server | int | `25` | consecutive autonomous inputs per thread and person; `0` means no chain cap; at the cap `refused` with a note (5.8.6, ruling D-AR-01-1) | active |
 | `run.autonomous_idle_max` | `BOTHY_RUN__AUTONOMOUS_IDLE_MAX` | Server | int | `3` | consecutive idle autonomous inputs per thread and person; minimum `1`, cannot be switched off (5.8.6) | active |
+| `team.turn_budget` | `BOTHY_TEAM__TURN_BUDGET` | Server | int | `200` | member inputs per team channel since an owner's last message; the next one pauses the channel (3.9.6, owner answer of 2026-11-21: high, only to catch loops) | active |
+| `team.pingpong_max` | `BOTHY_TEAM__PINGPONG_MAX` | Server | int | `40` | longest alternation of inputs between the same two members without an owner message; a longer one pauses the channel (3.9.6) | active |
+| `team.max_members` | `BOTHY_TEAM__MAX_MEMBERS` | Server | int | `20` | members per team channel (3.9.1) | active |
+| `team.handle_max_chars` | `BOTHY_TEAM__HANDLE_MAX_CHARS` | Server | int | `32` | longest handle of a team member (3.9.1) | active |
 | `thread.placeholder_titles` | `BOTHY_THREAD__PLACEHOLDER_TITLES` | Server | list(string) | `["Neuer Chat", "Chat", "Ohne Titel", "Test", "New chat", "Untitled"]` | placeholders for the title detection; the empty title is always a placeholder (12 point 2), a list entry is never empty | active |
 | `adapter.invocation_token_leeway` |  | Adapter |  | `10s` | clock tolerance for `exp` and `iat`; at most the server's `auth.clock_leeway` (4.5) |  |
 | `adapter.jwks_refresh_min_interval` |  | Adapter |  | `60s` | reload JWKS at most this often |  |

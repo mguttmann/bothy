@@ -89,6 +89,9 @@ type Runs struct {
 	Wakes *runsjobs.WakeScheduler
 	// wakeRepo is the repository of the wake-ups, the source of bothy.run.wake.pending.
 	wakeRepo *runspg.Repository
+	// Teams schedules runs.team_input (FEAT-TEAM-CHANNEL-SERVER); BindTeams creates it and the jobs
+	// step binds its inserter (BindJobs). nil until BindTeams.
+	Teams *runsjobs.TeamScheduler
 }
 
 // WakesConfig binds the keys of the wake-ups (09 21, stage AR): run.wake_max_pending,
@@ -126,6 +129,40 @@ func (r *Runs) BindWakes(cfg runsapp.WakeConfig, pool *pg.Pool, d WakeDeps) erro
 	}
 	r.Wakes, r.wakeRepo = sched, repo
 	r.Handlers.BindWakes(r.Service.Wakes())
+	return nil
+}
+
+// TeamsConfig binds the keys of the team channels (09 21, FEAT-TEAM-CHANNEL-SERVER):
+// team.turn_budget, team.pingpong_max, team.max_members and team.handle_max_chars. The error names
+// the key whose binding failed, never a value.
+func TeamsConfig(v *config.Values) (runsapp.TeamConfig, error) {
+	var c runsapp.TeamConfig
+	if err := config.Bind(v, &c); err != nil {
+		return runsapp.TeamConfig{}, err
+	}
+	return c, nil
+}
+
+// TeamDeps are the collaborators of the team channels from the other steps: the copies and notes
+// of messaging, the readers and the owner role of authz.
+type TeamDeps struct {
+	Messages runsapp.TeamMessages
+	Readers  runsapp.TeamReaders
+	Owners   runsapp.Owners
+}
+
+// BindTeams binds the team channels (FEAT-TEAM-CHANNEL-SERVER) to the use cases and the REST
+// handlers: the repository over pool, the scheduler of runs.team_input (bound to the job runtime
+// by BindJobs), the copies, the readers and the owner role. Errors: those of BindTeams.
+func (r *Runs) BindTeams(cfg runsapp.TeamConfig, pool *pg.Pool, d TeamDeps) error {
+	sched := &runsjobs.TeamScheduler{}
+	if err := r.Service.BindTeams(cfg, runsapp.TeamDeps{
+		Repo: runspg.NewRepository(pool), Messages: d.Messages, Readers: d.Readers, Owners: d.Owners, Schedule: sched,
+	}); err != nil {
+		return err
+	}
+	r.Teams = sched
+	r.Handlers.BindTeams(r.Service.Teams())
 	return nil
 }
 
@@ -403,6 +440,9 @@ func (r *Runs) BindJobs(ins jobs.Inserter) {
 	}
 	if r.Wakes != nil {
 		r.Wakes.Bind(ins)
+	}
+	if r.Teams != nil {
+		r.Teams.Bind(ins)
 	}
 	if r.AppDispatches != nil {
 		r.AppDispatches.Bind(ins)

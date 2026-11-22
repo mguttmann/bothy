@@ -557,6 +557,12 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"retention.privacy_job":            {Kind: config.KindDuration, Default: "1095d", Min: "1d", Chapter: "20-privacy.md"},
 		// AUD-srv-wire-01: the working directory of the export packages (20 section 13).
 		"privacy.export_work_dir": {Kind: config.KindString, Default: "", Chapter: "20-privacy.md"},
+		// FEAT-TEAM-CHANNEL-SERVER: the team channels (09 3.9 and 21); the brake defaults are high on
+		// purpose (owner answer of 2026-11-21: the brake catches loops, it is no cost limit).
+		"team.turn_budget":      {Kind: config.KindInt, Default: "200", Min: "1", Max: "100000", Chapter: "09-agents.md"},
+		"team.pingpong_max":     {Kind: config.KindInt, Default: "40", Min: "1", Max: "100000", Chapter: "09-agents.md"},
+		"team.max_members":      {Kind: config.KindInt, Default: "20", Min: "1", Max: "1000", Chapter: "09-agents.md"},
+		"team.handle_max_chars": {Kind: config.KindInt, Default: "32", Min: "1", Max: "64", Chapter: "09-agents.md"},
 		// M7-07: the retention of the deletion journal (20 section 13).
 		"privacy.deletion_journal_retention": {Kind: config.KindDuration, Default: "400d", Min: "1d", Chapter: "20-privacy.md"},
 	}

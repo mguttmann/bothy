@@ -90,6 +90,9 @@ from .agent_session_list import AgentSessionList
 from .agent_session_report import AgentSessionReport
 from .agent_session_report_bind_failed import AgentSessionReportBindFailed
 from .agent_status import AgentStatus
+from .agent_team_facts import AgentTeamFacts
+from .agent_team_facts_source import AgentTeamFactsSource
+from .agent_team_member import AgentTeamMember
 from .agent_template import AgentTemplate
 from .agent_template_list import AgentTemplateList
 from .agent_template_source import AgentTemplateSource
@@ -817,6 +820,11 @@ from .step_up_password_request import StepUpPasswordRequest
 from .step_up_result import StepUpResult
 from .step_up_with_password_x_console_request import StepUpWithPasswordXConsoleRequest
 from .target_kind import TargetKind
+from .team import Team
+from .team_member import TeamMember
+from .team_member_create import TeamMemberCreate
+from .team_pause_reason import TeamPauseReason
+from .team_stop_result import TeamStopResult
 from .template import Template
 from .template_create import TemplateCreate
 from .template_list import TemplateList
@@ -1012,6 +1020,9 @@ __all__ = (
     "AgentSessionReport",
     "AgentSessionReportBindFailed",
     "AgentStatus",
+    "AgentTeamFacts",
+    "AgentTeamFactsSource",
+    "AgentTeamMember",
     "AgentTemplate",
     "AgentTemplateList",
     "AgentTemplateSource",
@@ -1713,6 +1724,11 @@ __all__ = (
     "StepUpResult",
     "StepUpWithPasswordXConsoleRequest",
     "TargetKind",
+    "Team",
+    "TeamMember",
+    "TeamMemberCreate",
+    "TeamPauseReason",
+    "TeamStopResult",
     "Template",
     "TemplateCreate",
     "TemplateList",

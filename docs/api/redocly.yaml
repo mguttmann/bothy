@@ -264,6 +264,9 @@ rules:
         - status.public.read
         - status.read
         - sync.snapshot.read
+        - team.read
+        - team.stop
+        - team.update
         - template.manage
         - template.read
         - terminal.attach
@@ -550,6 +553,9 @@ rules:
         - status.public.read
         - status.read
         - sync.snapshot.read
+        - team.read
+        - team.stop
+        - team.update
         - template.manage
         - template.read
         - terminal.attach

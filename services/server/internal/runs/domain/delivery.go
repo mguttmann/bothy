@@ -5,6 +5,7 @@ package domain
 import (
 	"encoding/json"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -107,11 +108,13 @@ func DeliveryMatrix(eventType string, state State) (DeliveryRule, error) {
 // interaction.created, command.invoked (04 section 15.3, 05 section 6) and agent.wake_input (04
 // 15.9, stage AR).
 func InvocationBearing(eventType string) bool {
-	switch eventType {
-	case EventAgentInvocation, EventAgentFollowup, EventInteractionCreated, EventCommandInvoked, EventAgentWakeInput:
-		return true
-	}
-	return false
+	return slices.Contains(InvocationBearingTypes(), eventType)
+}
+
+// InvocationBearingTypes returns every invocation-bearing event type, the inputs an agent receives
+// for a run.
+func InvocationBearingTypes() []string {
+	return []string{EventAgentInvocation, EventAgentFollowup, EventInteractionCreated, EventCommandInvoked, EventAgentWakeInput}
 }
 
 // The deny reasons of authorize (07 4.1) the delivery maps to their own run reason.
@@ -229,7 +232,7 @@ func DeliveryGrant(f DeliveryFacts) (InvocationGrant, error) {
 	switch g.TriggerKind {
 	case TriggerWake:
 		g.WakeID = f.ObjectID
-	case TriggerMessage, TriggerFollowup:
+	case TriggerMessage, TriggerFollowup, TriggerTeam:
 		g.MessageID = f.ObjectID
 	case TriggerInteraction:
 		g.InteractionID = f.ObjectID
@@ -278,6 +281,60 @@ type InvocationPayloadInput struct {
 	Options                        []OptionValue
 	// Wake is the wake-up of trigger kind wake (stage AR); nil otherwise.
 	Wake *WakeFacts
+	// Team is the team facts of trigger kind team (09 3.9.9), required for it; nil otherwise.
+	Team *TeamFacts
+}
+
+// TeamFacts are the members of AgentTeamFacts in agent.invocation of a team run (09 3.9.9).
+type TeamFacts struct {
+	ChannelID, MemberID ids.ID
+	Handle              string
+	// Source is TeamSourceOwner or TeamSourceMember; SourceHandle is the source member's handle.
+	Source, SourceHandle string
+	Addressed            bool
+	Members              []TeamMemberFacts
+}
+
+// TeamMemberFacts is one member of AgentTeamFacts.members.
+type TeamMemberFacts struct {
+	MemberID, AgentID, HomeChannelID ids.ID
+	Handle                           string
+}
+
+// teamPayload is AgentTeamFacts.
+type teamPayload struct {
+	ChannelID    string              `json:"channel_id"`
+	MemberID     string              `json:"member_id"`
+	Handle       string              `json:"handle"`
+	Source       string              `json:"source"`
+	SourceHandle string              `json:"source_handle,omitzero"`
+	Addressed    bool                `json:"addressed"`
+	Members      []teamMemberPayload `json:"members"`
+}
+
+// teamMemberPayload is AgentTeamMember.
+type teamMemberPayload struct {
+	MemberID      string `json:"member_id"`
+	Handle        string `json:"handle"`
+	AgentID       string `json:"agent_id"`
+	HomeChannelID string `json:"home_channel_id"`
+}
+
+// payloadOf returns the payload form of the team facts; members is never null.
+func (t *TeamFacts) payloadOf() *teamPayload {
+	p := &teamPayload{
+		ChannelID: t.ChannelID.String(), MemberID: t.MemberID.String(), Handle: t.Handle, Source: t.Source, Addressed: t.Addressed,
+		Members: make([]teamMemberPayload, 0, len(t.Members)),
+	}
+	if t.Source == TeamSourceMember {
+		p.SourceHandle = t.SourceHandle
+	}
+	for _, m := range t.Members {
+		p.Members = append(p.Members, teamMemberPayload{
+			MemberID: m.MemberID.String(), Handle: m.Handle, AgentID: m.AgentID.String(), HomeChannelID: m.HomeChannelID.String(),
+		})
+	}
+	return p
 }
 
 // WakeFacts are the members of the wake-up in agent.invocation of a wake run and in
@@ -314,6 +371,7 @@ type invocationPayload struct {
 	InteractionID       string                `json:"interaction_id,omitzero"`
 	WakeID              string                `json:"wake_id,omitzero"`
 	Wake                *wakePayload          `json:"wake,omitempty"`
+	Team                *teamPayload          `json:"team,omitempty"`
 	CommandInvocationID string                `json:"command_invocation_id,omitzero"`
 	CommandID           string                `json:"command_id,omitzero"`
 	CommandName         string                `json:"command_name,omitzero"`
@@ -371,7 +429,7 @@ func InvocationPayload(in InvocationPayloadInput, session SessionDecision) ([]by
 // Errors: the members of another trigger kind, or a kind that agent.invocation never carries.
 func setTrigger(p *invocationPayload, in InvocationPayloadInput) error {
 	commandSet := !in.CommandID.IsZero() || !in.CommandInvocationID.IsZero() || in.CommandName != "" || in.Options != nil
-	if in.Wake != nil && TriggerKind(in.TriggerKind) != TriggerWake {
+	if (in.Wake != nil && TriggerKind(in.TriggerKind) != TriggerWake) || (in.Team != nil && TriggerKind(in.TriggerKind) != TriggerTeam) {
 		return errPayload
 	}
 	switch TriggerKind(in.TriggerKind) {
@@ -394,6 +452,8 @@ func setTrigger(p *invocationPayload, in InvocationPayloadInput) error {
 			return errPayload
 		}
 		p.TriggerKind, p.InteractionID = string(TriggerInteraction), in.InteractionID.String()
+	case TriggerTeam:
+		return setTeamTrigger(p, in, commandSet)
 	case TriggerFollowup, TriggerAutocomplete:
 		// agent.invocation carries message, command and interaction runs.
 		return errPayload
@@ -445,6 +505,17 @@ func setWakeTrigger(p *invocationPayload, in InvocationPayloadInput, commandSet 
 		return errPayload
 	}
 	p.TriggerKind, p.WakeID, p.Wake = string(TriggerWake), in.Wake.ID.String(), in.Wake.payloadOf()
+	return nil
+}
+
+// setTeamTrigger sets the trigger of a team run: the input message and the team facts, no
+// interaction, command or wake-up (09 3.9.9). Errors: the members of another trigger kind, no
+// message or no team facts.
+func setTeamTrigger(p *invocationPayload, in InvocationPayloadInput, commandSet bool) error {
+	if in.MessageID.IsZero() || !in.InteractionID.IsZero() || commandSet || in.Team == nil {
+		return errPayload
+	}
+	p.TriggerKind, p.MessageID, p.Team = string(TriggerTeam), in.MessageID.String(), in.Team.payloadOf()
 	return nil
 }
 
