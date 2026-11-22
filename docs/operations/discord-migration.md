@@ -275,11 +275,13 @@ answers again once its agent is the channel's operator or holds a `write` grant 
 channel (22 13.3.1).
 
 Exit `1` with counts per reason (busy, unsettled, lookback) means messages are still held back:
-repeat after `import.follow.settle_after`. Exit `1` with "written after it" means messages arrived
-after the round: the Discord lock of step 1 is not in place yet. Exit `1` with "of the channel's
-threads failed" means the round could not copy a thread; the line above it names the thread and
-the reason (section 11), and this says nothing about the Discord lock. Exit `0` prints steps 3
-and 4.
+repeat once the busy reactions are gone and `import.follow.settle_after` has passed since the last
+change. Exit `1` with "settled since" means messages the round held back settled before the check
+read them: run `switch` again. Exit `1` with "written after it" means messages arrived in a thread
+after the round read it without holding anything back: the Discord lock of step 1 is not in place
+yet. Exit `1` with "of the channel's threads failed" means the round could not copy a thread (its
+messages or the thread itself, for example a new name); the line above it names the thread and the
+reason (section 11), and this says nothing about the Discord lock. Exit `0` prints steps 3 and 4.
 
 Step 3, web console, owner (step-up): in the channel's row "Lead here", which makes the channel
 writable in the same step; then "Set operator" with the planned operator of the mapping. Another

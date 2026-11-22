@@ -221,11 +221,13 @@ Switch-over (22 13.3):
    changed `planned_operator` ends `switch` with exit `2`. The command runs one mirror round for the channel (with the lease of a
    run, exit `3` and `--takeover` as for `--once`), then reads the channel once more and applies
    the settle rule with the current time: anything still held back ends with exit `1` and the
-   counts per reason (busy, unsettled, lookback_busy); repeat after `import.follow.settle_after`.
-   Messages after the cursor that the rule does not hold but the round did not copy (written after
-   it) also end with exit `1`: the Discord lock of step 1 is evidently not in place yet. When a
-   thread of the channel failed in the round, the text says that instead and the line above it
-   names the thread and the reason; it draws no conclusion about the lock. On success
+   counts per reason (busy, unsettled, lookback_busy); repeat once the busy reactions are gone and
+   `import.follow.settle_after` has passed. Messages after the cursor that the rule does not hold
+   but the round did not copy end with exit `1` as well: in a thread the round held back they
+   settled since (run `switch` again), in any other thread they were written after the round read
+   it, and the Discord lock of step 1 is evidently not in place yet. When a thread of the channel
+   failed in the round, with or without messages left behind, the text says that instead and the
+   line above it names the thread and the reason; it draws no conclusion about the lock. On success
    standard error carries steps 3 and 4.
 3. Web console, owner (step-up): Import, the channel, "Lead here" (lead `bothy`), which lifts read-only in the
    same transaction; then the channel's operator, the planned operator of the mapping (the

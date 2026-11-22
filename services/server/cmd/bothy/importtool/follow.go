@@ -423,6 +423,7 @@ func (m *mirror) mirrorThread(ctx context.Context, c *channelPlan, t *threadPlan
 	active := wk.gs.active[t.th.ID]
 	stored, known := m.cur.mirrored(t.th.ID)
 	if !known && m.starterPending(c, t) {
+		c.rep.holdRead(t.th.ID)
 		return nil
 	}
 	wasOpen := !t.closed
@@ -529,6 +530,7 @@ func (m *mirror) page(ctx context.Context, c *channelPlan, pd *pending, page, lo
 		return false, nil
 	}
 	c.rep.MessagesHeld += held
+	c.rep.holdRead(pd.readID)
 	m.wk.log.DebugContext(ctx, "mirror: thread held back", slog.String(logKeyReason, string(reason)), slog.Int(logKeyHeld, held))
 	return true, nil
 }

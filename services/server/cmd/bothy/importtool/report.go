@@ -42,7 +42,9 @@ const (
 // a line in their message (22 6.5 item 7); PinsNotTaken counts the pins above pin.max_per_thread
 // of the server (22 6.6), which a dry run cannot see and counts as 0. threadsFailed counts the
 // threads of a mirror round that failed (mirror.local); switch reads it to tell a failed thread
-// from messages written after the round.
+// from messages written after the round. heldReads holds the Discord IDs of the threads (or of the
+// channel for its main thread) whose copy the settle rule held back in the round, directly or by
+// a pending starter; switch reads it to tell a message the round held from one written after it.
 type channelReport struct {
 	ThreadsOpen          int            `json:"threads_open"`
 	ThreadsDone          int            `json:"threads_done"`
@@ -69,6 +71,15 @@ type channelReport struct {
 	notes                []string
 	peopleSeen           map[string]bool
 	threadsFailed        int
+	heldReads            map[string]bool
+}
+
+// holdRead records that the round held back the copy of the thread readID.
+func (r *channelReport) holdRead(readID string) {
+	if r.heldReads == nil {
+		r.heldReads = map[string]bool{}
+	}
+	r.heldReads[readID] = true
 }
 
 // skipMessage counts a message skipped for reason.

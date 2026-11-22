@@ -159,3 +159,27 @@ func TestSwitchFailedThreadIsNoLockProblem(t *testing.T) {
 		}
 	}
 }
+
+// TestSwitchFailedThreadWithoutMessagesExit1 (22 13.3): a thread whose only change is its name,
+// refused by the server, fails in the last round and leaves no message after the cursor; switch
+// still ends with exit 1 and names the failed thread, because its thread object is not mirrored.
+// Before, the verdict looked only at messages left behind and printed step 3.
+func TestSwitchFailedThreadWithoutMessagesExit1(t *testing.T) {
+	e, _, mapFile := switchEnv(t, "")
+	e.discord.RenameThread(fxThread, "renamed thread")
+	e.bothy.RefuseBatch("thread:"+fxThread, 1, "/items/0/data/name", "invalid")
+	if code := e.run(switchArgs(mapFile, "--discord-locked")...); code != ExitAborted {
+		t.Fatalf("exit %d, want 1: %s", code, e.stderr.String())
+	}
+	for _, want := range []string{"1 of the channel's threads failed", "run switch again",
+		"thread " + fxThread + " of channel " + fxGeneral + " failed in this round"} {
+		if !strings.Contains(e.stderr.String(), want) {
+			t.Errorf("stderr lacks %q:\n%s", want, e.stderr.String())
+		}
+	}
+	for _, not := range []string{"messages after the cursor", "evidently not read-only", "Step 3"} {
+		if strings.Contains(e.stderr.String(), not) {
+			t.Errorf("stderr says %q for a failed thread object:\n%s", not, e.stderr.String())
+		}
+	}
+}

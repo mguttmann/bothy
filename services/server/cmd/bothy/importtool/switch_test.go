@@ -139,6 +139,42 @@ func TestSwitchNewMessagesExit1(t *testing.T) {
 	}
 }
 
+// TestSwitchSettledSinceRoundIsNoLockProblem (brief design note 2): a message the last round held
+// back as unsettled, which settles before the settle check reads it, was written before the round;
+// switch ends with exit 1 asking to run it again and does not conclude a missing Discord lock.
+// Before, the check counted it as written after the round.
+func TestSwitchSettledSinceRoundIsNoLockProblem(t *testing.T) {
+	e, _, mapFile := switchEnv(t, "")
+	now := e.clk.Now()
+	e.discord.AddMessage(fxGeneral, newMessage("13009001", now))
+	e.discord.AddMessage(fxThread, newMessage("13009002", now.Add(-time.Hour)))
+	advanced := false
+	e.hook = func(int) error {
+		// The batch of the thread is the last write of the round: the held message settles after it.
+		if !advanced {
+			advanced = true
+			e.clk.Advance(DefaultConfig().FollowSettleAfter)
+		}
+		return nil
+	}
+	if code := e.run(switchArgs(mapFile, "--discord-locked")...); code != ExitAborted {
+		t.Fatalf("exit %d, want 1: %s", code, e.stderr.String())
+	}
+	if !advanced {
+		t.Fatal("the round wrote no batch, so the clock never passed the settle time")
+	}
+	for _, want := range []string{"1 messages the last round held back have settled since", "run switch again"} {
+		if !strings.Contains(e.stderr.String(), want) {
+			t.Errorf("stderr lacks %q:\n%s", want, e.stderr.String())
+		}
+	}
+	for _, not := range []string{"written after it", "evidently not read-only", "Step 3"} {
+		if strings.Contains(e.stderr.String(), not) {
+			t.Errorf("stderr says %q:\n%s", not, e.stderr.String())
+		}
+	}
+}
+
 // TestSwitchWrongLeadExit2 (brief design note 1): a channel whose stored lead is already bothy, a
 // channel not imported yet and a source that is not running end with exit 2 naming the condition,
 // without any write.

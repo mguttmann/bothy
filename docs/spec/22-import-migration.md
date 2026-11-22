@@ -849,10 +849,13 @@ The tool cannot see step 1 (it never writes to Discord and reads no permissions 
 flag `--discord-locked` stands for it: the owner confirms with it that the Discord channel is
 read-only and the agent removed there; without it `switch` ends with exit `2` before any call.
 After the round `switch` reads the channel once more: messages after the cursor that the settle
-rule does not hold but the round did not copy (written after it) also end with exit `1`, because
-the lock of step 1 is evidently not in place yet. When a thread of the channel failed in the round
-(12.2 item 5), `switch` says that instead and names the thread and the reason: such messages stay
-behind until the cause is removed, and they say nothing about the lock.
+rule does not hold but the round did not copy also end with exit `1`. In a thread the round read
+without holding anything back they were written after it, so the lock of step 1 is evidently not
+in place yet; in a thread the round held back they settled since, and `switch` asks to run it
+again. When a thread of the channel failed in the round (12.2 item 5), `switch` ends with exit `1`
+even without messages left behind (the thread item itself may be the refused one), says that
+instead and names the thread and the reason: the thread stays behind until the cause is removed,
+and this says nothing about the lock.
 
 #### 13.3.1 Operator of the imported threads (addendum of 2026-10-30)
 
