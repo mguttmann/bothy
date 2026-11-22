@@ -178,16 +178,16 @@ func (r *Repository) TeamMirrored(ctx context.Context, sourceMessageID ids.ID) (
 }
 
 // TeamHistory implements app.TeamRepository.
-func (r *Repository) TeamHistory(ctx context.Context, threadID ids.ID, maxRows int) ([]app.TeamHistoryRow, error) {
-	rows, err := r.read(ctx).TeamHistory(ctx, sqlcgen.TeamHistoryParams{ThreadID: uuid(threadID), MaxRows: count32(maxRows)})
+func (r *Repository) TeamHistory(ctx context.Context, threadID ids.ID, beforeSeq int64, maxRows int) ([]app.TeamHistoryRow, error) {
+	rows, err := r.read(ctx).TeamHistory(ctx, sqlcgen.TeamHistoryParams{ThreadID: uuid(threadID), BeforeSeq: beforeSeq, MaxRows: count32(maxRows)})
 	if err != nil {
 		return nil, mapError(err, "reading the history of a team channel")
 	}
 	out := make([]app.TeamHistoryRow, len(rows))
 	for i, row := range rows {
-		out[len(rows)-1-i] = app.TeamHistoryRow{
+		out[i] = app.TeamHistoryRow{
 			MessageID: idOf(row.ID), AuthorID: idOf(row.AuthorPrincipalID), MirrorMemberID: idOf(row.MirrorMemberID), Origin: row.Origin,
-			Version: row.Version, Edited: row.Edited, Mirror: row.Mirror,
+			Version: row.Version, Seq: row.ThreadSeq, Edited: row.Edited, Mirror: row.Mirror,
 		}
 	}
 	return out, nil

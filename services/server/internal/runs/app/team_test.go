@@ -35,11 +35,12 @@ type teamRepo struct {
 	members []app.TeamMemberRow
 	inputs  map[ids.ID]app.TeamInputRow
 	mirrors map[ids.ID]ids.ID
-	// history returns the persons' text messages and mirrors of a thread, oldest first (TeamHistory).
+	// history returns the persons' text messages and mirrors of a thread, oldest first, with
+	// ascending sequences (TeamHistory pages over it).
 	history func(thread ids.ID, mirrors map[ids.ID]bool) []app.TeamHistoryRow
 }
 
-func (r *teamRepo) TeamHistory(_ context.Context, thread ids.ID, maxRows int) ([]app.TeamHistoryRow, error) {
+func (r *teamRepo) TeamHistory(_ context.Context, thread ids.ID, before int64, maxRows int) ([]app.TeamHistoryRow, error) {
 	r.mu.Lock()
 	mirrored := map[ids.ID]bool{}
 	for _, m := range r.mirrors {
@@ -50,9 +51,12 @@ func (r *teamRepo) TeamHistory(_ context.Context, thread ids.ID, maxRows int) ([
 	if h == nil {
 		return nil, nil
 	}
-	rows := h(thread, mirrored)
-	if len(rows) > maxRows {
-		rows = rows[len(rows)-maxRows:]
+	all := h(thread, mirrored)
+	var rows []app.TeamHistoryRow
+	for i := len(all) - 1; i >= 0 && len(rows) < maxRows; i-- {
+		if all[i].Seq < before {
+			rows = append(rows, all[i])
+		}
 	}
 	return rows, nil
 }
@@ -339,13 +343,13 @@ func (w *teamWorld) historyOf(thread ids.ID, mirrored map[ids.ID]bool) []app.Tea
 	w.msgFacts.mu.Lock()
 	defer w.msgFacts.mu.Unlock()
 	var out []app.TeamHistoryRow
-	for _, id := range order {
+	for i, id := range order {
 		m, ok := w.msgFacts.m[id]
 		if !ok || m.ThreadID != thread || m.Deleted || (m.Origin != "human" && !mirrored[id]) {
 			continue
 		}
 		out = append(out, app.TeamHistoryRow{
-			MessageID: id, AuthorID: m.Author.ID, Origin: m.Origin, Version: max(m.Version, 1), Edited: m.Edited, Mirror: mirrored[id],
+			MessageID: id, AuthorID: m.Author.ID, Origin: m.Origin, Version: max(m.Version, 1), Seq: int64(i + 1), Edited: m.Edited, Mirror: mirrored[id],
 		})
 	}
 	return out
@@ -1366,5 +1370,52 @@ func TestTeam_NewMemberHistoryIsCapped(t *testing.T) {
 	got := w.tmsgs.copiesInto(qa.WorkThreadID)
 	if len(got) != 200 || got[0].cmd.SourceMessageID != first {
 		t.Fatalf("%d history copies, first %v, want 200 from %s", len(got), got[0].cmd.SourceMessageID, first)
+	}
+}
+
+// TestTeam_NewMemberHistoryCapCountsOnlyCopies (D-TCX-6, PR 1763 review): the cap counts the
+// messages a new member gets, not the messages read: texts of a person who is no owner between
+// them never push an older owner message out of the history.
+func TestTeam_NewMemberHistoryCapCountsOnlyCopies(t *testing.T) {
+	t.Parallel()
+	w := newTeamWorld(t, defaultTeamConfig())
+	w.setUp()
+	var first ids.ID
+	for i := range 205 {
+		m := w.ownerMessage(w.alex, "note")
+		if i == 5 {
+			first = m
+		}
+		w.ownerMessage(w.sam, "chatter of a non-owner")
+	}
+	qa := w.addQA()
+	got := w.tmsgs.copiesInto(qa.WorkThreadID)
+	if len(got) != 200 || got[0].cmd.SourceMessageID != first {
+		t.Fatalf("%d history copies, want 200 from %s", len(got), first)
+	}
+	for _, c := range got {
+		if c.cmd.AuthorID != w.alex {
+			t.Fatalf("a history copy of %s", c.cmd.AuthorID)
+		}
+	}
+}
+
+// TestTeam_NewMemberHistoryReadsBoundedPages (D-TCX-6, PR 1763 review): the history reads at most
+// ten pages of 200 rows, so a long run of texts of a person who is no owner never makes the add
+// scan the whole thread; an owner message beyond those pages is not copied, the add still succeeds.
+func TestTeam_NewMemberHistoryReadsBoundedPages(t *testing.T) {
+	t.Parallel()
+	w := newTeamWorld(t, defaultTeamConfig())
+	w.setUp()
+	old := w.ownerMessage(w.alex, "beyond the pages")
+	w.ownerMessage(w.alex, "also beyond the pages")
+	for range 1999 {
+		w.ownerMessage(w.sam, "chatter of a non-owner")
+	}
+	recent := w.ownerMessage(w.alex, "recent")
+	qa := w.addQA()
+	got := w.tmsgs.copiesInto(qa.WorkThreadID)
+	if len(got) != 1 || got[0].cmd.SourceMessageID != recent {
+		t.Fatalf("%d history copies, want only %s (not %s)", len(got), recent, old)
 	}
 }

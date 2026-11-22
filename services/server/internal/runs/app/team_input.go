@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"errors"
+	"math"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
@@ -677,19 +678,25 @@ func (s *Service) followOnTeamRun(ctx context.Context, ended runs.RunSummary, in
 // context window the channel can be set to.
 const teamHistoryMax = 200
 
+// teamHistoryPages bounds the pages of teamHistoryMax rows backfillHistory reads, so a main thread
+// full of texts of persons who are no owner never makes addTeamMember scan the whole thread inside
+// its unit of work; the history then holds what those pages gave.
+const teamHistoryPages = 10
+
 // backfillHistory gives a new member the history of the team channel as context inputs (09 3.9.4,
 // FEAT-TEAM-CONTEXT-ALL, D-TCX-6), inside the unit of work of addTeamMember: the newest
 // teamHistoryMax messages of the main thread that are an active owner's text message or the
 // unedited mirror of a member reply, oldest first, each copied like contextInput with the sponsor
 // as authority. A system note, a text of anyone else, an edited mirror and a reply that was refused
-// (never mirrored) are skipped. A refusal of the checks of 3.9.5 skips the whole history, audited.
+// (never mirrored) are skipped and never count towards the cap. A refusal of the checks of 3.9.5
+// skips the whole history, audited.
 func (s *Service) backfillHistory(ctx context.Context, b *teamBox, team TeamRow, member TeamMemberRow) error {
 	ch, err := s.d.Channels.TriggerChannel(ctx, team.ChannelID)
 	if err != nil || ch.MainThreadID.IsZero() {
 		return err
 	}
-	rows, err := b.d.Repo.TeamHistory(ctx, ch.MainThreadID, teamHistoryMax)
-	if err != nil || len(rows) == 0 {
+	picked, read, err := s.historySources(ctx, b, team, ch.MainThreadID)
+	if err != nil || !read {
 		return err
 	}
 	check := &teamSource{authority: team.SponsorID, kind: sourceHistory}
@@ -697,33 +704,76 @@ func (s *Service) backfillHistory(ctx context.Context, b *teamBox, team TeamRow,
 	if err != nil || reason != "" {
 		return err
 	}
-	for _, r := range rows {
-		src, ok, err := s.historySource(ctx, b, team, r)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			continue
-		}
-		if err := s.copyContext(ctx, b, member, src); err != nil {
+	for i := len(picked) - 1; i >= 0; i-- {
+		if err := s.copyContext(ctx, b, member, picked[i]); err != nil {
 			return err
 		}
 	}
 	return s.auditContextInput(ctx, team, member, check, "")
 }
 
+// historySources reads the main thread page by page, newest first, at most teamHistoryPages
+// pages, and returns the newest teamHistoryMax messages a new member may get among them, newest
+// first; read is false for a thread without any person's text message or mirror.
+func (s *Service) historySources(ctx context.Context, b *teamBox, team TeamRow, thread ids.ID) ([]*teamSource, bool, error) {
+	var picked []*teamSource
+	owners := map[ids.ID]bool{}
+	read := false
+	before := int64(math.MaxInt64)
+	for range teamHistoryPages {
+		rows, err := b.d.Repo.TeamHistory(ctx, thread, before, teamHistoryMax)
+		if err != nil {
+			return nil, false, err
+		}
+		read = read || len(rows) > 0
+		if picked, err = s.pickHistory(ctx, b, team, rows, owners, picked); err != nil {
+			return nil, false, err
+		}
+		if len(picked) == teamHistoryMax || len(rows) < teamHistoryMax {
+			return picked, read, nil
+		}
+		before = rows[len(rows)-1].Seq
+	}
+	return picked, read, nil
+}
+
+// pickHistory appends the messages of one page a new member may get to picked, up to
+// teamHistoryMax.
+func (s *Service) pickHistory(ctx context.Context, b *teamBox, team TeamRow, rows []TeamHistoryRow, owners map[ids.ID]bool, picked []*teamSource) ([]*teamSource, error) {
+	for _, r := range rows {
+		if len(picked) == teamHistoryMax {
+			break
+		}
+		src, ok, err := s.historySource(ctx, b, team, r, owners)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			picked = append(picked, src)
+		}
+	}
+	return picked, nil
+}
+
 // historySource returns the source of one message of the history (backfillHistory); ok is false
 // for a message no member may get: a person who is no active owner, an edited mirror, anything
-// else that is no mirror.
-func (s *Service) historySource(ctx context.Context, b *teamBox, team TeamRow, r TeamHistoryRow) (*teamSource, bool, error) {
+// else that is no mirror. owners caches whether an author is an active owner.
+func (s *Service) historySource(ctx context.Context, b *teamBox, team TeamRow, r TeamHistoryRow, owners map[ids.ID]bool) (*teamSource, bool, error) {
 	src := &teamSource{message: r.MessageID, version: r.Version, author: r.AuthorID, authority: team.SponsorID, kind: domain.TeamSourceOwner}
 	switch {
 	case r.Mirror && !r.Edited && r.Origin == originAgent:
 		src.kind, src.member = domain.TeamSourceMember, &TeamMemberRow{ID: r.MirrorMemberID}
 		return src, true, nil
 	case !r.Mirror && r.Origin == originHuman:
-		owner, err := b.d.Owners.IsActiveOwner(ctx, r.AuthorID)
-		return src, owner, err
+		owner, known := owners[r.AuthorID]
+		if !known {
+			var err error
+			if owner, err = b.d.Owners.IsActiveOwner(ctx, r.AuthorID); err != nil {
+				return nil, false, err
+			}
+			owners[r.AuthorID] = owner
+		}
+		return src, owner, nil
 	}
 	return nil, false, nil
 }

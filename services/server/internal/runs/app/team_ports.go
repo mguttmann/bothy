@@ -63,12 +63,12 @@ type TeamInputRow struct {
 
 // TeamHistoryRow is one message of a team channel's main thread a new member may get as context
 // (09 3.9.4, FEAT-TEAM-CONTEXT-ALL): a person's text message or the mirror of a member reply, with
-// the version the copy takes, whether it was edited and, for a mirror, its source member (zero
-// after its removal).
+// the version the copy takes, whether it was edited, for a mirror its source member (zero after
+// its removal) and its sequence in the thread, the cursor of the next page.
 type TeamHistoryRow struct {
 	MessageID, AuthorID, MirrorMemberID ids.ID
 	Origin                              string
-	Version                             int64
+	Version, Seq                        int64
 	Edited, Mirror                      bool
 }
 
@@ -108,9 +108,9 @@ type TeamRepository interface {
 	InsertTeamMirror(ctx context.Context, sourceMessageID, mirrorMessageID, memberID ids.ID, at time.Time) (bool, error)
 	// TeamMirrored reports whether the reply was mirrored.
 	TeamMirrored(ctx context.Context, sourceMessageID ids.ID) (bool, error)
-	// TeamHistory reads the newest at most maxRows persons' text messages and mirrors of the main
-	// thread, oldest first.
-	TeamHistory(ctx context.Context, threadID ids.ID, maxRows int) ([]TeamHistoryRow, error)
+	// TeamHistory reads at most maxRows persons' text messages and mirrors of the main thread
+	// before the sequence beforeSeq, newest first; a page shorter than maxRows is the last.
+	TeamHistory(ctx context.Context, threadID ids.ID, beforeSeq int64, maxRows int) ([]TeamHistoryRow, error)
 }
 
 // TeamMessages is the part of messaging the team channels write through (messaging app Service):

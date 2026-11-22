@@ -398,6 +398,7 @@ session (section 9) therefore work as for any message of the work thread.
 | a message of an active owner in the team channel | that owner | `human` | that owner |
 | a member's final reply that mentions the member | the source member's agent | `agent` | the sponsor of the team channel |
 | a member's final reply that does not mention the member (a **context input**, 3.9.4) | the source member's agent | `agent` | the sponsor of the team channel |
+| a message of the history a member gets when it is added (context inputs, 3.9.4) | its author: the owner, or the source member's agent for a mirror | `human` or `agent` | the sponsor of the team channel, for an owner's message too: the checks run once, for the sponsor |
 
 An input is a team trigger, never decided by 3.4: the acceptance of the work thread ignores it.
 `trigger_state` follows an input of origin `human` as in section 6; an input of origin `agent` has
@@ -436,10 +437,14 @@ stage `team_context` and posts no note. The member's next run reads it in its ru
 like any message of its work thread: role `other`, trust `unverified`, recorded in 03 `run_feeders`
 with the sponsor as for every team input, so it never makes a later reply fail the check below and
 never becomes the owner's word. A member added later gets the history of the team channel as
-context inputs when it is added (`addTeamMember`, in its unit of work): of the newest 200 text
-messages of the main thread that are a person's or a mirror, oldest first, every message of an
-active owner and every unedited mirror, each with the sponsor as authority; system notes, texts of
-anyone else and replies that were refused (never mirrored) are never copied. The checks of 3.9.5
+context inputs when it is added (`addTeamMember`, in its unit of work): the newest 200 text
+messages of the main thread that are a message of an active owner or an unedited mirror, oldest
+first, each with the sponsor as authority, also a message of an owner who is not the sponsor (the
+table of 3.9.2, last row); system notes, texts of anyone else, edited mirrors and replies that were
+refused (never mirrored) are never copied and never count towards the 200. The server reads at
+most ten times that many persons' messages and mirrors of the main thread for it, so a long run of
+other texts never makes the add scan the whole thread; an eligible message beyond them is not
+copied. The checks of 3.9.5
 points 1 to 3 run once for the history; one audit entry with stage `team_context` and source
 `history` records it.
 
