@@ -38,6 +38,7 @@ from uuid import UUID
 from bothy_sdk.generated.types import Unset
 
 __all__ = [
+    "NOTICE_MARK",
     "QUIET_RULES",
     "SILENT_REPLY",
     "UNKNOWN_HANDLE",
@@ -46,9 +47,11 @@ __all__ = [
     "TeamMember",
     "followup_speaker",
     "input_speaker",
+    "is_silent_reply",
     "member_label",
     "team_facts",
     "team_lines",
+    "team_reply",
 ]
 
 SILENT_REPLY: Final = "NOTHING_TO_ADD"
@@ -57,14 +60,35 @@ team channel nor hands it on (09 3.9.4, FIX-TEAM-CHANNEL-NOISE). It is no silenc
 Hermes, so Hermes posts it like any answer."""
 
 QUIET_RULES: Final = (
-    "Write @handle only when you hand that member work and expect it to act or answer, and say "
-    "what you expect back. When you only refer to a member, write its handle without the @. Never "
-    "mention a member to say that a message was not for it, that you stay out, that you agree or "
-    "that you are waiting. If you have nothing new to contribute (the message is not for you, or "
-    "you would only acknowledge it, repeat a status or say that you wait), your whole final reply "
-    f"is exactly {SILENT_REPLY}: it is not shown in the team channel and hands nothing on."
+    "Write @handle only when you hand that member work or give back what it asked you for, and "
+    "say what you expect back. When you only refer to a member, write its handle without the @. "
+    "Never mention a member to say that a message was not for it, that you stay out, that you "
+    "agree or that you are waiting, unless it asked you for something. When a message mentions "
+    f"you with @ and asks you for something, never answer {SILENT_REPLY}: do what it asks, or say "
+    "briefly what you need for it or what blocks it (for example that you wait for the owner's "
+    "go), and mention the member who asked as @handle when you give something back. Otherwise, "
+    "if you have nothing new to contribute (the message is not for you, it only names you "
+    "without the @, or you would only acknowledge it, repeat a status or say that you wait), your "
+    f"whole final reply is exactly {SILENT_REPLY}: it is not shown in the team channel and hands "
+    "nothing on."
 )
-"""The rules that keep a team channel quiet (FIX-TEAM-CHANNEL-NOISE)."""
+"""The rules that keep a team channel quiet (FIX-TEAM-CHANNEL-NOISE), never silent towards a
+request that mentions the member (FIX-TEAM-HANDOFF-NOT-NOTHING)."""
+
+NOTICE_MARK: Final = "the session replied only that it had nothing to add.)"
+"""The end of the adapter's and the Claude Code runner's notice below: an input that carries it
+is a notice, and a silent reply to it stays silent, so two members never ping-pong notices."""
+
+_UNANSWERED_MEMBER: Final = (
+    "@{handle}: I got your request, but this run ended without an answer to it, so nothing of it "
+    "is done yet. Send it again or ask the owner. (Written by the adapter: the session replied "
+    "only that it had nothing to add.)"
+)
+_UNANSWERED_OWNER: Final = (
+    "I got your message, but this run ended without an answer to it, so nothing of it is done "
+    "yet. Send it again if you still need it. (Written by the adapter: the session replied only "
+    "that it had nothing to add.)"
+)
 
 UNKNOWN_HANDLE: Final = "unknown"
 """The handle printed for a member whose handle is missing or not in the server's form."""
@@ -285,7 +309,8 @@ def team_lines(facts: TeamFacts, speaker: Speaker) -> Sequence[str]:
             f'"von Mitglied @{speaker.handle}".'
         )
     addressed = (
-        "That message mentions you."
+        "That message mentions you: if it asks you for something, answer it, never with "
+        f"{SILENT_REPLY}."
         if facts.addressed
         else "That message does not mention you; an owner message without a mention reaches "
         "every member, so answer only with what you contribute."
@@ -311,3 +336,35 @@ def _other(facts: TeamFacts) -> str:
         if member.handle not in (facts.handle, UNKNOWN_HANDLE):
             return member.handle
     return "handle"
+
+
+def is_silent_reply(text: str) -> bool:
+    """Whether ``text`` is the silent reply alone, by the server's rule (``IsSilentTeamReply``).
+
+    The reply in any case, with white space, ``*``, ``_`` or backticks around it and a closing
+    full stop; a reply that says anything more is no silent reply.
+    """
+    core = text.strip().rstrip(".").strip("*_` \t\r\n")
+    return core.lower() == SILENT_REPLY.lower()
+
+
+def team_reply(reply: str, facts: TeamFacts | None, speaker: Speaker | None) -> str:
+    """The first answer of a team run as it goes out (FIX-TEAM-HANDOFF-NOT-NOTHING).
+
+    A silent reply to an input that mentions this member would be neither mirrored nor handed
+    on, so the request would be lost: it is replaced by a short visible answer that mentions the
+    member who asked (an owner is no member and is not mentioned, nor is an unknown handle).
+
+    Args:
+        reply: Hermes' answer.
+        facts: The run's team facts, ``None`` outside a team run.
+        speaker: Who wrote the run's triggering input.
+
+    Returns:
+        The answer to post.
+    """
+    if facts is None or not facts.addressed or not is_silent_reply(reply):
+        return reply
+    if speaker is None or speaker.owner or speaker.handle == UNKNOWN_HANDLE:
+        return _UNANSWERED_OWNER
+    return _UNANSWERED_MEMBER.format(handle=speaker.handle)

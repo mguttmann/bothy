@@ -37,10 +37,12 @@ __all__ = [
     "facts_of",
     "handles_of",
     "is_member_input",
+    "is_silent_reply",
     "member_lead_in",
     "mentioned_handles",
     "team_note",
     "team_part",
+    "team_reply",
 ]
 
 SILENT_REPLY = "NOTHING_TO_ADD"
@@ -48,16 +50,40 @@ SILENT_REPLY = "NOTHING_TO_ADD"
 team channel nor hands it on (09 3.9.4, FIX-TEAM-CHANNEL-NOISE)."""
 
 QUIET_RULES = (
-    "Write @handle only when you hand that member work and expect it to act or answer, and say "
-    "what you expect back. When you only refer to a member, write its handle without the @. Never "
-    "mention a member to say that a message was not for it, that you stay out, that you agree or "
-    "that you are waiting. If you have nothing new to contribute (the input is not for your "
-    "project, or you would only acknowledge it, repeat a status or say that you wait), your whole "
-    f"final reply is exactly {SILENT_REPLY}: it is not shown in the team channel and hands nothing "
-    "on."
+    "Write @handle only when you hand that member work or give back what it asked you for, and "
+    "say what you expect back. When you only refer to a member, write its handle without the @. "
+    "Never mention a member to say that a message was not for it, that you stay out, that you "
+    "agree or that you are waiting, unless it asked you for something. When an input mentions "
+    f"you with @ and asks you for something, never answer {SILENT_REPLY}: do what it asks, or say "
+    "briefly what you need for it or what blocks it (for example that you wait for the owner's "
+    "go), and mention the member who asked as @handle when you give something back. Otherwise, "
+    "if you have nothing new to contribute (the input is not for your project, it only names you "
+    "without the @, or you would only acknowledge it, repeat a status or say that you wait), your "
+    f"whole final reply is exactly {SILENT_REPLY}: it is not shown in the team channel and hands "
+    "nothing on."
 )
 """The rules that keep a team channel quiet (FIX-TEAM-CHANNEL-NOISE): a mention is a hand-over,
-and a member with nothing to add answers with `SILENT_REPLY`."""
+and a member with nothing to add answers with `SILENT_REPLY`, but never to a request that
+mentions it (FIX-TEAM-HANDOFF-NOT-NOTHING)."""
+
+NOTICE_MARK = "the session replied only that it had nothing to add.)"
+"""The end of the runner's and the Hermes adapter's notice below: an input that carries it is a
+notice, and a silent reply to it stays silent, so two members never ping-pong notices."""
+
+UNANSWERED_MEMBER = (
+    "@{handle}: I got your request, but this run ended without an answer to it, so nothing of it "
+    "is done yet. Send it again or ask the owner. (Written by the runner: the session replied "
+    "only that it had nothing to add.)"
+)
+"""What replaces a silent reply to a member's request that mentions this member: the request
+is answered visibly and handed back (FIX-TEAM-HANDOFF-NOT-NOTHING)."""
+
+UNANSWERED_OWNER = (
+    "I got your message, but this run ended without an answer to it, so nothing of it is done "
+    "yet. Send it again if you still need it. (Written by the runner: the session replied only "
+    "that it had nothing to add.)"
+)
+"""What replaces a silent reply to an owner's message that mentions this member."""
 
 ACCEPTED_TRIGGER_KINDS = frozenset({"message", "team"})
 """The trigger kinds of ``agent.invocation`` the runner starts; it refuses every other one."""
@@ -200,18 +226,66 @@ def _closing_run(line: str, start: int, n: int) -> int:
     return -1
 
 
+def _mentions_own(facts: AgentTeamFacts | None, text: str) -> bool:
+    """Whether ``text`` mentions the receiving member's handle (the server's rule, 09 3.9.4)."""
+    mentioned = set(mentioned_handles(text))
+    return any(h.lower() in mentioned for h in _own_handles(facts))
+
+
 def _addressed(facts: AgentTeamFacts | None, text: str) -> str:
     own = _own_handles(facts)
     if not own:
         return ""
-    mentioned = set(mentioned_handles(text))
-    if any(h.lower() in mentioned for h in own):
-        return f"It mentions you (@{own[0]})."
+    if _mentions_own(facts, text):
+        return (
+            f"It mentions you (@{own[0]}): if it asks you for something, answer it, never with "
+            f"{SILENT_REPLY}."
+        )
     return (
         f"It does not mention you (@{own[0]}); an owner message without a mention reaches every "
         "member, so answer only with what your project contributes, else with exactly "
         f"{SILENT_REPLY}."
     )
+
+
+def is_silent_reply(text: str) -> bool:
+    """Whether ``text`` is the silent reply alone, by the server's rule (``IsSilentTeamReply``).
+
+    The reply in any case, with white space, ``*``, ``_`` or backticks around it and a closing
+    full stop; a reply that says anything more is no silent reply.
+    """
+    core = text.strip().rstrip(".").strip("*_` \t\r\n")
+    return core.lower() == SILENT_REPLY.lower()
+
+
+def team_reply(reply: str, trigger: Any, facts: AgentTeamFacts | None) -> str:
+    """The first answer of a team run as it goes out (FIX-TEAM-HANDOFF-NOT-NOTHING).
+
+    A silent reply to an input that mentions this member (the run's trigger) would be neither
+    mirrored nor handed on, so the request would be lost: it is replaced by a short visible
+    answer, which mentions the member who asked (an owner is no member and is not mentioned).
+    Every other reply goes out as written.
+
+    Args:
+        reply: The session's final reply.
+        trigger: The run's triggering message.
+        facts: The run's team facts, ``None`` outside a team run.
+
+    Returns:
+        The reply to send.
+    """
+    text = str(getattr(trigger, "content_md", "") or "")
+    if facts is None or not is_silent_reply(reply) or not _mentions_own(facts, text):
+        return reply
+    if NOTICE_MARK in text:
+        return reply  # the notice of another member asks for nothing
+    if not is_member_input(trigger):
+        return UNANSWERED_OWNER
+    author = getattr(trigger, "author", None)
+    source = facts.source_handle if isinstance(facts.source_handle, str) else ""
+    handle = source or next(iter(handles_of(facts, getattr(author, "id", None))), "")
+    handle = handle or str(getattr(author, "handle", "") or "")
+    return UNANSWERED_MEMBER.format(handle=handle) if handle else UNANSWERED_OWNER
 
 
 def member_lead_in(message: Any, facts: AgentTeamFacts | None) -> str:

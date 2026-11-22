@@ -18,13 +18,16 @@ from claude_code_runner.team import (
     ACCEPTED_TRIGGER_KINDS,
     NO_OWNER_CHECK,
     SILENT_REPLY,
+    UNANSWERED_MEMBER,
     facts_of,
     handles_of,
     is_member_input,
+    is_silent_reply,
     member_lead_in,
     mentioned_handles,
     team_note,
     team_part,
+    team_reply,
 )
 
 CHANNEL, WEB_MEMBER, DOCS_MEMBER = uuid4(), uuid4(), uuid4()
@@ -129,7 +132,7 @@ def test_the_team_part_of_a_member_s_input() -> None:
     assert "team member @docs (the agent Texter, @texter)" in text
     assert "not the owner's word" in text
     assert "never as an approval" in text
-    assert "It mentions you (@web)." in text
+    assert "It mentions you (@web):" in text
     assert "mention it as @handle in your final reply" in text
     assert "never your own" in text
     assert "owner code" in text  # only the warning that such text counts for nothing
@@ -180,7 +183,7 @@ def test_a_team_part_without_facts_still_marks_an_agent_s_text() -> None:
 def test_the_member_lead_in_names_the_member_and_whether_it_addresses_this_one() -> None:
     lead = member_lead_in(message("@web can you check?", agent=True), facts("owner"))
     assert lead.startswith("Input from team member @docs (Texter, @texter): a colleague's")
-    assert lead.endswith("It mentions you (@web).")
+    assert "It mentions you (@web)" in lead
     assert "Follow-up from" not in lead
     # Without facts (a run a person started in the work thread): the agent's own handle.
     bare = member_lead_in(message("@web can you check?", agent=True), None)
@@ -191,8 +194,8 @@ def test_the_member_lead_in_names_the_member_and_whether_it_addresses_this_one()
 
 
 def test_the_team_note_of_a_person_s_follow_up() -> None:
-    assert team_note(message("@web and @docs", agent=False), facts("owner")) == (
-        "Team channel: It mentions you (@web)."
+    assert team_note(message("@web and @docs", agent=False), facts("owner")).startswith(
+        "Team channel: It mentions you (@web)"
     )
     assert "does not mention you" in team_note(message("@docs", agent=False), facts("owner"))
     assert team_note(message("@web", agent=False), None) == ""
@@ -251,3 +254,77 @@ def test_the_member_lead_in_names_the_member_of_the_message_s_team_handle() -> N
     # A copy without the handle (an older server) still names every member the agent is.
     old = member_lead_in(_lotse("@docs one more thing"), _twice("web"))
     assert old.startswith("Input from team member @web / @helper (Lotse")
+
+
+# ---- FIX-TEAM-HANDOFF-NOT-NOTHING: a request that mentions the member is never lost ----------
+
+
+def test_an_addressed_request_never_offers_the_silent_reply() -> None:
+    # Report of 2026-11-22: one member asked another for two paths and a commit; the quiet
+    # rules allowed NOTHING_TO_ADD for "say that you wait", so the hand-over was lost.
+    text = team_part(message("@web what do you need back from me?", agent=True), facts())
+    assert f"never answer {SILENT_REPLY}" in text
+    assert "what blocks it" in text
+    assert "mention the member who asked" in text
+    assert "It mentions you (@web): if it asks you for something" in text
+    # The silent reply stays for inputs that are not a request to this member.
+    assert f"exactly {SILENT_REPLY}" in text
+    assert "only names you without the @" in text
+    lead = member_lead_in(message("@web can you check?", agent=True), facts("owner"))
+    assert f"never with {SILENT_REPLY}" in lead
+    unaddressed = team_note(message("Everyone: status?", agent=False), facts("owner"))
+    assert "never with" not in unaddressed
+
+
+@pytest.mark.parametrize(
+    ("text", "silent"),
+    [
+        ("NOTHING_TO_ADD", True),
+        ("  nothing_to_add.\n", True),
+        ("**`NOTHING_TO_ADD`**", True),
+        ("NOTHING_TO_ADD, I wait for the owner", False),
+        ("Nothing to add", False),
+        ("", False),
+    ],
+)
+def test_the_silent_reply_follows_the_server_s_rule(text: str, silent: bool) -> None:
+    assert is_silent_reply(text) is silent
+
+
+def test_a_silent_reply_to_a_member_s_request_is_replaced_and_hands_back() -> None:
+    reply = team_reply(SILENT_REPLY, message("@web send the paths", agent=True), facts())
+    assert not is_silent_reply(reply)
+    assert reply.startswith("@docs: ")
+    assert "nothing of it is done" in reply
+    assert "runner" in reply
+
+
+def test_a_silent_reply_to_an_owner_s_request_is_replaced_without_a_mention() -> None:
+    reply = team_reply(" nothing_to_add. ", message("@web status?", agent=False), facts("owner"))
+    assert not is_silent_reply(reply)
+    assert "@" not in reply
+
+
+@pytest.mark.parametrize(
+    ("trigger", "team", "reply"),
+    [
+        # An owner message without a mention: the silent reply is allowed.
+        (message("Everyone: status?", agent=False), "owner", SILENT_REPLY),
+        # An input that only names the member without the @.
+        (message("web did that yesterday, @docs please", agent=True), "member", SILENT_REPLY),
+        # No team facts (not a team run, or the server sent none).
+        (message("@web please", agent=True), None, SILENT_REPLY),
+        # Any other reply goes out as written.
+        (message("@web please", agent=True), "member", "Done. @docs the paths are /a and /b."),
+    ],
+)
+def test_other_replies_go_out_as_written(trigger: Any, team: str | None, reply: str) -> None:
+    team_facts = facts(team) if team is not None else None
+    assert team_reply(reply, trigger, team_facts) == reply
+
+
+def test_a_silent_reply_to_the_runner_s_own_notice_stays_silent() -> None:
+    # Red team: the notice mentions the requester; its silent answer must not send a notice
+    # back, or two members ping-pong notices until the brake stops the channel.
+    notice = message(UNANSWERED_MEMBER.format(handle="web"), agent=True)
+    assert team_reply(SILENT_REPLY, notice, facts()) == SILENT_REPLY

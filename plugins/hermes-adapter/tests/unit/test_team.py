@@ -37,9 +37,11 @@ from bothy_hermes_adapter.team import (
     Speaker,
     followup_speaker,
     input_speaker,
+    is_silent_reply,
     member_label,
     team_facts,
     team_lines,
+    team_reply,
 )
 
 pytestmark = pytest.mark.anyio
@@ -216,6 +218,53 @@ def test_lines_keep_the_team_channel_quiet() -> None:
     )
 
 
+def test_an_addressed_request_never_offers_the_silent_reply() -> None:
+    """FIX-TEAM-HANDOFF-NOT-NOTHING: live 2026-11-22 a member asked a Claude Code member for two
+    paths and a commit, and the quiet rules let it answer NOTHING_TO_ADD ("say that you wait")."""
+    facts = team_facts(_facts_payload(source_handle="dev"))
+    assert facts is not None
+    text = "\n".join(team_lines(facts, Speaker(owner=False, handle="dev")))
+    assert f"never answer {SILENT_REPLY}" in text
+    assert "what blocks it" in text
+    assert "mention the member who asked" in text
+    assert "That message mentions you: if it asks you for something" in text
+    assert f"exactly {SILENT_REPLY}" in text
+    assert "only names you without the @" in text
+
+
+@pytest.mark.parametrize(
+    ("text", "silent"),
+    [
+        ("NOTHING_TO_ADD", True),
+        ("  nothing_to_add.\n", True),
+        ("**`NOTHING_TO_ADD`**", True),
+        ("NOTHING_TO_ADD, I wait for the owner", False),
+        ("", False),
+    ],
+)
+def test_the_silent_reply_follows_the_servers_rule(text: str, silent: bool) -> None:
+    assert is_silent_reply(text) is silent
+
+
+def test_a_silent_reply_to_an_addressed_input_is_replaced() -> None:
+    addressed = team_facts(_facts_payload(source_handle="dev"))
+    unaddressed = team_facts(_facts_payload(source="owner", addressed=False))
+    assert addressed is not None
+    assert unaddressed is not None
+    member = team_reply(SILENT_REPLY, addressed, Speaker(owner=False, handle="dev"))
+    assert member.startswith("@dev: ")
+    assert not is_silent_reply(member)
+    owner = team_reply(" nothing_to_add. ", addressed, Speaker(owner=True))
+    assert not is_silent_reply(owner)
+    assert "@" not in owner
+    # A member whose handle is unknown is not mentioned.
+    assert "@" not in team_reply(SILENT_REPLY, addressed, Speaker(owner=False))
+    # Unaddressed, no team, or another reply: as written.
+    assert team_reply(SILENT_REPLY, unaddressed, Speaker(owner=True)) == SILENT_REPLY
+    assert team_reply(SILENT_REPLY, None, None) == SILENT_REPLY
+    assert team_reply("Done. @dev", addressed, Speaker(owner=False, handle="dev")) == "Done. @dev"
+
+
 # ---- team runs -----------------------------------------------------------------------------------
 
 
@@ -233,7 +282,7 @@ async def test_owner_input_runs_with_the_team_context(tmp_path: Path) -> None:
     first = _first_turn_text(turn)
     assert "you are the member @qa" in first
     assert "a message the owner wrote" in first
-    assert "That message mentions you." in first
+    assert "That message mentions you" in first
     # Every turn of the run keeps the team lines (instructions, not the one-time context).
     assert "you are the member @qa" in turn.user_side.compose().instructions
 
@@ -674,3 +723,74 @@ async def test_a_context_file_that_cannot_be_loaded_reaches_hermes_as_a_note(
         assert "could not be loaded" in turn.user_text
         assert "code=not_found" in logs.text()
         assert "screen.jpg" not in logs.text()
+
+
+async def test_a_silent_answer_to_a_members_request_hands_back(tmp_path: Path) -> None:
+    """FIX-TEAM-HANDOFF-NOT-NOTHING: the run's first answer to a request that mentions this
+    member is never only the silent reply, which the server neither mirrors nor hands on."""
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        await rt.events.on_answer(turn.thread_id, SILENT_REPLY, None)
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await _member_input(r)
+        await r.until(lambda: r.finished(triggered.run_id))
+    (answer,) = r.fake.messages[-1:]
+    assert answer["content_md"].startswith("@dev: ")
+    assert not is_silent_reply(answer["content_md"])
+
+
+async def test_a_silent_answer_to_an_unaddressed_owner_message_stays(tmp_path: Path) -> None:
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        await rt.events.on_answer(turn.thread_id, SILENT_REPLY, None)
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await _owner_input(r, addressed=False)
+        await r.until(lambda: r.finished(triggered.run_id))
+    (answer,) = r.fake.messages[-1:]
+    assert answer["content_md"] == SILENT_REPLY
+
+
+async def test_a_silent_answer_to_a_notice_stays_silent(tmp_path: Path) -> None:
+    """Red team: the notice mentions the requester; a silent answer to it must not post a notice
+    back, or two members ping-pong notices until the brake stops the channel."""
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        await rt.events.on_answer(turn.thread_id, SILENT_REPLY, None)
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    facts = team_facts(_facts_payload(source_handle="dev"))
+    notice = team_reply(SILENT_REPLY, facts, Speaker(owner=False, handle="qa"))
+    assert notice.startswith("@qa: ")
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await _member_input(r, notice)
+        await r.until(lambda: r.finished(triggered.run_id))
+    (answer,) = r.fake.messages[-1:]
+    assert answer["content_md"] == SILENT_REPLY
+
+
+async def test_a_later_silent_edit_never_undoes_the_notice(tmp_path: Path) -> None:
+    """Red team: Hermes' edit transport edits the posted answer again with the same text; the
+    silent text must not overwrite the notice (an edited answer hands nothing on)."""
+
+    async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        ev = rt.events
+        key = await ev.on_answer(turn.thread_id, "NOTH \u2589", None, preview=True)
+        assert key is not None
+        assert await ev.on_edit(turn.thread_id, key, SILENT_REPLY, True)
+        assert await ev.on_edit(turn.thread_id, key, SILENT_REPLY, False)
+        return TurnOutcome.COMPLETED
+
+    rt = FakeRuntime(script=script)
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await _member_input(r)
+        await r.until(lambda: r.finished(triggered.run_id))
+        assert r.requests("updateMessage") == []
+    assert r.fake.run_state(triggered.run_id).state == "completed"
+    (answer,) = r.fake.messages[-1:]
+    assert answer["content_md"].startswith("@dev: ")

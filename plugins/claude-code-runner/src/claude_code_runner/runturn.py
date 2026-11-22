@@ -217,6 +217,7 @@ from claude_code_runner.team import (
     member_lead_in,
     team_note,
     team_part,
+    team_reply,
 )
 from claude_code_runner.title import propose_title, split_title
 from claude_code_runner.transcribe import (
@@ -2239,6 +2240,14 @@ class RunTurn:
         title, reply = split_title(str(text), planned.first)
         if title and not self.title:
             self.title = title
+        # The run's first answer is the one of its lowest planned line: lines are read in order
+        # and stay planned, so this holds also in a started session (whose answers carry no
+        # title) and for a line read again.
+        run_first = line == min(self.ledger.answers)
+        if run_first and self.state.team_run and self.state.context is not None:
+            # A silent reply to a request that mentions this member is never lost
+            # (FIX-TEAM-HANDOFF-NOT-NOTHING).
+            reply = team_reply(reply, self.state.context.trigger_message, self.state.team)
         body, paths = split_attach_lines(reply)
         problem: str | None = None
         # M4-47: an answer is never split; above message_max_content_bytes its rest becomes
