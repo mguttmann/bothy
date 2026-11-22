@@ -350,7 +350,8 @@ unchanged: no agent message triggers anything there.
 #### 3.9.1 Team channel and members
 
 - An active owner switches a text channel to team mode (`enableChannelTeam`, action `team.update`)
-  and becomes its sponsor (03 `team_channels.sponsor_id`). Another owner switching it on again
+  and becomes its sponsor (03 `team_channels.sponsor_id`); the apps also create such a channel
+  and switch it on in one step (`createChannel`, then `enableChannelTeam`; 01 6.23 item 6). Another owner switching it on again
   takes over the sponsorship; switching it off (`disableChannelTeam`) removes the team mode and
   every member, the work threads and their messages stay. A DM channel, a forum, an archived and a
   read-only channel cannot be team channels (`409 conflict` with `reason` `dm_channel`,

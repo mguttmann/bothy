@@ -184,6 +184,95 @@ final class ChannelAccessFamily extends $Family
   String toString() => r'channelAccessProvider';
 }
 
+/// The caller's level and capabilities in [spaceId] as the server reported them, or null while
+/// none was reported.
+
+@ProviderFor(spaceAccess)
+final spaceAccessProvider = SpaceAccessFamily._();
+
+/// The caller's level and capabilities in [spaceId] as the server reported them, or null while
+/// none was reported.
+
+final class SpaceAccessProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<AccessView?>,
+          AccessView?,
+          Stream<AccessView?>
+        >
+    with $FutureModifier<AccessView?>, $StreamProvider<AccessView?> {
+  /// The caller's level and capabilities in [spaceId] as the server reported them, or null while
+  /// none was reported.
+  SpaceAccessProvider._({
+    required SpaceAccessFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'spaceAccessProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$spaceAccessHash();
+
+  @override
+  String toString() {
+    return r'spaceAccessProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<AccessView?> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<AccessView?> create(Ref ref) {
+    final argument = this.argument as String;
+    return spaceAccess(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is SpaceAccessProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$spaceAccessHash() => r'1642d4f5ddfbe307ab0dfa5ce7cff9c689e986d5';
+
+/// The caller's level and capabilities in [spaceId] as the server reported them, or null while
+/// none was reported.
+
+final class SpaceAccessFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<AccessView?>, String> {
+  SpaceAccessFamily._()
+    : super(
+        retry: null,
+        name: r'spaceAccessProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The caller's level and capabilities in [spaceId] as the server reported them, or null while
+  /// none was reported.
+
+  SpaceAccessProvider call(String spaceId) =>
+      SpaceAccessProvider._(argument: spaceId, from: this);
+
+  @override
+  String toString() => r'spaceAccessProvider';
+}
+
 /// Every stored principal by ID (names, handles and the mention suggestions).
 
 @ProviderFor(principalsById)

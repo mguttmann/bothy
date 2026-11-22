@@ -2354,6 +2354,13 @@ only owners read a team channel (09 3.9.1), and a person who is no owner sees no
    channel without team mode), after every own change and when a new message arrives in the open
    thread of the team channel (a pause and a stop post a note there). The member states follow the
    runs live (`run.state_changed`).
+6. **Create.** Addendum of 2026-11-22 (FEAT-TEAM-CHANNEL-CREATE). The space menu has "Create team
+   channel..." for an owner with `manage` on the space (`channel.create`), below "New agent". Its
+   dialog asks for a name, creates a text channel (`createChannel` with kind `text` and an
+   `Idempotency-Key`), switches team mode on (`enableChannelTeam`) and then opens the dialog of
+   item 1 for the new channel, where the owner adds members. A refusal stays in the dialog with
+   the server's reason; a channel created before a refused switch stays, and the next press only
+   switches it on.
 
 ## 7. Keyboard shortcuts
 

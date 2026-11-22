@@ -35,15 +35,24 @@ Future<void> showTeamDialog(
   ProviderContainer container,
   Channel channel, {
   String? handle,
+}) => showTeamDialogOf(context, container, channel.id, handle: handle);
+
+/// Opens the team dialog of the channel [channel] like [showTeamDialog]; "Create team
+/// channel..." calls it with the ID of the channel it just created, which the sync may not have
+/// stored yet (01 6.23 item 6).
+Future<void> showTeamDialogOf(
+  BuildContext context,
+  ProviderContainer container,
+  ChannelId channel, {
+  String? handle,
 }) async {
   final port = container.read(teamPortProvider);
   if (port == null) return;
   final controller = TeamController(
-    channel: channel.id,
+    channel: channel,
     port: port,
     newKey: container.read(teamKeysProvider),
-    onChanged: () =>
-        container.invalidate(channelTeamProvider(channel.id.value)),
+    onChanged: () => container.invalidate(channelTeamProvider(channel.value)),
   );
   unawaited(controller.load());
   try {

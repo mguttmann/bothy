@@ -28,7 +28,8 @@ give it with his own message.
 
 ## 2. User flow
 
-1. The owner creates a channel "Team" in the space and switches it to team mode. He adds members
+1. The owner creates a channel "Team" in the space and switches it to team mode, in the app in one
+   step with "Create team channel..." of the space menu (01 6.23 item 6). He adds members
    in the app ("Add project", "Add agent") or in the channel (`/team add project coding`,
    `/team add @hermes-qa`, `/team list`, `/team remove`). Each member gets a handle
    (`@coding`, `@review`, `@qa`, `@coordinator`).
@@ -161,7 +162,8 @@ with the app slice.
   reply's `@handle` is parsed by the server. Later a command `bothy-team say` to post mid-run.
 - **Hermes adapter:** accept `trigger_kind = 'team'` and the team block, and the same prompt hint
   (built in FEAT-TEAM-CHANNEL-ADAPTER, 09 17.14).
-- **Apps:** team mode switch, member dialog with handles, `/team add|remove|list|stop`, header
+- **Apps:** "Create team channel..." in the space menu (FEAT-TEAM-CHANNEL-CREATE), team mode
+  switch, member dialog with handles, `/team add|remove|list|stop`, header
   with member states and stop all, relayed replies with handle and live box link, brake notes.
 
 ## 7. First slice and later steps

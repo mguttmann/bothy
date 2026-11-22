@@ -2,7 +2,8 @@
 
 /// The six owner-only operations of a team channel (09 3.9.1, 3.9.7) as the client's port:
 /// `getChannelTeam`, `enableChannelTeam`, `disableChannelTeam`, `addTeamMember`,
-/// `removeTeamMember` and `stopChannelTeam`, with the team as the app reads it ([TeamView]).
+/// `removeTeamMember` and `stopChannelTeam`, with the team as the app reads it ([TeamView]),
+/// and `createChannel` of a text channel for "Create team channel..." (01 6.23 item 6).
 /// They are online operations, never outbox entries: each answers the team's new state or a
 /// problem whose `reason` the dialog shows (ruling D-TEAM-APP-2). Tests replace the port.
 library;
@@ -158,6 +159,15 @@ abstract interface class TeamPort {
   /// Switches [channel] to team mode with the caller as sponsor.
   Future<TeamView> enable(ChannelId channel);
 
+  /// Creates the text channel [name] in [space] (`createChannel`, action `channel.create`) and
+  /// answers its ID; [idempotencyKey] makes a repeated press after a lost answer the same
+  /// request (01 6.23 item 6).
+  Future<ChannelId> createTextChannel(
+    SpaceId space,
+    String name, {
+    required String idempotencyKey,
+  });
+
   /// Switches team mode of [channel] off; the work threads stay.
   Future<void> disable(ChannelId channel);
 
@@ -208,6 +218,24 @@ final class ApiTeamPort implements TeamPort {
     final team = (await _channels.enableChannelTeam(channelId: channel.value))
         .data!;
     return teamOfWire(team);
+  });
+
+  @override
+  Future<ChannelId> createTextChannel(
+    SpaceId space,
+    String name, {
+    required String idempotencyKey,
+  }) => _guard(() async {
+    final created = (await _channels.createChannel(
+      spaceId: space.value,
+      idempotencyKey: idempotencyKey,
+      channelCreate: wire.ChannelCreate(
+        (b) => b
+          ..kind = wire.ChannelCreateKindEnum.text
+          ..name = name,
+      ),
+    )).data!;
+    return ChannelId.parse(created.id);
   });
 
   @override
