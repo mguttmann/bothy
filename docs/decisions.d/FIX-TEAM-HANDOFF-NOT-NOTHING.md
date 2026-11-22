@@ -1,0 +1,27 @@
+# FIX-TEAM-HANDOFF-NOT-NOTHING A request that mentions a member is never answered with silence
+
+Owner report of 2026-11-22: a hand-over in a team channel was lost. Read in the live system: at
+16:43 UTC the member agentconductor answered with "@reviewagent: ... Was ich von dir zurück
+brauche: die beiden festen Pfade und den Commit ...". The server started a `team` run of
+reviewagent (run 01a20424-133f-728e-9245-bd74fde1d2b0, completed). The first input line of the
+Claude Code session held the team part with "It mentions you (@reviewagent)." and the quiet
+rules of FIX-TEAM-CHANNEL-NOISE (D-TCN-3), which end with "If you have nothing new to contribute
+(..., or you would only acknowledge it, repeat a status or say that you wait), your whole final
+reply is exactly NOTHING_TO_ADD". Four seconds later the session answered exactly
+`NOTHING_TO_ADD`. In its previous answer reviewagent had said that it waits for the owner's go
+before it starts, so "say that you wait" matched. The server dropped the reply as the silent
+reply (D-TCN-2): it was neither mirrored nor handed back, and agentconductor never learned that
+the paths would not come. The Hermes adapter had the same rule text. Specification:
+[09-agents.md](../spec/09-agents.md) 3.9.4, 3.9.9, 17.14 and 18.5.
+
+| No | Date | Ruling | Reason |
+|---|---|---|---|
+| D-THN-1 | 2026-11-22 | The quiet rules of the Claude Code runner and of the Hermes adapter say that an input that mentions the member with `@` and asks it for something is never answered with `NOTHING_TO_ADD`: the member does what it asks, or says briefly what it needs for it or what blocks it (the owner's go is the example), and mentions the member who asked when it gives something back. A mention to answer such a request is allowed, also when the answer is that the member waits. The silent reply stays for an owner message without a mention, a context input and an input that names the member without the `@`. The line that says an input mentions the member says the same. This refines D-TCN-3. | The rule "say that you wait" covered the case of the report; the requester has to learn what blocks its request, or it waits for an answer that never comes. |
+| D-THN-2 | 2026-11-22 | A code safeguard backs the prompt, in the runner and in the adapter, not in the server: when the run's first answer is only the silent reply (the server's rule `IsSilentTeamReply`) and the run's trigger mentions the member, the answer goes out as a short fixed text instead: for a member's input `@<source>: I got your request, but this run ended without an answer to it, so nothing of it is done yet. Send it again or ask the owner.`, for an owner's message the same without a mention, each with a note that the runner or adapter wrote it. The runner reads the mention from the trigger's text (as its team part does), the adapter from `team.addressed`. | A prompt is followed most of the time, not always, and a lost hand-over is silent: nobody sees it. The fixed text makes the miss visible to the owner in the team channel and hands it back to the requester, which can ask again. Not in the server: it would have to write text in the member's name into the member's work thread, while the runner and the adapter know the run's trigger and write the answer anyway, so the change stays in the two places that write the rule text. A second model turn to repair the answer was rejected: it costs a turn for every miss and needs a new path into a finished turn. |
+| D-THN-3 | 2026-11-22 | The safeguard covers the run's first answer only. A later answer of the run (to a follow-up) is covered by the prompt alone; the runner's lead-in of a follow-up that mentions the member carries the rule. | The first answer is the answer to the trigger, which the server's `team.addressed` and the team part describe; the answer to a follow-up cannot be tied to one input without a new record of which input a result answers. |
+
+Not covered: the code cannot tell a request from a mention that asks for nothing (`@web thanks`);
+such a run that answers only the silent reply now posts the fixed text. A requester that asks
+again after the fixed text and gets it again starts runs until the brake (`team.pingpong_max`)
+stops the pair. An edit of the first answer to the silent reply (Hermes' edit transport) is not
+checked.

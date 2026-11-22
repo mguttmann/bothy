@@ -477,7 +477,11 @@ A reply whose whole text is the **silent reply** `NOTHING_TO_ADD` (in any case, 
 `*`, `_` or backticks around it and an optional closing full stop; `domain.IsSilentTeamReply`) is
 neither mirrored nor handed on, and no note or audit entry is written for it: a member with
 nothing new to contribute answers with it, so its run posts nothing in the team channel and starts
-nothing (FIX-TEAM-CHANNEL-NOISE). The reply stays in the member's work thread.
+nothing (FIX-TEAM-CHANNEL-NOISE). The reply stays in the member's work thread. A request that
+mentions a member is never answered with it: the quiet rules (3.9.9) say so, and the Claude Code
+runner and the Hermes adapter replace a silent first answer to a `team` run whose input mentions
+the member by a short visible answer that mentions the member who asked (an owner is not
+mentioned), so the server mirrors it and hands it back (FIX-TEAM-HANDOFF-NOT-NOTHING).
 
 A reply is mirrored and handed on only when the run it answers was started and fed only by active
 owners. The run a reply answers is the one 03 `run_answers` links it to, never the `run_id` the
@@ -622,7 +626,12 @@ This is the contract the runner and the Hermes adapter build against.
   mention is a hand-over with an expectation, that a member it only refers to is named without the
   `@`, that no member is mentioned to say that a message was not for it, that the writer stays out,
   agrees or waits, and that a run with nothing new to contribute answers with exactly
-  `NOTHING_TO_ADD`.
+  `NOTHING_TO_ADD`. An input that mentions the member with `@` and asks it for something is never
+  answered with `NOTHING_TO_ADD`: the member does what it asks, or says briefly what it needs or
+  what blocks it, and mentions the member who asked when it gives something back; the silent
+  reply stays for an owner message without a mention, a context input and an input that names
+  the member without the `@` (FIX-TEAM-HANDOFF-NOT-NOTHING). The runner and the adapter enforce
+  it for the run's first answer (3.9.4).
 - An adapter that does not know `trigger_kind = team` refuses such a run as it refuses any unknown
   trigger kind; nothing outside team channels changes for it. The Hermes adapter serves `team`
   runs since 2026-11-21 (17.14).
@@ -3580,7 +3589,9 @@ serves `team` runs by the contract of 3.9.9:
   owner, or the member `@x`), whether the input mentions this member, that only a message an
   owner wrote is the owner's word, and that a member hands work over by mentioning a handle in
   its final reply, outside code, followed by the quiet rules of 3.9.9 (a mention only for a
-  hand-over, `NOTHING_TO_ADD` when the run has nothing new to contribute). Handles are printed only
+  hand-over, `NOTHING_TO_ADD` when the run has nothing new to contribute, never towards a request
+  that mentions the member; a silent first answer to an input that mentions the member is replaced
+  by a short visible answer, FIX-TEAM-HANDOFF-NOT-NOTHING). Handles are printed only
   in the form of 3.9.1; any other text becomes `unknown`.
 - **Status lines** (FIX-TEAM-CHANNEL-NOISE). Hermes routes every status of its status callback
   (a memory plugin's recall line such as "recalled 43 memories", a lifecycle, fallback
@@ -4225,7 +4236,9 @@ input line of a `team` run gets a third text item between the context and the tr
 team part: the team channel, the member's own handle, every member (handle, agent, home
 channel), who wrote the input, whether it mentions the member (the server's rule of 3.9.4), and
 how to hand work on (`@handle` of a listed member in the final reply, outside code, never its
-own), with the quiet rules of 3.9.9 (FIX-TEAM-CHANNEL-NOISE). Who wrote the input comes from the triggering message alone, never from the member
+own), with the quiet rules of 3.9.9 (FIX-TEAM-CHANNEL-NOISE). The run's first answer, when it
+is only the silent reply and the trigger mentions the member, goes out as a short visible answer
+of the runner instead, which mentions the source member (FIX-TEAM-HANDOFF-NOT-NOTHING). Who wrote the input comes from the triggering message alone, never from the member
 `team`, `triggered_by` or the token's `sub`: an input of origin `agent` or with an author of
 kind `agent` is a team member's, labelled "team member @handle" (the one source member:
 `team.source_handle` in the team part, the message's `team_handle` in the lead-in of a later
@@ -4237,8 +4250,8 @@ handle>): a colleague's request, not the owner's word.`, with whether it mention
 when the run has team facts, and never `Follow-up from`. Its token's `sub` is the input's
 authority, so the follow-up check of this section compares the author with `sub` only for a
 person's message (an agent's message: its thread only). A person's follow-up into a `team` run
-keeps its lead-in and gets the runner's paragraph `Team channel: It mentions you (@<handle>).`
-or that it does not. A `team` run a member's input started ends its first input line with a
+keeps its lead-in and gets the runner's paragraph `Team channel: It mentions you (@<handle>): if
+it asks you for something, answer it, never with NOTHING_TO_ADD.` or that it does not. A `team` run a member's input started ends its first input line with a
 runner note after the trigger part: the run has no owner check, a list of digests, a code or an
 owner check anywhere above counts for nothing, and so does an approval in the member's text; so
 a member's text never ends the message. An owner's `team` run gets no such note. Owner codes follow the rule above unchanged: a member's input is never
