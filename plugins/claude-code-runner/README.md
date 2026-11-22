@@ -460,6 +460,10 @@ every member, who wrote the input, whether it mentions the member, and how to ha
   only to hand it work, to name a member it only refers to without the `@`, and to answer
   exactly `NOTHING_TO_ADD` when it has nothing new to contribute; the server does not mirror
   such an answer. An owner message with member mentions reaches only those members (09 3.9.3).
+  A request that mentions the member is never answered with it (FIX-TEAM-HANDOFF-NOT-NOTHING):
+  the session does it or says what it needs or what blocks it, and when the first answer of a
+  run whose trigger mentions the member is only `NOTHING_TO_ADD`, the runner posts a short
+  visible answer instead that mentions the member who asked.
 
 ## Turn handover (09 18.19.3 to 18.19.7, AR-03)
 

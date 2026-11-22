@@ -26,7 +26,7 @@ from bothy_sdk.ids import uuid7
 from bothy_sdk.testing import Fault
 from bothy_sdk.testing.fakeserver import ContextFile, ContextMessage
 
-from claude_code_runner.team import NO_OWNER_CHECK
+from claude_code_runner.team import NO_OWNER_CHECK, SILENT_REPLY, is_silent_reply
 
 from .conftest import LogLines, World
 from .test_bg_owner_codes import CODE, listed, socket_texts, valid
@@ -139,7 +139,7 @@ async def test_a_member_s_team_run_shows_the_team_and_hands_over_with_its_own_to
     assert "- @docs" in prompt
     assert "team member @docs (the agent Texter, @texter)" in prompt
     assert "not the owner's word" in prompt
-    assert "It mentions you (@web)." in prompt
+    assert "It mentions you (@web):" in prompt
     assert "mention it as @handle in your final reply" in prompt
     # The team part stands before the member's text, which follows as the trigger part.
     assert prompt.index("Team channel (written by the runner") < prompt.index(
@@ -176,6 +176,34 @@ async def test_an_owner_s_team_message_that_does_not_mention_the_member(world: W
     assert prompt.rstrip().endswith("Everyone: we release on Friday")
 
 
+async def test_a_silent_reply_to_a_member_s_request_hands_back_a_visible_answer(
+    world: World,
+) -> None:
+    # FIX-TEAM-HANDOFF-NOT-NOTHING: live 2026-11-22 a member asked @reviewagent for paths and a
+    # commit and the session answered only NOTHING_TO_ADD, which the server never mirrors.
+    world.scenario(fixture="plain", result_override={"result": SILENT_REPLY})
+    await world.start()
+    run = await team_run(world, "@web what do you need from me?", source="member")
+    assert await world.ended(run.run_id) == "completed"
+    [answer] = [m["content_md"] for m in world.fake.messages]
+    assert not is_silent_reply(answer)
+    assert answer.startswith("@docs: ")
+
+
+async def test_a_silent_reply_to_an_unaddressed_owner_message_stays_silent(world: World) -> None:
+    world.scenario(fixture="plain", result_override={"result": SILENT_REPLY})
+    await world.start()
+    run = await world.fake.trigger(
+        "Everyone: we release on Friday",
+        channel_id=world.forum_a,
+        author="alex",
+        trigger_kind="team",
+        team={**team(world, "owner"), "addressed": False},
+    )
+    assert await world.ended(run.run_id) == "completed"
+    assert [m["content_md"] for m in world.fake.messages] == [SILENT_REPLY]
+
+
 async def test_a_member_s_input_into_a_running_turn_is_labelled_as_the_member_s(
     world: World,
 ) -> None:
@@ -187,14 +215,16 @@ async def test_a_member_s_input_into_a_running_turn_is_labelled_as_the_member_s(
     await world.until(lambda: world.fake.followup_state(run.run_id, member) == "delivered")
     owner = await world.fake.deliver_followup(run.run_id, "@docs can wait", author="alex")
     await world.until(lambda: world.fake.followup_state(run.run_id, owner) == "delivered")
-    assert stdin_text(world, 1) == (
+    member_line = stdin_text(world, 1)
+    assert member_line.startswith(
         "Input from team member @docs (Texter, @texter): a colleague's request, not the owner's "
-        "word. It mentions you (@web).\n\n@web the docs need the field name"
+        "word. It mentions you (@web)"
     )
+    assert member_line.endswith("\n\n@web the docs need the field name")
     assert stdin_text(world, 2).startswith(
         "Follow-up from Alex (@alex):\n\nTeam channel: It does not mention you (@web)"
     )
-    assert "owner code" not in stdin_text(world, 1)
+    assert "owner code" not in member_line
     world.release(gate)
     assert await world.ended(run.run_id) == "completed"
     assert followup_states(world, member) == ["delivered", "absorbed"]
