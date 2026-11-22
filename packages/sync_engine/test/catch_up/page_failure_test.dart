@@ -217,4 +217,49 @@ void main() {
     expect(w.log.any((l) => l.contains('resync snapshot not stored')), isTrue);
     expect(w.notices.whereType<Resynced>(), isEmpty);
   });
+
+  /// Lets every write of the snapshot time fail, as a database that fails after the commit of
+  /// the snapshot would; the commit itself does not write that column.
+  Future<void> failSnapshotTime() => w.db.customStatement(
+    'CREATE TRIGGER fail_snapshot_time BEFORE UPDATE OF last_snapshot_at '
+    "ON sync_state BEGIN SELECT RAISE(ABORT, 'disk full'); END",
+  );
+
+  test('a resync whose snapshot time cannot be stored still goes live and '
+      'applies the held frames', () async {
+    w.rest.routes['GET /sync/snapshot'] = (_) =>
+        FakeReply(200, snapshotJson(headSeq: 90));
+    await w.connect(cursor: 30);
+    await w.push('catchup.complete', {'head_seq': 30});
+    await failSnapshotTime();
+    final first = w.ch;
+
+    await w.push('resync_required', {
+      'reason': 'retention',
+      'head_seq': 90,
+      'sync_epoch': 'epoch-1',
+    });
+    await w.dispatch([threadCreated(91, 1)]);
+
+    expect(first.clientCloseCode, isNull);
+    expect(await w.cursor(), 91, reason: 'frames after the snapshot apply');
+    expect(w.h.phase, ConnectionPhase.live);
+    expect(w.notices.whereType<Resynced>().single.reason, 'retention');
+    expect(w.log.any((l) => l.contains('snapshot time not stored')), isTrue);
+  });
+
+  test(
+    'a first ready whose snapshot time cannot be stored goes live',
+    () async {
+      await failSnapshotTime();
+      await w.connect();
+
+      expect(w.ch.clientCloseCode, isNull);
+      expect(await w.cursor(), 40);
+      expect(w.h.phase, ConnectionPhase.live);
+      await w.dispatch([threadCreated(41, 1)]);
+      expect(await w.cursor(), 41);
+      expect(w.log.any((l) => l.contains('snapshot time not stored')), isTrue);
+    },
+  );
 }

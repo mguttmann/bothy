@@ -57,7 +57,10 @@ extension ThreadViewWorld on FakeWorld {
 
   /// `markThreadUnread`: moves the read position of [principalId] in [threadId] back to
   /// [lastRead] when [expectedVersion] is the version of its read state (04 14), and appends
-  /// `read_state.updated`. Throws `412 version_conflict` with the current state.
+  /// `read_state.updated`; the current position answers the current state without an event.
+  /// Throws `412 version_conflict` with the current state and `400 validation_failed`
+  /// (`/last_read_seq`, `out_of_range`) for a position below `0` or above the current one, as
+  /// the server's `MarkUnread` does.
   JsonMap markUnread(
     String principalId,
     String threadId,
@@ -70,6 +73,20 @@ extension ThreadViewWorld on FakeWorld {
     final version = (current?['version'] as int?) ?? 0;
     if (version != expectedVersion) {
       throw FakeProblem(412, 'version_conflict', current: current);
+    }
+    final position = (current?['last_read_seq'] as int?) ?? 0;
+    if (lastRead < 0 || lastRead > position) {
+      throw const FakeProblem(
+        400,
+        'validation_failed',
+        errors: [
+          {'pointer': '/last_read_seq', 'code': 'out_of_range'},
+        ],
+      );
+    }
+    if (lastRead == position) {
+      // No change: the current state without an event, as [putReadState] answers it.
+      return putReadState(principalId, threadId, lastRead, deviceId: deviceId);
     }
     return setReadState(principalId, threadId, lastRead, deviceId: deviceId);
   }

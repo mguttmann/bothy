@@ -397,7 +397,7 @@ final class CatchUpListener implements SessionListener {
       final head = GlobalSeq(ready.headSeq);
       _committed();
       gaps.clear();
-      await _db.syncStateDao.markSnapshot(_clock.now());
+      await _markSnapshot();
       control.lastProcessedSeq = head;
       _loadOpenPostsAfter(snapshot, after);
       await _afterCommit(after);
@@ -605,6 +605,17 @@ final class CatchUpListener implements SessionListener {
     control.reconnect(after: wait);
   }
 
+  /// Stores the time of a committed snapshot. Mirror and cursor are committed before, and
+  /// nothing reads the time, so a failure is logged and the session goes on: it must neither
+  /// leave a resync standing (frames held, the phase `resyncing`) nor end a `ready`.
+  Future<void> _markSnapshot() async {
+    try {
+      await _db.syncStateDao.markSnapshot(_clock.now());
+    } on Object catch (e) {
+      _log('snapshot time not stored (${e.runtimeType})');
+    }
+  }
+
   /// 04 7.3: the connection stays; the mirror is replaced by the snapshot, cursor and epoch
   /// are its values, outbox, drafts and share inbox stay, the focused threads load again.
   void _resync(GatewayResyncRequired model, SessionControl control) =>
@@ -681,7 +692,7 @@ final class CatchUpListener implements SessionListener {
     // (the instance row and the read states come only from its reads); what the session sees
     // runs only for the session of the retry.
     gaps.clear();
-    await _db.syncStateDao.markSnapshot(_clock.now());
+    await _markSnapshot();
     for (final threadId in _openThreads()) {
       after.reads.add(() => _loadNewestPage(threadId));
     }
