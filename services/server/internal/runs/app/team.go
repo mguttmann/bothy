@@ -54,6 +54,7 @@ const (
 	attrOperation      = "operation"
 	attrStopped        = "stopped_runs"
 	stageTeam          = "team"
+	stageTeamContext   = "team_context"
 	resourceChannel    = "channel"
 )
 

@@ -246,7 +246,71 @@ func (s *Service) handOn(ctx context.Context, b *teamBox, team TeamRow, member T
 			return err
 		}
 	}
+	// Every other member sees the reply too, as context that starts and feeds no run (09 3.9.4,
+	// FEAT-TEAM-CONTEXT-ALL); a mentioned member the brake refused gets it the same way.
+	for _, target := range members {
+		if target.ID == member.ID {
+			continue
+		}
+		if err := s.contextInput(ctx, b, team, target, &src); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// contextInput copies a mirrored member reply into the work thread of a member as a context input
+// (09 3.9.4, FEAT-TEAM-CONTEXT-ALL): the same copy and team_inputs row as a member input, with the
+// sponsor as authority, but no follow-up, no run and no turn of the brake. A later run of the member
+// reads it in its run context, where it is recorded with the sponsor like any team input. A member
+// that already has an input of the source is nothing; the checks of 3.9.5 points 1 to 3 still
+// apply, and a refusal is audited (stage team_context) without a note, so a member whose home
+// channel is archived never blocks the mirror or the inputs of the others.
+func (s *Service) contextInput(ctx context.Context, b *teamBox, team TeamRow, member TeamMemberRow, src *teamSource) error {
+	done, err := b.d.Repo.TeamInputDelivered(ctx, src.message, member.ID)
+	if err != nil || done {
+		return err
+	}
+	reason, _, err := s.teamRefusal(ctx, b, team, member, src)
+	if err != nil {
+		return err
+	}
+	if reason != "" && reason != string(auditing.ReasonRunActiveOtherAgent) {
+		return s.auditContextInput(ctx, team, member, src, reason)
+	}
+	copied, err := b.d.Messages.CopyMessage(ctx, messaging.CopyCmd{
+		SourceMessageID: src.message, SourceVersion: src.version, ThreadID: member.WorkThreadID, AuthorID: src.author,
+	})
+	if err != nil {
+		return err
+	}
+	in := TeamInputRow{
+		MessageID: copied.ID, MemberID: member.ID, SourceMessageID: src.message, Source: src.kind, AuthorityID: src.authority,
+		SourceMemberID: src.member.ID, CreatedAt: s.now(),
+	}
+	if _, err := b.d.Repo.InsertTeamInput(ctx, in); err != nil {
+		return err
+	}
+	return s.auditContextInput(ctx, team, member, src, "")
+}
+
+// auditContextInput writes the audit entry of a context input: as auditTeamInput, with stage
+// team_context.
+func (s *Service) auditContextInput(ctx context.Context, team TeamRow, member TeamMemberRow, src *teamSource, reason string) error {
+	if s.d.Audit == nil {
+		return errs.New(errs.CodeInternalError, "runs: the team channels have no audit recorder")
+	}
+	e := auditing.Entry{
+		Action: string(authorize.ActionAgentInvoke), Decision: auditing.DecisionAllow, ResourceKind: resourceThread, ResourceID: member.WorkThreadID,
+		Attrs: auditing.Attrs{
+			attrStage: auditing.Code(stageTeamContext), attrTeamChannelID: auditing.ID(team.ChannelID), attrMemberID: auditing.ID(member.ID),
+			attrAgentID: auditing.ID(member.AgentID), attrSource: auditing.Code(src.kind), attrSourceMemberID: auditing.ID(src.member.ID),
+		},
+	}
+	if reason != "" {
+		e.Decision, e.Reason = auditing.DecisionDeny, auditing.Reason(reason)
+	}
+	return s.d.Audit.Record(actor.WithActor(ctx, actor.Recheck(src.authority)), e)
 }
 
 // memberInput passes one member input through the brake (09 3.9.6) and delivers it; the brake

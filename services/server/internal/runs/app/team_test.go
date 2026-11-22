@@ -765,16 +765,19 @@ func TestTeam_RefusedInputs(t *testing.T) {
 	cases := map[string]struct {
 		arrange func(w *teamWorld)
 		reason  string
+		// context is the number of context copies the refusal still allows (FEAT-TEAM-CONTEXT-ALL):
+		// an active run of another agent refuses the trigger, not the context.
+		context int
 	}{
 		"sponsor no owner": {func(w *teamWorld) {
 			// Sam took over the sponsorship while an owner and is no owner any more.
 			t := w.trepo.teams[w.team]
 			t.SponsorID = w.sam
 			w.trepo.teams[w.team] = t
-		}, domain.TeamRefusalSponsor},
-		"agent.invoke":         {func(w *teamWorld) { w.authz.decide = denyInvoke }, "level_insufficient"},
-		"readers differ":       {func(w *teamWorld) { w.readers.set[w.homeB] = []ids.ID{w.alex, w.sam} }, domain.TeamRefusalReaders},
-		"run of another agent": {func(w *teamWorld) { w.putRun(w.reviewWork, w.lotse, domain.StateRunning) }, "run_active_other_agent"},
+		}, domain.TeamRefusalSponsor, 0},
+		"agent.invoke":         {func(w *teamWorld) { w.authz.decide = denyInvoke }, "level_insufficient", 0},
+		"readers differ":       {func(w *teamWorld) { w.readers.set[w.homeB] = []ids.ID{w.alex, w.sam} }, domain.TeamRefusalReaders, 0},
+		"run of another agent": {func(w *teamWorld) { w.putRun(w.reviewWork, w.lotse, domain.StateRunning) }, "run_active_other_agent", 1},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -784,8 +787,8 @@ func TestTeam_RefusedInputs(t *testing.T) {
 			tc.arrange(w)
 			before := len(w.runsIn(w.reviewWork))
 			w.input(w.reply(w.coding, "@review go"))
-			if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 0 {
-				t.Fatalf("a refused input was copied: %d", n)
+			if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != tc.context {
+				t.Fatalf("a refused input was copied: %d, want %d context copies", n, tc.context)
 			}
 			if n := len(w.runsIn(w.reviewWork)); n != before {
 				t.Fatalf("a refused input started a run: %d", n)
@@ -827,8 +830,9 @@ func TestTeam_PingpongPausesUntilAnOwnerWrites(t *testing.T) {
 	if b := w.trepo.teams[w.team].Brake; b.PauseReason != domain.TeamPausePingpong {
 		t.Fatalf("brake %+v, want paused by pingpong", b)
 	}
-	if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 1 {
-		t.Fatalf("review got %d inputs, want 1", n)
+	// The refused mention still reaches review as context (FEAT-TEAM-CONTEXT-ALL).
+	if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 2 {
+		t.Fatalf("review got %d inputs, want a member input and a context copy", n)
 	}
 	notes := len(w.tmsgs.notes)
 	w.input(w.reply(w.review, "@coding 4"))
@@ -862,8 +866,9 @@ func TestTeam_TurnBudgetPauses(t *testing.T) {
 	if b := w.trepo.teams[w.team].Brake; b.PauseReason != domain.TeamPauseTurnBudget || b.MemberTurns != 2 {
 		t.Fatalf("brake %+v", b)
 	}
-	if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 2 {
-		t.Fatalf("review got %d inputs, want 2", n)
+	// The third, refused by the brake, reaches review as context and counts no turn.
+	if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 3 {
+		t.Fatalf("review got %d copies, want two member inputs and a context copy", n)
 	}
 }
 
@@ -892,9 +897,14 @@ func TestTeam_StopAll(t *testing.T) {
 	if w.trepo.teams[w.team].Brake.PauseReason != domain.TeamPauseStopped {
 		t.Fatalf("brake %+v", w.trepo.teams[w.team].Brake)
 	}
+	runsBefore := len(w.runsIn(w.reviewWork))
 	w.input(w.reply(w.coding, "@review again"))
-	if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 0 {
-		t.Fatalf("a stopped team copied %d inputs", n)
+	// A stopped team still shows the reply as context (FEAT-TEAM-CONTEXT-ALL), which starts nothing.
+	if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 1 {
+		t.Fatalf("a stopped team copied %d inputs, want one context copy", n)
+	}
+	if n := len(w.runsIn(w.reviewWork)); n != runsBefore {
+		t.Fatalf("a context copy in a stopped team started %d runs", n-runsBefore)
 	}
 }
 
@@ -1104,6 +1114,106 @@ func TestTeam_RunsSteeredByNonOwnersHandNothingOn(t *testing.T) {
 		w.input(reply)
 		if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 1 {
 			t.Fatalf("a run only owners fed handed on %d inputs, want 1", n)
+		}
+	})
+}
+
+// contextAudits returns the audit entries of agent.invoke with stage team_context and their actors.
+func (w *teamWorld) contextAudits() ([]auditing.Entry, []actor.Actor) {
+	es, as := w.audit.list()
+	var oe []auditing.Entry
+	var oa []actor.Actor
+	for i, e := range es {
+		if e.Action == string(authorize.ActionAgentInvoke) && e.Attrs["stage"].Data() == "team_context" {
+			oe, oa = append(oe, e), append(oa, as[i])
+		}
+	}
+	return oe, oa
+}
+
+// TestTeam_ReplyReachesEveryMemberAsContext (FEAT-TEAM-CONTEXT-ALL): a member's mirrored reply that
+// mentions nobody reaches every other member as a context copy: an agent's message of the source
+// member's agent with a team input row whose authority is the sponsor, that starts no run, is no
+// follow-up of the member's running run, counts no turn of the brake and is audited with stage
+// team_context for the sponsor. A repeated job copies nothing again.
+func TestTeam_ReplyReachesEveryMemberAsContext(t *testing.T) {
+	t.Parallel()
+	w := newTeamWorld(t, defaultTeamConfig())
+	w.setUp()
+	active := w.putRun(w.reviewWork, w.texter, domain.StateRunning)
+	reply := w.reply(w.coding, "built X on branch y, nothing for anyone yet")
+	w.input(reply)
+	mirror := w.tmsgs.copiesInto(w.teamMain)
+	if len(mirror) != 1 {
+		t.Fatalf("mirror %+v", mirror)
+	}
+	in := w.tmsgs.copiesInto(w.reviewWork)
+	if len(in) != 1 || in[0].cmd.AuthorID != w.lotse || in[0].cmd.SourceMessageID != mirror[0].id {
+		t.Fatalf("context copy for review %+v", in)
+	}
+	if f := w.msgFacts.m[in[0].id]; f.Origin != "agent" {
+		t.Fatalf("a context copy is an agent's message, got origin %q", f.Origin)
+	}
+	if n := len(w.tmsgs.copiesInto(w.codingWork)); n != 0 {
+		t.Fatalf("the source member got its own reply %d times", n)
+	}
+	rows := w.trepo.inputsOf(w.review.ID)
+	if len(rows) != 1 || rows[0].MessageID != in[0].id || rows[0].AuthorityID != w.alex || rows[0].Source != "member" ||
+		rows[0].SourceMemberID != w.coding.ID {
+		t.Fatalf("team inputs %+v", rows)
+	}
+	if rs := w.runsIn(w.reviewWork); len(rs) != 1 || rs[0].ID != active {
+		t.Fatalf("a context copy started a run: %+v", rs)
+	}
+	if st, _ := w.svc.Followups().States(context.Background(), active, []ids.ID{in[0].id}); st[in[0].id] != "" {
+		t.Fatalf("a context copy became a follow-up: %v", st)
+	}
+	if b := w.trepo.teams[w.team].Brake; b != (domain.TeamBrake{}) {
+		t.Fatalf("a context copy counted in the brake: %+v", b)
+	}
+	if es, _ := w.teamAudits(); len(es) != 0 {
+		t.Fatalf("a context copy was audited as a team trigger: %+v", es)
+	}
+	es, as := w.contextAudits()
+	if len(es) != 1 || es[0].Decision != auditing.DecisionAllow || as[0].ID != w.alex || !as[0].IsRecheckPrincipal() {
+		t.Fatalf("context audits %+v %+v", es, as)
+	}
+	w.input(reply)
+	if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != 1 {
+		t.Fatalf("a repeated job copied again: %d", n)
+	}
+}
+
+// TestTeam_RefusedReplyGivesNoContext (FEAT-TEAM-CONTEXT-ALL): a reply of a run a person who is no
+// owner fed is neither mirrored nor copied as context to anyone; a refused sponsor refuses the
+// context copy too, audited without a note of its own.
+func TestTeam_RefusedReplyGivesNoContext(t *testing.T) {
+	t.Parallel()
+	t.Run("source not owner", func(t *testing.T) {
+		t.Parallel()
+		w := newTeamWorld(t, defaultTeamConfig())
+		w.setUp()
+		w.input(w.replyBy(w.coding, "done, nothing for anyone", w.sam))
+		if n := len(w.tmsgs.copies); n != 0 {
+			t.Fatalf("a reply of a run Sam fed was copied %d times", n)
+		}
+	})
+	t.Run("sponsor no owner", func(t *testing.T) {
+		t.Parallel()
+		w := newTeamWorld(t, defaultTeamConfig())
+		w.setUp()
+		w.input(w.reply(w.coding, "done, nothing for anyone"))
+		team := w.trepo.teams[w.team]
+		team.SponsorID = w.sam
+		w.trepo.teams[w.team] = team
+		before := len(w.tmsgs.copiesInto(w.reviewWork))
+		w.input(w.reply(w.coding, "second, nothing for anyone"))
+		if n := len(w.tmsgs.copiesInto(w.reviewWork)); n != before {
+			t.Fatalf("a context copy for a sponsor who is no owner: %d", n-before)
+		}
+		es, _ := w.contextAudits()
+		if last := es[len(es)-1]; last.Decision != auditing.DecisionDeny || string(last.Reason) != domain.TeamRefusalSponsor {
+			t.Fatalf("last context audit %+v", last)
 		}
 	})
 }

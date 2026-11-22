@@ -747,3 +747,66 @@ func TestTeam_LiveBoxAnchorNotEditable(t *testing.T) {
 	}
 	w.wantFeeders(r.ID, "-/context", w.owner.String()+"/context", w.owner.String()+"/trigger")
 }
+
+// TestTeam_ContextCopiesKeepTheTeamTalking (FEAT-TEAM-CONTEXT-ALL): coding's reply that mentions
+// nobody reaches review as a context copy (an agent's message, no run, no follow-up, no turn of
+// the brake); review's next run, which the owner starts, reads it in its context as an unverified
+// message of another agent, records the sponsor for it in run_feeders, and its reply that mentions
+// @coding is still mirrored and handed on.
+func TestTeam_ContextCopiesKeepTheTeamTalking(t *testing.T) {
+	w := newTeamWorld(t)
+	w.setUp()
+	r := w.ownerRunOfCoding()
+	reply := w.answer(w.codingW, r.ID, "built X on branch y, nothing for anyone yet", true)
+	w.runInput(reply["id"].(string))
+	in := w.messagesIn(w.reviewW)
+	if len(in) != 1 || in[0].Author != w.lotse.String() || in[0].Origin != "agent" || in[0].Content != "built X on branch y, nothing for anyone yet" {
+		t.Fatalf("context copies of review %+v", in)
+	}
+	if got := w.text(`SELECT authority_id::text || '/' || source FROM team_inputs WHERE message_id = $1`, in[0].ID); got != w.owner.String()+"/member" {
+		t.Fatalf("team input of the context copy %q", got)
+	}
+	if n := w.count(`SELECT count(*) FROM runs WHERE thread_id = $1`, w.reviewW); n != 0 {
+		t.Fatalf("a context copy started %d runs", n)
+	}
+	if n := w.count(`SELECT count(*) FROM run_followups WHERE message_id = $1`, in[0].ID); n != 0 {
+		t.Fatalf("a context copy became %d follow-ups", n)
+	}
+	if n := w.count(`SELECT member_turns FROM team_channels WHERE channel_id = $1`, w.team); n != 0 {
+		t.Fatalf("a context copy counted %d turns", n)
+	}
+
+	m := w.post("owner", w.reviewW, "@texter what do you think of coding's work?")
+	rr, ok := w.runOf(m["id"].(string))
+	if !ok || rr.TriggeredBy != w.owner.String() {
+		t.Fatalf("the owner's message opened no owner run of review: %+v %v", rr, ok)
+	}
+	w.startRun("texter", rr.ID)
+	ctx := w.wantOK(w.do("texter", http.MethodGet, "/api/v1/runs/"+rr.ID+"/context", ""))
+	var copyEl map[string]any
+	for _, e := range ctx["thread_context"].([]any) {
+		if el := e.(map[string]any); el["message_id"] == in[0].ID {
+			copyEl = el
+		}
+	}
+	if copyEl == nil || copyEl["role"] != "other" || copyEl["trust"] != "unverified" || copyEl["origin"] != "agent" {
+		t.Fatalf("the context copy in the run context: %v (context %v)", copyEl, ctx["thread_context"])
+	}
+	// The copy speaks for the sponsor like any team input: no "-/context" that would refuse the reply.
+	w.wantFeeders(rr.ID, w.owner.String()+"/context", w.owner.String()+"/trigger")
+	name := w.bound("texter", rr.ID)
+	ans := w.want(w.do(name, http.MethodPost, "/api/v1/threads/"+w.reviewW.String()+"/messages",
+		`{"client_msg_id":"`+ids.New().String()+`","content_md":"@coding looks good, fix the naming","run_id":"`+rr.ID+`"}`, key()...), http.StatusCreated, "")
+	w.runInput(ans["id"].(string))
+	if n := w.count(`SELECT count(*) FROM audit_events WHERE deny_reason = 'team_source_not_owner'`); n != 0 {
+		t.Fatalf("a context copy silenced review: %d refusals", n)
+	}
+	got := w.messagesIn(w.codingW)
+	if last := got[len(got)-1]; last.Author != w.texter.String() || last.Origin != "agent" || last.Content != "@coding looks good, fix the naming" {
+		t.Fatalf("review's reply did not reach coding: %+v", got)
+	}
+	mirror := w.messagesIn(w.teamMain)
+	if last := mirror[len(mirror)-1]; last.Author != w.texter.String() {
+		t.Fatalf("review's reply was not mirrored: %+v", mirror)
+	}
+}

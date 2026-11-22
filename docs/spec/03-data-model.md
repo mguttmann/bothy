@@ -1920,7 +1920,10 @@ RESTRICT. Unique: `(channel_id, handle)`; `(channel_id, agent_id, home_channel_i
 #### `team_inputs`
 
 Purpose: a message the server copied into a member's work thread (09 3.9.2) with its source and
-its authority; the check before every delivery reads the authority here. Module: `runs`.
+its authority; the check before every delivery reads the authority here, and the run context
+records it for every run that reads the input (`run_feeders`). A context input (09 3.9.4, a reply
+that does not mention the member) is a row of the same form that no run and no follow-up names.
+Module: `runs`.
 
 | Field | Type | Null | Default | Rules / notes |
 |---|---|---|---|---|
