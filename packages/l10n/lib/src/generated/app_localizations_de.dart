@@ -1846,6 +1846,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Keine Verbindung. Versuche es erneut, wenn du online bist.';
 
   @override
+  String get selfAppFault => 'In der App ist ein Fehler aufgetreten';
+
+  @override
+  String selfProblemCorrelation(String text, String id) {
+    return '$text (Korrelations-ID $id)';
+  }
+
+  @override
   String get selfLoadFailed => 'Die Liste konnte nicht geladen werden.';
 
   @override
@@ -3263,6 +3271,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get adminWizardKindAgent => 'Agent';
+
+  @override
+  String get adminWizardKindApp => 'App';
 
   @override
   String get adminWizardSearch => 'Nach Namen suchen';

@@ -24,8 +24,8 @@
 ///
 /// M4-29 adds the audit log of A6: [AuditLogView] with its [AuditFilters], the details
 /// ([AuditEntryDetail]), "Check chain" ([AuditChainCheckButton], [AuditChainPanel]), the export
-/// ([AuditExportBar], [AuditSaveTarget], [auditNdjsonToCsv]) and the data source
-/// [AuditRepository] ([ApiAuditRepository]), which [AdminRepository] includes.
+/// ([AuditExportBar], [AuditSaveTarget] with its [AuditSaveFile], [auditNdjsonToCsv]) and the
+/// data source [AuditRepository] ([ApiAuditRepository]), which [AdminRepository] includes.
 ///
 /// M4-37 adds screen A8 for owners (01 5.2; 24 2.2, 3, 7, 8): the [HostsList], the
 /// [HostDetail] with [LlmLoginSection], [ServerHostSection], [DoctorResults],
@@ -166,6 +166,7 @@ export 'src/audit/audit_list.dart';
 export 'src/audit/audit_repository.dart';
 export 'src/audit/chain_check.dart';
 export 'src/common/admin_action.dart';
+export 'src/common/app_fault.dart';
 export 'src/common/code_text.dart';
 export 'src/common/confirm_change.dart';
 export 'src/common/principal_tokens.dart';

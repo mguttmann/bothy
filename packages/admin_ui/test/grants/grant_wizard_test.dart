@@ -219,7 +219,7 @@ void main() {
     expect(find.byKey(const ValueKey('stepUp.dialog')), findsOneWidget);
     expect(
       find.text(
-        'Create the access grant for Sam on Channel Marketing/Kampagnen',
+        'Create the access grant for Sam (@sam) on Channel Marketing/Kampagnen',
       ),
       findsOneWidget,
     );
@@ -253,6 +253,36 @@ void main() {
     await tap(tester, 'level.read');
     expect(repository.previews.last.subjectKind, AdminSubjectKind.agent);
     expect(repository.previews.last.target, campaigns);
+  });
+
+  testWidgets('without an installed app the kind App is not offered', (
+    tester,
+  ) async {
+    await wizard(tester, target: campaigns);
+    expect(find.byKey(const ValueKey('wizard.kind.agent')), findsOneWidget);
+    expect(find.byKey(const ValueKey('wizard.kind.app')), findsNothing);
+  });
+
+  testWidgets('an installed app is a subject, found by its slug too', (
+    tester,
+  ) async {
+    final app = repository.seedApp(repoBridgeManifest());
+    await wizard(tester, target: campaigns);
+    await tap(tester, 'wizard.kind.app');
+    await type(tester, 'wizard.search', 'repo-br');
+    expect(
+      find.descendant(
+        of: find.byKey(ValueKey('subject.${app.id}')),
+        matching: find.text('repo-bridge'),
+      ),
+      findsOneWidget,
+    );
+    await tap(tester, 'subject.${app.id}');
+    await tap(tester, 'wizard.next');
+    await tap(tester, 'wizard.next');
+    await tap(tester, 'level.write');
+    expect(repository.previews.last.subjectKind, AdminSubjectKind.app);
+    expect(repository.previews.last.subjectId, app.id);
   });
 
   testWidgets('revoking says it takes effect immediately and needs a reason', (

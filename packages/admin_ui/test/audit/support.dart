@@ -14,23 +14,44 @@ import '../admin/support.dart';
 
 export '../admin/support.dart';
 
-/// A save target that keeps what the export writes, as a file would.
+/// A save target that keeps what the export writes, as a file would: the bytes are there as
+/// they arrive, closing keeps them and discarding removes them.
 class MemoryTarget {
-  /// The bytes written.
+  /// The bytes of the file.
   final List<int> bytes = [];
 
   /// The file names asked for.
   final List<String> names = [];
 
-  /// Whether the sink was closed.
+  /// Whether the file was closed, which saves it.
   bool closed = false;
 
+  /// Whether the file was discarded, which removes it.
+  bool discarded = false;
+
   /// The target to pass to the view.
-  Future<StreamConsumer<List<int>>?> call(String name) async {
+  Future<AuditSaveFile?> call(String name) async {
     names.add(name);
-    final controller = StreamController<List<int>>();
-    controller.stream.listen(bytes.addAll, onDone: () => closed = true);
-    return controller;
+    return _MemoryFile(this);
+  }
+}
+
+class _MemoryFile implements AuditSaveFile {
+  _MemoryFile(this.target);
+
+  final MemoryTarget target;
+
+  @override
+  Future<void> addStream(Stream<List<int>> stream) =>
+      stream.forEach(target.bytes.addAll);
+
+  @override
+  Future<void> close() async => target.closed = true;
+
+  @override
+  Future<void> discard() async {
+    target.bytes.clear();
+    target.discarded = true;
   }
 }
 

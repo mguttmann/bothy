@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The labels and names around grants: levels, capabilities, targets, days, and the names of
-/// the people, groups, agents, spaces and channels an answer names only by ID
+/// the people, groups, agents, apps, spaces and channels an answer names only by ID
 /// (docs/spec/07-permissions.md 9.1, 9.3; brief M4-27 Design notes 1 and 2).
 ///
 /// Labels only: the sentence of an effect is the server's (07 9.3).
@@ -12,6 +12,7 @@ import 'package:l10n/l10n.dart';
 
 import '../data/access_repository.dart';
 import '../data/admin_repository.dart';
+import '../data/apps_repository.dart';
 
 /// The label of [level], for example "Trigger agents".
 String levelLabel(AppLocalizations l, AccessLevel level) => switch (level) {
@@ -68,14 +69,16 @@ String lastDayLabel(
 }
 
 /// The names of what the grant answers name by ID, loaded from the directory lists the caller
-/// may read (`listUsers`, `listGroups`, `listAgents`, `listSpaces`, `listSpaceChannels`,
-/// `listHosts`). A list the server refuses stays empty, and its IDs show as they are.
+/// may read (`listUsers`, `listGroups`, `listAgents`, `listApps`, `listSpaces`,
+/// `listSpaceChannels`, `listHosts`). A list the server refuses stays empty, and its IDs show
+/// as they are.
 final class AccessNames {
   /// Creates the names from loaded lists.
   AccessNames({
     this.people = const [],
     this.groups = const [],
     this.agents = const [],
+    this.apps = const [],
     this.targets = const [],
     this.hosts = const [],
   });
@@ -105,6 +108,9 @@ final class AccessNames {
       people: await orEmpty(() => allPeople(repository)),
       groups: await orEmpty(allGroups),
       agents: await orEmpty(repository.agents),
+      // An app is the subject of the grants its installation and its owner create (11 4.1),
+      // so its name belongs to the names of a grant (ruling AUD-AM1/1).
+      apps: await orEmpty(repository.apps),
       targets: await orEmpty(repository.targets),
       // Hosts are targets of the capability `terminal` only (07 2.12; M4-37); they stay out of
       // [targets], whose entries "Who has access?" explains.
@@ -123,16 +129,20 @@ final class AccessNames {
   /// The agents.
   final List<AdminAgent> agents;
 
+  /// The installed apps (`listApps` leaves out an uninstalled one).
+  final List<AppRecord> apps;
+
   /// The spaces and channels.
   final List<AdminTarget> targets;
 
   /// The hosts, as targets of kind [AdminTargetKind.host].
   final List<AdminTarget> hosts;
 
-  /// The name of the person or agent [id], or [id].
+  /// The name of the person, agent or app [id], or [id].
   String principal(String id) =>
       people.where((p) => p.id == id).firstOrNull?.displayName ??
       agents.where((a) => a.id == id).firstOrNull?.displayName ??
+      apps.where((a) => a.id == id).firstOrNull?.displayName ??
       id;
 
   /// The name of the group [id], or [id].

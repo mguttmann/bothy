@@ -16,6 +16,7 @@ import '../data/admin_repository.dart';
 import '../grants/grant_labels.dart';
 import '../grants/grant_wizard.dart';
 import '../grants/revoke_grant_dialog.dart';
+import '../people/person_choice.dart';
 import '../self/self_feedback.dart';
 import 'source_chain.dart';
 import 'view_as_person.dart';
@@ -152,7 +153,7 @@ class _WhoHasAccessState extends State<WhoHasAccess>
           child: ViewAsPerson(
             repository: widget.repository,
             userId: person.id,
-            name: person.displayName,
+            name: person.nameWithHandle,
             timeZone: widget.timeZone,
             clock: widget.clock,
             onExit: () => Navigator.of(dialog).pop(),
@@ -283,7 +284,7 @@ class _WhoHasAccessState extends State<WhoHasAccess>
                       DropdownMenuItem(
                         key: ValueKey('access.viewAs.${p.id}'),
                         value: p,
-                        child: Text(p.displayName),
+                        child: PersonChoice(person: p),
                       ),
                   ],
                   onChanged: (p) {

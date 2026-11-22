@@ -303,6 +303,36 @@ void main() {
     expect(adapter.seen.last.options.uri.queryParameters['cursor'], 'c2');
   });
 
+  test('the items of one state are read until the caller has enough', () async {
+    setUpWith(
+      (o) => (
+        200,
+        {
+          'items': [_item('channel:301', 'channel', 'posted')],
+          'next_cursor': 'c2',
+        },
+      ),
+    );
+    final pages = <List<String>>[];
+    final items = await repository.importItems(
+      _source,
+      state: 'posted',
+      enough: (page) {
+        pages.add([for (final i in page) i.originKey]);
+        return true;
+      },
+    );
+    expect([for (final i in items) i.originKey], ['channel:301']);
+    expect(pages, [
+      ['channel:301'],
+    ]);
+    // The second page the server offers is not asked for.
+    expect(adapter.seen, hasLength(1));
+    final query = adapter.seen.single.options.uri.queryParameters;
+    expect(query['state'], 'posted');
+    expect(query.containsKey('cursor'), isFalse);
+  });
+
   test('a channel reads as not live when it is archived or deleted', () async {
     for (final (extra, live) in [
       (const <String, Object?>{}, true),

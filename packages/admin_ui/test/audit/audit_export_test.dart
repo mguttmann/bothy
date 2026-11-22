@@ -2,14 +2,18 @@
 
 // The export (brief M4-29 Tests, Design note 3): the NDJSON file equals the server's bytes; the
 // CSV has the columns, quotes per RFC 4180 and guards cells that start with `=`, `+`, `-` or
-// `@`; an export needs a time range; a stream that breaks off says the file is incomplete.
+// `@`; an export needs a time range; a stream that breaks off says the file is incomplete. An
+// export that fails before the server sent a byte (a cancelled step-up, a refusal, no
+// connection) saves no file and says the reason (ruling AUD-AM1/2).
 
 import 'dart:async';
 import 'dart:convert';
 
 import 'package:admin_ui/admin_ui.dart';
+import 'package:api_client/api_client.dart' show ApiProblem;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:l10n/l10n.dart';
 
 import 'support.dart';
 
@@ -157,6 +161,117 @@ void main() {
         findsOneWidget,
       );
       expect(target.closed, isTrue);
+      expect(target.discarded, isFalse);
+      expect(target.bytes, isNotEmpty, reason: 'what arrived is kept');
+    });
+
+    for (final (format, key) in [
+      ('NDJSON', 'audit.export'),
+      ('CSV', 'audit.exportCsv'),
+    ]) {
+      testWidgets(
+        '$format: a cancelled step-up saves no file and says nothing',
+        (tester) async {
+          final navigator = GlobalKey<NavigatorState>();
+          repository = FakeAdminRepository(
+            prompt: StepUpDialogPrompt(() => navigator.currentContext),
+          )..stepUpFresh = true;
+          await pumpAudit(
+            tester,
+            repository,
+            saveTarget: target.call,
+            navigatorKey: navigator,
+          );
+          await range(tester);
+          // The step-up of the list has run out when the export starts.
+          repository.stepUpFresh = false;
+          await tester.tap(find.byKey(ValueKey(key)));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('stepUp.dialog')), findsOneWidget);
+          await tester.tap(find.byKey(const ValueKey('stepUp.cancel')));
+          await tester.pumpAndSettle();
+
+          expect(target.names, hasLength(1));
+          expect(target.discarded, isTrue);
+          expect(target.closed, isFalse, reason: 'closing would save the file');
+          expect(target.bytes, isEmpty);
+          expect(
+            find.byKey(const ValueKey('audit.exportNotice')),
+            findsNothing,
+          );
+          // The buttons work again.
+          expect(
+            tester.widget<OutlinedButton>(find.byKey(ValueKey(key))).onPressed,
+            isNotNull,
+          );
+        },
+      );
+
+      testWidgets(
+        '$format: a refused export saves no file and says the reason',
+        (tester) async {
+          await pumpAudit(tester, repository, saveTarget: target.call);
+          await range(tester);
+          repository.refuse['exportAudit'] = const ApiProblem(
+            status: 403,
+            code: 'forbidden',
+            reason: 'owner_only',
+          );
+          await export(tester, key);
+
+          expect(target.discarded, isTrue);
+          expect(target.closed, isFalse);
+          expect(target.bytes, isEmpty);
+          expect(
+            find.descendant(
+              of: find.byKey(const ValueKey('audit.exportNotice')),
+              matching: find.text(
+                problemText(
+                  lookupAppLocalizations(const Locale('en')),
+                  'forbidden',
+                  reason: 'owner_only',
+                ),
+              ),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.text('The export broke off; the file is incomplete.'),
+            findsNothing,
+          );
+        },
+      );
+
+      testWidgets('$format: without a connection no file is saved', (
+        tester,
+      ) async {
+        await pumpAudit(tester, repository, saveTarget: target.call);
+        await range(tester);
+        repository.exportBreaksAfter = 0;
+        await export(tester, key);
+
+        expect(target.discarded, isTrue);
+        expect(target.closed, isFalse);
+        expect(target.bytes, isEmpty);
+        expect(
+          find.text('No connection. Try again when you are online.'),
+          findsOneWidget,
+        );
+      });
+    }
+
+    testWidgets('a range without entries saves the file as it is', (
+      tester,
+    ) async {
+      repository.audit = [];
+      await pumpAudit(tester, repository, saveTarget: target.call);
+      await range(tester);
+      await export(tester, 'audit.exportCsv');
+
+      expect(target.closed, isTrue);
+      expect(target.discarded, isFalse);
+      expect(utf8.decode(target.bytes), '${auditCsvColumns.join(',')}\r\n');
+      expect(find.text('Export saved.'), findsOneWidget);
     });
 
     testWidgets('a cancelled save dialog exports nothing', (tester) async {
