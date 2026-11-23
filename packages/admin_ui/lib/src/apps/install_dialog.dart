@@ -444,6 +444,13 @@ class _InstallAppDialogState extends State<InstallAppDialog> {
       ),
       actions: [
         if (_stage == _Stage.grants && _failed) ...[
+          // What succeeded stays: the token can follow on the app page, the grants under
+          // Access grants.
+          TextButton(
+            key: const ValueKey('install.close'),
+            onPressed: _busy ? null : () => Navigator.of(context).pop(true),
+            child: Text(l.adminCodeClose),
+          ),
           TextButton(
             key: const ValueKey('install.uninstall'),
             onPressed: _busy ? null : _uninstall,
@@ -451,7 +458,13 @@ class _InstallAppDialogState extends State<InstallAppDialog> {
           ),
           FilledButton(
             key: const ValueKey('install.retry'),
-            onPressed: _busy ? null : _createRest,
+            onPressed:
+                _busy ||
+                    (_token is _Failed &&
+                        (_tokenName.text.trim().isEmpty ||
+                            _expiresAt(context) == null))
+                ? null
+                : _createRest,
             child: Text(l.selfRetry),
           ),
         ] else ...[
@@ -605,28 +618,7 @@ class _InstallAppDialogState extends State<InstallAppDialog> {
         child: Text(l.adminAppConsentToken, style: heading),
       ),
       Text(l.adminAppTokenBody, style: secondary),
-      TextField(
-        key: const ValueKey('consent.tokenName'),
-        controller: _tokenName,
-        enabled: !_busy,
-        decoration: InputDecoration(labelText: l.adminTokenName),
-      ),
-      TextField(
-        key: const ValueKey('consent.tokenLastDay'),
-        controller: _lastDay,
-        enabled: !_busy,
-        keyboardType: TextInputType.datetime,
-        decoration: InputDecoration(
-          labelText: l.adminTokenLastDay,
-          errorText: validDay ? null : l.adminTokenLastDayInvalid,
-        ),
-      ),
-      TextField(
-        key: const ValueKey('consent.tokenDpop'),
-        controller: _dpop,
-        enabled: !_busy,
-        decoration: InputDecoration(labelText: l.adminAppTokenDpop),
-      ),
+      ..._tokenFields(l, validDay: validDay),
       const SizedBox(height: DsSpace.s8),
       TextField(
         key: const ValueKey('consent.reason'),
@@ -646,6 +638,33 @@ class _InstallAppDialogState extends State<InstallAppDialog> {
       ],
     ];
   }
+
+  /// The name, last day and DPoP thumbprint of the token: in the consent, and again after the
+  /// token step failed, so "Try again" sends the corrected values.
+  List<Widget> _tokenFields(AppLocalizations l, {required bool validDay}) => [
+    TextField(
+      key: const ValueKey('consent.tokenName'),
+      controller: _tokenName,
+      enabled: !_busy,
+      decoration: InputDecoration(labelText: l.adminTokenName),
+    ),
+    TextField(
+      key: const ValueKey('consent.tokenLastDay'),
+      controller: _lastDay,
+      enabled: !_busy,
+      keyboardType: TextInputType.datetime,
+      decoration: InputDecoration(
+        labelText: l.adminTokenLastDay,
+        errorText: validDay ? null : l.adminTokenLastDayInvalid,
+      ),
+    ),
+    TextField(
+      key: const ValueKey('consent.tokenDpop'),
+      controller: _dpop,
+      enabled: !_busy,
+      decoration: InputDecoration(labelText: l.adminAppTokenDpop),
+    ),
+  ];
 
   /// The target picker of a space or channel grant: the server's targets of that kind and "Do
   /// not create"; null for an instance grant (no picker) or a kind this version cannot pick.
@@ -754,6 +773,11 @@ class _InstallAppDialogState extends State<InstallAppDialog> {
         l.adminAppStepToken(_tokenName.text.trim()),
         _token,
       ),
+      if (_token is _Failed)
+        ..._tokenFields(
+          l,
+          validDay: _lastDay.text.trim().isEmpty || _expiresAt(context) != null,
+        ),
       if (_uninstallFailure case final failure?) ...[
         const SizedBox(height: DsSpace.s8),
         DsBanner(tone: DsTone.danger, text: failure),

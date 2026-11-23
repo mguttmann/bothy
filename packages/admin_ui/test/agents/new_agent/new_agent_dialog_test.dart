@@ -335,6 +335,88 @@ void main() {
       });
     }
 
+    testWidgets('a passing fallback sends the same turns again', (
+      tester,
+    ) async {
+      port.interviewReplies.addAll([
+        const InterviewReply(
+          outcome: InterviewOutcome.questions,
+          questions: ['What should the agent do?'],
+        ),
+        const InterviewReply(
+          outcome: InterviewOutcome.fallback,
+          fallbackReason: 'builder_timeout',
+        ),
+        InterviewReply(
+          outcome: InterviewOutcome.draft,
+          draft: {
+            ...writingTemplate.definition,
+            'name': 'Notes',
+            'handle': 'notes',
+            'description': 'Keeps notes',
+          },
+        ),
+      ]);
+      await open(tester);
+      await tap(tester, 'newAgent.way.interview');
+      await tester.enterText(
+        find.byKey(const ValueKey('newAgent.interview.input')),
+        'Keep the notes of our meetings',
+      );
+      await tap(tester, 'newAgent.interview.send');
+      expect(
+        find.text('The builder agent did not answer in time.'),
+        findsOneWidget,
+      );
+      await tap(tester, 'newAgent.interview.retry');
+
+      expect(port.interviewRequests, hasLength(3));
+      final [_, (sent, _), (again, _)] = port.interviewRequests;
+      expect(
+        [for (final t in again) (t.role, t.text)],
+        [for (final t in sent) (t.role, t.text)],
+      );
+      expect(find.byKey(const ValueKey('newAgent.preview')), findsOneWidget);
+    });
+
+    testWidgets('an unusable answer offers no retry', (tester) async {
+      port.interviewReplies.add(
+        const InterviewReply(
+          outcome: InterviewOutcome.fallback,
+          fallbackReason: 'builder_invalid',
+        ),
+      );
+      await open(tester);
+      await tap(tester, 'newAgent.way.interview');
+      expect(
+        find.byKey(const ValueKey('newAgent.interview.retry')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('back to the interview takes its draft without a new request', (
+      tester,
+    ) async {
+      port.interviewReplies.add(
+        InterviewReply(
+          outcome: InterviewOutcome.draft,
+          draft: {
+            ...writingTemplate.definition,
+            'name': 'Notes',
+            'handle': 'notes',
+            'description': 'Keeps notes',
+          },
+        ),
+      );
+      await open(tester);
+      await tap(tester, 'newAgent.way.interview');
+      expect(find.byKey(const ValueKey('newAgent.preview')), findsOneWidget);
+      await tap(tester, 'newAgent.back');
+      await tap(tester, 'newAgent.way.interview');
+      expect(find.byKey(const ValueKey('newAgent.preview')), findsOneWidget);
+      expect(port.interviewRequests, hasLength(1));
+    });
+
     testWidgets('the fallback leads to the templates', (tester) async {
       await open(tester);
       await tap(tester, 'newAgent.way.interview');
@@ -374,6 +456,33 @@ void main() {
         ),
         findsOneWidget,
       );
+    });
+
+    testWidgets('a context that did not load says so and is read again', (
+      tester,
+    ) async {
+      port
+        ..offerValue = const NewAgentOffer(
+          templates: [writingTemplate],
+          runners: [alexRunner],
+        )
+        ..failNext['context'] = const NewAgentFailure.offline();
+      await open(tester);
+      await tap(tester, 'newAgent.way.empty');
+      expect(
+        find.text('Personal needs your account details, which are not loaded.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Personal is offered only when you are the only owner.'),
+        findsNothing,
+      );
+      await tap(tester, 'newAgent.contextRetry');
+      expect(
+        find.byKey(const ValueKey('newAgent.billing.personal')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('newAgent.contextRetry')), findsNothing);
     });
 
     testWidgets('a server without the class says what it does not load', (

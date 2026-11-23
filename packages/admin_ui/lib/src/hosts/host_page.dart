@@ -89,7 +89,16 @@ class _HostDetailState extends State<HostDetail>
   @override
   void didUpdateWidget(HostDetail old) {
     super.didUpdateWidget(old);
-    if (old.hostId != widget.hostId) _load();
+    if (old.hostId != widget.hostId) {
+      // Nothing of the former host stays: its record, its sessions and its audit history.
+      _host = null;
+      _error = null;
+      _sessions = null;
+      _former = const {};
+      _auditFailed = false;
+      _historyFor.clear();
+      _load();
+    }
   }
 
   Future<void> _load() async {
@@ -149,6 +158,13 @@ class _HostDetailState extends State<HostDetail>
     }
   }
 
+  /// "Try again" after a failed read of the audit: the names are looked up once more (a reload
+  /// alone does not ask again, so a cancelled step-up is not repeated on every change).
+  Future<void> _retryHistory(AdminHost host) {
+    _historyFor.removeAll(namesWithoutAssignment(host));
+    return _history(host);
+  }
+
   void _changed(AdminHost host) {
     setState(() => _host = host);
     widget.onChanged?.call();
@@ -173,7 +189,7 @@ class _HostDetailState extends State<HostDetail>
         purpose: l.stepUpPurposeUpdateHost(h.name),
       );
       return SelfNotice(l.hostAssigneeChanged(h.name));
-    });
+    }, reload: _load);
     if (changed case final host?) _changed(host);
   }
 
@@ -236,7 +252,9 @@ class _HostDetailState extends State<HostDetail>
       await PairingWizard.show(
         context,
         repository: widget.repository,
-        host: _host,
+        // The host read before the new code, when the read after it failed: the wizard then
+        // shows the code and reads the host again on "Next".
+        host: _host ?? h,
         code: code,
         reason: reason,
         clock: widget.clock,
@@ -260,7 +278,7 @@ class _HostDetailState extends State<HostDetail>
       return SelfNotice(
         l.hostStateChanged(h.name, hostStateLabel(l, changed!)),
       );
-    });
+    }, reload: _load);
     if (changed case final host?) _changed(host);
   }
 
@@ -430,6 +448,7 @@ class _HostDetailState extends State<HostDetail>
               host: h,
               people: _people,
               onChanged: _changed,
+              onReload: _load,
             ),
           ),
           _field(l.hostFieldServerHost, ServerHostSection(host: h)),
@@ -440,6 +459,7 @@ class _HostDetailState extends State<HostDetail>
               people: _people,
               former: _former,
               auditFailed: _auditFailed,
+              onRetryAudit: () => _retryHistory(h),
             ),
           ),
           _field(
@@ -470,6 +490,7 @@ class _HostDetailState extends State<HostDetail>
               host: h,
               people: _people,
               onChanged: _changed,
+              onReload: _load,
             ),
           ),
           if (_sessions case final count?)
@@ -533,7 +554,22 @@ class _AssigneeDialogState extends State<_AssigneeDialog> {
             items: [
               DropdownMenuItem(child: Text(l.hostOwnersOnly)),
               for (final p in widget.people)
-                DropdownMenuItem(value: p.id, child: Text(p.displayName)),
+                if (p.status == AdminPersonStatus.active ||
+                    p.status == AdminPersonStatus.pending)
+                  DropdownMenuItem(value: p.id, child: Text(p.displayName)),
+              // The current assignee stays an entry, also when the people did not load or
+              // the person is no longer active.
+              if (widget.host.assignedUserId case final current?
+                  when !widget.people.any(
+                    (p) =>
+                        p.id == current &&
+                        (p.status == AdminPersonStatus.active ||
+                            p.status == AdminPersonStatus.pending),
+                  ))
+                DropdownMenuItem(
+                  value: current,
+                  child: Text(personName(widget.people, current)),
+                ),
             ],
             onChanged: (v) => setState(() => _assignee = v),
           ),

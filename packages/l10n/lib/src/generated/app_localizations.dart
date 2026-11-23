@@ -17433,7 +17433,7 @@ abstract class AppLocalizations {
   /// Why the billing mode personal is not offered (10 10.3 item 3).
   ///
   /// In en, this message translates to:
-  /// **'{reason, select, notOnlyOwner{Personal is offered only when you are the only owner.} runnerNotPersonal{Personal needs a hosting runner on a personal subscription.} notHolder{Personal needs you to hold the credentials of the runner.} other{The hosting runner does not report Personal.}}'**
+  /// **'{reason, select, notOnlyOwner{Personal is offered only when you are the only owner.} runnerNotPersonal{Personal needs a hosting runner on a personal subscription.} notHolder{Personal needs you to hold the credentials of the runner.} contextUnknown{Personal needs your account details, which are not loaded.} other{The hosting runner does not report Personal.}}'**
   String newAgentPersonalNot(String reason);
 
   /// Section of the hosting runner.
@@ -18825,6 +18825,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'the channel is read-only'**
   String get teamReasonReadOnly;
+
+  /// Notice of an administration page after a change answered 412 version_conflict: the page read the record again.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone else changed this in the meantime. The page now shows the current state; make your change again.'**
+  String get adminVersionReloaded;
+
+  /// Button on the app page that opens the consent of the installed app (scopes and events).
+  ///
+  /// In en, this message translates to:
+  /// **'Change consent'**
+  String get adminAppChangeConsent;
+
+  /// Title of the dialog that changes the granted scopes and events of an installed app.
+  ///
+  /// In en, this message translates to:
+  /// **'Consent for {name}'**
+  String adminAppChangeConsentTitle(String name);
+
+  /// Body of the dialog that changes the granted scopes and events of an installed app.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose what the app may use and which events it receives; required items stay on.'**
+  String get adminAppChangeConsentBody;
 }
 
 class _AppLocalizationsDelegate

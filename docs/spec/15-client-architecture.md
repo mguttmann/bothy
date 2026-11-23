@@ -35,7 +35,13 @@ ADR 0030 (design tokens), ADR 0044 (branding).
    such a write names it here. Calls that concern only the device or a connection
    (`createFileTicket`, `createExtensionSession`, `registerPush`, `unregisterPush`,
    `openTerminalSession`, `closeTerminalSession`) are no writes of shared data and are not in
-   this class.
+   this class. In `admin_ui` a creating call of this class without a one-time secret in its answer
+   (`installApp`, `createGrant`, `createGroup`, `createAgent`) keeps its key while no final answer
+   arrived (no answer, `401`, `429`, `5xx`, `409 request_in_progress`; 06 section 7), so the same
+   request sent again is answered from the server's record instead of creating twice; any final
+   answer drops the key. A write with `If-Match` on the host and agent pages that gets
+   `412 version_conflict` reads the record again and says so, and the next attempt sends the
+   current version.
 4. **One code base, native only where the system requires it.** Flutter for all interfaces; Swift,
    Kotlin and C++ only for extensions and system services (Notification Service Extension, Share
    Extension, push service, notification area, keys in secure storage, auto-update).

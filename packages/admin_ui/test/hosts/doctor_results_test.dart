@@ -103,6 +103,21 @@ void main() {
     },
   );
 
+  testWidgets('a cancelled audit read is offered again with Try again', (
+    tester,
+  ) async {
+    await page(tester);
+    await tapKey(tester, 'stepUp.cancel');
+    expect(find.byKey(const ValueKey('doctor.auditFailed')), findsOneWidget);
+    await tapKey(tester, 'doctor.auditRetry');
+    await confirmStepUp(tester);
+    expect(find.byKey(const ValueKey('doctor.auditFailed')), findsNothing);
+    expect(
+      textOf(tester, 'doctor.hd9_foreign_homes.term-robin'),
+      contains('formerly assigned to Robin'),
+    );
+  });
+
   testWidgets('HD6, HD10 and HD11 entries with names, on a disconnected host', (
     tester,
   ) async {

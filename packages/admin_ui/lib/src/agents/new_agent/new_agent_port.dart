@@ -373,6 +373,12 @@ final class NewAgentFailure implements Exception {
       reason = null,
       errors = const [];
 
+  /// [error] as a failure: a [NewAgentFailure] as it is, anything else (a program error, a
+  /// malformed answer) as `internal_error`, never as "offline".
+  static NewAgentFailure of(Object error) => error is NewAgentFailure
+      ? error
+      : const NewAgentFailure.problem('internal_error');
+
   /// The kind.
   final NewAgentFailureKind kind;
 

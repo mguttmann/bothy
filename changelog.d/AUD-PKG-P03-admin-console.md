@@ -44,3 +44,25 @@
   and an unhandled error.
 - Ending a console session no longer waits forever when another tab holds the terminal pins
   database open, and a pin write the browser aborts reports an error.
+- A change on the host or agent page that meets `412 version_conflict` reads the record again
+  and says that it changed meanwhile, so the next attempt no longer fails the same way.
+- The switch of several agents, the runner change and the pairing wizard stay open while their
+  call runs; the pairing wizard keeps its one-time code after a failed read of the host.
+- The agent page no longer listens anew to the presence of its agent on every rebuild.
+- The built-in agent card shows a failed read after a save with Try again, a refused Disable as
+  an error, says nothing after a cancelled step-up, and no longer calls a program error
+  "offline".
+- "Change consent" on the app page grants or withdraws optional scopes and events after the
+  install, also after "Later" in the consent of an update.
+- A failed step of the app install offers Close (what succeeded stays) and shows the token's
+  fields again for the repeat.
+- Installing an app and creating a grant, a group or an agent keep their idempotency key after
+  a lost answer, so a repeat no longer creates twice.
+- The interview of "New agent" offers Try again after a timeout or an offline builder, takes an
+  already delivered draft after Back, and says when the account details did not load.
+- The host page offers to read its audit again after a failed read, and the assignee dialog
+  keeps the current assignee when the people list lacks it.
+
+### Removed
+
+- The unused `TokenSecretView` of `admin_ui`.

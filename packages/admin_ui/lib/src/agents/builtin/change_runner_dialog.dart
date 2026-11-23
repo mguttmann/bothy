@@ -79,6 +79,8 @@ class ChangeRunnerDialog extends StatefulWidget {
   }) => showDialog<ChangeRunnerOutcome>(
     context: context,
     useSafeArea: !fullScreen,
+    // A move that runs is not left by a tap beside the dialog: the card would miss it.
+    barrierDismissible: false,
     builder: (_) => ChangeRunnerDialog(
       port: port,
       agent: agent,
@@ -118,7 +120,7 @@ class _ChangeRunnerDialogState extends State<ChangeRunnerDialog> {
       if (mounted) Navigator.of(context).pop(RunnerChanged(runner));
     } on Object catch (e) {
       if (!mounted) return;
-      final f = e is NewAgentFailure ? e : const NewAgentFailure.offline();
+      final f = NewAgentFailure.of(e);
       setState(() {
         _holder = f.reason == 'hosted_holder_mismatch';
         _error = _sentence(l, f, runner);
@@ -152,98 +154,103 @@ class _ChangeRunnerDialogState extends State<ChangeRunnerDialog> {
     final l = AppLocalizations.of(context);
     final colors = context.dsColors;
     final error = _error;
-    return AlertDialog(
-      key: const ValueKey('agentHost.dialog'),
-      title: Text(l.agentHostTitle(widget.agent.name)),
-      content: SizedBox(
-        width: 520,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(l.agentHostBody, style: dsTextStyle(DsType.body)),
-              const SizedBox(height: DsSpace.s8),
-              if (widget.runners.isEmpty)
-                Text(
-                  l.agentHostNone,
-                  key: const ValueKey('agentHost.none'),
-                  style: dsTextStyle(DsType.bodySm)
-                      .copyWith(color: colors.textSecondary),
-                ),
-              RadioGroup<String>(
-                groupValue: _choice?.id,
-                onChanged: (id) => _busy
-                    ? null
-                    : setState(() {
-                        _choice = widget.runners.firstWhere((r) => r.id == id);
-                        _error = null;
-                        _holder = false;
-                      }),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final r in widget.runners)
-                      RadioListTile<String>(
-                        key: ValueKey('agentHost.runner.${r.id}'),
-                        contentPadding: EdgeInsets.zero,
-                        value: r.id,
-                        title: Text(
-                          l.agentHostChoice(
-                            r.name,
-                            toolClassName(l, r.ceiling),
+    return PopScope(
+      canPop: !_busy,
+      child: AlertDialog(
+        key: const ValueKey('agentHost.dialog'),
+        title: Text(l.agentHostTitle(widget.agent.name)),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(l.agentHostBody, style: dsTextStyle(DsType.body)),
+                const SizedBox(height: DsSpace.s8),
+                if (widget.runners.isEmpty)
+                  Text(
+                    l.agentHostNone,
+                    key: const ValueKey('agentHost.none'),
+                    style: dsTextStyle(DsType.bodySm)
+                        .copyWith(color: colors.textSecondary),
+                  ),
+                RadioGroup<String>(
+                  groupValue: _choice?.id,
+                  onChanged: (id) => _busy
+                      ? null
+                      : setState(() {
+                          _choice = widget.runners.firstWhere(
+                            (r) => r.id == id,
+                          );
+                          _error = null;
+                          _holder = false;
+                        }),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final r in widget.runners)
+                        RadioListTile<String>(
+                          key: ValueKey('agentHost.runner.${r.id}'),
+                          contentPadding: EdgeInsets.zero,
+                          value: r.id,
+                          title: Text(
+                            l.agentHostChoice(
+                              r.name,
+                              toolClassName(l, r.ceiling),
+                            ),
                           ),
+                          subtitle: widget.agent.toolClass.isAbove(r.ceiling)
+                              ? Text(
+                                  l.agentHostErrCeiling(
+                                    r.name,
+                                    toolClassName(l, r.ceiling),
+                                  ),
+                                  style: dsTextStyle(DsType.bodySm)
+                                      .copyWith(color: colors.warningFg),
+                                )
+                              : null,
                         ),
-                        subtitle: widget.agent.toolClass.isAbove(r.ceiling)
-                            ? Text(
-                                l.agentHostErrCeiling(
-                                  r.name,
-                                  toolClassName(l, r.ceiling),
-                                ),
-                                style: dsTextStyle(DsType.bodySm)
-                                    .copyWith(color: colors.warningFg),
-                              )
-                            : null,
-                      ),
-                  ],
-                ),
-              ),
-              if (error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: DsSpace.s8),
-                  child: Semantics(
-                    liveRegion: true,
-                    child: Text(
-                      error,
-                      key: const ValueKey('agentHost.error'),
-                      style: dsTextStyle(DsType.body)
-                          .copyWith(color: colors.dangerFg),
-                    ),
+                    ],
                   ),
                 ),
-            ],
+                if (error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: DsSpace.s8),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        error,
+                        key: const ValueKey('agentHost.error'),
+                        style: dsTextStyle(DsType.body)
+                            .copyWith(color: colors.dangerFg),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
+        actions: [
+          TextButton(
+            key: const ValueKey('agentHost.cancel'),
+            onPressed: _busy ? null : () => Navigator.of(context).pop(),
+            child: Text(l.newAgentCancel),
+          ),
+          if (_holder && widget.canSwitchBilling)
+            OutlinedButton(
+              key: const ValueKey('agentHost.switchBilling'),
+              onPressed: () =>
+                  Navigator.of(context).pop(const SwitchBillingFirst()),
+              child: Text(l.agentHostSwitchBilling),
+            ),
+          FilledButton(
+            key: const ValueKey('agentHost.confirm'),
+            onPressed: _busy || _choice == null ? null : () => _move(l),
+            child: Text(l.agentHostConfirm),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          key: const ValueKey('agentHost.cancel'),
-          onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: Text(l.newAgentCancel),
-        ),
-        if (_holder && widget.canSwitchBilling)
-          OutlinedButton(
-            key: const ValueKey('agentHost.switchBilling'),
-            onPressed: () =>
-                Navigator.of(context).pop(const SwitchBillingFirst()),
-            child: Text(l.agentHostSwitchBilling),
-          ),
-        FilledButton(
-          key: const ValueKey('agentHost.confirm'),
-          onPressed: _busy || _choice == null ? null : () => _move(l),
-          child: Text(l.agentHostConfirm),
-        ),
-      ],
     );
   }
 }

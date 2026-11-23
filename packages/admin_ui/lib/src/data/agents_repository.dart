@@ -14,6 +14,7 @@ import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
 
 import 'access_repository.dart';
+import 'request_keys.dart';
 import 'self_repository.dart';
 
 /// The backend of an agent (`BillingMode`, 10 1).
@@ -408,10 +409,14 @@ final class ApiAgentsRepository implements AgentsRepository {
   /// Creates the repository over `api` (the client of the signed-in session, so DPoP, refresh
   /// and the step-up interceptor apply); [newIdempotencyKey] returns a fresh UUIDv7.
   ApiAgentsRepository(this._api, {required String Function() newIdempotencyKey})
-    : _newKey = newIdempotencyKey;
+    : _newKey = newIdempotencyKey,
+      _keys = RequestKeys(newIdempotencyKey);
 
   final ApiClient _api;
   final String Function() _newKey;
+
+  /// The keys of creating requests across repetitions after a lost answer.
+  final RequestKeys _keys;
 
   AgentsApi get _agents => _api.getAgentsApi();
   TokensApi get _tokens => _api.getTokensApi();
@@ -569,21 +574,25 @@ final class ApiAgentsRepository implements AgentsRepository {
     required String adapterKind,
     String description = '',
     required String purpose,
-  }) => adminCall(
-    () async => agentRecordOf(
-      (await _agents.createAgent(
-        idempotencyKey: _newKey(),
-        agentCreate: AgentCreate(
-          (b) => b
-            ..handle = handle
-            ..displayName = displayName
-            ..adapterKind = adapterKind
-            ..description = description,
+  }) => adminCall(() async {
+    final body = AgentCreate(
+      (b) => b
+        ..handle = handle
+        ..displayName = displayName
+        ..adapterKind = adapterKind
+        ..description = description,
+    );
+    return agentRecordOf(
+      (await _keys.run(
+        'createAgent $body',
+        (key) => _agents.createAgent(
+          idempotencyKey: key,
+          agentCreate: body,
+          extra: _purpose(purpose),
         ),
-        extra: _purpose(purpose),
       )).data!,
-    ),
-  );
+    );
+  });
 
   @override
   Future<AgentRecord> setActive(

@@ -2882,7 +2882,7 @@
   "newAgentBilling": "Abrechnung",
   "newAgentBillingOrganization": "Organisation",
   "newAgentBillingPersonal": "Persönlich",
-  "newAgentPersonalNot": "{reason, select, notOnlyOwner{Persönlich gibt es nur, wenn du der einzige Eigentümer bist.} runnerNotPersonal{Persönlich braucht einen Runner mit einem persönlichen Abonnement.} notHolder{Persönlich braucht dich als Inhaber der Zugangsdaten des Runners.} other{Der Runner meldet Persönlich nicht.}}",
+  "newAgentPersonalNot": "{reason, select, notOnlyOwner{Persönlich gibt es nur, wenn du der einzige Eigentümer bist.} runnerNotPersonal{Persönlich braucht einen Runner mit einem persönlichen Abonnement.} notHolder{Persönlich braucht dich als Inhaber der Zugangsdaten des Runners.} contextUnknown{Persönlich braucht deine Kontodaten, die nicht geladen sind.} other{Der Runner meldet Persönlich nicht.}}",
   "newAgentSectionHost": "Runner",
   "newAgentHost": "Runner",
   "newAgentHostMissing": "Wähle einen Runner.",
@@ -3117,5 +3117,9 @@
   "switcherNoTarget": "kann hier noch nicht geöffnet werden",
   "liveBoxSendAgainUnavailable": "Hier gibt es nichts erneut zu senden: Die Nachricht hat keinen Text oder ist nicht auf diesem Gerät.",
   "liveBoxSendAgainFailed": "Erneutes Senden fehlgeschlagen. Noch einmal versuchen.",
-  "commandStatusClose": "Schließen"
+  "commandStatusClose": "Schließen",
+  "adminVersionReloaded": "Jemand anderes hat das inzwischen geändert. Die Seite zeigt jetzt den aktuellen Stand; nimm deine Änderung erneut vor.",
+  "adminAppChangeConsent": "Zustimmung ändern",
+  "adminAppChangeConsentTitle": "Zustimmung für {name}",
+  "adminAppChangeConsentBody": "Wähle, was die App nutzen darf und welche Ereignisse sie erhält; erforderliche Punkte bleiben an."
 }

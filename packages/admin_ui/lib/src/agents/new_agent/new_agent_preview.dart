@@ -849,6 +849,15 @@ class _BillingChoice extends StatelessWidget {
               key: const ValueKey('newAgent.personalNot'),
             ),
           ),
+        if (flow.contextFailed)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton(
+              key: const ValueKey('newAgent.contextRetry'),
+              onPressed: flow.loadContext,
+              child: Text(l.selfRetry),
+            ),
+          ),
       ],
     );
   }

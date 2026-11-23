@@ -14,6 +14,9 @@
 /// same request goes out once more with `want_draft` and the turns that fit ([fittingTurns]),
 /// so a builder that keeps asking leads to a draft and never to an error the person cannot
 /// leave (ruling AUD-AA1/1).
+///
+/// A fallback of a passing kind (`builder_timeout`, `builder_offline`) can be retried: the same
+/// turns go out once more, so the answers so far stay.
 library;
 
 import 'dart:math' as math;
@@ -45,6 +48,7 @@ final class AgentInterview extends ChangeNotifier {
   int _costMicros = 0;
   String? _currency;
   bool _hasCost = false;
+  bool _lastWantDraft = false;
 
   /// The most turns the server took in one request of this interview: that many fit
   /// `agents.interview.max_turns`, which the client cannot read.
@@ -68,6 +72,18 @@ final class AgentInterview extends ChangeNotifier {
 
   /// Whether a request runs.
   bool get pending => _pending;
+
+  /// Whether the fallback may pass, so [retry] is offered (`builder_timeout`,
+  /// `builder_offline`).
+  bool get canRetry =>
+      _fallback == 'builder_timeout' || _fallback == 'builder_offline';
+
+  /// Sends the request that ended in a passing fallback again, with the same turns.
+  Future<void> retry() async {
+    if (!canRetry || _pending) return;
+    _fallback = null;
+    await _send(wantDraft: _lastWantDraft);
+  }
 
   /// The sum of the cost estimates so far in micro units of [currency], or null before the
   /// first estimate.
@@ -98,6 +114,7 @@ final class AgentInterview extends ChangeNotifier {
   }
 
   Future<void> _send({required bool wantDraft}) async {
+    _lastWantDraft = wantDraft;
     _pending = true;
     _error = null;
     _notify();

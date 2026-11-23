@@ -10849,6 +10849,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'runnerNotPersonal':
           'Personal needs a hosting runner on a personal subscription.',
       'notHolder': 'Personal needs you to hold the credentials of the runner.',
+      'contextUnknown':
+          'Personal needs your account details, which are not loaded.',
       'other': 'The hosting runner does not report Personal.',
     });
     return '$_temp0';
@@ -11810,4 +11812,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get teamReasonReadOnly => 'the channel is read-only';
+
+  @override
+  String get adminVersionReloaded =>
+      'Someone else changed this in the meantime. The page now shows the current state; make your change again.';
+
+  @override
+  String get adminAppChangeConsent => 'Change consent';
+
+  @override
+  String adminAppChangeConsentTitle(String name) {
+    return 'Consent for $name';
+  }
+
+  @override
+  String get adminAppChangeConsentBody =>
+      'Choose what the app may use and which events it receives; required items stay on.';
 }

@@ -83,6 +83,7 @@ class _BuiltinAgentSectionState extends State<BuiltinAgentSection> {
   NewAgentContext? _context;
   NewAgentFailure? _loadFailure;
   String? _notice;
+  DsTone _noticeTone = DsTone.info;
   bool _busy = false;
 
   NewAgentPort get _port => widget.host.port;
@@ -132,11 +133,7 @@ class _BuiltinAgentSectionState extends State<BuiltinAgentSection> {
       });
     } on Object catch (e) {
       if (!mounted) return;
-      setState(
-        () => _loadFailure = e is NewAgentFailure
-            ? e
-            : const NewAgentFailure.offline(),
-      );
+      setState(() => _loadFailure = NewAgentFailure.of(e));
     }
     try {
       final c = await _port.context();
@@ -167,13 +164,31 @@ class _BuiltinAgentSectionState extends State<BuiltinAgentSection> {
 
   Future<void> _after(String notice) async {
     if (!mounted) return;
-    setState(() => _notice = notice);
+    setState(() {
+      _notice = notice;
+      _noticeTone = DsTone.info;
+    });
     widget.onChanged?.call();
     await _load();
   }
 
-  Future<void> _openEditor(ExistingAgent existing) async {
+  /// After a saved edit or restore: the card reloads, and the notice names the version the
+  /// reload read (a failed reload shows its own banner).
+  Future<void> _afterSaved(String name, {bool setup = false}) async {
+    if (!mounted) return;
     final l = AppLocalizations.of(context);
+    widget.onChanged?.call();
+    await _load();
+    if (!mounted) return;
+    setState(() {
+      _notice = setup
+          ? l.builtinAgentSetUp(name)
+          : l.builtinAgentSaved(name, _stored?.version ?? 0);
+      _noticeTone = DsTone.info;
+    });
+  }
+
+  Future<void> _openEditor(ExistingAgent existing) async {
     final setup = existing.stored == null && existing.content == null;
     final NewAgentResult? result = await widget.host.openExisting(
       context,
@@ -186,12 +201,7 @@ class _BuiltinAgentSectionState extends State<BuiltinAgentSection> {
       await _load();
       return;
     }
-    final stored = await _port.definition(widget.agentId);
-    await _after(
-      setup
-          ? l.builtinAgentSetUp(existing.agent.name)
-          : l.builtinAgentSaved(existing.agent.name, stored?.version ?? 0),
-    );
+    await _afterSaved(existing.agent.name, setup: setup);
   }
 
   Future<void> _edit() async {
@@ -207,7 +217,6 @@ class _BuiltinAgentSectionState extends State<BuiltinAgentSection> {
     final agent = _agent;
     final runner = _runner;
     if (agent == null || runner == null) return;
-    final l = AppLocalizations.of(context);
     final restored = await AgentVersionsDialog.show(
       context,
       port: _port,
@@ -246,8 +255,7 @@ class _BuiltinAgentSectionState extends State<BuiltinAgentSection> {
       },
     );
     if (!mounted || !(restored ?? false)) return;
-    final stored = await _port.definition(agent.id);
-    await _after(l.builtinAgentSaved(agent.name, stored?.version ?? 0));
+    await _afterSaved(agent.name);
   }
 
   Future<void> _changeRunner() async {
@@ -296,10 +304,13 @@ class _BuiltinAgentSectionState extends State<BuiltinAgentSection> {
       );
       await _after(l.builtinAgentDisabled(agent.name));
     } on Object catch (e) {
-      if (mounted) {
-        setState(
-          () => _notice = e is NewAgentFailure ? _failureText(l, e) : null,
-        );
+      final failure = NewAgentFailure.of(e);
+      // A cancelled step-up says nothing, as every other change of the administration.
+      if (mounted && failure.kind != NewAgentFailureKind.stepUpCancelled) {
+        setState(() {
+          _notice = _failureText(l, failure);
+          _noticeTone = DsTone.danger;
+        });
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -353,7 +364,7 @@ class _BuiltinAgentSectionState extends State<BuiltinAgentSection> {
           padding: const EdgeInsets.only(bottom: DsSpace.s8),
           child: DsBanner(
             key: const ValueKey('builtinAgent.notice'),
-            tone: DsTone.info,
+            tone: _noticeTone,
             text: notice,
             liveRegion: true,
           ),
@@ -363,6 +374,8 @@ class _BuiltinAgentSectionState extends State<BuiltinAgentSection> {
           key: const ValueKey('builtinAgent.error'),
           tone: DsTone.danger,
           text: _failureText(l, failure),
+          actionLabel: l.selfRetry,
+          onAction: _load,
         )
       else if (agent == null)
         const Center(child: CircularProgressIndicator())

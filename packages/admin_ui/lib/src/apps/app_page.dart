@@ -17,15 +17,13 @@ import '../self/self_feedback.dart';
 import 'app_labels.dart';
 import 'lifecycle_dialog.dart';
 import 'manifest_picker.dart';
+import 'scopes_dialog.dart';
 import 'subscriptions_section.dart';
 import 'update_dialog.dart';
 
 /// The key under which a refused lifecycle change hides suspend, resume and uninstall: all
 /// three are owner actions, so a `403` of one means the others are refused too.
 const String _lifecycle = 'lifecycle';
-
-/// The key under which a refused update hides "Update".
-const String _update = 'update';
 
 /// One app with its consent, its lifecycle, its tokens and its subscriptions.
 ///
@@ -34,7 +32,9 @@ const String _update = 'update';
 /// nothing), the granted scopes with their meaning (05 2.6), the event subscriptions, the
 /// destinations of outgoing data, the commands and the publisher's `data_egress` text.
 ///
-/// "Update" ([UpdateAppDialog]) needs the host's file dialog [pickManifest]; "Suspend" or
+/// "Update" ([UpdateAppDialog]) needs the host's file dialog [pickManifest]; "Change consent"
+/// ([AppScopesDialog]) changes the granted scopes and events of the installed manifest, also
+/// after "Later" in the new consent of an update; "Suspend" or
 /// "Resume" follows the state, "Uninstall" is offered until the app is uninstalled; each
 /// lifecycle action first shows its effects of 11 4.3 ([AppLifecycleDialog]) and then goes to
 /// the server with its purpose, the step-up is the server's. A `403` hides the refused
@@ -172,6 +172,23 @@ class _AppPageState extends State<AppPage> with AdminActionState<AppPage> {
     }
   }
 
+  Future<void> _changeConsent(AppRecord a) async {
+    final l = AppLocalizations.of(context);
+    final saved = await AppScopesDialog.show(
+      context,
+      repository: widget.repository,
+      app: a,
+    );
+    if (saved != true || !mounted) return;
+    widget.onChanged?.call();
+    await _load();
+    if (mounted) {
+      setState(
+        () => notice = SelfNotice(l.adminAppConsentSaved(a.displayName)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -276,13 +293,19 @@ class _AppPageState extends State<AppPage> with AdminActionState<AppPage> {
           spacing: DsSpace.s8,
           runSpacing: DsSpace.s8,
           children: [
-            if (live && !denied.contains(_update))
+            if (live)
               OutlinedButton(
                 key: const ValueKey('appPage.update'),
                 onPressed: pick == null || busy
                     ? null
                     : () => _updateApp(a, pick),
                 child: Text(l.adminAppUpdate),
+              ),
+            if (live)
+              OutlinedButton(
+                key: const ValueKey('appPage.consent'),
+                onPressed: busy ? null : () => _changeConsent(a),
+                child: Text(l.adminAppChangeConsent),
               ),
             if (!denied.contains(_lifecycle)) ...[
               if (a.state == AppInstallState.active)
