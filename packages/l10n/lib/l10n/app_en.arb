@@ -17590,5 +17590,9 @@
   "teamReasonReadOnly": "the channel is read-only",
   "@teamReasonReadOnly": {
     "description": "Reason channel_read_only of a refused team operation."
+  },
+  "adminVersionReloaded": "Someone else changed this in the meantime. The page now shows the current state; make your change again.",
+  "@adminVersionReloaded": {
+    "description": "Notice of an administration page after a change answered 412 version_conflict: the page read the record again."
   }
 }

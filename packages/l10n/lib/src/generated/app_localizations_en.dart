@@ -11804,4 +11804,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get teamReasonReadOnly => 'the channel is read-only';
+
+  @override
+  String get adminVersionReloaded =>
+      'Someone else changed this in the meantime. The page now shows the current state; make your change again.';
 }

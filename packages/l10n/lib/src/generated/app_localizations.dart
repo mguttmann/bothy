@@ -18819,6 +18819,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'the channel is read-only'**
   String get teamReasonReadOnly;
+
+  /// Notice of an administration page after a change answered 412 version_conflict: the page read the record again.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone else changed this in the meantime. The page now shows the current state; make your change again.'**
+  String get adminVersionReloaded;
 }
 
 class _AppLocalizationsDelegate

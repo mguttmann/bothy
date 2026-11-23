@@ -11869,4 +11869,8 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get teamReasonReadOnly => 'der Kanal ist schreibgeschützt';
+
+  @override
+  String get adminVersionReloaded =>
+      'Jemand anderes hat das inzwischen geändert. Die Seite zeigt jetzt den aktuellen Stand; nimm deine Änderung erneut vor.';
 }

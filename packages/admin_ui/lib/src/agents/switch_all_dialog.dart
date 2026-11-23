@@ -52,6 +52,8 @@ class SwitchAllDialog extends StatefulWidget {
     required List<AgentRecord> agents,
   }) => showDialog<SwitchAllResult>(
     context: context,
+    // A tap beside the dialog must not close it while the switch runs (see "Cancel").
+    barrierDismissible: false,
     builder: (_) => SwitchAllDialog(repository: repository, agents: agents),
   );
 
@@ -229,90 +231,94 @@ class _SwitchAllDialogState extends State<SwitchAllDialog> {
     final colors = context.dsColors;
     final body = dsTextStyle(DsType.body).copyWith(color: colors.textSecondary);
     final mode = _mode;
-    return AlertDialog(
-      key: const ValueKey('switchAll.dialog'),
-      backgroundColor: colors.surfaceRaised,
-      title: Text(
-        l.adminSwitchAllTitle,
-        style: dsTextStyle(DsType.title).copyWith(color: colors.textPrimary),
-      ),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: DsLayout.overlayWidth),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Wrap(
-                spacing: DsSpace.s8,
-                children: [
-                  for (final m in const [
-                    AgentBillingMode.organization,
-                    AgentBillingMode.personal,
-                  ])
-                    ChoiceChip(
-                      key: ValueKey('switchAll.mode.${m.wire}'),
-                      label: Text(
-                        m == AgentBillingMode.personal
-                            ? l.billingPersonal
-                            : l.billingOrganization,
+    // Escape and the back action are refused while the switch runs, like "Cancel".
+    return PopScope(
+      canPop: !_busy,
+      child: AlertDialog(
+        key: const ValueKey('switchAll.dialog'),
+        backgroundColor: colors.surfaceRaised,
+        title: Text(
+          l.adminSwitchAllTitle,
+          style: dsTextStyle(DsType.title).copyWith(color: colors.textPrimary),
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: DsLayout.overlayWidth),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Wrap(
+                  spacing: DsSpace.s8,
+                  children: [
+                    for (final m in const [
+                      AgentBillingMode.organization,
+                      AgentBillingMode.personal,
+                    ])
+                      ChoiceChip(
+                        key: ValueKey('switchAll.mode.${m.wire}'),
+                        label: Text(
+                          m == AgentBillingMode.personal
+                              ? l.billingPersonal
+                              : l.billingOrganization,
+                        ),
+                        selected: mode == m,
+                        onSelected: _busy ? null : (_) => _pick(m),
                       ),
-                      selected: mode == m,
-                      onSelected: _busy ? null : (_) => _pick(m),
-                    ),
+                  ],
+                ),
+                if (mode == AgentBillingMode.organization) ...[
+                  const SizedBox(height: DsSpace.s12),
+                  Text(l.adminSwitchAllOrgBody, style: body),
                 ],
-              ),
-              if (mode == AgentBillingMode.organization) ...[
-                const SizedBox(height: DsSpace.s12),
-                Text(l.adminSwitchAllOrgBody, style: body),
+                if (mode == AgentBillingMode.personal) ...[
+                  const SizedBox(height: DsSpace.s12),
+                  Text(l.adminSwitchAllPersonalBody, style: body),
+                  const SizedBox(height: DsSpace.s8),
+                  // While the proposal loads, the step-up dialog of the audit read lies above;
+                  // the list appears once the proposal (or its absence) is known.
+                  if (_personalLoaded) ..._personal(l, colors),
+                ],
+                if (mode != null) ...[
+                  const SizedBox(height: DsSpace.s12),
+                  TextField(
+                    key: const ValueKey('switchAll.reason'),
+                    controller: _reason,
+                    enabled: !_busy,
+                    decoration: InputDecoration(labelText: l.adminReason),
+                  ),
+                ],
+                if (_failure case final text?) ...[
+                  const SizedBox(height: DsSpace.s12),
+                  DsBanner(
+                    key: const ValueKey('switchAll.failure'),
+                    tone: DsTone.danger,
+                    text: text,
+                    liveRegion: true,
+                  ),
+                ],
+                if (_conflicts.isNotEmpty && _names != null) ...[
+                  const SizedBox(height: DsSpace.s8),
+                  I1Explanation(conflicts: _conflicts, names: _names!),
+                ],
               ],
-              if (mode == AgentBillingMode.personal) ...[
-                const SizedBox(height: DsSpace.s12),
-                Text(l.adminSwitchAllPersonalBody, style: body),
-                const SizedBox(height: DsSpace.s8),
-                // While the proposal loads, the step-up dialog of the audit read lies above;
-                // the list appears once the proposal (or its absence) is known.
-                if (_personalLoaded) ..._personal(l, colors),
-              ],
-              if (mode != null) ...[
-                const SizedBox(height: DsSpace.s12),
-                TextField(
-                  key: const ValueKey('switchAll.reason'),
-                  controller: _reason,
-                  enabled: !_busy,
-                  decoration: InputDecoration(labelText: l.adminReason),
-                ),
-              ],
-              if (_failure case final text?) ...[
-                const SizedBox(height: DsSpace.s12),
-                DsBanner(
-                  key: const ValueKey('switchAll.failure'),
-                  tone: DsTone.danger,
-                  text: text,
-                  liveRegion: true,
-                ),
-              ],
-              if (_conflicts.isNotEmpty && _names != null) ...[
-                const SizedBox(height: DsSpace.s8),
-                I1Explanation(conflicts: _conflicts, names: _names!),
-              ],
-            ],
+            ),
           ),
         ),
+        actions: [
+          TextButton(
+            key: const ValueKey('switchAll.cancel'),
+            // Not while the switch runs: the list would miss a change the server made.
+            onPressed: _busy ? null : () => Navigator.of(context).pop(),
+            child: Text(l.selfCancel),
+          ),
+          FilledButton(
+            key: const ValueKey('switchAll.submit'),
+            onPressed: _canSubmit ? _submit : null,
+            child: Text(l.adminSwitchConfirm),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          key: const ValueKey('switchAll.cancel'),
-          // Not while the switch runs: the list would miss a change the server made.
-          onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: Text(l.selfCancel),
-        ),
-        FilledButton(
-          key: const ValueKey('switchAll.submit'),
-          onPressed: _canSubmit ? _submit : null,
-          child: Text(l.adminSwitchConfirm),
-        ),
-      ],
     );
   }
 

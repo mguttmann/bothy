@@ -173,7 +173,7 @@ class _HostDetailState extends State<HostDetail>
         purpose: l.stepUpPurposeUpdateHost(h.name),
       );
       return SelfNotice(l.hostAssigneeChanged(h.name));
-    });
+    }, reload: _load);
     if (changed case final host?) _changed(host);
   }
 
@@ -236,7 +236,9 @@ class _HostDetailState extends State<HostDetail>
       await PairingWizard.show(
         context,
         repository: widget.repository,
-        host: _host,
+        // The host read before the new code, when the read after it failed: the wizard then
+        // shows the code and reads the host again on "Next".
+        host: _host ?? h,
         code: code,
         reason: reason,
         clock: widget.clock,
@@ -260,7 +262,7 @@ class _HostDetailState extends State<HostDetail>
       return SelfNotice(
         l.hostStateChanged(h.name, hostStateLabel(l, changed!)),
       );
-    });
+    }, reload: _load);
     if (changed case final host?) _changed(host);
   }
 
@@ -430,6 +432,7 @@ class _HostDetailState extends State<HostDetail>
               host: h,
               people: _people,
               onChanged: _changed,
+              onReload: _load,
             ),
           ),
           _field(l.hostFieldServerHost, ServerHostSection(host: h)),
@@ -470,6 +473,7 @@ class _HostDetailState extends State<HostDetail>
               host: h,
               people: _people,
               onChanged: _changed,
+              onReload: _load,
             ),
           ),
           if (_sessions case final count?)

@@ -3116,5 +3116,6 @@
   "switcherNoTarget": "kann hier noch nicht geöffnet werden",
   "liveBoxSendAgainUnavailable": "Hier gibt es nichts erneut zu senden: Die Nachricht hat keinen Text oder ist nicht auf diesem Gerät.",
   "liveBoxSendAgainFailed": "Erneutes Senden fehlgeschlagen. Noch einmal versuchen.",
-  "commandStatusClose": "Schließen"
+  "commandStatusClose": "Schließen",
+  "adminVersionReloaded": "Jemand anderes hat das inzwischen geändert. Die Seite zeigt jetzt den aktuellen Stand; nimm deine Änderung erneut vor."
 }

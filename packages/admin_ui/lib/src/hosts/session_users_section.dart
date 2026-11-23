@@ -263,7 +263,11 @@ class SessionUsersSection extends StatefulWidget {
     required this.host,
     required this.people,
     required this.onChanged,
+    this.onReload,
   });
+
+  /// Reads the host again after a `412 version_conflict`, or null.
+  final Future<void> Function()? onReload;
 
   /// The administration's calls.
   final AdminRepository repository;
@@ -302,7 +306,7 @@ class _SessionUsersSectionState extends State<SessionUsersSection>
         return null;
       }
       return notice;
-    });
+    }, reload: widget.onReload);
     if (changed case final host?) widget.onChanged(host);
   }
 
