@@ -75,6 +75,47 @@ void main() {
     expect(h.server.violations, isEmpty);
   });
 
+  test(
+    'mark unread only moves the position back, as the server does',
+    () async {
+      final thread = h.seed.releaseNotes;
+      for (var i = 0; i < 3; i++) {
+        h.seed.post(h.seed.sam, thread, 'line $i');
+      }
+      final prefs = alex.api.getPreferencesApi();
+      final read = (await prefs.putReadState(
+        threadId: thread,
+        readStatePut: ReadStatePut((b) => b..lastReadSeq = 2),
+      )).data!;
+      final events = world.log.length;
+      // Above the current position: 400 validation_failed, nothing stored (domain.MarkUnread).
+      expect(
+        await status(
+          prefs.markThreadUnread(
+            threadId: thread,
+            ifMatch: '"${read.version}"',
+            readStatePut: ReadStatePut((b) => b..lastReadSeq = 3),
+          ),
+        ),
+        400,
+      );
+      expect(
+        () => world.markUnread(h.seed.alex.id, thread, -1, read.version),
+        throwsA(isA<FakeProblem>().having((p) => p.status, 'status', 400)),
+      );
+      // The current position: the current state, without an event and a new version.
+      final same = (await prefs.markThreadUnread(
+        threadId: thread,
+        ifMatch: '"${read.version}"',
+        readStatePut: ReadStatePut((b) => b..lastReadSeq = 2),
+      )).data!;
+      expect(same.lastReadSeq, 2);
+      expect(same.version, read.version);
+      expect(world.log, hasLength(events));
+      expect(h.server.violations, isEmpty);
+    },
+  );
+
   test('pins need manage and appear in the list and the events', () async {
     final m = h.seed.post(h.seed.sam, h.seed.releaseNotes, 'pin me');
     final id = m['id']! as String;

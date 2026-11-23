@@ -168,6 +168,9 @@ class _Control implements SessionControl {
 
   @override
   String? get syncEpoch => 'epoch-1';
+
+  @override
+  void reconnect({Duration? after}) {}
 }
 
 final class _Keys implements DatabaseKeySource {

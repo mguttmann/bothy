@@ -74,8 +74,16 @@ Future<void> withScenario(
 
 /// [ScenarioClient] over [SyncEngine].
 class EngineScenarioClient implements ScenarioClient {
-  /// Builds the client for Alex against [server].
-  EngineScenarioClient(this.server, {this.login = WorldSeed.alexLogin}) {
+  /// Builds the client for Alex against [server]; [overrides] change client values beyond
+  /// [fastConfig].
+  EngineScenarioClient(
+    this.server, {
+    this.login = WorldSeed.alexLogin,
+    Map<String, String> overrides = const {},
+  }) : config = AppConfig.defaults().withOverrides({
+         ...fastConfig,
+         ...overrides,
+       }) {
     final random = Random(7);
     auth = AuthSession(
       serverUrl: server.baseUri,
@@ -144,7 +152,7 @@ class EngineScenarioClient implements ScenarioClient {
   final String login;
 
   /// The client values.
-  final AppConfig config = AppConfig.defaults().withOverrides(fastConfig);
+  final AppConfig config;
 
   /// The local database.
   final LocalDatabase db = openInMemoryForTests();

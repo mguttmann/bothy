@@ -49,4 +49,10 @@ abstract interface class SessionControl {
   /// The `sync_epoch` of the current `hello` and `ready` or `resumed`, kept in memory only
   /// (04 7.5).
   String? get syncEpoch;
+
+  /// Closes the current connection from the client side and connects again after [after]
+  /// (null: the reconnect backoff of 04 6.5): the listener could not apply what the session
+  /// delivered, and the next session starts from the stored cursor. Does nothing when the
+  /// connection is gone already.
+  void reconnect({Duration? after});
 }

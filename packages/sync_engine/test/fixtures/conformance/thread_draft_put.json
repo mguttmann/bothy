@@ -1,0 +1,317 @@
+{
+  "rule": "thread_draft_put",
+  "summary": "putThreadDraft stores a draft with text and deletes it when the text is empty or only white space, with draft.deleted instead of draft.updated (04 section 14)",
+  "events": [
+    "draft.updated",
+    "draft.deleted"
+  ],
+  "event_fields": [
+    "/audience",
+    "/resource/kind",
+    "/resource/version",
+    "/scope/thread_id",
+    "/payload/draft/thread_id",
+    "/payload/draft/content_md",
+    "/payload/draft/version",
+    "/payload/thread_id",
+    "/payload/channel_id"
+  ],
+  "steps": [
+    {
+      "name": "an empty draft without a stored one stores nothing",
+      "as": "alex",
+      "method": "PUT",
+      "path": "/threads/{thread}/draft",
+      "body": {
+        "content_md": ""
+      },
+      "observe": {
+        "body": [
+          "/draft/thread_id",
+          "/draft/channel_id",
+          "/draft/content_md",
+          "/draft/file_ids",
+          "/draft/version",
+          "/overwrote_newer"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "/draft/channel_id": "{channel}",
+          "/draft/content_md": "",
+          "/draft/file_ids": [],
+          "/draft/thread_id": "{thread}",
+          "/draft/version": 1,
+          "/overwrote_newer": false
+        },
+        "events": []
+      }
+    },
+    {
+      "name": "alex saves a draft",
+      "as": "alex",
+      "method": "PUT",
+      "path": "/threads/{thread}/draft",
+      "body": {
+        "content_md": "Draft of a reply"
+      },
+      "observe": {
+        "body": [
+          "/draft/thread_id",
+          "/draft/channel_id",
+          "/draft/content_md",
+          "/draft/file_ids",
+          "/draft/version",
+          "/overwrote_newer"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "/draft/channel_id": "{channel}",
+          "/draft/content_md": "Draft of a reply",
+          "/draft/file_ids": [],
+          "/draft/thread_id": "{thread}",
+          "/draft/version": 1,
+          "/overwrote_newer": false
+        },
+        "events": [
+          {
+            "/audience": "self",
+            "/payload/draft/content_md": "Draft of a reply",
+            "/payload/draft/thread_id": "{thread}",
+            "/payload/draft/version": 1,
+            "/resource/kind": "draft",
+            "/resource/version": 1,
+            "/scope/thread_id": "{thread}",
+            "type": "draft.updated"
+          }
+        ]
+      }
+    },
+    {
+      "name": "alex changes the draft",
+      "as": "alex",
+      "method": "PUT",
+      "path": "/threads/{thread}/draft",
+      "body": {
+        "content_md": "Draft of a longer reply"
+      },
+      "observe": {
+        "body": [
+          "/draft/thread_id",
+          "/draft/channel_id",
+          "/draft/content_md",
+          "/draft/file_ids",
+          "/draft/version",
+          "/overwrote_newer"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "/draft/channel_id": "{channel}",
+          "/draft/content_md": "Draft of a longer reply",
+          "/draft/file_ids": [],
+          "/draft/thread_id": "{thread}",
+          "/draft/version": 2,
+          "/overwrote_newer": false
+        },
+        "events": [
+          {
+            "/audience": "self",
+            "/payload/draft/content_md": "Draft of a longer reply",
+            "/payload/draft/thread_id": "{thread}",
+            "/payload/draft/version": 2,
+            "/resource/kind": "draft",
+            "/resource/version": 2,
+            "/scope/thread_id": "{thread}",
+            "type": "draft.updated"
+          }
+        ]
+      }
+    },
+    {
+      "name": "the list of drafts shows it",
+      "as": "alex",
+      "method": "GET",
+      "path": "/me/drafts",
+      "observe": {
+        "body": [
+          "/items/0/thread_id",
+          "/items/0/content_md",
+          "/items/0/version",
+          "/items/1"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "/items/0/content_md": "Draft of a longer reply",
+          "/items/0/thread_id": "{thread}",
+          "/items/0/version": 2
+        },
+        "events": []
+      }
+    },
+    {
+      "name": "an empty draft deletes the stored one",
+      "as": "alex",
+      "method": "PUT",
+      "path": "/threads/{thread}/draft",
+      "body": {
+        "content_md": ""
+      },
+      "observe": {
+        "body": [
+          "/draft/thread_id",
+          "/draft/channel_id",
+          "/draft/content_md",
+          "/draft/file_ids",
+          "/draft/version",
+          "/overwrote_newer"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "/draft/channel_id": "{channel}",
+          "/draft/content_md": "",
+          "/draft/file_ids": [],
+          "/draft/thread_id": "{thread}",
+          "/draft/version": 3,
+          "/overwrote_newer": false
+        },
+        "events": [
+          {
+            "/audience": "self",
+            "/payload/channel_id": "{channel}",
+            "/payload/thread_id": "{thread}",
+            "/resource/kind": "draft",
+            "/scope/thread_id": "{thread}",
+            "type": "draft.deleted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "the list of drafts is empty",
+      "as": "alex",
+      "method": "GET",
+      "path": "/me/drafts",
+      "observe": {
+        "body": [
+          "/items"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "/items": []
+        },
+        "events": []
+      }
+    },
+    {
+      "name": "alex saves a draft again",
+      "as": "alex",
+      "method": "PUT",
+      "path": "/threads/{thread}/draft",
+      "body": {
+        "content_md": "Second draft"
+      },
+      "observe": {
+        "body": [
+          "/draft/thread_id",
+          "/draft/channel_id",
+          "/draft/content_md",
+          "/draft/file_ids",
+          "/draft/version",
+          "/overwrote_newer"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "/draft/channel_id": "{channel}",
+          "/draft/content_md": "Second draft",
+          "/draft/file_ids": [],
+          "/draft/thread_id": "{thread}",
+          "/draft/version": 1,
+          "/overwrote_newer": false
+        },
+        "events": [
+          {
+            "/audience": "self",
+            "/payload/draft/content_md": "Second draft",
+            "/payload/draft/thread_id": "{thread}",
+            "/payload/draft/version": 1,
+            "/resource/kind": "draft",
+            "/resource/version": 1,
+            "/scope/thread_id": "{thread}",
+            "type": "draft.updated"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a draft of white space deletes it too",
+      "as": "alex",
+      "method": "PUT",
+      "path": "/threads/{thread}/draft",
+      "body": {
+        "content_md": "  \n\t"
+      },
+      "observe": {
+        "body": [
+          "/draft/thread_id",
+          "/draft/channel_id",
+          "/draft/content_md",
+          "/draft/file_ids",
+          "/draft/version",
+          "/overwrote_newer"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "/draft/channel_id": "{channel}",
+          "/draft/content_md": "",
+          "/draft/file_ids": [],
+          "/draft/thread_id": "{thread}",
+          "/draft/version": 2,
+          "/overwrote_newer": false
+        },
+        "events": [
+          {
+            "/audience": "self",
+            "/payload/channel_id": "{channel}",
+            "/payload/thread_id": "{thread}",
+            "/resource/kind": "draft",
+            "/scope/thread_id": "{thread}",
+            "type": "draft.deleted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "the list of drafts is empty again",
+      "as": "alex",
+      "method": "GET",
+      "path": "/me/drafts",
+      "observe": {
+        "body": [
+          "/items"
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "/items": []
+        },
+        "events": []
+      }
+    }
+  ]
+}
