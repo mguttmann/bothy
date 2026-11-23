@@ -12,6 +12,7 @@ import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
 import 'package:dio/dio.dart';
 
+import 'request_keys.dart';
 import 'self_repository.dart';
 
 /// A level of a grant (07 2.2), or [none] where the API says `LevelOrNone`.
@@ -867,10 +868,14 @@ final class ApiAccessRepository implements AccessRepository {
   /// Creates the repository over `api` (the client of the signed-in session, so DPoP, refresh
   /// and the step-up interceptor apply); [newIdempotencyKey] returns a fresh UUIDv7.
   ApiAccessRepository(this._api, {required String Function() newIdempotencyKey})
-    : _newKey = newIdempotencyKey;
+    : _newKey = newIdempotencyKey,
+      _keys = RequestKeys(newIdempotencyKey);
 
   final ApiClient _api;
   final String Function() _newKey;
+
+  /// The keys of creating requests across repetitions after a lost answer.
+  final RequestKeys _keys;
 
   AccessApi get _access => _api.getAccessApi();
 
@@ -977,15 +982,19 @@ final class ApiAccessRepository implements AccessRepository {
     GrantRequest request, {
     required String purpose,
     I1Resolution? resolveI1,
-  }) => _call(
-    () async => _grant(
-      (await _access.createGrant(
-        grantCreate: _create(request, resolveI1: resolveI1),
-        idempotencyKey: _newKey(),
-        extra: _purpose(purpose),
+  }) => _call(() async {
+    final body = _create(request, resolveI1: resolveI1);
+    return _grant(
+      (await _keys.run(
+        'createGrant $body',
+        (key) => _access.createGrant(
+          grantCreate: body,
+          idempotencyKey: key,
+          extra: _purpose(purpose),
+        ),
       )).data!,
-    ),
-  );
+    );
+  });
 
   @override
   Future<List<AdminGrant>> grantsOn(AdminTarget target) => _call(() async {

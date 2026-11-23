@@ -184,7 +184,7 @@ Further rules checked by `make arch`:
 | Path | Content |
 |---|---|
 | `lib/admin_ui.dart` | the public library; every public symbol has a doc comment (`make lint`, `public_member_api_docs`) |
-| `lib/src/data/` | the repositories over the generated client: `self_repository.dart`, `admin_repository.dart` (the port of the whole administration) and the parts it delegates to, `access_repository.dart`, `agents_repository.dart`, `apps_repository.dart`, `hosts_repository.dart`, `instance_repository.dart`; the audit, import, statistics and status sources live in their feature folders (`audit_repository.dart`, `import_repository.dart`, `stats_source.dart`, `status_repository.dart` and `status_source.dart`) |
+| `lib/src/data/` | the repositories over the generated client: `self_repository.dart`, `admin_repository.dart` (the port of the whole administration) and the parts it delegates to, `access_repository.dart`, `agents_repository.dart`, `apps_repository.dart`, `hosts_repository.dart`, `instance_repository.dart`, and `request_keys.dart` (the `Idempotency-Key` of a creating request kept across a lost answer); the audit, import, statistics and status sources live in their feature folders (`audit_repository.dart`, `import_repository.dart`, `stats_source.dart`, `status_repository.dart` and `status_source.dart`) |
 | `lib/src/self/` | the device and session views and their dialogs |
 | `lib/src/shell/`, `lib/src/people/`, `lib/src/groups/`, `lib/src/devices/`, `lib/src/common/` | the administration of M4-26 |
 | `lib/src/audit/` | the audit log of M4-29 |
