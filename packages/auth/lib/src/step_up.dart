@@ -110,7 +110,7 @@ final class StepUpService {
         },
       );
     } on AuthException {
-      // The signer may say more itself, for example StepUpUnavailable for a lost key.
+      // The signer may say more itself.
       rethrow;
     } on Object {
       // The operating system's confirmation was refused or cancelled (the port promises this

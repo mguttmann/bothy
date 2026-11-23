@@ -8,7 +8,7 @@
 - The administration counts the waiting devices one pass at a time and only after a change on
   People or Devices, which keeps large instances within the read rate limit.
 - A cancelled Touch ID, Face ID or PIN confirmation of a step-up no longer reads as "No
-  connection"; an invalidated step-up key says that this device cannot confirm.
+  connection".
 - People and group lists drop the answer of an older search or filter, "Load more" asks once
   while its page loads, and the group filter offers the groups of every page.
 - "Extend" keeps the person or group and the target of the grant it replaces.

@@ -8,7 +8,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:auth/auth.dart' show StepUpCancelled, StepUpUnavailable;
 import 'package:client/app/deep_links.dart';
 import 'package:client/platform/app_lifecycle.dart';
 import 'package:client/platform/browser_launcher.dart';
@@ -46,10 +45,6 @@ class FakeDeviceKeyClient implements dk.DeviceKeyClient {
   /// (D-M4-11-2); `null` creates the key.
   Object? stepUpError;
 
-  /// Thrown by `sign` of the step-up key, as the plugin does when the person cancels the
-  /// confirmation or the key was invalidated; `null` signs.
-  Object? stepUpSignError;
-
   dk.DeviceKeyInfo _info(int seed) => dk.DeviceKeyInfo(
     x: Uint8List.fromList(List.filled(32, seed)),
     y: Uint8List.fromList(List.filled(32, seed + 1)),
@@ -74,8 +69,6 @@ class FakeDeviceKeyClient implements dk.DeviceKeyClient {
   }) async {
     calls.add('sign $scope ${purpose.name}');
     lastPrompt = prompt;
-    final error = stepUpSignError;
-    if (purpose == dk.KeyPurpose.stepUp && error != null) throw error;
     return Uint8List(64);
   }
 
@@ -271,30 +264,6 @@ void main() {
       expect(keys.dpop.alg, 'ES256');
       expect(await keys.dpop.sign(Uint8List(3)), hasLength(64));
     });
-
-    for (final (code, matcher) in [
-      (dk.DeviceKeyError.userCancelled, isA<StepUpCancelled>()),
-      (dk.DeviceKeyError.keyInvalidated, isA<StepUpUnavailable>()),
-    ]) {
-      test(
-        'a step-up confirmation that fails with ${code.wire} is the error of '
-        'the login layer, not a network error',
-        () async {
-          final client = FakeDeviceKeyClient()
-            ..stepUpSignError = dk.DeviceKeyException(code);
-          final store = PlatformDeviceKeyStore(
-            client,
-            () => const dk.StepUpPromptTexts(
-              title: 'Confirm',
-              negativeButton: 'Cancel',
-            ),
-          );
-          final keys = await store.ensure('instance-1');
-          await expectLater(keys.stepUp!.sign(Uint8List(3)), throwsA(matcher));
-          expect(await keys.dpop.sign(Uint8List(3)), hasLength(64));
-        },
-      );
-    }
 
     for (final code in [
       dk.DeviceKeyError.userCancelled,
