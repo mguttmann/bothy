@@ -424,13 +424,17 @@ Where the list is:
   `test_the_attempts_of_one_run_count_once_with_the_flakes_of_each`.
 
 Known class, the scenario waits of the Claude Code runner (`plugins/claude-code-runner/tests/scenarios`):
-a few scenarios ran out of their wait in CI. They did not run slowly: the runner process did not
-reach the expected point for the whole of `quality.test.patience`, while the same test passes in
-seconds on a workstation. A longer bound would not change such a run, so the bound stays. Every
-scenario wait goes through `World.until`, and a wait that runs out fails with the evidence the
-next occurrence needs: the end of every runner process log, the state of every runner process
-and the last Fake-Claude records (`World.diagnostics`, test `tests/scenarios/test_world_waits.py`).
-The cause of the hang is open until such a report names it.
+a few scenarios ran out of their wait in CI (`test_br_05_counter_check_aborts_turn`,
+`test_resume_same_reference_attempt`). The failed waits lasted the whole of
+`quality.test.patience`, so a longer bound would not have changed them, and the bound stays. Their
+errors carried no evidence of what the runner was doing, and the waits for a runner process
+(`Popen.wait`) blocked the event loop that the FakeServer of the test runs on. Every wait of a
+scenario now goes through `World.until`, and a runner process through `World.exited`, which polls
+through it; a wait that runs out fails with the end of every runner process log, the state of
+every runner process and the last Fake-Claude records (`World.diagnostics`). Tests:
+`tests/scenarios/test_world_waits.py`, which also fails on a new `Popen.wait` in a scenario. Not
+covered: the teardown of the world in `conftest.py` (stopping the runners and their processes). The
+cause of the long waits is open until such a report names it.
 
 ## Red runs
 

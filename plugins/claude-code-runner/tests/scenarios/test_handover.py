@@ -149,7 +149,7 @@ async def job_turn(world: World, **runner: Any) -> tuple[subprocess.Popen[bytes]
 async def hand_over(world: World, runner: subprocess.Popen[bytes]) -> int:
     """SIGTERM, then SIGKILL to the runner's whole group (as a service manager would)."""
     runner.send_signal(signal.SIGTERM)
-    code = await asyncio.to_thread(runner.wait, PATIENCE)
+    code = await world.exited(runner)
     with contextlib.suppress(ProcessLookupError, PermissionError):
         os.killpg(runner.pid, signal.SIGKILL)
     return code
@@ -359,7 +359,7 @@ async def test_a_wait_for_the_account_survives_the_handover(world: World) -> Non
 async def test_runner_killed_the_turn_is_adopted_with_full_rights(world: World) -> None:
     first, run_id, job = await job_turn(world, followup_grace="300ms")
     os.killpg(first.pid, signal.SIGKILL)  # a crash, not a handover
-    first.wait(PATIENCE)
+    await world.exited(first)
     await world.start(world.config(turn_handover=True, followup_grace="300ms"))
     message_id = await world.fake.deliver_followup(run_id, "Still there?", author="alex")
     await world.until(lambda: world.fake.followup_state(run_id, message_id) == "absorbed")
@@ -446,7 +446,7 @@ async def test_stop_turns_ends_every_turn_and_exits_zero(world: World) -> None:
         check=False,
     )
     assert command.returncode == 0, command.stderr
-    assert first.wait(PATIENCE) == 0
+    assert await world.exited(first) == 0
     assert group_gone(turn["pgid"])
     [finish] = finishes(world, run_id)
     assert (finish["state"], finish["reason"]) == ("cancelled", "adapter_stopped")
@@ -488,7 +488,7 @@ async def test_key_switched_off_with_a_handed_over_turn_refuses_the_start_until_
     starts = len(world.requests("startRun"))
 
     second = world.spawn()  # the key off
-    assert await asyncio.to_thread(second.wait, PATIENCE) == 1
+    assert await world.exited(second) == 1
     failed = [e for e in runner_log(world, 1) if e.get("event") == "start_failed"]
     assert [e.get("code") for e in failed] == ["turn_handover_records_left"]
     assert alive(turn["pid"])  # the turn is untouched

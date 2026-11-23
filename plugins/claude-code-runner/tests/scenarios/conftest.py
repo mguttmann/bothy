@@ -259,6 +259,15 @@ class World:
             await asyncio.sleep(0.02)
         raise AssertionError("condition not reached\n" + self.diagnostics())
 
+    async def exited(self, process: subprocess.Popen[bytes]) -> int:
+        """Wait until a runner process exited and return its exit code.
+
+        Polls through `until`, so the event loop (and the FakeServer on it) keeps running and a
+        process that does not exit fails with the evidence of `diagnostics`.
+        """
+        await self.until(lambda: process.poll() is not None)
+        return process.returncode
+
     def diagnostics(self, tail: int = 4000) -> str:
         """What the runner processes and Fake-Claude did: the end of every runner log, the
         state of every runner process and the last Fake-Claude records."""

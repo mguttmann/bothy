@@ -111,7 +111,7 @@ async def sigterm_and_watch(
         if not path.exists():
             assert group_gone(pgid), "the turn record went while the turn's group was alive"
         await asyncio.sleep(0.005)
-    return runner.wait(PATIENCE)
+    return await world.exited(runner)
 
 
 async def test_sigterm_stops_own_turn_and_finishes_it_cancelled(world: World) -> None:

@@ -231,7 +231,7 @@ async def test_handover_while_preparing_restarts_through_the_inbox(
     await world.until(lambda: record(world, run.run_id).get("phase") == "preparing")
     await world.until(lambda: len(world.calls("auth_status")) == 1)
     first.send_signal(signal.SIGTERM)
-    assert await asyncio.to_thread(first.wait, PATIENCE) == 0  # no turn was handed over
+    assert await world.exited(first) == 0  # no turn was handed over
     # The record the first runner left, as it wrote it: no session is stored before run.start.
     left = record(world, run.run_id)
     assert left.get("phase") == "preparing"
@@ -266,7 +266,7 @@ async def test_handover_while_waiting_for_the_thread_lock(world: World, logs: Lo
     try:
         await world.until(lambda: record(world, run.run_id).get("phase") == "waiting_lock")
         first.send_signal(signal.SIGTERM)
-        assert await asyncio.to_thread(first.wait, PATIENCE) == 0
+        assert await world.exited(first) == 0
     finally:
         os.close(holder)
     await world.start(world.config(turn_handover=True))
@@ -347,7 +347,7 @@ async def _crashed_before_go(world: World) -> UUID:
     first = spawn_crashing(world, "keeper_started", "first")
     await ready(world)
     run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
-    assert await asyncio.to_thread(first.wait, PATIENCE) == 9
+    assert await world.exited(first) == 9
     return run.run_id
 
 
@@ -400,7 +400,7 @@ async def test_a_record_without_a_named_pipe_is_adopted_as_before(world: World) 
     await world.until(lambda: len(world.calls("gate_wait")) == 1)
     await world.until(lambda: "pid" in record(world, run.run_id))
     first.send_signal(signal.SIGKILL)
-    first.wait(PATIENCE)
+    await world.exited(first)
     await world.start(world.config(turn_handover=True))
     world.release(gate)
     assert await world.ended(run.run_id) == "completed"
@@ -421,7 +421,7 @@ async def test_an_adopted_process_that_fills_its_context_is_compacted(world: Wor
     await world.until(lambda: len(world.calls("gate_wait")) == 1)
     await world.until(lambda: record(world, run.run_id).get("phase") == "process")
     first.send_signal(signal.SIGTERM)
-    assert await asyncio.to_thread(first.wait, PATIENCE) == 75
+    assert await world.exited(first) == 75
     await world.start(world.config(turn_handover=True))
     world.release(gate)
     assert await world.ended(run.run_id) == "completed"
@@ -449,7 +449,7 @@ async def test_an_adopted_second_context_full_ends_runtime_error(world: World) -
         )
     )
     first.send_signal(signal.SIGTERM)
-    assert await asyncio.to_thread(first.wait, PATIENCE) == 75
+    assert await world.exited(first) == 75
     await world.start(world.config(turn_handover=True))
     world.release(gate)
     assert await world.ended(run.run_id) == "failed"

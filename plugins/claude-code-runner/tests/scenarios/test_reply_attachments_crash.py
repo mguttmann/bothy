@@ -55,7 +55,7 @@ async def test_crash_during_upload_resumes_once(world: World, held: str, refused
     run = await world.fake.trigger("Send both", channel_id=world.forum_a)
     await gate.reached.wait()
     first.send_signal(signal.SIGKILL)
-    first.wait(PATIENCE)
+    await world.exited(first)
     gate.open()  # the held request is stored after the kill; its answer never arrived
     await world.start()
     assert await world.ended(run.run_id) == "completed"

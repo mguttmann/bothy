@@ -7,7 +7,9 @@ state of every runner process (docs/quality/gates.md, section "Flakes").
 
 from __future__ import annotations
 
+import re
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -29,3 +31,22 @@ async def test_a_wait_that_runs_out_names_the_runner_logs_and_fake_claude(world:
     assert "runner-0.log" in text
     assert f"process {process.pid}: exit 0" in text
     assert "Fake-Claude records" in text
+
+
+async def test_a_runner_process_ends_through_the_world_wait(world: World) -> None:
+    process = world.spawn_command([sys.executable, "-c", "raise SystemExit(3)"])
+    assert await world.exited(process) == 3
+
+
+def test_no_scenario_waits_on_a_process_beside_the_world_wait() -> None:
+    """``Popen.wait`` blocks the event loop of the FakeServer and fails without evidence; every
+    scenario waits for a runner process with ``World.exited`` instead (the teardown of the
+    world in conftest.py is the one exception)."""
+    blocking = re.compile(r"\.wait\(PATIENCE\)|to_thread\(\w+\.wait\b")
+    found = [
+        f"{path.name}:{number}"
+        for path in sorted(Path(__file__).parent.glob("test_*.py"))
+        for number, line in enumerate(path.read_text().splitlines(), 1)
+        if blocking.search(line) and "blocking.search" not in line
+    ]
+    assert found == []
