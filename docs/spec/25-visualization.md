@@ -295,7 +295,8 @@ box, [components.md](../design/components.md) section 2), current tool as a tool
 the backend policy, costs (mode `organization` as "Estimate", mode `personal` as "information
 only", addendum of 2026-11-01, FIX-cost-display) and a note "Approval waiting" when an approval
 card is open. A click on a card whose chat the server named opens the thread via deep link
-(console: "Open in the app"); a card without a chat is no button. Data: `stats.live`.
+(console: "Open in the app" with the thread ID and a copy action, because discovery names no link
+into the apps yet); a card without a chat is no button. Data: `stats.live`.
 
 A queued card says why it waits (addendum of 2026-11-04, F-WARTESCHLANGE-GRUND,
 [09-agents.md](09-agents.md) 5.2.1), never only "queued": "Waiting for a free slot (4 of 4 in
