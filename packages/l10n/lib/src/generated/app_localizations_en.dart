@@ -4284,8 +4284,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get consolePlaceholderPage =>
-      'This page comes with a later version of the console.';
+  String consoleDocumentTitle(String page, String console) {
+    return '$page - $console';
+  }
 
   @override
   String consoleSignedInAs(String name) {
@@ -8405,6 +8406,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get consoleTerminalOpen => 'Open terminal';
+
+  @override
+  String consoleTerminalLeaveHint(String keys) {
+    return '$keys moves the focus from the terminal to the buttons above it.';
+  }
 
   @override
   String get consoleTerminalBack => 'Back to host';

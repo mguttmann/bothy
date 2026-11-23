@@ -276,6 +276,84 @@ void main() {
     );
 
     testWidgets(
+      'a view the server ended before the browser clock did reads the session, not a step-up',
+      (tester) async {
+        // console-terminal-ui-10: the browser clock says ten minutes are left, the server has
+        // ended the view and refuses the next request with step_up_required.
+        var stored = true;
+        final b = signedIn(
+          session: () => adminSession(
+            viewAsEnds: stored
+                ? DateTime.now().add(const Duration(minutes: 10))
+                : null,
+          ),
+        );
+        var calls = 0;
+        b.server.routes['GET /api/v1/probe'] = (_) {
+          calls++;
+          if (calls == 1) {
+            stored = false;
+            return const Answer(401, {
+              'code': 'step_up_required',
+              'status': 401,
+            });
+          }
+          return const Answer(200, {});
+        };
+        final c = await pumpConsole(tester, b, location: '/people');
+        expect(banner, findsOneWidget);
+        int? status;
+        unawaited(
+          c.api.dio.get<Object?>('/probe').then((r) => status = r.statusCode),
+        );
+        await tester.pumpAndSettle();
+        expect(status, 200);
+        expect(calls, 2);
+        expect(
+          find.byKey(const ValueKey('consoleStepUp.dialog')),
+          findsNothing,
+        );
+        expect(b.server.to('POST', '/api/v1/auth/step-up/challenge'), isEmpty);
+        expect(banner, findsNothing);
+      },
+    );
+
+    testWidgets(
+      'a session that cannot be read after the view started shows the failure',
+      (tester) async {
+        // console-terminal-ui-4: the view is stored on the server, the session read after it
+        // gets no answer; the page says so instead of showing nothing.
+        var started = false;
+        final b = signedIn(session: () => adminSession());
+        final session = b.server.routes['GET /api/v1/console/session']!;
+        b.server.routes['GET /api/v1/console/session'] = (r) => started
+            ? const Answer(503, {'code': 'unavailable', 'status': 503})
+            : session(r);
+        final viewAs = b.server.routes['GET /api/v1/users/$samId/view-as']!;
+        b.server.routes['GET /api/v1/users/$samId/view-as'] = (r) {
+          started = true;
+          return viewAs(r);
+        };
+        await pumpConsole(tester, b, location: '/people');
+        final admin = ConsoleApp.adminOf(
+          tester.element(find.byType(Navigator).first),
+        );
+        unawaited(
+          admin.startViewAs(
+            const AdminPersonFixture().sam,
+            purpose: 'View as Sam',
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(admin.failure, isNotNull);
+        expect(
+          find.byKey(const ValueKey('console.viewAs.failed')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
       'starting from a person shows the structure and the spaces Sam does not see',
       (tester) async {
         var stored = false;

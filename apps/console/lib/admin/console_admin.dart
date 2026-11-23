@@ -9,6 +9,7 @@ import 'dart:math';
 
 import 'package:admin_ui/admin_ui.dart';
 import 'package:api_client/api_client.dart';
+import 'package:dio/dio.dart' show DioException;
 import 'package:domain/domain.dart'
     show AppConfig, AppConfigValues, Uuid7Generator;
 import 'package:flutter/foundation.dart';
@@ -105,6 +106,9 @@ class ConsoleAdmin extends ChangeNotifier {
   /// The current time.
   final DateTime Function() clock;
 
+  /// How often the profile and the instance view are read for one person when a read fails.
+  static const int maxProfileReads = 3;
+
   ViewAsResult? _snapshot;
   List<String> _notVisible = const [];
   String? _viewName;
@@ -113,6 +117,7 @@ class ConsoleAdmin extends ChangeNotifier {
   Object? _failure;
   String _timeZone = 'UTC';
   bool _meRead = false;
+  int _profileReads = 0;
   Uri? _grafanaEmbedUrl;
   String? _user;
 
@@ -179,7 +184,7 @@ class ConsoleAdmin extends ChangeNotifier {
       _notVisible = notVisibleSpaces(targets, snapshot);
       await controller.refreshSession();
     } on Object catch (e) {
-      _failure = e;
+      _failure = _failureOf(e);
     } finally {
       _starting = false;
       notifyListeners();
@@ -198,7 +203,7 @@ class ConsoleAdmin extends ChangeNotifier {
       _notVisible = const [];
       await controller.refreshSession();
     } on Object catch (e) {
-      _failure = e;
+      _failure = _failureOf(e);
     } finally {
       _ending = false;
       notifyListeners();
@@ -212,8 +217,18 @@ class ConsoleAdmin extends ChangeNotifier {
     _snapshot = null;
     _notVisible = const [];
     notifyListeners();
-    await controller.refreshSession(afterViewEnd: true);
+    try {
+      await controller.refreshSession(afterViewEnd: true);
+    } on Object {
+      // Without an answer the banner stays; the next request after the end reads the session
+      // again (the step-up adapter recognizes the ended view).
+    }
   }
+
+  /// An answer of the server or its absence in a call of this class is a failure the page
+  /// names (`adminFailure`), not a fault of the app.
+  static Object _failureOf(Object error) =>
+      error is DioException ? SelfActionFailed(ApiProblem.of(error)) : error;
 
   void _onController() {
     final user = controller.session?.userId;
@@ -227,10 +242,16 @@ class ConsoleAdmin extends ChangeNotifier {
       _failure = null;
       _timeZone = 'UTC';
       _meRead = false;
+      _profileReads = 0;
       _grafanaEmbedUrl = null;
     }
-    if (controller.state is ConsoleSignedIn && !_meRead) {
+    // A failed read is tried again at the next change of the console's state, at most
+    // [maxProfileReads] times per person.
+    if (controller.state is ConsoleSignedIn &&
+        !_meRead &&
+        _profileReads < maxProfileReads) {
       _meRead = true;
+      _profileReads++;
       _readMe();
       _readInstance();
     }
@@ -250,18 +271,22 @@ class ConsoleAdmin extends ChangeNotifier {
       }
     } on Object {
       // Without the instance view the console shows no Grafana page.
+      if (user == _user) _meRead = false;
     }
   }
 
   Future<void> _readMe() async {
+    final user = _user;
     try {
       final zone = (await controller.api.getMeApi().getMe()).data?.timeZone;
-      if (zone != null && zone.isNotEmpty) {
+      // A late answer for the person before a change of person sets nothing.
+      if (user == _user && zone != null && zone.isNotEmpty) {
         _timeZone = zone;
         notifyListeners();
       }
     } on Object {
       // The administration shows its times in UTC without the profile.
+      if (user == _user) _meRead = false;
     }
   }
 

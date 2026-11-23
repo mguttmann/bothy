@@ -173,7 +173,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
         sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check sonar-main-branch sonar-visibility sonar-new-code semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog contract-documents apple-strings catalog catalog-check linkcheck \
-        trivy-image portability portability-trial load-capacity console-e2e alert-e2e adapters-e2e linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
+        trivy-image portability portability-trial load-capacity console-e2e console-web-test alert-e2e adapters-e2e linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
         runners-check release-pins install-options tofu-check tofu-vm-test templates-check commitlint fragments-check changelog-preview \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf bench-search ops-check signal-check \
@@ -1061,6 +1061,12 @@ load-capacity: ## Capacity load test of PORTABILITY_TAG on the full stack; write
 
 console-e2e: ## SEC-T05: the console under its CSP in Chromium, Firefox and WebKit against the Compose smoke stack (E2E_SERVER_IMAGE, default the tag of make image; tools/console-e2e/README.md)
 	$(UVRUN) python tools/console-e2e/console_e2e.py
+
+# The browser adapters of the console (WebAuthn, sessionStorage, the Grafana iframe, IndexedDB
+# of the terminal pins) are `@TestOn('browser')`, so `make test` skips them on the VM; this runs
+# them in Chrome (CHROME_EXECUTABLE, else the browser Flutter finds). CI: job "test (apps)".
+console-web-test: ## The console's browser adapter tests in Chrome (apps/console/test/web)
+	cd apps/console && $(FLUTTER) test --platform chrome test/web
 
 alert-e2e: ## M7-20: the alert path end to end (Prometheus, Alertmanager, the channel Operations, external and heartbeat stubs) against the Compose smoke stack (E2E_SERVER_IMAGE, default the tag of make image; docs/observability/alerting.md 5)
 	$(UVRUN) python tools/observability/alert_e2e.py

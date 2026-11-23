@@ -2335,6 +2335,12 @@ Every client shows: session list per host with state, reattach, fingerprint of t
 host, badge of the LLM login ("Personal", "Organization", "None"), remaining time until the
 maximum duration.
 
+Build state: the web console shows only the session its tab opened (detach, reattach and end
+while the tab lives); it has no session list and no remaining time yet. A session that a reload
+or a closed tab leaves behind runs on detached until it ends on the host: at the logout of the
+console, when the console session ends, or after `terminal.detach_grace`; the apps list and end
+it in the meantime.
+
 Tab life cycle in the apps (desktop on macOS and Windows, phone screen M8; FIX-terminal-session-lifecycle,
 `D-TSL-4` to `D-TSL-6`): "Sessions" lists the person's sessions on the host that are not closed
 with name, start time, "connected" or "detached since" and "Reattach"; a tab whose session ended

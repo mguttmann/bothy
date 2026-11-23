@@ -11,11 +11,11 @@ import 'package:admin_ui/admin_ui.dart';
 import 'package:bothy_viz/bothy_viz.dart';
 import 'package:domain/domain.dart' show AppConfig, AppConfigValues;
 import 'package:flutter/material.dart';
-import 'package:l10n/l10n.dart';
 
 import '../admin/console_admin.dart';
 import '../platform/browser.dart';
 import '../session/console_controller.dart';
+import '../shell/thread_link.dart';
 import 'polling_live_source.dart';
 
 /// The [LiveScreen] of `admin_ui` with the console's transport: the live frame polled from
@@ -23,7 +23,7 @@ import 'polling_live_source.dart';
 /// over the cookie client ([ApiStatsQuerySource]), the names and the telemetry link of the
 /// administration's repository, and "Open in Grafana" in a new tab ([ExternalLinks], never an
 /// iframe). The console has no chat (ADR 0028): a run card shows "Open in the app" with the
-/// thread ID instead of opening it.
+/// thread ID and a copy action instead of opening it.
 class ConsoleLivePage extends StatefulWidget {
   /// Creates the page.
   const ConsoleLivePage({
@@ -77,12 +77,22 @@ class _ConsoleLivePageState extends State<ConsoleLivePage> {
     super.dispose();
   }
 
+  /// The console has no chat and discovery names no link into the apps (D-M6-02-7): a dialog
+  /// shows the thread ID with a copy action, so the person can find the thread in the app.
   void _openThread(String threadId) {
-    final l = AppLocalizations.of(context);
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(
-        key: const ValueKey('console.live.threadInApp'),
-        content: Text(l.consoleThreadInApp(threadId)),
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          key: const ValueKey('console.live.threadInApp'),
+          content: ThreadLink(threadId: threadId),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(MaterialLocalizations.of(context).closeButtonLabel),
+            ),
+          ],
+        ),
       ),
     );
   }

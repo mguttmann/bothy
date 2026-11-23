@@ -3,6 +3,7 @@
 import 'package:admin_ui/admin_ui.dart';
 import 'package:console/console.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:terminal_ui/terminal_ui.dart';
 
@@ -162,6 +163,82 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(_paneKey), findsNothing);
         expect(find.byType(HostDetail), findsOneWidget);
+      },
+    );
+
+    testWidgets('an ID that is no host ID opens nothing and leaves no view', (
+      tester,
+    ) async {
+      // console-terminal-ui-11: a typed path /hosts/<anything> left a controller behind.
+      final b = _signedIn();
+      await _pump(
+        tester,
+        b,
+        FakeSockets(),
+        FakePinDatabase(),
+        location: '/hosts/not-a-host',
+      );
+      final terminals = tester
+          .widget<ConsoleHostsPage>(find.byType(ConsoleHostsPage))
+          .terminals;
+      await terminals.open('not-a-host');
+      await tester.pumpAndSettle();
+      expect(terminals.of('not-a-host'), isNull);
+      expect(find.byKey(_paneKey), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'the leave keys move the focus from the terminal to its buttons',
+      (tester) async {
+        // a11y-2, WCAG 2.1.2: the terminal takes Tab, so a key with the platform modifier leaves.
+        final b = _signedIn();
+        await _pump(
+          tester,
+          b,
+          FakeSockets(),
+          FakePinDatabase(),
+          location: '/hosts/$buildHostId',
+        );
+        await tester.tap(find.byKey(_openKey));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Confirm with passkey or device key'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('consoleStepUp.passkey')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('console.terminal.leaveHint')),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Ctrl+Shift+F6'), findsOneWidget);
+        // Into the terminal: the screen takes the focus on a tap.
+        await tester.tap(find.byType(TerminalScreenView));
+        await tester.pump();
+        final inTerminal = FocusManager.instance.primaryFocus!.context!;
+        expect(
+          find.ancestor(
+            of: find.byWidget(inTerminal.widget),
+            matching: find.byType(TerminalScreenView),
+          ),
+          findsOneWidget,
+        );
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.f6);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+        await tester.pump();
+        // The first button that can act takes the focus: "End" while the stream connects.
+        final focused = FocusManager.instance.primaryFocus!.context!;
+        expect(
+          find.ancestor(
+            of: find.byWidget(focused.widget),
+            matching: find.byKey(const ValueKey('console.terminal.end')),
+          ),
+          findsOneWidget,
+        );
+        // The tap's double-tap timer runs out.
+        await tester.pump(const Duration(seconds: 1));
       },
     );
 

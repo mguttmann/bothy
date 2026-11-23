@@ -94,6 +94,26 @@ def test_branding_for_takes_the_identity_from_the_distribution(tmp_path: Path) -
         common.branding_for(bad, cfg, tmp_path / "d.yaml", "android")
 
 
+def test_branding_for_passes_the_crash_report_target(tmp_path: Path) -> None:
+    # crash_reports.target of distribution.yaml reaches the build as crash_dsn (the define
+    # CRASH_DSN of tool/branding_defines.dart); empty or absent sends none.
+    cfg: dict[str, Any] = {
+        "bundle_id": "org.acme.chat",
+        "android": {"package_name": "org.acme.chat", "update_url": "https://a.acme.test/p"},
+        "crash_reports": {"target": "https://key@crash.acme.test/1"},
+    }
+    out = common.branding_for(common.DEFAULT_BRANDING, cfg, tmp_path / "b.yaml", "android")
+    assert yaml.safe_load(out.read_text(encoding="utf-8"))["crash_dsn"] == (
+        "https://key@crash.acme.test/1"
+    )
+    cfg["crash_reports"]["target"] = ""
+    out = common.branding_for(common.DEFAULT_BRANDING, cfg, tmp_path / "c.yaml", "android")
+    assert "crash_dsn" not in yaml.safe_load(out.read_text(encoding="utf-8"))
+    del cfg["crash_reports"]
+    out = common.branding_for(common.DEFAULT_BRANDING, cfg, tmp_path / "d.yaml", "android")
+    assert "crash_dsn" not in yaml.safe_load(out.read_text(encoding="utf-8"))
+
+
 @pytest.mark.parametrize(
     ("platform", "want"),
     [

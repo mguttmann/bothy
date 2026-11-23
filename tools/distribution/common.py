@@ -235,8 +235,9 @@ def branding_for(branding: Path, cfg: dict[str, Any], out: Path, platform: str) 
     """Write the build branding of a release for `platform` to `out` and return it.
 
     The branding file keeps name, URL scheme and default server; the bundle identifier, the
-    Android application ID and the update path of the platform (`update_url`) come from the
-    distribution (R-RL-05: the publisher owns the identity).
+    Android application ID, the update path of the platform (`update_url`) and the target of
+    crash reports (`crash_reports.target` as `crash_dsn`, the define `CRASH_DSN`; empty sends
+    none) come from the distribution (R-RL-05: the publisher owns the identity).
 
     Raises:
         StepError: the branding file is missing or no mapping.
@@ -254,6 +255,11 @@ def branding_for(branding: Path, cfg: dict[str, Any], out: Path, platform: str) 
         doc["update_url"] = path
     else:
         doc.pop("update_url", None)
+    target = (cfg.get("crash_reports") or {}).get("target") or ""
+    if target:
+        doc["crash_dsn"] = target
+    else:
+        doc.pop("crash_dsn", None)
     out.write_text(yaml.safe_dump(doc, sort_keys=False), encoding="utf-8")
     return out
 

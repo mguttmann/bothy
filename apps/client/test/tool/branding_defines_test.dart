@@ -273,6 +273,19 @@ void main() {
     expect(BuildBranding.fromEnvironment.updateUrl, isEmpty);
   });
 
+  test('the crash report target of a release reaches the defines', () {
+    final b = tool.Branding.parse(
+      'app_name: A\nurl_scheme: a-b\nbundle_id: com.example.a\n'
+      'default_server: https://a.example.com\n'
+      'crash_dsn: https://key@crash.example.com/1\n',
+    );
+    expect(b.crashDsn, 'https://key@crash.example.com/1');
+    expect(
+      (jsonDecode(b.dartDefines()) as Map)['CRASH_DSN'],
+      'https://key@crash.example.com/1',
+    );
+  });
+
   test('a bad branding is refused with its reason', () {
     String? reason(String yaml) {
       try {
@@ -310,6 +323,10 @@ void main() {
     expect(
       reason('${ok}update_url: http://apps.example.com/a\n'),
       contains('update_url'),
+    );
+    expect(
+      reason('${ok}crash_dsn: http://key@crash.example.com/1\n'),
+      contains('crash_dsn'),
     );
     // The application ID is also the scheme of the OIDC redirect: lower-case letters and
     // digits per segment; a bundle identifier with a hyphen needs its own application_id.

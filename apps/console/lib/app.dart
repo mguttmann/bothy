@@ -15,6 +15,7 @@ import 'admin/console_route.dart';
 import 'admin/step_up_dialog.dart';
 import 'login/logged_out_view.dart';
 import 'login/login_view.dart';
+import 'login/notice_text.dart';
 import 'login/public_status_page.dart';
 import 'login/step_up_view.dart';
 import 'ops/grafana_page.dart';
@@ -58,10 +59,12 @@ class ConsoleApp extends StatefulWidget {
   final Locale? locale;
 
   /// The controller of the console that [context] belongs to.
+  @visibleForTesting
   static ConsoleController controllerOf(BuildContext context) =>
       context.findAncestorStateOfType<_ConsoleAppState>()!._controller;
 
   /// The administration state of the console that [context] belongs to.
+  @visibleForTesting
   static ConsoleAdmin adminOf(BuildContext context) =>
       context.findAncestorStateOfType<_ConsoleAppState>()!._admin;
 
@@ -204,6 +207,10 @@ class _ConsoleRouterDelegate extends RouterDelegate<Uri>
 
   final ConsoleTerminals terminals;
 
+  /// The page the person last chose in the navigation; its entry takes the focus on the new
+  /// page, so the keyboard stays where it was instead of on the first entry (WCAG 2.4.3).
+  ConsolePage? _chosen;
+
   late final Listenable _changes = Listenable.merge([controller, admin]);
 
   @override
@@ -307,8 +314,14 @@ class _ConsoleRouterDelegate extends RouterDelegate<Uri>
         productName: product,
         displayName: session.displayName,
         page: c.page!,
-        onOpen: c.open,
+        onOpen: (page) {
+          _chosen = page;
+          c.open(page);
+        },
+        focusSelected: c.page == _chosen,
         onLogout: c.logout,
+        notice: c.notice == null ? null : noticeText(l, c.notice!),
+        busy: c.busy,
         banner: ConsoleViewAsBanner(admin: admin),
         navigation: consoleNavigationFor(
           grafana: admin.grafanaEmbedUrl != null,

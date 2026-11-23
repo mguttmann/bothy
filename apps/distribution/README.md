@@ -48,7 +48,7 @@ uv run --project tools --locked python tools/distribution/appdist.py validate --
 | `android.update_url` | the page the Android app opens as its update path, as a rule its Play page (M7-13) |
 | `android.stable_track` | the closed test track of the channel stable in the Play Console; never `internal` (beta) or `production` (M7-13) |
 | `firebase.project_id` | the Firebase project of the instance's push (M7-13) |
-| `crash_reports.target` | optional target of crash reports; empty sends none |
+| `crash_reports.target` | optional `https` target of crash reports (for example a Sentry DSN); a release build gets it as the define `CRASH_DSN`, and the apps then offer `privacy.crash_reports` (off until the person turns it on); empty sends none |
 
 Secrets never go into this file. The release jobs read the file from the environment variable
 `DISTRIBUTION_YAML`, the build branding of the instance from `BRANDING_YAML`, and the signing material from the secrets of the environments
@@ -59,16 +59,21 @@ Sparkle's own check), Windows `windows.update_url` with `stable.appinstaller`.
 
 ## Keys
 
-Create the EdDSA key pair of Sparkle once and keep the private half only as the secret
-`SPARKLE_ED_PRIVATE_KEY`: Sparkle's `generate_keys` stores it in the login keychain of the person
-who runs it and `generate_keys -x <file>` exports it; any other way to make an ed25519 key works
-too, the secret is the base64 of the 32-byte seed. The public half (base64 of 32 bytes) is
-`apple.sparkle.public_ed_key`. A release checks that both belong together.
+Create the EdDSA key pair of Sparkle once and store the private half as the secret
+`SPARKLE_ED_PRIVATE_KEY` of the environment `release-apple`: Sparkle's `generate_keys` stores it
+in the login keychain of the person who runs it and `generate_keys -x <file>` exports it; any
+other way to make an ed25519 key works too, the secret is the base64 of the 32-byte seed. The
+public half (base64 of 32 bytes) is `apple.sparkle.public_ed_key`. A release checks that both
+belong together. A GitHub secret cannot be read back, and promotion runs on the publisher's
+machine (below): the publisher also keeps the private half in a safe place of their
+own (the login keychain or a password manager) and hands it to `--ed-key-file -` on standard
+input, never as a file in a repository.
 
 ## Channels and promotion
 
 A release publishes into the channel beta; the same build moves to stable without a rebuild
-(18 5 rule 1):
+(18 5 rule 1). Promotion is a manual step of the publisher on their own machine; no workflow
+runs it yet, so each command below needs its key in the local environment.
 
 - macOS: the appcast entry of a new build carries `sparkle:channel` beta. Promotion removes the
   element and signs the appcast again:

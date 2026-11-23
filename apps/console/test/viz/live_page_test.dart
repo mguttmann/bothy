@@ -11,6 +11,7 @@ import 'dart:io';
 import 'package:admin_ui/admin_ui.dart';
 import 'package:console/console.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../admin/admin_pages_test.dart' show browserWindow, signedIn;
@@ -71,11 +72,39 @@ void main() {
     const thread = '0192f4a0-7b1c-7000-8a00-000000000301';
     tester.widget<LiveScreen>(find.byType(LiveScreen)).onOpenThread(thread);
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(
       find.byKey(const ValueKey('console.live.threadInApp')),
       findsOneWidget,
     );
     expect(find.textContaining(thread), findsOneWidget);
+    // fn-console-stats-viz-4: the ID can be copied, so the person can find the thread in the app.
+    final copied = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied.add((call.arguments as Map)['text'] as String);
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await tester.tap(find.text('Copy thread ID'));
+    await tester.pump();
+    expect(copied, [thread]);
+    await tester.tap(find.text('Close'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      find.byKey(const ValueKey('console.live.threadInApp')),
+      findsNothing,
+    );
   });
 
   testWidgets('the run history reads listRunHistory and its message jump '
@@ -99,6 +128,7 @@ void main() {
       '0192f4a0-7b1c-7000-8a00-000000000501',
     );
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.textContaining(thread), findsOneWidget);
   });
 }
