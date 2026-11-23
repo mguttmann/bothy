@@ -31,6 +31,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -628,13 +629,8 @@ func TestVerificationKey_WaiterHonorsItsContext(t *testing.T) {
 		_, err := k.VerificationKey(ctx, instance.PurposeInvocation, "kid")
 		second <- err
 	}()
-	select {
-	case err := <-second:
-		if !errors.Is(err, context.DeadlineExceeded) {
-			t.Errorf("waiter: %v, want the deadline of its context", err)
-		}
-	case <-time.After(10 * time.Second):
-		t.Error("a waiter whose context ended still waits for the hanging reload")
+	if err := testkit.Receive(t, "the waiter whose context ended", second); !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("waiter: %v, want the deadline of its context", err)
 	}
 	close(h.release)
 	if err := <-first; errs.KindOf(err) != errs.KindNotFound {
