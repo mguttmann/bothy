@@ -6,12 +6,10 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:l10n/l10n.dart';
 
 import '../common/principal_tokens.dart';
 import '../data/admin_repository.dart';
 import '../data/agents_repository.dart';
-import '../secrets/once_only_secret.dart';
 
 /// The token section of the agent page: [PrincipalTokens] with the texts of an agent and the
 /// keys `agentTokens`, `tokens.create`, `token.<id>`, `token.name` and the secret `token.*`;
@@ -67,43 +65,4 @@ class AgentTokens extends StatelessWidget {
     timeZone: timeZone,
     clock: clock,
   );
-}
-
-/// The dialog that shows the secret of a new token once: the shared [OnceOnlySecret] with the
-/// texts of a token and the keys `token.*` (08 12; brief M6-08 Design note 4).
-///
-/// Example: `TokenSecretView.show(context, name: 'Deploy', secret: created.secret)`.
-class TokenSecretView extends StatelessWidget {
-  /// Creates the view of [secret] for the token [name].
-  const TokenSecretView({super.key, required this.name, required this.secret});
-
-  /// The name of the token.
-  final String name;
-
-  /// The secret.
-  final String secret;
-
-  /// Shows the view over [context] until "Close"; it cannot be dismissed by a tap outside, so
-  /// the secret is not lost before it was copied.
-  static Future<void> show(
-    BuildContext context, {
-    required String name,
-    required String secret,
-  }) => showDialog<void>(
-    context: context,
-    barrierDismissible: false,
-    builder: (_) => TokenSecretView(name: name, secret: secret),
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    return OnceOnlySecret(
-      title: l.adminTokenSecretTitle(name),
-      label: l.adminTokenSecretLabel,
-      notice: l.adminTokenSecretOnce,
-      secret: secret,
-      keyPrefix: 'token',
-    );
-  }
 }

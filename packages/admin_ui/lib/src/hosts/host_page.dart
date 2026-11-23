@@ -89,7 +89,16 @@ class _HostDetailState extends State<HostDetail>
   @override
   void didUpdateWidget(HostDetail old) {
     super.didUpdateWidget(old);
-    if (old.hostId != widget.hostId) _load();
+    if (old.hostId != widget.hostId) {
+      // Nothing of the former host stays: its record, its sessions and its audit history.
+      _host = null;
+      _error = null;
+      _sessions = null;
+      _former = const {};
+      _auditFailed = false;
+      _historyFor.clear();
+      _load();
+    }
   }
 
   Future<void> _load() async {
