@@ -63,11 +63,7 @@ class _BuiltinAgentsViewState extends State<BuiltinAgentsView> {
       }
     } on Object catch (e) {
       if (mounted) {
-        setState(
-          () => _failure = e is NewAgentFailure
-              ? e
-              : const NewAgentFailure.offline(),
-        );
+        setState(() => _failure = NewAgentFailure.of(e));
       }
     }
   }
