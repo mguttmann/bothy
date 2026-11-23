@@ -311,6 +311,9 @@ events with a log line, a channel that is no forum or a refused post turns the m
 that process. Texts are cut to `hermes_adapter.max_message_bytes`; attachments are not mirrored.
 Put the forum in a space whose readers may see what these sessions carry. Mirroring `cron`
 next to a cron job that delivers to `bothy` posts its output twice.
+Tested against the fake server only (`tests/unit/test_mirror.py`,
+`tests/fake_hermes/test_session_mirror.py`); the suite against a real server
+(`tests/realserver`) has no mirrored session yet.
 Design: [docs/design/hermes-session-mirror.md](../../docs/design/hermes-session-mirror.md).
 
 ## Configuration keys

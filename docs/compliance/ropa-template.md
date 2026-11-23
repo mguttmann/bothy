@@ -1,6 +1,7 @@
 # Template: record of processing activities (Art. 30 GDPR)
 
-Status: template M0. For instance operators. Not legal advice.
+Status: template, activities as built up to M8 and A1 (built-in agents). For instance operators.
+Not legal advice. Section 4 names what the template does not cover.
 
 How to use the template:
 
@@ -61,6 +62,13 @@ Every activity has the mandatory fields from Art. 30(1)(b) to (g) GDPR.
 | Third country | `<per LLM provider; region of processing>` |
 | Deletion periods | in the product as in V1; at the runtime and the LLM provider according to their periods `<enter>` |
 | Measures | M2, M3, M6; agent badge (20, section 8); the one-time AI notice of 20 section 8 is not built, enter your own notice `<...>` |
+
+An agent with `billing_mode = personal` runs on the subscription of its `credential_holder`
+([../spec/10-backend-policy.md](../spec/10-backend-policy.md) 1). Only that person triggers it, but
+the context of a run holds the messages of the other people of the thread, and they reach the
+LLM provider under the consumer terms of that subscription: no processing contract under Art. 28,
+the provider's own retention and training rules. Name such agents in the table below and assess
+this flow `<...>`.
 
 Table of agents (one row per agent):
 
@@ -155,7 +163,56 @@ Table of agents (one row per agent):
 | Deletion periods | `<backup period>`; deleted data does not come back on a restore (deletion journal, 20 section 4.6) |
 | Measures | M8 |
 
-`<further activities, for example apps and integrations: one activity or one recipient entry per installed app>`
+### V10 Terminal
+
+| Field | Information |
+|---|---|
+| Purpose | shell access of people to connected hosts through the server ([../spec/24-terminal.md](../spec/24-terminal.md)) |
+| Legal basis | `<...>` |
+| Data subjects | people with terminal access, host assignees, holders of an LLM login on a host |
+| Data categories | hosts (host name, assignee, operating system, public keys, names of the session users), assignments of session users, terminal sessions (who, when, from which device, on which host, profile, duration, bytes per direction, reason for the end); never terminal contents |
+| Recipients | owners; the person themselves; the host where the session runs `<host operator>` |
+| Deletion periods | class `security`: `retention.security_after_end` = `<value>` after the end of the host or session |
+| Measures | M1, M2, M5; no content recording (20, R-DP-07); terminal contents stay on the host and in the memory of the host service |
+
+### V11 Search assistant
+
+| Field | Information |
+|---|---|
+| Purpose | answer a search question in the person's own words with a short list of threads ([../spec/14-search.md](../spec/14-search.md) 4.10) |
+| Legal basis | `<...>` |
+| Data subjects | the asking person; authors and people named in the candidate threads |
+| Data categories | the question and earlier questions of the popup, per candidate thread the title, channel and space name, time and an excerpt; only candidates the assistant agent may read itself |
+| Recipients | the agent named in `search.assist.agent_id`, its runtime and LLM provider `<name, region>` |
+| Deletion periods | the server stores and logs no question, term or candidate; at the runtime and the LLM provider according to their periods `<enter>` |
+| Measures | M2 (the agent's own grants filter the candidates); off while `search.assist.agent_id` is empty |
+
+### V12 Built-in agents and the interview
+
+| Field | Information |
+|---|---|
+| Purpose | create and run agents defined in the product, with the interview of "New agent" ([../spec/26-builtin-agents.md](../spec/26-builtin-agents.md)) |
+| Legal basis | `<...>` |
+| Data subjects | owners who run the interview; people whose messages reach the agents (as in V2) |
+| Data categories | the answers of the interview and the draft of the definition; the definition (instructions, skills, settings) |
+| Recipients | the builder agent named in `agents.builder_agent_id`, its runtime and LLM provider `<name, region>`; the runner that hosts the agents |
+| Deletion periods | the server stores no interview; definitions with the agent `<...>` |
+| Measures | M2; the interview is for owners only and audited without its contents |
+
+### V13 Apps and integrations
+
+One activity or one recipient entry per installed app. The reference apps of the repository:
+
+| App | What leaves the instance | Recipient |
+|---|---|---|
+| `github-app` | the form of `/issue` (title, text) and, with mirroring, replies of people in a linked post as comments | GitHub `<account, region>` |
+| `jira-app` | the form of `/issue` and, with mirroring, replies of people in a linked post as comments | Atlassian Jira Cloud `<site, region>` |
+| `cost-reconciler` | nothing personal: it reads the provider's daily cost report with the admin key and submits amounts per run to the server | the LLM provider (read only) |
+
+Autonomous runs that wake an agent without a message (stage AR) are not built (AR-05); they add
+no activity yet.
+
+`<further activities>`
 
 ## 3. Technical and organizational measures (Art. 30(1)(g), Art. 32)
 
@@ -173,3 +230,12 @@ Prefilled with product measures; add the operations side (host, network, staff).
 | M8 | Availability and recovery | encrypted backups, deletion journal, restore drill | `<backup target, drill schedule>` |
 | M9 | Encryption of data at rest | tokens only as hashes, secrets only in the secret provider; local caches encrypted | `<disk encryption of the host>` |
 | M10 | Testing of effectiveness | tests per control, red team per milestone, external test before publication | `<...>` |
+
+## 4. Not covered by this template
+
+The template is the record of Art. 30. It holds no framework for a data protection impact
+assessment (Art. 35, which [../spec/20-privacy.md](../spec/20-privacy.md) section 9 names), no
+procedure for a personal data breach (Art. 33 and 34) and no procedure for the rights to
+restriction and to object (Art. 18 and 21; the product builds access, export, rectification and
+deletion, [../spec/20-privacy.md](../spec/20-privacy.md) section 5). The instance operator keeps
+these in their own documentation; templates for them are plan row V3-ops-3.

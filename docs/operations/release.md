@@ -24,8 +24,10 @@ gates and runners (team H); this procedure names only the steps that belong to t
       as soon as there is one.
 3. `CHANGELOG.md` of the component has a reviewed section for the new version; release notes
    with the required sections ([18-release.md](../spec/18-release.md) 4).
-4. For `server`: migrations fulfill M1 to M12 ([upgrade.md](upgrade.md) 4); the
-   N-1 compatibility test is green.
+4. For `server`: migrations fulfill M1 to M12 ([upgrade.md](upgrade.md) 4). The N-1
+   compatibility test is not built (plan row V3-37, [upgrade.md](upgrade.md) 4): until it exists
+   the review of M1 to M12 is the only check, and the rollback by one version of
+   [18-release.md](../spec/18-release.md) 10 is not tested.
 5. Minimum app versions and deprecation dates in the release notes match ADR 0014.
 
 ## 2. Server and product

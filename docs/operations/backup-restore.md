@@ -272,6 +272,11 @@ further full backup needs its space and that of its WAL in the volume `pgbackres
 
 ### 5.3 Logical dump (other host, other major version)
 
+Not rehearsed (plan row V3-ops-1): no test loads the dump (section 7 item 5), and the steps are
+known to be incomplete. The roles of the server, among them `bothy_owner` of step 2, are created
+only by `bothy migrate up --bootstrap`, which step 1 does not let run, and the steps name no
+restic command for the dump or the objects.
+
 1. Start an empty instance with the same `BOTHY_VERSION` and the secrets bundle, do not let `migrate`
    run.
 2. `pg_restore --clean --if-exists --no-owner --role=bothy_owner` from the restic snapshot.

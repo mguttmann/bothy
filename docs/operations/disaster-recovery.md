@@ -10,7 +10,7 @@ automatic restore test measures the duration on every run.
 |---|---|---|
 | Secrets bundle (age), current | offline with the owner, separate from the off-site target | test decryption after every change |
 | Private age key of the owner | second place (for example a password manager with emergency access) | yearly |
-| Off-site access for reading | in the secrets bundle | the restore test reads from there |
+| Off-site access for reading | in the secrets bundle | a restore by hand from repo2 and restic ([backup-restore.md](backup-restore.md) 7 item 5); the restore test reads only its sample of objects from there |
 | Configuration (`.env`, overlays, OpenTofu variables) | repository of the instance operator | on every change |
 | External alert path | Alertmanager `external-oncall`, watchdog | the watchdog heartbeat arrives |
 | This runbook offline | copy next to the secrets bundle | yearly |
@@ -33,6 +33,14 @@ automatic restore test measures the duration on every run.
 
 ### Case B: host lost
 
+Not rehearsed: no test and no recorded run restores a new host from repo2 and restic, and the
+steps below are known to be incomplete (plan row V3-ops-1). Known gaps: `backup` waits for a
+healthy `postgres` (`depends_on` in `compose.yaml`), so step 3 starts the database before the
+restore, while `pgbackrest restore` needs a stopped server; whether the restore finds the
+backups of repo2 while repo1 of the new host is empty is not checked; step 4 names no restic
+command, and `bothy-backupd` has no restore command. Rehearse the case on
+a throwaway host before you rely on it.
+
 1. Provision a new host (same OpenTofu module or a new VM), same `BOTHY_VERSION`.
 2. Decrypt the secrets bundle and place it in `infra/compose/secrets/`
    (`mkdir -p infra/compose/secrets && age --decrypt -i <key file> bundle.age | tar -x -C infra/compose/secrets/`;
@@ -40,8 +48,10 @@ automatic restore test measures the duration on every run.
    takes over the files instead of generating new ones. If the volume `secrets` already exists
    (for example after a first start that generated new values), `secrets-init` aborts on differing
    generated values; then
-   `docker compose run --rm secrets-init secrets init --source /input --target /run/bothy/secrets --owner server=65532:65532 --owner migrate=65532:65532 --adopt-source`
-   takes over the values of the bundle. When `secrets-init` reports the entries as `adopted`,
+   `docker compose run --rm secrets-init secrets init --source /input --target /run/bothy/secrets --owner server=65532:65532 --owner migrate=65532:65532 --owner postgres=999:999 --owner backup=999:999 --adopt-source`
+   takes over the values of the bundle (the four `--owner` options are those of `secrets-init` in
+   `compose.yaml`; without the last two, `postgres` and `backup` cannot read their pgBackRest TLS
+   keys). When `secrets-init` reports the entries as `adopted`,
    `updated` or `kept`, delete the decrypted generated files from `infra/compose/secrets/`: `_store` holds
    them, and the source needs only the supplied ones. The same token pepper and the same signing
    keys mean: tokens and devices stay valid. `secrets-init` skips the directory `signing-keys/` of

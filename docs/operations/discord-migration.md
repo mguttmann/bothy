@@ -147,7 +147,12 @@ Going back: nothing was written; delete `mapping.yaml`.
    people `trigger` (or `read`) on its space or channel, its operator agent `write` on the channel.
 
 Check: the source shows "Started", and its channel mapping lists every channel as "Not imported".
-Going back: "Cancel import" ends the source; the tool can no longer write into it.
+Going back: "Cancel import" ends the source for good; the tool can no longer write into it, and
+the source cannot be started again. What it imported stays, and nothing removes it except a
+restore of a backup from before the import. A new source of the same server knows nothing of
+the old one: its preflight stops on the names the old source created, and with `existing`
+targets it would copy every thread and message a second time. Pause the source instead when
+you may want to continue (plan row V3-ops-4).
 
 ## 6. Pilot
 
@@ -352,8 +357,9 @@ a completed source cannot be started again, and nothing mirrors Discord any more
 | exit `1`, `applyImportBatch: status 400 validation_failed` with a pointer, a code and an origin key | the server refused one item of a batch, and with it the batch; the text names the place in the request (`/items/<n>/data/<member>`), the rule (the code) and the item (`channel:<id>`, `thread:<id>`, `message:<id>`, `pin:<id>`). The run stops there every time until the cause is gone | `/data/topic too_long`: the server allows a shorter topic than the default of `channel.topic_max_chars`; raise the key for the import or shorten the topic in Discord. Any other rule: correct the named item in Discord, or report the text; it carries no content |
 | exit `1`, `setImportCursor: status 413` | the cursor of the source, which grows with every thread, is larger than `http.max_json_body_bytes` of the server; the stored cursor stays (22 8) | raise the key on the server, run again; the run resumes at the stored cursor |
 | exit `1`, rate limit | Discord asked for a wait longer than `import.discord.max_rate_wait` | wait, run again; the run resumes. Never use the token of an agent bot (RK-76) |
-| exit `1`, `import_not_running` | the source was paused, cancelled or completed while the run wrote | start a paused source again in the console if the pause was not intended; a cancelled source cannot be started again, add a new one |
+| exit `1`, `import_not_running` | the source was paused, cancelled or completed while the run wrote | start a paused source again in the console if the pause was not intended; a cancelled source cannot be started again; a new source copies everything again (section 5, "Going back") |
 | exit `1`, network or server error | the run stopped; nothing is lost | run again; it resumes at the cursor |
+| exit `1`, network error during attachment uploads, again and again, behind your own TLS proxy | the server answers a part of an upload with `429` before it reads the body, and a proxy that then closes the connection leaves the tool with a write error instead of the `429`; the tool waits on a `429` it receives, but does not repeat a call after a write error | run again; it resumes at the cursor and loses nothing. A large import can stop this way several times; each run gets further |
 | exit `3`, lease held | another writing run of this source holds the lease (section 7, "One writing run at a time") | a `--follow` mirror: stop it, run the command, start the mirror again; a scheduled round: run the command again; a run that crashed: wait `import.lease_stale_after` or use `--takeover` |
 | note `403: the channel is not readable` | the bot lacks `VIEW_CHANNEL` or `READ_MESSAGE_HISTORY` there; the run avoids the channel | fix the permission in Discord, run again |
 | note `403 on archived private threads` | the bot lacks `MANAGE_THREADS` | add it if private threads matter |

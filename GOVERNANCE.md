@@ -7,6 +7,9 @@
 - **Contributors** propose changes through pull requests (CONTRIBUTING.md). Anyone can
   become a maintainer after sustained, reviewed contributions, by agreement of the
   existing maintainers.
+- **The Bothy Authors**, the copyright holder named in `NOTICE`, are
+  everyone whose contributions are in the history of this repository; each keeps the copyright
+  of their own contributions and licenses them under Apache-2.0 (CONTRIBUTING.md).
 
 ## How decisions are made
 

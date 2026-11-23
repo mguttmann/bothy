@@ -42,8 +42,9 @@ Profile `tailscale` instead of `direct`:
    Whether userspace mode forwards incoming connections to loopback ports
    is not documented (https://tailscale.com/kb/1112/userspace-networking, retrieved
    2026-10-10, describes only outgoing traffic) [verified]; therefore no userspace mode.
-   Whether the Docker VM on the Mac provides `/dev/net/tun` is checked by the portability test
-   [assumed].
+   Whether the Docker VM on the Mac provides `/dev/net/tun` is not checked: the
+   portability test starts the sidecar without a login on its Linux runners
+   ([tests/portability/README.md](../../tests/portability/README.md) item 10).
 5. The internal listener (`:8081`) is reachable for services in the stack under the name `api` (alias
    on the sidecar). It trusts no headers (R-OP-01); over the tailnet, the
    policy from section 3 blocks it.
@@ -72,7 +73,9 @@ process of the host may be able to send headers to this port.
    ports are forbidden.
 3. Reason: a second barrier next to kernel networking. If a tailnet device reaches only 443, every
    request lands at `tailscale serve`, which removes incoming identity headers and sets them itself.
-   The portability test checks that nothing except 443 answers.
+   The portability test does not check the policy: it has no tailnet (no account) and checks
+   only that in the namespace of the sidecar the public listener listens on loopback and the
+   internal listener is the only one beyond it.
 4. Funnel stays off (`AllowFunnel: false`).
 
 ## 4. Identity
@@ -117,8 +120,11 @@ Rules the server enforces (08 section 2.4):
   of the session must carry the same login; a different or missing login revokes the session
   (`401 session_revoked`, reason `trusted_header_mismatch`).
 
-WebSocket via `tailscale serve`: not confirmed in the documentation [assumed]. The
-portability test with profile `tailscale` checks the gateway explicitly.
+WebSocket via `tailscale serve`: not confirmed in the documentation [assumed], and not tested:
+the portability test has no tailnet, so neither the gateway through `tailscale serve` nor the
+login through the header identity has run against a real tailnet. A first
+installation with this profile checks both by hand: log in through `Tailnet`, open a channel
+(the gateway connects) and see that only port 443 of the device answers.
 
 ## 5. Operations
 

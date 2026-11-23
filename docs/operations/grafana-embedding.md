@@ -127,6 +127,9 @@ BOTHY_CONSOLE__GRAFANA_EMBED_URL=https://grafana.example.com/d/ops/operations?or
 bothy config check
 ```
 
+In the Compose stack the variable goes into `compose.override.yaml`, not into `.env`
+([install-compose.md](install-compose.md) section 10).
+
 ## 4. Check the setup
 
 1. `bothy config check` prints `configuration ok` and no warning about

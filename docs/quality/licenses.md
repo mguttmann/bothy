@@ -107,7 +107,8 @@ lies next to the files (`fonts/<family>.OFL.txt`), `fonts/MANIFEST.json` records
 `"license": "OFL-1.1"` per file, and `packages/design_system/test/fonts_test.dart` fails when a
 font file has no license text, a manifest entry names another license, or a file differs from
 its recorded SHA-256. `NOTICE` names both fonts with their copyright (docs/DECISIONS.md
-D-M4-04-4).
+D-M4-04-4). ScanCode does see them: `quality/licenses/scancode-exceptions.txt` lists both font
+folders with this reason, so `make scancode` does not stop a release on their OFL-1.1 texts.
 
 The terminal font JetBrains Mono (OFL-1.1) follows the same rule under
 `packages/terminal_ui/fonts/`: its OFL text `JetBrainsMono.OFL.txt` lies next to the files,
