@@ -4,6 +4,8 @@
 // thread's agent was not ready (09 3.8; F-PROJEKT-BEREIT): the cause for everyone, the button
 // for the author, a refusal with its reason, and nothing for another failure.
 
+import 'dart:async';
+
 import 'package:client/sync/message_ops_app.dart';
 import 'package:client/thread/retrigger_notice.dart';
 import 'package:design_system/design_system.dart';
@@ -13,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:l10n/l10n.dart';
 
+import '../support/column_host.dart';
 import '../support/structure.dart';
 import '../support/thread_fixtures.dart';
 import '../support/widgets.dart';
@@ -151,5 +154,28 @@ void main() {
     expect(offersRetrigger(_failed('operator_cannot_serve_project')), isTrue);
     expect(offersRetrigger(_failed('operator_not_in_channel')), isTrue);
     expect(offersRetrigger(_failed('no_trigger_right')), isFalse);
+  });
+
+  // AUD-PKG-P02-client-b: offline the entry never gets an answer; the watch of it ends when
+  // the notice closes instead of lasting for good.
+  testWidgets('the watch of a waiting Trigger again ends with the notice', (
+    tester,
+  ) async {
+    final host = await ColumnHost.open(tester);
+    final closed = Completer<void>();
+    var ended = false;
+    final answer = await host.run(tester, () async {
+      final pending = outboxRetrigger(host.engine, until: closed.future)(
+        messageId(1),
+      );
+      unawaited(pending.whenComplete(() => ended = true));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      final endedOffline = ended;
+      closed.complete();
+      return (endedOffline, await pending);
+    });
+    expect(answer.$1, isFalse, reason: 'no answer while offline');
+    expect(answer.$2, isNull);
+    await host.dispose(tester);
   });
 }

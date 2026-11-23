@@ -607,4 +607,109 @@ void main() {
     expect(tester.takeException(), isNull);
     await host.dispose(tester);
   });
+
+  // AUD-PKG-P02-client-b: the reply of a restored draft keeps its reference and names its
+  // author, for a stored draft and for a draft write the server has not confirmed.
+  testWidgets('a stored draft with a reply shows the reply with its author', (
+    tester,
+  ) async {
+    final host = await open(tester);
+    await host.run(
+      tester,
+      () => host.db.personalDao.upsertDraftIfNewer(
+        Draft(
+          id: DraftId.parse(uuid(0xd8)),
+          threadId: threadId(1),
+          channelId: channelId(1),
+          contentMd: 'Agreed',
+          fileIds: const [],
+          version: const ResourceVersion(1),
+          replyToMessageId: messageId(3),
+        ),
+      ),
+    );
+    await host.settle(tester);
+    expect(tester.widget<TextField>(composerField).controller!.text, 'Agreed');
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('composer.reply')),
+        matching: find.text(en.composerReplyTo(dsIsolate('Sam'))),
+      ),
+      findsOneWidget,
+    );
+    await host.dispose(tester);
+  });
+
+  testWidgets('an unsent draft with a reply comes back with the reply', (
+    tester,
+  ) async {
+    final host = await open(tester);
+    await host.run(
+      tester,
+      () => host.engine.outbox.enqueue(
+        OutboxRequest(
+          kind: PersonalOps.putThreadDraft,
+          threadId: threadId(1),
+          payload: {
+            'content_md': 'Typed offline',
+            'reply_to_message_id': messageId(3).value,
+          },
+        ),
+      ),
+    );
+    await pumpThreadWith(tester, host, const {}, show: false);
+    await pumpThreadWith(tester, host, const {});
+    await host.settle(tester);
+    expect(
+      tester.widget<TextField>(composerField).controller!.text,
+      'Typed offline',
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('composer.reply')),
+        matching: find.text(en.composerReplyTo(dsIsolate('Sam'))),
+      ),
+      findsOneWidget,
+    );
+    await type(tester, host, 'Typed offline, more');
+    final draft = (await entries(
+      tester,
+      host,
+    )).lastWhere((e) => e.kind == PersonalOps.putThreadDraft);
+    expect(
+      decodePayload(draft.payload)['reply_to_message_id'],
+      messageId(3).value,
+    );
+    await host.dispose(tester);
+  });
+
+  // AUD-PKG-P02-client-b: a send that cannot be written to the outbox (the database closed,
+  // the disk full) gives the text back and says so instead of losing it.
+  testWidgets('a send the outbox refuses keeps the text and reports it', (
+    tester,
+  ) async {
+    final host = await open(tester);
+    final composer = ComposerController(
+      thread: null,
+      channel: channelId(1),
+      actions: null,
+      drafts: DraftWriter.forum(
+        outbox: host.engine.outbox,
+        dao: host.db.outboxDao,
+        forum: channelId(1),
+      ),
+      editing: DraftEditingRegistry(),
+      sendNew: (_, _) async => throw StateError('the database is closed'),
+    );
+    addTearDown(composer.dispose);
+    final sent = await host.run(tester, () async {
+      composer.text.text = 'Do not lose me';
+      composer.onChanged('Do not lose me');
+      return composer.send('Do not lose me');
+    });
+    expect(sent, isFalse);
+    expect(composer.text.text, 'Do not lose me');
+    expect(composer.error, isA<SendFailed>());
+    await host.dispose(tester);
+  });
 }

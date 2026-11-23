@@ -29,16 +29,14 @@ ProjectReadinessPort? projectReadinessPort(Ref ref) {
   return services == null ? null : ApiProjectReadinessPort(services.auth.api);
 }
 
-/// The channel [channelId], or null when it is not stored.
+/// The channel [channelId] on every change, null while it is not stored; a channel that is
+/// stored later (opened by a link before the sync brought it) shows when it arrives.
 @riverpod
-Future<Channel?> storedChannel(Ref ref, String channelId) async {
+Stream<Channel?> storedChannel(Ref ref, String channelId) {
   final db = ref.watch(localDatabaseProvider);
-  if (db == null) return null;
-  // A change of the channel arrives as a new list of its space; re-read on each.
-  final channel = await db.structureDao.channelById(ChannelId.parse(channelId));
-  final space = channel?.spaceId;
-  if (space != null) ref.watch(spaceChannelsProvider(space.value));
-  return channel;
+  return db == null
+      ? Stream.value(null)
+      : db.structureDao.watchChannel(ChannelId.parse(channelId));
 }
 
 /// The stored threads of [channelId].
@@ -100,11 +98,24 @@ Stream<bool> channelColumnHidden(Ref ref) {
 }
 
 /// Hides or shows the channel column next to an open thread on this device (M4-42); [db] is
-/// the local database of `localDatabaseProvider`.
+/// the local database of `localDatabaseProvider`. Read and write run in one transaction, so two
+/// quick presses cannot read the same value.
 Future<void> toggleChannelColumn(LocalDatabase? db) async {
   if (db == null) return;
-  final hidden = await db.forumViewDao.channelColumnHidden();
-  await db.forumViewDao.setChannelColumnHidden(hidden: !hidden);
+  await db.transaction(() async {
+    final hidden = await db.forumViewDao.channelColumnHidden();
+    await db.forumViewDao.setChannelColumnHidden(hidden: !hidden);
+  });
+}
+
+/// Pins or unpins the forum overview as its own column on this device (01 D15, 6.8 item 7);
+/// read and write run in one transaction, like [toggleChannelColumn].
+Future<void> toggleOverviewPinned(LocalDatabase? db) async {
+  if (db == null) return;
+  await db.transaction(() async {
+    final pinned = await db.forumViewDao.overviewPinned();
+    await db.forumViewDao.setOverviewPinned(pinned: !pinned);
+  });
 }
 
 /// The person's stored draft of a new post in [channelId] (03 `drafts` with `thread_id` NULL;

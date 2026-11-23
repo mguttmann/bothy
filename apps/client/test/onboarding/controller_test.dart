@@ -64,6 +64,20 @@ void main() {
     },
   );
 
+  test(
+    'the end of the account closes the version watch of its services',
+    () async {
+      final control = await connected(c, f);
+      await loginAsAlex(control);
+      final versions = state().services!.versions;
+      var done = false;
+      versions.changes.listen((_) {}, onDone: () => done = true);
+      await control.logout();
+      expect(state().step, OnboardingStep.signedOut);
+      await eventually('closed', () => done);
+    },
+  );
+
   test('a wrong password shows the failure text and stays on E2', () async {
     final control = await connected(c, f);
     await control.loginWithPassword(

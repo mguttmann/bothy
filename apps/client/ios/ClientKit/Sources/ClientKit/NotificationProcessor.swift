@@ -117,7 +117,7 @@ public struct NotificationEnvironment {
             keychain: config.map { SharedKeychain(store: KeychainSecretStore(accessGroup: $0.keychainGroup)) },
             counters: state.map { DisplayCounters(store: $0.store) },
             nonces: state.map { NonceCache(store: $0.store) },
-            transport: URLSessionTransport(),
+            transport: URLSessionTransport.shared,
             signer: { scope in manager.flatMap { DeviceKeyProofSigner(manager: $0, scope: scope) } },
             strings: PushStrings.fromBundle(bundle),
             now: Date.init,
@@ -277,7 +277,10 @@ public final class NotificationProcessor {
 /// Tests subclass it and override `makeEnvironment()`, so the same class the extension runs is
 /// the one under test.
 open class ClientKitNotificationService: UNNotificationServiceExtension {
+    /// The push in progress; `didReceive` writes it and `serviceExtensionTimeWillExpire` reads
+    /// it, which the system may call on different threads, so both go through `lock`.
     private var processor: NotificationProcessor?
+    private let lock = NSLock()
 
     /// The environment of one push; the extension's bundle by default.
     ///
@@ -291,7 +294,9 @@ open class ClientKitNotificationService: UNNotificationServiceExtension {
         _ request: UNNotificationRequest, withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void
     ) {
         let processor = NotificationProcessor(environment: makeEnvironment())
+        lock.lock()
         self.processor = processor
+        lock.unlock()
         let content = request.content
         Task {
             await processor.process(content, deliver: contentHandler)
@@ -300,6 +305,9 @@ open class ClientKitNotificationService: UNNotificationServiceExtension {
 
     /// The system ends the extension's time: deliver the placeholder now.
     override open func serviceExtensionTimeWillExpire() {
+        lock.lock()
+        let processor = self.processor
+        lock.unlock()
         processor?.expire()
     }
 }

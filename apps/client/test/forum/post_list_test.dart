@@ -114,6 +114,25 @@ void main() {
     await host.dispose(tester);
   });
 
+  // AUD-PKG-P02-client-b: a forum opened before the sync stored it (a link) shows its posts
+  // when it arrives instead of staying empty.
+  testWidgets('a forum stored after the list opened shows its posts', (
+    tester,
+  ) async {
+    final host = await ColumnHost.open(tester);
+    await host.pump(
+      tester,
+      PostListColumn(channelId: channelId(1)),
+      overrides: overrides,
+    );
+    expect(order(tester), isEmpty);
+    // The database streams of the widgets run in fake time: write there.
+    await host.run(tester, () => fill(host.db));
+    await host.settle(tester);
+    expect(order(tester), [1, 4, 2]);
+    await host.dispose(tester);
+  });
+
   testWidgets('filters Open, Waiting for me and Tags', (tester) async {
     final host = await pumpList(tester);
     await tester.tap(find.byKey(const ValueKey('postList.filter.waiting')));
@@ -166,11 +185,12 @@ void main() {
     // run until the write completes.
     final entry = await host.run(
       tester,
-      () => ThreadOps.enqueue(
-        host.engine,
-        forum: channelId(1),
-        title: 'Printer jam',
-        contentMd: 'It stops after one page.',
+      () => host.engine.outbox.enqueue(
+        ThreadOps.postRequest(
+          forum: channelId(1),
+          title: 'Printer jam',
+          contentMd: 'It stops after one page.',
+        ),
       ),
     );
     await host.run(
@@ -219,12 +239,13 @@ void main() {
     final host = await pumpList(tester);
     final entry = await host.run(
       tester,
-      () => ThreadOps.enqueue(
-        host.engine,
-        forum: channelId(1),
-        title: 'Release plan',
-        contentMd: 'Version 2.',
-        tagIds: [tagId(1)],
+      () => host.engine.outbox.enqueue(
+        ThreadOps.postRequest(
+          forum: channelId(1),
+          title: 'Release plan',
+          contentMd: 'Version 2.',
+          tagIds: [tagId(1)],
+        ),
       ),
     );
     await host.run(tester, () async {

@@ -111,8 +111,19 @@ public protocol HTTPTransport {
 
 /// `HTTPTransport` over an ephemeral `URLSession`: no cookies, no cache, no credential storage,
 /// and redirects are refused, so the preview token and the proof never travel to another URL.
+///
+/// A session keeps its delegate until it is invalidated, so a transport lives as long as the
+/// process: the extensions use the one `shared` transport, which also reuses its connections
+/// across the pushes a reused extension process handles.
 public final class URLSessionTransport: NSObject, HTTPTransport, URLSessionTaskDelegate {
-    private lazy var session: URLSession = {
+    /// The transport of the running extension, one per process.
+    public static let shared = URLSessionTransport()
+
+    private var session: URLSession!
+
+    /// Creates the transport and its session.
+    override public init() {
+        super.init()
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpCookieStorage = nil
         configuration.httpShouldSetCookies = false
@@ -120,12 +131,7 @@ public final class URLSessionTransport: NSObject, HTTPTransport, URLSessionTaskD
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.urlCredentialStorage = nil
         configuration.waitsForConnectivity = false
-        return URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
-    }()
-
-    /// Creates the transport.
-    override public init() {
-        super.init()
+        session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
     }
 
     /// See `HTTPTransport.send(_:)`.
@@ -155,7 +161,7 @@ public final class URLSessionTransport: NSObject, HTTPTransport, URLSessionTaskD
 /// Example:
 ///
 ///     let client = PreviewClient(credentials: stored, signer: signer, nonces: cache,
-///                                transport: URLSessionTransport(), timeout: timeout)
+///                                transport: URLSessionTransport.shared, timeout: timeout)
 ///     let result = await client.fetch(nid: nid, messageID: message, kind: "mention")
 public final class PreviewClient {
     private let credentials: PushCredentials

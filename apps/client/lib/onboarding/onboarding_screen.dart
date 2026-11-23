@@ -60,7 +60,7 @@ class OnboardingScreen extends ConsumerWidget {
           onConnect: control.connect,
           // 18 9 item 2: below the minimum version E1 offers the update path of the build.
           onUpdate: ports.updatePath.available
-              ? () => unawaited(openUpdatePath(ref))
+              ? () => unawaited(openUpdatePath(ref, context))
               : null,
           onReset: () => unawaited(control.resetLocalData()),
         );
@@ -72,6 +72,8 @@ class OnboardingScreen extends ConsumerWidget {
           passkeysAvailable: ports.passkeysFor(instance) != null,
           notice: state.notice,
           busy: state.busy,
+          waitingForBrowser: state.waitingForBrowser,
+          onCancelBrowser: control.cancelBrowserLogin,
           onProvider: control.loginWithProvider,
           onPasskey: control.loginWithPasskey,
           onPassword: control.loginWithPassword,

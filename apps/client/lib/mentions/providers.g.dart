@@ -87,7 +87,7 @@ final class MentionsControllerProvider
 }
 
 String _$mentionsControllerHash() =>
-    r'd8fb31a62ff6bb08371e59978f59be13a2b2b9de';
+    r'720867e7519f80f29db8586b690da91f040f0462';
 
 /// The pages of the mentions view; [loadMore] appends the next page.
 

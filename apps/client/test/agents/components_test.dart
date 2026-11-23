@@ -114,6 +114,29 @@ void main() {
     await host.dispose(tester);
   });
 
+  // AUD-PKG-P02-client-b: a restriction of a newer server is not guessed open; the card
+  // stays locked and says that it needs a newer app.
+  testWidgets('a restriction this app does not know locks the card', (
+    tester,
+  ) async {
+    final host = await openCard(
+      tester,
+      text: 'Deploy?',
+      components: [
+        button(
+          1,
+          cardId,
+          customId: 'allow',
+          label: 'Allow once',
+          restrictedTo: ComponentRestriction.unknown,
+        ),
+      ],
+    );
+    expect(find.text(en.componentsUnsupported), findsWidgets);
+    expect(tester.widget<DsButton>(buttonOf('allow')).onPressed, isNull);
+    await host.dispose(tester);
+  });
+
   testWidgets('used shows who chose what and when; expired shows "Expired"', (
     tester,
   ) async {

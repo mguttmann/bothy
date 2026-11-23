@@ -145,7 +145,7 @@ Source: [01-product.md](../spec/01-product.md), section 14.
 | `ui.composer_paste_file_chars` |  | App |  | `4000` | a paste of more characters becomes a text file attachment in the composer (6.13) |  |
 | `ui.composer_paste_file_lines` |  | App |  | `100` | a paste of more lines becomes a text file attachment in the composer (6.13) |  |
 | `ui.code_block_collapse_lines` |  | App |  | `20` | a code block higher than this many lines of code shows collapsed with a fade and "Show all" (6.14) |  |
-| `ui.autocomplete_debounce` |  | App |  | `150ms` | waiting time before `command.autocomplete` |  |
+| `ui.autocomplete_debounce` |  | App |  | `150ms` | waiting time before `command.autocomplete` and before the target search of the share sheet |  |
 | `ui.quick_switch_max_results` |  | App |  | `20` | hits in the quick switcher |  |
 | `ui.desktop_min_width_four_columns` |  | App |  | `1280px` | below this width the session column collapses |  |
 | `ui.desktop_min_width_three_columns` |  | App |  | `960px` | below this width a pinned forum overview returns to the content column (navigation stack) |  |
@@ -756,7 +756,7 @@ Source: [15-client-architecture.md](../spec/15-client-architecture.md), section 
 | `client.push.fetch_timeout` |  | App |  | `20s` | time that the NSE or the Android service uses to fetch the text |  |
 | `client.voice.bitrate` |  | App |  | `64kbps` | bitrate of the AAC recording |  |
 | `client.voice.limit_notice_lead` |  | App |  | `30s` | how long before `voice.max_duration` the phone shows and announces that a recording ends; the recording stops by itself shortly before the limit |  |
-| `client.metrics.flush_interval` |  | App |  | `5m` | the client sends metrics at most this often |  |
+| `client.metrics.flush_interval` |  | App |  | `5m` | the client sends metrics this often, and when it moves to the background, quits or logs out |  |
 | `client.status_poll_interval` |  | App |  | `30s` | the web console and the open status page of the apps read the status page again this often (the apps also follow `status.updated`, which a change of agent components alone does not send) |  |
 | `client.perf.cold_start_p95` |  | App |  | `2500ms` | target for cold start |  |
 | `client.perf.thread_open_p95` |  | App |  | `300ms` | target for opening a thread from the cache |  |

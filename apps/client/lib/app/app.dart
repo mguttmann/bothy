@@ -85,8 +85,11 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   /// The app lock of the signed-in phone, or null (brief M5-08).
   AppLockController? _lock;
 
-  /// Sends the collected app metrics before the app quits (brief M4-31 Design note 2).
+  /// Sends the collected app metrics when the app moves to the background, where iOS and
+  /// Android may end the process without asking, and before the app quits (brief M4-31 Design
+  /// note 2).
   late final AppLifecycleListener _exit = AppLifecycleListener(
+    onHide: () => unawaited(ref.read(metricsSenderProvider)?.flush()),
     onExitRequested: () async {
       await ref.read(metricsSenderProvider)?.flush();
       return AppExitResponse.exit;
@@ -98,6 +101,16 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     super.initState();
     _syncStep(rebuild: false);
     ref.listenManual(appLockProvider, (_, _) => _syncStep());
+    // A start that shows an onboarding screen waits for a person: no cold start (15 19).
+    ref.listenManual(
+      onboardingControllerProvider.select(
+        (s) => s.starting || s.step == OnboardingStep.signedIn,
+      ),
+      (_, straight) {
+        if (!straight) ref.read(appMeasurementsProvider).coldStartWaited();
+      },
+      fireImmediately: true,
+    );
     HardwareKeyboard.instance.addHandler(_onKey);
     SemanticsBinding.instance.addSemanticsActionListener(_onSemanticsAction);
     ServicesBinding.instance.accessibilityFocus.addListener(_onAssistiveUse);
@@ -118,7 +131,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
           return kept;
         },
       ),
-      routes: _formFactor.isPhone ? _phoneRoutes() : _desktopRoutes(),
+      routes: appRoutes(phone: _formFactor.isPhone),
       // Every unknown path: the shell parses it and shows "Not found or no access"
       // (01 6.7).
       errorPageBuilder: _formFactor.isPhone ? _phonePage : null,
@@ -169,109 +182,6 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     );
   }
 
-  /// The onboarding screens. E6 comes without a page transition: a transition would keep the
-  /// content it replaces painted while it runs (brief M5-08, fixed requirement 12).
-  GoRoute _onboardingRoute() => GoRoute(
-    path: '/onboarding/:step',
-    pageBuilder: (context, state) {
-      final location = parseLocation(state.uri);
-      final step = location is OnboardingLocation
-          ? location.step
-          : OnboardingStep.server;
-      final screen = OnboardingScreen(step: step);
-      return step == OnboardingStep.locked
-          ? NoTransitionPage<void>(key: state.pageKey, child: screen)
-          : MaterialPage<void>(key: state.pageKey, child: screen);
-    },
-  );
-
-  /// The phone: every content path, the settings and the administration show the one
-  /// [PhoneShell] under one page key, so the shell and its tabs stay while the path changes.
-  List<RouteBase> _phoneRoutes() => [
-    _onboardingRoute(),
-    for (final path in const [
-      '/',
-      '/s/:id',
-      '/c/:id',
-      '/c/:id/new',
-      '/t/:id',
-      '/running',
-      '/running/:id',
-      '/mentions',
-      '/search',
-      '/settings',
-      '/settings/:section',
-      '/status',
-      '/admin',
-      '/admin/:section',
-      '/admin/:section/:id',
-    ])
-      GoRoute(path: path, pageBuilder: _phonePage),
-    GoRoute(
-      path: '/share',
-      pageBuilder: (context, state) =>
-          const NoTransitionPage<void>(child: ShareRoute()),
-    ),
-  ];
-
-  Page<void> _phonePage(BuildContext context, GoRouterState state) =>
-      NoTransitionPage<void>(
-        key: const ValueKey('phone.shell.page'),
-        child: PhoneShell(
-          location: state.uri,
-          external: state.extra is ExternalLink,
-        ),
-      );
-
-  List<RouteBase> _desktopRoutes() => [
-    GoRoute(path: '/', builder: _shell),
-    _onboardingRoute(),
-    GoRoute(path: '/share', builder: (context, state) => const ShareRoute()),
-    GoRoute(
-      path: '/settings',
-      redirect: (context, state) => SettingsSection.appearance.path,
-    ),
-    GoRoute(
-      path: '/settings/:section',
-      builder: (context, state) =>
-          SettingsShell(segment: state.pathParameters['section']),
-    ),
-    // The status page of 16 12 (M7-21).
-    GoRoute(
-      path: '/status',
-      builder: (context, state) => const DesktopStatusRoute(),
-    ),
-    // The administration of admin_ui (brief M4-26): the shell parses the rest of the
-    // path and shows "Not found or no access" for a path without a screen.
-    for (final path in const [
-      '/admin',
-      '/admin/:section',
-      '/admin/:section/:id',
-    ])
-      GoRoute(
-        path: path,
-        builder: (context, state) => AdminRoute(uri: state.uri),
-      ),
-    for (final path in const [
-      '/s/:id',
-      '/c/:id',
-      // The new chat view of a forum (01 6.8 item 8, M4-41).
-      '/c/:id/new',
-      '/t/:id',
-      '/running',
-      '/running/:id',
-      '/mentions',
-      '/search',
-      // The terminal view of a host and the hint without one (01 D11, M4-36).
-      '/hosts',
-      '/hosts/:id',
-    ])
-      GoRoute(path: path, builder: _shell),
-  ];
-
-  Widget _shell(BuildContext context, GoRouterState state) =>
-      DesktopShell(location: state.uri);
-
   /// The person opened a history, the moment to ask for the notification permission: a thread
   /// under `/t/<id>`, and the main history a text channel shows under `/c/<id>` (the post list
   /// of a forum is none; docs/decisions.d/AUD-client-app-01.md).
@@ -306,6 +216,9 @@ class _ClientAppState extends ConsumerState<ClientApp> {
       _lock = lock?..addListener(_onLock);
     }
     _step.value = routeStep(ref.read(onboardingControllerProvider).step, lock);
+    if (_step.value == OnboardingStep.locked) {
+      ref.read(appMeasurementsProvider).coldStartWaited();
+    }
     if (changed && rebuild && mounted) setState(() {});
   }
 
@@ -457,3 +370,115 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     );
   }
 }
+
+/// The onboarding screens. E6 comes without a page transition: a transition would keep the
+/// content it replaces painted while it runs (brief M5-08, fixed requirement 12).
+GoRoute _onboardingRoute() => GoRoute(
+  path: '/onboarding/:step',
+  pageBuilder: (context, state) {
+    final location = parseLocation(state.uri);
+    final step = location is OnboardingLocation
+        ? location.step
+        : OnboardingStep.server;
+    final screen = OnboardingScreen(step: step);
+    return step == OnboardingStep.locked
+        ? NoTransitionPage<void>(key: state.pageKey, child: screen)
+        : MaterialPage<void>(key: state.pageKey, child: screen);
+  },
+);
+
+/// The routes of the app: the phone's or the desktop's. Every path [parseLocation] knows has a
+/// route here, so none goes through the error builder, which is only for unknown paths.
+@visibleForTesting
+List<RouteBase> appRoutes({required bool phone}) =>
+    phone ? _phoneRoutes() : _desktopRoutes();
+
+/// The phone: every content path, the settings and the administration show the one
+/// [PhoneShell] under one page key, so the shell and its tabs stay while the path changes.
+List<RouteBase> _phoneRoutes() => [
+  _onboardingRoute(),
+  for (final path in const [
+    '/',
+    '/s/:id',
+    '/c/:id',
+    '/c/:id/new',
+    '/t/:id',
+    '/running',
+    '/running/:id',
+    '/mentions',
+    // "Live" of the sidebar (D12).
+    '/live',
+    '/search',
+    // The terminal view of a host and the hint without one (01 D11, M4-36).
+    '/hosts',
+    '/hosts/:id',
+    '/settings',
+    '/settings/:section',
+    '/status',
+    '/admin',
+    '/admin/:section',
+    '/admin/:section/:id',
+  ])
+    GoRoute(path: path, pageBuilder: _phonePage),
+  GoRoute(
+    path: '/share',
+    pageBuilder: (context, state) =>
+        const NoTransitionPage<void>(child: ShareRoute()),
+  ),
+];
+
+Page<void> _phonePage(BuildContext context, GoRouterState state) =>
+    NoTransitionPage<void>(
+      key: const ValueKey('phone.shell.page'),
+      child: PhoneShell(
+        location: state.uri,
+        external: state.extra is ExternalLink,
+      ),
+    );
+
+List<RouteBase> _desktopRoutes() => [
+  GoRoute(path: '/', builder: _shell),
+  _onboardingRoute(),
+  GoRoute(path: '/share', builder: (context, state) => const ShareRoute()),
+  GoRoute(
+    path: '/settings',
+    redirect: (context, state) => SettingsSection.appearance.path,
+  ),
+  GoRoute(
+    path: '/settings/:section',
+    builder: (context, state) =>
+        SettingsShell(segment: state.pathParameters['section']),
+  ),
+  // The status page of 16 12 (M7-21).
+  GoRoute(
+    path: '/status',
+    builder: (context, state) => const DesktopStatusRoute(),
+  ),
+  // The administration of admin_ui (brief M4-26): the shell parses the rest of the
+  // path and shows "Not found or no access" for a path without a screen.
+  for (final path in const ['/admin', '/admin/:section', '/admin/:section/:id'])
+    GoRoute(
+      path: path,
+      builder: (context, state) => AdminRoute(uri: state.uri),
+    ),
+  for (final path in const [
+    '/s/:id',
+    '/c/:id',
+    // The new chat view of a forum (01 6.8 item 8, M4-41).
+    '/c/:id/new',
+    '/t/:id',
+    '/running',
+    '/running/:id',
+    '/mentions',
+    // "Live" of the sidebar (D12).
+    '/live',
+    '/search',
+    // The terminal view of a host and the hint without one (01 D11, M4-36).
+    '/hosts',
+    '/hosts/:id',
+  ])
+    GoRoute(path: path, builder: _shell),
+];
+
+Widget _shell(BuildContext context, GoRouterState state) =>
+    DesktopShell(location: state.uri);

@@ -12,6 +12,8 @@ cd "$(dirname "$0")/.."
 serial=${ANDROID_SERIAL:-$(adb devices | awk 'NR > 1 && $2 == "device" { print $1; exit }')}
 if [ -z "$serial" ]; then
   echo "SKIP client android-a11y-checks: no device in state 'device' (adb devices)"
+  # In CI the job provides the device: a SKIP there would be a green run that tested nothing.
+  [ -z "${CI:-}" ] || exit 1
   exit 0
 fi
 entry="$(pwd)/integration_test/a11y_audit/audit_app.dart"

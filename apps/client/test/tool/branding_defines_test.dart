@@ -83,7 +83,10 @@ void main() {
     );
     expect(
       File('${dir.path}/windows/runner/branding.h').readAsStringSync(),
-      contains('#define BRANDING_APP_NAME_W L"Team Chat"'),
+      allOf(
+        contains('#define BRANDING_APP_NAME_W L"Team Chat"'),
+        contains('#define BRANDING_APP_NAME "Team Chat"'),
+      ),
     );
     expect(
       tool.run(['--input', 'b.yaml', '--check'], appDir: dir, out: out),
@@ -96,6 +99,32 @@ void main() {
     );
     expect(tool.run(['--bogus'], appDir: dir, out: out), 2);
   });
+
+  test(
+    'the version resource of client.exe names the branding and the license',
+    () {
+      // No template values of `flutter create`: the name comes from branding.h, the copyright
+      // line names the license as the macOS runner does.
+      final rc = File('${app.path}/windows/runner/Runner.rc')
+          .readAsStringSync();
+      expect(rc, contains('#include "branding.h"'));
+      expect(rc, isNot(contains('com.example')));
+      expect(rc, isNot(contains('All rights reserved')));
+      for (final key in ['CompanyName', 'FileDescription', 'ProductName']) {
+        expect(
+          rc,
+          contains('VALUE "$key", BRANDING_APP_NAME "\\0"'),
+          reason: key,
+        );
+      }
+      expect(
+        rc,
+        contains(
+          'VALUE "LegalCopyright", "Licensed under the Apache License, Version 2.0." "\\0"',
+        ),
+      );
+    },
+  );
 
   test('the iOS build gets name, identifier, scheme, team and domain', () async {
     final dir = await Directory.systemTemp.createTemp('branding');

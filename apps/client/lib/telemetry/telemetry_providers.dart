@@ -66,8 +66,9 @@ ClientMetricsApi? clientMetricsApi(Ref ref) {
   return services == null ? null : RestClientMetricsApi(services.auth.api);
 }
 
-/// The sender of the signed-in session, started; null before the login. A sign-out disposes it,
-/// which sends what is left while the session still exists.
+/// The sender of the signed-in session, started; null before the login. A logout flushes it
+/// before the server logout; the disposal after a sign-out sends what is left only while the
+/// session still answers.
 @Riverpod(keepAlive: true)
 MetricsSender? metricsSender(Ref ref) {
   final api = ref.watch(clientMetricsApiProvider);

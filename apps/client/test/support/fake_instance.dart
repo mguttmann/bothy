@@ -6,7 +6,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:auth/auth.dart' show StepUpPrompt;
+import 'package:auth/auth.dart' show RedirectReceiver, StepUpPrompt;
 import 'package:client/app/bootstrap.dart';
 import 'package:client/app/branding.dart';
 import 'package:client/app/discovery.dart';
@@ -76,6 +76,7 @@ class FakeInstance {
     BuildBranding branding = testBranding,
     UpdateLauncher updateLauncher = const NoUpdateLauncher(),
     Duration serverLogoutLimit = AppPorts.defaultServerLogoutLimit,
+    RedirectReceiver Function()? redirects,
   }) async {
     final server = await FakeServer.start(
       options: const FakeServerOptions(
@@ -103,6 +104,7 @@ class FakeInstance {
       branding: branding,
       updateLauncher: updateLauncher,
       serverLogoutLimit: serverLogoutLimit,
+      redirects: redirects,
     );
   }
 
@@ -135,6 +137,7 @@ class FakeInstance {
     BuildBranding branding = testBranding,
     UpdateLauncher updateLauncher = const NoUpdateLauncher(),
     Duration serverLogoutLimit = AppPorts.defaultServerLogoutLimit,
+    RedirectReceiver Function()? redirects,
   }) async {
     final root = await Directory.systemTemp.createTemp('client-flow');
     final keys = SoftwareKeyStore();
@@ -166,6 +169,7 @@ class FakeInstance {
       branding: branding,
       updateLauncher: updateLauncher,
       serverLogoutLimit: serverLogoutLimit,
+      redirects: redirects,
     );
     return FakeInstance._(server, seed, root, ports, keys, secure);
   }

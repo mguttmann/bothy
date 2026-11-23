@@ -1235,7 +1235,9 @@ the TestFlight or App Store page on iOS, the Play page on Android, `stable.appin
 Windows, and on macOS Sparkle's own update check over the channel `bothy/updater` with the
 download address as the fallback of a build without Sparkle. E1 "App too old", "Update required"
 after `4007` and the notice below `client.recommended_version.<platform>` offer it as "Get the
-update"; the notice can be dismissed once per recommended version.
+update"; the notice can be dismissed once per recommended version. When nothing opens (a macOS
+build whose runner answers that it carries no Sparkle and that has no download address), a dialog
+says that the app cannot open the update itself and where to get the new version.
 
 ## 16. Crash reports
 
@@ -1270,9 +1272,11 @@ directly to a Collector on the internet.
 | Reconnects by close code, depth of the outbox | `client.reconnects`, `client.outbox.depth` |
 | Push until display (NSE or Android service), placeholder instead of text | `client.push_display.duration`, `client.push.placeholder` |
 
-No content, no IDs of threads, channels or people; attributes only platform, app version,
-density, theme. The list is closed; the server discards entries with another name or
-an unsuitable `kind` one by one and accepts the rest of the batch (`202`). Sending at most every `client.metrics.flush_interval`, can be turned off
+A cold start that showed a login or the app lock before the sidebar, and the opening of a thread
+that had no messages in the cache or was left before they showed, are not reported: they would
+measure the wait for a person or for the network. No content, no IDs of threads, channels or
+people; attributes only platform, app version, density, theme. The list is closed; the server discards entries with another name or
+an unsuitable `kind` one by one and accepts the rest of the batch (`202`). Sending every `client.metrics.flush_interval`, and once more when the app moves to the background, quits or logs out (before the server logout), can be turned off
 (`privacy.client_metrics`). Endpoint `POST /api/v1/client-metrics` with the action
 `client_metrics.submit` (05; [ADR 0057](../adr/0057-client-telemetry-through-a-server-endpoint.md)).
 Histograms arrive pre-aggregated with the bounds of [signals.md](../observability/signals.md) 4.7;
@@ -1397,7 +1401,7 @@ it runs on and marks in its summary whether that is a reference device of sectio
 | `client.push.fetch_timeout` | `20s` | time that the NSE or the Android service uses to fetch the text |
 | `client.voice.bitrate` | `64kbps` | bitrate of the AAC recording |
 | `client.voice.limit_notice_lead` | `30s` | how long before `voice.max_duration` the phone shows and announces that a recording ends; the recording stops by itself shortly before the limit |
-| `client.metrics.flush_interval` | `5m` | the client sends metrics at most this often |
+| `client.metrics.flush_interval` | `5m` | the client sends metrics this often, and when it moves to the background, quits or logs out |
 | `client.status_poll_interval` | `30s` | the web console and the open status page of the apps read the status page again this often (the apps also follow `status.updated`, which a change of agent components alone does not send) |
 | `client.perf.cold_start_p95` | `2500ms` | target for cold start |
 | `client.perf.thread_open_p95` | `300ms` | target for opening a thread from the cache |

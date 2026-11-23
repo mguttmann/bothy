@@ -8,6 +8,7 @@
 import 'dart:async';
 
 import 'package:client/sync/search_index_feed.dart';
+import 'package:dio/dio.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_store/local_store.dart';
@@ -47,6 +48,9 @@ final class FakeTranscripts {
   /// Files whose next request fails once.
   final Set<FileId> failOnce = {};
 
+  /// Files the server refuses with this HTTP status on every request.
+  final Map<FileId, int> refuse = {};
+
   /// When set, every request waits for it.
   Completer<void>? gate;
 
@@ -61,6 +65,18 @@ final class FakeTranscripts {
     _requests.add(file);
     await gate?.future;
     if (failOnce.remove(file)) throw StateError('offline');
+    final status = refuse[file];
+    if (status != null) {
+      final options = RequestOptions(path: '/files/${file.value}/transcript');
+      throw DioException(
+        requestOptions: options,
+        type: DioExceptionType.badResponse,
+        response: Response<Object?>(
+          requestOptions: options,
+          statusCode: status,
+        ),
+      );
+    }
     return texts[file];
   }
 }
@@ -162,6 +178,26 @@ void main() {
     await indexed(voice(1));
     expect(transcripts.attempts, {voice(1).id: 2});
   });
+
+  test(
+    'a transcript the server refuses for good is fetched once per run',
+    () async {
+      // Every change of the watched tables fetched it again (AUD-PKG-P02-client-b, #1284).
+      transcripts.refuse[voice(1).id] = 404;
+      transcripts.texts[voice(2).id] = 'Sam booked the venue';
+      await attach(voice(1));
+      feed.start();
+      await transcripts.requests.firstWhere((f) => f == voice(1).id);
+      for (var seq = 2; seq <= 4; seq++) {
+        await db.messagesDao.upsertIfNewer(msg(seq, text: 'Message $seq'));
+        await pumpEventQueue();
+      }
+      // Voice 2 comes after voice 1 in a pass, so its row proves the passes are over.
+      await attach(voice(2), c: 2, seq: 5);
+      await indexed(voice(2));
+      expect(transcripts.attempts, {voice(1).id: 1, voice(2).id: 1});
+    },
+  );
 
   test('a transcript without text is fetched once', () async {
     await attach(voice(1));

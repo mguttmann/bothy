@@ -80,7 +80,8 @@ Widget newChat(Channel forum, {String? entry}) => ProviderScope(
       (ref) => Stream.value({robin: 'Robin'}),
     ),
     instanceLimitsProvider.overrideWith((ref) => Stream.value(null)),
-    storedChannelProvider(forum.id.value).overrideWith((ref) async => forum),
+    storedChannelProvider(forum.id.value)
+        .overrideWith((ref) => Stream.value(forum)),
     forumTagsProvider(forum.id.value)
         .overrideWith((ref) => Stream.value(forum == server ? serverTags : [])),
     channelDraftProvider(forum.id.value).overrideWith(

@@ -1809,6 +1809,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get updateDismiss => 'Ausblenden';
 
   @override
+  String get updateOpenFailed =>
+      'Diese App kann das Update nicht selbst öffnen. Installiere die neue Version dort, wo du die App herhast.';
+
+  @override
+  String get updateOpenFailedClose => 'Schließen';
+
+  @override
   String get shellStepUpTitle => 'Bestätige, dass du es bist';
 
   @override
@@ -4182,6 +4189,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get outboxCopy => 'Kopieren';
+
+  @override
+  String get composerSendFailed =>
+      'Die Nachricht konnte auf diesem Gerät nicht gespeichert werden. Sie steht wieder im Feld; versuche es noch einmal.';
 
   @override
   String composerTooLong(int limit) {

@@ -75,12 +75,32 @@ public final class KeychainSecretStore: SecretStore {
     }
 
     /// See `SecretStore.write(_:service:account:)`.
+    ///
+    /// Updates the item in place and adds it only when there is none, so a reader in another
+    /// process (the app, an extension) never sees the item missing, and a failed write keeps the
+    /// old value instead of losing it.
     public func write(_ value: Data, service: String, account: String) throws {
-        try delete(service: service, account: account)
-        let status = SecItemAdd(
-            Self.addAttributes(value: value, service: service, account: account, accessGroup: accessGroup) as CFDictionary,
-            nil)
+        let base = Self.base(service: service, account: account, accessGroup: accessGroup)
+        let attributes = Self.addAttributes(value: value, service: service, account: account, accessGroup: accessGroup)
+        let status = Self.upsert(
+            update: { SecItemUpdate(base as CFDictionary, [kSecValueData as String: value] as CFDictionary) },
+            add: { SecItemAdd(attributes as CFDictionary, nil) })
         guard status == errSecSuccess else { throw SecretStoreError(status: status) }
+    }
+
+    /// Writes an item without a moment in which it is missing: updates it, adds it when it does
+    /// not exist, and updates again when another process added it in between.
+    ///
+    /// - Parameters:
+    ///   - update: `SecItemUpdate` of the value.
+    ///   - add: `SecItemAdd` of the whole item.
+    /// - Returns: the status of the last call.
+    static func upsert(update: () -> OSStatus, add: () -> OSStatus) -> OSStatus {
+        let updated = update()
+        guard updated == errSecItemNotFound else { return updated }
+        let added = add()
+        guard added == errSecDuplicateItem else { return added }
+        return update()
     }
 
     /// See `SecretStore.read(service:account:)`.

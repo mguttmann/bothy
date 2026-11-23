@@ -1690,7 +1690,9 @@ a second interaction.
   "Information only".
 - **Destructive actions** (delete a message, a space, a channel or a chat (6.18), revoke a grant,
   revoke a device) ask for confirmation once; administration actions with step-up ask for the
-  confirmation of the device.
+  confirmation of the device. "Log out" in the apps (the foot of the desktop sidebar and the
+  phone's Me tab) asks once as well: it deletes the data of the device and its device keys, and
+  the dialog names the number of changes that still wait to be sent and are lost.
 - **Move:** The dialog shows only channels with the same operator; the thread ID stays.
 - **Each device navigates on its own** (addendum of 2026-10-29, R-PR-24). What a device shows
   is its own: the route (open space, channel, thread or view), the selected sidebar row, the open
@@ -2773,7 +2775,7 @@ Rules:
 | `ui.composer_paste_file_chars` | `4000` | a paste of more characters becomes a text file attachment in the composer (6.13) |
 | `ui.composer_paste_file_lines` | `100` | a paste of more lines becomes a text file attachment in the composer (6.13) |
 | `ui.code_block_collapse_lines` | `20` | a code block higher than this many lines of code shows collapsed with a fade and "Show all" (6.14) |
-| `ui.autocomplete_debounce` | `150ms` | waiting time before `command.autocomplete` |
+| `ui.autocomplete_debounce` | `150ms` | waiting time before `command.autocomplete` and before the target search of the share sheet |
 | `ui.quick_switch_max_results` | `20` | hits in the quick switcher |
 | `ui.desktop_min_width_four_columns` | `1280px` | below this width the session column collapses |
 | `ui.desktop_min_width_three_columns` | `960px` | below this width a pinned forum overview returns to the content column (navigation stack) |

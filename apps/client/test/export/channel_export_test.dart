@@ -71,6 +71,39 @@ class StreamAdapter implements HttpClientAdapter {
 const Duration patience = Duration(minutes: 3);
 
 void main() {
+  test('the hand-made security requirement equals the generated one of '
+      'exportChannel and downloadGdprExport', () async {
+    // The plain request copies it by hand; a change of the contract would go unnoticed
+    // (AUD-PKG-P02-client-b, #1287).
+    final seen = <Object?>[];
+    final dio = Dio(BaseOptions(baseUrl: 'https://chat.example.com'))
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            seen.add(options.extra['secure']);
+            handler.reject(DioException(requestOptions: options));
+          },
+        ),
+      );
+    final api = ApiClient(dio: dio);
+    await expectLater(
+      api.getPrivacyApi().exportChannel(
+        channelId: channelId(1).value,
+        from: DateTime.utc(2026, 10),
+        to: DateTime.utc(2026, 10, 2),
+      ),
+      throwsA(isA<DioException>()),
+    );
+    await expectLater(
+      api.getPrivacyApi().downloadGdprExport(requestId: channelId(1).value),
+      throwsA(isA<DioException>()),
+    );
+    expect(seen, [
+      ChannelExporter.secured['secure'],
+      ChannelExporter.secured['secure'],
+    ]);
+  });
+
   group('the menu entry follows the capability', () {
     Future<void> menuWith(
       WidgetTester tester,

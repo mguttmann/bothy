@@ -284,6 +284,21 @@ final class IosPlatformApiImpl: NSObject, IosPlatformApi,
     GCKeyboard.coalesced != nil
   }
 
+  // MARK: Device name (08 5.1)
+
+  /// `UIDevice.name` with the hardware model identifier (`utsname.machine`), so the device
+  /// list tells the kinds of devices apart; the identifier is left out when it is empty or
+  /// already part of the name.
+  func deviceName() throws -> String {
+    var system = utsname()
+    uname(&system)
+    let machine = withUnsafeBytes(of: &system.machine) { raw in
+      String(decoding: raw.prefix { $0 != 0 }, as: UTF8.self)
+    }
+    let name = UIDevice.current.name
+    return machine.isEmpty || name.contains(machine) ? name : "\(name) (\(machine))"
+  }
+
   /// The protection class of a path, or nil when it is missing.
   func fileProtection(path: String) throws -> String? {
     let files = FileManager.default

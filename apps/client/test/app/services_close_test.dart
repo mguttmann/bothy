@@ -8,7 +8,9 @@ import 'dart:io';
 
 import 'package:client/app/bootstrap.dart';
 import 'package:client/app/discovery.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:local_store/local_store.dart';
 
 import '../support/fakes.dart';
 
@@ -34,5 +36,38 @@ void main() {
     expect(identical(begun, later), isTrue);
     await later;
     expect(identical(services.close(), begun), isTrue);
+  });
+
+  test('a failure after the database opened closes it again', () async {
+    LocalDatabase? opened;
+    var protects = 0;
+    final ports = testPorts(
+      dataRoot: root,
+      // The second protection runs after the database opened (15 6.3).
+      protectFiles: (_) async {
+        if (++protects == 2) throw PlatformException(code: 'protect_failed');
+      },
+      openDatabase: (file, keys) async => opened = await openLocalStore(
+        file: file,
+        keys: keys,
+        inBackground: false,
+      ),
+    );
+    await expectLater(
+      InstanceServices.open(
+        ports,
+        InstanceInfo(
+          address: Uri.parse('https://chat.example.com'),
+          instanceId: '0193f2a7-0000-7000-8000-0000000000ac',
+          productName: 'Team Chat',
+        ),
+      ),
+      throwsA(isA<PlatformException>()),
+    );
+    expect(opened, isNotNull);
+    await expectLater(
+      opened!.customSelect('SELECT 1').get(),
+      throwsA(anything),
+    );
   });
 }

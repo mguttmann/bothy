@@ -11,6 +11,8 @@ import 'package:client/app/layout/column_widths.dart';
 import 'package:client/app/layout/desktop_shell.dart';
 import 'package:client/app/providers/target.dart';
 import 'package:client/app/target_resolver.dart';
+import 'package:client/forum/providers.dart'
+    show toggleChannelColumn, toggleOverviewPinned;
 import 'package:client/keyboard/bindings.dart';
 import 'package:client/keyboard/intents.dart';
 import 'package:design_system/design_system.dart';
@@ -105,6 +107,20 @@ final Finder button = find.byKey(const ValueKey('thread.channelColumn'));
 String path(int n) => '/t/${threadId(n).value}';
 
 void main() {
+  // AUD-PKG-P02-client-b: read and write of the local view state run in one transaction,
+  // like the session column, so two quick presses end where they started.
+  test(
+    'two quick toggles of the channel column and the pin restore them',
+    () async {
+      final db = openInMemoryForTests(clock: () => t0);
+      addTearDown(db.close);
+      await Future.wait([toggleChannelColumn(db), toggleChannelColumn(db)]);
+      expect(await db.forumViewDao.channelColumnHidden(), isFalse);
+      await Future.wait([toggleOverviewPinned(db), toggleOverviewPinned(db)]);
+      expect(await db.forumViewDao.overviewPinned(), isFalse);
+    },
+  );
+
   testWidgets('Hide channel gives the thread the whole width, Show brings the '
       'main history back; the choice survives a restart', (tester) async {
     final db = await tester.runAsync(

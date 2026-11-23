@@ -3,6 +3,7 @@
 #ifndef RUNNER_BRANDING_H_
 #define RUNNER_BRANDING_H_
 
+#define BRANDING_APP_NAME "ExampleChat"
 #define BRANDING_APP_NAME_W L"ExampleChat"
 #define BRANDING_URL_SCHEME "chat-example"
 #define BRANDING_URL_SCHEME_W L"chat-example"

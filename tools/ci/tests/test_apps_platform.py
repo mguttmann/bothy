@@ -289,8 +289,12 @@ def test_android_runs_with_one_device(
 
 
 def test_android_skips_without_device(
-    tmp_path: Path, fake_adb: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path,
+    fake_adb: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv("CI", raising=False)
     root = tmp_path / "repo"
     _android_member(root)
     assert apps_platform.main(["--root", str(root), "--system", "android"]) == 0
@@ -298,6 +302,21 @@ def test_android_skips_without_device(
     out = capsys.readouterr().out
     assert "SKIP apps-platform packages/device_key android: no device" in out
     assert "SKIP apps-platform packages/device_key macos: other host" in out
+
+
+def test_android_job_fails_without_device_in_ci(
+    tmp_path: Path,
+    fake_adb: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The Android job of CI never ends green when its emulator is gone."""
+    monkeypatch.setenv("CI", "true")
+    root = tmp_path / "repo"
+    _android_member(root)
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 1
+    assert _calls(fake_adb) == []
+    assert "packages/device_key android: no device in the CI job" in capsys.readouterr().err
 
 
 def test_android_skips_without_adb(

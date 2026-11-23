@@ -115,6 +115,31 @@ void main() {
     });
   }
 
+  test(
+    'a restored start never looks like a login screen to the cold start',
+    () async {
+      // The app drops the cold start when the start leaves `starting` without the main view
+      // (15 19); a start from the local data goes straight to the main view.
+      await signInAndQuit();
+      c = appContainer(f);
+      final seen = <bool>[];
+      c.listen(
+        onboardingControllerProvider.select(
+          (s) => s.starting || s.step == OnboardingStep.signedIn,
+        ),
+        (_, v) => seen.add(v),
+        fireImmediately: true,
+      );
+      await eventually(
+        'main view',
+        () => state().step == OnboardingStep.signedIn,
+        timeout: const Duration(seconds: 10),
+      );
+      expect(state().restored, isTrue);
+      expect(seen, isNot(contains(false)));
+    },
+  );
+
   test('the start screen shows until the first screen is decided', () async {
     expect(c.read(onboardingControllerProvider).starting, isTrue);
     await eventually('E1', () => !state().starting);

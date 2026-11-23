@@ -408,12 +408,8 @@ class PostListColumn extends ConsumerWidget {
       ),
       onOpenPost: (thread) => context.go('/t/${thread.value}'),
       pinned: pinned,
-      onPin: () => unawaited(
-        ref
-            .read(localDatabaseProvider)
-            ?.forumViewDao
-            .setOverviewPinned(pinned: !pinned),
-      ),
+      onPin: () =>
+          unawaited(toggleOverviewPinned(ref.read(localDatabaseProvider))),
       onSearch: () => context.go(
         Uri(
           path: '/search',

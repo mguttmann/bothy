@@ -63,15 +63,18 @@ abstract final class NotifyOps {
       ..register(putNotificationPreference, (e, ctx) async {
         final body = decodePayload(e.payload);
         final until = body['muted_until'];
-        final response = await prefs.putNotificationPreference(
-          targetKind: _str(body, 'target_kind'),
-          targetId: _str(body, 'target_id'),
-          notificationPreferencePut: wire.NotificationPreferencePut(
-            (b) => b
-              ..level = wire.NotificationLevel.valueOf(_str(body, 'level'))
-              ..mutedUntil = until is String ? DateTime.parse(until) : null,
+        final response = await _orServerState(
+          () => prefs.putNotificationPreference(
+            targetKind: _str(body, 'target_kind'),
+            targetId: _str(body, 'target_id'),
+            notificationPreferencePut: wire.NotificationPreferencePut(
+              (b) => b
+                ..level = wire.NotificationLevel.valueOf(_str(body, 'level'))
+                ..mutedUntil = until is String ? DateTime.parse(until) : null,
+            ),
+            extra: ctx.extra,
           ),
-          extra: ctx.extra,
+          () => _restorePreference(api, db, e),
         );
         final pref = response.data;
         if (pref != null &&
@@ -90,19 +93,25 @@ abstract final class NotifyOps {
       }, lane: (e) => 'notify:${_targetOf(e)}')
       ..register(deleteNotificationPreference, (e, ctx) async {
         final body = decodePayload(e.payload);
-        final response = await prefs.deleteNotificationPreference(
-          targetKind: _str(body, 'target_kind'),
-          targetId: _str(body, 'target_id'),
-          extra: ctx.extra,
+        final response = await _orServerState(
+          () => prefs.deleteNotificationPreference(
+            targetKind: _str(body, 'target_kind'),
+            targetId: _str(body, 'target_id'),
+            extra: ctx.extra,
+          ),
+          () => _restorePreference(api, db, e),
         );
         return OutboxResponse(status: response.statusCode);
       }, lane: (e) => 'notify:${_targetOf(e)}')
       ..register(createQuietHoursRule, (e, ctx) async {
         final body = decodePayload(e.payload);
-        final response = await prefs.createQuietHoursRule(
-          quietHoursRuleInput: _ruleInput(body),
-          idempotencyKey: ctx.idempotencyKey,
-          extra: ctx.extra,
+        final response = await _orServerState(
+          () => prefs.createQuietHoursRule(
+            quietHoursRuleInput: _ruleInput(body),
+            idempotencyKey: ctx.idempotencyKey,
+            extra: ctx.extra,
+          ),
+          () => _restoreRules(api, db, e),
         );
         final rule = response.data!;
         // The local row under the entry's ID gives way to the server's rule.
@@ -118,10 +127,13 @@ abstract final class NotifyOps {
       }, lane: (_) => quietHoursLane)
       ..register(putQuietHoursRule, (e, ctx) async {
         final body = decodePayload(e.payload);
-        final response = await prefs.putQuietHoursRule(
-          ruleId: _str(body, 'rule_id'),
-          quietHoursRuleInput: _ruleInput(body),
-          extra: ctx.extra,
+        final response = await _orServerState(
+          () => prefs.putQuietHoursRule(
+            ruleId: _str(body, 'rule_id'),
+            quietHoursRuleInput: _ruleInput(body),
+            extra: ctx.extra,
+          ),
+          () => _restoreRules(api, db, e),
         );
         final rule = response.data;
         if (rule != null &&
@@ -131,12 +143,118 @@ abstract final class NotifyOps {
         return OutboxResponse(status: response.statusCode, body: rule);
       }, lane: (_) => quietHoursLane)
       ..register(deleteQuietHoursRule, (e, ctx) async {
-        final response = await prefs.deleteQuietHoursRule(
-          ruleId: _str(decodePayload(e.payload), 'rule_id'),
-          extra: ctx.extra,
+        final response = await _orServerState(
+          () => prefs.deleteQuietHoursRule(
+            ruleId: _str(decodePayload(e.payload), 'rule_id'),
+            extra: ctx.extra,
+          ),
+          () => _restoreRules(api, db, e),
         );
         return OutboxResponse(status: response.statusCode);
       }, lane: (_) => quietHoursLane);
+  }
+
+  /// Runs the request [call]; when the server refuses it for good (the outbox keeps the entry
+  /// as failed, 04 13.2 item 5), [restore] first puts the local rows back to the server's
+  /// state, so D9 and the menus never show a value the server does not know. A failed
+  /// [restore] leaves the rows to the next refresh or event.
+  static Future<T> _orServerState<T>(
+    Future<T> Function() call,
+    Future<void> Function() restore,
+  ) async {
+    try {
+      return await call();
+    } on Object catch (error) {
+      final outcome = classify(error).outcome;
+      if (outcome == OutcomeClass.failed || outcome == OutcomeClass.conflict) {
+        try {
+          await restore();
+        } on Object {
+          // Offline or refused as well: the next refresh or event brings the server's state.
+        }
+      }
+      rethrow;
+    }
+  }
+
+  /// Puts the local level of the target of the refused [e] back to the server's, unless a
+  /// later write of the target waits (its answer decides).
+  static Future<void> _restorePreference(
+    ApiClient api,
+    LocalDatabase db,
+    OutboxEntry e,
+  ) async {
+    if (await _laterWriteWaits(db, e, _preferenceWrites, _targetOf)) return;
+    final body = decodePayload(e.payload);
+    final kind = _str(body, 'target_kind');
+    final id = _str(body, 'target_id');
+    final items =
+        (await api.getPreferencesApi().listMyNotificationPreferences())
+            .data!
+            .items;
+    NotificationPreference? server;
+    for (final p in items) {
+      final json = api.serializers.serializeWith(
+        wire.NotificationPreference.serializer,
+        p,
+      );
+      if (json is! Map) continue;
+      final pref = preferenceFromJson(json.cast<String, Object?>());
+      if (pref.targetKind.code == kind && pref.targetId == id) server = pref;
+    }
+    await db.transaction(() async {
+      // The local row carries a raised version; it goes before the server's row is stored.
+      for (final local in await db.personalDao.notificationPreferences()) {
+        if (local.targetKind.code == kind && local.targetId == id) {
+          await db.personalDao.deleteNotificationPreferenceIfNewer(
+            local.targetKind,
+            id,
+            ResourceVersion(local.version.value + 1),
+          );
+        }
+      }
+      if (server != null) {
+        await db.personalDao.upsertNotificationPreferenceIfNewer(server);
+      }
+    });
+  }
+
+  /// Puts the local quiet hours rules back to the server's list after the refused [e]; a rule
+  /// whose create still waits in the outbox keeps its local row.
+  static Future<void> _restoreRules(
+    ApiClient api,
+    LocalDatabase db,
+    OutboxEntry e,
+  ) async {
+    final items =
+        (await api.getPreferencesApi().listMyQuietHours()).data!.items;
+    final rules = <QuietHours>[];
+    for (final r in items) {
+      final json = api.serializers.serializeWith(
+        wire.QuietHoursRule.serializer,
+        r,
+      );
+      if (json is Map) {
+        rules.add(quietHoursFromJson(json.cast<String, Object?>()));
+      }
+    }
+    final waiting = {
+      for (final other in await db.outboxDao.allEntries())
+        if (other.id != e.id &&
+            other.kind == createQuietHoursRule &&
+            !other.state.isFinal)
+          other.id,
+    };
+    await db.transaction(() async {
+      for (final local in await db.personalDao.quietHours()) {
+        if (!waiting.contains(local.id.value)) {
+          await db.personalDao.deleteQuietHours(local.id);
+        }
+      }
+      for (final rule in rules) {
+        await db.personalDao.upsertQuietHoursIfNewer(rule);
+      }
+    });
   }
 
   static wire.QuietHoursRuleInput _ruleInput(Map<String, Object?> body) =>

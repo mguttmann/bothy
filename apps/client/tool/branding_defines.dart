@@ -322,6 +322,7 @@ final class Branding {
       '#ifndef RUNNER_BRANDING_H_\n'
       '#define RUNNER_BRANDING_H_\n'
       '\n'
+      '#define BRANDING_APP_NAME "$appName"\n'
       '#define BRANDING_APP_NAME_W L"$appName"\n'
       '#define BRANDING_URL_SCHEME "$urlScheme"\n'
       '#define BRANDING_URL_SCHEME_W L"$urlScheme"\n'

@@ -60,8 +60,19 @@ class MemorySecureBackend implements SecureBackend {
     return values[key];
   }
 
+  /// Keys whose writes fail as a keychain that refuses the app answers.
+  final Set<String> refusedWrites = {};
+
   @override
-  Future<void> write(String key, String value) async => values[key] = value;
+  Future<void> write(String key, String value) async {
+    if (refusedWrites.contains(key)) {
+      throw PlatformException(
+        code: 'Unexpected security result code',
+        details: -25308,
+      );
+    }
+    values[key] = value;
+  }
 
   @override
   Future<void> delete(String key) async => values.remove(key);
@@ -245,6 +256,7 @@ AppPorts testPorts({
   FileProtector? protectFiles,
   AppLifecycle? lifecycle,
   BrowserLauncher? browser,
+  RedirectReceiver Function()? redirects,
   DatabaseOpener? openDatabase,
   StepUpPrompt? stepUpPrompt,
   BuildBranding branding = testBranding,
@@ -284,7 +296,7 @@ AppPorts testPorts({
   discovery: discovery ?? ScriptedDiscovery(),
   dataRoot: () async => dataRoot,
   browser: browser ?? RecordingBrowser(),
-  redirects: SilentRedirects.new,
+  redirects: redirects ?? SilentRedirects.new,
   transport: IoGatewayTransport(),
   lifecycle: lifecycle ?? ForegroundLifecycle(),
   network: network ?? SwitchNetwork(),

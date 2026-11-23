@@ -144,23 +144,6 @@ abstract final class ThreadOps {
   static String _lane(OutboxEntry e) =>
       laneOf(_channelOf(decodePayload(e.payload)));
 
-  /// Puts a new post of [forum] into the outbox of [engine]: [title], the first message
-  /// [contentMd] and the tags [tagIds].
-  static Future<OutboxEntry> enqueue(
-    SyncEngine engine, {
-    required ChannelId forum,
-    required String title,
-    required String contentMd,
-    List<ForumTagId> tagIds = const [],
-  }) => engine.outbox.enqueue(
-    postRequest(
-      forum: forum,
-      title: title,
-      contentMd: contentMd,
-      tagIds: tagIds,
-    ),
-  );
-
   /// The outbox request of a new post of [forum]: [title], the first message [contentMd]
   /// with [attachments] (which make it wait for their upload entries, 15 7.5) and the tags
   /// [tagIds]. [id] is the entry ID, and so the first message's `client_msg_id`, a share

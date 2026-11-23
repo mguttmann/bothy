@@ -132,10 +132,6 @@ final class ThreadActions {
     ),
   );
 
-  /// Removes the waiting entry [id], or queues the delete behind it when it was sent
-  /// (04 13.3).
-  Future<String?> deleteEntry(String id) => _outbox.remove(id);
-
   /// Adds or, with [remove], removes the reaction [emoji] of the reader on [message].
   Future<OutboxEntry> react(
     Message message,

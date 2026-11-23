@@ -2977,6 +2977,18 @@ abstract class AppLocalizations {
   /// **'Dismiss'**
   String get updateDismiss;
 
+  /// Dialog after "Get the update" when nothing opened: a macOS build without its update check and without a download address (18 section 9).
+  ///
+  /// In en, this message translates to:
+  /// **'This app cannot open the update itself. Install the new version from where you got the app.'**
+  String get updateOpenFailed;
+
+  /// Closes the dialog updateOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get updateOpenFailedClose;
+
   /// Title of the system dialog that confirms a step-up signature with biometrics or the device password (08 section 6.1).
   ///
   /// In en, this message translates to:
@@ -6792,6 +6804,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copy'**
   String get outboxCopy;
+
+  /// Reason under the input when a message could not be written to the outbox of this device (the database is closed or the disk is full); text, reply and files are back in the composer.
+  ///
+  /// In en, this message translates to:
+  /// **'The message could not be saved on this device. It is back in the field; try again.'**
+  String get composerSendFailed;
 
   /// Reason why a message is not sent; the limit comes from the instance (D-W-115).
   ///
