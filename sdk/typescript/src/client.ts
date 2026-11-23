@@ -82,8 +82,12 @@ export interface RetryOptions {
   readonly capMs?: number | undefined;
   /** Jitter source in [0, 1) (default from `node:crypto`). */
   readonly random?: (() => number) | undefined;
-  /** Waits between attempts (default `clock.sleep`). */
-  readonly sleep?: ((ms: number) => Promise<void>) | undefined;
+  /**
+   * Waits between attempts (default `clock.sleep`); `signal` is the caller's, and its abort ends
+   * the wait.
+   */
+  readonly sleep?:
+    ((ms: number, signal?: AbortSignal) => Promise<void>) | undefined;
 }
 
 /** Options of {@link createApiClient}: openapi-fetch's options plus the hand layer's. */
@@ -217,13 +221,18 @@ async function problemCode(response: Response): Promise<string | undefined> {
  * The attempt's `Request` carries it, and {@link untilAborted} also races the `fetch` against
  * it: in Node.js the signal of a `Request` follows the given signal only through a weak
  * reference, so after a garbage collection a custom `fetch` that waits on `request.signal`
- * waited past the timeout (docs/decisions.d/M2-30.md D-M2-30-16). The caller's listener goes
- * when the timer fires.
+ * waited past the timeout (docs/decisions.d/M2-30.md D-M2-30-16). The timer covers the answer
+ * and the reading of its body; `done` ends it and drops the caller's listener once the attempt
+ * is over.
  */
 function attemptSignal(
   caller: AbortSignal,
   timeoutMs: number,
-): { readonly signal: AbortSignal; expired(): boolean } {
+): {
+  readonly signal: AbortSignal;
+  expired(): boolean;
+  done(): void;
+} {
   const controller = new AbortController();
   let expired = false;
   const onCaller = (): void => controller.abort(caller.reason);
@@ -237,7 +246,67 @@ function attemptSignal(
   timer.unref();
   if (caller.aborted) controller.abort(caller.reason);
   else caller.addEventListener("abort", onCaller, { once: true });
-  return { signal: controller.signal, expired: () => expired };
+  return {
+    signal: controller.signal,
+    expired: () => expired,
+    done: () => {
+      clearTimeout(timer);
+      caller.removeEventListener("abort", onCaller);
+    },
+  };
+}
+
+/** Settles with `pending`, or rejects with the reason of `signal` once it aborts first. */
+function raceAbort<T>(pending: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    pending.catch(() => undefined);
+    return Promise.reject(signal.reason as Error);
+  }
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => {
+      pending.catch(() => undefined);
+      reject(signal.reason as Error);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    pending.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (cause: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(cause as Error);
+      },
+    );
+  });
+}
+
+/** Statuses whose `Response` must not carry a body. */
+const NULL_BODY_STATUSES: ReadonlySet<number> = new Set([101, 204, 205, 304]);
+
+/**
+ * Reads the body of `response` within `signal` and returns an answer that holds it in memory,
+ * so a stalled or broken body fails inside the attempt (as a `TimeoutError` or
+ * `TransportError`) and not later in the caller.
+ */
+async function buffered(
+  response: Response,
+  signal: AbortSignal,
+): Promise<Response> {
+  if (response.body === null) return response;
+  const reading = response.arrayBuffer();
+  let body: ArrayBuffer;
+  try {
+    body = await raceAbort(reading, signal);
+  } catch (cause) {
+    void response.body.cancel().catch(() => undefined);
+    throw cause;
+  }
+  return new Response(NULL_BODY_STATUSES.has(response.status) ? null : body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
 }
 
 /**
@@ -304,7 +373,7 @@ class Transport {
         "retryBackoffBaseMs" | "retryBackoffCapMs"
       >;
       readonly random: () => number;
-      readonly sleep: (ms: number) => Promise<void>;
+      readonly sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
       readonly logger: Logger;
       readonly explicitLogger: boolean;
       readonly userAgent: string;
@@ -334,19 +403,27 @@ class Transport {
     let nonceRepeated = false;
     for (let attempt = 1; ; attempt++) {
       const limit = attemptSignal(request.signal, this.config.timeoutMs);
-      const attemptRequest = await this.prepare(
-        request,
-        body,
-        binding,
-        limit.signal,
-      );
       const last = !retryable || attempt >= maxAttempts;
       let response: Response;
+      let attemptRequest: Request;
+      try {
+        // A request that cannot be built is no transport failure: thrown as it is, no retry.
+        attemptRequest = await this.prepare(
+          request,
+          body,
+          binding,
+          limit.signal,
+        );
+      } catch (cause) {
+        limit.done();
+        throw cause;
+      }
       try {
         response = await untilAborted(
           this.config.fetch(attemptRequest),
           limit.signal,
         );
+        response = await buffered(response, limit.signal);
       } catch (cause) {
         if (request.signal.aborted) throw cause;
         const error = limit.expired()
@@ -360,8 +437,11 @@ class Transport {
           operation,
           attempt,
           backoffMs(attempt, this.config.backoff, this.config.random),
+          request.signal,
         );
         continue;
+      } finally {
+        limit.done();
       }
       this.log("debug", "request", operation, attempt, {
         status: response.status,
@@ -397,6 +477,7 @@ class Transport {
         operation,
         attempt,
         Math.max(jitter, retryAfter ?? 0),
+        request.signal,
         response.status,
       );
     }
@@ -436,17 +517,19 @@ class Transport {
     return new Request(request, body === undefined ? init : { ...init, body });
   }
 
+  /** Waits before the next attempt; an abort by the caller ends the wait with its reason. */
   private async wait(
     operation: string,
     attempt: number,
     ms: number,
+    signal: AbortSignal,
     status?: number,
   ): Promise<void> {
     this.log("info", "retry", operation, attempt, {
       status,
       waitMs: Math.round(ms),
     });
-    await this.config.sleep(ms);
+    await raceAbort(this.config.sleep(ms, signal), signal);
   }
 
   private warnDeprecation(operation: string, headers: Headers): void {
@@ -521,7 +604,9 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       retryBackoffCapMs: retry.capMs ?? settings.retryBackoffCapMs,
     },
     random: retry.random ?? cryptoRandom,
-    sleep: retry.sleep ?? ((ms: number) => clock.sleep(ms)),
+    sleep:
+      retry.sleep ??
+      ((ms: number, signal?: AbortSignal) => clock.sleep(ms, signal)),
     logger: log,
     explicitLogger: logger !== undefined,
     userAgent: userAgentHeader(userAgent),

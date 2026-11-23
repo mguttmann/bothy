@@ -22,6 +22,12 @@
  * - `4008`: wait the `retry_after` seconds of the close reason, else backoff;
  * - log and reconnect: `4001`, `4002`, `4003`, `4005` and unknown codes.
  *
+ * Limits: `sync.ws_max_frame_bytes` is checked once a frame has arrived; the global `WebSocket`
+ * buffers the whole frame before that and has no size option (a constructor such as `ws` with
+ * `maxPayload` can bound it earlier). The events of a connection wait in memory until the
+ * consumer reads them; the server bounds them with `agent.max_inflight_events` unacknowledged
+ * events, not this class.
+ *
  * Node.js only: the frames carry the API token.
  *
  * @example
@@ -564,7 +570,7 @@ export class Gateway {
               headers: { "User-Agent": this.userAgent },
             });
     } catch (error) {
-      this.logger.info("gateway connect failed", {
+      this.logger.warn("gateway connect failed", {
         error: error instanceof Error ? error.name : "unknown",
       });
       return undefined;
@@ -622,7 +628,9 @@ export class Gateway {
     reason: string,
     attempt: number,
   ): number | undefined {
-    this.logger.info("gateway closed", { code });
+    // The first close of a series is routine (a restart, a resume); a repeated one is not.
+    if (attempt === 0) this.logger.info("gateway closed", { code });
+    else this.logger.warn("gateway closed again", { code, attempt });
     if (STOP_ON.has(code)) {
       this.closeReason = new CloseReason(code, reason);
       return undefined;
@@ -805,6 +813,21 @@ export class Gateway {
     link.push(new GatewayEvent("ready", data, ready));
   }
 
+  /**
+   * The agent heartbeat, or `undefined` when there is none or it cannot be built; that failure
+   * is logged as an error and the connection heartbeat goes out without it.
+   */
+  private agentHeartbeat(): S["Heartbeat"] | undefined {
+    try {
+      return this.heartbeat?.();
+    } catch (error) {
+      this.logger.error("gateway: agent heartbeat could not be built", {
+        error: error instanceof Error ? error.name : "unknown",
+      });
+      return undefined;
+    }
+  }
+
   /** Heartbeat loop of one connection (04 6.3): random first delay, then every interval. */
   private async beat(link: Link, intervalMs: number): Promise<void> {
     const signal = link.beats.signal;
@@ -818,7 +841,7 @@ export class Gateway {
           return;
         }
         const beat: S["GatewayHeartbeat"] = { last_seq: this.seq };
-        const agent = this.heartbeat?.();
+        const agent = this.agentHeartbeat();
         if (agent !== undefined) beat.agent = agent;
         if (link.socket.readyState !== OPEN) return;
         this.ackPending = true;

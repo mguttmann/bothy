@@ -525,6 +525,7 @@ async def test_an_unexpected_error_of_the_adopter_stops_the_turn_and_fails_the_r
     assert await hand_over(world, first) == HANDOVER_EXIT
     runner = await world.start(world.config(turn_handover=True, followup_grace="300ms"))
     await world.until(lambda: run_id in runner.handler.adopted)
+    assert runner.handler.slots.used == 1  # the adopted turn holds a slot (18.2)
 
     fail_turn_records(monkeypatch)
 
@@ -537,6 +538,7 @@ async def test_an_unexpected_error_of_the_adopter_stops_the_turn_and_fails_the_r
         "summary": unexpected_error_summary(OSError()),
     }
     await world.until(lambda: run_id not in runner.handler.adopted)
+    assert runner.handler.slots.used == 0  # given back with the end of the adopted turn
     assert not record_path(world, run_id).exists()
     assert '"run_failed_unexpectedly", "error": "OSError"' in logs.text
     # Logged by the kind of the error only; the traceback is a line of level debug.

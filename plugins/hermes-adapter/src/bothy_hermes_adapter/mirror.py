@@ -69,7 +69,7 @@ from bothy_hermes_adapter.config import (
     load_token,
     platform_extra,
 )
-from bothy_hermes_adapter.context_format import cut_utf8
+from bothy_hermes_adapter.context_format import cut_with_note
 from bothy_hermes_adapter.reports import direct_send
 
 __all__ = [
@@ -114,7 +114,6 @@ MIRROR_READ_ONLY: Final = (
 _REQUEST_HEAD: Final = "**Request** ({platform} session)"
 _NO_TEXT_ANSWER: Final = "The turn ended without a text answer."
 _NO_ANSWER: Final = "The turn ended without an answer ({reason})."
-_CUT_NOTE: Final = "\n\n(cut)"
 _TOOL_NAME_CHARS: Final = 64
 _OFF_STATUSES: Final = frozenset({403, 404})
 _GONE_STATUSES: Final = frozenset({404, 410})
@@ -568,12 +567,7 @@ class Mirror:
 
     def _fit(self, text: str) -> str:
         """Cut to ``hermes_adapter.max_message_bytes`` with a closing note (09 14)."""
-        limit = self.settings.max_message_bytes
-        data = text.encode("utf-8")
-        if len(data) <= limit:
-            return text
-        head, _ = cut_utf8(data, max(0, limit - len(_CUT_NOTE.encode("utf-8"))))
-        return head + _CUT_NOTE
+        return cut_with_note(text, self.settings.max_message_bytes)[0]
 
 
 class _NotPosted(Exception):  # noqa: N818 - an outcome, already logged

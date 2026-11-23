@@ -34,6 +34,9 @@ generate: ## Regenerate the core in $(OUT) from $(SPEC) (never edit it by hand)
 	@# The templates of the pinned generator write em dashes, which the text-rules hook rejects;
 	@# a deterministic rewrite to a hyphen is the last step (docs/DECISIONS.md M2-23/5).
 	find $(OUT) -name '*.py' -exec perl -CSD -pi -e 's/[\x{2013}\x{2014}]/-/g' {} +
+	@# The templates put the UUID of `idempotency_key` into the header as it is, which httpx
+	@# refuses (header values are text); a deterministic rewrite sends its text form.
+	find $(OUT) -name '*.py' -exec perl -pi -e 's/^(\s*headers\["Idempotency-Key"\] = )idempotency_key$$/$${1}str(idempotency_key)/' {} +
 
 generate-check: ## G4: a fresh generation equals the checked-in core, which compiles and type checks
 	$(UV) run --project "$(TOOLS)" --locked --quiet python "$(TOOLS)/ci/codegen_check.py" --dir . -- $(MAKE) generate

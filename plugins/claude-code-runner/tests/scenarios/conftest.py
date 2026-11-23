@@ -249,13 +249,35 @@ class World:
         gate.touch()
 
     async def until(self, predicate: Callable[[], Any], timeout: float = PATIENCE) -> None:
+        """Wait until ``predicate`` holds; when it does not within ``timeout``, fail with the
+        evidence of `diagnostics` (a hang in CI leaves nothing else to read)."""
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout
         while loop.time() < deadline:
             if predicate():
                 return
             await asyncio.sleep(0.02)
-        raise AssertionError("condition not reached")
+        raise AssertionError("condition not reached\n" + self.diagnostics())
+
+    def diagnostics(self, tail: int = 4000) -> str:
+        """What the runner processes and Fake-Claude did: the end of every runner log, the
+        state of every runner process and the last Fake-Claude records."""
+        parts = []
+        for process in self.processes:
+            code = process.poll()
+            parts.append(
+                f"process {process.pid}: " + ("running" if code is None else f"exit {code}")
+            )
+        for log in sorted(self.root.glob("runner-*.log")):
+            text = log.read_text(errors="replace")
+            parts.append(f"--- {log.name} (last {tail} characters) ---\n{text[-tail:]}")
+        try:
+            records = helper.read_capture(self.capture)
+        except (OSError, ValueError) as exc:
+            records = [{"kind": "unreadable", "error": type(exc).__name__}]
+        lines = [json.dumps(r)[:300] for r in records[-30:]]
+        parts.append("--- Fake-Claude records (last 30) ---\n" + "\n".join(lines))
+        return "\n".join(parts)
 
     def state_of(self, run_id: UUID) -> str:
         return self.fake.run_state(run_id).state

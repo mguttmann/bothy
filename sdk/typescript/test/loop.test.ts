@@ -577,6 +577,14 @@ async function closed(adapter: Adapter, runId: string): Promise<boolean> {
 }
 
 describe("acceptance and start", () => {
+  it("refuses a configuration that breaks the heartbeat when it is built", () => {
+    expect(() =>
+      makeAdapter(new RecordingHandler(), "bad-name", {
+        adapterName: "Not A Name",
+      }),
+    ).toThrow(RangeError);
+  });
+
   it(
     "stores, acknowledges, prepares, starts and only then executes",
     async () => {
@@ -1137,6 +1145,47 @@ describe("runs in progress", () => {
         await until(fake, () => closed(adapter, runId));
       });
       expect(callbacks).toBe(1);
+    },
+    TEST_TIMEOUT,
+  );
+
+  it(
+    "keeps running and leaves the cancel unsettled when the end of a waiting run got no answer",
+    async () => {
+      class Waiting extends RecordingHandler {
+        override async execute(inv: Invocation, run: RunHandle): Promise<void> {
+          await super.execute(inv, run);
+          await run.awaitInput("Which file?");
+        }
+      }
+      const handler = new Waiting();
+      const adapter = makeAdapter(handler, "cancel-lost", {
+        settings: { ...fake.sdkSettings, retryMaxAttempts: 1 },
+      });
+      fake.inject("finishRun", Fault.disconnect(), 1);
+      let runId = "";
+      let ended = false;
+      await running(adapter, async ({ done, source }) => {
+        void done.finally(() => {
+          ended = true;
+        });
+        runId = (await fake.trigger()).runId;
+        await until(
+          fake,
+          async () => (await stateOf(runId)) === "waiting_input",
+        );
+        await fake.cancel(runId);
+        await until(fake, () =>
+          fake.requests().some((r) => r.path.endsWith("/finish")),
+        );
+        // The redelivered cancel sends the end again; the loop never stopped.
+        await until(fake, () => closed(adapter, runId));
+        expect(ended).toBe(false);
+        expect(source.envelopes("run.cancel_requested").length).toBeGreaterThan(
+          1,
+        );
+      });
+      expect((await fake.runState(runId)).state).toBe("cancelled");
     },
     TEST_TIMEOUT,
   );

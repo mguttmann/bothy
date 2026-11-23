@@ -9,6 +9,7 @@ import importlib
 import pkgutil
 import tomllib
 from types import ModuleType
+from typing import Any, cast
 
 from conftest import REPO, spec
 from openapi_python_client.strings import snake_case
@@ -58,3 +59,36 @@ def test_version_matches_version_file() -> None:
     version = (root / "VERSION").read_text(encoding="utf-8").strip()
     assert project["version"] == version
     assert bothy_sdk.__version__ == version
+    # The version the client sends in its User-Agent.
+    assert version == bothy_sdk.client._VERSION
+
+
+def test_idempotency_key_of_a_generated_operation_is_a_valid_header() -> None:
+    import inspect
+    import uuid
+
+    import httpx
+
+    # Every generated operation with an Idempotency-Key header sends it as text.
+    checked = 0
+    for name in _walk(api):
+        module = importlib.import_module(name)
+        get_kwargs = getattr(module, "_get_kwargs", None)
+        if get_kwargs is None or "idempotency_key" not in inspect.signature(get_kwargs).parameters:
+            continue
+        source = inspect.getsource(get_kwargs)
+        assert 'headers["Idempotency-Key"] = str(idempotency_key)' in source, name
+        checked += 1
+    assert checked > 50
+    from bothy_sdk.generated.api.apps import install_app
+
+    class Body:  # only `to_dict` of the body is used to build the request
+        def to_dict(self) -> dict[str, Any]:
+            return {}
+
+    key = uuid.uuid4()
+    kwargs = install_app._get_kwargs(body=cast(Any, Body()), idempotency_key=key)
+    request = httpx.Request(
+        kwargs["method"], "https://example.com" + kwargs["url"], headers=kwargs["headers"]
+    )
+    assert request.headers["Idempotency-Key"] == str(key)

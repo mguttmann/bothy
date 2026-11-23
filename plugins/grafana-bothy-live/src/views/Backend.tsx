@@ -53,30 +53,39 @@ export function backendModel(frames: readonly DataFrame[]): BackendRow[] {
     }
     return r;
   };
-  const each = (refId: string, fn: (agent: string, value: number, s: ReturnType<typeof seriesOf>[number]) => void) => {
+  // `increase()` extrapolates, so counts arrive as fractions: round them first, then leave out zeros.
+  // Costs keep their cents.
+  const each = (
+    refId: string,
+    round: (v: number) => number,
+    fn: (agent: string, value: number, s: ReturnType<typeof seriesOf>[number]) => void
+  ) => {
     for (const s of seriesOf(frames, refId)) {
-      const v = lastValue(s);
-      if (v !== null && Math.round(v * 100) > 0) {
+      const raw = lastValue(s);
+      const v = raw === null ? null : round(raw);
+      if (v !== null && v > 0) {
         fn(label(s, 'bothy_agent_handle'), v, s);
       }
     }
   };
-  each('mode_runs', (agent, v, s) => {
+  const count = Math.round;
+  const cents = (v: number) => Math.round(v * 100) / 100;
+  each('mode_runs', count, (agent, v, s) => {
     const r = row(agent);
     const mode = label(s, 'bothy_billing_mode');
-    r.modes[mode] = (r.modes[mode] ?? 0) + Math.round(v);
+    r.modes[mode] = (r.modes[mode] ?? 0) + v;
   });
-  each('mismatches', (agent, v) => {
-    row(agent).mismatches += Math.round(v);
+  each('mismatches', count, (agent, v) => {
+    row(agent).mismatches += v;
   });
-  each('denials', (agent, v, s) => {
-    row(agent).denials.push({ reason: label(s, 'bothy_reason'), count: Math.round(v) });
+  each('denials', count, (agent, v, s) => {
+    row(agent).denials.push({ reason: label(s, 'bothy_reason'), count: v });
   });
-  each('cost_by_mode', (agent, v, s) => {
+  each('cost_by_mode', cents, (agent, _v, s) => {
     row(agent).costs.push({
       mode: label(s, 'bothy_billing_mode'),
       currency: label(s, 'bothy_currency'),
-      amount: v,
+      amount: lastValue(s) ?? 0,
       estimate: label(s, 'bothy_cost_estimate') === 'true',
     });
   });

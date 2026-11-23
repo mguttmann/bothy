@@ -18,7 +18,11 @@
  *
  * @example
  * ```ts
- * const routes = createRoutes(context);
+ * const routes = {
+ *   "/github/webhook": githubWebhookRoute(context),
+ *   "/chat/interactions": interactionsRoute(context),
+ *   "/chat/events": eventsRoute(context),
+ * };
  * await startHttpServer({ ...address, routes, ready, logger, maxBodyBytes });
  * ```
  *

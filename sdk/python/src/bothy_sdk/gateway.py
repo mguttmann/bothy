@@ -75,6 +75,7 @@ __all__ = [
     "Gateway",
     "GatewayEvent",
     "gateway_url",
+    "next_heartbeat",
 ]
 
 PROTOCOL_VERSIONS: tuple[int, ...] = (1,)
@@ -128,6 +129,33 @@ class GatewayEvent:
     op: str
     data: dict[str, Any]
     model: Any = None
+
+
+def next_heartbeat(
+    callback: Callable[[], Heartbeat | None] | None, last: Heartbeat | None
+) -> Heartbeat | None:
+    """Return the agent heartbeat ``callback`` builds, or ``last`` when the callback fails.
+
+    A failing callback (for example a runtime status out of range) is logged with WARNING and
+    does not end the heartbeat loop; the last valid heartbeat goes out instead.
+
+    Args:
+        callback: Builds the agent heartbeat, or ``None`` for none.
+        last: The last heartbeat the callback built.
+
+    Returns:
+        The heartbeat to send, or ``None`` for none.
+    """
+    if callback is None:
+        return None
+    try:
+        return callback()
+    except Exception as exc:  # a failing callback must not end the heartbeat loop
+        # The kind only: the text of the error may carry a value of the status (SEC-LOG).
+        _LOG.warning(
+            "heartbeat callback failed (%s); sending the last valid heartbeat", type(exc).__name__
+        )
+        return last
 
 
 def gateway_url(base_url: str, url: str) -> str:
@@ -463,13 +491,15 @@ class Gateway:
     async def _beat(self, ws: ClientConnection, interval: float) -> None:
         """Heartbeat loop of one connection (04 6.3): random first delay, then every interval."""
         await self.clock.sleep(self._rng.random() * interval)
+        last_agent: Heartbeat | None = None
         while True:
             if self._ack_pending:
                 _LOG.info("gateway: heartbeat_ack missing; reconnecting")
                 await ws.close(_HEARTBEAT_TIMEOUT_CLOSE, "heartbeat_ack missing")
                 return
             beat = GatewayHeartbeat(last_seq=self._last_seq)
-            agent = self._heartbeat() if self._heartbeat is not None else None
+            agent = next_heartbeat(self._heartbeat, last_agent)
+            last_agent = agent
             if agent is not None:
                 beat.agent = agent
             self._ack_pending = True

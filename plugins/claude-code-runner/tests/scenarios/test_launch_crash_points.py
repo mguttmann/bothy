@@ -118,7 +118,8 @@ async def crash_and_continue(
     first = spawn_crashing(world, point, kind, **runner)
     await ready(world)
     run_id = await trigger()
-    assert await asyncio.to_thread(first.wait, PATIENCE) == 9  # the hook fired
+    await world.until(lambda: first.poll() is not None)
+    assert first.returncode == 9  # the hook fired
     await world.start(world.config(turn_handover=True, **runner))
     state = await world.ended(run_id)
     return run_id, {"completed": 0, "failed": 1, "cancelled": 2}[state]

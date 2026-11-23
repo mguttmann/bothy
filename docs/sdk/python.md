@@ -36,7 +36,7 @@ would only repeat that.
 | `invocation` | Check of the invocation token, with the JWKS cache and the `jti` store. |
 | `inbox` | Accepted events, their newest tokens and the `jti` store. |
 | `adapter` | The acceptance and run loop of an agent adapter. |
-| `runs` | The live-box patcher and the handle of a running run. |
+| `runs` | The live-box patcher and the handle of a running run; an end the server did not store is sent again. |
 | `context` | The run context with trust marks for the agent runtime. |
 | `components` | Message components of `component.v1`. |
 | `commands` | Slash commands: a declared list, reconciliation and autocomplete. |
@@ -44,6 +44,9 @@ would only repeat that.
 | `outbox` | Writes that must never go out twice or get lost. |
 | `long_answers` | A long answer stays one message: the head as its text, the rest above `message_max_content_bytes` as one attachment `answer.txt` (M4-47). |
 | `heartbeat` | The heartbeat building block for `agent_heartbeat.v1`. |
+| `uploads` | One part of an upload in mode `direct`, with its `Content-Digest`. |
+| `search_assist` | The agent's side of a search assist request. |
+| `message_format` | The format rules for replies an adapter hands to its runtime. |
 | `tolerance` | Tolerance of the generated core for what a newer server may send (gate G5). |
 | `webhooks` | Standard Webhooks verification for apps: `verify_webhook` and the key cache (M2-50). |
 | `testing` | Test support (extra `testing`): FakeServer, faults, scenario functions, doubles, the Fake-Agent of the agent conformance suite (M2-31) and the signing of test webhook deliveries (M2-50). |

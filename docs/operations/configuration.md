@@ -488,8 +488,8 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.anthropic_api_key_ref` |  | Runner |  | empty | `secret_ref` of the API key for `organization`; empty means: `organization` cannot be proven |  |
 | `runner.allow_personal` |  | Runner |  | `false` | runs in mode `personal` with the login of the runner user allowed |  |
 | `runner.forward_ssh_agent` |  | Runner |  | `false` | pass `SSH_AUTH_SOCK` on to the turn |  |
-| `runner.cli_probe_timeout` |  | Runner |  | `30s` | time limit for `claude auth status` and `claude --version` |  |
-| `runner.poll_interval` |  | Runner |  | `200ms` | interval at which the runner checks the recording for new lines and a held lock again |  |
+| `runner.cli_probe_timeout` |  | Runner |  | `30s` | time limit for `claude auth status` and `claude --version`; above zero |  |
+| `runner.poll_interval` |  | Runner |  | `200ms` | interval at which the runner checks the recording for new lines and a held lock again; above zero |  |
 | `runner.progress_patch_interval` |  | Runner |  | `2m` | `tool_progress` becomes a patch of `/metrics/progress_events` only when the last stored patch of the run is older than this; must stay below the server's `run.stall_after` (18.4, addendum of 2026-10-24) |  |
 | `hermes_adapter.server_url` |  | Hermes adapter |  | no default, required | API base of the instance (`https://<host>/api/v1`); discovery and JWKS come from `getDiscovery` |  |
 | `hermes_adapter.instance_id` |  | Hermes adapter |  | no default, required | instance ID of the server and the expected `iss` of every token (4.5 point 4) |  |
@@ -556,6 +556,7 @@ Source: [10-backend-policy.md](../spec/10-backend-policy.md), section 17.
 | `billing.show_personal_estimates` | `BOTHY_BILLING__SHOW_PERSONAL_ESTIMATES` | Server | bool | `true` | Show amounts in mode `personal` too, as information | active |
 | `billing.mismatch_alert_after` | `BOTHY_BILLING__MISMATCH_ALERT_AFTER` | Server | duration | `5m` | how long the reported mode may deviate from the configured mode before an alert goes out | active |
 | `reconciler.min_request_interval` |  | Reconciliation app |  | `60s` | Interval between requests to the Cost API |  |
+| `reconciler.pass_interval` |  | Reconciliation app |  | `1h` | Wait between the end of one pass and the start of the next |  |
 | `reconciler.lookback` |  | Reconciliation app |  | `3d` | this many days back are reconciled |  |
 | `reconciler.workspace_map` |  | Reconciliation app |  | empty | Assignment of workspace to agent |  |
 | `reconciler.server_url` |  | Reconciliation app |  | none (required) | Base address of the server API; `https`, `http` only to a loopback address |  |

@@ -111,6 +111,10 @@ async def test_no_canary_reaches_a_log_line(tmp_path: Path) -> None:
         assert set(line) <= {"time", "level", "msg", *LOG_ATTRIBUTES}
 
 
+def test_no_attribute_is_allowed_that_no_line_writes() -> None:
+    assert "step" not in LOG_ATTRIBUTES
+
+
 def test_formatter_drops_unknown_attributes_and_sdk_text() -> None:
     out = io.StringIO()
     log = AppLog.to_stream(out)

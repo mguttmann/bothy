@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 
 import { Secret } from "../src/auth/secret.js";
 import { createApiClient } from "../src/client.js";
+import { DEFAULTS } from "../src/config.js";
 import type { components } from "../src/generated/openapi.js";
 import { uuidv7 } from "../src/ids.js";
 import {
@@ -691,11 +692,17 @@ describe("InvocationVerifier", () => {
     expect(await env.verdict(tok)).toBe(TokenVerdict.UNKNOWN_KEY);
   });
 
-  it("fetches a JWKS without max-age again on the next use", async () => {
+  it("caches a JWKS without max-age for agent.jwks_max_age", async () => {
     const env = new Env({ maxAgeMs: undefined });
     expect(await env.verdict(env.issuer.token())).toBe(TokenVerdict.VALID);
     expect(await env.verdict(env.issuer.token())).toBe(TokenVerdict.VALID);
-    expect([env.verifier.fetches, env.verifier.forcedReloads]).toEqual([2, 0]);
+    expect([env.verifier.fetches, env.verifier.forcedReloads]).toEqual([1, 0]);
+    await env.clock.advance(DEFAULTS.jwksMaxAgeMs - 1);
+    expect(await env.verdict(env.issuer.token())).toBe(TokenVerdict.VALID);
+    expect(env.verifier.fetches).toBe(1);
+    await env.clock.advance(1);
+    expect(await env.verdict(env.issuer.token())).toBe(TokenVerdict.VALID);
+    expect(env.verifier.fetches).toBe(2);
   });
 
   it("skips unusable keys of the JWKS", async () => {

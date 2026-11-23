@@ -25,6 +25,15 @@ describe('TopologyView', () => {
     expect(lanes[1]!.costs).toEqual([{ currency: 'USD', amount: 0.42, estimate: true }]);
   });
 
+  it('counts a run state outside the catalogue as another state', () => {
+    const extra = [...frames, frame('active', { bothy_agent_handle: 'Scout', bothy_run_state: 'paused' }, [2])];
+    expect(topologyModel(extra)[1]).toMatchObject({ running: 2, other: 2 });
+    renderView(TopologyView, extra);
+    const scout = screen.getByRole('row', { name: /Scout/ });
+    expect(within(scout).getByText('other state 2')).toBeInTheDocument();
+    expect(screen.getByText('Active runs: 6')).toBeInTheDocument();
+  });
+
   it('renders lanes with states, tool steps and costs', () => {
     renderView(TopologyView, frames);
     const scout = screen.getByRole('row', { name: /Scout/ });

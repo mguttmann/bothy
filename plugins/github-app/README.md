@@ -141,15 +141,40 @@ The processor register of the operator lists GitHub when mirroring or `/issue` i
 ## Logs, state and lock
 
 Logs are JSON lines on stdout with `time`, `level`, a fixed `msg` code and only the attributes
-`event`, `action`, `delivery_id`, `webhook_id`, `job_id`, `job_kind`, `step`, `operation`,
+`event`, `action`, `delivery_id`, `webhook_id`, `job_id`, `job_kind`, `operation`,
 `status`, `outcome`, `reason`, `code`, `number`, `thread_id` and `channel_id`; never titles,
 bodies, names, logins, repository names, URLs, header values, tokens or secrets.
 
 `state_dir` holds `state.json` (thread map, drafts, created objects, seen identifiers), one file
 per queued job under `jobs/`, and `lock` with the PID of the running process; a second process on
-the same directory does not start, a lock of a process that is gone is taken over. Jobs run one
-at a time in creation order. A write to GitHub is attempted at most once: after a crash during it
-the outcome counts as unknown, and the person is told to check the repository.
+the same directory does not start, a lock of a process that is gone is taken over. The lock
+compares process IDs of one host: two containers that share the directory on a volume often run
+with the same PID and each takes the other's lock over, so run exactly one instance per
+`state_dir`. Jobs run one at a time in creation order. A failed write of the store (a full disk)
+keeps the job queued (`job.transient`, reason `store`) and the worker pauses. A write to GitHub is
+attempted at most once: when `/issue` meets a crash during it, the outcome counts as unknown and
+the person is told to check the repository; a mirrored reply that GitHub refused or did not
+confirm is only logged (`mirror.failed`, `mirror.unknown`) and not retried.
+
+## Operation and limits
+
+- Lost deliveries: the webhook endpoint answers `503` while the app is not ready (start, stop,
+  after a `401` of the server), when the queue is full or when the store or a secret file fails.
+  GitHub does not redeliver a failed delivery by itself, so such an event is lost until it is
+  redelivered by hand: from the webhook's "Recent Deliveries" in the repository settings or with
+  the REST endpoints for webhook deliveries
+  (https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/redelivering-webhooks).
+  Check the failed deliveries after a restart.
+- Back-up: `state_dir` is the only record of which thread belongs to which issue or pull request.
+  Back it up while the app is stopped. Without it, the next event of every existing issue or pull
+  request opens a new forum post.
+- A job that keeps failing: stop the app, remove its file under `jobs/` and start the app again.
+- Credentials: the app is not a GitHub App. It uses repository webhooks and the token of one
+  GitHub account (`github_token_file`); when that token expires or is revoked, `/issue` and
+  mirroring are refused with status `401`, visible only in the log lines. An organization that
+  forbids such tokens cannot run the app as it is.
+- Evidence: the tests use the Fake-GitHub API and payloads of the GitHub documentation; the app
+  has not been run against github.com.
 
 ## Tests
 

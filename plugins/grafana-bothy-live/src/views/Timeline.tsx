@@ -3,11 +3,12 @@
  * Timeline (docs/spec/25-visualization.md 8.2, mirror of 6.5): plays the dashboard period back.
  * The area shows the active runs over the period, the playhead a vertical line; the table below
  * lists every query of the view at the playhead. Controls: play, pause, jump to start or end and
- * the speeds of `viz.timeline_speeds` (seconds of time of day per second).
+ * the speeds of `viz.timeline_speeds` (seconds of time of day per second). It starts at the start of
+ * the period; Play at the end plays from the start again.
  */
 
 import { dateTimeFormat } from '@grafana/data';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { seriesOf, valueAt, type Series } from '../frames';
 import { formatValue } from '../format';
@@ -51,7 +52,9 @@ export function TimelineView({ frames, theme, range, timeZone }: ViewProps) {
   const [state, setPlayhead] = useState(range.from);
   // A dashboard refresh moves a relative period; the playhead stays where it was, kept inside it.
   const playhead = Math.min(Math.max(state, range.from), range.to);
-  const [playing, setPlaying] = useState(false);
+  const [running, setRunning] = useState(false);
+  // Playback ends by itself at the end of the period.
+  const playing = running && playhead < range.to;
   const [speed, setSpeed] = useState<number>(SPEEDS[0]);
   const st = tableStyles(theme);
   const c = theme.colors;
@@ -61,26 +64,22 @@ export function TimelineView({ frames, theme, range, timeZone }: ViewProps) {
       return undefined;
     }
     const timer = setInterval(() => {
-      setPlayhead((p) => {
-        const next = advance(Math.max(p, range.from), speed, range.to);
-        if (next >= range.to) {
-          setPlaying(false);
-        }
-        return next;
-      });
+      setPlayhead((p) => advance(Math.max(p, range.from), speed, range.to));
     }, TICK_MS);
     return () => clearInterval(timer);
   }, [playing, speed, range.from, range.to]);
 
-  const queries = QUERIES.timeline.queries;
-  const bySeries = queries.map((q) => ({ q, series: seriesOf(frames, q.refId) }));
+  const bySeries = useMemo(
+    () => QUERIES.timeline.queries.map((q) => ({ q, series: seriesOf(frames, q.refId) })),
+    [frames]
+  );
+  const active = useMemo(() => totals(bySeries[0]?.series ?? []), [bySeries]);
   if (bySeries.every(({ series }) => series.length === 0)) {
     return <p style={st.empty}>No data in this period.</p>;
   }
 
   const span = Math.max(1, range.to - range.from);
   const x = (t: number) => ((t - range.from) / span) * WIDTH;
-  const active = totals(bySeries[0]?.series ?? []);
   const max = Math.max(1, ...active.map(([, v]) => v));
   const y = (v: number) => HEIGHT - (v / max) * HEIGHT;
   const line = active.map(([t, v]) => `${x(t).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
@@ -111,17 +110,40 @@ export function TimelineView({ frames, theme, range, timeZone }: ViewProps) {
   return (
     <div>
       <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
-        <button type="button" style={button} onClick={() => setPlayhead(range.from)}>
+        <button
+          type="button"
+          style={button}
+          onClick={() => {
+            // A playback that reached the end is over: the jump does not resume it.
+            if (playhead >= range.to) {
+              setRunning(false);
+            }
+            setPlayhead(range.from);
+          }}
+        >
           Jump to start
         </button>
-        <button type="button" style={button} onClick={() => setPlaying((p) => !p && playhead < range.to)}>
+        <button
+          type="button"
+          style={button}
+          onClick={() => {
+            if (playing) {
+              setRunning(false);
+              return;
+            }
+            if (playhead >= range.to) {
+              setPlayhead(range.from);
+            }
+            setRunning(true);
+          }}
+        >
           {playing ? 'Pause' : 'Play'}
         </button>
         <button
           type="button"
           style={button}
           onClick={() => {
-            setPlaying(false);
+            setRunning(false);
             setPlayhead(range.to);
           }}
         >

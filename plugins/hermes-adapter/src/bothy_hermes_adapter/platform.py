@@ -112,7 +112,7 @@ from bothy_hermes_adapter.config import (
 )
 from bothy_hermes_adapter.context_format import ComposedUserSide
 from bothy_hermes_adapter.defaults import DEFAULT_MAX_MESSAGE_BYTES, NO_SPLIT_LENGTH
-from bothy_hermes_adapter.handler import TOOL_REFUSED, HermesHandler
+from bothy_hermes_adapter.handler import TOOL_REFUSED, HermesHandler, stack_of
 from bothy_hermes_adapter.heartbeat import ADAPTER_NAME, RUNTIME_NAME, HermesAdapterLoop
 from bothy_hermes_adapter.hermes_commands import declared_commands
 from bothy_hermes_adapter.installer import CONTROL_SENDER
@@ -139,7 +139,7 @@ from bothy_hermes_adapter.runtime import (
 from bothy_hermes_adapter.stages import STAGES_DIR, StageRegistry
 from bothy_hermes_adapter.store import CallbackStore
 
-__all__ = ["CONTROL_SENDER", "ServerPlatform", "dispatch_hook"]
+__all__ = ["CONTROL_SENDER", "FATAL_LOOP_FAILED", "ServerPlatform", "dispatch_hook"]
 
 _LOG = logging.getLogger("bothy_hermes_adapter")
 
@@ -161,6 +161,8 @@ _INTERIM: Final = "interim text is shown as the run's progress"
 # How often the adapter looks at the gateway's startup restore before it connects; a poll of a
 # flag, not a deadline (the wait ends when Hermes is ready).
 _READY_POLL_S: Final = 0.1
+FATAL_LOOP_FAILED: Final = "bothy_adapter_loop_failed"
+"""Hermes' fatal error code of a platform whose SDK loop failed (retryable, 09 17.3)."""
 # Bytes of an approval card that are not the command: Hermes' header, fences, reason label,
 # deadline and smart-deny lines and the cut notice of a longer command (D-HAM-3).
 _EA_CARD_RESERVE: Final = 4096
@@ -236,7 +238,8 @@ class ServerPlatform(BasePlatformAdapter):
     """
 
     # M4-47: Hermes hands every answer whole to `send` (no split, no cut of cron output); the
-    # handler keeps it one message and attaches the rest above hermes_adapter.max_message_bytes.
+    # handler keeps a run's answer one message and attaches the rest above
+    # hermes_adapter.max_message_bytes, and cuts a report there with a closing note (09 17.9).
     splits_long_messages = True
     MAX_MESSAGE_LENGTH = NO_SPLIT_LENGTH
     supports_status_text = True
@@ -258,6 +261,10 @@ class ServerPlatform(BasePlatformAdapter):
         self._allow_list_variable = f"{platform_key.upper()}_ALLOWED_USERS"
         self._loop: asyncio.AbstractEventLoop | None = None
         self._serve_task: asyncio.Task[Any] | None = None
+        # Set by `disconnect`: an end of the SDK loop after it is no failure to report.
+        self._closing = False
+        # The task that reports a failed SDK loop to Hermes (kept: asyncio holds weak refs).
+        self._fatal_task: asyncio.Task[Any] | None = None
         self._sdk: HermesAdapterLoop | None = None
         self.handler: HermesHandler | None = None
         self._turns: dict[str, asyncio.Future[TurnOutcome]] = {}
@@ -316,6 +323,7 @@ class ServerPlatform(BasePlatformAdapter):
             return False
         settings = self.settings
         self._loop = asyncio.get_running_loop()
+        self._closing = False
         try:
             credentials = Credentials(
                 load_token(settings.token_file),
@@ -421,10 +429,20 @@ class ServerPlatform(BasePlatformAdapter):
             reason = await loop.run()
             if reason.code == 4015:
                 _LOG.warning("another process took the consumer over; disconnected")
-            else:
-                _LOG.info("adapter loop stopped code=%s", reason.code)
+            elif not self._closing:
+                _LOG.warning("adapter loop stopped code=%s", reason.code)
         except Exception as exc:
-            _LOG.error("adapter loop failed: %s", type(exc).__name__)
+            _LOG.error("adapter loop failed: %s\n%s", type(exc).__name__, stack_of(exc))
+            if not self._closing:
+                # Hermes reconnects a platform only after a fatal error it was told about; a
+                # loop that ended on a failure (discovery, keys, a defect) would otherwise
+                # leave the agent offline until the gateway restarts (09 17.3).
+                self._set_fatal_error(
+                    FATAL_LOOP_FAILED, f"adapter loop failed: {type(exc).__name__}", retryable=True
+                )
+                # Not awaited here: Hermes' handler calls `disconnect`, which awaits the task
+                # that runs this method; it reports once this task has left `_serve`.
+                self._fatal_task = asyncio.ensure_future(self._notify_fatal_error())
         finally:
             if watch is not None:
                 watch.cancel()
@@ -433,6 +451,7 @@ class ServerPlatform(BasePlatformAdapter):
 
     async def disconnect(self) -> None:
         """Stop the SDK loop (close ``1000``); the server ends open runs ``interrupted``."""
+        self._closing = True
         if self._sdk is not None:
             await self._sdk.stop()
         if self._serve_task is not None:

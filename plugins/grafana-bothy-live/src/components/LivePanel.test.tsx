@@ -8,15 +8,20 @@ import { frame } from '../../test/fixtures';
 import { DEFAULT_OPTIONS, type LiveOptions } from '../types';
 import { LivePanel } from './LivePanel';
 
-function panel(options: Partial<LiveOptions>, mode: 'light' | 'dark') {
+const ACTIVE = [frame('active', { bothy_agent_handle: 'Scout', bothy_run_state: 'running' }, [1])];
+
+function panel(
+  options: Partial<LiveOptions>,
+  mode: 'light' | 'dark',
+  data: { state: LoadingState; series?: unknown[]; errors?: Array<{ message?: string }> } = {
+    state: LoadingState.Done,
+    series: ACTIVE,
+  }
+) {
   const timeRange = getDefaultTimeRange();
   const props = {
     id: 1,
-    data: {
-      state: LoadingState.Done,
-      series: [frame('active', { bothy_agent_handle: 'Scout', bothy_run_state: 'running' }, [1])],
-      timeRange,
-    },
+    data: { series: [], ...data, timeRange },
     timeRange,
     timeZone: 'utc',
     options: { ...DEFAULT_OPTIONS, ...options },
@@ -63,5 +68,30 @@ describe('LivePanel', () => {
     expect(styles).toHaveLength(1);
     expect(styles[0]!.textContent).toContain("font-family: 'Atkinson Hyperlegible Next'");
     expect(styles[0]!.textContent).toContain("font-family: 'Atkinson Hyperlegible Mono'");
+  });
+
+  it('shows a failed query as a failure, not as an empty period', () => {
+    panel({ view: 'topology' }, 'light', {
+      state: LoadingState.Error,
+      errors: [{ message: 'Bad Gateway' }],
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('Query failed: Bad Gateway');
+    expect(screen.queryByText('No agent activity in this period.')).not.toBeInTheDocument();
+  });
+
+  it('keeps the frames that arrived when one of several queries failed', () => {
+    panel({ view: 'topology' }, 'light', {
+      state: LoadingState.Error,
+      series: ACTIVE,
+      errors: [{ message: 'timeout' }],
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('Query failed: timeout');
+    expect(screen.getByText('Scout')).toBeInTheDocument();
+  });
+
+  it('shows loading instead of an empty period while the first frames load', () => {
+    panel({ view: 'topology' }, 'light', { state: LoadingState.Loading });
+    expect(screen.getByText('Loading')).toBeInTheDocument();
+    expect(screen.queryByText('No agent activity in this period.')).not.toBeInTheDocument();
   });
 });

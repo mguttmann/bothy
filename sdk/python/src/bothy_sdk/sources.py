@@ -24,6 +24,7 @@ import logging
 import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Protocol, runtime_checkable
 from uuid import UUID
 
@@ -39,7 +40,7 @@ from bothy_sdk.errors import (
     UnauthenticatedError,
     UseDpopNonce,
 )
-from bothy_sdk.gateway import CloseReason, Gateway, GatewayEvent
+from bothy_sdk.gateway import CloseReason, Gateway, GatewayEvent, next_heartbeat
 from bothy_sdk.generated.api.agent_runtime import (
     ack_agent_events,
     answer_autocomplete,
@@ -145,6 +146,8 @@ def envelope_from(data: Mapping[str, Any]) -> Envelope:
     Returns:
         The envelope.
 
+    A stored event of a known type that does not decode carries an `UnknownEvent`.
+
     Raises:
         ValueError: ``id`` or ``type`` is missing or malformed, or an ephemeral event lacks a
             required member or has one of a wrong type.
@@ -166,7 +169,17 @@ def envelope_from(data: Mapping[str, Any]) -> Envelope:
             # A member of the wrong type (a number where a UUID string belongs) raises the latter.
             raise ValueError(f"{event_type} without a required member or of a wrong type") from exc
     else:
-        event = decode_event(raw)
+        try:
+            event = decode_event(raw)
+        except (KeyError, ValueError, TypeError, AttributeError):
+            # A known type that does not decode is passed on as unknown and acknowledged like
+            # one, so it neither stops the adapter nor comes back forever.
+            _LOG.warning("event %s seq=%s does not decode; passed on as unknown", event_type, seq)
+            event = UnknownEvent(
+                type=event_type,
+                seq=seq if isinstance(seq, int) and not isinstance(seq, bool) else None,
+                raw=MappingProxyType(dict(raw)),
+            )
     return Envelope(
         raw=raw,
         event=event,
@@ -520,8 +533,9 @@ class PollingSource(_WindowedSource):
 
     async def _beat(self) -> None:
         interval = self.settings.poll_interval
+        beat: Heartbeat | None = None
         while not self._stopped.is_set():
-            beat = self._heartbeat() if self._heartbeat is not None else None
+            beat = next_heartbeat(self._heartbeat, beat)
             if beat is not None:
                 try:
                     result = await self.client.call(send_heartbeat.asyncio_detailed, body=beat)

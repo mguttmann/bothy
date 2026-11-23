@@ -3,9 +3,10 @@
  * The panel component: picks the view of the panel options and wraps it in the token theme that
  * follows Grafana's light or dark theme. The panel reads only the frames Grafana's data sources
  * return for its targets; it never talks to the product server (docs/spec/25-visualization.md 8.1).
+ * A failed query shows as a failure and a first load as loading, so neither looks like a quiet period.
  */
 
-import type { PanelProps } from '@grafana/data';
+import { LoadingState, type PanelProps } from '@grafana/data';
 import React, { useEffect } from 'react';
 
 import { ensureFonts } from '../fonts';
@@ -38,6 +39,14 @@ export function LivePanel({ data, options, width, height, timeRange, timeZone }:
   useEffect(() => ensureFonts(), []);
   const View = VIEWS[options.view] ?? TopologyView;
   const view = VIEWS[options.view] ? options.view : 'topology';
+  const failed = data.state === LoadingState.Error;
+  const errorText = (data.errors ?? [])
+    .map((e) => e.message)
+    .filter((m): m is string => typeof m === 'string' && m.length > 0)
+    .join('; ');
+  const loading = data.state === LoadingState.Loading && data.series.length === 0;
+  // The empty texts of the views mean "no activity" and hold only when every query returned.
+  const showView = !loading && (!failed || data.series.length > 0);
   return (
     <section
       aria-label={QUERIES[view].title}
@@ -55,13 +64,21 @@ export function LivePanel({ data, options, width, height, timeRange, timeZone }:
         borderRadius: theme.radii.md,
       }}
     >
-      <View
-        frames={data.series}
-        theme={theme}
-        options={options}
-        range={{ from: timeRange.from.valueOf(), to: timeRange.to.valueOf() }}
-        timeZone={timeZone}
-      />
+      {failed && (
+        <p role="alert" style={{ color: theme.colors.danger.fg, fontWeight: 600, margin: '0 0 8px' }}>
+          {`Query failed: ${errorText || 'no message'}`}
+        </p>
+      )}
+      {loading && <p style={{ color: theme.colors.text.muted, margin: 0 }}>Loading</p>}
+      {showView && (
+        <View
+          frames={data.series}
+          theme={theme}
+          options={options}
+          range={{ from: timeRange.from.valueOf(), to: timeRange.to.valueOf() }}
+          timeZone={timeZone}
+        />
+      )}
     </section>
   );
 }

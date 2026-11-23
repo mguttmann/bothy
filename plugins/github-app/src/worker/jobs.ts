@@ -48,7 +48,13 @@ import {
 } from "../domain/render.js";
 import type { GitHubClient, GitHubResult } from "../github/client.js";
 import type { GitHubEvent } from "../github/events.js";
-import type { Draft, JobRecord, JsonValue, Store } from "../store/store.js";
+import {
+  StoreError,
+  type Draft,
+  type JobRecord,
+  type JsonValue,
+  type Store,
+} from "../store/store.js";
 
 /** The kinds of jobs. */
 export type JobKind =
@@ -236,8 +242,21 @@ export class JobRunner {
       logger.error("job.secret_file", { ...base, reason: "secret_file" });
       return "done";
     }
+    if (err instanceof StoreError) {
+      // Safe to repeat: identifiers and the GitHub mark are stored before each write.
+      logger.error("job.transient", {
+        ...base,
+        reason: "store",
+        code: err.code,
+      });
+      return "retry";
+    }
     if (!(err instanceof ProblemError)) {
-      logger.error("job.failed", { ...base, reason: "internal" });
+      logger.error("job.failed", {
+        ...base,
+        reason: "internal",
+        code: err instanceof Error ? err.name : "unknown",
+      });
       return "done";
     }
     const fields = {

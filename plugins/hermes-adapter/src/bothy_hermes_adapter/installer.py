@@ -60,6 +60,7 @@ __all__ = [
     "HERMES_PACKAGES",
     "OWN_PACKAGES",
     "PACKAGES_FILE",
+    "STARTER_FILE",
     "InstallError",
     "InstallRequest",
     "PackageSource",
@@ -99,6 +100,9 @@ PACKAGES_FILE: Final = "packages.json"
 
 VENDOR_DIR: Final = "vendor"
 """Directory of the plugin directory with the copied packages."""
+
+STARTER_FILE: Final = "run.py"
+"""The plugin directory's starter of ``python -m bothy_hermes_adapter`` (09 17.12 point 8)."""
 
 ADAPTER_LOADABLE: Final = "adapter: loadable"
 ADAPTER_NOT_LOADABLE: Final = "adapter: not loadable"
@@ -318,6 +322,30 @@ register = make_register("{platform_key}")
 """
 
 
+_STARTER_MODULE = """\
+# SPDX-License-Identifier: Apache-2.0
+\"\"\"Run ``python -m bothy_hermes_adapter`` with the packages of this plugin (09 17.12 point 8).
+
+Written by the installer. Hermes' environment holds nothing of the adapter, so the module is not
+importable there by itself: this starter loads the plugin entry (which serves the packages
+packages.json names) and then runs the module, for example
+``python <plugin directory>/run.py job register ...`` with the Python of the profile.
+\"\"\"
+
+import importlib.util
+import runpy
+import sys
+from pathlib import Path
+
+_spec = importlib.util.spec_from_file_location(
+    "_bothy_plugin_entry", Path(__file__).resolve().parent / "__init__.py"
+)
+_spec.loader.exec_module(importlib.util.module_from_spec(_spec))
+sys.argv[0] = "bothy_hermes_adapter"
+runpy.run_module("bothy_hermes_adapter", run_name="__main__", alter_sys=True)
+"""
+
+
 def plugin_entry(platform_key: str) -> dict[str, str]:
     """The files of the plugin directory the pinned version discovers (without the packages).
 
@@ -325,8 +353,8 @@ def plugin_entry(platform_key: str) -> dict[str, str]:
         platform_key: `hermes_adapter.platform_key`.
 
     Returns:
-        File name to text: ``plugin.yaml`` (``kind: platform``) and ``__init__.py``, which
-        loads the packages ``packages.json`` names.
+        File name to text: ``plugin.yaml`` (``kind: platform``), ``__init__.py``, which
+        loads the packages ``packages.json`` names, and the starter `STARTER_FILE`.
     """
     manifest = (
         "# SPDX-License-Identifier: Apache-2.0\n"
@@ -337,7 +365,7 @@ def plugin_entry(platform_key: str) -> dict[str, str]:
         "description: Connects this Hermes profile to the chat server as one agent.\n"
     )
     module = _PLUGIN_MODULE.replace("{platform_key}", platform_key)
-    return {"plugin.yaml": manifest, "__init__.py": module}
+    return {"plugin.yaml": manifest, "__init__.py": module, STARTER_FILE: _STARTER_MODULE}
 
 
 def _platform_sections(config: Mapping[str, Any]) -> dict[str, Any]:

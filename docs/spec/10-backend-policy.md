@@ -727,7 +727,9 @@ Flow:
    `supersedes_id` pointing to the estimate. The server then sets `runs.cost_is_estimate` and
    `agent_sessions.cost_is_estimate` and adjusts the sums.
 5. The app queries at most every `reconciler.min_request_interval` and for the last
-   `reconciler.lookback` days.
+   `reconciler.lookback` days; between two passes it waits `reconciler.pass_interval`. Reason:
+   the report has daily buckets and a pass submits every day of the lookback again, and the
+   server records every submission in the audit trail, also a no-op.
 
 Authorization: `cost.reconcile` requires step-up and is therefore impossible for an app (R-AZ-03).
 The app therefore uses the separate action `cost.reconcile.submit` with scope `costs:reconcile`
@@ -832,6 +834,7 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 | `billing.show_personal_estimates` | Server | `true` | Show amounts in mode `personal` too, as information |
 | `billing.mismatch_alert_after` | Server | `5m` | how long the reported mode may deviate from the configured mode before an alert goes out |
 | `reconciler.min_request_interval` | Reconciliation app | `60s` | Interval between requests to the Cost API |
+| `reconciler.pass_interval` | Reconciliation app | `1h` | Wait between the end of one pass and the start of the next |
 | `reconciler.lookback` | Reconciliation app | `3d` | this many days back are reconciled |
 | `reconciler.workspace_map` | Reconciliation app | empty | Assignment of workspace to agent |
 | `reconciler.server_url` | Reconciliation app | none (required) | Base address of the server API; `https`, `http` only to a loopback address |

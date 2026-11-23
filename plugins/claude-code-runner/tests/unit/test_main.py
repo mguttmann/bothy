@@ -130,3 +130,78 @@ def test_config_error_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     err = capsys.readouterr().err
     assert "runner.surprise" in err
     assert "secret-value" not in err
+
+
+def test_sighup_stops_like_sigterm() -> None:
+    import signal
+
+    from claude_code_runner.__main__ import STOP_SIGNALS
+
+    assert set(STOP_SIGNALS) == {signal.SIGINT, signal.SIGTERM, signal.SIGHUP}
+
+
+@pytest.mark.anyio
+async def test_a_second_signal_starts_no_second_stop() -> None:
+    import asyncio
+
+    from claude_code_runner.__main__ import StopOnSignal
+
+    calls: list[int] = []
+    release = asyncio.Event()
+
+    async def stop() -> None:
+        calls.append(1)
+        await release.wait()
+
+    on_signal = StopOnSignal(stop, lambda: None)
+    on_signal()
+    on_signal()
+    await asyncio.sleep(0)
+    release.set()
+    assert on_signal.task is not None
+    await on_signal.task
+    assert calls == [1]
+    assert not on_signal.failed
+
+
+@pytest.mark.anyio
+async def test_a_failed_stop_is_logged_and_ends_the_run(caplog: pytest.LogCaptureFixture) -> None:
+    import asyncio
+
+    from claude_code_runner.__main__ import StopOnSignal
+
+    async def stop() -> None:
+        raise RuntimeError("stop broke")
+
+    ended: list[bool] = []
+    on_signal = StopOnSignal(stop, lambda: ended.append(True))
+    with caplog.at_level("ERROR", logger="claude_code_runner"):
+        on_signal()
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+    assert on_signal.failed
+    assert ended == [True]
+    assert '"event": "stop_failed", "error": "RuntimeError"' in caplog.text
+
+
+@pytest.mark.anyio
+async def test_the_error_line_of_a_failed_stop_names_only_the_kind(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # The message of an error may hold a path or a value; it goes to level debug only.
+    import asyncio
+
+    from claude_code_runner.__main__ import StopOnSignal
+
+    async def stop() -> None:
+        raise RuntimeError("/secret/path value-canary")
+
+    on_signal = StopOnSignal(stop, lambda: None)
+    with caplog.at_level("ERROR", logger="claude_code_runner"):
+        on_signal()
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+    errors = [r for r in caplog.records if r.levelname == "ERROR"]
+    assert [r.getMessage() for r in errors] == ['{"event": "stop_failed", "error": "RuntimeError"}']
+    assert all(r.exc_info is None for r in errors)
+    assert "value-canary" not in caplog.text

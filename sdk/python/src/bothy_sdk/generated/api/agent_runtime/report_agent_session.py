@@ -21,7 +21,7 @@ def _get_kwargs(
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
     if not isinstance(idempotency_key, Unset):
-        headers["Idempotency-Key"] = idempotency_key
+        headers["Idempotency-Key"] = str(idempotency_key)
 
     if not isinstance(if_match, Unset):
         headers["If-Match"] = if_match

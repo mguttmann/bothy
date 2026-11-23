@@ -56,7 +56,7 @@ from bothy_sdk.ids import uuid7
 
 from bothy_hermes_adapter import __version__
 from bothy_hermes_adapter.config import ConfigError, load_settings, load_token
-from bothy_hermes_adapter.context_format import cut_utf8
+from bothy_hermes_adapter.context_format import cut_with_note
 
 __all__ = [
     "STANDALONE_AGENT",
@@ -184,7 +184,7 @@ async def post_report(
     Args:
         client: The agent's client.
         target: Channel and optional thread.
-        text: The report (cut to ``max_bytes`` at a UTF-8 boundary).
+        text: The report (cut to ``max_bytes`` at a UTF-8 boundary, ending with a note).
         max_bytes: ``hermes_adapter.max_message_bytes``.
         send: Posts into an existing thread.
 
@@ -194,7 +194,9 @@ async def post_report(
     Raises:
         ReportError: An empty report, a dm channel, or a refusal of the server (its code).
     """
-    body, _ = cut_utf8(text.encode("utf-8"), max_bytes)
+    body, was_cut = cut_with_note(text, max_bytes)
+    if was_cut:  # the note tells the reader that text is missing (09 17.9)
+        _LOG.warning("report cut to the message limit code=report_cut")
     if not body.strip():
         raise ReportError("the report is empty")
     try:

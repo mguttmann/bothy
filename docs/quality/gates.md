@@ -423,6 +423,15 @@ Where the list is:
   Tests: `test_a_rerun_of_a_reported_run_with_a_new_flake_artifact_is_seen_again`,
   `test_the_attempts_of_one_run_count_once_with_the_flakes_of_each`.
 
+Known class, the scenario waits of the Claude Code runner (`plugins/claude-code-runner/tests/scenarios`):
+a few scenarios ran out of their wait in CI. They did not run slowly: the runner process did not
+reach the expected point for the whole of `quality.test.patience`, while the same test passes in
+seconds on a workstation. A longer bound would not change such a run, so the bound stays. Every
+scenario wait goes through `World.until`, and a wait that runs out fails with the evidence the
+next occurrence needs: the end of every runner process log, the state of every runner process
+and the last Fake-Claude records (`World.diagnostics`, test `tests/scenarios/test_world_waits.py`).
+The cause of the hang is open until such a report names it.
+
 ## Red runs
 
 Keeping `main` green is a duty of the maintainers (GOVERNANCE.md, "Roles"): they read the runs of

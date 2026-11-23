@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextvars
 import json
 import re
 from collections.abc import Callable
@@ -255,6 +257,79 @@ async def test_finish_after_run_inactive_not_raised() -> None:
     handle.started(Run.from_dict(_run(1)), "jti-1")
     await handle.finish("completed")
     assert handle.finished
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        lambda request: httpx.Response(503, json=_problem(503, "unavailable")),
+        lambda request: (_ for _ in ()).throw(httpx.ConnectError("down", request=request)),
+    ],
+    ids=["5xx", "no answer"],
+)
+@pytest.mark.anyio
+async def test_finish_not_stored_keeps_the_first_end(
+    failure: Callable[[httpx.Request], httpx.Response],
+) -> None:
+    down = True
+
+    def answer(request: httpx.Request, n: int) -> httpx.Response:
+        if down:
+            return failure(request)
+        return httpx.Response(200, json=_run(2, state="completed"))
+
+    rec = Recorder(answer)
+    client = _client(rec, retry_max_attempts=1)
+    handle = RunHandle(client, RUN_ID, UUID(RUN_JSON["thread_id"]), outbox=None)
+    handle.started(Run.from_dict(_run(1)), "jti-1")
+    with pytest.raises((errors.ProblemError, httpx.TransportError)):
+        await handle.finish("completed", summary="done")
+    assert not handle.finished
+    assert handle.finish_pending
+    down = False
+    # The adapter's reaction to a throwing handler asks for another end; the first one wins.
+    await handle.finish("failed", reason="adapter_error")
+    assert handle.finished
+    assert not handle.finish_pending
+    assert rec.requests[-1][2] == {"state": "completed", "summary": "done"}
+    await handle.retry_finish()  # nothing pending: nothing sent
+    assert len(rec.requests) == 2
+
+
+@pytest.mark.anyio
+async def test_finish_refused_stays_finished() -> None:
+    problem = _problem(400, "validation_failed", errors=[{"pointer": "/state", "code": "invalid"}])
+    rec = Recorder(lambda request, n: httpx.Response(400, json=problem))
+    handle = RunHandle(_client(rec), RUN_ID, UUID(RUN_JSON["thread_id"]), outbox=None)
+    handle.started(Run.from_dict(_run(1)), "jti-1")
+    with pytest.raises(errors.ValidationFailed):
+        await handle.finish("completed")
+    assert handle.finished
+    assert not handle.finish_pending
+
+
+@pytest.mark.anyio
+async def test_patch_timer_started_outside_the_run_is_bound_to_it() -> None:
+    tokens: list[str | None] = []
+
+    def answer(request: httpx.Request, n: int) -> httpx.Response:
+        tokens.append(request.headers.get("Invocation-Token"))
+        return _patch_ok(request, n)
+
+    client = _client(Recorder(answer))
+    patcher = RunPatcher(client, RUN_ID, 1)
+    with client.bind_run(RUN_ID, Secret("run-token")):
+        pass  # the run is bound in its own task; this context is not
+
+    # A runtime callback on a task without the binding starts the throttle timer.
+    async def unbound_setter() -> None:
+        patcher.set_status_line("from a callback")
+
+    await asyncio.get_running_loop().create_task(unbound_setter(), context=contextvars.Context())
+    timer = patcher._timer
+    assert timer is not None
+    await timer
+    assert tokens == ["run-token"]
 
 
 def test_patch_before_start_refused() -> None:

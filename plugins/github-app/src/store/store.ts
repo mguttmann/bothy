@@ -196,6 +196,45 @@ export class StoreLockedError extends Error {
   }
 }
 
+/**
+ * A write or delete of the store failed (a full or broken disk). The change did not happen, so
+ * repeating the step is safe: the worker keeps the job queued (brief M2-49 Design note 13).
+ */
+export class StoreError extends Error {
+  /** The `errno` code of the cause (`ENOSPC`, `EIO`), else the class name of the cause. */
+  readonly code: string;
+
+  /**
+   * Creates the error.
+   *
+   * @param cause - The error of the persistence hook.
+   */
+  constructor(cause: unknown) {
+    super("the store could not persist a change", { cause });
+    this.name = "StoreError";
+    const errno = (cause as { code?: unknown } | undefined)?.code;
+    this.code =
+      typeof errno === "string"
+        ? errno
+        : cause instanceof Error
+          ? cause.name
+          : "unknown";
+  }
+}
+
+/**
+ * Runs one persistence hook; its failure becomes a {@link StoreError}.
+ *
+ * @param write - The hook call.
+ */
+async function persist(write: () => Promise<void>): Promise<void> {
+  try {
+    await write();
+  } catch (err) {
+    throw new StoreError(err);
+  }
+}
+
 /** An empty state. */
 export function emptyState(): StateData {
   return {
@@ -312,7 +351,7 @@ export abstract class StoreBase implements Store {
       const next = clone(this.data);
       const result = change(next);
       this.prune(next);
-      await this.writeState(next);
+      await persist(() => this.writeState(next));
       this.data = next;
       return result;
     });
@@ -328,19 +367,32 @@ export abstract class StoreBase implements Store {
         return { kind: "full" };
       const next = clone(this.data);
       next.seen[input.seenKey] = { at: this.clock.now(), status: input.status };
+      let job: JobRecord | undefined;
       if (input.job !== undefined) {
-        const job: JobRecord = {
+        job = {
           ...clone(input.job),
           seq: next.next_seq,
           seen_key: input.seenKey,
         };
         next.next_seq += 1;
         // The job first: a crash before the state write still restores its seen key.
-        await this.writeJob(job);
+        const written = job;
+        await persist(() => this.writeJob(written));
         this.queue.set(job.id, job);
       }
       this.prune(next);
-      await this.writeState(next);
+      try {
+        await persist(() => this.writeState(next));
+      } catch (err) {
+        // The sender is answered 503 and delivers again: take the job back, so it neither runs
+        // twice nor keeps a sequence number the next job would get as well.
+        if (job !== undefined) {
+          this.queue.delete(job.id);
+          const written = job;
+          await this.deleteJob(written).catch(() => undefined);
+        }
+        throw err;
+      }
       this.data = next;
       return { kind: "accepted" };
     });
@@ -358,7 +410,7 @@ export abstract class StoreBase implements Store {
     return this.exclusive(async () => {
       if (!this.queue.has(job.id)) return;
       const copy = clone(job);
-      await this.writeJob(copy);
+      await persist(() => this.writeJob(copy));
       this.queue.set(job.id, copy);
     });
   }
@@ -368,7 +420,7 @@ export abstract class StoreBase implements Store {
     return this.exclusive(async () => {
       const job = this.queue.get(id);
       if (job === undefined) return;
-      await this.deleteJob(job);
+      await persist(() => this.deleteJob(job));
       this.queue.delete(id);
     });
   }

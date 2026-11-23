@@ -694,3 +694,10 @@ def test_tested_claude_code_keys(tmp_path: Path) -> None:
         text = f'tested_claude_code_version = "2.1.327"\ntested_claude_code_pin = "{bad}"\n'
         with pytest.raises(ConfigError, match="tested_claude_code_pin"):
             load_config(write(tmp_path, text))
+
+
+@pytest.mark.parametrize("key", ["poll_interval", "cli_probe_timeout"])
+def test_wait_keys_are_refused_at_zero(tmp_path: Path, key: str) -> None:
+    """A zero ``poll_interval`` makes every wait loop spin, a zero probe time fails every probe."""
+    with pytest.raises(ConfigError, match=key):
+        load_config(write(tmp_path, f'{key} = "0s"\n'))

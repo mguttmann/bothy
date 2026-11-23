@@ -54,6 +54,17 @@ describe('BackendView', () => {
     expect(screen.queryByText(/USD/)).toBeNull();
   });
 
+  it('rounds the extrapolated increases before it leaves out zero counts', () => {
+    const rows = backendModel([
+      frame('mode_runs', { bothy_agent_handle: 'Scout', bothy_billing_mode: 'organization' }, [6.6]),
+      frame('mode_runs', { bothy_agent_handle: 'Scout', bothy_billing_mode: 'personal' }, [0.4]),
+      frame('denials', { bothy_agent_handle: 'Scout', bothy_reason: 'i2_denied' }, [0.4]),
+      frame('mismatches', { bothy_agent_handle: 'Scout' }, [0.3]),
+      frame('mode_runs', { bothy_agent_handle: 'Lotse', bothy_billing_mode: 'personal' }, [0.2]),
+    ]);
+    expect(rows).toEqual([{ agent: 'Scout', modes: { organization: 7 }, mismatches: 0, denials: [], costs: [] }]);
+  });
+
   it('says so when there is no data', () => {
     renderView(BackendView, []);
     expect(screen.getByText('No runs in this period.')).toBeInTheDocument();

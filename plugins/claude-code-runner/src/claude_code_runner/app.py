@@ -674,7 +674,9 @@ class RunnerHandler(AgentHandler):
         """Take over or end the turns of the turn records an earlier runner left behind.
 
         The turns of hosted agents are never taken over: one that still runs is stopped and its
-        record removed (`claude_code_runner.hosting.stop_leftover_turns`).
+        record removed (`claude_code_runner.hosting.stop_leftover_turns`). A record whose
+        adoption raises is logged as ``turn_adoption_failed`` (the error's kind only) and kept;
+        the next record is adopted and the runner starts.
 
         Args:
             adapter: The built adapter (its client, inbox and outbox).
@@ -690,7 +692,13 @@ class RunnerHandler(AgentHandler):
                 warn("turn_record_unreadable", record=path.stem)
                 continue
             run_id, thread_id = UUID(record["run_id"]), UUID(record["thread_id"])
-            await self._adopt(adapter, path, record, run_id, thread_id)
+            try:
+                await self._adopt(adapter, path, record, run_id, thread_id)
+            except Exception as err:
+                # The record stays for the next start; the line names only the error's kind.
+                line = {"event": "turn_adoption_failed", "record": path.stem}
+                _LOG.error(json.dumps({**line, "error": type(err).__name__}))
+                _LOG.debug("adoption of %s failed", path.stem, exc_info=err)
         await stop_leftover_turns(
             self.config.state_dir,
             stop_grace=self.config.stop_grace,
@@ -789,6 +797,7 @@ class RunnerHandler(AgentHandler):
             return
         if self.stopping_all:
             turn.stop_reason = ADAPTER_STOPPED  # stop --turns: stopped as in 18.6 at once
+        self._occupy(turn.state)
         self.adopted[run_id] = turn
         task = asyncio.ensure_future(
             self._follow_adopted(adapter, turn, record, group, token, known)
@@ -822,6 +831,7 @@ class RunnerHandler(AgentHandler):
                 _failed("adopted_follow_failed", "the follow of the adopted run", run_id, err)
         finally:
             self.adopted.pop(run_id, None)
+            turn.state.close()  # the slot of the adopted turn
             adapter.client.release_run(run_id)
 
     # ---- adoption of a background turn (09 18.9 "Background mode") ---------------------------
@@ -941,6 +951,7 @@ class RunnerHandler(AgentHandler):
             finally:
                 state.close()
             return
+        self._occupy(turn.state)
         self.adopted[run_id] = turn
         task = asyncio.ensure_future(
             self._follow_background(adapter, turn, record, session, token, known)
@@ -1037,6 +1048,7 @@ class RunnerHandler(AgentHandler):
         known = {
             key: str(step.status.value) for key, step in run.steps.additional_properties.items()
         }
+        self._occupy(turn.state)
         self.adopted[run_id] = turn
         task = asyncio.ensure_future(self._take_over(adapter, turn, record, token, known))
         self._adopting.add(task)
@@ -1379,6 +1391,15 @@ class RunnerHandler(AgentHandler):
         if cached is None or (isinstance(wanted, int) and wanted > cached):
             await cache.reload(payload.channel_id)
         return cache.binding(payload.channel_id)
+
+    def _occupy(self, state: RunState) -> None:
+        """An adopted live turn holds a slot without waiting (09 18.2, AUD-P9R/1).
+
+        Without it a restart with live turns would report ``run_slots.used`` 0 and start up to
+        ``runner.max_parallel_runs`` further turns beside them.
+        """
+        self.slots.occupy()
+        state.slot = self.slots
 
     async def _take_locks(self, state: RunState, ids: Mapping[str, Any]) -> None:
         """Take the thread lock, the session lock and a slot; report each wait (09 5.2.1)."""

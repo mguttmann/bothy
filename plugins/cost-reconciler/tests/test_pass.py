@@ -247,12 +247,20 @@ def test_missing_token_file_is_exit_2(world: World) -> None:
 def test_loop_runs_passes_until_stopped(world: World) -> None:
     stop = FakeStop(world.clock, stop_after_waits=2)
     assert world.run(stop=stop) == 0
-    assert stop.waits == [60.0, 60.0]
+    # The default `reconciler.pass_interval` between passes, not the request interval.
+    assert stop.waits == [3600.0, 3600.0]
     assert len(world.events("pass_started")) == 2
     assert len(world.server.submissions()) == 2
     assert len(world.cost_api.requests) == 4
     # Every cost API request after the first started at least the interval after the previous.
     assert all(s <= 60.0 for s in world.clock.sleeps)
+
+
+def test_loop_waits_the_configured_pass_interval(world: World) -> None:
+    world.extra += 'pass_interval = "5m"\n'
+    stop = FakeStop(world.clock, stop_after_waits=2)
+    assert world.run(stop=stop) == 0
+    assert stop.waits == [300.0, 300.0]
 
 
 def test_loop_keeps_going_after_a_failed_pass(world: World) -> None:
