@@ -194,7 +194,7 @@
       "method": "on_processing_complete"
     }
   ],
-  "inputs_sha256": "a46fe617d5c9ef8f86b532b3d07b8e6b1f49abe2a38637bfb48c4781b9b3b5a3",
+  "inputs_sha256": "8a17610f27343e4c2e3cdfdcc47a5e1acfa07592164be1f4d07ae2d5052e4d2d",
   "model_requests": [
     {
       "credential": "none",
@@ -206,7 +206,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:c03c4c55fe1a8d28f51ad835f29dd9008fabba3fc82b8e0e34920efd499d267b:5184",
+        "sha256:b81e377b22bc4a9377e183191537c4201f0c8ac86c07713da07771421cfddd70:5007",
         "sha256:62b2cc6fe9d5219715af63d3463df1c19f5e127b91d314562c91b2aa7bbd7d95:41"
       ],
       "roles": [
@@ -250,11 +250,6 @@
       "tool_call_ids": [],
       "tools": [],
       "turn": null
-    },
-    {
-      "credential": "none",
-      "route": "openai.models",
-      "scripted": false
     }
   ],
   "pattern": [
@@ -332,7 +327,7 @@
     }
   ],
   "pin": {
-    "commit": "f7e2898aaefc8f967dbf7345e3999a65672fe60e",
+    "commit": "0f602c5f6f18615632535251d62a2db74ce93b69",
     "tag": null
   },
   "scenario": "access_policy_upstream"
