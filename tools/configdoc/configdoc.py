@@ -25,7 +25,8 @@ Checks (`--check`), each finding printed as `config-doc: <path>[:<line>]: <id>: 
     D4   a schema key's row names a place other than Server
     D5   schema default and chapter cell differ (`empty` is "", `no default, required` is
          required)
-    D6   a planned server key has no rule in planned.yaml, or a rule decides no planned key
+    D6   a planned server key has no rule in planned.yaml, or a rule decides no planned key,
+         or a rule names a milestone that docs/roadmap.md lists as done or built
     D7   a retired name of retired.yaml occurs in code (fenced block or code span), or its
          BOTHY_ form anywhere, in a tracked text file outside the allowlist
     D8   a Compose service that runs the server (`runs_serve`) has no stop_grace_period
@@ -92,6 +93,10 @@ PLACES = frozenset(
         "Server",
         "App",
         "Load test",
+        "Leak test",
+        "API policy",
+        "Alert rules",
+        "Database image",
         "Adapter",
         "Hermes adapter",
         "Runner",
@@ -332,6 +337,7 @@ class Paths:
     planned: str = "tools/configdoc/planned.yaml"
     retired: str = "tools/configdoc/retired.yaml"
     compose: str = "infra/compose/compose.yaml"
+    roadmap: str = "docs/roadmap.md"
 
     def file(self, rel: str) -> Path:
         """Absolute path of a repository-relative path."""
@@ -845,8 +851,15 @@ def check_planned(
     schema: Mapping[str, SchemaKey],
     rules: Sequence[Rule],
     paths: Paths,
+    closed: Iterable[str] = (),
 ) -> list[Finding]:
-    """D6: every planned server key has a milestone, and every rule gives the milestone of one."""
+    """D6: every planned server key has a milestone, and every rule gives the milestone of one.
+
+    A rule whose milestone is in `closed` (done or built in the roadmap) is a finding as well: the
+    milestone that was to build the key's user is over, so the key is built under another name,
+    belongs to another place, or waits for a ticket of an open milestone.
+    """
+    closed = set(closed)
     used: set[str] = set()
     found: list[Finding] = []
     for v in planned(chapters, schema):
@@ -872,7 +885,36 @@ def check_planned(
                     f"rule {rule.match!r} gives the milestone of no planned key (stale); remove it",
                 )
             )
+        elif rule.milestone in closed:
+            found.append(
+                Finding(
+                    paths.planned,
+                    rule.line,
+                    "D6",
+                    f"rule {rule.match!r} names {rule.milestone}, which {paths.roadmap} lists as"
+                    " done or built; give the key its place, a ticket of an open milestone, or"
+                    " remove it",
+                )
+            )
     return found
+
+
+def closed_milestones(text: str) -> set[str]:
+    """The milestones that the table of docs/roadmap.md lists as `done` or `built`.
+
+    A row is `| <ID> <name> | <content> | <status> |`; the status cell may go on after its first
+    word (`in progress: ...`), only the first word counts.
+    """
+    closed: set[str] = set()
+    for line in text.splitlines():
+        cells = _cells(line) if _ROW.match(line) else []
+        if len(cells) < 3 or not cells[0].split():
+            continue
+        milestone = cells[0].split()[0]
+        status = cells[-1].split()[:1]
+        if MILESTONE.match(milestone) and status and status[0].rstrip(":") in ("done", "built"):
+            closed.add(milestone)
+    return closed
 
 
 def tracked_files(root: Path) -> list[str]:
@@ -1459,7 +1501,8 @@ def evaluate(paths: Paths) -> Result:
     rendered = render(current, chapters, schema, rules)
     found += check_names(chapters, paths.spec)
     found += check_schema(chapters, schema, paths)
-    found += check_planned(chapters, schema, rules, paths)
+    closed = closed_milestones(_read(paths.file(paths.roadmap), paths.roadmap))
+    found += check_planned(chapters, schema, rules, paths, closed)
     # The reference is checked as it will be written: its generated block follows the chapters,
     # which D7 checks themselves, and D10 reports a stale block.
     found += check_retired(paths.root, retired, texts={paths.reference: rendered})

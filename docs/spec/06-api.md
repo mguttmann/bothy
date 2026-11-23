@@ -54,13 +54,15 @@ readiness are not part of the public API; they are on the internal listener
 |---|---|---|
 | Paths | Lower case, plural nouns, kebab-case (`/gdpr-requests`). Path parameters are named `{<resource>_id}`. Paths contain only IDs, never handles or names. | Stable URLs; a rename changes no address. |
 | State changes | Changes with a side effect, a reason or an audit entry are `POST /<resource>/{id}/<verb>` (`close`, `reopen`, `move`, `revoke`, `approve`, `archive`, `cancel`, `disable`). | One action per route, auditable with a reason, no hidden field in a PATCH. |
+| Methods for new operations | A removal that takes a reason or moves a state machine (soft delete, revoke with audit) is `POST .../<verb>`; a removal without either is `DELETE`. A partial change is `PATCH` (`update<Noun>`); `PUT` writes one value or setting as a whole (`set<Noun>` for a field of a resource, `put<Noun>` for an entry under a key). | One reading of the same verb across the API. |
+| Forms of v1 that differ | Built before the rule above and kept, because a rename or a new method is a breaking change (section 13): `revokeToken`, `revokePasskey` and `revokeIncomingWebhook` are `DELETE`, while `revokeSession`, `revokeDevice`, `revokeGrant` and `revokeOwner` are `POST .../revoke`; `deleteSpace`, `deleteChannel`, `deleteThread` and `uninstallApp` are `POST` (they move a state machine), the other deletes are `DELETE`; `PUT` operations are named `set*`, `put*`, `update*` (`updateBranding`, `updateCommand`) and a few verbs of their own; `putMySidebarSpace` and `putMySidebarChannel` keep absent members (R-API-31), a merge under `PUT`; the life cycle is `status` in `User`, `Agent`, `Transcript` and `WebhookDelivery` and `state` elsewhere; `features` is a list of keys in `Discovery` and a list of evaluated flags in `InstanceInfo`. No lint holds the rule for new operations; the review does. | The SDKs and apps already call these names and methods. |
 | No effect | If the target state is already reached (disabling a disabled one, revoking a revoked one, closing a done thread) or a PATCH changes nothing, the server answers as for the change with the current representation, without a new version, without an event and without a permission version; actions with an audit write an entry with `no_change: true` in `details`. A transition the state machine does not know (for example `deleted` after `active`, closing the main thread) gives `409 invalid_state_transition`. | The outbox retries even after `sync.idempotency_key_ttl`; an error for the desired state would look like a failure. |
 | Self reference | `/me/...` for the calling person; agent runtime under `/agents/me/...`. | No special value `me` in ID parameters; code generators type IDs as UUID. |
 | Fields | snake_case, the same as the database (03) and events (04). | One name per term across all layers. |
 | operationId | lowerCamelCase, verb plus noun (`createMessage`). Lint rule `rule/operation-id-camel-case`. | Generators build method names from it; a rename breaks SDKs. |
 | Enumerations | snake_case strings. Repeated value sets are named schemas (for example `ThreadState`). | The same types in all generators, no name collisions. |
 | IDs | UUIDv7 (RFC 9562) in lower case. The server accepts upper case when reading. | 03, R-DM-01. |
-| Time | RFC 3339 in UTC with `Z` and milliseconds. Durations as integers in milliseconds (`_ms`). Clients read every valid RFC 3339 form. | Unambiguous, sortable, language neutral. |
+| Time | RFC 3339 in UTC with `Z`, at millisecond precision. Durations as integers in milliseconds (`_ms`). Clients read every valid RFC 3339 form. As built the fraction has up to three digits: REST responses drop trailing zeros (`encoding/json` of a time truncated to milliseconds, so `...:00Z` or `...:00.5Z`), event payloads always write three (`...:00.000Z`) (docs/decisions.d/M1-31.md, M1-31/16). The same instant can thus have two spellings; clients compare and sort times as instants, not as strings. | Unambiguous, language neutral. |
 | Integers | `format: int64`. Sequences, versions and amounts stay below 2^53, so that JavaScript represents them exactly; a server test checks the limit at assignment. | JSON numbers in JavaScript are floating point. |
 | Money | `amount_micros` (int64) plus `currency` (ISO 4217). | 03, R-DM-04. |
 | No `null` | The server never sends JSON `null`. If a field is missing, it has no value. Clients treat a received `null` like a missing field. Values are removed through their own fields or modes (for example `use_global_order: true`, `OperatorSet.mode = none`), never through `null`. | dart-dio does not know the null type [verified, Q4]; one way for all generators (R-API-03, [ADR 0053](../adr/0053-no-json-null-in-api-and-events.md)). |
@@ -346,12 +348,46 @@ all texts of the YAML files (R-API-15); every response component names its statu
    `message.list_content_max_bytes` (`content_truncated: true`); `getMessage` returns the whole
    content. Reason: a page thus stays below `api.page_size_max` times this value instead of times
    `message.max_content_bytes`.
-6. Only lists whose set is small stay without pagination (spaces, channels of a space,
-   tags, settings, owners, group list of a person, the agent sessions of a thread in
-   `listAgentSessions`, newest first by `created_at`, then `id`; the price table in `listPrices`,
-   whose `PriceList` has only `items`, every row with closed ones, ordered by `provider`, `model`,
-   `unit`, `valid_from`, then `id`). If one of them grows, a new,
-   paginated endpoint comes; the old response shape stays (section 13).
+6. Only lists whose set is small stay without pagination. If one of them grows, a new,
+   paginated endpoint comes; the old response shape stays (section 13). As built, these `GET`
+   operations answer `items` without `next_cursor`; the column "Bound" names what limits the set,
+   and "none named" means that no configuration value limits it
+   (`tools/docs/tests/test_unpaginated_lists.py` holds the table to openapi.yaml). The lists
+   marked "grows" are the ones whose set grows with use; their paginated forms are plan row
+   V3-22.
+
+   | Operation | Bound |
+   |---|---|
+   | `listSpaces`, `listSpaceChannels` | none named; the spaces and channels a person can read |
+   | `getMySidebar` | none named; the person's own sidebar state of those spaces and channels |
+   | `listMyDms` | none named; grows with every direct conversation |
+   | `listOwners`, `listIdentityProviders` | none named; an instance has few |
+   | `listInstanceSettings`, `listFeatureFlags`, `listMySettings` | the keys the server knows |
+   | `listForumTags` | none named; the tags of one forum |
+   | `listTemplates`, `listMyTemplates` | `template.max_per_scope` per channel or per person |
+   | `listIncomingWebhooks`, `listChannelCommands` | none named for a channel (`command.max_per_principal` holds one principal) |
+   | `listAgentSessions` | none named; the sessions of one thread, newest first by `created_at`, then `id` |
+   | `listPins` | `pin.max_per_thread` |
+   | `listThreadMessages` | the history of item 5, paged by sequence instead of a cursor |
+   | `listMessageRevisions` | none named; grows with every edit of the message |
+   | `searchThreadTitles` | `limit`, at most `search.page_size_max`; one page only |
+   | `listMyReadStates` | none named; one row per thread of the channel, grows |
+   | `listMyDrafts` | none named; one per thread or channel with a draft, grows |
+   | `listMyNotificationPreferences`, `listMyQuietHours` | none named; the person's own rules |
+   | `listAgentTemplates` | the templates the server ships |
+   | `listAgentProjectFolders`, `listServedChannels` | none named; the folders and channels of one agent |
+   | `listAgentWebhookSubscriptions`, `listWebhookSubscriptions` | none named; the subscriptions of one agent or app |
+   | `listPendingRunWakes` | `run.wake_max_pending` per thread, none over all threads of the agent |
+   | `getStatsSlo`, `getStatsBackends` | reports: one row per objective or per backend |
+   | `listPrices` | the price table with closed rows, ordered by `provider`, `model`, `unit`, `valid_from`, then `id` |
+7. Three page forms are built. A generic page iterator of the SDKs (section 14 item 2) follows
+   only the first; the event poll of each SDK has its own loop.
+
+   | Form | Operations | Entries | Next page | Last page |
+   |---|---|---|---|---|
+   | Cursor (items 1 to 4) | every list with `cursor` and `limit` | `items` | `cursor = next_cursor` (opaque string) | `next_cursor` is missing |
+   | Event log (04 section 7.4) | `listEvents`, `pollAgentEvents` (`EventPage`) | `events` | `after = next_cursor` (integer, highest checked `seq`; required) | never; a page with no `events` means caught up |
+   | History (item 5) | `listThreadMessages` (`MessagePage`) | `items` | `before_seq` or `after_seq` from the first or last entry | `has_more_before` or `has_more_after` is `false` |
 
 ## 7. Idempotency
 
@@ -495,6 +531,14 @@ all texts of the YAML files (R-API-15); every response component names its statu
    fails with `412` (D-M3-10-11).
 3. Where "last write wins" applies (instance settings, switches, project binding,
    thread tags), `If-Match` is optional and is checked when it is sent.
+   Not versioned as built: people (`updateUser`), groups (`updateGroup`), identity providers
+   (`updateIdentityProvider`), forum tags (`updateForumTag`), the scopes and manifest of an app
+   (`setAppScopes`, `upgradeAppManifest`), webhook subscriptions (`updateWebhookSubscription`)
+   and status components (`updateStatusComponent`). Their schemas have no `version`, their reads
+   send no `ETag` and the contract names no `If-Match` for their writes, so the last write wins and a client cannot
+   detect a concurrent change. Reason: they are changed by owners or managers, rarely at the same
+   time. Adding `version`, `ETag` and an optional `If-Match` is additive (section 13) and is plan
+   row V3-21.
 4. Personal sync data follow 04, section 14: drafts with `base_version` and
    `overwrote_newer`, read state monotonic. Run patches use `base_version` and `409
    base_version_conflict` (04, 11.2).
@@ -658,11 +702,16 @@ request per subscription. Delivery, retry, verification at the receiver and inco
    tolerance test G5 (section 15).
 4. **Deprecation.** An op or a field gets `deprecated: true`, `x-deprecated-since`
    (spec version), `x-deprecated-at` (date of the replacement, RFC 3339 `full-date`, source of the
-   `Deprecation` header, R-API-25) and `x-sunset` (date). On every response of this op the server sends
+   `Deprecation` header, R-API-25) and `x-sunset` (date). On every response of this op the server is to send
    `Deprecation: @<unix-time>` (RFC 9745 [verified, Q7]), `Sunset: <HTTP-date>` (RFC 8594) and
    `Link: <...>; rel="deprecation"` pointing to the change note. `x-sunset` lies at least
    `api.deprecation_min_notice` after `x-deprecated-at`; RFC 9745 only requires "not earlier"
    [verified, Q7]. Removal happens only in the next major version.
+   Built: the fields in openapi.yaml, their check against `api.deprecation_min_notice` (G2)
+   and the warning of the Python and TypeScript SDKs on the headers. Not built: the server sends
+   none of the three headers, because nothing on the route path reads `x-deprecated-at` or
+   `x-sunset`; no operation is deprecated today. Plan row V3-20 builds the headers before
+   the first operation is marked.
 5. **Major versions overlap.** Server releases that offer `v2` keep serving `v1` for
    at least `api.major_version_overlap` from the first release with `v2`. Reason: apps from the
    stores and self-hosted servers are not updated at the same time.
@@ -747,7 +796,7 @@ request per subscription. Delivery, retry, verification at the receiver and inco
    Consumer-driven contracts would add a broker and a second source of truth without covering a
    risk that G4 to G8 leave open. This changes only when outside teams build their own clients
    without this spec.
-3. G1 to G6 run in the single local gate command, which is identical to CI (ADR 0038, Team H).
+3. G1 to G6 run in the single local gate command, the same as in CI (ADR 0038, Team H).
    G7 (`make contract-test`) and G8 (in every integration test) also run in `make check`,
    G9 and G10 with the integration tests. Reason against the Compose stack for G7: it needs the
    finished image and the smoke test of the milestone; the server from the working tree checks
@@ -1425,7 +1474,7 @@ former block "proposed" in docs/api/redocly.yaml is empty and is dropped.
 | No. | Decision | Reason |
 |---|---|---|
 | R-API-01 | Major version in the path `/api/v1`, only additive changes within it (ADR 0014). | Visible in logs and proxies, simple for generated clients. |
-| R-API-02 | Resource paths plus `POST .../<verb>` for state changes. | One action per route; reason and audit belong to the change. |
+| R-API-02 | Resource paths plus `POST .../<verb>` for state changes; the method of a new operation follows section 2 "Methods for new operations", and the forms of v1 that differ are listed there. | One action per route; reason and audit belong to the change. |
 | R-API-03 | No JSON `null`; missing means no value; removal through dedicated fields or modes ([ADR 0053](../adr/0053-no-json-null-in-api-and-events.md)). | dart-dio does not know the null type; Go `omitempty` fits; PATCH without three-valued logic. |
 | R-API-04 | Clients ignore unknown content in responses and events; the server rejects unknown request fields (W7, SEC-IN-1). | Independent updates of apps and servers, without an older server silently swallowing an intent. |
 | R-API-05 | `oneOf` only with a discriminator, no `anyOf`, no type arrays (lint). | oapi-codegen turns multi-type unions into `any` (baseline R-Stack). |
@@ -1459,16 +1508,16 @@ former block "proposed" in docs/api/redocly.yaml is empty and is dropped.
 
 ## 20. Configuration values of this chapter
 
-| Name | Default | Meaning |
-|---|---|---|
-| `api.page_size_default` | `50` | page size without `limit` |
-| `api.page_size_max` | `200` | larger `limit` values are capped |
-| `api.cors_allowed_origins` | empty | additional origins for CORS, each in the form of `server.public_url` |
-| `api.deprecation_min_notice` | `180d` | minimum gap from `Deprecation` to `Sunset` |
-| `api.major_version_overlap` | `365d` | how long an old major version stays after the new one appears |
-| `api.stats_max_buckets` | `1000` | time buckets per statistics query; more yields `400` |
-| `message.list_content_max_bytes` | `16384` | largest `content_md` per message in lists; above that truncated with `content_truncated` (section 6) |
-| `status.history_window` | `7d` | how long the status page shows resolved incidents |
+| Name | Place | Default | Meaning |
+|---|---|---|---|
+| `api.page_size_default` | Server | `50` | page size without `limit` |
+| `api.page_size_max` | Server | `200` | larger `limit` values are capped |
+| `api.cors_allowed_origins` | Server | empty | additional origins for CORS, each in the form of `server.public_url` |
+| `api.deprecation_min_notice` | API policy | `180d` | minimum gap from `Deprecation` to `Sunset` |
+| `api.major_version_overlap` | API policy | `365d` | how long an old major version stays after the new one appears |
+| `api.stats_max_buckets` | Server | `1000` | time buckets per statistics query; more yields `400` |
+| `message.list_content_max_bytes` | Server | `16384` | largest `content_md` per message in lists; above that truncated with `content_truncated` (section 6) |
+| `status.history_window` | Server | `7d` | how long the status page shows resolved incidents |
 
 Values of other chapters that this chapter refers to: `http.max_json_body_bytes`,
 `http.max_json_depth`, `http.unavailable_retry_after` ([02-architecture.md](02-architecture.md)), `server.trusted_proxies` ([16-operations.md](16-operations.md)),

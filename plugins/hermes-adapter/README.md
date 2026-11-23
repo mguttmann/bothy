@@ -58,8 +58,10 @@ installation.
 The adapter runs on Python 3.11 and newer, in the Python of the profile's gateway; it is tested
 against the pinned upstream main commit of Hermes Agent (`tests/hermes_pin.toml`, no release tag;
 the workflow `hermes-pin.yml` proposes the newest main commit once a day, D-HERMES-PIN-1 and
-D-HERMES-PIN-2), on Python 3.14, the only Python its lock installs, and, unchanged, on `v0.22.5`
-and on main commit `a8b0bc15053c`, the pin before `f7e2898aaefc` (D-HAM-4).
+D-HERMES-PIN-2), on Python 3.14, the only Python its lock installs. Older versions are not
+tested on every change: the adapter ran once against `v0.22.5` (D-HERMES-MAIN-7, 2026-11-07) and
+once against main commit `a8b0bc15053c`, the pin before `f7e2898aaefc` (D-HAM-4); no later change
+was run against them.
 
 Neither this component nor the SDK is packaged before the release chain (M7). Hermes replaces
 the Python environment of a profile on many of its commands (a new environment, the old one is

@@ -2,8 +2,8 @@
 
 Status: built (M1 to M7). Guide to [16-operations.md](../spec/16-operations.md) 8
 ([ADR 0058](../adr/0058-backup-with-pgbackrest-object-backup-and-restore-test.md)). Applies to
-the Compose stack; with a managed PostgreSQL service the steps for pgBackRest are dropped
-(section 6).
+the Compose stack, the only supported way to run the database; a managed PostgreSQL service is
+not available yet (section 6).
 
 ![Backup](diagrams/backup-flow.svg)
 
@@ -81,8 +81,8 @@ docker compose exec -T postgres psql -U postgres -d bothy -Atc "SELECT manifest 
 1. Create the off-site target. S3: bucket with versioning and Object Lock (mode Governance or
    Compliance, period at least the larger of `backup.logical.retention` and
    `backup.objects.retention`), one key with only write and
-   read for `backup`, a second one with delete only with the owner. SFTP: access without delete, cleanup
-   through a second access.
+   read for `backup`, a second one with delete only with the owner. Other kinds of target (such
+   as SFTP) are not supported.
 2. Put the access into `secrets/offsite/`, set `BOTHY_BACKUP_OFFSITE_TARGET`.
 
    As built (M7-02): only S3-compatible targets are supported (docs/decisions.d/M7-02.md D-M7-02-4).
@@ -232,7 +232,8 @@ further full backup needs its space and that of its WAL in the volume `pgbackres
 ### 5.2 PITR procedure in the Compose stack
 
 1. Status page: create an incident; maintenance mode `server.maintenance_mode = read_only` does not help,
-   because the database is replaced. Therefore: `docker compose stop api worker`.
+   because the database is replaced. Therefore: `docker compose stop api worker`
+   (profile `tailscale`: `api-tailscale` instead of `api`).
 2. `docker compose stop postgres`.
 3. Do not delete the old data directory but rename it (copy the volume) until the
    restore is verified.
@@ -265,7 +266,7 @@ further full backup needs its space and that of its WAL in the volume `pgbackres
    `database.restore_guard = off` is only for a managed failover without loss of committed
    transactions (section 6).
 7. Trigger a restore test against the new state by hand.
-8. `docker compose start api worker`. Clients get `resync_required` with reason
+8. `docker compose start api worker` (profile `tailscale`: `api-tailscale` instead of `api`). Clients get `resync_required` with reason
    `epoch_changed` and reload; their outbox is kept.
 9. Describe the incident with the point in time and the lost period.
 
@@ -281,6 +282,11 @@ further full backup needs its space and that of its WAL in the volume `pgbackres
    ([cloud-migration.md](cloud-migration.md) 3).
 
 ## 6. Managed PostgreSQL service
+
+Not available: no supported deployment runs on a managed database. The setup wizard and the
+Compose stack cannot use an external database, and the OpenTofu modules refuse
+`database_mode = managed` (docs/DECISIONS.md D-M7-16-4, plan row V3-36). `bothy-backupd` has
+no mode without pgBackRest. The items below are the plan for it.
 
 1. The provider takes over WAL archiving and PITR; the OpenTofu module sets the retention period.
 2. `bothy-backupd` runs without pgBackRest: logical dump, object backup, manifest,

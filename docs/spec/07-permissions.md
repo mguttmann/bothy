@@ -1214,7 +1214,11 @@ would give. The view needs `owner` or `manage` (05).
 Every action with column "Permissions" = `yes` has a preview without effect: the action
 `access.preview` (05; permission like the target action, without step-up, without audit, `rl.admin`). For
 grants the route is `POST /api/v1/grants/preview`; previews of further actions come with
-their routes. The server executes
+their routes. Built is only the preview of `grant.create` (`previewGrant`). Every other action
+with column "Permissions" = `yes` has no preview yet: adding a member, deleting a group, revoking
+a grant, adding an owner or setting an operator shows neither the effect per person nor the hint
+H1, and a breach of I1 shows only as `409` after the step-up. Previews for `group.member.add`,
+`group.delete`, `grant.revoke` and `owner.add` are plan row V3-27. The server executes
 the change in a transaction, computes differences and invariants and rolls back. The
 response contains:
 
@@ -1516,11 +1520,11 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 
 ## 14. Configuration values of this chapter
 
-| Name | Default | Meaning |
-|---|---|---|
-| `authz.expiry_sweep_interval` | `1m` | interval of the job that reports expiries and writes reminders |
-| `authz.expiry_reminder_lead` | `48h` | how long before expiry the reminder comes (Study C: two days) |
-| `authz.expiry_sweep_batch_max` | `500` | rows per transaction of the jobs `authz.expiry_sweep` and `authz.expiry_reminder` |
-| `authz.view_as_max_duration` | `15m` | maximum duration of "View as person" |
-| `authz.snapshot_cache_max_entries` | `10000` | permission snapshots in memory per process (LRU) |
-| `authz.not_found_timing_tolerance` | `20ms` | allowed deviation of the median in AZ-P4 |
+| Name | Place | Default | Meaning |
+|---|---|---|---|
+| `authz.expiry_sweep_interval` | Server | `1m` | interval of the job that reports expiries and writes reminders |
+| `authz.expiry_reminder_lead` | Server | `48h` | how long before expiry the reminder comes (Study C: two days) |
+| `authz.expiry_sweep_batch_max` | Server | `500` | rows per transaction of the jobs `authz.expiry_sweep` and `authz.expiry_reminder` |
+| `authz.view_as_max_duration` | Server | `15m` | maximum duration of "View as person" |
+| `authz.snapshot_cache_max_entries` | Server | `10000` | permission snapshots in memory per process (LRU) |
+| `authz.not_found_timing_tolerance` | Leak test | `20ms` | allowed deviation of the median in AZ-P4 |

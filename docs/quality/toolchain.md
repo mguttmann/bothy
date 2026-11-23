@@ -143,8 +143,14 @@ tags, the commit SHA behind the tag).
 
 ## Updates
 
-* Renovate proposes updates grouped and with a waiting period (ADR 0041). An update is only
-  done when this page names the new version; the test enforces this.
+* Renovate proposes updates grouped and with a waiting period (ADR 0041), once it is active.
+  It is not active yet: `renovate.json` is checked against its schema (`make lint`) and its
+  regex managers by the offline tests of `tools/opscheck`, but the hosted app is enabled only by
+  step 16 of the [publishing checklist](public-switch.md) (V1-05, an action of the owner), and
+  no update has come from it so far. Until then nobody proposes updates: a maintainer raises a
+  version by hand, and the advisory gates (`osv`, `trivy`) are what notice a vulnerable one.
+  Where another page says that Renovate updates or proposes something, it means this state.
+* An update is only done when this page names the new version; the test enforces this.
 * Release binaries: after the Renovate proposal, `make tools-lock TOOL=<name>
   VERSION=<version>`; the command takes over the sha256 values that GitHub reports for the
   release files. Check the diff, then `make bootstrap` and `make check`.

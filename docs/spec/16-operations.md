@@ -61,8 +61,8 @@ reference for these building blocks. Profiles add optional parts: `direct` or `t
 |---|---|---|---|---|---|
 | Mac | Docker Desktop or Colima, Compose | Container `postgres` | Volume `files` | `direct` with reverse proxy or `tailscale` | Driver `file` |
 | Linux VM | Docker Engine, Compose | Container `postgres` | Volume or S3 service | Reverse proxy, `tailscale` or private network | `file` |
-| Azure | VM with Compose | Container or Azure Database for PostgreSQL | Volume or SeaweedFS | Application Gateway or private network | `file`, later `azkv` (Azure Key Vault) |
-| AWS | EC2 with Compose | Container or Amazon RDS for PostgreSQL | Amazon S3 | Load balancer or private network | `file`, later `awssm` (AWS Secrets Manager) |
+| Azure | VM with Compose | Container (Azure Database for PostgreSQL: not available yet, rule 6) | Volume or SeaweedFS | Application Gateway or private network | `file`, later `azkv` (Azure Key Vault) |
+| AWS | EC2 with Compose | Container (Amazon RDS for PostgreSQL: not available yet, rule 6) | Amazon S3 | Load balancer or private network | `file`, later `awssm` (AWS Secrets Manager) |
 | Hetzner | Cloud server with Compose | Container | Volume or Hetzner Object Storage | Reverse proxy or `tailscale` | `file` |
 | Kubernetes | later, Helm (`infra/helm`) | managed service | S3 | Ingress | Driver of the cluster |
 
@@ -74,7 +74,8 @@ Rules:
    (https://docs.clamav.net/manual/Installing/Docker.html, retrieved 2026-10-10) [verified].
 3. With a managed PostgreSQL service, the provider takes over WAL archiving and
    point-in-time recovery. `bothy-backupd` then only does the logical backup and the
-   object backup (section 8.1).
+   object backup (section 8.1). Not built: no deployment can use a managed service yet (rule 6),
+   and `bothy-backupd` has no mode without pgBackRest (plan row V3-36).
 4. Azure Blob Storage offers no S3 API: Microsoft names the Azure Storage REST API, Azure
    PowerShell, Azure CLI, the Azure Storage client libraries, SFTP and NFS 3.0 as the ways to
    reach it, and no S3 interface
@@ -821,8 +822,12 @@ the run.
 | Environment | Purpose | Data | Push | Protection |
 |---|---|---|---|---|
 | `dev` | Development, local tests | synthetic only | APNs sandbox | Relaxations allowed only here, for example HTTP without TLS on loopback |
-| `staging` | Acceptance of a release candidate, portability test | synthetic or import from test sources | own keys | like `prod`; banner "Staging" in the apps |
+| `staging` | Acceptance of a release candidate, portability test | synthetic or import from test sources | own keys | like `prod`; banner "Staging" in the apps (not built: V3-35) |
 | `prod` | Operations | real data | production | all checks strict |
+
+The column "Protection" is a rule for the operator. Of `instance.environment` only the telemetry
+attribute `deployment.environment.name` is built; no check of the server binds a relaxation or a
+check to the value ([environments-and-flags.md](../operations/environments-and-flags.md) 1.2).
 
 Rules:
 
@@ -1155,14 +1160,14 @@ nothing; then the operator runs `bothy restore finalize` without the option, and
 major upgrade of PostgreSQL into a new cluster (dump and restore, or `pg_upgrade`) is such a
 relocation: take a backup right before it and finalize with its manifest.
 
-Managed failover. A managed PostgreSQL service with automatic failover promotes a standby, which
-raises the timeline without a restore. Where the provider documents that a failover loses no
-committed transaction (synchronous replication), the operator may set `database.restore_guard =
-off` and rely on R-SY-04; a failover that can lose commits is handled like a restore (not ready
-until `bothy restore finalize` starts a new epoch), because new writes could reuse sequence
-numbers a client already holds. The key changes only the start lock; `bothy restore finalize`
-behaves the same with either value. The comparison runs at start, so a failover while the server
-runs is detected at its next start.
+Managed failover (planned with the managed database, section 3 rule 6). A managed PostgreSQL
+service with automatic failover promotes a standby, which raises the timeline without a restore.
+Where the provider documents that a failover loses no committed transaction (synchronous
+replication), the operator may set `database.restore_guard = off` and rely on R-SY-04; a failover
+that can lose commits is handled like a restore (not ready until `bothy restore finalize` starts a
+new epoch), because new writes could reuse sequence numbers a client already holds. The key changes
+only the start lock; `bothy restore finalize` behaves the same with either value. The comparison
+runs at start, so a failover while the server runs is detected at its next start.
 
 
 ## 9. Disaster recovery
@@ -1206,6 +1211,11 @@ Rules in detail and flow: [upgrade.md](../operations/upgrade.md).
 
 Addendum of 2026-11-06 (stage AR, R-OP-21, [09-agents.md](09-agents.md) 18.19). The runner service
 guide (AR-09) describes the service form the handover relies on and these rules:
+
+Build state: the rules below apply to what is built, the orderly stop (AR-02) and
+`runner.turn_handover` (AR-03). The runner service guide itself is not written yet (AR-09), and
+`runner.wakes` is not built (AR-05; [PLAN](../PLAN.md) section 22), so a runner refuses that key as
+unknown and the wake-up parts of items 3 and 5 (recovery runs, pending wake-ups) do not occur yet.
 
 1. **Service form.** The runner runs as a service that restarts it after a non-zero exit (launchd
    `KeepAlive {SuccessfulExit: false}` without `AbandonProcessGroup`, or systemd
@@ -1635,7 +1645,7 @@ Column "Place": Server = configuration reference of the server; Installation scr
 | `migrate.backup_password_ref` | Server | `file:<secrets.dir>/db_backup_password` | password for `bothy_backup` (M7-02) |
 | `backup.pg.full_schedule` | Server | `0 2 * * 0` | schedule of the full backup (cron) |
 | `backup.pg.diff_schedule` | Server | `0 2 * * 1-6` | schedule of the differential backup (cron) |
-| `backup.pg.archive_timeout` | Server | `60s` | a WAL segment is archived at the latest after this time |
+| `backup.pg.archive_timeout` | Database image | `60s` | a WAL segment is archived at the latest after this time (`BOTHY_PG_ARCHIVE_TIMEOUT` of the Compose file) |
 | `backup.pg.retention_full` | Server | `4` | full backups kept in repo2 |
 | `backup.pg.local_retention_full` | Server | `1` | full backups kept in repo1; a point-in-time restore from repo1 reaches back to the oldest of them (8.2) |
 | `backup.logical.schedule` | Server | `0 3 * * *` | schedule of `pg_dump` (cron) |
@@ -1645,12 +1655,12 @@ Column "Place": Server = configuration reference of the server; Installation scr
 | `backup.offsite.target` | Server | empty | off-site target; empty means local only (warning "local backup only" of `bothy config check` and in the start log of `bothy-backupd`) |
 | `backup.offsite.region` | Server | `us-east-1` | region of the off-site bucket (signing of S3 requests) |
 | `backup.offsite.use_path_style` | Server | `true` | path-style addressing of the off-site bucket (`https://<host>/<bucket>`); `false` uses virtual hosts |
-| `backup.max_age` | Server | `26h` | no successful backup for longer than this: alert |
+| `backup.max_age` | Alert rules | `26h` | no successful backup for longer than this: alert |
 | `backup.restore_test.schedule` | Server | `0 5 * * 6` | schedule of the restore test (cron) |
 | `backup.restore_test.sample_files` | Server | `200` | files checked per test |
 | `backup.restore_test.sample_threads` | Server | `200` | threads checked per test |
-| `backup.restore_test.max_age` | Server | `8d` | no successful test for longer than this: alert |
-| `dr.rpo_target` | Server | `5m` | target for the largest data loss |
+| `backup.restore_test.max_age` | Alert rules | `8d` | no successful test for longer than this: alert |
+| `dr.rpo_target` | Alert rules | `5m` | target for the largest data loss (a goal that `backup.pg.archive_timeout` serves; no program reads it) |
 | `dr.rto_target` | Server | `4h` | target for the duration of the restore |
 | `status.check_interval` | Server | `30s` | interval of the automatic checks |
 | `status.degrade_after` | Server | `2m` | how long errors last until `degraded` |
@@ -1692,8 +1702,8 @@ Column "Place": Server = configuration reference of the server; Installation scr
 Plan P-22 and P-26, brief M7-27. One command turns an empty instance into a demo with made-up,
 white-label data; the showcase (M7-28) is produced from it. Reason: images and video must show
 real behaviour, so the demo writes like a person would and never beside the permission model.
-It is not `bothy dev seed` (6.1): it runs in every environment and refuses an instance that is
-not empty instead.
+It is bound to no environment (6.1): it runs in every environment and refuses an instance that
+is not empty instead.
 
 ### 16.1 Command
 

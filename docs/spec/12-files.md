@@ -139,7 +139,7 @@ a repeat answers the stored response):
 | `sha256` | yes | SHA-256 of the whole file as lowercase hex (`^[0-9a-f]{64}$`); the verify pass checks it |
 | `declared_mime_type` | no | hint only; stored without parameters in lower case in `declared_mime_type`; the server detects the type itself |
 | `purpose` | no | default `attachment`; further values in 3.7 |
-| `poster` | no | video only: small JPEG or PNG as thumbnail, at most `file.poster_max_bytes` |
+| `poster` | no | video only: small JPEG or PNG as thumbnail, at most `file.poster_max_bytes` (not built: V3-32) |
 
 The server checks in this order:
 
@@ -202,6 +202,10 @@ double quotes, derived from `file_upload_parts.sha256`, whose `etag` stays NULL
 never runs inside a database transaction (02 8.5).
 
 ### 3.3 Presigned PUT (mode `presigned`, optional)
+
+Status: planned, not built. No session offers this mode, and `file.s3.presigned_upload = true`
+stops the start (cross-check `presigned_mode_unavailable`); plan row V3-32. The text below
+describes the mode as planned.
 
 Only with the S3 driver and `file.s3.presigned_upload = true`. The session response contains,
 per part, a presigned URL for the multipart part, valid for `file.s3.presign_ttl`. The client
@@ -678,19 +682,22 @@ never content (05: `file.upload` with audit on malware detection). The uploader 
   `file.scan.retry_backoff_cap`, without a cap on the number of attempts, as long as the file
   is not deleted. Nothing is served unchecked.
 - `off`: no scan, `scan_status = 'skipped'`. Meant for development and for installations
-  without the memory that ClamAV needs (section 5.4). The admin console and the status page
-  permanently show "Virus scan off".
+  without the memory that ClamAV needs (section 5.4). Built: the setup wizard says so when it
+  writes `.env`, and the worker logs `virus scan is off (file.scan.mode = off)` at the start. A
+  permanent "Virus scan off" in the admin console and on the status page is not built (plan row
+  V3-31).
 
 The worker checks clamd every `file.scan.health_interval` with `PING`. The result feeds the
 status page component "Virus scan" (`status_components.health_source = 'clamd'`). If the
 oldest file has been in `pending` longer than `file.scan.pending_alert_after`, the component
-becomes `degraded` and an alert fires ([17-observability.md](17-observability.md)). At startup
+becomes `degraded` and an alert fires ([17-observability.md](17-observability.md)); this
+threshold is not built (plan row V3-31), the built alert is `BothyMalwareScanFailing`. At startup
 clamd takes a long time to load signatures; official images have a startup time limit for
 this, default 1800 s [Q9, verified]. Uploads during this time simply wait.
 
 If `file.scan.mode` changes from `off` to `required`, `skipped` files stay `skipped`. An
 admin can have them rechecked with the maintenance command `bothy files rescan --skipped`
-(server command, not an endpoint).
+(server command, not an endpoint). The command is not built (plan row V3-34).
 
 ### 5.4 Required settings for clamd
 
@@ -776,7 +783,7 @@ Images are free of metadata as soon as they are stored (Ruling L16, [ADR 0047](.
 | `image/png` | critical chunks (`IHDR`, `PLTE`, `IDAT`, `IEND`) as well as `tRNS`, `cHRM`, `gAMA`, `iCCP`, `sBIT`, `sRGB`, `cICP`, `mDCV`, `cLLI`, `bKGD`, `pHYs`, `acTL`, `fcTL`, `fdAT` | `tEXt`, `zTXt`, `iTXt`, `eXIf`, `tIME`, `hIST`, `sPLT` and unknown chunks |
 | `image/gif` | is re-encoded (lossless, palette); comments and application blocks except the loop setting are dropped | |
 | `image/webp` (still) | is decoded (`x/image/webp` can only read [Q18, verified]) and stored as PNG (with alpha) or JPEG (without alpha, `file.image.jpeg_quality`); with libvips re-encoded as WebP | |
-| `image/webp` (animated), `image/heic`, `image/heif`, `image/avif`, `image/tiff`, others | no inline image: stored unchanged as a file, shown as a download card; with libvips (`file.image.libvips_enabled`, own build with cgo; libvips LGPL-2.1, govips MIT [Q17, verified]) converted to JPEG, then like JPEG | |
+| `image/webp` (animated), `image/heic`, `image/heif`, `image/avif`, `image/tiff`, others | no inline image: stored unchanged as a file, shown as a download card; with libvips (`file.image.libvips_enabled`, not built: V3-32; own build with cgo; libvips LGPL-2.1, govips MIT [Q17, verified]) converted to JPEG, then like JPEG | |
 | `image/svg+xml` | never inline, never a thumbnail, always a download | |
 
 Evidence: `APPn` segments (`X'FFE0'` to `X'FFEF'`) and `COM` (`X'FFFE'`) are reserved for the
@@ -1441,13 +1448,13 @@ Values from other chapters (reference only): `file.max_upload_bytes`, `message.m
 | `file.s3.checksum_mode` | `when_required` | SDK checksums for request and response: `when_required` or `when_supported` (only with an `https` endpoint) |
 | `file.s3.access_key_ref` | `file:<secrets.dir>/s3_access_key` | reference to the secret provider; read only with `file.storage.driver = s3` |
 | `file.s3.secret_key_ref` | `file:<secrets.dir>/s3_secret_key` | reference to the secret provider; read only with `file.storage.driver = s3` |
-| `file.s3.presigned_upload` | `false` | allow mode `presigned` |
-| `file.s3.presign_ttl` | `15m` | validity of a presigned URL |
+| `file.s3.presigned_upload` | `false` | allow mode `presigned` (3.3); the mode is not built, so `true` stops the start (check `presigned_mode_unavailable`) |
+| `file.s3.presign_ttl` | `15m` | validity of a presigned URL (mode `presigned`, not built: V3-32) |
 | `file.upload_part_bytes` | `8388608` | part size |
 | `file.upload_session_ttl` | `24h` | lifetime of an open session |
 | `file.upload_max_open_sessions` | `20` | open sessions per principal |
 | `file.quota_bytes_per_principal` | `0` | quota per principal, 0 = off |
-| `file.poster_max_bytes` | `524288` | size of the video thumbnail from the client |
+| `file.poster_max_bytes` | `524288` | size of the video thumbnail from the client (`poster`, not built: V3-32) |
 | `file.sniff_bytes` | `1048576` | bytes for type detection |
 | `file.denied_mime_types` | empty | blocked types |
 | `file.name_max_bytes` | `255` | length of a file name in UTF-8 bytes |
@@ -1458,10 +1465,10 @@ Values from other chapters (reference only): `file.max_upload_bytes`, `message.m
 | `file.scan.max_concurrent` | `4` | scans per worker process |
 | `file.scan.retry_backoff_cap` | `5m` | largest interval between scan attempts |
 | `file.scan.health_interval` | `30s` | `PING` interval |
-| `file.scan.pending_alert_after` | `10m` | age of the oldest `pending` file before the alert |
+| `file.scan.pending_alert_after` | `10m` | age of the oldest `pending` file before the alert (not built: V3-31) |
 | `file.scan.clamd_stream_max_bytes` | `104857600` | mirror of clamd `StreamMaxLength` |
 | `file.invocation_hold_max` | `120s` | longest wait of the agent invocation for attachments |
-| `file.image.libvips_enabled` | `false` | use the libvips build |
+| `file.image.libvips_enabled` | `false` | use the libvips build (not built: V3-32) |
 | `file.image.max_pixels` | `50000000` | largest decoded pixel count |
 | `file.image.jpeg_quality` | `90` | quality when converting still WebP images without alpha to JPEG |
 | `file.image.processing_timeout` | `60s` | time limit of an image job |

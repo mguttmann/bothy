@@ -55,6 +55,7 @@ Diagram: [c4-2-container.svg](../architecture/c4-2-container.svg)
 |---|---|---|---|---|
 | `bothy serve --role=api` | Go, one binary, OCI image | REST, gateway WebSocket, log tail and fan-out in the process, agent consumers | only transient in memory (connections, permission cache, rate-limit buckets) | horizontal from level 2 (section 16) |
 | `bothy serve --role=worker` | same binary and image | River jobs, event consumers (push, webhooks, deletion journal), file processing, maintenance | none outside the database | horizontal from level 3 |
+| Backup service `bothy-backupd` | second Go program of the server module (`cmd/bothy-backupd`), in the image `bothy-postgres`, Compose service `backup` | scheduled backups with pgBackRest and logical dumps, the object backup, the automatic restore test, the copy to the off-site target; writes `backup_runs` ([16-operations.md](16-operations.md) 8) | pgBackRest repository and dump files in its volume; copies at the off-site target | one per instance |
 | PostgreSQL 18 | database | all domain data, `event_log`, audit, River tables in the schema `jobs.schema` | authoritative | vertical; read replica from level 4 |
 | Object storage | file system driver (default) or S3-compatible | files, thumbnails, export packages | authoritative for bytes | through the storage service |
 | ClamAV `clamd` | separate process, optional | malware scan via `INSTREAM` | signatures | own container |
@@ -86,7 +87,10 @@ line of configuration, because both roles use the same binary and the same datab
 ### 3.3 Commands of the binary
 
 One binary `bothy` with subcommands (ruling L1). This table is the register; other chapters
-name only commands from here.
+name only commands from here. The backup service is a second program of the server module,
+`bothy-backupd`, not a command of `bothy`: the server binary has no business in the database
+image (D-M7-01-3). Its commands are listed in its
+[README](../../services/server/cmd/bothy-backupd/README.md).
 
 | Command | Purpose | Chapter |
 |---|---|---|
@@ -99,9 +103,8 @@ name only commands from here.
 | `bothy restore finalize [--relocation <manifest>]` | after a restore: first the deletion journal is applied through the modules of the server ([20-privacy.md](20-privacy.md) 4.6, SEC-BAK-3; it needs the configuration and secrets of the server), then new sync epoch, cursors to `head_seq`, `permission_version` raised, next journal number and database identity (R-DM-50) stored, audit, in one transaction; as the schema owner and only while no `bothy_app` session is connected (exit `1` otherwise). `--relocation` takes the manifest of the final backup of a relocation without data loss: when `event_log.head_seq`, the audit head and `sync_epoch` equal it, only the identity is stored and epoch and cursors stay; a difference is exit `1` naming the field | [16-operations.md](16-operations.md) 8.4, [03-data-model.md](03-data-model.md) 6.7 |
 | `bothy secrets init\|export` | create and back up secrets: `init --target DIR [--source DIR] [--owner SERVICE=UID:GID ...] [--adopt-source]` reconciles the store `_store/` with the source and copies per service; `export --from DIR --age-recipient KEY [--age-recipient ...] [--signing-key-dir DIR] [--output FILE\|-] [--armor]` writes the age-encrypted bundle (with the key store under `signing-keys/`); both read only their flags, without a configuration file and database | [16-operations.md](16-operations.md) 5.3, 5.4 |
 | `bothy healthcheck --url URL [--timeout DURATION]` | health check against the internal listener for containers without a shell. `--url` takes only `http://` with a loopback host (`127.0.0.0/8`, `::1`, `localhost`), anything else is exit `2`; `--timeout` bounds the whole request (default `5s`, the timeout of the Compose healthcheck); no configuration, secrets or database; exit `0` for `2xx`, else `1` with one line naming the status code or the error class | [16-operations.md](16-operations.md) |
-| `bothy files rescan` | maintenance: have files checked again | [12-files.md](12-files.md) |
+| `bothy files rescan` | maintenance: have files checked again; not built (plan row V3-34) | [12-files.md](12-files.md) |
 | `bothy telemetry pseudonym <principal_id> [--at TIME] [--config FILE]` | pseudonym of a principal for the owner's troubleshooting: prints `bothy.principal.pseudo_id` for the period that contains `--at` ([RFC 3339](https://www.rfc-editor.org/rfc/rfc3339), retrieved 2026-10-12, default now) and the start of that period in UTC; reads `telemetry.pseudonym_key_ref` through the secret provider, no database | [../observability/privacy.md](../observability/privacy.md) |
-| `bothy dev seed` | test data, only in `instance.environment = dev` | [../operations/environments-and-flags.md](../operations/environments-and-flags.md) |
 
 Exit codes of all commands: `0` success or orderly end; `1` error (start failed, fatal
 runtime error, shutdown beyond `shutdown.total_timeout`, negative check result); `2` invocation or
@@ -243,8 +246,9 @@ else is forbidden and fails in the gate (section 7).
 | `terminal` | `instance`, `identity`, `authz`, `agents` | signer for terminal session tokens (purpose `terminal`) and `instance_id` of the `pairHost` response; people, devices, owners, consumption of the step-up, pairing codes (format and HMAC through `identity`, M2-41); grants on hosts and I6; readiness of the dev environment (milestone) |
 
 Tiers (from the bottom): `instance`, `billing` · `audit`, `authz` · `identity` · `chat` · `agents`,
-`files` · `messaging`, `status`, `terminal` · `runs`, `search`, `importer`, `privacy` · `sync` ·
-`notify`, `apps` · `stats` · `gateway`. Every edge points downward.
+`files` · `messaging`, `terminal` · `runs`, `search`, `importer`, `privacy` · `sync` ·
+`notify`, `apps` · `stats` · `status`, `gateway`. Every edge points downward;
+`tools/docs/tests/test_architecture_tiers.py` holds this line against the register (7.1).
 
 In addition, for all modules: `kernel` yes, `platform` only in `adapters`, `api` (generated code)
 only in `adapters`, River only in `platform/jobs`.
@@ -404,11 +408,13 @@ Rules with reasons:
 ```text
 services/server/
   go.mod                      module path github.com/OWNER/bothy/services/server until V1 (PLAN P-05)
-  cmd/bothy/                  main: subcommands serve, migrate, setup, config
+  cmd/bothy/                  main: the subcommands of 3.3
+  cmd/bothy-backupd/          main of the backup service (3.1), in the image bothy-postgres
   api/
     rest/                     generated from docs/api/openapi.yaml (oapi-codegen: std-http-server, strict-server)
-    ws/                       frame and payload types from docs/api/asyncapi.yaml (tool: 06-api.md)
+    restclient/               generated API client for the tools of the module (import tool)
     routes/                   generated: operationId -> action, rate-limit class; op -> action
+    specschema/               contract validator of gate G9 (openapi.yaml and asyncapi.yaml, tests only)
   architecture/
     modules.yaml              module register: tables, actions, dependencies, third-party libraries
   migrations/                 goose SQL, embedded in the binary (ADR 0007)
@@ -693,8 +699,8 @@ app uses a subpackage of a foreign app, a kernel port uses another one: exit cod
 
 | Check | What it holds | Implementation (ticket) |
 |---|---|---|
-| Table ownership | SQL of a module names only its own tables (principle 12 of 03) | Pass over `adapters/postgres/queries/*.sql`, table names against `modules.yaml` |
-| Completeness | every table from 03 and every action from 05 exactly once in the register | `make register-check` (M1-06): alignment of the register with 03 and `actions.yaml`, also event types and ops; the alignment with the migrations comes with the first schema |
+| Table ownership | SQL of a module names only its own tables (principle 12 of 03) | `tools/docs/tests/test_table_ownership.py`: pass over `adapters/postgres/queries/*.sql`, table names against `modules.yaml`; a foreign read that exists today stands in its list with a reason and may only go away |
+| Completeness | every table from 03 and every action from 05 exactly once in the register | `make register-check` (M1-06): alignment of the register with 03 and `actions.yaml`, also event types and ops; the alignment with the tables the migrations create: `tools/docs/tests/test_table_ownership.py`, with the tables of features that are not built listed by name |
 | Routes and ops | every operation has a known action; its handler lives in the module that owns the action | Startup check of the server and a test over the generated route table |
 | In-tx subscriptions | every subscription is an allowed direction (a higher module subscribes to a lower one) | Golden file of the registrations in `internal/wire`; the registration derives publisher and subscriber from the Go packages, not from declarations |
 | Counter access | only the phase hooks of `authz`, `sync`, `audit` use `instance.Counters` | Phase guard in `Counters` (runtime, 8.2) and a static test: only `instance`, `wire` and the packages of the registered hooks reference `Counters` |

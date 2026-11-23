@@ -42,6 +42,7 @@ flowchart TB
       pg[("<b>PostgreSQL 18</b><br/>[Database]<br/>Domain data, event_log,<br/>River tables")]:::store
       objects[("<b>Object storage</b><br/>[File system or S3-compatible]<br/>Files, thumbnails")]:::store
     end
+    backupd["<b>Backup service bothy-backupd</b><br/>[Go, image bothy-postgres]<br/>pgBackRest, dumps, restore test"]:::container
     clamd["<b>ClamAV clamd</b><br/>[separate process, optional]"]:::container
     otelcol["<b>OTel Collector</b><br/>[separate process]"]:::container
   end
@@ -52,6 +53,8 @@ flowchart TB
   integr["<b>Integrations</b><br/>[Apps, external systems]"]:::ext
   backends["<b>Telemetry backends</b>"]:::ext
   stt["<b>Transcription service</b><br/>[optional]"]:::ext
+  offsite[("<b>Off-site backup target</b><br/>[S3-compatible, optional]<br/>encrypted, append-only")]:::ext
+  sink[("<b>Audit checkpoint sink</b><br/>[file or S3 with retention lock]")]:::ext
 
   member --> apps
   member --> console
@@ -78,3 +81,7 @@ flowchart TB
   api -->|"OTLP"| otelcol
   worker -->|"OTLP"| otelcol
   otelcol -->|"Exporter per backend"| backends
+  pg -->|"WAL over TLS, dumps"| backupd
+  backupd -->|"Reads for the object backup"| objects
+  backupd -.->|"Backup copies, optional"| offsite
+  worker -.->|"Signed audit checkpoints"| sink

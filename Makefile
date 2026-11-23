@@ -219,7 +219,7 @@ bootstrap-ci: ## Install pinned tools without git hooks (CI)
 	  npm ci --prefix "$$(dirname "$$lock")" --ignore-scripts --no-audit --no-fund --loglevel=error || exit 1; done
 
 # ---- aggregate ------------------------------------------------------------------------
-check: gates denylist sonar ## Every gate, identical to CI (before every push)
+check: gates denylist sonar ## Every gate of the CI jobs of gates, denylist and sonar (before every push)
 	@echo "check: all gates passed"
 
 gates: ## All gates except denylist and sonar (CI job "gates")

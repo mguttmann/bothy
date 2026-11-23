@@ -160,7 +160,7 @@ in `tools/hooks/push_plan.py` or `tools/ci/components.py` with a test). Flow:
 1. Determine the cause and note it in the pull request.
 2. Close the gap locally (gate, test, pin), in the same or in a separate pull request.
 3. A commit "fix CI" or "typo" on `main` is a process failure: short analysis as an
-   entry in `docs/DECISIONS.md` (date, cause, new rule).
+   entry in a file of its own under `docs/decisions.d/` (date, cause, new rule).
 
 Findings after the push are acceptable only from checkers that cannot run locally:
 SonarQube Cloud (for example Dart rules) and CodeRabbit. Every such finding becomes
@@ -303,7 +303,7 @@ Flow:
 1. Look at the hit locally with `make denylist DENYLIST_RANGE=<before>..<after> DENYLIST_FLAGS=--reveal`
    (locally only, never in CI).
 2. The repository is public (ADR 0039), so the term is published: remove it, inform the owner,
-   analysis as an entry in `docs/DECISIONS.md` as for a process failure. Only the owner decides
+   analysis as an entry under `docs/decisions.d/` as for a process failure. Only the owner decides
    whether the public history is rewritten.
 3. Close the issue with the label `denylist-main` once a run on `main` is green again; a later
    red run opens a new one.

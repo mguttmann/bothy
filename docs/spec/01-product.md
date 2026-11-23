@@ -141,7 +141,8 @@ built in several milestones, the remark names the build milestones from the
 | Record a voice message, play it, transcript | core | D, M | `file.upload`, `file.transcribe` | switch `voice.enabled`; AAC (15-client-architecture.md) |
 | Share from other apps into a chosen target | core | M, macOS | `message.create`, `file.upload` | Windows see the next row |
 | Share from other apps on Windows | later | D | | needs MSIX identity; after the first Windows release |
-| Export of a channel | core | D, W | `export.channel` | capability `export`, step-up |
+| Export of a channel | core | D | `export.channel` | capability `export`, step-up; in the channel menu of the desktop app, not in the web console; the file holds the messages and the metadata of their attachments, not the files themselves (D-M3-11-2) |
+| Picture of a person (avatar): set, remove | core | API | `self.profile.update` (`setMyAvatar`, `deleteMyAvatar`) | no app sets or shows the picture (the sync engine stores `avatar_file_id`, no view reads it) (V3-29); agents have no operation for a picture ([12-files.md](12-files.md) 3.7) |
 
 ### 3.5 Notification, search, navigation
 
@@ -908,7 +909,9 @@ breaks off later keeps what arrived and says that the file is incomplete
 ```
 
 **A7 Statistics.** Metric tiles, runs per day, costs per agent and space, failure reasons. Values
-from the server; the console shows the same view at full width.
+from the server; the console shows the same view at full width. Not built (plan row V3-28):
+the button [Export], the tile "Mean duration" across all agents (the duration is shown per agent)
+and the tile "Waiting for people" (D-M6-06-1).
 
 ```text
 +----------------------------------------------------------------------------------------------------+
@@ -2258,7 +2261,7 @@ console.
    interview that reaches the server's limit of turns ends with the draft
    ([26-builtin-agents.md](26-builtin-agents.md) 6.1 item 1), never with an error.
 3. **Preview.** One editable page with everything that will be created: name, handle,
-   description, avatar, instructions, each skill, each MCP server with the secret names to add on
+   description, instructions, each skill, each MCP server with the secret names to add on
    the runner host, the hosting runner, the tool class with what it does and does not load, the
    billing mode, the model and the cost cap per run, and the channel to create (space and name) or
    none. The cost estimate of the interview so far is shown.
@@ -2285,6 +2288,12 @@ wake-ups and their cancel button stay visible when it no longer does (a runner t
 `wakes`, and so do the notes of item 3, which stay visible whatever the agent reports now: the
 `system` messages are messages of the thread, and the "Ended waiting" note and the usage-limit
 notice are derived from the stored run and its wake-ups, not stored as messages (issue 567).
+
+Build state: the server (AR-04) and the views below on the desktop and the phone (AR-08) are
+built; the runner side is not built yet (AR-05 to AR-07, 09 5.8). No runner reports `wakes` and
+no runner reports an end state, so no wake-up, wake run, recovery run, end state or usage-limit
+notice appears today, and the channel switch of item 5 can be set but has no effect until a
+runner of AR-05 serves the channel.
 
 1. **Pending wake-ups.** A thread with pending wake-ups shows them above the composer: the label,
    the condition ("in 20 minutes", "at 17:55", "when the checks of #123 finish", "when the command

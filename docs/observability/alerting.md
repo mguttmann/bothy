@@ -67,7 +67,7 @@ As built (M7-20). The guide with the commands is
 | Alert | SLO | Levels | First steps |
 |---|---|---|---|
 | `BothyApiAvailabilityBudgetBurn` | `bothy-api/requests-availability` | page, ticket | Dashboard Server: routes with 5xx; logs `ERROR`; database reachable? |
-| `BothyDeliveryLatencyBudgetBurn` | `bothy-sync/delivery-latency` | page, ticket | Dashboard Delivery: fan-out lag, waiting at the sequence counter, CPU |
+| `BothyDeliveryLatencyBudgetBurn` | `bothy-sync/delivery-latency` | page, ticket | Dashboard Delivery: fan-out lag, waiting at the sequence counter; CPU and memory of the containers of the Compose services `api` and `worker` with `docker stats` (no dashboard shows them, V3-24) |
 | `BothyReconnectBudgetBurn` | `bothy-sync/reconnect` | page, ticket | Edge (proxy, Tailscale) and certificate; login (OIDC reachable?) |
 | `BothyPushAcceptanceBudgetBurn` | `bothy-push/provider-acceptance` | page, ticket | Push dashboard: result per provider; key expired? Status page of the provider |
 | `BothyRunStartBudgetBurn` | `bothy-agents/run-start` | page, ticket | Agents dashboard: heartbeat, consumer backlog, rejections, mode mismatches |
@@ -179,7 +179,8 @@ Treat as an error with a security impact: a route answered without its permissio
 
 ### bothysecretrefreshfailing
 The server keeps using the old value. Which reference fails is shown by
-`docker compose exec api bothy config check --secrets` (per key `ok` or the error code); the log
+`docker compose exec api bothy config check --secrets` (per key `ok` or the error code; in the
+profile `tailscale` the service is `api-tailscale`); the log
 line names only the error code. Check the file in the secret provider: present, mode `0400`
 or `0600`, owned by the service user (SEC-SEC-1). Until this is fixed, a rotation has no effect.
 

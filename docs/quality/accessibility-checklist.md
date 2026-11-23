@@ -277,6 +277,19 @@ The same page on the desktop, the phones and in the console (`StatusScreen` of `
 | Text scaling up to 200 percent | the page and "Server unreachable" at text scale 1 and 2 | `status_golden_test.dart` |
 | VoiceOver, TalkBack and Narrator by hand | not proven automatically; part of the manual pass below | open for the release check |
 
+## Not covered yet
+
+This page has rows for the screens of M4-32, M4-36, M4-37 and M7-21 only, and no gate holds that
+every screen of the desktop app has a row (the phones have one, `routes_checklist_test.dart`).
+Without a row today, among others: the delete dialog, the new project assistant, the document and
+video views, export, the run graph and the live views on the desktop, the administration screens
+statistics, instance, apps, incoming webhooks, login providers and import, the built-in agent
+screens (their tests `new_agent_semantics_test.dart` and `builtin_agent_semantics_test.dart` of
+`admin_ui` exist) and the dialogs D-M4-32-7 names. The web console has no section: its own pages
+(login, step-up, shell, hosts and terminal, live, Grafana, public status) have no accessibility
+test beyond semantics being turned on, and no pass with NVDA is described. Planned:
+V3-40 (console) and V3-41 (the remaining desktop screens and a completeness gate).
+
 ## Manual pass before a release (M4-32)
 
 Run before every release (15 20, row "Accessibility by hand") on a macOS and a Windows machine

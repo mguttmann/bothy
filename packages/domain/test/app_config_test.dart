@@ -52,14 +52,10 @@ void main() {
 
   test('the keys of D-W-115 and D-W-116 are there with place Server', () {
     const listed = [
-      'sync.reconnect_backoff_base',
-      'sync.reconnect_backoff_cap',
       'sync.typing_min_interval',
       'sync.typing_ttl',
       'sync.max_focused_threads',
       'client.cache_max_age',
-      'client.outbox_retry_base',
-      'client.outbox_retry_cap',
       'auth.device_pending_ttl',
       // D-W-116, M4-36: the header of the terminal counts down to it (display only).
       'terminal.max_session_duration',

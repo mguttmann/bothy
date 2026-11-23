@@ -548,7 +548,9 @@ once the request has been sent, the job always ends successfully, so a request i
 automatically (09 section 1 point 5). Should the job still run again, for example after a crash
 during the request, the request carries the same `webhook-id`, which the app uses as its
 idempotency key. No event and no field tells the person the outcome after the commit; a display
-such as "App is not responding" in the clients is open (spec gap).
+such as "App is not responding" in the clients is open (spec gap). A component whose interaction
+ends `failed` stays `used` (table below), so the person cannot send the form again. The display is
+plan row V3-26.
 
 **Request to `interactions_url`.**
 

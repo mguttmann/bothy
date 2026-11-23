@@ -231,6 +231,9 @@ Sorted by deadline.
   local gates check alone.
 - **Due by:** before V1-05. The default costs nothing; allowing it earlier is possible at any
   time.
+- **State:** the repository is public, but the hosted Renovate app is not enabled yet (step 16 of
+  the checklist is open, an action of the owner), so no update has come from it; until then
+  updates are raised by hand ([toolchain](quality/toolchain.md#updates)).
 
 ### OQ-14: Commitments on deprecation and version overlap
 

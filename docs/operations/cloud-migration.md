@@ -1,7 +1,8 @@
 # Moving to another target
 
 Status: built (M1 to M7). Runbook for [16-operations.md](../spec/16-operations.md) 11. Applies to every move:
-Mac to Linux VM, VM to cloud, cloud to cloud, container database to managed service.
+Mac to Linux VM, VM to cloud, cloud to cloud. A move to a managed database service is not
+available yet (section 6).
 
 ![Move](diagrams/cloud-migration.svg)
 
@@ -13,8 +14,8 @@ clients continue with their cursor. `instance_id`, token pepper and signing key 
 so tokens, devices and invocation tokens stay valid. `bothy restore finalize --relocation` proves
 on the target that nothing was lost (section 3 step 4) before it keeps the epoch.
 
-A move to a managed PostgreSQL service with automatic failover: a failover raises the timeline,
-and the start lock holds the server not ready until `bothy restore finalize` ran
+Planned, not available yet (section 6): a move to a managed PostgreSQL service with automatic
+failover. A failover raises the timeline, and the start lock holds the server not ready until `bothy restore finalize` ran
 ([disaster-recovery.md](disaster-recovery.md), case G). Set `database.restore_guard = off` only
 where the provider documents that a failover loses no committed transaction; otherwise a failover
 is handled like a restore with a new epoch ([16-operations.md](../spec/16-operations.md) 8.4).

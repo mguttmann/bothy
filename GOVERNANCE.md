@@ -15,7 +15,8 @@
   process) are recorded as Architecture Decision Records in `docs/adr/` (MADR format,
   ADR 0001). An ADR starts as `proposed` in a pull request, is discussed there and
   becomes `accepted` or `rejected` when merged. Superseding an ADR needs a new ADR.
-- Smaller rulings go into `docs/DECISIONS.md` with date and reason.
+- Smaller rulings go into a file of their own, `docs/decisions.d/<name>.md`, with date and
+  reason (the ruling log `docs/DECISIONS.md`, section 10, collects them).
 - With several maintainers: lazy consensus. Silence for the review period of a pull
   request counts as agreement; an objection needs a reason and an alternative. If
   maintainers cannot agree, the longest-serving maintainer decides and the ADR records the

@@ -20,6 +20,8 @@ flowchart TB
   telemetry["<b>Telemetry backends</b><br/>[external]<br/>via OpenTelemetry Collector"]:::ext
   discord["<b>Discord</b><br/>[external]<br/>Import source, read-only"]:::ext
   stt["<b>Transcription service</b><br/>[external, optional]<br/>behind a port"]:::ext
+  offsite["<b>Off-site backup target</b><br/>[external, optional]<br/>encrypted, append-only"]:::ext
+  sink["<b>Audit checkpoint sink</b><br/>[external, optional]<br/>object store with retention lock"]:::ext
   hosts["<b>Connected hosts</b><br/>[external to the server]<br/>Host service bothy-host,<br/>terminal sessions"]:::ext
 
   member -->|"chats, triggers agents"| bothy
@@ -36,3 +38,5 @@ flowchart TB
   bothy -->|"reads during import"| discord
   bothy -->|"Audio for transcription"| stt
   hosts -->|"Outbound WebSocket,<br/>end-to-end Noise stream"| bothy
+  bothy -->|"Backup copies"| offsite
+  bothy -->|"Signed audit checkpoints"| sink

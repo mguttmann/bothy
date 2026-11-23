@@ -42,7 +42,7 @@ cd bothy
 make bootstrap   # pinned tools, git hooks (pre-commit, commit-msg, pre-push)
 # In a fork, without the maintainers' deny list, a SonarQube and a reviewer ("The gates"):
 export DENYLIST_FLAGS=--allow-missing SONAR_SKIP=1 REVIEW_SKIP=1
-make check       # every gate, exactly as CI runs it
+make check       # every gate of the CI jobs of make gates, denylist and sonar
 ```
 
 Without the three switches `make check` stops on a fresh clone: the white-label scan fails
@@ -55,8 +55,15 @@ error, never a skip.
 `make check` runs formatting, linters, type checks, all tests with coverage thresholds,
 the documentation build, link and diagram checks, the API lint, the workflow policy
 check, secret and white-label scans, Semgrep, Trivy, OSV-Scanner, the license gate and
-SonarQube. CI runs the same make targets, so a green `make check` means a green pull
-request. The list with every threshold: [docs/quality/gates.md](docs/quality/gates.md).
+SonarQube. CI runs the same make targets in the jobs of `make gates`
+([CI jobs](docs/quality/gates.md#ci-jobs)), the deny list and `sonar`. `ci-ok` can require
+more jobs than `make check` runs: the platform jobs of the apps, the console end to end test,
+the images and the end to end tests of the adapters run only in CI or through their own
+targets, when the plan of the change lists them
+([Jobs a change needs](docs/quality/gates.md#jobs-a-change-needs),
+[Not in `make check`](docs/quality/gates.md#not-in-make-check)), and only CI reruns a failed test
+([Flakes](docs/quality/gates.md#flakes)). The list with every threshold:
+[docs/quality/gates.md](docs/quality/gates.md).
 
 The pre-push hook first checks the review evidence of the pushed commit (see "Review
 before every push"), then runs `make check`. Do not bypass it with `--no-verify`.
@@ -118,6 +125,11 @@ Details: [docs/quality/gates.md](docs/quality/gates.md#migrations).
 
 The commit-msg hook checks format and sign-off; CI checks them again for the whole pull
 request.
+
+This flow (a branch, a pull request, changelog and ruling fragments) takes precedence over
+section 3 of [docs/PLAN.md](docs/PLAN.md) and over older ticket briefs in `docs/briefs/` that say
+to merge locally, never to open a pull request, or to write into `CHANGELOG.md` or
+`docs/DECISIONS.md` directly.
 
 ## Review before every push
 

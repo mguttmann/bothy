@@ -3,37 +3,19 @@
 # D6). The milestone is that of the first ticket in docs/PLAN.md (or its M1 brief) whose row
 # names the key, its prefix or the feature that reads it; without such a row, the milestone that
 # builds the chapter's module. The comment names the deciding tickets. A rule whose keys all
-# entered the schema is stale and goes (docs/operations/configuration.md section 10).
+# entered the schema is stale and goes (docs/operations/configuration.md section 10), and so does
+# a rule whose milestone docs/roadmap.md lists as done or built: such a key gets its real place,
+# a ticket of an open milestone, or leaves the chapter table.
 rules:
-  - match: "agent."  # M2-07 to M2-20
-    milestone: M2
-  - match: "api."  # M1-03, M1-18, M1-31
-    milestone: M1
-  - match: api.major_version_overlap  # M7-11
-    milestone: M7
   - match: auth.require_key_attestation  # V3-09
     milestone: V3
-  - match: "authz."  # M1-28 to M1-49
-    milestone: M1
-  - match: "backup."  # M7-01, M7-02
-    milestone: M7
-  - match: client.outbox_retry_base  # M4-15
-    milestone: M4
-  - match: client.outbox_retry_cap  # M4-15
-    milestone: M4
   - match: "dev."  # V2-01, V2-04
     milestone: V2
-  - match: "dr."  # M7-03
-    milestone: M7
-  - match: "file."  # M3-01 to M3-08
-    milestone: M3
-  - match: "interaction."  # M2-15
-    milestone: M2
-  - match: "privacy."  # M7-06, M7-07; milestone of the chapter for ai_notice_enabled, notice_url (no ticket names it)
-    milestone: M7
+  - match: "file."  # V3-31 (scan alert), V3-32 (presigned upload, poster, libvips)
+    milestone: V3
+  - match: interaction.ack_timeout  # V3-33
+    milestone: V3
+  - match: "privacy."  # V3-30 (privacy link and AI notice)
+    milestone: V3
   - match: search.extract.tika_url  # M3 out of scope defers Tika to V3; no ticket yet
     milestone: V3
-  - match: sync.reconnect_backoff_base  # M2-29
-    milestone: M2
-  - match: sync.reconnect_backoff_cap  # M2-29
-    milestone: M2

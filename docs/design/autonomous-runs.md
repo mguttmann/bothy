@@ -4,8 +4,11 @@ Status: design of 2026-11-06, revised six times the same day after red team revi
 blockers and majors are resolved in the text, the keeper of D-AR-3 is proven by a probe under a
 scratch launchd job (section 2.4), the replay of a turn's state at a handover by a probe against
 the runner modules (section 2.5), the open owner decisions are recorded as rulings (section 11),
-and the minors are in section 12. Of it, only D-AR-1 is built (AR-02, with the run reason
-`adapter_stopped`, [AR-02 rulings](../decisions.d/AR-02.md)). This
+and the minors are in section 12. Of it, D-AR-1 (AR-02, with the run reason `adapter_stopped`,
+[AR-02 rulings](../decisions.d/AR-02.md)), the turn handover (AR-03), the server side of wake-ups
+(AR-04) and the client views (AR-08) are built; `bothy-wake`, recovery and usage-window wake-ups,
+the end state, the runner service guide and the end-to-end test (AR-05, AR-06, AR-07, AR-09,
+AR-10) are not, so no wake-up can be created yet ([PLAN](../PLAN.md) section 22). This
 note records the goal, the evidence and the decisions with their reasons. Ticket AR-01 wrote the
 normative text into the chapters it names (09 5.8 and 18.19, 07 2.14, 03 and the others of section
 7), [ADR 0077](../adr/0077-autonomous-runs-wake-ups-and-turn-handover.md), the rulings

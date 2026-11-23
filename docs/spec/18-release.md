@@ -540,7 +540,9 @@ first with the owner's accounts (OQ-08).
 5. Adapters report their version in the heartbeat in `details.adapter.version` (stored in
    `agents.reported_details`); `reported_runtime_version` (heartbeat member `runtime_version`) is
    the version of the runtime ([09-agents.md](09-agents.md) section 4.8). The admin console
-   shows adapters whose SDK version is no longer supported.
+   shows adapters whose SDK version is no longer supported. Not built: the console shows the
+   reported runtime version only, and no rule names the supported SDK versions (plan row
+   V3-38).
 
 As built (M7-13): versions compare as SemVer 2.0.0, so a pre-release of the minimum is below it;
 only the rule of the app's own platform counts, a value that is no SemVer counts as absent (logged
@@ -564,7 +566,9 @@ view shows a notice with the same path, which the person dismisses once per vers
 The host service reports its version in `identify` of the control connection. The server accepts
 the versions whose protocol version it supports (prologue `bothy-terminal/1` and
 `x-protocol-versions` of the channel in [asyncapi.yaml](../api/asyncapi.yaml)); it closes a version
-that is too old with `4114`, and the console and the host card show "Update host service". The host
+that is too old with `4114`, and the console and the host card show "Update host service" (not
+built: the server closes before it knows the host, so the console shows only a host without a
+connection; plan row V3-38). The host
 service does not update itself. Reason: a program that replaces itself would need
 write permissions on its own binary; the service user deliberately does not have them
 ([24-terminal.md](24-terminal.md), section 2.2). Updates run through the package route of the

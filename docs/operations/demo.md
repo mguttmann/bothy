@@ -25,8 +25,24 @@ the demo overlay), runs `bothy setup demo` in the `api` container, pairs the hos
 when the command asks for it and prints:
 
 - the address `https://localhost:<port>`, published on `127.0.0.1` only;
-- the certificate of the demo CA of this run: trust it in the app or the browser for this run;
-- the enrollment code of Alex, the owner: sign in with it in the app (it is valid once).
+- the certificate of the demo CA of this run (valid for two days, a new one each run);
+- the enrollment code of Alex, the owner (valid once).
+
+To look at it:
+
+1. Trust the demo CA in the trust store of the system that runs the app or the browser (on
+   macOS the keychain, on Windows the certificate store, on Android the system store of the
+   emulator). The app has no setting to trust a CA of its own; without the system trust it shows
+   "Certificate invalid". Remove the CA again when the demo ends.
+2. Build and start the app ([apps/client](../../apps/client/README.md)) for macOS, Windows, iOS or
+   Android, enter the address and redeem the enrollment code of Alex. There is no Linux desktop
+   app: on Linux the app runs in the Android emulator. The certificate names only `localhost`
+   and `127.0.0.1`, so map the port into the emulator with `adb reverse tcp:<port> tcp:<port>`
+   and use the printed address there.
+3. The web console at the same address does not take an enrollment code: it signs in with a
+   password and TOTP ([08-identity.md](../spec/08-identity.md) 7.5), which `make demo` does not
+   set. The showcase creates them with `bothy-smoke seed`
+   ([tools/showcase/README.md](../../tools/showcase/README.md), platform `console`).
 
 The warm-up posts prompts at the pace of the data set, so the command takes a few minutes; the
 views fill while it runs. Ctrl-C stops the demo and removes the stack, its volumes and the
@@ -51,7 +67,7 @@ until the demo host reaches the server on its loopback, then removes the demo (e
 
 `bothy setup demo` runs in every environment, but only on an empty instance: an instance whose
 setup is complete gives exit `3` and nothing is written. Without the overlay there is no demo agent
-and no host container:
+and no host container (in the profile `tailscale` the service is `api-tailscale`):
 
 ```sh
 docker compose exec api bothy setup demo --data /path/in/the/container

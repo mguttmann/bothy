@@ -117,17 +117,20 @@ them. Rules ([16-operations.md](../../docs/spec/16-operations.md) 4.4,
 ## Checked
 
 `docker compose config --quiet` (Docker Compose v5.6.0) with `.env.example` and all profiles on
-2026-10-10: valid. A start was not possible because the Bothy images do not exist yet and no
-Docker daemon was running on the checking host. `secrets-init`, `bothy-backupd`, `bothy healthcheck`,
-`migrate --bootstrap` and the TLS connection of pgBackRest are contracts for build tickets.
+2026-10-10: valid. That first check could not start the stack; the stack starts since M1-73 with
+the images built from source (`make image`, `make postgres-image`,
+[install-compose.md](../../docs/operations/install-compose.md) section 1.2) and the tests below
+start it.
 
 Since M1-73 the smoke test `smoke.sh` (`make portability`, [test/README.md](test/README.md))
 proves the server part of the stack with the real `bothy-server` image: this file unchanged plus
 the test overlay, `secrets-init`, `migrate up --bootstrap`, `api`, `worker` and the collector,
 first setup, enrollment, live delivery over WebSocket, catch-up, revocation and the canary scan of
 the collector export and the container logs. It runs on the official PostgreSQL 18 image without
-`backup`; `bothy-postgres`, `bothy-backupd`, the profiles `scan`, `s3`, `tailscale` and
-`observability` and the full portability test stay for M7 (M7-14).
+`backup`. The full stack with `bothy-postgres`, `bothy-backupd`, the profiles `direct`, `scan`
+and `s3` and a backup with a restore test is the portability test of M7-14 (`make portability`
+with `PORTABILITY_TAG`, [tests/portability/README.md](../../tests/portability/README.md)), which
+needs a release.
 
 Checks of the overlay and the example edge (`services/server/test/edge`, needs Docker):
 `TestComposeMultiNodeOverlay` renders compose.yaml with the overlay and `.env.example` for the

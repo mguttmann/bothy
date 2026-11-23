@@ -85,7 +85,9 @@ def summary(topic: str | None) -> str:
 def usage() -> CostReport:
     """The usage of one run, reported with ``finishRun``.
 
-    No ``amount_micros``: the server prices the tokens with its price table.
+    No ``amount_micros``: the server prices the tokens with its price table when the owner
+    entered prices for this model (``createPrice``); without them the entry is ``unpriced``
+    with amount 0.
 
     Returns:
         One report for the example's runtime.

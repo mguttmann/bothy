@@ -252,8 +252,8 @@ func median(d []time.Duration) time.Duration {
 const toleranceKey = "authz.not_found_timing_tolerance"
 
 // notFoundTimingTolerance reads the standard of authz.not_found_timing_tolerance from the
-// configuration reference docs/operations/configuration.md (the key is planned there, the server
-// does not read it), so the test never carries the value as a literal.
+// configuration reference docs/operations/configuration.md (its place there is "Leak test", the
+// server does not read it), so the test never carries the value as a literal.
 func notFoundTimingTolerance(t *testing.T) time.Duration {
 	t.Helper()
 	d, err := toleranceFromReference(filepath.Join(moduleDir(), "..", "..", "docs", "operations", "configuration.md"))

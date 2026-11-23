@@ -59,7 +59,8 @@ and reaches back only as far as its retention period. Deleted messages do not co
    `privacy.stats_min_group_size` as "fewer than `privacy.stats_min_group_size`". Reason: small
    groups make individuals recognizable.
 3. The cost view per thread is not statistics but part of the thread (`cost.read.thread`).
-4. An export of the statistics as CSV contains only the same aggregates.
+4. An export of the statistics as CSV contains only the same aggregates. The export is not built:
+   no operation of the API offers it and the view has no export button (plan row V3-28).
 
 ## 4. Permissions
 

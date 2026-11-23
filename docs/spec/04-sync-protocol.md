@@ -1196,39 +1196,39 @@ sequenceDiagram
 
 ## 18. Configuration values of this chapter
 
-| Name | Default | Meaning |
-|---|---|---|
-| `sync.event_retention` | `30d` | durable events stay available for catch-up this long |
-| `sync.event_payload_max_bytes` | `65536` | largest payload of an event |
-| `sync.ws_max_frame_bytes` | `1048576` | largest WebSocket frame |
-| `sync.identify_timeout` | `10s` | time between `hello` and `identify` |
-| `sync.heartbeat_interval` | `30s` | interval of the heartbeats (reported in `hello`) |
-| `sync.heartbeat_miss_limit` | `2` | missed heartbeats until the connection is closed |
-| `sync.resume_window` | `5m` | `resume` is possible this long after a disconnect |
-| `sync.reauth_lead_time` | `60s` | lead time of `reauth_required` before the token expires |
-| `sync.reconnect_backoff_base` | `1s` | base of the backoff when reconnecting |
-| `sync.reconnect_backoff_cap` | `60s` | largest interval when reconnecting |
-| `sync.catchup_page_size` | `500` | events per catch-up page |
-| `sync.catchup_max_events` | `50000` | a larger backlog yields `resync_required` |
-| `sync.cursor_advance_every` | `1000` | one `cursor` frame after this many skipped events |
-| `sync.outbound_queue_max` | `10000` | frames in the outbound queue of a connection until `4014` |
-| `sync.idempotency_key_ttl` | `24h` | retention of `Idempotency-Key` |
-| `sync.max_focused_threads` | `20` | threads in `focus` per connection |
-| `sync.snapshot_thread_window` | `7d` | an open thread with activity within this window is in `active_threads` of the snapshot (6.3 item 4) |
-| `sync.snapshot_threads_per_channel` | `20` | bound of `active_threads` per channel, except threads with an active run or unread for the caller (6.3 item 4) |
-| `sync.run_patch_coalesce_interval` | `250ms` | collection window for `run.updated` |
-| `sync.typing_min_interval` | `5s` | `typing.start` at most this often |
-| `sync.typing_ttl` | `8s` | typing indicator without renewal |
-| `client.cache_max_age` | `30d` | unused cache entries |
-| `client.outbox_retry_base` | `2s` | base of the backoff in the outbox |
-| `client.outbox_retry_cap` | `5m` | largest interval in the outbox |
-| `agent.invocation_token_ttl` | `60s` | validity of an invocation token |
-| `agent.ack_timeout` | `30s` | without `ack`: redelivery |
-| `agent.ack_persist_interval` | `1s` | `acked_seq` is stored at least this often |
-| `agent.max_inflight_events` | `100` | unacknowledged events per consumer |
-| `agent.run_update_min_interval` | `500ms` | adapter throttle for `run.update` |
-| `agent.presence_timeout` | `90s` | without a heartbeat, the agent counts as `offline` |
-| `agent.cancel_grace` | `30s` | time for the adapter to report a cancellation |
+| Name | Place | Default | Meaning |
+|---|---|---|---|
+| `sync.event_retention` | Server | `30d` | durable events stay available for catch-up this long |
+| `sync.event_payload_max_bytes` | Server | `65536` | largest payload of an event |
+| `sync.ws_max_frame_bytes` | Server | `1048576` | largest WebSocket frame |
+| `sync.identify_timeout` | Server | `10s` | time between `hello` and `identify` |
+| `sync.heartbeat_interval` | Server | `30s` | interval of the heartbeats (reported in `hello`) |
+| `sync.heartbeat_miss_limit` | Server | `2` | missed heartbeats until the connection is closed |
+| `sync.resume_window` | Server | `5m` | `resume` is possible this long after a disconnect |
+| `sync.reauth_lead_time` | Server | `60s` | lead time of `reauth_required` before the token expires |
+| `sync.reconnect_backoff_base` | App | `1s` | base of the backoff when reconnecting |
+| `sync.reconnect_backoff_cap` | App | `60s` | largest interval when reconnecting |
+| `sync.catchup_page_size` | Server | `500` | events per catch-up page |
+| `sync.catchup_max_events` | Server | `50000` | a larger backlog yields `resync_required` |
+| `sync.cursor_advance_every` | Server | `1000` | one `cursor` frame after this many skipped events |
+| `sync.outbound_queue_max` | Server | `10000` | frames in the outbound queue of a connection until `4014` |
+| `sync.idempotency_key_ttl` | Server | `24h` | retention of `Idempotency-Key` |
+| `sync.max_focused_threads` | Server | `20` | threads in `focus` per connection |
+| `sync.snapshot_thread_window` | Server | `7d` | an open thread with activity within this window is in `active_threads` of the snapshot (6.3 item 4) |
+| `sync.snapshot_threads_per_channel` | Server | `20` | bound of `active_threads` per channel, except threads with an active run or unread for the caller (6.3 item 4) |
+| `sync.run_patch_coalesce_interval` | Server | `250ms` | collection window for `run.updated` |
+| `sync.typing_min_interval` | Server | `5s` | `typing.start` at most this often |
+| `sync.typing_ttl` | Server | `8s` | typing indicator without renewal |
+| `client.cache_max_age` | Server | `30d` | unused cache entries |
+| `client.outbox_retry_base` | App | `2s` | base of the backoff in the outbox |
+| `client.outbox_retry_cap` | App | `5m` | largest interval in the outbox |
+| `agent.invocation_token_ttl` | Server | `60s` | validity of an invocation token |
+| `agent.ack_timeout` | Server | `30s` | without `ack`: redelivery |
+| `agent.ack_persist_interval` | Server | `1s` | `acked_seq` is stored at least this often |
+| `agent.max_inflight_events` | Server | `100` | unacknowledged events per consumer |
+| `agent.run_update_min_interval` | Adapter | `500ms` | adapter throttle for `run.update` |
+| `agent.presence_timeout` | Server | `90s` | without a heartbeat, the agent counts as `offline` |
+| `agent.cancel_grace` | Server | `30s` | time for the adapter to report a cancellation |
 
 Values of other chapters that this chapter refers to: `auth.dpop_nonce_ttl`
 ([08-identity.md](08-identity.md)), `perf.event_commit_min_per_s`

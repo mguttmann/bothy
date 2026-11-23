@@ -60,7 +60,7 @@ Every activity has the mandatory fields from Art. 30(1)(b) to (g) GDPR.
 | Recipients | enter per agent: runtime `<name, run by, location>`, LLM provider `<name>`, tools with external effect `<list>`; name agents with tool class `host` or `scoped` separately |
 | Third country | `<per LLM provider; region of processing>` |
 | Deletion periods | in the product as in V1; at the runtime and the LLM provider according to their periods `<enter>` |
-| Measures | M2, M3, M6; agent badge and AI notice (20, section 8) |
+| Measures | M2, M3, M6; agent badge (20, section 8); the one-time AI notice of 20 section 8 is not built, enter your own notice `<...>` |
 
 Table of agents (one row per agent):
 
