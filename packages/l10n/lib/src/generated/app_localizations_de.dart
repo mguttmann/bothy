@@ -10810,7 +10810,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get newAgentSecretsHint =>
-      'Nur Namen; die Werte gehen nie über den Server.';
+      'Nur Namen; die Werte gehen nie über den Server. Auf dem Rechner des Runners jedes Geheimnis env:NAME als Datei NAME (Modus 0600) im Ordner <runner.hosted_secrets_dir>/<Agent-ID>/ ablegen, sobald der Agent angelegt ist; ein Geheimnis file: muss in diesem Ordner liegen.';
 
   @override
   String get newAgentSectionSettings => 'Einstellungen';
@@ -11673,6 +11673,38 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get teamCreateCancel => 'Abbrechen';
+
+  @override
+  String get structureCreateChannelMenu => 'Kanal anlegen...';
+
+  @override
+  String structureCreateChannelTitle(String name) {
+    return 'Neuer Kanal in $name';
+  }
+
+  @override
+  String get structureCreateSpaceMenu => 'Bereich anlegen...';
+
+  @override
+  String get structureCreateSpaceTitle => 'Neuer Bereich';
+
+  @override
+  String get structureCreateName => 'Name';
+
+  @override
+  String get structureCreateSubmit => 'Anlegen';
+
+  @override
+  String get structureCreateCancel => 'Abbrechen';
+
+  @override
+  String structureCreateRefused(String reason) {
+    return 'Abgelehnt: $reason';
+  }
+
+  @override
+  String get structureCreateOffline =>
+      'Keine Verbindung. Versuche es noch einmal.';
 
   @override
   String get teamTitle => 'Teamkanal';

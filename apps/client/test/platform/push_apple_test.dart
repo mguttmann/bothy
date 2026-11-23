@@ -103,6 +103,61 @@ void main() {
     expect(host.keychain[instance]!.registrationId, 'reg-2');
   });
 
+  test('start and foreground register again when the server disabled the '
+      'registration after transient failures or no longer has it, not when it '
+      'is active or ended with the session', () async {
+    host.authorized = true;
+    await push.signedIn(account(), previewMode: 'full');
+    expect(registrations.calls, ['register aa11 sandbox com.example.chat']);
+
+    // Active: the state is read at the start and at the foreground, nothing registers.
+    await push.signedIn(account(), previewMode: 'full');
+    await push.foreground();
+    expect(registrations.stateReads, ['reg-1', 'reg-1']);
+    expect(registrations.calls, hasLength(1));
+
+    // An ended session or a refused token: the same token is not registered again.
+    for (final reason in ['logout', 'device_revoked', 'token_invalid']) {
+      registrations.states['reg-1'] = PushRegistrationState.disabled(reason);
+      await push.foreground();
+      expect(registrations.calls, hasLength(1), reason: reason);
+    }
+
+    // Disabled after transient failures: the next start registers the same token again.
+    registrations.states['reg-1'] = const PushRegistrationState.disabled(
+      'repeated_failures',
+    );
+    await push.signedIn(account(), previewMode: 'full');
+    expect(registrations.calls.last, 'register aa11 sandbox com.example.chat');
+    expect(host.keychain[instance]!.registrationId, 'reg-2');
+
+    // Missing on the server: the return to the foreground registers again.
+    registrations.states['reg-2'] = const PushRegistrationState.missing();
+    await push.foreground();
+    expect(registrations.calls, hasLength(3));
+    expect(host.keychain[instance]!.registrationId, 'reg-3');
+    expect(host.keychain[instance]!.previewToken, 'bothy_pvw_EXAMPLE3');
+  });
+
+  test('a failed registration is tried again at the return to the '
+      'foreground', () async {
+    host.authorized = true;
+    registrations.failure = StateError('offline');
+    await push.signedIn(account(), previewMode: 'full');
+    expect(host.keychain, isEmpty);
+    registrations.failure = null;
+    await push.foreground();
+    expect(registrations.calls, ['register aa11 sandbox com.example.chat']);
+    expect(host.keychain[instance]!.registrationId, 'reg-1');
+  });
+
+  test('the foreground does nothing without a signed-in account', () async {
+    host.authorized = true;
+    await push.foreground();
+    expect(registrations.calls, isEmpty);
+    expect(registrations.stateReads, isEmpty);
+  });
+
   test('logout unregisters and deletes the keychain items', () async {
     host.authorized = true;
     await push.signedIn(account(), previewMode: 'full');

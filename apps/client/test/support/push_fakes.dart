@@ -21,6 +21,9 @@ class FakePushHost implements PushAppleHostApi {
   bool grant = true;
   String token = 'aa11';
   int permissionRequests = 0;
+
+  /// How often the app read the APNs token (once per registration attempt).
+  int tokenReads = 0;
   final Map<String, PushRegistrationRecord> keychain = {};
   final List<String> settings = [];
   PushDisplayCounters counters = PushDisplayCounters(
@@ -56,7 +59,10 @@ class FakePushHost implements PushAppleHostApi {
   }
 
   @override
-  Future<String> deviceToken() async => token;
+  Future<String> deviceToken() async {
+    tokenReads++;
+    return token;
+  }
 
   @override
   Future<void> saveRegistration(PushRegistrationRecord record) async =>
@@ -98,13 +104,26 @@ class FakePushHost implements PushAppleHostApi {
   }
 }
 
-/// `registerPush` and `unregisterPush` that record their calls.
+/// `registerPush` and `unregisterPush` that record their calls, and the server's state of each
+/// registration (active unless the test sets another).
 class FakeRegistrations implements PushRegistrations {
   final List<String> calls = [];
   int next = 0;
 
   /// What `registerPush` throws when set.
   Object? failure;
+
+  /// The server's state of a registration ID; an ID not in it is active.
+  final Map<String, PushRegistrationState> states = {};
+
+  /// The registration IDs whose state was read, in order.
+  final List<String> stateReads = [];
+
+  @override
+  Future<PushRegistrationState> state(String registrationId) async {
+    stateReads.add(registrationId);
+    return states[registrationId] ?? const PushRegistrationState.active();
+  }
 
   @override
   Future<RegisteredPush> register({

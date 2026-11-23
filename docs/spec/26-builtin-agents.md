@@ -190,10 +190,12 @@ All limits are configuration values (section 14).
 | `origin` | `kind`, optional `template_slug`, `template_version` | `kind` one of `template`, `interview`, `manual`; display only |
 
 A `secret_ref` names a key in the secret provider of the hosting runner (16, the `secret_ref`
-form of `runner.anthropic_api_key_ref`); the server never resolves it. The runner resolves only a
-`file:` reference whose file lies, also after following every link, in
-`<runner.hosted_secrets_dir>/<agent_id>/` of the same agent (5.1 item 3); an `env:` reference,
-another file and every reference without that key are out of scope.
+form of `runner.anthropic_api_key_ref`); the server never resolves it. The runner resolves a
+reference only to a file that lies, also after following every link, in
+`<runner.hosted_secrets_dir>/<agent_id>/` of the same agent (5.1 item 3): `file:<path>` names that
+file, and `env:<NAME>` (the form of a template, 7.1) names the file `NAME` in that folder, never a
+variable of the runner's environment (`NAME` matches `^[A-Z_][A-Z0-9_]*$`, so it holds no path
+separator). Another file and every reference without that key are out of scope.
 
 No `url`, `args[]` entry or plain `value` of `headers[]` or `env[]` holds `${` (finding
 `invalid`): the pinned CLI substitutes `${VAR}` and `${VAR:-default}` there from its own
@@ -297,7 +299,7 @@ at the repository root is the conformance set of every writer (A1-02).
    reach of the file tools of a `chat` or `scoped` turn.
 3. `runner.hosted_secrets_dir` (default empty) holds the secrets of hosted agents, one subfolder
    `<agent_id>/` per agent, filled by the host operator. A definition's `secret_ref` resolves only
-   to a file in its own agent's subfolder (4.2), read below the real path of the folder, so a
+   to a file in its own agent's subfolder (4.2; `env:NAME` is the file `NAME` there), read below the real path of the folder, so a
    subfolder that is a link resolves nothing; never to the runner's environment, another
    agent's subfolder or a credential of the runner itself (`agent_token_ref`, `dpop_key_ref`,
    `anthropic_api_key_ref`). The CLI's own login and configuration are no such key: under
@@ -581,7 +583,10 @@ One folder per template under `templates/agents/<slug>/` (`<slug>` matching
 
 `name`, `description`, `version`, `tool_class_wish` and `skills` are required; `model_hint`
 (becomes `settings.model`), `required_secrets` and `mcp_servers` are optional, and no other key is
-allowed. A `secret_ref` of a template is `env:<NAME>` with `NAME` listed in `required_secrets`.
+allowed. A `secret_ref` of a template is `env:<NAME>` with `NAME` listed in `required_secrets`;
+on the hosting runner it is the file `NAME` in the agent's subfolder of
+`runner.hosted_secrets_dir` (4.2, 5.1 item 3), which the host operator fills after the agent
+exists, and the preview of 8 names that place.
 The draft takes `CLAUDE.md` as `instructions` and, per skill, the frontmatter `description` and
 the text after the frontmatter as `body`; it is checked with 4.3 for the tool class
 `tool_class_wish` (decisions.d/A1-06.md).
@@ -663,7 +668,9 @@ A1-03b).
 ### 8.2 Steps
 
 The dialog offers a template, the interview or the manual form, then a preview of the whole draft:
-instructions, each skill, each MCP server with the secret names it needs, tool class (with what
+instructions, each skill, each MCP server with the secret names it needs and where the host
+operator puts them on the runner host (`env:NAME` as the file `NAME` in
+`<runner.hosted_secrets_dir>/<agent_id>/`, 4.2), tool class (with what
 the class does not load, 4.4 and 5.7), billing mode, model and cost cap, all editable, and the
 hosting runner, editable until `agent.create` succeeded and read-only afterwards (8.3). "Create"
 runs, in this order and each visible with its state (01 6.9 pattern): `agent.create` with
@@ -781,7 +788,7 @@ hosted agent in `personal` always equals that of its hosting runner (R-BA-12).
 | BA-T08 | `putProjectBinding` and `setChannelOperator` on a bound forum with a built-in agent | `operator_cannot_serve_project` (R-AG-39, A1-03) |
 | BA-T09 | runner with `runner.hosted_agents`: two hosted agents, shared slots, separate cursors and state folders; no token in any file under `runner.state_dir` or `runner.hosted_agents_root` | as 3.2 and 3.3 (A1-04) |
 | BA-T10 | runner start with `runner.hosted_agents_root` inside or above `runner.state_dir` or `runner.projects_root`, with a `CLAUDE.md` above it, writable by others | start refused, naming the key (A1-05) |
-| BA-T11 | materializer: files of 5.2 from a definition; frontmatter with a line break in `description`; a file name with `/` or `..`; settings file content exactly 5.4; a `secret_ref` naming the runner's own token, an `env:` variable, another agent's file, a link out of the agent's subfolder of `runner.hosted_secrets_dir`, a hard link there to a file elsewhere or a link swapped in after the check | as 5.2 and 5.4; injection and path escape impossible; an out-of-scope reference ends the run with `mcp_reference_unavailable` without a per-turn file (A1-05) |
+| BA-T11 | materializer: files of 5.2 from a definition; frontmatter with a line break in `description`; a file name with `/` or `..`; settings file content exactly 5.4; a `secret_ref` naming the runner's own token, an `env:` name that is only a variable of the runner's environment and not a file of the agent's subfolder, another agent's file, a link out of the agent's subfolder of `runner.hosted_secrets_dir`, a hard link there to a file elsewhere or a link swapped in after the check | as 5.2 and 5.4; injection and path escape impossible; an out-of-scope reference ends the run with `mcp_reference_unavailable` without a per-turn file (A1-05); the `env:<NAME>` of a template resolves from the file `NAME` of the agent's subfolder into the per-turn file (issue 1425) |
 | BA-T12 | rebuild: planted files of every surface of 5.5 in the agent folder and the control folder | removed before the turn; the agent's other files stay (A1-05) |
 | BA-T13 | command line per class against 5.3 with fake Claude; `stdio` server under a token below `host`; a definition failing 4.3 | exact list; `tool_class_mismatch` before `run.start` (A1-05) |
 | BA-T14 | probe against the pinned CLI with a planted skill carrying `hooks`, `allowed-tools: Bash` and both inline shell forms, and every point of 5.7 | no hook, no `Bash`, the placeholder "[shell command execution disabled by policy]"; results recorded in 5.7 (A1-05, real CLI behind its switch) |

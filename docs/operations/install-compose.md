@@ -146,9 +146,13 @@ docker compose exec api bothy setup bootstrap-owner --handle <handle> --display-
 ```
 
 The command prints an enrollment code once; with it, the owner redeems their first device in the
-app ([08-identity.md](../spec/08-identity.md), section 4). If all owners later lose their
-devices, `docker compose exec api bothy setup issue-enrollment-code --user <handle>`
-issues a code for recovery. Access to the host is the root of trust of the instance
+app ([08-identity.md](../spec/08-identity.md), section 4). The sidebar of a fresh instance then
+says "No spaces yet" with the button "Create space...": the owner creates the first space there and
+in it a text channel with "Create channel..." of the space's menu
+([01-product.md](../spec/01-product.md#625-creating-a-space-and-a-channel), section 6.25). If all
+owners later lose their devices,
+`docker compose exec api bothy setup issue-enrollment-code --user <handle>` issues a code for
+recovery. Access to the host is the root of trust of the instance
 ([16-operations.md](../spec/16-operations.md), section 4.3): shell and container runtime only for
 people who could also be owners.
 

@@ -10,6 +10,7 @@ import 'dart:async';
 import 'package:domain/domain.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:sync_engine/sync_engine.dart' show AppActivity;
 
 import '../app/bootstrap.dart';
 import '../app/providers/ports.dart';
@@ -33,7 +34,8 @@ Future<bool?> pushAvailable(Ref ref) async {
 ///
 /// The account is handed over once per signed-in services and only after the personal
 /// settings are read, so the extension or the push service never sees the default preview mode
-/// of a person who chose `none`; later changes of `notify.preview_mode` follow.
+/// of a person who chose `none`; later changes of `notify.preview_mode` follow. Every return of
+/// the app to the foreground lets the platform check its registration (13 13).
 @Riverpod(keepAlive: true)
 PushPlatform? pushPlatform(Ref ref) {
   final ports = ref.watch(appPortsProvider);
@@ -60,6 +62,7 @@ PushPlatform? pushPlatform(Ref ref) {
           registrations: ApiPushRegistrations(
             services.auth.api,
             services.ids.next,
+            services.storedDeviceId,
           ),
           fetchTimeout: ports.config.pushFetchTimeout,
         ),
@@ -68,7 +71,13 @@ PushPlatform? pushPlatform(Ref ref) {
     );
   }
 
+  final foreground = ports.lifecycle.changes
+      .where((a) => a == AppActivity.foreground)
+      .listen((_) {
+        if (handed != null) unawaited(push.foreground());
+      });
   ref
+    ..onDispose(foreground.cancel)
     ..listen(signedInServicesProvider, (_, _) => sync())
     ..listen(personalSettingsLoadedProvider, (_, _) => sync())
     ..listen(notifySettingsProvider.select((s) => s.previewMode), (_, mode) {

@@ -17268,10 +17268,10 @@ abstract class AppLocalizations {
   /// **'No secrets needed.'**
   String get newAgentSecretsNone;
 
-  /// Line under the secret names.
+  /// Line under the secret names: where the host operator stores each secret on the runner host (docs/spec/26-builtin-agents.md 4.2). runner.hosted_secrets_dir is a configuration key and env:NAME and file: are literal forms; keep them untranslated.
   ///
   /// In en, this message translates to:
-  /// **'Names only; the values never pass through the server.'**
+  /// **'Names only; the values never pass through the server. On the runner host, put each env:NAME secret as the file NAME (mode 0600) in the folder <runner.hosted_secrets_dir>/<agent ID>/ after the agent is created; a file: secret must lie in that folder.'**
   String get newAgentSecretsHint;
 
   /// Section of the settings.
@@ -18495,6 +18495,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel'**
   String get teamCreateCancel;
+
+  /// Entry of the space menu for a person with manage on the space that creates a plain text channel (01 6.25).
+  ///
+  /// In en, this message translates to:
+  /// **'Create channel...'**
+  String get structureCreateChannelMenu;
+
+  /// Title of the dialog that creates a text channel in a space; name is the space's name (01 6.25).
+  ///
+  /// In en, this message translates to:
+  /// **'New channel in {name}'**
+  String structureCreateChannelTitle(String name);
+
+  /// Entry of the space menu and button of the empty sidebar for owners that creates a space (01 6.25).
+  ///
+  /// In en, this message translates to:
+  /// **'Create space...'**
+  String get structureCreateSpaceMenu;
+
+  /// Title of the dialog that creates a space (01 6.25).
+  ///
+  /// In en, this message translates to:
+  /// **'New space'**
+  String get structureCreateSpaceTitle;
+
+  /// Label of the name field of the dialog that creates a space or a channel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get structureCreateName;
+
+  /// Button of the dialog that creates the space or the channel.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get structureCreateSubmit;
+
+  /// Button that closes the dialog that creates a space or a channel without creating it.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get structureCreateCancel;
+
+  /// Shown in the dialog that creates a space or a channel when the server refused; reason is the translated reason or problem.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused: {reason}'**
+  String structureCreateRefused(String reason);
+
+  /// Shown in the dialog that creates a space or a channel when no answer arrived; the next press sends the same request again.
+  ///
+  /// In en, this message translates to:
+  /// **'No connection. Try again.'**
+  String get structureCreateOffline;
 
   /// Title of the team dialog of a channel (09 3.9.1).
   ///

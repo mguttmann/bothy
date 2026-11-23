@@ -46,7 +46,11 @@ class SpaceTree extends StatelessWidget {
     this.onMoveThread,
     this.onSetHidden,
     this.onToggleArchived,
+    this.onCreateSpace,
   });
+
+  /// "Create space..." of the empty tree (01 6.25), or null for none (no owner).
+  final VoidCallback? onCreateSpace;
 
   /// Archives (true) or restores (false) a channel in the person's own sidebar (01 6.22), or
   /// null for no such entry.
@@ -116,12 +120,27 @@ class SpaceTree extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (nodes.isEmpty) {
+      final create = onCreateSpace;
       return Padding(
         padding: const EdgeInsets.all(DsSpace.s12),
-        child: Text(
-          AppLocalizations.of(context).sidebarNoSpaces,
-          style: dsTextStyle(DsType.bodySm)
-              .copyWith(color: context.dsColors.textOnSidebarSecondary),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              AppLocalizations.of(context).sidebarNoSpaces,
+              style: dsTextStyle(DsType.bodySm)
+                  .copyWith(color: context.dsColors.textOnSidebarSecondary),
+            ),
+            // 01 6.25: an owner of a fresh installation starts here.
+            if (create != null) ...[
+              const SizedBox(height: DsSpace.s8),
+              DsButton(
+                key: const ValueKey('sidebar.createSpace'),
+                label: AppLocalizations.of(context).structureCreateSpaceMenu,
+                onPressed: create,
+              ),
+            ],
+          ],
         ),
       );
     }

@@ -74,6 +74,9 @@ final class _Push implements PushPlatform {
   Future<void> previewModeChanged(String previewMode) async {}
 
   @override
+  Future<void> foreground() async {}
+
+  @override
   Future<void> logout() async {}
 
   @override
