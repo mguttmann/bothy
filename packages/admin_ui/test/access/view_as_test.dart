@@ -120,13 +120,17 @@ void main() {
     }
   });
 
-  testWidgets('a cancelled step-up shows no snapshot', (tester) async {
+  testWidgets('a cancelled step-up shows no snapshot and leaves the view', (
+    tester,
+  ) async {
     await pump(tester);
     await tester.tap(find.byKey(const ValueKey('stepUp.cancel')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('viewAs.frame')), findsNothing);
     expect(find.byKey(const ValueKey('viewAs.space.marketing')), findsNothing);
+    // No empty dialog without a way out (fn-permissions-audit-9).
+    expect(exits, 1);
   });
 
   testWidgets('a refusal shows the server reason', (tester) async {

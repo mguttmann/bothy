@@ -488,7 +488,7 @@ decision logic.
   placeholder in its language and its branding.
 - `loc-key` per kind: `PUSH_BODY_MESSAGE`, `PUSH_BODY_MENTION`, `PUSH_BODY_DM`,
   `PUSH_BODY_RUN_DONE`, `PUSH_BODY_RUN_FAILED`, `PUSH_BODY_INPUT_NEEDED`, `PUSH_BODY_SECURITY`,
-  `PUSH_BODY_ADMIN`. `category` correspondingly in upper case (the actions of the notification are defined in
+  `PUSH_BODY_ADMIN`, `PUSH_BODY_WAKE_ENDED`. `category` correspondingly in upper case (the actions of the notification are defined in
   [15-client-architecture.md](15-client-architecture.md)).
 - `interruption-level`: `active`; `passive` during quiet hours; `time-sensitive` only for
   `input_needed` and only if `push.apns.time_sensitive_enabled` is set (the app needs
@@ -584,8 +584,8 @@ the reminder for `admin`.
 As built (M3-22): the preview fields come from the same preview builder as the answer of 6.4
 (docs/DECISIONS.md D-M3-22-9, which supersedes D-M3-23-8). The job `notify.gateway_send` builds
 them in its first transaction, after its `push.deliver` check (or the recipient rule of R-AZ-30)
-passed, and only for a kind that points at a message (`message`, `mention`, `dm`, `run_done`,
-`run_failed`, `input_needed`) with a set `message_id`. It reads the recipient's
+passed, and only for a kind with a thread (`message`, `mention`, `dm`, `run_done`,
+`run_failed`, `input_needed`, `wake_ended`; `domain.PreviewKindAllowed`) with a set `message_id`. It reads the recipient's
 `notify.preview_mode` with the rules of 6.4; `none` builds nothing. An unknown or deleted message
 and a message of kind `run` or `system` build nothing either, and the event still goes out with its
 IDs. `names` adds `space_name`, `channel_name`, `thread_title` and `sender_display_name`, each only
@@ -657,8 +657,9 @@ other operation the authenticator refuses it with `401 unauthenticated` without 
 As built (M3-22), the checks of the endpoint, in this order; the first failure ends the request
 (docs/DECISIONS.md D-M3-22-8):
 
-1. The query parameter `kind` (`NotificationKind`) must name a kind that points at a message:
-   `message`, `mention`, `dm`, `run_done`, `run_failed` or `input_needed`. `security` and `admin`
+1. The query parameter `kind` (`NotificationKind`) must name a kind with a thread:
+   `message`, `mention`, `dm`, `run_done`, `run_failed`, `input_needed` or `wake_ended` (the
+   note of the wake-up in the thread, `domain.PreviewKindAllowed`). `security` and `admin`
    give `400 validation_failed` with `errors[].code` `invalid` at `#query/kind`; a missing or
    unknown value (also `sync`) fails the schema check of the request.
 2. Exactly one `Authorization` value with the scheme `DPoP`, otherwise `401 unauthenticated` with

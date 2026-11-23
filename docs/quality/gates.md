@@ -29,8 +29,8 @@ once for the components of the plan, the tests split by component
 
 | Job | Make targets | Runs |
 |---|---|---|
-| `gates` | `fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint fragments-check runners-check labels-check release-pins install-options templates-check` | always |
-| `gates (docs and contracts)` | `docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check api-clients tokens` | always |
+| `gates` | `fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check commitlint fragments-check runners-check labels-check release-pins install-options tofu-check templates-check` | always |
+| `gates (docs and contracts)` | `docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check signal-check api-clients tokens` | always |
 | `gates (security and supply chain)` | `gitleaks semgrep trivy osv licenses`, after `gradle/actions/wrapper-validation` checks every tracked `gradle-wrapper.jar` (a gate of the merge through `ci-ok`: the jobs of the run that call `./gradlew` do not wait for it; the release build with a signing key waits for the whole workflow as its gate stage) | always |
 | `test (tools)` | `test coverage` with no component (the Python tools) | always |
 | `test (server, shard I of N)` | `test COMPONENTS=server AREAS=none GO_TEST_SHARD=I/N`, one job per shard of a matrix | when the plan needs it |
@@ -39,8 +39,10 @@ once for the components of the plan, the tests split by component
 | `test (apps)` | `test coverage COMPONENTS=apps AREAS=none` (Dart and JVM) | when the plan needs it |
 | `test (SDKs and plugins)` | `test coverage` for the planned `sdk-python`, `sdk-typescript`, `plugins` with `AREAS=none` | when the plan needs it |
 
-`AREAS=none` leaves the tools suite to `test (tools)`; only the three tools tests that read
-component sources (`TOOLS_SOURCE_TESTS`) run in each test job as well.
+`AREAS=none` leaves the tools suite to `test (tools)`; only the tools tests that read component
+sources (the list `TOOLS_SOURCE_TESTS` of the `Makefile`) run in each test job as well. The
+targets of the three `gates` rows above are held equal to the `make` lines of their jobs in
+`ci.yml` by `tools/ci/tests/test_ci_parallel_gates.py`.
 
 Disk space: every Linux job of `ci.yml` and `build-verify.yml` except the short ones that only
 plan, scan or report runs `tools/ci/free_disk.sh` right after checkout. The ubuntu runner image
@@ -783,8 +785,9 @@ example a JSON report), `DENYLIST_FLAGS` (for example `--reveal` locally).
   host. Instead, `make diagrams` checks the stamp that `render_diagrams.py
   --write` writes from `.mmd` and theme (D-W-56); a hand-edited `.svg` with an old
   stamp goes unnoticed.
-* actionlint checks shell code in workflows without shellcheck, because shellcheck is not available
-  pinned; workflows therefore call only short commands and make targets.
+* actionlint checks shell code in workflows without shellcheck (`-shellcheck=`); the pinned
+  shellcheck of `make lint` checks only the tracked shell scripts (`tools/ci/shell_scripts.py`).
+  Workflows therefore call only short commands and make targets.
 * `osv` and `licenses` judge the packages of a Gradle lock file that ship (section
   "Advisories"). A known vulnerability or a license outside the list in a package that only the
   build or its tests resolve (the Android Gradle Plugin and its test platform, lint, the Kotlin

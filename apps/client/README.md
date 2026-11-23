@@ -88,7 +88,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `ios/ClientKit/` | the Swift package the native extensions share (M5-04): shared keychain, App Group state, DPoP, preview fetch, the Notification Service Extension's logic, with its tests |
 | `ios/NotificationService/`, `macos/NotificationService/` | the Notification Service Extensions (M5-04), each a subclass of ClientKit's without code of its own |
 | `ios/Localizations/` | the native push strings, generated from the ARB files by `make apple-strings` |
-| `lib/platform/push_apple.dart`, `lib/notifications/apple_push_provider.dart` | push on iOS and macOS (M5-04): permission, registration, the preview mode for the extension, taps, display counters |
+| `lib/platform/push_apple.dart`, `lib/notifications/push_provider.dart` | push on iOS and macOS (M5-04): permission, registration, the preview mode for the extension, taps, display counters |
 | `lib/share/` | sharing from other apps (M5-06): the child session and recent targets for the Share Extension (`share_apple.dart`), the takeover of its inbox (`share_takeover.dart`), the one send path into the outbox (`share_outbox.dart`), the Android receiver glue (`share_android.dart`), the target sheet and the route `/share` |
 | `ios/ShareExtension/`, `macos/ShareExtension/` | the Share Extensions (M5-06), each a subclass of `ClientKitShareViewController` of ClientKit's product `ClientKitShare`; `ios/Runner/ShareApple.swift` is their glue in the runners |
 | `ios/RunnerUITests/` | the UI test target of the `patrol` device tests (M5-06) |
