@@ -209,6 +209,8 @@ async def test_a_run_waiting_for_a_busy_session_covers_nothing_of_it(tmp_path: P
         assert r.handler.active_run(thread) is None
         assert await r.handler.on_answer(thread, "of the busy turn", None) is None
         r.handler.on_turn_ended(thread, failed=True)
+        r.handler.on_usage(thread, Usage("anthropic", "fake", 999, 77, 0, 0))
+        r.handler.on_model_reply(thread, 0, "the busy turn's answer")
         await r.fake.deliver_followup(triggered.run_id, "and this")
         await r.until(lambda: r.source.envelopes("agent.followup"))
         await r.fake.pass_time(0.5)
@@ -221,6 +223,9 @@ async def test_a_run_waiting_for_a_busy_session_covers_nothing_of_it(tmp_path: P
     assert len(rt.turns) == 1
     assert [m["content_md"] for m in r.fake.messages] != []
     assert not [m for m in r.fake.messages if "of the busy turn" in m["content_md"]]
+    finish = r.requests("finishRun")[-1].json
+    assert all(c.get("tokens_in") != 999 for c in finish.get("costs", []))
+    assert finish.get("metrics", {}).get("tokens_in", 0) < 999
 
 
 async def test_a_stop_ends_the_wait_for_a_busy_session(tmp_path: Path) -> None:

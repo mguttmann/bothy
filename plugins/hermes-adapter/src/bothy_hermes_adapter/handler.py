@@ -2441,7 +2441,7 @@ class HermesHandler(AgentHandler):
     def on_usage(self, thread_id: UUID, usage: Usage) -> None:
         """Token counts of one model request of the running turn."""
         turn = self._turns.get(thread_id)
-        if turn is not None and not turn.dropped:
+        if turn is not None and not turn.dropped and not turn.waiting:
             turn.usage.append(usage)
 
     def on_model_reply(
@@ -2454,7 +2454,7 @@ class HermesHandler(AgentHandler):
         of a reply that asked for tools is kept: a later send of it is progress (`on_interim`).
         """
         turn = self._turns.get(thread_id)
-        if turn is not None and not turn.dropped:
+        if turn is not None and not turn.dropped and not turn.waiting:
             turn.final_reply = not tool_calls
             turn.tool_text = (text or "").strip() if tool_calls else ""
 
