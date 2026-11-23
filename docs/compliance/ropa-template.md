@@ -238,4 +238,4 @@ assessment (Art. 35, which [../spec/20-privacy.md](../spec/20-privacy.md) sectio
 procedure for a personal data breach (Art. 33 and 34) and no procedure for the rights to
 restriction and to object (Art. 18 and 21; the product builds access, export, rectification and
 deletion, [../spec/20-privacy.md](../spec/20-privacy.md) section 5). The instance operator keeps
-these in their own documentation; templates for them are plan row V3-ops-3.
+these in their own documentation; templates for them are plan row V3-48.

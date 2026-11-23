@@ -152,7 +152,7 @@ the source cannot be started again. What it imported stays, and nothing removes 
 restore of a backup from before the import. A new source of the same server knows nothing of
 the old one: its preflight stops on the names the old source created, and with `existing`
 targets it would copy every thread and message a second time. Pause the source instead when
-you may want to continue (plan row V3-ops-4).
+you may want to continue (plan row V3-49).
 
 ## 6. Pilot
 

@@ -8,7 +8,7 @@ The procedure covers the Compose stack of the server. The host service installs,
 restarts as a system service by itself ([services/host/README.md](../../services/host/README.md)).
 The Claude Code runner and the adapters are processes the operator runs: the repository has no
 service template (launchd, systemd) for them, no rule for their logs and rotation, and no order
-of their update relative to the server (plan row V3-ops-2). On `SIGTERM` the runner hands its running
+of their update relative to the server (plan row V3-47). On `SIGTERM` the runner hands its running
 turns over and exits with `75`, and only its next start adopts them, so something must start it
 again ([claude-code-runner](../../plugins/claude-code-runner/README.md), "Handover"); its check
 before a start is `check-config`.

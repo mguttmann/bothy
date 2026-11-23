@@ -107,7 +107,7 @@ that this chapter names enter `docs/spec/actions.yaml`, `docs/api/openapi.yaml` 
    agents. This holds with `runner.turn_handover` too: a hosted turn is never handed over at a
    restart (09 18.19.3, D-AR-03-9), so an update of the runner ends the live answers of its
    built-in agents with `adapter_stopped`; the handover of hosted turns is not built (plan row
-   V3-spec-1).
+   V3-52).
    A record is a file, so the runner takes nothing in it as given (addendum of 2026-11-12,
    `docs/decisions.d/FIX-RUNNER-HOSTING-REVIEW.md`). (a) It acts on a record only at
    `<runner.state_dir>/hosted/<agent_id>/turns/<run_id>.json`, where the agent's folder is named

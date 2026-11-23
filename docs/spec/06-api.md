@@ -692,7 +692,7 @@ request per subscription. Delivery, retry, verification at the receiver and inco
    for every state, and a client must not use them as a compatibility signal before the first
    release. No gate holds the
    steps of items 1 and 2; G6 (item 7) passes without a tag. The rule and its gate from the first
-   release on are plan row V3-spec-6.
+   release on are plan row V3-57.
 2. **Gateway.** Protocol versions are in `hello` and `identify`; an unsupported version closes with
    `4007` (04, 6.1). Event payloads change only additively; `schema_version` increases with each
    such change, so that clients recognize new fields (not before the first release, item 1).

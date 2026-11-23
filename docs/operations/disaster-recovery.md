@@ -34,7 +34,7 @@ automatic restore test measures the duration on every run.
 ### Case B: host lost
 
 Not rehearsed: no test and no recorded run restores a new host from repo2 and restic, and the
-steps below are known to be incomplete (plan row V3-ops-1). Known gaps: `backup` waits for a
+steps below are known to be incomplete (plan row V3-46). Known gaps: `backup` waits for a
 healthy `postgres` (`depends_on` in `compose.yaml`), so step 3 starts the database before the
 restore, while `pgbackrest restore` needs a stopped server; whether the restore finds the
 backups of repo2 while repo1 of the new host is empty is not checked; step 4 names no restic

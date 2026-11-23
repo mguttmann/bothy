@@ -576,7 +576,7 @@ The switches `privacy.per_person_stats_enabled`, `privacy.stats_min_group_size` 
 them creates no audit entry in the product; as for `retention.content` (4.1), the instance operator
 tracks changes of the configuration in their own version control, which is the record a works
 agreement can refer to. An audit entry of the system for a changed effective value at startup is
-not built (plan row V3-spec-5). The instance operator checks a data protection
+not built (plan row V3-56). The instance operator checks a data protection
 impact assessment (Art. 35 GDPR); agents with access to employee data can be a reason for one.
 
 ## 10. Tests

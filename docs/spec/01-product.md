@@ -181,7 +181,7 @@ built in several milestones, the remark names the build milestones from the
 | "Who has access?" with origin | core | D, W | `access.explain` | |
 | "View as person" (read only) | core | D, W | `access.view_as` | logged |
 | Agents: backend switch, costs, tokens, commands | core | D, W | `agent.billing_mode.set`, `cost.read.aggregate`, `token.create` | |
-| Reconcile the costs of runs by hand (amounts per run from an invoice) | core | API | `cost.reconcile` (`reconcileCosts`) | no app offers it yet: the button [Reconcile] of A5 is not built, the reconciler app or the API sets the amounts (V3-spec-9) |
+| Reconcile the costs of runs by hand (amounts per run from an invoice) | core | API | `cost.reconcile` (`reconcileCosts`) | no app offers it yet: the button [Reconcile] of A5 is not built, the reconciler app or the API sets the amounts (V3-60) |
 | Agents of an adapter: create, tool class, features, disable and enable | core | D, W | `agent.create`, `agent.tool_class.set`, `agent.update`, `agent.disable`, `agent.enable` | section 5.2 A5; a built-in agent is created and edited as in 6.20 |
 | Filter the audit, verify the chain | core | D, W | `audit.read`, `audit.verify` | |
 | Statistics | core | D, W | `stats.read` | |
@@ -895,7 +895,7 @@ the page hides them.
 
 The button [Reconcile] is not built: no app calls `reconcileCosts` (ADR 0055 item 5, action
 `cost.reconcile`), so the amounts of runs are corrected through the API or an app such as the
-cost reconciler, and stay "estimate" without one (plan row V3-spec-9).
+cost reconciler, and stay "estimate" without one (plan row V3-60).
 
 **A6 Audit.** Filterable by action, person, result, resource, time range; check of the hash chain.
 Export of a time range as the server's NDJSON with hashes (verifiable offline) and as CSV, which

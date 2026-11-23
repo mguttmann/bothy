@@ -1579,7 +1579,7 @@ is named (people, readers per channel, channels, threads, agents), and the world
 tests are small: 20 people per space in the capacity test, 100 receivers in the fan-out test,
 4 receivers per channel in the push test, 20 channels of 500 messages and a visible set of 1000
 channels of 5 messages in the catch-up test (`services/server/perf/README.md`). Paths that grow with the readers of a channel or the threads of an instance (snapshot,
-badge, fan-out, push consumer) are therefore not measured at a larger size (plan row V3-ops-6).
+badge, fan-out, push consumer) are therefore not measured at a larger size (plan row V3-51).
 
 The job queues of a process share its pool ([02-architecture.md](02-architecture.md) 12.2). A job
 holds a connection only inside its units of work, so the sum of `jobs.queue.<queue>.max_workers`
