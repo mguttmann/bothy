@@ -251,7 +251,8 @@ async def test_installer_busy_mode_and_switch(world: HermesWorld) -> None:
         assert config["display"]["busy_input_mode"] == "queue"
         again = rig.installer("install", *base, "--busy-input-mode", "steer")
         assert again.returncode == 0
-        # personal: the API key goes, Hermes's allow list holds exactly the credential holder.
+        # personal: the API key goes, Hermes's allow list holds exactly the credential holder and
+        # the adapter's control sender.
         holder = str(rig.fake.robin_id)
         personal = rig.installer(
             "switch-mode",
@@ -267,7 +268,7 @@ async def test_installer_busy_mode_and_switch(world: HermesWorld) -> None:
         assert "ANTHROPIC_API_KEY=" not in env
         allowed = [line for line in env.splitlines() if line.startswith("BOTHY_ALLOWED_USERS=")]
         assert len(allowed) == 1
-        assert allowed[0].split("=", 1)[1].strip("'\"") == holder
+        assert allowed[0].split("=", 1)[1].strip("'\"") == f"{holder},{CONTROL_SENDER}"
         # The prediction equals the credential Hermes then uses for a turn.
         rig.fake.world.billing_mode = "personal"
         await _start_gateway(rig)

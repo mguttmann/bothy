@@ -3088,6 +3088,15 @@ Order as built (M2-33): the SDK checks the token, stores the event with its toke
 and acknowledges it before the adapter reads `run.context.read`; `run.start` follows after the
 actual mode was determined again (17.8), and the Hermes turn starts only after `200`.
 
+A run's turn is a turn of its own and starts only on a free session (addendum of 2026-11-23,
+FIX-hermes-busy-session): while a processing of Hermes still runs on the thread's session (a turn
+without a run, such as one a stop did not end or one Hermes started itself), the adapter waits
+with `handle_message` until that processing and any Hermes starts right after it for input it
+holds have ended. On a busy session Hermes would steer the text into the running turn and admit
+no turn for the event; the run then ended `failed` with `runtime_error` at once, and the answer
+the running turn gave to it found no run. A stop of the run ends the wait; the late answer of a
+stopped run's turn stays dropped (D-HERMES-CRON-COMMANDS-5).
+
 The adapter passes on the context (4.6) on the user side of the turn, separate from the text of
 the triggering person, which is the event's text together with the transcripts of its voice
 attachments. The event carries no ephemeral channel prompt: the adapter answers Hermes' plugin hook
@@ -3217,7 +3226,12 @@ Three layers, each sufficient on its own for "no stranger triggers":
    agent-self, `GET /api/v1/agents/me/triggerers`, returns IDs and `permission_version`). It is
    reloaded when a token carries a higher `permission_version` (4.5 item 9).
 3. **Hermes:** With `personal` the installer also writes Hermes' allowlist of the
-   platform (`allowed_users_env`) with exactly the `credential_holder`. It changes only on
+   platform (`allowed_users_env`) with exactly the `credential_holder` and the adapter's control
+   sender (17.4). Hermes judges every sender by the list, also the control sender, whose
+   `/stop`, `/new`, `/resume` and control commands it would otherwise refuse: a stopped run's
+   turn then went on in the session (addendum of 2026-11-23, FIX-hermes-busy-session; a profile
+   switched before needs `switch-mode personal` again and a gateway restart). No person's event
+   carries the control sender, because the adapter builds every source itself. It changes only on
    a switch (I4), which needs a restart in Hermes anyway. With `organization`
    this list stays empty, and Hermes relies on layer 2; a list that would need a restart on every
    grant would not be operable.

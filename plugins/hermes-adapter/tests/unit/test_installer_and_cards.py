@@ -101,7 +101,7 @@ def test_install_switch_and_check_without_values(tmp_path: Path) -> None:
     holder = uuid7()
     bridge.credential = ResolvedCredential("anthropic", "oauth")
     personal = switch_mode(bridge, "personal", holder)
-    assert bridge.env == {"BOTHY_ALLOWED_USERS": str(holder)}
+    assert bridge.env == {"BOTHY_ALLOWED_USERS": f"{holder},{CONTROL_SENDER}"}
     assert "predicted mode: personal" in "\n".join(personal)
     with pytest.raises(InstallError, match="ANTHROPIC_API_KEY"):
         switch_mode(bridge, "organization", None)

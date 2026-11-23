@@ -305,6 +305,9 @@ class Runtime(Protocol):
     async def start_turn(self, turn: TurnRequest) -> TurnOutcome:
         """Start a Hermes turn and wait until Hermes reports its end.
 
+        The turn starts once no processing of Hermes runs on the thread's session (a turn
+        without a run, such as one a stop did not end); until then the call waits.
+
         Args:
             turn: The turn.
 
