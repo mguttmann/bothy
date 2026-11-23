@@ -9,7 +9,7 @@ import 'dart:async';
 import 'package:api_client/api_client.dart' as api;
 import 'package:flutter/foundation.dart';
 
-import '../data/self_repository.dart' show SelfActionFailed;
+import '../common/problem_banner.dart' show loadProblem;
 import 'status_source.dart';
 
 /// Loads the page of [source], loads it again on every change, and decides whether the view
@@ -103,9 +103,11 @@ class StatusController extends ChangeNotifier {
           _page = page;
           _problem = null;
           _noAnswer = false;
-        } on SelfActionFailed catch (e) {
+        } on Object catch (e) {
           if (_disposed || generation != _generation) return;
-          final problem = e.problem;
+          // Every error ends the read: no answer (also a refresh that got none) is unreachable,
+          // anything else is the problem of the read, a fault of the app reported as one.
+          final problem = loadProblem(e);
           if (problem == null) {
             _noAnswer = true;
           } else {
