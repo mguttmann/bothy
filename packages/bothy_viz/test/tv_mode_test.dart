@@ -119,6 +119,32 @@ void main() {
     },
   );
 
+  testWidgets(
+    'the period of the REST views moves with the clock at every rotation (25 6.6)',
+    (tester) async {
+      final (world, _) = await pumpTv(
+        tester,
+        kinds: const [VizViewKind.backend, VizViewKind.executive],
+      );
+      VizRange range() =>
+          tester.widget<BackendView>(find.byType(BackendView)).options.range;
+      expect(range().to, fixtureRange.to);
+      // A screen in the office runs for hours: three hours and a bit later the backend view
+      // comes back with the period moved by the whole minutes since TV mode started.
+      // The fake clock fires every rotation on the way; one more brings the backend view back.
+      world.clock.advance(const Duration(hours: 3, seconds: 20));
+      await tester.pump();
+      await settleWorld(tester, world);
+      if (find.byType(BackendView).evaluate().isEmpty) {
+        await rotate(tester, world);
+      }
+      expect(find.byType(BackendView), findsOneWidget);
+      final minutes = world.clock.now().difference(fixtureNow).inMinutes;
+      expect(range().to, fixtureRange.to.add(Duration(minutes: minutes)));
+      expect(range().from, fixtureRange.from.add(Duration(minutes: minutes)));
+    },
+  );
+
   testWidgets('the timeline in TV mode shows the whole period', (tester) async {
     final (world, _) = await pumpTv(
       tester,

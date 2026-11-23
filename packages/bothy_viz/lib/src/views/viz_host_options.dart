@@ -115,4 +115,21 @@ final class VizHostOptions {
 
   /// The app configuration (`viz.*`).
   final AppConfig config;
+
+  /// These options with the period [range] instead of [this.range]; TV mode moves the period
+  /// with the clock this way (25 6.6).
+  ///
+  /// Example: `options.withRange(VizRange(from: from, to: to))`.
+  VizHostOptions withRange(VizRange range) => VizHostOptions(
+    formFactor: formFactor,
+    scope: scope,
+    range: range,
+    allowTvMode: allowTvMode,
+    showCostsInTv: showCostsInTv,
+    onOpenGrafana: onOpenGrafana,
+    names: names,
+    timeZone: timeZone,
+    clock: clock,
+    config: config,
+  );
 }
