@@ -100,8 +100,8 @@ built in several milestones, the remark names the build milestones from the
 | Follow-ups during a run | core | D, M | `run.followup.create` | |
 | Buttons, selects, forms on messages | core | D, M | `interaction.create` | once, only for those authorized |
 | Slash commands with suggestions and options | core | D, M | `command.invoke`, `command.autocomplete` | control commands (`/stop`) never go to the model |
-| One agent session per thread, earlier sessions, start over, resume | core | D, M | `agent_session.reset`, `agent_session.bind` | |
-| Backend policy badge in the thread header and on the agent card | core | D, M, W | `agent.read` | Personal or Organization |
+| One agent session per thread, earlier sessions, start over, resume | core | D, M | `agent_session.reset`, `agent_session.bind` | the apps resume an earlier session of the same thread; an external reference and a takeover from another thread stay with the API ([09-agents.md](09-agents.md) 9.4) |
+| Backend policy badge in the session column, the live box and on the agent card | core | D, M, W | `agent.read` | Personal or Organization; the thread header shows no badge (AUD-PKG-P01/11) |
 | Costs per run and thread (organization: estimate until reconciliation) | core | D, M | `cost.read.thread` | with Personal only information |
 | Overview "Running now" | core | D, M | `run.overview.read` | as live cards or list (D10, M11; addendum of 2026-10-24) |
 | Run history: finished runs with tokens, duration, cost and their steps | core | D, M, W | `run.overview.read`, `run.read` | tab of D12, M10 and the console live view ([25-visualization.md](25-visualization.md) 6.7; addendum of 2026-11-04) |
@@ -2644,7 +2644,7 @@ unknown keys and values outside the list.
 | `appearance.reduce_motion` | `system`, `on`, `off` | `system` | Reduce motion |
 | `composer.enter_sends` | `true`, `false` | without a stored value `true` on desktop and `false` on mobile; a stored value applies on all devices | Enter sends |
 | `composer.paste_originals` | `true`, `false` | `false` | Send pasted images as originals; with `false` the desktop app sends a bitmap pasted from the clipboard as a JPEG when that is much smaller (addendum of 2026-10-31, docs/decisions.d/FIX-scan-state-stale.md); files attached as files are never changed |
-| `privacy.crash_reports` | `true`, `false` | `true` if the instance has set up a crash service | Send crash reports |
+| `privacy.crash_reports` | `true`, `false` | `false`; the person turns it on, offered only when the build names a crash service | Send crash reports |
 | `privacy.client_metrics` | `true`, `false` | `true` | Send performance data without content |
 | `layout.column_widths` | Object: names `^[a-z][a-z0-9_]*$` (column, for example `sidebar`, `post_list`, `main_history`, `session`), values non-negative integers in logical pixels | empty | Column widths on desktop; the client interprets the names |
 | `sidebar.auto_arrange_spaces` | `true`, `false` | `false` | Spaces in the sidebar arranged by last activity instead of the personal order (6.16) |

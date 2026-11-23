@@ -21,6 +21,7 @@ import 'package:sync_engine/sync_engine.dart';
 import 'package:sync_engine/testing.dart';
 
 import '../support/fake_instance.dart';
+import '../support/fakes.dart' show fastConfig;
 
 /// The patience of the repository's test kits (`testkit.Patience`).
 const Duration _patience = Duration(minutes: 3);
@@ -50,7 +51,9 @@ void main() {
   setUp(() async {
     saved = HttpOverrides.current;
     HttpOverrides.global = null;
-    fake = await FakeInstance.start();
+    fake = await FakeInstance.start(
+      config: {...fastConfig, 'client.status_poll_interval': '1s'},
+    );
     c = appContainer(fake);
     final world = fake.server.world;
     world
@@ -117,6 +120,24 @@ void main() {
       timeout: _patience,
     );
   });
+
+  test(
+    'a change of an agent component alone shows after the poll interval',
+    () async {
+      final alex = await live(WorldSeed.alexLogin);
+      final world = fake.server.world;
+      // No status.updated: the server sends none for agent components (D-M7-09-5).
+      world.statusComponents.firstWhere((x) => x['id'] == lotse)['state'] =
+          'major_outage';
+      await eventually(
+        'the polled page',
+        () =>
+            alex.page!.components.firstWhere((x) => x.id == lotse).state ==
+            StatusComponentState.majorOutage,
+        timeout: _patience,
+      );
+    },
+  );
 
   test('an outage of the server shows Server unreachable', () async {
     final alex = await live(WorldSeed.alexLogin);

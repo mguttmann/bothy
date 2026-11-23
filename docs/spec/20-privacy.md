@@ -522,7 +522,7 @@ The owner rectifies other data; a `rectification` request documents that.
 | No network data | no IP addresses, no device names, no push tokens |
 | Allow list | only named attributes per signal ([17-observability.md](17-observability.md)) |
 | LLM attributes | `gen_ai.*` without prompt and response texts |
-| Crash reports of the apps | without contents and names; off by default, the owner turns them on |
+| Crash reports of the apps | without contents and names; off by default: the build names the target, and each person turns them on in the settings |
 | Check | canary test (19, SEC-T10) |
 
 ## 8. Notice obligations

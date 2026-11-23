@@ -94,6 +94,10 @@ final class EphemeralStore {
   /// The presence of [agentId], or null when unknown.
   AgentPresence? presenceOf(PrincipalId agentId) => _presence[agentId];
 
+  /// The ID of every agent whose presence changed (`agent.presence_changed` or the snapshot of
+  /// `ready`), for readers that do not know the agents in advance; a broadcast stream.
+  Stream<PrincipalId> get presenceChanges => _presenceChanges.stream;
+
   /// The presence of [agentId] after every change, starting with the current value.
   Stream<AgentPresence?> watchPresence(PrincipalId agentId) async* {
     yield presenceOf(agentId);

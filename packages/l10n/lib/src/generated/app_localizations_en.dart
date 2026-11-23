@@ -4143,6 +4143,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageReactionInput => 'Any character';
 
   @override
+  String get messageReactionInvalid => 'Enter exactly one character or emoji.';
+
+  @override
   String get messageReactionAdd => 'Add';
 
   @override
@@ -8288,6 +8291,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get switcherKindAgent => 'Agent';
 
   @override
+  String get switcherNoTarget => 'cannot be opened here yet';
+
+  @override
   String get switcherKindCommand => 'Command';
 
   @override
@@ -8414,6 +8420,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get liveBoxSendAgain => 'Send again';
 
   @override
+  String get liveBoxSendAgainUnavailable =>
+      'Nothing to send again from here: the message has no text or is not on this device.';
+
+  @override
+  String get liveBoxSendAgainFailed => 'Could not send again. Try again.';
+
+  @override
   String get liveBoxRetry => 'Retry';
 
   @override
@@ -8451,6 +8464,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get commandStatusTitle => 'Run and session';
+
+  @override
+  String get commandStatusClose => 'Close';
 
   @override
   String get commandStatusNoRun => 'No run is active';

@@ -127,11 +127,7 @@ void main() {
         ),
       ),
       personalSettingsProvider.overrideWithValue(
-        PersonalSettings.resolve(
-          const {},
-          desktop: platform == 'macos',
-          hasCrashTarget: false,
-        ),
+        PersonalSettings.resolve(const {}, desktop: platform == 'macos'),
       ),
       settingsRepositoryProvider.overrideWithValue(null),
       personTimeZoneProvider.overrideWithValue('UTC'),
@@ -535,11 +531,7 @@ void main() {
               testPorts(dataRoot: Directory.systemTemp, clock: TestClock(now)),
             ),
             personalSettingsProvider.overrideWithValue(
-              PersonalSettings.resolve(
-                const {},
-                desktop: true,
-                hasCrashTarget: false,
-              ),
+              PersonalSettings.resolve(const {}, desktop: true),
             ),
             settingsRepositoryProvider.overrideWithValue(null),
             personTimeZoneProvider.overrideWithValue('UTC'),

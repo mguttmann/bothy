@@ -74,6 +74,14 @@ void main() {
     }
   });
 
+  test('a stop for a reason this version does not know keeps the server line', () {
+    const line =
+        'Autonomous work stopped (autonomous_budget_max): a reply continues it';
+    expect(decodeWakeNote(line), isNull);
+    final m = msg(1, author: robin, text: line, origin: MessageOrigin.system);
+    expect(threadNoteText(en, m), line);
+  });
+
   test("a label with quotes and the words of a line stays whole", () {
     final note = decodeWakeNote(
       "Wake-up 'it's done' expired soon' expired: its deadline passed before it could fire",

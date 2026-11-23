@@ -1990,6 +1990,10 @@ session column ([01-product.md](01-product.md)).
 
 The next run gets `session.mode = bind`.
 
+The apps offer `/resume` only for the earlier sessions of the open thread and send no `take_over`
+(AUD-PKG-P01/12): entering a reference of an external session and taking over a session of another
+thread are reached through the API only.
+
 ### 9.5 Import binding and fail open
 
 For an imported thread with a previous session, the import creates a previous reference
@@ -2036,7 +2040,7 @@ They never go to a model as a prompt (control commands).
 | `/stop` | stop the active run | `run.cancel` |
 | `/status` | open run and session details in the client; no server call except reads | `run.read`, `agent_session.read` |
 | `/new` | new session | `agent_session.reset` |
-| `/resume` | bind an external session, with a selection | `agent_session.bind` |
+| `/resume` | bind an external session, with a selection (the apps offer the earlier sessions of the thread, 9.4) | `agent_session.bind` |
 | `/title` | set the title (source becomes `manual`) | `thread.title.update` |
 | `/close` | thread done | `thread.close` |
 | `/team` | `add`, `remove`, `list` and `stop` of a team channel (3.9; addendum of 2026-11-21) | `team.update`, `team.read`, `team.stop` |

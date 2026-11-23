@@ -95,11 +95,10 @@ Widget _section(Widget child) => ProviderScope(
       testPorts(dataRoot: Directory.systemTemp),
     ),
     personalSettingsProvider.overrideWithValue(
-      PersonalSettings.resolve(
-        const {'appearance.theme': 'dark', 'layout.column_widths': {}},
-        desktop: true,
-        hasCrashTarget: false,
-      ),
+      PersonalSettings.resolve(const {
+        'appearance.theme': 'dark',
+        'layout.column_widths': {},
+      }, desktop: true),
     ),
     settingsRepositoryProvider.overrideWithValue(null),
     profileControllerProvider.overrideWith(_Profile.new),

@@ -28,11 +28,7 @@ void main() {
     'default of 01 11: on; a stored false applies, a non-bool is absent',
     () {
       PersonalSettings resolve(Map<String, Object?> stored) =>
-          PersonalSettings.resolve(
-            stored,
-            desktop: true,
-            hasCrashTarget: false,
-          );
+          PersonalSettings.resolve(stored, desktop: true);
       expect(resolve(const {}).showProjectStatus, isTrue);
       expect(
         resolve(const {'sidebar.show_project_status': false}).showProjectStatus,
@@ -127,11 +123,7 @@ void main() {
               ),
             ),
             personalSettingsProvider.overrideWithValue(
-              PersonalSettings.resolve(
-                const {},
-                desktop: !phone,
-                hasCrashTarget: false,
-              ),
+              PersonalSettings.resolve(const {}, desktop: !phone),
             ),
             settingsRepositoryProvider.overrideWithValue(null),
           ],

@@ -279,52 +279,99 @@ class _SendAgainButton extends ConsumerStatefulWidget {
 
 class _SendAgainButtonState extends ConsumerState<_SendAgainButton> {
   bool _busy = false;
-  bool _sent = false;
+  SendAgainOutcome? _outcome;
+
+  bool get _done =>
+      _outcome == SendAgainOutcome.sent ||
+      _outcome == SendAgainOutcome.unavailable;
 
   Future<void> _send() async {
-    if (_busy || _sent) return;
+    if (_busy || _done) return;
     setState(() => _busy = true);
-    final sent = await sendAgain(ref, widget.run);
+    final outcome = await sendAgain(ref, widget.run);
     if (!mounted) return;
     setState(() {
       _busy = false;
-      _sent = sent;
+      _outcome = outcome;
     });
   }
 
   @override
-  Widget build(BuildContext context) => DsButton(
-    label: AppLocalizations.of(context).liveBoxSendAgain,
-    loading: _busy,
-    onPressed: _busy || _sent ? null : () => unawaited(_send()),
-  );
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final note = switch (_outcome) {
+      SendAgainOutcome.unavailable => l.liveBoxSendAgainUnavailable,
+      SendAgainOutcome.failed => l.liveBoxSendAgainFailed,
+      _ => null,
+    };
+    final button = DsButton(
+      label: l.liveBoxSendAgain,
+      loading: _busy,
+      onPressed: _busy || _done ? null : () => unawaited(_send()),
+    );
+    if (note == null) return button;
+    return Flexible(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              note,
+              key: const ValueKey('runline.sendAgain.note'),
+              style: dsTextStyle(DsType.bodySm)
+                  .copyWith(color: context.dsColors.textSecondary),
+            ),
+          ),
+          const SizedBox(width: DsSpace.s8),
+          button,
+        ],
+      ),
+    );
+  }
+}
+
+/// What "Send again" did (09 5.5).
+enum SendAgainOutcome {
+  /// A message with the text of the triggering message went into the outbox.
+  sent,
+
+  /// The run could not be read (offline or refused); another try may work.
+  failed,
+
+  /// There is nothing this device can send again: the triggering message is unknown here or
+  /// has no text (a voice message, attachments only).
+  unavailable,
 }
 
 /// "Send again" after `interrupted` or `stale` (09 5.5): a new message with the text of the
 /// triggering message of [run] goes into the outbox; there is no automatic retry, because the
-/// runtime may have caused side effects already. Returns whether a message went into the
-/// outbox; nothing is sent when the triggering message is unknown or the engine is gone.
-Future<bool> sendAgain(WidgetRef ref, RunSummary run) async {
+/// runtime may have caused side effects already. The send keeps the draft of the thread
+/// (`clear_draft` false): the person may have typed something else since. Attachments of the
+/// triggering message are not sent again.
+Future<SendAgainOutcome> sendAgain(WidgetRef ref, RunSummary run) async {
   final engine = ref.read(syncEngineProvider);
   final db = ref.read(localDatabaseProvider);
-  if (engine == null || db == null) return false;
+  if (engine == null || db == null) return SendAgainOutcome.failed;
   final Map<String, Object?>? json;
   try {
     json = await ref.read(agentReadsProvider).run(run.id);
   } on Object {
     // Offline or refused: nothing is sent; the button stays for another try.
-    return false;
+    return SendAgainOutcome.failed;
   }
   final triggering = json?['triggering_message_id'];
-  if (triggering is! String) return false;
+  if (triggering is! String) return SendAgainOutcome.unavailable;
   final MessageId id;
   try {
     id = MessageId.parse(triggering);
   } on FormatException {
-    return false;
+    return SendAgainOutcome.unavailable;
   }
   final message = await db.messagesDao.byId(id);
-  if (message == null || message.contentMd.trim().isEmpty) return false;
-  await ThreadActions(engine).send(run.threadId, message.contentMd);
-  return true;
+  if (message == null || message.contentMd.trim().isEmpty) {
+    return SendAgainOutcome.unavailable;
+  }
+  await ThreadActions(engine)
+      .send(run.threadId, message.contentMd, clearDraft: false);
+  return SendAgainOutcome.sent;
 }

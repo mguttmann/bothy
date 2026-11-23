@@ -9,22 +9,28 @@ part of 'status_route.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// The [StatusSource] of the signed-in app: `getStatus` through the session's client, the
-/// engine's `status.updated` as the changes and its connection state as the reachability; null
-/// while signed out.
+/// engine's `status.updated` and a read every `client.status_poll_interval` as the changes, and
+/// its connection state as the reachability; null while signed out. The timed read is needed
+/// because a change of agent components alone sends no `status.updated` (D-M7-09-5), and the
+/// page must not keep showing a state it no longer knows (AUD-PKG-P01/7).
 
 @ProviderFor(appStatusSource)
 final appStatusSourceProvider = AppStatusSourceProvider._();
 
 /// The [StatusSource] of the signed-in app: `getStatus` through the session's client, the
-/// engine's `status.updated` as the changes and its connection state as the reachability; null
-/// while signed out.
+/// engine's `status.updated` and a read every `client.status_poll_interval` as the changes, and
+/// its connection state as the reachability; null while signed out. The timed read is needed
+/// because a change of agent components alone sends no `status.updated` (D-M7-09-5), and the
+/// page must not keep showing a state it no longer knows (AUD-PKG-P01/7).
 
 final class AppStatusSourceProvider
     extends $FunctionalProvider<StatusSource?, StatusSource?, StatusSource?>
     with $Provider<StatusSource?> {
   /// The [StatusSource] of the signed-in app: `getStatus` through the session's client, the
-  /// engine's `status.updated` as the changes and its connection state as the reachability; null
-  /// while signed out.
+  /// engine's `status.updated` and a read every `client.status_poll_interval` as the changes, and
+  /// its connection state as the reachability; null while signed out. The timed read is needed
+  /// because a change of agent components alone sends no `status.updated` (D-M7-09-5), and the
+  /// page must not keep showing a state it no longer knows (AUD-PKG-P01/7).
   AppStatusSourceProvider._()
     : super(
         from: null,
@@ -58,4 +64,4 @@ final class AppStatusSourceProvider
   }
 }
 
-String _$appStatusSourceHash() => r'562d81c69883e9649adb7a43cd9d31dd8a7741e1';
+String _$appStatusSourceHash() => r'a8817108bc0685c72fcc0f57efbd358626ecf262';

@@ -143,8 +143,9 @@ final class ThreadCommandRunner implements BuiltinCommandRunner {
         ),
         actions: [
           TextButton(
+            key: const ValueKey('command.status.close'),
             onPressed: () => Navigator.of(context).pop(),
-            child: Text(l.threadCancel),
+            child: Text(l.commandStatusClose),
           ),
         ],
       ),

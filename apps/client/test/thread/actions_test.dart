@@ -22,6 +22,7 @@ import '../support/column_host.dart';
 import '../support/structure.dart';
 import '../support/thread_fixtures.dart';
 import '../support/thread_host.dart';
+import '../support/widgets.dart';
 
 Finder messageKey(MessageId id) => find.byKey(ValueKey('message.${id.value}'));
 
@@ -119,19 +120,31 @@ void main() {
     // React toggles: add, then remove the own reaction.
     await openMenu(tester, host, messageId(1));
     await choose(tester, host, 'react');
+    // More than one character is refused in the dialog, as the server would (AUD-PKG-P01/4).
     await tester.enterText(find.byKey(const ValueKey('reaction.input')), '+1');
+    await tester.tap(find.byKey(const ValueKey('reaction.add')));
+    await tester.pump();
+    expect(find.text(en.messageReactionInvalid), findsOneWidget);
+    expect(find.byKey(const ValueKey('reaction.dialog')), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('reaction.input')),
+      '\u{1F44D}\u{1F3FD}',
+    );
     await tester.tap(find.byKey(const ValueKey('reaction.add')));
     await tester.pump(const Duration(milliseconds: 500));
     await host.settle(tester);
     all = await entries(tester, host);
     final added = all.firstWhere((e) => e.kind == MessageOps.addReaction);
-    expect(body(added), {'message_id': messageId(1).value, 'emoji': '+1'});
+    expect(body(added), {
+      'message_id': messageId(1).value,
+      'emoji': '\u{1F44D}\u{1F3FD}',
+    });
     await host.run(
       tester,
       () => host.db.messagesDao.applyReactionSummary(
         ReactionSummary(
           messageId: messageId(1),
-          emoji: '+1',
+          emoji: '\u{1F44D}\u{1F3FD}',
           count: 1,
           me: true,
         ),
@@ -140,7 +153,9 @@ void main() {
     await host.settle(tester);
     await openMenu(tester, host, messageId(1));
     await choose(tester, host, 'react');
-    await tester.tap(find.byKey(const ValueKey('reaction.chip.+1')));
+    await tester.tap(
+      find.byKey(const ValueKey('reaction.chip.\u{1F44D}\u{1F3FD}')),
+    );
     await tester.pump(const Duration(milliseconds: 500));
     await host.settle(tester);
     all = await entries(tester, host);

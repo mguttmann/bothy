@@ -23,6 +23,7 @@ final class _Routes implements HttpClientAdapter {
   final Map<String, (int, Object?) Function(RequestOptions o)> routes;
   final List<String> seen = [];
   final List<Object?> bodies = [];
+  final List<Map<String, dynamic>> headers = [];
 
   @override
   Future<ResponseBody> fetch(
@@ -32,6 +33,7 @@ final class _Routes implements HttpClientAdapter {
   ) async {
     final key = '${options.method} ${options.uri.path}';
     seen.add('$key${options.uri.hasQuery ? '?${options.uri.query}' : ''}');
+    headers.add(options.headers);
     if (requestStream != null) {
       final bytes = await requestStream.expand((c) => c).toList();
       bodies.add(bytes.isEmpty ? null : jsonDecode(utf8.decode(bytes)));
@@ -116,7 +118,11 @@ void main() {
   });
 
   test('lists every page, reads the host and the sessions', () async {
-    final api = ApiTerminalServerApi(client, closeReason: 'Done');
+    final api = ApiTerminalServerApi(
+      client,
+      closeReason: 'Done',
+      newIdempotencyKey: () => 'k',
+    );
     expect(await api.listHosts(), hasLength(2));
     expect((await api.getHost(hostIdText)).name, 'Build host');
     expect(await api.listSessions(hostId: hostIdText), hasLength(1));
@@ -129,7 +135,11 @@ void main() {
   });
 
   test('reads a session for its stored exit code (brief M4-38)', () async {
-    final api = ApiTerminalServerApi(client, closeReason: 'Done');
+    final api = ApiTerminalServerApi(
+      client,
+      closeReason: 'Done',
+      newIdempotencyKey: () => 'k',
+    );
     final id = FakeHostsApi.sessionId(1);
     expect((await api.getSession(id)).id, id);
     expect(routes.seen.last, 'GET /api/v1/terminal/sessions/$id');
@@ -141,6 +151,7 @@ void main() {
       final api = ApiTerminalServerApi(
         client,
         closeReason: 'Ended in the view',
+        newIdempotencyKey: () => '0190a5a0-0000-7000-8000-000000000001',
       );
       final id = FakeHostsApi.sessionId(1);
       final grant = await api.attachSession(
@@ -155,6 +166,11 @@ void main() {
       expect(grant.session.id, id);
       await api.closeSession(id);
       expect(routes.bodies.last, {'reason': 'Ended in the view'});
+      // The same key header as the console's close (AUD-PKG-P01/3).
+      expect(
+        routes.headers.last['Idempotency-Key'],
+        '0190a5a0-0000-7000-8000-000000000001',
+      );
       Object? error;
       try {
         await api.openSession(

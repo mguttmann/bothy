@@ -37,15 +37,27 @@ abstract interface class TerminalHostsApi implements TerminalServerApi {
 ///
 /// Example:
 /// ```dart
-/// final api = ApiTerminalServerApi(services.terminalApi, closeReason: 'Ended in the app');
+/// final api = ApiTerminalServerApi(
+///   services.terminalApi,
+///   closeReason: 'Ended in the app',
+///   newIdempotencyKey: services.ids.next,
+/// );
 /// final hosts = await api.listHosts();
 /// ```
 final class ApiTerminalServerApi implements TerminalHostsApi {
   /// Creates the adapter over [api]; [closeReason] is the audit reason of
-  /// `closeTerminalSession`.
-  ApiTerminalServerApi(this._api, {required this.closeReason});
+  /// `closeTerminalSession`, [newIdempotencyKey] returns a fresh UUIDv7 for every close.
+  ApiTerminalServerApi(
+    this._api, {
+    required this.closeReason,
+    required this.newIdempotencyKey,
+  });
 
   final ApiClient _api;
+
+  /// A fresh `Idempotency-Key` per close (06 3), as the console sends it, so a repeated close
+  /// behaves the same in both apps.
+  final String Function() newIdempotencyKey;
 
   /// The `reason` that `closeTerminalSession` sends (05 audit; never terminal content).
   final String closeReason;
@@ -77,6 +89,7 @@ final class ApiTerminalServerApi implements TerminalHostsApi {
       (await _api.getTerminalApi().closeTerminalSession(
         sessionId: sessionId,
         reasonBody: ReasonBody((b) => b.reason = closeReason),
+        idempotencyKey: newIdempotencyKey(),
       )).data!;
 
   @override

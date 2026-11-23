@@ -70,9 +70,9 @@ abstract final class SettingKeys {
 
 /// The personal settings with the defaults of 01 11 applied where a key is absent.
 ///
-/// The server stores no defaults, because some depend on the device or the instance (04 14):
-/// `composer.enter_sends` is `true` on desktop and `false` on mobile, `privacy.crash_reports`
-/// is `true` only where a crash target exists. A stored value applies on every device.
+/// The server stores no defaults, because some depend on the device (04 14):
+/// `composer.enter_sends` is `true` on desktop and `false` on mobile; `privacy.crash_reports` is
+/// `false` everywhere until the person turns it on. A stored value applies on every device.
 final class PersonalSettings {
   const PersonalSettings._({
     required this.theme,
@@ -89,12 +89,11 @@ final class PersonalSettings {
 
   /// Reads [stored] (key to JSON value); a value outside the list of 01 11 counts as absent.
   ///
-  /// Example: `PersonalSettings.resolve({}, desktop: true, hasCrashTarget: false).enterSends`
+  /// Example: `PersonalSettings.resolve({}, desktop: true).enterSends`
   /// is `true`.
   factory PersonalSettings.resolve(
     Map<String, Object?> stored, {
     required bool desktop,
-    required bool hasCrashTarget,
   }) {
     String choice(String key, List<String> values) {
       final value = stored[key];
@@ -118,7 +117,8 @@ final class PersonalSettings {
       ]),
       enterSends: flag(SettingKeys.enterSends, desktop),
       pasteOriginals: flag(SettingKeys.pasteOriginals, false),
-      crashReports: flag(SettingKeys.crashReports, hasCrashTarget),
+      // Off until the person turns it on, also with a target (20 7; AUD-PKG-P01/8).
+      crashReports: flag(SettingKeys.crashReports, false),
       clientMetrics: flag(SettingKeys.clientMetrics, true),
       hasColumnWidths: stored[SettingKeys.columnWidths] is Map,
       arrangement: SidebarArrangement(
@@ -182,7 +182,6 @@ final class PersonalSettings {
 PersonalSettings personalSettings(Ref ref) => PersonalSettings.resolve(
   ref.watch(userSettingsProvider).value ?? const {},
   desktop: !ref.watch(appPortsProvider).formFactor.isPhone,
-  hasCrashTarget: ref.watch(appPortsProvider).branding.hasCrashTarget,
 );
 
 /// Which levels of the sidebar are arranged by activity, from the personal settings (01 6.16,

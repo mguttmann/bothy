@@ -159,6 +159,7 @@ void main() {
       String? field,
       String? reason,
       Duration? retryAfter,
+      String pointer = '/q',
     }) => DioException(
       requestOptions: RequestOptions(path: '/search/assist'),
       type: DioExceptionType.badResponse,
@@ -168,7 +169,8 @@ void main() {
         reason: reason,
         retryAfter: retryAfter,
         errors: [
-          if (field != null) rest.ProblemFieldError(pointer: '/q', code: field),
+          if (field != null)
+            rest.ProblemFieldError(pointer: pointer, code: field),
         ],
       ),
     );
@@ -180,6 +182,17 @@ void main() {
       assistFailureOf(problem(400, 'validation_failed', field: 'too_long'))
           .kind,
       AssistFailureKind.queryTooLong,
+    );
+    expect(
+      assistFailureOf(
+        problem(
+          400,
+          'validation_failed',
+          field: 'too_many_items',
+          pointer: '/history',
+        ),
+      ).kind,
+      AssistFailureKind.historyTooLong,
     );
     expect(
       assistFailureOf(problem(503, 'unavailable')).kind,
@@ -229,6 +242,23 @@ void main() {
     },
   );
 
+  test('an instance that allows fewer earlier questions gets a shorter '
+      'history, not a failure', () async {
+    final port = _Recording()..maxTurns = 2;
+    final conversation = AssistConversation(port);
+    for (var i = 0; i < 5; i++) {
+      await conversation.ask('q$i');
+    }
+    expect(conversation.exchanges.every((e) => e.answer != null), isTrue);
+    final accepted = port.calls.where((h) => h.length <= 2).toList();
+    expect(accepted.last.last.q, 'q3');
+    port.maxTurns = 0;
+    await conversation.ask('alone');
+    expect(conversation.exchanges.last.answer, isNotNull);
+    expect(port.calls.last, isEmpty);
+    conversation.dispose();
+  });
+
   test('signed out, a question fails', () async {
     final conversation = AssistConversation(null);
     await conversation.ask('takeover');
@@ -240,11 +270,15 @@ void main() {
 class _Recording implements AssistPort {
   final List<List<AssistTurn>> calls = [];
   bool fail = false;
+  int maxTurns = assistMaxTurns;
 
   @override
   Future<AssistAnswer> ask(String q, List<AssistTurn> history) async {
     calls.add(history);
     if (fail) throw const AssistFailure(AssistFailureKind.failed);
+    if (history.length > maxTurns) {
+      throw const AssistFailure(AssistFailureKind.historyTooLong);
+    }
     return AssistAnswer(hits: const [], terms: [q]);
   }
 }

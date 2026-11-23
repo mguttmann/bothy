@@ -6258,6 +6258,10 @@
   "@messageReactionInput": {
     "description": "Label of the field of the reaction picker that takes any Unicode character (01 section 3.3)."
   },
+  "messageReactionInvalid": "Enter exactly one character or emoji.",
+  "@messageReactionInvalid": {
+    "description": "Error under the input of the reaction dialog when the text is not exactly one character (one grapheme cluster)."
+  },
   "messageReactionAdd": "Add",
   "@messageReactionAdd": {
     "description": "Button of the reaction picker that adds the typed character."
@@ -12633,6 +12637,10 @@
   "@switcherKindAgent": {
     "description": "Kind of a hit of the quick switcher."
   },
+  "switcherNoTarget": "cannot be opened here yet",
+  "@switcherNoTarget": {
+    "description": "Note after the kind of a quick switcher row that has no place to open (a person or agent without a direct message, a command)."
+  },
   "switcherKindCommand": "Command",
   "@switcherKindCommand": {
     "description": "Kind of a hit of the quick switcher."
@@ -12800,6 +12808,14 @@
   "@liveBoxSendAgain": {
     "description": "Button after an interrupted or stale run that puts the triggering text into the outbox again (09 5.5)."
   },
+  "liveBoxSendAgainUnavailable": "Nothing to send again from here: the message has no text or is not on this device.",
+  "@liveBoxSendAgainUnavailable": {
+    "description": "Note next to the disabled button Send again when the triggering message cannot be sent again (09 5.5)."
+  },
+  "liveBoxSendAgainFailed": "Could not send again. Try again.",
+  "@liveBoxSendAgainFailed": {
+    "description": "Note next to the button Send again when the run could not be read (offline or refused)."
+  },
   "liveBoxRetry": "Retry",
   "@liveBoxRetry": {
     "description": "Button on the line of a failed or cancelled run that starts a new run of the same agent for the same message (retryRun, docs/spec/09 section 5.7, 01 section 6.2)."
@@ -12861,6 +12877,10 @@
   "commandStatusTitle": "Run and session",
   "@commandStatusTitle": {
     "description": "Title of the dialog of /status (09 10.1)."
+  },
+  "commandStatusClose": "Close",
+  "@commandStatusClose": {
+    "description": "Button that closes the dialog of /status; nothing is cancelled there."
   },
   "commandStatusNoRun": "No run is active",
   "@commandStatusNoRun": {

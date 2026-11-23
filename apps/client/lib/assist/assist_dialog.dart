@@ -476,6 +476,7 @@ String _failureText(
   AssistFailureKind.offline => l.assistOffline,
   AssistFailureKind.timeout => l.searchTimeout,
   AssistFailureKind.rateLimited => l.searchRateLimited(waitSeconds(retryAfter)),
+  AssistFailureKind.historyTooLong ||
   AssistFailureKind.failed => l.assistFailed,
 };
 

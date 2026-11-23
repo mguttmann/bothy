@@ -413,8 +413,10 @@ Mapping during connection setup (reason: one code per cause, so that the client 
 
 Before attempt `n` (from 0) the client waits a time uniformly distributed between 0 and
 `min(sync.reconnect_backoff_cap, sync.reconnect_backoff_base * 2^n)` (full jitter). After a
-successful `ready` or `resumed` response, `n` starts at 0 again. A network change and a
-return to the foreground trigger an immediate attempt that does not increase the counter.
+successful `ready` or `resumed` response, `n` starts at 0 again. A return to the foreground
+triggers an immediate attempt that does not increase the counter. The apps read no network status
+of the platform (D-M4-18-8): a network change alone triggers no attempt, the next attempt of the
+backoff or the heartbeat finds it.
 
 ## 7. Catch-up
 

@@ -22,7 +22,7 @@ import 'switcher_sources.dart';
 ///
 /// The commands offered are those of the channel the router shows when the switcher opens.
 /// Enter on a row with a path navigates there through the [GoRouter] above [context]; a row
-/// without a path (a command, a person without a stored DM) only closes the switcher; Esc
+/// without a path (a command, a person without a stored DM) says so and does nothing; Esc
 /// closes it without navigating. Completes when the switcher is closed.
 ///
 /// Example: `onTap: () => showQuickSwitcher(context)`.
@@ -120,7 +120,12 @@ class _QuickSwitcherState extends ConsumerState<QuickSwitcher> {
     });
   }
 
-  void _take(SwitcherEntry entry) => Navigator.of(context).pop(entry.path);
+  /// Takes [entry]: a row without a path (a person or agent without a stored direct message, a
+  /// command) is shown as not openable and keeps the switcher open (AUD-PKG-P01/6).
+  void _take(SwitcherEntry entry) {
+    if (entry.path == null) return;
+    Navigator.of(context).pop(entry.path);
+  }
 
   void _takeSelected() {
     if (_selected < _rows.length) {
@@ -430,9 +435,11 @@ class SwitcherRow extends StatelessWidget {
     final c = context.dsColors;
     final kind = switcherKindLabel(l, entry.kind);
     final where = entry.context;
+    final openable = entry.path != null;
+    final noTarget = openable ? null : l.switcherNoTarget;
     return DsTappable(
-      onTap: onTap,
-      label: [entry.name, ?where, kind].join(', '),
+      onTap: openable ? onTap : null,
+      label: [entry.name, ?where, kind, ?noTarget].join(', '),
       selected: selected,
       excludeChildSemantics: true,
       child: Container(
@@ -473,7 +480,7 @@ class SwitcherRow extends StatelessWidget {
               const SizedBox(width: DsSpace.s8),
             ],
             Text(
-              kind,
+              noTarget == null ? kind : '$kind \u00b7 $noTarget',
               style: dsTextStyle(DsType.caption).copyWith(color: c.textMuted),
             ),
           ],

@@ -33,11 +33,7 @@ import '../support/widgets.dart';
 void main() {
   group('defaults of 01 11', () {
     test('absent keys give the defaults; Enter sends on desktop', () {
-      final s = PersonalSettings.resolve(
-        const {},
-        desktop: true,
-        hasCrashTarget: false,
-      );
+      final s = PersonalSettings.resolve(const {}, desktop: true);
       expect(s.theme, 'system');
       expect(s.density, 'comfortable');
       expect(s.reduceMotion, 'system');
@@ -48,29 +44,22 @@ void main() {
     });
 
     test('device and instance dependent defaults', () {
-      final mobile = PersonalSettings.resolve(
-        const {},
-        desktop: false,
-        hasCrashTarget: true,
-      );
+      final mobile = PersonalSettings.resolve(const {}, desktop: false);
       expect(mobile.enterSends, isFalse);
-      expect(mobile.crashReports, isTrue);
+      // Crash reports stay off until the person turns them on, also with a target (20 7).
+      expect(mobile.crashReports, isFalse);
     });
 
     test(
       'a stored value applies; a value outside the list counts as absent',
       () {
-        final s = PersonalSettings.resolve(
-          const {
-            'appearance.theme': 'dark',
-            'appearance.density': 'touch',
-            'composer.enter_sends': false,
-            'privacy.client_metrics': 'yes',
-            'layout.column_widths': {'sidebar': 300},
-          },
-          desktop: true,
-          hasCrashTarget: false,
-        );
+        final s = PersonalSettings.resolve(const {
+          'appearance.theme': 'dark',
+          'appearance.density': 'touch',
+          'composer.enter_sends': false,
+          'privacy.client_metrics': 'yes',
+          'layout.column_widths': {'sidebar': 300},
+        }, desktop: true);
         expect(s.theme, 'dark');
         expect(s.density, 'comfortable');
         expect(s.enterSends, isFalse);
@@ -165,19 +154,13 @@ void main() {
     test('composer.paste_originals is off by default and on deletes nothing '
         'but stores true (FIX-scan-state-stale)', () async {
       expect(
-        PersonalSettings.resolve(
-          const {},
-          desktop: true,
-          hasCrashTarget: false,
-        ).pasteOriginals,
+        PersonalSettings.resolve(const {}, desktop: true).pasteOriginals,
         isFalse,
       );
       expect(
-        PersonalSettings.resolve(
-          const {SettingKeys.pasteOriginals: true},
-          desktop: true,
-          hasCrashTarget: false,
-        ).pasteOriginals,
+        PersonalSettings.resolve(const {
+          SettingKeys.pasteOriginals: true,
+        }, desktop: true).pasteOriginals,
         isTrue,
       );
       await writer().set(SettingKeys.pasteOriginals, true);
@@ -222,12 +205,7 @@ void main() {
           testPorts(dataRoot: Directory.systemTemp, branding: branding),
         ),
         personalSettingsProvider.overrideWithValue(
-          settings ??
-              PersonalSettings.resolve(
-                const {},
-                desktop: true,
-                hasCrashTarget: branding.hasCrashTarget,
-              ),
+          settings ?? PersonalSettings.resolve(const {}, desktop: true),
         ),
         settingsRepositoryProvider.overrideWithValue(null),
         ...extra,
@@ -295,7 +273,8 @@ void main() {
         tester
             .widget<Switch>(find.byKey(const ValueKey('settings.crashReports')))
             .value,
-        isTrue,
+        // Shown with a target, but off until the person turns it on (20 7).
+        isFalse,
       );
     });
 

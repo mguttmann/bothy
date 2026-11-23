@@ -3111,5 +3111,10 @@
   "teamReasonDm": "eine Direktnachricht kann nicht teilnehmen",
   "teamReasonChannelKind": "nur ein Textkanal kann ein Teamkanal sein",
   "teamReasonArchived": "der Kanal ist archiviert",
-  "teamReasonReadOnly": "der Kanal ist schreibgeschützt"
+  "teamReasonReadOnly": "der Kanal ist schreibgeschützt",
+  "messageReactionInvalid": "Genau ein Zeichen oder Emoji eingeben.",
+  "switcherNoTarget": "kann hier noch nicht geöffnet werden",
+  "liveBoxSendAgainUnavailable": "Hier gibt es nichts erneut zu senden: Die Nachricht hat keinen Text oder ist nicht auf diesem Gerät.",
+  "liveBoxSendAgainFailed": "Erneutes Senden fehlgeschlagen. Noch einmal versuchen.",
+  "commandStatusClose": "Schließen"
 }

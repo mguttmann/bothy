@@ -15,12 +15,16 @@ import 'package:admin_ui/admin_ui.dart';
 import 'package:client/app/providers/session.dart';
 import 'package:client/new_agent/new_agent_entry.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
+import 'package:domain/domain.dart'
+    show AgentPresence, AgentRuntimeState, PrincipalId;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sync_engine/sync_engine.dart' show AppActivity;
 import 'package:sync_engine/testing.dart';
 
 import '../admin/admin_step_up_test.dart' show RecordingPrompt;
 import '../support/fake_instance.dart';
+import '../support/fakes.dart' show SwitchLifecycle;
 
 final Map<String, Object?> _filesTemplate = {
   'slug': 'file-helper',
@@ -54,13 +58,15 @@ void main() {
   late FakeInstance fake;
   late ProviderContainer c;
   late RecordingPrompt prompt;
+  late SwitchLifecycle lifecycle;
   late FakeAgent runner;
 
   setUp(() async {
     saved = HttpOverrides.current;
     HttpOverrides.global = null;
     prompt = RecordingPrompt();
-    fake = await FakeInstance.start(stepUpPrompt: prompt);
+    lifecycle = SwitchLifecycle();
+    fake = await FakeInstance.start(stepUpPrompt: prompt, lifecycle: lifecycle);
     c = appContainer(fake);
     final world = fake.server.world;
     runner = world.addAgent(
@@ -139,6 +145,59 @@ void main() {
       runner.hostsAgents = null;
       await signIn();
       expect(await c.read(newAgentOfferProvider.future), isNull);
+    });
+
+    test(
+      'is read again when a runner comes back online with hosting on',
+      () async {
+        runner.hostsAgents = null;
+        await signIn();
+        final sub = c.listen(newAgentOfferProvider, (_, _) {});
+        expect(await c.read(newAgentOfferProvider.future), isNull);
+        // The runner was offline longer than agent.presence_timeout and comes back with hosting
+        // on: the server publishes agent.presence_changed (offline to online).
+        runner.hostsAgents = 'host';
+        c
+            .read(syncEngineProvider)!
+            .ephemeral
+            .presenceChanged(
+              PrincipalId.parse(runner.id),
+              const AgentPresence(state: AgentRuntimeState.online),
+            );
+        await pumpEventQueue();
+        final offer = await c.read(newAgentOfferProvider.future);
+        expect(offer!.runners.single.id, runner.id);
+        sub.close();
+      },
+    );
+
+    test('is read again when the app returns to the foreground', () async {
+      runner.hostsAgents = null;
+      await signIn();
+      final sub = c.listen(newAgentOfferProvider, (_, _) {});
+      expect(await c.read(newAgentOfferProvider.future), isNull);
+      // A quick restart of the runner with hosting on sends no event at all.
+      runner.hostsAgents = 'host';
+      lifecycle
+        ..set(AppActivity.background)
+        ..set(AppActivity.foreground);
+      await pumpEventQueue();
+      expect((await c.read(newAgentOfferProvider.future))!.runners, isNotEmpty);
+      sub.close();
+    });
+
+    test('is read again when a stored agent card changes', () async {
+      runner.hostsAgents = null;
+      await signIn();
+      final sub = c.listen(newAgentOfferProvider, (_, _) {});
+      expect(await c.read(newAgentOfferProvider.future), isNull);
+      // A new runner arrives with agent.updated, which writes the stored cards.
+      runner.hostsAgents = 'host';
+      final db = c.read(localDatabaseProvider)!;
+      db.markTablesUpdated({db.agents});
+      await pumpEventQueue();
+      expect((await c.read(newAgentOfferProvider.future))!.runners, isNotEmpty);
+      sub.close();
     });
 
     test('is null for a person who is not an owner', () async {

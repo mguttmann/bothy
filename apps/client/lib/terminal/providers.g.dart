@@ -58,7 +58,7 @@ final class TerminalServicesProvider
   }
 }
 
-String _$terminalServicesHash() => r'e590fc56c0b24d830df8637c0fc4bf100fc3065b';
+String _$terminalServicesHash() => r'edcd6e5913f6b417a67720510671357c368c5de5';
 
 /// Attaches the dropped streams of every host's tabs again when the app is online again or in
 /// front (FIX-terminal-session-lifecycle, D-TSL-5), never while the app lock holds the content;

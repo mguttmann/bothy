@@ -307,6 +307,33 @@ void main() {
         if (e.kind == MessageOps.createMessage) e,
     ];
     expect(sent.single.payload, contains('@robin run the tests'));
+    // The draft of the thread stays: the person may have typed since (AUD-PKG-P01/1).
+    expect(sent.single.payload, isNot(contains('clear_draft')));
+    await t.host.dispose(tester);
+  });
+
+  testWidgets('interrupted: "Send again" without a sendable message says so '
+      'and sends nothing', (tester) async {
+    final t = await openRun(
+      tester,
+      state: RunState.failed,
+      reason: 'interrupted',
+    );
+    // A triggering message this device does not hold.
+    t.reads.runs[runId(1)] = runDoc(
+      1,
+      state: 'failed',
+      reason: 'interrupted',
+      triggeringMessageId: messageId(9).value,
+    );
+    await tester.tap(find.text(en.liveBoxSendAgain));
+    await t.host.settle(tester);
+    expect(find.text(en.liveBoxSendAgainUnavailable), findsOneWidget);
+    final sent = [
+      for (final e in await outbox(tester, t.host))
+        if (e.kind == MessageOps.createMessage) e,
+    ];
+    expect(sent, isEmpty);
     await t.host.dispose(tester);
   });
 

@@ -1232,6 +1232,11 @@ The additions requested during drafting have been decided (integration of 2026-1
 Values from other chapters (reference only): `push.max_consecutive_failures`
 ([03-data-model.md](03-data-model.md)).
 
+The apps do not read the four `notify.default_*` values and `notify.user_default_level` of the
+instance, because no API names them (D-M4-33-1): the settings page D9 computes the effective
+level and the preview mode with the defaults of this table. An instance that changes one of
+them sends what it configured, but D9 still shows the default of this table (AUD-PKG-P01/10).
+
 | Name | Default | Meaning |
 |---|---|---|
 | `push.ttl` | `24h` | lifetime at the provider (`apns-expiration`, `android.ttl`), between 1 second and 28 days (FCM limit) |
