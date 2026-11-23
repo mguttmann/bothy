@@ -90,18 +90,19 @@ def _split(text: str, separators: str) -> list[str]:
 def states(status: str) -> list[tuple[str, str]]:
     """Return the states a status opens with, each with the text that belongs to it.
 
-    The states are the comma-separated items of the first sentence, as long as each starts with
-    a word of the vocabulary; a kind of page (`design`, `template`) ends the list, because the
-    words after it tell its story. Example: `states("normative, built (M1 to M8). Terms: x")`
-    returns `[("normative", ""), ("built", "(M1 to M8)")]`, and `states("draft M0. Guide")`
-    returns `[]`.
+    The states are the comma-separated items of the first sentence, each starting with a word of
+    the vocabulary; a kind of page (`design`, `template`) ends the list, because the words after
+    it tell its story. An item before that end that starts with another word makes the status
+    invalid. Example: `states("normative, built (M1 to M8). Terms: x")` returns
+    `[("normative", ""), ("built", "(M1 to M8)")]`, and `states("draft M0. Guide")` and
+    `states("normative, typo, built (V2).")` return `[]`.
     """
     head = _split(status, ".;:")[0]
     found = []
     for item in _split(head, ","):
         word, _, rest = item.strip().partition(" ")
         if word not in VOCABULARY:
-            break
+            return []
         found.append((word, rest.strip()))
         if word in KINDS:
             break
@@ -201,6 +202,7 @@ def test_the_leading_states_are_read() -> None:
     ]
     assert states("draft M0, no product code yet. This document") == []
     assert states("skeleton (M1-05) with configuration (M1-07)") == []
+    assert states("normative, typo, built (V2). Text") == []
 
 
 def test_milestones_are_read_from_tickets_and_ranges() -> None:
@@ -231,6 +233,7 @@ def test_a_status_against_the_roadmap() -> None:
     assert problems("design of 2026-11-06 for M9", roadmap) == []
     assert problems("draft M0, no product code yet. Text", roadmap) != []
     assert problems("M6-17. Rules", roadmap) != []
+    assert problems("normative, typo, built (V2). Text", roadmap) != []
     assert problems("built. Text", roadmap) == ["built names no milestone or ticket"]
     assert "later" in problems("built (V2). Text", roadmap)[0]
     assert "built" in problems("planned (M1). Text", roadmap)[0]

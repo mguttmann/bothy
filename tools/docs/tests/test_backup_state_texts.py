@@ -57,10 +57,16 @@ MANIFEST_STEPS = ("docs/operations/disaster-recovery.md", "docs/operations/cloud
 _OPERATION = re.compile(r"^ {4,}operationId:\s*(?P<id>\w+)\s*$")
 _PATH = re.compile(r"^ {2}(?P<path>/[^\s:]*):\s*$")
 # What marks a block as one about the state of the backups.
-_BACKUP = re.compile(r"backup_runs|bothy-backupd|off-site target|restore test", re.IGNORECASE)
+_BACKUP = re.compile(
+    r"backup_runs|bothy-backupd|off-site target|restore test"
+    r"|\bbackups? (?:state|status|runs?)\b|\b(?:state|status) of the backups?\b",
+    re.IGNORECASE,
+)
 _CONSOLE = re.compile(r"\bconsole\b", re.IGNORECASE)
 # "without" is no negation: "the console warns without an off-site target" is a claim.
 _NEGATION = re.compile(r"\b(?:no|not|neither|nor|never)\b", re.IGNORECASE)
+# A condition says when the console acts, not that it does not: "warns if no target is set".
+_CONDITION = re.compile(r"\b(?:if|when|whenever|while|unless)\b[^,;]*", re.IGNORECASE)
 _BLOCK_START = re.compile(r"\s*(?:\||#|\d+\.\s|[-*]\s)")
 _SENTENCE_END = re.compile(r"(?<=[.;?!])\s+|\s\|\s")
 _PSQL = re.compile(
@@ -116,8 +122,9 @@ def console_claims(text: str) -> list[tuple[int, str]]:
     """Return the sentences that name the console as a place of the backup state.
 
     A sentence counts when its block is about the backups, it names the console and it does not
-    negate. Example: the block "Every run writes a row into `backup_runs`. The admin console
-    reads the table." gives its second sentence; "No view of the admin console reads
+    negate outside a condition. Example: the block "Every run writes a row into `backup_runs`.
+    The admin console reads the table." gives its second sentence, and "The admin console warns
+    if no off-site target is set." is a claim; "No view of the admin console reads
     `backup_runs` yet." gives nothing.
     """
     found = []
@@ -125,7 +132,7 @@ def console_claims(text: str) -> list[tuple[int, str]]:
         if not (_BACKUP.search(block) and _CONSOLE.search(block)):
             continue
         for sentence in _SENTENCE_END.split(block):
-            if _CONSOLE.search(sentence) and not _NEGATION.search(sentence):
+            if _CONSOLE.search(sentence) and not _NEGATION.search(_CONDITION.sub("", sentence)):
                 found.append((line, sentence.strip()))
     return found
 
@@ -189,6 +196,10 @@ def test_blocks_are_paragraphs_items_and_rows() -> None:
         "| First backup | `bothy-backupd backup pg_full` | run `succeeded` in the admin console |",
         "### bothybackupstale\n`backup_runs` in the admin console; off-site target reachable?\n",
         "The admin console warns without an off-site target.\n",
+        "The admin console shows backup state.\n",
+        "The admin console shows the state of the backups.\n",
+        "The admin console warns if no off-site target is configured.\n",
+        "If no off-site target is set, the admin console warns.\n",
     ],
 )
 def test_a_console_claim_is_found(text: str) -> None:

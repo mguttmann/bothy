@@ -62,15 +62,18 @@ a run is in four places:
 The newest runs, read in the database container:
 
 ```sh
-docker compose exec -T postgres psql -U postgres -d bothy -Atc "SELECT kind, state, started_at, finished_at, error FROM backup_runs ORDER BY started_at DESC LIMIT 10"
+docker compose exec -T postgres psql -U postgres -d bothy -Atc "SELECT id, kind, state, started_at, finished_at, error FROM backup_runs ORDER BY started_at DESC LIMIT 10"
 ```
 
-The manifest of the newest successful run of a kind as a file, here of `logical`, as
-`bothy restore finalize --relocation` reads it ([disaster-recovery.md](disaster-recovery.md)
-case G, [cloud-migration.md](cloud-migration.md)):
+The manifest of one run as a file, as `bothy restore finalize --relocation` reads it
+([disaster-recovery.md](disaster-recovery.md) case G, [cloud-migration.md](cloud-migration.md)).
+Take the `id` of the run you started by hand from the list above (its kind, `succeeded`, started
+after your command) and put it in place of `<run id>`. Select the run by its `id`, not as the
+newest one: a scheduled run of the same kind that finishes later would replace it, and its
+manifest can differ from the backup that was restored.
 
 ```sh
-docker compose exec -T postgres psql -U postgres -d bothy -Atc "SELECT manifest FROM backup_runs WHERE kind = 'logical' AND state = 'succeeded' ORDER BY started_at DESC LIMIT 1" > manifest.json
+docker compose exec -T postgres psql -U postgres -d bothy -Atc "SELECT manifest FROM backup_runs WHERE id = '<run id>' AND state = 'succeeded'" > manifest.json
 ```
 
 ## 2. Set up

@@ -100,13 +100,18 @@ automatic restore test measures the duration on every run.
 
 ### Case G: managed database failed over, server not ready
 
+As built (M7-16): not reachable yet. No supported deployment runs on a managed database:
+`install.sh` and the Compose stack cannot use an external database, and the OpenTofu modules
+refuse `database_mode = managed` ([cloud-migration.md](cloud-migration.md) section 6). The steps
+below are the planned procedure for that case.
+
 `api` and `worker` report `restore_not_finalized` after the provider promoted a standby: the
 timeline of the database changed without a restore ([16-operations.md](../spec/16-operations.md) 8.4).
 
 1. Ask the provider whether the failover can have lost committed transactions. When it cannot
    (synchronous replication, documented by the provider): `docker compose stop api worker`, run
    a backup (`docker compose exec backup bothy-backupd backup logical`), save the manifest of that
-   run (`backup_runs.manifest` of the newest row; the command is in
+   run (`backup_runs.manifest` of that run, selected by its `id`; the command is in
    [backup-restore.md](backup-restore.md#11-state-of-the-runs)) as `manifest.json` next to the Compose file and run
    `docker compose run --rm -v ./manifest.json:/tmp/manifest.json:ro restore restore finalize --relocation /tmp/manifest.json`: nothing was
    written since the backup, so the facts match, the new identity is stored and the epoch stays.

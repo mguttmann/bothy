@@ -54,6 +54,12 @@ _INTERPOLATION = r"\$(?:\{[^}]*\}|\w+)"
 _METHOD = re.compile(r"\.(\w+)\s*\(")
 _NAME = re.compile(r"['\"](\w+)['\"]")
 _PATH_STRING = re.compile(r"['\"]([^'\"\s]*/[^'\"\s]*)['\"]")
+# A Dart string, kept, or a comment, dropped: strings first, so `//` inside a URL stays.
+_STRING_OR_COMMENT = re.compile(
+    r"(?P<string>r?'''.*?'''|r?\"\"\".*?\"\"\"|r'[^'\n]*'|r\"[^\"\n]*\""
+    r"|'(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\")|//[^\n]*|/\*.*?\*/",
+    re.DOTALL,
+)
 _CODE = re.compile(r"`(?P<code>[^`]+)`")
 _GROUP = re.compile(r"\((?P<inner>[^()]*)\)")
 
@@ -151,8 +157,10 @@ def read_calls(code: str) -> AppCode:
 
     Example: `api.setThreadTags(id)` and `const tags = 'setThreadTags';` give the name
     `setThreadTags`, `dio.get('/threads/${id.value}/tags')` gives the path string; the comment
-    ``/// see `setThreadTags` `` gives nothing.
+    ``/// see `setThreadTags` ``, ``// api.setThreadTags(id);`` and ``/* 'setThreadTags' */``
+    give nothing.
     """
+    code = _STRING_OR_COMMENT.sub(lambda m: m.group("string") or " ", code)
     names = set(_METHOD.findall(code)) | set(_NAME.findall(code))
     return AppCode(frozenset(names), tuple(sorted(set(_PATH_STRING.findall(code)))))
 
@@ -191,9 +199,23 @@ def app_code() -> AppCode:
     return read_calls("\n".join((REPO / p).read_text(encoding="utf-8") for p in app_sources()))
 
 
+def foreign_operations(row: Row, contract: Contract) -> list[str]:
+    """Return a finding for every named operation that belongs to no action of the row."""
+    found = []
+    for name in row.operations:
+        operation = contract.by_id(name)
+        if operation is not None and not any(
+            operation in contract.by_action(action) for action in row.actions
+        ):
+            found.append(
+                f"{row.feature!r}: `{name}` belongs to `{operation.action}`, no action of the row"
+            )
+    return found
+
+
 def app_row_problems(row: Row, contract: Contract, code: AppCode) -> list[str]:
     """Return what an app row promises that no app calls."""
-    found = []
+    found = foreign_operations(row, contract)
     for action in row.actions:
         operations = contract.by_action(action)
         if operations and not any(is_called(op, contract, code) for op in operations):
@@ -212,7 +234,7 @@ def api_row_problems(row: Row, contract: Contract, code: AppCode) -> list[str]:
     """Return what is wrong with a row whose place is the API alone."""
     if not row.operations:
         return [f"{row.feature!r}: a row of the place API names its operations in parentheses"]
-    found = []
+    found = foreign_operations(row, contract)
     for name in row.operations:
         operation = contract.by_id(name)
         if operation is None:
@@ -248,6 +270,8 @@ CONTRACT = read_contract(
 )
 SOURCES = read_calls(
     "await api.createThread(body);\n/// see `setThreadTags`\n"
+    "// api.setThreadTags(id);\n/* final op = 'setThreadTags'; */\n"
+    "final next = 'https://example.com/a'; // 'setThreadTags'\n"
     "static const String retryRun = 'retryRun';\n"
     "dio.get('/channels/${channel.value}/export');\n"
     "dio.get('/api/v1/channels/$id/templates?limit=5');\n"
@@ -297,6 +321,7 @@ def test_calls_are_read_from_the_code() -> None:
     assert SOURCES.paths == (
         "/api/v1/channels/$id/templates?limit=5",
         "/channels/${channel.value}/export",
+        "https://example.com/a",
     )
 
 
@@ -323,7 +348,8 @@ def test_an_app_row_without_a_caller_is_reported() -> None:
     assert "no operation of the API" in app_row_problems(renamed, CONTRACT, SOURCES)[0]
     uncalled = retry._replace(operations=("setThreadTags",))
     assert app_row_problems(uncalled, CONTRACT, SOURCES) == [
-        "'Retry': no app calls `setThreadTags`"
+        "'Retry': `setThreadTags` belongs to `thread.tags.set`, no action of the row",
+        "'Retry': no app calls `setThreadTags`",
     ]
 
 
@@ -332,10 +358,16 @@ def test_an_api_row_with_a_caller_is_reported() -> None:
     assert api_row_problems(change, CONTRACT, SOURCES) == []
     unnamed = change._replace(operations=())
     assert "in parentheses" in api_row_problems(unnamed, CONTRACT, SOURCES)[0]
-    called = change._replace(operations=("createThread",))
-    assert "so the place is the app" in api_row_problems(called, CONTRACT, SOURCES)[0]
+    called = change._replace(actions=("thread.create",), operations=("createThread",))
+    assert api_row_problems(called, CONTRACT, SOURCES) == [
+        "'Change tags': an app calls `createThread`, so the place is the app"
+    ]
     unknown = change._replace(operations=("setTags",))
     assert "no operation of the API" in api_row_problems(unknown, CONTRACT, SOURCES)[0]
+    other = change._replace(actions=("thread.create",))
+    assert api_row_problems(other, CONTRACT, SOURCES) == [
+        "'Change tags': `setThreadTags` belongs to `thread.tags.set`, no action of the row"
+    ]
 
 
 def test_the_app_sources_leave_out_the_generated_client_and_the_fake_server() -> None:
