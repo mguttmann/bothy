@@ -97,7 +97,8 @@ class GrantWizard extends StatefulWidget {
   /// The heading instead of "Create access grant", or null.
   final String? title;
 
-  /// The step that opens first (0: who, 1: where, 2: level).
+  /// The step that opens first (0: who, 1: where, 2: level); "Back" never goes before it, so
+  /// "Extend" (step 2) keeps the subject and the target of the grant it replaces.
   final int step;
 
   /// The administration's calls.
@@ -363,7 +364,7 @@ class _GrantWizardState extends State<GrantWizard>
       );
       return SelfNotice(l.adminGrantCreated(_subjectName));
     });
-    if (created case final grant?) widget.onCreated?.call(grant);
+    if (created case final grant? when mounted) widget.onCreated?.call(grant);
   }
 
   /// The guided option of 10 11 for the I1 [findings] of the preview: the reason, then one
@@ -535,10 +536,11 @@ class _GrantWizardState extends State<GrantWizard>
             if (widget.onCancel case final cancel?)
               TextButton(
                 key: const ValueKey('wizard.cancel'),
-                onPressed: cancel,
+                // Not while the grant is created: its answer would reach a closed dialog.
+                onPressed: busy ? null : cancel,
                 child: Text(l.selfCancel),
               ),
-            if (_step > 0)
+            if (_step > widget.step.clamp(0, 2))
               TextButton(
                 key: const ValueKey('wizard.back'),
                 onPressed: () => setState(() => _step--),
