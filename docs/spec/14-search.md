@@ -552,7 +552,10 @@ search.
   ([03-data-model.md](03-data-model.md) section 5).
 - GIN indexes with default settings (fast insert via a pending list that autovacuum
   merges in). A dashboard watches index size and bloat
-  ([17-observability.md](17-observability.md)); if needed, `REINDEX CONCURRENTLY`.
+  ([17-observability.md](17-observability.md)); if needed, `REINDEX CONCURRENTLY`. Not built:
+  no dashboard shows the search indexes, and no panel or alert reads `bothy.search.duration`
+  (its share of `timeout` included); the load test of section 7 measures the share of the
+  indexes in the database size (plan row V3-spec-3).
 - **Changing the expression** (new weights, new languages in the expression) rewrites the table. On
   PostgreSQL 16, `ADD COLUMN ... GENERATED ... STORED` changes the file node of the table
   (checked); the same applies to 18 [derived]. This needs a maintenance window. The load test measures the duration per million messages
@@ -560,7 +563,10 @@ search.
   into the maintenance window.
 - **Reassigning the language** (for example after a change of `search.locale_map`): a job resets
   `search_language` in small batches. Updating the base column recomputes the
-  vector, row by row, without a table lock.
+  vector, row by row, without a table lock. Not built (D-M3-13-8; plan row V3-spec-2): after a
+  change of `search.locale_map` or `locale.default` existing messages, threads and file texts,
+  imported ones included, keep their language, and only the `simple` part of a query finds them
+  in the new language.
 
 ## 9. Limit and outlook
 

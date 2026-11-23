@@ -183,3 +183,24 @@ def test_ci_ok_requires_every_gate_job() -> None:
     green = dict.fromkeys(_jobs()["ci-ok"]["needs"], "success")
     for job in GATE_JOBS:
         assert ci_ok.check_needs({**green, job: "failure"}, frozenset()) == [f"{job}: failure"]
+
+
+# The rows of the table "CI jobs" in docs/quality/gates.md whose cell lists make targets, by job.
+DOC_GATE_ROWS = {
+    "gates": "gates",
+    "gates (docs and contracts)": "gates-docs",
+    "gates (security and supply chain)": "gates-security",
+}
+
+
+def _doc_targets(row: str) -> list[str]:
+    text = (REPO / "docs" / "quality" / "gates.md").read_text(encoding="utf-8")
+    [line] = [ln for ln in text.splitlines() if ln.startswith(f"| `{row}` | `")]
+    cell = line.split("|")[2].strip()
+    return cell.split("`")[1].split()
+
+
+@pytest.mark.parametrize(("row", "job"), DOC_GATE_ROWS.items())
+def test_the_table_of_gates_md_names_the_targets_of_each_gates_job(row: str, job: str) -> None:
+    # The table is the documented contract of the gates (ci-gates-15): it drifted from ci.yml twice.
+    assert _doc_targets(row) == _targets(job)

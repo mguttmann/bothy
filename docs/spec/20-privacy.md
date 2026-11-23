@@ -571,7 +571,12 @@ defaults:
 | Terminal sessions | metadata only for the person themselves and owners; no content recording; not in the statistics per person ([24-terminal.md](24-terminal.md), section 10) |
 | Live statistics and visualizations | on (`stats.live_enabled`); only for owners and space managers, without values per person, without the trigger of a run, without counters about people; in channels with only one person, runs allow conclusions about that person, therefore it can be turned off ([25-visualization.md](25-visualization.md), section 4) |
 
-Every change of these switches is in the audit log. The instance operator checks a data protection
+The switches `privacy.per_person_stats_enabled`, `privacy.stats_min_group_size` and
+`stats.live_enabled` are server configuration, read only at process start (16 5.1). A change of
+them creates no audit entry in the product; as for `retention.content` (4.1), the instance operator
+tracks changes of the configuration in their own version control, which is the record a works
+agreement can refer to. An audit entry of the system for a changed effective value at startup is
+not built (plan row V3-spec-5). The instance operator checks a data protection
 impact assessment (Art. 35 GDPR); agents with access to employee data can be a reason for one.
 
 ## 10. Tests

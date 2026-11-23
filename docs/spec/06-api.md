@@ -58,6 +58,8 @@ readiness are not part of the public API; they are on the internal listener
 | Forms of v1 that differ | Built before the rule above and kept, because a rename or a new method is a breaking change (section 13): `revokeToken`, `revokePasskey` and `revokeIncomingWebhook` are `DELETE`, while `revokeSession`, `revokeDevice`, `revokeGrant` and `revokeOwner` are `POST .../revoke`; `deleteSpace`, `deleteChannel`, `deleteThread` and `uninstallApp` are `POST` (they move a state machine), the other deletes are `DELETE`; `PUT` operations are named `set*`, `put*`, `update*` (`updateBranding`, `updateCommand`) and a few verbs of their own; `putMySidebarSpace` and `putMySidebarChannel` keep absent members (R-API-31), a merge under `PUT`; the life cycle is `status` in `User`, `Agent`, `Transcript` and `WebhookDelivery` and `state` elsewhere; `features` is a list of keys in `Discovery` and a list of evaluated flags in `InstanceInfo`. No lint holds the rule for new operations; the review does. | The SDKs and apps already call these names and methods. |
 | No effect | If the target state is already reached (disabling a disabled one, revoking a revoked one, closing a done thread) or a PATCH changes nothing, the server answers as for the change with the current representation, without a new version, without an event and without a permission version; actions with an audit write an entry with `no_change: true` in `details`. A transition the state machine does not know (for example `deleted` after `active`, closing the main thread) gives `409 invalid_state_transition`. | The outbox retries even after `sync.idempotency_key_ttl`; an error for the desired state would look like a failure. |
 | Self reference | `/me/...` for the calling person; agent runtime under `/agents/me/...`. | No special value `me` in ID parameters; code generators type IDs as UUID. |
+| Created resources | A `201 Created` answers with the representation of the new resource, its `id` included, and without a `Location` header (as built; only the OIDC redirect declares `Location`). The address of the new resource is the path of its read or change operation in section 16, also for children that are created under their parent and addressed flat (a template is created under `/channels/{channel_id}/templates` and changed under `/templates/{template_id}`). | The SDKs and apps read the `id` from the body; an additive `Location` is listed as a minor in docs/decisions.d/AUD-P12-docs-b.md. |
+| Headers of every route | `Authorization`, `DPoP`, `Invocation-Token` (07 SR9) and the console's `X-Console-Request: 1` hold for every route they apply to and are declared once in the contract, not per operation: the component `InvocationToken` is referenced by no operation, and the parameter `ConsoleRequest` stands on seven operations only (logout, step-up, `endViewAs`), while section 3 requires it on every write of the console. `postIncomingWebhookWithBearer` carries the root security in the contract, but only `bearerAuth` with the token of the incoming webhook applies (its description says so). A generated client sets these headers itself. | The route generator knows the security profiles `public` and root only; an extension for headers of every route and a third profile for the webhook token are listed as minors in docs/decisions.d/AUD-P12-docs-b.md. |
 | Fields | snake_case, the same as the database (03) and events (04). | One name per term across all layers. |
 | operationId | lowerCamelCase, verb plus noun (`createMessage`). Lint rule `rule/operation-id-camel-case`. | Generators build method names from it; a rename breaks SDKs. |
 | Enumerations | snake_case strings. Repeated value sets are named schemas (for example `ThreadState`). | The same types in all generators, no name collisions. |
@@ -681,9 +683,19 @@ request per subscription. Delivery, retry, verification at the receiver and inco
    `info.version` of openapi.yaml and asyncapi.yaml is SemVer: MINOR for additive changes,
    PATCH for documentation only. Until the first release, `0.x` applies. The discovery reports
    `api_versions`, `spec_version` and `features`.
+   As built, before the first release: the version is not raised per change. openapi.yaml stays at
+   `0.2.0` and asyncapi.yaml at `0.1.1` while operations and schemas are added, `features` of the
+   discovery is empty and every event payload has `schema_version` 1 (item 2). So `spec_version`,
+   the `min_api_version` of an app manifest ([11-extensions.md](11-extensions.md) 3.1) and
+   `schema_version` tell no two development states of a server apart: the version check of the
+   console and the check of `min_api_version` at an app installation compare values that are equal
+   for every state, and a client must not use them as a compatibility signal before the first
+   release. No gate holds the
+   steps of items 1 and 2; G6 (item 7) passes without a tag. The rule and its gate from the first
+   release on are plan row V3-spec-6.
 2. **Gateway.** Protocol versions are in `hello` and `identify`; an unsupported version closes with
    `4007` (04, 6.1). Event payloads change only additively; `schema_version` increases with each
-   such change, so that clients recognize new fields.
+   such change, so that clients recognize new fields (not before the first release, item 1).
 
 | Additive, allowed in v1 | Breaking, only in a new major version |
 |---|---|

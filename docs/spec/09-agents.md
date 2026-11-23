@@ -5360,6 +5360,12 @@ A turn in background mode (18.2 "Background mode", addendum of 2026-11-16) is ne
 before step 1 the runner stops it as in 18.6, and its run finishes `cancelled` with
 `adapter_stopped`.
 
+A turn of a hosted agent ([26-builtin-agents.md](26-builtin-agents.md) 3.2) is never handed over
+either (D-AR-03-9): its agent's connection stops it as in 18.6 at SIGTERM, also with
+`runner.turn_handover`, and its run finishes `cancelled` with `adapter_stopped`. So every restart
+or update of a runner ends the live answers of its built-in agents. The handover and adoption of
+hosted turns are not built (plan row V3-spec-1).
+
 The non-zero code makes a service manager that restarts on failure (launchd `KeepAlive
 {SuccessfulExit: false}`, systemd `Restart=on-failure`) start the next runner after a SIGTERM that
 handed turns over; after exit 0 it does not. The restart and update operation of the service guide
