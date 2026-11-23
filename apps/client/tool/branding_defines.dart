@@ -47,13 +47,16 @@ const List<String> brandingKeys = [
 /// The optional keys of a branding file: the public domain of the phone builds (the
 /// associated domain of passkeys on iOS, the App Links host on Android), the Apple signing
 /// team (both empty in a neutral build), the Android application ID (the bundle identifier
-/// when absent) and the update path of the build (`update_url`, an `https` address the release
-/// steps of tools/distribution write from distribution.yaml; brief M7-13).
+/// when absent), the update path of the build (`update_url`, an `https` address the release
+/// steps of tools/distribution write from distribution.yaml; brief M7-13) and the target of
+/// crash reports (`crash_dsn`, an `https` address from `crash_reports.target` of
+/// distribution.yaml, the define `CRASH_DSN`; 15 16).
 const List<String> optionalBrandingKeys = [
   'associated_domain',
   'development_team',
   'application_id',
   'update_url',
+  'crash_dsn',
 ];
 
 /// A build branding, validated.
@@ -67,6 +70,7 @@ final class Branding {
     this.associatedDomain = '',
     this.developmentTeam = '',
     this.updateUrl = '',
+    this.crashDsn = '',
     String? applicationId,
   }) : applicationId = applicationId ?? bundleId;
 
@@ -78,7 +82,7 @@ final class Branding {
   /// associated domain that is not a host name, or a signing team that is not ten upper-case
   /// letters or digits, or an application ID (given, or else the bundle identifier) that is
   /// not lower-case letters and digits in dot-separated segments that start with a letter, or
-  /// an update URL that is not an `https` address with a host.
+  /// an update URL or crash report target that is not an `https` address with a host.
   factory Branding.parse(String yamlText) {
     final doc = loadYaml(yamlText);
     if (doc is! YamlMap) throw const FormatException('the branding is no map');
@@ -105,6 +109,7 @@ final class Branding {
       associatedDomain: optional('associated_domain'),
       developmentTeam: optional('development_team'),
       updateUrl: optional('update_url'),
+      crashDsn: optional('crash_dsn'),
       applicationId: doc['application_id'] == null
           ? null
           : optional('application_id'),
@@ -134,6 +139,15 @@ final class Branding {
           update.host.isEmpty ||
           branding.updateUrl.contains(RegExp(r'\s'))) {
         throw const FormatException('update_url: not an https address');
+      }
+    }
+    if (branding.crashDsn.isNotEmpty) {
+      final target = Uri.tryParse(branding.crashDsn);
+      if (target == null ||
+          target.scheme != 'https' ||
+          target.host.isEmpty ||
+          branding.crashDsn.contains(RegExp(r'\s'))) {
+        throw const FormatException('crash_dsn: not an https address');
       }
     }
     if (branding.developmentTeam.isNotEmpty &&
@@ -177,7 +191,11 @@ final class Branding {
   /// `.appinstaller` file), or "" in a build without one (brief M7-13).
   final String updateUrl;
 
-  /// The JSON of `--dart-define-from-file`.
+  /// The target of crash reports (`CRASH_DSN`), or "" for a build that sends none.
+  final String crashDsn;
+
+  /// The JSON of `--dart-define-from-file`; `CRASH_DSN` only when the branding names a target,
+  /// so a build without one can still pass `--dart-define=CRASH_DSN=<dsn>`.
   String dartDefines() => const JsonEncoder.withIndent('  ').convert({
     'BRANDING_APP_NAME': appName,
     'BRANDING_URL_SCHEME': urlScheme,
@@ -186,6 +204,7 @@ final class Branding {
     'BRANDING_ASSOCIATED_DOMAIN': associatedDomain,
     'BRANDING_APPLICATION_ID': applicationId,
     'BRANDING_UPDATE_URL': updateUrl,
+    if (crashDsn.isNotEmpty) 'CRASH_DSN': crashDsn,
   });
 
   /// The xcconfig that `AppInfo.xcconfig` includes.

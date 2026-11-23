@@ -183,7 +183,9 @@ the app once `windows.hours_between_update_checks` hours have passed since its l
 start with 0).
 
 Crash reports need a target in the build configuration (docs/spec/15-client-architecture.md 16):
-`--dart-define=CRASH_DSN=<dsn>` and optionally `--dart-define=CRASH_ENVIRONMENT=<name>`. Without
+`crash_dsn` of the build branding (a release takes it from `crash_reports.target` of
+`apps/distribution/distribution.yaml`), which `tool/branding_defines.dart` writes as `CRASH_DSN`,
+or `--dart-define=CRASH_DSN=<dsn>`; optionally `--dart-define=CRASH_ENVIRONMENT=<name>`. Without
 `CRASH_DSN` the crash path never starts and Settings hides `privacy.crash_reports`.
 
 ## Test
