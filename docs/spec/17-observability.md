@@ -18,7 +18,7 @@ Terms: [00-glossary.md](00-glossary.md). Operations: [16-operations.md](16-opera
 
 | No. | Rule | Source |
 |---|---|---|
-| 1 | Instrumentation only with OpenTelemetry (Go SDK in the server, OTel SDKs in Python and TypeScript in the adapters). | B11 |
+| 1 | Instrumentation only with OpenTelemetry (Go SDK in the server, OTel SDKs in Python and TypeScript in the adapters; the adapter part is not built, V3-23, [signals.md](../observability/signals.md) 5.1). | B11 |
 | 2 | Export only to an OpenTelemetry Collector. No process talks directly to a vendor backend. | B11, ADR 0034 |
 | 3 | No message content, prompts, file names, search terms, tokens or secrets in telemetry. Enforcement at the source and in the collector (allowlist). | B11, [privacy.md](../observability/privacy.md) |
 | 4 | Telemetry is asynchronous with a bounded queue. If it is full, the process drops data and counts `bothy.telemetry.dropped`. An export error never changes the result of a request. If a processor of the SDK drops data without feedback, the README of `platform/otel` names this uncounted point. | R-Telemetrie |
@@ -54,12 +54,19 @@ stored in `event_log.trace_context`; 03, 04 section 2.2).
 
 ![Trace propagation](../observability/diagrams/trace-propagation.svg)
 
+Built is the part up to the envelope: the server stores and sends `trace_context`. The adapter
+span `invoke_agent`, `TRACEPARENT` for the runtime, the spans under it and the adapter's requests
+under the same trace (steps 6 to 10 of the diagram) are not built: no SDK and no adapter uses
+OpenTelemetry yet (V3-23).
+
 Autonomous runs (addendum of 2026-11-06, stage AR, R-OB-11, [09-agents.md](09-agents.md) 5.8 and
 18.19). The Claude Code runner logs, by code: `turn_handed_over`, `turn_adopted`,
 `launch_check_refused`, `wake_created`, `wake_refused`, `wake_check_failed`, `wake_check_refused`,
 `wake_input_check_failed`, `wake_fired`, `wake_expired`, `wake_cancelled`, `wake_failed`,
 `recovery_wake`, `usage_limited`, `usage_warning`, `usage_status_unknown`,
-`continuation_without_wake`, `stop_turns_timeout` and `durable_cron_present`. Every end of a wake-up the runner learns (from its own call or from
+`continuation_without_wake`, `stop_turns_timeout` and `durable_cron_present` (built: the codes of
+the handover; the codes of wake-ups, recovery, the usage window and the end state come with
+AR-05 to AR-07, which are not built yet, 09 18.19). Every end of a wake-up the runner learns (from its own call or from
 `run.wake_changed`) has its own code: `wake_fired`, `wake_expired`, `wake_refused`,
 `wake_cancelled` (with the reason, for example `usage_cleared` or `cancelled_by_person`) and
 `wake_failed` (with the reason of the last failure); `wake_check_failed` names one failed check,

@@ -35,9 +35,8 @@ the overview.
 | `bothy restore finalize [--relocation FILE]` | after a restore: new sync epoch, cursors to `head_seq`, stored database identity; with `--relocation` the manifest of the final backup of a relocation keeps the epoch (16-operations.md 8.4, M7-04) |
 | `bothy secrets init\|export` | create and back up secrets (16-operations.md) |
 | `bothy healthcheck --url` | health check of a loopback URL of the internal listener (16-operations.md) |
-| `bothy files rescan` | have files checked again (12-files.md) |
+| `bothy files rescan` | have files checked again (12-files.md); not built (plan row V3-34) |
 | `bothy telemetry pseudonym` | pseudonym of a principal for debugging |
-| `bothy dev seed` | test data, only in the environment `dev` |
 
 Health: `/healthz` (the process is alive) and `/readyz` (ready) only on the internal listener
 `server.internal_listen_addr`, outside the public API and without an action (ruling L2,

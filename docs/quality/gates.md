@@ -96,12 +96,16 @@ builds of server and host service).
 | `apps (macOS)`, `apps (iOS)`, `apps (Windows)`, `apps (Android API 26)`, `apps (Android API 36)` | `apps/`, `packages/` (with the native code of the members), the root `pubspec.yaml` (Flutter pin) or `pubspec.lock`; the Android jobs only in the public phase. Other inputs of the component `apps` (`design/`, the SLO generator, `analysis_options.yaml`, `tools/arch-check/`) feed the Dart gates and committed generated files under `packages/`, which `test (apps)` checks |
 | `postgres-image (amd64)`, `postgres-image (arm64)` | what `bothy-postgres` is built and tested from: `services/server/images/bothy-postgres/`, `internal/`, `cmd/bothy-backupd/`, `migrations/`, `migrations.sha256`, `test/postgresimage/`, `go.mod`, `go.sum`, `VERSION` and `.golangci.yml` under `services/server/` |
 | `desktop trial (macOS)`, `desktop trial (Windows)` | the release steps of the desktop app (brief M7-12): `apps/distribution/`, `tools/distribution/` (but `hostdist.py` and its test), `apps/client/Makefile`, `.github/workflows/release.yml`, the branding tool and example, `apps/client/lib/app/branding.dart` (the version the app reports, which the trials check in the built app), and the runner files they package or sign (`DISTRIBUTION_FILES` in `tools/ci/components.py`); never for a shared input alone and never on `main`, because each builds the app twice on its own runner (docs/decisions.d/M7-12.md) |
+| `mobile trial (iOS)`, `mobile trial (Android)` | the release steps of the phone apps (brief M7-13): `apps/distribution/`, `tools/distribution/` (but `hostdist.py` and its test) and the files that shape the phone builds (`MOBILE_TRIAL_FILES` in `tools/ci/components.py`: `apps/client/Makefile`, the Gradle build file of the app, the Xcode project, the branding tool, example and `branding.dart`, `.github/workflows/release.yml`); never for a shared input alone and never on `main`: the unsigned iOS archive of a test publisher with its structure and entitlements checked, and the Android App Bundle signed with a throwaway upload key and verified (docs/decisions.d/M7-13.md) |
 | `host trial (macOS)`, `host trial (Windows)` | the host service and its release steps (brief M7-23): `services/host/`, `infra/host/`, `tools/distribution/` and `.github/workflows/release.yml` (`HOST_TRIAL_JOBS` in `tools/ci/components.py`); never for a shared input alone and never on `main`, because each builds, signs and installs the package on its own runner (docs/decisions.d/M7-23.md) |
 | `test (adapters end to end)` | the component `sdk-python` or `plugins` (both own `services/server/`, so a server change runs it): `make adapters-e2e`, the end-to-end suites of the Hermes adapter and the Claude Code runner against the server of this tree (pytest marker `e2e`, left out of `make test`; docs/decisions.d/HERMES-E2E-REAL-SERVER.md) |
 | `console-e2e` | the build context of the server image (`services/server/Dockerfile.dockerignore`: `api/`, `cmd/`, `internal/`, `migrations/`, `test/smoke/`, `go.mod`, `go.sum`, `VERSION` and the Dockerfile under `services/server/`; `apps/console/`, `packages/`, the root `pubspec.yaml`, `pubspec.lock` and `analysis_options.yaml`) or the Compose stack of the test (`infra/compose/compose.yaml`, `compose.smoke.yaml`, `compose.console-e2e.yaml`, `smoke.env`, `console-e2e.env` and `console-e2e/` under `infra/compose/test/`) |
 
-Every job but the two desktop trials and the two host trials runs on a push to `main`, on a manual run, for an empty
-diff and when a shared input changes: every path the component map does not know (among them the `Makefile`, `.github/`, the
+Every job but the desktop, phone and host trials runs on a push to `main`, on a manual run, for an empty
+diff and when a shared input changes. The trials run only in a pull request or merge group whose
+diff touches their files; the plan of a release tag leaves them out too, so the proof of the
+release steps is as old as the last change of these files (plan row V3-42). A shared
+input is every path the component map does not know (among them the `Makefile`, `.github/`, the
 root configuration files but `mkdocs.yml`, and the shared parts of `tools/`) and the API contract `docs/api/`.
 
 Under `tools/` the self-contained tool folders are components of the map
@@ -681,6 +685,7 @@ or the pre-push hook:
 |---|---|---|
 | `perf` | load tests of the performance targets of 02, the chaos tests of the event path and TM-T16 of the terminal (`TestChaosTMT16`), on `perf.reference_profile` (section above, ADR 0063) | end of a milestone, release, tickets that touch a performance target (PLAN P-07) |
 | `portability` | with `PORTABILITY_TAG` the portability test of [16 11.1](../spec/16-operations.md#111-portability-test-in-ci) ([tests/portability/README.md](../../tests/portability/README.md), M7-14): a product release installed with `install.sh` and the options of `tests/portability/install-options` for `fs` and `s3`, every version image verified by its signature before `install.sh`, the running images compared, the smoke scenario of M1-73 and the portability scenario (a run of the test adapter, an upload clean and with EICAR, search, status page), backup and restore test, telemetry through the overlay `local` without a canary, the tailnet case without an account, the digests reported; without `PORTABILITY_TAG` the Compose smoke test (`infra/compose/smoke.sh`) | release workflow (`portability.yml` after `publish` of a product tag, or by hand) |
+| `release-trial` | `make release-trial COMPONENT=<server, bothy, grafana-bothy-live or host>` (`tools/ci/release_trial.py`): the release steps of a component against local throwaway targets (a local registry, a throwaway signing key), with the checks of their results ([18-release.md](../spec/18-release.md) section 6.2) | by hand on the build host before a release; refuses to run under GitHub Actions, so no CI job runs it |
 | `portability-trial` | the portability test end to end against the local trial release of the product (source `release-download`), plus a forced failure that must print state and logs before the cleanup and an unsigned image that must fail before `install.sh`; refuses to run under GitHub Actions (D-W-127) | build host, tickets that change `install.sh`, the bundle, `compose.yaml` or the test |
 | `tofu-vm-test` | the OpenTofu module `generic-vm` on a local VM: the product trial, a pinned Ubuntu cloud image in QEMU (KVM, HVF or TCG) with the rendered user data, the smoke probe against the stack, a second delivery over SSH that changes nothing, a wrong checksum and a wrong signature that stop the setup ([infra/tofu/test/generic-vm/README.md](../../infra/tofu/test/generic-vm/README.md)); needs QEMU on the build host and refuses to run under GitHub Actions (D-W-127) | build host, tickets that change `infra/tofu/modules/generic-vm` or the bundle |
 | `console-e2e` | SEC-T05: the web console of the server image under its CSP in Chromium, Firefox and WebKit against the Compose smoke stack (`tools/console-e2e`, M6-03) | CI job `console-e2e` of `ci.yml` and `build-verify.yml` when the plan lists it ("Jobs a change needs"), feeding `ci-ok` and `build-verify-ok` |
@@ -768,9 +773,11 @@ example a JSON report), `DENYLIST_FLAGS` (for example `--reveal` locally).
   only GitHub shows differently from Python-Markdown is not seen by the test. It reads the
   diagram through a closed line grammar; a test with the pinned mermaid-cli holds that it equals
   Mermaid on the real diagram (needs `make bootstrap`).
-  Table ownership in SQL files and the alignment with the tables of the migrations (ADR 0050)
-  are missing as long as there are no migrations and queries; they come with the first schema
-  (PLAN M1-12).
+  Table ownership in the query files and the alignment of the register with the tables of the
+  migrations (ADR 0050) are held by `tools/docs/tests/test_table_ownership.py` in the tools
+  tests, not by `register-check`. It judges only names of tables of the register after `FROM`,
+  `JOIN`, `INTO`, `UPDATE` and `TABLE`, so SQL built in Go code is not covered, and the foreign
+  reads of today stand in its list with their reason.
 * Whether the content of an `.svg` matches what mermaid-cli would render today from its `.mmd`:
   the output depends on the browser version, so a byte comparison would differ on every
   host. Instead, `make diagrams` checks the stamp that `render_diagrams.py
@@ -782,7 +789,8 @@ example a JSON report), `DENYLIST_FLAGS` (for example `--reveal` locally).
   "Advisories"). A known vulnerability or a license outside the list in a package that only the
   build or its tests resolve (the Android Gradle Plugin and its test platform, lint, the Kotlin
   compiler, test libraries, plugins of the debug and profile variants) fails no gate; such
-  packages follow the updates of the Gradle plugins that Renovate proposes (SEC-ALERTS/9).
+  packages follow the updates of the Gradle plugins that Renovate proposes once it is active, by
+  hand until then ([toolchain](toolchain.md#updates), SEC-ALERTS/9).
 * The Swift packages of the Apple apps are outside `osv` and `licenses`: no `Package.resolved`
   is tracked. Two plugins of `pubspec.lock` name a remote Swift package today: `sentry_flutter`
   pins sentry-cocoa to an exact version, so the lock file decides it; `patrol`, the runner of the

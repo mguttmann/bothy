@@ -164,7 +164,7 @@ reason = "License Unlicense. Not shipped: reached through @grafana/data via reac
 [[IgnoredVulns]]
 id = "GHSA-gcqx-w48m-w2h4"
 ignoreUntil = 2026-11-18
-reason = "deepmerge 4.3.1, a dev dependency of jest-config and fork-ts-checker-webpack-plugin; it merges only the plugin's own test and type-check configuration and never ships. No fixed release exists yet; Renovate proposes it when one does."
+reason = "deepmerge 4.3.1, a dev dependency of jest-config and fork-ts-checker-webpack-plugin; it merges only the plugin's own test and type-check configuration and never ships. No fixed release exists yet; the maintainer looks for one at the expiry until Renovate is active (docs/quality/toolchain.md, section Updates)."
 
 [[IgnoredVulns]]
 id = "GHSA-g3hv-75wg-m249"

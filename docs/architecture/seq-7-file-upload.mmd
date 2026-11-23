@@ -19,14 +19,9 @@ sequenceDiagram
   A->>F: POST upload session (channel, size, name, declared type)
   F->>F: authorize(Alex, file.upload, channel): write and upload, size at most file.max_upload_bytes
   F->>DB: INSERT files (upload_state pending, random object_key)
-  alt driver S3 with presigned URL
-    F-->>A: short-lived PUT URL with checksum header
-    A->>OBJ: PUT bytes
-  else driver file system or upload through the server
-    F-->>A: upload target on the server
-    A->>F: PUT bytes (streamed, size limited)
-    F->>OBJ: write, SHA-256 while passing through
-  end
+  F-->>A: upload target on the server (mode presigned is not built, 12-files.md 3.3)
+  A->>F: PUT bytes (streamed, size limited)
+  F->>OBJ: write, SHA-256 while passing through
   A->>F: POST complete upload
   F->>DB: session completed, job files.scan (round 0) in the same transaction, no event
   F-->>A: 200 file (pending, being checked)

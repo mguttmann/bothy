@@ -31,7 +31,10 @@ Compose replaces `migrate` first; only after exit 0 do `api` and `worker` restar
 restart, clients are briefly disconnected; they receive `4013 server_restart` and continue with
 `resume`. Auxiliary services (collector, Prometheus and so on) follow their own version variables.
 
-Check: `docker compose ps`, `/readyz`, status page, SLO dashboard, version in the admin console.
+Check: `docker compose ps` (the image tag of `api` and `worker` is the new version; the label
+`org.opencontainers.image.version` of `docker image inspect` names it too), `/readyz`, status
+page, SLO dashboard, and `bothy migrate status` for the applied migrations. The admin console
+shows only the version of the specification, neither the server nor the schema version.
 
 ### 2.1 Installations from a bundle
 
@@ -85,9 +88,10 @@ messages of the search load test (`make bench-search`; `rewrite_seconds_per_mill
 `index_build_seconds_per_million` under `extra.search.rewrite` in `.cache/perf/results.json`)
 times the number of messages of the instance in millions.
 
-Check in the gate (ticket): every migration runs against the schema of the previous version with
-test data; then the test suite of the previous version runs against the new schema (N-1
-compatibility).
+Not built: a gate that runs every migration against the schema of the previous version with test
+data and then the test suite of the previous version against the new schema (N-1 compatibility;
+plan row V3-37). Until then rules M1 to M12 hold by review, and `make migrations-lint` checks
+numbers, checksums and form rules only.
 
 ## 5. Schema check at startup
 
@@ -103,7 +107,8 @@ compatibility).
    `instance.min_server_version`). Whoever changes the schema checks at release time whether the
    constant must rise.
 3. A newer schema without this lock is allowed; this is how the rollback from section 3 works.
-4. `instance.schema_version` shows the state in the admin console.
+4. `bothy migrate status` shows the applied migrations; `instance.schema_version` is stored in
+   the database, and no view of the admin console shows it.
 
 ## 6. PostgreSQL major version
 

@@ -64,7 +64,7 @@ keys of the column "Reported" below; any other key is refused.
 | Sending files | `supports_files_out` | `files_out: true` | Agent additionally needs `+upload` (an operator holds it by the operator rule, 2.3). If `supports_files_out` is off, the server rejects messages of an agent with attachments with `403 feature_disabled`. |
 | Hosting built-in agents | no key; reported only | `hosts_agents: chat`, `scoped` or `host` (the highest class it loads for a hosted agent) | Only a runner that reports it can be chosen as `hosted_by` ([26-builtin-agents.md](26-builtin-agents.md) 3.1); only a Claude Code runner with `runner.hosted_agents` reports it (addendum of 2026-11-06); `getAgent` and `listAgents` show the stored value to owners only as `AgentRuntimeStatus.hosts_agents`, for the "New agent" entry of 26 8.1 (addendum of 2026-11-07, A1-03b) |
 | Turn handover | no key; reported only | `turn_handover: true` | The runner hands live turns over at a restart and adopts them with full rights (18.19.3 to 18.19.7); only a Claude Code runner with `runner.turn_handover` reports it (addendum of 2026-11-06, stage AR) |
-| Wake-ups | no key; reported only | `wakes: true` | The runner takes wake-up requests from turns, checks host conditions and takes wake inputs (5.8, 18.19.8); clients show wake-up controls only for an agent that reports it; only a Claude Code runner with `runner.wakes` reports it (addendum of 2026-11-06, stage AR) |
+| Wake-ups | no key; reported only | `wakes: true` | The runner takes wake-up requests from turns, checks host conditions and takes wake inputs (5.8, 18.19.8); clients show wake-up controls only for an agent that reports it; only a Claude Code runner with `runner.wakes` reports it (addendum of 2026-11-06, stage AR); not built yet, no runner reports it before AR-05 (18.19) |
 
 Schema `agent_operator_config.v1` (03, `agents`): a JSON object without further keys
 (`additionalProperties: false`); every key is optional. `operator_config` never contains
@@ -1612,6 +1612,12 @@ wake run (`trigger_kind = 'wake'`) or, when the thread's run is still active, de
 input into it. The runner side (how an agent asks, how host conditions are checked, recovery and
 usage-window wake-ups) is 18.19.
 
+Build state: the server side of this section is built (AR-04), the clients show it (AR-08). The
+runner side is not built yet (AR-05 to AR-07, [PLAN](../PLAN.md) section 22): no runner reports
+`wakes`, the Claude Code runner refuses an `agent.invocation` with `trigger_kind = 'wake'`
+(`trigger_kind_unsupported`), and so no wake-up is created and no wake run starts today. A thread
+continues only when a person writes.
+
 #### 5.8.1 Record
 
 `run_wakes` (03 4.8) holds per wake-up: agent, thread, the run that asked for it
@@ -2483,7 +2489,8 @@ sequenceDiagram
 
 If the client retries with the same `client_interaction_id`, it gets the stored answer
 (04 section 5.1). If `interaction.respond` does not arrive for longer than `interaction.ack_timeout`,
-the card shows "not confirmed"; the component does not become active again. Reason: the delivery is
+the card shows "not confirmed" (not built: the server has no such key and the card no such
+state, plan row V3-33); the component does not become active again. Reason: the delivery is
 durable and arrives as soon as the adapter is back; a second decision would be more dangerous
 than a late one.
 
@@ -2860,9 +2867,12 @@ plugin surfaces. Verified basis, retrieved 2026-10-10:
   the Fake-Hermes tests and the recording run on 3.14 and the adapter's own tests on 3.11
   (D-HERMES-COMPAT-2).
 
-Hermes is not part of the product. The adapter pins a version range of Hermes; a
-compatibility test runs against the pinned and the newest version (16.1, fake Hermes). While the
-pin follows upstream main, the newest release is older than the pin (D-HERMES-PIN-1).
+Hermes is not part of the product. The adapter pins one commit of Hermes; its tests run against
+the pinned commit (16.1, fake Hermes), and the newest commit is reached through the daily pin
+workflow, which records and tests it before the pin moves (D-HERMES-PIN-2). No workflow runs the
+tests against another version: `--hermes-version` of `plugins/hermes-adapter/tests/conftest.py`
+is a manual option. While the pin follows upstream main, the newest release is older than the pin
+(D-HERMES-PIN-1).
 
 ### 17.2 Package and registration
 
@@ -5285,6 +5295,14 @@ done, waiting or blocked. The server side of wake-ups and autonomous inputs is 5
 off until its key is on (18.19.1); without the keys 18.1 to 18.18 apply unchanged, held by the
 byte-equal fixtures of AR-T16.
 
+Build state: 18.19.2 (AR-02) and 18.19.3 to 18.19.7 with `runner.turn_handover` (AR-03) are
+built. 18.19.8 to 18.19.12 are not built yet: `bothy-wake` (AR-05), recovery and usage-window
+wake-ups (AR-06) and the end state with `runner.cli_bg_wait_ceiling` (AR-07), and the runner
+service guide of 16 10.1 (AR-09) does not exist ([PLAN](../PLAN.md) section 22). The runner's
+configuration knows none of the keys of these parts; a configuration that sets one of them
+(`runner.wakes`, `runner.end_state`, `runner.cli_bg_wait_ceiling`, `runner.wake_*`) fails to load
+with `unknown key`.
+
 #### 18.19.1 Keys, capabilities and order
 
 | Key | Turns on | Capability in the heartbeat (4.8) |
@@ -5602,6 +5620,8 @@ position, so a value kept outside the object fails the test (issue 556 item 3).
 
 #### 18.19.8 Wake-ups from a turn: `bothy-wake`
 
+Not built yet (AR-05); the text is the rule for that ticket.
+
 With `runner.wakes` the runner puts a folder with the command `bothy-wake` first on the turn's
 cleaned `PATH` (owned by the runner user, not writable by group or others) and adds
 `Bash(bothy-wake:*)` to `--allowedTools` under `scoped`; for a hosted agent (18.18) the runner adds
@@ -5681,6 +5701,8 @@ print turn.
 
 #### 18.19.9 Lost work and recovery runs
 
+Not built yet (AR-06); the text is the rule for that ticket.
+
 With `runner.wakes`, when a turn ends with background tasks that did not finish, the runner calls
 `run.wake.recover` with reason `recovery` for the run (5.8.2), within the autonomy rules of 5.8.6.
 The cases:
@@ -5709,6 +5731,8 @@ note instead (log code `recovery_wake`, refused). The recovery run is a new run 
 the agent; the agent decides what to do again (R-AG-17 as amended, R-AG-53).
 
 #### 18.19.10 The usage window of the account
+
+Not built yet (AR-06); the text is the rule for that ticket.
 
 The stream reader knows `rate_limit_event` (added to its known types). A frame whose
 `rate_limit_info.status` is `rejected` while `overageStatus` is neither `allowed` nor
@@ -5756,6 +5780,8 @@ decides how the wake-up at the reset and the short retry meet.
 
 #### 18.19.11 End state of every run
 
+Not built yet (AR-07); the text is the rule for that ticket.
+
 With `runner.end_state` the runner prompt requires a last line `STATE: done`, `STATE: waiting` or
 `STATE: blocked` in every answer, handled like `TITLE:`: the runner removes it from the posted text
 and stores the value in the run's finish summary (`end_state`). `done`: nothing more to do;
@@ -5779,6 +5805,8 @@ carries no `end_state`; clients then show no end state on its line and no note o
 and the line stays as before (01 6.21 item 2, issue 567).
 
 #### 18.19.12 Time limits and the pinned CLI
+
+Not built yet (AR-07) for `runner.cli_bg_wait_ceiling`; the CLI facts below are recorded for AR-05 to AR-07.
 
 The runner itself has no limit on run duration, turns or budget, and the server has none for a
 running run; this stays so. `runner.cli_bg_wait_ceiling`, when set, is passed as
@@ -5965,7 +5993,7 @@ configuration of the respective program outside the server.
 | `signing_key.invocation_rotation_interval` | Server | `30d` | scheduled change of the token key |
 | `run.queued_max_age` | Server | `48h` | the maximum age a run that has not started may reach |
 | `run.orphan_timeout` | Server | `15m` | without a heartbeat during an active run: `stale` |
-| `interaction.ack_timeout` | Server | `30s` | after that the card shows "not acknowledged" |
+| `interaction.ack_timeout` | Server | `30s` | after that the card shows "not acknowledged" (not built: V3-33) |
 | `command.autocomplete_timeout` | Server | `2500ms` | wait time for suggestions |
 | `command.autocomplete_max_choices` | Server | `25` | suggestions per answer |
 | `command.max_per_principal` | Server | `100` | commands per agent or app |
@@ -6048,16 +6076,16 @@ configuration of the respective program outside the server.
 | `runner.max_parallel_runs` | Runner | `4` | concurrent turns |
 | `runner.stream_log_retention` | Runner | `14d` | retention of the recordings |
 | `runner.turn_handover` | Runner | `false` | keeper, named pipe, launch handshake and handover at a restart (18.19.3 to 18.19.7); reports `turn_handover` |
-| `runner.wakes` | Runner | `false` | `bothy-wake`, condition checks, wake inputs, recovery and usage-window wake-ups (18.19.8 to 18.19.10); needs `runner.turn_handover`; reports `wakes` |
-| `runner.end_state` | Runner | `false` | the `STATE:` marker, the nudge and the note of 18.19.11 |
-| `runner.cli_bg_wait_ceiling` | Runner | empty | passed as `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` when set; empty means the CLI's built-in default (18.19.12) |
-| `runner.wake_check_interval` | Runner | `60s` | interval of the checks of a pending `pr_checks` or `command` wake-up; failures back off up to `runner.wake_check_backoff_max` (18.19.8); above zero |
-| `runner.wake_check_backoff_max` | Runner | `10m` | longest wait between two checks of a wake-up after failures in a row (18.19.8, issue 567); at least `runner.wake_check_interval` |
-| `runner.wake_check_timeout` | Runner | `5m` | time limit of one `command` check or `gh` read (18.19.8); above zero |
-| `runner.wake_checks_max_parallel` | Runner | `2` | checks of wake-ups running at once (18.19.8); at least `1` |
-| `runner.wake_check_failures` | Runner | `10` | failures in a row after which a check wake-up ends `failed` with a note and a notification (18.19.8); at least `1` |
-| `runner.wake_result_max_bytes` | Runner | `4096` | longest result text of a fired check (18.19.8) |
-| `runner.wake_request_timeout` | Runner | `30s` | longest wait of `bothy-wake` for the runner's answer (18.19.8) |
+| `runner.wakes` | Runner | `false` | `bothy-wake`, condition checks, wake inputs, recovery and usage-window wake-ups (18.19.8 to 18.19.10); needs `runner.turn_handover`; reports `wakes`; not built yet (AR-05), the runner refuses the key as unknown |
+| `runner.end_state` | Runner | `false` | the `STATE:` marker, the nudge and the note of 18.19.11; not built yet (AR-07), the runner refuses the key as unknown |
+| `runner.cli_bg_wait_ceiling` | Runner | empty | passed as `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` when set; empty means the CLI's built-in default (18.19.12); not built yet (AR-07), the runner refuses the key as unknown |
+| `runner.wake_check_interval` | Runner | `60s` | interval of the checks of a pending `pr_checks` or `command` wake-up; failures back off up to `runner.wake_check_backoff_max` (18.19.8); above zero; not built yet (AR-05), the runner refuses the key as unknown |
+| `runner.wake_check_backoff_max` | Runner | `10m` | longest wait between two checks of a wake-up after failures in a row (18.19.8, issue 567); at least `runner.wake_check_interval`; not built yet (AR-05), the runner refuses the key as unknown |
+| `runner.wake_check_timeout` | Runner | `5m` | time limit of one `command` check or `gh` read (18.19.8); above zero; not built yet (AR-05), the runner refuses the key as unknown |
+| `runner.wake_checks_max_parallel` | Runner | `2` | checks of wake-ups running at once (18.19.8); at least `1`; not built yet (AR-05), the runner refuses the key as unknown |
+| `runner.wake_check_failures` | Runner | `10` | failures in a row after which a check wake-up ends `failed` with a note and a notification (18.19.8); at least `1`; not built yet (AR-05), the runner refuses the key as unknown |
+| `runner.wake_result_max_bytes` | Runner | `4096` | longest result text of a fired check (18.19.8); not built yet (AR-05), the runner refuses the key as unknown |
+| `runner.wake_request_timeout` | Runner | `30s` | longest wait of `bothy-wake` for the runner's answer (18.19.8); not built yet (AR-05), the runner refuses the key as unknown |
 | `runner.attach_allowed_roots` | Runner | `["project", "thread_inbox", "runner_temp"]` | roots for answer attachments, by name only (18.10) |
 | `runner.attach_denied_patterns` | Runner | list in 18.10 | denied patterns for answer attachments; must contain the list of 18.10 |
 

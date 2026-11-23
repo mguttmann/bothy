@@ -7,6 +7,12 @@ tests to write first, the acceptance criteria and the report format. Order and d
 from the [plan](../PLAN.md) (section "Tickets" of each milestone); this index repeats them for
 the launcher.
 
+The way work lands on `main` is the one of [AGENTS.md](../../AGENTS.md) ("How work lands on
+`main`") and [CONTRIBUTING.md](../../CONTRIBUTING.md): a branch and a pull request, changelog and
+ruling fragments instead of direct entries. It takes precedence over older briefs and over
+section 3 of the plan where they say to merge locally, never to open a pull request, or to write
+into `CHANGELOG.md` or `docs/DECISIONS.md` directly.
+
 Briefs exist for milestone M1 (plan ticket M0-05) and for the milestones M2 to M8. By the
 owner's decisions of 2026-10-11, 2026-10-13 and 2026-10-14 the briefs of M2 to M8 are written
 before M1 closes, so that builds do not run out of work (D-W-100, D-W-114, D-W-120, D-W-124 and D-W-125 in

@@ -34,7 +34,7 @@ come from the core contract ([00](../spec/00-glossary.md), [03](../spec/03-data-
 | Revoke a grant | Revocation with an open connection across two nodes, cancellation of the active run. | [seq-4-revoke-grant.mmd](seq-4-revoke-grant.mmd) | [light](seq-4-revoke-grant.svg), [dark](seq-4-revoke-grant.dark.svg) |
 | Switch the backend mode | Switching to `personal` with step-up, I1 check, configured and reported mode at the adapter. | [seq-5-backend-mode.mmd](seq-5-backend-mode.mmd) | [light](seq-5-backend-mode.svg), [dark](seq-5-backend-mode.dark.svg) |
 | Push with extension | Push without content, the Notification Service Extension fetches the message through the API. | [seq-6-push-nse.mmd](seq-6-push-nse.mmd) | [light](seq-6-push-nse.svg), [dark](seq-6-push-nse.dark.svg) |
-| File upload | Upload session, upload directly or through a presigned URL, scan with clamd, thumbnail. | [seq-7-file-upload.mmd](seq-7-file-upload.mmd) | [light](seq-7-file-upload.svg), [dark](seq-7-file-upload.dark.svg) |
+| File upload | Upload session, upload through the server (the presigned mode is not built), scan with clamd, thumbnail. | [seq-7-file-upload.mmd](seq-7-file-upload.mmd) | [light](seq-7-file-upload.svg), [dark](seq-7-file-upload.dark.svg) |
 | Open a terminal | Step-up, `terminal.open` with SR10, I6 and SR12, terminal session token, Noise `NK` through the relay, PTY only after `start`. | [seq-8-open-terminal.mmd](seq-8-open-terminal.mmd) | [light](seq-8-open-terminal.svg), [dark](seq-8-open-terminal.dark.svg) |
 
 ### Data model (ERD, from 03-data-model.md, split by module)

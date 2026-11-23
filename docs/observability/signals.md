@@ -50,6 +50,12 @@ processes or to detect a missing one (M1-68).
 
 ## 4. Metrics
 
+The catalogue has no metrics of the process, the host or the containers: no CPU, memory,
+goroutines or garbage collection of the server, the collector has neither `hostmetrics` nor
+`docker_stats`, and no dashboard has such a panel. Memory leaks, saturation, OOM kills and restart
+loops of `api` and `worker` show only indirectly (`BothyServerTelemetryMissing`, the SLO alerts).
+They are plan row V3-24.
+
 ### 4.1 REST and gateway
 
 | Name | Type | Unit | Attributes | Source | Prometheus |
@@ -245,6 +251,9 @@ compares `le` in the SLO files with this table.
    parent context of its `invoke_agent` span and passes it on to the runtime as the environment
    variable `TRACEPARENT`. Claude Code reads `TRACEPARENT` in `-p` and in the Agent SDK
    (https://code.claude.com/docs/en/monitoring-usage, retrieved 2026-10-10) [verified].
+   Built is the server part: the envelope carries `trace_context`. The adapter part is not built
+   (V3-23): neither SDK nor any adapter (the Claude Code runner, the Hermes adapter) uses
+   OpenTelemetry, reads `trace_context` or sets `TRACEPARENT`, so a trace ends at the server.
 5. The fan-out is not a child of the request but its own trace with a link to it.
 
 ### 5.2 Spans
@@ -265,7 +274,8 @@ compares `le` in the SLO files with this table.
 | `invoke_agent <gen_ai.agent.name>` | CLIENT | adapter (SDK) | `gen_ai.*` from section 6, `bothy.run.id` |
 | `execute_tool <gen_ai.tool.name>` | INTERNAL | adapter (SDK) | `gen_ai.tool.name`, `bothy.outcome` |
 
-A span never lives longer than one operation. A WebSocket connection is not a span.
+The two spans of the adapter (SDK) are not built (V3-23, 5.1 item 4); every other span of
+this table comes from the server. A span never lives longer than one operation. A WebSocket connection is not a span.
 
 ### 5.3 Attributes in spans and logs
 
@@ -315,7 +325,8 @@ This list equals the allowlist in [infra/otel/collector.yaml](../../infra/otel/c
    "anthropic"` applies (https://github.com/open-telemetry/semantic-conventions-genai, retrieved
    2026-10-10) [verified].
 2. Per code base there is exactly one package with all `gen_ai.*` keys: in the server
-   `internal/platform/otel/genai` (02, PLAN W8), in the SDKs a module `telemetry.genai`. The rest
+   `internal/platform/otel/genai` (02, PLAN W8), in the SDKs a module `telemetry.genai` (not built,
+   V3-23). The rest
    of the code uses only its constants. The package names the state of the convention: repository,
    status and retrieval date, plus the commit as soon as a ticket with network access has read it. The
    commit was not recorded during planning [open].
@@ -346,6 +357,6 @@ stdout stays as a fallback.
 | Flow | Signals |
 |---|---|
 | Send a message | span `POST /api/v1/threads/{id}/messages` with DB spans; `bothy.event.appended`, `bothy.db.event_seq.lock_wait`; span `event.fanout` with link; `bothy.delivery.duration` per recipient |
-| Agent run | as above, plus `agent.dispatch`, at the adapter `invoke_agent` (child of `trace_context`), runtime spans below it; `bothy.run.start.latency`, `bothy.run.steps`, `bothy.run.duration`, `bothy.run.tokens`, `bothy.run.cost` |
+| Agent run | as above, plus `agent.dispatch`, at the adapter `invoke_agent` (child of `trace_context`), runtime spans below it (the adapter and runtime spans are not built, V3-23); `bothy.run.start.latency`, `bothy.run.steps`, `bothy.run.duration`, `bothy.run.tokens`, `bothy.run.cost` |
 | Push | span `push.send` in the trace of the fan-out; `bothy.push.sent`; later `bothy.push.fetch` when the app fetches |
 | Reconnect | span `gateway.connect`, `gateway.catchup`; `bothy.gateway.connect.duration`, `bothy.gateway.catchup.duration`, if needed `bothy.gateway.resync` |

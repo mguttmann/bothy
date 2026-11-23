@@ -162,6 +162,20 @@ SCHEMA = [
 ]
 
 
+# The roadmap of a fixture repository: no milestone is closed, so no rule of PLANNED is stale.
+ROADMAP = """# Roadmap
+
+| Milestone | Content | Status |
+|---|---|---|
+| M0 Planning | Specification | done |
+| M1 Foundation | Server core | in progress: the core is open |
+| M2 Agent platform | Adapters | planned |
+| M3 Platform services | Files | planned |
+| A1 Built-in agents | Agents | planned |
+| V3 Expansion | Later | later |
+"""
+
+
 def write_repo(
     root: Path,
     *,
@@ -171,6 +185,7 @@ def write_repo(
     retired: str = RETIRED,
     compose: str = COMPOSE,
     reference: str = REFERENCE,
+    roadmap: str = ROADMAP,
     extra: dict[str, str | bytes] | None = None,
 ) -> Path:
     """Write a fixture repository with the layout of the real one and track every file in git.
@@ -190,6 +205,7 @@ def write_repo(
     files["tools/configdoc/retired.yaml"] = retired
     files["infra/compose/compose.yaml"] = compose
     files["docs/operations/configuration.md"] = reference
+    files["docs/roadmap.md"] = roadmap
     files.update(extra or {})
     for rel, content in files.items():
         path = root / rel
@@ -729,6 +745,39 @@ def test_stale_planned_rule_fails(tmp_path: Path) -> None:
         "config-doc: tools/configdoc/planned.yaml:15: D6: rule 'server.role' gives the milestone of"
         " no planned key (stale); remove it",
     ]
+
+
+def test_rule_of_a_built_milestone_fails(tmp_path: Path) -> None:
+    """A planned key whose milestone the roadmap lists as built is a finding (config-devex-4)."""
+    roadmap = ROADMAP.replace("| Adapters | planned |", "| Adapters | built |")
+    root = write_repo(tmp_path, roadmap=roadmap)
+    assert [f for f in findings(root) if ": D6: " in f] == [
+        "config-doc: tools/configdoc/planned.yaml:5: D6: rule 'agent.' names M2, which"
+        " docs/roadmap.md lists as done or built; give the key its place, a ticket of an open"
+        " milestone, or remove it",
+    ]
+
+
+def test_rule_of_a_milestone_in_progress_passes(tmp_path: Path) -> None:
+    """Only the first word of the status counts: `in progress: ...` keeps the milestone open."""
+    planned = PLANNED.replace("milestone: M2\n", "milestone: M1\n", 1)
+    root = written(write_repo(tmp_path, planned=planned))
+    assert not [f for f in findings(root) if ": D6: " in f]
+
+
+def test_closed_milestones_reads_the_real_roadmap() -> None:
+    """The parser finds the closed milestones of the real roadmap, and none of the open ones."""
+    text = (configdoc.REPO / "docs" / "roadmap.md").read_text(encoding="utf-8")
+    closed = configdoc.closed_milestones(text)
+    assert "M1" in closed
+    assert not closed & {"V2", "V3"}
+
+
+def test_missing_roadmap_is_an_input_error(tmp_path: Path) -> None:
+    root = write_repo(tmp_path)
+    (root / "docs" / "roadmap.md").unlink()
+    with pytest.raises(configdoc.InputError, match=r"docs/roadmap\.md: no such file"):
+        configdoc.evaluate(configdoc.Paths(root))
 
 
 def test_exact_rule_beats_prefix(tmp_path: Path) -> None:

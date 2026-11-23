@@ -6,8 +6,8 @@ checklist of exit criterion 3 of milestone M5 (PLAN 11): every rule of
 phone screen of M5 on iOS with VoiceOver and on Android with TalkBack, each with how it is
 checked. The desktop app has its own page,
 [accessibility-checklist.md](accessibility-checklist.md), with the same columns. M5-13 checked
-the terminal screens M8 and M9; the live views M10 are checked by M6-16 and have their rows
-below with that state.
+the terminal screens M8 and M9; the page M10 Live has its rows below, open: M6-16 built the live
+views without checking the phone page (V3-43).
 
 ## How to read this page
 
@@ -347,15 +347,15 @@ Mentions, Search, the Me page with the tab bar, every settings section on the ph
 
 | Rule of 01 section 8 | Where | Platform | Automated evidence | State | Manual pass |
 |---|---|---|---|---|---|
-| Contrast (text 4.5:1, controls 3:1) | the views of `bothy_viz` in the density `touch` | iOS, Android |  | not applicable here: M6-16 checks the live views | VoiceOver, TalkBack |
-| Screen reader: role and name | the views of `bothy_viz` in the density `touch` | iOS, Android |  | not applicable here: M6-16 checks the live views | VoiceOver, TalkBack |
-| Live content | the views of `bothy_viz` in the density `touch` | iOS, Android |  | not applicable here: M6-16 checks the live views | VoiceOver, TalkBack |
-| Font size to 200 percent | the views of `bothy_viz` in the density `touch` | iOS, Android |  | not applicable here: M6-16 checks the live views | VoiceOver, TalkBack |
-| Focus order | the views of `bothy_viz` in the density `touch` | iOS, Android |  | not applicable here: M6-16 checks the live views | VoiceOver, TalkBack |
-| Targets (`density.target-min` of `touch`) | the views of `bothy_viz` in the density `touch` | iOS, Android |  | not applicable here: M6-16 checks the live views | VoiceOver, TalkBack |
-| Motion | the views of `bothy_viz` in the density `touch` | iOS, Android |  | not applicable here: M6-16 checks the live views | VoiceOver, TalkBack |
-| Color | the views of `bothy_viz` in the density `touch` | iOS, Android |  | not applicable here: M6-16 checks the live views | VoiceOver, TalkBack |
-| Language | the views of `bothy_viz` in the density `touch` | iOS, Android |  | not applicable here: M6-16 checks the live views | VoiceOver, TalkBack |
+| Contrast (text 4.5:1, controls 3:1) | the views of `bothy_viz` in the density `touch` | iOS, Android |  | open: the page `/live` has no run of `dsPhoneAccessibilityTests` and no platform audit; the views themselves are tested in `packages/bothy_viz` (V3-43) | VoiceOver, TalkBack |
+| Screen reader: role and name | the views of `bothy_viz` in the density `touch` | iOS, Android |  | open: the page `/live` has no run of `dsPhoneAccessibilityTests` and no platform audit; the views themselves are tested in `packages/bothy_viz` (V3-43) | VoiceOver, TalkBack |
+| Live content | the views of `bothy_viz` in the density `touch` | iOS, Android |  | open: the page `/live` has no run of `dsPhoneAccessibilityTests` and no platform audit; the views themselves are tested in `packages/bothy_viz` (V3-43) | VoiceOver, TalkBack |
+| Font size to 200 percent | the views of `bothy_viz` in the density `touch` | iOS, Android |  | open: the page `/live` has no run of `dsPhoneAccessibilityTests` and no platform audit; the views themselves are tested in `packages/bothy_viz` (V3-43) | VoiceOver, TalkBack |
+| Focus order | the views of `bothy_viz` in the density `touch` | iOS, Android |  | open: the page `/live` has no run of `dsPhoneAccessibilityTests` and no platform audit; the views themselves are tested in `packages/bothy_viz` (V3-43) | VoiceOver, TalkBack |
+| Targets (`density.target-min` of `touch`) | the views of `bothy_viz` in the density `touch` | iOS, Android |  | open: the page `/live` has no run of `dsPhoneAccessibilityTests` and no platform audit; the views themselves are tested in `packages/bothy_viz` (V3-43) | VoiceOver, TalkBack |
+| Motion | the views of `bothy_viz` in the density `touch` | iOS, Android |  | open: the page `/live` has no run of `dsPhoneAccessibilityTests` and no platform audit; the views themselves are tested in `packages/bothy_viz` (V3-43) | VoiceOver, TalkBack |
+| Color | the views of `bothy_viz` in the density `touch` | iOS, Android |  | open: the page `/live` has no run of `dsPhoneAccessibilityTests` and no platform audit; the views themselves are tested in `packages/bothy_viz` (V3-43) | VoiceOver, TalkBack |
+| Language | the views of `bothy_viz` in the density `touch` | iOS, Android |  | open: the page `/live` has no run of `dsPhoneAccessibilityTests` and no platform audit; the views themselves are tested in `packages/bothy_viz` (V3-43) | VoiceOver, TalkBack |
 
 ## M8 Terminal and M9 Hosts
 

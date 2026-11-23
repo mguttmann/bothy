@@ -17,6 +17,7 @@ flowchart LR
         AV["Virus scanner<br/>Unix socket"]
         OTC["OTel Collector"]
         SP["Secret provider<br/>signing keys, pepper"]
+        BAK["Backup service bothy-backupd<br/>pgBackRest repository, dumps"]
     end
 
     subgraph Z4["Zone 4: Agents (semi-trusted)"]
@@ -40,6 +41,8 @@ flowchart LR
         PUSH["APNs, FCM, WNS"]
         LLM["LLM providers"]
         TEL["Telemetry backends"]
+        OFF[("Off-site backup target<br/>encrypted, append-only")]
+        CKS[("Audit checkpoint sink<br/>outside the database")]
     end
 
     subgraph Z7["Zone 7: Operations and supply chain"]
@@ -56,6 +59,9 @@ flowchart LR
     SRV -. "reads at startup" .-> SP
     SRV -- "OTLP without contents" --> OTC
     OTC -- "TB7" --> TEL
+    DB -- "TB3: WAL over TLS, dumps" --> BAK
+    BAK -- "TB7: encrypted backup copies" --> OFF
+    SRV -- "TB7: signed audit checkpoints" --> CKS
     ADP -- "TB4: API token, WSS, invocation token" --> PRX
     ADP --> RT
     RT -- "TB5: prompts and contents" --> LLM

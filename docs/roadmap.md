@@ -22,7 +22,8 @@ Next steps:
    accounts.
 4. Built-in agents: create an agent inside Bothy, from a template or through a short interview,
    that runs on local Claude through the Claude Code runner, so trying Bothy needs no other agent
-   runtime ([design](design/builtin-agents.md)).
+   runtime ([design](design/builtin-agents.md)). The server, runner and app parts are on `main`;
+   the end to end test and the operator guide (A1-10) are open.
 
 | Milestone | Content | Status |
 |---|---|---|
@@ -35,7 +36,8 @@ Next steps:
 | M6 Console, statistics and visualization | Web console for management, statistics and terminal; live topology, backend view, delivery live, executive page, timeline and TV mode from own measurement ([chapter 25](spec/25-visualization.md)); the visualization packages are built as a track already after M1 | built |
 | M7 Operations, release and showcase | Backup and restore with test, privacy flows, status page, signing, auto-update, portability, Grafana panel plugin "Bothy Live", demo instance, images and video | built |
 | M8 Migration | Import from Discord, switchover channel by channel | built |
-| A1 Built-in agents | Agents created in the apps from generic templates or an interview, hosted by the Claude Code runner with their own instructions, skills and MCP servers; off until a runner turns hosting on ([design](design/builtin-agents.md)) | planned |
+| A1 Built-in agents | Agents created in the apps from generic templates or an interview, hosted by the Claude Code runner with their own instructions, skills and MCP servers; off until a runner turns hosting on ([design](design/builtin-agents.md)) | in progress: A1-01 to A1-09 are on `main`; A1-10 (end to end test and operator guide) is open |
+| AR Autonomous runs | Wake-ups that survive the agent process and the runner, turn handover on a runner restart, recovery runs and continuation at the reset of the usage window ([design](design/autonomous-runs.md)) | in progress: AR-01 to AR-04 and AR-08 are on `main`; AR-05 to AR-07, AR-09 and AR-10 are open |
 | V1 Publication | Repository public, checklist [public-switch](quality/public-switch.md) | in progress: the repository is public; enable list, external test, placeholders, checklist and name are open |
 | V2 Multi-user development environment | Isolated development environments per person with their own terminal ([chapter 21](spec/21-dev-isolation.md)) | later |
 | V3 Expansion | Features that [chapter 01](spec/01-product.md) lists as "later" | later |

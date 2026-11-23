@@ -109,7 +109,8 @@ below are the planned procedure for that case.
 timeline of the database changed without a restore ([16-operations.md](../spec/16-operations.md) 8.4).
 
 1. Ask the provider whether the failover can have lost committed transactions. When it cannot
-   (synchronous replication, documented by the provider): `docker compose stop api worker`, run
+   (synchronous replication, documented by the provider): `docker compose stop api worker`
+   (profile `tailscale`: `api-tailscale` instead of `api`), run
    a backup (`docker compose exec backup bothy-backupd backup logical`), save the manifest of that
    run (`backup_runs.manifest` of that run, selected by its `id`; the command is in
    [backup-restore.md](backup-restore.md#11-state-of-the-runs)) as `manifest.json` next to the Compose file and run
@@ -117,9 +118,9 @@ timeline of the database changed without a restore ([16-operations.md](../spec/1
    written since the backup, so the facts match, the new identity is stored and the epoch stays.
    For such a service, `database.restore_guard = off` keeps the server ready across future
    failovers and R-SY-04 remains.
-2. When it can, or when unsure: treat it like a restore. `docker compose stop api worker`,
-   `docker compose run --rm restore` (deletion journal, new epoch, cursors to `head_seq`),
-   then start the services; clients reload and keep their outbox.
+2. When it can, or when unsure: treat it like a restore. `docker compose stop api worker`
+   (profile `tailscale`: `api-tailscale` instead of `api`), `docker compose run --rm restore`
+   (deletion journal, new epoch, cursors to `head_seq`), then start the services; clients reload and keep their outbox.
 
 ## 4. After each case
 

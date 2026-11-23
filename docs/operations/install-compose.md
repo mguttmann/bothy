@@ -21,7 +21,7 @@ follows the manual path.
 | Disk | according to the model in [16-operations.md](../spec/16-operations.md) 13 |
 | Network | egress to push services, OIDC provider, off-site target, ClamAV signatures |
 | Edge | a reverse proxy with TLS (profile `direct`) or a tailnet (profile `tailscale`) |
-| Off-site target | S3 bucket with Object Lock or SFTP with append-only access |
+| Off-site target | S3-compatible bucket with Object Lock (`s3:https://...`, [backup-restore.md](backup-restore.md) 2); SFTP is not supported |
 
 ### 1.1 One command: setup wizard
 
@@ -138,6 +138,10 @@ docker compose up -d
 Order that Compose enforces: `secrets-init` (once), `postgres`, `migrate`
 (once; allowed on the empty database without a backup), then `api`, `worker`, `backup`,
 `otel-collector` and the profiles.
+
+The API service is `api` in the profile `direct` and `api-tailscale` in the profile `tailscale`
+(`compose.yaml`). The commands of this guide and of the other guides write `api`; with the
+profile `tailscale` write `api-tailscale` in its place, also in `docker compose stop api worker`.
 
 First owner (only via a server command, Baseline 3):
 

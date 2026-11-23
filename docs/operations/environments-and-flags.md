@@ -20,10 +20,13 @@ are the same.
 
 | Effect | `dev` | `staging` | `prod` |
 |---|---|---|---|
-| HTTP without TLS on loopback for clients | allowed | no | no |
-| Banner in the apps | "Dev" | "Staging" | none |
 | `deployment.environment.name` in telemetry | `dev` | `staging` | `prod` |
-| Seed commands (`bothy dev seed`) | allowed | no | no |
+
+That is the only effect that is built (`internal/platform/otel`). No check of the server, no
+relaxation and no command depends on the value, so `prod` enforces nothing that `dev` does not.
+A banner "Dev" or "Staging" in the apps is not built: discovery and `getInstance` do not carry
+the environment (plan row V3-35). Test data for an empty instance comes from
+`bothy setup demo` in any environment ([16-operations.md](../spec/16-operations.md) 16).
 
 A missing off-site target is reported the same way in every environment: `bothy config check`
 and the start log of `bothy-backupd` warn "local backup only"

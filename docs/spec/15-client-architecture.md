@@ -17,7 +17,25 @@ ADR 0030 (design tokens), ADR 0044 (branding).
    database and from short-lived in-memory stores. The network writes into the database;
    the interface follows. That gives one path for online, offline and catch-up.
 3. **Every write goes through the outbox** with its own ID ([04](04-sync-protocol.md)
-   section 13.2). There is no second, "fast" write path.
+   section 13.2). There is no second, "fast" write path. One class of writes is the exception:
+   steps that need the server's answer while the person waits, because a later step or the
+   dialog depends on it or the action needs a step-up. They run online only, as direct calls of
+   the API client with an `Idempotency-Key`, and show their failure in the dialog that started
+   them. Members of this class are among others: the administration screens of `admin_ui`
+   (section 3), the steps of "New project" (`createChannel`, `putProjectBinding`,
+   `setChannelOperator`, `createGrant`;
+   [decisions.d/M4-43.md](../decisions.d/M4-43.md), D-M4-43-1) and the rename of a project forum
+   (`updateChannel`, M4-44), deleting and restoring a space, project or chat
+   ([decisions.d/FEAT-delete-spaces-chats.md](../decisions.d/FEAT-delete-spaces-chats.md)),
+   changing the own language and time zone (`updateMyProfile`) and asking for a transcript
+   (`requestTranscription`), the team of a channel (`enableChannelTeam`, `disableChannelTeam`,
+   `addTeamMember`, `removeTeamMember`, `stopChannelTeam` and its `createChannel`; D-TEAM-APP-2),
+   the readiness steps of a project (`setChannelOperator`, `putProjectBinding`) and the request
+   for a data export (`createGdprRequest`). The list is not held by a check; a ticket that adds
+   such a write names it here. Calls that concern only the device or a connection
+   (`createFileTicket`, `createExtensionSession`, `registerPush`, `unregisterPush`,
+   `openTerminalSession`, `closeTerminalSession`) are no writes of shared data and are not in
+   this class.
 4. **One code base, native only where the system requires it.** Flutter for all interfaces; Swift,
    Kotlin and C++ only for extensions and system services (Notification Service Extension, Share
    Extension, push service, notification area, keys in secure storage, auto-update).

@@ -222,9 +222,13 @@ generated column, redact the payloads of the related events (forms in 04, sectio
 2.2), event `message.deleted`. Afterwards:
 
 - Clients remove the message from the cache and the search index on the event.
-- Agent adapters receive `message.deleted` and must remove the message in their runtime where
-  possible (contract in [09-agents.md](09-agents.md)). What an LLM provider has already
-  processed, the provider deletes according to its periods (section 6).
+- Agent runtimes: the deletion does not reach them. [09-agents.md](09-agents.md) has no
+  contract for it, and neither the reference adapters (Claude Code runner, Hermes adapter) nor
+  the SDKs act on `message.deleted`. What a runtime received stays there (for the runner its run
+  files and the session transcripts of the CLI, see 4.2a); whoever runs the runtime sets the
+  periods there (4.7). A contract and its implementation in the runner are plan row V3-39.
+  What an LLM provider has already processed, the provider deletes according to its periods
+  (section 6).
 - Entry in the deletion journal (4.6), from the event `message.deleted`.
 
 ### 4.2a Deleting a space, channel or chat
@@ -399,7 +403,7 @@ How it is built (M7-07, docs/decisions.d/M7-07.md D-M7-07-1 to D-M7-07-10):
 | Place | Rule |
 |---|---|
 | Client caches | deletion on `message.deleted`, `access.changed` with `removed`, revocation (`4012`), after `client.cache_max_age` unused (04) |
-| Agent runtimes | receive deletion events; whoever runs the runtime is responsible for storage in the runtime; list them as separate recipients in the record |
+| Agent runtimes | no deletion reaches them (4.2); whoever runs the runtime is responsible for storage and periods in the runtime; list them as separate recipients in the record |
 | LLM providers | periods of the provider; example Anthropic API: inputs and outputs deleted "within 30 days", for policy violations up to 2 years (https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data, retrieved 2026-10-10 [verified]) |
 | Push services | no contents (ADR 0031) |
 | Telemetry backends | no contents; period in the backend |
@@ -527,13 +531,15 @@ The owner rectifies other data; a `rectification` request documents that.
 
 ## 8. Notice obligations
 
-- **Information for data subjects** (Art. 13 GDPR): the instance operator provides it. The console has
-  a field for a link (`privacy.notice_url`); apps show it at the first login and in
-  the settings.
+- **Information for data subjects** (Art. 13 GDPR): the instance operator provides it. Planned,
+  not built (plan row V3-30): the console has a field for a link (`privacy.notice_url`); apps
+  show it at the first login and in the settings. Until then the operator gives the information
+  through their own channels.
 - **AI notice:** agent messages always carry a visible badge (19, SEC-OUT-3); it cannot be
-  turned off. At the first contact with an agent in a channel the app shows once:
-  "Agent replies can be wrong. Check important information." (`privacy.ai_notice_enabled`,
-  text adjustable through branding). Basis: Anthropic obliges customers to tell users
+  turned off. Planned, not built (plan row V3-30): at the first contact with an agent in a
+  channel the app shows once: "Agent replies can be wrong. Check important information."
+  (`privacy.ai_notice_enabled`, text adjustable through branding). Until then the badge is the
+  only notice in the product, and the operator tells the people. Basis: Anthropic obliges customers to tell users
   that outputs are not reliable without review (Commercial Terms, section D.3,
   https://www.anthropic.com/legal/commercial-terms, retrieved 2026-10-10 [verified]).
 - **Transparency under the AI Act:** Art. 50 of Regulation (EU) 2024/1689 requires that people
@@ -637,5 +643,5 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 | `privacy.telemetry_pseudonym_rotation` | `30d` | rotation of the key for pseudonymous IDs in telemetry |
 | `privacy.per_person_stats_enabled` | `false` | statistics per person |
 | `privacy.stats_min_group_size` | `5` | smallest group for evaluations by persons |
-| `privacy.ai_notice_enabled` | `true` | one-time AI notice per channel with an agent |
-| `privacy.notice_url` | empty | link to the privacy information of the instance operator |
+| `privacy.ai_notice_enabled` | `true` | one-time AI notice per channel with an agent (not built: V3-30) |
+| `privacy.notice_url` | empty | link to the privacy information of the instance operator (not built: V3-30) |

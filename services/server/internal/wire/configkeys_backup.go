@@ -28,10 +28,10 @@ var backupScheduleKeys = []string{keyBackupPGFullSchedule, keyBackupPGDiffSchedu
 
 // backupConfigKeys returns the keys of the backup service bothy-backupd (M7-02) from
 // docs/spec/16-operations.md "Configuration values of this chapter". backup.pg.archive_timeout is
-// set by the PostgreSQL image (M7-01); backup.max_age, backup.restore_test.max_age and
-// dr.rpo_target are read by the alert rules only and stay planned until a consumer in the server
-// reads them. The restore test (M7-03) reads backup.restore_test.schedule, sample_files,
-// sample_threads and dr.rto_target.
+// set by the PostgreSQL image (M7-01, place "Database image" of the chapter table);
+// backup.max_age, backup.restore_test.max_age and dr.rpo_target are values of the alert rules
+// (place "Alert rules") and no key of the server. The restore test (M7-03) reads
+// backup.restore_test.schedule, sample_files, sample_threads and dr.rto_target.
 func backupConfigKeys() []config.Key {
 	return []config.Key{
 		{Name: keyBackupPGFullSchedule, Kind: config.KindString, Default: "0 2 * * 0", Chapter: chapter16,

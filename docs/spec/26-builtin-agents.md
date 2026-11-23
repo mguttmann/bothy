@@ -1,7 +1,7 @@
 # 26 Built-in agents
 
-Status: normative. Stage "A1 Built-in agents" ([PLAN](../PLAN.md) section 21): the tickets A1-01
-to A1-09 are on `main`, A1-10 is open. Normative for agents
+Status: normative, built (A1-01 to A1-09), planned (A1-10). Stage "A1 Built-in agents"
+([PLAN](../PLAN.md) section 21). Normative for agents
 that a person creates inside Bothy and that a Claude Code runner hosts: the hosting, the agent
 definition, its materialization in the runner, the interview, the templates and their gate, and the
 creation and editing flow in the apps. Decision:
