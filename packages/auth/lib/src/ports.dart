@@ -28,7 +28,9 @@ abstract interface class DeviceKeySigner {
   /// form of the signature: `R || S` with 32 bytes each for ES256 (RFC 7518 3.4), never DER.
   ///
   /// A step-up key asks the operating system for biometrics or the device PIN here; a refused
-  /// or cancelled confirmation throws (the step-up flow maps it to `StepUpCancelled`).
+  /// or cancelled confirmation throws (the step-up flow maps any error that is not an
+  /// `AuthException` to `StepUpCancelled`; an `AuthException` such as `StepUpUnavailable` for an
+  /// invalidated key passes as it is).
   Future<Uint8List> sign(Uint8List signingInput);
 }
 

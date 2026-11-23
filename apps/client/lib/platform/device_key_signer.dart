@@ -168,9 +168,30 @@ final class DeviceKeySignerAdapter implements DeviceKeySigner {
   @override
   String get thumbprint => _info.thumbprint;
 
+  /// Signs [signingInput]. A step-up confirmation the person cancels is [StepUpCancelled], and
+  /// one whose key was invalidated (new biometrics) is [StepUpUnavailable], so the step-up
+  /// says what happened instead of a network error; other failures pass as they are.
   @override
-  Future<Uint8List> sign(Uint8List signingInput) =>
-      _client.sign(_scope, _purpose, signingInput, prompt: _prompt?.call());
+  Future<Uint8List> sign(Uint8List signingInput) async {
+    try {
+      return await _client.sign(
+        _scope,
+        _purpose,
+        signingInput,
+        prompt: _prompt?.call(),
+      );
+    } on dk.DeviceKeyException catch (e) {
+      if (_purpose != dk.KeyPurpose.stepUp) rethrow;
+      switch (e.code) {
+        case dk.DeviceKeyError.userCancelled:
+          throw const StepUpCancelled();
+        case dk.DeviceKeyError.keyInvalidated:
+          throw const StepUpUnavailable();
+        case dk.DeviceKeyError.notAvailable || dk.DeviceKeyError.internal:
+          rethrow;
+      }
+    }
+  }
 }
 
 /// A device key of the stored session is gone, is another key or no longer signs (08 5.4):
