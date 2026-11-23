@@ -106,6 +106,8 @@ GATE_COMPONENT_INPUTS: dict[str, tuple[str, ...]] = {
         "docs/spec/11-extensions.md",
         "docs/spec/23-quality.md",
         "docs/operations/configuration.md",
+        # The panel's timeline speeds and budget ratio are held to chapter 25 (AUD-P9I/5).
+        "docs/spec/25-visualization.md",
         "infra/observability/grafana/dashboards/bothy-live.json",
         "infra/compose/compose.yaml",
         "infra/compose/.env.example",

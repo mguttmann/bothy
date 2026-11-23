@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The scenario world's waits: a wait that runs out names what the runner and Fake-Claude did.
 
 A scenario that hangs in CI cannot be run again with a debugger, so the error of the wait is the
