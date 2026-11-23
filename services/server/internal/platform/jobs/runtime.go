@@ -60,8 +60,9 @@ type Config struct {
 	// SoftStopTimeout is shutdown.jobs_soft_timeout: how long Stop lets running jobs finish
 	// before their contexts are cancelled.
 	SoftStopTimeout time.Duration
-	// Logger receives River's log lines and the panic lines of the handler wrapper; nil means
-	// slog.Default(). The server logger keeps only catalogue attributes (signals.md "Logs").
+	// Logger receives River's log lines (Info lowered to Debug, README.md "Logs") and the lines of
+	// the handler wrapper; nil means slog.Default(). The server logger keeps only catalogue
+	// attributes (signals.md "Logs").
 	Logger *slog.Logger
 	// StatementTimeout is database.statement_timeout: it bounds the count query of bothy.job.queue
 	// (0 means no bound of its own).
@@ -299,7 +300,7 @@ func (rt *Runtime) riverConfig(periodic []PeriodicJob, d workerDeps) (*river.Con
 		}
 	}
 	rc := &river.Config{
-		Logger:  rt.log,
+		Logger:  newRiverLogger(rt.log),
 		Schema:  rt.cfg.Schema,
 		Workers: workers,
 		// bothy_app owns no index of River, so River's nightly REINDEX could only fail; the

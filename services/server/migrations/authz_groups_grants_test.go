@@ -103,6 +103,8 @@ func TestAuthzGroupsGrantsSchema(t *testing.T) {
 			},
 			indexes: []string{
 				"CREATE INDEX group_memberships_active_user_idx ON public.group_memberships USING btree (user_id) WHERE (removed_at IS NULL)",
+				// The rows authz.expiry_sweep still reports (00118, audit finding srv-authz-11).
+				"CREATE INDEX group_memberships_expiry_due_idx ON public.group_memberships USING btree (expires_at) WHERE ((removed_at IS NULL) AND (expires_at IS NOT NULL) AND (expiry_reported_at IS NULL))",
 				"CREATE INDEX group_memberships_expiry_idx ON public.group_memberships USING btree (expires_at) WHERE ((removed_at IS NULL) AND (expires_at IS NOT NULL))",
 				"CREATE UNIQUE INDEX group_memberships_active_key ON public.group_memberships USING btree (group_id, user_id) WHERE (removed_at IS NULL)",
 				"CREATE UNIQUE INDEX group_memberships_pkey ON public.group_memberships USING btree (id)",
@@ -159,6 +161,8 @@ func TestAuthzGroupsGrantsSchema(t *testing.T) {
 				"CREATE INDEX grants_active_target_channel_idx ON public.grants USING btree (target_channel_id) WHERE (revoked_at IS NULL)",
 				"CREATE INDEX grants_active_target_host_idx ON public.grants USING btree (target_host_id) WHERE (revoked_at IS NULL)",
 				"CREATE INDEX grants_active_target_space_idx ON public.grants USING btree (target_space_id) WHERE (revoked_at IS NULL)",
+				// The rows authz.expiry_sweep still reports (00117, audit finding srv-authz-11).
+				"CREATE INDEX grants_expiry_due_idx ON public.grants USING btree (expires_at) WHERE ((revoked_at IS NULL) AND (expires_at IS NOT NULL) AND (expiry_reported_at IS NULL))",
 				"CREATE INDEX grants_expiry_idx ON public.grants USING btree (expires_at) WHERE ((revoked_at IS NULL) AND (expires_at IS NOT NULL))",
 				"CREATE UNIQUE INDEX grants_pkey ON public.grants USING btree (id)",
 			},

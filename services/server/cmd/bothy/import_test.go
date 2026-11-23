@@ -23,7 +23,6 @@ func testImportDeps(t *testing.T, fake *bothytest.Server) (importDeps, string) {
 	return importDeps{
 		sessionPath: func() (string, error) { return path, nil },
 		hostname:    func() (string, error) { return "workstation", nil },
-		limits:      bothyapi.DefaultLimits(),
 		deps: bothyapi.Deps{Sleep: func(ctx context.Context, _ time.Duration) error {
 			fake.Approve()
 			return ctx.Err()
@@ -124,5 +123,59 @@ func TestImportLoginFailureIsExit1(t *testing.T) {
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Errorf("session file written: %v", err)
+	}
+}
+
+// TestImportLoginReadsToolConfig (22 19, audit finding fn-import-migration-11): login and logout
+// read the tool configuration like "bothy import discord": import.login_poll_interval from a
+// BOTHY_IMPORT__ variable or from --config sets the wait between two polls, and a configuration
+// that does not load is exit 2 before any request.
+func TestImportLoginReadsToolConfig(t *testing.T) {
+	for name, tc := range map[string]struct {
+		env  []string
+		file string
+		want time.Duration
+	}{
+		"environment": {env: []string{"BOTHY_IMPORT__LOGIN_POLL_INTERVAL=7s"}, want: 7 * time.Second},
+		"file":        {file: "import:\n  login_poll_interval: 9s\n", want: 9 * time.Second},
+	} {
+		t.Run(name, func(t *testing.T) {
+			fake := bothytest.New(t, bothytest.Options{})
+			deps, _ := testImportDeps(t, fake)
+			var waits []time.Duration
+			deps.deps.Sleep = func(ctx context.Context, d time.Duration) error {
+				waits = append(waits, d)
+				fake.Approve()
+				return ctx.Err()
+			}
+			deps.environ = func() []string { return tc.env }
+			args := []string{"login", "--server", fake.URL}
+			if tc.file != "" {
+				path := filepath.Join(t.TempDir(), "import.yaml")
+				if err := os.WriteFile(path, []byte(tc.file), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				args = append(args, "--config", path)
+			}
+			var out, errw bytes.Buffer
+			if code := importCommand(t.Context(), args, &out, &errw, deps); code != exitOK {
+				t.Fatalf("login = %d: %s", code, errw.String())
+			}
+			if len(waits) == 0 || waits[0] != tc.want {
+				t.Errorf("waits = %v, want the first %s", waits, tc.want)
+			}
+		})
+	}
+	fake := bothytest.New(t, bothytest.Options{})
+	deps, _ := testImportDeps(t, fake)
+	deps.environ = func() []string { return []string{"BOTHY_IMPORT__LOGIN_POLL_INTERVAL=never"} }
+	for _, args := range [][]string{{"login", "--server", fake.URL}, {"logout"}} {
+		var out, errw bytes.Buffer
+		if code := importCommand(t.Context(), args, &out, &errw, deps); code != exitUsage || !strings.Contains(errw.String(), "login_poll_interval") {
+			t.Errorf("%v with a bad configuration = %d, want 2: %s", args, code, errw.String())
+		}
+	}
+	if n := len(fake.Requests()); n != 0 {
+		t.Errorf("requests = %d, want 0", n)
 	}
 }

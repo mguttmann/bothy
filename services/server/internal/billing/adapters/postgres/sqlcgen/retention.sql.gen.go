@@ -47,7 +47,7 @@ func (q *Queries) DeletePrice(ctx context.Context, arg DeletePriceParams) (int64
 
 const expiredCostEntries = `-- name: ExpiredCostEntries :many
 
-SELECT id FROM cost_entries WHERE occurred_at < $1 ORDER BY occurred_at DESC, id LIMIT $2
+SELECT id FROM cost_entries WHERE occurred_at < $1 ORDER BY occurred_at DESC, id DESC LIMIT $2
 `
 
 type ExpiredCostEntriesParams struct {
@@ -59,7 +59,10 @@ type ExpiredCostEntriesParams struct {
 // The participant of class cost (M7-05, docs/spec/20-privacy.md 2 and 4.1): cost entries after
 // occurred_at and closed price rows after valid_to; an open price row (valid_to NULL) has no end
 // time. Cost entries go newest first, so a correction goes before the entry it supersedes
-// (supersedes_id ON DELETE RESTRICT); an entry a kept correction still names stays with it.
+// (supersedes_id ON DELETE RESTRICT); an entry a kept correction still names stays with it. A
+// correction copies occurred_at of the entry it supersedes and has a newer ID (UUIDv7, Reconcile),
+// so the ID goes newest first as well: otherwise a batch of one row would start a chain with the
+// referenced entry and stop there.
 func (q *Queries) ExpiredCostEntries(ctx context.Context, arg ExpiredCostEntriesParams) ([]pgtype.UUID, error) {
 	rows, err := q.db.Query(ctx, expiredCostEntries, arg.Cutoff, arg.RowLimit)
 	if err != nil {

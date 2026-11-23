@@ -31,6 +31,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -592,6 +593,48 @@ func TestVerificationKey_UnknownKidReloadsOncePerTTL(t *testing.T) {
 	e.clk.Advance(keyCfg.CacheTTL)
 	if _, err := b.VerificationKey(ctx, instance.PurposeInvocation, em.NewKID); err != nil {
 		t.Errorf("after signing_key.cache_ttl the new kid is unknown: %v", err)
+	}
+}
+
+// hangingKeys is a repository whose PublishedKeys waits for release after it reported entered.
+type hangingKeys struct {
+	app.KeyRepository
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (h hangingKeys) PublishedKeys(ctx context.Context) ([]app.KeyRow, error) {
+	h.entered <- struct{}{}
+	<-h.release
+	return h.KeyRepository.PublishedKeys(ctx)
+}
+
+// TestVerificationKey_WaiterHonorsItsContext: while a reload of the verification cache hangs on
+// the database, another caller whose context ends returns with that error instead of waiting.
+func TestVerificationKey_WaiterHonorsItsContext(t *testing.T) {
+	t.Parallel()
+	e := newKeysEnv(t)
+	h := hangingKeys{entered: make(chan struct{}, 1), release: make(chan struct{})}
+	k := e.keysWith(t, func(r app.KeyRepository) app.KeyRepository { h.KeyRepository = r; return h })
+	first := make(chan error, 1)
+	go func() {
+		_, err := k.VerificationKey(context.Background(), instance.PurposeInvocation, "kid")
+		first <- err
+	}()
+	<-h.entered
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	second := make(chan error, 1)
+	go func() {
+		_, err := k.VerificationKey(ctx, instance.PurposeInvocation, "kid")
+		second <- err
+	}()
+	if err := testkit.Receive(t, "the waiter whose context ended", second); !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("waiter: %v, want the deadline of its context", err)
+	}
+	close(h.release)
+	if err := <-first; errs.KindOf(err) != errs.KindNotFound {
+		t.Errorf("first caller: %v, want not_found", err)
 	}
 }
 

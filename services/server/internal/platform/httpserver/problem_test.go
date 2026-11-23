@@ -231,6 +231,29 @@ func TestProblem_HeadersOfError(t *testing.T) {
 	}
 }
 
+// TestProblem_EveryUnauthorizedHasChallenge holds RFC 9110 section 15.5.2: a 401 whose error names
+// no WWW-Authenticate gets one (step_up_required the RFC 9470 error), and an own one is kept.
+func TestProblem_EveryUnauthorizedHasChallenge(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		err  error
+		want string
+	}{
+		{errs.New(errs.CodeStepUpRequired, "").WithReason("password_locked"), `DPoP error="insufficient_user_authentication", algs="ES256 EdDSA"`},
+		{errs.New(errs.CodeSessionRevoked, ""), `DPoP algs="ES256 EdDSA"`},
+		{errs.New(errs.CodeTokenExpired, ""), `DPoP algs="ES256 EdDSA"`},
+		{errs.New(errs.CodeUnauthenticated, "").WithHeader("WWW-Authenticate", "Bearer"), "Bearer"},
+	} {
+		rec := problemFor(t, c.err)
+		if got := rec.Header().Values("WWW-Authenticate"); rec.Code != 401 || len(got) != 1 || got[0] != c.want {
+			t.Errorf("%v: %d WWW-Authenticate %q, want %q", c.err, rec.Code, got, c.want)
+		}
+	}
+	if rec := problemFor(t, errs.New(errs.CodeForbidden, "")); rec.Header().Get("WWW-Authenticate") != "" {
+		t.Errorf("403 with WWW-Authenticate %q", rec.Header().Get("WWW-Authenticate"))
+	}
+}
+
 func TestProblem_StandardErrorsMapped(t *testing.T) {
 	t.Parallel()
 	if rec := problemFor(t, &http.MaxBytesError{Limit: 10}); rec.Code != 413 || !strings.Contains(rec.Body.String(), "http.max_json_body_bytes") {

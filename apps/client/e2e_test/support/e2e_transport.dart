@@ -3,7 +3,7 @@
 // The gateway transport of the E2E apps: the `dart:io` WebSocket of a real build (as
 // `IoGatewayTransport` of sync_engine), recording what happened to each connection, so a failed
 // wait names the cause and the revocation flow can check the close code `4012` the server sent
-// (04 6.6). Each connection gets its own `HttpClient`, created through the overrides of
+// (04 6.4). Each connection gets its own `HttpClient`, created through the overrides of
 // e2e_network.dart: the shared client of `WebSocket.connect` may exist before the overrides (the
 // test runner of flutter-tester opens a WebSocket of its own first) and would then use neither
 // the test CA nor the tunnel.

@@ -379,6 +379,9 @@ func writeProblemWith(w http.ResponseWriter, r *http.Request, e *errs.Error, ext
 	for name, values := range e.Headers {
 		h[name] = append([]string(nil), values...)
 	}
+	if status == http.StatusUnauthorized && h.Get(headerWWWAuthenticate) == "" {
+		h.Set(headerWWWAuthenticate, defaultChallenge(code))
+	}
 	if retry := retryAfter(ctx, e); retry > 0 {
 		h.Set(headerRetryAfter, strconv.FormatInt(int64(math.Ceil(retry.Seconds())), 10))
 	}
@@ -387,6 +390,24 @@ func writeProblemWith(w http.ResponseWriter, r *http.Request, e *errs.Error, ext
 	h.Set(headerContentLength, strconv.Itoa(len(body)))
 	w.WriteHeader(status)
 	_, _ = w.Write(body)
+}
+
+// headerWWWAuthenticate is the challenge header of a 401; dpopAlgs the algorithms of a DPoP proof
+// it names (identity.DPoPAlgs, which this package does not import).
+const (
+	headerWWWAuthenticate = "WWW-Authenticate"
+	dpopAlgs              = "ES256 EdDSA"
+)
+
+// defaultChallenge is the WWW-Authenticate of a 401 whose error names none (RFC 9110 section
+// 15.5.2 asks for at least one challenge): step_up_required gets the error
+// insufficient_user_authentication of RFC 9470 section 3, every other code the bare DPoP scheme
+// with its algorithms, as identity answers a request without usable credentials.
+func defaultChallenge(code errs.Code) string {
+	if code == errs.CodeStepUpRequired {
+		return `DPoP error="insufficient_user_authentication", algs="` + dpopAlgs + `"`
+	}
+	return `DPoP algs="` + dpopAlgs + `"`
 }
 
 // retryAfter returns the Retry-After of e: its own value, or http.unavailable_retry_after for

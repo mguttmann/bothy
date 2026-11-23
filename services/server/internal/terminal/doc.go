@@ -5,7 +5,7 @@
 // tokens, the control connections of the host services and the relay of the streams. Other
 // modules import only this package (docs/spec/02-architecture.md, "Layers within a module").
 //
-// M2-39 builds the host records: the port Hosts with the five operations of the API group Hosts
-// and the registration of host.updated; the implementation of authz.HostSource lives in app.
-// Sessions and Relay come with M2-44.
+// The port Hosts holds the operations of the API group Hosts and the registration of
+// host.updated (hosts.go), the port Sessions the terminal sessions (sessions.go); the
+// implementation of authz.HostSource lives in app.
 package terminal

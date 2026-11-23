@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"slices"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -17,21 +18,40 @@ import (
 // no action) or a check of a referencing row that an ON DELETE SET NULL would break (23514).
 const classIntegrity = "23"
 
-// PurgeEach deletes the candidate rows of a retention participant (M7-05) in one short
-// transaction on p: each candidate with del in its own savepoint, so a row that a foreign key with
-// ON DELETE RESTRICT of a row in another table holds through a rule of another row (SQLSTATE class 23) is skipped and stays
-// until that row is gone, while the other candidates are deleted. Why per row: a participant
-// deletes only its own tables and never reads another module's table to find out which rows are
-// still referenced (03 principle 12); the database knows it. Any integrity violation counts:
-// besides the foreign keys, an ON DELETE SET NULL can break a check of the referencing row (a
-// completed device pairing keeps its device, M7-05 review).
+// purgeChunk is the most candidates PurgeEach deletes in one transaction. Every savepoint that
+// deletes a row takes a subtransaction ID, and a backend caches at most 64 of them per
+// transaction; beyond that every other session has to read pg_subtrans to check the visibility
+// of the transaction's rows. 32 stays well below the cache.
+const purgeChunk = 32
+
+// PurgeEach deletes the candidate rows of a retention participant (M7-05) in short transactions
+// on p of at most purgeChunk candidates each: each candidate with del in its own savepoint, so a
+// row that a foreign key with ON DELETE RESTRICT of a row in another table holds through a rule
+// of another row (SQLSTATE class 23) is skipped and stays until that row is gone, while the other
+// candidates are deleted. Why per row: a participant deletes only its own tables and never reads
+// another module's table to find out which rows are still referenced (03 principle 12); the
+// database knows it. Any integrity violation counts: besides the foreign keys, an ON DELETE SET
+// NULL can break a check of the referencing row (a completed device pairing keeps its device,
+// M7-05 review).
 //
 // It returns how many rows del removed. Errors: the transaction, and every error of del other
-// than a foreign key violation; then nothing of the batch is committed.
+// than an integrity violation; then nothing of the failed transaction is committed, while the
+// transactions before it stay committed and count. A rerun is safe: a deleted row is no longer a
+// candidate.
 func PurgeEach[T any](ctx context.Context, p *Pool, candidates []T, del func(ctx context.Context, q DBTX, c T) (int64, error)) (int, error) {
-	if len(candidates) == 0 {
-		return 0, nil
+	deleted := 0
+	for chunk := range slices.Chunk(candidates, purgeChunk) {
+		n, err := purgeChunkTx(ctx, p, chunk, del)
+		if err != nil {
+			return deleted, err
+		}
+		deleted += n
 	}
+	return deleted, nil
+}
+
+// purgeChunkTx deletes the candidates of one chunk in one transaction of p.
+func purgeChunkTx[T any](ctx context.Context, p *Pool, candidates []T, del func(ctx context.Context, q DBTX, c T) (int64, error)) (int, error) {
 	tx, err := p.Begin(ctx, pgx.TxOptions{})
 	if err != nil {
 		return 0, err

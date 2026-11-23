@@ -81,7 +81,9 @@ func TestFailedRoundWaitsAndContinues(t *testing.T) {
 	e, s, ctx := follower(t, func(call int, stop context.CancelFunc) {
 		switch call {
 		case 1:
-			e.discord.Inject(pathGuildChannels, discordtest.Status(http.StatusBadGateway))
+			// One more 5xx than the client retries (TestServerErrorRetried) fails the round.
+			e.discord.Inject(pathGuildChannels, discordtest.Status(http.StatusBadGateway), discordtest.Status(http.StatusBadGateway),
+				discordtest.Status(http.StatusBadGateway), discordtest.Status(http.StatusBadGateway))
 		case 2:
 			e.discord.AddMessage(fxGeneral, newMessage("13009001", e.clk.Now().Add(-time.Hour)))
 		case 4:
@@ -145,6 +147,11 @@ func TestLeaseFreshDuringLongBackoff(t *testing.T) {
 			if r.Path == pathGuildChannels {
 				n++
 			}
+		}
+		// A failed round sends the request 1 + 3 times (the client retries a 5xx three times,
+		// discord TestServerErrorRetried); n counts rounds from here on.
+		if n > 2 {
+			n = 2 + (n-2)/4
 		}
 		rounds[n] += cfg.FollowPollInterval
 		if rounds[n] > cfg.FollowMaxBackoff+cfg.FollowPollInterval || n > 8 {
@@ -569,5 +576,87 @@ func TestForumLeadBothyQuiet(t *testing.T) {
 	}
 	if strings.Contains(e.stdout.String(), noteAfterSwitch) {
 		t.Errorf("a quiet forum with lead bothy got the warning:\n%s", e.stdout.String())
+	}
+}
+
+// TestMirrorEndsOnRevokedToken (22 4.3 item 4, 10.3): a 401 of Discord in a round ends the mirror
+// with exit 2 and a released lease instead of a retry in the backoff of failed rounds.
+func TestMirrorEndsOnRevokedToken(t *testing.T) {
+	var e *testEnv
+	e, s, ctx := follower(t, func(call int, stop context.CancelFunc) {
+		switch call {
+		case 1:
+			e.discord.Always(pathGuildChannels, discordtest.Status(http.StatusUnauthorized))
+		case 4:
+			stop()
+		}
+	})
+	src := e.startSource(fixtureMapping)
+	if code := e.runCtx(ctx, "--guild", fxGuild, "--map", e.writeMap(fixtureMapping), "--apply", "--follow"); code != ExitUsage {
+		t.Fatalf("exit %d, want %d: %s", code, ExitUsage, e.stderr.String())
+	}
+	if len(s.waits) != 1 {
+		t.Errorf("waits %v: the mirror must end in the round after the first wait", s.waits)
+	}
+	if strings.Contains(e.stderr.String(), "mirror round failed") || !strings.Contains(e.stderr.String(), "401") {
+		t.Errorf("stderr: %s", e.stderr.String())
+	}
+	if _, held := e.bothy.SourceCursor(src)["run"]; held {
+		t.Error("the lease is still held after the 401")
+	}
+}
+
+// TestMirrorNotesNewChannel (22 12.2): a channel created in Discord after the start of the mirror is
+// not mirrored, and every round report says so.
+func TestMirrorNotesNewChannel(t *testing.T) {
+	var e *testEnv
+	e, _, ctx := follower(t, func(call int, stop context.CancelFunc) {
+		switch call {
+		case 1:
+			e.discord.Mutate(func(fx *discordtest.Fixture) {
+				fx.Channels = append(fx.Channels, json.RawMessage(`{"id": "13000199", "type": 0, "guild_id": "13000001", "name": "late", "position": 9, "permission_overwrites": []}`))
+			})
+		case 2:
+			stop()
+		}
+	})
+	e.startSource(fixtureMapping)
+	if code := e.runCtx(ctx, "--guild", fxGuild, "--map", e.writeMap(fixtureMapping), "--apply", "--follow"); code != ExitOK {
+		t.Fatalf("exit %d: %s", code, e.stderr.String())
+	}
+	if n := strings.Count(e.stdout.String(), noteNewChannels); n != 1 {
+		t.Errorf("the note on the new channel appears %d times, want once (second round only): %s", n, e.stdout.String())
+	}
+}
+
+// TestFullRunStopsAfterBatchOnSignal (22 7.4, audit finding srv-import-10): a stop request (SIGINT,
+// SIGTERM) during a full --apply run finishes the current batch, sends no further one, frees the
+// lease and ends with exit 1, so the next run resumes at once instead of waiting for
+// import.lease_stale_after.
+func TestFullRunStopsAfterBatchOnSignal(t *testing.T) {
+	e := newTestEnv(t, discordtest.BasicFixture(t))
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	var src string
+	atStop := -1
+	e.hook = func(n int) error {
+		if n == 1 {
+			atStop = len(e.bothy.Batches(src))
+			cancel()
+		}
+		return nil
+	}
+	src = e.startSource(fixtureMapping)
+	if code := e.runCtx(ctx, "--guild", fxGuild, "--map", e.writeMap(fixtureMapping), "--apply"); code != ExitAborted {
+		t.Fatalf("exit %d, want %d: %s", code, ExitAborted, e.stderr.String())
+	}
+	if n := len(e.bothy.Batches(src)); atStop < 1 || n != atStop {
+		t.Errorf("batches = %d, want %d (none after the one in flight at the stop)", n, atStop)
+	}
+	if _, held := e.bothy.SourceCursor(src)["run"]; held {
+		t.Error("the lease is still held after the stop")
+	}
+	if !strings.Contains(e.stderr.String(), "stopped by a signal") {
+		t.Errorf("stderr: %s", e.stderr.String())
 	}
 }

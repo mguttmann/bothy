@@ -52,3 +52,27 @@ func WorkInMaintenanceForTest(m *Maintenance) (ran, exempt bool, err error) {
 
 // ValidateForTest is Config.validate.
 func ValidateForTest(c Config) error { return c.validate() }
+
+// OutcomeOfForTest is outcomeOf.
+func OutcomeOfForTest(ctx context.Context, err error) string { return outcomeOf(ctx, err) }
+
+// failingHandler returns err, or panics when err is nil.
+type failingHandler struct{ err error }
+
+func (h failingHandler) Work(context.Context, Job[timeoutArgs]) error {
+	if h.err == nil {
+		panic("boom")
+	}
+	return h.err
+}
+
+// WorkFailingForTest runs one attempt of the kind jobs.timeout whose handler returns err (panics
+// for nil), as attempt of maxAttempts, logging to log.
+func WorkFailingForTest(log *slog.Logger, err error, attempt, maxAttempts int) error {
+	w := newWorker[timeoutArgs](failingHandler{err: err}, HandlerOptions{}, "jobs.timeout",
+		workerDeps{tracer: noop.NewTracerProvider().Tracer("test"), log: log})
+	return w.Work(context.Background(), &river.Job[timeoutArgs]{JobRow: &rivertype.JobRow{Attempt: attempt, MaxAttempts: maxAttempts}})
+}
+
+// RiverLoggerForTest is the logger River gets from a runtime with log.
+func RiverLoggerForTest(log *slog.Logger) *slog.Logger { return newRiverLogger(log) }

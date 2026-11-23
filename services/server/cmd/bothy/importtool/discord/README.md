@@ -40,10 +40,14 @@ Per call (22 4.3 items 1 to 4):
 3. A missing or unparsable wait counts as `import.discord.max_rate_wait`; a wait longer than that
    ends the call at once with `ErrRateWaitTooLong`.
 4. `401` (`ErrUnauthorized`) and `403` (`ErrForbidden`) are never retried. A `403` on a channel
-   ends every later call on that channel for the life of the `Client` (one run), except a `403`
+   ends every later call on that channel for the life of the `Client` (one run) or until
+   `NewRound`, which the read mirror calls at the start of every round, except a `403`
    on the private archived list.
 
-`5xx` (`ErrServer`) and transport errors are returned, not retried. Waits go through
+A `5xx` and a transport error (no answer, a body that broke off) are asked again up to three
+times after waits of 1 s, 2 s and 4 s (named values `transientRetries`, `transientWait`; every
+call is an idempotent `GET`); after that the `5xx` is `ErrServer` and the transport error is
+returned as it is. Waits go through
 `Deps.Sleep` and the clock `Deps.Clock`, so tests never wait. Each request is bounded by
 `import.http_timeout`.
 
@@ -83,7 +87,8 @@ closes (M8-04 uploads it). Rules:
   the attachment with the same ID gives the fresh link, and the fetch is tried exactly once
   more; a missing message or attachment or a second `403` or `404` is `ErrCDNGone`.
 - `429` waits `retry_after` or `Retry-After` within `import.discord.max_429_retries` and
-  `import.discord.max_rate_wait`, like the API client; `5xx` is a `*CallError` without retry.
+  `import.discord.max_rate_wait`, like the API client; a `5xx` or a transport error is retried like
+  in the API client, then it is a `*CallError` (the attachment gets its line, 22 6.5 item 6).
 - Errors and log lines name only scheme, host and path (`SafeURL`); the error body of the CDN is
   never read, except the body of a `429` for its wait, which is never shown.
 - Nothing is written to disk: no temp file, no cache.

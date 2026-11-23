@@ -74,8 +74,8 @@ log warns "local backup only".
 --config FILE       configuration file (default: BOTHY_CONFIG_FILE, else none); the keys are
                     those of the server (docs/operations/configuration.md)
 
-backup KIND  runs one kind now and exits 0 when the run succeeded, 1 when it failed or the kind
-             runs already. Each run writes one row of backup_runs and, when it succeeds, a
+backup KIND  runs one kind now and exits 0 when the run succeeded, 1 when it failed. A run of
+             the same kind in the service is not detected; run it outside the schedule. Each run writes one row of backup_runs and, when it succeeds, a
              manifest. SIGINT or SIGTERM cancels the run: its row is finished as failed with the
              code canceled and its files are removed; the same holds for restore-test.
 expire       --offsite --credentials DIR: the owner's expiry of the off-site target with the

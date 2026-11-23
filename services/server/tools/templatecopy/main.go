@@ -44,20 +44,28 @@ func run(args []string, stderr io.Writer) int {
 	return 0
 }
 
-// Copy replaces out with a copy of every folder directly below src and everything inside it.
-// Errors: an unreadable source, a symbolic link or another file that is not a regular file, and
-// write errors.
-func Copy(src, out string) error {
+// Copy replaces out with a copy of every folder directly below src and everything inside it. The
+// copy is built in a temporary folder next to out and replaces out only when it is complete, so
+// an error leaves the output of the earlier run as it was. Errors: an unreadable source, a
+// symbolic link or another file that is not a regular file, and write errors.
+func Copy(src, out string) (err error) {
 	entries, err := os.ReadDir(src)
 	if err != nil {
 		return err
 	}
-	if err := os.RemoveAll(out); err != nil {
+	parent := filepath.Dir(out)
+	if err := os.MkdirAll(parent, 0o750); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(out, 0o750); err != nil {
+	tmp, err := os.MkdirTemp(parent, "."+filepath.Base(out)+".tmp-")
+	if err != nil {
 		return err
 	}
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, os.RemoveAll(tmp))
+		}
+	}()
 	for _, e := range entries {
 		if e.Type()&fs.ModeSymlink != 0 {
 			return fmt.Errorf("%s is a symbolic link", e.Name())
@@ -65,11 +73,18 @@ func Copy(src, out string) error {
 		if !e.IsDir() {
 			continue
 		}
-		if err := copyTree(filepath.Join(src, e.Name()), filepath.Join(out, e.Name())); err != nil {
+		if err := copyTree(filepath.Join(src, e.Name()), filepath.Join(tmp, e.Name())); err != nil {
 			return err
 		}
 	}
-	return nil
+	// MkdirTemp creates the folder with mode 0700; the output keeps the mode of the earlier copy.
+	if err := os.Chmod(tmp, 0o750); err != nil { //nolint:gosec // the mode MkdirAll gave the output before
+		return err
+	}
+	if err := os.RemoveAll(out); err != nil {
+		return err
+	}
+	return os.Rename(tmp, out)
 }
 
 // copyTree copies the folder from to to, regular files and folders only.

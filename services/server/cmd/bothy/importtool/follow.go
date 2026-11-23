@@ -89,8 +89,8 @@ func follow(ctx context.Context, o options, env Env, wk *walker, src *restclient
 }
 
 // outcome decides after a wait or a round whether the mirror ends and with which error: a stop
-// request, --once, a lost lease or the end of the source end it; any other error is a failed
-// round and the loop goes on.
+// request, --once, a lost lease, an invalid token or session (exit 2) or the end of the source end
+// it; any other error is a failed round and the loop goes on.
 func (m *mirror) outcome(ctx context.Context, err error) (bool, error) {
 	work := context.WithoutCancel(ctx)
 	var end *sourceEndError
@@ -99,6 +99,11 @@ func (m *mirror) outcome(ctx context.Context, err error) (bool, error) {
 	case errors.As(err, &end):
 		return true, end.err
 	case errors.As(err, &le):
+		return true, err
+	case permanent(err):
+		// A revoked Discord token or server session fails every later round the same way (22 4.3
+		// item 4: a 401 is never retried); the mirror ends with exit 2.
+		_ = m.finish(work)
 		return true, err
 	case errors.Is(err, errHalted), ctx.Err() != nil:
 		return true, m.finish(work)
@@ -194,6 +199,9 @@ func threadLocal(err error) bool {
 func (m *mirror) round(ctx context.Context) error {
 	m.notes, m.starters = nil, map[string]*discord.Message{}
 	wk := m.wk
+	// A 403 ends a channel for one round only: the owner may fix the permission in Discord while
+	// the mirror runs (22 4.3 item 4).
+	wk.dc.NewRound()
 	// pinsFull starts empty in every round: a full thread is asked again, so a pin slot freed here
 	// since the last round is used.
 	wk.known, wk.userDone, wk.pinsFull = map[string]*refInfo{}, map[string]bool{}, map[string]bool{}
@@ -314,14 +322,21 @@ func (m *mirror) channels(ctx context.Context) error {
 	return nil
 }
 
-// refresh takes the fresh channel objects and the active threads into the guild state.
+// refresh takes the fresh channel objects and the active threads into the guild state. A channel
+// created after the start of the mirror has no plan and is not mirrored; the round notes it.
 func (m *mirror) refresh(chans, active []discord.Channel) {
 	gs, p := m.wk.gs, m.wk.p
+	fresh := false
 	for _, ch := range chans {
 		gs.byID[ch.ID] = ch
 		if c := p.byID[ch.ID]; c != nil {
 			c.ch = ch
+		} else if ch.Type != typeCategory {
+			fresh = true
 		}
+	}
+	if fresh {
+		m.notes = append(m.notes, noteNewChannels)
 	}
 	gs.active, gs.activeBy = map[string]bool{}, map[string][]discord.Channel{}
 	for _, t := range active {

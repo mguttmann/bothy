@@ -19,6 +19,12 @@ migrator behind `bothy migrate`. Migrations never run at `bothy serve` (R-AR-16)
 | `config.go` | `Config`, `Validate`, `WithAppName`, `ForMigrate`, the connection string and session parameters |
 | `pool.go` | `Open`, `Pool` (`WaitReady`, `Ping`, `Acquire`, `Begin`, `Stat`, `Close`, `OpenSQL`, `PGX` for River's driver in `platform/jobs`), `Connect` |
 | `unit.go` | `UnitConfig`, `UnitOfWork` (`NewUnitOfWork`, `Do`), `Tx`, `Querier` |
+| `readonly.go` | the transaction of a unit in maintenance mode, `IsReadOnlyRejection` |
+| `purge.go` | `PurgeEach`, `PurgeStep` and `Limit` for the deletes of retention participants (M7-05) |
+| `snapshot.go` | `ReadSnapshot`: reads in one read-only `REPEATABLE READ` snapshot |
+| `ephemeral.go` | `EphemeralListener`, `EphemeralRoute`, `EphemeralConfig`: the one `LISTEN ephemeral` connection of a process with reconnect (M7-17) |
+| `textsearch.go` | `CheckTextSearch` (section "Text search check") |
+| `convert.go` | conversions between `ids.ID`, `time.Time` and the pgtype values of sqlc |
 | `querier.go` | `DBTX`, `Pool.Exec`, `Pool.Query`, `Pool.QueryRow` |
 | `timeouts.go` | `Timeouts`, `SetLocalTimeouts` |
 | `tracer.go` | otelpgx tracer without query parameters, statement errors redacted |
@@ -64,7 +70,8 @@ applies it to every transaction.
 `NewUnitOfWork(pool, cfg, reg)` implements `kernel/txn.UnitOfWork`, and `platform/pg` is the only
 package that begins, commits or rolls back a transaction (02 "Flow", R-AR-06; the Semgrep rule
 `bothy-go-tx-only-in-platform-pg` flags `Begin`, `BeginTx`, `pgx.BeginFunc` and
-`pgx.BeginTxFunc` elsewhere). `cfg` comes from `wire.UnitConfig`: `database.tx_retry_max`,
+`pgx.BeginTxFunc` elsewhere). Inside the package, two paths do so without the unit (section
+"Transactions outside the unit of work"). `cfg` comes from `wire.UnitConfig`: `database.tx_retry_max`,
 `database.statement_timeout`, `database.lock_timeout`, `database.idle_in_tx_timeout`; `reg` from
 `wire.NewTxnRegistry`, sealed. `Do` before `Seal` is an internal error.
 
@@ -77,7 +84,11 @@ One attempt of an outermost `Do`:
    synchronously, in registration order, each in a span `txn.subscribe <module>`.
 5. Phase `rights_check`: the authz hook, only with `txn.RightsChange`.
 6. Phase `sync`, then phase `audit`: their hooks.
-7. `COMMIT`.
+7. `COMMIT`, unless the context has ended by now (then the unit rolls back with the context's
+   error). Once sent, `COMMIT` runs without the cancellation of the context, bounded by
+   `database.statement_timeout` like the rollback: a `COMMIT` aborted in flight could leave a
+   durable transaction while `Do` reports an error and skips the `txn.AfterCommit` functions
+   (test `TestUnitOfWork_CancelDuringCommitStillCommits`).
 
 A phase without a hook is skipped. Any error rolls back and comes back unchanged (a veto stays
 the caller's error); a panic rolls back and is raised again, so the HTTP chain answers `500`. The
@@ -129,6 +140,20 @@ err := uow.Do(ctx, func(ctx context.Context) error {
 	return txn.Publish(ctx, authz.GrantChanged{ID: id})
 }, txn.RightsChange(subject))
 ```
+
+## Transactions outside the unit of work
+
+Two paths of this package open their own short transactions on the pool, without the `SET LOCAL`
+deadlines (the session values apply), the retry, the phase hooks and maintenance mode of the unit:
+
+- `PurgeEach` (and `PurgeStep` over it) deletes the candidates of a retention participant in
+  transactions of at most 32 candidates (`purgeChunk`), each candidate in its own savepoint, so a
+  row that another row's rule holds (SQLSTATE class 23) is skipped. Every savepoint that deletes
+  takes a subtransaction ID and a backend caches 64 per transaction; a larger transaction makes
+  other sessions read `pg_subtrans`. A failed transaction rolls back only its own candidates
+  (test `TestPurgeEach_ShortTransactions`).
+- `ReadSnapshot` runs reads in one `READ ONLY` transaction with `REPEATABLE READ` and always rolls
+  it back.
 
 ## Roles and bootstrap
 
@@ -217,6 +242,15 @@ pool statistics; `internal/wire` registers the process pool after `Open`.
 settings, tracer and password source of the pool, outside the pool and named `applicationName`
 (the log tail's `LISTEN` connection, `bothy-event-tail`, M1-16); connecting waits at most
 `database.acquire_timeout`, and the caller closes it.
+
+`EphemeralListener` holds the one `LISTEN ephemeral` connection of a process (named
+`EphemeralApplicationName`, M7-17) for the terminal and the gateway: it hands every payload to
+every `EphemeralRoute` on one goroutine, reconnects with backoff after a lost connection and asks
+every route to reconcile after a reconnect. A lost connection logs `ephemeral listener lost` once
+with `error.type`: the class of a failed connect or `LISTEN` as for the pool (the SQLSTATE, such as
+`28P01` for a wrong password, a secret error code, `timeout` or `connect`), or `wait` when an
+established connection fails (test `TestEphemeralListener_LostLineNamesTheClass`). Its other tests
+run in the modules that use it (`internal/wire`, `test/terminal`).
 
 ## Tests
 

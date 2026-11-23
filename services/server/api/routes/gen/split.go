@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"strings"
@@ -67,18 +68,22 @@ func typeDecl(f *ast.File, match func(name string) bool) *ast.GenDecl {
 	return nil
 }
 
-// splitAll is splitRest with objects.gen.go halved into objects.gen.go and objects2.gen.go
-// (halveObjects) and rest.gen.go cut into rest.gen.go and rest2.gen.go (halveServer).
-func splitAll(src []byte) (models, server, server2, objects, objects2 []byte, err error) {
-	models, server, objects, err = splitRest(src)
+// maxFileBytes is repo.max_file_kb (docs/spec/23-quality.md) in bytes: the hook
+// check-added-large-files refuses larger files.
+const maxFileBytes = 1024 * 1024
+
+// splitAll is splitRest with objects.gen.go cut into parts below repo.max_file_kb (chunkObjects)
+// and rest.gen.go cut into rest.gen.go and rest2.gen.go (halveServer).
+func splitAll(src []byte) (models, server, server2 []byte, objects [][]byte, err error) {
+	models, server, whole, err := splitRest(src)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	if objects, objects2, err = halveObjects(objects); err != nil {
-		return nil, nil, nil, nil, nil, err
+	if objects, err = chunkObjects(whole); err != nil {
+		return nil, nil, nil, nil, err
 	}
 	server, server2, err = halveServer(server)
-	return models, server, server2, objects, objects2, err
+	return models, server, server2, objects, err
 }
 
 // halveServer cuts rest.gen.go (the server part of splitRest) at the type StrictServerInterface:
@@ -105,53 +110,21 @@ func halveServer(server []byte) (head, tail []byte, err error) {
 	return head, tail, nil
 }
 
-// halveObjects cuts objects.gen.go (the output of splitRest) into two files at the start of the
-// operation group nearest its middle: the type declaration named *RequestObject, other than the
-// first, closest to half of its body. Each file keeps the header and only the imports it uses, so
-// neither reaches repo.max_file_kb as the contract grows (M6-01, M2-07). With one group only the
-// first file keeps everything and the second holds only the package clause. Errors: objects is
-// not valid Go.
-func halveObjects(objects []byte) (head, tail []byte, err error) {
-	f, err := gosplit.Parse("objects.gen.go", objects)
-	if err != nil {
-		return nil, nil, err
-	}
-	cut := groupNearest(f, f.BodyStart+(len(objects)-f.BodyStart)/2, len(objects))
-	if head, err = f.Assemble(objects[f.BodyStart:cut]); err != nil {
-		return nil, nil, err
-	}
-	if tail, err = f.Assemble(objects[cut:]); err != nil {
-		return nil, nil, err
-	}
-	return head, tail, nil
+// chunkObjects cuts objects.gen.go (the output of splitRest) into parts of at most
+// repo.max_file_kb, only between top-level declarations (api/internal/gosplit, as the API client
+// is cut), so the request and response objects never reach the limit as the contract grows
+// (M6-01, M2-07; audit finding api-contract-codegen-3: two fixed halves left no room). Each part
+// keeps the header and only the imports it uses; the first part always exists. Errors: objects
+// is not valid Go, or one declaration alone is larger than the limit.
+func chunkObjects(objects []byte) ([][]byte, error) {
+	return gosplit.Chunks(objects, maxFileBytes)
 }
 
-// groupNearest returns the offset of the operation group of f (a type declaration named
-// *RequestObject with its doc comment) nearest to middle, never the first group; end when f has
-// only one group.
-func groupNearest(f *gosplit.File, middle, end int) int {
-	cut, first := end, true
-	for _, d := range f.AST.Decls {
-		g, ok := d.(*ast.GenDecl)
-		if !ok || g.Tok != token.TYPE || !strings.HasSuffix(g.Specs[0].(*ast.TypeSpec).Name.Name, "RequestObject") {
-			continue
-		}
-		if first {
-			// The first group starts the file; cutting there would leave the first file empty.
-			first = false
-			continue
-		}
-		if off := f.DeclStart(g); cut == end || abs(off-middle) < abs(cut-middle) {
-			cut = off
-		}
+// objectsName returns the file name of part i (0-based) of chunkObjects: objects.gen.go,
+// objects2.gen.go, objects3.gen.go and so on.
+func objectsName(i int) string {
+	if i == 0 {
+		return "objects.gen.go"
 	}
-	return cut
-}
-
-// abs returns the distance of n from zero.
-func abs(n int) int {
-	if n < 0 {
-		return -n
-	}
-	return n
+	return fmt.Sprintf("objects%d.gen.go", i+1)
 }

@@ -57,9 +57,9 @@ line on stdout; logs go to stderr and never contain it. Hand the code over in pe
                      and the host stays pairing
 --pace DURATION      demo: wait between two warm-up prompts (default values.pace of the data set)
 
-Exit codes: 0 ok, 1 configuration, secret or database error (demo: a failed call or wait; the
-instance keeps what was written), 2 invalid arguments (also a handle that is no active owner,
-demo: an invalid data set), 3 bootstrap-owner: setup is already complete (nothing changed),
+Exit codes: 0 ok, 1 secret or database error (demo: a failed call or wait; the instance keeps
+what was written), 2 invalid arguments or a configuration that does not load (also a handle that
+is no active owner, demo: an invalid data set), 3 bootstrap-owner: setup is already complete (nothing changed),
 demo: the instance is not empty (nothing written), 4 issue-enrollment-code: setup is not
 complete yet.
 `
@@ -127,7 +127,7 @@ func setupCommand(ctx context.Context, args, env []string, stdout, stderr io.Wri
 	}
 	s, values, ok := loadConfig(env, wire.ConfigSchema, configOptions{file: o.file}, stderr)
 	if !ok {
-		return exitFailure
+		return exitUsage
 	}
 	log := commandLogger(stderr, s, values)
 	runner, err := d.open(ctx, values, env, log)

@@ -18,7 +18,8 @@ appears in the exported API, so a breaking change of River (0.x) touches this pa
 |---|---|
 | `args.go` | `Args`, `Job`, `Handler`, `HandlerOptions`, the queue names, `ValidateArgsType` |
 | `registry.go` | `Registry`, `NewRegistry`, `Register`, `AddPeriodic`, `PeriodicJob`, `ArgTypes` |
-| `worker.go` | the wrapper around every handler: span, panic, cancellation, retry rule |
+| `worker.go` | the wrapper around every handler: span, panic, cancellation, retry rule, the log line of a failed attempt |
+| `riverlog.go` | the handler of River's logger (section "Logs") |
 | `runtime.go` | `Config`, `ValidateSchema`, `Role`, `Runtime` (`New`, `Inserter`, `Start`, `Stop`, `Failed`), `Inserter`, `InsertOptions`, `InsertResult` |
 | `insert.go` | `InsertTx` in the ambient transaction and the checks all three operations share |
 | `unique.go` | `InsertUniqueTx` (River unique jobs by args and state), `PendingTx` and `LatestPendingTx` |
@@ -110,15 +111,22 @@ it as before. Tests: `TestMaintenance_WorkerHoldsOtherKinds`, `TestMaintenance_C
 7. Chapters with their own retry rule set `HandlerOptions.NextRetry` (pause after an attempt) and
    `MaxAttempts`. `HandlerOptions.Timeout` sets River's job timeout of a kind: zero keeps the
    default below, a negative value means no River timeout, for a handler that bounds its own work
-   (`files.scan`, M3-04).
+   (`files.scan`, M3-04). River's rescuer skips a job of such a kind: when its worker dies without
+   ending the attempt (killed, out of memory, host down), its row stays `running` and nothing runs
+   it again; the rescue after one hour (section "River defaults") holds only for kinds with a
+   finite timeout.
 8. Periodic jobs (`Registry.AddPeriodic`) need a registered kind and a positive interval; only the
-   leader among the workers inserts them.
+   leader among the workers inserts them. River keeps the schedule in the memory of the leader:
+   a new leader (every start of a worker that wins the election) counts each interval from its
+   start, so a kind without `RunOnStart` does not run while workers restart more often than its
+   interval.
 
 ## Spans
 
 Every attempt runs inside the CONSUMER span `job <bothy.job.kind>` with `bothy.job.kind` and
-`bothy.outcome`: `completed` (nil), `cancelled` (the context ended, for example at shutdown or
-River's job timeout) or `failed` (any other error or a panic). `snoozed` of the catalogue stays
+`bothy.outcome`: `completed` (nil), `cancelled` (the context was canceled with a cancellation
+error, at shutdown or by a cancellation of the job) or `failed` (any other error, River's job
+timeout, which uses up an attempt, or a panic). `snoozed` of the catalogue stays
 unused until this interface offers a snooze. The tracer is the global provider's unless `New`
 gets one.
 
@@ -131,6 +139,18 @@ A runtime that works jobs (roles `worker` and `all`) observes `bothy.job.queue` 
 `retryable` per collection, bounded by `database.statement_timeout` (`Config.StatementTimeout`),
 0 for a registered kind without waiting jobs. `Config.MeterProvider` nil means the global
 provider.
+
+## Logs
+
+A failed attempt writes `job attempt failed` with `bothy.job.kind` and `error.type` (the SQLSTATE
+of a database error, `timeout`, `canceled` or the kind of a `kernel/errs` error), never the error
+text or the arguments: Warn while River retries, Error for the last attempt, after which River
+discards the job. A panic writes `job panicked` instead (rule 6); a cancelled attempt writes
+nothing. River's own lines go through `riverlog.go`: its Info lines (producer counts, maintenance
+runs, a job that errored) reach the server logger at Debug, its Warn and Error lines keep their
+level; River's `job_kind` becomes `bothy.job.kind`, and its other attributes are dropped like
+every attribute outside the catalogue (signals.md "Logs"). Tests: `TestWorker_LogsFailedAttempt`,
+`TestRiverLogger_RoutineLinesAtDebug`, `TestOutcomeOf_TimeoutIsFailed`.
 
 ## Shutdown
 

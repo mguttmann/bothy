@@ -30,6 +30,7 @@ const (
 	noteAfterSwitch       = "written in Discord after the switch-over: nothing copied (lead bothy)"
 	noteThreadFailed      = "a thread failed in this round and is retried in the next"
 	noteSourcePaused      = "the source is not running: the round copied nothing"
+	noteNewChannels       = "a channel created in Discord after the start of the mirror is not mirrored: restart the mirror"
 	noteTopicFitted       = "the topic held characters the server refuses (control, bidi) or was longer than its limit: taken over without them, cut to the limit"
 	noteNameFitted        = "a thread or tag name held characters the server refuses (control, bidi): taken over without them"
 	notePinLimit          = "pin.max_per_thread reached in a thread: its further pins were not taken over"

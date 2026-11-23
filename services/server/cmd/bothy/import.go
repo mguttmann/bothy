@@ -18,8 +18,8 @@ import (
 )
 
 // importUsage is the help of "bothy import" (docs/spec/22-import-migration.md 10.1).
-const importUsage = `Usage: bothy import login --server URL [--name NAME] [--session-file PATH]
-       bothy import logout [--session-file PATH]
+const importUsage = `Usage: bothy import login --server URL [--name NAME] [--session-file PATH] [--config FILE]
+       bothy import logout [--session-file PATH] [--config FILE]
        bothy import discord --guild ID --map FILE [--apply] ... (bothy import discord --help)
 
 login   logs the import tool in as a command-line device (platform cli) through device
@@ -37,9 +37,11 @@ discord takes the history of a Discord server over: a dry run by default, --appl
 --session-file PATH  session file (default <user configuration directory>/bothy/import-session.json);
                      created with mode 0600 in a directory with mode 0700, refused when group or
                      others can access it
+--config FILE        tool configuration (YAML with keys under import:, 22 19); BOTHY_IMPORT__
+                     variables override it, as for bothy import discord
 
 Exit codes: 0 ok; 1 pairing expired, rejected or interrupted, network or server error;
-2 invalid arguments, already logged in to this server, not logged in, session revoked, or a
+2 invalid arguments, a tool configuration that does not load, already logged in to this server, not logged in, session revoked, or a
 session file that is invalid or accessible to others.
 `
 
@@ -49,8 +51,6 @@ type importDeps struct {
 	sessionPath func() (string, error)
 	// hostname returns the host name for the default device name.
 	hostname func() (string, error)
-	// limits are the tool values; M8-04 fills them from the tool configuration.
-	limits bothyapi.Limits
 	// deps are the client dependencies.
 	deps bothyapi.Deps
 	// environ returns the process environment for the tool configuration and the bot token; nil
@@ -68,9 +68,25 @@ func (d importDeps) toolEnv(stdout, stderr io.Writer) importtool.Env {
 		SessionPath: d.sessionPath, Server: d.deps}
 }
 
-// defaultImportDeps uses the user configuration directory, the host name and the defaults of 22 19.
+// defaultImportDeps uses the user configuration directory and the host name.
 func defaultImportDeps() importDeps {
-	return importDeps{sessionPath: bothyapi.DefaultSessionPath, hostname: os.Hostname, limits: bothyapi.DefaultLimits()}
+	return importDeps{sessionPath: bothyapi.DefaultSessionPath, hostname: os.Hostname}
+}
+
+// limits loads the tool configuration of --config file and the BOTHY_IMPORT__ variables, as
+// "bothy import discord" does (22 19), and returns the values of the server client. ok is false
+// after the error was printed (exit 2).
+func (d importDeps) limits(file string, stderr io.Writer) (bothyapi.Limits, bool) {
+	var environ []string
+	if d.environ != nil {
+		environ = d.environ()
+	}
+	cfg, err := importtool.LoadConfig(file, environ)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "bothy import: configuration: %s\n", err.Error())
+		return bothyapi.Limits{}, false
+	}
+	return cfg.ServerLimits(), true
 }
 
 // importCommand runs "bothy import" with the arguments after the command name.
@@ -128,11 +144,16 @@ func importLogin(ctx context.Context, args []string, stdout, stderr io.Writer, d
 	server := fs.String("server", "", "server origin")
 	name := fs.String("name", "", "device name")
 	session := fs.String("session-file", "", "session file")
+	file := fs.String("config", "", "tool configuration")
 	if code := importFlags(fs, args, stdout, stderr); code >= 0 {
 		return code
 	}
 	if *server == "" {
 		_, _ = fmt.Fprintln(stderr, "bothy import login: --server is required")
+		return exitUsage
+	}
+	limits, ok := deps.limits(*file, stderr)
+	if !ok {
 		return exitUsage
 	}
 	path, err := deps.sessionFile(*session)
@@ -145,7 +166,7 @@ func importLogin(ctx context.Context, args []string, stdout, stderr io.Writer, d
 	defer stop()
 	return importFailed(stderr, bothyapi.Login(ctx, bothyapi.LoginOptions{
 		ServerURL: *server, DeviceName: *name, Hostname: host, SessionFile: path, AppVersion: buildinfo.Version(),
-		Limits: deps.limits, Deps: deps.deps, Stdout: stdout, Stderr: stderr,
+		Limits: limits, Deps: deps.deps, Stdout: stdout, Stderr: stderr,
 	}))
 }
 
@@ -153,14 +174,19 @@ func importLogin(ctx context.Context, args []string, stdout, stderr io.Writer, d
 func importLogout(ctx context.Context, args []string, stdout, stderr io.Writer, deps importDeps) int {
 	fs := flag.NewFlagSet("bothy import logout", flag.ContinueOnError)
 	session := fs.String("session-file", "", "session file")
+	file := fs.String("config", "", "tool configuration")
 	if code := importFlags(fs, args, stdout, stderr); code >= 0 {
 		return code
+	}
+	limits, ok := deps.limits(*file, stderr)
+	if !ok {
+		return exitUsage
 	}
 	path, err := deps.sessionFile(*session)
 	if err != nil {
 		return importFailed(stderr, err)
 	}
-	err = bothyapi.Logout(ctx, bothyapi.Options{SessionFile: path, Limits: deps.limits, Deps: deps.deps})
+	err = bothyapi.Logout(ctx, bothyapi.Options{SessionFile: path, Limits: limits, Deps: deps.deps})
 	if err == nil {
 		_, _ = fmt.Fprintln(stderr, "logged out")
 	}

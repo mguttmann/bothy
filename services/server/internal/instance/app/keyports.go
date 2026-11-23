@@ -52,8 +52,6 @@ type KeyRepository interface {
 	// TransitionKey moves the key kid from state from to state to and sets not_after when
 	// notAfter is not zero. It reports false when the key was not in state from.
 	TransitionKey(ctx context.Context, kid string, from, to instance.KeyState, notAfter time.Time) (bool, error)
-	// PurposesWithoutActive returns the purposes of ps without an active key, ascending.
-	PurposesWithoutActive(ctx context.Context, ps []instance.Purpose) ([]instance.Purpose, error)
 }
 
 // PrivateKey is a loaded private signing key. Implementations keep the key material out of every

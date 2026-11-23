@@ -13589,7 +13589,7 @@ export interface components {
         Location: string;
         /** @description Console cookie or its clearing value (08, 7.5). */
         "Set-Cookie": string;
-        /** @description Authentication challenge, e.g. `DPoP error="use_dpop_nonce"` (RFC 9449). */
+        /** @description Authentication challenge, present on every 401 (RFC 9110 section 15.5.2), e.g. `DPoP error="use_dpop_nonce"` (RFC 9449) or, with `step_up_required`, `DPoP error="insufficient_user_authentication"` (RFC 9470). */
         "WWW-Authenticate": string;
         /** @description Fresh server nonce for the next DPoP proof (RFC 9449). */
         "DPoP-Nonce": string;

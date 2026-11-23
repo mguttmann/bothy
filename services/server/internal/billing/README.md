@@ -1,6 +1,6 @@
 # Module `billing`
 
-Status: the booking of run costs, the valid sums, the thread costs and the price table built (M2-22); the reconciliation with the invoice built (M2-28); the aggregate cost statistics follow with M6-05.
+Status: the booking of run costs, the valid sums, the thread costs and the price table built (M2-22); the reconciliation with the invoice built (M2-28); the aggregate cost statistics built (M6-05, "Statistics source" below).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -22,8 +22,9 @@ Price table, cost postings, totals per run, thread, space, agent, reconciliation
 ## Retention (M7-05)
 
 `adapters/postgres.Retention` is the participant of billing in the job `retention.cost`:
-`cost_entries` after `occurred_at` (newest first, so a correction goes before the entry it
-supersedes) and closed `price_table` rows after `valid_to`, each plus `retention.cost`. An open
+`cost_entries` after `occurred_at` (newest first by `occurred_at` and then by ID, so a correction,
+which copies `occurred_at` and has a newer ID, goes before the entry it supersedes, also with a
+batch of one row) and closed `price_table` rows after `valid_to`, each plus `retention.cost`. An open
 price row has no end time.
 
 ## Port (root package `internal/billing`)

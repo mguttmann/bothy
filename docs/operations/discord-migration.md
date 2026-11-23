@@ -82,7 +82,8 @@ bothy import login --server <server_url>
 ```
 
 It prints a pairing code. In the app or the web console choose "Add device" under Devices and enter
-the code; that step asks for step-up. The tool polls every `import.login_poll_interval` and
+the code; that step asks for step-up. The tool polls every `import.login_poll_interval` (set with `--config` or
+`BOTHY_IMPORT__LOGIN_POLL_INTERVAL`, as for every command of the tool) and
 then stores its session file (mode `0600`, `--session-file` names another path).
 
 Check: the device list shows the new device. Going back:
@@ -188,7 +189,11 @@ run never copies a posted item twice (22 7).
 ## 7. Full import and parallel operation
 
 Import the whole server. A run resumes at the cursors where an earlier one stopped, so the pilot
-channels are not taken again:
+channels are not taken again. A full run copies every message up to the present and has no settle
+rule (22 12.3 applies to the read mirror only): a message an agent is still writing or that carries
+a busy reaction is copied as it is at that moment, and a later edit is never taken over (22 12.4).
+Run the full import while the agents in Discord are idle, or accept that their last answers may be
+copied unfinished:
 
 <!-- rehearsal: import -->
 ```sh
@@ -220,7 +225,10 @@ runs, so stop it (Ctrl-C or SIGTERM, which a stopped service sends; it finishes 
 and frees the lease; a forced kill keeps the lease until `import.lease_stale_after`) before the
 full import or a `switch`, and start it again afterwards. A scheduled `--once` round
 holds the lease only while it runs; a command that meets one ends with exit `3` and is simply run
-again. `--takeover` is only for the lease of a run that crashed.
+again. Ctrl-C or SIGTERM stops a full `--apply` run the same way: it finishes the current batch,
+frees the lease and ends with exit `1`; the next run resumes at the cursor. `--takeover` is only
+for the lease of a run that crashed. A short failure of Discord (`5xx`, a broken connection) is
+retried by the tool three times before it ends the run with exit `1`.
 
 `--follow` starts a round every `import.follow.poll_interval`; after failed rounds the wait grows
 up to `import.follow.max_backoff`. A round does not copy a message that an agent is still working
@@ -361,7 +369,7 @@ a completed source cannot be started again, and nothing mirrors Discord any more
 | exit `1`, network or server error | the run stopped; nothing is lost | run again; it resumes at the cursor |
 | exit `1`, network error during attachment uploads, again and again, behind your own TLS proxy | the server answers a part of an upload with `429` before it reads the body, and a proxy that then closes the connection leaves the tool with a write error instead of the `429`; the tool waits on a `429` it receives, but does not repeat a call after a write error | run again; it resumes at the cursor and loses nothing. A large import can stop this way several times; each run gets further |
 | exit `3`, lease held | another writing run of this source holds the lease (section 7, "One writing run at a time") | a `--follow` mirror: stop it, run the command, start the mirror again; a scheduled round: run the command again; a run that crashed: wait `import.lease_stale_after` or use `--takeover` |
-| note `403: the channel is not readable` | the bot lacks `VIEW_CHANNEL` or `READ_MESSAGE_HISTORY` there; the run avoids the channel | fix the permission in Discord, run again |
+| note `403: the channel is not readable` | the bot lacks `VIEW_CHANNEL` or `READ_MESSAGE_HISTORY` there; the run avoids the channel | fix the permission in Discord, run again (a running read mirror asks again in its next round) |
 | note `403 on archived private threads` | the bot lacks `MANAGE_THREADS` | add it if private threads matter |
 | note `a thread failed in this round and is retried in the next: thread <id>: ...` (read mirror), with the same line on standard error | the round could not copy this thread; the other threads were copied. The text after the thread ID is the error: a `403` or `404` of Discord, or the refusal of the server as in the row on `validation_failed` | a refusal of the server repeats every round until its cause is gone: act as in that row |
 | note `written in Discord after the switch-over` | Discord shows new messages in a channel Bothy leads; the read mirror copies nothing | lock the Discord channel (section 8 step 1); transfer the messages by hand. A full `--apply` run without `--follow` or `--once` would append them behind the messages written in Bothy; it never renames, closes or reopens a thread that is already imported there |

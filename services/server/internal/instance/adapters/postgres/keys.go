@@ -95,23 +95,6 @@ func (r *Repository) TransitionKey(ctx context.Context, kid string, from, to ins
 	return n == 1, err
 }
 
-// PurposesWithoutActive returns the purposes of ps without an active key (app.KeyRepository).
-func (r *Repository) PurposesWithoutActive(ctx context.Context, ps []instance.Purpose) ([]instance.Purpose, error) {
-	names := make([]string, len(ps))
-	for i, p := range ps {
-		names[i] = string(p)
-	}
-	missing, err := r.queries(ctx).PurposesWithoutActiveKey(ctx, names)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]instance.Purpose, len(missing))
-	for i, m := range missing {
-		out[i] = instance.Purpose(m)
-	}
-	return out, nil
-}
-
 // oneKey converts the result of a single-row query; no row is found false.
 func oneKey(row sqlcgen.ServerSigningKey, err error) (app.KeyRow, bool, error) {
 	if errors.Is(err, pgx.ErrNoRows) {

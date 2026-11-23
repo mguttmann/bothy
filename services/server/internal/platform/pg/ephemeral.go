@@ -19,9 +19,7 @@ import (
 const (
 	msgListenerLost     = "ephemeral listener lost"
 	msgListenerRestored = "ephemeral listener restored"
-	errorListen         = "listen"
 	errorWait           = "wait"
-	errorDial           = "dial"
 	// EphemeralApplicationName is the name of the listener's connection in pg_stat_activity.
 	EphemeralApplicationName = "bothy-ephemeral"
 	// EphemeralComponent is the name of the listener's start component and stop step.
@@ -196,15 +194,17 @@ func (l *EphemeralListener) backoff(ctx context.Context) bool {
 	}
 }
 
-// listen dials and executes LISTEN ephemeral; it returns the connection or the error.type.
+// listen dials and executes LISTEN ephemeral; it returns the connection or the error.type, the
+// class the pool logs for a failed connection (errorType: the SQLSTATE, such as 28P01 for a wrong
+// password, a secret error code, timeout or connect).
 func (l *EphemeralListener) listen(ctx context.Context) (*pgx.Conn, string) {
 	conn, err := l.dial(ctx)
 	if err != nil {
-		return nil, errorDial
+		return nil, errorType(err)
 	}
 	if _, err := conn.Exec(ctx, "LISTEN ephemeral"); err != nil {
 		l.closeConn(ctx, conn)
-		return nil, errorListen
+		return nil, errorType(err)
 	}
 	return conn, ""
 }
