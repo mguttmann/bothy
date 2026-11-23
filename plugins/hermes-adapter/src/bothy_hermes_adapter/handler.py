@@ -296,6 +296,9 @@ class _Turn:
     seen_work: bool = False
     own_turns: int = 1
     internal: bool = False
+    # The run waits for the thread's busy Hermes session before its turn (17.6): what that
+    # session's turn does meanwhile has no run (no tool, no answer, no card).
+    waiting: bool = False
     hermes_open: bool = False
     failed_turn: bool = False
     failed_result: bool = False
@@ -855,6 +858,16 @@ class HermesHandler(AgentHandler):
 
     async def _run_turn(self, inv: Invocation, turn: _Turn) -> None:
         payload = inv.payload
+        # A run's turn is a turn of its own: on a busy session Hermes would steer the text into
+        # the running turn, which has no run, and admit no turn for the run (17.6).
+        turn.waiting = True
+        try:
+            await self.runtime.session_free(turn.thread_id)
+        finally:
+            turn.waiting = False
+        if turn.dropped or turn.abort_reason is not None:
+            await self._end_turn(turn, TurnOutcome.FAILED, None)
+            return
         request = TurnRequest(
             run_id=turn.run_id,
             thread_id=turn.thread_id,
@@ -1677,6 +1690,8 @@ class HermesHandler(AgentHandler):
             return "stopped"
         if turn.ended:
             return "turn_ended"
+        if turn.waiting:
+            return "session_busy"
         return "turn_answered"
 
     async def _files_final(self, turn: _Turn, run: RunHandle, message: Message) -> Message:
@@ -1762,7 +1777,13 @@ class HermesHandler(AgentHandler):
         Returns:
             Whether the text was passed.
         """
-        if self.busy_mode != BusyMode.STEER or turn.ended or turn.dropped or turn.final_reply:
+        if (
+            self.busy_mode != BusyMode.STEER
+            or turn.ended
+            or turn.dropped
+            or turn.final_reply
+            or turn.waiting
+        ):
             # After the answer Hermes may have drained its last steer already; the server's
             # follow-on run takes the follow-up instead (09 7).
             return False
@@ -2041,7 +2062,7 @@ class HermesHandler(AgentHandler):
 
     def _active(self, thread_id: UUID) -> _Turn | None:
         turn = self._turns.get(thread_id)
-        if turn is None or turn.dropped or turn.ended or turn.live is None:
+        if turn is None or turn.dropped or turn.ended or turn.live is None or turn.waiting:
             return None
         if turn.abort_reason is not None:
             return None  # the run ends with the abort; nothing of the turn is sent any more
@@ -2466,7 +2487,7 @@ class HermesHandler(AgentHandler):
             failed: Whether Hermes reports the turn failed or interrupted.
         """
         turn = self._turns.get(thread_id)
-        if turn is None or turn.dropped:
+        if turn is None or turn.dropped or turn.waiting:
             return
         turn.hermes_open = False
         if not turn.internal and (turn.own_turns > 0 or not turn.held):
@@ -2490,6 +2511,7 @@ class HermesHandler(AgentHandler):
         return (
             turn is not None
             and not turn.dropped
+            and not turn.waiting
             and not turn.ended
             and turn.abort_reason is None
             and not turn.handle.finished

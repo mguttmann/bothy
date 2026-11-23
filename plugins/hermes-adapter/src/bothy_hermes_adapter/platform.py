@@ -548,40 +548,7 @@ class ServerPlatform(BasePlatformAdapter):
         self._attach(event, turn.media)
         event.user_id = str(turn.user_id)
         event.user_name = turn.user_name
-        await self._session_free(turn.thread_id, event)
         return await self._dispatch(event)
-
-    async def _session_free(self, thread_id: uuid.UUID, event: MessageEvent) -> None:
-        """Wait until no processing of Hermes runs on the event's session (17.6).
-
-        A run's turn is a turn of its own. On a busy session Hermes would steer the text into the
-        running turn and admit no turn for the event, so the run would end ``failed`` at once
-        while that turn answers it after the run, when no run takes the answer. The session is busy with a turn that has no
-        run: one a stop did not end (Hermes refused it, or the turn sleeps in a retry until it
-        sees the interrupt) or one Hermes started itself. The wait ends with a stop of the run
-        (cancellation) or when Hermes ends its processing; one it starts right after for input
-        it holds (a queued follow-up) is waited for as well. Busy means the platform's processing
-        task of the session or the gateway's running-turn slot (`turn_running`), which a turn of
-        the session authority's queue holds without such a task.
-        """
-        key = self._event_session_key(event)
-        logged = False
-        while True:
-            task = self._session_tasks.get(key)
-            if task is not None and not task.done() and task is not asyncio.current_task():
-                pending: asyncio.Future[Any] | None = task
-            elif self.turn_running(thread_id):
-                pending = None
-            else:
-                return
-            if not logged:
-                logged = True
-                _LOG.info("thread %s: turn waits for the busy Hermes session", thread_id)
-            if pending is not None:
-                await asyncio.wait({pending})
-            else:
-                interval = self.settings.background_poll_interval if self.settings else 1.0
-                await asyncio.sleep(interval)
 
     def _user_side(self, turn: TurnRequest) -> ComposedUserSide:
         """The turn's user side with the profile's ``channel_prompts`` entry of the thread.
@@ -898,6 +865,33 @@ class ServerPlatform(BasePlatformAdapter):
             return None
         event = MessageEvent(text="", message_type=MessageType.TEXT, source=source)
         return str(self._event_session_key(event))
+
+    async def session_free(self, thread_id: uuid.UUID) -> None:
+        """Wait until no processing of Hermes runs on the thread's session (17.6).
+
+        Busy means the platform's processing task of the session or the gateway's running-turn
+        slot (`turn_running`), which a turn of the session authority's queue holds without such
+        a task; a processing Hermes starts right after another for input it holds is waited
+        for as well. Cancelling the caller ends the wait.
+        """
+        key = self._session_key(thread_id)
+        logged = False
+        while True:
+            task = self._session_tasks.get(key) if key is not None else None
+            if task is not None and not task.done() and task is not asyncio.current_task():
+                pending: asyncio.Future[Any] | None = task
+            elif self.turn_running(thread_id):
+                pending = None
+            else:
+                return
+            if not logged:
+                logged = True
+                _LOG.info("thread %s: turn waits for the busy Hermes session", thread_id)
+            if pending is not None:
+                await asyncio.wait({pending})
+            else:
+                interval = self.settings.background_poll_interval if self.settings else 1.0
+                await asyncio.sleep(interval)
 
     def turn_running(self, thread_id: uuid.UUID) -> bool | None:
         """Whether a turn of the thread's session runs: the gateway's running-turn slot (17.12).

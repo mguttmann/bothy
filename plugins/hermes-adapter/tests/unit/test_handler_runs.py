@@ -193,6 +193,48 @@ async def test_failed_turn_and_send_without_run(tmp_path: Path) -> None:
     assert r.fake.messages == []
 
 
+async def test_a_run_waiting_for_a_busy_session_covers_nothing_of_it(tmp_path: Path) -> None:
+    """While the thread's Hermes session is busy the run waits (FIX-hermes-busy-session).
+
+    What the busy turn does meanwhile has no run: its tools are refused, its answer is not the
+    run's, its end is not the run's, a follow-up stays queued. Then the run's own turn runs.
+    """
+    rt = FakeRuntime(session_gate=asyncio.Event())
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await r.fake.trigger()
+        thread = triggered.thread_id
+        await r.until(lambda: rt.waited == [thread])
+        await r.until(lambda: r.fake.run_state(triggered.run_id).state == "running")
+        assert r.handler.tool_allowed(thread) is False
+        assert r.handler.active_run(thread) is None
+        assert await r.handler.on_answer(thread, "of the busy turn", None) is None
+        r.handler.on_turn_ended(thread, failed=True)
+        await r.fake.deliver_followup(triggered.run_id, "and this")
+        await r.until(lambda: r.source.envelopes("agent.followup"))
+        await r.fake.pass_time(0.5)
+        assert rt.turns == []
+        assert rt.steered == []
+        rt.session_gate.set()
+        await r.until(lambda: r.finished(triggered.run_id))
+    view = r.fake.run_state(triggered.run_id)
+    assert (view.state, view.state_reason) == ("completed", None)
+    assert len(rt.turns) == 1
+    assert [m["content_md"] for m in r.fake.messages] != []
+    assert not [m for m in r.fake.messages if "of the busy turn" in m["content_md"]]
+
+
+async def test_a_stop_ends_the_wait_for_a_busy_session(tmp_path: Path) -> None:
+    rt = FakeRuntime(session_gate=asyncio.Event())
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await r.fake.trigger()
+        await r.until(lambda: rt.waited)
+        await r.until(lambda: r.fake.run_state(triggered.run_id).state == "running")
+        await r.fake.cancel(triggered.run_id)
+        await r.until(lambda: r.finished(triggered.run_id))
+    assert r.fake.run_state(triggered.run_id).state == "cancelled"
+    assert rt.turns == []
+
+
 async def test_title_after_first_completed_new_session(tmp_path: Path) -> None:
     rt = FakeRuntime()
     async with rig(tmp_path, runtime=rt) as r:

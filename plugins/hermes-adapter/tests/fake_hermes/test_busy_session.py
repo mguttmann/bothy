@@ -11,6 +11,7 @@ while that turn still runs (a model request in a long retry, held here by a latc
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 
 import pytest
@@ -22,6 +23,11 @@ from bothy_hermes_adapter.installer import CONTROL_SENDER
 pytestmark = pytest.mark.anyio
 
 LATE = "Late answer of the stopped turn."
+TODO = {
+    "name": "todo_list",
+    "arguments": {"todos": [{"content": "Migrate", "id": "1", "status": "pending"}]},
+}
+REFUSED = "no run is open in this chat"
 NEXT = "Going on now."
 
 
@@ -114,8 +120,14 @@ async def test_run_waits_for_a_busy_session_instead_of_failing(world: HermesWorl
     The allow list holds only the credential holder, as the installer wrote it before the fix:
     Hermes refuses the control sender's ``/stop``, so the stopped run's turn goes on.
     """
+    # The stopped turn's held request asks for a tool: the waiting run never covers it.
+    script = [
+        ScriptTurn(tool_calls=(TODO,), hold="retry"),
+        ScriptTurn(text=(LATE,), paced=True),
+        ScriptTurn(text=(NEXT,), paced=True),
+    ]
     profile = Profile(dotenv={"anthropic_oauth": "oauth"})
-    async with hermes_rig(world, _script(), profile=profile, start=False) as rig:
+    async with hermes_rig(world, script, profile=profile, start=False) as rig:
         await _personal(rig, allow_list=str(rig.fake.robin_id))
         first = await rig.fake.trigger("Migrate the host.", author="robin")
         await rig.until(rig.model.requests, "the first model request")
@@ -142,3 +154,5 @@ async def test_run_waits_for_a_busy_session_instead_of_failing(world: HermesWorl
         # (D-HERMES-CRON-COMMANDS-5).
         assert _texts(rig, second.run_id) == [NEXT]
         assert not [m for m in rig.fake.messages if LATE in str(m["content_md"])]
+        # The stopped turn's tool call was refused while the run waited (R-AG-44).
+        assert any(REFUSED in json.dumps(body) for body in rig.model.raw), gateway_log(rig)

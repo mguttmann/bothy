@@ -3054,7 +3054,7 @@ the text with the paths, an approval or confirmation is refused with that text i
 is acknowledged as above unless a file may still come (D-FMS-8). Every follow-up the adapter does
 not steer, also an answer to a card Hermes did not take, gets one log line with its message ID
 and the reason code (`no_turn`, `not_readable`, `stopped`, `run_ended`, `audio`,
-`scan_pending`, `unavailable`, `own_turn`, `busy_mode_queue`, `turn_answered`, `turn_ended`,
+`scan_pending`, `unavailable`, `own_turn`, `busy_mode_queue`, `turn_answered`, `turn_ended`, `session_busy`,
 `card_answer_not_taken`). From 2026-11-02 to
 2026-11-18 every follow-up with a file stayed `queued` until the end of the run (D-FIX-HIMG-3,
 AUD-HA1/3); before 2026-11-02 its text was steered without the file.
@@ -3091,10 +3091,12 @@ actual mode was determined again (17.8), and the Hermes turn starts only after `
 A run's turn is a turn of its own and starts only on a free session (addendum of 2026-11-23,
 FIX-hermes-busy-session): while a processing of Hermes still runs on the thread's session (a turn
 without a run, such as one a stop did not end or one Hermes started itself), the adapter waits
-with `handle_message` until that processing and any Hermes starts right after it for input it
-holds have ended. On a busy session Hermes would steer the text into the running turn and admit
-no turn for the event; the run then ended `failed` with `runtime_error` at once, and the answer
-the running turn gave to it found no run. A stop of the run ends the wait; the late answer of a
+before the turn (and before it sends `/new` or `/resume`) until that processing and any Hermes
+starts right after it for input it holds have ended. Meanwhile nothing of that session counts as
+the run's: its tool calls are refused, its answers, cards and turn ends are not the run's, and a
+follow-up stays queued (`session_busy`) for the follow-on run. On a busy session Hermes would
+steer the text into the running turn and admit no turn for the event; the run then ended `failed`
+with `runtime_error` at once, and the answer the running turn gave to it found no run. A stop of the run ends the wait; the late answer of a
 stopped run's turn stays dropped (D-HERMES-CRON-COMMANDS-5).
 
 The adapter passes on the context (4.6) on the user side of the turn, separate from the text of
