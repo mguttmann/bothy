@@ -83,6 +83,7 @@ class GrantWizard extends StatefulWidget {
     this.debounce = const Duration(milliseconds: 300),
     this.onCreated,
     this.onCancel,
+    this.fixedStart = false,
   });
 
   /// The preselected subject, or null.
@@ -97,9 +98,12 @@ class GrantWizard extends StatefulWidget {
   /// The heading instead of "Create access grant", or null.
   final String? title;
 
-  /// The step that opens first (0: who, 1: where, 2: level); "Back" never goes before it, so
-  /// "Extend" (step 2) keeps the subject and the target of the grant it replaces.
+  /// The step that opens first (0: who, 1: where, 2: level).
   final int step;
+
+  /// Whether "Back" never goes before [step]: "Extend" keeps the subject and the target of the
+  /// grant it replaces this way, because it revokes that grant afterwards.
+  final bool fixedStart;
 
   /// The administration's calls.
   final AdminRepository repository;
@@ -540,7 +544,7 @@ class _GrantWizardState extends State<GrantWizard>
                 onPressed: busy ? null : cancel,
                 child: Text(l.selfCancel),
               ),
-            if (_step > widget.step.clamp(0, 2))
+            if (_step > (widget.fixedStart ? widget.step.clamp(0, 2) : 0))
               TextButton(
                 key: const ValueKey('wizard.back'),
                 onPressed: () => setState(() => _step--),

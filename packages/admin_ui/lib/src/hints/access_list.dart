@@ -485,6 +485,7 @@ mixin AccessListState<W extends AccessListView, I> on AdminActionState<W> {
                   level: grant.level ?? AccessLevel.none,
                   capabilities: grant.capabilities.toSet(),
                   step: 2,
+                  fixedStart: true,
                   title: l.hintsExtendTitle(name),
                   timeZone: widget.timeZone,
                   clock: widget.clock,
