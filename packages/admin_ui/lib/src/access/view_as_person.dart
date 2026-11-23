@@ -15,7 +15,7 @@ import '../self/self_feedback.dart';
 
 /// The spaces and channels [userId] sees, from `viewAsUser`: owners only, with step-up and an
 /// audit entry on the server (05 `access.view_as`). The step-up comes from the interceptor
-/// before the answer; a cancelled step-up shows nothing.
+/// before the answer; a cancelled step-up shows nothing and leaves the view through [onExit].
 ///
 /// The answer is shown in a clear frame with "Viewing as `<name>` (read-only). Nothing is sent.
 /// Logged." and the end of the view (`expires_at`); nothing in the frame is a control. Direct
@@ -81,7 +81,10 @@ class _ViewAsPersonState extends State<ViewAsPerson> {
       if (mounted) setState(() => _snapshot = snapshot);
     } on Object catch (e) {
       final failure = adminFailure(l, e);
-      if (mounted) setState(() => _failure = failure);
+      if (!mounted) return;
+      // A cancelled step-up has no failure text: leave instead of an empty frame.
+      if (failure == null) return widget.onExit?.call();
+      setState(() => _failure = failure);
     }
   }
 
