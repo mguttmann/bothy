@@ -27,11 +27,7 @@ import '../support/widgets.dart';
 
 void main() {
   test('defaults of 01 11: spaces and channels manual, chats by activity', () {
-    final s = PersonalSettings.resolve(
-      const {},
-      desktop: true,
-      hasCrashTarget: false,
-    );
+    final s = PersonalSettings.resolve(const {}, desktop: true);
     expect(s.arrangement, const SidebarArrangement());
     expect(s.arrangement.autoChats, isTrue);
     expect(s.arrangement.autoSpaces, isFalse);
@@ -39,15 +35,11 @@ void main() {
   });
 
   test('stored values apply; a value that is no bool counts as absent', () {
-    final s = PersonalSettings.resolve(
-      const {
-        'sidebar.auto_arrange_spaces': true,
-        'sidebar.auto_arrange_channels': 'yes',
-        'sidebar.auto_arrange_chats': false,
-      },
-      desktop: false,
-      hasCrashTarget: false,
-    );
+    final s = PersonalSettings.resolve(const {
+      'sidebar.auto_arrange_spaces': true,
+      'sidebar.auto_arrange_channels': 'yes',
+      'sidebar.auto_arrange_chats': false,
+    }, desktop: false);
     expect(
       s.arrangement,
       const SidebarArrangement(autoSpaces: true, autoChats: false),
@@ -154,11 +146,7 @@ void main() {
               ),
             ),
             personalSettingsProvider.overrideWithValue(
-              PersonalSettings.resolve(
-                const {},
-                desktop: !phone,
-                hasCrashTarget: false,
-              ),
+              PersonalSettings.resolve(const {}, desktop: !phone),
             ),
             settingsRepositoryProvider.overrideWithValue(null),
           ],

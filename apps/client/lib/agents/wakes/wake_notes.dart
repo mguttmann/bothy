@@ -85,10 +85,13 @@ WakeNote? decodeWakeNote(String content) {
   final stopped = _stopped.firstMatch(content);
   if (stopped != null) {
     final reason = stopped[1]!;
-    return WakeNote(
-      reason == _chainMax ? WakeNoteKind.chainCap : WakeNoteKind.idleCap,
-      reason: reason,
-    );
+    // A reason this version does not know keeps the server's own line (AUD-PKG-P01/2).
+    final kind = switch (reason) {
+      _chainMax => WakeNoteKind.chainCap,
+      _idleMax => WakeNoteKind.idleCap,
+      _ => null,
+    };
+    return kind == null ? null : WakeNote(kind, reason: reason);
   }
   final m = _wake.firstMatch(content);
   if (m == null) return null;

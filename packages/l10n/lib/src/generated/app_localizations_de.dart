@@ -4164,6 +4164,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get messageReactionInput => 'Beliebiges Zeichen';
 
   @override
+  String get messageReactionInvalid => 'Genau ein Zeichen oder Emoji eingeben.';
+
+  @override
   String get messageReactionAdd => 'Hinzufügen';
 
   @override
@@ -8326,6 +8329,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get switcherKindAgent => 'Agent';
 
   @override
+  String get switcherNoTarget => 'kann hier noch nicht geöffnet werden';
+
+  @override
   String get switcherKindCommand => 'Befehl';
 
   @override
@@ -8453,6 +8459,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get liveBoxSendAgain => 'Erneut senden';
 
   @override
+  String get liveBoxSendAgainUnavailable =>
+      'Hier gibt es nichts erneut zu senden: Die Nachricht hat keinen Text oder ist nicht auf diesem Gerät.';
+
+  @override
+  String get liveBoxSendAgainFailed =>
+      'Erneutes Senden fehlgeschlagen. Noch einmal versuchen.';
+
+  @override
   String get liveBoxRetry => 'Erneut versuchen';
 
   @override
@@ -8490,6 +8504,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get commandStatusTitle => 'Lauf und Sitzung';
+
+  @override
+  String get commandStatusClose => 'Schließen';
 
   @override
   String get commandStatusNoRun => 'Kein Lauf aktiv';

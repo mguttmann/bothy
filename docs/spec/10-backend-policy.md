@@ -596,8 +596,8 @@ Booking details (M2-22):
 | Where | What | Action |
 |---|---|---|
 | Live box, collapsed line | Costs of the run | `cost.read.thread` |
-| Thread header | Sum of the session (`agent_sessions.cumulative_cost_micros`) | `cost.read.thread` |
-| Agent card, console | Sums per agent, per space, per period | `cost.read.aggregate` |
+| Session column of the thread | Sum of the session (`agent_sessions.cumulative_cost_micros`) | `cost.read.thread` |
+| Statistics of the console | Sums per agent, per space, per period (the agent card shows none) | `cost.read.aggregate` |
 | Statistics | History per space, agent, model | `cost.read.aggregate`, [01-product.md](01-product.md) |
 
 Rules: in mode `organization`, until reconciliation, every number carries the suffix "Estimate".
@@ -767,8 +767,8 @@ amount per run, and run the same use case in one transaction:
 
 | Element | Content |
 |---|---|
-| Badge | "Personal" or "Organization" on the thread header, agent card, live box; icon and text, not color alone (accessibility) |
-| Agent card (console) | Configured mode, reported mode according to the heartbeat, evidence source (`method`), supported modes, holder with `personal`, costs with `organization`, warnings from section 8 |
+| Badge | "Personal" or "Organization" in the session column, on the agent card and the live box; icon and text, not color alone (accessibility) |
+| Agent card (console) | Configured mode, reported mode according to the heartbeat, evidence source (`method`), supported modes, holder with `personal`, warnings from section 8; costs stand in the statistics |
 | Admin switch | per agent and global; required field reason; step-up; beforehand a plain-language text on what changes (who pays, who may trigger) |
 | I1 preview | on every permission change that touches I1 (section 11) |
 | Note on rejection | `billing_mode_personal_not_holder`: "This agent runs on a personal subscription and accepts requests only from its holder." |

@@ -236,9 +236,10 @@ void main() {
 
       // Reactions: add and remove.
       await s.act(s.first, 'react');
+      // One character, as the server takes (the dialog refuses more, AUD-PKG-P01/4).
       await tester.enterText(
         find.byKey(const ValueKey('reaction.input')),
-        '+1',
+        '\u{1F44D}',
       );
       await s.tapKey('reaction.add');
       await s.until(
@@ -247,7 +248,7 @@ void main() {
       );
       await s.wait(500);
       await s.act(s.first, 'react');
-      await s.tapKey('reaction.chip.+1');
+      await s.tapKey('reaction.chip.\u{1F44D}');
       await s.until(
         'reaction removed',
         () => (s.world.messages[s.first]!['reactions']! as List).isEmpty,

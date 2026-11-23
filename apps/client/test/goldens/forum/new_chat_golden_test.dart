@@ -73,7 +73,7 @@ Widget newChat(Channel forum, {String? entry}) => ProviderScope(
       (ref) => Stream.value(const ConnectionState(ConnectionPhase.live)),
     ),
     personalSettingsProvider.overrideWithValue(
-      PersonalSettings.resolve(const {}, desktop: true, hasCrashTarget: false),
+      PersonalSettings.resolve(const {}, desktop: true),
     ),
     newChatPresetProvider.overrideWith(_Preset.new),
     principalNamesProvider.overrideWith(

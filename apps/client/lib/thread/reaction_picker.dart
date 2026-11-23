@@ -46,6 +46,7 @@ class ReactionPicker extends StatefulWidget {
 
 class _ReactionPickerState extends State<ReactionPicker> {
   final TextEditingController _input = TextEditingController();
+  bool _invalid = false;
 
   @override
   void dispose() {
@@ -56,6 +57,12 @@ class _ReactionPickerState extends State<ReactionPicker> {
   void _add() {
     final emoji = _input.text.trim();
     if (emoji.isEmpty) return;
+    // The server takes exactly one grapheme cluster (InvalidEmoji); anything else is refused
+    // here, in the dialog, instead of failing later in the history (AUD-PKG-P01/4).
+    if (emoji.characters.length != 1) {
+      setState(() => _invalid = true);
+      return;
+    }
     final mine = widget.existing.any((r) => r.emoji == emoji && r.me);
     Navigator.of(context).pop(ReactionChoice(emoji, remove: mine));
   }
@@ -93,7 +100,13 @@ class _ReactionPickerState extends State<ReactionPicker> {
               key: const ValueKey('reaction.input'),
               controller: _input,
               autofocus: true,
-              decoration: InputDecoration(labelText: l.messageReactionInput),
+              decoration: InputDecoration(
+                labelText: l.messageReactionInput,
+                errorText: _invalid ? l.messageReactionInvalid : null,
+              ),
+              onChanged: (_) {
+                if (_invalid) setState(() => _invalid = false);
+              },
               onSubmitted: (_) => _add(),
             ),
           ],

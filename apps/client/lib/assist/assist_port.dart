@@ -136,6 +136,10 @@ enum AssistFailureKind {
   /// `429 rate_limited`: too many questions of this person.
   rateLimited,
 
+  /// `400 validation_failed` on `/history` with `too_many_items`: the instance allows fewer
+  /// earlier questions (`search.assist.max_turns`) than the popup sent.
+  historyTooLong,
+
   /// Any other failure.
   failed,
 }
@@ -221,6 +225,9 @@ AssistFailure assistFailureOf(Object error) {
     }
     if (problem.code == 'validation_failed') {
       for (final e in problem.errors) {
+        if (e.pointer == '/history' && e.code == 'too_many_items') {
+          return const AssistFailure(AssistFailureKind.historyTooLong);
+        }
         if (e.pointer != '/q') continue;
         if (e.code == 'empty') {
           return const AssistFailure(AssistFailureKind.queryEmpty);

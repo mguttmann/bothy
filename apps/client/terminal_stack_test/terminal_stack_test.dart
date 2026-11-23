@@ -148,6 +148,10 @@ final class _Device {
       ),
       authInterceptors: interceptors,
     );
+    final ids = Uuid7Generator(
+      nowMillis: () => DateTime.now().millisecondsSinceEpoch,
+      random: (bits) => random.nextInt(1 << (bits > 31 ? 31 : bits)),
+    );
     auth = AuthSession(
       serverUrl: conn.origin,
       keys: DeviceKeys(
@@ -156,10 +160,7 @@ final class _Device {
       ),
       secrets: _Secrets(),
       clock: const SystemClock(),
-      ids: Uuid7Generator(
-        nowMillis: () => DateTime.now().millisecondsSinceEpoch,
-        random: (bits) => random.nextInt(1 << (bits > 31 ? 31 : bits)),
-      ),
+      ids: ids,
       config: AppConfig.defaults(),
       device: DeviceDescription(name: name, platform: 'macos'),
       stepUpPrompt: const _Yes(),
@@ -171,6 +172,7 @@ final class _Device {
           if (i is! StepUpInterceptor) i,
       ]),
       closeReason: 'Stack test',
+      newIdempotencyKey: ids.next,
     );
   }
 

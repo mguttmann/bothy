@@ -6757,6 +6757,12 @@ abstract class AppLocalizations {
   /// **'Any character'**
   String get messageReactionInput;
 
+  /// Error under the input of the reaction dialog when the text is not exactly one character (one grapheme cluster).
+  ///
+  /// In en, this message translates to:
+  /// **'Enter exactly one character or emoji.'**
+  String get messageReactionInvalid;
+
   /// Button of the reaction picker that adds the typed character.
   ///
   /// In en, this message translates to:
@@ -13309,6 +13315,12 @@ abstract class AppLocalizations {
   /// **'Agent'**
   String get switcherKindAgent;
 
+  /// Note after the kind of a quick switcher row that has no place to open (a person or agent without a direct message, a command).
+  ///
+  /// In en, this message translates to:
+  /// **'cannot be opened here yet'**
+  String get switcherNoTarget;
+
   /// Kind of a hit of the quick switcher.
   ///
   /// In en, this message translates to:
@@ -13500,6 +13512,18 @@ abstract class AppLocalizations {
   /// **'Send again'**
   String get liveBoxSendAgain;
 
+  /// Note next to the disabled button Send again when the triggering message cannot be sent again (09 5.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to send again from here: the message has no text or is not on this device.'**
+  String get liveBoxSendAgainUnavailable;
+
+  /// Note next to the button Send again when the run could not be read (offline or refused).
+  ///
+  /// In en, this message translates to:
+  /// **'Could not send again. Try again.'**
+  String get liveBoxSendAgainFailed;
+
   /// Button on the line of a failed or cancelled run that starts a new run of the same agent for the same message (retryRun, docs/spec/09 section 5.7, 01 section 6.2).
   ///
   /// In en, this message translates to:
@@ -13565,6 +13589,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Run and session'**
   String get commandStatusTitle;
+
+  /// Button that closes the dialog of /status; nothing is cancelled there.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get commandStatusClose;
 
   /// Line of the /status dialog without an active run.
   ///

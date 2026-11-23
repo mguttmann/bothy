@@ -154,7 +154,7 @@ void main() {
     await send(tester, host, '/status');
     expect(find.byKey(const ValueKey('command.status')), findsOneWidget);
     expect(find.textContaining('sess-now'), findsOneWidget);
-    await tester.tap(find.text(en.threadCancel));
+    await tester.tap(find.text(en.commandStatusClose));
     await host.settle(tester);
 
     expect(await entriesOf(tester, host, AgentOps.invokeCommand), isEmpty);
@@ -184,7 +184,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text(en.commandSessionsFailed), findsOneWidget);
-    await tester.tap(find.text(en.threadCancel));
+    await tester.tap(find.text(en.commandStatusClose));
     await host.settle(tester);
 
     // A thread without sessions still reads "No earlier sessions".

@@ -10,6 +10,8 @@ import 'package:flutter/foundation.dart';
 import 'assist_port.dart';
 
 /// The most earlier questions a question carries: the default of `search.assist.max_turns`.
+/// An instance that allows fewer answers `too_many_items`; the question then goes again with
+/// half the earlier questions, down to none ([AssistFailureKind.historyTooLong]).
 const int assistMaxTurns = 6;
 
 /// One question and, once it came, its answer or failure.
@@ -79,7 +81,18 @@ class AssistConversation extends ChangeNotifier {
     final p = port;
     try {
       if (p == null) throw const AssistFailure(AssistFailureKind.failed);
-      exchange.answer = await p.ask(q, turns);
+      var sent = turns;
+      while (true) {
+        try {
+          exchange.answer = await p.ask(q, sent);
+          break;
+        } on AssistFailure catch (f) {
+          if (f.kind != AssistFailureKind.historyTooLong || sent.isEmpty) {
+            rethrow;
+          }
+          sent = sent.sublist(sent.length - sent.length ~/ 2);
+        }
+      }
     } on AssistFailure catch (f) {
       exchange
         ..failure = f.kind

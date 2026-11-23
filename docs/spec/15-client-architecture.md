@@ -361,7 +361,7 @@ and has ports for clock, network status, transport (WebSocket, HTTP) and login.
 
 | Building block | Task |
 |---|---|
-| `Connection` | WebSocket (`web_socket_channel`), frames `{op, d}`, heartbeat with random delay, backoff with full jitter (`sync.reconnect_backoff_*`), immediate attempt on a network change and on foreground |
+| `Connection` | WebSocket (`web_socket_channel`), frames `{op, d}`, heartbeat with random delay, backoff with full jitter (`sync.reconnect_backoff_*`), immediate attempt on return to the foreground (no platform network status, D-M4-18-8) |
 | `Session` | `hello`, `identify` or `resume` with DPoP proof and nonce, `reauth` before token expiry, close codes according to table 6.4 |
 | `CatchUp` | apply pages, store `cursor` frames, `catchup.complete`, `resync_required` |
 | `Dispatcher` | apply durable events (one transaction per page or per live event), version rule, echo of the outbox, access removal |
@@ -394,7 +394,7 @@ stateDiagram-v2
   CatchingUp --> Resyncing: resync_required
   Resyncing --> Live: snapshot loaded, cursor at head_seq
   Live --> Backoff: disconnect, 4009, 4013, 4014
-  Backoff --> Connecting: wait time over or network change
+  Backoff --> Connecting: wait time over or foreground
   Live --> Suspended: app in the background (iOS, Android)
   Suspended --> Connecting: foreground
   Live --> SignedOut: 4012 revoked
@@ -418,7 +418,7 @@ stateDiagram-v2
 After an app start the first connection is `identify` with the stored cursor, also inside the resume window: `resumed` carries no snapshot, and the new engine holds no counters until the snapshot of `ready` seeds them (04 14; docs/DECISIONS.md D-M4-30-11).
 Every attempt has the deadline `client.sync.connect_timeout` from its start in `Connecting` until `ready` or `resumed`: a socket that does not open, a missing `hello` or a missing answer to `identify` or `resume` ends the attempt, and the app goes to `Backoff` like after a failed connect.
 
-Every state carries a reason beside its phase (`ConnectionState(phase, reason)` of `sync_engine`): `none`, `networkUnavailable`, `devicePending`, `deviceReplaced`, `forbidden`, `rateLimited`, `revoked`, `protocolUnsupported`, `belowMinimumVersion` or `closedByServer(code)`; the interface explains `Offline` and `Backoff` with it. `Offline` with `networkUnavailable` connects when the network returns. The close reactions are one table in code (`closeCodeTable`, docs/DECISIONS.md D-M4-13-2).
+Every state carries a reason beside its phase (`ConnectionState(phase, reason)` of `sync_engine`): `none`, `networkUnavailable`, `devicePending`, `deviceReplaced`, `forbidden`, `rateLimited`, `revoked`, `protocolUnsupported`, `belowMinimumVersion` or `closedByServer(code)`; the interface explains `Offline` and `Backoff` with it. `Offline` with `networkUnavailable` connects when the network returns; the apps report it only through a test port today, because they read no platform network status (D-M4-18-8). The close reactions are one table in code (`closeCodeTable`, docs/DECISIONS.md D-M4-13-2).
 
 Version gate (M7-13, [18-release.md](18-release.md) 9): before every attempt, at the start and on every reconnect, the engine asks its connect gate (`ConnectGate`); the app answers with `getDiscovery` and `client.min_version.<platform>`. A refusal opens no socket and ends in `UpdateRequired` with the reason `belowMinimumVersion`, which never reconnects. A gate without an answer keeps the last decision: it admits the attempt unless that decision refused, and the server stays the second line with `4007`. After a refusal the app closes the instance without deleting its data and shows E1 "App too old" with the update path (section 15).
 
@@ -592,9 +592,9 @@ That is why all clients use **ES256** for DPoP and step-up, although the data mo
 | Platform | Device key (DPoP) | Step-up key | Secrets (refresh token, DB key) |
 |---|---|---|---|
 | iOS | Secure Enclave, P-256, without user confirmation, keychain access group with the extensions, `AfterFirstUnlockThisDeviceOnly` | Secure Enclave, P-256, `.biometryCurrentSet` when biometrics are enrolled (new biometrics invalidate the key, [08](08-identity.md) 6.1), otherwise `.userPresence` (device password); `WhenPasscodeSetThisDeviceOnly` | Keychain through `flutter_secure_storage` (publisher steenbakker.dev); tokens for the extensions in the shared access group with `AfterFirstUnlockThisDeviceOnly`, DB key `WhenUnlockedThisDeviceOnly` |
-| macOS | Secure Enclave (Macs with an Apple chip or with Touch Bar and Touch ID according to the Apple documentation), otherwise a keychain key without the enclave, reported to the server as "not hardware-bound" | like iOS; without an enclave in the Data Protection keychain a software key whose keychain item carries `.userPresence`; without an enclave in the login keychain no step-up key, confirmation with password and TOTP ([08](08-identity.md) 6.2, `docs/decisions.d/FIX-macos-keychain.md` FIX-KC/2) | Data Protection keychain |
-| Android | Android Keystore, StrongBox if available (`setIsStrongBoxBacked`, fallback on `StrongBoxUnavailableException`), P-256; without StrongBox and trusted execution environment (emulators) a software Keystore key, reported as not hardware-bound | Keystore key with user authentication per operation through `BiometricPrompt`: from API 30 strong biometrics or the device credential (PIN, pattern, password), on API 26 to 29 strong biometrics only, because a per-operation key cannot be unlocked with the device credential there; without enrolled biometrics on those levels there is no step-up key (`not_available`). Invalidated by new biometrics (`setInvalidatedByBiometricEnrollment`) | `flutter_secure_storage` (RSA-OAEP plus AES-GCM, key in the Keystore according to the package documentation) |
-| Windows | CNG with Microsoft Platform Crypto Provider (TPM), ECDSA P-256 after a check with `NCryptIsAlgSupported`; without a TPM a software key, reported as not hardware-bound; per user, export policy `0`, the provider fixed at creation (D-M4-11-1) | none: Windows enforces no confirmation per use for a P-256 key that code in the process cannot answer itself, so the plugin reports `not_available` and the app confirms a step-up with password and TOTP ([08](08-identity.md) 6.2, D-M4-11-2, docs/decisions.d/FIX-stepup-macos.md); the terminal, which needs a device key or a passkey ([08](08-identity.md) 6.3), stays unavailable [verified, see below] | `flutter_secure_storage` (a DPAPI-encrypted file in the support folder, see 9) |
+| macOS | Secure Enclave (Macs with an Apple chip or with Touch Bar and Touch ID according to the Apple documentation), otherwise a keychain key without the enclave, which the plugin marks as not hardware-bound (the mark stays on the device; the server is not told, AUD-PKG-P01/9) | like iOS; without an enclave in the Data Protection keychain a software key whose keychain item carries `.userPresence`; without an enclave in the login keychain no step-up key, confirmation with password and TOTP ([08](08-identity.md) 6.2, `docs/decisions.d/FIX-macos-keychain.md` FIX-KC/2) | Data Protection keychain |
+| Android | Android Keystore, StrongBox if available (`setIsStrongBoxBacked`, fallback on `StrongBoxUnavailableException`), P-256; without StrongBox and trusted execution environment (emulators) a software Keystore key, marked as not hardware-bound on the device | Keystore key with user authentication per operation through `BiometricPrompt`: from API 30 strong biometrics or the device credential (PIN, pattern, password), on API 26 to 29 strong biometrics only, because a per-operation key cannot be unlocked with the device credential there; without enrolled biometrics on those levels there is no step-up key (`not_available`). Invalidated by new biometrics (`setInvalidatedByBiometricEnrollment`) | `flutter_secure_storage` (RSA-OAEP plus AES-GCM, key in the Keystore according to the package documentation) |
+| Windows | CNG with Microsoft Platform Crypto Provider (TPM), ECDSA P-256 after a check with `NCryptIsAlgSupported`; without a TPM a software key, marked as not hardware-bound on the device; per user, export policy `0`, the provider fixed at creation (D-M4-11-1) | none: Windows enforces no confirmation per use for a P-256 key that code in the process cannot answer itself, so the plugin reports `not_available` and the app confirms a step-up with password and TOTP ([08](08-identity.md) 6.2, D-M4-11-2, docs/decisions.d/FIX-stepup-macos.md); the terminal, which needs a device key or a passkey ([08](08-identity.md) 6.3), stays unavailable [verified, see below] | `flutter_secure_storage` (a DPAPI-encrypted file in the support folder, see 9) |
 | Web (console) | none: cookie session according to the backend-for-frontend pattern, tokens only in the server ([08](08-identity.md) section 7.5) | WebAuthn passkey, otherwise a renewed OIDC login or password with TOTP | none in the browser; cookie `HttpOnly` |
 
 Sources: https://pub.dev/packages/flutter_secure_storage (version 11.2.0, retrieved 2026-10-10
@@ -1240,8 +1240,8 @@ https://docs.sentry.io/platforms/dart/guides/flutter/, retrieved 2026-10-10 [ver
 
 - Off while the build configuration names no DSN (the build define `CRASH_DSN`); there is no
   instance setting for the target, because no configuration key exists for it
-  ([DECISIONS](../DECISIONS.md) D-M4-31-3). The person can turn it off
-  (`privacy.crash_reports`, shown only when a target exists).
+  ([DECISIONS](../DECISIONS.md) D-M4-31-3). It stays off until the person turns it on
+  (`privacy.crash_reports`, default `false`, shown only when a target exists).
 - No content: `sendDefaultPii` off; `beforeSend` and `beforeBreadcrumb` remove texts,
   file names, URLs with IDs, titles; no screenshots, no Session Replay, no view hierarchy.
 - Only technical attributes: app version, platform, device type, hashed instance ID.
@@ -1393,7 +1393,7 @@ it runs on and marks in its summary whether that is a reference device of sectio
 | `client.voice.bitrate` | `64kbps` | bitrate of the AAC recording |
 | `client.voice.limit_notice_lead` | `30s` | how long before `voice.max_duration` the phone shows and announces that a recording ends; the recording stops by itself shortly before the limit |
 | `client.metrics.flush_interval` | `5m` | the client sends metrics at most this often |
-| `client.status_poll_interval` | `30s` | the web console reads the status page again this often (it has no sync engine; the apps follow `status.updated`) |
+| `client.status_poll_interval` | `30s` | the web console and the open status page of the apps read the status page again this often (the apps also follow `status.updated`, which a change of agent components alone does not send) |
 | `client.perf.cold_start_p95` | `2500ms` | target for cold start |
 | `client.perf.thread_open_p95` | `300ms` | target for opening a thread from the cache |
 | `client.perf.send_local_echo_p95` | `50ms` | target for the local display on sending |

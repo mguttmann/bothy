@@ -127,6 +127,7 @@ TerminalServices? terminalServices(Ref ref) {
     api: ApiTerminalServerApi(
       services.terminalApi,
       closeReason: terminalCloseReason,
+      newIdempotencyKey: services.ids.next,
     ),
     pins: LocalHostKeyPinStore(services.database.hostKeyPinsDao),
     events: EngineHostEvents(services.engine.hostEvents),

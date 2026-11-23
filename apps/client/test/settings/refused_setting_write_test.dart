@@ -331,11 +331,7 @@ void main() {
           testPorts(dataRoot: Directory.systemTemp),
         ),
         personalSettingsProvider.overrideWithValue(
-          PersonalSettings.resolve(
-            const {},
-            desktop: true,
-            hasCrashTarget: false,
-          ),
+          PersonalSettings.resolve(const {}, desktop: true),
         ),
         settingsRepositoryProvider.overrideWithValue(null),
         refusedSettingWritesProvider.overrideWith(

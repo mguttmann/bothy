@@ -29,14 +29,21 @@ final class ThreadActions {
   Outbox get _outbox => engine.outbox;
 
   /// Sends [text] into [thread] (with [replyTo] and [attachments]); the server deletes the
-  /// draft in the same transaction (`clear_draft`, 04 14).
+  /// draft in the same transaction (`clear_draft`, 04 14) unless [clearDraft] is false.
   Future<OutboxEntry> send(
     ThreadId thread,
     String text, {
     MessageId? replyTo,
     MessageAttachments? attachments,
+    bool? clearDraft,
   }) => _outbox.enqueue(
-    messageRequest(thread, text, replyTo: replyTo, attachments: attachments),
+    messageRequest(
+      thread,
+      text,
+      replyTo: replyTo,
+      attachments: attachments,
+      clearDraft: clearDraft,
+    ),
   );
 
   /// The outbox request of a message with [text] in [thread]: [kind] `voice` for a voice

@@ -60,7 +60,7 @@ final class PersonalSettingsProvider
   }
 }
 
-String _$personalSettingsHash() => r'369e9c461972a04378943563bfa3b51e43d26c2d';
+String _$personalSettingsHash() => r'00762a9d9b32c0dc7da81f7b102c9e4e0fbd10cd';
 
 /// Which levels of the sidebar are arranged by activity, from the personal settings (01 6.16,
 /// D-M4-51-5); synchronized like every personal setting.

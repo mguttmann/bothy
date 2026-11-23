@@ -11,6 +11,7 @@ import 'dart:async';
 
 import 'package:admin_ui/admin_ui.dart';
 import 'package:design_system/design_system.dart';
+import 'package:domain/domain.dart' show AppConfigValues;
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -46,16 +47,26 @@ bool? serverUnreachableOf(ConnectionState state) => switch (state.phase) {
 };
 
 /// The [StatusSource] of the signed-in app: `getStatus` through the session's client, the
-/// engine's `status.updated` as the changes and its connection state as the reachability; null
-/// while signed out.
+/// engine's `status.updated` and a read every `client.status_poll_interval` as the changes, and
+/// its connection state as the reachability; null while signed out. The timed read is needed
+/// because a change of agent components alone sends no `status.updated` (D-M7-09-5), and the
+/// page must not keep showing a state it no longer knows (AUD-PKG-P01/7).
 @Riverpod(keepAlive: true)
 StatusSource? appStatusSource(Ref ref) {
   final repository = ref.watch(adminRepositoryProvider);
   final engine = ref.watch(syncEngineProvider);
   if (repository == null || engine == null) return null;
+  final interval = ref.watch(appConfigProvider).statusPollInterval;
   return LiveStatusSource(
     loader: repository.status,
-    changes: engine.statusUpdates,
+    // Only while a page listens: the timer starts with the subscription and ends with it.
+    changes: Stream<void>.multi((c) {
+      final subs = [
+        engine.statusUpdates.listen((_) => c.add(null)),
+        Stream<void>.periodic(interval).listen(c.add),
+      ];
+      c.onCancel = () => Future.wait([for (final s in subs) s.cancel()]);
+    }),
     // Each page gets the current state first, then every change.
     unreachable: Stream<ConnectionState>.multi((c) {
       c.add(engine.state);

@@ -614,6 +614,27 @@ void main() {
       await host.dispose(tester);
     });
 
+    testWidgets('a row without a target says so and keeps the switcher open', (
+      tester,
+    ) async {
+      await open(tester);
+      await type(tester, 'sam');
+      final before = List.of(host.visited);
+      final row = find.byKey(ValueKey('switcher.row.person.${sam.value}'));
+      expect(
+        find.descendant(
+          of: row,
+          matching: find.textContaining(en.switcherNoTarget),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(row);
+      await host.settle(tester);
+      expect(find.byKey(const ValueKey('switcher.dialog')), findsOneWidget);
+      expect(host.visited, before);
+      await host.dispose(tester);
+    });
+
     testWidgets('Esc closes without navigating', (tester) async {
       await open(tester);
       final before = List.of(host.visited);

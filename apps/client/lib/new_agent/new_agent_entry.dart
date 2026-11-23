@@ -21,6 +21,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:sync_engine/sync_engine.dart' show AppActivity;
 
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
@@ -29,11 +30,36 @@ import '../notifications_settings/providers.dart' show isOwnerProvider;
 part 'new_agent_entry.g.dart';
 
 /// The offer of "New agent" for the signed-in person, or null when the entry stays hidden: signed
-/// out, not an owner, an older server or no runner that hosts agents (26 8.1).
+/// out, not an owner, an older server or no runner that hosts agents (26 8.1). No event carries
+/// `hosts_agents` (09 7, 26 8.1), so it is read again when the stored agent cards change (a new
+/// runner), when the presence of an agent changes (the snapshot of `ready` included), when the
+/// app returns to the foreground, and on every opening of the dialog (AUD-PKG-P01/5).
 @riverpod
 Future<NewAgentOffer?> newAgentOffer(Ref ref) async {
   final services = ref.watch(signedInServicesProvider);
   if (services == null) return null;
+  final db = ref.watch(localDatabaseProvider);
+  if (db != null) {
+    // The first value is the current list; only a later change reads the offer again.
+    final cards = db.principalsDao.watchAgents().skip(1).listen((_) {
+      ref.invalidateSelf();
+    });
+    ref.onDispose(cards.cancel);
+  }
+  final back = ref
+      .watch(appPortsProvider)
+      .lifecycle
+      .changes
+      .where((a) => a == AppActivity.foreground)
+      .listen((_) => ref.invalidateSelf());
+  ref.onDispose(back.cancel);
+  final engine = ref.watch(syncEngineProvider);
+  if (engine != null) {
+    final presence = engine.ephemeral.presenceChanges.listen((_) {
+      ref.invalidateSelf();
+    });
+    ref.onDispose(presence.cancel);
+  }
   if (!await ref.watch(isOwnerProvider.future)) return null;
   // The offer reads only; no step-up, so the texts of the prompt are not needed here.
   return ApiNewAgentPort(
@@ -88,6 +114,8 @@ Future<void> openNewAgent(
   WidgetRef ref, {
   required bool phone,
 }) async {
+  // Read fresh on every opening: a runner may have stopped hosting since the entry showed.
+  ref.invalidate(newAgentOfferProvider);
   final offer = await ref.read(newAgentOfferProvider.future);
   if (offer == null || !context.mounted) return;
   final host = newAgentHostOf(context, ref, phone: phone);
