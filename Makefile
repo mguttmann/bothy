@@ -225,7 +225,7 @@ check: gates denylist sonar ## Every gate of the CI jobs of gates, denylist and 
 gates: ## All gates except denylist and sonar (CI job "gates")
 # Generated code is checked before lint and type checks, so that stale generator output is
 # reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
-gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check test coverage contract-test commitlint fragments-check \
+gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check test coverage console-web-test contract-test commitlint fragments-check \
        docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check signal-check \
        api-clients tokens runners-check labels-check release-pins install-options tofu-check gitleaks semgrep trivy osv licenses templates-check
 
@@ -1066,7 +1066,8 @@ console-e2e: ## SEC-T05: the console under its CSP in Chromium, Firefox and WebK
 # of the terminal pins) are `@TestOn('browser')`, so `make test` skips them on the VM; this runs
 # them in Chrome (CHROME_EXECUTABLE, else the browser Flutter finds). CI: job "test (apps)".
 console-web-test: ## The console's browser adapter tests in Chrome (apps/console/test/web)
-	cd apps/console && $(FLUTTER) test --platform chrome test/web
+	@if [ -z "$(DART_ON)" ]; then $(call skip,console-web,no Dart package selected); \
+	else cd apps/console && $(FLUTTER) test --platform chrome test/web; fi
 
 alert-e2e: ## M7-20: the alert path end to end (Prometheus, Alertmanager, the channel Operations, external and heartbeat stubs) against the Compose smoke stack (E2E_SERVER_IMAGE, default the tag of make image; docs/observability/alerting.md 5)
 	$(UVRUN) python tools/observability/alert_e2e.py

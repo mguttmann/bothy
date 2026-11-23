@@ -419,7 +419,7 @@ jobs:
       - name: make test coverage
         env:
           COMPONENTS: apps
-        run: make test coverage COMPONENTS="$COMPONENTS" AREAS=none
+        run: make test coverage console-web-test COMPONENTS="$COMPONENTS" AREAS=none
 
   # The SDK and plugin test suites, each with its own threshold.
   test-sdk-plugins:
