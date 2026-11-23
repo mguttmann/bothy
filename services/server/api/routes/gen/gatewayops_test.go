@@ -66,6 +66,7 @@ components:
       name: ping
       payload:
         type: object
+        additionalProperties: false
         properties:
           d:
             $ref: ./openapi.yaml#/components/schemas/ThingCreate
@@ -73,6 +74,7 @@ components:
       name: pong
       payload:
         type: object
+        additionalProperties: false
         properties:
           d:
             $ref: ./openapi.yaml#/components/schemas/ThingUpdate
@@ -165,6 +167,8 @@ func TestGatewayOps_Rules(t *testing.T) {
 			"missing feature"},
 		"open frame body": {strings.Replace(fixtureAsyncAPI, "schemas/ThingCreate", "schemas/Thing", 1), fixtureGatewaySection,
 			"Thing"},
+		"open envelope": {strings.Replace(fixtureAsyncAPI, "        additionalProperties: false\n", "", 1), fixtureGatewaySection,
+			"op.ping"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -181,7 +185,7 @@ func TestGatewayOps_Rules(t *testing.T) {
 
 // TestRealInputs_GatewayOps is the gate check of gateway_ops (M1-64): every client-to-server op of
 // the channel gateway in docs/api/asyncapi.yaml is listed exactly once, every listed op is one,
-// every body of a client frame refuses unknown members (W7, SEC-IN-1), and the enabled ops are
+// every envelope and every body of a client frame refuses unknown members (W7, SEC-IN-1), and the enabled ops are
 // identify, resume, heartbeat and reauth with the action gateway.connect (M1-64), focus,
 // typing.start and typing.stop with gateway.focus and typing.start (M1-66), and the later ops of
 // their tickets, stats.subscribe and stats.unsubscribe with stats.read among them (M6-15).
