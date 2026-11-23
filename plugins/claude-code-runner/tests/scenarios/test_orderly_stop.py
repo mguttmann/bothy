@@ -11,7 +11,6 @@ FakeServer clock follows the real time, because the runner process uses the syst
 
 from __future__ import annotations
 
-import asyncio
 import dataclasses
 import json
 import os
@@ -102,15 +101,15 @@ async def sigterm_and_watch(
     """SIGTERM to the runner; until it exits, the record never goes while the group lives."""
     path = record_path(world, run_id)
     runner.send_signal(signal.SIGTERM)
-    loop = asyncio.get_running_loop()
-    deadline = loop.time() + PATIENCE
-    while runner.poll() is None:
-        assert loop.time() < deadline, "the runner did not exit after SIGTERM"
+
+    def exited_in_order() -> bool:
         # Order matters: the record is read first, so a gone record with a live group means
         # the runner removed it before the group was gone.
         if not path.exists():
             assert group_gone(pgid), "the turn record went while the turn's group was alive"
-        await asyncio.sleep(0.005)
+        return runner.poll() is not None
+
+    await world.until(exited_in_order)
     return await world.exited(runner)
 
 
@@ -194,11 +193,7 @@ async def test_sdk_cancel_of_a_live_turn_stops_its_group_before_the_record_goes(
     assert runner.adapter is not None
 
     await runner.adapter.stop()
-    loop = asyncio.get_running_loop()
-    deadline = loop.time() + PATIENCE
-    while path.exists():
-        assert loop.time() < deadline, "the turn record stayed"
-        await asyncio.sleep(0.005)
+    await world.until(lambda: not path.exists())
     # Seen right after the record went: no process of the group may be left by then.
     assert group_gone(pid), "the turn record went while the turn's group was alive"
 

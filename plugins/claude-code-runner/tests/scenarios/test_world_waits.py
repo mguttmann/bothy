@@ -42,7 +42,7 @@ def test_no_scenario_waits_on_a_process_beside_the_world_wait() -> None:
     """``Popen.wait`` blocks the event loop of the FakeServer and fails without evidence; every
     scenario waits for a runner process with ``World.exited`` instead (the teardown of the
     world in conftest.py is the one exception)."""
-    blocking = re.compile(r"\.wait\(PATIENCE\)|to_thread\(\w+\.wait\b")
+    blocking = re.compile(r"\.wait\([^)]|to_thread\(\w+\.wait\b|deadline = loop\.time\(\)")
     found = [
         f"{path.name}:{number}"
         for path in sorted(Path(__file__).parent.glob("test_*.py"))

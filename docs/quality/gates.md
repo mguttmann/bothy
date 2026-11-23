@@ -427,14 +427,17 @@ Known class, the scenario waits of the Claude Code runner (`plugins/claude-code-
 a few scenarios ran out of their wait in CI (`test_br_05_counter_check_aborts_turn`,
 `test_resume_same_reference_attempt`). The failed waits lasted the whole of
 `quality.test.patience`, so a longer bound would not have changed them, and the bound stays. Their
-errors carried no evidence of what the runner was doing, and the waits for a runner process
-(`Popen.wait`) blocked the event loop that the FakeServer of the test runs on. Every wait of a
-scenario now goes through `World.until`, and a runner process through `World.exited`, which polls
-through it; a wait that runs out fails with the end of every runner process log, the state of
-every runner process and the last Fake-Claude records (`World.diagnostics`). Tests:
-`tests/scenarios/test_world_waits.py`, which also fails on a new `Popen.wait` in a scenario. Not
-covered: the teardown of the world in `conftest.py` (stopping the runners and their processes). The
-cause of the long waits is open until such a report names it.
+errors carried no evidence of what the runner was doing, and most waits for a runner process
+called `Popen.wait`, which blocked the event loop that the FakeServer of the test runs on. In the `test_*.py`
+files of the scenarios, the waits for a condition and for the exit of a runner process now go
+through `World.until` (a process through `World.exited`, which polls through it), and a wait that
+runs out fails with the end of every runner process log, the state of every runner process and
+the last Fake-Claude records (`World.diagnostics`). Tests: `tests/scenarios/test_world_waits.py`,
+which also fails on a new `Popen.wait` with a bound, a `to_thread` of a process wait or an own
+deadline loop in those files. Not covered: the `stop --turns` commands that `test_handover.py` and
+`test_launch_crash_points.py` run with `subprocess.run` and a time limit, and the teardown of the
+worlds in `tests/scenarios/conftest.py` and `tests/hosting_world.py`; a time limit there fails
+without that evidence. The cause of the long waits is open until such a report names it.
 
 ## Red runs
 
