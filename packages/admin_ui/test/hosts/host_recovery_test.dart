@@ -87,6 +87,23 @@ void main() {
     expect(textOf(tester, 'host.state'), 'active');
   });
 
+  testWidgets('the assignee dialog keeps an assignee the people list lacks', (
+    tester,
+  ) async {
+    repository.peopleById.remove('robin');
+    await page(tester);
+    await tapKey(tester, 'host.assignee.change');
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('assignee.person')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('assignee.person')),
+        matching: find.text('robin'),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('re-pairing shows the code although the host read failed', (
     tester,
   ) async {

@@ -30,7 +30,8 @@ Set<String> namesWithoutAssignment(AdminHost host) {
 /// assignment comes from `session_users`; a name without one reads "formerly assigned to"
 /// the person [former] gives (the last assignment in the audit of the host); without either
 /// the name stands alone with "no assignment known". The screen never guesses a name.
-/// [auditFailed] adds a note when the audit could not be read.
+/// [auditFailed] adds a note when the audit could not be read, with "Try again" when
+/// [onRetryAudit] is given.
 ///
 /// Example: `DoctorResults(host: host, people: people, former: {'term-robin': robinId})`.
 class DoctorResults extends StatelessWidget {
@@ -41,7 +42,11 @@ class DoctorResults extends StatelessWidget {
     required this.people,
     this.former = const {},
     this.auditFailed = false,
+    this.onRetryAudit,
   });
+
+  /// Reads the audit again after [auditFailed], or null for no button.
+  final VoidCallback? onRetryAudit;
 
   /// The host.
   final AdminHost host;
@@ -120,6 +125,15 @@ class DoctorResults extends StatelessWidget {
             key: const ValueKey('doctor.auditFailed'),
             style: dsTextStyle(DsType.bodySm)
                 .copyWith(color: colors.textSecondary),
+          ),
+        if (auditFailed && onRetryAudit != null)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton(
+              key: const ValueKey('doctor.auditRetry'),
+              onPressed: onRetryAudit,
+              child: Text(l.selfRetry),
+            ),
           ),
       ],
     );

@@ -158,6 +158,13 @@ class _HostDetailState extends State<HostDetail>
     }
   }
 
+  /// "Try again" after a failed read of the audit: the names are looked up once more (a reload
+  /// alone does not ask again, so a cancelled step-up is not repeated on every change).
+  Future<void> _retryHistory(AdminHost host) {
+    _historyFor.removeAll(namesWithoutAssignment(host));
+    return _history(host);
+  }
+
   void _changed(AdminHost host) {
     setState(() => _host = host);
     widget.onChanged?.call();
@@ -452,6 +459,7 @@ class _HostDetailState extends State<HostDetail>
               people: _people,
               former: _former,
               auditFailed: _auditFailed,
+              onRetryAudit: () => _retryHistory(h),
             ),
           ),
           _field(
@@ -546,7 +554,22 @@ class _AssigneeDialogState extends State<_AssigneeDialog> {
             items: [
               DropdownMenuItem(child: Text(l.hostOwnersOnly)),
               for (final p in widget.people)
-                DropdownMenuItem(value: p.id, child: Text(p.displayName)),
+                if (p.status == AdminPersonStatus.active ||
+                    p.status == AdminPersonStatus.pending)
+                  DropdownMenuItem(value: p.id, child: Text(p.displayName)),
+              // The current assignee stays an entry, also when the people did not load or
+              // the person is no longer active.
+              if (widget.host.assignedUserId case final current?
+                  when !widget.people.any(
+                    (p) =>
+                        p.id == current &&
+                        (p.status == AdminPersonStatus.active ||
+                            p.status == AdminPersonStatus.pending),
+                  ))
+                DropdownMenuItem(
+                  value: current,
+                  child: Text(personName(widget.people, current)),
+                ),
             ],
             onChanged: (v) => setState(() => _assignee = v),
           ),
