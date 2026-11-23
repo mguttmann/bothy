@@ -139,8 +139,14 @@ final class IndexedDbPinDatabase implements PinDatabase {
     request.onerror = ((web.Event _) {
       if (!done.isCompleted) done.completeError(StateError('pins not deleted'));
     }).toJS;
-    // A connection of another tab holds the deletion until it closes; the stores close theirs
-    // after every operation, so the deletion goes through right after.
+    // A connection of another tab holds the deletion until it closes. The browser deletes the
+    // database once it is closed, but the caller (the end of the session) must not wait for
+    // that: a blocked deletion fails at once and E7 shows.
+    request.onblocked = ((web.Event _) {
+      if (!done.isCompleted) {
+        done.completeError(StateError('pins deletion blocked'));
+      }
+    }).toJS;
     await done.future;
   }
 
@@ -175,6 +181,10 @@ final class IndexedDbPinDatabase implements PinDatabase {
     final done = Completer<void>();
     tx.oncomplete = ((web.Event _) => done.complete()).toJS;
     tx.onerror = ((web.Event _) {
+      if (!done.isCompleted) done.completeError(StateError('pin not stored'));
+    }).toJS;
+    // A transaction the browser aborts (the quota at commit) ends without an error event.
+    tx.onabort = ((web.Event _) {
       if (!done.isCompleted) done.completeError(StateError('pin not stored'));
     }).toJS;
     return done.future;

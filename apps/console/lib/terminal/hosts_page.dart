@@ -10,7 +10,9 @@ import 'dart:async';
 import 'package:admin_ui/admin_ui.dart';
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart' show AppConfigValues;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:l10n/l10n.dart';
 import 'package:terminal_ui/terminal_ui.dart';
 
@@ -38,6 +40,30 @@ abstract final class ConsoleTerminalKeys {
 
   /// "Back to host": closes the view of a session that no longer runs.
   static const close = ValueKey('console.terminal.close');
+
+  /// The note that names the keys which leave the terminal.
+  static const leaveHint = ValueKey('console.terminal.leaveHint');
+}
+
+/// The keys that move the focus from the terminal to its buttons (WCAG 2.1.2): the terminal
+/// takes Tab, Shift+Tab and F6 for the shell, so the way out needs the platform modifier of the
+/// terminal's app shortcuts (01 7, R-PR-10): Cmd+Shift+F6 on Apple systems, Ctrl+Shift+F6
+/// elsewhere.
+SingleActivator consoleLeaveTerminalKeys(TargetPlatform platform) =>
+    _apple(platform)
+    ? const SingleActivator(LogicalKeyboardKey.f6, meta: true, shift: true)
+    : const SingleActivator(LogicalKeyboardKey.f6, control: true, shift: true);
+
+/// The label of [consoleLeaveTerminalKeys] for [platform].
+String consoleLeaveTerminalLabel(TargetPlatform platform) =>
+    _apple(platform) ? 'Cmd+Shift+F6' : 'Ctrl+Shift+F6';
+
+bool _apple(TargetPlatform platform) =>
+    platform == TargetPlatform.macOS || platform == TargetPlatform.iOS;
+
+/// Moves the focus from the terminal to the buttons above it.
+class _LeaveTerminalIntent extends Intent {
+  const _LeaveTerminalIntent();
 }
 
 /// The page of [route] on "Hosts and terminal".
@@ -135,8 +161,9 @@ class ConsoleHostsPage extends StatelessWidget {
   }
 }
 
-/// The terminal of one host with the console's controls above it.
-class _TerminalView extends StatelessWidget {
+/// The terminal of one host with the console's controls above it, and the keys that leave the
+/// terminal for those controls ([consoleLeaveTerminalKeys]).
+class _TerminalView extends StatefulWidget {
   const _TerminalView({
     required this.terminal,
     required this.fontSize,
@@ -148,8 +175,28 @@ class _TerminalView extends StatelessWidget {
   final VoidCallback onClose;
 
   @override
+  State<_TerminalView> createState() => _TerminalViewState();
+}
+
+class _TerminalViewState extends State<_TerminalView> {
+  final _back = FocusNode(debugLabel: 'console.terminal.close');
+  final _detach = FocusNode(debugLabel: 'console.terminal.detach');
+  final _reattach = FocusNode(debugLabel: 'console.terminal.reattach');
+  final _end = FocusNode(debugLabel: 'console.terminal.end');
+
+  @override
+  void dispose() {
+    for (final node in [_back, _detach, _reattach, _end]) {
+      node.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final terminal = widget.terminal;
+    final platform = defaultTargetPlatform;
     return ListenableBuilder(
       listenable: terminal,
       builder: (context, _) {
@@ -162,6 +209,15 @@ class _TerminalView extends StatelessWidget {
             phase == TerminalPhase.ended ||
             phase == TerminalPhase.blocked ||
             phase == TerminalPhase.failed;
+        final detached = phase == TerminalPhase.detached;
+        final endable = state.sessionId != null && !over;
+        // The first button that can act takes the focus when the person leaves the terminal.
+        final target = [
+          if (over) _back,
+          if (live) _detach,
+          if (detached) _reattach,
+          if (endable) _end,
+        ].firstOrNull;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -173,39 +229,63 @@ class _TerminalView extends StatelessWidget {
               child: Wrap(
                 spacing: DsSpace.s8,
                 runSpacing: DsSpace.s8,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   OutlinedButton(
                     key: ConsoleTerminalKeys.close,
-                    onPressed: over ? onClose : null,
+                    focusNode: _back,
+                    onPressed: over ? widget.onClose : null,
                     child: Text(l.consoleTerminalBack),
                   ),
                   OutlinedButton(
                     key: ConsoleTerminalKeys.detach,
+                    focusNode: _detach,
                     onPressed: live ? () => unawaited(terminal.detach()) : null,
                     child: Text(l.terminalDetach),
                   ),
                   OutlinedButton(
                     key: ConsoleTerminalKeys.reattach,
-                    onPressed: phase == TerminalPhase.detached
+                    focusNode: _reattach,
+                    onPressed: detached
                         ? () => unawaited(terminal.attach())
                         : null,
                     child: Text(l.terminalReattach),
                   ),
                   OutlinedButton(
                     key: ConsoleTerminalKeys.end,
-                    onPressed: state.sessionId != null && !over
-                        ? () => unawaited(terminal.end())
-                        : null,
+                    focusNode: _end,
+                    onPressed: endable ? () => unawaited(terminal.end()) : null,
                     child: Text(l.terminalEnd),
+                  ),
+                  Text(
+                    l.consoleTerminalLeaveHint(
+                      consoleLeaveTerminalLabel(platform),
+                    ),
+                    key: ConsoleTerminalKeys.leaveHint,
+                    style: dsTextStyle(DsType.caption),
                   ),
                 ],
               ),
             ),
             Expanded(
-              child: TerminalPane(
-                key: ConsoleTerminalKeys.pane,
-                controller: terminal,
-                fontSize: fontSize,
+              child: Actions(
+                actions: {
+                  _LeaveTerminalIntent: CallbackAction<_LeaveTerminalIntent>(
+                    onInvoke: (_) {
+                      target?.requestFocus();
+                      return null;
+                    },
+                  ),
+                },
+                child: TerminalPane(
+                  key: ConsoleTerminalKeys.pane,
+                  controller: terminal,
+                  fontSize: widget.fontSize,
+                  shortcuts: {
+                    consoleLeaveTerminalKeys(platform):
+                        const _LeaveTerminalIntent(),
+                  },
+                ),
               ),
             ),
           ],

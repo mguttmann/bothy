@@ -173,21 +173,31 @@ class ConsoleActionStepUp {
           : const [],
     );
     final answer = await dialog.ask(purpose, ways);
+    if (answer == null) throw const StepUpCancelled();
+    if (answer is StepUpWithOidc) {
+      onOidc(answer.provider);
+      throw const StepUpCancelled();
+    }
+    // The first challenge only told which ways there are. The person may take longer than
+    // `auth.step_up_challenge_ttl` in the dialog, so the confirmation runs over a challenge
+    // created after the answer, as packages/auth does.
+    final fresh = (await auth.createStepUpChallenge(extra: _own)).data!;
     switch (answer) {
-      case null:
-        throw const StepUpCancelled();
       case StepUpWithPasskey():
-        if (options == null) throw const StepUpCancelled();
+        final freshOptions = fresh.passkeyOptions;
+        if (options == null || freshOptions == null) {
+          throw const StepUpCancelled();
+        }
         final Map<String, Object?> credential;
         try {
-          credential = await passkeys.get(_plain(options));
+          credential = await passkeys.get(_plain(freshOptions));
         } on PasskeyCancelled {
           throw const StepUpCancelled();
         }
         await auth.completeStepUpWithPasskey(
           stepUpPasskeyRequest: StepUpPasskeyRequest(
             (b) => b
-              ..challengeId = challenge.challengeId
+              ..challengeId = fresh.challengeId
               ..credential.replace(_json(credential)),
           ),
           extra: _own,
@@ -196,14 +206,13 @@ class ConsoleActionStepUp {
         await auth.stepUpWithPassword(
           stepUpPasswordRequest: StepUpPasswordRequest(
             (b) => b
-              ..challengeId = challenge.challengeId
+              ..challengeId = fresh.challengeId
               ..password = password
               ..totpCode = code.trim(),
           ),
           extra: _own,
         );
-      case StepUpWithOidc(:final provider):
-        onOidc(provider);
+      case StepUpWithOidc():
         throw const StepUpCancelled();
     }
     await onConfirmed();
@@ -234,6 +243,7 @@ class ConsoleStepUpInterceptor extends Interceptor {
     required this.dio,
     required this.stepUp,
     required this.active,
+    this.viewEnded,
   });
 
   /// The Dio that repeats the request.
@@ -244,6 +254,11 @@ class ConsoleStepUpInterceptor extends Interceptor {
 
   /// Whether the console is signed in with its first step-up.
   final bool Function() active;
+
+  /// Whether the answer came from the end of a stored view (07 9.2: the server ends it with the
+  /// first request after its end and answers `step_up_required`); then the request repeats
+  /// without a step-up. Null treats every answer as the step-up of an action.
+  final Future<bool> Function()? viewEnded;
 
   @override
   Future<void> onError(
@@ -262,8 +277,11 @@ class ConsoleStepUpInterceptor extends Interceptor {
       return handler.next(err);
     }
     options.extra[_stepUpRetried] = true;
+    final ended = viewEnded;
     try {
-      await stepUp(options.extra[stepUpPurposeExtra] as String? ?? '');
+      if (ended == null || !await ended()) {
+        await stepUp(options.extra[stepUpPurposeExtra] as String? ?? '');
+      }
     } on DioException catch (e) {
       return handler.next(e);
     } on Object catch (e) {

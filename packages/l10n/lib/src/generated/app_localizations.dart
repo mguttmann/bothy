@@ -7009,11 +7009,11 @@ abstract class AppLocalizations {
   /// **'{product} console'**
   String consoleTitle(String product);
 
-  /// Web console screen 01 section 5.5: body of a navigation entry whose screen is not built yet.
+  /// Web console screen 01 section 5.5: the title of the browser tab on a page of the signed-in console (WCAG 2.4.2): the page, then the console.
   ///
   /// In en, this message translates to:
-  /// **'This page comes with a later version of the console.'**
-  String get consolePlaceholderPage;
+  /// **'{page} - {console}'**
+  String consoleDocumentTitle(String page, String console);
 
   /// Web console screen 01 section 5.5: header line with the signed-in person.
   ///
@@ -13487,6 +13487,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open terminal'**
   String get consoleTerminalOpen;
+
+  /// Web console terminal view (01 5.5, WCAG 2.1.2): the note below the buttons of the terminal that names the keys which leave the terminal, because Tab goes to the shell.
+  ///
+  /// In en, this message translates to:
+  /// **'{keys} moves the focus from the terminal to the buttons above it.'**
+  String consoleTerminalLeaveHint(String keys);
 
   /// Web console terminal: button that closes the view of a session that no longer runs and shows the host again.
   ///

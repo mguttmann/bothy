@@ -89,10 +89,17 @@ class ConsoleTerminals extends ChangeNotifier {
 
   /// Opens a terminal on [hostId]: a new controller runs the flow of 15 23.2 (the host from
   /// REST, the pin check, the dialog, the passkey step-up, the stream). A cancelled or refused
-  /// opening leaves no tab behind. Does nothing without a session or while the host has one.
+  /// opening leaves no tab behind. Does nothing without a session, while the host has one or
+  /// for an ID that is no host ID (a path the person typed).
   Future<void> open(String hostId) async {
     final self = console.session?.userId;
     if (self == null || _open.containsKey(hostId)) return;
+    final HostId host;
+    try {
+      host = HostId.parse(hostId);
+    } on FormatException {
+      return;
+    }
     final controller = TerminalController(
       api: api,
       transport: ConsoleTerminalTransport(
@@ -111,7 +118,7 @@ class ConsoleTerminals extends ChangeNotifier {
     _open[hostId] = controller;
     notifyListeners();
     await controller.open(
-      host: HostId.parse(hostId),
+      host: host,
       profile: consoleDefaultTerminalProfile,
       cols: 80,
       rows: 24,

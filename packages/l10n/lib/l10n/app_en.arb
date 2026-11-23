@@ -6457,9 +6457,19 @@
       }
     }
   },
-  "consolePlaceholderPage": "This page comes with a later version of the console.",
-  "@consolePlaceholderPage": {
-    "description": "Web console screen 01 section 5.5: body of a navigation entry whose screen is not built yet."
+  "consoleDocumentTitle": "{page} - {console}",
+  "@consoleDocumentTitle": {
+    "description": "Web console screen 01 section 5.5: the title of the browser tab on a page of the signed-in console (WCAG 2.4.2): the page, then the console.",
+    "placeholders": {
+      "page": {
+        "type": "String",
+        "example": "People"
+      },
+      "console": {
+        "type": "String",
+        "example": "Team Chat console"
+      }
+    }
   },
   "consoleSignedInAs": "Signed in: {name}",
   "@consoleSignedInAs": {
@@ -12791,6 +12801,16 @@
   "consoleTerminalOpen": "Open terminal",
   "@consoleTerminalOpen": {
     "description": "Web console page 'Hosts and terminal' (01 section 5.5): button on the page of a host that opens the terminal."
+  },
+  "consoleTerminalLeaveHint": "{keys} moves the focus from the terminal to the buttons above it.",
+  "@consoleTerminalLeaveHint": {
+    "description": "Web console terminal view (01 5.5, WCAG 2.1.2): the note below the buttons of the terminal that names the keys which leave the terminal, because Tab goes to the shell.",
+    "placeholders": {
+      "keys": {
+        "type": "String",
+        "example": "Ctrl+Shift+F6"
+      }
+    }
   },
   "consoleTerminalBack": "Back to host",
   "@consoleTerminalBack": {

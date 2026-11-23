@@ -127,6 +127,76 @@ void stepUpFirst(FakeServer server, String route, {int times = 1}) {
 }
 
 void main() {
+  test(
+    'the confirmation uses a challenge created after the dialog answered',
+    () async {
+      // fn-sign-in-devices-15: a person who needs longer than auth.step_up_challenge_ttl in the
+      // dialog must not confirm over an expired challenge.
+      final b = TestBrowser();
+      final h = Harness(
+        b,
+        FakePrompt(const StepUpWithPassword('secret-1', ' 492039 ')),
+        methods: const [StepUpMethod.passwordTotp],
+        passkeyOptions: false,
+      );
+      var issued = 0;
+      b.server.routes['POST /api/v1/auth/step-up/challenge'] = (_) {
+        issued++;
+        return Answer(200, {
+          'challenge_id': '0192f4a0-7b1c-747c-835d-13eca158d3c$issued',
+          'challenge': 'Zm9vYmFy',
+          'expires_at': '2026-10-10T09:35:00.000Z',
+        });
+      };
+      stepUpFirst(b.server, 'POST /api/v1/groups');
+      await h.createGroup();
+      expect(issued, 2);
+      final confirm = b.server
+          .to('POST', '/api/v1/auth/step-up/password')
+          .single;
+      expect(
+        (confirm.body! as Map)['challenge_id'],
+        '0192f4a0-7b1c-747c-835d-13eca158d3c2',
+      );
+    },
+  );
+
+  test(
+    'a step_up_required that ended the stored view repeats without a dialog',
+    () async {
+      // console-terminal-ui-10: the end of a view is the server's answer, not the browser's clock.
+      final b = TestBrowser();
+      final prompt = FakePrompt(const StepUpWithPasskey());
+      var viewEnded = 0;
+      late final ApiClient client;
+      client = createConsoleApiClient(
+        origin: Uri.parse('https://chat.example.com'),
+        adapter: b.server,
+        onUnauthorized: (_) {},
+        interceptors: [
+          ConsoleStepUpInterceptor(
+            dio: () => client.dio,
+            stepUp: (_) async => prompt.ask(
+              '',
+              const ConsoleStepUpWays(passkey: true, password: false, oidc: []),
+            ),
+            active: () => true,
+            viewEnded: () async {
+              viewEnded++;
+              return true;
+            },
+          ),
+        ],
+      );
+      stepUpFirst(b.server, 'POST /api/v1/groups');
+      final r = await client.dio.post<Object?>('/groups', data: {'name': 'x'});
+      expect(r.statusCode, 201);
+      expect(viewEnded, 1);
+      expect(prompt.purposes, isEmpty);
+      expect(b.server.to('POST', '/api/v1/groups'), hasLength(2));
+    },
+  );
+
   test('a step_up_required action runs the passkey step-up and repeats once with the same key', () async {
     final h = Harness(TestBrowser(), FakePrompt(const StepUpWithPasskey()));
     stepUpFirst(h.b.server, 'POST /api/v1/groups');
