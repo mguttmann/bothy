@@ -479,9 +479,14 @@ class SwitcherRow extends StatelessWidget {
               ),
               const SizedBox(width: DsSpace.s8),
             ],
-            Text(
-              noTarget == null ? kind : '$kind \u00b7 $noTarget',
-              style: dsTextStyle(DsType.caption).copyWith(color: c.textMuted),
+            Flexible(
+              child: Text(
+                noTarget == null ? kind : '$kind \u00b7 $noTarget',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
+                style: dsTextStyle(DsType.caption).copyWith(color: c.textMuted),
+              ),
             ),
           ],
         ),
