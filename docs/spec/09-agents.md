@@ -3068,7 +3068,7 @@ the text with the paths, an approval or confirmation is refused with that text i
 is acknowledged as above unless a file may still come (D-FMS-8). Every follow-up the adapter does
 not steer, also an answer to a card Hermes did not take, gets one log line with its message ID
 and the reason code (`no_turn`, `not_readable`, `stopped`, `run_ended`, `audio`,
-`scan_pending`, `unavailable`, `own_turn`, `busy_mode_queue`, `turn_answered`, `turn_ended`,
+`scan_pending`, `unavailable`, `own_turn`, `busy_mode_queue`, `turn_answered`, `turn_ended`, `session_busy`,
 `card_answer_not_taken`). From 2026-11-02 to
 2026-11-18 every follow-up with a file stayed `queued` until the end of the run (D-FIX-HIMG-3,
 AUD-HA1/3); before 2026-11-02 its text was steered without the file.
@@ -3101,6 +3101,18 @@ sequenceDiagram
 Order as built (M2-33): the SDK checks the token, stores the event with its token in the inbox
 and acknowledges it before the adapter reads `run.context.read`; `run.start` follows after the
 actual mode was determined again (17.8), and the Hermes turn starts only after `200`.
+
+A run's turn is a turn of its own and starts only on a free session (addendum of 2026-11-23,
+FIX-hermes-busy-session): while a processing of Hermes still runs on the thread's session (a turn
+without a run, such as one a stop did not end or one Hermes started itself), the adapter waits
+before the turn (and before it sends `/new` or `/resume`) until that processing and any Hermes
+starts right after it for input it holds have ended. Meanwhile nothing of that session counts as
+the run's: its tool calls are refused, its answers, cards and turn ends are not the run's, and a
+follow-up stays queued (`session_busy`) for the follow-on run. On a busy session Hermes would
+steer the text into the running turn and admit no turn for the event; the run then ended `failed`
+with `runtime_error` at once, and the answer the running turn gave to it found no run. A stop or
+an abort of the run ends the wait (an abort ends the run without a turn and without a session
+report); the late answer of a stopped run's turn stays dropped (D-HERMES-CRON-COMMANDS-5).
 
 The adapter passes on the context (4.6) on the user side of the turn, separate from the text of
 the triggering person, which is the event's text together with the transcripts of its voice
@@ -3231,7 +3243,12 @@ Three layers, each sufficient on its own for "no stranger triggers":
    agent-self, `GET /api/v1/agents/me/triggerers`, returns IDs and `permission_version`). It is
    reloaded when a token carries a higher `permission_version` (4.5 item 9).
 3. **Hermes:** With `personal` the installer also writes Hermes' allowlist of the
-   platform (`allowed_users_env`) with exactly the `credential_holder`. It changes only on
+   platform (`allowed_users_env`) with exactly the `credential_holder` and the adapter's control
+   sender (17.4). Hermes judges every sender by the list, also the control sender, whose
+   `/stop`, `/new`, `/resume` and control commands it would otherwise refuse: a stopped run's
+   turn then went on in the session (addendum of 2026-11-23, FIX-hermes-busy-session; a profile
+   switched before needs `switch-mode personal` again and a gateway restart). No person's event
+   carries the control sender, because the adapter builds every source itself. It changes only on
    a switch (I4), which needs a restart in Hermes anyway. With `organization`
    this list stays empty, and Hermes relies on layer 2; a list that would need a restart on every
    grant would not be operable.

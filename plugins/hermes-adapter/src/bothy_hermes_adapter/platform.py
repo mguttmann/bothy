@@ -866,6 +866,33 @@ class ServerPlatform(BasePlatformAdapter):
         event = MessageEvent(text="", message_type=MessageType.TEXT, source=source)
         return str(self._event_session_key(event))
 
+    async def session_free(self, thread_id: uuid.UUID) -> None:
+        """Wait until no processing of Hermes runs on the thread's session (17.6).
+
+        Busy means the platform's processing task of the session or the gateway's running-turn
+        slot (`turn_running`), which a turn of the session authority's queue holds without such
+        a task; a processing Hermes starts right after another for input it holds is waited
+        for as well. Cancelling the caller ends the wait.
+        """
+        logged = False
+        while (busy := self._busy_with(thread_id)) is not False:
+            if not logged:
+                logged = True
+                _LOG.info("thread %s: turn waits for the busy Hermes session", thread_id)
+            if busy is True:
+                interval = self.settings.background_poll_interval if self.settings else 1.0
+                await asyncio.sleep(interval)
+            else:
+                await asyncio.wait({busy})
+
+    def _busy_with(self, thread_id: uuid.UUID) -> asyncio.Future[Any] | bool:
+        """The session's running processing task, True for a taken running-turn slot, else False."""
+        key = self._session_key(thread_id)
+        task = self._session_tasks.get(key) if key is not None else None
+        if task is not None and not task.done() and task is not asyncio.current_task():
+            return task  # type: ignore[no-any-return]
+        return bool(self.turn_running(thread_id))
+
     def turn_running(self, thread_id: uuid.UUID) -> bool | None:
         """Whether a turn of the thread's session runs: the gateway's running-turn slot (17.12).
 

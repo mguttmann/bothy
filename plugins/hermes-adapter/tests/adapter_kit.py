@@ -99,6 +99,9 @@ class FakeRuntime:
     cancelled_background: list[UUID] = field(default_factory=list)
     # Hermes' busy state of a thread's session (`turn_running`); ``None``: the fake cannot tell.
     busy: set[UUID] | None = None
+    # A busy Hermes session: `session_free` waits until the event is set; ``None``: free.
+    session_gate: asyncio.Event | None = None
+    waited: list[UUID] = field(default_factory=list)
     # Hermes' clarify expired: its resolvers take no answer any more (D-HAM-2).
     expired: bool = False
     _events: HermesHandler | None = None
@@ -176,6 +179,11 @@ class FakeRuntime:
             replace(t, state="cancelled", open=False) if t.open else t
             for t in self.background.get(thread_id, ())
         ]
+
+    async def session_free(self, thread_id: UUID) -> None:
+        self.waited.append(thread_id)
+        if self.session_gate is not None:
+            await self.session_gate.wait()
 
     def turn_running(self, thread_id: UUID) -> bool | None:
         return None if self.busy is None else thread_id in self.busy
