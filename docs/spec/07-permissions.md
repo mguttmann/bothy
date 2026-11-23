@@ -1,6 +1,6 @@
 # 07 Permissions and authorization
 
-Status: draft M0. Normative for the module `authz`, for every route, every WebSocket op, every
+Status: normative, built (M1 to M8). Normative for the module `authz`, for every route, every WebSocket op, every
 delivery and every agent invocation.
 Terms: [00-glossary.md](00-glossary.md). Tables: [03-data-model.md](03-data-model.md).
 Events and catch-up: [04-sync-protocol.md](04-sync-protocol.md). Actions, receive actions

@@ -1,6 +1,6 @@
 # Audit log and telemetry
 
-Status: draft M0. Distinction according to B11. Audit log: [03-data-model.md](../spec/03-data-model.md)
+Status: built (M1 to M7). Distinction according to B11. Audit log: [03-data-model.md](../spec/03-data-model.md)
 4.12, actions with audit: [05-actions.md](../spec/05-actions.md). Security chapter 19 and
 ADR 0021 define the content and the checking of the audit log.
 

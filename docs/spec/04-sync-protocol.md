@@ -1,6 +1,6 @@
 # 04 Event and sync protocol
 
-Status: draft M0, integrated after the feedback of all chapters. Normative for the gateway
+Status: normative, built (M1 to M8). Normative for the gateway
 (AsyncAPI 3.0), the REST catch-up interface (OpenAPI 3.1), the clients and the agent adapters.
 All paths are under the prefix `/api/v1` ([06-api.md](06-api.md), R-API-01).
 Terms: [00-glossary.md](00-glossary.md). Tables: [03-data-model.md](03-data-model.md).

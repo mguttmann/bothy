@@ -1,6 +1,6 @@
 # 09 Agents
 
-Status: draft M0. Normative for the modules `agents` and `runs`, for every agent adapter and for
+Status: normative, built (M1 to M8). Normative for the modules `agents` and `runs`, for every agent adapter and for
 the two reference adapters (Hermes Agent, Claude Code runner).
 Terms: [00-glossary.md](00-glossary.md). Tables: [03-data-model.md](03-data-model.md).
 Events, cursors, live box patches: [04-sync-protocol.md](04-sync-protocol.md). Actions and

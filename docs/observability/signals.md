@@ -1,6 +1,6 @@
 # Signal catalogue
 
-Status: draft M0. The single list of all telemetry names, units and attributes. Rules:
+Status: built (M1 to M7). The single list of all telemetry names, units and attributes. Rules:
 [17-observability.md](../spec/17-observability.md). What is missing here, the code must not send;
 the collector allowlist, dashboards, rules and SLOs use only names from here.
 

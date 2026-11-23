@@ -1,6 +1,6 @@
 # 14 Search
 
-Status: draft M0. Normative for the full-text search in the server, the file text extraction and the
+Status: normative, built (M1 to M8). Normative for the full-text search in the server, the file text extraction and the
 offline search in the client. Terms: [00-glossary.md](00-glossary.md). Tables and search vectors:
 [03-data-model.md](03-data-model.md) section 5; this chapter defines what section 5 there assigns
 to it: "language choice, weighting, ranking, highlighting". Permissions:

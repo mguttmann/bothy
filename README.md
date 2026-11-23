@@ -99,6 +99,13 @@ Known limits:
   service and its helpers. Today a terminal runs only in the owner account mode, on the owner's
   own machine ([24 Terminal](docs/spec/24-terminal.md) 2.2 and 2.4,
   [services/host](services/host/README.md)).
+- **Channel settings only through the API.** The tags of a forum and of a post after its
+  creation, the behavior of a channel, the default operator of a space and the templates of a
+  channel can be changed through the API alone; no app has a view for them yet
+  ([01 Product](docs/spec/01-product.md#3-feature-list), place "API").
+- **No view of the backup runs.** The admin console shows neither the backup runs nor a warning
+  without an off-site target; the state is in the log of the backup service, in the alerts and
+  in the table `backup_runs` ([Backup and restore](docs/operations/backup-restore.md#11-state-of-the-runs)).
 - **Tested in daily use at one installation.** The automated tests run on every change; real
   operation so far is one installation.
 

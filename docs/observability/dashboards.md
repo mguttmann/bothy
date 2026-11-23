@@ -1,6 +1,6 @@
 # Dashboards
 
-Status: draft M0. Six Grafana dashboards (seven since M7-25, the seventh uses the panel plugin of
+Status: built (M1 to M7). Six Grafana dashboards (seven since M7-25, the seventh uses the panel plugin of
 section 5) as files under
 [infra/observability/grafana/dashboards/](../../infra/observability/grafana/dashboards/), loaded through
 file provisioning (https://grafana.com/docs/grafana/latest/administration/provisioning/,

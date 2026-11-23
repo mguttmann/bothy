@@ -1,6 +1,6 @@
 # 10 Backend policy
 
-Status: draft M0. Normative for the modules `agents`, `authz`, `billing`, for every
+Status: normative, built (M1 to M8). Normative for the modules `agents`, `authz`, `billing`, for every
 agent adapter and for the console.
 Terms: [00-glossary.md](00-glossary.md). Tables: [03-data-model.md](03-data-model.md)
 (`agents`, `runs`, `cost_entries`, `price_table`). Actions: [05-actions.md](05-actions.md).
