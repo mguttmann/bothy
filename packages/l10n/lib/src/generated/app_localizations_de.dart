@@ -10905,6 +10905,8 @@ class AppLocalizationsDe extends AppLocalizations {
           'Persönlich braucht einen Runner mit einem persönlichen Abonnement.',
       'notHolder':
           'Persönlich braucht dich als Inhaber der Zugangsdaten des Runners.',
+      'contextUnknown':
+          'Persönlich braucht deine Kontodaten, die nicht geladen sind.',
       'other': 'Der Runner meldet Persönlich nicht.',
     });
     return '$_temp0';

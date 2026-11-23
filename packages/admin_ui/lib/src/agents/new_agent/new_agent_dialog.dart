@@ -235,16 +235,9 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
           ..addListener(_changed);
     // An edit, a restore and a shown version start at the preview.
     if (_flow.draft != null) _stage = _Stage.preview;
-    unawaited(_loadContext());
-  }
-
-  Future<void> _loadContext() async {
-    try {
-      final c = await widget.port.context();
-      if (mounted) _flow.setContext(c);
-    } on Object {
-      // Without the context the preview offers no personal billing and no space; the rest works.
-    }
+    // Without the context the preview offers no personal billing and no space and says why,
+    // with a way to read it again; the rest works.
+    unawaited(_flow.loadContext());
   }
 
   void _changed() {
@@ -269,6 +262,14 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
   }
 
   void _go(_Stage stage) {
+    // An interview that already delivered its draft is not asked again: its draft is taken.
+    final i = _interview;
+    final draft = stage == _Stage.interview ? i?.draft : null;
+    if (i != null && draft != null) {
+      _flow.useInterview(draft, costMicros: i.costMicros, currency: i.currency);
+      setState(() => _stage = _Stage.preview);
+      return;
+    }
     setState(() => _stage = stage);
     if (stage == _Stage.interview && _interview == null) {
       _interview = AgentInterview(widget.port)..addListener(_interviewChanged);

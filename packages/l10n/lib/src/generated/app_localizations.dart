@@ -17427,7 +17427,7 @@ abstract class AppLocalizations {
   /// Why the billing mode personal is not offered (10 10.3 item 3).
   ///
   /// In en, this message translates to:
-  /// **'{reason, select, notOnlyOwner{Personal is offered only when you are the only owner.} runnerNotPersonal{Personal needs a hosting runner on a personal subscription.} notHolder{Personal needs you to hold the credentials of the runner.} other{The hosting runner does not report Personal.}}'**
+  /// **'{reason, select, notOnlyOwner{Personal is offered only when you are the only owner.} runnerNotPersonal{Personal needs a hosting runner on a personal subscription.} notHolder{Personal needs you to hold the credentials of the runner.} contextUnknown{Personal needs your account details, which are not loaded.} other{The hosting runner does not report Personal.}}'**
   String newAgentPersonalNot(String reason);
 
   /// Section of the hosting runner.

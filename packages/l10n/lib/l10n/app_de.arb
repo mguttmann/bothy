@@ -2881,7 +2881,7 @@
   "newAgentBilling": "Abrechnung",
   "newAgentBillingOrganization": "Organisation",
   "newAgentBillingPersonal": "Persönlich",
-  "newAgentPersonalNot": "{reason, select, notOnlyOwner{Persönlich gibt es nur, wenn du der einzige Eigentümer bist.} runnerNotPersonal{Persönlich braucht einen Runner mit einem persönlichen Abonnement.} notHolder{Persönlich braucht dich als Inhaber der Zugangsdaten des Runners.} other{Der Runner meldet Persönlich nicht.}}",
+  "newAgentPersonalNot": "{reason, select, notOnlyOwner{Persönlich gibt es nur, wenn du der einzige Eigentümer bist.} runnerNotPersonal{Persönlich braucht einen Runner mit einem persönlichen Abonnement.} notHolder{Persönlich braucht dich als Inhaber der Zugangsdaten des Runners.} contextUnknown{Persönlich braucht deine Kontodaten, die nicht geladen sind.} other{Der Runner meldet Persönlich nicht.}}",
   "newAgentSectionHost": "Runner",
   "newAgentHost": "Runner",
   "newAgentHostMissing": "Wähle einen Runner.",

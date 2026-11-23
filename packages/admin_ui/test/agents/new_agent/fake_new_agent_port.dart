@@ -275,7 +275,11 @@ class FakeNewAgentPort implements NewAgentPort {
   }
 
   @override
-  Future<NewAgentContext> context() async => contextValue;
+  Future<NewAgentContext> context() async {
+    final f = failNext.remove('context');
+    if (f != null) throw f;
+    return contextValue;
+  }
 
   @override
   Future<InterviewReply> interview(
