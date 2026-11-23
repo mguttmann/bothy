@@ -63,13 +63,23 @@ class _EmergencyHomeState extends State<EmergencyHome> {
     super.dispose();
   }
 
+  /// The number of the newest load: an older answer is dropped, so a late page of an old
+  /// search or filter never replaces the list of the new one.
+  int _generation = 0;
+
+  /// Whether "Load more" waits for its page; it asks once.
+  bool _loadingMore = false;
+
   Future<void> _load({bool more = false}) async {
+    if (more && _loadingMore) return;
+    final generation = ++_generation;
+    if (more) setState(() => _loadingMore = true);
     try {
       final page = await widget.repository.people(
         query: _search.text.trim(),
         cursor: more ? _next : null,
       );
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() {
         _people = [if (more) ...?_people, ...page.items];
         _next = page.nextCursor;
@@ -77,11 +87,13 @@ class _EmergencyHomeState extends State<EmergencyHome> {
         _failed = false;
       });
     } on Object catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() {
         _problem = loadProblem(e);
         _failed = true;
       });
+    } finally {
+      if (more && mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -153,7 +165,7 @@ class _EmergencyHomeState extends State<EmergencyHome> {
                 key: const ValueKey('emergency.people.more'),
                 label: l.adminLoadMore,
                 expand: true,
-                onPressed: () => _load(more: true),
+                onPressed: _loadingMore ? null : () => _load(more: true),
               ),
             ),
         ],

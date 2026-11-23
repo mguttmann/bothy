@@ -484,6 +484,20 @@ Future<List<AdminPerson>> allPeople(
   return people;
 }
 
+/// Every group of [repository], all pages of `listGroups`.
+///
+/// Example: `final groups = await allGroups(admin);`
+Future<List<AdminGroup>> allGroups(AdminRepository repository) async {
+  final groups = <AdminGroup>[];
+  String? cursor;
+  do {
+    final page = await repository.groups(cursor: cursor);
+    groups.addAll(page.items);
+    cursor = page.nextCursor;
+  } while (cursor != null);
+  return groups;
+}
+
 /// [AdminRepository] over the generated client of `api_client`.
 ///
 /// The `api` argument is the client of the signed-in session (`AuthSession.api`), so DPoP,

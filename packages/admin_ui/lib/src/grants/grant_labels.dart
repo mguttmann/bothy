@@ -93,20 +93,9 @@ final class AccessNames {
       }
     }
 
-    Future<List<AdminGroup>> allGroups() async {
-      final out = <AdminGroup>[];
-      String? cursor;
-      do {
-        final page = await repository.groups(cursor: cursor);
-        out.addAll(page.items);
-        cursor = page.nextCursor;
-      } while (cursor != null);
-      return out;
-    }
-
     return AccessNames(
       people: await orEmpty(() => allPeople(repository)),
-      groups: await orEmpty(allGroups),
+      groups: await orEmpty(() => allGroups(repository)),
       agents: await orEmpty(repository.agents),
       // An app is the subject of the grants its installation and its owner create (11 4.1),
       // so its name belongs to the names of a grant (ruling AUD-AM1/1).

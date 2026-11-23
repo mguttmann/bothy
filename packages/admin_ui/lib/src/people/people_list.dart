@@ -77,6 +77,13 @@ class _PeopleListState extends State<PeopleList>
   String? _group;
   Set<String>? _groupMembers;
 
+  /// The number of the newest load: an older answer is dropped, so a late page of an old
+  /// search or filter never replaces the list of the new one.
+  int _generation = 0;
+
+  /// Whether "Load more" waits for its page; it asks once.
+  bool _loadingMore = false;
+
   @override
   void initState() {
     super.initState();
@@ -91,13 +98,16 @@ class _PeopleListState extends State<PeopleList>
   }
 
   Future<void> _load({bool more = false}) async {
+    if (more && _loadingMore) return;
+    final generation = ++_generation;
+    if (more) setState(() => _loadingMore = true);
     try {
       final page = await widget.repository.people(
         query: _search.text.trim(),
         status: _status,
         cursor: more ? _next : null,
       );
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() {
         _people = [if (more) ...?_people, ...page.items];
         _next = page.nextCursor;
@@ -105,18 +115,21 @@ class _PeopleListState extends State<PeopleList>
         _loaded = true;
       });
     } on Object catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() {
         _problem = loadProblem(e);
         _loaded = true;
       });
+    } finally {
+      if (more && mounted) setState(() => _loadingMore = false);
     }
   }
 
   Future<void> _loadGroups() async {
     try {
-      final page = await widget.repository.groups();
-      if (mounted) setState(() => _groups = page.items);
+      // Every page: a group behind the first page must be a filter too.
+      final groups = await allGroups(widget.repository);
+      if (mounted) setState(() => _groups = groups);
     } on Object {
       // Without groups the group filter is not offered.
     }
@@ -307,7 +320,7 @@ class _PeopleListState extends State<PeopleList>
               alignment: Alignment.centerLeft,
               child: TextButton(
                 key: const ValueKey('people.more'),
-                onPressed: () => _load(more: true),
+                onPressed: _loadingMore ? null : () => _load(more: true),
                 child: Text(l.adminLoadMore),
               ),
             ),
