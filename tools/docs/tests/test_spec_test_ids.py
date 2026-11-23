@@ -98,7 +98,15 @@ def defined_ids() -> set[str]:
 def named_ids() -> set[str]:
     """The test IDs that a tracked test file names, in the form of the specification."""
     found = subprocess.run(
-        ["git", "grep", "-ohIE", _NAMED, "--", *_TEST_PATHS],
+        [
+            "git",
+            "grep",
+            "-ohIE",
+            _NAMED,
+            "--",
+            *_TEST_PATHS,
+            ":(exclude)tools/docs/tests/test_spec_test_ids.py",
+        ],
         cwd=REPO,
         capture_output=True,
         text=True,
