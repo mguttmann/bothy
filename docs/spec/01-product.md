@@ -181,6 +181,7 @@ built in several milestones, the remark names the build milestones from the
 | "Who has access?" with origin | core | D, W | `access.explain` | |
 | "View as person" (read only) | core | D, W | `access.view_as` | logged |
 | Agents: backend switch, costs, tokens, commands | core | D, W | `agent.billing_mode.set`, `cost.read.aggregate`, `token.create` | |
+| Reconcile the costs of runs by hand (amounts per run from an invoice) | core | API | `cost.reconcile` (`reconcileCosts`) | no app offers it yet: the button [Reconcile] of A5 is not built, the reconciler app or the API sets the amounts (V3-60) |
 | Agents of an adapter: create, tool class, features, disable and enable | core | D, W | `agent.create`, `agent.tool_class.set`, `agent.update`, `agent.disable`, `agent.enable` | section 5.2 A5; a built-in agent is created and edited as in 6.20 |
 | Filter the audit, verify the chain | core | D, W | `audit.read`, `audit.verify` | |
 | Statistics | core | D, W | `stats.read` | |
@@ -841,7 +842,13 @@ Starting the view from A3 or A1 calls `viewAsUser`; the console shows the spaces
 the answer as a structure list and the "Not visible" list (the spaces the owner sees and the
 person does not), and keeps the banner with name and remaining time on every page until
 `endViewAs` or the end time of `getConsoleSession`. A click on a channel opens nothing, because
-the console has no content routes (ADR 0028); the desktop app keeps showing content read-only.
+the console has no content routes (ADR 0028).
+
+Desktop app (M4-27): "View as person" in the access view shows the answer of `viewAsUser` as a
+text list of the spaces and channels with level and capabilities, in the frame below, and nothing
+in it is a control. Neither app shows the content of a channel as the person sees it; what the
+person can see and trigger is checked per channel, not per message. A cancelled step-up closes
+the view.
 
 ```text
 +----------------------------------------------------------------------------------------------+
@@ -850,7 +857,7 @@ the console has no content routes (ADR 0028); the desktop app keeps showing cont
 | Sidebar as Sam sees it:           v Support (# general, = requests, # alerts)                |
 |                                   > Research (# reading-club)                                |
 | Not visible for Sam: Engineering, Marketing                                                  |
-| Clicking a channel shows content as for Sam; input, buttons and reactions are off.           |
+| Per channel: level and capabilities as text; a click opens no content.                       |
 +----------------------------------------------------------------------------------------------+
 ```
 
@@ -885,6 +892,10 @@ the page hides them.
 |                                | Tokens [Create token]   Commands (6)   Presence history        |
 +--------------------------------+----------------------------------------------------------------+
 ```
+
+The button [Reconcile] is not built: no app calls `reconcileCosts` (ADR 0055 item 5, action
+`cost.reconcile`), so the amounts of runs are corrected through the API or an app such as the
+cost reconciler, and stay "estimate" without one (plan row V3-60).
 
 **A6 Audit.** Filterable by action, person, result, resource, time range; check of the hash chain.
 Export of a time range as the server's NDJSON with hashes (verifiable offline) and as CSV, which
@@ -2622,7 +2633,7 @@ names in its shared container would be content outside it (docs/decisions.d/M5-0
 
 | Platform | Behavior |
 |---|---|
-| iOS, macOS | Grouping per thread; tapping opens the thread at the message; badge = unread mentions plus questions |
+| iOS, macOS | Grouping per thread; tapping opens the thread at the message; badge = threads with an unread mention, unread threads with level `all` and unread DM threads ([13](13-push-notifications.md) 8) |
 | Android | Notification channels "Mentions", "Questions", "All messages", "Runs", changeable in the system settings; grouping per thread |
 | Windows | The app in the notification area keeps the connection and shows local notifications; a closed app gets no notifications (Baseline R-Push) |
 | iOS, Android, app in front | The notification shows as a banner inside the app, at the top of the screen, instead of a notification of the system: tapping opens the thread at the message, it leaves by itself after a moment or with its close button, and it never shows behind the app lock (addendum of 2026-11-12, [15](15-client-architecture.md) 10) |

@@ -1181,6 +1181,8 @@ The server sets `service.name`, `service.namespace` and `bothy.server.role` itse
 
 File `infra/compose/.env` based on the template [`.env.example`](../../infra/compose/.env.example).
 These variables are not server configuration; Compose derives values of the services from them.
+A server key that is not set through one of them goes into `compose.override.yaml`
+([install-compose.md](install-compose.md) section 10); in `.env` it has no effect.
 
 | Variable | Template | Meaning |
 |---|---|---|

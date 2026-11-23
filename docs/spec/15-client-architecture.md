@@ -411,6 +411,11 @@ stateDiagram-v2
 
 `4004`: the app renews the access token and reconnects; if the refresh fails, it logs out.
 `4018`: the app shows the reason and reconnects only on user action; a new token does not help.
+As built: the engine reconnects after `4015` and `4018` on `GatewayConnection.connectNow`, but no
+view of `apps/client` offers that action yet, so the connection stays offline until the app
+starts again. The "network change" of the diagram is, as built, the return to the foreground:
+the apps have no network listener (`LifecycleNetworkStatus`, D-M4-18-8), and a lost network shows
+through the failed connects and the heartbeat (04 6.5).
 `4016`: the device waits for approval; the app polls `GET /api/v1/devices/{id}` (`LoginService.pollPendingDevice`) and reconnects when the device is `active`.
 `4017`: a newer connection of the same device is active; the app reconnects only on the return to the foreground or on user action.
 `4008`: the app waits the seconds of `retry_after=<seconds>` in the close reason instead of the jitter; without a readable value the normal backoff applies.
@@ -898,7 +903,7 @@ notification (13 2) decides its channel:
 | `mentions` | Mentions | high | `mention`, `dm` |
 | `questions` | Questions | high | `input_needed`, `security`, `admin` |
 | `messages` | All messages | default | `message`, and every kind this build does not know |
-| `runs` | Runs | default | `run_done`, `run_failed` |
+| `runs` | Runs | default | `run_done`, `run_failed`, `wake_ended` |
 
 A quiet notification (`quiet = 1`, [13](13-push-notifications.md) 3.4) goes into the same channel
 with `setSilent(true)`, so the channel settings stay the person's only control. The runner keeps

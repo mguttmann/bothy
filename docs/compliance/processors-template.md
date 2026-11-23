@@ -1,6 +1,7 @@
 # Template: processors and recipients
 
-Status: template M0. For instance operators. Not legal advice.
+Status: template, recipients as built up to M8 and A1 (built-in agents). For instance operators.
+Not legal advice.
 
 Purpose: a list of all services to which an instance passes personal data, with what the product
 sends there. Basis for contracts under Art. 28 GDPR, for the record
@@ -20,13 +21,14 @@ How to use the template:
 |---|---|---|---|
 | Push (APNs, FCM, WNS) | push token, app identifier, IDs of thread and message, neutral placeholder text, time | message contents, names, files | ADR 0031, [../spec/13-push-notifications.md](../spec/13-push-notifications.md) |
 | Identity provider (OIDC) | login request with `state`, `nonce`, PKCE; the provider returns subject, name, optionally email and groups | contents | [../spec/08-identity.md](../spec/08-identity.md) |
-| LLM provider (through the agent runtime, not through the server) | thread contents, earlier messages up to `history_backfill_limit`, files, authors as handles, channel prompt | credentials of other people; email addresses | [../spec/20-privacy.md](../spec/20-privacy.md), section 6 |
+| LLM provider (through the agent runtime, not through the server) | thread contents, earlier messages up to `history_backfill_limit`, files, authors as handles, channel prompt; the question and candidate excerpts of the search assistant; the answers of the agent interview | credentials of other people; email addresses | [../spec/20-privacy.md](../spec/20-privacy.md), section 6; [../spec/14-search.md](../spec/14-search.md) 4.10; [../spec/26-builtin-agents.md](../spec/26-builtin-agents.md) 6 |
 | Telemetry backend | metrics, traces, logs without contents, pseudonymous IDs | contents, IP addresses, names | [../spec/20-privacy.md](../spec/20-privacy.md), section 7 |
 | Crash reports of the apps | sanitized stack traces, app version, platform | contents, tokens, names | [../spec/19-security.md](../spec/19-security.md), SEC-LOG-7 |
 | Object storage in the cloud | files, thumbnails, export packages, deletion journal | | [../spec/12-files.md](../spec/12-files.md) |
 | Hosting (cloud VM, managed database) | everything the instance stores | | [../spec/16-operations.md](../spec/16-operations.md) |
 | Transcription service | audio of voice messages, language | names, other contents | [../spec/12-files.md](../spec/12-files.md) |
-| Apps and integrations | events of their subscriptions within scopes and grants | whatever their grants do not allow | [../spec/07-permissions.md](../spec/07-permissions.md), section 2.10 |
+| Apps and integrations | events of their subscriptions within scopes and grants; the reference apps `github-app` and `jira-app` pass forms and, with mirroring, replies of people to GitHub or Jira | whatever their grants do not allow | [../spec/07-permissions.md](../spec/07-permissions.md), section 2.10; [../spec/11-extensions.md](../spec/11-extensions.md) 10 |
+| Connected hosts (terminal) | nothing; the terminal runs on the host, and the server relays frames that are end-to-end encrypted between device and host | terminal contents to any third party | [../spec/24-terminal.md](../spec/24-terminal.md) |
 | Backup target | encrypted images | keys of the backup | [../spec/19-security.md](../spec/19-security.md), SEC-BAK-* |
 
 Not a recipient in the sense of this list: the virus scanner, as long as it runs locally (it only
@@ -63,3 +65,8 @@ For orientation only; check again before use. All information retrieved 2026-10-
 | Region | `inference_geo` with the values `global` and `us`; no EU option named | https://platform.claude.com/docs/en/manage-claude/usage-cost-api [verified] |
 | Notice to users | The customer informs users that outputs are not reliable without review | Commercial Terms, D.3 [verified] |
 | Login | Personal subscriptions (OAuth) only for one's own, ordinary use; third-party products must not collect, store or relay Claude.ai credentials | https://code.claude.com/docs/en/legal-and-compliance [verified] |
+
+The example covers the API under the Commercial Terms. An agent with `billing_mode = personal`
+runs on a personal subscription under consumer terms: the DPA above does not apply to it, and the
+messages of other people in its runs reach the provider under the retention and training rules of
+that subscription. Enter it as its own row of section 2 and assess the role `<...>`.

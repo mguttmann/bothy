@@ -335,3 +335,65 @@ notification while its app is closed.
 No egress entry is needed: the server reaches `api.push.apple.com`, `api.sandbox.push.apple.com`,
 `fcm.googleapis.com` and `oauth2.googleapis.com` without one, so the host only needs the way out
 (section 1, row "Network").
+
+## 10. Further server keys
+
+`.env` holds only the Compose variables of [configuration.md](configuration.md) section 9, and
+`compose.yaml` passes a fixed list of server keys (`x-server-env`). Any other key of section 4 of
+the reference with place `Server` (for example a rate limit, a backup schedule,
+`console.grafana_embed_url` or `search.assist.agent_id`) goes into a file
+`compose.override.yaml` next to `compose.yaml`, as its environment variable (naming rule of
+configuration.md section 2). Compose reads that file together with `compose.yaml` whenever no
+`-f` is given. Git ignores it, and neither the setup wizard nor an upgrade writes it.
+
+Every server service reads the same configuration schema and refuses to start when a value does
+not fit it, so set a key for all of them: `api` (in the profile `tailscale` `api-tailscale`),
+`worker`, `migrate`, `restore` and `backup`.
+
+```yaml
+services:
+  api:
+    environment:
+      BOTHY_SEARCH__ASSIST__AGENT_ID: "<agent ID>"
+  worker:
+    environment:
+      BOTHY_SEARCH__ASSIST__AGENT_ID: "<agent ID>"
+  migrate:
+    environment:
+      BOTHY_SEARCH__ASSIST__AGENT_ID: "<agent ID>"
+  restore:
+    environment:
+      BOTHY_SEARCH__ASSIST__AGENT_ID: "<agent ID>"
+  backup:
+    environment:
+      BOTHY_SEARCH__ASSIST__AGENT_ID: "<agent ID>"
+```
+
+Then `docker compose config --quiet` and `docker compose up -d`, which recreates the services
+whose environment changed, and `docker compose exec api bothy config check` to see the value
+accepted. With the overlay of 5.3 name the override in the list of files
+(`docker compose -f compose.yaml -f compose.multi-node.yaml -f compose.override.yaml up -d`) and
+add `api-2`: it extends `api` of `compose.yaml`, not of the override. A key set only in `.env`
+has no effect.
+
+## 11. Search assistant
+
+The search assistant ([14-search.md](../spec/14-search.md) 4.10) answers a question in the
+quick switcher with a short list of threads. Without an agent it answers with the full text
+search only (`assistant_not_configured`).
+
+1. Choose the agent that answers: a Claude Code runner agent answers it without further setup
+   ([claude-code-runner](../../plugins/claude-code-runner/README.md), "Search assistant"; model
+   `runner.search_assist_model`). It needs an API key (`runner.anthropic_api_key_ref`) or a
+   personal login with `runner.allow_personal`, else it answers nothing.
+2. Grants: the agent gets as candidates only threads it may read itself (`thread.read` on the
+   thread and `message.read` on the message that is the jump target). A person who asks sees
+   the assistant's choice only among threads of the channels where that agent has `read`; the
+   other hits stay full text. Grant the agent `read` on the channels the assistant shall cover.
+3. Set `search.assist.agent_id` to the agent's ID for all server services (section 10).
+4. Check: the agent is online, a question in the quick switcher shows hits with a reason from
+   the assistant. When it shows full text only, the answer names the cause:
+   `assistant_unavailable` (the agent has no live connection, or with several api nodes not on
+   the node of the request, [multi-node.md](multi-node.md) 4) or `assistant_timeout` (no valid
+   answer within `search.assist.timeout`). The runner logs `search_assist_failed` with a code
+   when its call fails; neither side logs the question.

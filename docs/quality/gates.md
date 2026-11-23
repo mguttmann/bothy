@@ -29,8 +29,8 @@ once for the components of the plan, the tests split by component
 
 | Job | Make targets | Runs |
 |---|---|---|
-| `gates` | `fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint fragments-check runners-check labels-check release-pins install-options templates-check` | always |
-| `gates (docs and contracts)` | `docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check api-clients tokens` | always |
+| `gates` | `fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check commitlint fragments-check runners-check labels-check release-pins install-options tofu-check templates-check` | always |
+| `gates (docs and contracts)` | `docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check signal-check api-clients tokens` | always |
 | `gates (security and supply chain)` | `gitleaks semgrep trivy osv licenses`, after `gradle/actions/wrapper-validation` checks every tracked `gradle-wrapper.jar` (a gate of the merge through `ci-ok`: the jobs of the run that call `./gradlew` do not wait for it; the release build with a signing key waits for the whole workflow as its gate stage) | always |
 | `test (tools)` | `test coverage` with no component (the Python tools) | always |
 | `test (server, shard I of N)` | `test COMPONENTS=server AREAS=none GO_TEST_SHARD=I/N`, one job per shard of a matrix | when the plan needs it |
@@ -39,8 +39,10 @@ once for the components of the plan, the tests split by component
 | `test (apps)` | `test coverage COMPONENTS=apps AREAS=none` (Dart and JVM) | when the plan needs it |
 | `test (SDKs and plugins)` | `test coverage` for the planned `sdk-python`, `sdk-typescript`, `plugins` with `AREAS=none` | when the plan needs it |
 
-`AREAS=none` leaves the tools suite to `test (tools)`; only the three tools tests that read
-component sources (`TOOLS_SOURCE_TESTS`) run in each test job as well.
+`AREAS=none` leaves the tools suite to `test (tools)`; only the tools tests that read component
+sources (the list `TOOLS_SOURCE_TESTS` of the `Makefile`) run in each test job as well. The
+targets of the three `gates` rows above are held equal to the `make` lines of their jobs in
+`ci.yml` by `tools/ci/tests/test_ci_parallel_gates.py`.
 
 Disk space: every Linux job of `ci.yml` and `build-verify.yml` except the short ones that only
 plan, scan or report runs `tools/ci/free_disk.sh` right after checkout. The ubuntu runner image
@@ -695,7 +697,7 @@ or the pre-push hook:
 | `e2e-desktop-terminal` | 15 20 and 23.5 row "E2E" (M4-38): `tools/ci/terminal_stack.py --mode e2e` starts the client stack of the terminal (the stack of M2-48 with its TLS front and one host container, installed but not paired; the helper checks that the server knows no host and that only the TLS front publishes a port) and runs `apps/client/e2e_test/terminal_e2e_test.dart`: Alex pairs the host through the administration (the code goes to the helper's loopback endpoint, which runs `bothy-host pair` in the host container of the project), opens a shell with the step-up, runs a command, detaches, reattaches with the scrollback, exits with a code and ends the tab; the canary he typed is in none of the app's paths and none of the stack's logs, database dump, collector export or host journal | with `e2e-desktop`; on its own after a change of the terminal or the client stack |
 | `e2e-mobile` | 15 20 "E2E on devices" for the phone apps (M5-11): `tools/e2e/mobile_e2e.py` starts the Compose stack of `infra/compose/e2e.sh` with the overlay `test/compose.e2e-mobile.yaml` (the E2E server build of the Go build tag `e2e`, whose push goes to the fake APNs and FCM providers of the service `fakepush`; their capture endpoint is the only extra published port, on `127.0.0.1`), an iOS simulator it creates and an Android emulator from an AVD (or the ones named by `MOBILE_E2E_UDID` and `MOBILE_E2E_SERIAL`), and runs the `patrol` suites of `apps/client/e2e_test/phone` per platform: login (address, password and TOTP, the device confirmed by a second session), the push permission dialog, a push from Sam that the runner's relay hands to the device (the Android service fetches its text from the real server; the iOS simulator shows the payload's text, its `simctl push` runs no Notification Service Extension), tapping it to the thread, sharing an image from the system share sheet, sending offline with delivery after the reconnect; then the terminal suite of M5-13 against the terminal stack of `services/server/test/terminal/clientstack` (mode `mobile`: a real host service in a container, paired through the API, needs Go): opening from M9 with the step-up, Ctrl+C from the extra keys bar, the reattach with the scrollback after a network loss, no terminal content in the app switcher picture, the reattach within `terminal.quick_reattach_window` without and after it with the step-up; a platform whose tools are missing prints a SKIP line, the target fails when no platform ran; stacks (the host container among them), devices it started and temporary data are removed after the run, also after a failing suite | nightly for Android (`.github/workflows/e2e-mobile.yml`, not a pull request check), both platforms on a macOS host with Docker, Xcode and the Android SDK before a release and at the close of M5; needs `make image` |
 | `perf-desktop` | 15 19: the desktop targets `client.perf.*` from `AppConfig` measured in a profile build against the same stack (`apps/client/perf_test`, M4-34), then the terminal targets of `perf-desktop-terminal` added to the same summary; writes `apps/client/build/perf/summary.json` with the device (`PERF_DEVICE_LABEL`, `PERF_REFERENCE=1` on a reference device) and fails when a target is missed | before a release and at the close of M4; on a reference device of 15 19 |
-| `perf-desktop-terminal` | 15 19 and 23.5 row "Performance" (M4-38): `client.perf.terminal_frame_to_paint_p95` (a decrypted `data` frame until the rasterization of the first frame that shows its line, p95 over at least 1000 lines of the generator's rate profile) and `client.perf.terminal_throughput_min` (bytes per second of the generator's burst profile, per acknowledged chunk, without a detach) in a profile build with `--dart-define=TERMINAL_PERF_HOOKS=true` against the client stack of the terminal with a paired host (`tools/ci/terminal_stack.py --mode perf`, `apps/client/perf_test/terminal_perf_test.dart`); fails when a target is missed | with `perf-desktop`; on a reference device of 15 19 |
+| `perf-desktop-terminal` | 15 19 and 23.5 row "Performance" (M4-38): `client.perf.terminal_frame_to_paint_p95` (a decrypted `data` frame until the rasterization of the first frame that shows its line, p95 over at least 1000 lines of the generator's rate profile) and `client.perf.terminal_throughput_min` (bytes per second of the generator's burst profile, per acknowledged chunk, without a detach) in a profile build with `--dart-define=TERMINAL_PERF_HOOKS=true` against the client stack of the terminal with a paired host (`tools/ci/terminal_stack.py --mode perf`, `apps/client/perf_test/terminal_perf_test.dart`); fails when a target is missed. Not met: the run of M4-38 on a development machine, no reference device, measured frame to paint above `16ms` and stays red; at 60 Hz the wait for the next frame alone can take 16.7 ms, so the target or its definition is decided again (plan row V3-50) | with `perf-desktop`; on a reference device of 15 19 |
 
 ## Migrations
 
@@ -783,8 +785,9 @@ example a JSON report), `DENYLIST_FLAGS` (for example `--reveal` locally).
   host. Instead, `make diagrams` checks the stamp that `render_diagrams.py
   --write` writes from `.mmd` and theme (D-W-56); a hand-edited `.svg` with an old
   stamp goes unnoticed.
-* actionlint checks shell code in workflows without shellcheck, because shellcheck is not available
-  pinned; workflows therefore call only short commands and make targets.
+* actionlint checks shell code in workflows without shellcheck (`-shellcheck=`); the pinned
+  shellcheck of `make lint` checks only the tracked shell scripts (`tools/ci/shell_scripts.py`).
+  Workflows therefore call only short commands and make targets.
 * `osv` and `licenses` judge the packages of a Gradle lock file that ship (section
   "Advisories"). A known vulnerability or a license outside the list in a package that only the
   build or its tests resolve (the Android Gradle Plugin and its test platform, lint, the Kotlin

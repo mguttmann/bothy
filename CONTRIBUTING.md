@@ -97,6 +97,22 @@ package). The pre-push hook therefore runs `make check` only for the parts a pus
   pull request, which runs the gates of the changed components
   ([gates](docs/quality/gates.md#how-a-pull-request-lands)).
 
+## When a gate fails for no reason in your change
+
+[docs/quality/troubleshooting.md](docs/quality/troubleshooting.md) lists the failures that come
+from the environment (a shared lock of golangci-lint, a missing buildx plugin, the umask and
+temporary directory of the host tests, Flutter tests on a busy machine).
+
+## Known problems and open work
+
+- Open issues of the repository, with the labels `good first issue` and `help wanted` for work
+  that suits a first contribution.
+- The sections "Open" or "Open minors" of the ruling fragments in `docs/decisions.d/` and of the
+  design notes in `docs/design/`: known small gaps of each area that the next change in that area
+  takes along.
+- The plan rows of [docs/PLAN.md](docs/PLAN.md) that are not built, and the risks in
+  [docs/RISKS.md](docs/RISKS.md).
+
 ## Database migrations
 
 Server migrations are plain SQL files run by goose (ADR 0007). Create the next free number of
@@ -120,6 +136,11 @@ Details: [docs/quality/gates.md](docs/quality/gates.md#migrations).
   commit author. By signing off you certify the
   [Developer Certificate of Origin 1.1](https://developercertificate.org/). There is no
   separate contributor license agreement; contributions are licensed under Apache-2.0.
+- The person who signs off certifies the DCO for the whole commit, also for what a tool or an AI
+  agent wrote in it: you are responsible that you may contribute it under Apache-2.0.
+- Code, text, fonts, icons or data from a third party come in only with their source, a license
+  that the license policy allows (docs/quality/licenses.md, `quality/licenses/allowed.txt`),
+  and an entry in `NOTICE` when the license asks for one. Never paste code of unknown origin.
 - Before you push, squash your work into meaningful commits (`git rebase -i main` in your
   terminal). Commits such as "fix CI" or "typo" do not belong in `main`.
 

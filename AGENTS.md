@@ -18,6 +18,9 @@ where the two differ, this file wins for agents.
 - The white-label scan with the maintainers' private deny list and the secret scan are
   gates, not a replacement for judgement. If you are unsure whether something is
   private, leave it out.
+- Never copy code, text or assets from outside the repository without their source and a
+  license that CONTRIBUTING.md "Branches and commits" allows. The person who signs off the
+  commit certifies the DCO for what you wrote.
 
 ## Language
 

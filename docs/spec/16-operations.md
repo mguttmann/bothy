@@ -1564,7 +1564,7 @@ run. The gate `perf.capacity_min_messages_per_s` of `make perf` holds the sustai
 | Bottleneck | Metric | Last step that held: 400 messages/s, 800 connections | First missed step: 600 messages/s, 1200 connections | Lever |
 |---|---|---|---|---|
 | Serial section at the counter `event_seq` ([04-sync-protocol.md](04-sync-protocol.md) 3.2) | `bothy.db.event_seq.lock_wait` | mean 0.21 ms, p99 at most 5 ms (the first bucket bound) at 400 events/s | mean 0.74 ms, p99 at most 5 ms at 592 events/s | faster storage for WAL, shorter transactions |
-| Connections to the database | `postgresql.backends`, pool metrics | 34 backends; the api pool used 19 of `database.max_conns` | 34 backends; the api pool used all 20 | `database.max_conns`, several `api` processes only with a pooler |
+| Connections to the database | `postgresql.backends`, pool metrics | 34 backends; the api pool used 19 of `database.max_conns` | 34 backends; the api pool used all 20 | `database.max_conns` within `max_connections` of PostgreSQL; several `api` processes ([multi-node.md](../operations/multi-node.md)) each with a pool of its own. No connection pooler is supported or tested: the server sets session parameters at connect (`statement_timeout`, `lock_timeout`, isolation), caches named prepared statements per connection and holds `LISTEN` connections |
 | WebSocket connections | `bothy.gateway.connections.active` | 800, api memory 581 MiB | 1200, api memory 946 MiB | more `api` processes; each process reads fan-out itself |
 | Fan-out lag | `bothy.event.fanout.lag` | at most 1.1 ms; commit to dispatch p99 85 ms | up to 19.8 s; commit to dispatch p99 61 s, a quarter of the dispatches still missing after the drain | fewer receivers per process |
 | ClamAV memory | Container memory | 987 MiB (signatures loaded, no upload in the scenario) | 987 MiB | separate host for the scan |
@@ -1573,6 +1573,13 @@ At 400 messages per second the sustained throughput (answered within `perf.messa
 was 399 messages per second; at 600 the api pool reached `database.max_conns` and the hub fell
 behind, while the api process used at most 2.2 of its 4 vCPU and PostgreSQL 2.6 of its 4. Every
 message is one event; each reached the 20 people of its space.
+
+The table measures one shape of load, not a size of organization. No target size of an instance
+is named (people, readers per channel, channels, threads, agents), and the worlds of the load
+tests are small: 20 people per space in the capacity test, 100 receivers in the fan-out test,
+4 receivers per channel in the push test, 20 channels of 500 messages and a visible set of 1000
+channels of 5 messages in the catch-up test (`services/server/perf/README.md`). Paths that grow with the readers of a channel or the threads of an instance (snapshot,
+badge, fan-out, push consumer) are therefore not measured at a larger size (plan row V3-51).
 
 The job queues of a process share its pool ([02-architecture.md](02-architecture.md) 12.2). A job
 holds a connection only inside its units of work, so the sum of `jobs.queue.<queue>.max_workers`

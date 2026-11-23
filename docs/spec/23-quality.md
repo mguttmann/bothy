@@ -86,6 +86,11 @@ gate, not a review item (R-QA-14):
 | TypeScript | typedoc with the check for undocumented exports as an error: `validation.notDocumented` with `treatValidationWarningsAsErrors` in the script `lint` (`eslint` then `npm run docs:check`), the generated core outside the rule | TypeScript SDK: typedoc reference in the docs site, built in `make docs` and mounted under `api/typescript-reference/` | M2-30 |
 
 Every gate has a test: a public symbol without a doc comment makes it fail.
+
+Without a gate (as built): the native code of the apps and packages (Swift, Kotlin, and C++ in
+`packages/device_key` and `apps/client/windows`) and the TypeScript of
+`plugins/grafana-bothy-live`, whose `lint` runs `eslint` without typedoc. The review checks their
+doc comments; no SwiftLint, detekt or typedoc check holds them.
 "OpenAPI from the routes" means one source for both here: `openapi.yaml` is normative,
 routes and clients are generated from it, and `make codegen-check` keeps them in sync
 ([briefs/README.md](../briefs/README.md), item 6).

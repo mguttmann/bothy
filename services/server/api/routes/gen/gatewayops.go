@@ -163,7 +163,8 @@ func checkGatewayLater(path string, i int, e gatewayLater, p *problemsError) {
 
 // readAsyncGatewayOps returns the client-to-server ops of the channel gateway of the AsyncAPI
 // document at path: every operation with action receive on #/channels/gateway, with its message
-// name, its x-authz-action and the schema name of its body d. A malformed operation is a problem.
+// name, its x-authz-action and the schema name of its body d. A malformed operation and an
+// envelope that accepts unknown members are problems.
 func readAsyncGatewayOps(path string, p *problemsError) []gatewayOp {
 	doc, _, err := readYAML(path)
 	if err != nil {
@@ -196,6 +197,10 @@ func readAsyncGatewayOps(path string, p *problemsError) []gatewayOp {
 		if g.Op == "" || g.Action == "" || g.Schema == "" {
 			p.add(path, "operations.%s: the message needs a name, the operation an x-authz-action and the body d a reference to a schema of openapi.yaml", id)
 			continue
+		}
+		// The envelope {op, d} too: decodeEnvelope closes with 4002 on a third member (W7).
+		if scalar(value(value(msg, "payload"), "additionalProperties")) != "false" {
+			p.add(path, "components.messages.%s: the envelope of a gateway client frame accepts unknown members; add additionalProperties: false (W7, SEC-IN-1)", ref)
 		}
 		out = append(out, g)
 	}

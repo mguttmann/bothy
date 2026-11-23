@@ -968,6 +968,11 @@ Afterwards the console shows a list of the steps outside the product: disable th
 identity provider, withdraw network access, replace API keys of external systems that
 the person knew, rotate secrets in their dev environment.
 
+Not built (plan row V3-55): after disabling, the person view of `admin_ui` shows only the notice
+`adminPersonDisabled` ("is disabled. All sessions ended."); neither the list of the steps outside the product nor the step
+"revoke all grants" exists. Grants are revoked one by one in the access view, and grants and group
+memberships that stay take effect again at `user.enable`.
+
 ## 12. API tokens for agents, apps and tools
 
 - **Form.** `<prefix>_<kind>_<random>_<checksum>` following [ADR 0061](../adr/0061-token-format-with-a-fixed-prefix-and-checksum.md): prefix `bothy` (one of the

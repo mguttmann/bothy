@@ -974,6 +974,7 @@ components:
       summary: Authenticate a new gateway session.
       payload:
         type: object
+        additionalProperties: false
         required: [op, d]
         properties:
           op:
@@ -987,6 +988,7 @@ components:
       summary: Resume a gateway session after a short disconnect.
       payload:
         type: object
+        additionalProperties: false
         required: [op, d]
         properties:
           op:
@@ -1000,6 +1002,7 @@ components:
       summary: Liveness signal with the last processed `seq`. Agents add their state; then `agent.heartbeat` is checked as well.
       payload:
         type: object
+        additionalProperties: false
         required: [op, d]
         properties:
           op:
@@ -1013,6 +1016,7 @@ components:
       summary: Hand over a new access token during the connection.
       payload:
         type: object
+        additionalProperties: false
         required: [op, d]
         properties:
           op:
@@ -1026,6 +1030,7 @@ components:
       summary: Set the threads currently on screen (live-box patches, typing). Unreadable threads are ignored silently.
       payload:
         type: object
+        additionalProperties: false
         required: [op, d]
         properties:
           op:
@@ -1039,6 +1044,7 @@ components:
       summary: The person types in a thread. People only.
       payload:
         type: object
+        additionalProperties: false
         required: [op, d]
         properties:
           op:
@@ -1052,6 +1058,7 @@ components:
       summary: The person stopped typing. No event is sent; the op only resets the throttle of the connection.
       payload:
         type: object
+        additionalProperties: false
         required: [op, d]
         properties:
           op:
@@ -1065,6 +1072,7 @@ components:
       summary: 'Agents only: acknowledge all events up to `seq`.'
       payload:
         type: object
+        additionalProperties: false
         required: [op, d]
         properties:
           op:
@@ -1078,6 +1086,7 @@ components:
       summary: 'Agents only: live-box patch of an own run, same as `PATCH /runs/{run_id}`.'
       payload:
         type: object
+        additionalProperties: false
         required: [op, d]
         properties:
           op:
@@ -1091,6 +1100,7 @@ components:
       summary: Subscribe to `stats.live` for the instance or one space. Needs `stats.read`; a denial answers `error` and keeps the connection.
       payload:
         type: object
+        additionalProperties: false
         required: [op, d]
         properties:
           op:
@@ -1104,6 +1114,7 @@ components:
       summary: End the `stats.live` subscription of the connection.
       payload:
         type: object
+        additionalProperties: false
         required: [op, d]
         properties:
           op:
@@ -1117,6 +1128,7 @@ components:
       summary: 'Agents and apps: suggestions for an autocomplete request (04, 15.7).'
       payload:
         type: object
+        additionalProperties: false
         required: [op, d]
         properties:
           op:
