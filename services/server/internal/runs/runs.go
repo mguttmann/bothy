@@ -13,14 +13,15 @@ import (
 
 // Register declares the events runs emits and the ops it owns (M1-25, docs/spec/05-actions.md
 // sections 6 and 7): the durable run.state_changed (M2-05), agent.invocation (M2-08),
-// command.invoked (M2-16), run.cancel_requested (M2-09) and interaction.created (M2-15), the
-// ephemeral command.autocomplete_requested and the gateway op command.autocomplete_result (M2-17),
-// the durable run.wake_changed and agent.wake_input (AR-04),
-// whose handler the gateway runs on CommandExec, and the gateway op run.update it serves (M2-10).
+// agent.followup (M2-11), command.invoked (M2-16), run.cancel_requested (M2-09) and
+// interaction.created (M2-15), the ephemeral command.autocomplete_requested and the gateway op
+// command.autocomplete_result (M2-17), whose handler the gateway runs on CommandExec, the durable
+// run.wake_changed and agent.wake_input (AR-04), and the gateway op run.update it serves (M2-10).
 // internal/wire lists it in moduleRegistrations.
 func Register(r *authorize.Registry) {
 	r.Event("runs", authorize.EventRunStateChanged)
 	r.Event("runs", authorize.EventAgentInvocation)
+	r.Event("runs", authorize.EventAgentFollowup)
 	r.Event("runs", authorize.EventCommandInvoked)
 	r.Event("runs", authorize.EventRunCancelRequested)
 	r.Event("runs", authorize.EventInteractionCreated)
@@ -284,7 +285,9 @@ type RetryRun struct {
 	RunID ids.ID
 }
 
-// Runs is the read side of the runs module for handlers and other modules (M2-05). The caller is
+// Runs is the port of the runs module for handlers and other modules (M2-05): the reads (Get, the
+// lists, ActiveForActor, Context), the adapter operations of a run (Start, Resume, RenewToken,
+// AwaitInput, Patch, Finish) and Cancel and Retry. The caller is
 // the principal of ctx (kernel/actor). Errors are kernel/errs errors; an unknown and an invisible
 // run or thread give the same 404 not_found (02 section 9.2), and a foreign cursor 400
 // cursor_invalid. Apart from the adapter operations and cancelRun of M2-09, which the REST handlers

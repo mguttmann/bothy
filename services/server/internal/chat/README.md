@@ -65,7 +65,8 @@ Spaces, sidebar state, channels with behavior, skills, project binding, DM parti
   target are `400` on the field. Create and move take the order lock (an advisory lock, then
   every space that is not archived in ascending id) and a move writes exactly its own row
   (docs/DECISIONS.md M1-52/3).
-- Archive (07 section 4.5): final. A first unit authorizes and answers an archived space without
+- Archive (07 section 4.5): final; only the restore of a deletion lifts the archive the deletion
+  set (FEAT-delete-spaces-chats). A first unit authorizes and answers an archived space without
   a write (`no_change`); a second unit, a declared rights change with the space as target, sets
   `archived_at`, bumps the version, publishes `SpaceArchived` and appends `space.archived`. authz
   caps every level in the space at `read` (owners included) and writes `access.changed` with the
@@ -256,11 +257,11 @@ checks under the lock (archive state, If-Match, no-op) and before the operator c
   ActiveThreadsQuery{ChannelIDs, PinnedIDs, Window, PerChannel})` returns the active threads of
   the snapshot of sync in one statement (query `ActiveThreads`, `Store.ActiveThreads`): the open
   threads of kind `thread` among the pinned ids (sync passes the threads of the caller's active
-  runs and unread threads) through the primary key, plus per channel a `LATERAL` read over
-  `threads_channel_state_activity_idx` of the open threads with `last_activity_at` at or after the
-  clock of the service minus `Window`, newest first, limited to `PerChannel` minus the pinned
-  threads of the channel; both parts carry the whole row, the result follows the channel list,
-  then descending activity. `TestActiveThreads_QueryPlan` holds the plan (index scans only) on a
+  runs and unread threads) through the primary key, plus per channel a `LATERAL` read over an
+  activity index (`threads_channel_state_activity_idx`, or `threads_channel_activity_idx` of
+  00121) of the open threads with `last_activity_at` at or after the clock of the service minus
+  `Window`, newest first, limited to `PerChannel` minus the pinned threads of the channel; both
+  parts carry the whole row, the result follows the channel list, then descending activity. `TestActiveThreads_QueryPlan` holds the plan (index scans only) on a
   seeded database. Each thread is kept only after `thread.read` in filter mode and comes with its
   tags and billing mode as in `Get`. A port of its own, so the implementations of `Threads` stay
   unchanged.
@@ -325,7 +326,10 @@ checks under the lock (archive state, If-Match, no-op) and before the operator c
   `state` and `tag_id` (an unknown tag gives an empty page), sort `last_activity` or `created`
   (default the channel's `forum_default_sort`), keyset `(time DESC, id DESC)`, `limit` default
   `api.page_size_default`, capped at `api.page_size_max`, no totals. The cursor is bound to caller,
-  channel, filters and sort; any other combination is `400 cursor_invalid`.
+  channel, filters and sort; any other combination is `400 cursor_invalid`. Each sort reads an
+  index in its keyset order over the live threads of the channel: `threads_channel_activity_idx`
+  (00121) and `threads_channel_created_idx` (00120); `migrations/thread_list_indexes_test.go`
+  holds the plans.
 - Archived channels: authz caps the level at `read`, so close, reopen, title and tags are `403
   channel_read_only` with `reason: channel_archived`; reading stays.
 
@@ -454,19 +458,13 @@ limit below one) answers an empty result without a statement.
   `from_channel_id`, `to_channel_id` and `reason`.
 - No permission version and no `access.changed` (05: Permissions `no`). `parent_message_id` stays
   and then points into the source channel (03 `threads`).
-- Out of scope: delivery of the two events and the permission cache of the gateway (M1-65),
-  `message_attachments.channel_id` (M3-07).
+- Out of scope here: delivery of the two events and the permission cache of the gateway (M1-65).
+  `files` subscribes to `ThreadMoved` and changes `message_attachments.channel_id` in the same
+  transaction (M3-07).
 
 Rulings: docs/DECISIONS.md M1-62. Tests: `domain/move_test.go`, `register_test.go` and the
 integration tests `test/integration/move_test.go` (PostgreSQL 18, real modules through
 internal/wire, HTTP through the chain with response validation).
-
-## Port (root package `internal/chat`)
-
-- Inbound: `Structure` (spaces, channels, read-only), `ImportStructure` and `ReadOnlySwitch` (M8-03), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info, locate), `ThreadsByParent` (M2-27), `AgentConfig`, `TriggerFacts`, `ProjectBindings`, `SearchReads` (M3-14).
-- Emits in-tx events: `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived`, `ContentDeleted` (FEAT-delete-spaces-chats).
-- Subscribes to in-tx events: none.
-- Implements source ports and cross-cutting ports: `authz.StructureSource`, kernel `personaldata.Participant`; declares `ReadOnlyGuard` (implemented by `importer`, bound by `internal/wire`, M8-03), `FileCounter` and `SessionCounter` (implemented by `files` and `agents`, FEAT-delete-spaces-chats).
 
 ## Dependencies
 
@@ -655,10 +653,13 @@ R-DM-57, 07 4.5a, 20 4.2a.
   marks it deleted and publishes `ContentDeleted` (runs end). A deleted item answers its deletion
   without effect; a restore of a live item answers without effect. A restore is allowed strictly
   before `deleted_at` plus `chat.delete_undo_window` and before the purge, and it clears the
-  archive only when the delete set it. `deleteChannel` with `trash_project_folder` needs a binding
-  (`validation_failed` on `/trash_project_folder`), `channel.project.bind` and an ok folder check
+  archive only when the delete set it. A restore takes the order lock first (the space order for a
+  space, the space row for a channel); when a live sibling created during the undo window took the
+  sort key, the restored item gets a free key right after it. `deleteChannel` with
+  `trash_project_folder` needs a binding (`validation_failed` with code `not_allowed` on
+  `/trash_project_folder`), `channel.project.bind` and an ok folder check
   (`409 conflict`, reason `project_folder_refused`); it asks the forum's effective operator (`trash_agent_id`).
-- A deleted thread: `Get` and `AppendToThread` answer 404; `Info` reports `Deleted`, so the
+- A deleted thread: `Get` and `AppendToThread` answer 404; `Info` and `Locate` report `Deleted`, so the
   purge and the run lifecycle still reach it; every thread list query filters `deleted_at IS
   NULL`; authz answers `not_found` for it except `thread.read`, `thread.delete`,
   `thread.restore` (`authzsource` reports `ThreadFacts.Deleted`).
@@ -679,10 +680,10 @@ R-DM-57, 07 4.5a, 20 4.2a.
 
 ## Port (root package `internal/chat`)
 
-- Inbound: `Structure` (spaces, channels, read-only), `ImportThreads` (M8-11), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info, locate, UnreadCandidates), `ThreadsByParent` (M2-27), `AgentConfig`, `TriggerFacts`, `ProjectBindings`, `Deletions`, `Purges` and `ProjectTrash` (FEAT-delete-spaces-chats); declares `FileCounter` (implemented by `files`) and `SessionCounter` (implemented by `agents`), bound by `internal/wire`.
-- Emits in-tx events: `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived`, `ContentDeleted`.
+- Inbound: `Structure` (spaces, channels, read-only), `ImportStructure` and `ReadOnlySwitch` (M8-03), `ImportThreads` (M8-11), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info, locate, `UnreadCandidates`), `ThreadsByParent` (M2-27), `AgentConfig`, `TriggerFacts`, `ProjectBindings`, `SearchReads` (M3-14), `Deletions`, `Purges` and `ProjectTrash` (FEAT-delete-spaces-chats).
+- Emits in-tx events: `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived`, `ContentDeleted` (FEAT-delete-spaces-chats).
 - Subscribes to in-tx events: none.
-- Implements source ports and cross-cutting ports: `authz.StructureSource`, kernel `personaldata.Participant`.
+- Implements source ports and cross-cutting ports: `authz.StructureSource`, kernel `personaldata.Participant`; declares `ReadOnlyGuard` (implemented by `importer`, M8-03), `FileCounter` (implemented by `files`) and `SessionCounter` (implemented by `agents`), all bound by `internal/wire`.
 
 In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
 Checked by go-arch-lint (ADR 0008).

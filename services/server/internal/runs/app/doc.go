@@ -2,10 +2,12 @@
 
 // Package app holds the use cases of the runs module (M2-05): the acceptance of a triggering
 // message (Acceptor, the in-transaction subscriber of messaging.MessagePosted), the lifecycle of a
-// run (Open and Transition, the compare-and-swap of 03 runs on state and version that the later
-// tickets M2-08, M2-09, M2-11, M2-15 and M2-16 call), the reads of runs.Runs and the source of the
-// gauge bothy.run.active. It depends only on the ports of chat, agents and messaging and on the
-// kernel; the tables are reached through Repository (adapters/postgres).
+// run (Open and Transition, the compare-and-swap of 03 runs on state and version), the delivery
+// with its invocation tokens, follow-ups, cards and interactions, commands, wake-ups, team runs,
+// the reads of runs.Runs and the source of the gauge bothy.run.active. It depends on the ports of
+// chat, agents, messaging, files, billing and instance and on the kernel; the tables are reached
+// through Repository and the other store ports (adapters/postgres). The lock order is the one of
+// the README section "Lock order".
 //
 // Example:
 //

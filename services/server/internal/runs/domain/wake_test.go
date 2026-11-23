@@ -105,6 +105,18 @@ func TestWakeWindow(t *testing.T) {
 	if _, _, err := domain.WakeWindow(now, now.Add(time.Hour), now.Add(10*time.Minute), domain.WakeReasonAgent, wakeLim); pointers(t, err)[0] != "/deadline invalid" {
 		t.Fatalf("deadline before not_before: %v", err)
 	}
+	// A not_before past creation plus max_wait could never fire before its deadline: refused for
+	// every reason but usage_limit (audit srv-runs-app-6).
+	late := now.Add(wakeLim.MaxWait + time.Hour)
+	for _, reason := range []domain.WakeReason{domain.WakeReasonAgent, domain.WakeReasonRecovery} {
+		if _, _, err := domain.WakeWindow(now, late, time.Time{}, reason, wakeLim); err == nil || pointers(t, err)[0] != "/not_before invalid" {
+			t.Fatalf("%s: not_before past max_wait: %v", reason, err)
+		}
+	}
+	if nb, dl, err := domain.WakeWindow(now, now.Add(wakeLim.MaxWait), time.Time{}, domain.WakeReasonAgent, wakeLim); err != nil ||
+		!nb.Equal(dl) {
+		t.Fatalf("not_before at max_wait: %v %v %v", nb, dl, err)
+	}
 }
 
 // TestAutonomyCaps: the chain cap refuses at the cap and 0 switches it off; the idle cap refuses

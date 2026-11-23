@@ -86,8 +86,10 @@ The server enforces the owner's part of the capability "Components" (M2-15): a c
 (`kind = card`, section 11) of an agent whose `operator_config` sets `supports_components` to
 `false` is refused with `403 feature_disabled`, and nothing of the request is stored. `runs` reads
 the switch through the agents port (`agents.RunFacts.ComponentsAllowed`). The adapter's part, the
-report `components: true` in the heartbeat, is checked with M2-20; until then a card of an agent
-whose owner allows components is accepted whatever the adapter reports.
+report `components: true` in the heartbeat, is stored but not checked: a card of an agent whose
+owner allows components is accepted whatever the adapter reports. `supports_files_out` and
+`supports_followups` are enforced as their rows say; `supports_title` and `supports_voice` reach no
+adapter and no server check yet, so switching them off has no effect.
 
 ### 2.3 Grants of an agent
 
@@ -715,7 +717,7 @@ or acknowledges a `seq` that process cannot yet deliver.
 
 | Event | When | Payload (schema `<type>.v1`, excerpt) | Token |
 |---|---|---|---|
-| `agent.invocation` | new run | `run`, `thread`, `channel` (`id`, `kind`, `settings_version`), `trigger` (`kind`, IDs, triggering person), `session` (9.1; in openapi the members `session_mode` for `session.mode` and `agent_session` for the session row; `agent_session` is missing for `new` without a row; both are missing for a guest run), `capabilities_effective`; for `trigger_kind = command` the command ID, its name and the parsed options in the order of the definition (`command_id`, `command_name`, `options`, `command_invocation_id`) instead of a message (M2-16) | yes |
+| `agent.invocation` | new run | `run`, `thread`, `channel` (`id`, `kind`, `settings_version`), `trigger` (`kind`, IDs, triggering person), `session` (9.1; in openapi the members `session_mode` for `session.mode` and `agent_session` for the session row; `agent_session` is missing for `new` without a row; both are missing for a guest run); the planned member `capabilities_effective` is not built, the invocation does not carry it; for `trigger_kind = command` the command ID, its name and the parsed options in the order of the definition (`command_id`, `command_name`, `options`, `command_invocation_id`) instead of a message (M2-16) | yes |
 | `agent.followup` | follow-up (section 7) | `run_id`, `message_id`, triggering person | yes |
 | `interaction.created` | component used | `interaction_id`, `component` (`custom_id`, type), `values`, `run_id`, acting person | yes |
 | `command.invoked` | control command executed (10.4) | `command_id`, `command_name`, `options`, location, triggering person; `run_id` exactly when the owner has an active run in the thread at execution time, then that run, never the run of another agent (R-AZ-25) | yes |
@@ -1595,7 +1597,8 @@ triggering message, so the person does not have to write the message again: `ret
 3. The new run is opened like an acceptance (3.4 step 7): same thread, same agent,
    `triggering_message_id` of the old run, `triggered_by` = the caller, a new live box anchor,
    `run.state_changed`, `trigger_state = received` on the message, and `agent.invocation` (held
-   while an attachment of the message is not final, 12 section 10). The old run stays as it is.
+   while an attachment of the message is not final, 12 section 10), whose `triggered_by` is the
+   caller as in the run and the token, not the author of the message. The old run stays as it is.
 4. Idempotent: when the newest run of the thread is already a run of the same agent for the same
    message (an earlier retry), the answer is that run and nothing is written; a repeated request
    with the same `Idempotency-Key` gets the stored answer (06 7).
@@ -1628,7 +1631,9 @@ condition, a short label written by the agent, the reason (`agent`, `recovery`, 
 wake input it produced. For `pr_checks` it also stores the head commit of the pull request at
 creation. The deadline of a `usage_limit` wake-up is at most `run.wake_max_wait` after its
 `not_before` (not after its creation), so a weekly window that resets close to the limit still
-fires; for every other reason it is at most `run.wake_max_wait` after creation.
+fires; for every other reason it is at most `run.wake_max_wait` after creation, and a
+`not_before` later than that is `400 validation_failed` with `invalid` on `/not_before`, because
+such a wake-up could only expire.
 
 | Kind | Condition | Evaluated by | Allowed when |
 |---|---|---|---|

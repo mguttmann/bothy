@@ -204,7 +204,7 @@ sql:
         output_files_suffix: .gen
         emit_interface: false
         omit_unused_structs: true
-  # runs (M2-05): runs and run_steps.
+  # runs (M2-05): runs, run_steps and the other tables of the module.
   - engine: postgresql
     schema: migrations
     queries: internal/runs/adapters/postgres/queries

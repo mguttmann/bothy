@@ -91,7 +91,6 @@ func (t *Tracker) Heartbeat(ctx context.Context, body json.RawMessage) (agents.P
 		return agents.PresenceStatus{}, err
 	}
 	e.mu.Lock()
-	defer e.mu.Unlock()
 	// A Changed that ran since the read above took newer configured values.
 	if e.changes == changes {
 		e.target = row.Target
@@ -109,8 +108,12 @@ func (t *Tracker) Heartbeat(ctx context.Context, body json.RawMessage) (agents.P
 		t.arm(e, now)
 	}
 	by := a.ID
-	t.publish(ctx, e, &by)
+	ev, publish := t.presenceEvent(e, &by)
 	st := t.status(e, now)
+	e.mu.Unlock()
+	if publish {
+		t.send(ctx, e.id, ev)
+	}
 	st.ProjectTrash = trash
 	return st, nil
 }

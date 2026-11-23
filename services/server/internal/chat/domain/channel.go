@@ -180,7 +180,8 @@ func (c *Channel) Move(key string) {
 // channels.version.
 func (c *Channel) Touch() { c.Version++ }
 
-// Archive sets the archive time and bumps the version; there is no way back (05 has no unarchive).
+// Archive sets the archive time and bumps the version. 05 has no unarchive; only the restore of a
+// deletion clears an archive that the deletion set (Restore).
 func (c *Channel) Archive(at time.Time) {
 	c.ArchivedAt = at
 	c.Version++

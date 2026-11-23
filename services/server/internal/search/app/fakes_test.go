@@ -135,10 +135,26 @@ func (f *fakeIndex) TitlePrefix(_ context.Context, q searchkit.PrefixQuery) ([]s
 	return f.titleHits, f.err
 }
 
-// fakeStructure maps spaces to channels and names every channel.
+// fakeStructure maps spaces to channels and names every channel; every thread is live unless it
+// is in deleted.
 type fakeStructure struct {
-	spaces map[ids.ID][]ids.ID
-	asked  [][]ids.ID
+	spaces  map[ids.ID][]ids.ID
+	asked   [][]ids.ID
+	deleted map[ids.ID]bool
+	hitErr  error
+}
+
+func (s *fakeStructure) HitThreads(_ context.Context, threadIDs, channelIDs []ids.ID) ([]chat.Thread, error) {
+	if s.hitErr != nil {
+		return nil, s.hitErr
+	}
+	var out []chat.Thread
+	for _, t := range threadIDs {
+		if !s.deleted[t] {
+			out = append(out, chat.Thread{ID: t, ChannelID: channelIDs[0]})
+		}
+	}
+	return out, nil
 }
 
 func (s *fakeStructure) ChannelsInSpaces(_ context.Context, spaceIDs []ids.ID) ([]ids.ID, error) {

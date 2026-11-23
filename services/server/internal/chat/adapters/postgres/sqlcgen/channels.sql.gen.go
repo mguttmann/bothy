@@ -455,25 +455,28 @@ func (q *Queries) SaveChannel(ctx context.Context, arg SaveChannelParams) error 
 
 const saveChannelDeletion = `-- name: SaveChannelDeletion :exec
 UPDATE channels
-SET archived_at = $1, deleted_at = $2, deleted_by = $3, version = $4
-WHERE id = $5
+SET archived_at = $1, deleted_at = $2, deleted_by = $3, sort_key = $4,
+    version = $5
+WHERE id = $6
 `
 
 type SaveChannelDeletionParams struct {
 	ArchivedAt pgtype.Timestamptz
 	DeletedAt  pgtype.Timestamptz
 	DeletedBy  pgtype.UUID
+	SortKey    string
 	Version    int64
 	ID         pgtype.UUID
 }
 
 // Writes a delete or restore of channel.delete and channel.restore (D-DEL-2): the archive time,
-// the deletion and the version.
+// the deletion, the sort key (a restore may move it, audit srv-chat-1) and the version.
 func (q *Queries) SaveChannelDeletion(ctx context.Context, arg SaveChannelDeletionParams) error {
 	_, err := q.db.Exec(ctx, saveChannelDeletion,
 		arg.ArchivedAt,
 		arg.DeletedAt,
 		arg.DeletedBy,
+		arg.SortKey,
 		arg.Version,
 		arg.ID,
 	)

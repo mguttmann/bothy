@@ -16,6 +16,17 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// NewRevokeGrantRequest calls the generic RevokeGrant builder with application/json body
+func NewRevokeGrantRequest(server string, grantId GrantIdPath, params *RevokeGrantParams, body RevokeGrantJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRevokeGrantRequestWithBody(server, grantId, params, "application/json", bodyReader)
+}
+
 // NewRevokeGrantRequestWithBody constructs an http.Request for the RevokeGrant method, with any body, and a specified content type
 func NewRevokeGrantRequestWithBody(server string, grantId GrantIdPath, params *RevokeGrantParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -14602,9 +14613,12 @@ type ClientWithResponsesInterface interface {
 	// `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
 	// hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
 	// Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
-	// `search.query_max_chars` or without a term is `400 validation_failed`; more than
-	// `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
-	// `503 unavailable` with reason `search_timeout`.
+	// `search.query_max_chars` or without a term is `400 validation_failed`, as is an earlier
+	// question in `history` longer than `search.query_max_chars` (`too_long` on
+	// `/history/<i>/q`); more than `search.assist.max_turns` turns in `history` is
+	// `too_many_items`. A statement timeout is `503 unavailable` with reason `search_timeout`;
+	// when only the second search with the assistant's terms fails, the answer keeps the picks
+	// and the hits of the first search.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -14621,9 +14635,12 @@ type ClientWithResponsesInterface interface {
 	// `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
 	// hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
 	// Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
-	// `search.query_max_chars` or without a term is `400 validation_failed`; more than
-	// `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
-	// `503 unavailable` with reason `search_timeout`.
+	// `search.query_max_chars` or without a term is `400 validation_failed`, as is an earlier
+	// question in `history` longer than `search.query_max_chars` (`too_long` on
+	// `/history/<i>/q`); more than `search.assist.max_turns` turns in `history` is
+	// `too_many_items`. A statement timeout is `503 unavailable` with reason `search_timeout`;
+	// when only the second search with the assistant's terms fails, the answer keeps the picks
+	// and the hits of the first search.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -23691,30 +23708,4 @@ type CompleteStepUpWithDeviceKeyResponse200Headers struct {
 	CorrelationId   *CorrelationId
 	RateLimit       *string
 	RateLimitPolicy *string
-}
-
-// CompleteStepUpWithDeviceKeyResponse400Headers the declared response headers of an HTTP 400 response for CompleteStepUpWithDeviceKey
-type CompleteStepUpWithDeviceKeyResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CompleteStepUpWithDeviceKeyResponse401Headers the declared response headers of an HTTP 401 response for CompleteStepUpWithDeviceKey
-type CompleteStepUpWithDeviceKeyResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// CompleteStepUpWithDeviceKeyResponse403Headers the declared response headers of an HTTP 403 response for CompleteStepUpWithDeviceKey
-type CompleteStepUpWithDeviceKeyResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CompleteStepUpWithDeviceKeyResponse429Headers the declared response headers of an HTTP 429 response for CompleteStepUpWithDeviceKey
-type CompleteStepUpWithDeviceKeyResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
 }

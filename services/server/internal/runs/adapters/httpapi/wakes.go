@@ -40,6 +40,9 @@ func (h *Runs) CreateRunWake(ctx context.Context, req rest.CreateRunWakeRequestO
 		return nil, err
 	}
 	b := req.Body
+	if b == nil {
+		return nil, missingBody()
+	}
 	in := runs.CreateWake{
 		RunID: ids.ID(req.RunId), Kind: string(b.Kind), Reason: string(b.Reason), Label: deref(b.Label), Condition: conditionIn(b.Condition),
 		NotBefore: timeOf(b.NotBefore), Deadline: timeOf(b.Deadline), Outage: derefInt(b.Outage),
@@ -64,6 +67,9 @@ func (h *Runs) RecoverRunWake(ctx context.Context, req rest.RecoverRunWakeReques
 		return nil, err
 	}
 	b := req.Body
+	if b == nil {
+		return nil, missingBody()
+	}
 	res, err := w.Recover(ctx, runs.RecoverWake{RunID: ids.ID(req.RunId), Reason: string(b.Reason), Label: deref(b.Label), NotBefore: timeOf(b.NotBefore)})
 	if err != nil {
 		return nil, err
@@ -111,6 +117,9 @@ func (h *Runs) FireRunWake(ctx context.Context, req rest.FireRunWakeRequestObjec
 		return nil, err
 	}
 	b := req.Body
+	if b == nil {
+		return nil, missingBody()
+	}
 	in := runs.FireWake{WakeID: ids.ID(req.WakeId), Outcome: string(b.Outcome), ResultText: deref(b.ResultText), Reason: deref(b.Reason)}
 	if b.RunId != nil {
 		in.RunID = ids.ID(*b.RunId)

@@ -110,14 +110,22 @@ func (o *OperatorConfig) set(key string, v any) error {
 }
 
 // OperatorConfigFromStore reads the stored column. The value was validated before it was
-// written; a value that is not the schema anymore is refused all the same.
+// written; a key this release does not know is ignored (a later release may have stored it, and
+// docs/operations/upgrade.md promises the rollback by one release), while a known key with a
+// value that is not the schema anymore is refused all the same.
 //
-// Errors: those of ParseOperatorConfig, or validation_failed on /operator_config for a value that
-// is not a JSON object.
+// Errors: those of ParseOperatorConfig for the known keys, or validation_failed on
+// /operator_config for a value that is not a JSON object.
 func OperatorConfigFromStore(raw []byte) (OperatorConfig, error) {
 	var m map[string]any
 	if err := json.Unmarshal(raw, &m); err != nil {
 		return OperatorConfig{}, fieldError(pointerConfig, FieldInvalid, "operator_config is not a JSON object")
+	}
+	var probe operatorConfigV1
+	for k := range m {
+		if k != keyDefaultModel && probe.flag(Capability(k)) == nil {
+			delete(m, k)
+		}
 	}
 	return ParseOperatorConfig(m)
 }

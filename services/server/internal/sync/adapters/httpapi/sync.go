@@ -157,8 +157,8 @@ func channelViewREST(c sync.SnapshotChannel) rest.ChannelView {
 		Id: rest.Uuid(c.ID), SpaceId: optionalID(c.SpaceID), Kind: rest.ChannelKind(c.Kind), Name: c.Name, Topic: c.Topic, SortKey: c.SortKey,
 		Operator: rest.ChannelOperator{Mode: rest.OperatorMode(c.OperatorMode), AgentId: optionalID(c.OperatorAgentID),
 			EffectiveAgentId: optionalID(c.EffectiveOperatorID)},
-		ReadOnly: c.ReadOnly, ProjectBound: c.ProjectBound, MainThreadId: optionalID(c.MainThreadID), ArchivedAt: optionalTime(c.ArchivedAt),
-		CreatedAt: c.CreatedAt.UTC().Truncate(time.Millisecond), Version: c.Version, SettingsVersion: c.SettingsVersion,
+		ReadOnly: c.ReadOnly, AllowAutonomousRuns: &c.AllowAutonomousRuns, ProjectBound: c.ProjectBound, MainThreadId: optionalID(c.MainThreadID),
+		ArchivedAt: optionalTime(c.ArchivedAt), CreatedAt: c.CreatedAt.UTC().Truncate(time.Millisecond), Version: c.Version, SettingsVersion: c.SettingsVersion,
 	}
 	if c.ForumDefaultSort != "" {
 		s := rest.ForumSort(c.ForumDefaultSort)

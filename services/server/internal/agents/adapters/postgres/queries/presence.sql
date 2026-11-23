@@ -1,7 +1,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 -- Queries of the presence of agents (agents module, M2-20; docs/spec/03-data-model.md table
 -- agents, docs/spec/09-agents.md section 4.8). Only this module reads and writes the table (03
--- Grundsatz 12). A transaction of the heartbeat locks at most one agents row (03 section 6.3).
+-- principle 12). A transaction of the heartbeat locks at most one agents row (03 section 6.3).
 
 -- name: GetPresenceRow :one
 -- The configured mode and class and the stored reported state of one agent, read on every

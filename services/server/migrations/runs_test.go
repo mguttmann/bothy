@@ -107,6 +107,9 @@ func TestMigration_RunsAndRunSteps(t *testing.T) {
 			"WHERE (state = ANY (ARRAY['completed'::text, 'failed'::text, 'cancelled'::text]))",
 		"CREATE INDEX runs_state_agent_active_idx ON public.runs USING btree (state, agent_id) " + active,
 		"CREATE INDEX runs_thread_queued_idx ON public.runs USING btree (thread_id, queued_at DESC)",
+		// The answer and the deletion of an interaction (00122, audit finding srv-runs-core-4).
+		"CREATE INDEX runs_triggering_interaction_idx ON public.runs USING btree (triggering_interaction_id) " +
+			"WHERE (triggering_interaction_id IS NOT NULL)",
 		"CREATE UNIQUE INDEX runs_invocation_jti_key ON public.runs USING btree (invocation_jti)",
 		"CREATE UNIQUE INDEX runs_pkey ON public.runs USING btree (id)",
 		"CREATE UNIQUE INDEX runs_thread_active_key ON public.runs USING btree (thread_id) " + active,

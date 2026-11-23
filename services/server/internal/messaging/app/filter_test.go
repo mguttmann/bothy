@@ -62,9 +62,10 @@ func (rowsStore) Mentions(context.Context, ids.ID) ([]ids.ID, error) { return ni
 type oneThread struct {
 	chat.Threads
 	info chat.ThreadInfo
+	err  error
 }
 
-func (o oneThread) Info(context.Context, ids.ID) (chat.ThreadInfo, error) { return o.info, nil }
+func (o oneThread) Info(context.Context, ids.ID) (chat.ThreadInfo, error) { return o.info, o.err }
 
 // anyone resolves every principal.
 type anyone struct{ identity.Directory }

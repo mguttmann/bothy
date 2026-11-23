@@ -118,13 +118,6 @@ func EmptyQuery() error {
 	})
 }
 
-// TooLong is 400 validation_failed on #query/q with code too_long for a raw query of more than
-// maxChars runes, nil otherwise; the prefix search checks only the length.
-func TooLong(raw string, maxChars int) error {
-	_, err := ValidateQ(raw, maxChars)
-	return err
-}
-
 // PageSize returns the page size of a request (06 section 6 item 3): def
 // (search.page_size_default) when limit is not positive, otherwise limit capped at maxSize
 // (search.page_size_max).

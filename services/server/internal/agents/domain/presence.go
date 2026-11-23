@@ -28,17 +28,16 @@ const (
 // Present reports whether s is a state of a running adapter (online or degraded).
 func (s RuntimeState) Present() bool { return s == RuntimeOnline || s == RuntimeDegraded }
 
-// StateAt derives the presence state at now (04 section 12 item 2): unknown without any
-// heartbeat, offline once now has reached last + timeout (agent.presence_timeout; the boundary
-// is inclusive, D-M2-20-4), otherwise the reported state.
-func StateAt(last time.Time, reported RuntimeState, now time.Time, timeout time.Duration) RuntimeState {
-	switch {
-	case last.IsZero():
-		return RuntimeUnknown
-	case !now.Before(last.Add(timeout)):
+// StoredState is the presence of a stored row that no process tracks at now: a stored online or
+// degraded state is offline once now has reached last + stale (the boundary is inclusive,
+// D-M2-20-4); stale is agent.presence_timeout plus agent.heartbeat_persist_interval, the most a
+// stored heartbeat lags the real one. Every other state, and any state for stale 0, is returned as
+// stored.
+func StoredState(stored RuntimeState, last, now time.Time, stale time.Duration) RuntimeState {
+	if stale > 0 && stored.Present() && !now.Before(last.Add(stale)) {
 		return RuntimeOffline
 	}
-	return reported
+	return stored
 }
 
 // StoredPresence is the stored presence of an agent that the start rule reads.

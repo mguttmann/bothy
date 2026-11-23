@@ -819,6 +819,9 @@ type msgFacts struct {
 	mu   sync.Mutex
 	m    map[ids.ID]messaging.TriggerMessage
 	dflt messaging.TriggerMessage
+	// unknown principals are missing from PrincipalRefs; refsErr fails it.
+	unknown map[ids.ID]bool
+	refsErr error
 }
 
 func (m msgs) SetTriggerState(_ context.Context, cmd messaging.SetTriggerStateCmd) error {
@@ -855,7 +858,17 @@ func (m msgs) TriggerMessageOf(_ context.Context, id ids.ID) (messaging.TriggerM
 // PrincipalRefs renders every id as a person named Alex (M2-16).
 func (m msgs) PrincipalRefs(_ context.Context, list []ids.ID) (map[ids.ID]messaging.PrincipalRef, error) {
 	out := map[ids.ID]messaging.PrincipalRef{}
+	if m.facts != nil {
+		m.facts.mu.Lock()
+		defer m.facts.mu.Unlock()
+		if m.facts.refsErr != nil {
+			return nil, m.facts.refsErr
+		}
+	}
 	for _, id := range list {
+		if m.facts != nil && m.facts.unknown[id] {
+			continue
+		}
 		out[id] = messaging.PrincipalRef{ID: id, Kind: "user", Handle: "alex", DisplayName: "Alex"}
 	}
 	return out, nil

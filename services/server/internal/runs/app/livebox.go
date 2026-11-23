@@ -15,8 +15,11 @@ var _ runs.LiveBox = (*Service)(nil)
 // Documents implements runs.LiveBox (M2-10 design note 10): the documents of the active runs of
 // threadIDs, each built by the projection getRun answers with. It does not authorize: the gateway
 // checked gateway.focus per thread and admits every recipient with run.read before it sends (07
-// section 7.4 rule 1, exception "loading a resource that has already been checked"). Reads join
-// one snapshot through the unit of work, so a document is never torn between a patch.
+// section 7.4 rule 1, exception "loading a resource that has already been checked"). The reads
+// share one unit of work, which runs READ COMMITTED: each statement sees what was committed when
+// it started, so a patch that commits between the read of the run row and the read of its steps
+// can pair version N with the steps of N+1. The run.updated of that patch follows and corrects
+// the client's document.
 func (s *Service) Documents(ctx context.Context, threadIDs []ids.ID) ([]runs.Run, error) {
 	if len(threadIDs) == 0 {
 		return nil, nil

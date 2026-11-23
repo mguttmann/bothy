@@ -39,7 +39,8 @@ type DeliveryInput struct {
 	// EventID and Seq name the event.
 	EventID ids.ID
 	Seq     int64
-	// Type is agent.invocation, agent.followup, interaction.created or command.invoked.
+	// Type is agent.invocation, agent.followup, interaction.created, command.invoked or
+	// agent.wake_input.
 	Type string
 	// ResourceKind and ResourceID are the resource of the event (run for the first two).
 	ResourceKind string

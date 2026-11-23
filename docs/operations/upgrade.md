@@ -83,7 +83,7 @@ whose bundle changed needs manual work, and the section "Upgrade notes" of its r
 | M5 | New constraints first as `NOT VALID`, `VALIDATE CONSTRAINT` in a later migration. | Check without a write lock. |
 | M6 | Every step sets `lock_timeout` to `migrate.lock_timeout` and would rather abort than wait. | A waiting lock blocks all following requests. |
 | M7 | Never backfill data in the migration, but as a background job in batches. | Short transactions; progress visible. |
-| M8 | Enumerations are `text` with `CHECK`; new values are additive (R-DM-02). Code of N-1 must tolerate unknown values. | Rollback. |
+| M8 | Enumerations are `text` with `CHECK`; new values are additive (R-DM-02). Code of N-1 must tolerate unknown values. A stored JSON document with a closed schema (for example `agents.operator_config`) is checked strictly on write only; a read ignores keys it does not know. | Rollback. |
 | M9 | Event payloads change only additively (`schema_version`, [04-sync-protocol.md](../spec/04-sync-protocol.md) 2.2). | Old clients keep reading. |
 | M10 | A job creates the partitions of the event log in advance, never a migration during operation. `bothy migrate up` calls the same idempotent routine after the migrations so that a fresh database has partitions ([16-operations.md](../spec/16-operations.md) 7.1). | No DDL lock in the hot path. |
 | M11 | Migrations of River (jobs) run in the same `migrate` run, in a fixed order before our own. | One start step, one result. |

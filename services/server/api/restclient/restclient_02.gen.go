@@ -3401,9 +3401,12 @@ type ClientInterface interface {
 	// `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
 	// hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
 	// Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
-	// `search.query_max_chars` or without a term is `400 validation_failed`; more than
-	// `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
-	// `503 unavailable` with reason `search_timeout`.
+	// `search.query_max_chars` or without a term is `400 validation_failed`, as is an earlier
+	// question in `history` longer than `search.query_max_chars` (`too_long` on
+	// `/history/<i>/q`); more than `search.assist.max_turns` turns in `history` is
+	// `too_many_items`. A statement timeout is `503 unavailable` with reason `search_timeout`;
+	// when only the second search with the assistant's terms fails, the answer keeps the picks
+	// and the hits of the first search.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3420,9 +3423,12 @@ type ClientInterface interface {
 	// `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
 	// hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
 	// Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
-	// `search.query_max_chars` or without a term is `400 validation_failed`; more than
-	// `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
-	// `503 unavailable` with reason `search_timeout`.
+	// `search.query_max_chars` or without a term is `400 validation_failed`, as is an earlier
+	// question in `history` longer than `search.query_max_chars` (`too_long` on
+	// `/history/<i>/q`); more than `search.assist.max_turns` turns in `history` is
+	// `too_many_items`. A statement timeout is `503 unavailable` with reason `search_timeout`;
+	// when only the second search with the assistant's terms fails, the answer keeps the picks
+	// and the hits of the first search.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -11699,9 +11705,12 @@ func (c *Client) AnswerSearchAssist(ctx context.Context, requestId RequestIdPath
 // `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
 // hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
 // Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
-// `search.query_max_chars` or without a term is `400 validation_failed`; more than
-// `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
-// `503 unavailable` with reason `search_timeout`.
+// `search.query_max_chars` or without a term is `400 validation_failed`, as is an earlier
+// question in `history` longer than `search.query_max_chars` (`too_long` on
+// `/history/<i>/q`); more than `search.assist.max_turns` turns in `history` is
+// `too_many_items`. A statement timeout is `503 unavailable` with reason `search_timeout`;
+// when only the second search with the assistant's terms fails, the answer keeps the picks
+// and the hits of the first search.
 //
 // Takes any type of body and a specified content type.
 //
@@ -11728,9 +11737,12 @@ func (c *Client) AssistSearchWithBody(ctx context.Context, contentType string, b
 // `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
 // hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
 // Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
-// `search.query_max_chars` or without a term is `400 validation_failed`; more than
-// `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
-// `503 unavailable` with reason `search_timeout`.
+// `search.query_max_chars` or without a term is `400 validation_failed`, as is an earlier
+// question in `history` longer than `search.query_max_chars` (`too_long` on
+// `/history/<i>/q`); more than `search.assist.max_turns` turns in `history` is
+// `too_many_items`. A statement timeout is `503 unavailable` with reason `search_timeout`;
+// when only the second search with the assistant's terms fails, the answer keeps the picks
+// and the hits of the first search.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -21350,15 +21362,4 @@ func NewGetGrantRequest(server string, grantId GrantIdPath) (*http.Request, erro
 	}
 
 	return req, nil
-}
-
-// NewRevokeGrantRequest calls the generic RevokeGrant builder with application/json body
-func NewRevokeGrantRequest(server string, grantId GrantIdPath, params *RevokeGrantParams, body RevokeGrantJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewRevokeGrantRequestWithBody(server, grantId, params, "application/json", bodyReader)
 }

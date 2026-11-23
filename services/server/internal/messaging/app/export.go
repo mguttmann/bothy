@@ -165,23 +165,16 @@ func (st *exportStream) batch(ctx context.Context, sel ExportRead) ([]messaging.
 		if err != nil {
 			return err
 		}
-		authors := map[ids.ID]messaging.PrincipalRef{}
-		fctx := authorize.Filter(ctx)
 		for _, m := range rows {
 			seqs = append(seqs, m.ThreadSeq)
-			ok, err := st.s.allowed(fctx, st.a, authorize.ActionMessageRead, historyResource(m))
-			if err != nil {
-				return err
-			}
-			if !ok {
-				st.s.historyFilterMismatch(ctx)
-				continue
-			}
-			v, err := st.s.exported(ctx, m, authors)
-			if err != nil {
-				return err
-			}
-			out = append(out, v)
+		}
+		kept, err := st.s.exportable(ctx, st.a, rows)
+		if err != nil {
+			return err
+		}
+		// The export representation is that of Get with the whole content (brief M3-11 note 4).
+		if out, err = st.s.views(ctx, kept, map[ids.ID]messaging.PrincipalRef{}); err != nil {
+			return err
 		}
 		return st.s.decorate(ctx, sel.Visible, out)
 	})
@@ -193,23 +186,27 @@ func (st *exportStream) batch(ctx context.Context, sel ExportRead) ([]messaging.
 	return out, nil
 }
 
-// exported returns the export representation of m: the representation of Get with the whole
-// content (brief M3-11 note 4). authors caches the authors of one batch.
-func (s *Service) exported(ctx context.Context, m domain.Message, authors map[ids.ID]messaging.PrincipalRef) (messaging.Message, error) {
-	author, ok := authors[m.AuthorID]
-	if !ok {
-		var err error
-		if author, err = s.author(ctx, m.AuthorID); err != nil {
-			return messaging.Message{}, err
+// exportable returns the rows a may read, each checked with message.read in filter mode. A refused
+// row is a filter mismatch unless its thread is deleted (threadGone).
+func (s *Service) exportable(ctx context.Context, a actor.Actor, rows []domain.Message) ([]domain.Message, error) {
+	fctx := authorize.Filter(ctx)
+	kept := make([]domain.Message, 0, len(rows))
+	for _, m := range rows {
+		ok, err := s.allowed(fctx, a, authorize.ActionMessageRead, historyResource(m))
+		if err != nil {
+			return nil, err
 		}
-		authors[m.AuthorID] = author
-	}
-	var mentions []ids.ID
-	if m.DeletedAt.IsZero() {
-		var err error
-		if mentions, err = s.d.Store.Mentions(ctx, m.ID); err != nil {
-			return messaging.Message{}, err
+		if ok {
+			kept = append(kept, m)
+			continue
+		}
+		gone, err := s.threadGone(ctx, m.ThreadID)
+		if err != nil {
+			return nil, err
+		}
+		if !gone {
+			s.historyFilterMismatch(ctx)
 		}
 	}
-	return view(m, author, mentions), nil
+	return kept, nil
 }

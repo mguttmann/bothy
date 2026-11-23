@@ -232,7 +232,7 @@ modules:
     # attachment state of a message (files.Attachments.Pending); the edge points down
     # (docs/decisions.d/M3-07.md D-M3-07-1).
     depends_on: [instance, chat, agents, messaging, billing, files]
-    adapter_vendors: [pgx, otel]   # sqlc code and the repository of runs and run_steps; adapters/otelmetrics records the run metrics (M2-05)
+    adapter_vendors: [pgx, otel]   # sqlc code and the repository of the tables of runs; adapters/otelmetrics records the run metrics (M2-05)
   search:
     tables: []
     actions: [search.query, search.assist, search.assist.respond]

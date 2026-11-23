@@ -27,7 +27,7 @@ METHODS = ("get", "put", "post", "patch", "delete", "head", "options")
 CEILINGS = {
     "operations": 159,
     "schemas": 388,
-    "properties": 981,
+    "properties": 980,
 }
 
 

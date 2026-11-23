@@ -86,6 +86,8 @@ type ReferenceOptions struct {
 // state of the runtime (points 8 and 10). Zero values are not compared.
 type ReferenceExpectation struct {
 	RunID, ThreadID, MessageID, InteractionID, CommandID ids.ID
+	// WakeID is the wake-up of a wake run or of agent.wake_input (AR-04).
+	WakeID ids.ID
 	// ActualBillingMode is the mode the runtime reports for this run; "unknown" never matches.
 	ActualBillingMode string
 	// ActualToolClass is the tool class the runtime actually loaded.
@@ -98,6 +100,7 @@ type ReferenceClaims struct {
 	Iat, Exp                                   int64
 	TriggerKind                                string
 	RunID, MessageID, InteractionID, CommandID string
+	WakeID                                     string
 	ThreadID, ChannelID, SpaceID               string
 	Level, BillingMode, ToolClass              string
 	PermissionVersion                          int64
@@ -229,7 +232,8 @@ func (v *ReferenceVerifier) checkClaims(c ReferenceClaims, e ReferenceExpectatio
 	for _, m := range []struct {
 		want ids.ID
 		got  string
-	}{{e.RunID, c.RunID}, {e.ThreadID, c.ThreadID}, {e.MessageID, c.MessageID}, {e.InteractionID, c.InteractionID}, {e.CommandID, c.CommandID}} {
+	}{{e.RunID, c.RunID}, {e.ThreadID, c.ThreadID}, {e.MessageID, c.MessageID}, {e.InteractionID, c.InteractionID}, {e.CommandID, c.CommandID},
+		{e.WakeID, c.WakeID}} {
 		if !m.want.IsZero() && m.got != m.want.String() {
 			return fmt.Errorf("%w: run, thread or triggering object differs from the event", ErrRefInvalid)
 		}
@@ -354,7 +358,7 @@ func decodeClaims(body []byte) (ReferenceClaims, error) {
 		{"trigger_kind", &c.TriggerKind, true}, {"thread_id", &c.ThreadID, true}, {"channel_id", &c.ChannelID, true},
 		{"space_id", &c.SpaceID, true}, {"level", &c.Level, true}, {"billing_mode", &c.BillingMode, true},
 		{"tool_class", &c.ToolClass, true}, {"run_id", &c.RunID, false}, {"message_id", &c.MessageID, false},
-		{"interaction_id", &c.InteractionID, false}, {"command_id", &c.CommandID, false},
+		{"interaction_id", &c.InteractionID, false}, {"command_id", &c.CommandID, false}, {"wake_id", &c.WakeID, false},
 	} {
 		if _, present := members[f.name]; !present && !f.required {
 			continue

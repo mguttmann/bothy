@@ -85,8 +85,9 @@ func NewCatchUp(cfg CatchUpConfig, d CatchUpDeps) (*CatchUpService, error) {
 	return &CatchUpService{cfg: cfg, d: d}, nil
 }
 
-// logHead returns the head (the counter, never max(seq): after retention the log can be empty
-// while the counter is not, docs/DECISIONS.md M1-63/1) and the sync epoch, read in this order.
+// logHead returns the head (the counter event_seq, one row instead of a read of the log; it equals
+// max(seq), which the tail starts from, because the head partition is never dropped,
+// docs/DECISIONS.md M1-63/1) and the sync epoch, read in this order.
 func logHead(ctx context.Context, head HeadSource, epoch EpochSource) (int64, ids.ID, error) {
 	h, err := head.EventSeq(ctx)
 	if err != nil {

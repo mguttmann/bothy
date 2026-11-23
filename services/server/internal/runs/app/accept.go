@@ -531,6 +531,24 @@ func (s *Service) invoke(ctx context.Context, ev messaging.MessagePosted, info c
 	return nil, err
 }
 
+// runPerson returns triggered_by of agent.invocation: the person of the run (runs.triggered_by),
+// which the token and run.state_changed name too. It is the author of the triggering message
+// except for a retry by another person (retryRun, 09 5.7 point 3), whose name is then read.
+func (s *Service) runPerson(ctx context.Context, sum runs.RunSummary, author messaging.PrincipalRef) (domain.PrincipalRefPayload, error) {
+	if sum.TriggeredBy.IsZero() || sum.TriggeredBy == author.ID {
+		return refPayload(author), nil
+	}
+	refs, err := s.d.Messages.PrincipalRefs(ctx, []ids.ID{sum.TriggeredBy})
+	if err != nil {
+		return domain.PrincipalRefPayload{}, err
+	}
+	ref, ok := refs[sum.TriggeredBy]
+	if !ok {
+		return domain.PrincipalRefPayload{}, errs.New(errs.CodeInternalError, "runs: the person of a run is not in the directory")
+	}
+	return refPayload(ref), nil
+}
+
 // emitInvocation appends agent.invocation as the last write of the acceptance (M2-08 design note
 // 14): audience the agent, receive action agent.events.consume, resource the run without version,
 // the scope of the run's thread and the payload AgentInvocationPayload without a token. The token
@@ -557,12 +575,13 @@ func (s *Service) emitInvocation(ctx context.Context, sum runs.RunSummary, messa
 	if err != nil {
 		return err
 	}
+	by, err := s.runPerson(ctx, sum, m.Author)
+	if err != nil {
+		return err
+	}
 	p, err := domain.InvocationPayload(domain.InvocationPayloadInput{
 		RunID: sum.ID, ThreadID: sum.ThreadID, ChannelID: info.ChannelID, SpaceID: info.SpaceID, MessageID: message,
-		TriggeredBy: domain.PrincipalRefPayload{
-			ID: m.Author.ID.String(), Kind: m.Author.Kind, Handle: m.Author.Handle, DisplayName: m.Author.DisplayName,
-			AvatarFileID: optionalID(m.Author.AvatarFileID),
-		},
+		TriggeredBy: by,
 		BillingMode: mode, SettingsVersion: ch.SettingsVersion,
 	}, session)
 	if err != nil {

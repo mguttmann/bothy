@@ -415,7 +415,7 @@ func channelOf(cv chat.ChannelView) sync.SnapshotChannel {
 		ID: c.ID, SpaceID: c.SpaceID, Kind: c.Kind, Name: c.Name, Topic: c.Topic, SortKey: c.SortKey,
 		OperatorMode: c.Operator.Mode, OperatorAgentID: c.Operator.AgentID, EffectiveOperatorID: c.Operator.EffectiveAgentID,
 		ForumDefaultSort: c.ForumDefaultSort, DefaultNotificationLevel: c.DefaultNotificationLevel, ReadOnly: c.ReadOnly,
-		ProjectBound: c.ProjectBound, MainThreadID: c.MainThreadID, CreatedAt: c.CreatedAt, ArchivedAt: c.ArchivedAt, Version: c.Version,
+		AllowAutonomousRuns: c.AllowAutonomousRuns, ProjectBound: c.ProjectBound, MainThreadID: c.MainThreadID, CreatedAt: c.CreatedAt, ArchivedAt: c.ArchivedAt, Version: c.Version,
 		SettingsVersion: c.SettingsVersion, Level: cv.Level, Capabilities: nonNil(cv.Capabilities),
 	}
 }

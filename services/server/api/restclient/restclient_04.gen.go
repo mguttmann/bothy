@@ -7,6 +7,32 @@ import (
 	"net/http"
 )
 
+// CompleteStepUpWithDeviceKeyResponse400Headers the declared response headers of an HTTP 400 response for CompleteStepUpWithDeviceKey
+type CompleteStepUpWithDeviceKeyResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// CompleteStepUpWithDeviceKeyResponse401Headers the declared response headers of an HTTP 401 response for CompleteStepUpWithDeviceKey
+type CompleteStepUpWithDeviceKeyResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// CompleteStepUpWithDeviceKeyResponse403Headers the declared response headers of an HTTP 403 response for CompleteStepUpWithDeviceKey
+type CompleteStepUpWithDeviceKeyResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// CompleteStepUpWithDeviceKeyResponse429Headers the declared response headers of an HTTP 429 response for CompleteStepUpWithDeviceKey
+type CompleteStepUpWithDeviceKeyResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
 // CompleteStepUpWithDeviceKeyResponseDefaultHeaders the declared response headers of an HTTP default response for CompleteStepUpWithDeviceKey
 type CompleteStepUpWithDeviceKeyResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
@@ -25808,37 +25834,4 @@ func (r AddReactionResponse) GetApplicationproblemJSON401() *Unauthorized {
 // GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
 func (r AddReactionResponse) GetApplicationproblemJSON403() *Forbidden {
 	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r AddReactionResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
-func (r AddReactionResponse) GetApplicationproblemJSON410() *Gone {
-	return r.ApplicationproblemJSON410
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r AddReactionResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r AddReactionResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r AddReactionResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r AddReactionResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
 }

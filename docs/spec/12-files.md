@@ -1192,7 +1192,8 @@ send gives the same answer with the pointer of the list. Nothing of the request 
 thread sequence number is given back (03 6.2).
 
 **Content and rights.** With at least one attachment `content_md` may be empty or white space
-only (a picture without caption); without attachments it may not. Sending attachments needs
+only (a picture without caption), also after an edit with `updateMessage` that removes the
+caption; without attachments it may not. Sending attachments needs
 `write` and the additional right `upload` on the channel of the thread; without `upload` the
 answer is `403 forbidden` with `reason` `capability_missing`. An agent sends files only while the
 owner's switch `supports_files_out` in its `operator_config` is not `false`

@@ -9,6 +9,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/agents/domain"
 	"github.com/OWNER/bothy/services/server/internal/identity"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
@@ -81,7 +82,7 @@ func (t *Tracker) scheduleFlush() {
 			return
 		}
 		if err := t.Flush(context.Background()); err != nil {
-			t.d.Log.LogAttrs(context.Background(), slog.LevelError, "agent presence flush failed")
+			t.d.Log.LogAttrs(context.Background(), slog.LevelError, "agent presence flush failed", slog.String(logKeyErrorType, errs.Type(err)))
 		}
 		t.scheduleFlush()
 	})

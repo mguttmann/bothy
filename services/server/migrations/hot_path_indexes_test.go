@@ -14,7 +14,10 @@ import (
 // schema of all migrations and the query files: the head and the pending count of a webhook
 // subscription read only its pending rows (00114, audit finding srv-apps-billing-8), and the
 // sweep authz.expiry_sweep reads only the grants and memberships it has not yet reported (00117
-// and 00118, audit finding srv-authz-11), so neither grows with the history of the table.
+// and 00118, audit finding srv-authz-11), so neither grows with the history of the table. The run
+// an interaction opened is found through its index (00122, audit finding srv-runs-core-4): the
+// answer of createInteraction and the foreign key check of a deleted interaction never read runs
+// whole.
 //
 // The planner may not fall back to a sequential or bitmap scan here: on the empty tables of the
 // test it would otherwise prefer one whatever index exists. The grants and memberships carry a
@@ -59,6 +62,8 @@ func TestHotPathIndexes(t *testing.T) {
 		{webhooks, "CountPending", ":one", sub, "webhook_deliveries_pending_seq_idx"},
 		{expiry, "ListDueExpiredGrants", ":many", due, "grants_expiry_due_idx"},
 		{expiry, "ListDueExpiredMemberships", ":many", due, "group_memberships_expiry_due_idx"},
+		{"../internal/runs/adapters/postgres/queries/interactions.sql", "RunOfInteraction", ":one",
+			map[string]string{"sqlc.arg(interaction_id)": "'00000000-0000-7000-8000-000000000001'::uuid"}, "runs_triggering_interaction_idx"},
 	} {
 		nodes, indexes := planNodes(t, conn, namedQuery(t, tc.file, tc.query, tc.kind, tc.args))
 		if !slices.Contains(indexes, tc.index) || slices.Contains(nodes, "Seq Scan") {

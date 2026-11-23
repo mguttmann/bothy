@@ -34,12 +34,15 @@ type SearchIndex interface {
 }
 
 // Structure is the part of chat.SearchReads the coordinator itself reads: the channels of the
-// space filter and the names of a page.
+// space filter, the names of a page and whether the thread of a refused hit still exists.
 type Structure interface {
 	// ChannelsInSpaces returns the channels of the given (visible) spaces.
 	ChannelsInSpaces(ctx context.Context, spaceIDs []ids.ID) ([]ids.ID, error)
 	// Labels returns channel names, space names and thread titles.
 	Labels(ctx context.Context, visibleSpaceIDs, channelIDs, threadIDs []ids.ID) (chat.Labels, error)
+	// HitThreads returns the live threads of threadIDs that lie in channelIDs; a deleted thread
+	// is absent.
+	HitThreads(ctx context.Context, threadIDs, channelIDs []ids.ID) ([]chat.Thread, error)
 }
 
 // Cursors is the cursor codec of M1-18 (platform/httpserver), an outgoing port so the order of

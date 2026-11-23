@@ -316,33 +316,14 @@ func myReactions(list []string) *[]string {
 	return &out
 }
 
-// threadREST converts a thread (schema Thread) like the thread handlers of chat: empty values
-// become absent members, unread_floor_seq only when not 0, tag_ids always present.
-func threadREST(th chat.Thread) rest.Thread {
-	out := rest.Thread{
-		Id: rest.Uuid(th.ID), ChannelId: rest.Uuid(th.ChannelID), Kind: rest.ThreadKind(th.Kind),
-		ParentMessageId: optionalID(th.ParentMessageID), Title: th.Title, TitleSource: rest.ThreadTitleSource(th.TitleSource),
-		State: rest.ThreadState(th.State), ClosedAt: optionalTime(th.ClosedAt), ClosedBy: optionalID(th.ClosedBy),
-		OperatorAgentId: optionalID(th.OperatorAgentID), LastMessageSeq: th.LastMessageSeq,
-		LastActivityAt: th.LastActivityAt.UTC().Truncate(time.Millisecond), MessageCount: th.MessageCount,
-		CreatedBy: rest.Uuid(th.CreatedBy), CreatedAt: th.CreatedAt.UTC().Truncate(time.Millisecond), MovedAt: optionalTime(th.MovedAt),
-		Version: th.Version, TagIds: idsREST(th.TagIDs),
-	}
-	if th.UnreadFloorSeq != 0 {
-		v := th.UnreadFloorSeq
-		out.UnreadFloorSeq = &v
-	}
-	if th.BillingMode != "" && !th.OperatorAgentID.IsZero() {
-		m := rest.BillingMode(th.BillingMode)
-		out.BillingMode = &m
-	}
-	return out
-}
+// threadREST converts a thread (schema Thread) with the one conversion of api/rest that the thread
+// handlers of chat use too (ThreadREST of chat/adapters/httpapi), so deleted_at and every later
+// member stay alike in both.
+func threadREST(th chat.Thread) rest.Thread { return rest.ThreadOf(rest.ThreadFields(th)) }
 
-// The response conversions are the shared ones of api/rest: idsREST never returns nil,
-// optionalID and optionalTime leave the zero value absent.
+// The response conversions are the shared ones of api/rest: optionalID and optionalTime leave the
+// zero value absent.
 var (
-	idsREST      = rest.IDs
 	optionalID   = rest.OptionalID
 	optionalTime = rest.OptionalTime
 )

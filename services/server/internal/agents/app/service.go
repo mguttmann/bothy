@@ -242,7 +242,7 @@ func (s *Service) presence(rec domain.Agent) agents.PresenceStatus {
 	if s.d.Presence != nil {
 		return s.d.Presence.recordStatus(rec)
 	}
-	return recordPresence(rec, s.d.Clock.Now(), 0)
+	return recordPresence(rec, s.d.Clock.Now(), 0, 0)
 }
 
 // agentView converts a record and its principal.
@@ -473,7 +473,7 @@ func (s *Service) notifyPresence(ctx context.Context, list []ids.ID) {
 		return
 	}
 	if err := s.d.Presence.Changed(ctx, list); err != nil {
-		s.d.Presence.d.Log.LogAttrs(ctx, slog.LevelError, "agent presence not reassessed")
+		s.d.Presence.d.Log.LogAttrs(ctx, slog.LevelError, "agent presence not reassessed", slog.String(logKeyErrorType, errs.Type(err)))
 	}
 }
 

@@ -17,9 +17,10 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
 - `domain/`: the record `Agent` of 03 section 4.4 (every change bumps `Version`), the backend
   policy `Policy` with `To` (10 section 9: organization always and without holder, personal only
   with a holder, the same target is no change), `ToolClass` with the order `chat < scoped < host`
-  and `EffectiveToolClass` (the higher of target and reported class, 07 section 2.11), the schema
-  `agent_operator_config.v1` (`ParseOperatorConfig`, `OperatorConfigFromStore`, `Allows`; 09
-  section 2.2), the presence view and the checks of `adapter_kind`, description and reason.
+  (the effective class, the higher of target and reported class of 07 section 2.11, is
+  `authz/domain.EffectiveToolClass`), the schema `agent_operator_config.v1` (`ParseOperatorConfig`,
+  `OperatorConfigFromStore`, which ignores keys it does not know, upgrade.md rule M8, `Allows`;
+  09 section 2.2) and the checks of `adapter_kind`, description and reason.
 - `app/`: `Service`, one use case per operation (load, `authorize` with the action of 05 section
   4.10, unit of work, domain, repository, `agent.updated`, audit), and the outgoing ports `Store`,
   `Cursors` and `TokenRevoker`. `Config` binds `api.page_size_default` and `api.page_size_max`
@@ -139,7 +140,7 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
 - `domain/session.go`: the end transition, the report rules, the import-binding candidate, the
   cost baseline and the checks of `external_session_ref` (`agent.session_ref_max_bytes`,
   `textcheck.DisplayText`) and `model`, all pure.
-- Data owned: the table `agent_sessions` (migration `00064_agents_agent_sessions.sql`, also the FK
+- Data owned: the table `agent_sessions` (migration `00069_agents_agent_sessions.sql`, also the FK
   of `runs.agent_session_id`, validated by `00070`); queries in
   `adapters/postgres/queries/agent_sessions.sql`, the repository in `adapters/postgres/sessions.go`.
   Locks: run row (through `RunSource` or in `runs`) before session rows, session rows in ascending
@@ -218,8 +219,10 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
   audit details (`billing_mode_old`, `billing_mode_new`, `tool_class_old`, `tool_class_new`,
   `key_type`, `method` from `next.Evidence`); `Report.StoredDetails` and `ReportFromStore` are the
   form of `agents.reported_details`.
-- `domain/presence.go`: `StateAt` (offline at and after last heartbeat plus
-  `agent.presence_timeout`), `StartRule`, `Assess` with the difference kinds (a) reported mode
+- `domain/presence.go`: `StoredState` (a stored online or degraded row no process tracks is offline
+  at and after its last heartbeat plus `agent.presence_timeout` plus
+  `agent.heartbeat_persist_interval`; `getAgent`, `listAgents`, `Statuses` and the status page use
+  it), `StartRule`, `Assess` with the difference kinds (a) reported mode
   unequal, (b) configured mode not supported, (c) `key_type` unknown, and `Warnings`
   (`billing_mode_mismatch` only after `billing.mismatch_alert_after`, the others at once, nothing
   while `offline` or `unknown`).
@@ -585,6 +588,12 @@ Built-in agents (`adapter_kind` `claude_agent`, [26-builtin-agents.md](../../../
 - **identity.** `IsHostedAgent` implements `identity.HostedAgents`, bound by `internal/wire`, so
   `createToken` refuses a built-in agent (`409 conflict` with reason `hosted_agent_token`).
 
+- **Lock order.** The change frame locks the hosted agent's row first; `checkHostedSide` and
+  `moveHost` then lock its runner's row, usually the smaller id. That is against the ascending
+  order of 03 section 6.3 within the table `agents`, which the presence flush keeps; a deadlock
+  between the two ends with `40P01`, and `platform/pg` runs the unit again. Changing the frame to
+  lock both rows ahead is not built.
+
 Tests: `domain/hosting_test.go`, `app/hosting_test.go`, `test/integration/hosting_test.go`,
 `internal/wire/serve_hosted_test.go` (the `4012` closes) and `migrations/agents_hosted_by_test.go`.
 
@@ -659,7 +668,7 @@ holds them generic and closed ([26-builtin-agents.md](../../../../docs/spec/26-b
 
 ## Port (root package `internal/agents`)
 
-- Inbound: `Agents` (administration, policy, tool class; M1-51), `Definitions` (definitions of built-in agents; A1-02), `Templates` (the template catalogue; A1-06), `Interviewer` (the interview of "New agent"; A1-07), `Facts` (run facts of runs; M2-05), `Presence` (heartbeat and presence; M2-20), `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `OwnedCommands` (the commands of an app for the owner actions of `apps`; M2-25), `Sessions`, `DevEnvironments` (milestone), `StatusAgents` (M7-09: the active agents with their stored presence for the status page, `app.StatusSource`; a stored online or degraded state older than `agent.presence_timeout` plus `agent.heartbeat_persist_interval` counts as offline; never authorized).
+- Inbound: `Agents` (administration, policy, tool class; M1-51), `Definitions` (definitions of built-in agents; A1-02), `Templates` (the template catalogue; A1-06), `Interviewer` (the interview of "New agent"; A1-07), `Facts` (run facts of runs; M2-05), `Presence` (heartbeat and presence; M2-20), `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `OwnedCommands` (the commands of an app for the owner actions of `apps`; M2-25), `Sessions`, `StatusAgents` (M7-09: the active agents with their stored presence for the status page, `app.StatusSource`; a stored online or degraded state older than `agent.presence_timeout` plus `agent.heartbeat_persist_interval` counts as offline; never authorized).
 - Declares the source ports `ConsumerFeed` (M2-07), `InterviewRelay` (A1-07, implemented by `gateway/adapters/interviewrelay`) and `RunSource` (M2-12).
 - Emits in-tx events: `AgentDisabled`, `SessionAttached` (M2-12).
 - Subscribes to in-tx events: none.
@@ -676,7 +685,7 @@ Checked by go-arch-lint (ADR 0008).
 
 ## Tables
 
-`agents`, `agent_definitions`, `agent_consumer_cursors`, `commands`, `agent_sessions`, `dev_environments`.
+`agents`, `agent_definitions`, `agent_consumer_cursors`, `commands`, `agent_sessions` (`dev_environments` is planned and not built).
 
 Only this module writes and reads these tables by SQL (03-data-model.md, principle 12).
 
