@@ -78,6 +78,19 @@ void main() {
     },
   );
 
+  test('a paused listener of the version watch does not hold the end of the account', () async {
+    // The update notice listens through a provider that Riverpod pauses while nothing
+    // shows it; a broadcast close waits for its done event, E7 must not.
+    final control = await connected(c, f);
+    await loginAsAlex(control);
+    final versions = state().services!.versions;
+    versions.changes.listen((_) {}).pause();
+    await control
+        .endLocally(SignOutCause.revokedBySelf)
+        .timeout(const Duration(seconds: 5));
+    expect(state().step, OnboardingStep.signedOut);
+  });
+
   test('a wrong password shows the failure text and stays on E2', () async {
     final control = await connected(c, f);
     await control.loginWithPassword(

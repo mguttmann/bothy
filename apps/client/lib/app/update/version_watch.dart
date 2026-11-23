@@ -59,6 +59,10 @@ final class VersionWatch {
     return admitted;
   }
 
-  /// Closes [changes].
-  Future<void> dispose() => _changes.close();
+  /// Closes [changes]. Does not wait for the done event to reach every listener: a broadcast
+  /// close waits for it, and a paused listener (a provider nothing shows) would hold the end of
+  /// an account forever.
+  Future<void> dispose() async {
+    unawaited(_changes.close());
+  }
 }
