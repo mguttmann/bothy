@@ -228,6 +228,26 @@ async def test_a_run_waiting_for_a_busy_session_covers_nothing_of_it(tmp_path: P
     assert finish.get("metrics", {}).get("tokens_in", 0) < 999
 
 
+async def test_a_mode_change_ends_the_wait_for_a_busy_session(tmp_path: Path) -> None:
+    """The abort ends the run at once, interrupts no turn and reports no session (no bind ran)."""
+    rt = FakeRuntime(session_gate=asyncio.Event())
+    async with rig(tmp_path, runtime=rt) as r:
+        triggered = await r.fake.trigger(session_mode="bind")
+        await r.until(lambda: rt.waited)
+        await r.until(lambda: r.fake.run_state(triggered.run_id).state == "running")
+        rt.credential = ResolvedCredential("anthropic", "oauth")
+        r.loop.heartbeat()
+        await r.until(lambda: r.finished(triggered.run_id))
+        assert rt.session_gate is not None
+        assert not rt.session_gate.is_set()
+    view = r.fake.run_state(triggered.run_id)
+    assert (view.state, view.state_reason) == ("failed", "billing_mode_mismatch")
+    assert rt.turns == []
+    assert rt.interrupted == []
+    assert rt.switches == []
+    assert r.requests("reportAgentSession") == []
+
+
 async def test_a_stop_ends_the_wait_for_a_busy_session(tmp_path: Path) -> None:
     rt = FakeRuntime(session_gate=asyncio.Event())
     async with rig(tmp_path, runtime=rt) as r:

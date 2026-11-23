@@ -462,7 +462,10 @@ class HermesHandler(AgentHandler):
             if not turn.ended and actual.sdk_mode != turn.mode_used and turn.abort_reason is None:
                 _LOG.warning("run %s: actual mode changed during the turn", turn.run_id)
                 turn.abort_reason = "billing_mode_mismatch"
-                self._spawn(self._interrupt(turn))
+                turn.wake.set()  # ends a wait for a busy session (`_session_free`)
+                if not turn.waiting:
+                    # A waiting run has no Hermes turn; the busy one is not the run's.
+                    self._spawn(self._interrupt(turn))
         return actual, self._tool_class, self.capabilities()
 
     # ---- run start ---------------------------------------------------------------------------
@@ -862,11 +865,13 @@ class HermesHandler(AgentHandler):
         # the running turn, which has no run, and admit no turn for the run (17.6).
         turn.waiting = True
         try:
-            await self.runtime.session_free(turn.thread_id)
+            await self._session_free(turn)
         finally:
             turn.waiting = False
-        if turn.dropped or turn.abort_reason is not None:
-            await self._end_turn(turn, TurnOutcome.FAILED, None)
+        if turn.dropped:
+            return  # the stop's handler ends the run (`_abandon`)
+        if turn.abort_reason is not None:
+            await self._abort_unstarted(turn)
             return
         request = TurnRequest(
             run_id=turn.run_id,
@@ -887,6 +892,37 @@ class HermesHandler(AgentHandler):
             request = replace(request, new_session=True)
         outcome = await self.runtime.start_turn(request)
         await self._end_turn(turn, outcome, switched)
+
+    async def _session_free(self, turn: _Turn) -> None:
+        """Wait for the thread's free Hermes session; an abort of the run ends the wait."""
+        wait = asyncio.ensure_future(self.runtime.session_free(turn.thread_id))
+        try:
+            while not wait.done() and turn.abort_reason is None:
+                turn.wake.clear()
+                woken = asyncio.ensure_future(turn.wake.wait())
+                try:
+                    await asyncio.wait({wait, woken}, return_when=asyncio.FIRST_COMPLETED)
+                finally:
+                    woken.cancel()
+        finally:
+            if not wait.done():
+                wait.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await wait
+        if wait.done() and not wait.cancelled():
+            wait.result()
+
+    async def _abort_unstarted(self, turn: _Turn) -> None:
+        """End a run aborted before its turn: no Hermes turn ran and no session switch was tried.
+
+        Nothing is reported about the session (a bind that never ran is no failed bind).
+        """
+        turn.ended = True
+        if turn.live is not None:
+            turn.live.end(failed=True)
+        await self._end_stages(turn)
+        metrics, costs = self._usage(turn)
+        await turn.handle.finish("failed", reason=turn.abort_reason, metrics=metrics, costs=costs)
 
     def _starts_session(self, turn: _Turn) -> bool:
         """Whether the turn runs on a new Hermes session of the thread (`_before_turn`).

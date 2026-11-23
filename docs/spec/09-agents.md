@@ -3096,8 +3096,9 @@ starts right after it for input it holds have ended. Meanwhile nothing of that s
 the run's: its tool calls are refused, its answers, cards and turn ends are not the run's, and a
 follow-up stays queued (`session_busy`) for the follow-on run. On a busy session Hermes would
 steer the text into the running turn and admit no turn for the event; the run then ended `failed`
-with `runtime_error` at once, and the answer the running turn gave to it found no run. A stop of the run ends the wait; the late answer of a
-stopped run's turn stays dropped (D-HERMES-CRON-COMMANDS-5).
+with `runtime_error` at once, and the answer the running turn gave to it found no run. A stop or
+an abort of the run ends the wait (an abort ends the run without a turn and without a session
+report); the late answer of a stopped run's turn stays dropped (D-HERMES-CRON-COMMANDS-5).
 
 The adapter passes on the context (4.6) on the user side of the turn, separate from the text of
 the triggering person, which is the event's text together with the transcripts of its voice
