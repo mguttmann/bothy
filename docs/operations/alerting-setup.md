@@ -16,8 +16,9 @@ Alertmanager does not start and says which file is missing (`docker compose logs
 These steps need a session with step-up: the console or the desktop app, signed in as an owner.
 An API token cannot step up, so no script can do them for you.
 
-1. Create a space and in it the text channel **Operations**. Give no one else access: only the
-   owners and their deputies read it.
+1. Create a space ("Create space..." in the app: the button below "No spaces yet" or the menu of a
+   space) and in it the text channel **Operations** ("Create channel..." in the menu of the
+   space). Give no one else access: only the owners and their deputies read it.
 2. Install an app for the alerts (for example with the name "Alertmanager") with the scope
    `messages:write`, and grant it `write` on the channel Operations.
 3. Create an incoming webhook of that app in the channel. Copy the URL it shows once; it holds

@@ -944,10 +944,13 @@ never copying a file of it, and checks it itself before every turn.
   crashed runner are swept at start. A secret that cannot be read, or one out of scope, ends the
   run `adapter_error` with the cause `mcp_reference_unavailable` and writes no file. Secret values
   are never in the environment of a turn, a log line or another file.
-- **Secret scope** (26 5.1 item 3). A definition's `secret_ref` resolves only as
-  `file:<runner.hosted_secrets_dir>/<agent_id>/<name>`, also after following links, and never to
-  a credential of the runner (`agent_token_ref`, `dpop_key_ref`, `anthropic_api_key_ref`); `env:`
-  references and other agents' subfolders are out of scope. The file is opened one name at a
+- **Secret scope** (26 5.1 item 3). A definition's `secret_ref` resolves only to a file in
+  `<runner.hosted_secrets_dir>/<agent_id>/`, also after following links, and never to a
+  credential of the runner (`agent_token_ref`, `dpop_key_ref`, `anthropic_api_key_ref`):
+  `file:<runner.hosted_secrets_dir>/<agent_id>/<name>` names it directly, and `env:NAME`, the form
+  every template uses, is the file `NAME` in that folder (for the template `research-summarizer`
+  the file `<runner.hosted_secrets_dir>/<agent_id>/SEARCH_MCP_TOKEN`). `env:` never reads the
+  runner's environment, and other agents' subfolders are out of scope. The file is opened one name at a
   time without following a link and must have exactly one hard link, so a link swapped in after
   the check or a hard link to a file elsewhere resolves nothing. The host operator places each
   agent's secrets there (mode `0600` or `0400`), keeps copies or links of the runner's or the

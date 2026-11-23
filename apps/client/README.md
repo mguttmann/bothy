@@ -75,6 +75,7 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/notifications_settings/` | D9 (M4-33): the page inside Settings > Notifications, the tree of levels with inheritance, the quiet hours editor, the effective level of 13 3.1 for display, the providers of the notification settings |
 | `lib/terminal/` | the terminal (M4-36): the group "Hosts" of the sidebar, the view of a host with its tabs, the ports of `terminal_ui` (WebSocket transport with DPoP `identify`, pins in `host_key_pins`, host events of the engine, the REST adapter), the table "In the terminal" and the providers |
 | `lib/menus/` | the menus of a space, a channel and a thread (M4-33): level, "Mute until", "Export history" |
+| `lib/structure/` | creating a space and a plain text channel (FEAT-SPACE-CHANNEL-CREATE, 01 6.25): the port over `createSpace` and `createChannel` (`structure_port.dart`), "Create channel..." and "Create space..." of the space menu and of the empty sidebar with their dialog (`structure_create_dialog.dart`) and the providers |
 | `lib/team/` | team channels for owners (FEAT-TEAM-CHANNEL-APP, 01 6.23, 09 3.9): the port over the six team operations and the create of a text channel (`team_port.dart`), "Create team channel..." of the space menu (`team_create_dialog.dart`), the controller of the dialog and of `/team`, the member bar under the thread header, the labels of member replies and owner messages, and the providers (`channelTeamProvider`) |
 | `lib/export/` | the channel export (M4-33): range dialog, save dialog, the stream into the file with progress and cancel |
 | `lib/notifications/` | local notifications (M4-30): the content of a toast, the router from `notification.created` to a toast or nothing, the presenter over `flutter_local_notifications` and their providers; the in-app banner of the phone (`in_app_banner.dart`, AUD-client-app-01) |
@@ -386,7 +387,10 @@ The app (`lib/platform/push_apple.dart`) asks for the notification permission wh
 first opens a history after the login (a thread, or the main history of a text channel), registers the APNs token with `registerPush` (provider
 `apns`, the environment of the build, the bundle identifier), and the runner stores the preview
 token and the registration ID at once in the shared keychain (never in Dart). A new token
-registers again; logout calls `unregisterPush` and every end of the account deletes the items.
+registers again, and so does the same token at a start or a return to the foreground when the
+server no longer has the stored registration or disabled it with `repeated_failures` (read with
+`getDevice`, 13 13); a failed registration is tried again at those moments. Logout calls
+`unregisterPush` and every end of the account deletes the items.
 A tapped notification opens `/t/<thread>?m=<message>`; the runner is the notification center's
 delegate only for pushes and hands every other notification to the delegate it replaced, so the
 local notifications of the desktop keep working (D-M5-04-9). At start the app takes the extension's
@@ -444,8 +448,10 @@ person first opens a history after the login (a thread, or the main history of a
 registers the FCM token with `registerPush`
 (provider `fcm`, the package name), and the runner keeps the preview token and the registration
 ID in its own store (`PushStore`: values sealed with an AES-GCM key of the Android Keystore,
-never in Dart). A new token, also one FCM rotates while the app runs, registers again; logout
-calls `unregisterPush`, and every end of the account deletes the store's entries and the shown
+never in Dart). A new token, also one FCM rotates while the app runs, registers again, and so
+does the same token at a start or a return to the foreground when the server no longer has the
+stored registration or disabled it with `repeated_failures`, as on iOS; logout calls
+`unregisterPush`, and every end of the account deletes the store's entries and the shown
 push notifications. A tap opens `/t/<thread>?m=<message>`. At start the app takes the service's
 display counters into `client.push_display.duration` and `client.push.placeholder`.
 
@@ -673,6 +679,17 @@ Counters per channel come from the sync engine and the stored read states. A for
 pages through `listChannelThreads`, writes new posts as `createThread` through the outbox, and
 keeps the collapse state of its "Done (n)" section per device in `forum_view_states` (01 6.1;
 docs/DECISIONS.md D-M4-19-1 to D-M4-19-7).
+
+### Creating spaces and channels (FEAT-SPACE-CHANNEL-CREATE)
+
+An empty sidebar says "No spaces yet"; for an owner (`isOwnerProvider`) it adds the button
+"Create space...", and the space menu has the same entry. The space menu has "Create channel..."
+for a person whose stored access to the space has `manage` (`spaceAccessProvider`). Both dialogs
+(`lib/structure/structure_create_dialog.dart`) ask for a name and call `StructurePort` online with
+one `Idempotency-Key` per name: a refusal drops the key, a lost answer and
+`409 request_in_progress` keep it. A new channel opens at `/c/<id>`; a new space shows once the
+sync delivers it (01 6.25, docs/decisions.d/FEAT-SPACE-CHANNEL-CREATE.md). Tests:
+`test/structure/`.
 
 ### Threads in the sidebar and the forum overview (M4-40)
 

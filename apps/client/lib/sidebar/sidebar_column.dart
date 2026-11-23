@@ -26,6 +26,7 @@ import '../notifications_settings/providers.dart' show isOwnerProvider;
 import '../onboarding/onboarding_controller.dart';
 import '../running/providers.dart' show activeRunCountProvider;
 import '../settings/settings_providers.dart' show sidebarArrangementProvider;
+import '../structure/structure_create_dialog.dart' show showSpaceCreateDialog;
 import '../switcher/quick_switcher.dart' show showQuickSwitcher;
 import '../sync/sidebar_ops.dart';
 import '../telemetry/telemetry_providers.dart';
@@ -84,7 +85,11 @@ class SidebarView extends StatelessWidget {
     this.onMoveThread,
     this.onSetHidden,
     this.onToggleArchived,
+    this.onCreateSpace,
   });
+
+  /// "Create space..." of the empty tree (01 6.25), or null for none.
+  final VoidCallback? onCreateSpace;
 
   /// Archives (true) or restores (false) a channel in the person's own sidebar (01 6.22), or
   /// null for no such entry.
@@ -259,6 +264,7 @@ class SidebarView extends StatelessWidget {
           onMoveThread: onMoveThread,
           onSetHidden: onSetHidden,
           onToggleArchived: onToggleArchived,
+          onCreateSpace: onCreateSpace,
         ),
       ),
       // The group scrolls within a share of the column, so the spaces keep their room.
@@ -642,6 +648,15 @@ class SidebarColumn extends ConsumerWidget {
       onNewAgent: ref.watch(newAgentOfferProvider).value == null
           ? null
           : (_) => unawaited(openNewAgent(context, ref, phone: phone)),
+      // 01 6.25: an owner creates a space from the empty sidebar, on the desktop and the phone.
+      onCreateSpace: ref.watch(isOwnerProvider).value ?? false
+          ? () => unawaited(
+              showSpaceCreateDialog(
+                context,
+                ProviderScope.containerOf(context, listen: false),
+              ),
+            )
+          : null,
       selectedNewChat: newChat,
       onOpenNewChat: (forum, entry) =>
           context.go(NewChatLocation.pathOf(forum, entry: entry)),

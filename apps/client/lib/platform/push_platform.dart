@@ -45,17 +45,56 @@ abstract interface class PushRegistrations {
 
   /// `unregisterPush` of [registrationId]. Throws what the API client throws.
   Future<void> unregister(String registrationId);
+
+  /// What the server says about [registrationId] of this device: `getDevice` of the device of
+  /// the session, its member `push_registrations` (13 13). Throws what the API client throws.
+  Future<PushRegistrationState> state(String registrationId);
+}
+
+/// The state of a stored push registration on the server (13 7.3 and 13).
+final class PushRegistrationState {
+  /// The registration is active.
+  const PushRegistrationState.active() : exists = true, disabledReason = null;
+
+  /// The device has no registration with that ID (a takeover, `unregisterPush` or the retention
+  /// removed it).
+  const PushRegistrationState.missing() : exists = false, disabledReason = null;
+
+  /// The server disabled the registration for [reason] (`disabled_reason`).
+  const PushRegistrationState.disabled(String reason)
+    : exists = true,
+      disabledReason = reason;
+
+  /// Whether the device still has the registration.
+  final bool exists;
+
+  /// `disabled_reason` of a disabled registration, null for an active or missing one.
+  final String? disabledReason;
+
+  /// Whether the app registers its token again: when the registration is missing, or the
+  /// server disabled it after transient failures (`repeated_failures`), which say nothing
+  /// about the token. Not for an ended session or a revoked device (`logout`,
+  /// `device_revoked`), nor for an answer of the provider about the token or the app
+  /// (`token_invalid`, `topic_mismatch`, `sender_mismatch`): the same token would fail again,
+  /// and a new token registers anyway (docs/decisions.d/FIX-PUSH-RENEW.md).
+  bool get renew => !exists || disabledReason == 'repeated_failures';
+
+  @override
+  String toString() => exists
+      ? 'PushRegistrationState(${disabledReason ?? 'active'})'
+      : 'PushRegistrationState(missing)';
 }
 
 /// [PushRegistrations] over the generated API client of a signed-in session; [idempotencyKey]
 /// gives a fresh key per registration (the preview token is a one-time secret, so a replay
-/// answers `409`).
+/// answers `409`); [deviceId] reads the ID of the session's device.
 final class ApiPushRegistrations implements PushRegistrations {
   /// Creates the adapter over [api].
-  ApiPushRegistrations(this._api, this._idempotencyKey);
+  ApiPushRegistrations(this._api, this._idempotencyKey, this._deviceId);
 
   final ApiClient _api;
   final String Function() _idempotencyKey;
+  final Future<String?> Function() _deviceId;
 
   @override
   Future<RegisteredPush> register({
@@ -86,6 +125,27 @@ final class ApiPushRegistrations implements PushRegistrations {
   @override
   Future<void> unregister(String registrationId) =>
       _api.getDevicesApi().unregisterPush(registrationId: registrationId);
+
+  @override
+  Future<PushRegistrationState> state(String registrationId) async {
+    final deviceId = await _deviceId();
+    if (deviceId == null) {
+      throw StateError('no device ID is stored');
+    }
+    final device = (await _api.getDevicesApi().getDevice(deviceId: deviceId))
+        .data;
+    if (device == null) {
+      throw StateError('getDevice answered without a body');
+    }
+    for (final r in device.pushRegistrations ?? const <PushRegistration>[]) {
+      if (r.id != registrationId) continue;
+      final reason = r.disabledReason;
+      return r.disabledAt == null
+          ? const PushRegistrationState.active()
+          : PushRegistrationState.disabled(reason ?? '');
+    }
+    return const PushRegistrationState.missing();
+  }
 }
 
 /// The signed-in account as push needs it.
@@ -141,6 +201,11 @@ abstract interface class PushPlatform {
   /// `notify.preview_mode` changed in the synced settings.
   Future<void> previewModeChanged(String previewMode);
 
+  /// The app came back to the foreground: checks the stored registration on the server and
+  /// registers again when it is missing or was disabled after transient failures, or when a
+  /// registration failed before (13 13).
+  Future<void> foreground();
+
   /// The person logs out: `unregisterPush` best effort, then [forget].
   Future<void> logout();
 
@@ -185,7 +250,10 @@ void recordPushCounters(
 /// - Registration: with the permission the provider's token is registered with `registerPush`
 ///   ([registerToken]); the runner keeps the preview token and the registration ID at once
 ///   ([saveRegistration]), Dart never persists them. A token that differs from the one last
-///   registered (kept under [tokenKey] in the instance's secrets) registers again.
+///   registered (kept under [tokenKey] in the instance's secrets) registers again, and so does
+///   a token whose registration the server no longer has or disabled after transient failures
+///   ([PushRegistrationState.renew], read with `getDevice` at every start and every return to
+///   the foreground, [foreground]); a failed registration is tried again at those moments.
 /// - [logout] calls `unregisterPush` best effort; [forget] deletes what the runner keeps on every
 ///   end of the account (logout, `4012`, a revoked device).
 /// - [previewModeChanged] hands `notify.preview_mode` to the runner.
@@ -193,8 +261,9 @@ void recordPushCounters(
 /// - [targets] gives the app path of every tapped notification ([tapped]).
 ///
 /// Every platform failure is swallowed: push is an addition, the app works without it, and the
-/// next start tries again. Each swallowed failure leaves one line in the log that names the
-/// step and the type of the error, never a token, an ID or a text of the error.
+/// next start or return to the foreground tries again. Each swallowed failure leaves one line
+/// in the log that names the step and the type of the error, never a token, an ID or a text of
+/// the error.
 abstract base class NativePush implements PushPlatform {
   /// Creates the flow; [metrics] receives the display counters; [log] receives one line per
   /// swallowed failure, never content, and is the developer log of the app unless given.
@@ -323,6 +392,12 @@ abstract base class NativePush implements PushPlatform {
   }
 
   @override
+  Future<void> foreground() async {
+    if (_account == null) return;
+    await _registerIfAuthorized();
+  }
+
+  @override
   Future<void> logout() async {
     final account = _account;
     if (account == null) return;
@@ -385,7 +460,12 @@ abstract base class NativePush implements PushPlatform {
       final token = await hostToken();
       final known = await account.secrets.read(tokenKey);
       final stored = await hostRegistrationId(account.instanceId);
-      if (known == token && stored != null) return;
+      if (known == token && stored != null) {
+        // The server may have disabled or removed the registration (13 7.3): read its state;
+        // a failed read leaves it for the next start or return to the foreground.
+        final state = await account.registrations.state(stored);
+        if (!state.renew || !identical(_account, account)) return;
+      }
       final created = await registerToken(account.registrations, token);
       // The account may have ended while the call ran: then nothing is stored.
       if (!identical(_account, account)) return;
@@ -395,7 +475,8 @@ abstract base class NativePush implements PushPlatform {
   }
 
   /// Runs [body], the step [what]; a failure is logged without content and swallowed: push is
-  /// an addition, and the next start tries again (see the class comment).
+  /// an addition, and the next start or return to the foreground tries again (see the class
+  /// comment).
   Future<void> _guard(String what, FutureOr<void> Function() body) =>
       guarded(_log, 'push', what, body);
 

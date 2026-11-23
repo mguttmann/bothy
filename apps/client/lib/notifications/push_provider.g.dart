@@ -54,7 +54,8 @@ String _$pushAvailableHash() => r'bfbce18387bfdb81b38045d7f69ba1ea4e7c0613';
 ///
 /// The account is handed over once per signed-in services and only after the personal
 /// settings are read, so the extension or the push service never sees the default preview mode
-/// of a person who chose `none`; later changes of `notify.preview_mode` follow.
+/// of a person who chose `none`; later changes of `notify.preview_mode` follow. Every return of
+/// the app to the foreground lets the platform check its registration (13 13).
 
 @ProviderFor(pushPlatform)
 final pushPlatformProvider = PushPlatformProvider._();
@@ -64,7 +65,8 @@ final pushPlatformProvider = PushPlatformProvider._();
 ///
 /// The account is handed over once per signed-in services and only after the personal
 /// settings are read, so the extension or the push service never sees the default preview mode
-/// of a person who chose `none`; later changes of `notify.preview_mode` follow.
+/// of a person who chose `none`; later changes of `notify.preview_mode` follow. Every return of
+/// the app to the foreground lets the platform check its registration (13 13).
 
 final class PushPlatformProvider
     extends $FunctionalProvider<PushPlatform?, PushPlatform?, PushPlatform?>
@@ -74,7 +76,8 @@ final class PushPlatformProvider
   ///
   /// The account is handed over once per signed-in services and only after the personal
   /// settings are read, so the extension or the push service never sees the default preview mode
-  /// of a person who chose `none`; later changes of `notify.preview_mode` follow.
+  /// of a person who chose `none`; later changes of `notify.preview_mode` follow. Every return of
+  /// the app to the foreground lets the platform check its registration (13 13).
   PushPlatformProvider._()
     : super(
         from: null,
@@ -108,4 +111,4 @@ final class PushPlatformProvider
   }
 }
 
-String _$pushPlatformHash() => r'1a4e0784eafb453d56ee6a205c1cfb3946d2db22';
+String _$pushPlatformHash() => r'82efe5f40e6fd815b6d8474e17a2adb1aa7cfe5f';

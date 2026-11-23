@@ -193,6 +193,17 @@ void main() {
       );
       expect(secret('env:FILES_TOKEN'), findsOneWidget);
       expect(secret('FILES_TOKEN'), findsOneWidget);
+      // Where the host operator puts them on the runner host (26 4.2, issue 1425).
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('newAgent.secrets')),
+          matching: find.textContaining(
+            'the file NAME (mode 0600) in the folder '
+            '<runner.hosted_secrets_dir>/<agent ID>/',
+          ),
+        ),
+        findsOneWidget,
+      );
       await tap(tester, 'newAgent.create');
       expect(find.byKey(const ValueKey('newAgent.dialog')), findsNothing);
       expect(results.single!.agentId, port.onlyAgent);

@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -95,6 +96,46 @@ func TestShippedTemplatesLoad(t *testing.T) {
 	}
 	if def.Skills[0].Name != "summarize-sources" || strings.HasPrefix(def.Skills[0].Body, "---") {
 		t.Fatalf("skill %+v", def.Skills[0])
+	}
+}
+
+// TestTheResearchSummarizerDraftIsTheCorpusFixture: the draft the server makes of the shipped
+// template research-summarizer equals the definition of the corpus fixture
+// valid/template-research-summarizer.json, which the runner's scenario test runs as a hosted turn
+// with its env:<NAME> secret (issue 1425), so the chain from template to turn rests on the real
+// draft.
+func TestTheResearchSummarizerDraftIsTheCorpusFixture(t *testing.T) {
+	t.Parallel()
+	items, err := templatefs.Load(templates.FS(), "", limits(t), logged(&bytes.Buffer{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var draft json.RawMessage
+	for _, it := range items {
+		if it.Slug == "research-summarizer" {
+			draft = it.Definition
+		}
+	}
+	raw, err := os.ReadFile(filepath.Join(repoRoot, "tests", "agent-definitions", "valid", "template-research-summarizer.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		ToolClass  string          `json:"tool_class"`
+		Definition json.RawMessage `json:"definition"`
+	}
+	if err := json.Unmarshal(raw, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	var got, want any
+	if err := json.Unmarshal(draft, &got); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(fixture.Definition, &want); err != nil {
+		t.Fatal(err)
+	}
+	if fixture.ToolClass != "scoped" || !reflect.DeepEqual(got, want) {
+		t.Fatalf("the fixture differs from the draft; its definition must be:\n%s", draft)
 	}
 }
 

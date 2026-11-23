@@ -286,13 +286,14 @@ def definition_resolver(
 ) -> Callable[[str], str]:
     """The resolver of a hosted agent's ``secret_ref`` values (26 4.2, 5.1 item 3).
 
-    A definition may name only ``file:`` references whose file lies, also after following every
-    link, in ``<secrets_dir>/<agent_id>/`` (that subfolder itself never a link); never ``env:``
-    (the runner's own environment), never another agent's folder and never one of ``refused``
-    (the runner's own credentials). Without
-    ``secrets_dir`` no reference resolves. The file is opened below the subfolder without
-    following a link, must have one hard link (a second name may lie outside) and is then read
-    as any ``secret_ref`` (16 5.2).
+    A definition may name only files that lie, also after following every link, in
+    ``<secrets_dir>/<agent_id>/`` (that subfolder itself never a link): a ``file:`` reference
+    names one there, and ``env:NAME`` (the form of a template, 26 7.1) names the file ``NAME``
+    there; never the runner's own environment, never another agent's folder and never one of
+    ``refused`` (the runner's own credentials). ``NAME`` matches ``[A-Z_][A-Z0-9_]*``, so it
+    holds no separator and no ``..``. Without ``secrets_dir`` no reference resolves. The file is
+    opened below the subfolder without following a link, must have one hard link (a second name
+    may lie outside) and is then read as any ``secret_ref`` (16 5.2).
 
     Args:
         secrets_dir: ``runner.hosted_secrets_dir``.
@@ -310,12 +311,18 @@ def definition_resolver(
             parsed = parse_secret_ref(ref)
         except SecretError:
             raise MaterializeError("secret_unavailable") from None
-        if secrets_dir is None or parsed.scheme != "file":
+        if secrets_dir is None:
             raise MaterializeError("secret_out_of_scope")
+        # env:NAME is the file NAME of the agent's own subfolder, never a variable (issue 1425).
+        target = (
+            secrets_dir / str(agent_id) / parsed.target
+            if parsed.scheme == "env"
+            else Path(parsed.target)
+        )
         try:
             # Anchored to the configured folder: a link at the agent's subfolder moves nothing.
             scope = secrets_dir.resolve(strict=True) / str(agent_id)
-            real = Path(parsed.target).resolve(strict=True)
+            real = target.resolve(strict=True)
             inside = not scope.is_symlink() and real.is_relative_to(scope)
             own = any(real == p.resolve() for p in refused_paths)
         except (OSError, RuntimeError):
