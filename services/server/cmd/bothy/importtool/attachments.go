@@ -17,10 +17,11 @@ import (
 	"github.com/OWNER/bothy/services/server/cmd/bothy/importtool/discord"
 )
 
-// The reasons of an attachment line (22 6.5 item 6).
+// The reasons of an attachment line (22 6.5 items 6 and 7).
 const (
-	reasonTooLarge = "too large"
-	reasonFailed   = "failed"
+	reasonTooLarge  = "too large"
+	reasonFailed    = "failed"
+	reasonForwarded = "of a forwarded message"
 )
 
 // fetcher loads one attachment from the CDN; *discord.Fetcher satisfies it.

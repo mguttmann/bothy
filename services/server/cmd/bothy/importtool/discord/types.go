@@ -137,6 +137,26 @@ type Attachment struct {
 	ContentType string `json:"content_type"`
 }
 
+// EmbedAuthor is the author line of an embed.
+type EmbedAuthor struct {
+	// Name is the name shown above the title.
+	Name string `json:"name"`
+}
+
+// EmbedField is one name and value pair of an embed.
+type EmbedField struct {
+	// Name is the heading of the field.
+	Name string `json:"name"`
+	// Value is the text of the field.
+	Value string `json:"value"`
+}
+
+// EmbedFooter is the footer line of an embed.
+type EmbedFooter struct {
+	// Text is the footer text.
+	Text string `json:"text"`
+}
+
 // Embed is a rich embed of a message.
 type Embed struct {
 	// Type is the embed type ("rich", "link", ...).
@@ -147,6 +167,12 @@ type Embed struct {
 	Description string `json:"description"`
 	// URL is the link of the title.
 	URL SignedURL `json:"url"`
+	// Author is the author line, nil for none.
+	Author *EmbedAuthor `json:"author"`
+	// Fields are the name and value pairs below the description.
+	Fields []EmbedField `json:"fields"`
+	// Footer is the footer line, nil for none.
+	Footer *EmbedFooter `json:"footer"`
 }
 
 // Sticker is a sticker item of a message.

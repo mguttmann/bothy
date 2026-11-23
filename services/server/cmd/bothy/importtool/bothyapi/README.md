@@ -72,4 +72,8 @@ redirects.
 `bothytest` is a fake Bothy on `127.0.0.1` for the auth paths: pairing with approve, reject and
 expiry, refresh rotation with reuse revocation, logout, `getMe`, `getInstance`, DPoP checks with
 nonces, `429`, redirects and an echo of the presented tokens for the leak test. Only tests import
-it (`TestNoTestPackageInBinary`).
+it (`TestNoTestPackageInBinary`). Its import interface (`imports.go`) models the routes of the
+import with the answers of the server's importer, among them the rules that valid Discord data
+breaks: the display text rule for a topic, a thread name and a tag name, the length of a topic,
+the content of a message without a file, and the pin limit of a thread when a test sets one
+(`TestFakeRefusesWhatTheServerRefuses`).

@@ -201,7 +201,9 @@ func foreignOperators(ctx context.Context, r bothyReads, src *restclient.ImportS
 }
 
 // foreignOperatorText is the refusal of threadOperators: the count, the agents by ID with their
-// counts, the operator the channel will have and the two ways on.
+// counts, the operator the channel will have and the way on. It does not advise a change of
+// planned_operator: the stored mapping of a source cannot be changed (docs/decisions.d/M8-04.md
+// D-M8-04-3), and a file that differs from it ends switch with exit 2.
 func foreignOperatorText(id, planned string, total int, foreign map[string]int) string {
 	parts := make([]string, 0, len(foreign))
 	for _, agent := range slices.Sorted(maps.Keys(foreign)) {
@@ -216,23 +218,32 @@ func foreignOperatorText(id, planned string, total int, foreign map[string]int) 
 		noun = "imported thread names"
 	}
 	return fmt.Sprintf("%d %s an operator the channel will not have (%s); %s. A message in such a thread would get "+
-		"a notice instead of an agent run. Set planned_operator of channel %s to the agent of those threads and that agent "+
-		"as the channel's operator in step 3, or run switch with --force to switch anyway", total, noun, strings.Join(parts, ", "), will, id)
+		"a notice instead of an agent run. The mapping of a source is fixed once the source exists, so planned_operator of "+
+		"channel %s cannot be changed now: run switch with --force to switch anyway. After that such a thread gets an agent run "+
+		"once its agent is the channel's operator or holds a write grant of its own on the channel", total, noun, strings.Join(parts, ", "), will, id)
 }
 
 // switchResult counts what the settle check found after the last round: the messages held back
-// per reason and the messages after the cursor that the rule did not hold but the round did not
-// copy.
+// per reason, the messages after the cursor that the rule did not hold but the round did not copy
+// (fresh: in a thread the round read without a hold, so written after it read the thread;
+// settled: in a thread the round held back, which may have settled since), and the threads of the
+// channel that failed in the round.
 type switchResult struct {
-	held  map[HoldReason]int
-	fresh int
+	held    map[HoldReason]int
+	fresh   int
+	settled int
+	failed  int
 }
 
 // heldReasons is the order in which the reasons are printed.
 var heldReasons = []HoldReason{HoldBusy, HoldUnsettled, HoldLookbackBusy}
 
-// verdict is the decision of brief design note 2: an error (exit 1) while anything is held back or
-// not copied, nil when the owner may go on with step 3.
+// verdict is the decision of brief design note 2: an error (exit 1) while anything is held back,
+// not copied or failed, nil when the owner may go on with step 3. A thread that failed in the
+// round stops the switch even when it left no message behind (its thread object may be the item
+// the server refused). Only messages written after the round read their thread say that the
+// Discord channel is not locked; messages of a failed thread and messages the round held back
+// that settled since do not.
 func (r switchResult) verdict() error {
 	total := 0
 	var parts []string
@@ -246,9 +257,21 @@ func (r switchResult) verdict() error {
 		return fmt.Errorf("%d messages are still held back (%s): wait import.follow.settle_after after their last change "+
 			"(and until the busy reactions are gone), then run switch again", total, strings.Join(parts, ", "))
 	}
+	if r.failed > 0 {
+		left := ""
+		if n := r.fresh + r.settled; n > 0 {
+			left = fmt.Sprintf("%d messages after the cursor were not copied by the last round, in which ", n)
+		}
+		return fmt.Errorf("%s%d of the channel's threads failed (each with its reason in a line above; a batch the server "+
+			"refused names the rule and the item): this says nothing about the Discord lock of step 1; remove the cause and "+
+			"run switch again", left, r.failed)
+	}
 	if r.fresh > 0 {
-		return fmt.Errorf("%d messages after the cursor were not copied by the last round (written after it, or their thread "+
-			"failed): the Discord channel is evidently not read-only yet (step 1); run switch again", r.fresh)
+		return fmt.Errorf("%d messages after the cursor were not copied by the last round (written after it): the Discord "+
+			"channel is evidently not read-only yet (step 1); run switch again", r.fresh)
+	}
+	if r.settled > 0 {
+		return fmt.Errorf("%d messages the last round held back have settled since: run switch again to copy them", r.settled)
 	}
 	return nil
 }
@@ -258,7 +281,7 @@ func (r switchResult) verdict() error {
 // newer than the cursor the messages after it, and applies the settle rule once more with the
 // current time. It only reads.
 func settleCheck(ctx context.Context, o options, env Env, wk *walker, id string) (switchResult, error) {
-	res := switchResult{held: map[HoldReason]int{}}
+	res := switchResult{held: map[HoldReason]int{}, failed: wk.p.byID[id].rep.threadsFailed}
 	m := &mirror{o: o, env: env, wk: wk, reads: bothyReads{api: wk.api}, starters: map[string]*discord.Message{}}
 	chans, err := wk.dc.GuildChannels(ctx, wk.m.GuildID)
 	if err != nil {
@@ -286,7 +309,8 @@ func settleCheck(ctx context.Context, o options, env Env, wk *walker, id string)
 
 // recheck applies the settle rule to the messages of one main thread (main true) or thread after
 // its cursor, when last is newer than the cursor, and adds the counts to res. Messages of a type
-// that is not taken over (22 6.1) never count as not copied.
+// that is not taken over (22 6.1) never count as not copied; a message the rule passes now counts
+// as settled when the round held the thread back, else as fresh.
 func (m *mirror) recheck(ctx context.Context, c *channelPlan, main bool, readID, last string, res *switchResult) error {
 	after := m.wk.w.position(main, readID)
 	if !newer(last, after) {
@@ -321,7 +345,11 @@ func (m *mirror) recheck(ctx context.Context, c *channelPlan, main bool, readID,
 	cp, held, reason := Settle(m.env.clock().Now(), msgs, lookback, func(id string) *discord.Message { return m.starters[id] }, cfg)
 	res.held[reason] += held
 	for _, msg := range cp {
-		if takenTypes[msg.Type] {
+		switch {
+		case !takenTypes[msg.Type]:
+		case c.rep.heldReads[readID]:
+			res.settled++
+		default:
 			res.fresh++
 		}
 	}
