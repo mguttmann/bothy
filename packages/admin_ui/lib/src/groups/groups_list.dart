@@ -132,13 +132,15 @@ class _GroupsListState extends State<GroupsList>
         noticeBanner(),
         if (_problem case final problem?)
           ProblemBanner(problem: problem, onRetry: _load)
-        else if (groups != null && groups.isEmpty)
+        else if (groups == null)
+          const Center(child: CircularProgressIndicator())
+        else if (groups.isEmpty)
           Text(
             l.adminGroupsEmpty,
             style: dsTextStyle(DsType.body)
                 .copyWith(color: colors.textSecondary),
           )
-        else if (groups != null)
+        else
           for (final group in groups) ...[
             // A button for screen readers: an InkWell row has a tap but no role (brief M4-32).
             DsTappable(

@@ -13,6 +13,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support.dart';
 
 void main() {
+  _loadingTests();
+
   late GlobalKey<NavigatorState> navigator;
   late FakeAdminRepository repository;
   late int changed;
@@ -206,6 +208,33 @@ void main() {
       expect(counting.counts, base + 2, reason: 'one more for the changes');
     },
   );
+}
+
+void _loadingTests() {
+  testWidgets('the queue shows that it loads until the devices are there', (
+    tester,
+  ) async {
+    final navigator = GlobalKey<NavigatorState>();
+    final counting = _CountingRepository(
+      prompt: StepUpDialogPrompt(() => navigator.currentContext),
+    )..gate = Completer<void>();
+    await pumpInApp(
+      tester,
+      WaitingDevicesView(
+        repository: counting,
+        timeZone: 'Europe/Berlin',
+        clock: testClock,
+      ),
+      navigatorKey: navigator,
+      settle: false,
+    );
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    counting.gate!.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byKey(const ValueKey('waiting.sam-tablet')), findsOneWidget);
+  });
 }
 
 /// Counts the reads of the waiting devices; a set [gate] holds a read until it completes.

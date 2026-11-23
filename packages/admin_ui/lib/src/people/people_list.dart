@@ -297,7 +297,7 @@ class _PeopleListState extends State<PeopleList>
             ),
           const SizedBox(height: DsSpace.s8),
           if (!_loaded)
-            const SizedBox.shrink()
+            const Center(child: CircularProgressIndicator())
           else if (shown != null && shown.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: DsSpace.s16),

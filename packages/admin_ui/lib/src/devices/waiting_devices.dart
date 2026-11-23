@@ -157,14 +157,16 @@ class _WaitingDevicesViewState extends State<WaitingDevicesView>
         noticeBanner(),
         if (_problem case final problem?)
           ProblemBanner(problem: problem, onRetry: _load)
-        else if (waiting != null && waiting.isEmpty)
+        else if (waiting == null)
+          const Center(child: CircularProgressIndicator())
+        else if (waiting.isEmpty)
           Text(
             l.adminWaitingEmpty,
             key: const ValueKey('waiting.empty'),
             style: dsTextStyle(DsType.body)
                 .copyWith(color: colors.textSecondary),
           )
-        else if (waiting != null)
+        else
           for (final w in waiting) ...[
             Padding(
               key: ValueKey('waiting.${w.device.id}'),
