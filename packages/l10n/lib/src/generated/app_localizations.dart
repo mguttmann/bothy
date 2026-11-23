@@ -18825,6 +18825,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Someone else changed this in the meantime. The page now shows the current state; make your change again.'**
   String get adminVersionReloaded;
+
+  /// Button on the app page that opens the consent of the installed app (scopes and events).
+  ///
+  /// In en, this message translates to:
+  /// **'Change consent'**
+  String get adminAppChangeConsent;
+
+  /// Title of the dialog that changes the granted scopes and events of an installed app.
+  ///
+  /// In en, this message translates to:
+  /// **'Consent for {name}'**
+  String adminAppChangeConsentTitle(String name);
+
+  /// Body of the dialog that changes the granted scopes and events of an installed app.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose what the app may use and which events it receives; required items stay on.'**
+  String get adminAppChangeConsentBody;
 }
 
 class _AppLocalizationsDelegate

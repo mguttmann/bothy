@@ -11808,4 +11808,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get adminVersionReloaded =>
       'Someone else changed this in the meantime. The page now shows the current state; make your change again.';
+
+  @override
+  String get adminAppChangeConsent => 'Change consent';
+
+  @override
+  String adminAppChangeConsentTitle(String name) {
+    return 'Consent for $name';
+  }
+
+  @override
+  String get adminAppChangeConsentBody =>
+      'Choose what the app may use and which events it receives; required items stay on.';
 }

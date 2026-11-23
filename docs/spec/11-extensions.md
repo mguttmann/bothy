@@ -175,7 +175,9 @@ sequenceDiagram
   and therefore needs an existing subject. The administration (desktop and console) previews the
   grants of the chosen targets right after `app.install` and creates them with a second
   confirmation; a step that fails stops the flow, shows what succeeded and offers to repeat the
-  failed step or to uninstall the app (docs/decisions.d/M6-08.md D-M6-08-1).
+  failed step, to close the dialog or to uninstall the app (docs/decisions.d/M6-08.md D-M6-08-1).
+  A failed token step shows the token's name, last day and DPoP thumbprint again for the repeat;
+  after "Close" the app and its created grants stay, and the token follows on the app page.
 - The token appears exactly once. Rotation: create a new token, revoke the old one
   (`token.create`, `token.revoke`).
 
@@ -183,7 +185,9 @@ sequenceDiagram
 
 A new manifest with the same `slug` shows a diff. New scopes and events need a new consent
 (`app.scopes.update`, step-up). Until then the app runs with the old granted scopes; new commands
-and events that need new scopes stay inactive. Removed scopes, events and commands take effect
+and events that need new scopes stay inactive. The administration asks for the new consent right
+after the update and, at any time, with "Change consent" on the app page, which also withdraws an
+optional scope or event (required scopes stay on). Removed scopes, events and commands take effect
 immediately. An update never adds a grant; grants arise only with `grant.create`: in the
 administration the owner creates them under "Access grants", whose wizard offers the installed apps
 as subjects, for a target the new manifest asks for as for a second target of the app at any time

@@ -11873,4 +11873,16 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get adminVersionReloaded =>
       'Jemand anderes hat das inzwischen geändert. Die Seite zeigt jetzt den aktuellen Stand; nimm deine Änderung erneut vor.';
+
+  @override
+  String get adminAppChangeConsent => 'Zustimmung ändern';
+
+  @override
+  String adminAppChangeConsentTitle(String name) {
+    return 'Zustimmung für $name';
+  }
+
+  @override
+  String get adminAppChangeConsentBody =>
+      'Wähle, was die App nutzen darf und welche Ereignisse sie erhält; erforderliche Punkte bleiben an.';
 }

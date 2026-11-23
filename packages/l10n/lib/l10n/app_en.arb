@@ -17594,5 +17594,23 @@
   "adminVersionReloaded": "Someone else changed this in the meantime. The page now shows the current state; make your change again.",
   "@adminVersionReloaded": {
     "description": "Notice of an administration page after a change answered 412 version_conflict: the page read the record again."
+  },
+  "adminAppChangeConsent": "Change consent",
+  "@adminAppChangeConsent": {
+    "description": "Button on the app page that opens the consent of the installed app (scopes and events)."
+  },
+  "adminAppChangeConsentTitle": "Consent for {name}",
+  "@adminAppChangeConsentTitle": {
+    "description": "Title of the dialog that changes the granted scopes and events of an installed app.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Repo bridge"
+      }
+    }
+  },
+  "adminAppChangeConsentBody": "Choose what the app may use and which events it receives; required items stay on.",
+  "@adminAppChangeConsentBody": {
+    "description": "Body of the dialog that changes the granted scopes and events of an installed app."
   }
 }

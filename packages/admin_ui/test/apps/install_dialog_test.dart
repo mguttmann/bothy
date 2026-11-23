@@ -343,6 +343,54 @@ void main() {
     await tap(tester, 'appToken.secretClose');
   });
 
+  testWidgets('a failed token can be corrected and retried, or the dialog '
+      'closed with the app and grants kept', (tester) async {
+    repository.stepUpFresh = true;
+    await openDialog(tester);
+    await consent(tester);
+    await tap(tester, 'install.submit');
+    repository.refuse['createToken'] = const ApiProblem(
+      status: 400,
+      code: 'validation_failed',
+    );
+    await tap(tester, 'install.createGrants');
+    expect(textOf(tester, 'install.step.token'), contains('failed: '));
+    // The token's fields are there again and changeable.
+    await type(tester, 'consent.tokenName', 'Bridge 2');
+    await type(tester, 'consent.tokenLastDay', '2026-12-30');
+    repository.refuse.remove('createToken');
+    await tap(tester, 'install.retry');
+    expect(
+      repository.calls.where((c) => c.startsWith('createToken')).last,
+      contains('Bridge 2'),
+    );
+    await tap(tester, 'appToken.secretClose');
+    expect(find.byKey(const ValueKey('install.dialog')), findsNothing);
+  });
+
+  testWidgets('Close after a failed step keeps what succeeded', (tester) async {
+    repository.stepUpFresh = true;
+    await openDialog(tester);
+    await consent(tester);
+    await tap(tester, 'install.submit');
+    repository.refuse['createToken'] = const ApiProblem(
+      status: 400,
+      code: 'validation_failed',
+    );
+    await tap(tester, 'install.createGrants');
+    await tap(tester, 'install.close');
+    expect(find.byKey(const ValueKey('install.dialog')), findsNothing);
+    expect(
+      repository.calls.where((c) => c.startsWith('uninstallApp')),
+      isEmpty,
+    );
+    expect(
+      find.byKey(const ValueKey('apps.row.app-repo-bridge-0')),
+      findsOneWidget,
+    );
+    expect(changed, 1);
+  });
+
   testWidgets('Uninstall removes the half-installed app', (tester) async {
     repository.stepUpFresh = true;
     await openDialog(tester);
