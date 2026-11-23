@@ -515,6 +515,24 @@ void main() {
     expect(find.byKey(const ValueKey('import.channels')), findsNothing);
   });
 
+  testWidgets(
+    'a refresh that fails after the source was shown says so and keeps the '
+    'source',
+    (tester) async {
+      final id = repository.seedImport('Old', state: 'running');
+      await pumpSource(tester, repository, id, navigator);
+      expect(actions(), isNotEmpty);
+      repository.refuse['importSource'] = const ApiProblem(
+        status: 429,
+        code: 'rate_limited',
+      );
+      await tester.tap(find.byKey(const ValueKey('import.refresh')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('admin.loadFailed')), findsOneWidget);
+      expect(actions(), isNotEmpty, reason: 'the last state stays');
+    },
+  );
+
   testWidgets('German texts', (tester) async {
     final id = repository.seedImport('Alt', state: 'running');
     repository.postChannels(id, ['301']);
