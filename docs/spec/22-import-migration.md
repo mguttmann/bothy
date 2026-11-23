@@ -139,10 +139,14 @@ Discord reports limits through headers and `429` with `retry_after` [R7, verifie
    retries at most `import.discord.max_429_retries` times.
 3. Aborts if a requested wait time is greater than `import.discord.max_rate_wait`. The
    state remains; a new run resumes.
-4. Never retries `401` and `403`. A `403` on a channel ends all further calls for
-   this channel in the run. Reason: Discord temporarily blocks an IP after too many responses with
+4. Never retries `401` and `403`. A `401` ends the run with exit `2`, a read mirror too. A `403`
+   on a channel ends all further calls for this channel in the run; in a read mirror, until its
+   next round. Reason: Discord temporarily blocks an IP after too many responses with
    `401`, `403` or `429` [R7, verified].
 5. Likewise respects `429` of the Bothy server (header `Retry-After`).
+6. Asks a `GET` again that Discord or its CDN answered with `5xx` or that failed in the connection,
+   up to three times after waits of 1 s, 2 s and 4 s; only then does the error end the run
+   (10.3) or give the attachment its line (6.5 item 6).
 
 ### 4.4 Preflight check
 
@@ -634,8 +638,8 @@ Who may bind is governed by `agent.invoke`: the binding arises only from a permi
 
 | Command | Effect |
 |---|---|
-| `bothy import login --server <url>` | logs the tool in as a `cli` device through device pairing; the owner approves the pairing code in the app or the web console; writes only the session file of the tool |
-| `bothy import logout` | ends the session on the server and deletes the session file |
+| `bothy import login --server <url>` | logs the tool in as a `cli` device through device pairing; the owner approves the pairing code in the app or the web console; writes only the session file of the tool; reads the tool configuration (`--config`, `BOTHY_IMPORT__` variables, section 19) like the other commands |
+| `bothy import logout` | ends the session on the server and deletes the session file; reads the tool configuration like `login` |
 | `bothy import discord --guild <id> --map <file>` | dry run: only `GET` against Discord and Bothy, writes nothing, not even a local file (exceptions of the login in rule 5 of 10.2); prints the check report |
 | `… --apply` | imports into the source of this guild that the owner created and started in the web console (section 8); without such a running source exit `2` |
 | `… --apply --follow` | read mirror as a loop (section 12); without `--apply` one reading round per interval with "would copy" |
@@ -681,8 +685,8 @@ output, log line or error carries a token, the key or the content of the file.
 | Code | Meaning |
 |---|---|
 | `0` | done, or dry run without errors |
-| `1` | run aborted (network, rate limit above the limit, server error); the state remains, a new run resumes |
-| `2` | invocation, mapping file or preflight check faulty; nothing written |
+| `1` | run aborted (network or server error after the retries of 4.3 item 6, rate limit above the limit, SIGINT or SIGTERM after the current batch with the lease freed); the state remains, a new run resumes |
+| `2` | invocation, mapping file or preflight check faulty, nothing written; or Discord refused the token (`401`) or the session of the server is missing, revoked or invalid, in any phase |
 | `3` | another run holds the lease of the source (without `--takeover`, section 7.4); with `--once` the normal case for scheduled calls |
 
 A batch the server refuses ends a full run with exit `1`. The message names the operation, the
@@ -767,10 +771,12 @@ Every `import.follow.poll_interval`:
 4. Channels with `lead = bothy` in which Discord nevertheless shows new messages appear as a
    warning in the report. Nothing is copied.
 5. Errors of a round (network, `5xx`, rate limit above the limit) do not end the mirror; the
-   next round waits with backoff up to `import.follow.max_backoff`. Errors of one thread do not hold
+   next round waits with backoff up to `import.follow.max_backoff`. A `401` of Discord or an
+   invalid session of the server ends it with exit `2` (4.3 item 4). Errors of one thread do not hold
    up other threads: the thread stays behind and is tried again in the next round, and the note
    of its channel and a line on standard error name the thread and the error, for a batch the
-   server refused with the place, the rule and the item (10.3).
+   server refused with the place, the rule and the item (10.3). A channel created in Discord
+   after the start of the mirror is not mirrored and noted in every round.
 
 ### 12.3 Settle rule
 

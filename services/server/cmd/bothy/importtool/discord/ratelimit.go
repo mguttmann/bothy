@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -108,7 +109,28 @@ func (g *guard) clear(template, major string) {
 	delete(g.resetAt, g.bucketKey(template, major))
 }
 
-// forbid ends a channel for the rest of the run.
+// newRound forgets the channels a 403 ended and the buckets whose refill time has passed; a
+// bucket that is still exhausted keeps its refill time and its name. The maps of a long read
+// mirror so stay bounded by one round.
+func (g *guard) newRound() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	clear(g.forbidden)
+	now := g.clock.Now()
+	for key, at := range g.resetAt {
+		if !at.After(now) {
+			delete(g.resetAt, key)
+		}
+	}
+	for route := range g.buckets {
+		template, major, _ := strings.Cut(route, "|")
+		if _, pending := g.resetAt[g.bucketKey(template, major)]; !pending {
+			delete(g.buckets, route)
+		}
+	}
+}
+
+// forbid ends a channel until the next round (newRound) or the end of the run.
 func (g *guard) forbid(channelID string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()

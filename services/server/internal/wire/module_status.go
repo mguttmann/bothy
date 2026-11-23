@@ -55,7 +55,7 @@ func statusWiring() moduleWiring {
 
 // startStatus builds the status module over the pool, the unit of work and recorder of audit, the
 // Authorizer, the appender of sync and the checks over the ports of stats, files, search and
-// agents, and binds the in-transaction subscriber of agents.AgentDisabled to the appender.
+// agents.
 // Deps.StatusSources, when set, replaces the checks (tests simulate outages with it).
 func (s *server) startStatus(context.Context) error {
 	cfg, err := StatusConfigFrom(s.values)
@@ -80,7 +80,6 @@ func (s *server) startStatus(context.Context) error {
 	if err != nil {
 		return err
 	}
-	a.StatusSubscribers().Bind(sy.Appender())
 	s.mu.Lock()
 	s.status, s.statusCfg = st, cfg
 	s.mu.Unlock()

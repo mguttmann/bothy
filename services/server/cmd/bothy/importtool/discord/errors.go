@@ -23,8 +23,8 @@ var (
 	ErrForbidden = errors.New("discord: forbidden")
 	// ErrNotFound: Discord answered 404.
 	ErrNotFound = errors.New("discord: not found")
-	// ErrServer: Discord answered 5xx. The client does not retry it; an import run ends, the
-	// read mirror backs off (M8-05).
+	// ErrServer: Discord still answered 5xx after transientRetries retries; an import run ends,
+	// the read mirror backs off (M8-05).
 	ErrServer = errors.New("discord: server error")
 	// ErrUnexpectedStatus: any other status that is not a success, a redirect included (the
 	// client never follows one).
@@ -68,6 +68,9 @@ type CallError struct {
 	Kind error
 	// Hint is an optional advice for the operator, for example the missing permission.
 	Hint string
+	// transport marks a failure of the connection (no answer, or a body that broke off); such a
+	// call is retried (transientRetries).
+	transport bool
 }
 
 // Error implements error.

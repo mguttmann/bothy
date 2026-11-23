@@ -162,8 +162,8 @@ type CatalogEntry struct {
 // Catalog answers which rate-limit class an action has. ok is false for an action the
 // catalogue does not know; a route with such an action must not be served (05 rule 5).
 //
-// SpecCatalog is the catalogue generated from docs/spec/actions.yaml; the authz module will
-// provide the closed catalogue that replaces it at start (M1-25).
+// SpecCatalog is the catalogue generated from docs/spec/actions.yaml; the server passes the
+// closed catalogue of the authz module at start (M1-25), and SpecCatalog serves the test worlds.
 type Catalog interface { // NOSONAR: a catalogue is a thing, not an action; see M1-17/33.
 	Class(action string) (class string, ok bool)
 }

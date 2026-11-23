@@ -391,17 +391,26 @@ func TestCDNGoneAfterSecondFailure(t *testing.T) {
 	}
 }
 
-// TestCDNServerErrorNotRetried: a 5xx is a *CallError with ErrServer, without a retry or a
-// re-read.
-func TestCDNServerErrorNotRetried(t *testing.T) {
+// TestCDNServerErrorRetried (audit finding fn-import-migration-8): a 5xx is asked again up to
+// transientRetries times with the waits of the API client; a file that arrives within them is
+// fetched, one that does not is a *CallError with ErrServer, without a re-read.
+func TestCDNServerErrorRetried(t *testing.T) {
 	h := newCDNHarness(t, nil)
 	h.cdn.Inject(cdnPath, discordtest.CDNStatus(http.StatusBadGateway))
+	if n, _, err := h.fetchAll(t, h.ref(h.staleURL(discordtest.CDNHost))); err != nil || n != cdnFileSize {
+		t.Fatalf("after one 5xx: n = %d, err = %v", n, err)
+	}
+	if got := h.sleeper.recorded(); !slices.Equal(got, []time.Duration{transientWait}) {
+		t.Errorf("waits = %v", got)
+	}
+	h = newCDNHarness(t, nil)
+	h.cdn.Always(cdnPath, discordtest.CDNStatus(http.StatusBadGateway))
 	_, err := h.fetcher.Fetch(t.Context(), h.ref(h.staleURL(discordtest.CDNHost)))
 	var ce *CallError
 	if !errors.As(err, &ce) || !errors.Is(err, ErrServer) || ce.Status != http.StatusBadGateway {
 		t.Fatalf("err = %v, want a CallError with ErrServer", err)
 	}
-	if len(h.cdn.Requests()) != 1 || h.reader.calls.Load() != 0 {
+	if len(h.cdn.Requests()) != 1+transientRetries || h.reader.calls.Load() != 0 {
 		t.Errorf("CDN requests = %d, re-reads = %d", len(h.cdn.Requests()), h.reader.calls.Load())
 	}
 }

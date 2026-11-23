@@ -162,8 +162,9 @@ func parseConfigFlags(sub string, args []string) (configOptions, error) {
 }
 
 // loadConfig builds the schema and loads the configuration as the server start does, from env,
-// the --config file and --role. On failure it prints the error on stderr and reports false: a
-// configuration that does not load is exit code 1, not a usage error.
+// the --config file and --role. On failure it prints the error on stderr and reports false; the
+// caller picks the exit code: 1 for bothy config check (a negative check result), 2 for every
+// other command (02 section 3.3).
 func loadConfig(env []string, schema func() (*config.Schema, error), o configOptions, stderr io.Writer) (*config.Schema, *config.Values, bool) {
 	s, err := schema()
 	if err != nil {

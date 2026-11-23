@@ -19,11 +19,20 @@ import (
 // arguments replaced by values, so the plan test explains the query the job runs.
 func candidateQuery(t *testing.T, file, name string) string {
 	t.Helper()
+	return namedQuery(t, file, name, ":many", map[string]string{
+		"@cutoff": "'2026-01-01T00:00:00Z'::timestamptz", "@row_limit": "500",
+	})
+}
+
+// namedQuery returns the statement of the sqlc query name with the annotation kind in file, its
+// comment lines removed and each named argument replaced by its value in args.
+func namedQuery(t *testing.T, file, name, kind string, args map[string]string) string {
+	t.Helper()
 	raw, err := os.ReadFile(file) // #nosec G304 -- a query file of this repository
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, rest, found := strings.Cut(string(raw), "-- name: "+name+" :many\n")
+	_, rest, found := strings.Cut(string(raw), "-- name: "+name+" "+kind+"\n")
 	if !found {
 		t.Fatalf("%s has no query %s", file, name)
 	}
@@ -35,8 +44,9 @@ func candidateQuery(t *testing.T, file, name string) string {
 		}
 	}
 	stmt = strings.TrimSuffix(strings.TrimSpace(strings.Join(lines, "\n")), ";")
-	stmt = strings.ReplaceAll(stmt, "@cutoff", "'2026-01-01T00:00:00Z'::timestamptz")
-	stmt = strings.ReplaceAll(stmt, "@row_limit", "500")
+	for arg, value := range args {
+		stmt = strings.ReplaceAll(stmt, arg, value)
+	}
 	if strings.Contains(stmt, "@") {
 		t.Fatalf("%s has an argument the test does not know: %s", name, stmt)
 	}
@@ -75,7 +85,9 @@ func planNodes(t *testing.T, conn *pgx.Conn, stmt string) (nodes, indexes []stri
 	return nodes, indexes
 }
 
-// TestRetentionIndexes (00104, audit finding data-layer-3; 00105 for the job retention.import)
+// TestRetentionIndexes (00104, audit finding data-layer-3; 00105 for the job retention.import;
+// 00113 and 00115 for push registrations and webhook deliveries, srv-notify-14 and
+// srv-apps-billing-8)
 // holds the plans the retention jobs rely on, against the schema of all migrations and the query
 // files the jobs run:
 //
@@ -103,6 +115,8 @@ func TestRetentionIndexes(t *testing.T) {
 		{identity, "ExpiredDevices", "devices_revoked_at_idx"},
 		{"../internal/terminal/adapters/postgres/queries/retention.sql", "ExpiredTerminalSessions", "terminal_sessions_closed_at_idx"},
 		{"../internal/messaging/adapters/postgres/queries/retention.sql", "ExpiredMessages", "messages_content_created_idx"},
+		{"../internal/notify/adapters/postgres/queries/registrations_write.sql", "ExpiredPushRegistrations", "push_registrations_disabled_at_idx"},
+		{"../internal/apps/adapters/postgres/queries/webhooks.sql", "ExpiredWebhookDeliveries", "webhook_deliveries_finished_end_idx"},
 	} {
 		nodes, indexes := planNodes(t, conn, candidateQuery(t, tc.file, tc.query))
 		if !slices.Contains(indexes, tc.index) || slices.Contains(nodes, "Seq Scan") || slices.Contains(nodes, "Sort") {

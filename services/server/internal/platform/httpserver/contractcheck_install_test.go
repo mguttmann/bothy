@@ -68,6 +68,7 @@ func TestG8_SkipsInBandRoutes(t *testing.T) {
 		}
 		chain, err := httpserver.NewChain(httpserver.DefaultChainConfig(httpservertest.PublicURL), httpserver.Deps{
 			Logger: slog.New(slog.DiscardHandler), Authenticator: httpservertest.FakeAuthenticator{}, Validator: v,
+			InBandPatterns: []string{"GET /api/v1/hosts/connect"},
 		})
 		if err != nil {
 			t.Fatal(err)

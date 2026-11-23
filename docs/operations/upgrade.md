@@ -70,7 +70,7 @@ whose bundle changed needs manual work, and the section "Upgrade notes" of its r
 | M1 | Version N may only remove or reinterpret what version N-1 no longer reads or writes. | Rollback by one version without reverting the database. |
 | M2 | Never rename directly: new column (expand), write both (N), read only the new one (N+1), remove the old one (N+2). | M1. |
 | M3 | New columns allow `NULL` or have a default without rewriting the table. | No long lock on large tables. |
-| M4 | Indexes with `CREATE INDEX CONCURRENTLY` in a migration without a transaction (goose: `-- +goose NO TRANSACTION`). | Writes continue. |
+| M4 | Indexes with `CREATE INDEX CONCURRENTLY` in a migration without a transaction (goose: `-- +goose NO TRANSACTION`), one index per migration file; the `DROP INDEX CONCURRENTLY IF EXISTS` before the build only removes an invalid rest of the same build. Replacing a unique index builds the new one in one migration and drops the old one in a later one. | Writes continue. goose records each finished file, so a repeated run after an abort never drops an index that was already built, and the uniqueness is never without an index. |
 | M5 | New constraints first as `NOT VALID`, `VALIDATE CONSTRAINT` in a later migration. | Check without a write lock. |
 | M6 | Every step sets `lock_timeout` to `migrate.lock_timeout` and would rather abort than wait. | A waiting lock blocks all following requests. |
 | M7 | Never backfill data in the migration, but as a background job in batches. | Short transactions; progress visible. |

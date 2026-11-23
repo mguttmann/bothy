@@ -21,6 +21,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/tools/go/packages"
 
@@ -570,7 +571,8 @@ func TestInvalidSnowflake(t *testing.T) {
 	}
 }
 
-// TestStatusErrors: 404, 5xx and other statuses map to their sentinels and are not retried.
+// TestStatusErrors: 404, 5xx and other statuses map to their sentinels; a 5xx that stays is
+// ErrServer after the retries of TestServerErrorRetried.
 func TestStatusErrors(t *testing.T) {
 	cases := map[int]error{
 		http.StatusNotFound:            ErrNotFound,
@@ -581,7 +583,7 @@ func TestStatusErrors(t *testing.T) {
 	for status, want := range cases {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			h := newHarness(t, nil, nil)
-			h.fake.Inject(path("/guilds/"+guildID), discordtest.Status(status))
+			h.fake.Always(path("/guilds/"+guildID), discordtest.Status(status))
 			_, err := h.client.Guild(t.Context(), guildID)
 			if !errors.Is(err, want) {
 				t.Fatalf("err = %v, want %v", err, want)
@@ -590,8 +592,12 @@ func TestStatusErrors(t *testing.T) {
 			if !strings.HasPrefix(err.Error(), want) {
 				t.Fatalf("text %q, want prefix %q", err, want)
 			}
-			if n := len(h.fake.Requests()); n != 1 {
-				t.Fatalf("requests = %d, want 1", n)
+			requests := 1
+			if errors.Is(err, ErrServer) {
+				requests = 1 + transientRetries
+			}
+			if n := len(h.fake.Requests()); n != requests {
+				t.Fatalf("requests = %d, want %d", n, requests)
 			}
 		})
 	}
@@ -623,5 +629,29 @@ func TestTransportError(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), firstMsgID) || strings.Contains(err.Error(), testToken) {
 		t.Fatalf("err %q quotes the query or the token", err)
+	}
+}
+
+// TestServerErrorRetried (audit finding srv-import-10): a 5xx of Discord is asked again up to
+// transientRetries times with a doubling wait from transientWait; a call that gets its answer
+// within them succeeds, one that does not ends with ErrServer after 1 + transientRetries
+// requests.
+func TestServerErrorRetried(t *testing.T) {
+	h := newHarness(t, nil, nil)
+	p := path("/guilds/" + guildID)
+	h.fake.Inject(p, discordtest.Status(http.StatusBadGateway), discordtest.Status(http.StatusServiceUnavailable))
+	if _, err := h.client.Guild(t.Context(), guildID); err != nil {
+		t.Fatalf("Guild after two 5xx = %v, want the answer of the third request", err)
+	}
+	if got := h.sleeper.recorded(); !slices.Equal(got, []time.Duration{transientWait, 2 * transientWait}) {
+		t.Errorf("waits = %v", got)
+	}
+	h.fake.Always(p, discordtest.Status(http.StatusBadGateway))
+	before := requestsTo(h, "/guilds/"+guildID)
+	if _, err := h.client.Guild(t.Context(), guildID); !errors.Is(err, ErrServer) {
+		t.Fatalf("err = %v, want ErrServer", err)
+	}
+	if n := requestsTo(h, "/guilds/"+guildID) - before; n != 1+transientRetries {
+		t.Errorf("requests = %d, want %d", n, 1+transientRetries)
 	}
 }

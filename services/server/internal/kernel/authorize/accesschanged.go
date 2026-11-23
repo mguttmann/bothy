@@ -7,7 +7,7 @@ import "github.com/OWNER/bothy/services/server/internal/kernel/ids"
 // AccessTargetKind is the kind of an entry of access.changed (OpenAPI AccessTargetKind).
 type AccessTargetKind string
 
-// The kinds of AccessTarget. host comes with M2-39 (the terminal right).
+// The kinds of AccessTarget; host carries the terminal right (M2-39).
 const (
 	// AccessSpace is a space: it appears or disappears, and it changes with its level when the
 	// level on the space itself changes (archiving, M1-52).

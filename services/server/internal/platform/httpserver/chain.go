@@ -88,6 +88,10 @@ type Deps struct {
 	// Measure is the own measurement of the process (M6-13): one sli.api_availability per REST
 	// response of the public listener; nil records nothing.
 	Measure measure.Recorder
+	// InBandPatterns is the closed list of the route patterns that may carry
+	// Operation.AuthorizedInBand (internal/wire passes wire.InBandPatterns). Wrap panics for a
+	// marked operation whose pattern is not on it, so no route skips the per-route stages unnoticed.
+	InBandPatterns []string
 }
 
 // Chain is the HTTP middleware chain of the public listener. Build it once with NewChain, let
@@ -122,6 +126,7 @@ type Chain struct {
 	gate        func(http.Handler) http.Handler
 	public      bool
 	inBandPats  []string
+	inBandOK    []string
 
 	// trace, when set by a test of this package, is called with the name of every stage a
 	// request enters; TestChainOrder_Golden reads the order from it.
@@ -158,7 +163,7 @@ func NewChain(cfg ChainConfig, deps Deps) (*Chain, error) {
 		cfg: cfg, log: deps.Logger, auth: deps.Authenticator, validator: deps.Validator,
 		authzErrors: counter, measure: measure.OrNop(deps.Measure), publicURL: public, origins: map[string]bool{},
 		sec:    SecurityHeadersFor(public, cfg.HSTSMaxAge),
-		stages: map[Stage]func(http.Handler) http.Handler{},
+		stages: map[Stage]func(http.Handler) http.Handler{}, inBandOK: slices.Clone(deps.InBandPatterns),
 	}
 	for _, o := range cfg.CORSAllowedOrigins {
 		c.origins[o] = true
@@ -195,10 +200,10 @@ func (c *Chain) Use(stage Stage, mw func(http.Handler) http.Handler) {
 }
 
 // SetFailedCredentialsHook installs fn, which StageAuthenticate calls with the error of the
-// Authenticator before it answers. It returns the error to send: the one it got, or a
-// replacement such as 429 rate_limited once rl.public_auth of the client IP is empty (02
-// "Chain in the api node", rule on failed credentials; M1-19 fills it and skips token_expired and
-// use_dpop_nonce, which are normal flows). It panics when called twice or after the first Wrap.
+// Authenticator before it answers. It returns the error to send: the one it got or a
+// replacement. The server sets no hook: the failed-credentials rule of M1-19 runs in the
+// precheck (SetCredentialsPrecheck), and the hook stays for other uses (docs/DECISIONS.md
+// M1-19/5). It panics when called twice or after the first Wrap.
 func (c *Chain) SetFailedCredentialsHook(fn func(r *http.Request, err error) error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -252,9 +257,13 @@ func (c *Chain) Order() []string {
 
 // Wrap returns h with the per-route stages around it, for the operation op. Mount the result at
 // op.Pattern on the mux that Public serves. An operation with AuthorizedInBand gets no per-route
-// stage: only the operation in the context (the gateway upgrade, M1-64).
+// stage: only the operation in the context (the upgrade routes, M1-64). Wrap panics for such an
+// operation whose pattern is not in Deps.InBandPatterns.
 func (c *Chain) Wrap(op Operation, h http.Handler) http.Handler {
 	if op.AuthorizedInBand {
+		if !slices.Contains(c.inBandOK, op.Pattern) {
+			panic("httpserver: Wrap: " + op.Pattern + " is marked AuthorizedInBand but not in Deps.InBandPatterns")
+		}
 		c.mu.Lock()
 		c.inBandPats = append(c.inBandPats, op.Pattern)
 		c.mu.Unlock()

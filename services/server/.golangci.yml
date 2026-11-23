@@ -76,6 +76,30 @@ linters:
           deny:
             - pkg: github.com/aws/
               desc: only internal/files/adapters/s3, internal/audit/adapters/s3sink, internal/status/adapters/s3mirror and the image test of bothy-postgres may import the AWS SDK (12 "15", ADR 0048, M7-22, M7-02)
+        # Test helpers stay out of the binaries (audit findings srv-platform-data-14 and
+        # api-contract-codegen-10): go-arch-lint grants the vendors of pgtest and the package testkit
+        # to the whole component pg and skips only _test.go, so a production import would pass it.
+        # Allowed are test files, the tree test/ and the helper packages named *test themselves.
+        test-helpers-only-in-tests:
+          list-mode: lax
+          files:
+            - $all
+            - "!$test"
+            - "!**/services/server/test/**"
+            - "!**/internal/**/*test/*.go"
+          deny:
+            - pkg: github.com/testcontainers/
+              desc: only tests and test helpers start containers
+            - pkg: github.com/moby/
+              desc: only tests and test helpers talk to Docker
+            - pkg: github.com/docker/
+              desc: only tests and test helpers talk to Docker
+            - pkg: github.com/OWNER/bothy/services/server/internal/platform/testkit
+              desc: only tests and test helpers import testkit (docs/DECISIONS.md PL/8)
+            - pkg: github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest
+              desc: only tests and test helpers import pgtest
+            - pkg: github.com/OWNER/bothy/services/server/internal/platform/jobs/jobstest
+              desc: only tests and test helpers import jobstest
         # Only the image codec of files decodes WebP and resamples (ADR 0047, brief M3-06 design
         # note 2); go-arch-lint grants the vendor group ximage to all adapters of files.
         ximage-only-in-imaging:
@@ -176,7 +200,7 @@ linters:
       # TokenResponse carries access and refresh token by contract (openapi.yaml): the strict
       # server marshals them exactly once into the response of refreshToken and
       # createExtensionSession (M1-34, docs/DECISIONS.md M1-34). G117 sees the member name only.
-      - path: ^api/rest/(models|objects|objects2|rest)\.gen\.go$
+      - path: ^api/rest/(models|objects[0-9]*|rest[0-9]*)\.gen\.go$
         linters: [gosec]
         text: "G117:"
       # The generated API client (M8-10, docs/DECISIONS.md D-M8-10-1) returns every response to
@@ -186,17 +210,17 @@ linters:
         linters: [bodyclose, noctx]
       # The strict server streams the NDJSON body of exportAuditEvents and closes a ReadCloser body
       # in a defer without checking the error (M1-50); the handler hands it no ReadCloser.
-      - path: ^api/rest/(models|objects|objects2|rest)\.gen\.go$
+      - path: ^api/rest/(models|objects[0-9]*|rest[0-9]*)\.gen\.go$
         linters: [errcheck]
         text: "closer.Close"
       # The retention queries of identity (M7-05) name refresh_tokens, api_tokens and
       # passkey_credentials; they bind only ids and the cutoff, never a secret.
-      - path: ^internal/identity/adapters/postgres/sqlcgen/retention\.sql\.go$
+      - path: ^internal/identity/adapters/postgres/sqlcgen/retention\.sql\.gen\.go$
         linters: [gosec]
         text: "G101:"
       # Query names and SQL of refresh_tokens contain "token"; G101 reads them as credentials. The
       # queries hold no secret: tokens are bound as HMAC parameters (M1-34).
-      - path: ^internal/identity/adapters/postgres/sqlcgen/refresh\.sql\.go$
+      - path: ^internal/identity/adapters/postgres/sqlcgen/refresh\.sql\.gen\.go$
         linters: [gosec]
         text: "G101:"
       # The queries of push registrations (M3-22) name the columns token and preview_token_hash;
@@ -206,26 +230,26 @@ linters:
         linters: [gosec]
         text: "G101:"
       # The same for api_tokens (M1-44): the lookup binds token_hash, never the token itself.
-      - path: ^internal/identity/adapters/postgres/sqlcgen/apitokens\.sql\.go$
+      - path: ^internal/identity/adapters/postgres/sqlcgen/apitokens\.sql\.gen\.go$
         linters: [gosec]
         text: "G101:"
       # The account deletion and the export of identity (M7-06) name refresh_tokens, api_tokens,
       # passkey_credentials and local_credentials; they bind only ids and select no secret column.
-      - path: ^internal/identity/adapters/postgres/sqlcgen/personaldata\.sql\.go$
+      - path: ^internal/identity/adapters/postgres/sqlcgen/personaldata\.sql\.gen\.go$
         linters: [gosec]
         text: "G101:"
       # The same for passkey_credentials (M1-40): the rows hold public keys and counters only.
-      - path: ^internal/identity/adapters/postgres/sqlcgen/passkey_credentials\.sql\.go$
+      - path: ^internal/identity/adapters/postgres/sqlcgen/passkey_credentials\.sql\.gen\.go$
         linters: [gosec]
         text: "G101:"
       # The queries of the LLM login declaration of hosts (M2-40) name the column llm_credentials;
       # they hold codes and ids only, never a credential.
-      - path: ^internal/terminal/adapters/postgres/sqlcgen/llm_credentials\.sql\.go$
+      - path: ^internal/terminal/adapters/postgres/sqlcgen/llm_credentials\.sql\.gen\.go$
         linters: [gosec]
         text: "G101:"
       # The same for local_credentials (M1-39): the column names contain "password"; the queries
       # read and write only the Argon2id hash and the sealed TOTP secret as parameters.
-      - path: ^internal/identity/adapters/postgres/sqlcgen/local_credentials\.sql\.go$
+      - path: ^internal/identity/adapters/postgres/sqlcgen/local_credentials\.sql\.gen\.go$
         linters: [gosec]
         text: "G101:"
       # oapi-codegen writes capitalized error strings ("Header parameter ... is required"); only

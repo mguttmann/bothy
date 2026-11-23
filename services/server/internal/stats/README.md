@@ -94,7 +94,8 @@ The server measures what level a of the visualizations needs itself
   SLO period and the retention cutoff.
 - `app/`: `Measurement` (counters per minute and key in memory under one mutex, at most
   `stats.flush_queue_max` keys, the oldest minute dropped first), `Flush` (every
-  `stats.flush_interval` and once at the shutdown, chunks of one additive upsert each, merge back
+  `stats.flush_interval` and once at the shutdown, rows sorted by their whole key so concurrent
+  flushes of several processes lock shared rows in one order, chunks of one additive upsert each, merge back
   on an error, missing day partitions created on demand) and `Retention` (the use case of
   `stats.retention`). Loss is counted in `bothy.stats.flush.dropped` with `queue_full`,
   `db_error` or `invalid_key`; each flush in `bothy.stats.flush.duration`.
@@ -154,8 +155,13 @@ section 5, rulings `D-M6-15-1` to `D-M6-15-8` in
   the stop step `stats_live` and the test seam `Deps.StatsLive`; the gateway mount binds the
   gateway as sink and the hub as connection source.
 
-The frame carries IDs, states, billing modes, step kind and name, the approval flag and costs only:
-no person, no triggering person, no message, title or step detail (SEC-VZ-3, VZ-T07).
+The frame carries IDs, states, billing modes, step kind and name, the approval flag, costs (only
+with `cost.read.aggregate`) and the task nodes of the agent tree with their `tool`; no person, no
+triggering person, no message and no step detail (SEC-VZ-3, VZ-T07). Two contents go only to a
+receiver who may read them (25 section 4 rule 6 and the agent tree in section 5): a run's chat
+(`channel_name`, `thread_title`) when the receiver may read the thread (`thread.read`), and the
+`label` of a task node (the first line of the step title) when the receiver may read the run
+(`run.read`).
 
 ## Timeline, traffic light and backend view (M6-14)
 

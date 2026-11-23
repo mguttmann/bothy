@@ -595,6 +595,53 @@ func TestVerificationKey_UnknownKidReloadsOncePerTTL(t *testing.T) {
 	}
 }
 
+// hangingKeys is a repository whose PublishedKeys waits for release after it reported entered.
+type hangingKeys struct {
+	app.KeyRepository
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (h hangingKeys) PublishedKeys(ctx context.Context) ([]app.KeyRow, error) {
+	h.entered <- struct{}{}
+	<-h.release
+	return h.KeyRepository.PublishedKeys(ctx)
+}
+
+// TestVerificationKey_WaiterHonorsItsContext: while a reload of the verification cache hangs on
+// the database, another caller whose context ends returns with that error instead of waiting.
+func TestVerificationKey_WaiterHonorsItsContext(t *testing.T) {
+	t.Parallel()
+	e := newKeysEnv(t)
+	h := hangingKeys{entered: make(chan struct{}, 1), release: make(chan struct{})}
+	k := e.keysWith(t, func(r app.KeyRepository) app.KeyRepository { h.KeyRepository = r; return h })
+	first := make(chan error, 1)
+	go func() {
+		_, err := k.VerificationKey(context.Background(), instance.PurposeInvocation, "kid")
+		first <- err
+	}()
+	<-h.entered
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	second := make(chan error, 1)
+	go func() {
+		_, err := k.VerificationKey(ctx, instance.PurposeInvocation, "kid")
+		second <- err
+	}()
+	select {
+	case err := <-second:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("waiter: %v, want the deadline of its context", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Error("a waiter whose context ended still waits for the hanging reload")
+	}
+	close(h.release)
+	if err := <-first; errs.KindOf(err) != errs.KindNotFound {
+		t.Errorf("first caller: %v, want not_found", err)
+	}
+}
+
 // TestEnsureActive_ReplacesKeysWithoutFile: after a restore without the key store an active key
 // has no private file; the next start retires it (audited) and creates a fresh active key, so the
 // server signs again instead of failing every token (16 section 5.4, "Signing key" lost).

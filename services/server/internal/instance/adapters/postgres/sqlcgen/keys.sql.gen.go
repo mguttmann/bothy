@@ -203,34 +203,6 @@ func (q *Queries) PublishedSigningKeys(ctx context.Context) ([]ServerSigningKey,
 	return items, nil
 }
 
-const purposesWithoutActiveKey = `-- name: PurposesWithoutActiveKey :many
-SELECT p::text AS purpose
-FROM unnest($1::text[]) AS p
-WHERE NOT EXISTS (SELECT 1 FROM server_signing_keys k WHERE k.purpose = p AND k.state = 'active')
-ORDER BY p
-`
-
-// The purposes of the list that have no active key.
-func (q *Queries) PurposesWithoutActiveKey(ctx context.Context, purposes []string) ([]string, error) {
-	rows, err := q.db.Query(ctx, purposesWithoutActiveKey, purposes)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var purpose string
-		if err := rows.Scan(&purpose); err != nil {
-			return nil, err
-		}
-		items = append(items, purpose)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const signingKeyByKID = `-- name: SigningKeyByKID :one
 SELECT kid, purpose, alg, public_jwk, private_key_ref, state, created_at, not_after
 FROM server_signing_keys

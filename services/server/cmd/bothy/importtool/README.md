@@ -70,8 +70,8 @@ The file holds JSON lines, one object per line (blank lines are skipped):
 | Code | Meaning |
 |---|---|
 | `0` | done, or a dry run without errors |
-| `1` | aborted: network, rate limit above the limit, server error, a batch the server refused, or the owner paused the source; the state stays and a new run resumes |
-| `2` | invocation, configuration, mapping file or preflight faulty; nothing written |
+| `1` | aborted: network or a `5xx` of Discord after three retries, rate limit above the limit, server error, a batch the server refused, the owner paused the source, or SIGINT or SIGTERM (after the current batch, with the lease freed); the state stays and a new run resumes |
+| `2` | invocation, configuration, mapping file or preflight faulty, nothing written; or a `401` of Discord or a missing, revoked or invalid session in any phase (a read mirror ends too) |
 | `3` | another run holds the lease of the source; use `--takeover`; with `--once` the normal case for scheduled calls |
 
 ## The dry run writes nothing
@@ -176,11 +176,17 @@ of a type that is taken over; skipped types never stop it. When one of the
 The report counts the messages held back (`messages_held`). Edits and deletions after the copy are
 not kept in sync (22 12.4); a later full run counts them as "changed at the source".
 
-A failed round (network, `5xx`, `401`, a rate wait above the limit) never ends `--follow`: the next
+A failed round (network, `5xx`, a rate wait above the limit) never ends `--follow`: the next
 round waits `min(import.follow.max_backoff, import.follow.poll_interval * 2^failures)`. The waits
 are slept in pieces of at most `import.follow.poll_interval` with a lease renewal after each, so a
-long backoff never frees the lease of a living mirror. An error of one thread (a `403` or `404` of
-Discord, a `4xx` of Bothy for its batch) is a note, and the round goes on with the next thread; the
+long backoff never frees the lease of a living mirror. A `401` of Discord (a revoked or wrong token)
+or a missing, revoked or invalid session of the server is no failed round: it clears the lease and
+ends the mirror with exit `2`, because every later round would fail the same way (22 4.3 item 4).
+An error of one thread (a `403` or `404` of
+Discord, a `4xx` of Bothy for its batch) is a note, and the round goes on with the next thread; a
+channel a `403` ended is asked again in the next round, so a permission fixed in Discord takes
+effect without a restart. A channel created in Discord after the start of the mirror is not
+mirrored; each round notes it until the mirror is restarted with a mapping that names it. The
 note and a line on standard error name the thread and the error (for a refused batch the place,
 the rule and the item), so a thread that stays behind round after round says why. A
 paused or draft source makes the round a no-op with a note (a mirror may also start on one and

@@ -149,6 +149,16 @@ func TestValidator_Probe_HeaderAndPathParameters(t *testing.T) {
 	wantFields(t, fieldErrors(t, h.Do(h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "", "X-Mode", "slowest"))), "#header/X-Mode invalid_enum")
 }
 
+// TestValidate_UndeclaredQueryParameterIgnored holds the exception of 06 section 2 "Unknown
+// values": a query parameter the operation does not declare is ignored, not refused.
+func TestValidate_UndeclaredQueryParameterIgnored(t *testing.T) {
+	t.Parallel()
+	h := validationHarness(t)
+	if resp := h.Do(h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID+"?limit=5&bogus=1", "", "X-Mode", "fast")); resp.StatusCode != 204 {
+		t.Fatalf("undeclared query parameter: %d %s", resp.StatusCode, resp.Body)
+	}
+}
+
 func TestNewValidatorErrors(t *testing.T) {
 	t.Parallel()
 	if _, err := httpserver.NewValidator([]byte("not: [openapi"), nil); err == nil {

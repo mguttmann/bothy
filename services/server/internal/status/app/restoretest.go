@@ -408,7 +408,7 @@ func (t *restoreRun) checkEventLog(db ScratchDB) domain.CheckResult {
 }
 
 // checkAudit is check 4: the chain of the copy through the port of the module audit, the
-// verification of audit.verify from row 1 (the anchor of M7 is not built yet) to the end.
+// verification of audit.verify from row 1, or from the retention anchor after a trim, to the end.
 func (t *restoreRun) checkAudit(db ScratchDB) domain.CheckResult {
 	in, err := db.AuditChain(t.ctx)
 	if err != nil {

@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/instance"
@@ -157,7 +156,7 @@ func NewKeys(cfg KeysConfig, deps KeysDeps) (*Keys, error) {
 	if deps.Log == nil {
 		deps.Log = slog.New(slog.DiscardHandler)
 	}
-	return &Keys{cfg: cfg, d: deps}, nil
+	return &Keys{cfg: cfg, d: deps, cache: newVerifyCache()}, nil
 }
 
 // generated is a key written to the key store before its transaction.
@@ -870,21 +869,30 @@ func checkRotate(cmd instance.RotateCommand) error {
 
 // verifyCache is the per-process cache of the published keys behind VerificationKey: refreshed
 // after signing_key.cache_ttl, and an unknown kid reloads at most once per signing_key.cache_ttl.
-// The mutex makes concurrent reloads one (singleflight): a caller that waits sees the result of
-// the reload before it.
+// The lock makes concurrent reloads one: a caller that waits sees the result of the reload before
+// it. It is a channel of capacity one rather than a mutex, so a caller whose context ends while a
+// reload hangs on the database returns with the error of its context instead of waiting.
 type verifyCache struct {
-	mu       sync.Mutex
+	lock     chan struct{}
 	keys     map[string]KeyRow
 	loadedAt time.Time
 	missAt   time.Time
 	loaded   bool
 }
 
+// newVerifyCache returns an empty cache.
+func newVerifyCache() verifyCache { return verifyCache{lock: make(chan struct{}, 1)} }
+
 // get returns the cached published key kid, reloading when the cache expired, or once per TTL for
-// an unknown kid.
+// an unknown kid. The end of ctx while it waits for the lock is an internal error that wraps the
+// error of ctx.
 func (c *verifyCache) get(ctx context.Context, k *Keys, kid string) (KeyRow, bool, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	select {
+	case c.lock <- struct{}{}:
+	case <-ctx.Done():
+		return KeyRow{}, false, errs.Wrap(errs.CodeInternalError, ctx.Err(), "")
+	}
+	defer func() { <-c.lock }()
 	now := k.d.Clock.Now()
 	ttl := k.cfg.CacheTTL
 	expired := !c.loaded || now.Sub(c.loadedAt) >= ttl || now.Before(c.loadedAt)
@@ -912,7 +920,7 @@ func (c *verifyCache) get(ctx context.Context, k *Keys, kid string) (KeyRow, boo
 
 // invalidate makes the next get reload, after a transition of this process.
 func (c *verifyCache) invalidate() {
-	c.mu.Lock()
+	c.lock <- struct{}{}
 	c.loaded, c.missAt = false, time.Time{}
-	c.mu.Unlock()
+	<-c.lock
 }

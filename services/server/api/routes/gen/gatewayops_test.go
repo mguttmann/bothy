@@ -118,11 +118,11 @@ func gatewayFixture(t *testing.T, async, section string) (spec, catalog, list, a
 func gatewayProblems(t *testing.T, async, section string) ([]gatewayOp, []string) {
 	t.Helper()
 	spec, catalog, list, asyncPath := gatewayFixture(t, async, section)
-	in, err := loadInputs(spec, catalog, list)
+	_, err := loadInputs(spec, catalog, list)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ops, err := loadGatewayOps(in, spec, list, asyncPath)
+	ops, err := loadGatewayOps(spec, list, asyncPath)
 	if err == nil {
 		return ops, nil
 	}
@@ -186,11 +186,11 @@ func TestGatewayOps_Rules(t *testing.T) {
 // typing.start and typing.stop with gateway.focus and typing.start (M1-66), and the later ops of
 // their tickets, stats.subscribe and stats.unsubscribe with stats.read among them (M6-15).
 func TestRealInputs_GatewayOps(t *testing.T) {
-	in, err := realInputs()
+	_, err := realInputs()
 	if err != nil {
 		t.Fatal(err)
 	}
-	ops, err := loadGatewayOps(in, "../../../../../docs/api/openapi.yaml", "../../operations.yaml", realAsyncAPI)
+	ops, err := loadGatewayOps("../../../../../docs/api/openapi.yaml", "../../operations.yaml", realAsyncAPI)
 	if err != nil {
 		t.Fatalf("gateway ops: %v", err)
 	}

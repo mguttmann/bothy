@@ -43,9 +43,12 @@ type UnitConfig struct {
 	ReadOnlyRetryAfter time.Duration
 }
 
-// UnitOfWork is the implementation of txn.UnitOfWork over a Pool: the only place of the server
-// that begins, commits and rolls back transactions (02 "Flow", R-AR-06). It is safe for
-// concurrent use; every Do of an outermost unit gets its own transaction.
+// UnitOfWork is the implementation of txn.UnitOfWork over a Pool: the place where the request and
+// job paths of the server begin, commit and roll back transactions (02 "Flow", R-AR-06). It is
+// safe for concurrent use; every Do of an outermost unit gets its own transaction. A few platform
+// paths open their own short transactions outside it, without its SET LOCAL deadlines, retry,
+// hooks and maintenance mode: PurgeEach (retention deletes, purge.go) and ReadSnapshot (one
+// consistent read, snapshot.go); README.md "Transactions outside the unit of work".
 type UnitOfWork struct {
 	pool *Pool
 	cfg  UnitConfig
@@ -238,7 +241,11 @@ func (w *UnitOfWork) attempt(ctx context.Context, fn func(context.Context) error
 		return err
 	}
 	u.setPhase(txn.PhaseNone)
-	err = tx.Commit(ctx)
+	// A context that ended before COMMIT rolls the unit back (the deferred rollback).
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	err = w.commit(ctx, tx)
 	// After a failed COMMIT the transaction is over as well; a rollback has nothing to do.
 	done = true
 	if err == nil {
@@ -246,6 +253,20 @@ func (w *UnitOfWork) attempt(ctx context.Context, fn func(context.Context) error
 		ctrl.Committed()
 	}
 	return err
+}
+
+// commit commits tx. Once sent, COMMIT is not aborted by the end of ctx: aborting it could leave
+// a transaction that is durable while the unit reports an error and skips its AfterCommit
+// functions. Like the rollback it runs without the cancellation of ctx, bounded by
+// database.statement_timeout.
+func (w *UnitOfWork) commit(ctx context.Context, tx pgx.Tx) error {
+	cctx := context.WithoutCancel(ctx)
+	if w.cfg.StatementTimeout > 0 {
+		var cancel context.CancelFunc
+		cctx, cancel = context.WithTimeout(cctx, w.cfg.StatementTimeout)
+		defer cancel()
+	}
+	return tx.Commit(cctx)
 }
 
 // rollback ends tx. It runs also when ctx is already canceled (the case that made the attempt

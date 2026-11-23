@@ -24023,7 +24023,7 @@ components:
       schema:
         type: string
     WWW-Authenticate:
-      description: Authentication challenge, e.g. `DPoP error="use_dpop_nonce"` (RFC 9449).
+      description: Authentication challenge, present on every 401 (RFC 9110 section 15.5.2), e.g. `DPoP error="use_dpop_nonce"` (RFC 9449) or, with `step_up_required`, `DPoP error="insufficient_user_authentication"` (RFC 9470).
       schema:
         type: string
     DPoP-Nonce:

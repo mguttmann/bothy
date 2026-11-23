@@ -22,7 +22,8 @@ Instance identity, sync epoch, minimum server version, settings and branding, fe
 Migration `00002_instance_counters.sql` creates both tables, the three counter rows with value 0
 and the trigger function `instance_counter_monotonic()`, which refuses a lower value and a new
 name for every role. `bothy_app` may read both tables and update only the column `value` of the
-counters; it never inserts or deletes a counter row and never writes the instance row.
+counters; it never inserts or deletes a counter row. Of the instance row it updates only the
+column `setup_completed_at` (column right of migration `00016`, see `CompleteSetup` below).
 
 ### Counters (`Counters`)
 
@@ -37,8 +38,7 @@ Phase guard (02 "Lock order"): the service reads `txn.CurrentPhase(ctx)` and all
 `Advance(audit_seq)` only in `audit`, and `Current` only in one of the four hook phases. Any other
 call, an unknown name and `n < 1` are errors of kind `internal` before any SQL; the table `CHECK`
 is the second line. `internal/wire` builds the service (`wire.InstanceCounters`) and passes it only
-to the constructors of the phase hooks of authz, sync and audit (M1-29, M1-16, M1-24; none exist
-yet). `TestCountersOnlyUsedByPhaseHooks` in `test/countersscan` (run by `make arch`) loads every package of the module with
+to the constructors of the phase hooks of authz, sync and audit (M1-29, M1-16, M1-24). `TestCountersOnlyUsedByPhaseHooks` in `test/countersscan` (run by `make arch`) loads every package of the module with
 its tests and fails when a package other than this module, `internal/wire` or a package of a
 registered hook handler names `Counters` or `CounterName` (an interface of the same shape must
 name it), calls the methods of `Counters`, has an expression whose type is or contains it, or

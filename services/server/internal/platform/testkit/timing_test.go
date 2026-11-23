@@ -51,6 +51,8 @@ func TestTimingSame(t *testing.T) {
 			func(int) time.Duration { return 5*time.Millisecond + 2*bound }, false, testkit.TimingRounds},
 		{"a difference just inside the bound", func(int) time.Duration { return 5 * time.Millisecond },
 			func(int) time.Duration { return 5*time.Millisecond + bound }, true, 1},
+		{"a difference just above the bound", func(int) time.Duration { return 5 * time.Millisecond },
+			func(int) time.Duration { return 5*time.Millisecond + bound + time.Microsecond }, false, testkit.TimingRounds},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			a, na := fakeTimes(c.a)
@@ -62,8 +64,8 @@ func TestTimingSame(t *testing.T) {
 			if *na != c.rounds*perRound || *nb != c.rounds*perRound {
 				t.Fatalf("calls %d and %d, want %d rounds of %d", *na, *nb, c.rounds, perRound)
 			}
-			if !same && d != 2*bound {
-				t.Fatalf("difference %s, want the smallest of the rounds, %s", d, 2*bound)
+			if want := c.b(0) - c.a(0); !same && d != want {
+				t.Fatalf("difference %s, want the smallest of the rounds, %s", d, want)
 			}
 		})
 	}

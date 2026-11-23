@@ -94,7 +94,13 @@ func (c *Chain) CORSEnabled() bool { return len(c.origins) > 0 }
 // actor.WithCredentials for its use case (M3-22).
 // The actor, the DPoP facts of the request (reqmeta.Proof) and a setter of response headers go
 // into the context.
+//
+// Wrap builds the stage after it sealed the chain, so the hook and the precheck are read once here
+// and no request takes the lock of the chain.
 func (c *Chain) authenticateStage(next http.Handler) http.Handler {
+	c.mu.Lock()
+	hook, precheck := c.failedCreds, c.precheck
+	c.mu.Unlock()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip, _ := reqmeta.ClientIP(r.Context())
 		creds := actor.Credentials{
@@ -119,9 +125,6 @@ func (c *Chain) authenticateStage(next http.Handler) http.Handler {
 		ctx = reqmeta.WithTransport(ctx, reqmeta.Transport{Peer: peer, Header: r.Header, Action: op.Action})
 		ctx = reqmeta.WithResponseHeaders(ctx, w.Header().Set)
 		r = r.WithContext(ctx)
-		c.mu.Lock()
-		hook, precheck := c.failedCreds, c.precheck
-		c.mu.Unlock()
 		if op.skipsAuthenticator() {
 			serveWithoutAuthenticator(next, w, r, op, creds)
 			return

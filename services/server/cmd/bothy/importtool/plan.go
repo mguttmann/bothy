@@ -26,6 +26,8 @@ type discordAPI interface {
 	MessagesAfter(ctx context.Context, channelID, afterID string, limit int) ([]discord.Message, error)
 	MessagesBefore(ctx context.Context, channelID, beforeID string, limit int) ([]discord.Message, error)
 	MessagesAround(ctx context.Context, channelID, aroundID string, limit int) ([]discord.Message, error)
+	// NewRound starts a round of the read mirror: channels a 403 ended are asked again.
+	NewRound()
 }
 
 // The Discord channel types of 22 5.1 ([R3]).

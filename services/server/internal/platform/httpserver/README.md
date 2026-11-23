@@ -69,9 +69,12 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 - Body kind `BodyReport` (M6-03): `application/reports+json` or `application/csp-report`, read
   whole under `http.max_json_body_bytes` and the JSON guard, available as `RawJSONBody`; the
   request validator checks no schema for it.
-- `Operation.AuthorizedInBand`: the one route that authenticates and authorizes on the connection
-  it opens (`GET /api/v1/gateway`, M1-64); `Chain.Wrap` runs no per-route stage for it, only the
-  outer steps 1 to 4, and puts the operation into the context.
+- `Operation.AuthorizedInBand`: the routes that authenticate and authorize on the connection they
+  open: `GET /api/v1/gateway` (M1-64) and the three terminal upgrades of host control, device
+  stream and host data (M2-43, M2-44); `Chain.Wrap` runs no per-route stage for them, only the
+  outer steps 1 to 4, and puts the operation into the context. `Deps.InBandPatterns` is the
+  closed list of patterns that may carry the marker (`wire.InBandPatterns`); `Wrap` panics for
+  any other.
 - `Operation.BodyLimit` and `Operation.BodyLimitKey` (M2-27): a `BodyLimit` above zero replaces
   `http.max_json_body_bytes` (and `file.max_upload_bytes`) as the body limit of the operation, and
   the `413 payload_too_large` names `BodyLimitKey` in its `detail` (the two post operations of the
@@ -236,6 +239,9 @@ the proof applies to every success of a route.
   unless the error names its own; the maintenance stage and `platform/pg` name
   `server.maintenance_retry_after`).
 - Error headers of `errs.Error.WithHeader` (`WWW-Authenticate`, `DPoP-Nonce`, `Allow`) are applied.
+- Every `401` carries `WWW-Authenticate` (RFC 9110 section 15.5.2): an error without its own gets
+  `DPoP algs="ES256 EdDSA"`, and `step_up_required` gets `DPoP error="insufficient_user_authentication"`
+  with the same algorithms (RFC 9470).
 - `instance` is the escaped path with `{token}` segments written as `%7Btoken%7D` (a URI reference has no braces); unmatched requests have
   none. Internal causes and wrapped texts never reach the body.
 - Response writer: success without a check of the route's action is replaced by `500` and counts in
@@ -277,7 +283,13 @@ operation ID must be in it. A handler that sends JSON `null` fails the test unle
 | `setupgate.go` | `SetupGate`, `SetupState`, `SetupStateFunc`, `RouteLookup`, `MuxLookup` (M1-37) |
 | `validate.go` | `Validator` (libopenapi-validator) and the FieldError mapping |
 | `jsonguard.go`, `sanitize.go` | JSON guard (SEC-IN-2), null and integer scan (ADR 0053) |
-| `clientip.go`, `etag.go`, `cursor.go`, `config.go`, `operation.go` | helpers and types |
+| `maintenance.go` | `NewMaintenanceStage`, the exception table of maintenance mode (M7-08) |
+| `schema.go` | `SchemaValidator`: one named schema of the contract, for gateway and terminal frames |
+| `console.go`, `console_assets.go`, `csp.go` | `ConsoleGuard`, `ConsoleAssets`, the console CSP and its nonce (M6-01, M6-03, M6-17) |
+| `site.go` | `SameSite` over the public suffix list |
+| `fileheaders.go`, `imagepart.go` | `SetFileHeaders` of file downloads, `ImagePart` of image uploads |
+| `contractcheck_install.go` | installs the G8 response check of the test build (`contractcheck/`) |
+| `clientip.go`, `etag.go`, `cursor.go`, `config.go`, `operation.go`, `doc.go` | helpers and types |
 | `httpservertest/` | the test harness and its contract |
 
 ## Dependencies

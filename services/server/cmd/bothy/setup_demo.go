@@ -86,7 +86,7 @@ func demoCommand(ctx context.Context, args, env []string, stdout, stderr io.Writ
 	}
 	s, values, ok := loadConfig(env, wire.ConfigSchema, configOptions{file: o.file}, stderr)
 	if !ok {
-		return exitFailure
+		return exitUsage
 	}
 	log := commandLogger(stderr, s, values)
 	api := o.api

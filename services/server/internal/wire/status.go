@@ -62,8 +62,8 @@ func (c StatusConfig) checksConfig() checks.Config {
 	}
 }
 
-// Status is the status module of a process (M7-09): the status page with its REST handlers, the
-// job status.probe and the participant of retention.ops.
+// Status is the status module of a process (M7-09): the status page with its REST handlers and the
+// job status.probe. The jobs step registers the participant of retention.ops itself.
 type Status struct {
 	// Page implements status.Status.
 	Page *statusapp.Page
@@ -71,8 +71,6 @@ type Status struct {
 	Handlers *statushttp.Status
 	// Probe is the use case of status.probe; only the roles worker and all run it.
 	Probe *statusapp.Probe
-	// Retention is the participant of retention.ops.
-	Retention *statuspg.Retention
 }
 
 // StatusDeps are the collaborators of the status module.
@@ -108,7 +106,7 @@ func NewStatus(cfg StatusConfig, pool *pg.Pool, d StatusDeps) (*Status, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Status{Page: page, Handlers: statushttp.New(page), Probe: probe, Retention: statuspg.NewRetention(pool)}, nil
+	return &Status{Page: page, Handlers: statushttp.New(page), Probe: probe}, nil
 }
 
 // fillHandlers sets the nil status handlers of h; a nil st leaves h unchanged.

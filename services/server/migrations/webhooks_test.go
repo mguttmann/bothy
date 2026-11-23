@@ -88,7 +88,10 @@ func TestWebhookTablesMatchDataModel(t *testing.T) {
 			"CREATE UNIQUE INDEX webhook_subscriptions_pkey ON public.webhook_subscriptions USING btree (id)",
 		},
 		"webhook_deliveries": {
-			"CREATE INDEX webhook_deliveries_pending_next_idx ON public.webhook_deliveries USING btree (next_attempt_at) WHERE (status = 'pending'::text)",
+			// 00114 to 00116 (audit finding srv-apps-billing-8): the retention candidates and the
+			// pending rows of a subscription; the index on next_attempt_at of 00038 is gone.
+			"CREATE INDEX webhook_deliveries_finished_end_idx ON public.webhook_deliveries USING btree (COALESCE(delivered_at, created_at), id) WHERE (status <> 'pending'::text)",
+			"CREATE INDEX webhook_deliveries_pending_seq_idx ON public.webhook_deliveries USING btree (subscription_id, event_seq) WHERE (status = 'pending'::text)",
 			"CREATE UNIQUE INDEX webhook_deliveries_pkey ON public.webhook_deliveries USING btree (id)",
 			"CREATE UNIQUE INDEX webhook_deliveries_subscription_id_event_seq_key ON public.webhook_deliveries USING btree (subscription_id, event_seq)",
 		},
