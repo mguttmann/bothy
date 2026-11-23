@@ -19,3 +19,15 @@ Fake-Hermes rig against the pinned version (`tests/fake_hermes/test_busy_session
 Not changed: a late answer of a turn whose run ended while no other run of the thread is open is
 still dropped (D-HERMES-CRON-COMMANDS-5). A turn that never ends keeps the waiting run open until
 a person stops it; with D-FIX-HBS-1 that stop reaches Hermes.
+
+Open minors for the next run in this area (red team of 2026-11-23):
+
+- `check` shows the allow list only as `set` or `empty`; a `personal` profile switched before
+  this fix (no control sender on the list) does not stand out.
+- Windows of the same class not reproduced: between the wait and the turn's start (a `/new` or
+  `/resume` of the session switch), follow-up turns of a run that holds work (`_followup_turn`
+  does not wait), and a thread without a known source after a gateway restart (the wait returns
+  at once).
+- The historical brief `docs/briefs/M2-33-hermes-adapter.md` still says the list holds exactly
+  the credential holder (archive, left as is).
+- A card of the busy turn during the wait is covered only by the unit test through `_active`.
