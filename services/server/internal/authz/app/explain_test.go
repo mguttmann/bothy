@@ -143,6 +143,30 @@ func TestExplainGuardBlockedSR2(t *testing.T) {
 	}
 }
 
+// TestExplainGuardBlockedSR3: Sam has trigger on a project-bound channel whose operator Lotse is
+// not of class host: the source guard_blocked with rule sr3 and agent Lotse, the rule of the hint
+// trigger_blocked, until Sam's own dev environment is ready (07 SR3, section 9.1).
+func TestExplainGuardBlockedSR3(t *testing.T) {
+	t.Parallel()
+	w := newPGWorld(t)
+	bound := ids.New()
+	w.structure.PutChannel(authz.ChannelFacts{ID: bound, SpaceID: w.support, Kind: authz.ChannelText, EffectiveOperatorID: w.lotse, ProjectBound: true, ProjectReady: true})
+	w.grantRow(t, domain.Subject{Kind: domain.SubjectUser, PrincipalID: w.sam}, domain.Target{Kind: domain.TargetChannel, ChannelID: bound}, domain.LevelTrigger, time.Time{})
+	sam := w.explain(t, "channel", bound)[w.sam]
+	if sam.Level != "trigger" || !slices.Contains(sourceKinds(sam), "guard_blocked") {
+		t.Fatalf("sam %+v", sam)
+	}
+	for _, s := range sam.Sources {
+		if s.Kind == "guard_blocked" && (s.Rule != "sr3" || s.AgentID != w.lotse) {
+			t.Fatalf("guard_blocked %+v", s)
+		}
+	}
+	w.policies.SetDevReady(w.sam, bound, true)
+	if sam := w.explain(t, "channel", bound)[w.sam]; slices.Contains(sourceKinds(sam), "guard_blocked") {
+		t.Fatalf("a ready dev environment still blocks: %+v", sam)
+	}
+}
+
 // TestExplainInactivePrincipalMarked: a disabled Robin with G-3 appears with inactive and the level
 // G-3 would give (07 section 9.1, SR7).
 func TestExplainInactivePrincipalMarked(t *testing.T) {

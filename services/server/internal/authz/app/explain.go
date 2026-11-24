@@ -103,6 +103,8 @@ type explainTarget struct {
 	defaultOperator ids.ID
 	// relevant are the channels whose H1 counts: the channel itself, or the channels of a space.
 	relevant []domain.Path
+	// projectBound is the project binding of a channel target (SR3); false for a space.
+	projectBound bool
 }
 
 // explain returns the entries of the target, sorted (domain.SortEntries).
@@ -144,7 +146,7 @@ func (x *explainer) target(ctx context.Context, kind authorize.ResourceKind, id 
 		if !found {
 			return explainTarget{}, errNotFound()
 		}
-		return explainTarget{path: res.path, relevant: []domain.Path{res.path}}, nil
+		return explainTarget{path: res.path, relevant: []domain.Path{res.path}, projectBound: res.channel.ProjectBound}, nil
 	}
 	tg := explainTarget{path: domain.Path{Kind: domain.PathSpace, SpaceID: id}}
 	details, err := x.a.structure.SpaceDetails(ctx, []ids.ID{id})
@@ -259,24 +261,37 @@ func (x *explainer) entry(ctx context.Context, tg explainTarget, p ids.ID) (*dom
 		if tg.path.Kind == domain.PathSpace {
 			op = tg.defaultOperator
 		}
-		blocked, err := x.hostAgent(ctx, op)
+		rules, err := x.blockRules(ctx, tg, p, op)
 		if err != nil {
 			return nil, err
 		}
-		if blocked {
-			e.Sources = append(e.Sources, domain.Source{Kind: domain.SourceGuardBlocked, AgentID: op, Rule: domain.RuleSR2})
+		for _, rule := range rules {
+			e.Sources = append(e.Sources, domain.Source{Kind: domain.SourceGuardBlocked, AgentID: op, Rule: rule})
 		}
 	}
 	return e, nil
 }
 
-// hostAgent reports an agent whose effective tool class is host (SR2); false for none.
-func (x *explainer) hostAgent(ctx context.Context, agent ids.ID) (bool, error) {
-	if agent.IsZero() {
-		return false, nil
+// blockRules returns the guard rules that keep the person p from triggering the operator op on
+// the target, with the facts and the rule of the hint trigger_blocked (domain.TriggerBlockRules):
+// SR2 for an operator of tool class host, SR3 for a project-bound channel, each without a ready
+// own dev environment of p on that channel. nil without an operator or without its policy.
+func (x *explainer) blockRules(ctx context.Context, tg explainTarget, p, op ids.ID) ([]string, error) {
+	if op.IsZero() {
+		return nil, nil
 	}
-	class, ok, err := x.toolClass(ctx, agent)
-	return ok && domain.SR2Blocks(class, false), err
+	class, ok, err := x.toolClass(ctx, op)
+	if err != nil || !ok {
+		return nil, err
+	}
+	c := domain.TriggerChannel{ChannelID: tg.path.ChannelID, ToolClass: class, ProjectBound: tg.projectBound}
+	if tg.path.Kind == domain.PathChannel {
+		if c.DevReady, err = x.a.policies.DevEnvironmentReady(ctx, p, tg.path.ChannelID); err != nil {
+			return nil, sourceError("agent policy source", err)
+		}
+	}
+	rules, _ := domain.TriggerBlockRules([]domain.TriggerChannel{c}, false)
+	return rules, nil
 }
 
 // toolClass returns the effective tool class of agent; ok is false without a policy.

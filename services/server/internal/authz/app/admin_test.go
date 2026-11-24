@@ -267,6 +267,19 @@ func TestGrantTargets(t *testing.T) {
 	wantErr(t, err, errs.CodeNotFound, "")
 	_, err = w.admin.RevokeGrant(ctx, owner, w.g2, " ")
 	wantField(t, err, "/reason", "required")
+	// audit.reason_max_chars bounds the reason of a grant and of a revocation (SEC-AUD-5).
+	tooLong := cmd("space", w.support)
+	tooLong.Reason = strings.Repeat("ä", reasonMaxChars+1)
+	_, err = w.admin.CreateGrant(ctx, owner, tooLong)
+	wantField(t, err, "/reason", "too_long")
+	_, err = w.admin.PreviewGrant(ctx, owner, tooLong)
+	wantField(t, err, "/reason", "too_long")
+	_, err = w.admin.RevokeGrant(ctx, owner, w.g2, strings.Repeat("ä", reasonMaxChars+1))
+	wantField(t, err, "/reason", "too_long")
+	atLimit := cmd("space", w.support)
+	atLimit.Reason = strings.Repeat("ä", reasonMaxChars)
+	_, err = w.admin.CreateGrant(ctx, owner, atLimit)
+	mustOK(t, err)
 	_, err = w.admin.RevokeGrant(ctx, owner, w.g2, "test")
 	mustOK(t, err)
 	v, seq := w.version(t), w.lastSeq(t)
@@ -386,6 +399,11 @@ func TestAdminAudit(t *testing.T) {
 		}
 		var details map[string]any
 		mustOK(t, json.Unmarshal([]byte(r.Details), &details))
+		if s.action == "grant.revoke" && (details["subject_kind"] != "group" || details["subject_id"] != group.String() ||
+			details["target_kind"] != "space" || details["target_id"] != w.marketing.String()) {
+			// The history of a target or a subject reads from the audit log (fn-permissions-audit-3).
+			t.Fatalf("grant.revoke details without subject and target: %s", r.Details)
+		}
 		for _, name := range []string{"Marketing", "robin", "owner"} {
 			if strings.Contains(r.Details, name) {
 				t.Fatalf("%s: details name %q: %s", s.action, name, r.Details)
