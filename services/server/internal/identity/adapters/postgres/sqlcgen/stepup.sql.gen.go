@@ -35,7 +35,8 @@ WHERE c.expires_at <= $1
   AND NOT (c.purpose = 'step_up' AND c.status = 'failed' AND c.finished_at > $2)
   AND NOT (c.purpose = 'step_up' AND c.status = 'used' AND EXISTS (
         SELECT 1 FROM auth_sessions s
-        WHERE s.id = c.session_id AND s.step_up_at = c.finished_at AND s.revoked_at IS NULL AND s.expires_at > $1))
+        WHERE s.id = c.session_id AND s.step_up_method = 'passkey' AND s.step_up_at = c.finished_at
+          AND s.revoked_at IS NULL AND s.expires_at > $1))
 `
 
 type DeleteExpiredChallengesParams struct {
@@ -46,7 +47,7 @@ type DeleteExpiredChallengesParams struct {
 // The job identity.auth_cleanup: every challenge past expires_at, except failed step-up challenges
 // whose finished_at still lies inside auth.login_fail_window (keep_failed_since), because they
 // count toward auth.step_up_fail_limit (08 section 13), and the used step-up challenge of the
-// current step-up of a live session (finished_at = step_up_at), from which GetConsoleAuthState
+// current passkey step-up of a live session (finished_at = step_up_at), from which GetConsoleAuthState
 // and LockSessionForStepUpConsumption read step_up_user_verified.
 func (q *Queries) DeleteExpiredChallenges(ctx context.Context, arg DeleteExpiredChallengesParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteExpiredChallenges, arg.Now, arg.KeepFailedSince)
