@@ -3,7 +3,9 @@
 # ScanCode Toolkit for the release license scan (docs/quality/licenses.md section 4, brief
 # M7-10). ScanCode publishes no container image, so this file builds one from the release
 # archive of the project: the base image is pinned by digest (SEC-SC-4, `make lint`) and the
-# archive by its sha256 (`ADD --checksum`), so the image is fully determined by this file.
+# archive by its sha256 (`ADD --checksum`). The four Debian packages below come from the current
+# mirror without a version or snapshot, so two builds can differ in them; the scan results come
+# from ScanCode and its bundled wheels, which the checksum fixes.
 # The archive bundles every Python dependency as a wheel and installs offline; its native
 # wheels exist only for linux/amd64, so the image is linux/amd64 (on an arm64 host the scan
 # runs emulated and slower; the release job runs on an amd64 runner).
