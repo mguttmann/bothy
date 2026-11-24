@@ -25,7 +25,7 @@
 - "Trigger again" stops watching once its notice is closed.
 - Approval cards with a restriction from a newer server stay locked.
 - Turning crash reports off while they start really stops them.
-- App metrics are sent when the app goes to the background and before logging out.
+- App metrics are sent when the app goes to the background.
 - Cold start and thread open timings no longer count a login, the app lock or the wait for a
   first message.
 - The offline search no longer asks again and again for a transcript the server refuses.

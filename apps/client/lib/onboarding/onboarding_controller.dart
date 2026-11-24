@@ -29,7 +29,6 @@ import '../app/providers/ports.dart';
 import '../app/router.dart';
 import '../platform/device_key_signer.dart' show DeviceKeyLost;
 import '../platform/secure_store.dart';
-import '../telemetry/telemetry_providers.dart';
 import 'start_route.dart';
 
 export '../app/router.dart' show OnboardingStep;
@@ -878,10 +877,6 @@ class OnboardingController extends _$OnboardingController {
   /// after the wipe (the logout clears the stored session when its call ends).
   Future<void> _serverLogout(InstanceServices services) async {
     Future<void> calls() async {
-      // The app metrics collected since the last flush need the session too (15 17).
-      if (ref.exists(metricsSenderProvider)) {
-        await ref.read(metricsSenderProvider)?.flush();
-      }
       // M5-04, M5-05: `unregisterPush` needs the session, so it runs before the server
       // logout; it is best effort, the logout disables the session's registrations anyway
       // (13 6.4).

@@ -12,12 +12,10 @@ import 'dart:io';
 import 'package:auth/auth.dart' show DeviceKeySigner, DeviceKeys;
 import 'package:client/app/account_wiper.dart';
 import 'package:client/app/providers/ports.dart';
-import 'package:client/app/providers/session.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:client/platform/device_key_signer.dart';
 import 'package:client/platform/secure_store.dart';
 import 'package:client/telemetry/client_metrics.dart';
-import 'package:client/telemetry/metrics_sender.dart';
 import 'package:client/telemetry/telemetry_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -46,18 +44,6 @@ class _StubbornKeys implements DeviceKeyStore {
     if (refuse) throw StateError('the key store refuses the delete');
     await inner.delete(scope);
   }
-}
-
-/// Records, for every batch, whether the server logout had not run yet.
-final class _LogoutOrderApi implements ClientMetricsApi {
-  _LogoutOrderApi(this.f);
-
-  final FakeInstance f;
-  final List<bool> sentBeforeLogout = [];
-
-  @override
-  Future<void> submit(MetricsBatch batch) async =>
-      sentBeforeLogout.add(f.server.requestsOf('logout').isEmpty);
 }
 
 void main() {
@@ -217,36 +203,27 @@ void main() {
     });
   });
 
-  test(
-    'logout sends the collected app metrics before the server logout',
-    () async {
-      // The disposal of the sender ran after the server logout, so the last batch went out
-      // without a session (AUD-PKG-P02-client-b, #1282).
-      f = await FakeInstance.start();
-      final api = _LogoutOrderApi(f);
-      c = ProviderContainer(
-        overrides: [
-          appPortsProvider.overrideWithValue(f.ports),
-          clientMetricsApiProvider.overrideWith(
-            (ref) => ref.watch(signedInServicesProvider) == null ? null : api,
-          ),
-        ],
-      );
-      final control = await connected(c, f);
-      await control.loginWithPassword(
-        WorldSeed.alexLogin,
-        WorldSeed.password,
-        WorldSeed.totp,
-      );
-      c.listen(appTelemetryProvider, (_, _) {});
-      await eventually('metrics on', () => c.read(clientMetricsOnProvider));
-      c.read(appMeasurementsProvider).metrics.record(ClientMetric.frames, 3);
-      await control.logout();
-      expect(state().step, OnboardingStep.signedOut);
-      await pumpEventQueue();
-      expect(api.sentBeforeLogout, [true]);
-    },
-  );
+  test('logout reaches the server while the metrics sender runs', () async {
+    // The sender depends on this controller: reading it in the logout step threw a circular
+    // dependency, which the step swallowed, and the server logout was never sent.
+    f = await FakeInstance.start();
+    c = ProviderContainer(
+      overrides: [appPortsProvider.overrideWithValue(f.ports)],
+    );
+    final control = await connected(c, f);
+    await control.loginWithPassword(
+      WorldSeed.alexLogin,
+      WorldSeed.password,
+      WorldSeed.totp,
+    );
+    c.listen(appTelemetryProvider, (_, _) {});
+    await eventually('metrics on', () => c.read(clientMetricsOnProvider));
+    c.listen(metricsSenderProvider, (_, _) {});
+    c.read(appMeasurementsProvider).metrics.record(ClientMetric.frames, 3);
+    await control.logout();
+    expect(state().step, OnboardingStep.signedOut);
+    expect(f.server.requestsOf('logout'), hasLength(1));
+  });
 
   test('logout ends on E7 with the local data deleted while the instance never '
       'answers', () async {
