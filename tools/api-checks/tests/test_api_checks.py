@@ -2131,19 +2131,24 @@ def _leftovers(root: Path) -> list[str]:
 
 
 @pytest.mark.parametrize(
-    ("limit", "failing"),
-    [(50_000, CHAPTER), (150_000, WEBHOOKS)],
+    ("extra", "failing"),
+    [(None, CHAPTER), (20_000, WEBHOOKS)],
     ids=["first-file", "second-file"],
 )
 def test_write_that_fails_part_way_changes_no_file(
-    tmp_path: Path, limit: int, failing: Path
+    tmp_path: Path, extra: int | None, failing: Path
 ) -> None:
     # A real write error: the process may not write files larger than `limit` (RLIMIT_FSIZE;
-    # Python ignores SIGXFSZ, so the write fails with EFBIG). 06 is about 113 kB.
+    # Python ignores SIGXFSZ, so the write fails with EFBIG). The limit follows the size of 06,
+    # which grows with the specification: half of it stops the first file, 06 plus `extra`
+    # lets 06 through and stops the padded webhooks page (about 270 kB).
     resource = pytest.importorskip("resource")
     root = _copy_inputs(tmp_path)
     before = _two_stale_files(root)
     files = _leftovers(root)
+    chapter = len(before[CHAPTER])
+    limit = chapter // 2 if extra is None else chapter + extra
+    assert limit < len(before[WEBHOOKS])
 
     def limit_file_size() -> None:
         resource.setrlimit(resource.RLIMIT_FSIZE, (limit, limit))
