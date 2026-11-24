@@ -217,15 +217,24 @@ def test_other_jobs_install_no_mirror(workflow: str, job: str) -> None:
 
 
 def test_the_mirror_comes_first_in_every_build_of_the_tree() -> None:
+    """The init script only puts the mirror in front of repositories a build uses.
+
+    Text checks only: CI has no Gradle outside the jobs that build. The behaviour was checked
+    with Gradle 9.3.1 on a copy of the Flutter Gradle plugin's build (ruling AUD-PKG-P10/B5).
+    """
     script = (REPO / MIRROR_SCRIPT).read_text(encoding="utf-8")
     assert f"'{MIRROR_URL}'" in script
     assert "addFirst" in script
-    # Plugin resolution of the settings and the repositories of every project, in every build
-    # of the tree (an included build too): the Flutter plugin loader failed in its buildscript.
+    # Plugin repositories before the settings script runs (a settings plugin resolves while it
+    # runs), the Plugin Portal kept for a build that declares no plugin repository, the
+    # buildscript repositories when the classpath resolves, and project repositories only in
+    # PREFER_PROJECT: the Flutter Gradle plugin's build sets FAIL_ON_PROJECT_REPOS.
     for hook in (
         "beforeSettings",
-        "pluginManagement.repositories",
-        "allprojects",
+        "settingsEvaluated",
+        "gradlePluginPortal()",
         "buildscript.repositories",
+        "beforeResolve",
+        "RepositoriesMode.PREFER_PROJECT",
     ):
         assert hook in script, hook

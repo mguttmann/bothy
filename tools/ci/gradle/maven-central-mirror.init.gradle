@@ -3,11 +3,20 @@
 // Every build of the build tree (also the Flutter Gradle plugin, an included build) asks
 // Google's public mirror of Maven Central first, because Maven Central answers the shared CI
 // runners with HTTP 429. The mirror serves the same files with the same checksums, and the
-// lock files pin the versions; a module the mirror lacks still comes from the repositories
-// the build declares. The release build does not use this script.
+// lock files pin the versions; a module the mirror lacks still comes from the repositories the
+// build declares. The plugin repositories get the mirror before the settings script runs,
+// because a settings plugin (the Flutter plugin loader) resolves while it runs; a build that
+// declares no plugin repository gets the Gradle Plugin Portal, its default, behind the mirror
+// once the settings are evaluated. After that the mirror goes in front of the repositories of
+// the settings and of a buildscript block when there are any, and in front of the project
+// repositories only where the settings allow them (PREFER_PROJECT; the Flutter Gradle plugin's
+// build refuses project repositories). The release build does not use this script.
 def mirrorUrl = 'https://maven-central.storage-download.googleapis.com/maven2/'
 
 def mirrorFirst = { RepositoryHandler repos ->
+    if (repos.any { it instanceof MavenArtifactRepository && it.url.toString() == mirrorUrl }) {
+        return
+    }
     def mirror = repos.maven {
         name = 'MavenCentralMirror'
         url = mirrorUrl
@@ -20,7 +29,32 @@ beforeSettings { settings ->
     mirrorFirst(settings.pluginManagement.repositories)
 }
 
-allprojects {
-    mirrorFirst(buildscript.repositories)
-    mirrorFirst(repositories)
+settingsEvaluated { settings ->
+    def plugins = settings.pluginManagement.repositories
+    if (plugins.size() == 1) {
+        plugins.gradlePluginPortal()
+    }
+    def shared = settings.dependencyResolutionManagement
+    if (!shared.repositories.isEmpty()) {
+        mirrorFirst(shared.repositories)
+    }
+    def projectRepos = shared.repositoriesMode.get() == RepositoriesMode.PREFER_PROJECT
+    settings.gradle.allprojects { project ->
+        // The buildscript repositories are declared in the script itself: the mirror goes in
+        // front of them when the script classpath resolves.
+        project.buildscript.configurations.configureEach { conf ->
+            conf.incoming.beforeResolve {
+                if (!project.buildscript.repositories.isEmpty()) {
+                    mirrorFirst(project.buildscript.repositories)
+                }
+            }
+        }
+        if (projectRepos) {
+            project.afterEvaluate {
+                if (!project.repositories.isEmpty()) {
+                    mirrorFirst(project.repositories)
+                }
+            }
+        }
+    }
 }
