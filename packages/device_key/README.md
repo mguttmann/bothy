@@ -23,7 +23,7 @@ const scope = 'https://chat.example.com'; // separates the keys per server
 final info = await keys.ensure(scope, KeyPurpose.dpop); // creates the key if missing
 info.publicJwk; // {"crv":"P-256","kty":"EC","x":...,"y":...}
 info.thumbprint; // RFC 7638, base64url
-info.hardwareBound; // false: report the key to the server as not hardware-bound
+info.hardwareBound; // false: a software key (the mark stays on the device)
 final signature = await keys.sign(scope, KeyPurpose.dpop, signingInput); // R || S, 64 bytes
 final confirmation = await keys.sign(
   scope,
