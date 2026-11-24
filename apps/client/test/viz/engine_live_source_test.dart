@@ -97,10 +97,12 @@ void main() {
     source.start().listen(events.add);
     final second = <LiveFrameEvent>[];
     source.start(spaceId: _space).listen(second.add);
-    expect(sent.map((f) => f.toData()), [
-      <String, Object?>{},
-      {'space_id': _space},
-    ]);
+    // The base stops the running subscription before it starts the next one.
+    expect(
+      [for (final f in sent) f.op],
+      ['stats.subscribe', 'stats.unsubscribe', 'stats.subscribe'],
+    );
+    expect(sent.last.toData(), {'space_id': _space});
     stats.onLive(_envelope(null));
     expect(second, isEmpty, reason: 'a frame of the old scope');
     stats.onLive(_envelope(_space));
