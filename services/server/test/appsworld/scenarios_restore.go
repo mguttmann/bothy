@@ -105,7 +105,7 @@ func ScenarioWebhookCarriesEpochAfterRestore(t *testing.T) {
 }
 
 // ScenarioRestoreEndsPendingDeliveries (ADR 0059: server-side cursors catch up nothing from the
-// old timeline; AUD-P08B/2): a delivery still pending from the backup ends dead with
+// old timeline; srv-apps-billing-10): a delivery still pending from the backup ends dead with
 // event_expired at bothy restore finalize and never reaches the receiver.
 func ScenarioRestoreEndsPendingDeliveries(t *testing.T) {
 	t.Parallel()
