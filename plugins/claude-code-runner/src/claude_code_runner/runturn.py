@@ -3943,7 +3943,7 @@ class RunTurn:
             ``adopted``, ``retried_before``, ``stopping``, ``output_accepted``,
             ``session_alive``, ``tool_called`` or ``nothing_to_repeat``.
         """
-        if attempt is None:
+        if attempt is None or self.bg_adopted:
             return "adopted"
         if self.login_retried:
             return "retried_before"

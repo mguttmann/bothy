@@ -841,7 +841,9 @@ did nothing when no record came. Decided:
 - Every request record is judged, and the newest one decides: nothing a session puts out is
   accepted unless the newest request record of its process listed the login beta. At the
   first output after a record without it the session is stopped and the run ends
-  `billing_mode_mismatch`, also when earlier records listed it.
+  `billing_mode_mismatch`, also when earlier records listed it. Since 2026-11-24 a run whose
+  stopped attempt cannot have acted is tried once more first (09 18.3,
+  FIX-RUNNER-LOGIN-BLIP-RETRY).
 - The name is compared as a whole: `oauth-2025-04-20`, a constant of the pinned CLI. A
   recording holds a request record of the pinned CLI with it (`transcript_login.jsonl`: a
   session on a dummy token, item 33) and records without it, a level-one test runs both

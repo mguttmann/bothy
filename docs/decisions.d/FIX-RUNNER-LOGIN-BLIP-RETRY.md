@@ -30,9 +30,15 @@ although nothing about the account had changed. Normative text: 09 18.3 (addendu
 Evidence for the rulings: `tests/scenarios/test_bg_inbox_auth.py` (one request without the
 login is tried once more and answered; a second one ends the run; a tool call as the first
 output is never run again; a login gone after the wait ends the run `runtime_not_authenticated`;
-a stop during the wait ends it `cancelled`; a turn that acted before keeps the old end) and
+a stop during the wait ends it `cancelled`; a turn that acted before keeps the old end; an
+adopted turn is refused with `adopted`) and
 `tests/unit/test_bgtranscript.py` (`tool_called`).
 
 What stays open: the counter-check reads the request records alone, so it cannot tell which
 credential answered the one request without the login; that request and its answer happened
 before the check, with or without this retry.
+
+Minors noted in the review, left for the next run in this area: `login_retried` is not part of
+the turn record (no effect, an adopted turn never retries); the stopped attempt's one request
+is not added to the run's costs; a cancellation of the run by the SDK itself during the wait
+is untested (the server's stop during the wait is tested).

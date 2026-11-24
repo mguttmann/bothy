@@ -883,6 +883,30 @@ async def test_a_login_gone_after_the_wait_ends_the_run_without_a_retry(
     await nothing_left(world)
 
 
+async def test_an_adopted_turn_is_never_tried_again(bg_world: World, logs: LogLines) -> None:
+    world = bg_world
+    # The runner is killed before the session's request without the login; the next runner
+    # adopts the turn, finds that request, and ends the run as before (18.3).
+    gate = world.gate("bg_prompt_gate")
+    world.scenario(fixture="plain", bg_no_login=True, bg_prompt_gate=str(gate))
+    first = world.spawn(**BACKGROUND)
+    await world.until(
+        lambda: any(h.get("details", {}).get("adapter") for h in world.fake.heartbeats)
+    )
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: "short_id" in record(world, run.run_id).get("bg", {}))
+    first.send_signal(signal.SIGKILL)
+    first.wait(PATIENCE)
+    world.release(gate)
+    await restart(world)
+    assert await world.ended(run.run_id) == "failed"
+    assert world.fake.run_state(run.run_id).state_reason == "billing_mode_mismatch"
+    assert texts(world) == []
+    assert [e["code"] for e in events(logs, "login_retry_refused")] == ["adopted"]
+    assert events(logs, "login_retry_wait") == []
+    assert len(launches(world)) == 1
+
+
 async def test_a_stop_during_the_wait_ends_the_run_without_a_retry(
     bg_world: World, logs: LogLines, monkeypatch: pytest.MonkeyPatch
 ) -> None:
