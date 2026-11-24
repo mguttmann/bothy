@@ -4,6 +4,8 @@ package app
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
@@ -75,8 +77,9 @@ func (s *Service) HelloDetachGrace(ctx context.Context, sessionID ids.ID) (time.
 // session for which domain.SweepVerdict matches, one unit of work per session (host row, then the
 // session row, the verdict decided again on the locked rows), through the one end function with
 // source server. A session another path ended first is skipped. No actor (system). Errors: a
-// window that is not positive or no identity port (fail closed), and those of the store and the
-// units; the sessions ended before the error stay ended.
+// window that is not positive or no identity port (fail closed), and those of the store; the error
+// of one session's unit does not stop the run, the sessions after it are still swept and the run
+// returns the errors of all failed sessions together (audit finding srv-terminal-13).
 func (s *Service) Sweep(ctx context.Context) (SweepResult, error) {
 	w := s.windows()
 	if w.Idle <= 0 || w.IdleGrace <= 0 || w.MaxDuration <= 0 || w.DetachGrace <= 0 || w.OpenTimeout <= 0 || s.d.AuthSessions == nil {
@@ -101,16 +104,18 @@ func (s *Service) Sweep(ctx context.Context) (SweepResult, error) {
 		ended[id] = true
 	}
 	var res SweepResult
+	var failed []error
 	for _, c := range list {
 		done, err := s.sweepOne(ctx, c, ended[c.AuthSessionID], now, w)
 		if err != nil {
-			return res, err
+			failed = append(failed, fmt.Errorf("terminal: sweep of session %s: %w", c.SessionID, err))
+			continue
 		}
 		if done {
 			res.Ended++
 		}
 	}
-	return res, nil
+	return res, errors.Join(failed...)
 }
 
 // sweepOne decides and ends one candidate in its own unit of work; it reports whether it ended it.
