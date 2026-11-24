@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/OWNER/bothy/services/host/internal/doctor"
 	"github.com/OWNER/bothy/services/host/internal/fingerprint"
@@ -85,7 +86,14 @@ type Options struct {
 	Random io.Reader
 	// Transport overrides the HTTP transport (tests); nil uses the TLS roots above.
 	Transport http.RoundTripper
+	// Timeout bounds the call of the server; zero means DefaultTimeout.
+	Timeout time.Duration
 }
+
+// DefaultTimeout bounds the pairing call: a server that takes the request and never answers
+// would otherwise hold pair and the admin endpoint that runs it (a program constant, not a
+// product window).
+const DefaultTimeout = time.Minute
 
 // Result is a successful pairing.
 type Result struct {
@@ -203,6 +211,12 @@ func (o Options) post(ctx context.Context, endpoint string, body []byte) (int, [
 	if err != nil {
 		return 0, nil, err
 	}
+	timeout := o.Timeout
+	if timeout <= 0 {
+		timeout = DefaultTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return 0, nil, ErrNotHTTPS

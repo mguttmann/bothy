@@ -785,6 +785,8 @@ permissions. Disabling by the owner sets `hosts.disabled_reason = 'owner'`; a ho
    (authentication with the server), stores both privately in the state directory
    (section 4.2) and sends the public keys with the code, its profiles and the names of its
    session users (`host.pair`, public, `rl.public_auth`). The host becomes `confirming`.
+   A fixed bound of the program holds the call; a server that does not answer within it gives
+   "server unreachable", and nothing is stored.
 3. `bothy-host pair` shows the fingerprint locally (section 4.3). The owner types the first
    `terminal.fingerprint_confirm_chars` characters into the app, declares the LLM login of the
    host while doing so (section 7) and assigns people their session users (2.2).
