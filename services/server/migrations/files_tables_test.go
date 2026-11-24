@@ -63,6 +63,7 @@ func TestMigrationFilesTables(t *testing.T) {
 				"UNIQUE (object_key)",
 			},
 			idx: []string{
+				"CREATE INDEX files_deleted_at_idx ON public.files USING btree (deleted_at, id) WHERE (deleted_at IS NOT NULL)",
 				"CREATE INDEX files_scan_status_pending_idx ON public.files USING btree (scan_status) WHERE (scan_status = 'pending'::text)",
 				"CREATE INDEX files_search_vector_idx ON public.files USING gin (search_vector)",
 				"CREATE INDEX files_upload_state_pending_idx ON public.files USING btree (upload_state, created_at) WHERE (upload_state = 'pending'::text)",

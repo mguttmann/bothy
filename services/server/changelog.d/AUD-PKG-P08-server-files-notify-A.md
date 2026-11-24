@@ -14,3 +14,9 @@
 - The media type detector keeps its own read limit of `file.sniff_bytes` instead of changing a
   process-wide limit of the library in its constructor, so a second detector can no longer make
   Office documents read as ZIP archives.
+
+### Changed
+
+- Migration `00123` adds the partial index `files (deleted_at, id) WHERE deleted_at IS NOT NULL`,
+  so the catch-up and the backlog gauge of `files.cleanup_pending` no longer read the whole
+  `files` table on every run.

@@ -1536,7 +1536,8 @@ PK: `id`. FK: `uploaded_by` -> `principals(id)` ON DELETE RESTRICT; `scope_chann
 NULL)`. Unique: `object_key`. Indexes: `(uploaded_by, created_at DESC)` for export and
 quota; `(scan_status) WHERE scan_status = 'pending'` for the scan queue;
 `(upload_state, created_at) WHERE upload_state = 'pending'` for cleaning up aborted
-uploads; GIN `(search_vector)`. Retention: `content`.
+uploads; `(deleted_at, id) WHERE deleted_at IS NOT NULL` for the catch-up of purges; GIN
+`(search_vector)`. Retention: `content`.
 No deduplication across files (R-DM-13). Download only through the server after
 `file.read`, also for media players through short-lived file tickets instead of presigned GET
 ([12-files.md](12-files.md), section 9;

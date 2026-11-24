@@ -17,7 +17,8 @@ import (
 // and 00118, audit finding srv-authz-11), so neither grows with the history of the table. The run
 // an interaction opened is found through its index (00122, audit finding srv-runs-core-4): the
 // answer of createInteraction and the foreign key check of a deleted interaction never read runs
-// whole.
+// whole. The catch-up and the backlog gauge of files.cleanup_pending read only the files marked
+// deleted (00123, audit findings srv-files-adapters-7 and srv-files-core-7).
 //
 // The planner may not fall back to a sequential or bitmap scan here: on the empty tables of the
 // test it would otherwise prefer one whatever index exists. The grants and memberships carry a
@@ -53,6 +54,9 @@ func TestHotPathIndexes(t *testing.T) {
 	sub := map[string]string{"@subscription_id": "'00000000-0000-7000-8000-000000000001'::uuid", "@bound": "100"}
 	due := map[string]string{"@at": "'2026-01-01T00:00:00Z'::timestamptz", "@max_rows": "100",
 		"sqlc.embed(g)": "g.*", "sqlc.embed(m)": "m.*"}
+	cleanup := "../internal/files/adapters/postgres/queries/cleanup.sql"
+	deleted := map[string]string{"sqlc.arg(after_time)": "'epoch'", "sqlc.arg(after_id)": "'00000000-0000-0000-0000-000000000000'",
+		"sqlc.arg(batch_size)": "100"}
 	for _, tc := range []struct {
 		file, query, kind string
 		args              map[string]string
@@ -64,6 +68,8 @@ func TestHotPathIndexes(t *testing.T) {
 		{expiry, "ListDueExpiredMemberships", ":many", due, "group_memberships_expiry_due_idx"},
 		{"../internal/runs/adapters/postgres/queries/interactions.sql", "RunOfInteraction", ":one",
 			map[string]string{"sqlc.arg(interaction_id)": "'00000000-0000-7000-8000-000000000001'::uuid"}, "runs_triggering_interaction_idx"},
+		{cleanup, "DeletedRows", ":many", deleted, "files_deleted_at_idx"},
+		{cleanup, "PurgeBacklog", ":one", nil, "files_deleted_at_idx"},
 	} {
 		nodes, indexes := planNodes(t, conn, namedQuery(t, tc.file, tc.query, tc.kind, tc.args))
 		if !slices.Contains(indexes, tc.index) || slices.Contains(nodes, "Seq Scan") {
