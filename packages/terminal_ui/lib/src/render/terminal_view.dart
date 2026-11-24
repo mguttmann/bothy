@@ -13,6 +13,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart' show PointerDeviceKind, kTouchSlop;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:l10n/l10n.dart' show AppLocalizations;
 import 'package:terminal_ui/src/controller/terminal_controller.dart';
 import 'package:terminal_ui/src/perf/perf_hooks.dart';
 import 'package:terminal_ui/src/render/mouse_selection.dart';
@@ -45,10 +46,11 @@ class ReadScreenIntent extends Intent {
 bool _apple(TargetPlatform platform) =>
     platform == TargetPlatform.macOS || platform == TargetPlatform.iOS;
 
-/// The keys of "Read screen" on [platform] as the screen names them: Cmd+Shift+S on Apple
-/// systems, Ctrl+Shift+S elsewhere (R-PR-10: only with the platform modifier).
-String terminalReadScreenKeys(TargetPlatform platform) =>
-    _apple(platform) ? 'Cmd+Shift+S' : 'Ctrl+Shift+S';
+/// The keys of "Read screen" on [platform] as the screen names them, with the key names of [l]
+/// as the shortcut list words them: Cmd+Shift+S on Apple systems, Ctrl+Shift+S elsewhere
+/// (R-PR-10: only with the platform modifier); German reads "Strg+Umschalt+S".
+String terminalReadScreenKeys(TargetPlatform platform, AppLocalizations l) =>
+    '${_apple(platform) ? l.shortcutKeyCmd : l.shortcutKeyCtrl}+${l.shortcutKeyShift}+S';
 
 /// The shortcuts of the screen: copy and paste only with the platform modifier (Cmd on Apple,
 /// Ctrl+Shift elsewhere, so Ctrl+C and Ctrl+V stay with the shell, 15 23.4), and "Read screen"
@@ -295,7 +297,10 @@ class _TerminalScreenViewState extends State<TerminalScreenView>
                     onPointerCancel: (_) => _mouse.up(),
                     child: TerminalScreenSemantics(
                       screen: _c.screen,
-                      readScreenKeys: terminalReadScreenKeys(platform),
+                      readScreenKeys: terminalReadScreenKeys(
+                        platform,
+                        dsL10n(context),
+                      ),
                       child: _privateInput(
                         private,
                         TerminalView(

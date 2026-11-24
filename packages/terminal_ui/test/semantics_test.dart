@@ -8,7 +8,9 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:l10n/l10n.dart' show lookupAppLocalizations;
 import 'package:terminal_ui/terminal_ui.dart';
 
 import 'support/fakes.dart';
@@ -68,12 +70,32 @@ void main() {
   );
 
   // a11y-3: macOS, Windows and the browser ignore custom semantics actions, so the command
-  // also has keys, which the screen names in its hint.
-  for (final (platform, keys, meta) in [
-    (TargetPlatform.macOS, 'Cmd+Shift+S', true),
-    (TargetPlatform.windows, 'Ctrl+Shift+S', false),
+  // also has keys, which the screen names in its hint with the key names of the language.
+  for (final (platform, locale, keys, hint, meta) in [
+    (
+      TargetPlatform.macOS,
+      const Locale('en'),
+      'Cmd+Shift+S',
+      'Cmd+Shift+S reads the screen',
+      true,
+    ),
+    (
+      TargetPlatform.windows,
+      const Locale('en'),
+      'Ctrl+Shift+S',
+      'Ctrl+Shift+S reads the screen',
+      false,
+    ),
+    (
+      TargetPlatform.windows,
+      const Locale('de'),
+      'Strg+Umschalt+S',
+      'Strg+Umschalt+S liest den Bildschirm vor',
+      false,
+    ),
   ]) {
-    testWidgets('${platform.name}: $keys reads the screen', (tester) async {
+    testWidgets('${platform.name} ${locale.languageCode}: $keys reads the '
+        'screen', (tester) async {
       debugDefaultTargetPlatformOverride = platform;
       final handle = tester.ensureSemantics();
       try {
@@ -81,6 +103,7 @@ void main() {
         await pumpApp(
           tester,
           TerminalPane(controller: h.controller, fontSize: 14),
+          locale: locale,
         );
         final opening = h.open();
         await pumpUntil(
@@ -95,12 +118,12 @@ void main() {
         );
         await tester.tap(find.byType(TerminalScreenView));
         await tester.pump();
-        expect(terminalReadScreenKeys(platform), keys);
-        final node = find.bySemanticsLabel(RegExp('^Terminal, line'));
         expect(
-          tester.getSemantics(node).getSemanticsData().hint,
-          '$keys reads the screen',
+          terminalReadScreenKeys(platform, lookupAppLocalizations(locale)),
+          keys,
         );
+        final node = find.bySemanticsLabel(RegExp('^Terminal, '));
+        expect(tester.getSemantics(node).getSemanticsData().hint, hint);
         tester.takeAnnouncements();
         await tester.sendKeyDownEvent(
           meta ? LogicalKeyboardKey.metaLeft : LogicalKeyboardKey.controlLeft,
