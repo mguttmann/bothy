@@ -328,6 +328,10 @@ class _SpaceNodeState extends State<SpaceNode> {
             space: space.id,
             count: node.archived.length,
             expanded: node.archivedExpanded,
+            counts: ThreadCounts(
+              unread: node.archived.fold(0, (n, c) => n + c.counts.unread),
+              mentions: node.archived.fold(0, (n, c) => n + c.counts.mentions),
+            ),
             onToggle: onToggleArchived ?? (_) {},
           ),
           for (final c in node.visibleArchived) archivedEntry(c),

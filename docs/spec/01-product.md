@@ -2357,7 +2357,9 @@ only.
    only, no right changes, nobody else sees a difference, runs keep going, and an archived channel
    opens from its row in the section, a link, a search hit or a notification as before.
    Notifications, unread counts and mentions of an archived channel still reach the person: its
-   row in the section shows them, and the space shows its unread dot.
+   row in the section shows them, the collapsed row "Archived (n)" carries the unread mark and the
+   mentions of the channels it does not show (as "All posts" does, 6.8 item 5), and the space
+   shows its unread dot.
 5. **Automatic arrangement.** A channel arranged by activity (6.16 item 4) stays in the section while
    archived; activity does not bring it back.
 
