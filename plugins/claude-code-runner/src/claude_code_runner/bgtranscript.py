@@ -814,8 +814,9 @@ class TranscriptMapper:
                 # the dequeue, with the earlier timestamp (FIX-RUNNER-CLI-331). Its start
                 # follows that turn's ``result``, as in a print stream, so the result never
                 # counts as the answer of the turn the input starts. An output the turn gives
-                # after the dequeue (`_resume_deferred`) gives the start on before it; a dequeue
-                # after a tool result, before the next request, is given on at once, as before.
+                # after the dequeue (`_resume_deferred`) gives the start on before that output,
+                # so a dequeue while a request waits is no longer given on at the dequeue itself;
+                # one after a tool result, before the next request, is given on at once.
                 if not self._deferred:
                     self._dequeued_at = _stamp(record)
                 self._deferred.append(started)
