@@ -69,44 +69,63 @@ class DsButton extends StatelessWidget {
             DsButtonStyle.secondary ||
             DsButtonStyle.unknown => (null, c.textPrimary, c.borderControl),
           };
+    // The fill of the primary button is ink of the surface, so the hover and pressed ink of
+    // DsTappable paint over it in color.accent.bg-hover and bg-pressed (components.md "Common
+    // rules"); the other fills have no hover tokens and keep their plain box.
+    final primary = enabled && style == DsButtonStyle.primary;
+    final decoration = BoxDecoration(
+      color: bg,
+      borderRadius: BorderRadius.circular(DsRadius.md),
+      border: border == null
+          ? null
+          : Border.all(color: border, width: DsBorderWidth.hairline),
+    );
+    final content = Row(
+      mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (loading) ...[
+          DsIcon(
+            DsIcons.triggerWorking,
+            size: DsIconSizeRole.sm,
+            color: fg,
+            decorative: true,
+          ),
+          const SizedBox(width: DsSpace.s6),
+        ],
+        Flexible(
+          child: Text(
+            label,
+            style: dsTextStyle(DsType.label).copyWith(color: fg),
+          ),
+        ),
+      ],
+    );
+    final constraints = BoxConstraints(minHeight: context.dsDensity.targetMin);
+    const padding = EdgeInsets.symmetric(horizontal: DsSpace.s12);
     return DsTappable(
       onTap: onPressed,
       label: label,
       hint: loading ? l.componentsSending : null,
       radius: DsRadius.md,
+      hoverColor: primary ? a.accentBgHover : null,
+      pressedColor: primary ? a.accentBgPressed : null,
       excludeChildSemantics: true,
-      child: Container(
-        constraints: BoxConstraints(minHeight: context.dsDensity.targetMin),
-        padding: const EdgeInsets.symmetric(horizontal: DsSpace.s12),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(DsRadius.md),
-          border: border == null
-              ? null
-              : Border.all(color: border, width: DsBorderWidth.hairline),
-        ),
-        child: Row(
-          mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (loading) ...[
-              DsIcon(
-                DsIcons.triggerWorking,
-                size: DsIconSizeRole.sm,
-                color: fg,
-                decorative: true,
+      child: primary
+          ? Ink(
+              decoration: decoration,
+              child: Container(
+                constraints: constraints,
+                padding: padding,
+                child: content,
               ),
-              const SizedBox(width: DsSpace.s6),
-            ],
-            Flexible(
-              child: Text(
-                label,
-                style: dsTextStyle(DsType.label).copyWith(color: fg),
-              ),
+            )
+          : Container(
+              constraints: constraints,
+              padding: padding,
+              decoration: decoration,
+              child: content,
             ),
-          ],
-        ),
-      ),
     );
   }
 }

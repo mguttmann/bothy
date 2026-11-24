@@ -217,6 +217,7 @@ class DsTappable extends StatefulWidget {
     this.label,
     this.hint,
     this.hoverColor,
+    this.pressedColor,
     this.radius = DsRadius.sm,
     this.selected,
     this.expanded,
@@ -242,6 +243,12 @@ class DsTappable extends StatefulWidget {
 
   /// The hover background, or null for `color.surface.hover`.
   final Color? hoverColor;
+
+  /// The pressed background, or null for `color.surface.selected`.
+  ///
+  /// Hover and pressed are ink of this surface, painted below the child: a child with an
+  /// opaque fill paints that fill with [Ink] instead (as [DsButton] does), so they show.
+  final Color? pressedColor;
 
   /// The corner radius of the hover, splash and ring.
   final double radius;
@@ -304,7 +311,7 @@ class _DsTappableState extends State<DsTappable> {
         borderRadius: shape,
         hoverColor: widget.hoverColor ?? colors.surfaceHover,
         focusColor: Colors.transparent,
-        highlightColor: colors.surfaceSelected,
+        highlightColor: widget.pressedColor ?? colors.surfaceSelected,
         splashFactory: NoSplash.splashFactory,
         onFocusChange: (focused) => setState(() => _focused = focused),
         child: content,
