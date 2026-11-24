@@ -217,8 +217,9 @@ scans what actually reached `main`):
 - an edit of a fork or dependency bot pull request: its run cannot mark `ci-ok` pending, so
   the older result stays the latest until the new `ci-ok` ends (wait for it before the
   merge);
-- a manual `workflow_dispatch` of `ci.yml` on the pull request branch or "Re-run all jobs"
-  of a run from before the edit: both run without the current text (maintainers only);
+- a manual `workflow_dispatch` of `ci.yml` on the pull request branch, or "Re-run all jobs"
+  or "Re-run failed jobs" of a run from before the edit: they run without the current text
+  (maintainers only);
 - a run that waits for a maintainer's approval (first contribution from a fork) has no
   `ci-ok` yet, so the older result stays the latest until the maintainer approves;
 - a message typed into the merge dialog instead of the pull request body.

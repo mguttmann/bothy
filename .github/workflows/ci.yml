@@ -1672,7 +1672,8 @@ jobs:
     # ended, holds no runner while they run, and reports on every run, also after a failed,
     # skipped or cancelled job. tools/ci/ci_ok.py checks the results against the plan: a needed
     # job must succeed, a job that ran must pass, a missing plan fails. It then completes the
-    # pending check run that the plan job created (docs/quality/push-discipline.md).
+    # pending check run that the plan job created, or in a later attempt creates its own
+    # (docs/quality/push-discipline.md).
     needs: [plan, gates, gates-docs, gates-security, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, test-adapters-e2e, denylist, denylist-fork, sonar, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-ios, apps-windows, apps-android-26, apps-android-36, desktop-trial-macos, desktop-trial-windows, mobile-trial-ios, mobile-trial-android, host-trial-macos, host-trial-windows]
     if: always()
     runs-on: ubuntu-24.04
