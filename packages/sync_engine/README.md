@@ -284,6 +284,10 @@ Life cycle of an entry:
   `enqueue` resolves the IDs it is given through the replacements and confirmations of the
   running outbox; an ID gone before the outbox was created is unknown and fails the entry the
   same way.
+- A change over several rows (a replacement and the delete of the failed entry, a failed chain
+  and the delete of the discarded entry, the slots of the dependents and the delete of a
+  confirmed entry) is one database transaction, so a process that ends between its steps
+  leaves the rows as they were before it.
 - `start()` sends (M4-17 calls it after `catchup.complete`, 04 13.4), `pause()` lets running
   requests finish and starts none. The first `start()` resets `sending` entries of an earlier run
   to `pending`; they are sent again with their stored IDs.

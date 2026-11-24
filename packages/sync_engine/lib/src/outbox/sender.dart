@@ -53,6 +53,7 @@ final class OutboxSender {
     required this.timer,
     required this.random,
     required this.lock,
+    required this.transaction,
     required this.dependencies,
     required this.onChanged,
     this.onConfirmed,
@@ -78,6 +79,10 @@ final class OutboxSender {
 
   /// The lock shared with `Outbox`.
   final SerialLock lock;
+
+  /// Runs its action in one database transaction (`LocalDatabase.transaction`), for the steps
+  /// that change several rows.
+  final Future<T> Function<T>(Future<T> Function() action) transaction;
 
   /// The dependency graph shared with `Outbox`.
   final OutboxDependencies dependencies;
@@ -190,8 +195,10 @@ final class OutboxSender {
           case Readiness.broken:
             // A dependency is gone without a confirmation: the entry and its chain fail
             // visibly instead of going without it (D-M4-15-10).
-            await dao.recordFailure(head.id, code: dependencyDiscarded);
-            await dependencies.failChain(head.id);
+            await transaction(() async {
+              await dao.recordFailure(head.id, code: dependencyDiscarded);
+              await dependencies.failChain(head.id);
+            });
             _again = true;
             continue;
           case Readiness.ready:
@@ -319,14 +326,17 @@ final class OutboxSender {
     switch (outcome.outcome) {
       case OutcomeClass.confirmed:
         final r = response ?? const OutboxResponse();
-        await confirm(stored, r.result);
         try {
           await onConfirmed?.call(stored, r);
         } on Object {
           // The write is stored on the server; its echo or the catch-up brings the result
           // again, so a failing hook must not keep the entry and send it once more.
         }
-        await dependencies.removeEntry(stored.id, into: const []);
+        // The slots of the dependents and the delete of the entry go together.
+        await transaction(() async {
+          await confirm(stored, r.result);
+          await dependencies.removeEntry(stored.id, into: const []);
+        });
       case OutcomeClass.retry:
         // Retry-After is the floor; the jitter on top keeps lanes refused together from
         // returning together (addendum of 2026-10-30).
