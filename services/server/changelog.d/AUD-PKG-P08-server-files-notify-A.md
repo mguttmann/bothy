@@ -11,3 +11,6 @@
 - With the S3 driver the scan pass completes the multipart upload of a confirmed file before it
   checks clamd, so a scanner outage no longer keeps the bytes in an incomplete upload that a
   storage lifecycle rule may abort.
+- The media type detector keeps its own read limit of `file.sniff_bytes` instead of changing a
+  process-wide limit of the library in its constructor, so a second detector can no longer make
+  Office documents read as ZIP archives.
