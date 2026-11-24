@@ -34,7 +34,6 @@ type configCheck struct {
 // and the check of a key whose entries a platform package parses (egress_allowed_hosts, in
 // egress.go). Their errors become problem messages verbatim, so they name keys and never values.
 var configChecks = []configCheck{
-	{name: "shutdown_budgets", keys: shutdownBudgetKeys, fn: shutdownBudgets},
 	{name: "listeners_distinct", keys: []string{"server.listen_addr", "server.internal_listen_addr"}, fn: listenersDistinct},
 	{name: "json_limit_above_message", keys: []string{"http.max_json_body_bytes", "message.max_content_bytes"}, fn: jsonLimitAboveMessage},
 	{name: "egress_allowed_hosts", keys: []string{keyEgressAllowedHosts}, fn: egressAllowedHosts},
