@@ -240,7 +240,7 @@ func newWorld(t *testing.T, requiresApproval bool) *world {
 	}
 	svc, err := app.New(app.Config{
 		ExportTTL: 7 * 24 * time.Hour, ExportRequiresApproval: requiresApproval, DeletionContent: personaldata.KeepPseudonymized,
-		ReminderLead: 72 * time.Hour, PageSizeDefault: 50, PageSizeMax: 200,
+		ReminderLead: 72 * time.Hour, PageSizeDefault: 50, PageSizeMax: 200, ReasonMaxChars: 500,
 	}, app.Deps{
 		Store: w.store, UoW: directUoW{}, Authorizer: ownerAuthorizer{owners: map[ids.ID]bool{w.robin.ID: true}}, Audit: w.rec,
 		Events: w.rec, People: people{users: users, owners: []ids.ID{w.robin.ID}}, Packages: noPackages{},

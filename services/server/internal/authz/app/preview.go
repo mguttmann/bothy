@@ -100,7 +100,7 @@ func (s *AdminService) newPreviewer(caller actor.Actor, cmd authz.CreateGrantCmd
 	}
 	now := s.d.Clock.Now()
 	reason := strings.TrimSpace(cmd.Reason)
-	subject, target, level, caps, err := grantShape(cmd, reason, now)
+	subject, target, level, caps, err := grantShape(cmd, reason, s.d.Config.ReasonMaxChars, now)
 	if err := joinFields(err, s.checkResolve(cmd.ResolveI1)); err != nil {
 		return nil, err
 	}

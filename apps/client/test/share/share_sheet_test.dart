@@ -6,6 +6,8 @@
 // a target is chosen, a new post has a title and the files fit `file_max_upload_bytes` and
 // `message_max_attachments`, with the reason shown.
 
+import 'dart:io';
+
 import 'package:client/share/share_sheet.dart';
 import 'package:client/share/share_target.dart';
 import 'package:design_system/design_system.dart';
@@ -33,10 +35,12 @@ void main() {
     List<ShareFile>? files,
     String text = '',
     InstanceLimits? limits = _limits,
+    Duration searchDelay = Duration.zero,
   }) => ShareSheetController(
     files: files ?? [sharedFile('screenshot.png', 1258291)],
     text: text,
     limits: limits,
+    searchDelay: searchDelay,
     recent: () async => sheetTargets,
     search: (q) async {
       queries.add(q);
@@ -191,6 +195,56 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('share.search')), '');
     await tester.pumpAndSettle();
     expect(find.text(dsIsolate('server > Gateway: resume')), findsOneWidget);
+  });
+
+  testWidgets('the search asks the server once the typing pauses', (
+    tester,
+  ) async {
+    // Every key press was a request (AUD-PKG-P02-client-b, #1288).
+    await pump(
+      tester,
+      controller(searchDelay: const Duration(milliseconds: 150)),
+    );
+    for (final q in ['g', 'ge', 'gen']) {
+      await tester.enterText(find.byKey(const ValueKey('share.search')), q);
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(queries, ['gen']);
+    expect(find.text(dsIsolate('general')), findsOneWidget);
+  });
+
+  testWidgets('a failed send says so and Send tries again', (tester) async {
+    // The sheet stayed without a word (AUD-PKG-P02-client-b, #1288).
+    var fail = true;
+    await tester.pumpWidget(
+      hostScreen(
+        ShareSheet(
+          controller: controller(),
+          onCancel: () => cancelled++,
+          onSend: (choice) async {
+            if (fail) throw const FileSystemException('copy failed');
+            sent.add(choice);
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share.target.0')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share.send')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Not sent: it could not be saved on this device'),
+      findsOneWidget,
+    );
+    expect(send(tester).onPressed, isNotNull);
+    fail = false;
+    await tester.tap(find.byKey(const ValueKey('share.send')));
+    await tester.pumpAndSettle();
+    expect(sent, hasLength(1));
+    expect(find.byKey(const ValueKey('share.failed')), findsNothing);
   });
 
   testWidgets('Cancel closes without sending', (tester) async {

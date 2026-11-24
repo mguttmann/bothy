@@ -41,9 +41,11 @@ WHERE i.user_id = @user_id AND i.unlinked_at IS NULL AND p.enabled AND i.id <> @
 
 -- name: CountPairingDevicesOfUser :one
 -- Active devices that can approve a pairing with step-up (08 section 5.3); a cli device has no
--- step-up (ID-T29).
-SELECT count(*) FROM devices
-WHERE user_id = @user_id AND state = 'active' AND platform <> 'cli';
+-- step-up (ID-T29), and a device without an active key (the web device of a console login)
+-- holds no app session that could approve one.
+SELECT count(*) FROM devices d
+WHERE d.user_id = @user_id AND d.state = 'active' AND d.platform <> 'cli'
+  AND EXISTS (SELECT 1 FROM device_keys k WHERE k.device_id = d.id AND k.purpose = 'dpop' AND k.revoked_at IS NULL);
 
 -- name: UnlinkIdentity :execrows
 UPDATE user_identities SET unlinked_at = @at WHERE id = @id AND unlinked_at IS NULL;

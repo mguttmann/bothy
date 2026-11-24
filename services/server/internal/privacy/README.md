@@ -122,7 +122,17 @@ request when the deadline minus the reminder lead has passed (R-AZ-35).
 4. `privacy.erase` runs steps 1 to 6 of 20 4.4 through all participants, records the last
    finished step in `progress` and resumes there after a crash; step 7 is the audit entry
    `privacy.erase`. The content mode `privacy.account_deletion_content` is fixed when the job
-   starts. After `jobs.MaxAttempts` failed attempts the request is `failed`.
+   starts. After `jobs.MaxAttempts` failed attempts the request is `failed`; the job marks it
+   with a context detached from the attempt, so a last attempt that ended by the job timeout or
+   the stop of the worker still ends the request. An export whose request did not take its
+   package (the completion failed or the request ended meanwhile) deletes the package at once.
+
+Limits: `jobs.MaxAttempts` and `jobs.RequestTimeout` are named constants of the job adapter, not
+configuration keys. A job that River's rescuer discards after a hard death of the worker in its
+last attempt never runs `Fail`, so its request stays `running` until an operator ends it; a
+periodic reconciliation of running requests without a live job is not built. A package stored
+by an export whose process died before the completion stays until a sweeper of `gdpr_export`
+files without a request exists (not built).
 
 ## Participants of the modules (kernel `personaldata`)
 
@@ -133,7 +143,8 @@ Each module with tables of 20 section 2 registers one participant in
 ## Configuration
 
 `privacy.export_ttl`, `privacy.export_requires_approval`, `privacy.account_deletion_content`,
-`privacy.request_reminder_lead`, `retention.privacy_job`, `privacy.deletion_journal_retention`
+`privacy.request_reminder_lead`, `retention.privacy_job`, `privacy.deletion_journal_retention`,
+`audit.reason_max_chars` (the longest reason of a request and of a decision, SEC-AUD-5)
 (20 section 13; the cross-check `deletion_journal_retention` holds it at least the longest backup
 period, DP-T08) and `privacy.export_work_dir` (empty or an absolute path, cross-check
 `export_work_dir_absolute`); the maintenance jobs

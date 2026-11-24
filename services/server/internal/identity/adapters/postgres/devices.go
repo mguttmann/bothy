@@ -109,19 +109,6 @@ func (r *Repository) ActiveKey(ctx context.Context, deviceID ids.ID, purpose ide
 	return toKey(row), true, nil
 }
 
-// KeyByJKT returns the key with the thumbprint jkt, revoked or not; found is false when none has
-// it. The login tickets use it to refuse a key that another device holds.
-func (r *Repository) KeyByJKT(ctx context.Context, jkt string) (identity.DeviceKey, bool, error) {
-	row, err := r.read(ctx).GetDeviceKeyByJKT(ctx, jkt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return identity.DeviceKey{}, false, nil
-	}
-	if err != nil {
-		return identity.DeviceKey{}, false, mapError(err, "reading a device key")
-	}
-	return toKey(row), true, nil
-}
-
 func toDevice(d sqlcgen.Device, key, stepUp pgtype.Text) identity.Device {
 	return identity.Device{
 		ID: idOf(d.ID), UserID: idOf(d.UserID), Name: d.Name, Platform: identity.Platform(d.Platform),

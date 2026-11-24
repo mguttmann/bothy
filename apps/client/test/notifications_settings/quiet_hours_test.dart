@@ -446,6 +446,142 @@ void main() {
       await host.dispose(tester);
     });
 
+    // A final refusal left the local row on a value the server does not know, and its raised
+    // version made the server's row look older (AUD-PKG-P02-client-b, #1278).
+    const refusal = (
+      400,
+      {
+        'type': 'about:blank',
+        'title': 'Validation failed',
+        'status': 400,
+        'code': 'validation_failed',
+      },
+    );
+
+    Future<Object?> sendFailing(
+      WidgetTester tester,
+      OutboxExecutors executors,
+      OutboxEntry e,
+    ) => tester.runAsync<Object?>(() async {
+      try {
+        await executors
+            .lookup(e.kind)!
+            .send(e, ApiCallContext(idempotencyKey: e.id));
+        return null;
+      } on DioException catch (error) {
+        return error;
+      }
+    });
+
+    testWidgets('a refused quiet hours write brings back the rules the server '
+        'stores', (tester) async {
+      host = await ColumnHost.open(tester);
+      final w = writer();
+      final existing = rule();
+      await tester.runAsync(
+        () => host.db.personalDao.upsertQuietHoursIfNewer(existing),
+      );
+      await tester.runAsync(() => w.putQuietHours(rule(enabled: false)));
+      await tester.runAsync(() => w.addQuietHours(rule(weekdays: 0x60)));
+      final adapter = RouteAdapter({
+        'PUT /me/quiet-hours/${existing.id.value}': refusal,
+        'POST /me/quiet-hours': refusal,
+        'GET /me/quiet-hours': (
+          200,
+          {
+            'items': [
+              {
+                'id': existing.id.value,
+                'weekdays': 0x1f,
+                'start_local': '19:00',
+                'end_local': '07:00',
+                'enabled': true,
+                'version': 3,
+              },
+            ],
+          },
+        ),
+      });
+      final executors = OutboxExecutors();
+      NotifyOps.register(executors, routed(adapter), host.db);
+      final entries = (await tester.runAsync(host.db.outboxDao.allEntries))!;
+      for (final e in entries) {
+        expect(await sendFailing(tester, executors, e), isA<DioException>());
+      }
+      final rules = (await tester.runAsync(host.db.personalDao.quietHours))!;
+      expect(rules.single.id, existing.id);
+      expect(rules.single.enabled, isTrue);
+      expect(rules.single.version, const ResourceVersion(3));
+      await host.dispose(tester);
+    });
+
+    testWidgets('a refused level write brings back the level the server '
+        'stores', (tester) async {
+      host = await ColumnHost.open(tester);
+      final w = writer();
+      const channel = '0192f4a0-7b1c-72d4-8bae-7661d2b2f203';
+      const kept = '0192f4a0-7b1c-72d4-8bae-7661d2b2f204';
+      await tester.runAsync(() async {
+        await host.db.personalDao.upsertNotificationPreferenceIfNewer(
+          const NotificationPreference(
+            targetKind: NotificationTargetKind.channel,
+            targetId: channel,
+            level: NotificationLevel.mentions,
+            version: ResourceVersion(3),
+          ),
+        );
+      });
+      await tester.runAsync(
+        () => w.setLevel(
+          NotificationTargetKind.channel,
+          channel,
+          NotificationLevel.mute,
+        ),
+      );
+      await tester.runAsync(
+        () => w.setLevel(
+          NotificationTargetKind.channel,
+          kept,
+          NotificationLevel.all,
+        ),
+      );
+      final adapter = RouteAdapter({
+        'PUT /me/notification-preferences/channel/$channel': refusal,
+        'GET /me/notification-preferences': (
+          200,
+          {
+            'items': [
+              {
+                'target_kind': 'channel',
+                'target_id': channel,
+                'level': 'mentions',
+                'version': 3,
+              },
+            ],
+          },
+        ),
+      });
+      final executors = OutboxExecutors();
+      NotifyOps.register(executors, routed(adapter), host.db);
+      final entries = (await tester.runAsync(host.db.outboxDao.allEntries))!;
+      expect(
+        await sendFailing(tester, executors, entries.first),
+        isA<DioException>(),
+      );
+      final prefs = (await tester.runAsync(
+        host.db.personalDao.notificationPreferences,
+      ))!;
+      // The refused target shows the server's level; the other target keeps its waiting write.
+      expect(
+        {for (final p in prefs) p.targetId: (p.level, p.version.value)},
+        {
+          channel: (NotificationLevel.mentions, 3),
+          kept: (NotificationLevel.all, 1),
+        },
+      );
+      await host.dispose(tester);
+    });
+
     testWidgets('refresh stores the lists and drops what the server lost', (
       tester,
     ) async {

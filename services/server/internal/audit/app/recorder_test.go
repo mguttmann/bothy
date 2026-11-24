@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/audit/app"
 	"github.com/OWNER/bothy/services/server/internal/audit/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
@@ -476,5 +477,28 @@ func TestSourceURLValue(t *testing.T) {
 	}
 	if n := len(w.store.committed()); n != 1 {
 		t.Fatalf("%d entries written, want the one valid entry", n)
+	}
+}
+
+// TestKeyring_LongerPeriodStartsAfterTheLastKey: after privacy.audit_ip_key_period grows from 30
+// to 90 days, the aligned start of the new period can hold an expired key of the old period; the
+// new key then starts where the last key ended, so a key covers now (srv-kernel-audit-privacy-3).
+func TestKeyring_LongerPeriodStartsAfterTheLastKey(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t, time.Minute, 10)
+	const month, quarter = 30 * 24 * time.Hour, 90 * 24 * time.Hour
+	start, end := domain.KeyPeriod(t0, quarter)
+	if _, _, err := w.keyring.Current(context.Background(), start.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	longer := app.NewKeyring(w.store, w.uow, fakeKEK{kekRef: kekHex}, kekRef, quarter)
+	now := start.Add(month + time.Hour)
+	id, _, err := longer.Current(context.Background(), now)
+	if err != nil {
+		t.Fatalf("Current after the longer period: %v", err)
+	}
+	k, ok, _ := w.store.CurrentIPKey(context.Background(), now)
+	if !ok || k.ID != id || !k.ValidFrom.Equal(start.Add(month)) || !k.ValidUntil.Equal(end) {
+		t.Fatalf("key %+v (found %v), want %v .. %v", k, ok, start.Add(month), end)
 	}
 }

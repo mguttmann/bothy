@@ -1,6 +1,6 @@
 # Module `audit`
 
-Status: built in part (M1-24, M1-50, M7-22): the hash chain of `audit_events`, the recorder behind the kernel port `auditing.Recorder` with the audit phase hook, the aggregation of identical denials and the keys of the IP pseudonyms (`audit_ip_keys`) (M1-24); the port `Log` with query, export and verification, the signed checkpoints (`audit_checkpoints`) with the file sink, the job `audit.chain_verify` and the operations `listAuditEvents`, `exportAuditEvents`, `verifyAuditChain` (M1-50). The object store sink with retention lock (`s3://`, M7-22) is built. Truncation with an anchor and the destruction of IP keys come with M7.
+Status: built (M1-24, M1-50, M7-05, M7-22): the hash chain of `audit_events`, the recorder behind the kernel port `auditing.Recorder` with the audit phase hook, the aggregation of identical denials and the keys of the IP pseudonyms (`audit_ip_keys`) (M1-24); the port `Log` with query, export and verification, the signed checkpoints (`audit_checkpoints`) with the file sink, the job `audit.chain_verify` and the operations `listAuditEvents`, `exportAuditEvents`, `verifyAuditChain` (M1-50); the trim with an anchor entry and the destruction of IP keys in the job `retention.audit` (M7-05, section "Retention (M7-05)"); the object store sink with retention lock (`s3://`, M7-22).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -113,7 +113,8 @@ logged.
 `ip_hmac = hex(HMAC-SHA-256(key, text))` with the client IP of `kernel/reqmeta` after `Unmap()`
 without zone, in the text form of [`netip.Addr.String()`](https://pkg.go.dev/net/netip#Addr.String) (retrieved 2026-10-13); raw addresses are stored nowhere in
 `audit_events`. Every entry of a request with a client IP carries `ip_hmac` and `ip_key_id`. One
-key per `privacy.audit_ip_key_period`, `valid_from` aligned in Unix time; on a cache miss the
+key per `privacy.audit_ip_key_period`, `valid_from` aligned in Unix time and moved to the end of
+an older key that covers the aligned start (after the period grew); on a cache miss the
 keyring reads the row covering now or creates one in an own short transaction (`domain.IPKeyBytes` random bytes,
 AES-256-GCM under the key behind `privacy.audit_ip_kek_ref` with the row id as additional data,
 `ON CONFLICT (valid_from) DO NOTHING`, then read again) and caches the decrypted key until
@@ -221,13 +222,20 @@ allow entry (20: every read of the log is audited).
   removal of the newest checkpoint files together with a rewrite of the rows after the remaining
   ones is not detectable. The object store sink with retention lock (M7-22) closes this for a
   bucket in mode `COMPLIANCE`, whose objects nobody can delete or replace before the period ends.
-- Until the anchors of M7 every walk from the first retained row starts at row 1, so a log whose
-  first rows are gone is `seq_gap` at 1; the retention trim of M7 changes this rule with its
-  anchors.
+- A walk from the first retained row starts at row 1, or after a trim at the first retained row
+  with the hash of the anchor entry that names the row before it (section "Retention (M7-05)"); a
+  log whose first rows are gone without such an anchor is `seq_gap` at 1.
 - Rows deleted after the newest sink checkpoint (the newest rows) leave a shorter chain that
   verifies; nothing outside the database knows them yet. The next checkpoint narrows this window
   to `audit.checkpoint_interval`.
 - A row with a `seq` below 1 lies outside the chain and is `seq_gap` at that `seq`.
+- After a restore to an earlier point in time the sink holds checkpoints newer than the database,
+  so the job reports `checkpoint_mismatch` in every run until the operator moves the sink to a new
+  location with the checkpoints of the restored database
+  ([backup-restore.md](../../../../docs/operations/backup-restore.md) 8.1,
+  `TestRestoreBreaksTheChainUntilTheSinkMoves`); a signed rollback marker is not built. The sink
+  must keep every object: the check of the sink starts at its first checkpoint, and the job reads
+  the whole sink in every run.
 - With a sink the job reads the sink every run, before the last checkpoint of the database, so an
   overlapping run of another worker is no break: a sink that cannot be read fails the run before
   it signs, and a sink checkpoint newer than the database, an invalid unexported checkpoint or

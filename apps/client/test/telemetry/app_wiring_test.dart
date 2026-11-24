@@ -91,6 +91,27 @@ void main() {
     await host.dispose(tester);
   });
 
+  testWidgets('a thread empty in the cache reports no open', (tester) async {
+    // A later first message counted the wait as the open (AUD-PKG-P02-client-b, #1285).
+    final metrics = ClientMetrics();
+    final measurements = immediate(metrics);
+    final host = await ColumnHost.open(tester);
+    await host.run(tester, () => seedThread(host.db, messages: []));
+    final reads = FakeThreadReads(host.db);
+    await host.pump(
+      tester,
+      HistoryColumn(threadId: threadId(1)),
+      location: '/t/${threadId(1).value}',
+      overrides: [
+        ...threadOverrides(reads),
+        appMeasurementsProvider.overrideWithValue(measurements),
+      ],
+    );
+    measurements.threadShown(threadId(1).value);
+    expect(recorded(metrics), isEmpty);
+    await host.dispose(tester);
+  });
+
   group('providers', () {
     late ClientMetrics metrics;
     late RecordingApi api;

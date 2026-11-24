@@ -317,6 +317,21 @@ def test_workflow_proposes_daily_on_a_free_runner_and_runs_the_recording_and_tes
     assert re.search(r"gh pr (create|edit)", runs)
 
 
+def test_proposal_text_names_no_repository_url() -> None:
+    """Title and body become the squash commit on main, and the deny list of ci-ok scans both.
+
+    A run URL carries the owner's account name, so a maintainer's edit (D-HERMES-PIN-4) would
+    turn ci-ok red; the body names the run by its number only.
+    """
+    flow, _ = _workflow()
+    for job in flow["jobs"].values():
+        for step in job["steps"]:
+            env = " ".join(str(v) for v in (step.get("env") or {}).values())
+            if "gh pr" in str(step.get("run", "")):
+                assert "github.server_url" not in env
+                assert "github.repository }}/" not in env
+
+
 def test_upstream_code_never_runs_in_a_job_with_a_write_token() -> None:
     """The recording runs upstream main code without a cooldown (D-HERMES-PIN-1).
 

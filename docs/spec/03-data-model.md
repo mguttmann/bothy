@@ -2562,8 +2562,8 @@ Module: `audit`.
 | Field | Type | Null | Default | Rules / notes |
 |---|---|---|---|---|
 | `id` | `uuid` | no | | UUIDv7; appears as `ip_key_id` in `audit_events.details` |
-| `valid_from` | `timestamptz` | no | | start of the period, aligned to `privacy.audit_ip_key_period` |
-| `valid_until` | `timestamptz` | no | | `valid_from + privacy.audit_ip_key_period` |
+| `valid_from` | `timestamptz` | no | | start of the period, aligned to `privacy.audit_ip_key_period`; after the period grew, moved to the end of an older key that covers the aligned start |
+| `valid_until` | `timestamptz` | no | | end of the aligned period, `valid_from + privacy.audit_ip_key_period` unless `valid_from` was moved |
 | `key_ciphertext` | `bytea` | yes | | 32 random bytes, AEAD-encrypted with the key from `key_ref`; NULL after destruction |
 | `key_ref` | `text` | no | | reference to the encryption key in the secret provider (`privacy.audit_ip_kek_ref` at creation time) |
 | `created_at` | `timestamptz` | no | `now()` | |

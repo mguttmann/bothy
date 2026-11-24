@@ -5,8 +5,8 @@
 ///
 /// | Metric | Starts | Stops |
 /// |---|---|---|
-/// | `client.cold_start.duration` | the first line of `main` ([appStartWatch]) | the first frame in which the sidebar shows spaces from the local database ([AppMeasurements.sidebarShown]), once per process |
-/// | `client.thread_open.duration` | the history column of a thread is created ([AppMeasurements.threadOpening]) | the first frame with messages of that thread ([AppMeasurements.threadShown]) |
+/// | `client.cold_start.duration` | the first line of `main` ([appStartWatch]) | the first frame in which the sidebar shows spaces from the local database ([AppMeasurements.sidebarShown]), once per process; not reported when a login or the app lock came first ([AppMeasurements.coldStartWaited]) |
+/// | `client.thread_open.duration` | the history column of a thread is created ([AppMeasurements.threadOpening]) | the first frame with messages of that thread ([AppMeasurements.threadShown]); dropped when the column closes before or the cached history is empty ([AppMeasurements.threadDropped]) |
 /// | `client.send_local.duration` | Enter in the composer ([AppMeasurements.sendStarted]) | the frame after the outbox write that the history shows ([AppMeasurements.sendShown]) |
 /// | `client.frames`, `client.frames.over_budget` | the frame timings of the engine ([AppMeasurements.attachFrameTimings]) | one count per frame, over budget when its total time exceeds one refresh interval |
 /// | `client.catchup.duration`, `client.catchup.events` | the connection enters `catchingUp` | it reaches `live`; events are the `dispatch` frames of the gateway in between ([AppMeasurements.wrapTransport]) |
@@ -71,8 +71,16 @@ final class AppMeasurements {
     );
   }
 
+  /// The start waits for a person (a login, the app lock): no cold start is reported in this
+  /// process, because the duration would hold that wait.
+  void coldStartWaited() => _coldStartDone = true;
+
   /// The history column of [threadId] was created: the thread opens.
   void threadOpening(String threadId) => _threadOpens[threadId] = _now;
+
+  /// The open of [threadId] ends without a measurement: the column was left before messages
+  /// showed, or the thread had no messages in the cache when it opened.
+  void threadDropped(String threadId) => _threadOpens.remove(threadId);
 
   /// The history of [threadId] has messages: the open ends after this frame. Without an open
   /// thread of that ID nothing is recorded.

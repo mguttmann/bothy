@@ -66,7 +66,7 @@ final class OnboardingControllerProvider
 }
 
 String _$onboardingControllerHash() =>
-    r'8c84e44b5370cb1e868ab64ccbfccf25c16a682c';
+    r'e9a0b6226b4c8d039f81c44f322d6dc66dbf3428';
 
 /// Drives E1 to E7 from the outcomes of `LoginService` (Design note 3).
 ///

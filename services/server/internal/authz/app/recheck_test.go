@@ -58,6 +58,26 @@ func TestRecheckPrincipal_OnlyAgentInvoke(t *testing.T) {
 	}
 }
 
+// TestRecheckPrincipal_BoundOutsideAuthorize (R-AZ-29): the bound of the marker holds for Scope,
+// AdminScope and EffectiveRights as for Authorize: another action than its five is an internal
+// error, never the lists of an owner without a session.
+func TestRecheckPrincipal_BoundOutsideAuthorize(t *testing.T) {
+	w := newWorld(t)
+	ctx := authorize.Filter(context.Background())
+	if _, err := w.az.Scope(ctx, recheck(w.owner), authorize.ActionMessageRead); errs.KindOf(err) != errs.KindInternal {
+		t.Fatalf("Scope with message.read: err %v, want internal", err)
+	}
+	if _, err := w.az.AdminScope(ctx, recheck(w.owner), authorize.ActionGroupRead); errs.KindOf(err) != errs.KindInternal {
+		t.Fatalf("AdminScope with group.read: err %v, want internal", err)
+	}
+	if _, err := w.az.EffectiveRights(ctx, recheck(w.owner), authorize.ActionMessageRead, w.thread(w.allgemein)); errs.KindOf(err) != errs.KindInternal {
+		t.Fatalf("EffectiveRights with message.read: err %v, want internal", err)
+	}
+	if _, err := w.az.Scope(ctx, recheck(w.owner), authorize.ActionPushDeliver); err != nil {
+		t.Fatalf("Scope with push.deliver: %v", err)
+	}
+}
+
 // TestRecheckPrincipal_ChannelRead (M7-06): the names rule of the privacy export asks channel.read
 // for the person without a request: a channel of a current grant is readable, one without a grant
 // is not, and one whose grant expired is not readable any more.

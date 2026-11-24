@@ -96,6 +96,7 @@ final class OnboardingState {
     this.restored = false,
     this.starting = false,
     this.wipeIncomplete = false,
+    this.waitingForBrowser = false,
   });
 
   /// The screen.
@@ -148,6 +149,10 @@ final class OnboardingState {
   /// and the app deletes the rest at its next start (R-SY-14).
   final bool wipeIncomplete;
 
+  /// Whether an OIDC login waits for the redirect of the system browser; E2 offers "Cancel"
+  /// meanwhile ([OnboardingController.cancelBrowserLogin]).
+  final bool waitingForBrowser;
+
   /// A copy with the given fields; [notice] and [code] are replaced as given (null clears).
   OnboardingState next({
     OnboardingStep? step,
@@ -165,6 +170,7 @@ final class OnboardingState {
     bool restored = false,
     bool starting = false,
     bool? wipeIncomplete,
+    bool waitingForBrowser = false,
   }) => OnboardingState(
     step: step ?? this.step,
     instance: instance,
@@ -181,6 +187,7 @@ final class OnboardingState {
     restored: restored,
     starting: starting,
     wipeIncomplete: wipeIncomplete ?? this.wipeIncomplete,
+    waitingForBrowser: waitingForBrowser,
   );
 
   /// The same state for [instance] (a new discovery result).
@@ -200,6 +207,7 @@ final class OnboardingState {
     restored: restored,
     starting: starting,
     wipeIncomplete: wipeIncomplete,
+    waitingForBrowser: waitingForBrowser,
   );
 }
 
@@ -268,6 +276,10 @@ class OnboardingController extends _$OnboardingController {
       }
       if (await _startFromLocalData(remembered)) return;
       await connect(remembered.toString());
+    } on Object catch (error, stack) {
+      // The secret store refused or timed out a read of the start: E1 says so.
+      _logOpenFailure(error, stack);
+      await _failToServer(error);
     } finally {
       // Whatever the start ran into, E1 takes over from the start screen.
       if (ref.mounted && state.starting) state = state.next();
@@ -290,9 +302,15 @@ class OnboardingController extends _$OnboardingController {
     state = state.next(address: address.toString(), starting: true);
     final services = await _openServices(known);
     if (services == null) return true;
+    // Still `starting` until the main view: the app counts a start that leaves `starting`
+    // without it as one that waited for a person (no cold start, 15 19).
     state = state
         .withInstance(known)
-        .next(services: services, serverStatus: ServerStatus.idle);
+        .next(
+          services: services,
+          serverStatus: ServerStatus.idle,
+          starting: true,
+        );
     _signedIn(restored: true);
     unawaited(_catchUpStart(services, known));
     return true;
@@ -435,7 +453,56 @@ class OnboardingController extends _$OnboardingController {
   /// what discovery answered: E1 with its text, E2, or the stored session from its local data
   /// (the main view or E4), also when discovery got no usable answer (D-M4-18-13,
   /// D-M4-18-15).
-  Future<void> connect(String typed) async {
+  ///
+  /// A call while a "Connect" runs starts none: it waits for the running one, so two never
+  /// open the same database. A failure of the secret store or of a later step (a refused or
+  /// timed-out read or write) closes what was opened and shows E1 with its text
+  /// ([openFailureStatus]).
+  Future<void> connect(String typed) {
+    final running = _connecting;
+    if (running != null) return running;
+    late final Future<void> current;
+    current = _guardedConnect(typed).whenComplete(() {
+      if (identical(_connecting, current)) _connecting = null;
+    });
+    return _connecting = current;
+  }
+
+  /// The [connect] that runs, or null.
+  Future<void>? _connecting;
+
+  Future<void> _guardedConnect(String typed) async {
+    try {
+      await _connect(typed);
+    } on Object catch (error, stack) {
+      _logOpenFailure(error, stack);
+      await _failToServer(error);
+    }
+  }
+
+  /// Shows E1 with the text of [error] ([openFailureStatus]) after a step outside
+  /// `InstanceServices.open` failed: the running flows stop and open services close, nothing
+  /// is deleted.
+  Future<void> _failToServer(Object error) async {
+    _flow++;
+    final address = state.instance?.address.toString() ?? state.address;
+    try {
+      await _closeServices();
+    } on Object catch (error, stack) {
+      _logOpenFailure(error, stack);
+    }
+    if (!ref.mounted) return;
+    state = state
+        .withInstance(null)
+        .next(
+          step: OnboardingStep.server,
+          clearServices: true,
+          address: address,
+          serverStatus: openFailureStatus(error),
+        );
+  }
+
+  Future<void> _connect(String typed) async {
     final address = normalizeServerAddress(typed);
     if (address == null) {
       state = state.next(
@@ -628,7 +695,7 @@ class OnboardingController extends _$OnboardingController {
   /// device waited for its confirmation ([pendingKey]).
   Future<StoredAccount> _storedAccount(InstanceInfo instance) async {
     final secrets = InstanceSecrets(_ports.secureBackend, instance.instanceId);
-    if (await secrets.read('auth/${instance.address.origin}/refresh_token') ==
+    if (await secrets.read(SessionSecretKeys.refreshToken(instance.address)) ==
         null) {
       return StoredAccount.none;
     }
@@ -665,11 +732,24 @@ class OnboardingController extends _$OnboardingController {
   }
 
   /// E2: login with an OIDC provider in the system browser or behind a proxy.
+  ///
+  /// While the OIDC login waits for the browser, E2 offers "Cancel" ([cancelBrowserLogin]).
   Future<void> loginWithProvider(LoginProvider provider) => _login(
-    (login) => provider.isProxy
+    (login, isCancelled) => provider.isProxy
         ? login.loginWithTrustedHeader()
-        : login.beginOidc(provider.id),
+        : login.beginOidc(provider.id, isCancelled: isCancelled),
+    browser: !provider.isProxy,
   );
+
+  /// E2 "Cancel" while an OIDC login waits for the browser (a closed tab reports nothing on the
+  /// desktop): the screen takes the next attempt at once. A redirect that still arrives for the
+  /// cancelled attempt is not completed; the loopback receiver stays bound until the next
+  /// attempt replaces it or the attempt expires.
+  void cancelBrowserLogin() {
+    if (!state.waitingForBrowser) return;
+    _flow++;
+    state = state.next(step: state.step);
+  }
 
   /// E2: password with one-time code (08 2.5).
   Future<void> loginWithPassword(
@@ -677,7 +757,7 @@ class OnboardingController extends _$OnboardingController {
     String password,
     String oneTimeCode,
   ) => _login(
-    (login) => login.loginWithPassword(
+    (login, _) => login.loginWithPassword(
       loginName: loginName,
       password: password,
       totpCode: oneTimeCode,
@@ -686,7 +766,7 @@ class OnboardingController extends _$OnboardingController {
 
   /// E2: passkey login (only where the build has a passkey port, D-M4-18-9).
   Future<void> loginWithPasskey(String loginName) => _login(
-    (login) =>
+    (login, _) =>
         login.loginWithPasskey(loginName: loginName.isEmpty ? null : loginName),
   );
 
@@ -702,7 +782,7 @@ class OnboardingController extends _$OnboardingController {
   /// E3 "Continue": redeems [code] with [method]; a redeemed code makes the device active at
   /// once (08 3.2).
   Future<void> redeem(String code, EnrollMethod method) => _login(
-    (login) => switch (method) {
+    (login, isCancelled) => switch (method) {
       EnrollThisDevice() => login.redeemEnrollmentCode(code),
       EnrollWithPasskey() => login.enrollWithPasskey(
         code,
@@ -711,7 +791,11 @@ class OnboardingController extends _$OnboardingController {
       EnrollWithProvider(:final provider) =>
         provider.isProxy
             ? login.loginWithTrustedHeader(enrollmentCode: code)
-            : login.beginOidc(provider.id, enrollmentCode: code),
+            : login.beginOidc(
+                provider.id,
+                enrollmentCode: code,
+                isCancelled: isCancelled,
+              ),
     },
     step: OnboardingStep.enroll,
   );
@@ -831,16 +915,21 @@ class OnboardingController extends _$OnboardingController {
   );
 
   Future<void> _login(
-    Future<LoginOutcome> Function(LoginService login) run, {
+    Future<LoginOutcome> Function(
+      LoginService login,
+      bool Function() isCancelled,
+    )
+    run, {
     OnboardingStep step = OnboardingStep.login,
+    bool browser = false,
   }) async {
     final services = _services;
     if (services == null) return;
     final flow = ++_flow;
-    state = state.next(step: step, busy: true);
+    state = state.next(step: step, busy: true, waitingForBrowser: browser);
     LoginOutcome outcome;
     try {
-      outcome = await run(services.auth.login);
+      outcome = await run(services.auth.login, () => flow != _flow);
     } on Object {
       // A refused passkey or device key, a missing port: the same text as a rejected login.
       outcome = const LoginFailed(reason: 'login_failed');
@@ -850,7 +939,16 @@ class OnboardingController extends _$OnboardingController {
       case LoginSignedIn():
         _signedIn();
       case LoginPending(:final device):
-        await _pending(services, device, flow);
+        try {
+          await _pending(services, device, flow);
+        } on Object catch (error, stack) {
+          // The secret store refused the waiting device's code: the screen takes the next
+          // attempt instead of staying busy.
+          _logOpenFailure(error, stack);
+          if (flow == _flow && ref.mounted) {
+            state = state.next(step: step, notice: LoginNotice.failed);
+          }
+        }
       case LoginNeedsSecondFactor():
         state = state.next(step: step, notice: LoginNotice.failed);
       case LoginFailed(:final reason):
@@ -1106,6 +1204,10 @@ class OnboardingController extends _$OnboardingController {
         );
       }
       await services.auth.dispose();
+      // The rest of what the services hold beyond the wiped engine and database, as their
+      // close releases it.
+      await services.versions.dispose();
+      services.terminalApi.dio.close(force: true);
       // The app quit or a test ended while the wipe ran: the data is gone, no state is left.
       if (!ref.mounted) return;
       state = state.next(

@@ -120,8 +120,12 @@ func secretsDir(t *testing.T, db *pgtest.DB) string {
 	if err != nil {
 		t.Fatal(err)
 	}
+	maint, err := os.ReadFile(filepath.Join(db.SecretsDir(), "db_maint_password"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	files := map[string][]byte{
-		"db_app_password": pw, "telemetry_pseudonym_key": bytes.Repeat([]byte("k"), 48),
+		"db_app_password": pw, "db_maint_password": maint, "telemetry_pseudonym_key": bytes.Repeat([]byte("k"), 48),
 		"audit_ip_kek": []byte(strings.Repeat("6b", 32) + "\n"), "token_pepper": []byte(strings.Repeat("7c", 32) + "\n"),
 		"totp_key": []byte(strings.Repeat("5d", 32) + "\n"), "webhook_hmac_master_key": []byte(strings.Repeat("4e", 32) + "\n"),
 		"file_ticket_key": []byte(strings.Repeat("3f", 32) + "\n"),
@@ -492,7 +496,24 @@ func TestServeBudgetsAboveTotalExit2(t *testing.T) {
 	if code := p.exit(t); code != lifecycle.ExitUsage {
 		t.Fatalf("exit = %d", code)
 	}
-	if err := p.runner.Err(); err == nil || !strings.Contains(err.Error(), "1m5s") || !strings.Contains(err.Error(), "1m0s") {
+	// 30s drain, 30s HTTP, 5s telemetry and twice 2s for the database flushes.
+	if err := p.runner.Err(); err == nil || !strings.Contains(err.Error(), "1m9s") || !strings.Contains(err.Error(), "1m0s") {
+		t.Fatalf("Err() = %v", err)
+	}
+}
+
+// TestServeDatabaseFlushBudgetCountsAtWiring: the budgets of the flush steps audit_denials and
+// stats_flush, which their components register during the start, count in the sum Run checks
+// before the start (shutdown.database_flush_timeout, 02 "Shutdown").
+func TestServeDatabaseFlushBudgetCountsAtWiring(t *testing.T) {
+	t.Parallel()
+	db := newServeDB(t)
+	p := start(t, wire.RoleAPI, serveEnv(t, db, "BOTHY_SHUTDOWN__DATABASE_FLUSH_TIMEOUT=20s", "BOTHY_SHUTDOWN__TOTAL_TIMEOUT=60s"), wire.Deps{})
+	if code := p.exit(t); code != lifecycle.ExitUsage {
+		t.Fatalf("exit = %d, want 2", code)
+	}
+	// Without the two database flushes (twice 20s) the budgets of the role add up to 25s.
+	if err := p.runner.Err(); err == nil || !strings.Contains(err.Error(), "1m5s") {
 		t.Fatalf("Err() = %v", err)
 	}
 }
@@ -502,13 +523,13 @@ func TestServeBudgetsAboveTotalExit2(t *testing.T) {
 func TestServeWorkerBudgetIncludesJobsSoftTimeout(t *testing.T) {
 	t.Parallel()
 	db := newServeDB(t)
-	env := serveEnv(t, db, "BOTHY_SHUTDOWN__JOBS_SOFT_TIMEOUT=30s", "BOTHY_SHUTDOWN__TOTAL_TIMEOUT=30s")
+	env := serveEnv(t, db, "BOTHY_SHUTDOWN__JOBS_SOFT_TIMEOUT=30s", "BOTHY_SHUTDOWN__TOTAL_TIMEOUT=34s")
 	p := start(t, wire.RoleWorker, env, wire.Deps{})
 	if code := p.exit(t); code != lifecycle.ExitUsage {
 		t.Fatalf("exit = %d", code)
 	}
-	if err := p.runner.Err(); err == nil || !strings.Contains(err.Error(), "35s") {
-		t.Fatalf("Err() = %v, want the sum 35s of jobs and telemetry", err)
+	if err := p.runner.Err(); err == nil || !strings.Contains(err.Error(), "39s") {
+		t.Fatalf("Err() = %v, want the sum 39s of jobs, telemetry and the two database flushes", err)
 	}
 	// The api role has no River step: the same budgets pass.
 	api := start(t, wire.RoleAPI, env, wire.Deps{})

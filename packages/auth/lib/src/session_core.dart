@@ -15,6 +15,30 @@ import 'package:auth/src/tokens.dart';
 import 'package:dio/dio.dart';
 import 'package:domain/domain.dart';
 
+/// The names under which an `AuthSession` keeps its session in the `SecretStore`: the one
+/// place that knows them, so an app that asks whether a session is stored, or reads the device
+/// ID, uses the same names the session writes.
+///
+/// Example: `await secrets.read(SessionSecretKeys.refreshToken(serverUrl)) != null`.
+abstract final class SessionSecretKeys {
+  /// The first segment of every key of a session.
+  static const String root = 'auth';
+
+  /// The last segment of the refresh token's key.
+  static const String refreshTokenName = 'refresh_token';
+
+  /// The last segment of the device ID's key.
+  static const String deviceIdName = 'device_id';
+
+  /// The key of the refresh token of the server at [serverUrl] (its origin).
+  static String refreshToken(Uri serverUrl) =>
+      '$root/${serverUrl.origin}/$refreshTokenName';
+
+  /// The key of the device ID of the server at [serverUrl] (its origin).
+  static String deviceId(Uri serverUrl) =>
+      '$root/${serverUrl.origin}/$deviceIdName';
+}
+
 /// Internal: the state every part of one session shares.
 final class SessionCore {
   /// Creates the core for the server at [serverUrl].
@@ -25,7 +49,7 @@ final class SessionCore {
     required this.clock,
     required this.ids,
     required this.config,
-  }) : _prefix = 'auth/${serverUrl.origin}/';
+  });
 
   /// The server address (origin) this session belongs to.
   final Uri serverUrl;
@@ -56,8 +80,6 @@ final class SessionCore {
 
   final StreamController<AuthEvent> _events = StreamController.broadcast();
 
-  final String _prefix;
-
   /// Counts sign-outs, so a refresh that completes after a sign-out is not adopted.
   int generation = 0;
 
@@ -68,10 +90,10 @@ final class SessionCore {
   Stream<AuthEvent> get events => _events.stream;
 
   /// Store key of the refresh token of this server.
-  String get refreshTokenKey => '${_prefix}refresh_token';
+  String get refreshTokenKey => SessionSecretKeys.refreshToken(serverUrl);
 
   /// Store key of the device ID of this server.
-  String get deviceIdKey => '${_prefix}device_id';
+  String get deviceIdKey => SessionSecretKeys.deviceId(serverUrl);
 
   /// Emits [event] and logs it.
   void emit(AuthEvent event) {

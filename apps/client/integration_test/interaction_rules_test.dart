@@ -268,7 +268,7 @@ void main() {
         () => s.message(replyId).evaluate().isNotEmpty,
       );
       await s.act(replyId, 'delete');
-      await s.tapKey('delete.confirm');
+      await s.tapKey('message.delete.confirm');
       await s.until(
         'deleted',
         () => s.world.messages[replyId]!['deleted_at'] != null,

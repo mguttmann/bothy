@@ -161,13 +161,14 @@ final class DraftWriter {
   /// than what the person typed here (the next local write wins, 04 14).
   Future<bool> hasUnsent() async => (await _unsent()).isNotEmpty;
 
-  /// The text of the newest draft write that waits or is in flight, or null; a write that was
+  /// The text and the reply reference of the newest draft write that waits or is in flight,
+  /// or null; a write that was
   /// not attempted becomes the one that later changes update (a composer opened again, or the
   /// app started again while offline).
   ///
   /// A message of the thread (or a new post of the forum) queued after that write was sent
   /// with `clear_draft`, so the draft ended there and nothing is restored.
-  Future<String?> restore() async {
+  Future<({String text, MessageId? replyTo})?> restore() async {
     final all = await _entries();
     final unsent = [
       for (final e in all)
@@ -182,7 +183,14 @@ final class DraftWriter {
     if (last.attempts == 0 && last.state == OutboxState.pending) {
       _waiting = last.id;
     }
-    return decodePayload(last.payload)['content_md'] as String?;
+    final payload = decodePayload(last.payload);
+    final text = payload['content_md'];
+    if (text is! String) return null;
+    final reply = payload['reply_to_message_id'];
+    return (
+      text: text,
+      replyTo: reply is String ? MessageId.parse(reply) : null,
+    );
   }
 
   Future<OutboxEntry?> _waitingEntry() async {

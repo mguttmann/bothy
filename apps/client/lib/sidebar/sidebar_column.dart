@@ -24,6 +24,8 @@ import '../new_project/new_project_dialog.dart' show showNewProjectDialog;
 import '../new_project/project_sync_dialog.dart' show showProjectSyncDialog;
 import '../notifications_settings/providers.dart' show isOwnerProvider;
 import '../onboarding/onboarding_controller.dart';
+import '../phone/me/logout_confirm.dart' show confirmLogout;
+import '../phone/providers.dart' show outboxWaitingProvider;
 import '../running/providers.dart' show activeRunCountProvider;
 import '../settings/settings_providers.dart' show sidebarArrangementProvider;
 import '../structure/structure_create_dialog.dart' show showSpaceCreateDialog;
@@ -680,10 +682,30 @@ class SidebarColumn extends ConsumerWidget {
           : () => context.go(
               adminPathOf(const AdminLocation(AdminSection.statistics)),
             ),
-      onLogout: () =>
-          unawaited(ref.read(onboardingControllerProvider.notifier).logout()),
+      // Asks once like the phone's Me tab, naming the changes that still wait (01 6.7).
+      onLogout: () => unawaited(_logOut(context, ref)),
     );
   }
+}
+
+/// "Log out" of the sidebar's foot: asks once ([confirmLogout]), naming the outbox entries
+/// that still wait and are lost with the local data, then logs out.
+Future<void> _logOut(BuildContext context, WidgetRef ref) async {
+  // Read before the dialog: the column may be gone when it closes.
+  final control = ref.read(onboardingControllerProvider.notifier);
+  // Nothing on the desktop watches the count: listened while its first value is awaited (a
+  // provider without listeners is paused and would never answer).
+  final count = ref.listenManual(outboxWaitingProvider, (_, _) {});
+  final int waiting;
+  try {
+    waiting = await ref.read(outboxWaitingProvider.future);
+  } finally {
+    count.close();
+  }
+  if (!context.mounted || !await confirmLogout(context, waiting: waiting)) {
+    return;
+  }
+  await control.logout();
 }
 
 /// Opens the new project dialog of [space] and, when every step is done, the new forum or,

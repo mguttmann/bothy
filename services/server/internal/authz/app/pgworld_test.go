@@ -41,6 +41,9 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
+// reasonMaxChars is audit.reason_max_chars of the PostgreSQL world (SEC-AUD-5).
+const reasonMaxChars = 200
+
 func TestMain(m *testing.M) { os.Exit(pgtest.Main(m)) }
 
 // pgStart is the clock of the PostgreSQL world.
@@ -183,7 +186,7 @@ func newPGWorld(t *testing.T) *pgWorld {
 		UoW: w.uow, Authorizer: w.az, Store: w.store, Principals: w.principals, Structure: w.structure, Rights: hook,
 		Audit: w.rec, Clock: w.clk, Events: w.appender, Scopes: w.az, Cursors: authzhttp.Cursors{},
 		Config: app.AdminConfig{GroupNameMaxChars: 100, GroupDescriptionMaxChars: 500, PageSizeDefault: 2, PageSizeMax: 3,
-			ExpiryReminderLead: reminderLead},
+			ExpiryReminderLead: reminderLead, ReasonMaxChars: reasonMaxChars},
 		Agents: w.policies, Tokens: w.tokenExp,
 	}
 	w.admin, err = app.NewAdminService(w.adminDeps)

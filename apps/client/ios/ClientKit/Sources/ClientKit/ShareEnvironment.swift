@@ -48,7 +48,7 @@ public enum ShareEnvironment {
         let manager = DeviceKeyManager(store: KeychainKeyStore(), accessGroup: config.keychainGroup)
         return assemble(
             state: state, root: container, secrets: KeychainSecretStore(accessGroup: config.keychainGroup),
-            signer: { DeviceKeyProofSigner(manager: manager, scope: $0) }, transport: URLSessionTransport(), now: Date.init)
+            signer: { DeviceKeyProofSigner(manager: manager, scope: $0) }, transport: URLSessionTransport.shared, now: Date.init)
     }
 
     /// Wires the pieces; separate from `live` so the tests build the same graph over fakes.

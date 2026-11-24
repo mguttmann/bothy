@@ -194,9 +194,6 @@ func (ap *Apps) BindKeys(k appsapp.Signers) {
 // BindJobs binds the inserter of the job runtime of the role to the delivery scheduler.
 func (ap *Apps) BindJobs(ins jobs.Inserter) { ap.Scheduler.Bind(ins) }
 
-// RegisterJobs registers apps.webhook_deliver on the queue delivery in reg (every role).
-func (ap *Apps) RegisterJobs(reg *jobs.Registry) error { return appsjobs.Register(reg, ap.Webhooks) }
-
 // Consumer returns the handler of the worker consumer webhooks.
 func (ap *Apps) Consumer() sync.ConsumerHandler { return ap.Webhooks.Consumer() }
 

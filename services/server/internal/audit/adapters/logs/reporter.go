@@ -29,7 +29,7 @@ const (
 	msgDenialsDropped = "aggregated audit denials dropped"
 	msgWriteFailed    = "write of aggregated audit denials failed, retrying"
 	msgIPKeyFailed    = "audit IP pseudonym key unavailable, denial kept without IP fields"
-	msgSinkMissing    = "audit checkpoint sink not configured, the chain is not protected outside the database"
+	msgSinkMissing    = "audit checkpoint sink not configured, the chain is not protected outside the database and retention.audit trims nothing"
 	msgVerifyFailed   = "audit chain verification failed, no checkpoint signed"
 	msgExportCut      = "audit export cut short after the stream started"
 	msgRecordFailed   = "audit entry of the chain verification not written"

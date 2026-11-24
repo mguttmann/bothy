@@ -324,6 +324,21 @@ def test_android_job_fails_when_no_android_command_ran(
     assert "apps-platform android: no Android command ran" in capsys.readouterr().err
 
 
+def test_android_job_fails_without_device_in_ci(
+    tmp_path: Path,
+    fake_adb: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The Android job of CI never ends green when its emulator is gone."""
+    monkeypatch.setenv("CI", "true")
+    root = tmp_path / "repo"
+    _android_member(root)
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 1
+    assert _calls(fake_adb) == []
+    assert "packages/device_key android: no device" in capsys.readouterr().err
+
+
 def test_android_skips_without_adb(
     tmp_path: Path,
     fake_flutter: Path,

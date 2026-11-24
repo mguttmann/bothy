@@ -54,6 +54,8 @@ type PrivacyConfig struct {
 	// PageSizeDefault and PageSizeMax are api.page_size_default and api.page_size_max.
 	PageSizeDefault int `config:"api.page_size_default"`
 	PageSizeMax     int `config:"api.page_size_max"`
+	// ReasonMaxChars is audit.reason_max_chars, the longest reason of a request and a decision.
+	ReasonMaxChars int `config:"audit.reason_max_chars"`
 }
 
 // PrivacyConfigFrom binds PrivacyConfig from v; the error names the key, never a value.
@@ -70,7 +72,7 @@ func (c PrivacyConfig) appConfig() privacyapp.Config {
 	return privacyapp.Config{
 		ExportTTL: c.ExportTTL, ExportRequiresApproval: c.ExportRequiresApproval,
 		DeletionContent: personaldata.ContentMode(c.DeletionContent), ReminderLead: c.ReminderLead,
-		PageSizeDefault: c.PageSizeDefault, PageSizeMax: c.PageSizeMax,
+		PageSizeDefault: c.PageSizeDefault, PageSizeMax: c.PageSizeMax, ReasonMaxChars: c.ReasonMaxChars,
 	}
 }
 

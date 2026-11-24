@@ -29,12 +29,14 @@ func (q *Queries) CountOtherIdentitiesAtEnabledProviders(ctx context.Context, ar
 }
 
 const countPairingDevicesOfUser = `-- name: CountPairingDevicesOfUser :one
-SELECT count(*) FROM devices
-WHERE user_id = $1 AND state = 'active' AND platform <> 'cli'
+SELECT count(*) FROM devices d
+WHERE d.user_id = $1 AND d.state = 'active' AND d.platform <> 'cli'
+  AND EXISTS (SELECT 1 FROM device_keys k WHERE k.device_id = d.id AND k.purpose = 'dpop' AND k.revoked_at IS NULL)
 `
 
 // Active devices that can approve a pairing with step-up (08 section 5.3); a cli device has no
-// step-up (ID-T29).
+// step-up (ID-T29), and a device without an active key (the web device of a console login)
+// holds no app session that could approve one.
 func (q *Queries) CountPairingDevicesOfUser(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countPairingDevicesOfUser, userID)
 	var count int64

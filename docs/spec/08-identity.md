@@ -339,7 +339,9 @@ Table `enrollment_codes` (03). Properties:
   same answer.
 - Handover outside the product (in person, telephone). No email sending (Baseline section 4).
 - A code is at the same time the approval of the first device: The device that redeems it becomes
-  `active`. It is redeemed only with device keys (`POST /api/v1/auth/enroll/redeem`), together
+  `active`. A device that is already known and `pending` (an earlier login without a code) is
+  refused with `409 conflict` and reason `device_pending`; the code stays unused and the device
+  is approved with its verification code (section 5.2). It is redeemed only with device keys (`POST /api/v1/auth/enroll/redeem`), together
   with a passkey (`/api/v1/auth/enroll/begin` and `/complete`) or through a login with OIDC or proxy header
   (field `enrollment_code`, section 3.1).
 
@@ -357,8 +359,9 @@ Table `enrollment_codes` (03). Properties:
   method remains afterwards (no identity at an enabled driver, no passkey, no active device for
   device pairing). The check locks the identities of the person, so that two parallel unlinks
   do not both succeed.
-  A device counts for device pairing when it is `active` and not on the platform `cli`, which has
-  no step-up (ID-T29, docs/DECISIONS.md M1-36/3).
+  A device counts for device pairing when it is `active`, has an active DPoP key and is not on
+  the platform `cli`, which has no step-up (ID-T29, docs/DECISIONS.md M1-36/3); the keyless web
+  device of a console login (section 7.5) never approves a pairing and does not count.
 - Unlinking an identity ends the sessions that began with it (`auth_sessions.identity_id`,
   reason `logout` when the person does it, `admin` when someone else does); switching off a
   driver (`enabled = false`) ends the sessions of all its identities (`admin`) and prevents new
@@ -1049,7 +1052,9 @@ Rules:
 - Step-up failures are counted per session over `auth_challenges` (`status = 'failed'`,
   `finished_at` inside `auth.login_fail_window`). The job `identity.auth_cleanup` deletes a
   challenge after its `expires_at`, but a failed step-up challenge only once its `finished_at` has
-  left `auth.login_fail_window`; otherwise the cleanup would reset the count (M1-35).
+  left `auth.login_fail_window`; otherwise the cleanup would reset the count (M1-35). The used
+  passkey challenge of the current step-up of a live session also stays, because the fact that
+  this step-up verified the user (section 6.3 point 3) is read from it.
 - The failure window of an account starts with the first failed attempt
   (`local_credentials.fail_window_started_at`); a failed attempt after it starts a new window.
   Every request computes exactly one Argon2id hash, also for an unknown name and during a lockout.

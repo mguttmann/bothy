@@ -60,7 +60,11 @@ typedef ReaderFacts = ({AccessView? access, PrincipalId? me, bool owner});
       }
     case ComponentRestriction.owner:
       return (permitted: false, reason: l.componentsApproverOwner);
-    case ComponentRestriction.any || ComponentRestriction.unknown || null:
+    // A restriction of a newer server is not guessed: the card stays locked (owners pass
+    // above).
+    case ComponentRestriction.unknown:
+      return (permitted: false, reason: l.componentsUnsupported);
+    case ComponentRestriction.any || null:
       break;
   }
   return (permitted: true, reason: null);

@@ -306,7 +306,7 @@ func TestAudit_StartFlushesBeforeThePoolCloses(t *testing.T) {
 	}})
 	started := make(chan struct{})
 	r.Add(componentFunc{name: "audit", start: func(context.Context) error {
-		e.audit.Start(r)
+		e.audit.Start(r, 5*time.Second)
 		close(started)
 		return nil
 	}})

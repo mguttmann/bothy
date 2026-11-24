@@ -145,7 +145,7 @@ Source: [01-product.md](../spec/01-product.md), section 14.
 | `ui.composer_paste_file_chars` |  | App |  | `4000` | a paste of more characters becomes a text file attachment in the composer (6.13) |  |
 | `ui.composer_paste_file_lines` |  | App |  | `100` | a paste of more lines becomes a text file attachment in the composer (6.13) |  |
 | `ui.code_block_collapse_lines` |  | App |  | `20` | a code block higher than this many lines of code shows collapsed with a fade and "Show all" (6.14) |  |
-| `ui.autocomplete_debounce` |  | App |  | `150ms` | waiting time before `command.autocomplete` |  |
+| `ui.autocomplete_debounce` |  | App |  | `150ms` | waiting time before `command.autocomplete` and before the target search of the share sheet |  |
 | `ui.quick_switch_max_results` |  | App |  | `20` | hits in the quick switcher |  |
 | `ui.desktop_min_width_four_columns` |  | App |  | `1280px` | below this width the session column collapses |  |
 | `ui.desktop_min_width_three_columns` |  | App |  | `960px` | below this width a pinned forum overview returns to the content column (navigation stack) |  |
@@ -206,6 +206,7 @@ Source: [02-architecture.md](../spec/02-architecture.md), section 22.
 | `shutdown.http_grace` | `BOTHY_SHUTDOWN__HTTP_GRACE` | Server | duration | `20s` | deadline for running HTTP requests | active |
 | `shutdown.jobs_soft_timeout` | `BOTHY_SHUTDOWN__JOBS_SOFT_TIMEOUT` | Server | duration | `20s` | soft stop of River | active |
 | `shutdown.telemetry_flush_timeout` | `BOTHY_SHUTDOWN__TELEMETRY_FLUSH_TIMEOUT` | Server | duration | `5s` | flushing telemetry | active |
+| `shutdown.database_flush_timeout` | `BOTHY_SHUTDOWN__DATABASE_FLUSH_TIMEOUT` | Server | duration | `2s` | each flush step of the database phase (`audit_denials`, `stats_flush`) | active |
 | `shutdown.total_timeout` | `BOTHY_SHUTDOWN__TOTAL_TIMEOUT` | Server | duration | `60s` | total deadline until the end; at least the sum of the step budgets (15.3) | active |
 | `perf.reference_profile` |  | Load test |  | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 local with fsync and synchronous_commit on, role all` | environment of the load tests; measurement modes in ADR 0063 |  |
 | `perf.sustained_messages_per_s` |  | Load test |  | `200` | sustained load for `perf.message_create_p99`, `perf.invocation_delivery_p99` and `perf.run_patch_fanout_p99`; also the load of `perf.push_handoff_p95` |  |
@@ -756,7 +757,7 @@ Source: [15-client-architecture.md](../spec/15-client-architecture.md), section 
 | `client.push.fetch_timeout` |  | App |  | `20s` | time that the NSE or the Android service uses to fetch the text |  |
 | `client.voice.bitrate` |  | App |  | `64kbps` | bitrate of the AAC recording |  |
 | `client.voice.limit_notice_lead` |  | App |  | `30s` | how long before `voice.max_duration` the phone shows and announces that a recording ends; the recording stops by itself shortly before the limit |  |
-| `client.metrics.flush_interval` |  | App |  | `5m` | the client sends metrics at most this often |  |
+| `client.metrics.flush_interval` |  | App |  | `5m` | the client sends metrics this often, and when it moves to the background or quits |  |
 | `client.status_poll_interval` |  | App |  | `30s` | the web console and the open status page of the apps read the status page again this often (the apps also follow `status.updated`, which a change of agent components alone does not send) |  |
 | `client.perf.cold_start_p95` |  | App |  | `2500ms` | target for cold start |  |
 | `client.perf.thread_open_p95` |  | App |  | `300ms` | target for opening a thread from the cache |  |
@@ -904,7 +905,7 @@ Source: [20-privacy.md](../spec/20-privacy.md), section 13.
 | `retention.content` | `BOTHY_RETENTION__CONTENT` | Server | string | `none` | period for contents, at least one day; `none` means no automatic deletion (without `retention.content_none_reason` a warning, 4.1) | active |
 | `retention.content_none_reason` | `BOTHY_RETENTION__CONTENT_NONE_REASON` | Server | string | empty | reason of the instance operator for `retention.content = none`; empty means a warning in `bothy config check` and in the startup log (4.1) | active |
 | `retention.security_after_end` | `BOTHY_RETENTION__SECURITY_AFTER_END` | Server | duration | `90d` | security data after end, expiry or revocation | active |
-| `retention.audit` | `BOTHY_RETENTION__AUDIT` | Server | duration | `365d` | audit log (Study C suggested twelve months) | active |
+| `retention.audit` | `BOTHY_RETENTION__AUDIT` | Server | duration | `365d` | audit log (Study C suggested twelve months); trims nothing while `audit.checkpoint_sink` is empty (4.5) | active |
 | `retention.cost` | `BOTHY_RETENTION__COST` | Server | duration | `395d` | costs and prices | active |
 | `retention.import_after_completion` | `BOTHY_RETENTION__IMPORT_AFTER_COMPLETION` | Server | duration | `90d` | import state (the source and its items) after the completion or cancellation of the source | active |
 | `retention.privacy_job` | `BOTHY_RETENTION__PRIVACY_JOB` | Server | duration | `1095d` | privacy requests (without export packages) | active |
@@ -920,7 +921,7 @@ Source: [20-privacy.md](../spec/20-privacy.md), section 13.
 | `privacy.request_reminder_lead` | `BOTHY_PRIVACY__REQUEST_REMINDER_LEAD` | Server | duration | `7d` | how long before `due_at` of an open privacy request the owners get `gdpr.request_due`; less than one month | active |
 | `privacy.object_delete_delay` | `BOTHY_PRIVACY__OBJECT_DELETE_DELAY` | Server | duration | `24h` | maximum time until deleted objects are removed | active |
 | `privacy.deletion_journal_retention` | `BOTHY_PRIVACY__DELETION_JOURNAL_RETENTION` | Server | duration | `400d` | retention of the deletion journal; at least the backup period | active |
-| `privacy.audit_ip_key_period` | `BOTHY_PRIVACY__AUDIT_IP_KEY_PERIOD` | Server | duration | `30d` | period per key for IP pseudonyms | active |
+| `privacy.audit_ip_key_period` | `BOTHY_PRIVACY__AUDIT_IP_KEY_PERIOD` | Server | duration | `30d` | period per key for IP pseudonyms; a changed value takes effect with the next key (03 `audit_ip_keys`) | active |
 | `privacy.audit_ip_key_retention` | `BOTHY_PRIVACY__AUDIT_IP_KEY_RETENTION` | Server | duration | `90d` | keys are destroyed after this | active |
 | `privacy.audit_ip_kek_ref` | `BOTHY_PRIVACY__AUDIT_IP_KEK_REF` | Server | secret_ref | `file:<secrets.dir>/audit_ip_kek` | reference to the key that encrypts the IP keys in `audit_ip_keys` | active |
 | `privacy.telemetry_pseudonym_rotation` | `BOTHY_PRIVACY__TELEMETRY_PSEUDONYM_ROTATION` | Server | duration | `30d` | rotation of the key for pseudonymous IDs in telemetry | active |

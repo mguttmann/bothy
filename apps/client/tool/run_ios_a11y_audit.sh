@@ -12,6 +12,8 @@ set -eu
 cd "$(dirname "$0")/.."
 if ! xcrun --find simctl >/dev/null 2>&1 || ! xcrun --find xcodebuild >/dev/null 2>&1; then
   echo "SKIP client ios-a11y-audit: Xcode with the iOS simulator is not installed on this host"
+  # In CI the job provides the device: a SKIP there would be a green run that tested nothing.
+  [ -z "${CI:-}" ] || exit 1
   exit 0
 fi
 udid=$(xcrun simctl list devices available | sed -n 's/^ *iPhone[^(]*(\([0-9A-F-]\{36\}\)).*/\1/p' | head -n 1)

@@ -26,6 +26,13 @@ sealed class ComposerError {
   const ComposerError();
 }
 
+/// The message could not be written to the outbox (the database is closed or the disk is
+/// full); the text, the reply and the attachments are back in the composer.
+final class SendFailed extends ComposerError {
+  /// Creates the error.
+  const SendFailed();
+}
+
 /// The content is larger than `message_max_content_bytes` of the instance (D-W-115) and its
 /// rest could not become an attachment (no file support here, or the attachment was refused;
 /// M4-47).
@@ -157,7 +164,8 @@ final class ComposerController extends ChangeNotifier {
   /// The message a reply quotes, or null.
   MessageId? replyTo;
 
-  /// The author of [replyTo].
+  /// The author of [replyTo] when the person started the reply here; null for the reply of a
+  /// restored draft, whose author the view takes from the stored message.
   String? replyName;
 
   /// The mention suggestions for the token at the cursor.
@@ -166,9 +174,6 @@ final class ComposerController extends ChangeNotifier {
   ResourceVersion? _draftVersion;
   bool _focused = false;
   bool _dirty = false;
-
-  /// Whether the person changed the text since the stored draft was applied.
-  bool get dirty => _dirty;
 
   /// The field got or lost the focus; without it the person is not typing (04 14), so a
   /// draft of another device may be applied again.
@@ -290,10 +295,18 @@ final class ComposerController extends ChangeNotifier {
     // composer opened again shows the draft this device saved).
     final next = draft?.contentMd ?? '';
     if (draft != null) _draftVersion = draft.version;
-    if (next == text.text) return;
-    _setText(next);
-    replyTo = draft?.replyToMessageId;
+    final reply = draft?.replyToMessageId;
+    if (next == text.text && reply == replyTo) return;
+    if (next != text.text) _setText(next);
+    _setReply(reply);
     notifyListeners();
+  }
+
+  /// Takes over the reply reference [reply] of a stored or unsent draft; the name of a
+  /// different reply goes, the view names its author from the stored message then.
+  void _setReply(MessageId? reply) {
+    if (reply != replyTo) replyName = null;
+    replyTo = reply;
   }
 
   int _applyCalls = 0;
@@ -313,8 +326,10 @@ final class ComposerController extends ChangeNotifier {
   /// opened again, or the app started again while offline, 04 13); the stored draft is older.
   Future<void> restoreUnsent() async {
     final unsent = await _drafts.restore();
-    if (_closed || unsent == null || _typingNow || unsent == text.text) return;
-    _setText(unsent);
+    if (_closed || unsent == null || _typingNow) return;
+    if (unsent.text == text.text && unsent.replyTo == replyTo) return;
+    if (unsent.text != text.text) _setText(unsent.text);
+    _setReply(unsent.replyTo);
     notifyListeners();
   }
 
@@ -434,6 +449,10 @@ final class ComposerController extends ChangeNotifier {
         _taking = false;
       }
     }
+    final replyAuthor = replyName;
+    final held = (stagedFiles?.stages ?? true)
+        ? const <PendingAttachment>[]
+        : List.of(stagedFiles!.attachments);
     _seen = '';
     text.clear();
     replyTo = null;
@@ -446,11 +465,26 @@ final class ComposerController extends ChangeNotifier {
     if (thread != null) _typing?.onSent(thread);
     notifyListeners();
     final files = (stagedFiles?.stages ?? false) ? staged : attach?.take();
-    await _drafts.dropWaiting();
-    if (thread == null) {
-      await sendNew?.call(body, files);
-    } else {
-      await _actions?.send(thread, body, replyTo: reply, attachments: files);
+    try {
+      await _drafts.dropWaiting();
+      if (thread == null) {
+        await sendNew?.call(body, files);
+      } else {
+        await _actions?.send(thread, body, replyTo: reply, attachments: files);
+      }
+    } on Object {
+      // Nothing is in the outbox: the text, the reply and the attachments come back, unless
+      // the person typed or replied meanwhile, and the composer says the send failed.
+      if (_closed) return false;
+      if (text.text.isEmpty) _setText(value);
+      if (replyTo == null) {
+        replyTo = reply;
+        replyName = replyAuthor;
+      }
+      if (held.isNotEmpty) stagedFiles?.putBack(held);
+      error = const SendFailed();
+      notifyListeners();
+      return false;
     }
     // The outbox write is done; the history shows it in the next frame.
     if (started != null) measurements!.sendShown(started);

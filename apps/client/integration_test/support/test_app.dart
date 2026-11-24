@@ -8,6 +8,7 @@
 import 'package:client/app/app.dart';
 import 'package:client/app/bootstrap.dart' show FileProtector;
 import 'package:client/app/providers/ports.dart';
+import 'package:client/app/providers/retry.dart';
 import 'package:client/desktop/window_behavior.dart';
 import 'package:client/files/file_ports.dart';
 import 'package:client/lock/app_lock_port.dart';
@@ -86,6 +87,7 @@ class TestApp {
   Future<void> pumpApp() async {
     await tester.pumpWidget(
       ProviderScope(
+        retry: appProviderRetry,
         overrides: [appPortsProvider.overrideWithValue(fake.ports)],
         child: const ClientApp(),
       ),

@@ -172,6 +172,16 @@ func TestAZP3_UnknownActionFailsClosedThroughAuthorize(t *testing.T) {
 	if detached != 1 || w.rec.detached[0].Decision != auditing.DecisionError || w.rec.detached[0].Reason != auditing.ReasonUnknownAction {
 		t.Fatalf("recorder %+v", w.rec.detached)
 	}
+	// The entry of a decision error does not end with the request (R-AZ-04): a canceled request
+	// still writes it.
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := w.az.Authorize(canceled, w.user(w.owner), unknownAction, authorize.Resource{Kind: authorize.ResourceInstance}); err == nil {
+		t.Fatal("unknown action with a canceled context allowed")
+	}
+	if _, detached := w.rec.counts(); detached != 2 || w.rec.detachedCtx[1] != nil {
+		t.Fatalf("decision error of a canceled request written with context error %v", w.rec.detachedCtx)
+	}
 	// Every deferred action fails the same way (D3). The list comes from the requirement table, so a
 	// ticket that builds one of them leaves this test valid.
 	for _, id := range domain.DeferredActions() {

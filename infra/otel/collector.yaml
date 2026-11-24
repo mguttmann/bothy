@@ -152,6 +152,7 @@ processors:
       - bothy.billing_mode
       - bothy.channel.id
       - bothy.close.code
+      - bothy.connection.duration
       - bothy.consumer.name
       - bothy.correlation_id
       - bothy.csp.blocked_origin

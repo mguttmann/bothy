@@ -798,6 +798,13 @@ the commit order in the server, expressed by the version.
 
 A device recognizes its own echo by `updated_by_device_id` and ignores it.
 
+When the server refuses a write of a notification level or a quiet hours rule for good (section
+13.2 item 5), the app reads `listMyNotificationPreferences` or `listMyQuietHours` and puts the
+local rows of the refused target, or the local rules, back to the server's state, so the app
+never shows a value the server does not know; a rule whose create still waits keeps its row. A
+refused later write of a sidebar row does not keep the answer of an earlier one from being
+stored.
+
 Not synchronized (addendum of 2026-10-29, R-SY-29): the navigation state of a device. Its route
 (the open space, channel, thread or view), its selected sidebar row, its open and hidden columns,
 which spaces and groups of its sidebar are collapsed and its scroll positions have no event, no

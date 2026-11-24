@@ -64,6 +64,11 @@ abstract class IosPlatformApi {
   /// Whether a physical keyboard is connected (`GCKeyboard.coalesced`); the terminal hides its
   /// extra keys bar then (01 screen M8).
   bool hardwareKeyboardConnected();
+
+  /// The device's name for the registration (08 5.1): `UIDevice.name` (since iOS 16 the kind
+  /// of device, such as `iPhone`, unless the app has the entitlement for the name the person
+  /// gave it) with the hardware model identifier, for example `iPhone (iPhone15,2)`.
+  String deviceName();
 }
 
 /// Calls from the iOS runner into the app.

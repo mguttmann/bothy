@@ -302,20 +302,20 @@ void main() {
     final host = await open(tester);
     await openMenu(tester, host, messageId(2));
     await choose(tester, host, 'delete');
-    expect(find.byKey(const ValueKey('delete.dialog')), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('delete.cancel')));
+    expect(find.byKey(const ValueKey('message.delete.dialog')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('message.delete.cancel')));
     await tester.pump(const Duration(milliseconds: 500));
     await host.settle(tester);
     expect(await entries(tester, host), isEmpty);
     await openMenu(tester, host, messageId(2));
     await choose(tester, host, 'delete');
-    await tester.tap(find.byKey(const ValueKey('delete.confirm')));
+    await tester.tap(find.byKey(const ValueKey('message.delete.confirm')));
     await tester.pump(const Duration(milliseconds: 500));
     await host.settle(tester);
     final all = await entries(tester, host);
     expect(all.single.kind, MessageOps.deleteMessage);
     expect(body(all.single), {'message_id': messageId(2).value});
-    expect(find.byKey(const ValueKey('delete.dialog')), findsNothing);
+    expect(find.byKey(const ValueKey('message.delete.dialog')), findsNothing);
     await host.dispose(tester);
   });
 

@@ -246,8 +246,11 @@ final class FlutterSecureBackend implements SecureBackend {
     probeKey,
   };
 
+  /// The refresh token of a session under an instance prefix, by the names the session writes
+  /// ([SessionSecretKeys]); group 1 is the instance ID.
   static final RegExp _refreshTokenKey = RegExp(
-    r'^instance/([^/]+)/auth/.+/refresh_token$',
+    '^instance/([^/]+)/${RegExp.escape(SessionSecretKeys.root)}/.+/'
+    '${RegExp.escape(SessionSecretKeys.refreshTokenName)}\$',
   );
 
   /// The status `errSecMissingEntitlement` of the Security framework.
@@ -410,7 +413,7 @@ final class FlutterSecureBackend implements SecureBackend {
       final marked = await _read(scopeMarkerKey, scoped) != null;
       final current = await _scopedKeys(scoped);
       final shared = _shared(scoped);
-      if (marked && !shared && current.any(_isRefreshToken)) return;
+      if (marked && !shared && current.any(isRefreshToken)) return;
       final Set<String>? own = shared
           ? await (localInstances?.call() ?? Future.value(<String>{}))
           : null;
@@ -436,7 +439,9 @@ final class FlutterSecureBackend implements SecureBackend {
     }
   }
 
-  static bool _isRefreshToken(String key) => _refreshTokenKey.hasMatch(key);
+  /// Whether [key] of the backend is the refresh token of a session of an instance.
+  @visibleForTesting
+  static bool isRefreshToken(String key) => _refreshTokenKey.hasMatch(key);
 
   /// Whether the scope keys [current] hold a session of [instanceId] (a refresh token).
   static bool _settled(String instanceId, Set<String> current) => current.any(

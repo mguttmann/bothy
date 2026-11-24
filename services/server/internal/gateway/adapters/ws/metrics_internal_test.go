@@ -3,12 +3,17 @@
 package ws
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"log/slog"
 	"slices"
 	gosync "sync"
 	"testing"
 	"time"
+
+	"go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/wstest"
 	"github.com/OWNER/bothy/services/server/internal/gateway/app"
@@ -153,5 +158,26 @@ func TestGatewayMetrics_DeliveredDurability(t *testing.T) {
 	want := []string{"delivered durable  250ms", "delivered ephemeral  0s"}
 	if !slices.Equal(lines, want) {
 		t.Errorf("recorded %q, want %q", lines, want)
+	}
+}
+
+// TestConnectionEndLogsOneLine: the end of every connection writes one info line with the close
+// code, the outcome, the principal kind and the duration, and nothing of the frames (fn-sync-offline-8).
+func TestConnectionEndLogsOneLine(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	clk := clock.NewFake(time.Date(2026, 11, 23, 9, 0, 0, 0, time.UTC))
+	h := &Handler{d: Deps{Log: slog.New(slog.NewJSONHandler(&buf, nil)), Clock: clk}}
+	started := clk.Now()
+	clk.Advance(90 * time.Second)
+	_, span := noop.NewTracerProvider().Tracer("test").Start(context.Background(), SpanName)
+	h.end(context.Background(), span, domain.CloseCode(4013), true, "user", started)
+	var line map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &line); err != nil {
+		t.Fatalf("log %q: %v", buf.String(), err)
+	}
+	if line["msg"] != msgConnectionClosed || line["level"] != "INFO" || line[attrCloseCode] != float64(4013) ||
+		line[attrPrincipalKind] != "user" || line[attrOutcome] == nil || line[logKeyDuration] != float64(90) {
+		t.Fatalf("log line %v", line)
 	}
 }

@@ -63,7 +63,30 @@ class MentionsView extends ConsumerWidget {
       body = ListView(
         children: [
           for (final entry in page.entries) MentionTile(entry: entry),
-          if (page.nextCursor != null)
+          // The next page failed: the pages so far stay, with the failure and "Try again".
+          if (state.hasError && !state.isLoading)
+            Padding(
+              padding: const EdgeInsets.all(DsSpace.s12),
+              child: Column(
+                children: [
+                  Text(
+                    l.mentionsFailed,
+                    key: const ValueKey('mentions.moreFailed'),
+                    style: dsTextStyle(DsType.body)
+                        .copyWith(color: c.textSecondary),
+                  ),
+                  const SizedBox(height: DsSpace.s8),
+                  DsButton(
+                    key: const ValueKey('mentions.moreRetry'),
+                    label: l.mentionsRetry,
+                    onPressed: () => ref
+                        .read(mentionsControllerProvider.notifier)
+                        .loadMore(),
+                  ),
+                ],
+              ),
+            )
+          else if (page.nextCursor != null)
             Padding(
               padding: const EdgeInsets.all(DsSpace.s12),
               child: Center(

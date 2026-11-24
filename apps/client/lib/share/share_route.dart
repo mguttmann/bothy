@@ -5,7 +5,6 @@
 library;
 
 import 'dart:async';
-import 'dart:io';
 
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
@@ -65,6 +64,7 @@ class _ShareRouteState extends ConsumerState<ShareRoute> {
       files: content.files,
       text: content.text ?? '',
       limits: ref.read(instanceLimitsProvider).value,
+      searchDelay: ref.read(appConfigProvider).autocompleteDebounce,
       recent: () async {
         final me = services?.engine.catchUp.me;
         if (source == null || me == null) return const <ShareTarget>[];
@@ -87,17 +87,14 @@ class _ShareRouteState extends ConsumerState<ShareRoute> {
       ),
       newId: services.ids.next,
     );
-    try {
-      await sender.send(
-        content,
-        target: choice.target,
-        comment: choice.comment,
-        title: choice.title,
-      );
-    } on FileSystemException {
-      // A copy failed: nothing was written, the sheet stays and the person tries again.
-      return;
-    }
+    // A failure (a copy, the local write) leaves nothing queued; it reaches the sheet, which
+    // says so and stays for another try.
+    await sender.send(
+      content,
+      target: choice.target,
+      comment: choice.comment,
+      title: choice.title,
+    );
     if (!mounted) return;
     ref.read(pendingShareProvider.notifier).done(content);
     final target = choice.target;

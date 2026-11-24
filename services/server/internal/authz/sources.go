@@ -17,8 +17,7 @@ import (
 // adds PrincipalSource.Profiles and OwnerIDs, StructureSource.SpaceDetails and ChannelDetails and
 // AgentPolicy.BillingModesSupported for "who has access", the preview and "view as"; M2-39 adds
 // HostSource; M2-40 adds HostSource.PersonalHosts and SessionUsersOf and the FreshStepUpCheck.
-// Until their owning modules have tables, internal/wire passes empty sources (ruling D2 of
-// docs/briefs/M1-28-authz-core.md).
+// internal/wire passes the sources of the owning modules (identity, chat, agents, terminal).
 
 // PrincipalStatus is the lifecycle state of a principal as authz sees it.
 type PrincipalStatus string

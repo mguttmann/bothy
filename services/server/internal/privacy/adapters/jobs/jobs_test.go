@@ -23,11 +23,14 @@ type useCases struct {
 
 func (u *useCases) RunExport(context.Context, ids.ID) error { return u.err }
 func (u *useCases) RunErase(context.Context, ids.ID) error  { return u.err }
-func (u *useCases) Fail(_ context.Context, id ids.ID, code string) error {
+func (u *useCases) Fail(ctx context.Context, id ids.ID, code string) error {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	if code != codeFailed {
 		return errors.New("wrong code")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	u.failed = append(u.failed, id)
 	return nil
@@ -90,5 +93,23 @@ func TestWork_FailsOnTheLastAttempt(t *testing.T) {
 	}
 	if (requestHandler[Erase]{}).Work(context.Background(), jobs.Job[Erase]{}) == nil {
 		t.Fatal("a handler without use cases worked")
+	}
+}
+
+// TestWork_FailsAfterATimedOutLastAttempt: a last attempt that ended with its context (River's job
+// timeout, the stop of the worker) still marks the request failed (srv-kernel-audit-privacy-6).
+func TestWork_FailsAfterATimedOutLastAttempt(t *testing.T) {
+	t.Parallel()
+	uc := &useCases{err: context.DeadlineExceeded}
+	h := requestHandler[Export]{uc: uc, run: UseCases.RunExport, id: func(a Export) ids.ID { return a.Request }}
+	id := ids.New()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := h.Work(ctx, jobs.Job[Export]{Attempt: MaxAttempts, Args: Export{Request: id}})
+	if !errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		t.Fatalf("Work = %v, want the attempt's error and a successful Fail", err)
+	}
+	if !slices.Equal(uc.failed, []ids.ID{id}) {
+		t.Fatalf("failed = %v", uc.failed)
 	}
 }

@@ -276,9 +276,12 @@ and to the replay time of a restore. The value bounds the data loss under low lo
    `database.restore_guard = off` is only for a managed failover without loss of committed
    transactions (section 6).
 7. Trigger a restore test against the new state by hand.
-8. `docker compose start api worker` (profile `tailscale`: `api-tailscale` instead of `api`). Clients get `resync_required` with reason
+8. With `audit.checkpoint_sink` set, move the sink before the start (section 8.1): the sink still
+   holds the checkpoints signed after the target time, and `audit.chain_verify` would report
+   `checkpoint_mismatch` at every run.
+9. `docker compose start api worker` (profile `tailscale`: `api-tailscale` instead of `api`). Clients get `resync_required` with reason
    `epoch_changed` and reload; their outbox is kept.
-9. Describe the incident with the point in time and the lost period.
+10. Describe the incident with the point in time and the lost period.
 
 ### 5.3 Logical dump (other host, other major version)
 
@@ -411,6 +414,36 @@ M7-22/2). Not proven: a real cloud bucket in mode Compliance; the owner checks t
 checkpoint object of a new bucket once (`HeadObject` shows mode `COMPLIANCE` and a retain-until
 date). A `file://` target stays possible and is not immutable: then the owner copies the
 checkpoints with their own access into the bucket above.
+
+Every checkpoint object stays for good. `verifyAuditChain` checks the sink from its first
+checkpoint on, which names no predecessor: a lifecycle rule or a hand that removes old objects,
+also after the retention period ended, makes every later check `checkpoint_invalid`. Size the
+bucket for one small object per `audit.checkpoint_interval` with new rows.
+
+### 8.1 Sink after a restore
+
+A restore to an earlier point in time (5.2) brings back a database whose newest checkpoint is
+older than the newest one of the sink, and new rows reuse the `seq` of the lost ones. The job
+`audit.chain_verify` then reports `checkpoint_mismatch` at the newest checkpoint of the sink in
+every run (alert `BothyAuditChainBroken`), signs nothing, and the trim of `retention.audit` stops.
+The old checkpoints cannot and must not be removed. Before `docker compose start api worker`:
+
+1. Read the newest checkpoint of the restored database:
+   `docker compose exec -T postgres psql -U postgres -d bothy -Atc "SELECT max(seq) FROM audit_checkpoints"`
+   (empty: none).
+2. Create a new location: a new prefix in the same bucket (`s3://<bucket>/<new prefix>`) or a new
+   directory for `file://`.
+3. Copy every object of `[<old prefix>/]<instance_id>/` whose 20-digit name is at or below the
+   seq of item 1 into `<new prefix>/<instance_id>/` with the same name and content. With none in
+   item 1, copy nothing.
+4. Set `audit.checkpoint_sink` to the new location and run `bothy config check`.
+5. Record the old location, the target time and the seq of item 1 in the incident (5.2 item 10):
+   the old location stays as evidence of the state before the restore.
+
+After the start the job checks the restored log against the new location and signs again; a
+`checkpoint_mismatch` there is a real break (alerting runbook `BothyAuditChainBroken`). A test
+holds this path (`TestRestoreBreaksTheChainUntilTheSinkMoves`). The server does not do it by
+itself: a signed rollback marker in the sink is not built.
 
 ## 9. Off-site expiry by the owner
 

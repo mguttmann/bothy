@@ -187,7 +187,7 @@ jobs:
           EXPECTED: ${{ steps.proposal.outputs.sha }}
           RECORD: ${{ needs.record.outputs.record }}
           TEST: ${{ needs.record.outputs.test }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_ID: ${{ github.run_id }}
         run: |
           title="chore(deps): follow Hermes Agent main to $SHORT"
           git add -A -- plugins/hermes-adapter/tests/hermes_pin.toml \
@@ -206,7 +206,7 @@ jobs:
           body=$(mktemp)
           cat > "$body" <<EOF
           Proposes upstream Hermes Agent main commit \`$COMMIT\` as the pin of the Hermes adapter
-          (docs/decisions.d/HERMES-PIN-MAIN.md, D-HERMES-PIN-1). Written by the workflow hermes-pin: $RUN_URL
+          (docs/decisions.d/HERMES-PIN-MAIN.md, D-HERMES-PIN-1). Written by run $RUN_ID of the workflow hermes-pin.
 
           - \`make -C plugins/hermes-adapter record\`: $RECORD
           - \`make -C plugins/hermes-adapter test\`: $TEST

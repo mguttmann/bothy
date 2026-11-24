@@ -105,6 +105,25 @@ void main() {
     },
   );
 
+  test('a start through a login or the app lock reports no cold start', () {
+    // The wait for a person landed in the top bucket (AUD-PKG-P02-client-b, #1285).
+    m.coldStartWaited();
+    clock.now = const Duration(seconds: 40);
+    m.sidebarShown();
+    expect(entries(metrics), isEmpty);
+  });
+
+  test('a thread left or empty when it opened reports no open', () {
+    m.threadOpening('t1');
+    m.threadOpening('t2');
+    m.threadDropped('t1');
+    m.threadDropped('t2');
+    clock.now = const Duration(minutes: 3);
+    m.threadShown('t1');
+    m.threadShown('t2');
+    expect(entries(metrics), isEmpty);
+  });
+
   test('send runs until the frame after the local write', () {
     clock.now = const Duration(seconds: 2);
     final send = m.sendStarted();

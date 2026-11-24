@@ -223,7 +223,7 @@ func newJournalWorld(t *testing.T) *journalWorld {
 	}
 	svc, err := app.New(app.Config{
 		ExportTTL: 7 * 24 * time.Hour, DeletionContent: personaldata.KeepPseudonymized,
-		ReminderLead: 72 * time.Hour, PageSizeDefault: 50, PageSizeMax: 200,
+		ReminderLead: 72 * time.Hour, PageSizeDefault: 50, PageSizeMax: 200, ReasonMaxChars: 500,
 	}, app.Deps{
 		Store: w.store, UoW: directUoW{}, Authorizer: ownerAuthorizer{}, Audit: &recorder{}, Events: &recorder{}, People: dir,
 		Packages: noPackages{}, Participants: reg, InstanceID: func(context.Context) (ids.ID, error) { return ids.New(), nil },

@@ -58,6 +58,7 @@ import '../team/team_header.dart';
 import '../team/team_label_line.dart';
 import '../team/team_model.dart' show teamMessageLabel;
 import '../team/team_port.dart' show TeamView;
+import '../telemetry/measurements.dart';
 import '../telemetry/telemetry_providers.dart';
 import 'collapsing_header.dart';
 import 'delete_confirm.dart';
@@ -167,16 +168,21 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
 
   String get _thread => widget.threadId.value;
 
+  /// The measurement points, read once: `dispose` may not read providers.
+  late final AppMeasurements _measurements;
+
   @override
   void initState() {
     super.initState();
     _visible = ref.read(visibleThreadsProvider.notifier)..add(widget.threadId);
     // `client.thread_open.duration` runs until the first messages show (brief M4-31).
-    ref.read(appMeasurementsProvider).threadOpening(_thread);
+    _measurements = ref.read(appMeasurementsProvider)..threadOpening(_thread);
   }
 
   @override
   void dispose() {
+    // A column left before its messages showed measures nothing.
+    _measurements.threadDropped(_thread);
     _visible.remove(widget.threadId);
     _collapse.dispose();
     _selected.dispose();
@@ -527,14 +533,19 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
     final windowValue = ref.watch(threadWindowProvider(_thread));
     final window = windowValue.value ?? const ContiguousWindow(messages: []);
     if (window.messages.isNotEmpty) {
-      ref.read(appMeasurementsProvider).threadShown(_thread);
+      _measurements.threadShown(_thread);
+    } else if (windowValue.hasValue) {
+      // Empty in the cache: a first message later is no open from the cache (15 19).
+      _measurements.threadDropped(_thread);
     }
     final outbox = ref.watch(threadOutboxProvider(_thread)).value ?? const [];
-    // The upload entries by attachment key, for the files of a waiting message (M4-22).
+    // The upload entries by attachment key, for the files of a waiting message (M4-22); an
+    // entry of an older form without a key is skipped, it never breaks the history.
     final uploads = {
       for (final v in outbox)
-        if (v.entry.kind == UploadOps.upload)
-          v.payload['attachment_key']! as String: v,
+        if (v.payload['attachment_key'] case final String key
+            when v.entry.kind == UploadOps.upload)
+          key: v,
     };
     final progress = ref.watch(uploadProgressProvider);
     final principals = ref.watch(principalsByIdProvider).value ?? const {};

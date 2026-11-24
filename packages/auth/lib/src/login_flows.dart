@@ -220,12 +220,15 @@ final class LoginService {
   /// receiver's redirect URI, opens `authorization_url` through the browser port, waits for the
   /// redirect until the attempt's `expires_at`, and completes with `client_verifier`, the proof
   /// and the device fields. A redirect with `error`, of another attempt or none in time fails.
-  /// [enrollmentCode] links an unknown identity (08 3.1).
+  /// [enrollmentCode] links an unknown identity (08 3.1). When [isCancelled] answers true once
+  /// the redirect arrives (the person cancelled the wait in the app), the attempt is not
+  /// completed and the outcome is `LoginFailed('cancelled')`.
   ///
   /// Throws a [StateError] when the session was built without browser or redirect port.
   Future<LoginOutcome> beginOidc(
     String providerId, {
     String? enrollmentCode,
+    bool Function()? isCancelled,
   }) async {
     final browser = _browser;
     final redirects = _redirects;
@@ -260,6 +263,9 @@ final class LoginService {
       );
     } on TimeoutException {
       return const LoginFailed(reason: 'flow_expired');
+    }
+    if (isCancelled?.call() ?? false) {
+      return const LoginFailed(reason: 'cancelled');
     }
     final query = redirect.queryParameters;
     if (query['login_attempt_id'] != begun.loginAttemptId) {

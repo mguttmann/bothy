@@ -12,6 +12,9 @@ import 'dart:io';
 import 'package:api_client/api_client.dart' show ReadRetryPolicy;
 import 'package:client/agents/providers.dart';
 import 'package:client/app/providers/ports.dart';
+import 'package:client/app/providers/retry.dart';
+import 'package:client/settings/settings_providers.dart'
+    show instanceDescriptionProvider;
 import 'package:dio/dio.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -87,6 +90,66 @@ void main() {
       expect(document.read().hasError, isTrue);
       document.close();
     });
+  });
+
+  test('with the retry of the app, a refused provider read is retried by the '
+      'API client alone, never again by Riverpod', () async {
+    final saved = HttpOverrides.current;
+    HttpOverrides.global = null;
+    final f = await FakeInstance.start();
+    // The container of the app: ProviderScope(retry: appProviderRetry) in main.dart.
+    final c = ProviderContainer(
+      retry: appProviderRetry,
+      overrides: [appPortsProvider.overrideWithValue(f.ports)],
+    );
+    final client = AppScenarioClient(
+      c,
+      f.server,
+      f.ports.network as SwitchNetwork,
+    );
+    try {
+      await client.start();
+      final attempts = readAttempts(c);
+      expect(attempts, greaterThan(1));
+      f.server.faults.onRequest(
+        'getInstance',
+        status: 503,
+        code: 'unavailable',
+        times: attempts * 20,
+      );
+      final description = c.listen(instanceDescriptionProvider, (_, _) {});
+      await eventually('the failed read', () => description.read().hasError);
+      expect(description.read().error, isA<DioException>());
+      // A build the services' first update began may still make its attempts (at most
+      // `client.outbox_retry_cap` apart).
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      final failed = requests(f, 'getInstance');
+      expect(failed, greaterThanOrEqualTo(attempts));
+      // Riverpod's default would build the provider again after 200 ms, then 400 ms, each
+      // time with every attempt of the read retry.
+      await Future<void>.delayed(const Duration(seconds: 2));
+      expect(requests(f, 'getInstance'), failed);
+      expect(description.read().hasError, isTrue);
+      description.close();
+    } finally {
+      await client.stop();
+      c.dispose();
+      await f.stop();
+      HttpOverrides.global = saved;
+    }
+  });
+
+  test('the retry of the app keeps Riverpod\'s default for a failure that is '
+      'no request', () {
+    expect(appProviderRetry(0, StateError('x')), isNull);
+    expect(
+      appProviderRetry(0, Exception('x')),
+      ProviderContainer.defaultRetry(0, Exception('x')),
+    );
+    expect(
+      appProviderRetry(0, DioException(requestOptions: RequestOptions())),
+      isNull,
+    );
   });
 
   test('the session read of /status and /resume is one request and its '

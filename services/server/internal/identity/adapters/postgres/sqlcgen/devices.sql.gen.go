@@ -96,27 +96,6 @@ func (q *Queries) GetDevice(ctx context.Context, id pgtype.UUID) (GetDeviceRow, 
 	return i, err
 }
 
-const getDeviceKeyByJKT = `-- name: GetDeviceKeyByJKT :one
-SELECT id, device_id, purpose, jkt, public_jwk, alg, attestation, created_at, revoked_at FROM device_keys WHERE jkt = $1
-`
-
-func (q *Queries) GetDeviceKeyByJKT(ctx context.Context, jkt string) (DeviceKey, error) {
-	row := q.db.QueryRow(ctx, getDeviceKeyByJKT, jkt)
-	var i DeviceKey
-	err := row.Scan(
-		&i.ID,
-		&i.DeviceID,
-		&i.Purpose,
-		&i.Jkt,
-		&i.PublicJwk,
-		&i.Alg,
-		&i.Attestation,
-		&i.CreatedAt,
-		&i.RevokedAt,
-	)
-	return i, err
-}
-
 const insertDevice = `-- name: InsertDevice :one
 
 INSERT INTO devices (id, user_id, name, platform, state, app_version, approved_by, approved_at, created_at)
