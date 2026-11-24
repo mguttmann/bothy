@@ -93,6 +93,9 @@ final class BrowserTerminalSocket implements TerminalSocket {
 /// Every operation opens the database and closes it again, so no connection of this tab stays
 /// open and the deletion at logout in another tab is never blocked by it.
 final class IndexedDbPinDatabase implements PinDatabase {
+  /// How long [delete] waits for a blocking connection to close before it fails.
+  static const Duration blockedGrace = Duration(seconds: 1);
+
   /// Creates the database over the browser's [factory] (`window.indexedDB`).
   IndexedDbPinDatabase(this.factory);
 
@@ -135,19 +138,29 @@ final class IndexedDbPinDatabase implements PinDatabase {
   Future<void> delete() async {
     final request = factory.deleteDatabase(pinDatabaseName);
     final done = Completer<void>();
-    request.onsuccess = ((web.Event _) => done.complete()).toJS;
+    Timer? grace;
+    request.onsuccess = ((web.Event _) {
+      if (!done.isCompleted) done.complete();
+    }).toJS;
     request.onerror = ((web.Event _) {
       if (!done.isCompleted) done.completeError(StateError('pins not deleted'));
     }).toJS;
     // A connection of another tab holds the deletion until it closes. The browser deletes the
     // database once it is closed, but the caller (the end of the session) must not wait for
-    // that: a blocked deletion fails at once and E7 shows.
+    // that: a deletion still blocked after [blockedGrace] fails and E7 shows. The grace covers
+    // a connection of this tab that is still closing after its last operation.
     request.onblocked = ((web.Event _) {
-      if (!done.isCompleted) {
-        done.completeError(StateError('pins deletion blocked'));
-      }
+      grace ??= Timer(blockedGrace, () {
+        if (!done.isCompleted) {
+          done.completeError(StateError('pins deletion blocked'));
+        }
+      });
     }).toJS;
-    await done.future;
+    try {
+      await done.future;
+    } finally {
+      grace?.cancel();
+    }
   }
 
   Future<web.IDBDatabase> _open() {

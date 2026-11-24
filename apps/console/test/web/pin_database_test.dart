@@ -43,6 +43,22 @@ void main() {
   );
 
   test(
+    'a deletion goes through when the blocking connection closes right after',
+    () async {
+      // CI: the store's own connection was still closing when the logout deleted the pins,
+      // and the deletion failed as "blocked" at once.
+      final pins = IndexedDbPinDatabase(web.window.indexedDB);
+      await pins.write('host-1', {'fingerprint': 'SHA256:abc'});
+      final other = await _holdOpen();
+      final deletion = pins.delete();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      other.close();
+      await deletion;
+      expect(await pins.read('host-1'), isNull);
+    },
+  );
+
+  test(
     'a deletion that another connection blocks fails instead of waiting',
     () async {
       final pins = IndexedDbPinDatabase(web.window.indexedDB);

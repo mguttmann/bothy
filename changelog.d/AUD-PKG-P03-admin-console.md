@@ -44,7 +44,8 @@
 - Opening a terminal on a path whose host ID is invalid no longer leaves an empty terminal view
   and an unhandled error.
 - Ending a console session no longer waits forever when another tab holds the terminal pins
-  database open, and a pin write the browser aborts reports an error.
+  database open (it gives up after a second), and a pin write the browser aborts reports an
+  error.
 - A change on the host or agent page that meets `412 version_conflict` reads the record again
   and says that it changed meanwhile, so the next attempt no longer fails the same way.
 - The switch of several agents, the runner change and the pairing wizard stay open while their
