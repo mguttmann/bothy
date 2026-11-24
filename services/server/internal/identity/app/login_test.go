@@ -227,9 +227,12 @@ func TestService_CompleteLoginRules(t *testing.T) {
 	if err != nil || !r.NewDevice || r.Device.State != identity.DeviceStatePending {
 		t.Fatalf("unconfirmed = %+v, %v", r, err)
 	}
-	if r, err = login(alex.ID, k, k.jkt, app.TrustConfirmed); err != nil || r.NewDevice {
+	if r, err = login(alex.ID, k, k.jkt, app.TrustUnconfirmed); err != nil || r.NewDevice {
 		t.Fatalf("known device = %+v, %v", r, err)
 	}
+	// A code or pairing on the known pending device is refused, so the code is not spent.
+	_, err = login(alex.ID, k, k.jkt, app.TrustConfirmed)
+	wantKind(t, err, errs.KindConflict)
 	_, err = login(sam.ID, k, k.jkt, app.TrustConfirmed)
 	wantKind(t, err, errs.KindConflict)
 	o := freshKey(t)

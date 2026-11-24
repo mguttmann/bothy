@@ -185,16 +185,6 @@ func ConsumablePurposes(consumer EnrollmentConsumer) []EnrollmentPurpose {
 	return nil
 }
 
-// PurposeConsumableBy reports whether a code of purpose p may be redeemed by consumer.
-func PurposeConsumableBy(p EnrollmentPurpose, consumer EnrollmentConsumer) bool {
-	for _, a := range ConsumablePurposes(consumer) {
-		if a == p {
-			return true
-		}
-	}
-	return false
-}
-
 // EnrollmentCodeState is the part of an enrollment_codes row that decides whether it is usable.
 type EnrollmentCodeState struct {
 	// ExpiresAt is expires_at; UsedAt is used_at (zero while unused).

@@ -548,15 +548,6 @@ func (f *Files) ScanRunner() filesjobs.Runner {
 	return f.Pass
 }
 
-// ScannerHealth returns the health of the virus scanner as this worker sees it (12 5.3); nil in
-// the role api. M7-09 reads it for the status component.
-func (f *Files) ScannerHealth() files.ScannerHealth {
-	if f == nil || f.Health == nil {
-		return nil
-	}
-	return f.Health
-}
-
 // BindJobs gives the scan queue and the extraction queue the inserter of the job runtime of the
 // role; nil-safe.
 func (f *Files) BindJobs(ins jobs.Inserter) {

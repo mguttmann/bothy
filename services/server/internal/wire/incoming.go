@@ -7,11 +7,14 @@ import (
 	"log/slog"
 	"net/http"
 	stdsync "sync"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
 	appshttp "github.com/OWNER/bothy/services/server/internal/apps/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/platform/health"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
 )
@@ -68,12 +71,27 @@ var internalHooksValidator = stdsync.OnceValues(func() (*httpserver.Validator, e
 	return httpserver.NewValidator(rest.Spec, webhookPostOperationIDs())
 })
 
+// shutdownGate answers every request with 503 unavailable and Retry-After retryAfter once reg
+// reports the shutdown, and passes it to next before. The internal listener closes after the
+// consumers, the jobs and the pool, so its webhook routes must not write during the shutdown.
+func shutdownGate(reg *health.Registry, retryAfter time.Duration, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if reg.ShuttingDown() {
+			httpserver.WriteProblem(w, r, errs.New(errs.CodeUnavailable, "The server is shutting down.").WithRetryAfter(retryAfter))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // mountInternalHooks mounts the two post operations of the incoming webhooks on the internal
 // listener, in every role (16 section 4.2, 02 section 3.2, M2-27 design note 12): senders inside
 // the stack (Alertmanager) reach the same routes there. They run through a chain built for this
 // listener with the stages of the public one: the trusted proxies are empty, so the client IP is
 // the peer address and forwarded headers are never read (R-SE-09); its own rate limiter counts
 // rl.webhook_in and rl.public_auth for this listener. Nothing else of the API is mounted there.
+// Once the shutdown began they answer 503 unavailable with Retry-After shutdown.total_timeout
+// (shutdownGate), because the listener closes only after the pool.
 // mountRoutes does not call it while the start lock of R-DM-50 holds (restore_not_finalized): the
 // listener then answers these routes with the 404 of an unknown path.
 func (s *server) mountInternalHooks(cat routes.Catalog, log *slog.Logger) error {
@@ -111,7 +129,7 @@ func (s *server) mountInternalHooks(cat routes.Catalog, log *slog.Logger) error 
 	if err := mount(hooks, wrapped); err != nil {
 		return err
 	}
-	public := chain.Public(hooks)
+	public := shutdownGate(s.reg, s.cfg.TotalTimeout, chain.Public(hooks))
 	for i := range wrapped {
 		wrapped[i].Handler = public
 	}

@@ -619,6 +619,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"server.tls_cert_ref =   # default\n" +
 		"server.tls_key_ref =   # default\n" +
 		"server.trusted_proxies = 127.0.0.1/32, ::1/128  # default\n" +
+		"shutdown.database_flush_timeout = 2s  # default\n" +
 		"shutdown.drain_delay = 5s  # default\n" +
 		"shutdown.http_grace = 20s  # default\n" +
 		"shutdown.jobs_soft_timeout = 20s  # default\n" +

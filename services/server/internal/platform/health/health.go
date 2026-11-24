@@ -109,6 +109,9 @@ func (r *Registry) SetStarted() { r.started.Store(true) }
 // and never passes again.
 func (r *Registry) SetShuttingDown() { r.shutting.Store(true) }
 
+// ShuttingDown reports whether SetShuttingDown was called.
+func (r *Registry) ShuttingDown() bool { return r.shutting.Load() }
+
 // Handler returns the handler of PathLiveness and PathReadiness: GET and HEAD, other methods
 // 405 with Allow "GET, HEAD" and an empty body, other paths 404 with an empty body.
 func (r *Registry) Handler() http.Handler {

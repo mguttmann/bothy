@@ -4722,6 +4722,18 @@
       "doc": "Peers whose forwarding and identity headers count and that may send plaintext."
     },
     {
+      "name": "shutdown.database_flush_timeout",
+      "env": "BOTHY_SHUTDOWN__DATABASE_FLUSH_TIMEOUT",
+      "kind": "duration",
+      "default": "2s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "1h",
+      "chapter": "02-architecture.md",
+      "doc": "Time each flush step of the database phase (audit denials, statistics) gets before the pool closes."
+    },
+    {
       "name": "shutdown.drain_delay",
       "env": "BOTHY_SHUTDOWN__DRAIN_DELAY",
       "kind": "duration",

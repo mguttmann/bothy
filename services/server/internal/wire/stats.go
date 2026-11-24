@@ -261,11 +261,11 @@ func NewMeasure(cfg MeasureConfig, pool *pg.Pool, clk clock.Clock, log *slog.Log
 }
 
 // Start runs the periodic flush until the shutdown and registers the stop step "stats_flush" in
-// lifecycle.PhaseDatabase: it ends the loop and flushes once within the rest of the shutdown
-// budget (25 3.4 item 4). Call Start from a component's Start, after the stop step of the pool was
+// lifecycle.PhaseDatabase with budget (shutdown.database_flush_timeout): it ends the loop and
+// flushes once within it (25 3.4 item 4). Call Start from a component's Start, after the stop step of the pool was
 // registered: steps of one phase run in reverse registration order, so the flush runs before the
 // pool closes. Every role calls it.
-func (m *Measure) Start(r *lifecycle.Runner) {
+func (m *Measure) Start(r *lifecycle.Runner, budget time.Duration) {
 	// The stop step calls cancel (Measure.stop); gosec cannot see that through the struct field.
 	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // G118: cancel is called by the stop step stats_flush
 	m.cancel, m.done = cancel, make(chan struct{})
@@ -273,7 +273,7 @@ func (m *Measure) Start(r *lifecycle.Runner) {
 		defer close(m.done)
 		m.Flush.Run(ctx)
 	}()
-	r.OnStop(lifecycle.StopStep{Name: "stats_flush", Phase: lifecycle.PhaseDatabase, Run: m.stop})
+	r.OnStop(lifecycle.StopStep{Name: "stats_flush", Phase: lifecycle.PhaseDatabase, Budget: budget, Run: m.stop})
 }
 
 // stop ends the periodic flush and writes the counters once within the budget of ctx; what does

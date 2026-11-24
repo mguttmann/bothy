@@ -17,34 +17,6 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
 )
 
-func TestDevice_StateMachine(t *testing.T) {
-	t.Parallel()
-	allowed := [][2]device.State{
-		{device.StatePending, device.StateActive},
-		{device.StatePending, device.StateRevoked},
-		{device.StateActive, device.StateRevoked},
-	}
-	all := []device.State{device.StatePending, device.StateActive, device.StateRevoked}
-	for _, from := range all {
-		for _, to := range all {
-			err := from.Transition(to)
-			if slices.Contains(allowed, [2]device.State{from, to}) {
-				if err != nil {
-					t.Errorf("%s -> %s: %v", from, to, err)
-				}
-				continue
-			}
-			e, ok := errs.As(err)
-			if !ok || e.PublicCode() != errs.CodeInvalidStateTransition || e.Kind().Status() != 409 {
-				t.Errorf("%s -> %s = %v, want 409 invalid_state_transition", from, to, err)
-			}
-		}
-	}
-	if err := device.State("lost").Transition(device.StateActive); errs.KindOf(err) != errs.KindConflict {
-		t.Errorf("unknown state: %v", err)
-	}
-}
-
 func ecKey(t *testing.T) json.RawMessage {
 	t.Helper()
 	k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)

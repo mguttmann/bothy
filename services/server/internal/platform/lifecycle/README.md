@@ -14,7 +14,7 @@ in `internal/wire` and exits with the code of `Run`.
 | File | Content |
 |---|---|
 | `phase.go` | `Phase`, the fixed shutdown order, `Phases`, `String` |
-| `runner.go` | `Component`, `StopStep`, `Options`, `Runner` (`New`, `Add`, `OnStop`, `Fail`, `FailOn`, `Run`, `Err`, `Shutdown`: the stop plan once without a signal, for a host command that started its components itself, M7-07), exit codes |
+| `runner.go` | `Component`, `StopStep`, `Options`, `Runner` (`New`, `Add`, `OnStop`, `Reserve`, `Fail`, `FailOn`, `Run`, `Err`, `Shutdown`: the stop plan once without a signal, for a host command that started its components itself, M7-07), exit codes |
 | `doc.go` | package documentation with an example |
 
 ## Start
@@ -39,7 +39,7 @@ Stop steps run in this order; steps of one phase in reverse registration order.
 | `consumers` | worker consumers finish their round (M2) | worker, all |
 | `jobs` | River soft stop with `shutdown.jobs_soft_timeout`, then the wait for the cancelled jobs (M1-14) | worker, all |
 | `telemetry` | flush within `shutdown.telemetry_flush_timeout` | all |
-| `database` | close the pool | all |
+| `database` | flush the denial aggregations and the own measurement (each within `shutdown.database_flush_timeout`), close the pool | all |
 | `internal_listener` | close `/healthz` and `/readyz` | all |
 
 Roles differ only in which steps they register; the order yields the sequences of 02
@@ -56,7 +56,8 @@ Roles differ only in which steps they register; the order yields the sequences o
   panicking step is logged (`shutdown step failed`); the plan moves on in both cases.
 - When the total is spent, the remaining steps are skipped and `shutdown budget exceeded`
   names the phase; the exit code is 1.
-- When `Run` begins, the sum of the registered budgets must not exceed the total; otherwise
+- When `Run` begins, the sum of the registered budgets and the reserve (`Reserve`) must not exceed
+  the total; otherwise
   nothing starts and `Run` returns 2 (`Err` names both values).
 
 ## Exit codes
@@ -77,7 +78,9 @@ A later ticket adds its part in `internal/wire`, in the file of its module (`mod
 docs/DECISIONS.md PL/28): a start part with its order key becomes a component at its place in
 the start order, and `OnStop` registers its step with the phase from the table and its budget
 key. A step whose budget comes from configuration is registered before `Run`,
-so the budget check sees it. A part that fails at run time (a panic in the log tail) calls
+so the budget check sees it; a step that only its component's start can register (the flush
+steps `audit_denials` and `stats_flush` of `internal/wire`) has its budget reserved with
+`Reserve` before `Run`. A part that fails at run time (a panic in the log tail) calls
 `Fail`; a part that reports its loss on a channel (the River client of `platform/jobs`,
 `Runtime.Failed`) is watched with `FailOn(name, ch)`: an error on the channel ends the process
 with exit code 1, a channel closed without a value (the orderly `Stop`) does nothing.

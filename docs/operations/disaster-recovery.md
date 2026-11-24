@@ -68,7 +68,9 @@ a throwaway host before you rely on it.
    finalize and start follow here once.
 4. Restore the objects from restic.
 5. `docker compose run --rm restore` (`bothy restore finalize`, which also applies the deletion
-   journal, [backup-restore.md](backup-restore.md) 5.2 step 6), restore test, then start all services. Without this step
+   journal, [backup-restore.md](backup-restore.md) 5.2 step 6), restore test, the audit sink
+   checked and moved if it holds newer checkpoints ([backup-restore.md](backup-restore.md) 8.1),
+   then start all services. Without the finalize step
    `api` and `worker` stay not ready with `restore_not_finalized`, because the database identity
    of the new host differs from the stored one ([16-operations.md](../spec/16-operations.md) 8.4).
 6. Point DNS or the Tailscale device to the new host. With `tailscale` the device is new; keep

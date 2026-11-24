@@ -87,6 +87,9 @@ func JobRole(r Role) jobs.Role {
 // verification of audit (M1-50) and the webhook delivery of apps (M2-26). The use cases may be nil where no job runs
 // (tests of the registration); a worker always passes them.
 type JobModules struct {
+	// StartChecks run once with the start context before River starts; an error ends the start
+	// (the login of bothy_maint for the audit trim, M7-05).
+	StartChecks []func(ctx context.Context) error
 	// Partitions is the use case of sync.partition_maintenance.
 	Partitions syncjobs.Maintainer
 	// PartitionInterval is sync.partition_maintenance_interval.

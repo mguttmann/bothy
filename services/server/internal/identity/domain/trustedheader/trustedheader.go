@@ -143,8 +143,8 @@ const fallbackHandle = "user"
 // HandleFromLogin derives the handle of a provisioned person from login (08 section 3.1 item 3):
 // the part before the first "@", lower case, only a-z, 0-9, ".", "_" and "-", starting with a
 // letter or digit, cut to maxChars bytes (every kept character is one byte). A login that keeps
-// nothing gives "user". The rule is the one brief M1-41 names for OIDC; M1-41 is not merged, so it
-// lives here until both drivers share one helper.
+// nothing gives "user". The OIDC driver derives its handle with oidcflow.ProvisionedHandle, which
+// replaces a dropped character with "-" instead; the two rules are not yet one shared helper.
 func HandleFromLogin(login string, maxChars int) string {
 	local, _, _ := strings.Cut(login, "@")
 	var b strings.Builder

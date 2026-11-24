@@ -141,15 +141,12 @@ func AutoApproved(kind Kind, subject, requestedBy ids.ID, requiresApproval bool)
 	return kind == KindExport && subject == requestedBy && !requiresApproval
 }
 
-// MaxReasonRunes bounds the reason of a request and of a decision.
-const MaxReasonRunes = 1000
-
 // CheckReason validates the reason of a request or a decision at pointer (/reason): not blank,
-// at most MaxReasonRunes runes, free of control and bidi characters (SEC-IN-4, SEC-AUD-5),
-// because it goes into the audit log and is communicated to the person.
+// at most maxChars runes (audit.reason_max_chars), free of control and bidi characters (SEC-IN-4,
+// SEC-AUD-5), because it goes into the audit log and is communicated to the person.
 //
-// Errors: 422 validation_failed with the code required, too_long or the textcheck rule.
-func CheckReason(reason, pointer string) error {
+// Errors: 400 validation_failed with the code required, too_long or the textcheck rule.
+func CheckReason(reason, pointer string, maxChars int) error {
 	if err := textcheck.DisplayText(reason); err != nil {
 		var te *textcheck.Error
 		rule := string(textcheck.RuleInvalidUTF8)
@@ -161,7 +158,7 @@ func CheckReason(reason, pointer string) error {
 	if strings.TrimFunc(reason, func(r rune) bool { return unicode.IsSpace(r) || unicode.Is(unicode.Cf, r) }) == "" {
 		return fieldError(pointer, "required", "the reason is required")
 	}
-	if utf8.RuneCountInString(reason) > MaxReasonRunes {
+	if utf8.RuneCountInString(reason) > maxChars {
 		return fieldError(pointer, "too_long", "the reason is too long")
 	}
 	return nil

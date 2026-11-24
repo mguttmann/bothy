@@ -237,3 +237,35 @@ func TestTMT12_Console(t *testing.T) {
 		t.Fatalf("the app's quick reattach: %+v", d)
 	}
 }
+
+// TestConsoleStepUpSurvivesChallengeCleanup (srv-identity-core-4): the challenge cleanup past
+// auth.step_up_challenge_ttl keeps the used passkey challenge of a live session's current step-up,
+// from which step_up_user_verified is read, and deletes the older used ones.
+func TestConsoleStepUpSurvivesChallengeCleanup(t *testing.T) {
+	t.Parallel()
+	w := newConsoleFresh(t)
+	w.want(w.tab.passkeyStepUp(), http.StatusOK, "")
+	w.clk.Advance(time.Second)
+	w.want(w.tab.passkeyStepUp(), http.StatusOK, "")
+	if a := w.mustActor(authorize.ActionTerminalOpen); !a.StepUpUserVerified {
+		t.Fatal("the passkey step-up is not user verified before the cleanup")
+	}
+	sid := w.tab.sessionID()
+	if n := w.count(`SELECT count(*) FROM auth_challenges WHERE session_id = $1 AND status = 'used'`, sid.String()); n != 2 {
+		t.Fatalf("%d used challenges, want 2", n)
+	}
+	repo := postgres.NewRepository(w.pool)
+	later := w.clk.Now().Add(10 * time.Minute)
+	if err := w.uow.Do(context.Background(), func(ctx context.Context) error {
+		_, err := repo.DeleteExpiredChallenges(ctx, later, later.Add(-time.Hour))
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if n := w.count(`SELECT count(*) FROM auth_challenges WHERE session_id = $1 AND status = 'used'`, sid.String()); n != 1 {
+		t.Fatalf("%d used challenges after the cleanup, want the current one", n)
+	}
+	if a := w.mustActor(authorize.ActionTerminalOpen); !a.StepUpUserVerified {
+		t.Fatal("the cleanup took the user verification of the current step-up")
+	}
+}

@@ -77,6 +77,9 @@ const (
 	FileID = "bothy.file.id"
 	// CloseCode is a WebSocket close code of 04-sync-protocol.md 6.4.
 	CloseCode = "bothy.close.code"
+	// ConnectionDuration is the lifetime of a gateway connection in seconds; logs only, on the
+	// line of the connection end.
+	ConnectionDuration = "bothy.connection.duration"
 	// ConsumerName is the name of a worker consumer of the event log (push, webhooks; 03
 	// event_consumer_cursors); also the only attribute of bothy.event.consumer.lag and
 	// bothy.event.consumer.pending_age, a closed set.
@@ -179,7 +182,7 @@ var scopes = map[string]scope{
 	Action: scopeSpanLog, AgentHandle: scopeSpanLog, AgentAdapterKind: scopeSpanLog,
 	BackupKind: scopeSpanLog, BillingMode: scopeSpanLog, ChannelID: scopeSpanLog,
 	SpaceID: scopeSpanLog, ThreadID: scopeSpanLog, MessageID: scopeSpanLog, RunID: scopeSpanLog,
-	FileID: scopeSpanLog, CloseCode: scopeSpanLog, ConsumerName: scopeSpanLog, CorrelationID: scopeSpanLog,
+	FileID: scopeSpanLog, CloseCode: scopeSpanLog, ConnectionDuration: scopeSpanLog, ConsumerName: scopeSpanLog, CorrelationID: scopeSpanLog,
 	CSPDirective: scopeSpanLog, CSPDisposition: scopeSpanLog, CSPBlockedOrigin: scopeSpanLog,
 	Decision: scopeSpanLog, EgressPurpose: scopeSpanLog, EventDurability: scopeSpanLog,
 	EventSeq: scopeSpanLog, EventType: scopeSpanLog, JobKind: scopeSpanLog,

@@ -595,7 +595,7 @@
       "method": "on_processing_complete"
     }
   ],
-  "inputs_sha256": "a46fe617d5c9ef8f86b532b3d07b8e6b1f49abe2a38637bfb48c4781b9b3b5a3",
+  "inputs_sha256": "8a17610f27343e4c2e3cdfdcc47a5e1acfa07592164be1f4d07ae2d5052e4d2d",
   "model_requests": [
     {
       "credential": "none",
@@ -607,7 +607,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:72470705c5121f8d602bb1af40b779b53c1eea898ea3d0b3a4ee26f42e2a50f5:5184",
+        "sha256:2f087f2af7d9cf0712edcfc4a26fce324e1f8a2f66d912ace543aeee8cc99ee4:5007",
         "sha256:354fffcff870d90b48e0469344c0dd645038ce983084ac81086eeb4f70266c04:37"
       ],
       "roles": [
@@ -653,16 +653,11 @@
       "turn": null
     },
     {
-      "credential": "none",
-      "route": "openai.models",
-      "scripted": false
-    },
-    {
       "completed": true,
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:72470705c5121f8d602bb1af40b779b53c1eea898ea3d0b3a4ee26f42e2a50f5:5184",
+        "sha256:2f087f2af7d9cf0712edcfc4a26fce324e1f8a2f66d912ace543aeee8cc99ee4:5007",
         "sha256:c41adaac7cd28913a340cf4fca202bbe0892719d798fdabd871e94bb3270ce3b:36"
       ],
       "roles": [
@@ -707,7 +702,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:72470705c5121f8d602bb1af40b779b53c1eea898ea3d0b3a4ee26f42e2a50f5:5184",
+        "sha256:2f087f2af7d9cf0712edcfc4a26fce324e1f8a2f66d912ace543aeee8cc99ee4:5007",
         "sha256:354fffcff870d90b48e0469344c0dd645038ce983084ac81086eeb4f70266c04:37",
         "sha256:42069384d477d67e018da6d80538e858956d30482b09488a9daf31219f3da392:46"
       ],
@@ -1000,7 +995,7 @@
     }
   ],
   "pin": {
-    "commit": "f7e2898aaefc8f967dbf7345e3999a65672fe60e",
+    "commit": "0f602c5f6f18615632535251d62a2db74ce93b69",
     "tag": null
   },
   "scenario": "session_resume_same_thread"

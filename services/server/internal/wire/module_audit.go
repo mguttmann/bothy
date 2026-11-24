@@ -66,7 +66,7 @@ func (s *server) startAudit(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	a.Start(s.runner)
+	a.Start(s.runner, s.cfg.DatabaseFlushTimeout)
 	s.mu.Lock()
 	s.audit = a
 	s.mu.Unlock()
@@ -100,7 +100,8 @@ func (s *server) startAuditLog(ctx context.Context) error {
 }
 
 // auditRetention registers the participants of audit in the job retention.audit (M7-05): the trim
-// as bothy_maint and the destruction of the IP keys; nothing without a participant registry.
+// as bothy_maint and the destruction of the IP keys; nothing without a participant registry. In
+// the roles worker and all it adds the start check of the bothy_maint login (checkMaintLogin).
 func (s *server) auditRetention(m *JobModules) error {
 	if m.RetentionParticipants == nil {
 		return nil
@@ -119,6 +120,10 @@ func (s *server) auditRetention(m *JobModules) error {
 	units, err := NewMaintUnits(open, unitCfg, newAuditChain(pool, s.logger()))
 	if err != nil {
 		return err
+	}
+	if s.worker() {
+		// The trim runs in the worker; a missing or wrong password ends the start (16 7.1).
+		m.StartChecks = append(m.StartChecks, func(ctx context.Context) error { return checkMaintLogin(ctx, open) })
 	}
 	return registerAuditRetention(m.RetentionParticipants, m.RetentionConfig, units, pool, a.Recorder(), s.deps.Clock)
 }
