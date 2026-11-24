@@ -216,7 +216,8 @@ TOOL_COMPONENTS: dict[str, tuple[str, ...]] = {
 # the hooks (commitlint and the pre-push plan) and the Node tools with their lock file.
 SHARED_TOOL_FOLDERS = ("bin", "ci", "console-e2e", "hooks", "node")
 # Areas without component gates; their repository-wide gates always run.
-NO_COMPONENT_PREFIXES = ("docs/", "infra/")
+# The fragments of the root changelog are read only by fragments-check, which runs on every change.
+NO_COMPONENT_PREFIXES = ("docs/", "infra/", "changelog.d/")
 # mkdocs.yml configures the documentation site: `make docs` (job gates (docs and contracts)) and
 # the tools tests read it, and the guide test of the server only looks for it to find the root.
 NO_COMPONENT_ROOT_FILES = re.compile(r"^[^/]+\.md$|^(?:LICENSE|NOTICE|mkdocs\.yml)$")

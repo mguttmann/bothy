@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # The module uses only the built-in features of OpenTofu (templatefile, yamlencode and the
 # resource terraform_data with its file and remote-exec provisioners), so it needs no provider
 # and `tofu init` needs no network (docs/DECISIONS.md D-M7-15-3). The OpenTofu version itself is

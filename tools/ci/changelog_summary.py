@@ -13,6 +13,11 @@ The release page shows the summary first (tools/ci/release_notes.py,
 The check covers every tracked `CHANGELOG.md` of the repository, which includes the root file
 and the one of every release component of tools/ci/components.py.
 
+A release section of the server changelog also needs the headings of FIXED_SECTIONS (section 4
+item 3: upgrade notes with manual work yes or no, migrations, compatibility); without them the
+release page would say "None listed in the changelog." under its upgrade notes, which reads like
+"no manual work". A person writes them in the release pull request, also as "None".
+
 Example of a section that passes:
 
     ## [0.2.0] - 2026-10-15
@@ -42,6 +47,10 @@ import components
 from release_prep import SUMMARY_PLACEHOLDER
 
 SUMMARY_PREFIX = "Summary:"
+# Headings every release section of a component's changelog must have (spec 18 section 4 item 3).
+FIXED_SECTIONS: dict[str, tuple[str, ...]] = {
+    "services/server/CHANGELOG.md": ("Upgrade notes", "Migrations", "Compatibility"),
+}
 _SECTION = re.compile(r"^## \[([^\]]+)\]")
 # Where the technical entries begin; the summary must come before them.
 _ENTRIES = re.compile(r"^(?:### |[-*+] )")
@@ -181,6 +190,11 @@ def check_text(path: str, text: str) -> list[Finding]:
         problem = problem_of(section)
         if problem is not None:
             found.append(Finding(path, section.line, section.version, problem))
+        headings = {line[4:].strip() for line in section.body if line.startswith("### ")}
+        missing = [h for h in FIXED_SECTIONS.get(path, ()) if h not in headings]
+        if missing:
+            names = ", ".join(f"'### {h}'" for h in missing)
+            found.append(Finding(path, section.line, section.version, f"the section lacks {names}"))
     return found
 
 

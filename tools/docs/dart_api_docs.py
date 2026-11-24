@@ -59,15 +59,30 @@ _EXTERNAL_LINK = re.compile(
 )
 
 
-def strip_external_links(folder: Path) -> int:
-    """Remove every `<link>` to another origin from the HTML pages below `folder`.
+# An `<iframe>` of another origin: Flutter's doc comments embed videos (`{@youtube}`), which
+# dart doc renders as a frame in the pages of every inherited member.
+_EXTERNAL_FRAME = re.compile(
+    r"""<iframe\b[^>]*\bsrc=["']?(?P<src>(?:https?:)?//[^"'\s>]+)[^>]*>.*?</iframe>""",
+    re.IGNORECASE | re.DOTALL,
+)
 
-    The pages then use the fonts of the system. Returns the number of changed pages.
+
+def _frame_link(match: re.Match[str]) -> str:
+    src = match.group("src")
+    return f'<a href="{src}">{src}</a>'
+
+
+def strip_external_links(folder: Path) -> int:
+    """Remove what the HTML pages below `folder` would load from another origin.
+
+    Every `<link>` to another origin goes (the pages then use the fonts of the system), and
+    every `<iframe>` of another origin becomes a plain link to its address. Returns the number
+    of changed pages.
     """
     changed = 0
     for page in sorted(folder.rglob("*.html")):
         text = page.read_text(encoding="utf-8")
-        stripped = _EXTERNAL_LINK.sub("", text)
+        stripped = _EXTERNAL_FRAME.sub(_frame_link, _EXTERNAL_LINK.sub("", text))
         if stripped != text:
             page.write_text(stripped, encoding="utf-8")
             changed += 1

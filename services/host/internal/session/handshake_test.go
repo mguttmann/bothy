@@ -262,3 +262,49 @@ func TestOpeningWindowAlreadyOver(t *testing.T) {
 		t.Errorf("close code %d", code)
 	}
 }
+
+// TestOpeningHelperSilentAfterTheGate (audit host-service-7): a helper that never answers
+// pty.start does not hold the opening past its window: the host service ends it with open_failed
+// and open_timeout and stops a PTY the helper might still start.
+func TestOpeningHelperSilentAfterTheGate(t *testing.T) {
+	r := newPipeRig(t)
+	r.helper.answer = func(localchan.PTYStart) (string, any) { return "", nil }
+	n := r.srv.DataCount(sessID) + 1
+	r.sessionOpen(1500 * time.Millisecond)
+	dc := r.srv.Data(r.ctx, sessID, n)
+	dev := r.device()
+	if err := r.handshakeOn(dc, dev, "shell", AttOpen); err != nil {
+		t.Fatalf("handshake: %v", err)
+	}
+	r.send(dc, dev, frame.Start(80, 24))
+	wantEnded(t, recv(t, r.ctx, "session.ended", r.note.ended), ReasonOpenFailed, DetailOpenTimeout)
+	if id := recv(t, r.ctx, "pty.stop", r.helper.stops); id != sessID {
+		t.Errorf("pty.stop for %q", id)
+	}
+}
+
+// A helper that answers pty.started after the opening ended (it was still starting the PTY when
+// the host forgot the session, so it ignored the first pty.stop) gets pty.stop again: no PTY runs
+// without a session.
+func TestOpeningLateStartedIsStopped(t *testing.T) {
+	r := newPipeRig(t)
+	r.helper.answer = func(localchan.PTYStart) (string, any) { return "", nil }
+	n := r.srv.DataCount(sessID) + 1
+	r.sessionOpen(1500 * time.Millisecond)
+	dc := r.srv.Data(r.ctx, sessID, n)
+	dev := r.device()
+	if err := r.handshakeOn(dc, dev, "shell", AttOpen); err != nil {
+		t.Fatalf("handshake: %v", err)
+	}
+	r.send(dc, dev, frame.Start(80, 24))
+	wantEnded(t, recv(t, r.ctx, "session.ended", r.note.ended), ReasonOpenFailed, DetailOpenTimeout)
+	if id := recv(t, r.ctx, "pty.stop", r.helper.stops); id != sessID {
+		t.Fatalf("pty.stop for %q", id)
+	}
+	if err := r.helper.helperEnd().Send(localchan.OpPTYStarted, "late", localchan.PTYStarted{SessionID: sessID}); err != nil {
+		t.Fatalf("late pty.started: %v", err)
+	}
+	if id := recv(t, r.ctx, "pty.stop after the late pty.started", r.helper.stops); id != sessID {
+		t.Errorf("pty.stop for %q", id)
+	}
+}

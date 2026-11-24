@@ -1,5 +1,6 @@
 //{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ generated include file.
+// SPDX-License-Identifier: Apache-2.0
 // Used by Runner.rc
 //
 #define IDI_APP_ICON                    101

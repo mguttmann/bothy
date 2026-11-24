@@ -10,6 +10,7 @@ every member pin the same exact version.
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -379,3 +380,33 @@ def test_mac_app_jobs_restore_the_swiftpm_cache(job: str) -> None:
     assert "restore-keys" not in step["with"]
     platform = next(i for i, s in enumerate(steps) if "apps_platform.py" in str(s.get("run", "")))
     assert caches[0] < platform, f"{job}: the cache is restored before the tests"
+
+
+def _node_minimum(spec: str) -> tuple[int, int]:
+    match = re.fullmatch(r">=\s*(\d+)(?:\.(\d+))?(?:\.\d+)?", spec.strip())
+    assert match, f"engines.node {spec!r} is not a plain >= range"
+    return int(match.group(1)), int(match.group(2) or 0)
+
+
+def test_bootstrap_requires_the_highest_node_of_every_package() -> None:
+    """bootstrap-ci installs every tracked npm package, so it asks for the highest engines.node."""
+    manifests = [
+        json.loads((REPO / path).read_text(encoding="utf-8"))
+        for path in _tracked("package.json", "*/package.json", "*/*/package.json")
+    ]
+    highest = max(
+        _node_minimum(m["engines"]["node"]) for m in manifests if "node" in m.get("engines", {})
+    )
+    makefile = (REPO / "Makefile").read_text(encoding="utf-8")
+    recipe = makefile.split("\nbootstrap-ci:", 1)[1].split("\n\n", 1)[0]
+    check = re.search(r"process\.exit\(a>(\d+)\|\|\(a===(\d+)&&b>=(\d+)\)\?0:1\)", recipe)
+    assert check, "bootstrap-ci has no Node version check"
+    above, major, minor = (int(g) for g in check.groups())
+    assert above == major == highest[0]
+    assert minor == highest[1]
+    assert f"Node.js >= {highest[0]}.{highest[1]} is required" in recipe
+    for workflow in sorted((REPO / ".github" / "workflows").glob("*.yml")):
+        for version in re.findall(r'node-version: "(\d+)"', workflow.read_text(encoding="utf-8")):
+            assert int(version) >= highest[0], (
+                f"{workflow.name}: node-version {version} is below {highest}"
+            )

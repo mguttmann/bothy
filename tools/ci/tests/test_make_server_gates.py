@@ -676,16 +676,18 @@ GENERATED_COVERAGE = (
     "example.com/svc/api/routes/gen/main.go:1.1,2.2 8 1\n"
     "example.com/svc/api/routes/gen/main.go:3.1,4.2 2 0\n"
     "example.com/svc/api/rest/rest.gen.go:1.1,2.2 500 0\n"
+    "example.com/svc/internal/authz/catalog_gen.go:1.1,2.2 500 0\n"
 )
 
 
 @pytest.mark.parametrize("shell", SHELLS, ids=SHELL_IDS)
 def test_go_coverage_leaves_generated_code_out(fakes: Fakes, shell: list[str]) -> None:
-    # Generated Go files end in .gen.go (docs/DECISIONS.md M1-05/7, M1-17); they are not counted.
+    # Generated Go files end in .gen.go (docs/DECISIONS.md M1-05/7, M1-17) or, from the catalog
+    # and design key generators, in _gen.go; they are not counted.
     # The hand-written generator below a directory named gen still counts: 8 of 10 statements.
     (fakes.module / "coverage.out").write_text(GENERATED_COVERAGE, encoding="utf-8")
     command = _recipe_command("coverage", "'go-coverage'", fakes, "-o", "test")
-    result = _bash(command, fakes, shell)  # with rest.gen.go it would be 8 of 510 statements
+    result = _bash(command, fakes, shell)  # with both generated files: 8 of 1010 statements
     assert result.returncode == 0, result.stdout + result.stderr
     assert (fakes.module / "coverage.out").read_text() == GENERATED_COVERAGE
     uncovered = GENERATED_COVERAGE.replace("main.go:1.1,2.2 8 1", "main.go:1.1,2.2 8 0")

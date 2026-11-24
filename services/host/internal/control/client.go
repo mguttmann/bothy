@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"strings"
 	gosync "sync"
+	"syscall"
 	"time"
 
 	"github.com/coder/websocket"
@@ -64,7 +65,15 @@ type Config struct {
 	// (buildinfo.UpdatePath); the client logs it in one line when the server refuses the version
 	// with 4114 or shares no protocol version (docs/spec/18-release.md 9.1).
 	UpdatePath string
+	// HandshakeTimeout bounds one login up to hello: the dial with TLS and the upgrade, then the
+	// wait for hello. A server, proxy or edge that accepts the connection and stays silent would
+	// otherwise hold the client offline without a new attempt. Zero means DefaultHandshakeTimeout.
+	HandshakeTimeout time.Duration
 }
+
+// DefaultHandshakeTimeout is the bound of HandshakeTimeout: a program constant of the dial, not a
+// product window; the heartbeats of hello bound the connection after it.
+const DefaultHandshakeTimeout = 30 * time.Second
 
 // Client is the control connection of the host service. It implements startup.Control. It is
 // safe for concurrent use.
@@ -144,7 +153,8 @@ func New(cfg Config, sessions Sessions) (*Client, error) {
 	return c, nil
 }
 
-// Keys returns the key store of purpose terminal (M2-45 checks session tokens with it).
+// Keys returns the key store of purpose terminal from hello and heartbeat_ack. No production code
+// reads it: the sessions check tokens with the JWKS of the hello of their data connection.
 func (c *Client) Keys() *KeyStore { return &c.keys }
 
 // SetReadyHandler sets the function every later ready reaches (startup.Service.OnReady): the
@@ -361,15 +371,17 @@ func (c *Client) logUpdate(ctx context.Context, reason string) {
 	c.log.LogAttrs(ctx, slog.LevelError, msgUpdate, attrs...)
 }
 
-// dial opens the WebSocket and returns it with the remote address of the TCP connection.
+// dial opens the WebSocket and returns it with the remote address of the TCP connection, nil when
+// the connection goes through a proxy: its peer is then the proxy, not the server (24 2.3).
 func (c *Client) dial(ctx context.Context) (*websocket.Conn, net.IP, error) {
 	var remote net.IP
 	var mu gosync.Mutex
+	viaProxy := c.viaProxy()
 	tr := c.http.Transport.(*http.Transport).Clone()
 	dialer := &net.Dialer{} // nosemgrep: bothy-go-egress-only -- the host module has no egress package; this dialer only records the peer address of the control connection (24 2.3)
 	tr.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		nc, err := dialer.DialContext(ctx, network, addr)
-		if err == nil {
+		if err == nil && !viaProxy {
 			if a, ok := nc.RemoteAddr().(*net.TCPAddr); ok {
 				mu.Lock()
 				remote = a.IP
@@ -378,7 +390,8 @@ func (c *Client) dial(ctx context.Context) (*websocket.Conn, net.IP, error) {
 		}
 		return nc, err
 	}
-	hc := &http.Client{Transport: tr, CheckRedirect: c.http.CheckRedirect} // nosemgrep: bothy-go-egress-only -- the transport of New with the address recorded for PeerIsLocal (24 2.3)
+	// websocket.Dial turns Timeout into a deadline of the handshake alone (TCP, TLS, upgrade).
+	hc := &http.Client{Transport: tr, CheckRedirect: c.http.CheckRedirect, Timeout: c.handshakeTimeout()} // nosemgrep: bothy-go-egress-only -- the transport of New with the address recorded for PeerIsLocal (24 2.3)
 	ws, resp, err := websocket.Dial(ctx, c.url, &websocket.DialOptions{HTTPClient: hc, CompressionMode: websocket.CompressionDisabled})
 	if resp != nil && resp.Body != nil {
 		_ = resp.Body.Close()
@@ -391,11 +404,68 @@ func (c *Client) dial(ctx context.Context) (*websocket.Conn, net.IP, error) {
 	return ws, remote, nil
 }
 
+// logCause is the attribute of the error class of a failed dial.
+const logCause = "cause"
+
+// DialCause maps the error of a failed dial to a fixed code for the log, without address or
+// value: proxy, tls_unknown_authority, tls_expired, tls_invalid, dns, refused, timeout,
+// upgrade_refused or other.
+func DialCause(err error) string {
+	var op *net.OpError
+	var unknown x509.UnknownAuthorityError
+	var invalid x509.CertificateInvalidError
+	var hostname x509.HostnameError
+	var dns *net.DNSError
+	var nerr net.Error
+	switch {
+	case errors.As(err, &op) && op.Op == "proxyconnect":
+		return "proxy"
+	case errors.As(err, &unknown):
+		return "tls_unknown_authority"
+	case errors.As(err, &invalid) && invalid.Reason == x509.Expired:
+		return "tls_expired"
+	case errors.As(err, &invalid), errors.As(err, &hostname):
+		return "tls_invalid"
+	case errors.As(err, &dns):
+		return "dns"
+	case errors.Is(err, syscall.ECONNREFUSED):
+		return "refused"
+	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &nerr) && nerr.Timeout():
+		return "timeout"
+	case strings.Contains(err.Error(), "handshake response status code"):
+		return "upgrade_refused"
+	}
+	return "other"
+}
+
+// viaProxy reports whether the proxy of the configuration takes the control connection. The
+// upgrade is an https request, so the proxy is chosen for the https form of the URL.
+func (c *Client) viaProxy() bool {
+	if c.cfg.Proxy == nil {
+		return false
+	}
+	u, err := url.Parse(c.url)
+	if err != nil {
+		return false
+	}
+	u.Scheme = "https"
+	p, err := c.cfg.Proxy(&http.Request{Method: http.MethodGet, URL: u, Header: http.Header{}, Host: u.Host})
+	return err == nil && p != nil
+}
+
+// handshakeTimeout is HandshakeTimeout or its default.
+func (c *Client) handshakeTimeout() time.Duration {
+	if c.cfg.HandshakeTimeout > 0 {
+		return c.cfg.HandshakeTimeout
+	}
+	return DefaultHandshakeTimeout
+}
+
 // connect runs one connection to its end (Design note 12 a to f of M2-43).
 func (c *Client) connect(ctx context.Context) outcome {
 	ws, remote, err := c.dial(ctx)
 	if err != nil {
-		c.log.LogAttrs(ctx, slog.LevelWarn, "server unreachable")
+		c.log.LogAttrs(ctx, slog.LevelWarn, "server unreachable", slog.String(logCause, DialCause(err)))
 		return outcome{Reaction: Reaction{Kind: Backoff}}
 	}
 	ws.SetReadLimit(-1)

@@ -211,7 +211,7 @@ func installed(t *testing.T, extra string, users ...string) {
 	applyPendingOwners(t)
 }
 
-// doctorEntries runs doctor and returns output and exit code.
+// doctor runs doctor and returns output and exit code.
 func doctor(t *testing.T) (string, int) {
 	t.Helper()
 	return host("doctor")
@@ -235,7 +235,7 @@ func hasLine(out, line string) bool {
 	return slices.ContainsFunc(strings.Split(out, "\n"), func(l string) bool { return strings.HasPrefix(l, line) })
 }
 
-// waitExit waits until the host service is stopped and returns whether it stopped with 78.
+// waitRefused waits until the host service is stopped and returns whether it stopped with 78.
 func waitRefused(t *testing.T) bool {
 	t.Helper()
 	ctx, cancel := context.WithDeadline(context.Background(), testkit.Deadline())

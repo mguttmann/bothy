@@ -5,10 +5,9 @@
 it runs and which ticket implemented it. This gate keeps it together with the documents it
 mirrors, so that a test that a document promises cannot silently disappear:
 
-1. The IDs of the table in docs/spec/24-terminal.md section 14 equal the TM-T entries. The cells
-   `title` and `expected` are compared only when the chapter is English (header
-   `| ID | Test | Expected |`); a German chapter is compared by ID only, because the catalogue
-   holds the English cells.
+1. The IDs of the table in docs/spec/24-terminal.md section 14 equal the TM-T entries, and so
+   do the cells `title` and `expected`; a table header other than `| ID | Test | Expected |` is
+   a finding.
 2. Every TM-T, AZ-M and ID-T ID of the PLAN row M2-48 and of exit criterion 8 in PLAN section 8
    has a run that `make check` executes (kind `e2e` or `unit`, or `platform` on `linux`) and is
    not deferred; TM-T16 also runs in `make perf`; the IDs of the `doctor` matrix run on every
@@ -253,20 +252,20 @@ def chapter_rows(text: str) -> tuple[bool, dict[str, tuple[str, str]]] | None:
         text: the chapter.
 
     Returns:
-        (english, rows) with rows mapping each TM-T ID to its (test, expected) cells, where
-        english is true for the header `| ID | Test | Expected |`; None without a table.
+        (header_ok, rows) with rows mapping each TM-T ID to its (test, expected) cells, where
+        header_ok is true for the header `| ID | Test | Expected |`; None without a table.
     """
     lines = _section(text, re.compile(r"^## 14\. "))
     header = next((line for line in lines if line.startswith("| ID |")), None)
     if header is None:
         return None
-    english = _cells(header) == ["ID", "Test", "Expected"]
+    header_ok = _cells(header) == ["ID", "Test", "Expected"]
     rows: dict[str, tuple[str, str]] = {}
     for line in lines:
         if line.startswith("| TM-T"):
             cells = _cells(line)
             rows[cells[0]] = (cells[1], cells[2]) if len(cells) >= 3 else ("", "")
-    return english, rows
+    return header_ok, rows
 
 
 def plan_ids(text: str) -> tuple[set[str] | None, set[str] | None]:
@@ -479,9 +478,10 @@ def check_chapter(entries: dict[str, dict[str, Any]], text: str | None) -> list[
     parsed = chapter_rows(text or "")
     if parsed is None:
         return [f"{CHAPTER}: section 14 has no test table"]
-    english, rows = parsed
+    header_ok, rows = parsed
     where = f"{CHAPTER} section 14"
-    problems = [
+    problems = [] if header_ok else [f"{where}: the table header is not `| ID | Test | Expected |`"]
+    problems += [
         f"{i}: catalogue entry has no row in {where}"
         for i in sorted(entries, key=id_key)
         if i.startswith("TM-T") and i not in rows
@@ -491,14 +491,13 @@ def check_chapter(entries: dict[str, dict[str, Any]], text: str | None) -> list[
         for i in sorted(rows, key=id_key)
         if i not in entries
     ]
-    if english:
-        for id_, (title, expected) in sorted(rows.items(), key=lambda r: id_key(r[0])):
-            entry = entries.get(id_)
-            if entry is None:
-                continue
-            for name, cell in (("title", title), ("expected", expected)):
-                if entry.get(name) != cell:
-                    problems.append(f"{id_}: {name} differs from the cell of {where}")
+    for id_, (title, expected) in sorted(rows.items(), key=lambda r: id_key(r[0])):
+        entry = entries.get(id_)
+        if entry is None:
+            continue
+        for name, cell in (("title", title), ("expected", expected)):
+            if entry.get(name) != cell:
+                problems.append(f"{id_}: {name} differs from the cell of {where}")
     return problems
 
 

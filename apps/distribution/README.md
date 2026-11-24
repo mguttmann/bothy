@@ -42,7 +42,7 @@ uv run --project tools --locked python tools/distribution/appdist.py validate --
 | `windows.publisher` | the subject of the signing certificate; it must equal the certificate's subject exactly |
 | `windows.update_url` | the address below which the MSIX files and `stable.appinstaller` and `beta.appinstaller` are published (ends with `/`) |
 | `windows.hours_between_update_checks` | how often App Installer checks at the start of the app (0 to 255) |
-| `windows.timestamp_url` | optional RFC 3161 timestamp server of the certificate authority |
+| `windows.timestamp_url` | the RFC 3161 timestamp server of the certificate authority; a release refuses the empty value of the template, only the trials sign without a timestamp |
 | `ios.update_url` | the page the iOS app opens as its update path: the public TestFlight link until the App Store listing exists, then the App Store page (M7-13) |
 | `android.package_name` | the application ID of the Android app (M7-13) |
 | `android.update_url` | the page the Android app opens as its update path, as a rule its Play page (M7-13) |

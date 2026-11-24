@@ -342,7 +342,50 @@ func TestEdgeExample_Config(t *testing.T) {
 	checkUpstreams(t, httpCtx)
 	checkLocations(t, one(t, httpCtx.block, "server"))
 	checkTimeouts(t, conf)
+	checkCapacity(t, conf)
 	checkHardening(t, w)
+}
+
+// checkCapacity checks that the edge holds perf.ws_connections_per_node WebSockets for each node
+// of its upstream, each of which takes two connections (client and node), with a file limit of
+// two descriptors per connection, and that REST requests reuse their connections to the nodes.
+func checkCapacity(t *testing.T, conf []*directive) {
+	t.Helper()
+	perNode, err := strconv.Atoi(configDefault(t, "perf.ws_connections_per_node"))
+	if err != nil {
+		t.Fatalf("default of perf.ws_connections_per_node: %v", err)
+	}
+	conns, err := strconv.Atoi(arg(t, one(t, one(t, conf, "events").block, "worker_connections"), 0))
+	if err != nil {
+		t.Fatalf("worker_connections: %v", err)
+	}
+	if want := 2 * perNode * len(nodes); conns < want {
+		t.Errorf("worker_connections %d, want at least %d", conns, want)
+	}
+	files, err := strconv.Atoi(arg(t, one(t, conf, "worker_rlimit_nofile"), 0))
+	if err != nil {
+		t.Fatalf("worker_rlimit_nofile: %v", err)
+	}
+	if files < 2*conns {
+		t.Errorf("worker_rlimit_nofile %d, want at least %d", files, 2*conns)
+	}
+	httpCtx := one(t, conf, "http")
+	for _, u := range find(httpCtx.block, "upstream") {
+		if arg(t, u, 0) == "bothy_api" {
+			one(t, u.block, "keepalive")
+		}
+	}
+	for _, m := range find(httpCtx.block, "map") {
+		if !slices.Equal(m.args, []string{"$http_upgrade", "$connection_upgrade"}) {
+			continue
+		}
+		// The tokenizer drops the quotes: the entry "" is the directive with the empty name.
+		for _, d := range m.block {
+			if d.name == "" && !slices.Equal(d.args, []string{""}) {
+				t.Errorf("map $connection_upgrade sends %v for a plain request; keepalive needs an empty Connection header", d.args)
+			}
+		}
+	}
 }
 
 // checkMain checks the main context: pid under /tmp and only critical errors to stderr.

@@ -37,8 +37,8 @@ class ContrastRow:
 
     @property
     def passed(self) -> bool:
-        """Return True if the rounded ratio reaches the required ratio."""
-        return round(self.ratio, 2) >= self.required
+        """Return True if the unrounded ratio reaches the required ratio (WCAG does not round)."""
+        return self.ratio >= self.required
 
 
 def _hex(tokens: dict[str, dtcg.Token], path: str, theme: str, what: str = "contrast pair") -> str:

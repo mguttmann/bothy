@@ -612,9 +612,11 @@ The following paragraphs record how `bothy-host` implements this section; the ro
   `organization` (`claude_api_key`, read by the sessions), it holds the pairing record
   (`pairing.json`: server URL, host ID, instance ID, fingerprint) and the last declaration
   (`declaration.json`), both without secrets and without a subscription login, on Linux and
-  macOS the admin endpoint `admin.sock`, and on macOS and Windows the log of the host service
-  (`bothy-host.log` and its predecessor `bothy-host.log.1`; 4.2, AUD-host-01). Every file but the
-  log is written atomically with mode `0600`; the log has the same mode and is appended to.
+  macOS the admin endpoint `admin.sock` with its lock `admin.sock.lock` (a second `run` of the
+  same directory ends before it touches the endpoint), and on macOS and Windows the log of the
+  host service (`bothy-host.log` and its predecessor `bothy-host.log.1`; 4.2, AUD-host-01). Every
+  file but the log is written atomically with mode `0600`; the log has the same mode and is
+  appended to.
 - **Declaration from `ready`** (D-M2-42-15): the host service learns `hosts.llm_credentials` only
   from `ready`; the server sends `ready` again on every change of the declaration, and the host
   service treats each `ready` as the current declaration and evaluates HD6 again. Until a `ready`
@@ -666,7 +668,10 @@ one of the following applies:
 - The host service reports it (`hosts.reported_is_server_host`): the address from `server.public_url`
   resolves to an address of one of its own network interfaces or to loopback, or the peer
   of the control connection is a local address [derived: a heuristic that does not detect a server
-  behind another party's edge].
+  behind another party's edge]. A control connection through a proxy (taken from the environment,
+  D-M2-43-17) has the proxy as its peer, so only the address check counts then; `bothy-host pair`
+  uses no proxy (D-M2-42-25), so a host behind a mandatory proxy is paired from a network that
+  reaches the server directly.
 
 Then the following applies:
 
@@ -785,6 +790,8 @@ permissions. Disabling by the owner sets `hosts.disabled_reason = 'owner'`; a ho
    (authentication with the server), stores both privately in the state directory
    (section 4.2) and sends the public keys with the code, its profiles and the names of its
    session users (`host.pair`, public, `rl.public_auth`). The host becomes `confirming`.
+   A fixed bound of the program holds the call; a server that does not answer within it gives
+   "server unreachable", and nothing is stored.
 3. `bothy-host pair` shows the fingerprint locally (section 4.3). The owner types the first
    `terminal.fingerprint_confirm_chars` characters into the app, declares the LLM login of the
    host while doing so (section 7) and assigns people their session users (2.2).
@@ -1015,9 +1022,14 @@ system roots, proxy from the environment, and never skips the verification. It p
 protocol version both sides support (none: it stops and logs "update the host service or the
 server", with the update route of its package, as after `4114`; [18-release.md](18-release.md)
 9.1). It sends `heartbeat` every `heartbeat_interval_ms` and treats `heartbeat_interval_ms`
-times (`heartbeat_miss_limit` + 1) without a frame of the server as a dead connection.
-`is_server_host` is HD5 or the peer of the connection is an address of the host itself (2.3). Its
-reaction per close code: `1000`, `1001`, `4000`, `4002`, `4009`, `4014`, `4113` and any unknown
+times (`heartbeat_miss_limit` + 1) without a frame of the server as a dead connection. Before
+`hello` a fixed bound of the program holds one attempt: the dial with TLS and the upgrade, then
+the wait for `hello`; a server, proxy or edge that accepts and stays silent past it counts as
+unreachable and the attempt is retried with the backoff. The log line of a failed dial names its
+error class as a fixed code without an address (`proxy`, `tls_unknown_authority`, `tls_expired`,
+`tls_invalid`, `dns`, `refused`, `timeout`, `upgrade_refused`, `other`).
+`is_server_host` is HD5 or the peer of the connection, without a proxy, is an address of the host
+itself (2.3). Its reaction per close code: `1000`, `1001`, `4000`, `4002`, `4009`, `4014`, `4113` and any unknown
 code reconnect with exponential backoff with full jitter from
 `host_service.reconnect_backoff_base` to `host_service.reconnect_backoff_cap`, reset after a
 `ready`; `4013` reconnects after a random delay below `host_service.reconnect_backoff_base`;
@@ -1055,7 +1067,8 @@ theft stays unnoticed until it returns (threat model T-TM-05).
 
 Files of the state directory (D-M2-42-4): `keys` (both private keys; on Windows a DPAPI blob of
 `CryptProtectData` without `CRYPTPROTECT_LOCAL_MACHINE`), `pairing.json`, `bindings.json`,
-`declaration.json`, `claude_api_key` (only at `organization`) and on Linux and macOS `admin.sock`.
+`declaration.json`, `claude_api_key` (only at `organization`) and on Linux and macOS `admin.sock`
+with its lock `admin.sock.lock`.
 `pair` generates both key pairs locally and stores them only after the server accepted them.
 On macOS and Windows, where the service manager keeps no output of a service, the directory also
 holds the log of the host service, `bothy-host.log` and its predecessor `bothy-host.log.1`
@@ -1357,7 +1370,10 @@ Diagram: [seq-8-open-terminal.svg](../architecture/seq-8-open-terminal.svg) (sou
    with `open_failed` and `open_timeout`. The gate run ends at `expires_at` as well
    ([FIX-HOGS/2](../decisions.d/FIX-host-open-gate-slow.md)): a run not finished by then gives
    `open_failed` with `open_timeout` and applies nothing (no `report`, no end of running
-   sessions). Every failure after message 2 and before the PTY runs sends `session.ended` with
+   sessions). The channel to the helper of `osu` (dial and `hello`) and `pty.start` together get
+   the length of the opening window, counted after the gate and the local confirmation (which
+   may end after `expires_at`, 6.4): a helper that has not answered by then gives `open_failed`
+   with `open_timeout`, and a PTY it still starts is stopped (`pty.stop`). Every failure after message 2 and before the PTY runs sends `session.ended` with
    `open_failed` and its `close_detail`, and the host service keeps
    the data connection open: the server ends the session and closes both sides (host side
    `4100`), so the device gets the code of the end (`4104` for `handshake_failed`, else `4100`)
@@ -2544,6 +2560,9 @@ Column "Place": Server = configuration reference of the server; Host service = c
 | `host_service.local_confirm_timeout` | Host service | `60s` | Deadline for the consent on the host |
 | `host_service.reconnect_backoff_base` | Host service | `1s` | first delay of the exponential backoff with full jitter before a new control connection (3.5) |
 | `host_service.reconnect_backoff_cap` | Host service | `5m` | largest delay of that backoff; also the total time the login of a refused start keeps trying (3.5) |
+
+Every duration of `host_service` is above zero: the host service refuses a configuration with a
+zero duration at its start (`config_invalid`), naming the key.
 
 Values of other chapters that this chapter refers to: `auth.clock_leeway`
 ([08-identity.md](08-identity.md)), `cluster.mode` ([02-architecture.md](02-architecture.md)),

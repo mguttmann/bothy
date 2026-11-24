@@ -103,7 +103,7 @@ func TestStartWritesTheRunMaterial(t *testing.T) {
 			t.Fatalf("URL %q: %v", base, err)
 		}
 		d := tls.Dialer{Config: &tls.Config{RootCAs: pool, ServerName: "localhost", MinVersion: tls.VersionTLS12}}
-		conn, err := d.DialContext(t.Context(), "tcp", net.JoinHostPort("127.0.0.1", u.Port())) // nosemgrep: bothy-go-egress-only -- a TLS check of the in-process fake
+		conn, err := d.DialContext(t.Context(), "tcp", net.JoinHostPort("127.0.0.1", u.Port()))
 		if err != nil {
 			t.Fatalf("TLS to %s under the run CA: %v", base, err)
 		}
@@ -234,7 +234,7 @@ func get(t *testing.T, target string) (int, string, []byte) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err := http.DefaultClient.Do(req) // nosemgrep: bothy-go-egress-only -- a test client of the in-process capture API on loopback
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +305,7 @@ func TestCaptureAPIOrderAndAfter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := &http.Client{Transport: &http.Transport{ // nosemgrep: bothy-go-egress-only -- a test client of the in-process fake on loopback
+	c := &http.Client{Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{RootCAs: caPool(t, dir), MinVersion: tls.VersionTLS12}, ForceAttemptHTTP2: true}}
 	resp, err := c.Do(req)
 	if err != nil {
@@ -344,7 +344,7 @@ func TestCaptureAPIOrderAndAfter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pr, err := http.DefaultClient.Do(post) // nosemgrep: bothy-go-egress-only -- a test client of the in-process capture API on loopback
+	pr, err := http.DefaultClient.Do(post)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -367,7 +367,7 @@ func TestCloseClosesEveryServer(t *testing.T) {
 	}
 	ctx := testkit.Context(t)
 	var d net.Dialer
-	capture, err := d.DialContext(ctx, "tcp", u.Host) // nosemgrep: bothy-go-egress-only -- a raw connection to the in-process capture API
+	capture, err := d.DialContext(ctx, "tcp", u.Host)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -400,7 +400,7 @@ func TestCloseClosesEveryServer(t *testing.T) {
 			t.Fatal(err)
 		}
 		td := tls.Dialer{Config: &tls.Config{RootCAs: caPool(t, dir), ServerName: "localhost", MinVersion: tls.VersionTLS12}}
-		c, err := td.DialContext(ctx, "tcp", net.JoinHostPort("127.0.0.1", fu.Port())) // nosemgrep: bothy-go-egress-only -- a TLS connection to the in-process fake
+		c, err := td.DialContext(ctx, "tcp", net.JoinHostPort("127.0.0.1", fu.Port()))
 		if err != nil {
 			t.Fatal(err)
 		}

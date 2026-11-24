@@ -90,7 +90,7 @@ def _problem(
 ) -> str | None:
     """Return the problem line of one pair, or None if it meets the gate.
 
-    The rounding is that of the token gate (`rules.ContrastRow.passed`).
+    The comparison is that of the token gate (`rules.ContrastRow.passed`): the unrounded ratio.
     """
     row = rules.ContrastRow(
         theme=theme,
@@ -109,18 +109,6 @@ def _problem(
         f"{graphic} [{theme}] {fg} on {bg}: {row.ratio:.2f} < {row.required} "
         f"({row.fg_hex} on {row.bg_hex}, {kind})"
     )
-
-
-def class_colours(source: str) -> list[tuple[str, str | None, str]]:
-    """Return (label, color or None, fill) of every `classDef` and `style` with a fill.
-
-    The label is e.g. `classDef person` or `style N`.
-    """
-    return [
-        (label, props.get("color"), props["fill"])
-        for label, props in class_props(source)
-        if "fill" in props and not label.startswith("linkStyle")
-    ]
 
 
 def class_props(source: str) -> list[tuple[str, dict[str, str]]]:

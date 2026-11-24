@@ -227,3 +227,41 @@ func TestCallHonoursContext(t *testing.T) {
 		t.Errorf("%v", err)
 	}
 }
+
+// TestAdminEndpointOneInstance (audit host-service-13): a second run with the same state directory
+// fails with ErrAdminInUse and leaves the endpoint of the first one in place; after the first one
+// closes, the endpoint can be opened again.
+func TestAdminEndpointOneInstance(t *testing.T) {
+	path := filepath.Join(shortDir(t), "admin.sock")
+	l, err := ListenAdmin(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ListenAdmin(path); !errors.Is(err, ErrAdminInUse) {
+		t.Fatalf("second instance: %v, want ErrAdminInUse", err)
+	}
+	after, err := os.Stat(path)
+	if err != nil || !os.SameFile(before, after) {
+		t.Fatalf("the second instance replaced the socket of the first: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { _ = ServeAdmin(ctx, l, me, echo); close(done) }()
+	c, err := DialAdmin(context.Background(), path, me)
+	if err != nil {
+		t.Fatalf("the first instance lost its endpoint: %v", err)
+	}
+	_ = c.Close()
+	cancel()
+	<-done
+	_ = l.Close() // waits for the close that the end of ServeAdmin started
+	l2, err := ListenAdmin(path)
+	if err != nil {
+		t.Fatalf("after the first closed: %v", err)
+	}
+	_ = l2.Close()
+}

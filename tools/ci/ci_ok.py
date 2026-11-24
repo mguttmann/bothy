@@ -14,7 +14,9 @@ job plan) and fails when a job did not pass:
   shards of test-server, test-server-contract runs the contract tests beside them) is needed
   exactly when the plan lists that job;
 - `sonar` (MAY_SKIP) may end skipped: without the secrets, on main without SONAR_MAIN_ANALYSIS,
-  in the merge queue, and after a failed or cancelled test job, which fails through that job;
+  in the merge queue, and after a failed or cancelled test job, which fails through that job. In a
+  pull request with the private checks (SONAR_EXPECTED `true`, set by ci-ok of ci.yml) only the
+  last case remains, so a wrong condition of the job cannot drop the scan unnoticed;
 - of the deny-list pair (ONE_OF) exactly the one that ran must pass; both skipped fails;
 - every other job must succeed;
 - a missing, empty or unknown plan fails (docs/quality/gates.md, "Jobs a change needs").
@@ -38,6 +40,11 @@ import components
 
 # Jobs that may end skipped whatever the plan says.
 MAY_SKIP = frozenset({"sonar"})
+# The `needs` of sonar in ci.yml: when it must run, only a failed or cancelled one of them skips it.
+SONAR_NEEDS = frozenset(
+    {"plan", "test-server", "test-server-coverage", "test-apps", "test-sdk-plugins"}
+)
+SONAR_SKIPPED = "sonar: skipped, but a pull request with the private checks needs it"
 # Groups of jobs of which exactly one runs; that one must pass.
 ONE_OF: tuple[frozenset[str], ...] = (frozenset({"denylist", "denylist-fork"}),)
 # Jobs that run after a conditional job and only when the plan lists it (job -> that job).
@@ -67,11 +74,15 @@ def _needed(job: str, needed: frozenset[str]) -> bool:
     return job in needed or FOLLOWS.get(job) in needed
 
 
-def _skip_allowed(job: str, results: dict[str, str], needed: frozenset[str]) -> bool:
+def _skip_allowed(
+    job: str, results: dict[str, str], needed: frozenset[str], sonar_expected: bool
+) -> bool:
     if job in FOLLOWS:
         return not _needed(job, needed)
     if job in components.CONDITIONAL_JOBS:
         return job not in needed
+    if job == "sonar" and sonar_expected:
+        return any(results.get(n) in ("failure", "cancelled") for n in SONAR_NEEDS)
     if job in MAY_SKIP:
         return True
     return any(
@@ -80,15 +91,25 @@ def _skip_allowed(job: str, results: dict[str, str], needed: frozenset[str]) -> 
     )
 
 
-def check_needs(results: dict[str, str], needed: frozenset[str]) -> list[str]:
-    """Return the problems of a run from `needs` results (job id -> result), empty when green."""
+def check_needs(
+    results: dict[str, str], needed: frozenset[str], *, sonar_expected: bool = False
+) -> list[str]:
+    """Return the problems of a run from `needs` results (job id -> result), empty when green.
+
+    Args:
+        results: job id -> result of the `needs` of the result job.
+        needed: the conditional jobs the plan lists.
+        sonar_expected: a pull request with the private checks, where sonar must run.
+    """
     problems = [f"{job}: missing" for job in REQUIRED if job not in results]
     for job, result in sorted(results.items()):
         if result == "success":
             continue
-        if result == "skipped" and _skip_allowed(job, results, needed):
+        if result == "skipped" and _skip_allowed(job, results, needed, sonar_expected):
             continue
-        if result == "skipped" and _needed(job, needed):
+        if result == "skipped" and job == "sonar":
+            problems.append(SONAR_SKIPPED)
+        elif result == "skipped" and _needed(job, needed):
             problems.append(f"{job}: skipped, but the plan needs it")
         else:
             problems.append(f"{job}: {result}")
@@ -112,7 +133,8 @@ def main(argv: list[str] | None = None) -> int:
         for problem in check_needs(results, frozenset(components.CONDITIONAL_JOBS)):
             print(f"{label}: {problem}")
         return 1
-    problems = check_needs(results, needed)
+    sonar_expected = os.environ.get("SONAR_EXPECTED") == "true"
+    problems = check_needs(results, needed, sonar_expected=sonar_expected)
     for problem in problems:
         print(f"{label}: {problem}")
     if problems:

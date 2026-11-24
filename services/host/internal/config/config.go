@@ -239,13 +239,13 @@ func (c *Config) set(key string, v *yaml.Node) error {
 	case "host_service.extra_forbidden_groups":
 		c.ExtraForbiddenGroups, err = strList(key, v)
 	case "host_service.credential_check_interval":
-		c.CredentialCheckInterval, err = duration(key, v)
+		c.CredentialCheckInterval, err = positiveDuration(key, v)
 	case "host_service.entry_scan_timeout":
-		c.EntryScanTimeout, err = duration(key, v)
+		c.EntryScanTimeout, err = positiveDuration(key, v)
 	case "host_service.auth_status_timeout":
-		c.AuthStatusTimeout, err = duration(key, v)
+		c.AuthStatusTimeout, err = positiveDuration(key, v)
 	case "host_service.local_confirm_timeout":
-		c.LocalConfirmTimeout, err = duration(key, v)
+		c.LocalConfirmTimeout, err = positiveDuration(key, v)
 	case "host_service.profiles":
 		c.Profiles, err = profiles(key, v)
 	case "host_service.claude_bin":

@@ -37,6 +37,12 @@ class ContrastGateTest(unittest.TestCase):
         self.assertFalse(rows[0].passed)
         self.assertEqual(rows[0].required, 4.5)
 
+    def test_ratio_just_below_the_threshold_fails_without_rounding(self):
+        # WCAG compares the unrounded ratio: 4.496:1 does not meet 4.5:1, although it shows as 4.50.
+        row = rules.ContrastRow("light", "fg", "bg", "text", "#000000", "#ffffff", 4.496, 4.5, "")
+        self.assertFalse(row.passed)
+        self.assertTrue(rules.ContrastRow("light", "fg", "bg", "text", "#000000", "#ffffff", 4.5, 4.5, "").passed)
+
     def test_ui_pair_needs_only_three(self):
         tokens = _tokens({"fg": "#949494", "bg": "#ffffff"})
         rows = rules.check_contrast({"light": tokens}, [{"fg": "fg", "bg": "bg", "kind": "ui"}])

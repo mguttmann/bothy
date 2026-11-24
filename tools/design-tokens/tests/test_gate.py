@@ -110,6 +110,23 @@ class CheckGateTest(GateTreeMixin, unittest.TestCase):
         self.assertEqual(proc.returncode, 1)
         self.assertIn("gate: [light] color.text.primary on color.surface.canvas: 1.00 < 4.5", proc.stderr)
 
+    def test_role_missing_in_one_theme_is_an_input_error(self):
+        def drop_role(data):
+            del data["color"]["text"]["primary"]
+
+        self._edit_json("design/tokens/color.dark.tokens.json", drop_role)
+        proc = self._check()
+        self.assertEqual(proc.returncode, 2, proc.stderr)
+        self.assertIn("error: modifier theme: context dark lacks color.text.primary", proc.stderr)
+        self.assertNotIn("Traceback", proc.stderr)
+
+    def test_rule_file_without_a_member_is_an_input_error(self):
+        self._edit_json("design/design-rules.json", lambda data: data.pop("palette_guards"))
+        proc = self._check()
+        self.assertEqual(proc.returncode, 2, proc.stderr)
+        self.assertIn("error: design/design-rules.json lacks 'palette_guards'", proc.stderr)
+        self.assertNotIn("Traceback", proc.stderr)
+
     def test_check_fails_when_accent_output_stale(self):
         dart = self.root / "design" / "build" / "dart" / "design_tokens.g.dart"
         text = dart.read_text(encoding="utf-8")

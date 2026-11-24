@@ -288,20 +288,40 @@ def test_android_runs_with_one_device(
     assert "apps-platform packages/device_key android: 1 commands ok" in out
 
 
-def test_android_skips_without_device(
-    tmp_path: Path,
-    fake_adb: Path,
-    capsys: pytest.CaptureFixture[str],
-    monkeypatch: pytest.MonkeyPatch,
+def test_android_job_fails_without_device(
+    tmp_path: Path, fake_adb: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    monkeypatch.delenv("CI", raising=False)
+    """With --system android a missing device is an error, never a skip (R-QA-02, ci-gates-2)."""
     root = tmp_path / "repo"
     _android_member(root)
-    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 0
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 1
     assert _calls(fake_adb) == []
-    out = capsys.readouterr().out
-    assert "SKIP apps-platform packages/device_key android: no device" in out
-    assert "SKIP apps-platform packages/device_key macos: other host" in out
+    captured = capsys.readouterr()
+    assert "apps-platform packages/device_key android: no device" in captured.err
+    assert "SKIP apps-platform packages/device_key android" not in captured.out
+    assert "SKIP apps-platform packages/device_key macos: other host" in captured.out
+
+
+def test_android_skips_without_device_on_a_host(
+    tmp_path: Path, fake_adb: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A local run for the host (no --system android) still skips the Android commands."""
+    root = tmp_path / "repo"
+    _android_member(root)
+    assert apps_platform.main(["--root", str(root), "--system", "linux"]) == 0
+    assert "SKIP apps-platform packages/device_key android: no device" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("tests", [None, {"macos": [["flutter", "test", "mac"]]}])
+def test_android_job_fails_when_no_android_command_ran(
+    tmp_path: Path, fake_adb: Path, capsys: pytest.CaptureFixture[str], tests: object
+) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    if tests is not None:
+        _member(root, "packages/device_key", tests)
+    assert apps_platform.main(["--root", str(root), "--system", "android"]) == 1
+    assert "apps-platform android: no Android command ran" in capsys.readouterr().err
 
 
 def test_android_job_fails_without_device_in_ci(
@@ -316,7 +336,7 @@ def test_android_job_fails_without_device_in_ci(
     _android_member(root)
     assert apps_platform.main(["--root", str(root), "--system", "android"]) == 1
     assert _calls(fake_adb) == []
-    assert "packages/device_key android: no device in the CI job" in capsys.readouterr().err
+    assert "packages/device_key android: no device" in capsys.readouterr().err
 
 
 def test_android_skips_without_adb(

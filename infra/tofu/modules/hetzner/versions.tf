@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Provider and OpenTofu versions of the module hetzner. The provider is pinned to one exact version
 # (infra/tofu/README.md rule 4); Renovate raises it together with the hashes in the lock files of
 # the roots (infra/tofu/test/*/.terraform.lock.hcl), and tools/ci/tests/test_tofu_cloud_modules.py

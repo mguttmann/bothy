@@ -10,6 +10,10 @@ Rules (docs/quality/push-discipline.md):
   * header `type(scope)!: description`, type from TYPES, at most HEADER_MAX_LENGTH chars
   * a blank line between header and body
   * with --require-signoff: a `Signed-off-by:` trailer whose e-mail matches the author
+  * the message of a merge in progress (MERGE_HEAD in the git directory, as `git merge`
+    leaves it for the hook) is not checked; a commit whose header merely starts with
+    `Merge `, a commit of a range (merges are left out there) and the pull request title are
+    checked like any other message
   * `fixup!`/`squash!`/`amend!` commits are fine locally and rejected in ranges,
     because they must be squashed before a push
   * with --pr-author naming a dependency bot of BOT_AUTHORS (CI passes the pull request
@@ -65,14 +69,23 @@ def _clean(message: str) -> str:
 
 
 def check_message(
-    message: str, *, require_signoff: bool, author: str, allow_fixup: bool = True
+    message: str,
+    *,
+    require_signoff: bool,
+    author: str,
+    allow_fixup: bool = True,
+    merge: bool = False,
 ) -> list[str]:
-    """Return a list of human readable errors; empty means the message passes."""
+    """Return a list of human readable errors; empty means the message passes.
+
+    `merge` is true only for the message of a real merge commit (`_merging`); the header text
+    alone never exempts a message.
+    """
     text = _clean(message)
     lines = text.splitlines()
     header = lines[0] if lines else ""
     errors: list[str] = []
-    if header.startswith("Merge "):
+    if merge:
         return errors
     if header.startswith(_AUTOSQUASH):
         if not allow_fixup:
@@ -111,6 +124,15 @@ def _git(repo: Path, *args: str) -> str:
     return subprocess.run(
         ["git", "-C", str(repo), *args], check=True, capture_output=True, text=True
     ).stdout
+
+
+def _merging(repo: Path) -> bool:
+    """True while `git merge` waits for its commit: the hook then sees MERGE_HEAD."""
+    try:
+        path = Path(_git(repo, "rev-parse", "--git-path", "MERGE_HEAD").strip())
+    except subprocess.CalledProcessError:
+        return False
+    return (path if path.is_absolute() else repo / path).is_file()
 
 
 def _author_ident(repo: Path) -> str:
@@ -170,6 +192,7 @@ def main(argv: list[str] | None = None) -> int:
         args.msgfile.read_text(encoding="utf-8"),
         require_signoff=args.require_signoff,
         author=_author_ident(args.repo) if args.require_signoff else "",
+        merge=_merging(args.repo),
     )
     for err in errors:
         print(f"commit message: {err}")

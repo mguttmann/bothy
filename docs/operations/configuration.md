@@ -1220,7 +1220,7 @@ A server key that is not set through one of them goes into `compose.override.yam
 | `BOTHY_OTEL_METRIC_EXPORT_INTERVAL_MS` | `15000` | sets `OTEL_METRIC_EXPORT_INTERVAL` of the server processes |
 | `BOTHY_TRACE_SAMPLE_PERCENT` | `10` | tail sampling: share of the remaining traces in percent |
 | `BOTHY_TRACE_SLOW_THRESHOLD_MS` | `2000` | tail sampling: from this duration on, a trace is always kept |
-| `BOTHY_OTEL_MEMORY_LIMIT_PERCENT` | `80` | memory_limiter of the collector |
+| `BOTHY_OTEL_MEMORY_LIMIT_PERCENT` | `80` | memory_limiter of the collector, in percent of `BOTHY_OTELCOL_MEMORY_LIMIT` |
 | `NEW_RELIC_OTLP_ENDPOINT` | `https://otlp.eu01.nr-data.net` | overlay newrelic: endpoint (EU or US) |
 | `GRAFANA_OTLP_ENDPOINT` | `https://otlp-gateway-REGION.grafana.net/otlp` | overlay grafana: OTLP gateway |
 | `GRAFANA_INSTANCE_ID` | empty | overlay grafana: instance ID (information only; the header value is in secrets) |
@@ -1245,6 +1245,7 @@ A server key that is not set through one of them goes into `compose.override.yam
 | `BOTHY_GRAFANA_VERSION` | `13.2.3` | image version of Grafana |
 | `BOTHY_NGINX_VERSION` | `1.30.6-alpine` | image version of the example edge (nginx-unprivileged) of the overlay `compose.multi-node.yaml` ([install-compose.md](install-compose.md) 5.3) |
 | `BOTHY_CLAMAV_MEMORY_LIMIT` | `4g` | memory limit of the ClamAV container |
+| `BOTHY_OTELCOL_MEMORY_LIMIT` | `1g` | memory limit of the collector container |
 | `BOTHY_LOG_MAX_SIZE` | `20m` | size of a container log file until rotation |
 | `BOTHY_LOG_MAX_FILE` | `5` | kept container log files per service |
 

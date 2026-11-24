@@ -1,15 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Check that the built documentation site loads no script, stylesheet or font from elsewhere.
+"""Check that the built documentation site loads nothing from elsewhere.
 
 A public docs site that pulls scripts, styles or fonts from another server tells that server
 who reads which page and breaks the content security rules the project applies elsewhere
 (brief M7-19, requirement 13). Everything a page needs is bundled into the site at build time,
 so `make docs` runs this check over the built HTML and CSS after `mkdocs build`.
 
-What fails: `<script src>`, `<link href>` with rel `stylesheet`, `preload`, `modulepreload` or
-`prefetch`, and CSS `url(...)` or `@import` (in `<style>`, in `style` attributes and in `.css`
-files) whose URL names a host (`https://...`, `//...`). Plain anchors to external pages and
-links such as `rel="canonical"` stay allowed: they load nothing.
+What fails: a URL that names a host (`https://...`, `//...`) in `src` of `<script>`, `<img>`,
+`<iframe>`, `<video>`, `<audio>`, `<source>`, `<track>`, `<embed>` and `<input>`, in `srcset`
+of `<img>` and `<source>`, in `poster` of `<video>`, in `data` of `<object>`, in `<link href>`
+with a rel of LOADING_RELS (stylesheet, preload, modulepreload, prefetch, icon, manifest,
+preconnect, dns-prefetch and the like), and in CSS `url(...)` or `@import` (in `<style>`, in
+`style` attributes and in `.css` files). Plain anchors to external pages and links such as
+`rel="canonical"` stay allowed: they load nothing.
 
 Not covered: requests a bundled script makes at run time (a static check cannot see them).
 
@@ -26,8 +29,38 @@ from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit
 
-# rel values whose href the browser loads as a script, stylesheet or font.
-_LOADING_RELS = frozenset({"stylesheet", "preload", "modulepreload", "prefetch"})
+# rel values whose href the browser loads or connects to.
+LOADING_RELS = frozenset(
+    {
+        "stylesheet",
+        "preload",
+        "modulepreload",
+        "prefetch",
+        "prerender",
+        "icon",
+        "apple-touch-icon",
+        "apple-touch-icon-precomposed",
+        "mask-icon",
+        "manifest",
+        "preconnect",
+        "dns-prefetch",
+    }
+)
+# Attributes holding one URL the browser loads, per element.
+_URL_ATTRS: dict[str, tuple[str, ...]] = {
+    "script": ("src",),
+    "img": ("src",),
+    "iframe": ("src",),
+    "video": ("src", "poster"),
+    "audio": ("src",),
+    "source": ("src",),
+    "track": ("src",),
+    "embed": ("src",),
+    "input": ("src",),
+    "object": ("data",),
+}
+# Elements whose `srcset` lists candidate URLs (`url [descriptor], ...`).
+_SRCSET_TAGS = frozenset({"img", "source"})
 # `url(x)`, `url('x')`, `@import 'x'` and `@import url(x)` in CSS.
 _CSS_URL = re.compile(
     r"""url\(\s*['"]?(?P<url>[^'")\s]+)|@import\s+['"](?P<imp>[^'"]+)""", re.IGNORECASE
@@ -83,11 +116,17 @@ class _PageScanner(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         values = {name: value or "" for name, value in attrs}
-        if tag == "script" and is_external(values.get("src", "")):
-            self._add(values["src"])
+        for attr in _URL_ATTRS.get(tag, ()):
+            if is_external(values.get(attr, "")):
+                self._add(values[attr])
+        if tag in _SRCSET_TAGS:
+            for candidate in values.get("srcset", "").split(","):
+                url = next(iter(candidate.split()), "")
+                if is_external(url):
+                    self._add(url)
         if tag == "link":
             rels = set(values.get("rel", "").lower().split())
-            if rels & _LOADING_RELS and is_external(values.get("href", "")):
+            if rels & LOADING_RELS and is_external(values.get("href", "")):
                 self._add(values["href"])
         if style := values.get("style"):
             for _, url in _css_urls(style):
@@ -106,7 +145,7 @@ class _PageScanner(HTMLParser):
 
 
 def scan(site: Path) -> list[Finding]:
-    """Return every external script, stylesheet or font reference under `site`.
+    """Return every external asset reference under `site`.
 
     Args:
         site: Directory of the built site (`mkdocs build --site-dir`).

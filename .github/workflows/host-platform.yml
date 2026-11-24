@@ -101,6 +101,36 @@ jobs:
         env:
           BOTHY_PLATFORM_DISPOSABLE: "1"
         run: make -C services/host platform-test
+      # A refused start logs its code but never a path (docs/spec/24-terminal.md 2.2), so a red run
+      # did not show which folder a session user could write. After a failure these steps print the
+      # owner, mode and ACL of every folder on the way to the program folders of the product and of
+      # the suite, and the free space of the system drive on Windows (profile 80070070), for the
+      # open causes of plan row V1-13 (docs/decisions.d/AUD-misc-misc-01.md, "Open").
+      - name: Owners and modes of the program folders (Linux and macOS, on failure)
+        if: ${{ failure() && runner.os != 'Windows' }}
+        shell: bash
+        run: |
+          for p in /opt/bothy-host/bin /opt/bothy-platform/fake /opt/bothy-platform/bin \
+            "/Library/Application Support/bothy-host/bin" /var/lib/bothy-host /usr/bin /bin; do
+            [ -e "$p" ] || continue
+            echo "== $p"
+            d="$p"
+            while :; do
+              if [ "$RUNNER_OS" = Linux ]; then sudo ls -ld "$d"; sudo getfacl -p "$d" 2>/dev/null | grep -v '^#' || true
+              else sudo ls -led "$d"; fi
+              [ "$d" = / ] && break
+              d="$(dirname "$d")"
+            done
+          done
+      - name: Owners and ACLs of the program folders (Windows, on failure)
+        if: ${{ failure() && runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          foreach ($p in @($env:ProgramFiles, "$env:ProgramFiles\bothy-host", "$env:ProgramFiles\bothy-platform",
+              "$env:ProgramFiles\bothy-platform\fake", "$env:ProgramData", "$env:ProgramData\bothy-host")) {
+            if (Test-Path -LiteralPath $p) { Write-Output "== $p"; icacls $p }
+          }
+          Get-PSDrive -PSProvider FileSystem | Format-Table -AutoSize Name, Used, Free
       - name: Keep the result file
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

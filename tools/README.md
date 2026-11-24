@@ -62,6 +62,40 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 | `docs/tests/test_backupd_commands.py` | every `bothy-backupd` command line in the code of the current Markdown documents (briefs, decision and change logs left out) is a command, option or backup kind of the usage text in `services/server/cmd/bothy-backupd/main.go` | `test` | |
 | `sonarqube/` | local SonarQube and syncing of profile and gate ([README](sonarqube/README.md)) | `sonar-up`, `sonar-config`, `sonar-config-check`, `sonar-main-branch`, `sonar-visibility`, `sonar-new-code` | `sonarqube/tests/` |
 | `design-tokens/` | translate design tokens into CSS, Dart, contrast table and preview (chapter 15, design system) | `tokens` (`design-tokens/Makefile`, target `check`) | `design-tokens/tests/` (unittest, via `make tokens`) |
+| `arch-check/` | architecture test of the Dart workspace: the dependency rules between the members of 15 section 3.1 (`arch_check.py`, `rules.yaml`) and no web view in the apps (`no_webview.py`) ([README](arch-check/README.md)) | `arch` | `arch-check/tests/` |
+| `console-e2e/` | headless browser test of the web console of the real server image with its Content Security Policy enforced ([README](console-e2e/README.md)) | `console-e2e` | `console-e2e/tests/` |
+| `e2e/` | runner of the mobile device end to end test (`mobile_e2e.py`) and its push relay (`push_relay.py`) | `e2e-mobile` | `e2e/tests/` |
+| `load/` | runner of the capacity load test (`capacity_run.py`) | `load-capacity` | `load/tests/` |
+| `observability/` | SLI bounds from the Sloth files (`sli_bounds.py`, read by `opscheck/`) and the runner of the alert path test (`alert_e2e.py`) ([README](observability/README.md)) | `alert-e2e`, `ops-check` | `observability/tests/` |
+| `portability/` | runner of the portability test (`portability_run.py`) and its local trial (`portability_trial.py`) | `portability`, `portability-trial` | `portability/tests/` |
+| `scancode/` | the pinned ScanCode Toolkit image of the text-level license scan | `scancode` | |
+| `bin/tofu_providers.py` | offline provider mirror of the OpenTofu gates | `install-options`, `tofu-check` | `bin/tests/` |
+| `ci/android_sdk.py` | install the emulator packages of an Android CI job with retries | CI jobs `apps-android-*`, workflow `e2e-mobile.yml` | `ci/tests/` |
+| `ci/apps_platform.py` | platform tests of the apps and packages | `apps-platform` | `ci/tests/` |
+| `ci/check_extension_links.py` | the app extensions of the Apple builds link no Flutter framework | `apps-platform` | `ci/tests/` |
+| `ci/dart_sdk_denylist.py` | no Dart package depends on an OpenTelemetry or analytics SDK | `licenses` | `ci/tests/` |
+| `ci/desktop_e2e_agent.py` | the scripted agents of the desktop end to end test (Fake-Agent of the Python SDK) | desktop end to end tests | `ci/tests/` |
+| `ci/dockerfile_pins.py` | every base image of a tracked Dockerfile is pinned by digest | `lint` | `ci/tests/` |
+| `ci/fragments.py` | changelog and ruling fragments: one file per ticket, their form, the merge at release | `fragments-check`, MkDocs | `ci/tests/` |
+| `ci/info_plist_strings.py` | the localized permission texts of the iOS app from the ARB files | `codegen-check` | `ci/tests/` |
+| `ci/l10n_check.py` | `flutter gen-l10n` in a temporary copy of a Dart member | `codegen-check` | `ci/tests/` |
+| `ci/lcov_filter.py` | drop the records of generated Dart files from an lcov report | `test`, `coverage` | `ci/tests/` |
+| `ci/merge_queue.py` | the merge queue of `main`: repository ruleset and the variable that switches the CI stages | by hand (maintainers) | `ci/tests/` |
+| `ci/plugin_release.py` | release ZIP of the Grafana panel plugin | `make -C plugins/grafana-bothy-live` | `ci/tests/` |
+| `ci/pr_mode.py` | whether a `ci.yml` run gets the checks that need repository secrets | CI job of `ci.yml` | `ci/tests/` |
+| `ci/release_chain.py` | supply-chain steps of a component release: join, SBOM, sign, verify, tag | workflow `release.yml` | `ci/tests/` |
+| `ci/release_prep.py` | release preparation of one component | `release-prep` | `ci/tests/` |
+| `ci/release_trial.py` | trial release on the build host | `release-trial` | `ci/tests/` |
+| `ci/scancode_policy.py` | license gate over a ScanCode report | `scancode` | `ci/tests/` |
+| `ci/terminal_stack.py` | the client stack of the terminal of the app and the tests against it | `terminal-stack`, `e2e-desktop-terminal` | `ci/tests/` |
+| `ci/tofu_vm_test.py` | local VM test of the OpenTofu module `generic-vm` | `tofu-vm-test` | `ci/tests/` |
+| `docs/dart_api_docs.py` | API documentation of the Dart packages for the documentation site | `docs` | `docs/tests/` |
+| `docs/external_assets_check.py` | the built documentation site loads nothing from another host | `docs` | `docs/tests/` |
+| `docs/mkdocs_api_reference.py`, `docs/mkdocs_markdown_structure.py`, `docs/mkdocs_ruling_fragments.py`, `docs/mkdocs_sdk_reference.py` | MkDocs hooks: the REST and gateway references, Markdown that renders differently from its source, the index of the ruling fragments, the reference of the TypeScript SDK | `docs` | `docs/tests/` |
+| `docs/placeholder_links.py` | no link to the placeholder repository `OWNER` in Markdown files | `linkcheck` | `docs/tests/` |
+| `docs/terminal_catalogue.py` | docs gate of the terminal test catalogue | `docs` | `docs/tests/` |
+| `hooks/push_plan.py`, `hooks/build_push.py` | pre-push gate: the gates of the parts a push touches, only the fast gates for a push to a `build/**` branch | pre-push | `hooks/tests/` |
+| `hooks/review_gate.py` | pre-push gate: a pushed branch head needs an independent review with verdict JA | pre-push, `review` | `hooks/tests/` |
 
 Rules for new tools: Python with the standard library or PyYAML (a MkDocs hook
 additionally with MkDocs and Markdown from the same pinned environment; the release steps of

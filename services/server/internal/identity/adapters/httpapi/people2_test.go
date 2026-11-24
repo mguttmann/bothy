@@ -306,7 +306,7 @@ func mapValues(m map[string]string) []string {
 	return out
 }
 
-// TestPersonalTokenIsNoOwnerForReads: listOwners and getUser need no owner; a personal token
+// TestPersonalTokenReadsDirectory: listOwners and getUser need no owner; a personal token
 // reads the directory (people see it).
 func TestPersonalTokenReadsDirectory(t *testing.T) {
 	t.Parallel()

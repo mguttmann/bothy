@@ -67,6 +67,40 @@ def test_write_all_permissions() -> None:
     assert check(text) == ["broad-permissions"]
 
 
+@pytest.mark.parametrize("permission", ["contents", "pull-requests", "id-token", "issues"])
+def test_a_write_on_top_level_is_rejected(permission: str) -> None:
+    """Top level grants only reads; a job that needs a write names it itself (ci-gates-16)."""
+    text = ok_job().replace(
+        "permissions:\n  contents: read\n",
+        f"permissions:\n  contents: read\n  {permission}: write\n",
+    )
+    if permission == "contents":
+        text = ok_job().replace(
+            "permissions:\n  contents: read\n", "permissions:\n  contents: write\n"
+        )
+    assert text != ok_job()
+    assert check(text) == ["top-level-write"]
+
+
+def test_a_write_on_a_job_passes() -> None:
+    text = ok_job().replace(
+        "    timeout-minutes: 30\n",
+        "    timeout-minutes: 30\n    permissions:\n      contents: read\n      issues: write\n",
+    )
+    assert text != ok_job()
+    assert check(text) == []
+
+
+def test_workflow_run_forbidden() -> None:
+    """A workflow_run job runs with the rights of the default branch after any run, also one of a
+    fork's pull request."""
+    text = ok_job().replace(
+        "  pull_request:\n", "  workflow_run:\n    workflows: [ci]\n  pull_request:\n"
+    )
+    assert text != ok_job()
+    assert check(text) == ["workflow-run"]
+
+
 def test_pull_request_target_forbidden() -> None:
     text = ok_job().replace("  pull_request:\n", "  pull_request_target:\n")
     assert "pull-request-target" in check(text)

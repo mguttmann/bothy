@@ -452,7 +452,7 @@ def test_licenses_judges_licenses_not_advisories(repo: Repo, report: str, code: 
 
 def test_apps_platform_not_in_gates(repo: Repo) -> None:
     text = (REPO / "Makefile").read_text(encoding="utf-8")
-    gates = re.search(r"^gates: (fmt-check[^\n]*(?:\\\n[^\n]*)*)", text, re.MULTILINE)
+    gates = re.search(r"^gates: (?!##)((?:[^\\\n]*\\\n)*[^\n]*)", text, re.MULTILINE)
     assert gates
     assert "apps-platform" not in gates.group(1)
     assert "apps-platform" not in re.search(r"^check: ([^\n]*)", text, re.MULTILINE).group(1)  # type: ignore[union-attr]

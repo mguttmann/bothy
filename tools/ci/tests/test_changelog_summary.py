@@ -135,3 +135,31 @@ def test_component_changelogs_are_covered() -> None:
 
 def test_real_repository_passes() -> None:
     assert changelog_summary.check_repo(REPO) == []
+
+
+# ---- fixed sections of the server release notes (docs/spec/18-release.md section 4 item 3) ----
+SERVER = "services/server/CHANGELOG.md"
+SERVER_SECTION = (
+    "## [0.2.0] - 2026-10-15\n\nSummary: Replies arrive faster.\n\n"
+    "### Upgrade notes\n\n- None: no manual step.\n\n"
+    "### Migrations\n\n- None.\n\n"
+    "### Compatibility\n\n- Apps from 0.1.0.\n\n"
+    "### Fixed\n\n- A fix.\n"
+)
+
+
+def test_server_section_with_the_fixed_sections_passes() -> None:
+    assert changelog_summary.check_text(SERVER, HEAD + SERVER_SECTION) == []
+
+
+@pytest.mark.parametrize("heading", ["Upgrade notes", "Migrations", "Compatibility"])
+def test_server_section_without_a_fixed_section_fails(heading: str) -> None:
+    text = HEAD + SERVER_SECTION.replace(f"### {heading}\n", "### Other\n")
+    [finding] = changelog_summary.check_text(SERVER, text)
+    assert finding.version == "0.2.0"
+    assert f"'### {heading}'" in finding.problem
+
+
+def test_other_components_need_no_fixed_sections() -> None:
+    text = HEAD + "## [0.2.0] - 2026-10-15\n\nSummary: Replies arrive faster.\n\n### Fixed\n\n- x\n"
+    assert changelog_summary.check_text("services/host/CHANGELOG.md", text) == []

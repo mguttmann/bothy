@@ -101,3 +101,9 @@ rules:
           - pattern-regex: '(?m)^\s*(http\.(Client|Transport)|(net|tls)\.Dialer|httputil\.ReverseProxy)[ \t]*(//.*)?$'
       # A client copy without the checking transport falls back to http.DefaultTransport.
       - pattern: $C.Transport = nil
+      # A WebSocket dial (github.com/coder/websocket) without an HTTPClient in its literal options
+      # uses http.DefaultClient; options passed as a variable are reported as well, because the
+      # rule cannot see their fields.
+      - patterns:
+          - pattern: websocket.Dial(...)
+          - pattern-not: 'websocket.Dial($CTX, $URL, &websocket.DialOptions{..., HTTPClient: $H, ...})'

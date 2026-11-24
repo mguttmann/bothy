@@ -16,6 +16,7 @@ import tomllib
 from pathlib import Path
 
 import pytest
+import yaml
 
 REPO = Path(__file__).resolve().parents[3]
 ADVISORY_ID = re.compile(
@@ -53,3 +54,20 @@ def test_ignore_is_one_advisory_with_reason_and_expiry(where: str, entry: dict) 
     until = entry.get("ignoreUntil")
     assert isinstance(until, datetime.date), f"{where}: ignoreUntil must be a TOML date"
     assert str(entry.get("reason", "")).strip(), f"{where}: reason is missing"
+
+
+def _locked_pub_packages() -> set[tuple[str, str]]:
+    data = yaml.safe_load((REPO / "pubspec.lock").read_text(encoding="utf-8"))
+    return {(name, str(entry["version"])) for name, entry in data["packages"].items()}
+
+
+def test_every_pub_license_override_names_a_package_of_the_lock() -> None:
+    """A license override of a version the lock no longer holds checks nothing (licensing-8)."""
+    data = tomllib.loads((REPO / "osv-scanner.toml").read_text(encoding="utf-8"))
+    locked = _locked_pub_packages()
+    orphans = [
+        f"{entry['name']} {entry['version']}"
+        for entry in data.get("PackageOverrides", [])
+        if entry.get("ecosystem") == "Pub" and (entry["name"], entry["version"]) not in locked
+    ]
+    assert orphans == [], "license overrides without a package of pubspec.lock"

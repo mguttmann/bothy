@@ -1,5 +1,5 @@
 {
-  "$comment": "Origin of the embedded files. Only for the preview and the docs; the apps get fonts and icons in the package build from the same sources. sha256 of the stored bytes (text files with LF as in .gitattributes); tokens.py check verifies them.",
+  "$comment": "Origin of the embedded files. The fonts serve only the preview and the docs (the apps bundle their own copies, packages/design_system/fonts/MANIFEST.json); the Phosphor SVGs are the source of the icon assets of packages/design_system (tokens.py build). sha256 of the stored bytes (text files with LF as in .gitattributes); tokens.py check verifies them.",
   "sources": {
     "fonts/atkinson-hyperlegible-next-*": "npm @fontsource-variable/atkinson-hyperlegible-next@5.3.0 (OFL-1.1)",
     "fonts/atkinson-hyperlegible-mono-*": "npm @fontsource-variable/atkinson-hyperlegible-mono@5.3.0 (OFL-1.1)",

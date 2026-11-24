@@ -23,6 +23,7 @@ type ListGrantsOfPrincipalHistoryRow struct {
 	Grant Grant
 }
 
+// SPDX-License-Identifier: Apache-2.0
 // Reads of the export of one person (docs/spec/20-privacy.md section 5.2, M7-06): the whole
 // history, revoked grants and removed memberships included, because the person has a right to
 // know which access existed and when it ended.

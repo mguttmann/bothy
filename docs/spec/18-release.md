@@ -173,7 +173,9 @@ Before 1.0.0, SemVer 0.x applies: a minor version may break; the release notes n
    `make release-prep` ([ADR 0060](../adr/0060-release-automation-in-the-monorepo.md)).
 3. Release notes of the server have fixed sections: upgrade notes (manual work yes or no),
    migrations (expand or contract, duration on large tables), compatibility (supported
-   protocol versions, minimum app version), security, known issues.
+   protocol versions, minimum app version), security, known issues. A release section of
+   `services/server/CHANGELOG.md` without the headings `### Upgrade notes`, `### Migrations` and
+   `### Compatibility` fails `make check` (`tools/ci/changelog_summary.py`).
 4. Every release section `## [<version>] - <date>` starts with a summary for users: a paragraph
    whose first line begins with `Summary: `, before the first `###` heading or entry;
    `make release-prep` writes a placeholder line there, and `make check`
@@ -455,7 +457,7 @@ anything is signed ([release.md](../operations/release.md) 4).
 | Signature | Developer ID, hardened runtime, every nested code item first; the provisioning profiles of app and extension; `aps-environment` production | the publisher's certificate (`windows.publisher` is its subject), with the timestamp server of `windows.timestamp_url` |
 | Checks | `codesign --verify --deep --strict` and the team of `apple.team_id`; `xcrun notarytool submit --wait`, `xcrun stapler staple`; `spctl --assess` must accept | `signtool verify /pa` |
 | Update files | the archive's EdDSA signature from Sparkle's `sign_update`; `appcast.xml` with the entry in the channel `beta` and `sparkle:phasedRolloutInterval`, signed as a whole with the same key (the app requires a signed feed) | `beta.appinstaller` pointing at the MSIX; App Installer checks it at a start of the app once `windows.hours_between_update_checks` have passed since the last check (at every start with 0) |
-| Promotion (5 rule 1) | `appdist.py promote-appcast` removes `sparkle:channel` of the build and signs the appcast again | `appdist.py promote-appinstaller` writes `stable.appinstaller` for the same MSIX |
+| Promotion (5 rule 1) | `appdist.py promote-appcast` removes `sparkle:channel` of the build, sets its `pubDate` to the time of the promotion (Sparkle counts the phased rollout from it) and signs the appcast again | `appdist.py promote-appinstaller` writes `stable.appinstaller` for the same MSIX |
 | Updater in the app | `AppUpdater` loads Sparkle at run time when the bundle carries it; default channel, plus the channels of the user default `UpdateChannels` | App Installer, from the `.appinstaller` file the package was installed from, as often as `windows.hours_between_update_checks` allows |
 
 Versions are `X.Y.Z` without a pre-release; the build number is `X * 1000000 + Y * 1000 + Z`,

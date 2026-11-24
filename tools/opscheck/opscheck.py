@@ -624,7 +624,7 @@ def check_sli_bounds(ctx: Context) -> list[str]:
     return sli_bounds.check(ctx.root)
 
 
-SLI_METRIC_COLUMNS = ("Metrik der eigenen Messung", "Metric of the own measurement")
+SLI_METRIC_COLUMN = "Metric of the own measurement"
 """Header of the column of slos.md "SLOs" that repeats the label `bothy_sli_metric`."""
 
 MEASURE_GO = "services/server/internal/kernel/measure/measure.go"
@@ -659,10 +659,9 @@ def check_sli_labels(ctx: Context) -> list[str]:
         for m in sorted(labelled - constants)
     ]
     rows = markdown_table((ctx.root / SLOS_DOC).read_text(encoding="utf-8"), "SLOs")
-    column = next((c for c in SLI_METRIC_COLUMNS if rows and c in rows[0]), None)
-    if column is None:
-        names = " or ".join(SLI_METRIC_COLUMNS)
-        return [*found, f'{SLOS_DOC} "SLOs" has no column {names}']
+    column = SLI_METRIC_COLUMN
+    if not rows or column not in rows[0]:
+        return [*found, f'{SLOS_DOC} "SLOs" has no column {column}']
     for row in rows:
         match = re.fullmatch(r"`([^`]+)`", next(iter(row.values()), ""))
         if match is None or match.group(1) not in labels:

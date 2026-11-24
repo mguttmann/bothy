@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
+	"github.com/coder/websocket"
 
 	nethttp "net/http"
 )
@@ -263,4 +264,15 @@ func allowed(ctx context.Context, cfg egress.Config, opts egress.Options, deps e
 	// ok: bothy-go-egress-only
 	_ = &tls.Config{MinVersion: tls.VersionTLS12}
 	return resp.Body.Close()
+}
+
+func websockets(ctx context.Context, u string, hc *http.Client, opts *websocket.DialOptions) {
+	// ruleid: bothy-go-egress-only
+	_, _, _ = websocket.Dial(ctx, u, nil)
+	// ruleid: bothy-go-egress-only
+	_, _, _ = websocket.Dial(ctx, u, &websocket.DialOptions{CompressionMode: websocket.CompressionDisabled})
+	// ruleid: bothy-go-egress-only
+	_, _, _ = websocket.Dial(ctx, u, opts)
+	// ok: bothy-go-egress-only
+	_, _, _ = websocket.Dial(ctx, u, &websocket.DialOptions{HTTPClient: hc, CompressionMode: websocket.CompressionDisabled})
 }

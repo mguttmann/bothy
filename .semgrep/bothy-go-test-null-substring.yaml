@@ -4,9 +4,9 @@ rules:
     languages: [go]
     severity: ERROR
     paths:
-      include: ["*_test.go", "services/*/test/**"]
+      include: ["*_test.go", "/services/*/test/**"]
       # The one place that finds a JSON null by decoding.
-      exclude: ["services/*/internal/platform/testkit/*"]
+      exclude: ["/services/*/internal/platform/testkit/*"]
     message: >-
       A test looks for a JSON null (ADR 0053) as the text null. A random token, a name or an ID in
       a string can hold those letters, so the check fails correct responses at random (issue

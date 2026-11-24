@@ -162,6 +162,46 @@ def test_sonar_may_be_skipped() -> None:
     assert ci_ok.check_needs(failed, ALL) == ["test-server: failure"]
 
 
+@pytest.mark.parametrize("failed", ["test-server", "test-apps", "test-server-coverage"])
+def test_sonar_of_a_pull_request_with_the_secrets_must_run(failed: str) -> None:
+    """In a pull request of the repository itself (the plan's private_checks), sonar is skipped
+    only after a failed or cancelled job it needs, which fails through that job (ci-gates-11)."""
+    skipped = {**GREEN, "sonar": "skipped"}
+    assert ci_ok.check_needs(skipped, ALL, sonar_expected=True) == [
+        "sonar: skipped, but a pull request with the private checks needs it"
+    ]
+    assert ci_ok.check_needs({**GREEN}, ALL, sonar_expected=True) == []
+    for result in ("failure", "cancelled"):
+        broken = {**skipped, failed: result}
+        assert ci_ok.check_needs(broken, ALL, sonar_expected=True) == [f"{failed}: {result}"]
+
+
+def test_sonar_needs_match_the_workflow() -> None:
+    assert set(_load(CI)["jobs"]["sonar"]["needs"]) == ci_ok.SONAR_NEEDS
+
+
+def test_ci_ok_tells_whether_sonar_must_run() -> None:
+    [check] = [
+        s for s in _load(CI)["jobs"]["ci-ok"]["steps"] if "ci_ok.py needs" in str(s.get("run", ""))
+    ]
+    assert check["env"]["SONAR_EXPECTED"] == (
+        "${{ github.event_name == 'pull_request' && needs.plan.outputs.private_checks == 'true' }}"
+    )
+
+
+def test_cli_requires_sonar_when_expected(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GITHUB_JOB", "ci-ok")
+    monkeypatch.setenv("RESULTS", _needs({**GREEN, "sonar": "skipped"}))
+    monkeypatch.setenv("CI_JOBS", " ".join(sorted(ALL)))
+    monkeypatch.setenv("SONAR_EXPECTED", "false")
+    assert ci_ok.main(["needs"]) == 0
+    monkeypatch.setenv("SONAR_EXPECTED", "true")
+    assert ci_ok.main(["needs"]) == 1
+    assert "ci-ok: sonar: skipped, but a pull request" in capsys.readouterr().out
+
+
 def test_fork_path_passes() -> None:
     fork = {**GREEN, "denylist": "skipped", "denylist-fork": "success", "sonar": "skipped"}
     assert ci_ok.check_needs(fork, ALL) == []

@@ -5,10 +5,9 @@
 # reports UNKNOWN. One entry per package and version, each checked against the LICENSE file of
 # that version as pub.dev ships it (checked 2026-10-12 for M2-38, the new packages and versions
 # on 2026-10-14 for M4-01). Never a blanket override; a new version needs a new check.
-# Runtime packages of the apps today: cryptography (bothy_noise) and its transitive packages,
-# characters, collection, material_color_utilities, meta and vector_math (Flutter); the others
-# are dev dependencies (test, lints, flutter_lints, flutter_test) and their transitive packages,
-# which the gate checks as well.
+# The reason of each entry says whether the package is a runtime dependency of the apps or a
+# dev dependency; the gate checks both. tools/ci/tests/test_osv_ignores.py holds every entry to a
+# package and version of pubspec.lock.
 
 # Packages of the Flutter SDK (source: sdk, version 0.0.0 in pubspec.lock): they are not on
 # pub.dev, so deps.dev cannot know them. Checked against the LICENSE files of Flutter 3.47.7
@@ -981,20 +980,6 @@ reason = "LICENSE of this version is the three-clause BSD text. Runtime dependen
 [[PackageOverrides]]
 name = "go_router"
 version = "18.1.0"
-ecosystem = "Pub"
-license.override = ["BSD-3-Clause"]
-reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
-
-[[PackageOverrides]]
-name = "jni"
-version = "1.1.0"
-ecosystem = "Pub"
-license.override = ["BSD-3-Clause"]
-reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
-
-[[PackageOverrides]]
-name = "jni_flutter"
-version = "1.0.4+1"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
