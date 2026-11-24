@@ -59,9 +59,10 @@ Stop steps: `readiness` (not ready), `drain` and `public_listener` (api, all, bu
 soft stop within `shutdown.jobs_soft_timeout`, then for the cancelled jobs to end what
 `shutdown.total_timeout` leaves after the fixed budgets of the role, left out when nothing is
 left; docs/DECISIONS.md M1-14/4), `telemetry`
-(`shutdown.telemetry_flush_timeout`), `audit_denials` and `pool` (phase `database`; the audit
-step is registered later, so it runs first and flushes the open aggregations of denials before
-the pool closes), `internal_listener`.
+(`shutdown.telemetry_flush_timeout`), `stats_flush`, `audit_denials` and `pool` (phase
+`database`; the two flush steps each get `shutdown.database_flush_timeout`, which `jobs_wait`
+leaves to them, and are registered after the pool step, so they run first and write the own
+measurement and the open aggregations of denials before the pool closes), `internal_listener`.
 
 Every unit of work of a role runs on a registry from `NewTxnRegistry(NewModules(pool, log))`;
 `NewTxnRegistry` refuses `Modules` without the audit hook, so no unit can skip the chain.

@@ -1503,10 +1503,15 @@ The signals `SIGTERM` and `SIGINT` start it, a second signal ends immediately (e
 Total deadline `shutdown.total_timeout`; each step runs at most with its own budget and
 the rest of the total deadline. During wiring, the sum of the step budgets
 (`shutdown.drain_delay`, `shutdown.http_grace`, `shutdown.jobs_soft_timeout`,
-`shutdown.telemetry_flush_timeout`) must not exceed `shutdown.total_timeout`, otherwise the
+`shutdown.telemetry_flush_timeout`, and `shutdown.database_flush_timeout` for each of the two
+flush steps `audit_denials` and `stats_flush`) must not exceed `shutdown.total_timeout`, otherwise the
 start aborts (exit code `2`). The orchestrator must wait longer: Compose sets `stop_grace_period`
 greater than `shutdown.total_timeout` ([infra/compose/compose.yaml](../../infra/compose/compose.yaml),
 a test holds it).
+
+The internal listener closes last, after the pool. From the first step on, the incoming webhook
+routes it carries (16 section 4.2) answer `503 unavailable` with `Retry-After` equal to
+`shutdown.total_timeout`, so nothing writes while the log tail, the jobs and the pool stop.
 
 Role `api`:
 
@@ -1525,8 +1530,9 @@ Role `api`:
    `shutdown.total_timeout`; a restart of the server is not an agent going offline.)
 4. Stop the log tail and `LISTEN`.
 5. Flush telemetry, at most `shutdown.telemetry_flush_timeout`.
-6. Write the own measurement once (stop step `stats_flush`, 25 3.4, M6-13) within the rest of
-   `shutdown.total_timeout`; keys that do not make it are counted as dropped. Then close the pool.
+6. Write the own measurement once (stop step `stats_flush`, 25 3.4, M6-13) and the open denial
+   aggregations (stop step `audit_denials`, 05 2.4), each within `shutdown.database_flush_timeout`;
+   keys that do not make it are counted as dropped. Then close the pool.
 
 Role `worker`:
 
@@ -1537,7 +1543,10 @@ Role `worker`:
 3. River: soft stop with `SoftStopTimeout` equal to `shutdown.jobs_soft_timeout`, after that the
    job contexts are canceled [Q3, Q4, verified]; canceled jobs return an error and are
    retried.
-4. Flush telemetry, write the own measurement once (`stats_flush`), close the pool.
+4. Flush telemetry, write the own measurement once (`stats_flush`) and the open denial
+   aggregations (`audit_denials`), each within `shutdown.database_flush_timeout`, close the pool.
+   The wait for cancelled jobs after the soft stop gets only what the other budgets leave of
+   `shutdown.total_timeout`, so these flushes keep theirs.
 
 Role `all`: api steps 1 to 4, then worker steps 2 and 3, then telemetry and pool. Reason:
 first accept no new requests and events, then finish running jobs.
@@ -1761,6 +1770,7 @@ the limits of outbound calls (`egress.*`) are listed in [19-security.md](19-secu
 | `shutdown.http_grace` | Server | `20s` | deadline for running HTTP requests |
 | `shutdown.jobs_soft_timeout` | Server | `20s` | soft stop of River |
 | `shutdown.telemetry_flush_timeout` | Server | `5s` | flushing telemetry |
+| `shutdown.database_flush_timeout` | Server | `2s` | each flush step of the database phase (`audit_denials`, `stats_flush`) |
 | `shutdown.total_timeout` | Server | `60s` | total deadline until the end; at least the sum of the step budgets (15.3) |
 | `perf.reference_profile` | Load test | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 local with fsync and synchronous_commit on, role all` | environment of the load tests; measurement modes in ADR 0063 |
 | `perf.sustained_messages_per_s` | Load test | `200` | sustained load for `perf.message_create_p99`, `perf.invocation_delivery_p99` and `perf.run_patch_fanout_p99`; also the load of `perf.push_handoff_p95` |

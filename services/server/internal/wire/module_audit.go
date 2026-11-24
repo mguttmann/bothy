@@ -66,7 +66,7 @@ func (s *server) startAudit(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	a.Start(s.runner)
+	a.Start(s.runner, s.cfg.DatabaseFlushTimeout)
 	s.mu.Lock()
 	s.audit = a
 	s.mu.Unlock()

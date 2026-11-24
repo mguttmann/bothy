@@ -34,6 +34,11 @@ func shutdownConfigKeys() []config.Key {
 			Chapter: chapter02,
 		},
 		{
+			Name: "shutdown.database_flush_timeout", Kind: config.KindDuration, Default: "2s", Min: minPositiveDuration, Max: maxShutdownBudget,
+			Doc:     "Time each flush step of the database phase (audit denials, statistics) gets before the pool closes.",
+			Chapter: chapter02,
+		},
+		{
 			Name: "shutdown.total_timeout", Kind: config.KindDuration, Default: "60s", Min: "1s", Max: maxShutdownBudget,
 			Doc:     "Whole budget of the shutdown; at least the sum of the step budgets, and the orchestrator waits longer.",
 			Chapter: chapter02,

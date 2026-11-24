@@ -17,7 +17,7 @@ func TestJobsWaitBudgetLeavesTheLaterSteps(t *testing.T) {
 	t.Parallel()
 	cfg := ServeConfig{
 		DrainDelay: 5 * time.Second, HTTPGrace: 10 * time.Second,
-		TelemetryFlushTimeout: 5 * time.Second, TotalTimeout: 60 * time.Second,
+		TelemetryFlushTimeout: 5 * time.Second, DatabaseFlushTimeout: 2 * time.Second, TotalTimeout: 60 * time.Second,
 	}
 	soft := 20 * time.Second
 	cases := []struct {
@@ -25,8 +25,9 @@ func TestJobsWaitBudgetLeavesTheLaterSteps(t *testing.T) {
 		role Role
 		want time.Duration
 	}{
-		{"worker", RoleWorker, 35 * time.Second},
-		{"all", RoleAll, 20 * time.Second},
+		// The two database flush steps keep 2s each.
+		{"worker", RoleWorker, 31 * time.Second},
+		{"all", RoleAll, 16 * time.Second},
 	}
 	for _, c := range cases {
 		if got := jobsWaitBudget(cfg, c.role, soft); got != c.want {

@@ -280,11 +280,11 @@ func (a *Audit) Recorder() *auditapp.Recorder { return a.recorder }
 var _ auditing.Recorder = (*auditapp.Recorder)(nil)
 
 // Start runs the aggregator of denials until the shutdown and registers the stop step
-// "audit_denials" in lifecycle.PhaseDatabase: it ends the aggregator and writes every open
-// aggregation (02 "15.3", 05 "2.4"). Call Start from a component's Start, after the stop step of
+// "audit_denials" in lifecycle.PhaseDatabase with budget (shutdown.database_flush_timeout): it
+// ends the aggregator and writes every open aggregation (02 "15.3", 05 "2.4"). Call Start from a component's Start, after the stop step of
 // the pool was registered: steps of one phase run in reverse registration order, so the flush runs
 // before the pool closes. Both roles call it.
-func (a *Audit) Start(r *lifecycle.Runner) {
+func (a *Audit) Start(r *lifecycle.Runner, budget time.Duration) {
 	// The stop step calls cancel (Audit.stop); gosec cannot see that through the struct field.
 	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // G118: cancel is called by the stop step audit_denials
 	a.cancel, a.done = cancel, make(chan struct{})
@@ -292,7 +292,7 @@ func (a *Audit) Start(r *lifecycle.Runner) {
 		defer close(a.done)
 		_ = a.recorder.Aggregator().Run(ctx)
 	}()
-	r.OnStop(lifecycle.StopStep{Name: "audit_denials", Phase: lifecycle.PhaseDatabase, Run: a.stop})
+	r.OnStop(lifecycle.StopStep{Name: "audit_denials", Phase: lifecycle.PhaseDatabase, Budget: budget, Run: a.stop})
 }
 
 // stop ends the aggregator and flushes it within the budget of ctx; what cannot be written is

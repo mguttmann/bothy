@@ -39,7 +39,7 @@ Stop steps run in this order; steps of one phase in reverse registration order.
 | `consumers` | worker consumers finish their round (M2) | worker, all |
 | `jobs` | River soft stop with `shutdown.jobs_soft_timeout`, then the wait for the cancelled jobs (M1-14) | worker, all |
 | `telemetry` | flush within `shutdown.telemetry_flush_timeout` | all |
-| `database` | close the pool | all |
+| `database` | flush the denial aggregations and the own measurement (each within `shutdown.database_flush_timeout`), close the pool | all |
 | `internal_listener` | close `/healthz` and `/readyz` | all |
 
 Roles differ only in which steps they register; the order yields the sequences of 02
