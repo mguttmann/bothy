@@ -55,7 +55,8 @@ able to mount them (Colima mounts only the home folder by default, so set `TMPDI
 - `createApiClient` builds the generated `ApiClient` for one server address: base URL plus
   `/api/v1`, JSON responses, and the interceptors in a fixed order: headers, the JSON problem
   body of a download (`BinaryProblemInterceptor`, M4-22), the `authInterceptors` slot, problem
-  mapping, read retry.
+  mapping, read retry. `connectTimeout` and `receiveTimeout` come from the caller (the apps pass
+  `client.http_connect_timeout` and `client.http_receive_timeout`); there is no send timeout.
 - Headers: `traceparent` on every request from the caller's `TraceContext`, with a new span ID
   per request; `Idempotency-Key` on `POST`, `PATCH`, `PUT` and `DELETE` from the request option
   `idempotencyKeyExtra`, never invented; `ResponseMeta.of` exposes `Correlation-Id`.
