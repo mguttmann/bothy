@@ -2917,7 +2917,8 @@ is a manual option. While the pin follows upstream main, the newest release is o
   the adapter's own file of resolved callbacks, open cards and the Hermes session of each thread;
   no file holds a content or a key value. A person's text reaches Hermes with
   `allow_gateway_control` off, so it never runs a Hermes command or answers a Hermes prompt by
-  itself; the adapter's own commands go out from its control sender (17.4).
+  itself; the adapter's own commands go out from its control sender (17.4), and so does an
+  owner's session command typed as a message (17.3, "Session commands typed as a message").
 - Platform key `hermes_adapter.platform_key`. **Never change after commissioning:** Hermes
   builds the session key from the platform name; a new name separates every thread from its
   Hermes session.
@@ -2953,6 +2954,26 @@ is a manual option. While the pin follows upstream main, the newest release is o
 | `get_chat_info(chat_id)` | the thread from the ID alone, without a server call: `name` and `chat_id` are the ID, `type` is `thread` (as built; Hermes' base class asks only for `name` and `type`) |
 | Hermes commands | Built (HERMES-CRON-COMMANDS). At connect the adapter declares its complete command list and the SDK reconciles it (10.2, D-M2-29-12). The Hermes commands that the server has as built-in commands (10.1) stay the server's and are never registered: `/stop` is the stop of section 8 (`/stop` via `handle_message`, item 3), `/new` a new session (`session.mode = new` after a reset, `/new` via `handle_message`; Hermes asks via `send_slash_confirm`, and the adapter answers through `tools.slash_confirm.resolve(session_key, confirm_id, "once")`, because the server has already checked the reset), `/resume` the rebinding (`bind`, `/resume <session ID> --all`, 17.4, 9.5), `/title` and `/status` the server's. A follow-up without configuration also works with `/steer <text>` (17.5), which the adapter does not use. The adapter's command table (`hermes_commands.COMMAND_CLASSES`) names every gateway command of the pinned version with its class and reason; a test fails when a pin update brings a command the table does not name, and commands of other Hermes plugins are never offered. Control commands (`control = true`, instance-wide, no options): `/context` and `/version`, which read the thread's Hermes session or Hermes itself and call no model. On `command.invoked` the adapter sends the bare `/<name>` (never an option value) via `handle_message` from its control sender (17.4) in the thread's session; Hermes answers an idle session through its normal processing and a busy one inline, both with `reply_to` = the command's message, and each text Hermes answers becomes a message of the agent in the thread without a run (`message.create` without `run_id` and without an invocation token, 10.4), also during a run of the thread. When Hermes fails the command, the adapter posts the notice "The command /<name> failed in Hermes and gave no reply." the same way instead (never the error's text), and a text above `hermes_adapter.max_message_bytes` ends with the cut note of 17.9. Every other gateway command is refused: it calls the model outside a run, changes the thread's session outside the server's session record, bypasses the server's follow-up, approval or card rules, reaches the host, or acts on the whole profile. Skill commands: every skill Hermes offers for the platform (its skill scan without the skills `skills.platform_disabled` turns off for the platform key) becomes a model command (`control = false`, instance-wide) with the optional `string` option `input`; a name that is no valid command name or that a built-in, a table row or a control command uses is left out, and the list never exceeds `command.max_per_principal`. A run with `trigger_kind = command` of such a skill is a turn whose text is Hermes' own skill invocation message for the skill and the `input` (`build_skill_invocation_message`, as Hermes' gateway builds it for `/<skill>`), with the format rules of 4.11 and the channel instructions on the user side of the turn (17.6) and no reply anchor: a command run has no run context (4.6 defines it for a triggering message, and the server answers `run.context.read` of any other trigger kind with `500 internal_error`), so the adapter does not read it (addendum of 2026-10-30, found by the end-to-end suite of HERMES-E2E-REAL-SERVER); any other command run is refused before the start (`failed`, `adapter_error`). Skills installed after the gateway start are declared at the next start. Evidence: the Fake-Hermes tests `test_commands_and_reports.py` and `test_command_table_covers_pinned_commands` against the pinned version, and the end-to-end suite `plugins/hermes-adapter/tests/realserver` against the server of this tree |
 | Title | after the first completed run of a new session, the Hermes session title as an automatic suggestion (`auto = true`, section 12 point 5), read through Hermes' storage interface (`persistence_assembly`), on a Hermes without it through `hermes_state.SessionDB` (D-HAM-1) |
+
+Session commands typed as a message (addendum of 2026-11-24, FIX-hermes-session-commands): Hermes
+pauses a thread's session when a turn was lost in a restart (a reboot, a crash) and tells the
+person to send `/discard` or `/reset`. A person's text reaches Hermes with `allow_gateway_control`
+off (17.4), so such a text was a plain turn and never the command. The adapter therefore sends
+`/discard`, `/reset`, `/new` or `/stop` as the Hermes command, from its control sender (17.4),
+instead of a turn exactly when all of these hold: the run has `trigger_kind = message`; its token
+carries `tool_class = host`, for which the server lets only an active owner trigger the agent (07
+SR2, checked at acceptance and before every delivery; a ready dev environment, the other way SR2
+allows, the server does not set yet); the triggering message has `origin = human`, an author of
+kind `user` equal to the token's `sub`, no attachments, and its whole text (white space around it
+and the case of the name aside) is one of these four commands without an argument. Every other
+run keeps the text as a turn, among them a `team` run (a member's reply or an owner's copy, 3.9.9),
+a follow-up, a command run and a run of an agent of tool class `chat` or `scoped`. A confirmation
+Hermes asks for (`/new`, `/reset`) is answered "once"; each text Hermes answers, for a confirmed
+command the text its confirmation returns, becomes the run's answer, no answer at all the notice
+"The command /<name> failed in Hermes and gave no reply.", and the run ends `completed`. A new Hermes session after `/reset` or `/new` is reported with
+`agent_session.report` like any session change of a run (a different reference replaces the
+stored one, 9.5 point 3). The registered command table keeps `discard` refused: no
+command is offered in the apps, and a non-owner never sends it.
 
 Long replies stay one message (Baseline section 4; addendum of 2026-10-29, 01 6.13, D-M4-47-5):
 the adapter gives Hermes `MAX_MESSAGE_LENGTH` = `NO_SPLIT_LENGTH` (as a class attribute and as
@@ -3118,6 +3139,16 @@ steer the text into the running turn and admit no turn for the event; the run th
 with `runtime_error` at once, and the answer the running turn gave to it found no run. A stop or
 an abort of the run ends the wait (an abort ends the run without a turn and without a session
 report); the late answer of a stopped run's turn stays dropped (D-HERMES-CRON-COMMANDS-5).
+
+A run's message that Hermes takes without a turn and without a reply never ends the run silently
+(addendum of 2026-11-24, FIX-hermes-session-commands): on a paused session Hermes admits the
+message, answers only the first one of a pause with its notice and every later one with nothing.
+When Hermes reports the event's processing complete, no turn of the thread passed `pre_llm_call`
+while the run was open and the run has no answer, the adapter posts the notice "Hermes saved this
+message but did not answer it: its conversation in this thread is paused or waiting. If Hermes
+said that a previous turn did not finish when it restarted, an owner can send /discard to drop
+that turn and continue, or /reset to start a fresh conversation." as the run's answer and ends the
+run `completed`. A turn that ran and answered nothing on purpose (a silent reply) gets no notice.
 
 The adapter passes on the context (4.6) on the user side of the turn, separate from the text of
 the triggering person, which is the event's text together with the transcripts of its voice

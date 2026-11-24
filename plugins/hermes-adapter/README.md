@@ -128,6 +128,13 @@ during a run. Every other Hermes command is refused (the reasons are in
 with an optional `input`: the server opens a run, and the turn is Hermes' own skill invocation. A
 skill installed later is declared after the next gateway start.
 
+An owner may type `/discard`, `/reset`, `/new` or `/stop` as a whole message, for example when
+Hermes paused the thread's conversation after a restart: on an agent of tool class `host` (only
+owners can trigger it) the adapter sends that command from its control sender instead of a turn,
+and Hermes' reply is the run's answer (09 17.3). Any other sender's text stays a plain message.
+When Hermes takes a message without a turn and without a reply (a paused conversation), the run
+answers with a notice instead of ending silently.
+
 ## Reports without a run
 
 Cron jobs and `hermes send` deliver to the platform (09 14, 17.9): `<platform key>` (the home
