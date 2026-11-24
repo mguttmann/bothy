@@ -735,6 +735,8 @@ async def test_drafts_then_the_answer_give_one_message_and_patch_only_their_run(
     answer = "The trip to the lake is planned for Saturday morning."
 
     async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        # Both runs are Hermes turns (``pre_llm_call``); the quiet one answers silently.
+        rt.events.on_turn_started(turn.thread_id)
         if "draft" in turn.user_text:
             rt.events.on_draft(turn.thread_id, answer[:8])
             rt.events.on_draft(turn.thread_id, answer[:30])

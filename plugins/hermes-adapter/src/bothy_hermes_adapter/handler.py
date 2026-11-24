@@ -173,6 +173,11 @@ from bothy_hermes_adapter.runtime import (
     TurnRequest,
     Usage,
 )
+from bothy_hermes_adapter.session_commands import (
+    NOT_ANSWERED,
+    confirmed,
+    owner_session_command,
+)
 from bothy_hermes_adapter.stages import StageCursor, StageRegistry, StageSteps
 from bothy_hermes_adapter.store import CallbackStore
 from bothy_hermes_adapter.team import (
@@ -263,6 +268,10 @@ class _Turn:
     team: TeamFacts | None = None
     speaker: Speaker | None = None
     notice_input: bool = False
+    # The owner's session command the run sends instead of a turn (09 17.3), else ``None``.
+    session_command: str | None = None
+    # Whether Hermes ran a turn of the thread (``pre_llm_call``) while the run was open.
+    hermes_ran: bool = False
     user_id: UUID | None = None
     user_name: str = ""
     answers: dict[str, tuple[UUID, int]] = field(default_factory=dict)
@@ -374,6 +383,9 @@ class HermesHandler(AgentHandler):
         # Team runs whose input is another member's notice of an unanswered request: a silent
         # answer to it stays silent (FIX-TEAM-HANDOFF-NOT-NOTHING).
         self._notices: set[UUID] = set()
+        # An owner's session command typed as the run's message, from prepare to execute
+        # (09 17.3 "Session commands"): the command line the run sends instead of a turn.
+        self._commands: dict[UUID, str] = {}
         self._channels: dict[UUID, tuple[int, ChannelBehavior]] = {}
         # Runs that stop their work now, by thread: the run's start in wall time. Such a run
         # still covers its jobs until they are stopped (09 17.12 point 8).
@@ -521,6 +533,15 @@ class HermesHandler(AgentHandler):
             actual = self.actual_mode()
             return StartOptions(billing_evidence=BillingEvidence.from_dict(actual.evidence))
         ctx = await run.load_context()
+        command = owner_session_command(inv.claims, ctx.trigger_message)
+        if command is not None:
+            # An owner's /discard, /reset, /new or /stop: sent as the command, no turn and no
+            # context (09 17.3 "Session commands").
+            _LOG.info("run %s: session command of the owner", run.run_id)
+            self._commands[run.run_id] = command
+            self._prepared[run.run_id] = BuiltContext(command_user_side(channel), command)
+            actual = self.actual_mode()
+            return StartOptions(billing_evidence=BillingEvidence.from_dict(actual.evidence))
         if team is not None:
             trigger = ctx.trigger_message
             self._teams[run.run_id] = (team, input_speaker(team, trigger.origin, trigger.author))
@@ -677,6 +698,7 @@ class HermesHandler(AgentHandler):
             team=team[0] if team is not None else None,
             speaker=team[1] if team is not None else None,
             notice_input=self._pop_notice(run.run_id),
+            session_command=self._commands.pop(run.run_id, None),
             user_id=inv.claims.sub,
             user_name=str(payload.triggered_by.display_name),
         )
@@ -716,6 +738,7 @@ class HermesHandler(AgentHandler):
         self._inbound.pop(run_id, None)
         self._teams.pop(run_id, None)
         self._notices.discard(run_id)
+        self._commands.pop(run_id, None)
         self._mirror_runs.discard(run_id)
 
     async def _transcribed(
@@ -915,8 +938,51 @@ class HermesHandler(AgentHandler):
         if switched is SessionSwitch.NEW and not request.new_session:
             # A refused bind falls back to a new session (9.5): it loads the bound skills too.
             request = replace(request, new_session=True)
-        outcome = await self.runtime.start_turn(request)
+        if turn.session_command is not None:
+            outcome = await self._session_command(turn, request, turn.session_command)
+        else:
+            outcome = await self.runtime.start_turn(request)
+            await self._never_silent(turn, outcome)
         await self._end_turn(turn, outcome, switched)
+
+    async def _session_command(self, turn: _Turn, request: TurnRequest, line: str) -> TurnOutcome:
+        """Send an owner's session command and post Hermes' reply as the run's answer (17.3).
+
+        The command goes out from the adapter's control sender like every Hermes command
+        (17.4); a confirmation Hermes asks for (``/new``, ``/reset``) is answered "once". When
+        Hermes answers nothing, the run's answer is the notice of a failed command.
+        """
+        try:
+            replies = await self.runtime.run_command(
+                CommandRequest(
+                    thread_id=turn.thread_id,
+                    channel_id=turn.channel_id,
+                    user_id=request.user_id,
+                    user_name=request.user_name,
+                    text=line,
+                    confirm=confirmed(line),
+                )
+            )
+        except Exception as exc:  # the run's answer says so; never the error's text
+            _LOG.warning("run %s: session command failed: %s", turn.run_id, type(exc).__name__)
+            replies = []
+        texts = [r for r in replies if r.strip()] or [COMMAND_FAILED.format(name=line[1:])]
+        for text in texts:
+            await self._post_answer(turn, text, None)
+        return TurnOutcome.COMPLETED
+
+    async def _never_silent(self, turn: _Turn, outcome: TurnOutcome) -> None:
+        """Answer a run whose message Hermes took without a turn and without a reply (17.6).
+
+        Hermes admits a message onto a paused session (a turn lost in a restart) and answers
+        only the first one with its notice; every later run would end with nothing to show.
+        """
+        if outcome is not TurnOutcome.COMPLETED or turn.abort_reason is not None or turn.dropped:
+            return
+        if turn.hermes_ran or turn.answers or turn.previews:
+            return
+        _LOG.info("run %s: Hermes ran no turn and sent no answer code=not_answered", turn.run_id)
+        await self._post_answer(turn, NOT_ANSWERED, None)
 
     async def _session_free(self, turn: _Turn) -> None:
         """Wait for the thread's free Hermes session; an abort of the run ends the wait."""
@@ -1848,9 +1914,11 @@ class HermesHandler(AgentHandler):
             or turn.dropped
             or turn.final_reply
             or turn.waiting
+            or turn.session_command is not None
         ):
             # After the answer Hermes may have drained its last steer already; the server's
-            # follow-on run takes the follow-up instead (09 7).
+            # follow-on run takes the follow-up instead (09 7). A run of a session command has
+            # no turn of its own to steer into (09 17.3).
             return False
         await self.runtime.steer(turn.thread_id, text, message_id)
         return True
@@ -2543,6 +2611,7 @@ class HermesHandler(AgentHandler):
             _LOG.info("thread %s: a Hermes turn without a run", thread_id)
             return
         turn.hermes_open = True
+        turn.hermes_ran = True
         if turn.own_turns == 0:
             turn.internal = True
         self._touch(turn)

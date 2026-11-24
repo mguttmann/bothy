@@ -275,6 +275,10 @@ class ServerPlatform(BasePlatformAdapter):
         # keeps such a session live on that thread's route until the gateway restarts.
         self._ran_here: dict[str, uuid.UUID] = {}
         self._control: dict[uuid.UUID, int] = {}
+        # Threads whose running typed session command Hermes may confirm: the adapter answers
+        # "once", collects the confirmed command's reply into that command's replies and keeps
+        # the command's own resolver tasks, which it waits for (17.3).
+        self._confirming: dict[uuid.UUID, tuple[list[str], set[asyncio.Task[Any]]]] = {}
         self._confirms: set[asyncio.Task[Any]] = set()
         self._store: CallbackStore | None = None
         # Replies of a running control command by the command's message ID, and the IDs given
@@ -764,6 +768,9 @@ class ServerPlatform(BasePlatformAdapter):
         message_id = f"ctl-{uuid.uuid4().hex}"
         replies: list[str] = []
         self._replies[message_id] = replies
+        own: tuple[list[str], set[asyncio.Task[Any]]] = (replies, set())
+        if command.confirm:
+            self._confirming[thread_id] = own
         try:
             event = self._event(
                 thread_id, command.text, user=(CONTROL_SENDER, "adapter"), message_id=message_id
@@ -771,7 +778,13 @@ class ServerPlatform(BasePlatformAdapter):
             await self._dispatch(event)
             if getattr(event, "_gateway_accepted", True):
                 await self._command_settled(event)
+            while own[1]:
+                # Only this command's confirmations; ``wait`` cancels none of them when the
+                # caller is cancelled.
+                await asyncio.wait(set(own[1]))
         finally:
+            if command.confirm and self._confirming.get(thread_id) is own:
+                del self._confirming[thread_id]
             self._replies.pop(message_id, None)
             for key in [k for k in self._reply_ids if k.startswith(f"{message_id}-")]:
                 del self._reply_ids[key]
@@ -1319,15 +1332,24 @@ class ServerPlatform(BasePlatformAdapter):
         confirm_id: str,
         metadata: dict[str, Any] | None = None,
     ) -> SendResult:
-        """A slash confirmation as a card; the adapter's own ``/new`` is confirmed at once."""
+        """A slash confirmation as a card; the adapter's own ``/new`` is confirmed at once.
+
+        So is an owner's ``/new`` or ``/reset`` typed as a message (17.3 "Session commands").
+        """
         thread = self._thread(chat_id, metadata)
-        if thread is not None and thread in self._control:
-            # The server already checked the reset (17.3 "Hermes commands"): answer "once".
+        if thread is not None and (thread in self._control or thread in self._confirming):
+            # The server already checked the reset (17.3 "Hermes commands"), or proved the
+            # owner of a typed session command: answer "once". Hermes returns the confirmed
+            # command's reply from the resolver, never through `send`.
+            own = self._confirming.get(thread)
             task = asyncio.ensure_future(
-                slash_confirm.resolve(str(session_key), str(confirm_id), "once")
+                self._confirm_once(str(session_key), str(confirm_id), own[0] if own else None)
             )
             self._confirms.add(task)
             task.add_done_callback(self._confirms.discard)
+            if own is not None:
+                own[1].add(task)
+                task.add_done_callback(own[1].discard)
             return SendResult(success=True, message_id=f"ctl-{confirm_id}")
         request = CardRequest(
             CardKind.SLASH_CONFIRM,
@@ -1338,6 +1360,13 @@ class ServerPlatform(BasePlatformAdapter):
             str(title),
         )
         return await self._card(chat_id, metadata, request)
+
+    @staticmethod
+    async def _confirm_once(session_key: str, confirm_id: str, replies: list[str] | None) -> None:
+        """Answer a confirmation "once"; its reply joins the running typed command's replies."""
+        result = await slash_confirm.resolve(session_key, confirm_id, "once")
+        if replies is not None and isinstance(result, str) and result.strip():
+            replies.append(result)
 
     # ---- hooks -------------------------------------------------------------------------------
 
