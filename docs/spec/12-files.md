@@ -159,6 +159,9 @@ The server checks in this order:
    seconds and at least one (D-M3-03-8).
 6. File system driver only: free space after the upload at least `file.fs.min_free_bytes`.
    Otherwise `503 unavailable` with `reason` `storage_full` and a warning to the status page.
+   The check compares the free space at this moment with the declared size; it does not count
+   other open sessions, the joined copy of the scan pass or the variants of the image job, so the
+   reserve is a guide, not a guarantee.
 
 Steps 4 to 6 run under a transaction-level advisory lock of the principal, so two parallel
 announcements cannot both pass a limit (D-M3-03-7).
@@ -673,7 +676,9 @@ A small client of our own is enough; the protocol is small, and the well-known G
 
 On `infected` an audit entry is written with `action = 'file.upload'`, `decision = 'deny'`,
 `deny_reason = 'malware_detected'` and, in `details`, the signature, the SHA-256 and the size,
-never content (05: `file.upload` with audit on malware detection). The uploader and the owner see the reason; everyone else sees only "blocked".
+never content (05: `file.upload` with audit on malware detection). The owner sees that reason in
+the audit log. The API does not deliver the session's `failure_reason` yet (planned): the uploader
+and everyone else see only the state of the file (failed or blocked).
 
 ### 5.3 When ClamAV is missing or not ready
 
@@ -1369,10 +1374,14 @@ completes the session itself (3.7).
 
 ## 14. Observability
 
-Signals (names binding in `docs/observability/signals.md`, Team F): uploads by result,
-bytes, duration of the verification pass and the scan, scan results by `scan_status`, age of the
-oldest `pending` file, clamd reachability, image jobs by result, deletion backlog (the gauge
-`bothy.file.purge.backlog`: files marked deleted whose purge is still due, M3-08). No file names,
+Signals (names binding in `docs/observability/signals.md`, Team F): the upload size
+(`bothy.file.upload.size`), scan results by outcome and the duration of the scan
+(`bothy.file.scan`, `bothy.file.scan.duration`), the scan queue (`bothy.file.scan.queue`) and the
+deletion backlog (the gauge `bothy.file.purge.backlog`: files marked deleted whose purge is still
+due, M3-08). Planned, not built yet: uploads by result, the age of the oldest `pending` file with
+its alert (`file.scan.pending_alert_after`), clamd reachability, image jobs by result and storage
+errors per operation; until then a permanent image error (pixel limit, undecodable image) ends
+`files.thumbnail` as a completed job and shows only in its log line. No file names,
 no content, no signature names in metric attributes (cardinality and privacy);
 signature names only in the audit log.
 
