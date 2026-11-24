@@ -315,7 +315,11 @@ audit chain and replies with a quote stay consistent (03, principle 7).
 ### 4.5 Audit log and IP addresses
 
 - The audit log contains only IDs, actions, decisions and codes; never contents, names, emails
-  (03, `audit_events.details`). With the pseudonymization of the principal, the IDs in the audit log
+  (03, `audit_events.details`). The exceptions are those of SEC-AUD-5 ([19-security.md](19-security.md)):
+  the required reason of an administrative action (`reason`, at most `audit.reason_max_chars`
+  characters) and the session user names of a host (`os_user` and the lists of `host.connect`).
+  They stay in the chain like every row until the trim of `retention.audit`; a deletion of the
+  account does not change them. With the pseudonymization of the principal, the IDs in the audit log
   become pseudonymous without any row being changed. The hash chain therefore stays valid (ADR 0021).
 - IP addresses are in the audit log only as an HMAC with one key per period
   (`privacy.audit_ip_key_period`). The keys are stored encrypted in `audit_ip_keys` (03); the
@@ -334,7 +338,9 @@ audit chain and replies with a quote stay consistent (03, principle 7).
   `anchor_hash`: the last removed row) and removes the rows up to it and the checkpoints up to it.
   It never removes the newest row nor the row of the newest checkpoint stored at
   `audit.checkpoint_sink` or a later row, so only rows that a checkpoint outside the database
-  covers are removed; without a configured sink the log is not trimmed. `audit.verify` and the
+  covers are removed; without a configured sink the log is not trimmed, and the warning
+  `audit_checkpoint_sink_not_configured` at every start of a process that runs jobs and every run
+  of `audit.chain_verify` says so. `audit.verify` and the
   restore test start at the first retained row with the hash of the anchor that names the row
   before it. A checkpoint of the sink below the anchor is not compared, but it must be older than
   `retention.audit`, one at the anchor must equal it, and the newest one must lie after the anchor;
@@ -633,7 +639,7 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 | `retention.content` | `none` | period for contents, at least one day; `none` means no automatic deletion (without `retention.content_none_reason` a warning, 4.1) |
 | `retention.content_none_reason` | empty | reason of the instance operator for `retention.content = none`; empty means a warning in `bothy config check` and in the startup log (4.1) |
 | `retention.security_after_end` | `90d` | security data after end, expiry or revocation |
-| `retention.audit` | `365d` | audit log (Study C suggested twelve months) |
+| `retention.audit` | `365d` | audit log (Study C suggested twelve months); trims nothing while `audit.checkpoint_sink` is empty (4.5) |
 | `retention.cost` | `395d` | costs and prices |
 | `retention.import_after_completion` | `90d` | import state (the source and its items) after the completion or cancellation of the source |
 | `retention.privacy_job` | `1095d` | privacy requests (without export packages) |
@@ -649,7 +655,7 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 | `privacy.request_reminder_lead` | `7d` | how long before `due_at` of an open privacy request the owners get `gdpr.request_due`; less than one month |
 | `privacy.object_delete_delay` | `24h` | maximum time until deleted objects are removed |
 | `privacy.deletion_journal_retention` | `400d` | retention of the deletion journal; at least the backup period |
-| `privacy.audit_ip_key_period` | `30d` | period per key for IP pseudonyms |
+| `privacy.audit_ip_key_period` | `30d` | period per key for IP pseudonyms; a changed value takes effect with the next key (03 `audit_ip_keys`) |
 | `privacy.audit_ip_key_retention` | `90d` | keys are destroyed after this |
 | `privacy.audit_ip_kek_ref` | `file:<secrets.dir>/audit_ip_kek` | reference to the key that encrypts the IP keys in `audit_ip_keys` |
 | `privacy.telemetry_pseudonym_rotation` | `30d` | rotation of the key for pseudonymous IDs in telemetry |

@@ -86,7 +86,7 @@ Table of agents (one row per agent):
 | Data categories | identities at the provider (subject), devices (name, platform, public keys), sessions (times, login method, last IP), audit log (actor ID, action, decision, IP only as a pseudonym) |
 | Recipients | owners; identity provider `<name>` |
 | Third country | `<...>` |
-| Deletion periods | security data `retention.security_after_end` = `<value>`; audit log `retention.audit` = `<value>`; IP pseudonym key destroyed after `privacy.audit_ip_key_retention` = `<value>` |
+| Deletion periods | security data `retention.security_after_end` = `<value>`; audit log `retention.audit` = `<value>` (trimmed only with a configured `audit.checkpoint_sink`); IP pseudonym key destroyed after `privacy.audit_ip_key_retention` = `<value>` |
 | Measures | M1, M4, M5 |
 
 ### V4 Push notifications

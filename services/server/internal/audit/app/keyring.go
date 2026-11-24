@@ -51,8 +51,9 @@ var errDestroyed = errors.New("audit: the IP key of the current period is destro
 // Current returns the id and the key of the period that contains now. On a cache miss it reads
 // the row covering now or, when there is none, creates one: 32 random bytes from crypto/rand,
 // encrypted with AES-256-GCM under the key behind privacy.audit_ip_kek_ref (row id as additional
-// data), valid_from aligned to the period in Unix time, inserted with ON CONFLICT (valid_from) DO
-// NOTHING and read again, so concurrent processes agree on one key. A destroyed key is never
+// data), valid_from aligned to the period in Unix time and moved past older keys that cover it
+// (periodStart), inserted with ON CONFLICT (valid_from) DO NOTHING and read again, so concurrent
+// processes agree on one key. A destroyed key is never
 // used.
 //
 // Errors (kind internal): the database errors, a destroyed key, a key-encryption key that does not
@@ -91,7 +92,10 @@ func (k *Keyring) create(ctx context.Context, now time.Time) (domain.IPKey, erro
 	if _, err := io.ReadFull(k.random, key); err != nil {
 		return domain.IPKey{}, internalError(err)
 	}
-	from, until := domain.KeyPeriod(now, k.period)
+	from, until, err := k.periodStart(ctx, now)
+	if err != nil {
+		return domain.IPKey{}, err
+	}
 	row := domain.IPKey{ID: ids.New(), ValidFrom: from, ValidUntil: until, KeyRef: k.ref}
 	if row.Ciphertext, err = domain.SealIPKey(kek, key, row.ID, k.random); err != nil {
 		return domain.IPKey{}, internalError(err)
@@ -107,6 +111,26 @@ func (k *Keyring) create(ctx context.Context, now time.Time) (domain.IPKey, erro
 		return domain.IPKey{}, errs.New(errs.CodeInternalError, "audit: no IP key covers now after the insert")
 	}
 	return got, nil
+}
+
+// periodStart returns the period of the new key for now: the period of privacy.audit_ip_key_period
+// that contains now, aligned in Unix time, its start moved past every key that covers it. Keys
+// end at or before now when none covers now, so the start stays at or before now; after the period
+// grew (30 to 90 days) the aligned start can hold an expired key of the old period, whose
+// valid_from would make the insert a no-op. Every process computes the same start from the same
+// rows, so ON CONFLICT (valid_from) still lets one of them win.
+func (k *Keyring) periodStart(ctx context.Context, now time.Time) (time.Time, time.Time, error) {
+	from, until := domain.KeyPeriod(now, k.period)
+	for {
+		row, ok, err := k.store.CurrentIPKey(ctx, from)
+		if err != nil {
+			return time.Time{}, time.Time{}, errs.Wrap(errs.CodeInternalError, err, "audit: read the IP key")
+		}
+		if !ok || !row.ValidUntil.After(from) || row.ValidUntil.After(now) {
+			return from, until, nil
+		}
+		from = row.ValidUntil
+	}
 }
 
 // open decrypts row with the key-encryption key of its key_ref.

@@ -168,6 +168,22 @@ type env struct {
 	h        *httpservertest.Harness
 	// superConn is the superuser of the throwaway container, the attacker of SEC-T16.
 	superConn *pgx.Conn
+	// logCfg and logDeps built log; logWithSink builds the log again over another sink.
+	logCfg  auditapp.Config
+	logDeps auditapp.LogDeps
+}
+
+// logWithSink returns the log of the environment over sink, as a server started with another
+// audit.checkpoint_sink.
+func (e *env) logWithSink(sink auditapp.CheckpointSink) *auditapp.Log {
+	e.t.Helper()
+	deps := e.logDeps
+	deps.Sink = sink
+	l, err := auditapp.NewLog(e.logCfg, deps)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	return l
 }
 
 // newEnv builds the environment; withSink false leaves audit.checkpoint_sink empty, true puts the
@@ -249,14 +265,16 @@ func newEnvWithSink(t *testing.T, newSink func(sinkDir string, inst ids.ID) audi
 	if err != nil {
 		t.Fatal(err)
 	}
-	l, err := auditapp.NewLog(auditCfg, auditapp.LogDeps{
+	deps := auditapp.LogDeps{
 		Store: auditpg.NewRepository(pool), UoW: a.UoW(), Authorizer: az, Audit: a.Recorder(), Keys: keys, Sink: sink,
 		Cursors: httpapi.Cursors{}, Metrics: metrics, Reporter: logs.New(slog.New(ll)), Clock: clk, InstanceID: inst,
-	})
+	}
+	l, err := auditapp.NewLog(auditCfg, deps)
 	if err != nil {
 		t.Fatal(err)
 	}
 	e := &env{
+		logCfg: auditCfg, logDeps: deps,
 		t: t, pool: pool, super: db.Pool(t, pg.RoleOwner), audit: a, log: l, keys: keys, sink: sink, sinkDir: sinkDir,
 		instance: inst, clk: clk, auth: &tokenAuth{actors: map[string]actor.Actor{}}, people: people, reader: reader, logs: ll,
 	}
