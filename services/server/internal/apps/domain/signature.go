@@ -6,7 +6,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
-	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -48,23 +47,6 @@ func DeriveHMACKey(master []byte, subscriptionID ids.ID, generation int) []byte 
 // FormatSecret returns key in the form shown once to the owner: whsec_ and standard base64 with
 // padding.
 func FormatSecret(key []byte) string { return SecretPrefix + base64.StdEncoding.EncodeToString(key) }
-
-// ErrSecretFormat reports a value that is not whsec_ and standard base64.
-var ErrSecretFormat = errors.New("apps: the value is no whsec_ secret")
-
-// ParseSecret returns the key bytes of a whsec_ secret. Errors: ErrSecretFormat; it never repeats
-// the value.
-func ParseSecret(s string) ([]byte, error) {
-	rest, ok := strings.CutPrefix(s, SecretPrefix)
-	if !ok {
-		return nil, ErrSecretFormat
-	}
-	key, err := base64.StdEncoding.DecodeString(rest)
-	if err != nil || len(key) == 0 {
-		return nil, ErrSecretFormat
-	}
-	return key, nil
-}
 
 // HMACSignature returns the v1 signature of content with key (HMAC-SHA256).
 func HMACSignature(key, content []byte) []byte {

@@ -301,9 +301,6 @@ var appSubscribable = []string{
 // AppSubscribable reports whether an app subscription may name eventType.
 func AppSubscribable(eventType string) bool { return slices.Contains(appSubscribable, eventType) }
 
-// AppSubscribableTypes returns the subscribable types, ascending, in a fresh slice.
-func AppSubscribableTypes() []string { return slices.Clone(appSubscribable) }
-
 // agentOnly are the event types only an agent subscription may name (webhooks.md section 7,
 // "agent subscription only"): the types with receivers agent in docs/spec/actions.yaml.
 var agentOnly = []string{"agent.config_changed", "agent.followup", "agent.invocation", "run.cancel_requested"}
@@ -313,14 +310,6 @@ var agentOnly = []string{"agent.config_changed", "agent.followup", "agent.invoca
 // TestAppSubscribableMatchesContract holds the set equal to the contract.
 func AgentSubscribable(eventType string) bool {
 	return AppSubscribable(eventType) || slices.Contains(agentOnly, eventType)
-}
-
-// AgentSubscribableTypes returns the types an agent subscription may name, ascending, in a fresh
-// slice.
-func AgentSubscribableTypes() []string {
-	out := append(AppSubscribableTypes(), agentOnly...)
-	slices.Sort(out)
-	return out
 }
 
 // Subscribable reports whether an app or an agent subscription may name eventType; the consumer
