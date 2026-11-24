@@ -1,6 +1,6 @@
 # Module `files`
 
-Status: skeleton (M1-05) plus object storage port and file system driver (M3-01), the S3 driver (M3-02), the upload sessions in mode `direct` with `getFile` (M3-03), the scan pass with clamd (M3-04), the downloads with download tickets and transcripts (M3-05) the removal of image metadata with thumbnails (M3-06), avatar and logo files (M3-10), the attachments of messages (M3-07), the read operations for the search coordinator (M3-14) and the text extraction of attachments (M3-15). The other use cases follow with the tickets of milestone M3.
+Status: built. The module holds the object storage port with the file system and S3 drivers, the upload sessions in mode `direct`, the scan pass with clamd, image metadata removal and thumbnails, avatar and logo files, the attachments of messages, downloads with file tickets, transcripts of voice messages, the text extraction for the search, the cleanup and purge, the import of files (M8-11) and the personal data participant with the export packages (M7-06). The section "Code" lists the parts by the ticket that built them; the rulings are in `docs/decisions.d/`.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
