@@ -13,7 +13,8 @@ answer (24.11., production).
 * A run on a paused session never ends without an answer (09 17.6).
 * A message of an active owner whose text is exactly a session command reaches Hermes as that
   command from the adapter's control sender, and Hermes' reply is the run's answer (09 17.3).
-* The same text from a run the server does not prove to be an owner's stays plain text.
+* The same text from a run the server does not prove to be an owner's stays plain text (covered
+  by ``tests/unit/test_session_commands.py``).
 """
 
 from __future__ import annotations
@@ -48,7 +49,7 @@ def _script() -> list[ScriptTurn]:
     # after /discard and the next run's turn answer from the rest.
     return [
         ScriptTurn(text=(LOST,), hold="lost"),
-        *[ScriptTurn(text=(QUEUED,)) for _ in range(3)],
+        *[ScriptTurn(text=(QUEUED,)) for _ in range(4)],
         ScriptTurn(text=(NEXT,)),
     ]
 
@@ -91,8 +92,14 @@ async def _run(rig: HermesRig, thread: Any, text: str, **kwargs: Any) -> tuple[A
     return run, _texts(rig, run.run_id)
 
 
-async def test_paused_session_never_ends_a_run_silently(world: HermesWorld) -> None:
-    """Every run on the paused session shows why Hermes does not answer."""
+async def test_paused_session_answers_every_run_and_owner_discard_resumes(
+    world: HermesWorld,
+) -> None:
+    """Every run on the paused session shows why; ``/discard`` of an owner drops the lost turn.
+
+    One rig for both, as each start of the pinned Hermes costs about a minute of the CI job's
+    limit; ``/discard`` of a run not proven an owner's stays text (unit test of the handler).
+    """
     async with hermes_rig(world, _script(), tool_class="host") as rig:
         thread = await _paused(rig)
         _, first = await _run(rig, thread, "Are you there?")
@@ -103,13 +110,7 @@ async def test_paused_session_never_ends_a_run_silently(world: HermesWorld) -> N
         assert "paused" in texts[0], (texts, gateway_log(rig))
         assert "/discard" in texts[0]
         assert rig.fake.run_state(second.run_id).state == "completed"
-
-
-async def test_owner_discard_reaches_hermes_and_the_session_runs_again(world: HermesWorld) -> None:
-    """``/discard`` of an owner (tool class ``host``, 07 SR2) drops the lost turn."""
-    async with hermes_rig(world, _script(), tool_class="host") as rig:
-        thread = await _paused(rig)
-        await _run(rig, thread, "Are you there?")
+        # The owner's /discard (tool class ``host``, 07 SR2) reaches Hermes as the command.
         _, texts = await _run(rig, thread, "/discard")
         assert texts, (texts, gateway_log(rig))
         assert COMMAND_FAILED.format(name="discard") not in texts, (texts, gateway_log(rig))
@@ -135,17 +136,3 @@ async def test_owner_reset_starts_a_fresh_session(world: HermesWorld) -> None:
         _, texts = await _run(rig, thread, "Go on.")
         assert texts[-1:] in ([NEXT], [QUEUED]), (texts, gateway_log(rig))
         assert rig.fake.sessions(thread) != before
-
-
-async def test_discard_of_a_run_not_proven_an_owners_stays_text(world: HermesWorld) -> None:
-    """Tool class ``chat``: the server proves no owner, so ``/discard`` is no command."""
-    async with hermes_rig(world, _script(), tool_class="chat") as rig:
-        thread = await _paused(rig)
-        await _run(rig, thread, "Are you there?")
-        _, texts = await _run(rig, thread, "/discard")
-        assert len(texts) == 1, (texts, gateway_log(rig))
-        assert "paused" in texts[0], (texts, gateway_log(rig))
-        _, texts = await _run(rig, thread, "Go on.")
-        assert len(texts) == 1, (texts, gateway_log(rig))
-        assert "paused" in texts[0], (texts, gateway_log(rig))
-        assert not any(QUEUED in str(m["content_md"]) for m in rig.fake.messages)
