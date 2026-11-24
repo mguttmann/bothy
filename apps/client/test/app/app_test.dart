@@ -326,6 +326,25 @@ void main() {
     expect(find.byKey(const ValueKey('shell.offline')), findsNothing);
   });
 
+  testWidgets('4018 names the reason and offers "Reconnect"', (tester) async {
+    await pumpApp(
+      tester,
+      initial: const OnboardingState(step: OnboardingStep.signedIn),
+      extra: [
+        connectionStateProvider.overrideWith(
+          (ref) => Stream.value(
+            const ConnectionState(
+              ConnectionPhase.offline,
+              ConnectionReason.forbidden,
+            ),
+          ),
+        ),
+      ],
+    );
+    expect(find.text(en.connectionForbidden), findsOneWidget);
+    expect(find.text(en.connectionReconnect), findsOneWidget);
+  });
+
   testWidgets('4007 shows "Update required"', (tester) async {
     await pumpApp(
       tester,

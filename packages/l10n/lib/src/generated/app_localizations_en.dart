@@ -168,6 +168,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get connectionOffline => 'Offline';
 
   @override
+  String get connectionDeviceReplaced =>
+      'Offline: a newer connection of this device is active.';
+
+  @override
+  String get connectionForbidden =>
+      'Offline: the server does not let this account connect.';
+
+  @override
+  String get connectionEndedByServer =>
+      'Offline: the server ended the connection.';
+
+  @override
+  String get connectionReconnect => 'Reconnect';
+
+  @override
   String get relativeDayToday => 'Today';
 
   @override

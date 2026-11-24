@@ -46,6 +46,7 @@ import '../router.dart';
 import '../update/update_notice.dart';
 import 'column_layout.dart';
 import 'column_widths.dart';
+import 'offline_reason.dart';
 
 /// The desktop main view for [location] (path and query of the router).
 ///
@@ -69,7 +70,8 @@ class DesktopShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
     final config = ref.watch(appConfigProvider);
-    final phase = ref.watch(connectionStateProvider).value?.phase;
+    final connection = ref.watch(connectionStateProvider).value;
+    final phase = connection?.phase;
     final widths = ref.watch(columnWidthsProvider);
     final parsed = parseLocation(location);
     final resolving = ref.watch(routeSelectionProvider(location.toString()));
@@ -111,11 +113,11 @@ class DesktopShell extends ConsumerWidget {
       ConnectionPhase.updateRequired => const UpdateRequiredBanner(),
       ConnectionPhase.offline ||
       ConnectionPhase.backoff ||
-      ConnectionPhase.suspended => DsBanner(
-        key: const ValueKey('shell.offline'),
-        tone: DsTone.info,
+      ConnectionPhase.suspended => OfflineBanner(
         text: l.connectionOffline,
-        liveRegion: true,
+        reason: connection?.reason,
+        onReconnect: () =>
+            unawaited(ref.read(syncEngineProvider)?.connection.connectNow()),
       ),
       _ => null,
     };

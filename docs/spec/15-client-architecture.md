@@ -417,9 +417,9 @@ stateDiagram-v2
 
 `4004`: the app renews the access token and reconnects; if the refresh fails, it logs out.
 `4018`: the app shows the reason and reconnects only on user action; a new token does not help.
-As built: the engine reconnects after `4015` and `4018` on `GatewayConnection.connectNow`, but no
-view of `apps/client` offers that action yet, so the connection stays offline until the app
-starts again. The "network change" of the diagram is, as built, the return to the foreground:
+As built: after `4015`, `4017` and `4018` the offline banner of both shells of `apps/client` names
+the reason and offers "Reconnect", which calls `GatewayConnection.connectNow`.
+The "network change" of the diagram is, as built, the return to the foreground:
 the apps have no network listener (`LifecycleNetworkStatus`, D-M4-18-8), and a lost network shows
 through the failed connects and the heartbeat (04 6.5).
 `4016`: the device waits for approval; the app polls `GET /api/v1/devices/{id}` (`LoginService.pollPendingDevice`) and reconnects when the device is `active`.
