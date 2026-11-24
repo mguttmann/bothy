@@ -180,12 +180,6 @@ func (s *Service) upsertPreference(ctx context.Context, user ids.ID, target noti
 	return row, s.d.Events.Append(ctx, e)
 }
 
-// UpsertPreference exposes upsertPreference to the automatic following of M3-19, which runs in
-// the transaction of the message and has authorized and locked the path itself.
-func (s *Service) UpsertPreference(ctx context.Context, user ids.ID, target notify.Target, level string, mutedUntil time.Time) (notify.Preference, error) {
-	return s.upsertPreference(ctx, user, target, level, mutedUntil)
-}
-
 // insertPreferenceIfAbsent is the second write path of notification_preferences (13 3.2, brief
 // M3-19 design note 17, D-M3-19-14): it inserts level for user on target with version 1 at at
 // only when the person has no own row on that target, and appends notification_pref.updated

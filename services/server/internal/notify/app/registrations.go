@@ -178,7 +178,7 @@ func (r *Registrations) register(ctx context.Context, a actor.Actor, in domain.R
 				return err
 			}
 		}
-		if _, err := r.d.Store.DisableOthersOfApp(ctx, a.DeviceID, in.Provider, in.AppID, domain.DisabledTokenInvalid, now); err != nil {
+		if _, err := r.d.Store.DisableOthersOfApp(ctx, a.DeviceID, in.Provider, in.AppID, domain.DisableTokenInvalid, now); err != nil {
 			return err
 		}
 		tok, err := r.d.Tokens.NewPushPreviewToken(ctx)

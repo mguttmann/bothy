@@ -190,9 +190,8 @@ func NewPush(cfg PushConfig, d PushDeps) (*Push, error) {
 func (p *Push) Consumer() *PushConsumer { return &PushConsumer{p: p} }
 
 // PushConsumer is the sync.ConsumerHandler of the consumer push (13 12 point 1, ADR 0051): it
-// turns the events message.created, run.state_changed, access.expiring, device.pending and
-// gdpr.request_due (M7-06) into hint jobs and read_state.updated into the badge sync, inside the
-// round's transaction, so the jobs and the cursor move commit together (R-PN-09). Every other
+// turns the hint events of the table in HandleEvent into hint jobs and read_state.updated into
+// the badge sync, inside the round's transaction, so the jobs and the cursor move commit together (R-PN-09). Every other
 // type is ignored.
 type PushConsumer struct{ p *Push }
 

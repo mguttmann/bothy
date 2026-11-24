@@ -186,17 +186,6 @@ func printableToken(s string) bool {
 	return true
 }
 
-// The values of push_registrations.disabled_reason this ticket writes (03; 13 6.4 and 7.3).
-const (
-	// DisabledLogout ends a registration whose session ended.
-	DisabledLogout = "logout"
-	// DisabledDeviceRevoked ends a registration of a revoked device or a disabled person.
-	DisabledDeviceRevoked = "device_revoked"
-	// DisabledTokenInvalid ends the older registration of the same app installation (brief M3-22
-	// design note 5 d).
-	DisabledTokenInvalid = "token_invalid"
-)
-
 // DisableReasonForSession maps the revocation reason of auth_sessions onto
 // push_registrations.disabled_reason (brief M3-22 design note 7 a, docs/DECISIONS.md
 // D-M3-22-7): device_revoked and user_disabled give device_revoked; every other reason (logout,
@@ -205,7 +194,7 @@ const (
 func DisableReasonForSession(reason string) string {
 	switch reason {
 	case "device_revoked", "user_disabled":
-		return DisabledDeviceRevoked
+		return DisableDeviceRevoked
 	}
-	return DisabledLogout
+	return DisableLogout
 }

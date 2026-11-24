@@ -50,7 +50,8 @@ const (
 )
 
 // PushSend are the arguments of notify.push_send (design note 11 a): only IDs and int64. KindCode
-// is domain.KindCode (1 to 8 in the order of NotificationKind, 9 the badge sync); the brief's
+// is domain.KindCode (1 to 8 in the order of NotificationKind, 9 the badge sync, later kinds after
+// it, see domain/codes.go); the brief's
 // field name Kind would clash with the method Kind of jobs.Args. Quiet is 0 or 1, DueAt t0 of 13 9
 // in Unix microseconds. Absent IDs are left out of the stored JSON (a zero ID is no UUIDv7).
 type PushSend struct {

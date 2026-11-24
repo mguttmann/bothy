@@ -977,6 +977,11 @@ Fake-APNs under the sustained load `perf.sustained_messages_per_s`, with t0 read
 of the triggering transaction and t1 as the `200` of the Fake; the value is held by
 `perf.push_handoff_p95` (02 section 17). The operational SLI above stays as written.
 
+As built: the operational SLO of push is the provider acceptance (`sli.push_acceptance`,
+`docs/observability/slos.md`); t1 minus t0 is measured only by `perf/push_handoff`, t2 minus t0
+and the confirmation rate per platform are not measured in operation, and the skips `expired` and
+`no_provider` (`bothy.push.skipped`) have no alert rule yet.
+
 Signal names: `docs/observability/signals.md`. Attributes only provider, kind, result, platform;
 no person, device or thread IDs.
 
@@ -1032,12 +1037,12 @@ no person, device or thread IDs.
 
    As built (M3-19, [ADR 0051](../adr/0051-worker-consumers-of-the-event-log-with-a-cursor.md),
    [02-architecture.md](02-architecture.md) 11.5): the hints arise in the worker consumer `push`.
-   It reads six durable event types from the log in `seq` order and inserts the hint jobs in the round that moves its cursor, so a restart in the
+   It reads seven durable event types from the log in `seq` order and inserts the hint jobs in the round that moves its cursor, so a restart in the
    middle of a round neither doubles nor loses a hint; every other type moves the cursor without
    effect. `message.created` gives `dm` in a DM channel, else `mention` to the mentioned people
    and `message` to the other readers (one hint per person and event; precedence `dm`, `mention`,
    `message`; nothing for a redacted event of a deleted message, for `silent`,
-   `origin IN ('import','system')` and the kinds `run` and `system`); `run.state_changed` gives the run kinds and the run's `message` hint of 2.1;
+   `origin IN ('import','system')` and the kinds `run` and `system`); `run.state_changed` gives the run kinds and the run's `message` hint of 2.1; `run.wake_changed` gives `wake_ended` of section 2;
    `access.expiring` gives `admin` to its audience; `gdpr.request_due` (M7-06, R-AZ-35, D-W-108)
    gives `admin` to its audience, the owner, with the request ID as target and no text; `device.pending`, which `identity` writes in
    the transaction that registers a device with state `pending` (R-AZ-31), gives `security` to
@@ -1110,7 +1115,7 @@ no person, device or thread IDs.
    rows counts as offline after `cluster.presence_ttl`, so its person gets the push.
 
 5. Per registration one job `notify.push_send` (job catalogue in 02, section 12.3) with
-   retries according to section 7. HTTP/2 connections to APNs stay open and are shared; at most `push.max_concurrent_requests` at the same time.
+   retries according to section 7. HTTP/2 connections to APNs are shared while in use and close after 90 seconds idle (the egress client's idle timeout; there are no HTTP/2 keepalive pings, so the next send after a quiet period opens a new connection); at most `push.max_concurrent_requests` at the same time.
 
    As built (M3-19): the job is `notify.push_send` on the queue `delivery`, one per active
    registration of a hint, with only IDs and numbers as arguments (the kind as a fixed code that

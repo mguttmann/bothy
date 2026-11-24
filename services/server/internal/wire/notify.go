@@ -141,18 +141,20 @@ type PushDeps struct {
 	// Providers are the registered push providers: the FCM adapter when FCM is enabled (M3-21);
 	// tests pass fakepush providers.
 	Providers []notifyapp.PushProvider
-	// Presence gives the live connections; nil means presence.None (role worker; role all passes
-	// the gateway's PresenceView, M3-23).
+	// Presence gives the live connections; nil means presence.None. wirePresence passes the
+	// gateway's PresenceView (role all, single) or the table-backed view (role all with multi,
+	// role worker; M7-17).
 	Presence presence.View
 	// Routes takes the gateway and delayed routes; nil means notifyapp.FailClosedRoutes, unless
 	// LiveRoutes is set.
 	Routes notifyapp.LiveRoutes
 	// LiveRoutes wires notifyapp.NewLiveRoutes over the scheduler of the push path when Routes is
-	// nil: role all, where the gateway and the consumer push share the process (M3-23,
-	// docs/DECISIONS.md D-M3-23-1).
+	// nil: roles all and worker (M3-23, M7-17; docs/decisions.d/M3-23.md D-M3-23-1 and
+	// docs/decisions.d/M7-17.md D-M7-17-7).
 	LiveRoutes bool
-	// Publisher is the EphemeralPublisher of the gateway of this process for the job
-	// notify.gateway_send (role all); nil in role worker.
+	// Publisher is the EphemeralPublisher for the job notify.gateway_send: the gateway of this
+	// process or its cluster publisher (role all), or the cluster publisher that sends the hint to
+	// the api nodes (role worker).
 	Publisher eventlog.EphemeralPublisher
 	// Metrics records the push signals; nil means notify/adapters/otelmetrics on the global meter
 	// provider, which also gets the gauge bothy.push.registrations.active. Tests pass their own.

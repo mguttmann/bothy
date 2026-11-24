@@ -17,9 +17,9 @@ type liveRoutes struct{ s Scheduler }
 // Compile-time check.
 var _ LiveRoutes = liveRoutes{}
 
-// NewLiveRoutes returns the live routes over the scheduler s; internal/wire passes them in role
-// all, where the gateway and the consumer push share the process (D-M3-23-1). Role worker keeps
-// FailClosedRoutes with presence.None, so no decision yields such a route there.
+// NewLiveRoutes returns the live routes over the scheduler s; internal/wire passes them in the
+// roles all and worker (D-M3-23-1, D-M7-17-7): in role worker the presence is the table-backed
+// view of gateway_presence and the publisher sends the hint to the api nodes.
 //
 // Example:
 //
