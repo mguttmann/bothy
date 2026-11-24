@@ -71,9 +71,49 @@ void main() {
       expect(device['public_jwk'], h.dpopKey.publicJwk);
       expect(device.containsKey('step_up_key'), isFalse);
     });
+
+    test('the session keeps its secrets under the names of SessionSecretKeys, '
+        'which the app reads', () async {
+      h.server.routes['POST /auth/password/login'] = (_) => tokens();
+      await h.session.login.loginWithPassword(
+        loginName: 'alex',
+        password: 'pw-canary',
+        totpCode: '123456',
+      );
+      final fields = await h.session.login.registerDeviceFields();
+      expect(h.store.values, {
+        SessionSecretKeys.refreshToken(serverUrl): 'R1',
+        SessionSecretKeys.deviceId(serverUrl): fields.deviceId,
+      });
+      expect(
+        SessionSecretKeys.refreshToken(serverUrl),
+        'auth/${serverUrl.origin}/refresh_token',
+      );
+    });
   });
 
   group('OIDC with PKCE', () {
+    test('a wait the app cancelled is not completed when the redirect '
+        'arrives', () async {
+      h.server.routes['POST /auth/oidc/begin'] = (_) => const FakeReply(200, {
+        'login_attempt_id': attemptId,
+        'authorization_url': 'https://idp.example.com/authorize?client_id=c',
+        'expires_at': '2026-10-15T10:10:00.000Z',
+      });
+      h.server.routes['POST /auth/oidc/complete'] = (_) => tokens();
+      h.redirects.next = Uri.parse(
+        'http://127.0.0.1:49152/callback?login_code=LC-canary&login_attempt_id=$attemptId',
+      );
+      final outcome = await h.session.login.beginOidc(
+        providerId,
+        isCancelled: () => true,
+      );
+      expect(outcome, isA<LoginFailed>());
+      expect((outcome as LoginFailed).reason, 'cancelled');
+      expect(h.server.to('/auth/oidc/complete'), isEmpty);
+      expect(h.store.values.values, isNot(contains('R1')));
+    });
+
     test('client_challenge is S256 of the verifier; complete carries verifier and device', () async {
       h.server.routes['POST /auth/oidc/begin'] = (_) => const FakeReply(200, {
         'login_attempt_id': attemptId,

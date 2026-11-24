@@ -11,9 +11,12 @@ import 'dart:io';
 
 import 'package:auth/auth.dart' show DeviceKeySigner, DeviceKeys;
 import 'package:client/app/account_wiper.dart';
+import 'package:client/app/providers/ports.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:client/platform/device_key_signer.dart';
 import 'package:client/platform/secure_store.dart';
+import 'package:client/telemetry/client_metrics.dart';
+import 'package:client/telemetry/telemetry_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sync_engine/sync_engine.dart';
@@ -198,6 +201,28 @@ void main() {
       expect(await remembered(), isNull);
       expect(keys.inner.scopes, isEmpty);
     });
+  });
+
+  test('logout reaches the server while the metrics sender runs', () async {
+    // The sender depends on this controller: reading it in the logout step threw a circular
+    // dependency, which the step swallowed, and the server logout was never sent.
+    f = await FakeInstance.start();
+    c = ProviderContainer(
+      overrides: [appPortsProvider.overrideWithValue(f.ports)],
+    );
+    final control = await connected(c, f);
+    await control.loginWithPassword(
+      WorldSeed.alexLogin,
+      WorldSeed.password,
+      WorldSeed.totp,
+    );
+    c.listen(appTelemetryProvider, (_, _) {});
+    await eventually('metrics on', () => c.read(clientMetricsOnProvider));
+    c.listen(metricsSenderProvider, (_, _) {});
+    c.read(appMeasurementsProvider).metrics.record(ClientMetric.frames, 3);
+    await control.logout();
+    expect(state().step, OnboardingStep.signedOut);
+    expect(f.server.requestsOf('logout'), hasLength(1));
   });
 
   test('logout ends on E7 with the local data deleted while the instance never '

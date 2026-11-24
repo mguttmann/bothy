@@ -274,6 +274,28 @@ class IosPlatformApi {
     );
     return pigeonVar_replyValue! as bool;
   }
+
+  /// The device's name for the registration (08 5.1): `UIDevice.name` (since iOS 16 the kind
+  /// of device, such as `iPhone`, unless the app has the entitlement for the name the person
+  /// gave it) with the hardware model identifier, for example `iPhone (iPhone15,2)`.
+  Future<String> deviceName() async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.client.IosPlatformApi.deviceName$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
+    return pigeonVar_replyValue! as String;
+  }
 }
 
 /// Calls from the iOS runner into the app.

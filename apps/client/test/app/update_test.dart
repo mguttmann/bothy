@@ -133,13 +133,18 @@ void main() {
     late RecordingUpdateLauncher launcher;
     setUp(() => launcher = RecordingUpdateLauncher());
 
-    Widget scoped(Widget child, {String updateUrl = address}) => ProviderScope(
+    Widget scoped(
+      Widget child, {
+      String updateUrl = address,
+      String platform = 'android',
+      UpdateLauncher? updateLauncher,
+    }) => ProviderScope(
       overrides: [
         appPortsProvider.overrideWithValue(
           testPorts(
             dataRoot: Directory.systemTemp,
-            platform: 'android',
-            updateLauncher: launcher,
+            platform: platform,
+            updateLauncher: updateLauncher ?? launcher,
             branding: BuildBranding(
               appName: 'ExampleChat',
               urlScheme: 'chat-example',
@@ -162,6 +167,33 @@ void main() {
       await tester.tap(find.text(en.updateGet));
       await tester.pump();
       expect(launcher.opened, [UpdatePath(url: Uri.parse(address))]);
+    });
+
+    testWidgets('a macOS build whose update opened nothing says so', (
+      tester,
+    ) async {
+      // A build without Sparkle and without a download address: the runner answers false.
+      await tester.pumpWidget(
+        scoped(
+          const UpdateRequiredBanner(),
+          updateUrl: '',
+          platform: 'macos',
+          updateLauncher: const NoUpdateLauncher(),
+        ),
+      );
+      await tester.tap(find.text(en.updateGet));
+      await tester.pumpAndSettle();
+      expect(find.text(en.updateOpenFailed), findsOneWidget);
+      await tester.tap(find.text(en.updateOpenFailedClose));
+      await tester.pumpAndSettle();
+      expect(find.text(en.updateOpenFailed), findsNothing);
+    });
+
+    testWidgets('an update that opened shows no dialog', (tester) async {
+      await tester.pumpWidget(scoped(const UpdateRequiredBanner()));
+      await tester.tap(find.text(en.updateGet));
+      await tester.pumpAndSettle();
+      expect(find.text(en.updateOpenFailed), findsNothing);
     });
 
     testWidgets('without a path "Update required" only explains', (

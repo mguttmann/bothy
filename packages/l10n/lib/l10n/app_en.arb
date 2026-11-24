@@ -2564,6 +2564,14 @@
   "@updateDismiss": {
     "description": "Tooltip of the close button of the banner \"Update recommended\"; it stays hidden until the instance recommends a newer version."
   },
+  "updateOpenFailed": "This app cannot open the update itself. Install the new version from where you got the app.",
+  "@updateOpenFailed": {
+    "description": "Dialog after \"Get the update\" when nothing opened: a macOS build without its update check and without a download address (18 section 9)."
+  },
+  "updateOpenFailedClose": "Close",
+  "@updateOpenFailedClose": {
+    "description": "Closes the dialog updateOpenFailed."
+  },
   "shellStepUpTitle": "Confirm it is you",
   "@shellStepUpTitle": {
     "description": "Title of the system dialog that confirms a step-up signature with biometrics or the device password (08 section 6.1)."
@@ -6286,6 +6294,10 @@
   "outboxCopy": "Copy",
   "@outboxCopy": {
     "description": "Button of a refused edit of a deleted message that copies its text (04 section 13.3)."
+  },
+  "composerSendFailed": "The message could not be saved on this device. It is back in the field; try again.",
+  "@composerSendFailed": {
+    "description": "Reason under the input when a message could not be written to the outbox of this device (the database is closed or the disk is full); text, reply and files are back in the composer."
   },
   "composerTooLong": "The message is too long: at most {limit} bytes",
   "@composerTooLong": {

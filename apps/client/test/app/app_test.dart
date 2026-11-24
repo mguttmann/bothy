@@ -14,6 +14,11 @@ import 'package:client/app/providers/target.dart';
 import 'package:client/app/rich_clipboard.dart';
 import 'package:client/app/target_resolver.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
+import 'package:client/phone/providers.dart' show outboxWaitingProvider;
+import 'package:client/telemetry/client_metrics.dart';
+import 'package:client/telemetry/measurements.dart';
+import 'package:client/telemetry/metrics_sender.dart';
+import 'package:client/telemetry/telemetry_providers.dart';
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart' show AppConfig, AppConfigValues;
 import 'package:flutter/material.dart' hide ConnectionState;
@@ -25,6 +30,7 @@ import 'package:sync_engine/sync_engine.dart';
 import '../support/fakes.dart';
 import '../support/instances.dart';
 import '../support/widgets.dart';
+import '../telemetry/metrics_sender_test.dart' show ManualTimer, RecordingApi;
 
 const String thread = '0193f2a7-0000-7000-8000-000000000001';
 
@@ -210,6 +216,64 @@ void main() {
     },
   );
 
+  testWidgets('a start through a login screen reports no cold start', (
+    tester,
+  ) async {
+    // The wait for the person landed in the cold start (AUD-PKG-P02-client-b, #1285).
+    final metrics = ClientMetrics();
+    final measurements = AppMeasurements(
+      metrics,
+      afterFrame: (callback) => callback(),
+    );
+    final (control, _) = await pumpApp(
+      tester,
+      initial: const OnboardingState(
+        step: OnboardingStep.server,
+        starting: true,
+      ),
+      extra: [appMeasurementsProvider.overrideWithValue(measurements)],
+    );
+    control.show(const OnboardingState(step: OnboardingStep.login));
+    await tester.pumpAndSettle();
+    measurements.sidebarShown();
+    expect(metrics.take(), isEmpty);
+  });
+
+  testWidgets('the app metrics go out when the app moves to the background', (
+    tester,
+  ) async {
+    // iOS and Android never ask to quit, so the last values were lost with the process
+    // (AUD-PKG-P02-client-b, #1282).
+    final metrics = ClientMetrics();
+    final api = RecordingApi();
+    final sender = MetricsSender(
+      metrics: metrics,
+      api: api,
+      interval: const Duration(minutes: 5),
+      enabled: () => true,
+      attributes: () =>
+          const MetricsAttributes(platform: 'ios', appVersion: '1.4.0'),
+      timer: ManualTimer.new,
+    );
+    await pumpApp(
+      tester,
+      extra: [metricsSenderProvider.overrideWithValue(sender)],
+    );
+    metrics.record(ClientMetric.frames, 3);
+    for (final step in [AppLifecycleState.inactive, AppLifecycleState.hidden]) {
+      tester.binding.handleAppLifecycleStateChanged(step);
+    }
+    await tester.pump();
+    expect(api.sent, hasLength(1));
+    for (final step in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(step);
+    }
+    await tester.pump();
+  });
+
   testWidgets('the offline banner, the update banner and the logout button', (
     tester,
   ) async {
@@ -218,8 +282,35 @@ void main() {
       initial: const OnboardingState(step: OnboardingStep.signedIn),
     );
     expect(find.byKey(const ValueKey('shell.offline')), findsOneWidget);
+    // AUD-PKG-P02-client-b: "Log out" in the foot asks once, like the phone; Cancel keeps
+    // the login.
     await tester.tap(find.byKey(const ValueKey('shell.logout')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('logout.dialog')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('logout.cancel')));
+    await tester.pumpAndSettle();
+    expect(control.logouts, 0);
+    await tester.tap(find.byKey(const ValueKey('shell.logout')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('logout.confirm')));
+    await tester.pumpAndSettle();
     expect(control.logouts, 1);
+  });
+
+  testWidgets('"Log out" in the foot names the changes that still wait', (
+    tester,
+  ) async {
+    await pumpApp(
+      tester,
+      initial: const OnboardingState(step: OnboardingStep.signedIn),
+      extra: [outboxWaitingProvider.overrideWith((ref) => Stream.value(2))],
+    );
+    await tester.tap(find.byKey(const ValueKey('shell.logout')));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('logout.waiting'))).data,
+      en.phoneLogoutWaiting(2),
+    );
   });
 
   testWidgets('live hides the banner', (tester) async {

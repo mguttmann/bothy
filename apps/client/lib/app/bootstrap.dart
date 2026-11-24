@@ -334,6 +334,7 @@ final class AppPorts {
 AppPorts productionPorts({
   BuildBranding branding = BuildBranding.fromEnvironment,
   AndroidRunnerInfo? android,
+  String? iosDeviceName,
 }) {
   final lifecycle = FlutterAppLifecycle();
   AppLocalizations texts() => lookupAppLocalizations(
@@ -391,7 +392,11 @@ AppPorts productionPorts({
     updateLauncher: PlatformUpdateLauncher(),
     branding: branding,
     platform: platform,
-    deviceName: android?.deviceName ?? Platform.localHostname,
+    deviceName: registrationDeviceName(
+      runner: android?.deviceName ?? iosDeviceName,
+      hostName: Platform.localHostname,
+      platform: platform,
+    ),
     secureBackend: secrets,
     // The device keys of a shared key store belong to this app identity as well
     // (docs/decisions.d/FIX-app-logout.md FIX-AL/4); the macOS keys go to the login keychain
@@ -454,6 +459,26 @@ AppPorts productionPorts({
   );
 }
 
+/// The name this device registers with (08 5.1): what the runner reports ([runner], the model
+/// on Android and iOS), else the [hostName] of the system; iOS answers `localhost` there, so a
+/// host name that names no device gives the [platform] (`ios` becomes `iPhone or iPad`).
+String registrationDeviceName({
+  required String? runner,
+  required String hostName,
+  required String platform,
+}) {
+  final reported = runner?.trim() ?? '';
+  if (reported.isNotEmpty) return reported;
+  final host = hostName.trim();
+  if (host.isNotEmpty && host.toLowerCase() != 'localhost') return host;
+  return switch (platform) {
+    'ios' => 'iPhone or iPad',
+    'android' => 'Android device',
+    'windows' => 'Windows PC',
+    _ => 'Mac',
+  };
+}
+
 /// Everything the app holds for one signed-in or signing-in instance.
 final class InstanceServices {
   InstanceServices._({
@@ -506,7 +531,7 @@ final class InstanceServices {
     InstanceSecrets secrets,
     InstanceInfo instance,
   ) async =>
-      await secrets.read('auth/${instance.address.origin}/refresh_token') !=
+      await secrets.read(SessionSecretKeys.refreshToken(instance.address)) !=
       null;
 
   /// Deletes the folder of [instance], the database files and the file cache, while its
@@ -617,7 +642,14 @@ final class InstanceServices {
       await ports.protectFiles(protected);
       database = await ports.openDatabase(io.File(dbPath), databaseKey);
     }
-    await ports.protectFiles(protected);
+    try {
+      await ports.protectFiles(protected);
+    } on Object {
+      // The caller shows E1 and "Connect" opens the database again: this connection must not
+      // stay open (Windows keeps an open file locked).
+      await database.close();
+      rethrow;
+    }
     final random = Random.secure();
     final ids = Uuid7Generator(
       nowMillis: () => ports.clock.now().millisecondsSinceEpoch,
@@ -842,15 +874,10 @@ final class InstanceServices {
   /// session cannot go on, and the app ends the account on the device (08 5.4).
   Stream<void> get deviceKeyLost => _keyLost.stream;
 
-  /// Whether a refresh token of an earlier login is stored, so the app can start signed in.
-  ///
-  /// The key is the one `AuthSession` writes (`auth/<origin>/refresh_token`, M4-09).
-  Future<bool> hasStoredSession() => _sessionStored(secrets, instance);
-
-  /// The ID of this device at the instance, kept by `AuthSession` (`auth/<origin>/device_id`,
-  /// M4-09), or null before the first registration.
+  /// The ID of this device at the instance, kept by `AuthSession`
+  /// ([SessionSecretKeys.deviceId], M4-09), or null before the first registration.
   Future<String?> storedDeviceId() =>
-      secrets.read('auth/${instance.address.origin}/device_id');
+      secrets.read(SessionSecretKeys.deviceId(instance.address));
 
   Future<void>? _closing;
 
@@ -864,6 +891,7 @@ final class InstanceServices {
     await engine.dispose();
     await database.close();
     await auth.dispose();
+    terminalApi.dio.close(force: true);
     await versions.dispose();
     await _keyLost.close();
   }

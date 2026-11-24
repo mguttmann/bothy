@@ -9,6 +9,7 @@ library;
 
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
 
@@ -22,7 +23,8 @@ typedef TranscriptFetch = Future<String?> Function(FileId fileId);
 /// It watches `SearchDao.watchTranscriptsToIndex`: each pending file is fetched once and indexed
 /// with the thread, channel and space of the attaching message. A failed fetch writes nothing
 /// and is retried on the next change of the watched tables, so there is no timer and no loop
-/// while the server is unreachable. A transcript without text is fetched once per start. On every
+/// while the server is unreachable. A transcript without text, or one the server refuses with a
+/// 4xx other than 429, is fetched once per start. On every
 /// change it also calls `SearchDao.pruneTranscripts`, so a deleted voice message or a dropped
 /// attachment is not findable offline any more (04 2.2 item 5). Removed targets lose their rows
 /// through `removeTargets` (04 8.3).
@@ -53,8 +55,8 @@ final class SearchIndexFeed {
   Future<void>? _write;
   bool _stopped = false;
 
-  /// Files fetched in this run whose transcript had no text; they stay pending in the database
-  /// but are not fetched again.
+  /// Files fetched in this run whose transcript had no text or that the server refused for good
+  /// (a 4xx other than 429); they stay pending in the database but are not fetched again.
   final Set<FileId> _empty = {};
 
   /// Starts watching; a second call does nothing, a call after [stop] neither.
@@ -103,6 +105,14 @@ final class SearchIndexFeed {
     final String? text;
     try {
       text = await _fetch(item.fileId);
+    } on DioException catch (e) {
+      final status = e.response?.statusCode ?? 0;
+      // A refusal for good (404, 403) would be asked again on every change of the tables; it
+      // waits for the next start. Offline, 429 and server errors retry on the next change.
+      if (status >= 400 && status < 500 && status != 429) {
+        _empty.add(item.fileId);
+      }
+      return;
     } on Object {
       // Offline or a server error: the row stays pending and the next change retries.
       return;

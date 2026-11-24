@@ -55,6 +55,7 @@ final class ShareSheetController extends ChangeNotifier {
     required Future<List<ShareTarget>> Function(String query) search,
     this.text = '',
     InstanceLimits? limits,
+    this.searchDelay = Duration.zero,
   }) : _limits = limits, // ignore: prefer_initializing_formals
        _loadRecent = recent,
        _search = search; // ignore: prefer_initializing_formals
@@ -64,6 +65,9 @@ final class ShareSheetController extends ChangeNotifier {
 
   /// The shared text or link, the start of the comment.
   final String text;
+
+  /// The pause in the typing before a query goes to the server (`ui.autocomplete_debounce`).
+  final Duration searchDelay;
 
   /// The limits of the instance, or null while unknown; they may arrive after the sheet
   /// opened.
@@ -84,6 +88,7 @@ final class ShareSheetController extends ChangeNotifier {
   ShareTarget? _selected;
   int _generation = 0;
   bool _sending = false;
+  bool _failed = false;
   bool _disposed = false;
 
   /// The targets shown: the search results while a query is typed, else the recent ones.
@@ -94,6 +99,9 @@ final class ShareSheetController extends ChangeNotifier {
 
   /// Whether a send is running.
   bool get sending => _sending;
+
+  /// Whether the last send failed on this device; Send tries again.
+  bool get failed => _failed;
 
   /// Why the files cannot be sent, or null: more files than `message_max_attachments`, or
   /// the first file over `file_max_upload_bytes`.
@@ -126,14 +134,19 @@ final class ShareSheetController extends ChangeNotifier {
     _changed();
   }
 
-  /// Searches [query]; a blank query shows the recent targets again. An answer to an older
-  /// query is dropped, a failing search finds nothing.
+  /// Searches [query] after [searchDelay] without a newer query; a blank query shows the
+  /// recent targets again. An answer to an older query is dropped, a failing search finds
+  /// nothing.
   Future<void> setQuery(String query) async {
     final generation = ++_generation;
     if (query.trim().isEmpty) {
       _results = null;
       _changed();
       return;
+    }
+    if (searchDelay > Duration.zero) {
+      await Future<void>.delayed(searchDelay);
+      if (generation != _generation || _disposed) return;
     }
     List<ShareTarget> found;
     try {
@@ -157,7 +170,8 @@ final class ShareSheetController extends ChangeNotifier {
         (target.kind != ShareTargetKind.newPost || title.trim().isNotEmpty);
   }
 
-  /// Hands the choice to [onSend] once; a second call while it runs does nothing.
+  /// Hands the choice to [onSend] once; a second call while it runs does nothing. When
+  /// [onSend] throws, [failed] is set and the sheet stays for another try.
   Future<void> send(
     Future<void> Function(ShareChoice choice) onSend, {
     required String comment,
@@ -166,6 +180,7 @@ final class ShareSheetController extends ChangeNotifier {
     final target = _selected;
     if (target == null || !canSend(comment: comment, title: title)) return;
     _sending = true;
+    _failed = false;
     _changed();
     try {
       await onSend(
@@ -175,6 +190,9 @@ final class ShareSheetController extends ChangeNotifier {
           title: target.kind == ShareTargetKind.newPost ? title.trim() : null,
         ),
       );
+    } on Object {
+      // A copy or the local write failed; nothing was queued.
+      _failed = true;
     } finally {
       _sending = false;
       _changed();
@@ -330,6 +348,18 @@ class _ShareSheetState extends State<ShareSheet> {
                           key: const ValueKey('share.reason'),
                           style: dsTextStyle(DsType.bodySm)
                               .copyWith(color: colors.dangerFg),
+                        ),
+                      ],
+                      if (_sheet.failed) ...[
+                        const SizedBox(height: DsSpace.s6),
+                        Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            l.shareRefused(l.shareReasonSave),
+                            key: const ValueKey('share.failed'),
+                            style: dsTextStyle(DsType.bodySm)
+                                .copyWith(color: colors.dangerFg),
+                          ),
                         ),
                       ],
                       const SizedBox(height: DsSpace.s12),

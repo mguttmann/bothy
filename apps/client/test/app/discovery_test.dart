@@ -32,8 +32,11 @@ class StubAdapter implements HttpClientAdapter {
     return respond(options);
   }
 
+  /// How often a client closed this adapter.
+  int closed = 0;
+
   @override
-  void close({bool force = false}) {}
+  void close({bool force = false}) => closed++;
 }
 
 ResponseBody json(int status, Object body) => ResponseBody.fromString(
@@ -85,6 +88,27 @@ Future<DiscoveryOutcome> run(
 ).discover(Uri.parse(address));
 
 void main() {
+  test(
+    'every discovery and version check closes the client it opened',
+    () async {
+      final adapter = StubAdapter(
+        (o) async => o.uri.path.endsWith('/logo')
+            ? ResponseBody.fromBytes([1, 2, 3], 200)
+            : json(200, discovery(logoUrl: '/api/v1/instance/branding/logo')),
+      );
+      final client = ApiDiscoveryClient(
+        platform: 'macos',
+        appVersion: '1.2.0',
+        adapter: adapter,
+      );
+      final address = Uri.parse('https://chat.example.com');
+      expect(await client.discover(address), isA<DiscoveryFound>());
+      expect(adapter.closed, 1);
+      expect(await client.checkVersion(address), isNotNull);
+      expect(adapter.closed, 2);
+    },
+  );
+
   test(
     'an instance ID that is no UUID is no instance (storage scope)',
     () async {

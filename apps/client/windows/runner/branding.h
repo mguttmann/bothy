@@ -3,6 +3,8 @@
 #ifndef RUNNER_BRANDING_H_
 #define RUNNER_BRANDING_H_
 
+// The resource compiler of Runner.rc knows macros only.
+#define BRANDING_APP_NAME "ExampleChat"  // NOSONAR
 #define BRANDING_APP_NAME_W L"ExampleChat"
 #define BRANDING_URL_SCHEME "chat-example"
 #define BRANDING_URL_SCHEME_W L"chat-example"

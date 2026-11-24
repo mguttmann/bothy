@@ -67,11 +67,29 @@ String? recommendedUpdate(Ref ref) {
       : decision.recommendedVersion;
 }
 
-/// Opens the update path of the build through the ports; does nothing without one.
-Future<void> openUpdatePath(WidgetRef ref) async {
+/// Opens the update path of the build through the ports; does nothing without one. When
+/// nothing opened (a macOS build whose runner answers that it carries no Sparkle and that has
+/// no download address), a dialog over [context] says so instead of a silent click.
+Future<void> openUpdatePath(WidgetRef ref, BuildContext context) async {
   final ports = ref.read(appPortsProvider);
   final path = ports.updatePath;
-  if (path.available) await ports.updateLauncher.open(path);
+  if (!path.available) return;
+  if (await ports.updateLauncher.open(path) || !context.mounted) return;
+  final l = AppLocalizations.of(context);
+  await showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      key: const ValueKey('update.openFailed'),
+      content: Text(l.updateOpenFailed),
+      actions: [
+        TextButton(
+          key: const ValueKey('update.openFailed.close'),
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l.updateOpenFailedClose),
+        ),
+      ],
+    ),
+  );
 }
 
 /// "Update required" after `4007` (04 6.4, 15 15) with the action that opens the update path
@@ -84,7 +102,9 @@ class UpdateRequiredBanner extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final available = ref.watch(appPortsProvider).updatePath.available;
     return UpdateRequiredBannerView(
-      onUpdate: available ? () => unawaited(openUpdatePath(ref)) : null,
+      onUpdate: available
+          ? () => unawaited(openUpdatePath(ref, context))
+          : null,
     );
   }
 }
@@ -126,7 +146,9 @@ class RecommendedUpdateBanner extends ConsumerWidget {
     final available = ref.watch(appPortsProvider).updatePath.available;
     return RecommendedUpdateBannerView(
       version: version,
-      onUpdate: available ? () => unawaited(openUpdatePath(ref)) : null,
+      onUpdate: available
+          ? () => unawaited(openUpdatePath(ref, context))
+          : null,
       onDismiss: () => unawaited(
         ref.read(updateNoticeDismissalProvider.notifier).dismiss(version),
       ),

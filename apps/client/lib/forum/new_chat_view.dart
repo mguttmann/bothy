@@ -26,7 +26,7 @@ import '../app/providers/session.dart';
 import '../app/router.dart' show NewChatLocation;
 import '../composer/attach_actions.dart';
 import '../composer/attachment_chips.dart';
-import '../composer/composer_controller.dart' show ContentTooLong;
+import '../composer/composer_controller.dart' show ContentTooLong, SendFailed;
 import '../composer/long_text.dart';
 import '../files/providers.dart'
     show newPostAttachmentsProvider, uploadProgressProvider;
@@ -361,6 +361,12 @@ class NewChatComposeState extends ConsumerState<NewChatCompose> {
           const ValueKey('newChat.error'),
           DsTone.danger,
           l.composerTooLong(limit),
+        ),
+      if (composer.error is SendFailed)
+        note(
+          const ValueKey('newChat.sendFailed'),
+          DsTone.danger,
+          l.composerSendFailed,
         ),
       if (composer.overflows)
         note(

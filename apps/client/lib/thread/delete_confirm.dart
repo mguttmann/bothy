@@ -16,18 +16,18 @@ Future<bool> confirmDelete(BuildContext context) async =>
       builder: (context) {
         final l = AppLocalizations.of(context);
         return AlertDialog(
-          key: const ValueKey('delete.dialog'),
+          key: const ValueKey('message.delete.dialog'),
           title: Text(l.messageDeleteTitle),
           content: Text(l.messageDeleteBody),
           actions: [
             DsButton(
-              key: const ValueKey('delete.cancel'),
+              key: const ValueKey('message.delete.cancel'),
               label: l.threadCancel,
               style: DsButtonStyle.ghost,
               onPressed: () => Navigator.of(context).pop(false),
             ),
             DsButton(
-              key: const ValueKey('delete.confirm'),
+              key: const ValueKey('message.delete.confirm'),
               label: l.messageActionDelete,
               style: DsButtonStyle.danger,
               onPressed: () => Navigator.of(context).pop(true),

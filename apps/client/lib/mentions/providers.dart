@@ -136,6 +136,8 @@ class MentionsController extends _$MentionsController {
         state.isLoading) {
       return;
     }
+    // Loading with the pages shown so far: a second press waits, and a failure keeps them.
+    state = const AsyncLoading<MentionsPage>();
     state = await AsyncValue.guard(
       () => _page(source, cursor, current.entries),
     );

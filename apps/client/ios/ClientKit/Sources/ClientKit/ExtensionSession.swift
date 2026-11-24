@@ -217,7 +217,7 @@ public protocol AuthorizedRequester {
 /// Example:
 ///
 ///     let session = ExtensionSession(instanceID: instance, keychain: keychain, signer: signer,
-///                                    nonces: nonces, transport: URLSessionTransport())
+///                                    nonces: nonces, transport: URLSessionTransport.shared)
 ///     let (data, response) = try await session.send(request)
 public actor ExtensionSession: AuthorizedRequester {
     /// How long before its expiry the access token is refreshed ahead of a request, so it does

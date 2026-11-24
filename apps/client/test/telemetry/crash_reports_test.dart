@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import 'dart:async';
+
 import 'package:client/telemetry/crash_reports.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -67,6 +69,31 @@ void main() {
     expect(o.enableAutoSessionTracking, isFalse);
     expect(o.beforeSend, isNotNull);
     expect(o.beforeBreadcrumb, isNotNull);
+  });
+
+  test('a switch-off during the start closes Sentry after the start', () async {
+    // The start of Sentry takes time; a close that ran before it ended met an empty hub and
+    // Sentry kept running until the process ended (AUD-PKG-P02-client-b, #1280).
+    final events = <String>[];
+    final started = Completer<void>();
+    final r = CrashReports(
+      dsn: dsn,
+      release: 'client@1.4.0',
+      environment: 'production',
+      start: (_) async {
+        events.add('start');
+        await started.future;
+        events.add('started');
+      },
+      close: () async => events.add('close'),
+    );
+    final on = r.apply(enabled: true);
+    final off = r.apply(enabled: false);
+    await Future<void>.delayed(Duration.zero);
+    started.complete();
+    await Future.wait([on, off]);
+    expect(events, ['start', 'started', 'close']);
+    expect(r.running, isFalse);
   });
 
   test('turning the switch off closes Sentry', () async {

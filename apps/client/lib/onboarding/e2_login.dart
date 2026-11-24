@@ -19,6 +19,9 @@ import 'onboarding_controller.dart';
 /// one-time code" with its second step; always "I have an enrollment code" and "Pair with
 /// another device". Without a method: "No login is set up for this instance".
 ///
+/// While an OIDC login waits for the system browser ([waitingForBrowser]) "Cancel" ends the
+/// wait, so a closed browser tab does not hold the screen until the attempt expires.
+///
 /// Enter triggers the main action (the open password step, else the first provider); Esc goes
 /// back to E1.
 class LoginScreen extends StatefulWidget {
@@ -35,6 +38,8 @@ class LoginScreen extends StatefulWidget {
     required this.onChangeServer,
     this.notice,
     this.busy = false,
+    this.waitingForBrowser = false,
+    this.onCancelBrowser,
   });
 
   /// The instance: name, logo, address and methods.
@@ -48,6 +53,12 @@ class LoginScreen extends StatefulWidget {
 
   /// Whether a login runs.
   final bool busy;
+
+  /// Whether an OIDC login waits for the redirect of the system browser.
+  final bool waitingForBrowser;
+
+  /// Ends the wait of [waitingForBrowser] ("Cancel").
+  final VoidCallback? onCancelBrowser;
 
   /// Login with a provider.
   final ValueChanged<LoginProvider> onProvider;
@@ -130,6 +141,14 @@ class _LoginScreenState extends State<LoginScreen> {
             key: ValueKey('e2.provider.${p.id}'),
             onPressed: enabled ? () => w.onProvider(p) : null,
             child: Text(l.onboardingLoginWithProvider(p.name)),
+          ),
+          controlGap,
+        ],
+        if (w.waitingForBrowser && w.onCancelBrowser != null) ...[
+          OutlinedButton(
+            key: const ValueKey('e2.cancelBrowser'),
+            onPressed: w.onCancelBrowser,
+            child: Text(l.onboardingCancel),
           ),
           controlGap,
         ],

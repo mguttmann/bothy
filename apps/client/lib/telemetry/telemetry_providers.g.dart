@@ -303,20 +303,23 @@ final class ClientMetricsApiProvider
 
 String _$clientMetricsApiHash() => r'8df35d7206b4ed00fe8b2443cfa8cac1c6fadac0';
 
-/// The sender of the signed-in session, started; null before the login. A sign-out disposes it,
-/// which sends what is left while the session still exists.
+/// The sender of the signed-in session, started; null before the login. It sends when the app
+/// moves to the background; the disposal after a sign-out sends what is left only while the
+/// session still answers.
 
 @ProviderFor(metricsSender)
 final metricsSenderProvider = MetricsSenderProvider._();
 
-/// The sender of the signed-in session, started; null before the login. A sign-out disposes it,
-/// which sends what is left while the session still exists.
+/// The sender of the signed-in session, started; null before the login. It sends when the app
+/// moves to the background; the disposal after a sign-out sends what is left only while the
+/// session still answers.
 
 final class MetricsSenderProvider
     extends $FunctionalProvider<MetricsSender?, MetricsSender?, MetricsSender?>
     with $Provider<MetricsSender?> {
-  /// The sender of the signed-in session, started; null before the login. A sign-out disposes it,
-  /// which sends what is left while the session still exists.
+  /// The sender of the signed-in session, started; null before the login. It sends when the app
+  /// moves to the background; the disposal after a sign-out sends what is left only while the
+  /// session still answers.
   MetricsSenderProvider._()
     : super(
         from: null,

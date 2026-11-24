@@ -64,18 +64,21 @@ final class ProjectReadinessPortProvider
 String _$projectReadinessPortHash() =>
     r'20ef7fa3f966be1ede03d11cbbbad952681513e8';
 
-/// The channel [channelId], or null when it is not stored.
+/// The channel [channelId] on every change, null while it is not stored; a channel that is
+/// stored later (opened by a link before the sync brought it) shows when it arrives.
 
 @ProviderFor(storedChannel)
 final storedChannelProvider = StoredChannelFamily._();
 
-/// The channel [channelId], or null when it is not stored.
+/// The channel [channelId] on every change, null while it is not stored; a channel that is
+/// stored later (opened by a link before the sync brought it) shows when it arrives.
 
 final class StoredChannelProvider
     extends
-        $FunctionalProvider<AsyncValue<Channel?>, Channel?, FutureOr<Channel?>>
-    with $FutureModifier<Channel?>, $FutureProvider<Channel?> {
-  /// The channel [channelId], or null when it is not stored.
+        $FunctionalProvider<AsyncValue<Channel?>, Channel?, Stream<Channel?>>
+    with $FutureModifier<Channel?>, $StreamProvider<Channel?> {
+  /// The channel [channelId] on every change, null while it is not stored; a channel that is
+  /// stored later (opened by a link before the sync brought it) shows when it arrives.
   StoredChannelProvider._({
     required StoredChannelFamily super.from,
     required String super.argument,
@@ -99,11 +102,11 @@ final class StoredChannelProvider
 
   @$internal
   @override
-  $FutureProviderElement<Channel?> $createElement($ProviderPointer pointer) =>
-      $FutureProviderElement(pointer);
+  $StreamProviderElement<Channel?> $createElement($ProviderPointer pointer) =>
+      $StreamProviderElement(pointer);
 
   @override
-  FutureOr<Channel?> create(Ref ref) {
+  Stream<Channel?> create(Ref ref) {
     final argument = this.argument as String;
     return storedChannel(ref, argument);
   }
@@ -119,12 +122,13 @@ final class StoredChannelProvider
   }
 }
 
-String _$storedChannelHash() => r'2ccb9e4be9ae053fd28550aa6ff7b447208f8873';
+String _$storedChannelHash() => r'0d75c7bbc59c7aa9eaa3b968fd1ae7d3894fcb21';
 
-/// The channel [channelId], or null when it is not stored.
+/// The channel [channelId] on every change, null while it is not stored; a channel that is
+/// stored later (opened by a link before the sync brought it) shows when it arrives.
 
 final class StoredChannelFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<Channel?>, String> {
+    with $FunctionalFamilyOverride<Stream<Channel?>, String> {
   StoredChannelFamily._()
     : super(
         retry: null,
@@ -134,7 +138,8 @@ final class StoredChannelFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// The channel [channelId], or null when it is not stored.
+  /// The channel [channelId] on every change, null while it is not stored; a channel that is
+  /// stored later (opened by a link before the sync brought it) shows when it arrives.
 
   StoredChannelProvider call(String channelId) =>
       StoredChannelProvider._(argument: channelId, from: this);

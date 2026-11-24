@@ -11,7 +11,9 @@ import 'package:l10n/l10n.dart';
 import 'app/app.dart';
 import 'app/bootstrap.dart';
 import 'app/providers/ports.dart';
+import 'app/providers/retry.dart';
 import 'platform/android_platform.dart';
+import 'platform/ios_platform.dart' show IosPlatformApi;
 import 'platform/notification_channels.dart';
 import 'telemetry/measurements.dart';
 
@@ -23,7 +25,8 @@ import 'telemetry/measurements.dart';
 /// frame timings of the engine count `client.frames` from the first frame on. On Android the
 /// app first reads the device's name and passkey support from the runner and registers the
 /// notification channels in the device language, so they are in the system settings before
-/// the first push (brief M5-03 Design note 4).
+/// the first push (brief M5-03 Design note 4). On iOS it reads the device's name from the runner
+/// as well, because the host name there is `localhost`.
 Future<void> main() async {
   appStartWatch.elapsed;
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,10 +46,20 @@ Future<void> main() async {
       ).then<void>((_) {}, onError: (Object _) {}),
     );
   }
-  final ports = productionPorts(android: android);
+  String? iosDeviceName;
+  if (Platform.isIOS) {
+    // The model of the device (08 5.1); without an answer the registration names the platform.
+    try {
+      iosDeviceName = await IosPlatformApi().deviceName();
+    } on Object {
+      iosDeviceName = null;
+    }
+  }
+  final ports = productionPorts(android: android, iosDeviceName: iosDeviceName);
   ports.measurements.attachFrameTimings(SchedulerBinding.instance);
   runApp(
     ProviderScope(
+      retry: appProviderRetry,
       overrides: [appPortsProvider.overrideWithValue(ports)],
       child: const ClientApp(),
     ),

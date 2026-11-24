@@ -291,13 +291,16 @@ final class ApiDiscoveryClient implements DiscoveryClient {
   @override
   Future<ClientVersionDecision?> checkVersion(Uri address) async {
     if (address.scheme == 'http' && !allowPlainHttp) return null;
+    final client = _client(address);
     try {
-      final discovery = (await _client(
-        address,
-      ).getDiscoveryApi().getDiscovery()).data;
+      final discovery = (await client.getDiscoveryApi().getDiscovery()).data;
       return discovery == null ? null : _decide(discovery);
     } on Object {
       return null;
+    } finally {
+      // One client per call: its connections go with the answer, also in every round of the
+      // version gate's backoff.
+      client.dio.close();
     }
   }
 
@@ -307,6 +310,14 @@ final class ApiDiscoveryClient implements DiscoveryClient {
       return const DiscoveryNoInstance();
     }
     final client = _client(address);
+    try {
+      return await _discover(client, address);
+    } finally {
+      client.dio.close();
+    }
+  }
+
+  Future<DiscoveryOutcome> _discover(ApiClient client, Uri address) async {
     final Discovery discovery;
     try {
       discovery = (await client.getDiscoveryApi().getDiscovery()).data!;

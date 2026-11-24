@@ -139,6 +139,10 @@ protocol IosPlatformApi {
   /// Whether a physical keyboard is connected (`GCKeyboard.coalesced`); the terminal hides its
   /// extra keys bar then (01 screen M8).
   func hardwareKeyboardConnected() throws -> Bool
+  /// The device's name for the registration (08 5.1): `UIDevice.name` (since iOS 16 the kind
+  /// of device, such as `iPhone`, unless the app has the entitlement for the name the person
+  /// gave it) with the hardware model identifier, for example `iPhone (iPhone15,2)`.
+  func deviceName() throws -> String
 }
 
 /// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
@@ -287,6 +291,22 @@ class IosPlatformApiSetup {
       }
     } else {
       hardwareKeyboardConnectedChannel.setMessageHandler(nil)
+    }
+    /// The device's name for the registration (08 5.1): `UIDevice.name` (since iOS 16 the kind
+    /// of device, such as `iPhone`, unless the app has the entitlement for the name the person
+    /// gave it) with the hardware model identifier, for example `iPhone (iPhone15,2)`.
+    let deviceNameChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.client.IosPlatformApi.deviceName\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      deviceNameChannel.setMessageHandler { _, reply in
+        do {
+          let result = try api.deviceName()
+          reply(wrapResult(result))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      deviceNameChannel.setMessageHandler(nil)
     }
   }
 }

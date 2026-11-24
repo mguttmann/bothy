@@ -39,24 +39,48 @@ typedef RetriggerRefusal = ({String code, String? reason});
 typedef Retrigger = Future<RetriggerRefusal?> Function(MessageId message);
 
 /// [Retrigger] over the outbox of [engine]: one `retriggerMessage` without a thread in the lane
-/// `message:<id>`; a refused entry is discarded and its problem returned.
-Retrigger outboxRetrigger(SyncEngine engine) => (message) async {
-  final entry = await engine.outbox.enqueue(
-    OutboxRequest(
-      kind: AppMessageOps.retriggerMessage,
-      payload: {'message_id': message.value},
-    ),
-  );
-  await for (final views in engine.outbox.watchThread(null)) {
-    final mine = views.where((v) => v.id == entry.id).firstOrNull;
-    if (mine == null) return null;
-    if (mine.stateLabel == OutboxStateLabel.failed) {
-      unawaited(engine.outbox.discard(mine.id));
-      return (code: mine.failureCode ?? 'unknown', reason: mine.failureReason);
-    }
-  }
-  return null;
-};
+/// `message:<id>`; a refused entry is discarded and its problem returned. The watch of the
+/// entry ends with its answer or when [until] completes (the notice closed); offline it would
+/// otherwise last for good.
+Retrigger outboxRetrigger(SyncEngine engine, {Future<void>? until}) =>
+    (message) async {
+      final entry = await engine.outbox.enqueue(
+        OutboxRequest(
+          kind: AppMessageOps.retriggerMessage,
+          payload: {'message_id': message.value},
+        ),
+      );
+      final done = Completer<RetriggerRefusal?>();
+      void finish(RetriggerRefusal? refusal) {
+        if (!done.isCompleted) done.complete(refusal);
+      }
+
+      final sub = engine.outbox
+          .watchThread(null)
+          .listen(
+            (views) {
+              final mine = views.where((v) => v.id == entry.id).firstOrNull;
+              if (mine == null) return finish(null);
+              if (mine.stateLabel == OutboxStateLabel.failed) {
+                unawaited(engine.outbox.discard(mine.id));
+                finish((
+                  code: mine.failureCode ?? 'unknown',
+                  reason: mine.failureReason,
+                ));
+              }
+            },
+            onError: (Object e, StackTrace s) {
+              if (!done.isCompleted) done.completeError(e, s);
+            },
+            onDone: () => finish(null),
+          );
+      unawaited(until?.then((_) => finish(null)));
+      try {
+        return await done.future;
+      } finally {
+        await sub.cancel();
+      }
+    };
 
 /// The notice of [message] for the reader whose author check is [mine]; nothing for a message
 /// that [offersRetrigger] does not cover.
@@ -86,6 +110,15 @@ class _RetriggerNoticeState extends ConsumerState<RetriggerNotice> {
   bool _busy = false;
   RetriggerRefusal? _refusal;
 
+  /// Completes when the notice closes, so the watch of a sent "Trigger again" ends with it.
+  final Completer<void> _closed = Completer<void>();
+
+  @override
+  void dispose() {
+    _closed.complete();
+    super.dispose();
+  }
+
   @override
   void didUpdateWidget(RetriggerNotice old) {
     super.didUpdateWidget(old);
@@ -108,7 +141,7 @@ class _RetriggerNoticeState extends ConsumerState<RetriggerNotice> {
     if (send == null) {
       final engine = ref.read(syncEngineProvider);
       if (engine == null) return;
-      send = outboxRetrigger(engine);
+      send = outboxRetrigger(engine, until: _closed.future);
     }
     setState(() {
       _busy = true;

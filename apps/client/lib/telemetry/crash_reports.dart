@@ -5,7 +5,7 @@
 ///
 /// Sentry starts only when the build names a target (the define `CRASH_DSN`; there is no instance
 /// setting for it, docs/DECISIONS.md D-M4-31-3) and the person leaves `privacy.crash_reports` on
-/// (01 11; default on when a target exists). The options turn off everything that could carry
+/// (01 11; default off, AUD-PKG-P01/8). The options turn off everything that could carry
 /// content: no default PII, no screenshots, no view hierarchy, no session replay, no breadcrumbs
 /// of user interactions, no traces. [CrashReports.scrubEvent] and [CrashReports.scrubBreadcrumb]
 /// remove message texts, exception values, titles, file names, request data with every header
@@ -58,6 +58,7 @@ final class CrashReports {
   final SentryStart _start;
   final Future<void> Function() _close;
   bool _running = false;
+  Future<void> _applied = Future<void>.value();
   String? _instanceTag;
 
   /// Whether the build names a target; only then Settings shows `privacy.crash_reports`.
@@ -67,8 +68,15 @@ final class CrashReports {
   bool get running => _running;
 
   /// Starts Sentry when a target exists and [enabled] (`privacy.crash_reports`) is on, closes
-  /// it when the switch is turned off.
-  Future<void> apply({required bool enabled}) async {
+  /// it when the switch is turned off. Calls run one after the other, so a close never meets a
+  /// start that has not ended.
+  Future<void> apply({required bool enabled}) {
+    final next = _applied.then((_) => _apply(enabled: enabled));
+    _applied = next.catchError((Object _) {});
+    return next;
+  }
+
+  Future<void> _apply({required bool enabled}) async {
     if (!hasTarget) return;
     if (enabled && !_running) {
       _running = true;

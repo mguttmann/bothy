@@ -7,6 +7,7 @@
 
 import 'dart:async';
 
+import 'package:client/files/upload_executor.dart' show UploadOps;
 import 'package:client/thread/history_column.dart';
 import 'package:client/thread/providers.dart';
 import 'package:design_system/design_system.dart';
@@ -128,6 +129,35 @@ void main() {
     expect(find.byKey(ValueKey('message.${messageId(1).value}')), findsNothing);
     final text = find.widgetWithText(SelectableText, 'Please keep this text');
     expect(text, findsOneWidget);
+    await host.dispose(tester);
+  });
+
+  // AUD-PKG-P02-client-b: an upload entry of an older form without `attachment_key` (outbox
+  // entries outlive an update of the app) is skipped and never replaces the history.
+  testWidgets('an upload entry without an attachment key keeps the history', (
+    tester,
+  ) async {
+    final host = await ColumnHost.open(tester);
+    await host.run(
+      tester,
+      () => seedThread(host.db, messages: [msg(1), msg(2, minutes: 5)]),
+    );
+    await host.run(
+      tester,
+      () => host.engine.outbox.enqueue(
+        OutboxRequest(
+          kind: UploadOps.upload,
+          threadId: threadId(1),
+          payload: {'channel_id': channelId(1).value, 'name': 'old.txt'},
+        ),
+      ),
+    );
+    await pumpThread(tester, host, FakeThreadReads(host.db));
+    expect(tester.takeException(), isNull);
+    expect(
+      find.byKey(ValueKey('message.${messageId(2).value}')),
+      findsOneWidget,
+    );
     await host.dispose(tester);
   });
 }

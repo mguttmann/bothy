@@ -577,6 +577,14 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
       me: me,
     );
     final error = composer.error;
+    // The author of the reply of a restored draft comes from the stored message.
+    final reply = composer.replyTo;
+    final replyAuthor = reply == null || composer.replyName != null
+        ? null
+        : ref.watch(storedMessageProvider(reply.value)).value?.authorId;
+    final replyName =
+        composer.replyName ??
+        (replyAuthor == null ? null : principals[replyAuthor]?.displayName);
     final colors = context.dsColors;
     Widget note(Key key, DsTone tone, String text, {VoidCallback? onClose}) =>
         Padding(
@@ -623,6 +631,12 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
               const ValueKey('composer.error'),
               DsTone.danger,
               l.composerTooLong(limit),
+            ),
+          if (error is SendFailed)
+            note(
+              const ValueKey('composer.sendFailed'),
+              DsTone.danger,
+              l.composerSendFailed,
             ),
           // M4-47: the draft is larger than one message; the rest goes as an attachment.
           if (composer.overflows)
@@ -681,7 +695,7 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
                 children: [
                   Expanded(
                     child: Text(
-                      l.composerReplyTo(dsIsolate(composer.replyName ?? '')),
+                      l.composerReplyTo(dsIsolate(replyName ?? '')),
                       style: dsTextStyle(DsType.caption)
                           .copyWith(color: colors.textSecondary),
                     ),

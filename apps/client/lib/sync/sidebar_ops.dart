@@ -128,7 +128,8 @@ abstract final class SidebarOps {
     for (final other in await db.outboxDao.allEntries()) {
       if (other.id == e.id ||
           other.kind != kind ||
-          other.state == OutboxState.confirmed ||
+          // A refused (failed) write sends nothing more, so it holds nothing back.
+          other.state.isFinal ||
           other.createdAt.isBefore(e.createdAt)) {
         continue;
       }

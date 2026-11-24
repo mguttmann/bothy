@@ -4,6 +4,8 @@
 // from `listMyMentions` with path and author from the local database, paging with the cursor,
 // the jump to the message, and a failure with "Try again".
 
+import 'dart:async';
+
 import 'package:client/mentions/mentions_view.dart';
 import 'package:client/mentions/providers.dart';
 import 'package:design_system/design_system.dart' show dsIsolate;
@@ -125,6 +127,68 @@ void main() {
       () => find.text(en.mentionsEmpty).evaluate().isNotEmpty,
       what: 'the empty text',
     );
+    await host.dispose(tester);
+  });
+
+  // AUD-PKG-P02-client-b: a second press while the next page loads sends nothing, and a
+  // next page that fails keeps the list and shows the failure with "Try again".
+  testWidgets('a next page loads once and its failure shows with Try again', (
+    tester,
+  ) async {
+    final cursors = <String?>[];
+    var fail = true;
+    var gate = Completer<void>();
+    Future<({List<Message> messages, String? nextCursor})> source(
+      String? cursor,
+    ) async {
+      cursors.add(cursor);
+      if (cursor == null) {
+        return (messages: [mention(2, '@Alex please look')], nextCursor: 'c2');
+      }
+      await gate.future;
+      if (fail) throw StateError('offline');
+      return (messages: [mention(1, '@Alex older one')], nextCursor: null);
+    }
+
+    final host = await ColumnHost.open(tester);
+    await tester.runAsync(() => fill(host.db));
+    await host.pump(
+      tester,
+      const MentionsView(),
+      overrides: [mentionsSourceProvider.overrideWithValue(source)],
+    );
+    await pumpUntil(
+      tester,
+      () => entry(2).evaluate().isNotEmpty,
+      what: 'page 1',
+    );
+    await tester.tap(find.byKey(const ValueKey('mentions.loadMore')));
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('mentions.loadMore')),
+      warnIfMissed: false,
+    );
+    gate.complete();
+    await pumpUntil(
+      tester,
+      () => find
+          .byKey(const ValueKey('mentions.moreFailed'))
+          .evaluate()
+          .isNotEmpty,
+      what: 'the failure of page 2',
+    );
+    expect(cursors, [null, 'c2']);
+    expect(entry(2), findsOneWidget);
+    fail = false;
+    gate = Completer<void>()..complete();
+    await tester.tap(find.byKey(const ValueKey('mentions.moreRetry')));
+    await pumpUntil(
+      tester,
+      () => entry(1).evaluate().isNotEmpty,
+      what: 'page 2',
+    );
+    expect(cursors, [null, 'c2', 'c2']);
+    expect(find.byKey(const ValueKey('mentions.moreFailed')), findsNothing);
     await host.dispose(tester);
   });
 }

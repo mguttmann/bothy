@@ -29,6 +29,9 @@ void main() {
     final app = await signedIn(tester);
     try {
       await tester.tap(find.byKey(const ValueKey('shell.logout')));
+      // "Log out" asks once before it deletes the data of the device (AUD-PKG-P02/2).
+      await app.waitFor(find.byKey(const ValueKey('logout.dialog')));
+      await tester.tap(find.byKey(const ValueKey('logout.confirm')));
       await app.waitFor(find.byKey(const ValueKey('screen.e7')));
       expect(await app.fake.wiped(), isTrue);
       expect(app.fake.server.requestsOf('logout'), hasLength(1));

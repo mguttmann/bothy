@@ -185,6 +185,32 @@ void main() {
     expect(row.version, const ResourceVersion(3));
   });
 
+  test(
+    'a later write the server refused does not hold back the answer',
+    () async {
+      // The copy of the rule counted a failed entry as waiting, so the row kept the refused
+      // local order (AUD-PKG-P02-client-b, #1278).
+      final routes = {
+        'PUT /me/sidebar/channels/${ch1.value}': {
+          'channel_id': ch1.value,
+          'thread_order': [t1.value],
+          'version': 4,
+          'updated_by_device_id': otherDevice,
+        },
+      };
+      final executors = OutboxExecutors();
+      SidebarOps.register(executors, client(_Adapter(routes)), db);
+      await writer.orderThreads(ch1, [t1]);
+      await writer.orderThreads(ch1, [t1, t2]);
+      final entries = await db.outboxDao.allEntries();
+      await db.outboxDao.markState(entries.last.id, OutboxState.failed);
+      await run(executors, entries.first);
+      final row = (await db.structureDao.watchUserChannelStates().first).single;
+      expect(row.threadOrder, [t1]);
+      expect(row.version, const ResourceVersion(4));
+    },
+  );
+
   test('setHidden archives and restores the channel at once, then sends only '
       'hidden; the answer brings hidden_at (PROJ-ARCHIVE)', () async {
     final routes = {

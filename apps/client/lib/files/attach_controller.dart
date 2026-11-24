@@ -412,6 +412,17 @@ final class AttachController extends ChangeNotifier {
     return _attachmentsOf(taken);
   }
 
+  /// Puts [items] that [take] handed to a send back in front of the attachments, because the
+  /// send could not be written to the outbox; their upload entries stay as they are.
+  void putBack(List<PendingAttachment> items) {
+    final kept = {for (final a in _items) a.key};
+    _items.insertAll(0, [
+      for (final a in items)
+        if (!kept.contains(a.key)) a,
+    ]);
+    notifyListeners();
+  }
+
   /// Hands the staged files to the send of a new post and clears the composer; null without
   /// files (FNCA/2). Each copy moves from the staging folder into the outgoing folder, which
   /// the upload reads and deletes after it (D-M4-22-5), and the result names the upload

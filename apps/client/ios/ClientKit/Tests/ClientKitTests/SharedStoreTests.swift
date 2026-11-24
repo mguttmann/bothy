@@ -44,6 +44,34 @@ private func sharedGroupUsable() -> Bool {
     #expect(!SharedKeychain.account(instanceID: instanceID, name: "preview_token").contains(instanceID))
 }
 
+@Test func testKeychainWriteUpdatesInPlace() {
+    // An existing item is updated; it is never deleted first, so no reader sees it missing.
+    var calls: [String] = []
+    var status = KeychainSecretStore.upsert(
+        update: { calls.append("update"); return errSecSuccess },
+        add: { calls.append("add"); return errSecSuccess })
+    #expect(status == errSecSuccess && calls == ["update"])
+    // No item yet: added.
+    calls = []
+    status = KeychainSecretStore.upsert(
+        update: { calls.append("update"); return errSecItemNotFound },
+        add: { calls.append("add"); return errSecSuccess })
+    #expect(status == errSecSuccess && calls == ["update", "add"])
+    // Another process added it in between: updated again instead of failing.
+    calls = []
+    var updates = 0
+    status = KeychainSecretStore.upsert(
+        update: { calls.append("update"); updates += 1; return updates == 1 ? errSecItemNotFound : errSecSuccess },
+        add: { calls.append("add"); return errSecDuplicateItem })
+    #expect(status == errSecSuccess && calls == ["update", "add", "update"])
+    // A failure is reported, and nothing was deleted before it.
+    calls = []
+    status = KeychainSecretStore.upsert(
+        update: { calls.append("update"); return errSecInteractionNotAllowed },
+        add: { calls.append("add"); return errSecSuccess })
+    #expect(status == errSecInteractionNotAllowed && calls == ["update"])
+}
+
 @Test(.enabled(if: sharedGroupUsable(), "the test binary has no keychain access group entitlement"))
 func testSharedKeychainRealRoundTrip() throws {
     let keychain = SharedKeychain(store: KeychainSecretStore(accessGroup: testGroup))
@@ -85,4 +113,13 @@ func testSharedKeychainRealRoundTrip() throws {
     #expect(snapshot.buckets.last == 1)
     #expect(snapshot.buckets.reduce(0, +) == 3)
     #expect(counters.take().isEmpty)
+}
+
+@Test func testExtensionsShareOneTransport() {
+    // A session keeps its delegate until it is invalidated: one transport per process, never one
+    // per push.
+    let first = NotificationEnvironment.production(bundle: .main).transport as AnyObject
+    let second = NotificationEnvironment.production(bundle: .main).transport as AnyObject
+    #expect(first === URLSessionTransport.shared)
+    #expect(second === first)
 }
