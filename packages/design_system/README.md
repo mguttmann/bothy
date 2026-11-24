@@ -22,6 +22,10 @@ Dart workspace at the repository root (`resolution: workspace`, `publish_to: non
 | `DsIconAssets`, `dsSemanticIcons`, `dsIconPackage` | `design_system.dart` | generated asset lookup of the icons and the list of every semantic icon |
 | `dsPumpIcons` | `testing.dart` | `pumpBeforeTest` of a golden with icons: pumps until every icon asset is loaded |
 | `dsGoldenMatrix` | `testing.dart` | one alchemist `GoldenTestGroup` per theme, density, text scale and locale; import it from tests only |
+| `DsGoldenFileComparator`, `dsCiGoldenDiffThreshold`, `dsCiGoldenChannelTolerance` | `testing.dart` | the golden comparator of the members with design-system goldens and its two bounds; see "Golden tests" |
+| `dsAccessibilityTests`, `dsA11yHost`, `dsA11yWindow` | `testing.dart` | the desktop accessibility tests of a screen (labels, tap targets, contrast) in a host window |
+| `dsPhoneAccessibilityTests`, `dsPhoneA11yHost`, `dsPhoneA11yWindow`, `dsSemanticsSnapshot`, `dsExpectSemanticsSnapshot` | `testing.dart` | the same on a phone, and the semantics snapshot of a screen compared with its stored file |
+| `dsSemanticsProblems`, `DsSemanticsProblem`, `dsExpectAccessible`, `DsDesktopTargetGuideline`, `dsDesktopTargetMin`, `DsTextContrastGuideline`, `dsTextContrastGuideline` | `testing.dart` | the semantics audit of a pumped screen and the guidelines it runs |
 
 Widgets read colors, type, spacing and motion only from these classes (ADR 0030); no literal
 size, color, duration or curve in widget code except `0`. Type roles only, never
@@ -62,6 +66,8 @@ the apps pass them from the app configuration (M4-08), this package holds no num
 | `DsBillingBadge`, `DsCostText` | `DsBillingMode`, `DsCost` | none | 10 |
 | `DsBanner` | `DsTone` and text | none | 2.1, 6.6 of 01 |
 | `DsTappable`, `DsBadge`, `dsIsolate` | shared building blocks | none | "Common rules" |
+| `DsDropdownField`, `DsMenuItem` | the options or the menu entry | none | "Common rules"; the required replacements of `DropdownMenu` and `MenuItemButton` |
+| `DsAvatar`, `DsCollapsible` | the author of a message; content clipped to `ui.message_collapse_lines` with "Show more" | none | 1 |
 | `DsFocusRing`, `DsKeyboardDismiss` | installed once around the app's navigator: the focus ring of controls without one, and the keyboard closing on a tap outside a text field and, on iOS and Android, on a drag of a list | none | "Common rules" |
 
 Security rules held here: Markdown renders no HTML, loads no image and activates only `https`,
@@ -197,6 +203,12 @@ design system is drawn in the test font of `flutter test`, as blocks, also in it
 goldens: the roles name the plain font family, which resolves only in this package
 (docs/decisions.d/AUD-pkg-design-system-01.md AUD-DS1/5). No CI job compares a platform golden
 (docs/spec/15-client-architecture.md 20).
+
+`DsGoldenFileComparator` compares a CI golden (a file under `ci/`) with two bounds: a pixel
+counts as different only when one color channel differs by more than
+`dsCiGoldenChannelTolerance`, and the image passes while at most `dsCiGoldenDiffThreshold` of its
+pixels differ; both are relative to the image, so a large sheet tolerates more differing pixels
+than a small one. A platform golden must match exactly.
 
 Regenerate goldens after an intended visual change with
 `flutter test --update-goldens` in the package folder. Platform goldens are updated only on
