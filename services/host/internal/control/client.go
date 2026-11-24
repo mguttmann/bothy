@@ -369,15 +369,17 @@ func (c *Client) logUpdate(ctx context.Context, reason string) {
 	c.log.LogAttrs(ctx, slog.LevelError, msgUpdate, attrs...)
 }
 
-// dial opens the WebSocket and returns it with the remote address of the TCP connection.
+// dial opens the WebSocket and returns it with the remote address of the TCP connection, nil when
+// the connection goes through a proxy: its peer is then the proxy, not the server (24 2.3).
 func (c *Client) dial(ctx context.Context) (*websocket.Conn, net.IP, error) {
 	var remote net.IP
 	var mu gosync.Mutex
+	viaProxy := c.viaProxy()
 	tr := c.http.Transport.(*http.Transport).Clone()
 	dialer := &net.Dialer{} // nosemgrep: bothy-go-egress-only -- the host module has no egress package; this dialer only records the peer address of the control connection (24 2.3)
 	tr.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		nc, err := dialer.DialContext(ctx, network, addr)
-		if err == nil {
+		if err == nil && !viaProxy {
 			if a, ok := nc.RemoteAddr().(*net.TCPAddr); ok {
 				mu.Lock()
 				remote = a.IP
@@ -398,6 +400,21 @@ func (c *Client) dial(ctx context.Context) (*websocket.Conn, net.IP, error) {
 	mu.Lock()
 	defer mu.Unlock()
 	return ws, remote, nil
+}
+
+// viaProxy reports whether the proxy of the configuration takes the control connection. The
+// upgrade is an https request, so the proxy is chosen for the https form of the URL.
+func (c *Client) viaProxy() bool {
+	if c.cfg.Proxy == nil {
+		return false
+	}
+	u, err := url.Parse(c.url)
+	if err != nil {
+		return false
+	}
+	u.Scheme = "https"
+	p, err := c.cfg.Proxy(&http.Request{Method: http.MethodGet, URL: u, Header: http.Header{}, Host: u.Host})
+	return err == nil && p != nil
 }
 
 // handshakeTimeout is HandshakeTimeout or its default.

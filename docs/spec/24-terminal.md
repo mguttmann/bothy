@@ -666,7 +666,10 @@ one of the following applies:
 - The host service reports it (`hosts.reported_is_server_host`): the address from `server.public_url`
   resolves to an address of one of its own network interfaces or to loopback, or the peer
   of the control connection is a local address [derived: a heuristic that does not detect a server
-  behind another party's edge].
+  behind another party's edge]. A control connection through a proxy (taken from the environment,
+  D-M2-43-17) has the proxy as its peer, so only the address check counts then; `bothy-host pair`
+  uses no proxy (D-M2-42-25), so a host behind a mandatory proxy is paired from a network that
+  reaches the server directly.
 
 Then the following applies:
 
@@ -1021,8 +1024,8 @@ times (`heartbeat_miss_limit` + 1) without a frame of the server as a dead conne
 `hello` a fixed bound of the program holds one attempt: the dial with TLS and the upgrade, then
 the wait for `hello`; a server, proxy or edge that accepts and stays silent past it counts as
 unreachable and the attempt is retried with the backoff.
-`is_server_host` is HD5 or the peer of the connection is an address of the host itself (2.3). Its
-reaction per close code: `1000`, `1001`, `4000`, `4002`, `4009`, `4014`, `4113` and any unknown
+`is_server_host` is HD5 or the peer of the connection, without a proxy, is an address of the host
+itself (2.3). Its reaction per close code: `1000`, `1001`, `4000`, `4002`, `4009`, `4014`, `4113` and any unknown
 code reconnect with exponential backoff with full jitter from
 `host_service.reconnect_backoff_base` to `host_service.reconnect_backoff_cap`, reset after a
 `ready`; `4013` reconnects after a random delay below `host_service.reconnect_backoff_base`;

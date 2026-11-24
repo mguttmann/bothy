@@ -8,7 +8,11 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"io"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -732,4 +736,58 @@ func TestHandshakeIsBounded(t *testing.T) {
 		}
 		srv.Accept(ctx(t))
 	})
+}
+
+// TestServerHostFlagNotFromProxy (audit host-service-12, 24 section 2.3): through a proxy the TCP
+// peer is the proxy, not the server; a proxy on loopback does not make the host the server host.
+func TestServerHostFlagNotFromProxy(t *testing.T) {
+	t.Parallel()
+	srv := controltest.New(t)
+	proxy := connectProxy(t)
+	c, err := control.New(control.Config{ServerURL: srv.URL, HostID: hostID, AuthKey: key(), HostVersion: "1.0.0", BackoffBase: base,
+		BackoffCap: capDelay, RootCAs: srv.Pool, Proxy: func(*http.Request) (*url.URL, error) { return proxy, nil }}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+	go func() { _, _ = c.Login(ctx(t)) }()
+	conn, _ := handshake(t, srv, 60000, "none")
+	if err := c.Report(ctx(t), sampleReport("Debian 13")); err != nil {
+		t.Fatal(err)
+	}
+	var r startup.Report
+	if err := controltest.Strict(conn.Expect(t, ctx(t), "report"), &r); err != nil || r.IsServerHost {
+		t.Fatalf("is_server_host through a loopback proxy %+v %v", r, err)
+	}
+}
+
+// connectProxy starts an HTTP CONNECT proxy on loopback and returns its URL.
+func connectProxy(t *testing.T) *url.URL {
+	t.Helper()
+	ps := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodConnect {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		up, err := net.Dial("tcp", r.Host)
+		if err != nil {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		down, _, err := http.NewResponseController(w).Hijack()
+		if err != nil {
+			_ = up.Close()
+			return
+		}
+		go func() { _, _ = io.Copy(up, down); _ = up.Close() }()
+		_, _ = io.Copy(down, up)
+		_ = down.Close()
+	}))
+	t.Cleanup(ps.Close)
+	u, err := url.Parse(ps.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u
 }
