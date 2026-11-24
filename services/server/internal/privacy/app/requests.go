@@ -63,7 +63,7 @@ func (s *Service) checkCreate(ctx context.Context, a actor.Actor, subject ids.ID
 	if !kind.Valid() {
 		return "", invalidEnum("/kind", "unknown kind")
 	}
-	if err := domain.CheckReason(cmd.Reason, "/reason"); err != nil {
+	if err := domain.CheckReason(cmd.Reason, "/reason", s.cfg.ReasonMaxChars); err != nil {
 		return "", err
 	}
 	if _, err := s.d.People.User(ctx, subject); err != nil {
@@ -300,7 +300,7 @@ func (s *Service) decideLocked(ctx context.Context, a actor.Actor, cmd privacy.D
 	if !ok {
 		return r, notFound()
 	}
-	if err := domain.CheckReason(cmd.Reason, "/reason"); err != nil {
+	if err := domain.CheckReason(cmd.Reason, "/reason", s.cfg.ReasonMaxChars); err != nil {
 		return r, err
 	}
 	now := s.now()

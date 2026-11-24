@@ -19,6 +19,12 @@
 - The warning `audit_checkpoint_sink_not_configured` also says that `retention.audit` trims
   nothing without a checkpoint sink; configuration reference, privacy chapter and ROPA template
   name the condition.
+- The reason of a privacy request and of its decision is limited to `audit.reason_max_chars`
+  characters instead of a fixed 1000.
+- A privacy export or deletion whose last attempt ended by the job timeout or a worker stop is
+  still marked `failed` instead of staying `running`.
+- An export package whose request did not take it (failed completion, or the request ended
+  meanwhile) is deleted at once, also when the job's context has ended.
 
 ### Changed
 

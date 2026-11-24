@@ -81,7 +81,7 @@ func (s *Service) Fail(ctx context.Context, id ids.ID, code string) error {
 // writes README.txt in the language of the person and manifest.json last, stores the ZIP through
 // the files port with purpose gdpr_export and completes the request with result_expires_at =
 // now + privacy.export_ttl. A retry builds the package again from the start; a package stored by
-// a failed attempt is deleted again.
+// a failed attempt, or by an attempt whose request ended meanwhile, is deleted again.
 //
 // Errors: those of the participants, the archive and the storage; the job retries.
 func (s *Service) RunExport(ctx context.Context, id ids.ID) error {
@@ -108,15 +108,21 @@ func (s *Service) RunExport(ctx context.Context, id ids.ID) error {
 	if err != nil {
 		return err
 	}
+	took := false
 	err = s.finish(ctx, id, func(_ context.Context, r *domain.Request) error {
 		r.State, r.CompletedAt = domain.StateCompleted, now
 		r.ResultFileID, r.ResultExpiresAt = fileID, now.Add(s.cfg.ExportTTL)
 		r.Progress.Bytes = built.Size
+		took = true
 		return nil
 	})
-	if err != nil {
-		// The request did not take the package: nobody can download it, so it goes at once.
-		if derr := s.d.UoW.Do(ctx, func(ctx context.Context) error { return s.d.Packages.Delete(ctx, fileID) }); derr != nil {
+	if err != nil || !took {
+		// The request did not take the package (the completion failed, or the request is no
+		// longer running): nobody can download it, so it goes at once. The deletion is detached
+		// from the job's context, so a timeout or a stop that ended the completion does not leave
+		// the package behind; the unit of work bounds it by database.statement_timeout.
+		del := context.WithoutCancel(ctx)
+		if derr := s.d.UoW.Do(del, func(ctx context.Context) error { return s.d.Packages.Delete(ctx, fileID) }); derr != nil {
 			return errors.Join(err, derr)
 		}
 	}

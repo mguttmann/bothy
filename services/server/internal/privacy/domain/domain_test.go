@@ -136,12 +136,13 @@ func TestReminderDue(t *testing.T) {
 // TestCheckReason: required, bounded, no control characters.
 func TestCheckReason(t *testing.T) {
 	t.Parallel()
-	if err := domain.CheckReason("Request by the person", "/reason"); err != nil {
+	const limit = 500
+	if err := domain.CheckReason(strings.Repeat("ä", limit), "/reason", limit); err != nil {
 		t.Fatal(err)
 	}
-	for _, bad := range []string{"", "  \n", "a\u202eb", strings.Repeat("x", domain.MaxReasonRunes+1)} {
+	for _, bad := range []string{"", "  \n", "a\u202eb", strings.Repeat("x", limit+1)} {
 		var e *errs.Error
-		if err := domain.CheckReason(bad, "/reason"); !errors.As(err, &e) || e.Code != errs.CodeValidationFailed {
+		if err := domain.CheckReason(bad, "/reason", limit); !errors.As(err, &e) || e.Code != errs.CodeValidationFailed {
 			t.Errorf("CheckReason(%q) = %v", bad, err)
 		}
 	}
