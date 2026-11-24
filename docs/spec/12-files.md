@@ -1307,6 +1307,7 @@ uploaded for (10).
 | Session open and expired | after `file.upload_session_ttl`: delete the parts, abort the multipart upload, `upload_state = 'failed'` with `file.updated`, session `expired` |
 | Failed or blocked | delete the objects immediately: the transaction of the transition to `failed`, `infected` or `error` queues `files.purge_objects` beside the deletes after the commit; the row of an attachment file that hangs on no message stays until `file.failed_row_ttl` for display to the uploader and is then deleted. Blocked files (`complete` with `infected` or `error`) follow this row. An attached blocked file keeps its row |
 | Avatar and branding rows | not touched by the cleanup: they go when their release marks them deleted (row above) |
+| Export package not completed | The store of an export package (20 5.2) inserts its row `pending` before it writes the object and sets it `complete` only after length and SHA-256 match, so every object has a row that names its key. A refused package is marked deleted at once and goes through `files.purge_objects`; a package whose store ended before the last step stays `pending`, is never handed out and is deleted by the cleanup after `file.failed_row_ttl` |
 | Retention periods | class `content`; periods and GDPR deletion in [20-privacy.md](20-privacy.md) |
 | Backups | Deleted objects remain in backups until the backup period expires ([16-operations.md](16-operations.md)) |
 
@@ -1483,7 +1484,7 @@ Values from other chapters (reference only): `file.max_upload_bytes`, `message.m
 | `file.ticket_key_ref` | `file:<secrets.dir>/file_ticket_key` | reference to the ticket key in the secret provider |
 | `file.not_ready_retry_after` | `5s` | `Retry-After` of the `409 file_not_ready` responses (in whole seconds) |
 | `file.unattached_ttl` | `24h` | period for never attached files |
-| `file.failed_row_ttl` | `7d` | period for rows of failed or blocked files |
+| `file.failed_row_ttl` | `7d` | period for rows of failed or blocked files and of export packages that were not completed |
 | `file.gc_interval` | `10m` | interval of the cleanup job |
 | `file.gc_batch_size` | `500` | candidates per batch of a cleanup step |
 | `voice.max_duration` | `15m` | longest voice message |

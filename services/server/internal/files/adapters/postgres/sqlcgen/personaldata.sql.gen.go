@@ -11,6 +11,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const completeExportFile = `-- name: CompleteExportFile :execrows
+UPDATE files SET upload_state = 'complete'
+WHERE id = $1 AND purpose = 'gdpr_export' AND upload_state = 'pending' AND deleted_at IS NULL
+`
+
+// Store of an export package (20 section 5.2): the row inserted pending before the object was
+// written becomes complete once the object holds the verified bytes. A row deleted meanwhile (the
+// cleanup of a stale package) stays as it is, and the caller removes the package.
+func (q *Queries) CompleteExportFile(ctx context.Context, id pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, completeExportFile, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const listOpenUploadsOfUploader = `-- name: ListOpenUploadsOfUploader :many
 SELECT s.file_id
 FROM file_upload_sessions s

@@ -661,7 +661,7 @@ Source: [12-files.md](../spec/12-files.md), section 18.
 | `file.ticket_key_ref` | `BOTHY_FILE__TICKET_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/file_ticket_key` | reference to the ticket key in the secret provider | active |
 | `file.not_ready_retry_after` | `BOTHY_FILE__NOT_READY_RETRY_AFTER` | Server | duration | `5s` | `Retry-After` of the `409 file_not_ready` responses (in whole seconds) | active |
 | `file.unattached_ttl` | `BOTHY_FILE__UNATTACHED_TTL` | Server | duration | `24h` | period for never attached files | active |
-| `file.failed_row_ttl` | `BOTHY_FILE__FAILED_ROW_TTL` | Server | duration | `7d` | period for rows of failed or blocked files | active |
+| `file.failed_row_ttl` | `BOTHY_FILE__FAILED_ROW_TTL` | Server | duration | `7d` | period for rows of failed or blocked files and of export packages that were not completed | active |
 | `file.gc_interval` | `BOTHY_FILE__GC_INTERVAL` | Server | duration | `10m` | interval of the cleanup job | active |
 | `file.gc_batch_size` | `BOTHY_FILE__GC_BATCH_SIZE` | Server | int | `500` | candidates per batch of a cleanup step | active |
 | `voice.max_duration` | `BOTHY_VOICE__MAX_DURATION` | Server | duration | `15m` | longest voice message | active |

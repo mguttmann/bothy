@@ -185,7 +185,8 @@ func (r *repo) UnattachedCandidates(_ context.Context, cutoff time.Time, after a
 func (r *repo) FailedRowCandidates(_ context.Context, cutoff time.Time, after app.Candidate, limit int) ([]app.Candidate, error) {
 	return r.candidates(func(f app.FileRecord) (time.Time, bool) {
 		blocked := f.UploadState == "failed" || f.ScanStatus == "infected" || f.ScanStatus == "error"
-		return f.CreatedAt, f.Purpose == "attachment" && !f.Deleted && blocked && !r.attachedLocked(f.ID) && !f.CreatedAt.After(cutoff)
+		stale := f.Purpose == "gdpr_export" && f.UploadState == "pending"
+		return f.CreatedAt, (stale || f.Purpose == "attachment" && blocked && !r.attachedLocked(f.ID)) && !f.Deleted && !f.CreatedAt.After(cutoff)
 	}, after, limit), nil
 }
 

@@ -31,13 +31,15 @@ ORDER BY f.created_at, f.id
 LIMIT sqlc.arg(batch_size);
 
 -- name: FailedRowCandidates :many
--- Step c: failed or blocked attachment files that are not deleted and not attached, created at or
--- before the cutoff.
+-- Step c: failed or blocked attachment files that are not deleted and not attached, and export
+-- packages that stayed pending (their store ended before the last step), created at or before the
+-- cutoff.
 SELECT f.id, f.created_at
 FROM files f
-WHERE f.purpose = 'attachment' AND f.deleted_at IS NULL
-  AND (f.upload_state = 'failed' OR f.scan_status IN ('infected', 'error')) AND f.created_at <= sqlc.arg(cutoff)
-  AND NOT EXISTS (SELECT 1 FROM message_attachments a WHERE a.file_id = f.id)
+WHERE f.deleted_at IS NULL AND f.created_at <= sqlc.arg(cutoff)
+  AND ((f.purpose = 'attachment' AND (f.upload_state = 'failed' OR f.scan_status IN ('infected', 'error'))
+        AND NOT EXISTS (SELECT 1 FROM message_attachments a WHERE a.file_id = f.id))
+    OR (f.purpose = 'gdpr_export' AND f.upload_state = 'pending'))
   AND (f.created_at, f.id) > (sqlc.arg(after_time)::timestamptz, sqlc.arg(after_id)::uuid)
 ORDER BY f.created_at, f.id
 LIMIT sqlc.arg(batch_size);

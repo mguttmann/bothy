@@ -501,7 +501,9 @@ empty object or an empty file
 when there is nothing), the uploads are under `files/<file_id>`, `README.txt` is in German for a
 person whose `users.locale` is German and in English otherwise, and `manifest.json` is written last
 with the SHA-256 of every other file. The ZIP is stored as a file with `purpose = 'gdpr_export'`
-and `result_expires_at = now + privacy.export_ttl`. `access.json` also holds the person's own
+and `result_expires_at = now + privacy.export_ttl`; its row exists before its object is written
+and becomes deliverable only when length and SHA-256 match (12 section 12, row "Export package
+not completed"). `access.json` also holds the person's own
 privacy requests, agents whose credentials the person holds and app installations the person made;
 `devices.json` also holds push targets and terminal hosts and sessions.
 

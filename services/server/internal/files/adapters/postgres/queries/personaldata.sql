@@ -35,3 +35,10 @@ FROM files f
 WHERE f.uploaded_by = sqlc.arg(uploaded_by) AND f.purpose = sqlc.arg(purpose) AND f.deleted_at IS NULL
   AND NOT EXISTS (SELECT 1 FROM message_attachments a WHERE a.file_id = f.id)
 ORDER BY f.id;
+
+-- name: CompleteExportFile :execrows
+-- Store of an export package (20 section 5.2): the row inserted pending before the object was
+-- written becomes complete once the object holds the verified bytes. A row deleted meanwhile (the
+-- cleanup of a stale package) stays as it is, and the caller removes the package.
+UPDATE files SET upload_state = 'complete'
+WHERE id = sqlc.arg(id) AND purpose = 'gdpr_export' AND upload_state = 'pending' AND deleted_at IS NULL;

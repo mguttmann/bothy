@@ -252,6 +252,8 @@ func (c *Cleanup) unattached(ctx context.Context, now time.Time) error {
 // failedRows is step c (12 12 row "Failed or blocked"): the row of a failed or blocked attachment
 // file that hangs on no message is deleted once domain.FailedRowExpired. Drafts do not protect it,
 // and avatar and branding rows are left to their release (docs/decisions.d/M3-08.md D-M3-08-7).
+// An export package that stayed pending (its store ended before the last step) is deleted after
+// the same period, so its object never stays without a way to remove it.
 func (c *Cleanup) failedRows(ctx context.Context, now time.Time) error {
 	cutoff := now.Add(-c.cfg.FailedRowTTL)
 	return c.batches(ctx, StepFailedRows, func(after Candidate, limit int) ([]Candidate, error) {
@@ -262,9 +264,14 @@ func (c *Cleanup) failedRows(ctx context.Context, now time.Time) error {
 			if err != nil || !ok {
 				return err
 			}
+			if cur.Deleted || !domain.FailedRowExpired(cur.Ages, now, c.cfg.FailedRowTTL) {
+				return nil
+			}
+			if cur.Purpose == string(domain.PurposeGDPRExport) && cur.UploadState == domain.UploadPending {
+				return c.deletion().mark(ctx, Deletion{FileIDs: []ids.ID{id}, Purpose: cur.Purpose}, now)
+			}
 			blocked := domain.Final(cur.UploadState, cur.ScanStatus, false) && !domain.IsDeliverable(cur.UploadState, cur.ScanStatus, false)
-			if cur.Purpose != string(domain.PurposeAttachment) || cur.Deleted || cur.Attached || !blocked ||
-				!domain.FailedRowExpired(cur.Ages, now, c.cfg.FailedRowTTL) {
+			if cur.Purpose != string(domain.PurposeAttachment) || cur.Attached || !blocked {
 				return nil
 			}
 			return c.deletion().mark(ctx, Deletion{FileIDs: []ids.ID{id}}, now)
