@@ -88,8 +88,8 @@ type ActiveThreadsRow struct {
 // The active threads of the snapshot of sync (M2-52, 04 section 6.3 item 4, R-SY-28) in one
 // statement: the open threads of kind thread among the pinned ids (the caller's active runs and
 // unread threads, never left out; read through the primary key) in the given channels, plus per
-// channel a LATERAL read over threads_channel_state_activity_idx (channel_id, state,
-// last_activity_at DESC) of the open threads active since the given time, newest first, limited
+// channel a LATERAL read over an activity index (threads_channel_state_activity_idx, or
+// threads_channel_activity_idx of 00121) of the open threads active since the given time, newest first, limited
 // to the bound (sync.snapshot_threads_per_channel) minus the pinned threads of that channel. Both
 // parts carry the whole row, so no third read of threads joins them (a join back by id planned a
 // sequential scan, TestActiveThreads_QueryPlan). The result follows the order of the channel list,
@@ -658,7 +658,8 @@ func (q *Queries) ListThreadsByCreated(ctx context.Context, arg ListThreadsByCre
 
 const locateThreads = `-- name: LocateThreads :many
 SELECT t.id, t.channel_id, c.space_id, c.kind AS channel_kind, t.kind, t.state, t.operator_agent_id, t.created_by, t.version,
-    (c.archived_at IS NOT NULL OR s.archived_at IS NOT NULL)::boolean AS channel_archived, t.last_message_seq, t.unread_floor_seq
+    (c.archived_at IS NOT NULL OR s.archived_at IS NOT NULL)::boolean AS channel_archived, t.last_message_seq, t.unread_floor_seq,
+    (t.deleted_at IS NOT NULL)::boolean AS deleted
 FROM threads t
 JOIN channels c ON c.id = t.channel_id
 LEFT JOIN spaces s ON s.id = c.space_id
@@ -679,12 +680,14 @@ type LocateThreadsRow struct {
 	ChannelArchived bool
 	LastMessageSeq  int64
 	UnreadFloorSeq  int64
+	Deleted         bool
 }
 
 // The routing data of a batch of threads (M2-05, chat.Threads.Locate: "Running now" resolves the
 // threads of the active runs) in one statement, the fields of Threads.Info: the channel kind and
-// space, and the archived flag of the channel or its space. A dm channel has no space, hence the
-// LEFT JOIN. The caller filters by its Authorizer.Scope, so there is no channel predicate here.
+// space, the archived flag of the channel or its space and the deleted flag of the thread. A dm
+// channel has no space, hence the LEFT JOIN. The caller filters by its Authorizer.Scope, so there
+// is no channel predicate here.
 func (q *Queries) LocateThreads(ctx context.Context, threadIds []pgtype.UUID) ([]LocateThreadsRow, error) {
 	rows, err := q.db.Query(ctx, locateThreads, threadIds)
 	if err != nil {
@@ -707,6 +710,7 @@ func (q *Queries) LocateThreads(ctx context.Context, threadIds []pgtype.UUID) ([
 			&i.ChannelArchived,
 			&i.LastMessageSeq,
 			&i.UnreadFloorSeq,
+			&i.Deleted,
 		); err != nil {
 			return nil, err
 		}

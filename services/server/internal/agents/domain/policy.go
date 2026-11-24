@@ -110,15 +110,6 @@ func ParseToolClass(s string) (ToolClass, error) {
 	return c, nil
 }
 
-// EffectiveToolClass is the class authorize reckons with: the higher of the target class and the
-// reported class; an empty reported class counts as none (09 section 2.4).
-func EffectiveToolClass(target, reported ToolClass) ToolClass {
-	if reported.rank() > target.rank() {
-		return reported
-	}
-	return target
-}
-
 // RuntimeState is the reported state of the runtime, agents.reported_runtime_state.
 type RuntimeState string
 

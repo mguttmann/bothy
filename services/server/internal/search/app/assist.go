@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"slices"
 	"strconv"
@@ -29,11 +30,13 @@ import (
 // assistMinTermChars is the shortest term of a question (docs/spec/14-search.md 4.10 point 2).
 const assistMinTermChars = 3
 
-// The field error codes and pointers of a question (06 section 5).
+// The field error codes and pointers of a question (06 section 5); pointerHistoryQ names the q of
+// one earlier question.
 const (
-	codeEmpty   = "empty"
-	codeTooLong = "too_long"
-	pointerQ    = "/q"
+	codeEmpty       = "empty"
+	codeTooLong     = "too_long"
+	pointerQ        = "/q"
+	pointerHistoryQ = "/history/%d/q"
 )
 
 // The log line of one question: mode, reason and counts, never a text or an id.
@@ -42,6 +45,8 @@ const (
 	keyMode       = "bothy.search.mode"
 	keyCandidates = "bothy.search.candidates"
 	keyPicks      = "bothy.search.picks"
+	msgSecondPass = "search: assist second pass failed"
+	keyErrorKind  = "error.type"
 )
 
 // hitKindMessage is the kind of a message hit of the coordinator.
@@ -196,7 +201,10 @@ func (a *Assistant) Assist(ctx context.Context, p actor.Actor, r search.AssistRe
 		if len(extra) > 0 {
 			res.Terms = append(slices.Clone(terms), extra...)
 			if second, err = a.pass(ctx, p, extra); err != nil {
-				return search.AssistResult{}, err
+				// The answer is paid for: a failed second pass (search_timeout, the end of the
+				// request) adds no hits instead of discarding the picks and the first pass.
+				a.d.Log.LogAttrs(ctx, slog.LevelWarn, msgSecondPass, slog.String(keyErrorKind, errs.KindOf(err).String()))
+				second = nil
 			}
 		}
 		res.Cost = estimate(answer.Costs)
@@ -217,11 +225,17 @@ func (a *Assistant) terms(r search.AssistRequest) ([]string, error) {
 	if len(r.History) > a.cfg.MaxTurns {
 		return nil, domain.TooManyTurns()
 	}
+	for i, t := range r.History {
+		// An earlier question goes into the payload whole, so it has the limit of a question.
+		if utf8.RuneCountInString(t.Q) > a.cfg.QueryMaxChars {
+			return nil, fieldError(fmt.Sprintf(pointerHistoryQ, i), codeTooLong, "an earlier question is longer than search.query_max_chars")
+		}
+	}
 	var prior []string
 	for i := len(r.History) - 1; i >= 0; i-- {
 		t := r.History[i]
 		prior = append(prior, t.Terms...)
-		prior = append(prior, truncateRunes(t.Q, a.cfg.QueryMaxChars))
+		prior = append(prior, t.Q)
 	}
 	terms := domain.AssistTerms(r.Q, prior, assistMinTermChars, a.cfg.MaxTerms)
 	if len(terms) == 0 {
@@ -579,14 +593,6 @@ func segmentText(segs []searchkit.Segment) string {
 		b.WriteString(s.Text)
 	}
 	return b.String()
-}
-
-// truncateRunes cuts s to at most n runes.
-func truncateRunes(s string, n int) string {
-	if utf8.RuneCountInString(s) <= n {
-		return s
-	}
-	return string([]rune(s)[:n])
 }
 
 // isEmptyQuery reports the 400 empty of the coordinator: the query text has no term in any

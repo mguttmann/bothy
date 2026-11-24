@@ -130,6 +130,23 @@ func (r *Repository) Mentions(ctx context.Context, message ids.ID) ([]ids.ID, er
 	return out, nil
 }
 
+// MentionsOfMessages implements app.Store with one statement for all messages.
+func (r *Repository) MentionsOfMessages(ctx context.Context, messages []ids.ID) (map[ids.ID][]ids.ID, error) {
+	out := make(map[ids.ID][]ids.ID, len(messages))
+	if len(messages) == 0 {
+		return out, nil
+	}
+	rows, err := r.read(ctx).ListMentionsOfMessages(ctx, uuids(messages))
+	if err != nil {
+		return nil, mapError(err, "reading mentions")
+	}
+	for _, row := range rows {
+		m := idOf(row.MessageID)
+		out[m] = append(out[m], idOf(row.PrincipalID))
+	}
+	return out, nil
+}
+
 // messageRow is the column list every query of messages.sql returns: the columns of messages
 // without search_language and search_vector (docs/DECISIONS.md D-M3-13-10), has_attachments
 // (M3-07) and team_handle (FIX-TEAM-MEMBER-ATTRIBUTION) last. The row types sqlc generates per query have exactly these fields, so each converts to

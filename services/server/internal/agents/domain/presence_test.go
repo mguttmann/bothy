@@ -13,24 +13,27 @@ import (
 // t0 is the reference time of the presence tests.
 var t0 = time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
 
-// TestStateAtBoundary: before last + agent.presence_timeout the reported state holds, at and
-// after it offline (inclusive boundary, D-M2-20-4); no heartbeat is unknown.
-func TestStateAtBoundary(t *testing.T) {
+// TestStoredStateBoundary: a stored online or degraded state holds before last + stale and is
+// offline at and after it (inclusive boundary, D-M2-20-4); other states and stale 0 stay as
+// stored.
+func TestStoredStateBoundary(t *testing.T) {
 	t.Parallel()
-	const timeout = 90 * time.Second
+	const stale = 90 * time.Second
 	cases := []struct {
-		last time.Time
-		now  time.Time
-		want domain.RuntimeState
+		stored domain.RuntimeState
+		now    time.Time
+		stale  time.Duration
+		want   domain.RuntimeState
 	}{
-		{t0, t0.Add(timeout - time.Nanosecond), domain.RuntimeDegraded},
-		{t0, t0.Add(timeout), domain.RuntimeOffline},
-		{t0, t0.Add(timeout + time.Second), domain.RuntimeOffline},
-		{time.Time{}, t0, domain.RuntimeUnknown},
+		{domain.RuntimeDegraded, t0.Add(stale - time.Nanosecond), stale, domain.RuntimeDegraded},
+		{domain.RuntimeDegraded, t0.Add(stale), stale, domain.RuntimeOffline},
+		{domain.RuntimeOnline, t0.Add(stale + time.Second), stale, domain.RuntimeOffline},
+		{domain.RuntimeUnknown, t0.Add(stale + time.Second), stale, domain.RuntimeUnknown},
+		{domain.RuntimeOnline, t0.Add(time.Hour), 0, domain.RuntimeOnline},
 	}
 	for _, c := range cases {
-		if got := domain.StateAt(c.last, domain.RuntimeDegraded, c.now, timeout); got != c.want {
-			t.Errorf("StateAt(%v, %v) = %s, want %s", c.last, c.now, got, c.want)
+		if got := domain.StoredState(c.stored, t0, c.now, c.stale); got != c.want {
+			t.Errorf("StoredState(%s, %v, %v) = %s, want %s", c.stored, c.now, c.stale, got, c.want)
 		}
 	}
 }

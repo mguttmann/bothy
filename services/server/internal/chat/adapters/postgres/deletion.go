@@ -30,7 +30,7 @@ func (r *Repository) SaveSpaceDeletion(ctx context.Context, sp domain.Space) err
 	}
 	err = q.SaveSpaceDeletion(ctx, sqlcgen.SaveSpaceDeletionParams{
 		ID: uuid(sp.ID), ArchivedAt: optionalTime(sp.ArchivedAt), DeletedAt: optionalTime(sp.Deletion.At),
-		DeletedBy: optionalUUID(sp.Deletion.By), Version: sp.Version,
+		DeletedBy: optionalUUID(sp.Deletion.By), SortKey: sp.SortKey, Version: sp.Version,
 	})
 	return mapError(err, "writing the deletion of a space")
 }
@@ -43,7 +43,7 @@ func (r *Repository) SaveChannelDeletion(ctx context.Context, c domain.Channel) 
 	}
 	err = q.SaveChannelDeletion(ctx, sqlcgen.SaveChannelDeletionParams{
 		ID: uuid(c.ID), ArchivedAt: optionalTime(c.ArchivedAt), DeletedAt: optionalTime(c.Deletion.At),
-		DeletedBy: optionalUUID(c.Deletion.By), Version: c.Version,
+		DeletedBy: optionalUUID(c.Deletion.By), SortKey: c.SortKey, Version: c.Version,
 	})
 	return mapError(err, "writing the deletion of a channel")
 }

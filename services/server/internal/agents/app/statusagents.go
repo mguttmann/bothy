@@ -93,14 +93,12 @@ func (s *StatusSource) appendActive(ctx context.Context, out []agents.StatusAgen
 	return out, nil
 }
 
-// state is the stored presence, offline once the last heartbeat is older than the stale age.
+// state is the stored presence, offline once the last heartbeat is the stale age old
+// (domain.StoredState, the rule of getAgent and listAgents for a row no process tracks).
 func (s *StatusSource) state(r domain.Reported, now time.Time) string {
 	st := r.State
 	if st == "" {
 		st = domain.RuntimeUnknown
 	}
-	if (st == domain.RuntimeOnline || st == domain.RuntimeDegraded) && now.Sub(r.LastHeartbeatAt) > s.stale {
-		return agents.StateOffline
-	}
-	return string(st)
+	return string(domain.StoredState(st, r.LastHeartbeatAt, now, s.stale))
 }

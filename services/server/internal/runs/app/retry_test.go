@@ -59,6 +59,24 @@ func wantCode(t *testing.T, err error, code errs.Code, reason string) {
 // thread can be started again for the same message, with the rights of triggering, once.
 func TestRetry(t *testing.T) {
 	t.Parallel()
+	t.Run("the retrying person must resolve for agent.invocation", func(t *testing.T) {
+		t.Parallel()
+		for name, set := range map[string]func(f *msgFacts, sam ids.ID){
+			"not in the directory": func(f *msgFacts, sam ids.ID) { f.unknown = map[ids.ID]bool{sam: true} },
+			"directory fails":      func(f *msgFacts, _ ids.ID) { f.refsErr = errs.New(errs.CodeInternalError, "directory: down") },
+		} {
+			w := newWorld(t)
+			old := w.endedRun(w.lotse, domain.StateFailed, t0.Add(-time.Minute), w.lotse)
+			sam := ids.New()
+			w.msgFacts.mu.Lock()
+			set(w.msgFacts, sam)
+			w.msgFacts.mu.Unlock()
+			_, err := w.retryAs(sam, old.ID)
+			if e, ok := errs.As(err); !ok || e.PublicCode() != errs.CodeInternalError {
+				t.Fatalf("%s: err = %v, want internal_error (the transaction rolls back)", name, err)
+			}
+		}
+	})
 	t.Run("a failed run starts a new run for the same message", func(t *testing.T) {
 		t.Parallel()
 		w := newWorld(t)
@@ -82,6 +100,10 @@ func TestRetry(t *testing.T) {
 		}
 		if w.j.count("event") < 2 || w.j.count("anchor") != 1 {
 			t.Fatalf("a retry writes the anchor, run.state_changed and agent.invocation: %v", w.j.whats())
+		}
+		// agent.invocation names the person of the run, the one who retried (audit srv-runs-app-4).
+		if by, _ := w.invocationPayload()["triggered_by"].(map[string]any); by["id"] != sam.String() {
+			t.Fatalf("triggered_by %v, want the retrying person %s", by, sam)
 		}
 		var res authorize.Resource
 		for _, c := range w.j.list() {

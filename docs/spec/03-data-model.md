@@ -1699,7 +1699,7 @@ Purpose: one agent turn; at the same time the live box. Module: `runs`.
 | `triggered_by` | `uuid` | no | | person who triggered |
 | `state` | `text` | no | `'queued'` | `CHECK (state IN ('queued','running','waiting_input','completed','failed','cancelled'))` |
 | `state_reason` | `text` | yes | | reason code from [09-agents.md](09-agents.md), section 5.2, for example `billing_mode_mismatch`, `access_revoked`, `stale`, `user_cancelled`, `channel_read_only`; while `queued` the wait reason of 09 5.2.1 (`invocation_held`, `slots_full`, `thread_busy`) or NULL, cleared by `run.start` (addendum of 2026-11-04, R-AG-41) |
-| `version` | `bigint` | no | `1` | rises with every stored change; basis of the patches |
+| `version` | `bigint` | no | `1` | rises with every stored change; basis of the patches; one exception: setting `agent_session_id` does not raise it and sends no event (the session row announces itself with `agent_session.changed`, the run document shows the column at the next read) |
 | `billing_mode_expected` | `text` | no | | configured mode from `agents.billing_mode` at the last delivery; every delivery sets it anew |
 | `billing_mode_used` | `text` | yes | | reported mode, as reported by the adapter per run |
 | `billing_evidence` | `jsonb` | no | `'{}'` | schema `billing_evidence.v1` from `run.start`: `provider`, `key_type`, `method`; never a value, never a prefix |

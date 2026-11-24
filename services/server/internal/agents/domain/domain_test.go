@@ -154,56 +154,16 @@ func TestBillingPolicyTransitions(t *testing.T) {
 	}
 }
 
-// TestEffectiveToolClass holds 07 section 2.11: chat < scoped < host, the effective class is the
-// higher of target and reported class, a missing report counts as nothing.
-func TestEffectiveToolClass(t *testing.T) {
+// TestOperatorConfigFromStore_IgnoresUnknownKeys (audit srv-agents-6, upgrade.md rule M8): a key a
+// later release stored is ignored on read, so a rollback by one release keeps the lists of agents
+// working; the known keys still count and a write stays strict.
+func TestOperatorConfigFromStore_IgnoresUnknownKeys(t *testing.T) {
 	t.Parallel()
-	cases := []struct{ target, reported, want domain.ToolClass }{
-		{domain.ToolChat, "", domain.ToolChat},
-		{domain.ToolChat, domain.ToolScoped, domain.ToolScoped},
-		{domain.ToolHost, domain.ToolScoped, domain.ToolHost},
-		{domain.ToolScoped, domain.ToolHost, domain.ToolHost},
-		{domain.ToolScoped, domain.ToolScoped, domain.ToolScoped},
+	c, err := domain.OperatorConfigFromStore([]byte(`{"supports_title":false,"supports_future":true}`))
+	if err != nil || c.Allows(domain.CapabilityTitle) || string(c.JSON()) != `{"supports_title":false}` {
+		t.Fatalf("stored config %s, %v", c.JSON(), err)
 	}
-	for _, c := range cases {
-		if got := domain.EffectiveToolClass(c.target, c.reported); got != c.want {
-			t.Errorf("Effective(%s, %s) = %s, want %s", c.target, c.reported, got, c.want)
-		}
-	}
-	if _, err := domain.ParseToolClass("shell"); err == nil {
-		t.Fatal("unknown tool class accepted")
-	}
-	a := domain.NewAgent(ids.New(), "hermes", "", domain.OperatorConfig{})
-	if changed := a.SetToolClass(domain.ToolChat); changed || a.Version != 1 {
-		t.Fatal("the same class must be no change")
-	}
-	if changed := a.SetToolClass(domain.ToolHost); !changed || a.Version != 2 || a.ToolClass != domain.ToolHost {
-		t.Fatalf("SetToolClass = %+v", a)
-	}
-}
-
-// TestPresenceView holds the presence part of Agent (brief "Record and representation"):
-// billing_mode_matches is false only when a reported mode exists and differs.
-func TestPresenceView(t *testing.T) {
-	t.Parallel()
-	a := domain.NewAgent(ids.New(), "hermes", "", domain.OperatorConfig{})
-	if p := a.Presence(); p.State != domain.RuntimeUnknown || !p.BillingModeMatches || p.ReportedBillingMode != "" {
-		t.Fatalf("presence without heartbeat %+v", p)
-	}
-	a.Reported = domain.Reported{BillingMode: domain.Personal, ToolClass: domain.ToolScoped, State: domain.RuntimeOnline,
-		BillingModesSupported: []domain.BillingMode{domain.Organization, domain.Personal}}
-	if p := a.Presence(); p.BillingModeMatches || p.State != domain.RuntimeOnline || len(p.BillingModesSupported) != 2 {
-		t.Fatalf("presence with a differing mode %+v", p)
-	}
-	a.Reported.BillingMode = domain.Organization
-	if p := a.Presence(); !p.BillingModeMatches {
-		t.Fatalf("presence with the same mode %+v", p)
-	}
-	if got := a.EffectiveToolClass(); got != domain.ToolScoped {
-		t.Fatalf("effective class %s", got)
-	}
-	if d, err := domain.ReportedDetailsFromStore([]byte(`{"billing_modes_supported":["personal","bogus"],"capabilities":{}}`)); err != nil ||
-		len(d) != 1 || d[0] != domain.Personal {
-		t.Fatalf("details %v, %v", d, err)
+	if _, err := domain.ParseOperatorConfig(map[string]any{"supports_future": true}); err == nil {
+		t.Fatal("a write accepted an unknown key")
 	}
 }

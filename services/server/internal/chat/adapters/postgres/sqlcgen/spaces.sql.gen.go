@@ -63,7 +63,7 @@ SELECT id, name, icon, color, sort_key, default_operator_agent_id, created_by, c
 
 // SPDX-License-Identifier: Apache-2.0
 // Queries on spaces (chat module, M1-52; docs/spec/03-data-model.md section 4.5). Only this
-// module reads and writes the table (03 Grundsatz 12). Orders are sort_key (COLLATE "C" from the
+// module reads and writes the table (03 principle 12). Orders are sort_key (COLLATE "C" from the
 // column), then id.
 // One space for authorize resolution and for a resource authorize checks next (07 section 7.4
 // rule 1, exception list).
@@ -235,25 +235,28 @@ func (q *Queries) MoveSpace(ctx context.Context, arg MoveSpaceParams) error {
 
 const saveSpaceDeletion = `-- name: SaveSpaceDeletion :exec
 UPDATE spaces
-SET archived_at = $1, deleted_at = $2, deleted_by = $3, version = $4
-WHERE id = $5
+SET archived_at = $1, deleted_at = $2, deleted_by = $3, sort_key = $4,
+    version = $5
+WHERE id = $6
 `
 
 type SaveSpaceDeletionParams struct {
 	ArchivedAt pgtype.Timestamptz
 	DeletedAt  pgtype.Timestamptz
 	DeletedBy  pgtype.UUID
+	SortKey    string
 	Version    int64
 	ID         pgtype.UUID
 }
 
 // Writes a delete or restore of space.delete and space.restore (D-DEL-2): the archive time, the
-// deletion and the version.
+// deletion, the sort key (a restore may move it, audit srv-chat-1) and the version.
 func (q *Queries) SaveSpaceDeletion(ctx context.Context, arg SaveSpaceDeletionParams) error {
 	_, err := q.db.Exec(ctx, saveSpaceDeletion,
 		arg.ArchivedAt,
 		arg.DeletedAt,
 		arg.DeletedBy,
+		arg.SortKey,
 		arg.Version,
 		arg.ID,
 	)

@@ -234,6 +234,13 @@ func TestReferenceVerifier_AcceptsValidToken(t *testing.T) {
 	if _, err := v.Check(context.Background(), e.issue(t, g), runstest.ReferenceExpectation{CommandID: g.CommandID, ThreadID: g.ThreadID}); err != nil {
 		t.Fatalf("autocomplete: %v", err)
 	}
+	// A wake token (a wake run or agent.wake_input, AR-04) passes with its wake-up and carries it.
+	g = e.grant
+	g.TriggerKind, g.MessageID, g.WakeID = domain.TriggerWake, ids.ID{}, ids.New()
+	c, err = v.Check(context.Background(), e.issue(t, g), runstest.ReferenceExpectation{RunID: g.RunID, ThreadID: g.ThreadID, WakeID: g.WakeID})
+	if err != nil || c.WakeID != g.WakeID.String() {
+		t.Fatalf("wake: %+v %v", c, err)
+	}
 }
 
 func TestNewReferenceVerifier_RequiresOptions(t *testing.T) {
@@ -363,6 +370,11 @@ func TestReferenceVerifier_Points(t *testing.T) {
 			x := full
 			x.MessageID = ids.New()
 			return e.issue(t, e.grant), x
+		},
+		"wake_id of a wake token": func() (string, runstest.ReferenceExpectation) {
+			g := e.grant
+			g.TriggerKind, g.MessageID, g.WakeID = domain.TriggerWake, ids.ID{}, ids.New()
+			return e.issue(t, g), runstest.ReferenceExpectation{RunID: g.RunID, ThreadID: g.ThreadID, WakeID: ids.New()}
 		},
 		"iat in the future": func() (string, runstest.ReferenceExpectation) {
 			return e.resign(t, e.issue(t, e.grant), func(m map[string]any) {

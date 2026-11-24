@@ -11,6 +11,11 @@ FROM unnest(@principal_ids::uuid[]) AS p;
 -- The resolved principals of a message, sorted (Message.mention_ids).
 SELECT principal_id FROM mentions WHERE message_id = @message_id ORDER BY principal_id;
 
+-- name: ListMentionsOfMessages :many
+-- The resolved principals of several messages in one statement, sorted by message and principal
+-- (the mention_ids of one page of a list; the primary key serves it).
+SELECT message_id, principal_id FROM mentions WHERE message_id = ANY(@message_ids::uuid[]) ORDER BY message_id, principal_id;
+
 -- name: ListMyMentions :many
 -- One page of the mentions of a principal in visible channels without tombstones, newest first
 -- (brief M1-60 note 2): keyset (mn.created_at DESC, mn.message_id DESC) after the cursor, index

@@ -30,8 +30,8 @@ func Register(r *authorize.Registry) {
 }
 
 // SpaceArchived is the in-transaction event of space.archive (02 section 4.3): published inside
-// the unit of work that archives the space. No module subscribes in M1; notify drops the
-// notification preferences of the space in M3.
+// the unit of work that archives the space. notify subscribes and drops the notification
+// preferences of the space (M3-18).
 type SpaceArchived struct {
 	// SpaceID is the archived space.
 	SpaceID ids.ID

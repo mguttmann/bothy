@@ -17,7 +17,8 @@ class MessageUpdate:
     `MessageCreate`.
 
         Attributes:
-            content_md (str | Unset):
+            content_md (str | Unset): Empty or white space only content is allowed only when the message has at least one
+                attachment (removing the caption); otherwise `400 validation_failed` with `errors[].code` `empty`.
             mention_ids (list[UUID] | Unset):
     """
 

@@ -212,16 +212,6 @@ func CommandInvokedPayload(in CommandInvokedInput) ([]byte, error) {
 	})
 }
 
-// InvokedRunID reads run_id of a CommandInvokedPayload; zero when absent (the delivery of
-// command.invoked, design note 13 a). Errors: a payload that is not the schema.
-func InvokedRunID(payload []byte) (ids.ID, error) {
-	p, err := invokedOf(payload)
-	if err != nil || p.RunID == "" {
-		return ids.ID{}, err
-	}
-	return ids.Parse(p.RunID)
-}
-
 // InvokedFacts are the members of a CommandInvokedPayload a delivery reads.
 type InvokedFacts struct {
 	CommandID, ThreadID, RunID, InvokedBy ids.ID

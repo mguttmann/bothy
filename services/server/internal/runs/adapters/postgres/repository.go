@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package postgres is the PostgreSQL adapter of the runs module (M2-05): the sqlc queries of runs
-// and run_steps in queries/, the generated code in sqlcgen/ and Repository, which implements
-// app.Repository over both tables (docs/spec/03-data-model.md section 4.8). Only this package runs
+// Package postgres is the PostgreSQL adapter of the runs module (M2-05): the sqlc queries of the
+// tables of runs (runs, run_steps, run_followups, message_components, interactions, run_wakes,
+// run_autonomy, the team tables, run_feeders and run_answers) in queries/, the generated code in
+// sqlcgen/ and Repository, which implements app.Repository and the other store ports of app over
+// them (docs/spec/03-data-model.md section 4.8). Only this package runs
 // SQL on them (03 Grundsatz 12). The tables have no channel_id; every read follows the visibility
 // rule of docs/DECISIONS.md D-M2-05-9, which tools/lint/sql_visibility.yaml records per query.
 //

@@ -16,8 +16,8 @@ import (
 	agentsmetrics "github.com/OWNER/bothy/services/server/internal/agents/adapters/otelmetrics"
 	agentspg "github.com/OWNER/bothy/services/server/internal/agents/adapters/postgres"
 	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
-	"github.com/OWNER/bothy/services/server/internal/agents/domain"
 	"github.com/OWNER/bothy/services/server/internal/authz/adapters/fake"
+	azdomain "github.com/OWNER/bothy/services/server/internal/authz/domain"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -308,14 +308,14 @@ func TestReportedToolClassImmediateAndOnlyRaises(t *testing.T) {
 	if err != nil || !ok || pol.ReportedToolClass != "host" || pol.ToolClass != "chat" || w.permissionVersion() != pv {
 		t.Fatalf("policy %+v %v %v, permission_version %d -> %d", pol, ok, err, pv, w.permissionVersion())
 	}
-	if c := domain.EffectiveToolClass(domain.ToolClass(pol.ToolClass), domain.ToolClass(pol.ReportedToolClass)); c != domain.ToolHost {
+	if c := azdomain.EffectiveToolClass(pol.ToolClass, pol.ReportedToolClass); c != "host" {
 		t.Fatalf("effective class %s", c)
 	}
 	w.wantOK(w.do("owner", http.MethodPut, "/api/v1/agents/"+agent.String()+"/tool-class", `{"tool_class":"host","reason":"Shell work"}`,
 		ifMatch(w.agentVersion(agent))...))
 	w.beatOK("support-agent", `{"state":"online","reported_tool_class":"chat"}`)
 	pol, _, _ = policies.AgentPolicy(context.Background(), agent)
-	if c := domain.EffectiveToolClass(domain.ToolClass(pol.ToolClass), domain.ToolClass(pol.ReportedToolClass)); c != domain.ToolHost || pol.ReportedToolClass != "chat" {
+	if c := azdomain.EffectiveToolClass(pol.ToolClass, pol.ReportedToolClass); c != "host" || pol.ReportedToolClass != "chat" {
 		t.Fatalf("policy %+v, effective %s", pol, c)
 	}
 }

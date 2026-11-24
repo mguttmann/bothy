@@ -93,9 +93,12 @@ def sync_detailed(
     `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
     hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
     Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
-    `search.query_max_chars` or without a term is `400 validation_failed`; more than
-    `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
-    `503 unavailable` with reason `search_timeout`.
+    `search.query_max_chars` or without a term is `400 validation_failed`, as is an earlier
+    question in `history` longer than `search.query_max_chars` (`too_long` on
+    `/history/<i>/q`); more than `search.assist.max_turns` turns in `history` is
+    `too_many_items`. A statement timeout is `503 unavailable` with reason `search_timeout`;
+    when only the second search with the assistant's terms fails, the answer keeps the picks
+    and the hits of the first search.
 
     Args:
         body (SearchAssistQuery): One question to the search assistant (14, 4.10).
@@ -134,9 +137,12 @@ def sync(
     `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
     hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
     Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
-    `search.query_max_chars` or without a term is `400 validation_failed`; more than
-    `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
-    `503 unavailable` with reason `search_timeout`.
+    `search.query_max_chars` or without a term is `400 validation_failed`, as is an earlier
+    question in `history` longer than `search.query_max_chars` (`too_long` on
+    `/history/<i>/q`); more than `search.assist.max_turns` turns in `history` is
+    `too_many_items`. A statement timeout is `503 unavailable` with reason `search_timeout`;
+    when only the second search with the assistant's terms fails, the answer keeps the picks
+    and the hits of the first search.
 
     Args:
         body (SearchAssistQuery): One question to the search assistant (14, 4.10).
@@ -170,9 +176,12 @@ async def asyncio_detailed(
     `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
     hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
     Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
-    `search.query_max_chars` or without a term is `400 validation_failed`; more than
-    `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
-    `503 unavailable` with reason `search_timeout`.
+    `search.query_max_chars` or without a term is `400 validation_failed`, as is an earlier
+    question in `history` longer than `search.query_max_chars` (`too_long` on
+    `/history/<i>/q`); more than `search.assist.max_turns` turns in `history` is
+    `too_many_items`. A statement timeout is `503 unavailable` with reason `search_timeout`;
+    when only the second search with the assistant's terms fails, the answer keeps the picks
+    and the hits of the first search.
 
     Args:
         body (SearchAssistQuery): One question to the search assistant (14, 4.10).
@@ -209,9 +218,12 @@ async def asyncio(
     `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
     hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
     Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
-    `search.query_max_chars` or without a term is `400 validation_failed`; more than
-    `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
-    `503 unavailable` with reason `search_timeout`.
+    `search.query_max_chars` or without a term is `400 validation_failed`, as is an earlier
+    question in `history` longer than `search.query_max_chars` (`too_long` on
+    `/history/<i>/q`); more than `search.assist.max_turns` turns in `history` is
+    `too_many_items`. A statement timeout is `503 unavailable` with reason `search_timeout`;
+    when only the second search with the assistant's terms fails, the answer keeps the picks
+    and the hits of the first search.
 
     Args:
         body (SearchAssistQuery): One question to the search assistant (14, 4.10).

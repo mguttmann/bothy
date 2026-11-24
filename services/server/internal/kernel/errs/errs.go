@@ -15,6 +15,7 @@
 package errs
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -386,6 +387,24 @@ func KindOf(err error) Kind {
 		return e.Kind()
 	}
 	return KindInternal
+}
+
+// Type returns the class of err for the log attribute error.type, never its text: the SQLSTATE of
+// a database error, timeout for an ended deadline, canceled, or the kind of an Error (internal for
+// any other error); "" for nil.
+func Type(err error) string {
+	var pgErr interface{ SQLState() string }
+	switch {
+	case err == nil:
+		return ""
+	case errors.As(err, &pgErr):
+		return pgErr.SQLState()
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	}
+	return KindOf(err).String()
 }
 
 // ProblemExtender is implemented by errors that carry extension members of the problem body

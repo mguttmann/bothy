@@ -279,7 +279,7 @@ func (s *Service) View(ctx context.Context, threadID ids.ID) (chat.Thread, error
 // threadUnit runs fn for the thread id in one unit of work: act on the thread (an invisible
 // thread is 404), the row lock, then fn, which changes the locked thread and reports whether it
 // did. A change is saved and appends the event typ (brief D9); no change appends nothing (06
-// section 2 "Ohne Wirkung").
+// section 2 "No effect").
 func (s *Service) threadUnit(ctx context.Context, a actor.Actor, act authorize.Action, id ids.ID, typ authorize.EventType,
 	fn func(ctx context.Context, th *domain.Thread, c ChannelRow) (bool, error)) (chat.Thread, error) {
 	ctx, err := withCaller(ctx, a)

@@ -331,7 +331,12 @@ func (c *Coordinator) channelSet(ctx context.Context, scope authorize.Scope, r s
 		if err != nil {
 			return nil, err
 		}
-		out = slices.DeleteFunc(out, func(id ids.ID) bool { return !slices.Contains(inSpaces, id) })
+		// A set, so the cut costs the number of channels and not its square.
+		in := make(map[ids.ID]bool, len(inSpaces))
+		for _, id := range inSpaces {
+			in[id] = true
+		}
+		out = slices.DeleteFunc(out, func(id ids.ID) bool { return !in[id] })
 	}
 	return out, nil
 }
@@ -339,8 +344,10 @@ func (c *Coordinator) channelSet(ctx context.Context, scope authorize.Scope, r s
 // pageCheck is design note 8: in a fresh request scope in filter mode, one Scope of read, then for
 // each hit its channel in that scope (a miss is a revocation that raced the query: dropped
 // silently) and authorize (a refusal is a mismatch between SQL filter and authorize: dropped,
-// logged without ids and counted as filter_mismatch). It returns the kept hits in order and the
-// fresh scope.
+// logged without ids and counted as filter_mismatch). A refused hit whose thread is no longer a
+// live thread of its channel is dropped silently too: authorize answers not_found for a deleted
+// thread (D-DEL-SRV-1), while its messages and files stay rows of the SQL filter until the purge.
+// It returns the kept hits in order and the fresh scope.
 func pageCheck[H any](ctx context.Context, c *Coordinator, p actor.Actor, read authorize.Action, hits []H,
 	describe func(H) (ids.ID, authorize.Resource)) ([]H, authorize.Scope, error) {
 	fctx := authorize.Filter(authorize.WithRequestScope(authorize.WithoutRequestScope(ctx)))
@@ -359,12 +366,35 @@ func pageCheck[H any](ctx context.Context, c *Coordinator, p actor.Actor, read a
 			return nil, authorize.Scope{}, err
 		}
 		if !d.Allowed() {
-			c.filterMismatch(ctx, read)
+			gone, err := c.threadGone(ctx, channel, res)
+			if err != nil {
+				return nil, authorize.Scope{}, err
+			}
+			if !gone {
+				c.filterMismatch(ctx, read)
+			}
 			continue
 		}
 		kept = append(kept, h)
 	}
 	return kept, fresh, nil
+}
+
+// threadGone reports whether the thread of the refused resource res is no longer a live thread of
+// channel (deleted, or moved since the query). It reads only for a refusal, which is rare.
+func (c *Coordinator) threadGone(ctx context.Context, channel ids.ID, res authorize.Resource) (bool, error) {
+	thread := res.ThreadID
+	if res.Kind == authorize.ResourceThread {
+		thread = res.ID
+	}
+	if thread.IsZero() {
+		return false, nil
+	}
+	live, err := c.d.Structure.HitThreads(ctx, []ids.ID{thread}, []ids.ID{channel})
+	if err != nil {
+		return false, err
+	}
+	return len(live) == 0, nil
 }
 
 // compareIDs orders ids like Scope.ChannelIDs (ascending bytes).

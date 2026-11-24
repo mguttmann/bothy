@@ -119,14 +119,14 @@ func InvocationBearingTypes() []string {
 
 // The deny reasons of authorize (07 4.1) the delivery maps to their own run reason.
 const (
-	denyBillingPersonal  = "billing_mode_personal_not_holder"
-	denyToolClass        = "tool_class_owner_only"
-	denyProjectNotReady  = "project_not_ready"
-	denyCannotServe      = "operator_cannot_serve_project"
-	denyChannelReadOnly  = "channel_read_only"
-	denyChannelArchived  = "channel_archived"
-	denyPrincipalInactve = "principal_inactive"
-	denyNotReachable     = "agent_not_reachable"
+	denyBillingPersonal   = "billing_mode_personal_not_holder"
+	denyToolClass         = "tool_class_owner_only"
+	denyProjectNotReady   = "project_not_ready"
+	denyCannotServe       = "operator_cannot_serve_project"
+	denyChannelReadOnly   = "channel_read_only"
+	denyChannelArchived   = "channel_archived"
+	denyPrincipalInactive = "principal_inactive"
+	denyNotReachable      = "agent_not_reachable"
 )
 
 // DeliveryReason maps the reason of a denial of agent.invoke before a delivery to the code of
@@ -151,7 +151,7 @@ func DeliveryReason(authzReason string, agentActive bool) string {
 		return RunReasonProjectNotReady
 	case denyChannelReadOnly, denyChannelArchived:
 		return RunReasonChannelReadOnly
-	case denyPrincipalInactve:
+	case denyPrincipalInactive:
 		return RunReasonUserDisabled
 	case denyNotReachable:
 		if !agentActive {

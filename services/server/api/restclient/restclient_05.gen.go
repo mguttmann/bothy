@@ -9,6 +9,39 @@ import (
 	"net/http"
 )
 
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r AddReactionResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
+func (r AddReactionResponse) GetApplicationproblemJSON410() *Gone {
+	return r.ApplicationproblemJSON410
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r AddReactionResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r AddReactionResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r AddReactionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r AddReactionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
 // StatusCode returns HTTPResponse.StatusCode
 func (r AddReactionResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
@@ -22915,19 +22948,4 @@ func (c *ClientWithResponses) AddReactionWithResponse(ctx context.Context, messa
 		return nil, err
 	}
 	return ParseAddReactionResponse(rsp)
-}
-
-// RetriggerMessageWithResponse Trigger a failed message again
-//
-// Runs the trigger decision (09 3.4) again for an own message whose `trigger_state` is `failed` with `trigger_state_reason` `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel`, after the cause was fixed (a runner set as operator, a folder created), so the person does not have to write the message again (09 3.7, addendum of 2026-11-04). Only the author may do this (`403 forbidden` with `reason` `not_self` otherwise); a message that is not readable is `404`; another state or reason, or a deleted message, is `409 invalid_state_transition`. When the message's thread is a thread whose fixed operator is not the channel's effective operator and never completed a run in it, the thread takes the channel's effective operator first (an exception to R-DM-12, recorded as `thread.updated`). A caller without `trigger` on the thread (`agent.invoke` in filter mode with the thread's operator refuses with `level_insufficient` or `no_grant`) gets `403 agent_invocation_denied`. Then the acceptance runs as for a new message: `agent.invoke` in request mode for the caller (authz audits a denial), and the message's `trigger_state` and `trigger_state_reason` follow it (`received` and a queued run, or `failed` with the reason of now). The answer is the message after the decision. Repeating the request after a successful retrigger answers `409 invalid_state_transition`, because the message is no longer `failed`.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /messages/{message_id}/retrigger (the `RetriggerMessage` operationId).
-func (c *ClientWithResponses) RetriggerMessageWithResponse(ctx context.Context, messageId MessageIdPath, params *RetriggerMessageParams, reqEditors ...RequestEditorFn) (*RetriggerMessageResponse, error) {
-	rsp, err := c.RetriggerMessage(ctx, messageId, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseRetriggerMessageResponse(rsp)
 }

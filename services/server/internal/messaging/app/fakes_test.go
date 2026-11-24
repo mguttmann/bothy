@@ -14,6 +14,10 @@ import (
 // (M1-59), every other method is the nil app.Store and panics when called.
 type bareStore struct{ app.Store }
 
+func (bareStore) MentionsOfMessages(context.Context, []ids.ID) (map[ids.ID][]ids.ID, error) {
+	return map[ids.ID][]ids.ID{}, nil
+}
+
 func (bareStore) ReactionGroups(context.Context, []ids.ID, []ids.ID) (map[ids.ID][]domain.ReactionGroup, error) {
 	return map[ids.ID][]domain.ReactionGroup{}, nil
 }

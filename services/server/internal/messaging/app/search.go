@@ -52,18 +52,17 @@ func (s *Service) HitMessages(ctx context.Context, messageIDs, channelIDs []ids.
 	for _, m := range rows {
 		byID[m.ID] = m
 	}
-	authors := map[ids.ID]messaging.PrincipalRef{}
+	ordered := make([]domain.Message, 0, len(rows))
 	for _, id := range messageIDs {
 		m, ok := byID[id]
 		if !ok {
 			continue
 		}
 		delete(byID, id)
-		v, err := s.listed(ctx, m, authors)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, v)
+		ordered = append(ordered, m)
+	}
+	if out, err = s.listed(ctx, ordered, map[ids.ID]messaging.PrincipalRef{}); err != nil {
+		return nil, err
 	}
 	if err := s.decorate(ctx, channelIDs, out); err != nil {
 		return nil, err

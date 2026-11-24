@@ -110,7 +110,7 @@ func (s *Service) recordChannel(ctx context.Context, act authorize.Action, id id
 	})
 }
 
-// noChangeChannel records a call on a channel without effect (06 section 2 "Ohne Wirkung").
+// noChangeChannel records a call on a channel without effect (06 section 2 "No effect").
 func (s *Service) noChangeChannel(ctx context.Context, act authorize.Action, id ids.ID, attrs auditing.Attrs) error {
 	if attrs == nil {
 		attrs = auditing.Attrs{}
@@ -518,6 +518,7 @@ type channelJSON struct {
 	ForumDefaultSort         string       `json:"forum_default_sort,omitempty"`
 	DefaultNotificationLevel string       `json:"default_notification_level,omitempty"`
 	ReadOnly                 bool         `json:"read_only"`
+	AllowAutonomousRuns      bool         `json:"allow_autonomous_runs"`
 	ProjectBound             bool         `json:"project_bound"`
 	MainThreadID             string       `json:"main_thread_id,omitempty"`
 	ArchivedAt               string       `json:"archived_at,omitempty"`
@@ -534,7 +535,7 @@ func channelBody(c ChannelRow) channelJSON {
 		ID: d.ID.String(), SpaceID: optionalID(d.SpaceID), Kind: d.Kind, Name: d.Name, Topic: d.Topic, SortKey: d.SortKey,
 		Operator:         operatorJSON{Mode: d.Operator.Mode, AgentID: optionalID(d.Operator.AgentID), EffectiveAgentID: optionalID(d.Operator.EffectiveAgentID)},
 		ForumDefaultSort: d.ForumDefaultSort, DefaultNotificationLevel: d.DefaultNotificationLevel, ReadOnly: d.ReadOnly,
-		ProjectBound: d.ProjectBound, MainThreadID: optionalID(d.MainThreadID), ArchivedAt: stamp(d.ArchivedAt), Version: d.Version,
+		AllowAutonomousRuns: d.AllowAutonomousRuns, ProjectBound: d.ProjectBound, MainThreadID: optionalID(d.MainThreadID), ArchivedAt: stamp(d.ArchivedAt), Version: d.Version,
 		SettingsVersion: d.SettingsVersion, CreatedAt: stamp(d.CreatedAt), DeletedAt: stamp(d.DeletedAt),
 	}
 }

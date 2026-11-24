@@ -22,9 +22,9 @@ import (
 // spaces, channels, threads and project_bindings (implemented by adapters/postgres). Writes run
 // only inside a unit of work. Errors are kernel/errs errors without SQL text or values.
 type DeletionStore interface {
-	// SaveSpaceDeletion writes archived_at, deleted_at, deleted_by and version of sp.
+	// SaveSpaceDeletion writes archived_at, deleted_at, deleted_by, sort_key and version of sp.
 	SaveSpaceDeletion(ctx context.Context, sp domain.Space) error
-	// SaveChannelDeletion writes archived_at, deleted_at, deleted_by and version of c.
+	// SaveChannelDeletion writes archived_at, deleted_at, deleted_by, sort_key and version of c.
 	SaveChannelDeletion(ctx context.Context, c domain.Channel) error
 	// SaveThreadDeletion writes deleted_at, deleted_by and version of th.
 	SaveThreadDeletion(ctx context.Context, th domain.Thread) error
@@ -232,6 +232,10 @@ func (s *Service) RestoreSpace(ctx context.Context, a actor.Actor, id ids.ID) (c
 
 // restoreSpaceWrite is the second unit of RestoreSpace.
 func (s *Service) restoreSpaceWrite(ctx context.Context, st DeletionStore, id ids.ID) (domain.Space, error) {
+	order, err := s.lockOrder(ctx)
+	if err != nil {
+		return domain.Space{}, err
+	}
 	sp, err := s.lock(ctx, id)
 	if err != nil {
 		return domain.Space{}, err
@@ -241,6 +245,15 @@ func (s *Service) restoreSpaceWrite(ctx context.Context, st DeletionStore, id id
 	}
 	if err := sp.Deletion.CheckRestore(s.now(), s.window()); err != nil {
 		return domain.Space{}, err
+	}
+	// A space created at the deleted one's place during the undo window took its sort key; the
+	// restored space goes right after it with a free key (audit srv-chat-1).
+	if i := slices.IndexFunc(order, func(k SpaceKey) bool { return k.SortKey == sp.SortKey }); i >= 0 {
+		key, err := between(order, i)
+		if err != nil {
+			return domain.Space{}, err
+		}
+		sp.Move(key)
 	}
 	sp.Restore()
 	if err := st.SaveSpaceDeletion(ctx, sp); err != nil {
@@ -457,8 +470,12 @@ func (s *Service) checkChannelRestore(ctx context.Context, c ChannelRow) error {
 	return nil
 }
 
-// restoreChannelWrite is the second unit of RestoreChannel.
+// restoreChannelWrite is the second unit of RestoreChannel. Like moveChannel it takes the space
+// row, the lock of the channel order, before the channel row.
 func (s *Service) restoreChannelWrite(ctx context.Context, st DeletionStore, id ids.ID) (ChannelRow, error) {
+	if err := s.lockOrderOfChannel(ctx, id); err != nil {
+		return ChannelRow{}, err
+	}
 	c, err := s.lockChannel(ctx, id)
 	if err != nil {
 		return ChannelRow{}, err
@@ -467,6 +484,9 @@ func (s *Service) restoreChannelWrite(ctx context.Context, st DeletionStore, id 
 		return c, s.noChangeChannel(ctx, authorize.ActionChannelRestore, id, nil)
 	}
 	if err := s.checkChannelRestore(ctx, c); err != nil {
+		return ChannelRow{}, err
+	}
+	if err := s.freeChannelKey(ctx, &c.Channel); err != nil {
 		return ChannelRow{}, err
 	}
 	b, bound, err := st.LockBindingTrash(ctx, id)
@@ -487,6 +507,41 @@ func (s *Service) restoreChannelWrite(ctx context.Context, st DeletionStore, id 
 		return ChannelRow{}, err
 	}
 	return c, s.emitChannel(ctx, authorize.EventChannelUpdated, c)
+}
+
+// lockOrderOfChannel locks the space row of channel id, the lock of its channel order; a dm
+// channel or an unknown id takes no lock (lockChannel answers the unknown id).
+func (s *Service) lockOrderOfChannel(ctx context.Context, id ids.ID) error {
+	pre, found, err := s.d.Store.Channel(ctx, id)
+	if err != nil || !found || pre.Channel.SpaceID.IsZero() {
+		return err
+	}
+	_, err = s.lock(ctx, pre.Channel.SpaceID)
+	return err
+}
+
+// freeChannelKey gives the channel c, restored under its space's lock, a free sort key right after
+// a live sibling that took its key during the undo window (audit srv-chat-1); a dm channel has no
+// order.
+func (s *Service) freeChannelKey(ctx context.Context, c *domain.Channel) error {
+	if c.SpaceID.IsZero() {
+		return nil
+	}
+	order, err := s.d.Store.ChannelOrder(ctx, c.SpaceID)
+	if err != nil {
+		return err
+	}
+	order = slices.DeleteFunc(order, func(k domain.Keyed) bool { return k.ID == c.ID })
+	i := slices.IndexFunc(order, func(k domain.Keyed) bool { return k.SortKey == c.SortKey })
+	if i < 0 {
+		return nil
+	}
+	key, err := domain.KeyAt(order, i)
+	if err != nil {
+		return err
+	}
+	c.Move(key)
+	return nil
 }
 
 // ChannelDeletion implements chat.Deletions: channel.read, also on a deleted channel.

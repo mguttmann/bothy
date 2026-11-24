@@ -17,13 +17,14 @@ func TestRegister_Events(t *testing.T) {
 	r := authorize.NewRegistry()
 	runs.Register(r)
 	ev := r.Events()
-	// AR-04 adds agent.wake_input and run.wake_changed.
-	if len(ev) != 8 || ev[0].Module != "runs" || ev[0].Type != authorize.EventAgentInvocation ||
-		ev[1].Type != authorize.EventAgentWakeInput ||
-		ev[2].Module != "runs" || ev[2].Type != authorize.EventCommandAutocompleteRequested ||
-		ev[3].Module != "runs" || ev[3].Type != authorize.EventCommandInvoked ||
-		ev[4].Type != authorize.EventInteractionCreated || ev[5].Type != authorize.EventRunCancelRequested ||
-		ev[6].Type != authorize.EventRunStateChanged || ev[7].Type != authorize.EventRunWakeChanged {
+	// AR-04 adds agent.wake_input and run.wake_changed; agent.followup (M2-11) is emitted by the
+	// follow-ups and declared too (audit srv-runs-core-8).
+	if len(ev) != 9 || ev[0].Module != "runs" || ev[0].Type != authorize.EventAgentFollowup ||
+		ev[1].Type != authorize.EventAgentInvocation || ev[2].Type != authorize.EventAgentWakeInput ||
+		ev[3].Module != "runs" || ev[3].Type != authorize.EventCommandAutocompleteRequested ||
+		ev[4].Module != "runs" || ev[4].Type != authorize.EventCommandInvoked ||
+		ev[5].Type != authorize.EventInteractionCreated || ev[6].Type != authorize.EventRunCancelRequested ||
+		ev[7].Type != authorize.EventRunStateChanged || ev[8].Type != authorize.EventRunWakeChanged {
 		t.Fatalf("events %+v", ev)
 	}
 	// M2-17 and M2-10: runs serves the gateway ops command.autocomplete_result and run.update.

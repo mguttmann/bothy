@@ -251,7 +251,9 @@ transaction, and a run that stops anywhere is resumed by the next.
 - Synced personal order rows stay, so an undo restores the person's arrangement.
 - Not covered by the purge: the stored payloads of `thread.created` and `thread.updated` keep the
   former title until `sync.event_retention`, and drafts of the item stay until their owner
-  deletes them or the account is erased (recorded in the decisions of the ticket).
+  deletes them or the account is erased (recorded in the decisions of the ticket). Deleting a
+  draft, also through sending it or the erasure of the account, blanks `content_md` of its stored
+  `draft.updated` events in the same transaction.
 - Not covered by any deletion path: the texts of a run. `runs.status_line`, `last_text_excerpt`,
   `summary` and `plan`, the titles and details of `run_steps` and the label, condition and
   result of `run_wakes` stay in their rows after this purge, after a content period (4.1), after
@@ -516,6 +518,11 @@ The owner rectifies other data; a `rectification` request documents that.
   messages (03, `channels`) and authors as handle and kind, no email addresses.
 - Personal mode (`billing_mode = personal`): the person uses their own subscription for their own
   purposes; the product stores no credentials (baseline I5).
+- Search assistant (14 4.10): when `search.assist.agent_id` names an agent, a question to the
+  assistant sends the question, the earlier questions of the popup and, per candidate the agent may
+  read itself, the thread title, channel and space name, a time and an excerpt to that agent and so
+  to its LLM provider. Nothing of it is stored on the server. The instance operator names this flow
+  in the information for data subjects like the other agent flows of this section.
 
 ## 7. Telemetry
 

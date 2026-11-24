@@ -31,6 +31,7 @@ type fakeSearch struct {
 	messages map[string][]search.ResultHit
 	asked    []search.Request
 	err      error
+	failOn   map[string]error // by query text
 }
 
 func (f *fakeSearch) Query(_ context.Context, _ actor.Actor, r search.Request) (search.Result, error) {
@@ -39,6 +40,9 @@ func (f *fakeSearch) Query(_ context.Context, _ actor.Actor, r search.Request) (
 	f.asked = append(f.asked, r)
 	if f.err != nil {
 		return search.Result{}, f.err
+	}
+	if err := f.failOn[r.Q]; err != nil {
+		return search.Result{}, err
 	}
 	src := f.messages
 	if r.Type == search.TypeThreads {
@@ -268,6 +272,7 @@ func TestAssist_ValidatesTheQuestion(t *testing.T) {
 		{search.AssistRequest{Q: strings.Repeat("x", 257)}, "too_long", "/q"},
 		{search.AssistRequest{Q: "the of and"}, "empty", "/q"},
 		{search.AssistRequest{Q: "larkspur", History: make([]search.AssistTurn, 4)}, "too_many_items", "/history"},
+		{search.AssistRequest{Q: "larkspur", History: []search.AssistTurn{{Q: "takeover"}, {Q: strings.Repeat("x", 257)}}}, "too_long", "/history/1/q"},
 	} {
 		_, err := e.as.Assist(ctx, e.alex, tc.r)
 		code, pointer := field(t, err)
@@ -366,6 +371,33 @@ func TestAssist_TermsOfTheAssistantRunASecondPass(t *testing.T) {
 	}
 	if res.Cost == nil || res.Cost.AmountMicros != 1500 || res.Cost.Currency != "USD" {
 		t.Fatalf("cost %+v", res.Cost)
+	}
+}
+
+// TestAssist_FailedSecondPassKeepsTheAnswer (audit fn-search-5): a second pass that fails (here
+// 503 search_timeout) adds no hits, and the person still gets the first pass and the cost of the
+// answer instead of an error that would ask the assistant again.
+func TestAssist_FailedSecondPassKeepsTheAnswer(t *testing.T) {
+	t.Parallel()
+	e := newAssistEnv(t, true)
+	move := ids.New()
+	e.search.messages["umzug or discord"] = []search.ResultHit{messageHit(move, e.general, "Discord bots", "discord bot", day)}
+	e.search.failOn = map[string]error{"migration": errs.New(errs.CodeUnavailable, "timeout").WithReason("search_timeout")}
+	amount := int64(1500)
+	e.relay.answer = func(ev eventlog.EphemeralEvent) {
+		var p struct {
+			RequestID string `json:"request_id"`
+		}
+		_ = json.Unmarshal(raw(ev), &p)
+		_ = e.as.AnswerAssist(context.Background(), e.helper, search.AssistAnswer{RequestID: ids.MustParse(p.RequestID),
+			Terms: []string{"Migration"}, Costs: []search.AssistCostReport{{Provider: "anthropic", Model: "m", Currency: "USD", AmountMicros: &amount}}})
+	}
+	res, err := e.as.Assist(context.Background(), e.alex, search.AssistRequest{Q: "Umzug von Discord"})
+	if err != nil {
+		t.Fatalf("a failed second pass: %v", err)
+	}
+	if res.Mode != search.ModeAssisted || len(res.Hits) != 1 || res.Hits[0].ThreadID != move || res.Cost == nil {
+		t.Fatalf("result %+v", res)
 	}
 }
 

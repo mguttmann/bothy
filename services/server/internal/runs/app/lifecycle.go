@@ -40,9 +40,9 @@ type OpenCmd struct {
 	TriggeringInteractionID ids.ID
 	// TriggeringWakeID is the wake-up of a wake run (09 5.8.3, AR-04); zero otherwise.
 	TriggeringWakeID ids.ID
-	// TriggerKind is message, command or interaction: message needs no command and no
+	// TriggerKind is message, command, interaction, team or wake: message needs no command and no
 	// interaction, command needs TriggeringCommandID and interaction TriggeringInteractionID, each
-	// without a message.
+	// without a message, team needs its input message (09 3.9.2) and wake TriggeringWakeID alone.
 	TriggerKind string
 	// BillingModeExpected is the agent's billing mode now (ruling D-M2-05-5).
 	BillingModeExpected string
@@ -167,7 +167,7 @@ func (s *Service) Open(ctx context.Context, cmd OpenCmd) (runs.RunSummary, error
 	}
 	if !openTrigger(cmd) || cmd.ThreadID.IsZero() || cmd.AgentID.IsZero() || cmd.TriggeredBy.IsZero() {
 		return runs.RunSummary{}, errs.New(errs.CodeInternalError,
-			"runs: Open needs a thread, an agent, a person and a trigger of kind message, command or interaction with its object")
+			"runs: Open needs a thread, an agent, a person and a trigger of a known kind with its object")
 	}
 	row, inserted, err := s.d.Repo.InsertRun(ctx, NewRun{
 		ID: ids.New(), ThreadID: cmd.ThreadID, AgentID: cmd.AgentID, TriggeredBy: cmd.TriggeredBy, TriggerKind: cmd.TriggerKind,

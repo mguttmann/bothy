@@ -140,6 +140,37 @@ func (q *Queries) ListMentions(ctx context.Context, messageID pgtype.UUID) ([]pg
 	return items, nil
 }
 
+const listMentionsOfMessages = `-- name: ListMentionsOfMessages :many
+SELECT message_id, principal_id FROM mentions WHERE message_id = ANY($1::uuid[]) ORDER BY message_id, principal_id
+`
+
+type ListMentionsOfMessagesRow struct {
+	MessageID   pgtype.UUID
+	PrincipalID pgtype.UUID
+}
+
+// The resolved principals of several messages in one statement, sorted by message and principal
+// (the mention_ids of one page of a list; the primary key serves it).
+func (q *Queries) ListMentionsOfMessages(ctx context.Context, messageIds []pgtype.UUID) ([]ListMentionsOfMessagesRow, error) {
+	rows, err := q.db.Query(ctx, listMentionsOfMessages, messageIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMentionsOfMessagesRow
+	for rows.Next() {
+		var i ListMentionsOfMessagesRow
+		if err := rows.Scan(&i.MessageID, &i.PrincipalID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMyMentions = `-- name: ListMyMentions :many
 SELECT m.id, m.thread_id, m.channel_id, m.thread_seq, m.author_principal_id, m.client_msg_id,
     m.client_payload_sha256, m.origin, m.kind, m.system_code, m.content_md, m.content_format,

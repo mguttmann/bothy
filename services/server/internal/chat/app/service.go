@@ -326,7 +326,7 @@ func (s *Service) record(ctx context.Context, act authorize.Action, id ids.ID, a
 	})
 }
 
-// noChange records a call without effect (06 section 2 "Ohne Wirkung") with the reason when given.
+// noChange records a call without effect (06 section 2 "No effect") with the reason when given.
 func (s *Service) noChange(ctx context.Context, act authorize.Action, id ids.ID, reason string) error {
 	attrs := auditing.Attrs{attrNoChange: auditing.Bool(true)}
 	if reason != "" {

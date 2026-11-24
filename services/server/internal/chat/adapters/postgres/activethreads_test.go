@@ -142,12 +142,14 @@ func TestActiveThreads_QueryPlan(t *testing.T) {
 		if n["Relation Name"] == "threads" && n["Node Type"] == "Seq Scan" {
 			t.Fatalf("sequential scan of threads in the plan:\n%s", raw)
 		}
-		if n["Index Name"] == "threads_channel_state_activity_idx" {
+		// Either activity index serves the per-channel read; the one of 00121 also holds the id tie
+		// break, so the planner may prefer it.
+		if n["Index Name"] == "threads_channel_state_activity_idx" || n["Index Name"] == "threads_channel_activity_idx" {
 			usedActivity = true
 		}
 	}
 	if !usedActivity {
-		t.Fatalf("threads_channel_state_activity_idx unused:\n%s", raw)
+		t.Fatalf("no activity index of threads used:\n%s", raw)
 	}
 	t.Logf("plan of ActiveThreads on %d threads: %s", forums*perForum, raw)
 

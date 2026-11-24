@@ -23,8 +23,8 @@ func (s *Service) ContextWindow(ctx context.Context, q messaging.ContextQuery) (
 		return messaging.ContextPage{}, err
 	}
 	out := messaging.ContextPage{Items: make([]messaging.Message, 0, len(rows.Items)), HasOlder: rows.HasOlder}
-	authors := map[ids.ID]messaging.PrincipalRef{}
 	fctx := authorize.Filter(ctx)
+	kept := make([]domain.Message, 0, len(rows.Items))
 	for _, m := range rows.Items {
 		ok, err := s.allowed(fctx, a, authorize.ActionMessageRead, historyResource(m))
 		if err != nil {
@@ -34,11 +34,10 @@ func (s *Service) ContextWindow(ctx context.Context, q messaging.ContextQuery) (
 			s.historyFilterMismatch(ctx)
 			continue
 		}
-		v, err := s.whole(ctx, m, authors)
-		if err != nil {
-			return messaging.ContextPage{}, err
-		}
-		out.Items = append(out.Items, v)
+		kept = append(kept, m)
+	}
+	if out.Items, err = s.views(ctx, kept, map[ids.ID]messaging.PrincipalRef{}); err != nil {
+		return messaging.ContextPage{}, err
 	}
 	return out, nil
 }
@@ -65,20 +64,9 @@ func (s *Service) ContextMessage(ctx context.Context, messageID ids.ID) (messagi
 // whole returns the representation of m with its full content (a tombstone without content);
 // authors caches the authors of one request.
 func (s *Service) whole(ctx context.Context, m domain.Message, authors map[ids.ID]messaging.PrincipalRef) (messaging.Message, error) {
-	author, ok := authors[m.AuthorID]
-	if !ok {
-		var err error
-		if author, err = s.author(ctx, m.AuthorID); err != nil {
-			return messaging.Message{}, err
-		}
-		authors[m.AuthorID] = author
+	out, err := s.views(ctx, []domain.Message{m}, authors)
+	if err != nil {
+		return messaging.Message{}, err
 	}
-	var mentions []ids.ID
-	if m.DeletedAt.IsZero() {
-		var err error
-		if mentions, err = s.d.Store.Mentions(ctx, m.ID); err != nil {
-			return messaging.Message{}, err
-		}
-	}
-	return view(m, author, mentions), nil
+	return out[0], nil
 }

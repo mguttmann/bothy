@@ -220,7 +220,7 @@ extension DeletionWorld on FakeWorld {
             400,
             'validation_failed',
             errors: [
-              {'pointer': '/trash_project_folder', 'code': 'not_project_bound'},
+              {'pointer': '/trash_project_folder', 'code': 'not_allowed'},
             ],
           );
         }

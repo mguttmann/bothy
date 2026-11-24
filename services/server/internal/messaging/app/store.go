@@ -42,6 +42,9 @@ type Store interface {
 	InsertMentions(ctx context.Context, message, thread ids.ID, principals []ids.ID, at time.Time) error
 	// Mentions returns the mentioned principals of message, sorted.
 	Mentions(ctx context.Context, message ids.ID) ([]ids.ID, error)
+	// MentionsOfMessages returns the mentioned principals of each of messages, sorted, in one
+	// read; a message without mentions has no key.
+	MentionsOfMessages(ctx context.Context, messages []ids.ID) (map[ids.ID][]ids.ID, error)
 	// MyMentions returns up to q.Limit mentions of q.PrincipalID in q.Visible without tombstones,
 	// newest first, after the keyset position of q when q.HasAfter.
 	MyMentions(ctx context.Context, q MentionQuery) ([]MentionRow, error)

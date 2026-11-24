@@ -2120,7 +2120,7 @@ def _two_stale_files(root: Path) -> dict[Path, bytes]:
     _edit(root, CHAPTER, *EXTRA_PROBLEM_ROW)
     _edit(root, WEBHOOKS, *STALE_WEBHOOK_ROW)
     with (root / WEBHOOKS).open("a", encoding="utf-8") as stream:
-        stream.write("\nPadding outside the blocks. " * 8000)  # larger than 06, about 230 kB
+        stream.write("\nPadding outside the blocks. " * 16000)  # larger than 06, about 460 kB
     return {rel: (root / rel).read_bytes() for rel in (CHAPTER, WEBHOOKS)}
 
 
@@ -2132,14 +2132,14 @@ def _leftovers(root: Path) -> list[str]:
 
 @pytest.mark.parametrize(
     ("limit", "failing"),
-    [(50_000, CHAPTER), (150_000, WEBHOOKS)],
+    [(50_000, CHAPTER), (300_000, WEBHOOKS)],
     ids=["first-file", "second-file"],
 )
 def test_write_that_fails_part_way_changes_no_file(
     tmp_path: Path, limit: int, failing: Path
 ) -> None:
     # A real write error: the process may not write files larger than `limit` (RLIMIT_FSIZE;
-    # Python ignores SIGXFSZ, so the write fails with EFBIG). 06 is about 113 kB.
+    # Python ignores SIGXFSZ, so the write fails with EFBIG). 06 is about 150 kB.
     resource = pytest.importorskip("resource")
     root = _copy_inputs(tmp_path)
     before = _two_stale_files(root)

@@ -80,7 +80,7 @@ func init() {
 
 // AssistTerms returns the search terms of a question (14 4.10 point 2): the words of q (runs of
 // letters and digits, lower case), without stop words and words shorter than minChars
-// (search.prefix_min_chars), then the earlier terms of the popup, without duplicates, at most
+// (three letters, 14 4.10 point 2), then the earlier terms of the popup, without duplicates, at most
 // maxTerms (search.assist.max_terms). Never nil.
 //
 // Example:

@@ -211,7 +211,8 @@ func (o replacedRow) of(version int64) domain.ReplacedDraft {
 	return out
 }
 
-// DeleteDraft implements app.PersonalStore and app.DraftRows.
+// DeleteDraft implements app.PersonalStore and app.DraftRows; it also blanks the text of the
+// stored draft.updated events of the deleted draft (redactDrafts).
 func (r *PersonalRepository) DeleteDraft(ctx context.Context, user, thread, channel ids.ID) (sync.Draft, bool, error) {
 	if thread.IsZero() == channel.IsZero() {
 		return sync.Draft{}, false, errs.New(errs.CodeInternalError, "sync: DeleteDraft needs exactly one of thread and channel")
@@ -232,7 +233,11 @@ func (r *PersonalRepository) DeleteDraft(ctx context.Context, user, thread, chan
 	if err != nil {
 		return sync.Draft{}, false, failed(err, "deleting a draft")
 	}
-	return draftOf(row), true, nil
+	d := draftOf(row)
+	if err := redactDrafts(ctx, d); err != nil {
+		return sync.Draft{}, false, err
+	}
+	return d, true, nil
 }
 
 // DraftsInChannels implements app.PersonalStore.

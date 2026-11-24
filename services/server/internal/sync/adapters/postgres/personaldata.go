@@ -53,7 +53,7 @@ func (r *PersonalRepository) DeleteReadStatesOf(ctx context.Context, user ids.ID
 }
 
 // DeleteDraftsOf implements app.PersonalDataRows inside the unit of work of ctx and returns the
-// deleted rows.
+// deleted rows; the text of their stored draft.updated events is blanked (redactDrafts).
 func (r *PersonalRepository) DeleteDraftsOf(ctx context.Context, user ids.ID) ([]sync.Draft, error) {
 	q, err := r.write(ctx)
 	if err != nil {
@@ -63,7 +63,11 @@ func (r *PersonalRepository) DeleteDraftsOf(ctx context.Context, user ids.ID) ([
 	if err != nil {
 		return nil, failed(err, "deleting the drafts of a person")
 	}
-	return draftsOf(rows), nil
+	out := draftsOf(rows)
+	if err := redactDrafts(ctx, out...); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // DeleteSettingsOf implements app.PersonalDataRows inside the unit of work of ctx and returns the

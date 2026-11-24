@@ -294,7 +294,9 @@ func CheckResultText(s string, maxBytes int) error {
 // not_before is the requested time but never earlier than now plus lim.MinDelay (also a time in
 // the past, --after 0 and a command that succeeds at once); the deadline is the requested one, at
 // most lim.MaxWait after not_before for usage_limit and after now for every other reason, and the
-// longest one when none is requested. A requested deadline before not_before is a field error.
+// longest one when none is requested. A requested deadline before not_before is a field error, and
+// so is a not_before later than now plus lim.MaxWait for every reason but usage_limit: its
+// deadline would come before it, and it could only expire.
 //
 // Example:
 //
@@ -307,6 +309,8 @@ func WakeWindow(now, notBefore, deadline time.Time, reason WakeReason, lim WakeL
 	base := now
 	if reason == WakeReasonUsageLimit {
 		base = notBefore
+	} else if notBefore.After(now.Add(lim.MaxWait)) {
+		return time.Time{}, time.Time{}, fieldErr("/not_before", "invalid", "not_before lies after run.wake_max_wait")
 	}
 	latest := base.Add(lim.MaxWait)
 	if latest.Before(notBefore) {

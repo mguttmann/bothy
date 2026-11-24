@@ -203,7 +203,8 @@ type ErrorCounter interface {
 type Deps struct {
 	// Repo reads and writes runs and run_steps.
 	Repo Repository
-	// UoW runs the reads that need one snapshot; the writes join the caller's unit of work.
+	// UoW runs reads that belong together in one transaction (READ COMMITTED, not one snapshot);
+	// the writes join the caller's unit of work.
 	UoW txn.UnitOfWork
 	// Authorizer decides agent.invoke, run.read and run.overview.read.
 	Authorizer authorize.Authorizer

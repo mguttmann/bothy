@@ -159,7 +159,7 @@ func (r *Repository) LocateThreads(ctx context.Context, threads []ids.ID) ([]cha
 	for i, row := range rows {
 		out[i] = chat.ThreadInfo{ID: idOf(row.ID), ChannelID: idOf(row.ChannelID), SpaceID: idOf(row.SpaceID), ChannelKind: row.ChannelKind,
 			Kind: row.Kind, State: row.State, OperatorAgentID: idOf(row.OperatorAgentID), CreatedBy: idOf(row.CreatedBy), Version: row.Version,
-			ChannelArchived: row.ChannelArchived, LastMessageSeq: row.LastMessageSeq, UnreadFloorSeq: row.UnreadFloorSeq}
+			ChannelArchived: row.ChannelArchived, Deleted: row.Deleted, LastMessageSeq: row.LastMessageSeq, UnreadFloorSeq: row.UnreadFloorSeq}
 	}
 	return out, nil
 }

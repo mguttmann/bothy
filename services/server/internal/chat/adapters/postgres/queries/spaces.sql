@@ -1,6 +1,6 @@
 -- SPDX-License-Identifier: Apache-2.0
 -- Queries on spaces (chat module, M1-52; docs/spec/03-data-model.md section 4.5). Only this
--- module reads and writes the table (03 Grundsatz 12). Orders are sort_key (COLLATE "C" from the
+-- module reads and writes the table (03 principle 12). Orders are sort_key (COLLATE "C" from the
 -- column), then id.
 
 -- name: GetSpace :one
@@ -53,7 +53,8 @@ SELECT * FROM spaces WHERE id = @id FOR SHARE;
 
 -- name: SaveSpaceDeletion :exec
 -- Writes a delete or restore of space.delete and space.restore (D-DEL-2): the archive time, the
--- deletion and the version.
+-- deletion, the sort key (a restore may move it, audit srv-chat-1) and the version.
 UPDATE spaces
-SET archived_at = sqlc.narg(archived_at), deleted_at = sqlc.narg(deleted_at), deleted_by = sqlc.narg(deleted_by), version = @version
+SET archived_at = sqlc.narg(archived_at), deleted_at = sqlc.narg(deleted_at), deleted_by = sqlc.narg(deleted_by), sort_key = @sort_key,
+    version = @version
 WHERE id = @id;

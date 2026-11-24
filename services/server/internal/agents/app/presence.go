@@ -19,6 +19,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
@@ -330,13 +331,21 @@ func (t *Tracker) expire(e *entry, gen uint64) {
 		return
 	}
 	row, found, err := t.d.Store.GetPresenceRow(context.Background(), e.id)
+	if ev, ok := t.expireEntry(e, gen, row, found && err == nil); ok {
+		t.send(context.Background(), e.id, ev)
+	}
+}
+
+// expireEntry is the part of expire under the entry lock; it returns agent.presence_changed when
+// one is due, which expire publishes after the lock is released (D-M2-21-11).
+func (t *Tracker) expireEntry(e *entry, gen uint64, row domain.PresenceRow, found bool) (eventlog.EphemeralEvent, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if t.stopped.Load() || gen != e.gen || !e.state.Present() {
-		return
+		return eventlog.EphemeralEvent{}, false
 	}
 	now := t.d.Clock.Now()
-	if err == nil && found && row.LastHeartbeatAt.After(e.last) {
+	if found && row.LastHeartbeatAt.After(e.last) {
 		e.target, e.report, e.last, e.dirty = row.Target, row.Stored, row.LastHeartbeatAt, false
 		e.state = row.Stored.State
 		e.fed, e.elsewhere = false, true
@@ -345,11 +354,11 @@ func (t *Tracker) expire(e *entry, gen uint64) {
 	if deadline := e.last.Add(t.cfg.PresenceTimeout + t.cfg.PersistInterval); e.elsewhere && e.state.Present() && deadline.After(now) {
 		e.deadline = deadline
 		t.arm(e, now)
-		return
+		return eventlog.EphemeralEvent{}, false
 	}
 	e.state, e.dirty, e.stop = domain.RuntimeOffline, true, nil
 	t.reassess(e, now)
-	t.publish(context.Background(), e, nil)
+	return t.presenceEvent(e, nil)
 }
 
 // due reports whether the timer of generation gen of e expires now: false when a newer heartbeat
@@ -367,19 +376,20 @@ func (t *Tracker) due(e *entry, gen uint64) bool {
 	return true
 }
 
-// publish sends agent.presence_changed when state or reported mode differ from the last
-// published pair (the caller holds e.mu; D-M2-20-4). The envelope has an empty scope, the
+// presenceEvent returns agent.presence_changed when state or reported mode differ from the last
+// published pair and records the pair as published (the caller holds e.mu; D-M2-20-4); ok is
+// false when nothing is due or no publisher is bound. The envelope has an empty scope, the
 // resource agent without version, no audience and the payload AgentPresencePayload; the hub
-// admits receivers with agent.read in delivery mode, never before catchup.complete. A publish
-// error is logged and never fails the heartbeat.
-func (t *Tracker) publish(ctx context.Context, e *entry, by *ids.ID) {
+// admits receivers with agent.read in delivery mode, never before catchup.complete. The caller
+// sends it with send after releasing e.mu: the hub may read the database (audit srv-agents-3).
+func (t *Tracker) presenceEvent(e *entry, by *ids.ID) (eventlog.EphemeralEvent, bool) {
 	if t.stopped.Load() || (e.state == e.pubState && e.report.BillingMode == e.pubMode) {
-		return
+		return eventlog.EphemeralEvent{}, false
 	}
 	pub, _ := t.bound()
 	e.pubState, e.pubMode = e.state, e.report.BillingMode
 	if pub == nil {
-		return
+		return eventlog.EphemeralEvent{}, false
 	}
 	ev := eventlog.EphemeralEvent{
 		Type: string(authorize.EventAgentPresenceChanged), SchemaVersion: 1,
@@ -389,14 +399,28 @@ func (t *Tracker) publish(ctx context.Context, e *entry, by *ids.ID) {
 	if by != nil {
 		ev.Actor = &eventlog.ActorRef{Kind: eventlog.ActorAgent, PrincipalID: *by}
 	}
+	return ev, true
+}
+
+// send publishes ev of agent id without holding an entry lock. A publish error is logged with its
+// class and never fails the heartbeat.
+func (t *Tracker) send(ctx context.Context, id ids.ID, ev eventlog.EphemeralEvent) {
+	pub, _ := t.bound()
+	if pub == nil || t.stopped.Load() {
+		return
+	}
 	if err := pub.PublishEphemeral(ctx, ev); err != nil {
-		t.d.Log.LogAttrs(ctx, slog.LevelError, "agent.presence_changed not published", slog.String(logKeyAgentID, e.id.String()))
+		t.d.Log.LogAttrs(ctx, slog.LevelError, "agent.presence_changed not published", slog.String(logKeyAgentID, id.String()),
+			slog.String(logKeyErrorType, errs.Type(err)))
 	}
 }
 
 // logKeyAgentID is the log key of the agent of a failed publish (signals.md 7: IDs only in logs
 // and spans).
 const logKeyAgentID = "bothy.agent.id"
+
+// logKeyErrorType is the log key of the class of an error, never its text (errs.Type).
+const logKeyErrorType = "error.type"
 
 // presencePayload is the schema AgentPresencePayload; the last reported mode stays while offline
 // and is left out when not reported (ADR 0053: no null).
@@ -451,7 +475,7 @@ func (t *Tracker) Statuses(ctx context.Context, agentIDs []ids.ID) ([]agents.Pre
 			found[row.ID] = st
 			continue
 		}
-		found[row.ID] = storedStatus(row, now, t.cfg.MismatchAlertAfter)
+		found[row.ID] = storedStatus(row, now, t.cfg.MismatchAlertAfter, t.staleAge())
 	}
 	out := make([]agents.PresenceStatus, 0, len(agentIDs))
 	for _, id := range agentIDs {
@@ -481,14 +505,20 @@ func (t *Tracker) memory(id ids.ID, stored, now time.Time) (agents.PresenceStatu
 }
 
 // storedStatus is the status of an untracked row: the immediate warnings only, because this
-// process does not know when a difference began.
-func storedStatus(row domain.PresenceRow, now time.Time, alertAfter time.Duration) agents.PresenceStatus {
-	st := statusOf(row.ID, row.Target, row.Stored, row.Stored.State, row.LastHeartbeatAt)
-	if row.Stored.State.Present() {
-		st.Warnings = domain.Assess(row.Target, row.Stored, row.Stored.State).Warnings(time.Time{}, now, alertAfter)
+// process does not know when a difference began. A stored online or degraded state whose heartbeat
+// is stale age old or older is offline (domain.StoredState); stale 0 takes the row as stored.
+func storedStatus(row domain.PresenceRow, now time.Time, alertAfter, stale time.Duration) agents.PresenceStatus {
+	state := domain.StoredState(row.Stored.State, row.LastHeartbeatAt, now, stale)
+	st := statusOf(row.ID, row.Target, row.Stored, state, row.LastHeartbeatAt)
+	if state.Present() {
+		st.Warnings = domain.Assess(row.Target, row.Stored, state).Warnings(time.Time{}, now, alertAfter)
 	}
 	return st
 }
+
+// staleAge is the age after which a stored online or degraded row is offline: the stored heartbeat
+// lags the real one by at most agent.heartbeat_persist_interval.
+func (t *Tracker) staleAge() time.Duration { return t.cfg.PresenceTimeout + t.cfg.PersistInterval }
 
 // recordStatus is the presence of the record rec for getAgent and listAgents: the entry from
 // memory when this process tracks the agent and rec holds no newer heartbeat, otherwise the
@@ -498,16 +528,16 @@ func (t *Tracker) recordStatus(rec domain.Agent) agents.PresenceStatus {
 	if st, ok := t.memory(rec.ID, rec.Reported.LastHeartbeatAt, now); ok {
 		return st
 	}
-	return recordPresence(rec, now, t.cfg.MismatchAlertAfter)
+	return recordPresence(rec, now, t.cfg.MismatchAlertAfter, t.staleAge())
 }
 
-// recordPresence converts the stored reported state of rec.
-func recordPresence(rec domain.Agent, now time.Time, alertAfter time.Duration) agents.PresenceStatus {
+// recordPresence converts the stored reported state of rec (stale as for storedStatus).
+func recordPresence(rec domain.Agent, now time.Time, alertAfter, stale time.Duration) agents.PresenceStatus {
 	r := rec.Reported
 	stored := domain.Report{State: r.State, RuntimeVersion: r.RuntimeVersion, BillingMode: r.BillingMode,
 		BillingModesSupported: r.BillingModesSupported, Evidence: r.Evidence, ToolClass: r.ToolClass}
 	return storedStatus(domain.PresenceRow{ID: rec.ID, Target: domain.Target{BillingMode: rec.Policy.Mode, ToolClass: rec.ToolClass},
-		Stored: stored, LastHeartbeatAt: r.LastHeartbeatAt}, now, alertAfter)
+		Stored: stored, LastHeartbeatAt: r.LastHeartbeatAt}, now, alertAfter, stale)
 }
 
 // Changed takes the configured values and the status of the tracked agents among list again after

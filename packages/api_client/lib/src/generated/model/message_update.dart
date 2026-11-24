@@ -12,11 +12,12 @@ part 'message_update.g.dart';
 /// The server resolves the mentions of the resulting content again; `mention_ids` is an optional check as in `MessageCreate`.
 ///
 /// Properties:
-/// * [contentMd]
+/// * [contentMd] - Empty or white space only content is allowed only when the message has at least one attachment (removing the caption); otherwise `400 validation_failed` with `errors[].code` `empty`.
 /// * [mentionIds]
 @BuiltValue()
 abstract class MessageUpdate
     implements Built<MessageUpdate, MessageUpdateBuilder> {
+  /// Empty or white space only content is allowed only when the message has at least one attachment (removing the caption); otherwise `400 validation_failed` with `errors[].code` `empty`.
   @BuiltValueField(wireName: r'content_md')
   String? get contentMd;
 
