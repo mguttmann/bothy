@@ -109,8 +109,8 @@ type Deps struct {
 	// channel ops the start checks against the catalogue (M1-25); nil means the functions of the
 	// module ports. Tests inject a bad registration here.
 	Registrations []func(*authorize.Registry)
-	// ConsumerHandlers replaces the production list of worker consumers (consumerHandlers,
-	// empty until M2-26 and M3-19) in worker and all; nil keeps it. Tests register probe
+	// ConsumerHandlers replaces the production list of worker consumers (consumerHandlers:
+	// webhooks, push, privacy.journal) in worker and all; nil keeps it. Tests register probe
 	// handlers here.
 	ConsumerHandlers map[sync.ConsumerName]sync.ConsumerHandler
 	// PushProviders are additional push providers of the push path (M3-19); production adds

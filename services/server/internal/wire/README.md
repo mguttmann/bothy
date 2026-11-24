@@ -35,7 +35,10 @@ the assembly of `bothy serve` (M1-11). Only `cmd` imports it.
 ## Serve assembly
 
 `Serve(ctx, values, role, deps)` returns a `lifecycle.Runner`; it starts nothing itself. The
-components, in start order:
+table names the main components in start order; the complete start sequence of each role
+(the module steps from `stats_measure` to `privacy`, `status`, `statistics`, `log_tail`,
+`agent_presence`, `ephemeral_listener`, `scan_health` and the others) comes from the order keys in
+`module_<name>.go` and is held by `TestStartSequenceUnchanged` (`wiring_internal_test.go`):
 
 | Component | Does | Roles |
 |---|---|---|
@@ -68,13 +71,14 @@ Every unit of work of a role runs on a registry from `NewTxnRegistry(NewModules(
 `NewTxnRegistry` refuses `Modules` without the audit hook, so no unit can skip the chain.
 
 The rights hooks (M1-29): `NewModules` builds `authzapp.RightsHook` (`NewRightsHook` with the
-PrincipalSource of identity, the agent policy source of agents (`NewAgentPolicySource`, M1-51)
-and the empty structure source until M1-54) and registers `Begin` for phase 1 and `BeforeCommit` for phase 3.1; `NewTxnRegistry`
+PrincipalSource of identity, the agent policy source of agents (`NewAgentPolicySource`, M1-51),
+the structure source (`NewStructureSource`) and the host source of terminal) and registers `Begin` for phase 1 and `BeforeCommit` for phase 3.1; `NewTxnRegistry`
 refuses Modules without them. The hook needs the appender of sync and the recorder of audit,
 which need the unit of work themselves, so the start step `authz` binds them
 (`Audit.RightsHook().Bind`) before any route or job runs; an unbound hook fails every rights
 change with kind internal (the registries of `bothy migrate up` and of the job registry check
-never run one). `authorize.AccessChanged` has no production subscriber in M1.
+never run one). runs and terminal subscribe `authorize.AccessChanged`
+(`testdata/txn_registrations.golden` holds every subscription in its order).
 
 The subscribers of sync (M1-61): `NewModules` builds `syncapp.Subscribers` over the personal
 repository and `NewTxnRegistry` subscribes `messaging.MessagePosted -> sync` (drafts with
