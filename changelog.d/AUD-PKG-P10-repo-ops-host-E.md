@@ -17,3 +17,6 @@
   when a role is missing in one theme, and naming the member when the rule file lacks
   `contrast_pairs` or `palette_guards`, instead of a `KeyError` traceback
   (AUD-PKG-P10-repo-ops-host).
+- `make signal-check` fails when the dashboards, the rule files, the Sloth files or the panel
+  queries hold no expression, and `make templates-check` fails when the template folder holds no
+  template, instead of passing with less to check (AUD-PKG-P10-repo-ops-host).

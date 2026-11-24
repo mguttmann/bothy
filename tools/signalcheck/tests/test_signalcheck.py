@@ -84,6 +84,23 @@ def test_fixture_passes_recording_rules_window_variables_by_lists_and_buckets(
     assert [str(f) for f in findings] == []
 
 
+@pytest.mark.parametrize(
+    "folder",
+    [
+        "infra/observability/grafana/dashboards",
+        "infra/observability/prometheus/rules",
+        "infra/observability/slo",
+        "plugins/grafana-bothy-live",
+    ],
+)
+def test_a_source_without_expressions_fails(repo: Path, folder: str) -> None:
+    """A moved or emptied folder is a finding, not a pass with fewer expressions."""
+    shutil.rmtree(repo / folder)
+    findings, _ = sc.run(repo, None)
+    source = sc.PANEL_QUERIES.as_posix() if folder.startswith("plugins") else folder
+    assert (source, "no expressions found") in [(f.file, f.message) for f in findings], findings
+
+
 def test_dashboard_syntax_error_fails(repo: Path, promtool: Path) -> None:
     mutate(
         repo,
