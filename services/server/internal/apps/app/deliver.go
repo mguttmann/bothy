@@ -30,7 +30,7 @@ type claim struct {
 
 // Deliver runs one attempt of the job apps.webhook_deliver for a subscription (M2-26 design note 4,
 // D-M2-26-3): claim the due head under the subscription lock in one unit of work (with the gap,
-// routing and rights checks, and a lease of webhook.delivery_timeout with its wake-up job), send
+// routing and rights checks, and a lease of WebhookConfig.Lease with its wake-up job), send
 // it outside any transaction, then record the outcome in a second unit of work and chain the next
 // job. Several jobs of one subscription serialize on its row lock, so at most one attempt is in
 // flight. Errors (database, context) return and River retries the job; a retry that finds the
@@ -83,7 +83,7 @@ func (w *WebhookService) claim(ctx context.Context, subscriptionID ids.ID) (clai
 		return claim{}, err
 	}
 	head.Attempt++
-	head.NextAttemptAt = now.Add(w.cfg.DeliveryTimeout)
+	head.NextAttemptAt = now.Add(w.cfg.Lease())
 	if err := w.d.Store.UpdateDelivery(ctx, head); err != nil {
 		return claim{}, err
 	}

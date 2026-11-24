@@ -9,7 +9,7 @@
 //
 //	sched := &jobs.Scheduler{}
 //	svc, _ := app.NewWebhooks(cfg, app.WebhookDeps{Scheduler: sched, ...})
-//	_ = jobs.Register(reg, svc) // every role
+//	_ = jobs.Register(reg, svc, svc.Lease()) // every role
 //	sched.Bind(runtime.Inserter()) // after the runtime of the role exists
 package jobs
 
@@ -54,9 +54,13 @@ func (h Handler) Work(ctx context.Context, j jobs.Job[WebhookDeliver]) error {
 
 // Register adds the handler on the queue delivery. Every role builds the same registry: the api
 // role inserts the job (redeliverWebhook, subscription changes), worker and all run it. d may be
-// nil only where no job runs (tests of the registration). The error is the rejected registration.
-func Register(reg *jobs.Registry, d Deliverer) error {
-	return jobs.Register[WebhookDeliver](reg, Handler{Deliverer: d}, jobs.HandlerOptions{Queue: jobs.QueueDelivery})
+// nil only where no job runs (tests of the registration). timeout is River's job timeout of the
+// kind, app.WebhookConfig.Lease: an attempt sends within webhook.delivery_timeout after its claim,
+// so the job ends before its lease and a hanging receiver is recorded as a failed attempt instead
+// of being cut off by River's default timeout; zero means River's default. The error is the
+// rejected registration.
+func Register(reg *jobs.Registry, d Deliverer, timeout time.Duration) error {
+	return jobs.Register[WebhookDeliver](reg, Handler{Deliverer: d}, jobs.HandlerOptions{Queue: jobs.QueueDelivery, Timeout: timeout})
 }
 
 // Scheduler implements app.DeliveryScheduler over jobs.Inserter.InsertTx. The use cases are built

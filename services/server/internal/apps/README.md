@@ -172,7 +172,7 @@ sections 6 and 7, ADR 0016 and 0051. Rulings: `docs/DECISIONS.md` D-M2-26-1 to D
   `retention.webhook_deliveries`, never `pending` ones.
 - **Attempt** (job `apps.webhook_deliver`): claim the due head under the subscription lock, check
   routing and `webhook_out.deliver` in filter mode with the current grants and scopes (no request
-  without access), sign, take a lease of `webhook.delivery_timeout` with a wake-up job, send
+  without access), sign, take a lease of twice `webhook.delivery_timeout` (also the River timeout of the job, so a hanging receiver ends as a failed attempt before the lease wake-up claims the head again) with a wake-up job, send
   through the egress client outside any transaction, record the outcome and chain the next job.
   Strictly in `seq` order; at least once with the same `webhook-id`.
 - **Signatures**: `v1a` with every signer of the purpose `webhook_out` (`instance.Keys.Signers`);

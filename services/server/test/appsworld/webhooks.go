@@ -254,7 +254,7 @@ func egressConfig(t *testing.T, o Options, hooks, alt *Receiver, timeout time.Du
 func (w *World) newRuntime(role jobs.Role) *jobs.Runtime {
 	w.t.Helper()
 	reg := jobs.NewRegistry()
-	Must(w.t, appsjobs.Register(reg, w.apps.Webhooks))
+	Must(w.t, appsjobs.Register(reg, w.apps.Webhooks, w.apps.Webhooks.Lease()))
 	rt, err := jobs.New(w.pool, jobs.Config{Schema: JobsSchema, MaxWorkers: map[string]int{
 		jobs.QueueDefault: 1, jobs.QueueFiles: 1, jobs.QueueDelivery: 2, jobs.QueueMaintenance: 1, jobs.QueuePrivacy: 1,
 	}, SoftStopTimeout: time.Second}, role, reg, nil)

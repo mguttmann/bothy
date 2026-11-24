@@ -40,13 +40,22 @@ type WebhookConfig struct {
 	MaxPendingPerSubscription int `config:"webhook.max_pending_per_subscription"`
 	// SecretRotationOverlap is webhook.secret_rotation_overlap.
 	SecretRotationOverlap time.Duration `config:"webhook.secret_rotation_overlap"`
-	// DeliveryTimeout is webhook.delivery_timeout: the time limit of one attempt and the lease of
-	// an attempt in flight.
+	// DeliveryTimeout is webhook.delivery_timeout: the time limit of one attempt; the lease of an
+	// attempt in flight is Lease.
 	DeliveryTimeout time.Duration `config:"webhook.delivery_timeout"`
 	// PageSizeDefault and PageSizeMax are api.page_size_default and api.page_size_max.
 	PageSizeDefault int `config:"api.page_size_default"`
 	PageSizeMax     int `config:"api.page_size_max"`
 }
+
+// leaseFactor is the lease of an attempt in units of webhook.delivery_timeout: one for the send
+// limit, which starts only after the claim commits, and one as reserve for that commit and the
+// record step, so the lease wake-up never claims the head while its attempt can still record.
+const leaseFactor = 2
+
+// Lease is the lease of an attempt in flight and the River timeout of apps.webhook_deliver:
+// leaseFactor times webhook.delivery_timeout (AUD-PKG-P08-server-files-notify).
+func (c WebhookConfig) Lease() time.Duration { return leaseFactor * c.DeliveryTimeout }
 
 // InstanceState is the part of instance.State the deliveries read: the sync epoch of the row.
 type InstanceState interface {
@@ -135,6 +144,10 @@ func NewWebhooks(cfg WebhookConfig, d WebhookDeps) (*WebhookService, error) {
 		BackoffBase: cfg.RetryBackoffBase, BackoffCap: cfg.RetryBackoffCap, MaxAge: cfg.RetryMaxAge,
 	}}, nil
 }
+
+// Lease returns WebhookConfig.Lease of the service: the lease of an attempt in flight, which
+// internal/wire also sets as the River timeout of apps.webhook_deliver.
+func (w *WebhookService) Lease() time.Duration { return w.cfg.Lease() }
 
 // now is the time of the clock at the precision of PostgreSQL.
 func (w *WebhookService) now() time.Time { return w.d.Clock.Now().Truncate(time.Microsecond) }
