@@ -1795,6 +1795,57 @@ def test_a_transcript_only_input_after_the_late_answer_ends_its_own_turn() -> No
     assert _decide_pending(state, 40.0, pending=0) == "close"
 
 
+def test_two_transcript_only_inputs_dequeued_together_end_their_turn_with_the_last() -> None:
+    # The CLI dequeues several notifications at once (real 2.1.326 transcript): two starts
+    # behind the late answer, two noted records, no request.
+    records = [json.loads(x) for x in TRANSCRIPT_ONLY_NOTICE.read_text("utf-8").splitlines()]
+    [prompt] = [r for r in records if (r.get("origin") or {}).get("kind") == "human"]
+    [notice] = [r for r in records if r.get("queueTranscriptOnly") is True]
+    enqueue = next(r for r in records if r.get("operation") == "enqueue")
+    dequeue = next(r for r in records if r.get("operation") == "dequeue")
+    doubled: list[dict[str, Any]] = []
+    for record in records:
+        doubled.append(record)
+        if record in (enqueue, dequeue):
+            doubled.append(dict(record))
+        if record is notice:
+            doubled.append({**notice, "uuid": "00000000-0000-4000-8000-0000000000aa"})
+    mapper = TranscriptMapper(prompt["uuid"])
+    out = [m for r in doubled for m in mapper.map(r)]
+    results = [m for m in out if m["type"] == "result"]
+    assert [r["num_turns"] for r in results][-1] == 0
+    assert len(results) == 2  # the prompt's answer, then one end of the noted inputs
+    assert not mapper.turn_open
+    state = ProcessState(has_stdin=True)
+    for message in out:
+        state.apply(message, 1.0)
+    assert _decide_pending(state, 40.0, pending=0) == "close"
+
+
+def test_a_noted_input_beside_a_line_that_starts_work_ends_nothing() -> None:
+    # Two inputs opened the turn: a noted notification and a line the model answers.
+    mapper = started("prompt-uuid", "line-1")
+    records = [
+        REQUEST,
+        _stamped_answer("end_turn", 10),
+        {"type": "queue-operation", "operation": "enqueue"},
+        {"type": "queue-operation", "operation": "enqueue"},
+        {"type": "queue-operation", "operation": "dequeue"},
+        {"type": "queue-operation", "operation": "dequeue"},
+        TURN_ENDS,
+        {
+            "type": "user",
+            "isSidechain": False,
+            "queueTranscriptOnly": True,
+            "origin": {"kind": "task-notification", "producer": "session-task"},
+            "message": {"role": "user", "content": "<task-notification>\n</task-notification>"},
+        },
+    ]
+    out = [m for r in records for m in mapper.map(r)]
+    assert [shape(m) for m in out].count("result") == 1
+    assert mapper.turn_open  # the line's turn still comes
+
+
 def test_a_transcript_only_input_inside_a_working_turn_ends_nothing() -> None:
     mapper = started("prompt-uuid")
     notice = {

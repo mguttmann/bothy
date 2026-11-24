@@ -30,15 +30,16 @@ Rulings:
    request waits is therefore no longer given on at the `dequeue` itself (ruling 1 of
    FIX-RUNNER-FOLLOWUP-AT-TURN-END said "at once" for a working turn).
 3. A `user` record with `queueTranscriptOnly` (an input the CLI only notes and never sends to the
-   model, such as the notification of a task left by the process before, seen on a resume with
-   2.1.326 and 2.1.331) ends the turn when its start alone opened that turn, with a `result` of
-   `num_turns` 0 and no text, as a print stream does. Without this a start deferred behind the
+   model: the notification of a task, on a resume, with or without `producer`, and within a
+   session too; seen with 2.1.326, 2.1.330 and 2.1.331) ends the turn when such inputs alone
+   opened it, with a `result` of `num_turns` 0 and no text, as a print stream does. The CLI
+   may dequeue several at once; the turn ends with the last of the inputs that opened it. Without this a start deferred behind the
    late answer of the prompt kept the run open after its answer (a real 2.1.326 transcript;
    the stdin rule waited for a result that never came). Inside a working turn it ends nothing.
 4. The runner reads `timestamp` of `assistant`, `api-request` and `queue-operation` records (the
    recording of the pinned CLI lists it) and `queueTranscriptOnly` of `user` records (read in
    real transcripts, not recorded).
-5. Such a notification has no `producer` and stays an input of another sender for the log
+5. Such a notification without `producer` stays an input of another sender for the log
    (`background_foreign_input` with origin `other`); the origin rule is not relaxed.
 
 Open minors (no reproduced fault; for the next run in this area):

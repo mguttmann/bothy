@@ -379,6 +379,8 @@ class TranscriptMapper:
         """The time of the first deferred dequeue, if its record named a readable one."""
         self._fresh_starts = 0
         """The inputs whose start opened the open turn, with no request or output since."""
+        self._noted = 0
+        """Of those, the inputs the CLI only noted (``queueTranscriptOnly``) so far."""
         self._commands = 0
         self._texts: dict[str, list[str]] = {}
         self._last_message: str | None = None
@@ -469,7 +471,7 @@ class TranscriptMapper:
             self._sealed |= self._open
             self._open.clear()
             self._awaiting = True
-            self._fresh_starts = 0
+            self._fresh_starts = self._noted = 0
             return [*out, *self._request(record)]
         if kind == "cost-state":
             usage = record.get("modelUsage")
@@ -497,16 +499,20 @@ class TranscriptMapper:
     def _noted_only(self, record: Mapping[str, Any]) -> list[dict[str, Any]]:
         """The end of a turn that only an input the CLI merely notes opened.
 
-        Such an input (``queueTranscriptOnly``: the notification of a task the CLI gives on a
-        resume, real transcripts of 2.1.326 and 2.1.331) is never sent to the model, so its
+        Such an input (``queueTranscriptOnly``: the notification of a task, on a resume and also
+        within a session; real transcripts of 2.1.326, 2.1.330 and 2.1.331) is never sent to the
+        model, so its
         turn ends here without a request, as a print stream ends it with a result of
         ``num_turns`` 0. Without this the runner waits for a result that never comes once that
         start follows the turn before (FIX-RUNNER-CLI-331). Inside a working turn it ends
         nothing.
         """
-        if record.get("queueTranscriptOnly") is True and self._fresh_starts == 1:
-            return [self._turn_end()]
-        return []
+        if record.get("queueTranscriptOnly") is not True or not self._fresh_starts:
+            return []
+        self._noted += 1
+        # Several such inputs may open one turn together (the CLI dequeues them at once): the
+        # turn ends with the last of them.
+        return [self._turn_end()] if self._noted >= self._fresh_starts else []
 
     def _before_prompt(self, kind: str, record: Mapping[str, Any]) -> list[dict[str, Any]]:
         """A record before the run's prompt: skipped, unless it is the prompt or an input.
@@ -653,7 +659,7 @@ class TranscriptMapper:
         ]
         self._answered = message.get("stop_reason") == "end_turn"
         self._awaiting = False
-        self._fresh_starts = 0
+        self._fresh_starts = self._noted = 0
         model = message.get("model")
         error = record.get("isApiErrorMessage") is True
         items: list[dict[str, Any]] = []
@@ -849,7 +855,10 @@ class TranscriptMapper:
                     self._dequeued_at = _stamp(record)
                 self._deferred.append(started)
                 return []
-            self._fresh_starts = 0 if self.turn_open else self._fresh_starts + 1
+            if self.turn_open:
+                self._fresh_starts = self._noted = 0
+            else:
+                self._fresh_starts += 1
             return [started, self._init()]
         out: list[dict[str, Any]] = [
             {"type": "command_lifecycle", "command_uuid": command, "state": "completed"}
@@ -905,7 +914,7 @@ class TranscriptMapper:
             "num_turns": len(self._requests),
         }
         self.turn_open = False
-        self._fresh_starts = 0
+        self._fresh_starts = self._noted = 0
         self._texts = {}
         self._last_message = None
         self._last_error = False
