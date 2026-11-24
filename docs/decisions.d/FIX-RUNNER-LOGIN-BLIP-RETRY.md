@@ -41,4 +41,8 @@ before the check, with or without this retry.
 Minors noted in the review, left for the next run in this area: `login_retried` is not part of
 the turn record (no effect, an adopted turn never retries); the stopped attempt's one request
 is not added to the run's costs; a cancellation of the run by the SDK itself during the wait
-is untested (the server's stop during the wait is tested).
+is untested (the server's stop during the wait is tested); the refusal codes `session_alive`,
+`stopping` and `nothing_to_repeat` have no scenario of their own; whether a hard kill after
+the stop grace can lose a tool call record written after the tool started is not proven
+(the evidence is one transcript of the pinned CLI); the resumed session keeps the text answer
+of the request without the login in its context (it is never posted).
