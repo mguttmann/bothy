@@ -33,6 +33,9 @@ final class FakeTime {
   /// The time source.
   DateTime clock() => now;
 
+  /// The timers that are neither fired nor cancelled.
+  int get activeTimers => _timers.where((t) => t.isActive).length;
+
   /// The timer factory the outbox receives.
   Timer timer(Duration delay, void Function() callback) {
     final t = _FakeTimer(now.add(delay), callback);

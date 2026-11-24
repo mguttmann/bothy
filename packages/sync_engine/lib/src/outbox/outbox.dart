@@ -351,6 +351,8 @@ final class Outbox {
         }, onError: controller.addError);
       },
       onCancel: () async {
+        // A publish still reading the database sees the new generation and arms no timer.
+        generation++;
         delayTimer?.cancel();
         await sub?.cancel();
       },
