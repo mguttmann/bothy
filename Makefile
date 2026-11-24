@@ -219,13 +219,15 @@ bootstrap-ci: ## Install pinned tools without git hooks (CI)
 	  npm ci --prefix "$$(dirname "$$lock")" --ignore-scripts --no-audit --no-fund --loglevel=error || exit 1; done
 
 # ---- aggregate ------------------------------------------------------------------------
-check: gates denylist sonar ## Every gate of the CI jobs of gates, denylist and sonar (before every push)
+# The deny list comes first: it takes seconds and fails at once when the private list is missing.
+check: denylist gates sonar ## Every gate of the CI jobs of gates, denylist and sonar (before every push)
 	@echo "check: all gates passed"
 
 gates: ## All gates except denylist and sonar (CI job "gates")
 # Generated code is checked before lint and type checks, so that stale generator output is
-# reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
-gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check test coverage console-web-test contract-test commitlint fragments-check \
+# reported as drift and not as a confusing compile error. The commit and fragment checks take
+# seconds and come before the long ones. `perf` is not a gate (P-07).
+gates: commitlint fragments-check fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check test coverage console-web-test contract-test \
        docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check signal-check \
        api-clients tokens runners-check labels-check release-pins install-options tofu-check gitleaks semgrep trivy osv licenses templates-check
 
@@ -364,7 +366,8 @@ coverage: test ## Coverage thresholds (named values quality.coverage.*)
 	else cd tools && uv run --locked --quiet coverage report >/dev/null && echo "  tools coverage: ok (fail_under in tools/pyproject.toml)"; fi
 	@# Production code only: packages under <module>/test/ and <module>/perf/ are test code
 	@# (docs/spec/02-architecture.md "Code layout"), and generated files (*.gen.go, docs/DECISIONS.md
-	@# M1-05/7 and M1-17) are not hand-written code. The total comes from a filtered copy;
+	@# M1-05/7 and M1-17, and *_gen.go of catalogen and designkeysgen) are not hand-written code.
+	@# The total comes from a filtered copy;
 	@# coverage.out stays as go test wrote it, so SonarQube reads the same file in
 	@# `make check` and in the CI job sonar, which scans the reports of the job gates.
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-coverage,no Go module selected); \
@@ -372,7 +375,7 @@ coverage: test ## Coverage thresholds (named values quality.coverage.*)
 	  mod=$$(awk '$$1 == "module" { gsub(/"/, "", $$2); print $$2; exit }' $$m/go.mod); \
 	  [ -n "$$mod" ] || { echo "coverage: no module path in $$m/go.mod" >&2; exit 1; }; \
 	  f=$$(mktemp "$${TMPDIR:-/tmp}/bothy-coverage.XXXXXX") || exit 1; \
-	  awk -v p="$$mod/" 'NR == 1 || (index($$0, p "test/") != 1 && index($$0, p "perf/") != 1 && index($$0, ".gen.go:") == 0)' \
+	  awk -v p="$$mod/" 'NR == 1 || (index($$0, p "test/") != 1 && index($$0, p "perf/") != 1 && index($$0, ".gen.go:") == 0 && index($$0, "_gen.go:") == 0)' \
 	    $$m/coverage.out > "$$f" || { rm -f "$$f"; exit 1; }; \
 	  out=$$(cd $$m && go tool cover -func="$$f") || { rm -f "$$f"; exit 1; }; rm -f "$$f"; \
 	  total=$$(printf '%s\n' "$$out" | awk '/^total:/ {sub("%","",$$3); print $$3}'); \
