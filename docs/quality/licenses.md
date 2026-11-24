@@ -128,6 +128,31 @@ public domain (https://sqlite.org/copyright.html). Both are bundled native code,
 the lock file: OSV-Scanner does not see them and `quality/licenses/allowed.txt` stays unchanged;
 MIT is on that list (docs/DECISIONS.md D-M4-12-9).
 
+## Third-party services of the installation
+
+The Compose stack (`infra/compose/compose.yaml`) pulls the images below unchanged from their
+publishers and runs each as a separate process next to the server; nothing of them is linked
+into or shipped with a Bothy image. The license is the one of the upstream project's own code
+(its `LICENSE` or `COPYING` file, retrieved 2026-11-24); each image also contains operating
+system packages under their own licenses. Operators who may not run AGPL software leave the
+profile `observability` off: the installation then runs without Grafana, Loki and Tempo, and
+the collector exports to the overlays named in `BOTHY_OTEL_EXPORTER` and
+`BOTHY_OTEL_EXPORTER_2` of `.env` (`infra/otel/exporters`). The virus scanner is a separate
+process for the same reason (ADR 0033). A test (`tools/docs/tests/test_compose_third_party_licenses.py`)
+keeps the images and profiles of this table equal to `compose.yaml`.
+
+| Image | Profile | License | Role |
+|---|---|---|---|
+| `tailscale/tailscale` | `tailscale` | `BSD-3-Clause` | edge over the tailnet |
+| `otel/opentelemetry-collector-contrib` | none | `Apache-2.0` | telemetry collector |
+| `clamav/clamav-debian` | `scan` | `GPL-2.0-only` | virus scanner |
+| `chrislusf/seaweedfs` | `s3` | `Apache-2.0` | S3 object storage |
+| `prom/prometheus` | `observability` | `Apache-2.0` | metrics and alert rules |
+| `prom/alertmanager` | `observability` | `Apache-2.0` | alert routing |
+| `grafana/loki` | `observability` | `AGPL-3.0-only` | logs |
+| `grafana/tempo` | `observability` | `AGPL-3.0-only` | traces |
+| `grafana/grafana` | `observability` | `AGPL-3.0-only` | dashboards |
+
 ## SBOM and checking releases
 
 * Every release contains `sbom.spdx.json` (SPDX, generated with Syft via
