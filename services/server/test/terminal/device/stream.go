@@ -98,7 +98,7 @@ func Dial(ctx context.Context, p DialParams) (*Stream, error) {
 	tr := d.Transport()
 	tr.DisableKeepAlives = true
 	url := "wss://" + strings.TrimPrefix(p.Origin, "https://") + p.StreamPath
-	ws, resp, err := websocket.Dial(ctx, url, &websocket.DialOptions{HTTPClient: &http.Client{Transport: tr}, CompressionMode: websocket.CompressionDisabled}) // nosemgrep: bothy-go-egress-only -- the Go test device of the suite; it dials only the TLS front of the test stack
+	ws, resp, err := websocket.Dial(ctx, url, &websocket.DialOptions{HTTPClient: &http.Client{Transport: tr}, CompressionMode: websocket.CompressionDisabled})
 	if resp != nil && resp.Body != nil {
 		_ = resp.Body.Close()
 	}

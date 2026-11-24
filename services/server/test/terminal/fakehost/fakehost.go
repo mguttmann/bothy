@@ -226,7 +226,7 @@ func (n Network) client() *http.Client {
 	if n.Dial == nil && n.TLS == nil {
 		return nil
 	}
-	tr := http.DefaultTransport.(*http.Transport).Clone() // nosemgrep: bothy-go-egress-only -- test client of the data connection; it dials only the server of the test
+	tr := http.DefaultTransport.(*http.Transport).Clone()
 	if n.Dial != nil {
 		tr.DialContext = n.Dial
 	}
@@ -684,7 +684,7 @@ type DataConn struct {
 // after it are binary. Errors: the dial or the login.
 func (h *Host) DialData(ctx context.Context, session ids.ID) (*DataConn, error) {
 	url := "ws" + strings.TrimPrefix(h.base, "http") + "/api/v1/hosts/sessions/" + session.String() + "/stream"
-	ws, resp, err := websocket.Dial(ctx, url, &websocket.DialOptions{HTTPClient: h.net.client(), CompressionMode: websocket.CompressionDisabled}) // nosemgrep: bothy-go-egress-only -- test client of the data connection; it dials only the server of the test
+	ws, resp, err := websocket.Dial(ctx, url, &websocket.DialOptions{HTTPClient: h.net.client(), CompressionMode: websocket.CompressionDisabled})
 	if resp != nil && resp.Body != nil {
 		_ = resp.Body.Close()
 	}
@@ -897,7 +897,7 @@ func DialDevice(t testing.TB, ctx context.Context, baseURL, publicURL string, se
 	if dp.ClientIP != "" {
 		opts.HTTPHeader.Set("X-Forwarded-For", dp.ClientIP)
 	}
-	ws, resp, err := websocket.Dial(ctx, url, opts) // nosemgrep: bothy-go-egress-only -- test client of the device stream; it dials only the server of the test
+	ws, resp, err := websocket.Dial(ctx, url, opts)
 	status := 0
 	if resp != nil {
 		status = resp.StatusCode
@@ -1051,7 +1051,7 @@ func Dial(ctx context.Context, url string) (*websocket.Conn, int, error) {
 // DialHeader is Dial with the request headers h of the upgrade (nil for none), for example the
 // Origin and the cookie of a console stream (M6-18).
 func DialHeader(ctx context.Context, url string, h http.Header) (*websocket.Conn, int, error) {
-	ws, resp, err := websocket.Dial(ctx, url, &websocket.DialOptions{CompressionMode: websocket.CompressionDisabled, HTTPHeader: h}) // nosemgrep: bothy-go-egress-only -- test client of the relay tests; it dials only the server of the test
+	ws, resp, err := websocket.Dial(ctx, url, &websocket.DialOptions{CompressionMode: websocket.CompressionDisabled, HTTPHeader: h})
 	status := 0
 	if resp != nil {
 		status = resp.StatusCode
@@ -1091,7 +1091,7 @@ func ControlAttempt(ctx context.Context, baseURL string, id ids.ID, key hosttest
 		opts.HTTPHeader = http.Header{"X-Forwarded-For": []string{clientIP}}
 	}
 	url := "ws" + strings.TrimPrefix(baseURL, "http") + hosttest.Path
-	ws, resp, err := websocket.Dial(ctx, url, opts) // nosemgrep: bothy-go-egress-only -- test client of the control connection; it dials only the server of the test
+	ws, resp, err := websocket.Dial(ctx, url, opts)
 	if resp != nil && resp.Body != nil {
 		_ = resp.Body.Close()
 	}
