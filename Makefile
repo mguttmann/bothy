@@ -259,7 +259,8 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
 	$(UVRUN) check-jsonschema --schemafile https://coderabbit.ai/integrations/schema.v2.json .coderabbit.yaml
-	$(call tool,actionlint) -shellcheck= -pyflakes= .github/workflows/*.yml
+	@# The pinned shellcheck also reads the run: blocks of the workflows; pyflakes stays off (no Python in run: blocks).
+	sc=$(call tool,shellcheck) || exit 1; $(call tool,actionlint) -shellcheck="$$sc" -pyflakes= .github/workflows/*.yml
 	@# Every tracked shell script, by its name (*.sh) or its first line (tools/ci/shell_scripts.py);
 	@# each file's shebang selects the dialect.
 	sc=$(call tool,shellcheck) || exit 1; $(UVRUN) python tools/ci/shell_scripts.py --shellcheck "$$sc"

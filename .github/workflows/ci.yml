@@ -133,7 +133,7 @@ jobs:
         run: |
           if [ "$EVENT" = pull_request ]; then
             stage=full
-            if [ "$MERGE_QUEUE" = true ]; then stage=pr; fi
+            if [ "$MERGE_QUEUE" = true ]; then stage="pr"; fi
             plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --base "$BASE_SHA" --head "$HEAD_SHA" --public "$PUBLIC" --stage "$stage")
           elif [ "$EVENT" = merge_group ]; then
             plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --base "$QUEUE_BASE_SHA" --head "$QUEUE_HEAD_SHA" --public "$PUBLIC" --stage queue)
