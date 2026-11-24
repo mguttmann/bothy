@@ -256,11 +256,15 @@ def test_cells_of_an_english_chapter_must_be_equal(tmp_path: Path) -> None:
     ]
 
 
-def test_cells_of_a_german_chapter_are_not_compared(tmp_path: Path) -> None:
-    doc = _broken(lambda d: _find(d, "TM-T12").update(expected="Anders"))
+def test_a_chapter_table_with_another_header_is_reported(tmp_path: Path) -> None:
+    """A renamed column is a finding, not a silent fall back to comparing IDs only."""
+    doc = _broken(lambda d: _find(d, "TM-T12").update(expected="Other"))
     repo = _repo(tmp_path, doc)
-    _write(repo / "docs/spec/24-terminal.md", _chapter(CHAPTER_IDS, "| ID | Test | Erwartet |"))
-    assert terminal_catalogue.check(repo) == []
+    _write(repo / "docs/spec/24-terminal.md", _chapter(CHAPTER_IDS, "| ID | Test | Result |"))
+    assert terminal_catalogue.check(repo) == [
+        "docs/spec/24-terminal.md section 14: the table header is not `| ID | Test | Expected |`",
+        "TM-T12: expected differs from the cell of docs/spec/24-terminal.md section 14",
+    ]
 
 
 def test_chapter_without_section_14_table_is_reported(tmp_path: Path) -> None:
