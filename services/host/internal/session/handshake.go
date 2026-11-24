@@ -4,6 +4,7 @@ package session
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"slices"
 	"time"
@@ -165,6 +166,14 @@ func (h *handshake) claimRefused(ctx context.Context, cl Claims) {
 	h.abandon()
 }
 
+// windowDetail is open_timeout when the opening window (octx) ended while ctx still runs, else d.
+func windowDetail(ctx, octx context.Context, d string) string {
+	if ctx.Err() == nil && errors.Is(octx.Err(), context.DeadlineExceeded) {
+		return DetailOpenTimeout
+	}
+	return d
+}
+
 // abandon closes the data connection of a stale opening with 1000 and reports nothing.
 func (h *handshake) abandon() {
 	h.dc.close(CodeNormal, "")
@@ -231,9 +240,13 @@ func (h *handshake) open(ctx context.Context, cl Claims, tr *noise.Transport, ki
 		h.failOpening(ctx, cl, d)
 		return
 	}
-	l, d := m.link(ctx, cl.Osu)
+	// The rest of the opening ends with its window too: a helper that does not answer the dial,
+	// its hello or pty.start would otherwise hold the opening with no report and no log line.
+	octx, cancel := context.WithTimeout(ctx, h.expires.Sub(m.d.Clock.Now()))
+	defer cancel()
+	l, d := m.link(octx, cl.Osu)
 	if d != "" {
-		h.failOpening(ctx, cl, d)
+		h.failOpening(ctx, cl, windowDetail(ctx, octx, d))
 		return
 	}
 	s, ok := m.claimSession(cl, l, h.sidb, h.dc, tr, h.window)
@@ -241,9 +254,9 @@ func (h *handshake) open(ctx context.Context, cl Claims, tr *noise.Transport, ki
 		h.claimRefused(ctx, cl)
 		return
 	}
-	if d := l.start(ctx, req); d != "" {
+	if d := l.start(octx, req); d != "" {
 		m.forget(s)
-		h.failOpening(ctx, cl, d)
+		h.failOpening(ctx, cl, windowDetail(ctx, octx, d))
 		return
 	}
 	req.APIKey = ""

@@ -1370,7 +1370,9 @@ Diagram: [seq-8-open-terminal.svg](../architecture/seq-8-open-terminal.svg) (sou
    with `open_failed` and `open_timeout`. The gate run ends at `expires_at` as well
    ([FIX-HOGS/2](../decisions.d/FIX-host-open-gate-slow.md)): a run not finished by then gives
    `open_failed` with `open_timeout` and applies nothing (no `report`, no end of running
-   sessions). Every failure after message 2 and before the PTY runs sends `session.ended` with
+   sessions). So do the channel to the helper of `osu` (dial and `hello`) and `pty.start`: a
+   helper that has not answered by `expires_at` gives `open_failed` with `open_timeout`, and a
+   PTY it still starts is stopped (`pty.stop`). Every failure after message 2 and before the PTY runs sends `session.ended` with
    `open_failed` and its `close_detail`, and the host service keeps
    the data connection open: the server ends the session and closes both sides (host side
    `4100`), so the device gets the code of the end (`4104` for `handshake_failed`, else `4100`)
