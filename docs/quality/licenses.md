@@ -58,7 +58,9 @@ planning basis names River (MPL-2.0) for background jobs.
    If OSV-Scanner reports a license as `UNKNOWN` or `non-standard` (deps.dev does not know the
    license text as an SPDX expression), the license is checked in the LICENSE file of the package
    and recorded with a reason in an `osv-scanner.toml` of the component as `PackageOverrides`;
-   never as a blanket rule for all packages.
+   never as a blanket rule for all packages. A test (`tools/ci/tests/test_osv_ignores.py`) fails
+   when a Pub override of the root `osv-scanner.toml` names a package version that the root
+   `pubspec.lock` no longer holds.
    The Grafana panel plugin (M7-25) ships only its own code: React, Emotion and `@grafana/*` are
    webpack externals that Grafana provides, and the rest of its lock are build and test tools.
    Its `osv-scanner.toml` therefore also lists, per package version and with a reason,
