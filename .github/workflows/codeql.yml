@@ -88,7 +88,7 @@ jobs:
         if: matrix.language == 'go'
         working-directory: services/host
         env:
-          # bothy-host ships without cgo (docs/DECISIONS.md D-M2-38-6).
+          # bothy-host ships without cgo (docs/DECISIONS-FOUNDATION.md D-M2-38-6).
           CGO_ENABLED: "0"
         run: go build ./...
       - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3

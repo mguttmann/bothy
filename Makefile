@@ -345,8 +345,10 @@ test: ## All tests with coverage data
 	else for p in $(PY_PROJECTS); do (cd $$p && $(UV) run --locked pytest --cov --cov-report=xml:coverage.xml); done; fi
 	@if [ -z "$(TS_ON)" ]; then $(call skip,ts-test,no TypeScript project selected); \
 	else for p in $(TS_PROJECTS); do npm --prefix $$p test; done; fi
-	@# The setup wizard infra/compose/install.sh with stubs, in a pinned container (docs/quality/gates.md).
-	@if [ ! -f infra/compose/test/install/run.sh ]; then $(call skip,install-test,no tests of infra/compose/install.sh); \
+	@# The setup wizard infra/compose/install.sh with stubs, in a pinned container (docs/quality/gates.md),
+	@# with the area tools only: in CI once in test (tools), not in every test job (ci-gates-17).
+	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,install-test); \
+	elif [ ! -f infra/compose/test/install/run.sh ]; then $(call skip,install-test,no tests of infra/compose/install.sh); \
 	else $(MAKE) --no-print-directory install-test || exit 1; fi
 
 # G7 (06 "Contract tests and gate"): the Go test starts the server of this tree with a throwaway

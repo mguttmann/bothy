@@ -13,11 +13,16 @@ Every finding names a rule:
   invalid-yaml                  file does not parse or has no jobs
   missing-permissions           no top-level `permissions`
   broad-permissions             `permissions: write-all`, on top level or on a job
+  top-level-write               a write permission in the top-level `permissions`: top level
+                                grants reads only, a job that needs a write names it itself
   actions-write                 `actions: write`, on top level or on a job, in any workflow:
                                 with it the GITHUB_TOKEN can start workflow_dispatch runs,
                                 for example of portability.yml, outside the one run per tag
                                 of its release (D-W-111)
   pull-request-target           the pull_request_target trigger
+  workflow-run                  the workflow_run trigger: its jobs run with the rights and
+                                secrets of the default branch after any run, also one of a
+                                pull request from a fork
   push-on-branch                a push trigger that is not limited to tags (only the
                                 post-merge workflows and MAIN_PUSH_WORKFLOWS may name
                                 exactly `main`, only build-verify.yml exactly `build/**`)
@@ -197,6 +202,8 @@ def _check_uses(file: str, where: str, uses: Any, out: list[Finding]) -> None:
 def _check_triggers(file: str, triggers: dict[str, Any], out: list[Finding]) -> None:
     if "pull_request_target" in triggers:
         out.append(Finding(file, "on", "pull-request-target", "use pull_request instead"))
+    if "workflow_run" in triggers:
+        out.append(Finding(file, "on", "workflow-run", "use a schedule or the workflow itself"))
     if "push" in triggers:
         push = triggers["push"] or {}
         tag_only = isinstance(push, dict) and (
@@ -493,7 +500,15 @@ def check_workflow(file: str, text: str) -> list[Finding]:
     if "permissions" not in doc:
         out.append(Finding(file, "permissions", "missing-permissions", "set contents: read"))
     else:
+        before = len(out)
         _check_permissions(file, "permissions", doc["permissions"], out)
+        top = doc["permissions"]
+        writes = (
+            sorted(k for k, v in top.items() if str(v) == "write") if isinstance(top, dict) else []
+        )
+        if len(out) == before and writes:
+            detail = f"{', '.join(writes)}: write only on the job that needs it"
+            out.append(Finding(file, "permissions", "top-level-write", detail))
     triggers = _triggers(doc)
     _check_triggers(file, triggers, out)
     for name, job in doc["jobs"].items():
