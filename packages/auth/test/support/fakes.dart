@@ -293,6 +293,12 @@ class FakePrompt implements StepUpPrompt {
   /// The answer of each prompt.
   bool answer = true;
 
+  /// Called when a prompt opens, before it answers.
+  void Function(String purposeText)? onAsk;
+
+  /// When set, a prompt answers only when this completes (with its value).
+  Completer<bool>? hold;
+
   /// Texts shown.
   final List<String> asked = [];
 
@@ -306,6 +312,9 @@ class FakePrompt implements StepUpPrompt {
   @override
   Future<bool> ask(String purposeText) async {
     asked.add(purposeText);
+    onAsk?.call(purposeText);
+    final held = hold;
+    if (held != null) return held.future;
     return answer;
   }
 

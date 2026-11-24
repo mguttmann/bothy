@@ -4,6 +4,8 @@
 /// 6.2, 6.3, 14.3; 06 3.3; brief M4-09 Design note 6).
 library;
 
+import 'dart:async';
+
 import 'package:api_client/api_client.dart';
 import 'package:auth/src/errors.dart';
 import 'package:auth/src/jose.dart';
@@ -40,10 +42,15 @@ typedef StepUpCredentials = ({String password, String totpCode});
 /// Confirms the current session with the step-up key, or with password and TOTP on a device
 /// without one.
 ///
-/// One confirmation with the key: `createStepUpChallenge`, [StepUpPrompt.ask], the step-up key
+/// One confirmation with the key: [StepUpPrompt.ask], `createStepUpChallenge` (after the
+/// prompt, because the challenge lives only `auth.step_up_challenge_ttl`), the step-up key
 /// signs a compact JWS whose header is only `{"alg":"ES256"}` (no `jwk`, `jku`, `x5u`, `x5c`,
 /// `crit`) over `{challenge, sid, iat}`, then `completeStepUpWithDeviceKey`. The terminal's
 /// fresh step-up (08 6.3) is the same flow; the server consumes it.
+///
+/// [confirm] runs at most one step-up at a time: a caller that asks while one runs joins it
+/// and gets its result, because one confirmation counts for every request of the session for
+/// `auth.step_up_max_age`. [confirmFresh] never joins.
 ///
 /// A device without a step-up key (Windows, D-M4-11-2) confirms with password and TOTP (08
 /// 6.2): `createStepUpChallenge`, [StepUpPrompt.askPassword], then `stepUpWithPassword`. A
@@ -66,6 +73,8 @@ final class StepUpService {
 
   static const Map<String, Object?> _internal = {internalRequestExtra: true};
 
+  Future<void>? _running;
+
   /// Runs one step-up for the current session.
   ///
   /// Throws [StepUpCancelled] when the person declines the prompt or the signer reports a
@@ -73,8 +82,23 @@ final class StepUpService {
   /// `403 step_up_not_possible` (no local account) or `404` (local passwords switched off) for
   /// the password, [NotSignedIn] without a session, and the `DioException` of a rejected
   /// challenge or confirmation otherwise (`401 step_up_required` of the device key or with
-  /// reason [passwordLockedReason], `401 session_revoked`, `403 forbidden`).
-  Future<void> confirm({required String purposeText}) async {
+  /// reason [passwordLockedReason], `401 session_revoked`, `403 forbidden`). While a step-up
+  /// runs, a further call joins it (its [purposeText] is not shown) and ends as that one ends.
+  Future<void> confirm({required String purposeText}) {
+    final running = _running;
+    if (running != null) return running;
+    final next = _confirm(purposeText);
+    _running = next;
+    // Free the slot when this step-up ends, whichever way; a later caller starts a new one.
+    unawaited(
+      next.then<void>((_) {}, onError: (Object _) {}).whenComplete(() {
+        if (identical(_running, next)) _running = null;
+      }),
+    );
+    return next;
+  }
+
+  Future<void> _confirm(String purposeText) async {
     final key = _core.keys.stepUp;
     if (key == null) return _confirmWithPassword(purposeText);
     await _confirmWithKey(key, purposeText);
@@ -92,12 +116,15 @@ final class StepUpService {
   }
 
   Future<void> _confirmWithKey(DeviceKeySigner key, String purposeText) async {
+    if (_core.tokens.state?.session == null) throw const NotSignedIn();
+    if (!await _prompt.ask(purposeText)) throw const StepUpCancelled();
+    // The challenge comes after the prompt, as in the password path: it lives
+    // auth.step_up_challenge_ttl, and a prompt left open longer must not sign an expired one.
     final challenge = (await _core.api.getAuthApi().createStepUpChallenge(
       extra: _internal,
     )).data!;
     final session = _core.tokens.state?.session;
     if (session == null) throw const NotSignedIn();
-    if (!await _prompt.ask(purposeText)) throw const StepUpCancelled();
     final String jws;
     try {
       jws = await signCompactJws(

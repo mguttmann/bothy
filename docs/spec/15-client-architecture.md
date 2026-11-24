@@ -572,12 +572,16 @@ changes (docs/decisions.d/AUD-client-settings-01.md).
   stops asking when the password path is locked (reason `password_locked`); the web
   console uses WebAuthn passkeys. For
   `terminal.open` and `terminal.attach` the step-up is fresh and is consumed (08, section
-  6.3); for this the console uses only a passkey with `userVerification = required`.
+  6.3); for this the console uses only a passkey with `userVerification = required`. The app
+  creates the challenge after the person answered the prompt, because it lives only
+  `auth.step_up_challenge_ttl`, and runs one step-up at a time: requests that need one while a
+  step-up runs wait for it and repeat after it (the terminal's fresh step-up never joins).
 - **Interceptor order:** `packages/auth` fills the auth slot of `createApiClient` with
   `RefreshInterceptor`, `DpopInterceptor` and `StepUpInterceptor` in this order, so a request is
   refreshed before its proof hashes the token, and each interceptor answers only its own problem
   code (`token_expired`, `use_dpop_nonce`, `invalid_dpop_proof`, `step_up_required`) with at most
-  one repeat each. On `invalid_dpop_proof` the proof is signed anew (new `iat`, new `jti`, the
+  one repeat each. A repeat stays without the `StepUpInterceptor` when the request came
+  through a client without it (the terminal's, 23.1). On `invalid_dpop_proof` the proof is signed anew (new `iat`, new `jti`, the
   current nonce); the error never ends the session, because the server revokes nothing for it
   ([08](08-identity.md) section 7.3). A refresh request has connect, send and receive timeouts
   that end it well before `auth.dpop_proof_max_age`, so a request held while the device sleeps

@@ -23,9 +23,13 @@ const _refreshRetried = 'auth.refresh_retried';
 const _stepUpRetried = 'auth.step_up_retried';
 const _tokenVersion = 'auth.token_version';
 const _generation = 'auth.generation';
+const _repeated = 'auth.repeated';
+const _stepUpOwned = 'auth.step_up_owned';
 
 /// Repeats the request of [err] through every interceptor of [core]'s client and hands the
-/// result to [handler]; every auth repeat goes through here.
+/// result to [handler]; every auth repeat goes through here. A request that came through a
+/// client without the [StepUpInterceptor] (the terminal's) stays without it on the repeat: the
+/// interceptor answers only requests it saw first.
 ///
 /// A late answer to a request of an earlier session is never resent with the token of the
 /// session that replaced it. A `FormData` body is sent as a fresh clone, because Dio finalizes
@@ -45,6 +49,7 @@ Future<void> _repeat(
   } else if (data is Stream) {
     return handler.next(err);
   }
+  options.extra[_repeated] = true;
   try {
     handler.resolve(await core.api.dio.fetch<Object?>(options));
   } on DioException catch (e) {
@@ -232,13 +237,21 @@ const String stepUpPurposeExtra = 'auth.step_up_purpose';
 /// new proof and the current token (08 6.2, 6.3, 14.3; brief M4-09 Design note 6).
 ///
 /// A cancelled prompt ends the request with [StepUpCancelled]; a second `step_up_required`
-/// after a successful confirmation goes to the caller, never into a loop.
+/// after a successful confirmation goes to the caller, never into a loop. A request that was
+/// first sent through a client without this interceptor is not answered, also when a nonce,
+/// proof or refresh repeat sent it through the session's client.
 class StepUpInterceptor extends Interceptor {
   /// Internal: created by the session over its [SessionCore] with its `stepUp` service.
   StepUpInterceptor(this._core, this._stepUp);
 
   final SessionCore _core;
   final StepUpService _stepUp;
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    if (options.extra[_repeated] != true) options.extra[_stepUpOwned] = true;
+    handler.next(options);
+  }
 
   @override
   Future<void> onError(
@@ -248,6 +261,7 @@ class StepUpInterceptor extends Interceptor {
     final options = err.requestOptions;
     final problem = problemOf(err);
     if (!needsToken(options) ||
+        options.extra[_stepUpOwned] != true ||
         options.extra[internalRequestExtra] == true ||
         problem == null ||
         problem.status != 401 ||
