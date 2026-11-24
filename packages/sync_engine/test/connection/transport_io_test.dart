@@ -55,6 +55,30 @@ void main() {
     await channel.frames.drain<void>().timeout(const Duration(seconds: 5));
   });
 
+  test('a stalled upgrade ends at the timeout and aborts its socket', () async {
+    // A server that accepts the TCP connection and never answers the upgrade.
+    final silent = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    final aborted = Completer<void>();
+    silent.listen((socket) {
+      socket.listen((_) {}, onDone: aborted.complete, onError: (Object _) {});
+    });
+    addTearDown(silent.close);
+    final started = DateTime.now();
+    await expectLater(
+      IoGatewayTransport().connect(
+        Uri.parse('ws://127.0.0.1:${silent.port}/api/v1/gateway'),
+        timeout: const Duration(milliseconds: 200),
+      ),
+      throwsA(isA<TimeoutException>()),
+    );
+    expect(
+      DateTime.now().difference(started),
+      lessThan(const Duration(seconds: 5)),
+    );
+    // The stalled handshake does not run on beside the next attempt (04 6.1).
+    await aborted.future.timeout(const Duration(seconds: 5));
+  });
+
   test('a failed upgrade throws', () async {
     await expectLater(
       IoGatewayTransport().connect(url.replace(path: '/other')),

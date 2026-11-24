@@ -324,7 +324,7 @@ final class GatewayConnection {
     if (!await _admitted(gen)) return;
     final GatewayChannel ch;
     try {
-      ch = await _transport.connect(_gatewayUrl);
+      ch = await _transport.connect(_gatewayUrl, timeout: _connectTimeout);
     } on Object catch (e) {
       if (gen != _channelGen) return;
       _log('connect failed: ${e.runtimeType}');

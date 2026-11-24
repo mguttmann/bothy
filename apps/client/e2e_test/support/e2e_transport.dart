@@ -60,9 +60,9 @@ final class RecordingTransport implements GatewayTransport {
   }
 
   @override
-  Future<GatewayChannel> connect(Uri url) async {
+  Future<GatewayChannel> connect(Uri url, {Duration? timeout}) async {
     try {
-      final channel = await _inner.connect(url);
+      final channel = await _inner.connect(url, timeout: timeout);
       opened++;
       return _Recorded(channel, this);
     } on Object catch (e) {
@@ -119,7 +119,7 @@ final class _Recorded implements GatewayChannel {
 /// The transport of `IoGatewayTransport` (text frames only, 04 2.3) with a fresh client.
 final class _IoTransport implements GatewayTransport {
   @override
-  Future<GatewayChannel> connect(Uri url) async {
+  Future<GatewayChannel> connect(Uri url, {Duration? timeout}) async {
     final socket = await WebSocket.connect(
       url.toString(),
       customClient: HttpClient(),

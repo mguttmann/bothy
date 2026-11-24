@@ -207,6 +207,9 @@ class FakeTransport implements GatewayTransport {
   /// Every URL connected to.
   final List<Uri> urls = [];
 
+  /// The timeout of every connect, in order.
+  final List<Duration?> timeouts = [];
+
   /// How many of the next connects fail with a network error.
   int failNext = 0;
 
@@ -220,9 +223,10 @@ class FakeTransport implements GatewayTransport {
   FakeChannel get last => channels.last;
 
   @override
-  Future<GatewayChannel> connect(Uri url) async {
+  Future<GatewayChannel> connect(Uri url, {Duration? timeout}) async {
     attempts++;
     urls.add(url);
+    timeouts.add(timeout);
     if (failNext > 0) {
       failNext--;
       throw const SocketLikeError();

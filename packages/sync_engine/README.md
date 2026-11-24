@@ -37,7 +37,8 @@ the first after a random fraction; a missing `heartbeat_ack` within one interval
 `resumed`; a network change or the foreground starts an attempt at once without raising `n`.
 An attempt that has not reached `ready` or `resumed` within `client.sync.connect_timeout` (a
 stalled connect, no `hello`, no answer to `identify` or `resume`) is dropped and waits the
-backoff like a failed connect.
+backoff like a failed connect; the transport gets the same deadline and aborts a stalled open,
+so it never runs on beside the next attempt.
 A server frame that does not decode is counted (`decodeErrors`) and skipped; unknown ops and
 fields are ignored.
 
