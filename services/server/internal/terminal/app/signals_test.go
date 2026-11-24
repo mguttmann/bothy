@@ -60,6 +60,8 @@ type recSignals struct {
 	committed []domain.Signal
 	outside   int
 	failStage bool
+	// inUnit counts the Committed calls whose context still carries a unit of work.
+	inUnit int
 }
 
 func (r *recSignals) Stage(ctx context.Context, s domain.Signal) error {
@@ -75,9 +77,12 @@ func (r *recSignals) Stage(ctx context.Context, s domain.Signal) error {
 	return nil
 }
 
-func (r *recSignals) Committed(_ context.Context, s domain.Signal) {
+func (r *recSignals) Committed(ctx context.Context, s domain.Signal) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if txn.InUnit(ctx) {
+		r.inUnit++
+	}
 	r.committed = append(r.committed, s)
 }
 
@@ -218,6 +223,32 @@ func TestUseCasesStageSignals(t *testing.T) {
 		}
 		if got := kinds(rec.committed); len(got) != 1 || got[0] != domain.SignalHostClose || len(rec.staged) != 1 || rec.outside != 0 {
 			t.Fatalf("re-pairing: staged %+v committed %+v", rec.staged, rec.committed)
+		}
+	})
+	// Inside an outer unit (the Idempotency-Key stage runs the whole request in one) the host_close
+	// waits for the outermost commit and never comes after its rollback (srv-terminal-5).
+	t.Run("outer_unit", func(t *testing.T) {
+		t.Parallel()
+		for _, commit := range []bool{false, true} {
+			w := newSWorld(t, nil)
+			rec := &recSignals{}
+			w.svc.BindSignals(rec)
+			u, ctrl := txn.NewControlledUnit(nil, txn.Options{})
+			_, err := w.svc.SetState(txn.WithUnit(ctx, u), w.alex, terminal.SetHostState{HostID: w.r1, State: "disabled", Reason: "test",
+				IfMatch: terminal.Precondition{Present: true, Valid: true, Version: w.store.hosts[w.r1].Version}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(rec.committed) != 0 {
+				t.Fatalf("host_close before the outer commit: %+v", rec.committed)
+			}
+			if !commit {
+				continue // the outer unit rolls back: nothing runs its registrations
+			}
+			ctrl.Committed()
+			if got := kinds(rec.committed); len(got) != 1 || got[0] != domain.SignalHostClose || rec.inUnit != 0 {
+				t.Fatalf("after the outer commit: committed %+v, %d inside a unit", rec.committed, rec.inUnit)
+			}
 		}
 	})
 }
