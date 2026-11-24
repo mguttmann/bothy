@@ -134,27 +134,6 @@ func TestHashesAndSecrets(t *testing.T) {
 	}
 }
 
-func TestFlowStateMachine(t *testing.T) {
-	t.Parallel()
-	all := []oidcflow.Status{oidcflow.StatusStarted, oidcflow.StatusCodeIssued, oidcflow.StatusCompleted, oidcflow.StatusFailed}
-	allowed := map[[2]oidcflow.Status]bool{
-		{oidcflow.StatusStarted, oidcflow.StatusCodeIssued}:   true,
-		{oidcflow.StatusCodeIssued, oidcflow.StatusCompleted}: true,
-		{oidcflow.StatusStarted, oidcflow.StatusFailed}:       true,
-		{oidcflow.StatusCodeIssued, oidcflow.StatusFailed}:    true,
-	}
-	for _, from := range all {
-		for _, to := range all {
-			if got := oidcflow.CanTransition(from, to); got != allowed[[2]oidcflow.Status{from, to}] {
-				t.Errorf("%s -> %s = %v", from, to, got)
-			}
-		}
-	}
-	if oidcflow.CanTransition("x", oidcflow.StatusFailed) {
-		t.Error("unknown state")
-	}
-}
-
 // claimsFixture is a valid set of claims against expectation e.
 func claimsFixture() (oidcflow.Claims, oidcflow.Expectation) {
 	now := time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)

@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/rand"
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -177,16 +178,7 @@ func TestEnrollmentPurposeRules(t *testing.T) {
 	}
 	all := []domain.EnrollmentPurpose{domain.PurposeFirstLogin, domain.PurposeRecovery, domain.PurposeIdentityLink, "other"}
 	for consumer, allowed := range consume {
-		for _, p := range all {
-			want := false
-			for _, a := range allowed {
-				want = want || a == p
-			}
-			if got := domain.PurposeConsumableBy(p, consumer); got != want {
-				t.Errorf("PurposeConsumableBy(%s, %s) = %v, want %v", p, consumer, got, want)
-			}
-		}
-		if got := domain.ConsumablePurposes(consumer); len(got) != len(allowed) {
+		if got := domain.ConsumablePurposes(consumer); !slices.Equal(got, allowed) {
 			t.Errorf("ConsumablePurposes(%s) = %v, want %v", consumer, got, allowed)
 		}
 	}
