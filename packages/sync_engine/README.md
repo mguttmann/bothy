@@ -270,6 +270,9 @@ Life cycle of an entry:
 | `waiting` | backing off until `next_attempt_at` | `sending` |
 | `failed` | refused for good, with the problem code and reason; after `412` also the `current` revision | edited, sent again with a new ID, or discarded by the person |
 
+A refused `putReadState`, `putThreadDraft` or `deleteThreadDraft` without dependents does not
+become `failed`: no view shows it, so the row is deleted and the refusal logged.
+
 - One worker per FIFO lane sends the oldest entry and the next only after the response (04 13.2
   item 2). The lane is the thread, or the lane the executor names for writes outside a thread
   (`setting:<key>`, `message:<id>`, the client's `upload:<channel id>`); lanes run in parallel, bounded only by the

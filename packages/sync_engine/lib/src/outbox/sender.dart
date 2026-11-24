@@ -15,6 +15,7 @@ import 'backoff.dart';
 import 'classify.dart';
 import 'dependencies.dart';
 import 'executors.dart';
+import 'operations/personal_ops.dart';
 
 /// Called with a confirmed entry and its response before the entry leaves the outbox; stores
 /// what the response returned (for example the server's message).
@@ -41,6 +42,13 @@ final class SerialLock {
     return result;
   }
 }
+
+/// The kinds whose failed entries no view shows; they are removed instead of kept as failed.
+const Set<String> _unseenWhenFailed = {
+  PersonalOps.putReadState,
+  PersonalOps.putThreadDraft,
+  PersonalOps.deleteThreadDraft,
+};
 
 /// The scheduler and the workers of the outbox.
 final class OutboxSender {
@@ -337,6 +345,16 @@ final class OutboxSender {
     // response changes nothing and adds no second display entry.
     final stored = await dao.byId(sent.id);
     if (stored == null) return;
+    if ((outcome.outcome == OutcomeClass.failed ||
+            outcome.outcome == OutcomeClass.conflict) &&
+        _unseenWhenFailed.contains(stored.kind) &&
+        (await dependentsOf(stored.id)).isEmpty) {
+      // No view shows a failed read state or draft write: a kept row would only grow the
+      // outbox and keep the draft text for good.
+      log?.call('outbox: ${stored.kind} failed (${outcome.code}), removed');
+      await dao.delete(stored.id);
+      return;
+    }
     switch (outcome.outcome) {
       case OutcomeClass.confirmed:
         final r = response ?? const OutboxResponse();
