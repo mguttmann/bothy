@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -182,21 +183,23 @@ type PersonalDataStore interface {
 // and pseudonymize (6) of the account deletion as the system: no caller, no authorize, no audit
 // entry per row (privacy writes the one entry of step 7). It is safe for concurrent use.
 type PersonalData struct {
-	l    *Lifecycle
-	rows PersonalDataStore
+	l        *Lifecycle
+	rows     PersonalDataStore
+	redactor eventlog.Redactor
 }
 
 // Compile-time check: PersonalData is a participant of kernel/personaldata.
 var _ personaldata.Participant = (*PersonalData)(nil)
 
 // NewPersonalData returns the participant over the revocation use cases l (their store, people,
-// session and token use cases do the revocations and append the events) and rows. Errors: a
+// session and token use cases do the revocations and append the events), rows and the redactor
+// of the event log, which step 6 uses for the stored user.updated events of the person. Errors: a
 // missing collaborator.
-func NewPersonalData(l *Lifecycle, rows PersonalDataStore) (*PersonalData, error) {
-	if l == nil || rows == nil {
-		return nil, errors.New("identity: NewPersonalData needs the lifecycle use cases and the personal data store")
+func NewPersonalData(l *Lifecycle, rows PersonalDataStore, redactor eventlog.Redactor) (*PersonalData, error) {
+	if l == nil || rows == nil || redactor == nil {
+		return nil, errors.New("identity: NewPersonalData needs the lifecycle use cases, the personal data store and the event log redactor")
 	}
-	return &PersonalData{l: l, rows: rows}, nil
+	return &PersonalData{l: l, rows: rows, redactor: redactor}, nil
 }
 
 // Module returns "identity".
@@ -518,7 +521,54 @@ func (p *PersonalData) pseudonymizeLocked(ctx context.Context, userID ids.ID, fi
 	if !found {
 		return errs.New(errs.CodeInternalError, "identity: a pseudonymized person is gone")
 	}
-	return p.emitUpdated(ctx, userView(after))
+	view := userView(after)
+	// The stored user.updated events of the person carry the old handle and name until
+	// sync.event_retention: their personal members get the pseudonymized values too (20 section
+	// 2, event_log: redaction on deletion); status and the other members stay as stored.
+	if _, err := p.redactor.Redact(ctx, resourceUser, userID, pseudonymizeUserUpdated(view)); err != nil {
+		return err
+	}
+	return p.emitUpdated(ctx, view)
+}
+
+// pseudonymizeUserUpdated returns the RedactFunc of step 6: in a stored user.updated event, handle,
+// display_name, locale and time_zone take the values of the pseudonymized person u and
+// avatar_file_id is removed; every other event and member stays as stored.
+func pseudonymizeUserUpdated(u identity.UserView) eventlog.RedactFunc {
+	return func(eventType string, _ int, payload json.RawMessage) (json.RawMessage, error) {
+		if eventType != eventUserUpdated {
+			return payload, nil
+		}
+		var outer, user map[string]json.RawMessage
+		if err := json.Unmarshal(payload, &outer); err != nil {
+			return nil, errs.Wrap(errs.CodeInternalError, err, "identity: stored user.updated payload")
+		}
+		if err := json.Unmarshal(outer["user"], &user); err != nil {
+			return nil, errs.Wrap(errs.CodeInternalError, err, "identity: stored user.updated payload")
+		}
+		setMember(user, "handle", u.Handle, false)
+		setMember(user, "display_name", u.DisplayName, false)
+		setMember(user, "locale", u.Locale, true)
+		setMember(user, "time_zone", u.TimeZone, true)
+		delete(user, "avatar_file_id")
+		b, err := json.Marshal(user)
+		if err != nil {
+			return nil, errs.Wrap(errs.CodeInternalError, err, "identity: user.updated payload")
+		}
+		outer["user"] = b
+		return json.Marshal(outer)
+	}
+}
+
+// setMember sets the string member key of m to value; with omitEmpty an empty value removes it,
+// as the omitempty members of userJSON are left out.
+func setMember(m map[string]json.RawMessage, key, value string, omitEmpty bool) {
+	if omitEmpty && value == "" {
+		delete(m, key)
+		return
+	}
+	b, _ := json.Marshal(value) // a string always encodes
+	m[key] = b
 }
 
 // emitUpdated appends user.updated for u with the system as actor (05 rule 10).

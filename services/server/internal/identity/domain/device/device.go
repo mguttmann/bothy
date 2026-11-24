@@ -41,19 +41,6 @@ const (
 	StateRevoked State = "revoked"
 )
 
-// Transition checks the state machine pending -> active, pending -> revoked, active -> revoked.
-// Every other pair, and a state outside the three, is 409 invalid_state_transition. Approval
-// (M1-38) and revocation (M1-45) call it before they write.
-func (s State) Transition(to State) error {
-	switch {
-	case s == StatePending && (to == StateActive || to == StateRevoked):
-		return nil
-	case s == StateActive && to == StateRevoked:
-		return nil
-	}
-	return errs.New(errs.CodeInvalidStateTransition, "the device state does not allow this change")
-}
-
 // Platform is devices.platform.
 type Platform string
 

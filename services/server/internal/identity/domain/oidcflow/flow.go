@@ -28,23 +28,6 @@ const (
 	StatusFailed Status = "failed"
 )
 
-// CanTransition reports whether a flow may move from from to to: started to code_issued,
-// code_issued to completed, and started or code_issued to failed. Every other move, including a
-// repeated one, is refused, so a replayed callback or a second redemption cannot change a flow.
-func CanTransition(from, to Status) bool {
-	switch to {
-	case StatusCodeIssued:
-		return from == StatusStarted
-	case StatusCompleted:
-		return from == StatusCodeIssued
-	case StatusFailed:
-		return from == StatusStarted || from == StatusCodeIssued
-	case StatusStarted:
-		// A flow is created started; nothing moves back to it.
-	}
-	return false
-}
-
 // Mode is auth_login_flows.mode.
 type Mode string
 

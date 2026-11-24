@@ -109,7 +109,7 @@ personal data, also of third parties and also special categories under Art. 9),
 | `enrollment_codes` (03, 08) | indirect | hash, times | `security` | `retention.security_after_end` |
 | `auth_login_flows` (03, 08) | direct | login flow; between callback and completion the verified identity from the provider (`external_identity`: subject, display name, email hint), empty afterwards | `transient` | `auth.login_flow_ttl` |
 | `device_pairings` (03, 08) | indirect | pairing process with public device keys | `transient` | `auth.pairing_code_ttl` |
-| `auth_challenges` (03, 08) | indirect | one-time challenges for step-up and passkeys, counted failed attempts | `transient` | `auth.step_up_challenge_ttl` or `auth.login_flow_ttl`, respectively, deleted by the job `identity.auth_cleanup`; a failed step-up challenge stays until its `finished_at` leaves `auth.login_fail_window` (08 section 13) |
+| `auth_challenges` (03, 08) | indirect | one-time challenges for step-up and passkeys, counted failed attempts | `transient` | `auth.step_up_challenge_ttl` or `auth.login_flow_ttl`, respectively, deleted by the job `identity.auth_cleanup`; a failed step-up challenge stays until its `finished_at` leaves `auth.login_fail_window`, the used challenge of a live session's current step-up as long as that session and step-up (08 section 13) |
 | `dev_environments` (03, 21; milestone) | indirect | environment of a person, check results | `security` | after `retired` plus `retention.security_after_end` |
 | `hosts` (03, 24) | indirect | host name (often with names of persons), host assignee, holder of the LLM login, public keys, operating system, reported names of the session users with display names of their working folders, check results (with the name of every session user or former session user that the rule for names from 24, section 2.2 names; never names of other users of the host), last seen | `security` | after `retired` plus `retention.security_after_end` |
 | `host_session_users` (03, 24) | indirect | which person has or had which session user on which host, who assigned and ended it | `security` | after `retired` of the host plus `retention.security_after_end`; never deleted before that, so that no name becomes free again (24, section 2.2); on account deletion with a pseudonymous ID |
@@ -597,7 +597,7 @@ impact assessment (Art. 35 GDPR); agents with access to employee data can be a r
 | ID | Test | Expected |
 |---|---|---|
 | DP-T01 | Delete a message | content, revisions, attachments, search hits, event payloads empty; journal entry |
-| DP-T02 | Delete an account with `keep_pseudonymized` and with `delete` | steps from 4.4 verifiable; no clear data in `principals`, `users`; the audit chain still verifies (`audit.verify`) |
+| DP-T02 | Delete an account with `keep_pseudonymized` and with `delete` | steps from 4.4 verifiable; no clear data in `principals`, `users` and the stored `user.updated` events of the person in `event_log`; the audit chain still verifies (`audit.verify`) |
 | DP-T03 | Export | package matches the schema; no foreign messages, no secrets, no hashes; checksums match |
 | DP-T04 | Export expiry | package deleted after `privacy.export_ttl` |
 | DP-T05 | Retention job per class with a controlled clock | only expired data removed |

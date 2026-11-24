@@ -146,7 +146,7 @@ func (t *Terminal) bindSessionMetrics(override terminalapp.SessionMetrics) error
 // the recorder and appender of w, the identity module id (the pairing codes of identity.Tokens and
 // the directory of people), the clock (nil means clock.System()) and the test seam
 // beforeOpenCommit (terminalapp.Deps.BeforeOpenCommit; nil in production). Presence is
-// NoConnections until M2-43 builds the control connections. It opens no connection. Errors: a
+// NoConnections until the registry of the control connections is bound (terminalapp.Service). It opens no connection. Errors: a
 // missing collaborator or a configuration value the use cases refuse.
 func NewTerminal(cfg terminalapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, w IdentityWrites, id *Identity,
 	clk clock.Clock, beforeOpenCommit func(), _ *slog.Logger) (*Terminal, error) {

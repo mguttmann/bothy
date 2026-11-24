@@ -201,7 +201,7 @@ func personalDataList(m personalDataModules) ([]personaldata.Participant, error)
 	if err != nil {
 		return nil, err
 	}
-	people, err := m.identity.PersonalData()
+	people, err := m.identity.PersonalData(syncpg.NewRedactor(m.pool))
 	if err != nil {
 		return nil, err
 	}

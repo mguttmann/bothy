@@ -253,6 +253,35 @@ func TestRedeemFailedAttemptSurvivesRollback(t *testing.T) {
 	w.want(w.redeem(w.phoneKeys(), res.Code.Code, nil), http.StatusCreated, "")
 }
 
+func TestRedeemOnKnownPendingDeviceKeepsTheCode(t *testing.T) {
+	t.Parallel()
+	w := newSessionWorld(t)
+	res := w.bootstrap("alex")
+	p := w.phoneKeys()
+	// A password or passkey login left the device pending (not confirmed by a code).
+	_, err := w.id.Logins.CompleteLogin(context.Background(), app.LoginCompletion{
+		UserID: res.OwnerID, AuthMethod: identity.AuthPasskey, ProofJKT: p.jkt, Trust: app.TrustUnconfirmed,
+		Device: identity.RegisterDevice{DeviceID: p.id, Name: "Alex Phone", Platform: identity.PlatformIOS, DPoPKey: p.pub},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pr := w.want(w.redeem(p, res.Code.Code, nil), http.StatusConflict, "conflict")
+	if pr["reason"] != "device_pending" {
+		t.Fatalf("problem %v, want reason device_pending", pr)
+	}
+	var state string
+	w.scalar(&state, `SELECT state FROM devices WHERE id = $1`, p.id.String())
+	if state != "pending" {
+		t.Fatalf("device %s, want pending", state)
+	}
+	if n := w.count(`SELECT count(*) FROM enrollment_codes WHERE id = $1 AND used_at IS NULL`, res.Code.ID.String()); n != 1 {
+		t.Fatal("the refused code was consumed")
+	}
+	// The code still enrolls a new device.
+	w.want(w.redeem(w.phoneKeys(), res.Code.Code, nil), http.StatusCreated, "")
+}
+
 func TestRedeemUnknownCodeDoesNotTouchAttempts(t *testing.T) {
 	t.Parallel()
 	w := newSessionWorld(t)
@@ -536,10 +565,16 @@ func TestCompleteLoginDeviceRules(t *testing.T) {
 	if approved != 1 {
 		t.Fatal("a pending device has approved_at")
 	}
-	// The known pending device with the same key is reused unchanged, even by a confirming path.
-	r, err = login(alex, pending, pending.jkt, app.TrustConfirmed)
+	// The known pending device with the same key is reused unchanged by an unconfirmed login.
+	r, err = login(alex, pending, pending.jkt, app.TrustUnconfirmed)
 	if err != nil || r.NewDevice || r.Device.State != identity.DeviceStatePending {
 		t.Fatalf("known device: %+v, %v", r, err)
+	}
+	// A confirming path (a code) is refused on it: the code would be spent on a device that
+	// stays pending; the device is approved with its verification code instead.
+	_, err = login(alex, pending, pending.jkt, app.TrustConfirmed)
+	if e, ok := errs.As(err); !ok || e.Code != errs.CodeConflict || e.Reason != "device_pending" {
+		t.Fatalf("known pending device with a code: %v, want conflict device_pending", err)
 	}
 	other := w.phoneKeys()
 	other.id = confirmed.id

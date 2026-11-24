@@ -80,8 +80,8 @@ type Modules struct {
 }
 
 // NewModules returns the module objects over pool with log for their reports; pool may be nil
-// where no unit of work runs (the golden test). It opens no connection. The rights hook gets the
-// empty structure and agent policy sources until M1-54 and M1-51.
+// where no unit of work runs (the golden test). It opens no connection. The rights hook builds
+// its principal, structure, agent policy and host sources over pool (NewRightsHook).
 func NewModules(pool *pg.Pool, log *slog.Logger) *Modules { return NewModulesWithClock(pool, nil, log) }
 
 // NewModulesWithClock is NewModules with the clock of the rights hook (nil means clock.System()):

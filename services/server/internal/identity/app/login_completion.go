@@ -309,9 +309,14 @@ func loginActor(ctx context.Context, userID ids.ID, set identity.TokenSet) conte
 	return actor.WithActor(ctx, actor.Actor{Kind: actor.KindUser, ID: userID, SessionID: set.Session.ID, DeviceID: set.Device.ID})
 }
 
+// reasonDevicePending is the reason of the 409 of a confirmed login (a code or a pairing) on a
+// known pending device.
+const reasonDevicePending = "device_pending"
+
 // loginDevice validates the registration of in, checks its dpop key against the proof key and
 // returns the device of the login: a new one, or the known device of the same person with the
-// same active key (isNew false, state unchanged).
+// same active key (isNew false, state unchanged). A confirmed login on a known pending device is
+// 409 conflict with reason device_pending.
 func (s *Service) loginDevice(ctx context.Context, in LoginCompletion) (identity.Device, bool, error) {
 	reg := device.Registration{
 		ID: in.Device.DeviceID, UserID: in.UserID, Name: in.Device.Name, Platform: device.Platform(in.Device.Platform),
@@ -344,6 +349,12 @@ func (s *Service) loginDevice(ctx context.Context, in LoginCompletion) (identity
 			pendingExpired(known, s.d.Clock.Now(), s.cfg.DevicePendingTTL) {
 			return identity.Device{}, false, errs.New(errs.CodeConflict, "").
 				WithFields(errs.FieldError{Pointer: fieldDeviceID, Code: fieldCodeTaken, Detail: "The device id is taken."})
+		}
+		if in.Trust == TrustConfirmed && known.State == identity.DeviceStatePending {
+			// A code or pairing would be spent on a device that stays pending: refused, so the
+			// unit rolls back and the code stays usable; the device is approved with its
+			// verification code (08 section 5.2).
+			return identity.Device{}, false, errs.New(errs.CodeConflict, "").WithReason(reasonDevicePending)
 		}
 		return known, false, nil
 	}

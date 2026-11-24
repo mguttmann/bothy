@@ -291,6 +291,7 @@ This list equals the allowlist in [infra/otel/collector.yaml](../../infra/otel/c
 | `bothy.billing_mode` | `personal`, `organization` | |
 | `bothy.channel.id`, `bothy.space.id`, `bothy.thread.id`, `bothy.message.id`, `bothy.run.id`, `bothy.file.id` | UUID | never on metrics |
 | `bothy.close.code` | close code from [04-sync-protocol.md](../spec/04-sync-protocol.md) 6.4 | |
+| `bothy.connection.duration` | seconds from the upgrade to the close of a gateway connection | only in the log `gateway connection closed` (info), with `bothy.close.code`, `bothy.outcome` and `bothy.principal.kind`; never on metrics |
 | `bothy.consumer.name` | `push`, `webhooks`, `privacy.journal` | name of the worker consumer ([03-data-model.md](../spec/03-data-model.md) `event_consumer_cursors`) |
 | `bothy.correlation_id` | UUID | only in logs; in spans it is the trace ID |
 | `bothy.csp.blocked_origin` | origin (scheme, host, port) of the blocked URL of a CSP violation report, or one of `inline`, `eval`, `wasm-eval`, `data`, `blob`, `trusted-types-policy`, `trusted-types-sink`, `other`; never a path, a query or the document URL | only in the log `csp violation reported`, never on metrics (M6-03) |
