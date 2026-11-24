@@ -52,73 +52,75 @@ class DsSuggestionList extends StatelessWidget {
         boxShadow: context.dsElevation.menu,
         borderRadius: BorderRadius.circular(DsRadius.md),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Semantics(
-            container: true,
-            liveRegion: true,
-            label: l.composerSuggestions(suggestions.length),
-            child: const SizedBox.shrink(),
-          ),
-          for (var i = 0; i < suggestions.length; i++)
-            DsTappable(
-              key: ValueKey('ds-suggestion-${suggestions[i].id}'),
-              onTap: () => onAccept(suggestions[i]),
-              selected: i == activeIndex,
-              button: false,
-              label: [
-                suggestions[i].command,
-                if (suggestions[i].description != null)
-                  suggestions[i].description!,
-                if (suggestions[i].originName != null)
-                  suggestions[i].originName!,
-                if (suggestions[i].control) l.composerControlCommand,
-              ].join(', '),
-              excludeChildSemantics: true,
-              child: Container(
-                constraints: BoxConstraints(
-                  minHeight: context.dsDensity.rowSuggestion,
-                ),
-                color: i == activeIndex ? c.surfaceSelected : null,
-                padding: const EdgeInsets.symmetric(horizontal: DsSpace.s12),
-                child: Row(
-                  children: [
-                    Text(
-                      suggestions[i].command,
-                      style: dsTextStyle(DsType.codeSm)
-                          .copyWith(color: c.textPrimary),
-                    ),
-                    const SizedBox(width: DsSpace.s8),
-                    Expanded(
-                      child: Text(
-                        suggestions[i].description ?? '',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: secondary,
-                      ),
-                    ),
-                    if (suggestions[i].originName != null) ...[
-                      const SizedBox(width: DsSpace.s8),
+      // The count is the label of the list itself: a node without an area (a zero-size box)
+      // is dropped from the semantics tree and never reaches a screen reader.
+      child: Semantics(
+        container: true,
+        liveRegion: true,
+        explicitChildNodes: true,
+        label: l.composerSuggestions(suggestions.length),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < suggestions.length; i++)
+              DsTappable(
+                key: ValueKey('ds-suggestion-${suggestions[i].id}'),
+                onTap: () => onAccept(suggestions[i]),
+                selected: i == activeIndex,
+                button: false,
+                label: [
+                  suggestions[i].command,
+                  if (suggestions[i].description != null)
+                    suggestions[i].description!,
+                  if (suggestions[i].originName != null)
+                    suggestions[i].originName!,
+                  if (suggestions[i].control) l.composerControlCommand,
+                ].join(', '),
+                excludeChildSemantics: true,
+                child: Container(
+                  constraints: BoxConstraints(
+                    minHeight: context.dsDensity.rowSuggestion,
+                  ),
+                  color: i == activeIndex ? c.surfaceSelected : null,
+                  padding: const EdgeInsets.symmetric(horizontal: DsSpace.s12),
+                  child: Row(
+                    children: [
                       Text(
-                        dsIsolate(suggestions[i].originName!),
-                        style: secondary,
+                        suggestions[i].command,
+                        style: dsTextStyle(DsType.codeSm)
+                            .copyWith(color: c.textPrimary),
                       ),
-                    ],
-                    if (suggestions[i].control) ...[
                       const SizedBox(width: DsSpace.s8),
-                      DsBadge(
-                        text: l.composerControlCommand,
-                        background: c.warningSubtle,
-                        foreground: c.warningFg,
+                      Expanded(
+                        child: Text(
+                          suggestions[i].description ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: secondary,
+                        ),
                       ),
+                      if (suggestions[i].originName != null) ...[
+                        const SizedBox(width: DsSpace.s8),
+                        Text(
+                          dsIsolate(suggestions[i].originName!),
+                          style: secondary,
+                        ),
+                      ],
+                      if (suggestions[i].control) ...[
+                        const SizedBox(width: DsSpace.s8),
+                        DsBadge(
+                          text: l.composerControlCommand,
+                          background: c.warningSubtle,
+                          foreground: c.warningFg,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

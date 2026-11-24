@@ -342,16 +342,23 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
         children: [
           header,
           divider,
-          if (widget.data.title != null)
-            Semantics(
-              container: true,
-              label: widget.data.title,
-              child: const SizedBox.shrink(),
+          // The card title labels the group of the agent's part (text and components): a
+          // node of its own without an area would be dropped from the semantics tree.
+          Semantics(
+            container: widget.data.title != null,
+            explicitChildNodes: true,
+            label: widget.data.title,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.agentText.isNotEmpty)
+                  DsMarkdown(widget.agentText, onOpenLink: widget.onOpenLink),
+                const SizedBox(height: DsSpace.s8),
+                ..._body(context),
+              ],
             ),
-          if (widget.agentText.isNotEmpty)
-            DsMarkdown(widget.agentText, onOpenLink: widget.onOpenLink),
-          const SizedBox(height: DsSpace.s8),
-          ..._body(context),
+          ),
         ],
       ),
     );
