@@ -529,6 +529,3 @@ func ValidateHostSessionEnd(e HostSessionEnd) bool {
 func HeartbeatDeadline(last time.Time, interval time.Duration, missLimit int) time.Time {
 	return last.Add(interval * time.Duration(missLimit+1))
 }
-
-// HeartbeatMissed reports a deadline passed at now; exactly at the deadline the connection stays.
-func HeartbeatMissed(deadline, now time.Time) bool { return now.After(deadline) }

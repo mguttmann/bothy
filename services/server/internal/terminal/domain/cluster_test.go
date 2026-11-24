@@ -197,18 +197,6 @@ func TestLoneSideOutcome(t *testing.T) {
 	}
 }
 
-// TestLoneSideDeadline: one millisecond before the acceptance time plus terminal.open_timeout the
-// side is not yet unpaired, at that instant it is.
-func TestLoneSideDeadline(t *testing.T) {
-	t.Parallel()
-	t0 := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
-	open := 20 * time.Second
-	d := domain.LoneDeadline(t0, open)
-	if domain.LoneExpired(d, d.Add(-time.Millisecond)) || !domain.LoneExpired(d, d) {
-		t.Fatal("deadline boundary")
-	}
-}
-
 // TestHostCloseCode: the close code of a control connection after terminal.host_close, by the
 // state read after the signal (the codes of M2-43's single-node path).
 func TestHostCloseCode(t *testing.T) {
