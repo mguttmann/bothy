@@ -370,14 +370,14 @@ class TranscriptMapper:
         self._sealed: set[str] = set()
         self._model_sent = False
         self._queued: deque[str] = deque()
-        self._deferred: list[dict[str, Any]] = []
+        self._deferred: list[tuple[dict[str, Any], datetime | None]] = []
         """The start of an input the CLI dequeued before it wrote the end of the turn before."""
         self._answered = False
         """The open turn's last output is a final answer (``end_turn``) and no request followed."""
         self._awaiting = False
         """A request record came and no output after it yet."""
-        self._dequeued_at: datetime | None = None
-        """The time of the first deferred dequeue, if its record named a readable one."""
+        self._noted_early = 0
+        """Inputs the CLI only noted (``queueTranscriptOnly``) while their starts were deferred."""
         self._fresh_starts = 0
         """The inputs whose start opened the open turn, with no request or output since."""
         self._noted = 0
@@ -508,7 +508,11 @@ class TranscriptMapper:
         start follows the turn before (FIX-RUNNER-CLI-331). Inside a working turn it ends
         nothing.
         """
-        if record.get("queueTranscriptOnly") is not True or not self._fresh_starts:
+        if record.get("queueTranscriptOnly") is not True:
+            return []
+        if not self._fresh_starts:
+            if self._deferred:
+                self._noted_early += 1  # its start follows the end of the turn before
             return []
         self._noted += 1
         # Several such inputs may open one turn together (the CLI dequeues them at once): the
@@ -852,9 +856,7 @@ class TranscriptMapper:
                 # after the dequeue (`_resume_deferred`) gives the start on before that output,
                 # so a dequeue while a request waits is no longer given on at the dequeue itself;
                 # one after a tool result, before the next request, is given on at once.
-                if not self._deferred:
-                    self._dequeued_at = _stamp(record)
-                self._deferred.append(started)
+                self._deferred.append((started, _stamp(record)))
                 return []
             if self.turn_open and not self._fresh_starts:
                 self._fresh_starts = self._noted = 0  # the turn works: the input joins it
@@ -881,30 +883,50 @@ class TranscriptMapper:
         return out
 
     def _end_turn(self) -> list[dict[str, Any]]:
-        """The ``result`` of the turn, then the start of each input dequeued before it."""
-        deferred, self._deferred = self._deferred, []
+        """The ``result`` of the turn, then the start of each input dequeued before it.
+
+        When every one of those inputs was only noted before this end (``queueTranscriptOnly``
+        between the late answer and ``turn_duration``), their turn ends right after its start.
+        """
+        deferred = [started for started, _ in self._deferred]
+        self._deferred = []
+        noted, self._noted_early = self._noted_early, 0
         self._answered = self._awaiting = False
-        self._dequeued_at = None
-        ended = self._turn_end()
-        self._fresh_starts = len(deferred)
-        return [ended, *((*deferred, self._init()) if deferred else ())]
+        out = [self._turn_end()]
+        if deferred:
+            out.extend([*deferred, self._init()])
+            self._fresh_starts, self._noted = len(deferred), noted
+            if noted >= len(deferred):
+                out.append(self._turn_end())
+        return out
 
     def _resume_deferred(self, record: Mapping[str, Any]) -> list[dict[str, Any]]:
-        """The turn went on after the dequeue: a deferred start is given on now.
+        """The turn went on after a dequeue: each start dequeued before this record is given on.
 
-        A record whose ``timestamp`` is earlier than the deferred dequeue's was written late
-        (the CLI may write a turn's final answer seconds late): the turn gave it before
-        the dequeue, so the start stays deferred. Without a readable time on either record the
-        start is given on, as before.
+        Each deferred dequeue is judged by its own ``timestamp``: a record with an earlier time
+        than a dequeue's was written late (the CLI may write a turn's final answer seconds
+        late), the turn gave it before that dequeue, so that start stays deferred. Without a
+        readable time on either record the start is given on, as before.
         """
-        if self._deferred and self._dequeued_at is not None:
-            written = _stamp(record)
-            if written is not None and written < self._dequeued_at:
-                return []
+        if not self._deferred:
+            self._answered = False
+            return []
+        written = _stamp(record)
+        released = [
+            started
+            for started, at in self._deferred
+            if written is None or at is None or not written < at
+        ]
+        if not released:
+            return []
+        self._deferred = [
+            (started, at)
+            for started, at in self._deferred
+            if written is not None and at is not None and written < at
+        ]
         self._answered = False
-        self._dequeued_at = None
-        deferred, self._deferred = self._deferred, []
-        return [*deferred, *(self._turn_start() if deferred else ())]
+        self._noted_early = 0  # the inputs joined a turn that works
+        return [*released, *self._turn_start()]
 
     def _turn_end(self) -> dict[str, Any]:
         texts = self._texts.get(self._last_message or "", [])

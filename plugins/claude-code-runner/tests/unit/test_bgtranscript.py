@@ -1870,6 +1870,43 @@ def test_a_noted_input_beside_a_line_after_the_turn_end_ends_nothing() -> None:
     assert mapper.turn_open  # the line's turn still comes
 
 
+def test_each_deferred_dequeue_is_judged_by_its_own_time() -> None:
+    # Dequeues at 10 and 20, then the turn's output written at 15: the first input joined the
+    # working turn, the second came after the answer and starts after the turn's result.
+    mapper = started("prompt-uuid")
+    records = [
+        _stamped(REQUEST, 5),
+        *[_stamped({"type": "queue-operation", "operation": "enqueue"}, 9)] * 2,
+        _stamped({"type": "queue-operation", "operation": "dequeue"}, 10),
+        _stamped({"type": "queue-operation", "operation": "dequeue"}, 20),
+        _stamped_answer("end_turn", 15),
+        _stamped(TURN_ENDS, 21),
+    ]
+    shapes = [shape(m) for r in records for m in mapper.map(r)]
+    first = shapes.index("command/started")
+    second = shapes.index("command/started", first + 1)
+    assert first < shapes.index("assistant") < shapes.index("result") < second
+    assert mapper.turn_open
+
+
+def test_a_noted_input_before_the_turn_end_ends_its_turn_after_the_start() -> None:
+    # The noted record of an input deferred behind the late answer comes before turn_duration.
+    mapper = started("prompt-uuid")
+    records = [
+        _stamped(REQUEST, 5),
+        _stamped({"type": "queue-operation", "operation": "enqueue"}, 9),
+        _stamped({"type": "queue-operation", "operation": "dequeue"}, 10),
+        _stamped_answer("end_turn", 8),
+        _NOTED,
+        _stamped(TURN_ENDS, 11),
+    ]
+    out = [m for r in records for m in mapper.map(r)]
+    shapes = [shape(m) for m in out if shape(m) != "system/bg_request"]
+    assert shapes[-4:] == ["result", "command/started", "system/init", "result"]
+    assert out[-1]["num_turns"] == 0
+    assert not mapper.turn_open
+
+
 def test_a_noted_input_beside_a_line_that_starts_work_ends_nothing() -> None:
     # Two inputs opened the turn: a noted notification and a line the model answers.
     mapper = started("prompt-uuid", "line-1")
