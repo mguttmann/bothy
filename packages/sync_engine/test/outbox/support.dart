@@ -163,6 +163,7 @@ final class Harness {
     OutboxExecutors? executors,
     int seed = 7,
     bool hookFails = false,
+    void Function(String line)? log,
   }) {
     final t = time ?? FakeTime();
     final d = db ?? openInMemoryForTests(clock: t.clock);
@@ -183,6 +184,7 @@ final class Harness {
         if (hookFails) throw StateError('storage failed');
         confirmed.add(entry.id);
       },
+      logHook: log,
     );
     return Harness._(d, t, registry, outbox, confirmed);
   }

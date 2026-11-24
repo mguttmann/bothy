@@ -45,6 +45,8 @@ final class Outbox {
   /// The clock is the database's (`LocalDatabase.clock`); [timer] creates the timers of the
   /// backoff and of the delayed display, [random] draws the jitter (a secure source by
   /// default), and [onConfirmed] stores what a `2xx` returned before the entry leaves.
+  /// [logHook] receives one line for a step that nobody awaits and that failed (a send or the
+  /// next pump on a closed database), never content.
   Outbox({
     required LocalDatabase db,
     required OutboxExecutors executors,
@@ -53,6 +55,7 @@ final class Outbox {
     OutboxTimerFactory? timer,
     Random? random,
     OutboxConfirmationHook? onConfirmed,
+    void Function(String line)? logHook,
   }) : _db = db,
        _dao = db.outboxDao,
        _executors = executors,
@@ -73,6 +76,7 @@ final class Outbox {
       dependencies: _deps,
       onChanged: _changed,
       onConfirmed: onConfirmed,
+      log: logHook,
     );
   }
 
@@ -102,7 +106,7 @@ final class Outbox {
   Future<OutboxEntry> enqueue(OutboxRequest request) async {
     final entry = await _lock.run(() => _db.transaction(() => _store(request)));
     _changed();
-    unawaited(_sender.pump());
+    _sender.pumpInBackground();
     return entry;
   }
 
@@ -125,7 +129,7 @@ final class Outbox {
       }),
     );
     _changed();
-    unawaited(_sender.pump());
+    _sender.pumpInBackground();
     return entries;
   }
 
@@ -207,7 +211,7 @@ final class Outbox {
       )).id;
     });
     _changed();
-    unawaited(_sender.pump());
+    _sender.pumpInBackground();
     return result;
   }
 
@@ -234,7 +238,7 @@ final class Outbox {
       )).id;
     });
     _changed();
-    unawaited(_sender.pump());
+    _sender.pumpInBackground();
     return result;
   }
 
@@ -250,7 +254,7 @@ final class Outbox {
       return _replaceFailed(e, decodePayload(e.payload));
     });
     _changed();
-    unawaited(_sender.pump());
+    _sender.pumpInBackground();
     return result;
   }
 
@@ -263,7 +267,7 @@ final class Outbox {
       if (e != null) await _discard(e);
     });
     _changed();
-    unawaited(_sender.pump());
+    _sender.pumpInBackground();
   }
 
   /// Confirms the entry whose ID is [clientMsgId] because its echo `message.created` arrived
@@ -284,7 +288,7 @@ final class Outbox {
     });
     if (found) {
       _changed();
-      unawaited(_sender.pump());
+      _sender.pumpInBackground();
     }
     return found;
   }

@@ -666,7 +666,11 @@ final class GatewayConnection {
         _connect();
       case Reconnect.afterPendingDevice:
         _set(reaction.phase, reaction.reason);
-        unawaited(_pollPendingDevice());
+        unawaited(
+          _pollPendingDevice().catchError(
+            (Object e) => _log('device poll failed: ${e.runtimeType}'),
+          ),
+        );
       case Reconnect.onForeground
           when reaction.phase == ConnectionPhase.suspended && _foreground:
         // The app came back while its own background close was still running.

@@ -57,6 +57,7 @@ final class OutboxSender {
     required this.dependencies,
     required this.onChanged,
     this.onConfirmed,
+    this.log,
   });
 
   /// The outbox table.
@@ -92,6 +93,9 @@ final class OutboxSender {
 
   /// Called for a confirmed entry with its response.
   final OutboxConfirmationHook? onConfirmed;
+
+  /// Receives one line for a failed step that nobody awaits.
+  final void Function(String line)? log;
 
   final Set<String> _busy = {};
   bool _started = false;
@@ -147,6 +151,16 @@ final class OutboxSender {
 
   /// Every entry in the table in FIFO order, final ones included.
   Future<List<OutboxEntry>> allEntries() => dependencies.all();
+
+  /// [pump] for a caller that does not wait: a failure (the database closed by a wipe) is
+  /// logged instead of becoming an unhandled error of the zone.
+  void pumpInBackground() => _background(pump(), 'pump');
+
+  void _background(Future<void> step, String what) => unawaited(
+    step.catchError(
+      (Object e) => log?.call('outbox: $what failed (${e.runtimeType})'),
+    ),
+  );
 
   /// Looks for lanes that can send and starts their workers; safe to call at any time.
   Future<void> pump() async {
@@ -223,13 +237,13 @@ final class OutboxSender {
       _wake?.cancel();
       _wake = nextWake == null
           ? null
-          : timer(nextWake.difference(current), () => unawaited(pump()));
+          : timer(nextWake.difference(current), pumpInBackground);
       return claimed;
     });
     if (claims.isEmpty) return;
     onChanged();
     for (final (lane, entry) in claims) {
-      unawaited(_send(lane, entry));
+      _background(_send(lane, entry), 'send');
     }
   }
 
@@ -310,7 +324,7 @@ final class OutboxSender {
       onChanged();
     } finally {
       _busy.remove(lane);
-      if (!_closed) unawaited(pump());
+      if (!_closed) pumpInBackground();
     }
   }
 
