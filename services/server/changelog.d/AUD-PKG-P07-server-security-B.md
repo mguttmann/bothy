@@ -18,3 +18,6 @@
 - The gateway writes one info line `gateway connection closed` per connection with the close
   code, the outcome, the principal kind and the duration (new log attribute
   `bothy.connection.duration`), so the disconnects of a device can be followed in the log.
+- The challenge cleanup keeps the used passkey challenge of a live session's current step-up, so
+  a console session no longer loses its user-verified step-up (and gets `passkey_required` at the
+  terminal) when the job runs between the step-up and the opening.

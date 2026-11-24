@@ -76,7 +76,8 @@ type ChallengeStore interface {
 	LockSessionForStepUpConsumption(ctx context.Context, id, userID ids.ID) (s SessionRecord, found bool, err error)
 	// ConsumeStepUp sets step_up_consumed_at = at on the session id (M2-40).
 	ConsumeStepUp(ctx context.Context, id ids.ID, at time.Time) error
-	// DeleteExpiredChallenges deletes the challenges with expires_at <= now, except failed step-up
+	// DeleteExpiredChallenges deletes the challenges with expires_at <= now, except the used step-up
+	// challenge of the current step-up of a live session and failed step-up
 	// challenges with finished_at after keepFailedSince, and returns how many it deleted.
 	DeleteExpiredChallenges(ctx context.Context, now, keepFailedSince time.Time) (int64, error)
 }

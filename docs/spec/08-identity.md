@@ -1052,7 +1052,9 @@ Rules:
 - Step-up failures are counted per session over `auth_challenges` (`status = 'failed'`,
   `finished_at` inside `auth.login_fail_window`). The job `identity.auth_cleanup` deletes a
   challenge after its `expires_at`, but a failed step-up challenge only once its `finished_at` has
-  left `auth.login_fail_window`; otherwise the cleanup would reset the count (M1-35).
+  left `auth.login_fail_window`; otherwise the cleanup would reset the count (M1-35). The used
+  passkey challenge of the current step-up of a live session also stays, because the fact that
+  this step-up verified the user (section 6.3 point 3) is read from it.
 - The failure window of an account starts with the first failed attempt
   (`local_credentials.fail_window_started_at`); a failed attempt after it starts a new window.
   Every request computes exactly one Argon2id hash, also for an unknown name and during a lockout.
