@@ -1822,6 +1822,54 @@ def test_two_transcript_only_inputs_dequeued_together_end_their_turn_with_the_la
     assert _decide_pending(state, 40.0, pending=0) == "close"
 
 
+_NOTED = {
+    "type": "user",
+    "isSidechain": False,
+    "queueTranscriptOnly": True,
+    "origin": {"kind": "task-notification", "producer": "session-task"},
+    "message": {"role": "user", "content": "<task-notification>\n</task-notification>"},
+}
+
+
+def test_noted_inputs_dequeued_together_after_the_turn_end_end_their_turn() -> None:
+    # Real 2.1.326 pattern: after a turn ended, two notifications are enqueued and dequeued in
+    # the same millisecond and both only noted, with no request.
+    mapper = started("prompt-uuid")
+    records = [
+        REQUEST,
+        _stamped_answer("end_turn", 10),
+        TURN_ENDS,
+        *[{"type": "queue-operation", "operation": "enqueue"}] * 2,
+        *[{"type": "queue-operation", "operation": "dequeue"}] * 2,
+        _NOTED,
+        _NOTED | {"uuid": "noted-2"},
+    ]
+    out = [m for r in records for m in mapper.map(r)]
+    assert [shape(m) for m in out].count("result") == 2
+    assert out[-1]["type"] == "result"
+    assert out[-1]["num_turns"] == 0
+    assert not mapper.turn_open
+    state = ProcessState(has_stdin=True)
+    for message in out:
+        state.apply(message, 1.0)
+    assert _decide_pending(state, 40.0, pending=0) == "close"
+
+
+def test_a_noted_input_beside_a_line_after_the_turn_end_ends_nothing() -> None:
+    mapper = started("prompt-uuid", "line-1")
+    records = [
+        REQUEST,
+        _stamped_answer("end_turn", 10),
+        TURN_ENDS,
+        *[{"type": "queue-operation", "operation": "enqueue"}] * 2,
+        *[{"type": "queue-operation", "operation": "dequeue"}] * 2,
+        _NOTED,
+    ]
+    out = [m for r in records for m in mapper.map(r)]
+    assert [shape(m) for m in out].count("result") == 1
+    assert mapper.turn_open  # the line's turn still comes
+
+
 def test_a_noted_input_beside_a_line_that_starts_work_ends_nothing() -> None:
     # Two inputs opened the turn: a noted notification and a line the model answers.
     mapper = started("prompt-uuid", "line-1")

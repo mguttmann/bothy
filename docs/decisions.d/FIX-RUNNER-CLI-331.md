@@ -33,7 +33,9 @@ Rulings:
    model: the notification of a task, on a resume, with or without `producer`, and within a
    session too; seen with 2.1.326, 2.1.330 and 2.1.331) ends the turn when such inputs alone
    opened it, with a `result` of `num_turns` 0 and no text, as a print stream does. The CLI
-   may dequeue several at once; the turn ends with the last of the inputs that opened it. Without this a start deferred behind the
+   may dequeue several at once, after the late answer of a turn or after a turn ended; the turn
+   ends with the last of the inputs that opened it. A `dequeue` in a turn that already works
+   joins it and ends nothing. Without this a start deferred behind the
    late answer of the prompt kept the run open after its answer (a real 2.1.326 transcript;
    the stdin rule waited for a result that never came). Inside a working turn it ends nothing.
 4. The runner reads `timestamp` of `assistant`, `api-request` and `queue-operation` records (the
@@ -52,3 +54,10 @@ Open minors (no reproduced fault; for the next run in this area):
 - The fake CLI's `late` line is not reset after the first turn; only the first turn reads it.
 - The update chain's log check counts every `background_foreign_input` line as a failure, also
   the `other` line of such a notification after a resume.
+- CLI versions up to 2.1.325 wrote noted records right after `enqueue`, without a `dequeue`.
+  Such a record between the `dequeue` of a runner line and its request would end that line's
+  turn. Not seen in background transcripts from 2.1.326 on.
+- A noted record between the late answer and `turn_duration` is not counted; the turn then
+  stays open. Seen once, at the end of a file.
+- A noted record that carries several task ids after as many `dequeue` records would leave the
+  count short and the turn open. Not seen as a complete case.

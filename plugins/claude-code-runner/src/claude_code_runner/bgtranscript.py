@@ -45,10 +45,11 @@ The mapping, record by record (only records of the main conversation, ``isSidech
   after the queue records of an input that arrived meanwhile (real transcripts of 2.1.326,
   2.1.330 and 2.1.331, FIX-RUNNER-CLI-331); an output written after the dequeue, or one
   without a readable ``timestamp``, gives the start on before it, as one in a working turn. A
-  ``user`` record with ``queueTranscriptOnly`` (an input the CLI only notes) ends a turn that only
-  its start opened, with a ``result`` of ``num_turns`` 0; ``remove`` with ``absorbed_mid_turn``
-  is the echo of the runner's line with ``commandUuid``. The records of one queue are matched
-  in their order, because ``enqueue`` and ``dequeue`` carry no id.
+  ``user`` record with ``queueTranscriptOnly`` (an input the CLI only notes) ends a turn that
+  only such inputs opened, with the last of them, as a ``result`` of ``num_turns`` 0;
+  ``remove`` with ``absorbed_mid_turn`` is the echo of the runner's line with ``commandUuid``.
+  The records of one queue are matched in their order, because ``enqueue`` and ``dequeue``
+  carry no id.
 * ``attachment`` of the type ``queued_command``: what a running turn took in. Only its
   origin and ``source_uuid`` are read, and of the session's own notification its ``prompt``
   for the end of a task (above); every other attachment is skipped.
@@ -855,9 +856,11 @@ class TranscriptMapper:
                     self._dequeued_at = _stamp(record)
                 self._deferred.append(started)
                 return []
-            if self.turn_open:
-                self._fresh_starts = self._noted = 0
+            if self.turn_open and not self._fresh_starts:
+                self._fresh_starts = self._noted = 0  # the turn works: the input joins it
             else:
+                # The input opens the turn, or joins inputs that opened it together (the CLI
+                # dequeues several notifications at once): no request or output came since.
                 self._fresh_starts += 1
             return [started, self._init()]
         out: list[dict[str, Any]] = [
