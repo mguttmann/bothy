@@ -153,7 +153,8 @@ func New(cfg Config, sessions Sessions) (*Client, error) {
 	return c, nil
 }
 
-// Keys returns the key store of purpose terminal (M2-45 checks session tokens with it).
+// Keys returns the key store of purpose terminal from hello and heartbeat_ack. No production code
+// reads it: the sessions check tokens with the JWKS of the hello of their data connection.
 func (c *Client) Keys() *KeyStore { return &c.keys }
 
 // SetReadyHandler sets the function every later ready reaches (startup.Service.OnReady): the
