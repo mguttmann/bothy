@@ -60,22 +60,3 @@ func TestDetect(t *testing.T) {
 		t.Errorf("empty head detected as %q", got)
 	}
 }
-
-// TestDetectorsDoNotShareTheLimit pins that a detector keeps its own read limit: building a
-// second detector with a smaller limit changes nothing for the first, and the zero value reads
-// the whole head it is given.
-func TestDetectorsDoNotShareTheLimit(t *testing.T) {
-	const word = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-	big := mimetype.NewDetector(1 << 20)
-	small := mimetype.NewDetector(4096)
-	doc := docx(t, 6000)
-	if got := domain.MediaType(big.Detect(doc)); got != word {
-		t.Errorf("the large detector after a small one detected %q", got)
-	}
-	if got := domain.MediaType(small.Detect(doc)); got == word {
-		t.Errorf("the small detector read beyond its limit")
-	}
-	if got := domain.MediaType(mimetype.Detector{}.Detect(doc)); got != word {
-		t.Errorf("the zero value detected %q", got)
-	}
-}

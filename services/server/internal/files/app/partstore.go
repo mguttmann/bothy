@@ -111,6 +111,11 @@ func (p s3PartStore) uploadID(ctx context.Context, s SessionRecord) (string, err
 		}
 		return err
 	})
+	if err != nil && stored {
+		// The unit wrote the id, but its commit failed: whether the row names the upload is
+		// unknown, so the upload stays and the caller retries the part.
+		return "", err
+	}
 	if stored {
 		return created, nil
 	}
