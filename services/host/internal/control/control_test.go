@@ -688,7 +688,7 @@ func TestHandshakeIsBounded(t *testing.T) {
 	const bound = 200 * time.Millisecond
 	t.Run("silent TCP peer", func(t *testing.T) {
 		t.Parallel()
-		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -770,7 +770,7 @@ func connectProxy(t *testing.T) *url.URL {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		up, err := net.Dial("tcp", r.Host)
+		up, err := (&net.Dialer{}).DialContext(r.Context(), "tcp", r.Host)
 		if err != nil {
 			w.WriteHeader(http.StatusBadGateway)
 			return
@@ -798,7 +798,7 @@ func connectProxy(t *testing.T) *url.URL {
 func TestUnreachableNamesTheCause(t *testing.T) {
 	t.Parallel()
 	srv := controltest.New(t)
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}

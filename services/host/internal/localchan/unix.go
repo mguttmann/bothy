@@ -163,7 +163,7 @@ func ListenAdmin(path string) (net.Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("localchan: admin endpoint: %w", err)
 	}
-	if err := unix.Flock(int(lock.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil { //nolint:gosec // G115: a descriptor fits an int
+	if err := unix.Flock(int(lock.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
 		_ = lock.Close()
 		if errors.Is(err, unix.EWOULDBLOCK) {
 			return nil, ErrAdminInUse

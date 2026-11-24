@@ -16,5 +16,5 @@
   as the server host.
 - On Linux and macOS a second `bothy-host run` with the same state directory ends before it takes
   the admin endpoint of the running service and logs in with its keys.
-- An opening whose PTY helper does not answer after the gate ends at its window with
-  `open_failed` and `open_timeout` instead of hanging without a report.
+- An opening whose PTY helper does not answer after the gate ends after the length of its
+  opening window with `open_failed` and `open_timeout` instead of hanging without a report.
