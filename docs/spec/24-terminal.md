@@ -1025,7 +1025,9 @@ server", with the update route of its package, as after `4114`; [18-release.md](
 times (`heartbeat_miss_limit` + 1) without a frame of the server as a dead connection. Before
 `hello` a fixed bound of the program holds one attempt: the dial with TLS and the upgrade, then
 the wait for `hello`; a server, proxy or edge that accepts and stays silent past it counts as
-unreachable and the attempt is retried with the backoff.
+unreachable and the attempt is retried with the backoff. The log line of a failed dial names its
+error class as a fixed code without an address (`proxy`, `tls_unknown_authority`, `tls_expired`,
+`tls_invalid`, `dns`, `refused`, `timeout`, `upgrade_refused`, `other`).
 `is_server_host` is HD5 or the peer of the connection, without a proxy, is an address of the host
 itself (2.3). Its reaction per close code: `1000`, `1001`, `4000`, `4002`, `4009`, `4014`, `4113` and any unknown
 code reconnect with exponential backoff with full jitter from

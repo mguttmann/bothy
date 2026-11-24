@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -790,4 +791,36 @@ func connectProxy(t *testing.T) *url.URL {
 		t.Fatal(err)
 	}
 	return u
+}
+
+// TestUnreachableNamesTheCause (audit host-service-14): "server unreachable" carries a fixed code
+// of the error class, never an address.
+func TestUnreachableNamesTheCause(t *testing.T) {
+	t.Parallel()
+	srv := controltest.New(t)
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed := ln.Addr().String()
+	_ = ln.Close()
+	for url, want := range map[string]string{srv.URL: "tls_unknown_authority", "https://" + closed: "refused"} {
+		var buf syncBuffer
+		c, err := control.New(control.Config{ServerURL: url, HostID: hostID, AuthKey: key(), HostVersion: "1.0.0", BackoffBase: base,
+			BackoffCap: capDelay, Log: slog.New(slog.NewJSONHandler(&buf, nil))}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := c.Login(ctx(t)); !errors.Is(err, startup.ErrUnreachable) {
+			t.Errorf("%s: %v", want, err)
+		}
+		_ = c.Close()
+		out := buf.String()
+		if !strings.Contains(out, `"msg":"server unreachable","cause":"`+want+`"`) {
+			t.Errorf("want cause %s in %s", want, out)
+		}
+		if strings.Contains(out, "127.0.0.1") {
+			t.Errorf("an address in the log: %s", out)
+		}
+	}
 }

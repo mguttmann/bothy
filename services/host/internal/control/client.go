@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"strings"
 	gosync "sync"
+	"syscall"
 	"time"
 
 	"github.com/coder/websocket"
@@ -402,6 +403,40 @@ func (c *Client) dial(ctx context.Context) (*websocket.Conn, net.IP, error) {
 	return ws, remote, nil
 }
 
+// logCause is the attribute of the error class of a failed dial.
+const logCause = "cause"
+
+// DialCause maps the error of a failed dial to a fixed code for the log, without address or
+// value: proxy, tls_unknown_authority, tls_expired, tls_invalid, dns, refused, timeout,
+// upgrade_refused or other.
+func DialCause(err error) string {
+	var op *net.OpError
+	var unknown x509.UnknownAuthorityError
+	var invalid x509.CertificateInvalidError
+	var hostname x509.HostnameError
+	var dns *net.DNSError
+	var nerr net.Error
+	switch {
+	case errors.As(err, &op) && op.Op == "proxyconnect":
+		return "proxy"
+	case errors.As(err, &unknown):
+		return "tls_unknown_authority"
+	case errors.As(err, &invalid) && invalid.Reason == x509.Expired:
+		return "tls_expired"
+	case errors.As(err, &invalid), errors.As(err, &hostname):
+		return "tls_invalid"
+	case errors.As(err, &dns):
+		return "dns"
+	case errors.Is(err, syscall.ECONNREFUSED):
+		return "refused"
+	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &nerr) && nerr.Timeout():
+		return "timeout"
+	case strings.Contains(err.Error(), "handshake response status code"):
+		return "upgrade_refused"
+	}
+	return "other"
+}
+
 // viaProxy reports whether the proxy of the configuration takes the control connection. The
 // upgrade is an https request, so the proxy is chosen for the https form of the URL.
 func (c *Client) viaProxy() bool {
@@ -429,7 +464,7 @@ func (c *Client) handshakeTimeout() time.Duration {
 func (c *Client) connect(ctx context.Context) outcome {
 	ws, remote, err := c.dial(ctx)
 	if err != nil {
-		c.log.LogAttrs(ctx, slog.LevelWarn, "server unreachable")
+		c.log.LogAttrs(ctx, slog.LevelWarn, "server unreachable", slog.String(logCause, DialCause(err)))
 		return outcome{Reaction: Reaction{Kind: Backoff}}
 	}
 	ws.SetReadLimit(-1)
