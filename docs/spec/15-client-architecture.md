@@ -537,7 +537,8 @@ changes (docs/decisions.d/AUD-client-settings-01.md).
 ## 8. Network and login
 
 - **REST:** `api_client` (openapi-generator `dart-dio`, baseline R-Clients) with interceptors for
-  DPoP, `Idempotency-Key`, correlation ID, retry only for reads (`Retry-After` plus jitter); the
+  DPoP, `Idempotency-Key`, correlation ID, retry only for reads (`Retry-After` plus jitter; a
+  `Retry-After` above `client.outbox_retry_cap` goes to the caller instead of a wait); the
   outbox retries writes. An outbox executor that reads within an attempt opts out of the read
   retry, so a refused read is retried once, with its entry ([12](12-files.md) 3.8). In the
   agent interface the read retry is the one place that repeats a refused read: the provider

@@ -62,7 +62,8 @@ able to mount them (Colima mounts only the home folder by default, so set `TMPDI
 - Read retry: only `GET` and `HEAD`, only after a network error, a timeout, `429` or `503`
   (not `503 setup_required`), waiting `Retry-After` plus a full-jitter backoff, or the backoff
   alone without the header, from `ReadRetryPolicy.fromBackoff(base, cap)`, which the apps fill
-  from `client.outbox_retry_base` and `client.outbox_retry_cap`. A read with the request option
+  from `client.outbox_retry_base` and `client.outbox_retry_cap`; a `Retry-After` above the cap
+  is not waited for, the error goes to the caller. A read with the request option
   `noReadRetryExtra` is never retried here (an outbox executor retries it with its entry, and
   the search view shows the failure of its request at once). Writes are retried by the outbox,
   never here.
