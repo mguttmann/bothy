@@ -26,7 +26,7 @@ export 'src/nonce_store.dart';
 export 'src/pkce.dart';
 export 'src/ports.dart';
 export 'src/redact.dart';
-export 'src/refresh.dart' show RefreshCoordinator;
+export 'src/refresh.dart' show RefreshCoordinator, refreshCallerDeadline;
 export 'src/session_core.dart' show SessionSecretKeys, requestTimeoutExtra;
 export 'src/step_up.dart';
 export 'src/tokens.dart' show SessionInfo, TokenState;

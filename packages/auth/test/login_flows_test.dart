@@ -582,6 +582,22 @@ void main() {
       },
     );
 
+    test(
+      'a store that cannot delete still ends the session and emits signedOut',
+      () async {
+        await h.signIn();
+        h.server.routes['POST /auth/logout'] = (_) => const FakeReply(204);
+        h.store.deleteError = StateError('keychain unavailable');
+        await expectLater(h.session.login.logout(), throwsStateError);
+        await h.settle();
+        expect(
+          h.events.whereType<SignedOut>().single.reason,
+          SignOutReason.loggedOut,
+        );
+        expect(h.session.session, isNull);
+      },
+    );
+
     test('online logout calls the server with the token first', () async {
       await h.signIn();
       h.server.routes['POST /auth/logout'] = (_) => const FakeReply(204);

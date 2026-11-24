@@ -585,7 +585,11 @@ changes (docs/decisions.d/AUD-client-settings-01.md).
   current nonce); the error never ends the session, because the server revokes nothing for it
   ([08](08-identity.md) section 7.3). A refresh request has connect, send and receive timeouts
   that end it well before `auth.dpop_proof_max_age`, so a request held while the device sleeps
-  fails as a network error instead of arriving minutes later with an expired proof.
+  fails as a network error instead of arriving minutes later with an expired proof. A request
+  waits at most `refreshCallerDeadline` for a refresh and then fails as a network error;
+  the refresh keeps its single-flight slot until it ends, so a hanging store or signer call
+  never starts a second refresh with the same token. A sign-out emits `SignedOut` also when the
+  `SecretStore` fails to delete, so the app still deletes its local data.
 - **Signed out:** `401 session_revoked`, a refresh rejected with `unauthenticated` or
   `token_expired` (a refresh that still gets `invalid_dpop_proof` after its repeat keeps the
   stored refresh token and reports `RefreshFailed`), a revoked pending device, the

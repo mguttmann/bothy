@@ -138,17 +138,32 @@ final class SessionCore {
   /// Ends the session for [reason]: clears the access token, deletes the refresh token (and
   /// the device ID when the device or session was revoked, R-SY-14) and emits `SignedOut`
   /// once.
+  ///
+  /// `SignedOut` is emitted also when the store fails to delete (its error is rethrown after
+  /// the event), so the app still leaves the session and deletes its local data.
   Future<void> signOut(SignOutReason reason) async {
-    final hadSession =
-        tokens.state != null || await secrets.read(refreshTokenKey) != null;
+    final hadSession = tokens.state != null || await _storedRefreshToken();
     generation++;
     tokens.state = null;
-    await secrets.delete(refreshTokenKey);
-    if (reason == SignOutReason.sessionRevoked ||
-        reason == SignOutReason.deviceRevoked) {
-      await secrets.delete(deviceIdKey);
+    try {
+      await secrets.delete(refreshTokenKey);
+      if (reason == SignOutReason.sessionRevoked ||
+          reason == SignOutReason.deviceRevoked) {
+        await secrets.delete(deviceIdKey);
+      }
+    } finally {
+      if (hadSession) emit(SignedOut(reason));
     }
-    if (hadSession) emit(SignedOut(reason));
+  }
+
+  /// Whether a refresh token is stored; a store that cannot be read counts as one, so a
+  /// sign-out is never silent.
+  Future<bool> _storedRefreshToken() async {
+    try {
+      return await secrets.read(refreshTokenKey) != null;
+    } on Object {
+      return true;
+    }
   }
 
   /// Signs out for [reason] only while [generationAtStart] is still current, so a late answer

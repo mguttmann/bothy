@@ -33,6 +33,15 @@ const Set<String> _rejectedCodes = {'unauthenticated', 'token_expired'};
 /// instead of reaching the server minutes later with an expired proof.
 const Duration refreshRequestTimeout = Duration(seconds: 15);
 
+/// The longest time a caller waits for a refresh, from its call of `refreshNow` or
+/// `ensureFresh`; then it gets [RefreshUnavailable].
+///
+/// It covers the store, the signer and up to three refresh requests (a nonce and a proof
+/// repeat, each within [refreshRequestTimeout]). The refresh itself keeps its slot until it
+/// ends, so a hanging platform call fails requests instead of blocking them, and never leads to
+/// a second refresh with the same refresh token (which the server would take as reuse).
+const Duration refreshCallerDeadline = Duration(seconds: 60);
+
 /// Runs at most one refresh of the session's family at a time.
 ///
 /// Two refreshes with one refresh token would look like reuse to the server and revoke the
@@ -48,9 +57,12 @@ const Duration refreshRequestTimeout = Duration(seconds: 15);
 /// ```
 final class RefreshCoordinator {
   /// Internal: created by the session over its [SessionCore].
-  RefreshCoordinator(this._core);
+  RefreshCoordinator(this._core, {this.deadline = refreshCallerDeadline});
 
   final SessionCore _core;
+
+  /// How long one caller waits for a refresh ([refreshCallerDeadline]).
+  final Duration deadline;
   Future<String>? _inflight;
 
   /// Returns a valid access token: the current one while its `exp` lies ahead by the injected
@@ -73,19 +85,27 @@ final class RefreshCoordinator {
   /// clear the store, emit `SignedOut` and throw [SessionEnded]. A network error, a timeout
   /// ([refreshRequestTimeout]), a `401 invalid_dpop_proof` that remains after one repeat with a
   /// fresh proof, or any other answer keeps the state and the stored refresh token, emits
-  /// `RefreshFailed` and throws [RefreshUnavailable].
+  /// `RefreshFailed` and throws [RefreshUnavailable]. A caller that waited [deadline] gets
+  /// [RefreshUnavailable] while the refresh keeps running and holds its slot.
   Future<String> refreshNow() {
-    final running = _inflight;
-    if (running != null) return running;
-    final next = _run();
-    _inflight = next;
-    // Clear the slot when this refresh ends, whichever way; a later caller starts a new one.
-    unawaited(
-      next.then<void>((_) {}, onError: (Object _) {}).whenComplete(() {
-        if (identical(_inflight, next)) _inflight = null;
-      }),
+    var next = _inflight;
+    if (next == null) {
+      final started = _run();
+      next = _inflight = started;
+      // Clear the slot when this refresh ends, whichever way; a later caller starts a new one.
+      unawaited(
+        started.then<void>((_) {}, onError: (Object _) {}).whenComplete(() {
+          if (identical(_inflight, started)) _inflight = null;
+        }),
+      );
+    }
+    return next.timeout(
+      deadline,
+      onTimeout: () {
+        _core.log('refresh still running after the caller deadline');
+        throw const RefreshUnavailable();
+      },
     );
-    return next;
   }
 
   Future<String> _run() async {

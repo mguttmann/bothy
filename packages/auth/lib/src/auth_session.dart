@@ -57,7 +57,8 @@ final class AuthSession {
   /// Creates the session for [serverUrl].
   ///
   /// [random] draws the PKCE verifier; it defaults to `Random.secure()`. [browser],
-  /// [redirects] and [passkeys] are needed only by the flows that use them.
+  /// [redirects] and [passkeys] are needed only by the flows that use them. [refreshDeadline]
+  /// is how long a caller waits for a refresh ([refreshCallerDeadline]).
   AuthSession({
     required Uri serverUrl,
     required DeviceKeys keys,
@@ -72,6 +73,7 @@ final class AuthSession {
     RedirectReceiver? redirects,
     PasskeyAuthenticator? passkeys,
     Random? random,
+    Duration refreshDeadline = refreshCallerDeadline,
   }) : _core = SessionCore(
          serverUrl: serverUrl,
          keys: keys,
@@ -81,7 +83,7 @@ final class AuthSession {
          config: config,
        ) {
     proofs = DpopProofFactory(keys.dpop, _core.nonces, clock, ids);
-    refresh = RefreshCoordinator(_core);
+    refresh = RefreshCoordinator(_core, deadline: refreshDeadline);
     stepUp = StepUpService(_core, stepUpPrompt);
     login = LoginService(
       _core,

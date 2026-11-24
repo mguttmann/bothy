@@ -205,6 +205,9 @@ class FakeSecretStore implements SecretStore {
   /// Delay of each write, to prove the caller waits for it.
   Duration writeDelay = Duration.zero;
 
+  /// When set, every delete throws it (a failing platform store).
+  Object? deleteError;
+
   @override
   Future<String?> read(String key) async => values[key];
 
@@ -217,6 +220,8 @@ class FakeSecretStore implements SecretStore {
 
   @override
   Future<void> delete(String key) async {
+    final error = deleteError;
+    if (error != null) throw error;
     values.remove(key);
     log.add('delete ${key.split('/').last}');
   }
@@ -418,8 +423,11 @@ Map<String, Object?> deviceBody(
 class Harness {
   /// Builds a session against a fresh fake server; [withStepUpKey] `false` builds the keys of a
   /// device without a step-up key (Windows, D-M4-11-2).
-  Harness({DateTime? start, bool withStepUpKey = true})
-    : clock = FakeClock(start ?? DateTime.utc(2026, 10, 15, 10)) {
+  Harness({
+    DateTime? start,
+    bool withStepUpKey = true,
+    Duration refreshDeadline = refreshCallerDeadline,
+  }) : clock = FakeClock(start ?? DateTime.utc(2026, 10, 15, 10)) {
     store = FakeSecretStore(log);
     server.onSend = (r) => log.add('send ${r.path}');
     var counter = 0;
@@ -454,6 +462,7 @@ class Harness {
       redirects: redirects,
       passkeys: passkeys,
       random: Random(7),
+      refreshDeadline: refreshDeadline,
     );
     session.events.listen(events.add);
   }

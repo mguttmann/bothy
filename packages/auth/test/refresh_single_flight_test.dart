@@ -173,6 +173,31 @@ void main() {
     },
   );
 
+  test('a refresh that hangs fails its callers at the deadline and starts no '
+      'second refresh while it runs', () async {
+    h = Harness(refreshDeadline: const Duration(milliseconds: 50));
+    await h.signIn(access: 'A1', refresh: 'R1');
+    deviceRoute();
+    final never = Completer<FakeReply>();
+    h.server.routes['POST /auth/token/refresh'] = (_) => never.future;
+    h.clock.advance(const Duration(minutes: 6));
+    Future<void> read() => expectLater(
+      h.session.api.getDevicesApi().getDevice(deviceId: h.deviceId),
+      throwsA(
+        isA<DioException>().having(
+          (e) => e.error,
+          'error',
+          isA<RefreshUnavailable>(),
+        ),
+      ),
+    );
+    await read();
+    await read();
+    expect(h.server.to('/auth/token/refresh'), hasLength(1));
+    expect(h.session.session, isNotNull);
+    expect(h.store.values, isNotEmpty);
+  });
+
   test('ensureFresh returns the current token while it is valid', () async {
     final token = await h.session.refresh.ensureFresh();
     expect(token, contains('.'));
