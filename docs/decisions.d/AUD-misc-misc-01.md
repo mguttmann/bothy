@@ -48,6 +48,9 @@ Platform runs (V1-13), read from run 42556146760 of 2026-11-09 on commit `7c46cb
   AUD-PKG-P10-repo-ops-host a failed job prints the owner, mode and ACL of every folder on the way
   to the program folders (and the free disk space on Windows), so the next red run names the place.
 - No run on a Windows 10 or Windows 11 machine is recorded (M2 exit criterion 8, TM-T29 (i)).
+- Windows: the three findings of D-M2-42-29 (no deadline and no cancel of `Accept` and `Read` on
+  the synchronous pipe handles of the local channel) stay open with this row, not with M2-48;
+  they need overlapped handles and a Windows run to prove them.
 - A failed scheduled run of `host-platform.yml` reports to nobody. AUD-misc-testing-01 built the
   report (`red-runs.yml`); it writes the issue "Red runs of host-platform.yml" only once the
   owner switched it on (AUD-MISC-TESTING-01/11, AUD-CG1/7).
