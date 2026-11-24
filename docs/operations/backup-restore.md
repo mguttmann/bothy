@@ -229,6 +229,16 @@ with its WAL. A state before that exists only as a logical backup (5.3), one per
 runs. For a longer window set an off-site target or raise `backup.pg.local_retention_full`; each
 further full backup needs its space and that of its WAL in the volume `pgbackrest-repo`.
 
+The amount of that WAL depends on `backup.pg.archive_timeout` as much as on the write load:
+PostgreSQL switches to a new WAL segment at the latest after this time whenever anything was
+written since the last switch. An instance with little load still writes (the periodic jobs of
+the worker, for example), so with the default nearly every minute sends one segment to every
+repository. pgBackRest
+compresses the mostly empty segments well, but their number adds to the size of the repository
+and to the replay time of a restore. The value bounds the data loss under low load and serves
+`dr.rpo_target`: a larger value means fewer segments and a larger possible loss. Check the size of
+`pgbackrest-repo` and the replay time in the restore test before changing it.
+
 ### 5.2 PITR procedure in the Compose stack
 
 1. Status page: create an incident; maintenance mode `server.maintenance_mode = read_only` does not help,
