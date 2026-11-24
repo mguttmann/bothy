@@ -296,6 +296,37 @@ func TestS3PartStrategy(t *testing.T) {
 	}
 }
 
+// TestS3PartStoreAbortsItsUploadWhenTheFileIsGone pins that a multipart upload created for a
+// first part is aborted when its id cannot be stored because the file was deleted meanwhile:
+// no upload is left that no row names.
+func TestS3PartStoreAbortsItsUploadWhenTheFileIsGone(t *testing.T) {
+	e := newEnv(t, "s3", testCfg)
+	s, err := e.svc.Create(e.ctx, createCmd("report.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale, _, _ := e.repo.Session(e.ctx, s.FileID, e.alex.ID)
+	e.repo.mu.Lock()
+	f := e.repo.files[s.FileID]
+	f.Deleted = true
+	e.repo.files[s.FileID] = f
+	gone := e.repo.sessions[s.FileID]
+	gone.State = domain.SessionAborted
+	e.repo.sessions[s.FileID] = gone
+	e.repo.mu.Unlock()
+
+	parts := app.NewS3PartStore(e.store, e.repo, e.uow)
+	if _, err := parts.Put(e.ctx, stale, 1, bytes.NewReader(content[:4]), 4); problem(err) != "not_found" {
+		t.Fatalf("Put = %v; want not_found", err)
+	}
+	if e.store.count("CreateMultipart") != 1 || e.store.count("AbortMultipart") != 1 {
+		t.Fatalf("create %d, abort %d; want the own upload aborted", e.store.count("CreateMultipart"), e.store.count("AbortMultipart"))
+	}
+	if len(e.store.uploads) != 0 {
+		t.Fatalf("%d multipart uploads left open", len(e.store.uploads))
+	}
+}
+
 // TestAbortWritesUploaderEvent holds design note 16 at the unit level: the abort appends one
 // file.updated for the uploader with receive action file.read and the failed state.
 func TestAbortWritesUploaderEvent(t *testing.T) {

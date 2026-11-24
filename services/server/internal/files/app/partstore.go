@@ -111,8 +111,16 @@ func (p s3PartStore) uploadID(ctx context.Context, s SessionRecord) (string, err
 		}
 		return err
 	})
-	if err != nil || stored {
-		return created, err
+	if stored {
+		return created, nil
+	}
+	if err != nil {
+		// The id is stored nowhere: abort the own upload even when the request ended, so no
+		// multipart upload stays open that no row names (12 3.2). The first error wins.
+		if aerr := p.store.AbortMultipart(context.WithoutCancel(ctx), s.File.ObjectKey, created); aerr != nil {
+			return "", errors.Join(err, aerr)
+		}
+		return "", err
 	}
 	// Another request stored its upload first, or the session ended: drop the own upload.
 	if err := p.store.AbortMultipart(ctx, s.File.ObjectKey, created); err != nil {
