@@ -168,8 +168,8 @@ func AuthzConfig(v *config.Values) (authzapp.AuthorizerConfig, error) {
 // (M1-28), over pool: the PrincipalSource of identity (M1-26), the grant store of authz (M1-27),
 // the rights version of instance (instance.Versions), the recorder of audit (M1-24), the clock and
 // log, the CredentialSource of identity (devices since M1-33, sessions since M1-34, API tokens
-// since M1-44), the agent policy source of agents (M1-51) and the structure source with the
-// spaces of chat (M1-52) and no channels until M1-53 (NewStructureSource), and the counter
+// since M1-44), the agent policy source of agents (M1-51) and the structure source of chat
+// (NewStructureSource), and the counter
 // bothy.authz.decisions of authz/adapters/otelmetrics on the global meter provider (M1-68).
 // It opens no connection.
 //

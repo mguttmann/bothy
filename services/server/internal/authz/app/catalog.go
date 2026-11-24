@@ -24,6 +24,7 @@ const (
 	msgUnknownAction = "unknown action"
 	keyAction        = "bothy.action"
 	keyErrorType     = "error.type"
+	keyPrincipalKind = "bothy.principal.kind"
 )
 
 // ErrorCounter counts programming errors of the rights check in bothy.authz.errors with the

@@ -129,6 +129,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"server.trusted_proxies":                      {Kind: config.KindCIDRList, Default: "127.0.0.1/32, ::1/128", Chapter: "16-operations.md"},
 		"shutdown.drain_delay":                        {Kind: config.KindDuration, Default: "5s", Min: "0s", Max: "1h", Chapter: "02-architecture.md"},
 		"shutdown.http_grace":                         {Kind: config.KindDuration, Default: "20s", Min: "1ms", Max: "1h", Chapter: "02-architecture.md"},
+		"shutdown.database_flush_timeout":             {Kind: config.KindDuration, Default: "2s", Min: "1ms", Max: "1h", Chapter: "02-architecture.md"},
 		"shutdown.telemetry_flush_timeout":            {Kind: config.KindDuration, Default: "5s", Min: "1ms", Max: "1h", Chapter: "02-architecture.md"},
 		"shutdown.total_timeout":                      {Kind: config.KindDuration, Default: "60s", Min: "1s", Max: "1h", Chapter: "02-architecture.md"},
 		"shutdown.jobs_soft_timeout":                  {Kind: config.KindDuration, Default: "20s", Min: "1ms", Max: "1h", Chapter: "02-architecture.md"},

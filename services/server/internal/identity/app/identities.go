@@ -23,8 +23,8 @@ import (
 // LoginMethodSource is one kind of sign-in method of a person (M1-36 extension point; the brief
 // calls it CredentialSource, a name app already uses for authz.CredentialSource). Each source
 // contributes its part of the credential overview and counts the methods that remain when an
-// identity is unlinked. This ticket registers the sources of identities and of active devices;
-// M1-39 (local password, TOTP) and M1-40 (passkeys) add theirs to IdentitiesDeps.Sources.
+// identity is unlinked. NewIdentities registers the sources of identities and of active devices;
+// the passkey and local credential sources come through IdentitiesDeps.Sources.
 type LoginMethodSource interface {
 	// Contribute fills the part of out this source owns for userID.
 	Contribute(ctx context.Context, userID ids.ID, out *identity.CredentialOverview) error
@@ -230,8 +230,8 @@ func (s *Identities) person(ctx context.Context, a actor.Actor, act authorize.Ac
 }
 
 // Credentials implements identity.Identities: identity.read on the person (self or owner, others
-// and unknown ids not_found, a pending device device_pending). Every source contributes;
-// passkeys stay empty and the local flags false until M1-40 and M1-39 register their sources.
+// and unknown ids not_found, a pending device device_pending). Every source contributes its part
+// (identities, devices, passkeys, the local password and TOTP flags).
 func (s *Identities) Credentials(ctx context.Context, a actor.Actor, userID ids.ID) (identity.CredentialOverview, error) {
 	if err := s.person(ctx, a, authorize.ActionIdentityRead, userID); err != nil {
 		return identity.CredentialOverview{}, err

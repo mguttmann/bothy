@@ -96,15 +96,18 @@ type requestHandler[A jobs.Args] struct {
 	id  func(A) ids.ID
 }
 
-// Work runs the request; after the last failed attempt the request is marked failed, so it
-// never stays running.
+// Work runs the request; after the last failed attempt the request is marked failed. Fail runs
+// with a context detached from the job, so a last attempt that ended by River's job timeout or the
+// stop of the worker still ends the request; the unit of work bounds it by
+// database.statement_timeout. A job River's rescuer discards after a hard death of the worker in
+// its last attempt never reaches Work, so its request stays running (module README, "Limits").
 func (h requestHandler[A]) Work(ctx context.Context, job jobs.Job[A]) error {
 	if h.uc == nil {
 		return errNoUseCases
 	}
 	err := h.run(h.uc, ctx, h.id(job.Args))
 	if err != nil && job.Attempt >= MaxAttempts {
-		return errors.Join(err, h.uc.Fail(ctx, h.id(job.Args), codeFailed))
+		return errors.Join(err, h.uc.Fail(context.WithoutCancel(ctx), h.id(job.Args), codeFailed))
 	}
 	return err
 }

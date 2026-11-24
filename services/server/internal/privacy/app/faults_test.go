@@ -205,6 +205,8 @@ type memPackages struct {
 	f       *faults
 	stored  map[ids.ID][]byte
 	deleted []ids.ID
+	// onStore runs after a package is stored, outside the lock.
+	onStore func()
 }
 
 func (p *memPackages) Store(_ context.Context, cmd files.StoreExport) (ids.ID, error) {
@@ -216,9 +218,13 @@ func (p *memPackages) Store(_ context.Context, cmd files.StoreExport) (ids.ID, e
 		return ids.ID{}, err
 	}
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	id := ids.New()
 	p.stored[id] = b
+	hook := p.onStore
+	p.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
 	return id, nil
 }
 
@@ -235,8 +241,11 @@ func (p *memPackages) Open(_ context.Context, id ids.ID) (files.ExportContent, e
 	return files.ExportContent{Name: "export.zip", SizeBytes: int64(len(b)), Body: io.NopCloser(bytes.NewReader(b))}, nil
 }
 
-func (p *memPackages) Delete(_ context.Context, id ids.ID) error {
+func (p *memPackages) Delete(ctx context.Context, id ids.ID) error {
 	if err := p.f.hit("packages.Delete"); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	p.mu.Lock()
@@ -381,7 +390,7 @@ func newFaultWorld(t *testing.T, requiresApproval bool) *faultWorld {
 	}
 	svc, err := app.New(app.Config{
 		ExportTTL: 7 * 24 * time.Hour, ExportRequiresApproval: requiresApproval, DeletionContent: personaldata.KeepPseudonymized,
-		ReminderLead: 72 * time.Hour, PageSizeDefault: 1, PageSizeMax: 2,
+		ReminderLead: 72 * time.Hour, PageSizeDefault: 1, PageSizeMax: 2, ReasonMaxChars: 500,
 	}, app.Deps{
 		Store: faultStore{memStore: w.store, f: f}, UoW: directUoW{},
 		Authorizer: faultAuthz{ownerAuthorizer: ownerAuthorizer{owners: map[ids.ID]bool{w.robin.ID: true}}, f: f},
@@ -451,6 +460,12 @@ func TestCreateReturnsEveryFault(t *testing.T) {
 	}
 	if _, err := w.svc.Create(context.Background(), w.alex, privacy.CreateCmd{Kind: "export", Reason: " "}); code(err) != errs.CodeValidationFailed {
 		t.Fatalf("empty reason = %v", err)
+	}
+	// audit.reason_max_chars bounds the reason, which goes into the audit log (SEC-AUD-5).
+	var long *errs.Error
+	if _, err := w.svc.Create(context.Background(), w.alex, privacy.CreateCmd{Kind: "export", Reason: strings.Repeat("ä", 501)}); !errors.As(err, &long) ||
+		len(long.Fields) != 1 || long.Fields[0].Code != "too_long" {
+		t.Fatalf("reason above audit.reason_max_chars = %v", err)
 	}
 	w.f.set("store.Insert", app.ErrOpen)
 	_, err := w.svc.Create(context.Background(), w.alex, privacy.CreateCmd{Kind: "export", Reason: "x"})
@@ -687,6 +702,38 @@ func TestRunExportReturnsFaults(t *testing.T) {
 	}
 }
 
+// TestRunExportLeavesNoOrphanPackage (srv-kernel-audit-privacy-7): a package whose request ended
+// while it was built, or whose completion failed after the job's context ended, is deleted, so no
+// package outlives its request.
+func TestRunExportLeavesNoOrphanPackage(t *testing.T) {
+	t.Parallel()
+	w := newFaultWorld(t, false)
+	r := w.put(t, domain.KindExport, domain.StateRunning)
+	w.pkgs.onStore = func() {
+		ended := w.row(t, r.ID)
+		ended.State = domain.StateFailed
+		_ = w.store.Update(context.Background(), ended)
+	}
+	if err := w.svc.RunExport(context.Background(), r.ID); err != nil {
+		t.Fatalf("RunExport of an ended request = %v", err)
+	}
+	if len(w.pkgs.deleted) != 1 || len(w.pkgs.stored) != 0 {
+		t.Fatalf("package of an ended request kept: stored %d, deleted %v", len(w.pkgs.stored), w.pkgs.deleted)
+	}
+
+	w = newFaultWorld(t, false)
+	r = w.put(t, domain.KindExport, domain.StateRunning)
+	ctx, cancel := context.WithCancel(context.Background())
+	w.pkgs.onStore = cancel
+	w.f.set("events", nil)
+	if err := w.svc.RunExport(ctx, r.ID); !errors.Is(err, errBoom) {
+		t.Fatalf("RunExport with a failed completion = %v", err)
+	}
+	if len(w.pkgs.deleted) != 1 || len(w.pkgs.stored) != 0 {
+		t.Fatalf("package kept after the job's context ended: stored %d, deleted %v", len(w.pkgs.stored), w.pkgs.deleted)
+	}
+}
+
 // TestRunEraseStepsAndFaults: the deletion job runs every participant step in order and
 // completes with the audit entry; a failing step makes the job retry and resume after the last
 // finished step; the last owner fails the request without a retry.
@@ -781,7 +828,10 @@ func TestNewRefusesMissingParts(t *testing.T) {
 	if _, err := app.New(app.Config{ExportTTL: time.Hour, ReminderLead: time.Hour, DeletionContent: "shred", PageSizeDefault: 1, PageSizeMax: 1}, d); err == nil {
 		t.Fatal("use cases with an unknown content mode")
 	}
-	if _, err := app.New(app.Config{ExportTTL: time.Hour, ReminderLead: time.Hour, DeletionContent: personaldata.KeepPseudonymized, PageSizeDefault: 1, PageSizeMax: 1}, d); err != nil {
+	if _, err := app.New(app.Config{ExportTTL: time.Hour, ReminderLead: time.Hour, DeletionContent: personaldata.KeepPseudonymized, PageSizeDefault: 1, PageSizeMax: 1}, d); err == nil {
+		t.Fatal("use cases without audit.reason_max_chars")
+	}
+	if _, err := app.New(app.Config{ExportTTL: time.Hour, ReminderLead: time.Hour, DeletionContent: personaldata.KeepPseudonymized, PageSizeDefault: 1, PageSizeMax: 1, ReasonMaxChars: 500}, d); err != nil {
 		t.Fatalf("use cases with the system clock = %v", err)
 	}
 }

@@ -405,6 +405,9 @@ func TestUnlink_LastMethod(t *testing.T) {
 	// The only identity and no device: refused.
 	last := w.link(samID, prov, "https://login.example.com", "sub-sam-2")
 	w.noDevices(samID)
+	// The keyless web device of a console login approves no pairing, so it does not count either.
+	w.sql(`INSERT INTO devices (id, user_id, name, platform, state, approved_by, approved_at)
+		VALUES ($1, $2, 'Web console', 'web', 'active', $2, now())`, ids.New().String(), samID.String())
 	p := w.want(owner.call(http.MethodDelete, identityPath(samID, last.ID), ""), http.StatusConflict, "conflict")
 	if p["reason"] != "no_login_method_left" || p["hint"] == nil {
 		t.Fatalf("problem %v", p)

@@ -155,7 +155,7 @@ func NewGrant(id ids.ID, s Subject, tg Target, l Level, c Caps, expiresAt time.T
 	case at.IsZero():
 		return Grant{}, internalError("grant without creation time")
 	}
-	if err := CheckGrantShape(s, tg, l, c, expiresAt, reason, at); err != nil {
+	if err := CheckGrantShape(s, tg, l, c, expiresAt, reason, 0, at); err != nil {
 		return Grant{}, err
 	}
 	return Grant{
@@ -166,8 +166,10 @@ func NewGrant(id ids.ID, s Subject, tg Target, l Level, c Caps, expiresAt time.T
 
 // CheckGrantShape applies the shape checks of NewGrant without an id and a grantor, so a use case
 // can refuse a malformed request before it authorizes (brief M1-48 "createGrant" step 1, also
-// for an anonymous caller). Errors: those of NewGrant.
-func CheckGrantShape(s Subject, tg Target, l Level, c Caps, expiresAt time.Time, reason string, at time.Time) error {
+// for an anonymous caller). reasonMaxChars is audit.reason_max_chars (SEC-AUD-5); zero or less
+// leaves the length unchecked, as for a stored grant. Errors: those of NewGrant, and too_long on
+// /reason.
+func CheckGrantShape(s Subject, tg Target, l Level, c Caps, expiresAt time.Time, reason string, reasonMaxChars int, at time.Time) error {
 	if err := checkSubject(s); err != nil {
 		return err
 	}
@@ -180,13 +182,15 @@ func CheckGrantShape(s Subject, tg Target, l Level, c Caps, expiresAt time.Time,
 	if err := checkExpiry(expiresAt, at); err != nil {
 		return err
 	}
-	return CheckReason(reason)
+	return CheckReason(reason, reasonMaxChars)
 }
 
-// CheckReason checks the reason of a grant or a revocation (07 section 9.5): not blank and free of
-// control and bidi characters (SEC-IN-4). Errors: validation_failed on /reason.
-func CheckReason(reason string) error {
-	return checkText(pointerReason, "reason", reason, true, 0)
+// CheckReason checks the reason of a grant or a revocation (07 section 9.5): not blank, free of
+// control and bidi characters (SEC-IN-4) and at most maxChars runes (audit.reason_max_chars,
+// SEC-AUD-5) when maxChars is positive. Errors: validation_failed on /reason (required, too_long
+// or the rule of the character).
+func CheckReason(reason string, maxChars int) error {
+	return checkText(pointerReason, "reason", reason, true, maxChars)
 }
 
 // Shape returns the facts of g that the delegation rules judge.

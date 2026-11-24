@@ -3,6 +3,7 @@
 package domain_test
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -467,5 +468,22 @@ func TestNewClaimGroup(t *testing.T) {
 		if e, ok := errs.As(err); !ok || e.Code != errs.CodeValidationFailed || e.Fields[0].Pointer != c.pointer {
 			t.Errorf("%+v: %v", c, err)
 		}
+	}
+}
+
+// TestCheckReason_MaxChars (SEC-AUD-5): the reason of a grant or a revocation is at most
+// audit.reason_max_chars runes; zero leaves the length unchecked (a stored grant).
+func TestCheckReason_MaxChars(t *testing.T) {
+	t.Parallel()
+	if err := domain.CheckReason(strings.Repeat("ä", 10), 10); err != nil {
+		t.Fatalf("at the limit: %v", err)
+	}
+	var e *errs.Error
+	if err := domain.CheckReason(strings.Repeat("ä", 11), 10); !errors.As(err, &e) || len(e.Fields) != 1 ||
+		e.Fields[0].Pointer != "/reason" || e.Fields[0].Code != "too_long" {
+		t.Fatalf("above the limit: %v", err)
+	}
+	if err := domain.CheckReason(strings.Repeat("ä", 11), 0); err != nil {
+		t.Fatalf("without a limit: %v", err)
 	}
 }

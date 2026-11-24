@@ -30,8 +30,10 @@ type recorder struct {
 	mu       sync.Mutex
 	denials  []auditing.Entry
 	detached []auditing.Entry
-	records  []auditing.Entry
-	fail     bool
+	// detachedCtx holds the context error each RecordDetached call saw.
+	detachedCtx []error
+	records     []auditing.Entry
+	fail        bool
 }
 
 var _ auditing.Recorder = (*recorder)(nil)
@@ -53,10 +55,11 @@ func (r *recorder) RecordDenial(_ context.Context, e auditing.Entry) error {
 	return nil
 }
 
-func (r *recorder) RecordDetached(_ context.Context, e auditing.Entry) error {
+func (r *recorder) RecordDetached(ctx context.Context, e auditing.Entry) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.detached = append(r.detached, e)
+	r.detachedCtx = append(r.detachedCtx, ctx.Err())
 	if r.fail {
 		return fake.ErrInjected
 	}

@@ -77,6 +77,11 @@ func TestReporter_KeysAreInTheCatalogue(t *testing.T) {
 	if got[3][attr.DBResponseStatusCode] != "57014" || got[4][attr.DBResponseStatusCode] != nil {
 		t.Errorf("SQLSTATE: %v / %v", got[3], got[4])
 	}
+	// The warning names both effects of a missing sink: no protection outside the database and
+	// no trim by retention.audit (privacy-5, srv-kernel-audit-privacy-4).
+	if msg, _ := got[5]["msg"].(string); !strings.Contains(msg, "not protected outside the database") || !strings.Contains(msg, "retention.audit trims nothing") {
+		t.Errorf("sink warning = %v", got[5])
+	}
 	if got[6][attr.Reason] != "checkpoint_mismatch" {
 		t.Errorf("verify failure = %v", got[6])
 	}

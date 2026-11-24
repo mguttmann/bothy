@@ -76,6 +76,9 @@ type ServeConfig struct {
 	HTTPGrace time.Duration `config:"shutdown.http_grace"`
 	// TelemetryFlushTimeout is shutdown.telemetry_flush_timeout.
 	TelemetryFlushTimeout time.Duration `config:"shutdown.telemetry_flush_timeout"`
+	// DatabaseFlushTimeout is shutdown.database_flush_timeout, the budget of each flush step of
+	// the phase database (audit_denials, stats_flush).
+	DatabaseFlushTimeout time.Duration `config:"shutdown.database_flush_timeout"`
 	// TotalTimeout is shutdown.total_timeout.
 	TotalTimeout time.Duration `config:"shutdown.total_timeout"`
 }
@@ -106,8 +109,8 @@ type Deps struct {
 	// channel ops the start checks against the catalogue (M1-25); nil means the functions of the
 	// module ports. Tests inject a bad registration here.
 	Registrations []func(*authorize.Registry)
-	// ConsumerHandlers replaces the production list of worker consumers (consumerHandlers,
-	// empty until M2-26 and M3-19) in worker and all; nil keeps it. Tests register probe
+	// ConsumerHandlers replaces the production list of worker consumers (consumerHandlers:
+	// webhooks, push, privacy.journal) in worker and all; nil keeps it. Tests register probe
 	// handlers here.
 	ConsumerHandlers map[sync.ConsumerName]sync.ConsumerHandler
 	// PushProviders are additional push providers of the push path (M3-19); production adds
@@ -571,6 +574,9 @@ func (s *server) register() {
 	}
 	r.OnStop(lifecycle.StopStep{Name: "telemetry", Phase: lifecycle.PhaseTelemetry, Budget: s.cfg.TelemetryFlushTimeout, Run: s.stopTelemetry})
 	r.OnStop(lifecycle.StopStep{Name: "pool", Phase: lifecycle.PhaseDatabase, Run: s.stopDatabase})
+	// audit_denials and stats_flush register during the start of their components (Audit.Start,
+	// Measure.Start); their budgets count in the sum Run checks before the start.
+	r.Reserve(databaseFlushSteps * s.cfg.DatabaseFlushTimeout)
 	r.OnStop(lifecycle.StopStep{Name: "internal_listener", Phase: lifecycle.PhaseInternalListener, Run: s.stopInternal})
 }
 
@@ -920,12 +926,16 @@ func (s *server) jobsStopSteps() []lifecycle.StopStep {
 	return append(steps, lifecycle.StopStep{Name: stepJobs, Phase: lifecycle.PhaseJobs, Budget: s.jobsCfg.SoftStopTimeout, Run: s.stopJobs})
 }
 
+// databaseFlushSteps is the number of flush steps of the phase database that each get
+// shutdown.database_flush_timeout (audit_denials and stats_flush).
+const databaseFlushSteps = 2
+
 // jobsWaitBudget returns the budget of the stop step jobs_wait for role: shutdown.total_timeout
 // minus the fixed budgets of the role's stop steps (drain and HTTP for all, the soft stop soft,
-// the telemetry flush). 0 means there is no slack and the step is left out; a step budget of 0
-// would take the whole rest of the total instead.
+// the telemetry flush, the flush steps of the phase database). 0 means there is no slack and the
+// step is left out; a step budget of 0 would take the whole rest of the total instead.
 func jobsWaitBudget(cfg ServeConfig, role Role, soft time.Duration) time.Duration {
-	fixed := soft + cfg.TelemetryFlushTimeout
+	fixed := soft + cfg.TelemetryFlushTimeout + databaseFlushSteps*cfg.DatabaseFlushTimeout
 	if role == RoleAPI || role == RoleAll {
 		fixed += cfg.DrainDelay + cfg.HTTPGrace
 	}
@@ -948,6 +958,11 @@ func (s *server) startJobs(ctx context.Context) error {
 	}
 	if err := s.moduleJobs(&modules); err != nil {
 		return err
+	}
+	for _, check := range modules.StartChecks {
+		if err := check(ctx); err != nil {
+			return err
+		}
 	}
 	if modules.Retention, err = NewRetentionJobs(modules.RetentionParticipants, modules.RetentionConfig, s.deps.Clock); err != nil {
 		return err

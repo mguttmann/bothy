@@ -868,7 +868,7 @@ Decision: [ADR 0064](../adr/0064-feature-flag-registration-with-a-cleanup-gate.m
 | `postgres` | Superuser (`migrate.bootstrap_user`) | only `migrate --bootstrap` and `bothy-backupd` |
 | `bothy_owner` | Owner of the database, of the schema `public` and of `jobs.schema`; DDL | `migrate` |
 | `bothy_app` | DML; on `audit_events` only `INSERT` and `SELECT` | `api`, `worker`, server commands `bothy setup ...` (they only write rows) |
-| `bothy_maint` | Truncating the audit log at the end of the retention period with an anchor entry | Retention job ([03-data-model.md](03-data-model.md) 4.12) |
+| `bothy_maint` | Truncating the audit log at the end of the retention period with an anchor entry | Retention job ([03-data-model.md](03-data-model.md) 4.12); the roles `worker` and `all` open one connection with `migrate.maint_password_ref` at the start, and a failed login ends the start |
 | `bothy_monitor` | `pg_monitor` | `otel-collector` |
 | `bothy_backup` | `SELECT, INSERT, UPDATE` on `backup_runs` only (03 4.12) | `bothy-backupd`, records its runs (M7-02) |
 

@@ -32,8 +32,8 @@ type AdminConfig struct {
 	// api.page_size_max, the cap of a larger limit.
 	PageSizeDefault int `config:"api.page_size_default"`
 	PageSizeMax     int `config:"api.page_size_max"`
-	// ReasonMaxChars is audit.reason_max_chars, the longest reason of the guided flow resolve_i1
-	// (SEC-AUD-5, M2-21); internal/wire passes it to the Resolver.
+	// ReasonMaxChars is audit.reason_max_chars, the longest reason of a grant, a revocation and the
+	// guided flow resolve_i1 (SEC-AUD-5, M2-21); internal/wire also passes it to the Resolver.
 	ReasonMaxChars int `config:"audit.reason_max_chars"`
 	// ExpiryReminderLead is authz.expiry_reminder_lead, the window of the list "Expiring soon"
 	// (07 section 9.4, M6-07); zero or less refuses that list with kind internal.
@@ -695,7 +695,7 @@ func (s *AdminService) CreateGrant(ctx context.Context, caller actor.Actor, cmd 
 	}
 	now := s.d.Clock.Now()
 	reason := strings.TrimSpace(cmd.Reason)
-	subject, target, level, caps, err := grantShape(cmd, reason, now)
+	subject, target, level, caps, err := grantShape(cmd, reason, s.d.Config.ReasonMaxChars, now)
 	if err := joinFields(err, s.checkResolve(cmd.ResolveI1)); err != nil {
 		return authz.Grant{}, err
 	}
@@ -763,13 +763,13 @@ func (s *AdminService) createGrant(ctx context.Context, g domain.Grant, beforeWr
 }
 
 // grantShape parses cmd with grantParts and checks the shape of the grant with the trimmed reason
-// at now (400 before authorize).
-func grantShape(cmd authz.CreateGrantCmd, reason string, now time.Time) (domain.Subject, domain.Target, domain.Level, domain.Caps, error) {
+// of at most reasonMaxChars runes at now (400 before authorize).
+func grantShape(cmd authz.CreateGrantCmd, reason string, reasonMaxChars int, now time.Time) (domain.Subject, domain.Target, domain.Level, domain.Caps, error) {
 	subject, target, level, caps, err := grantParts(cmd)
 	if err != nil {
 		return subject, target, level, caps, err
 	}
-	return subject, target, level, caps, domain.CheckGrantShape(subject, target, level, caps, cmd.ExpiresAt, reason, now)
+	return subject, target, level, caps, domain.CheckGrantShape(subject, target, level, caps, cmd.ExpiresAt, reason, reasonMaxChars, now)
 }
 
 // checkResolve validates the guided flow of a request (M2-21 design note 2); nil for none.
@@ -974,7 +974,7 @@ func (s *AdminService) RevokeGrant(ctx context.Context, caller actor.Actor, gran
 		return authz.Grant{}, err
 	}
 	reason = strings.TrimSpace(reason)
-	if err := domain.CheckReason(reason); err != nil {
+	if err := domain.CheckReason(reason, s.d.Config.ReasonMaxChars); err != nil {
 		return authz.Grant{}, err
 	}
 	attrs, err := reasonAttrs(reason)
@@ -1067,7 +1067,24 @@ func (s *AdminService) revokeGrant(ctx context.Context, caller actor.Actor, gran
 	if err := s.grantEvent(ctx, authorize.ActionGrantRevoke, revoked, changeRevoked); err != nil {
 		return domain.Grant{}, false, err
 	}
-	return revoked, true, s.record(ctx, authorize.ActionGrantRevoke, authorize.ResourceGrant, g.ID, attrs)
+	return revoked, true, s.record(ctx, authorize.ActionGrantRevoke, authorize.ResourceGrant, g.ID, revokeAttrs(revoked, attrs))
+}
+
+// revokeAttrs are the audit attributes of a revocation: the reason attributes plus subject and
+// target of the grant (kinds and ids, never names), so the history of a target or a subject reads
+// from the audit log without the grant row.
+func revokeAttrs(g domain.Grant, reason auditing.Attrs) auditing.Attrs {
+	all := grantAttrs(g)
+	attrs := auditing.Attrs{}
+	for _, k := range []string{attrSubjectKind, attrSubjectID, attrTargetKind, attrTargetID} {
+		if v, ok := all[k]; ok {
+			attrs[k] = v
+		}
+	}
+	for k, v := range reason {
+		attrs[k] = v
+	}
+	return attrs
 }
 
 // reasonAttrs checks an optional reason (SEC-IN-4) and returns its audit attribute.

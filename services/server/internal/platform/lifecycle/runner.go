@@ -117,6 +117,7 @@ type Runner struct {
 	mu         sync.Mutex
 	components []Component
 	steps      []StopStep
+	reserved   time.Duration
 	err        error
 	fail       chan struct{}
 	failOnce   sync.Once
@@ -147,6 +148,15 @@ func (r *Runner) OnStop(s StopStep) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.steps = append(r.steps, s)
+}
+
+// Reserve adds d to the budget sum that Run checks against Options.TotalTimeout before any
+// component starts: the budget of stop steps that their components register only during the
+// start, which the check would otherwise not see. It changes no step.
+func (r *Runner) Reserve(d time.Duration) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.reserved += d
 }
 
 // Fail reports a fatal runtime error, for example a panic in the log tail (02 "Panics"): the
@@ -310,11 +320,12 @@ func (r *Runner) signals() (<-chan os.Signal, func()) {
 	return ch, func() { signal.Stop(ch) }
 }
 
-// checkBudgets compares the sum of the registered step budgets with the total (02 "Shutdown").
+// checkBudgets compares the sum of the registered step budgets and the reserve (Reserve) with the
+// total (02 "Shutdown").
 func (r *Runner) checkBudgets() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	var sum time.Duration
+	sum := r.reserved
 	for _, s := range r.steps {
 		sum += s.Budget
 	}

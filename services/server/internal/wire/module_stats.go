@@ -75,7 +75,7 @@ func (s *server) startMeasure(context.Context) error {
 		// Maintenance mode measures nothing (M7-08): the rows would be missing on the target of a
 		// relocation, and every 503 maintenance would count against sli.api_availability.
 		// bothy restore finalize measures nothing either: it serves no request (M7-07).
-		me.Start(s.runner)
+		me.Start(s.runner, s.cfg.DatabaseFlushTimeout)
 	}
 	s.mu.Lock()
 	s.measure = me

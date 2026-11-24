@@ -206,6 +206,7 @@ Source: [02-architecture.md](../spec/02-architecture.md), section 22.
 | `shutdown.http_grace` | `BOTHY_SHUTDOWN__HTTP_GRACE` | Server | duration | `20s` | deadline for running HTTP requests | active |
 | `shutdown.jobs_soft_timeout` | `BOTHY_SHUTDOWN__JOBS_SOFT_TIMEOUT` | Server | duration | `20s` | soft stop of River | active |
 | `shutdown.telemetry_flush_timeout` | `BOTHY_SHUTDOWN__TELEMETRY_FLUSH_TIMEOUT` | Server | duration | `5s` | flushing telemetry | active |
+| `shutdown.database_flush_timeout` | `BOTHY_SHUTDOWN__DATABASE_FLUSH_TIMEOUT` | Server | duration | `2s` | each flush step of the database phase (`audit_denials`, `stats_flush`) | active |
 | `shutdown.total_timeout` | `BOTHY_SHUTDOWN__TOTAL_TIMEOUT` | Server | duration | `60s` | total deadline until the end; at least the sum of the step budgets (15.3) | active |
 | `perf.reference_profile` |  | Load test |  | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 local with fsync and synchronous_commit on, role all` | environment of the load tests; measurement modes in ADR 0063 |  |
 | `perf.sustained_messages_per_s` |  | Load test |  | `200` | sustained load for `perf.message_create_p99`, `perf.invocation_delivery_p99` and `perf.run_patch_fanout_p99`; also the load of `perf.push_handoff_p95` |  |
@@ -904,7 +905,7 @@ Source: [20-privacy.md](../spec/20-privacy.md), section 13.
 | `retention.content` | `BOTHY_RETENTION__CONTENT` | Server | string | `none` | period for contents, at least one day; `none` means no automatic deletion (without `retention.content_none_reason` a warning, 4.1) | active |
 | `retention.content_none_reason` | `BOTHY_RETENTION__CONTENT_NONE_REASON` | Server | string | empty | reason of the instance operator for `retention.content = none`; empty means a warning in `bothy config check` and in the startup log (4.1) | active |
 | `retention.security_after_end` | `BOTHY_RETENTION__SECURITY_AFTER_END` | Server | duration | `90d` | security data after end, expiry or revocation | active |
-| `retention.audit` | `BOTHY_RETENTION__AUDIT` | Server | duration | `365d` | audit log (Study C suggested twelve months) | active |
+| `retention.audit` | `BOTHY_RETENTION__AUDIT` | Server | duration | `365d` | audit log (Study C suggested twelve months); trims nothing while `audit.checkpoint_sink` is empty (4.5) | active |
 | `retention.cost` | `BOTHY_RETENTION__COST` | Server | duration | `395d` | costs and prices | active |
 | `retention.import_after_completion` | `BOTHY_RETENTION__IMPORT_AFTER_COMPLETION` | Server | duration | `90d` | import state (the source and its items) after the completion or cancellation of the source | active |
 | `retention.privacy_job` | `BOTHY_RETENTION__PRIVACY_JOB` | Server | duration | `1095d` | privacy requests (without export packages) | active |
@@ -920,7 +921,7 @@ Source: [20-privacy.md](../spec/20-privacy.md), section 13.
 | `privacy.request_reminder_lead` | `BOTHY_PRIVACY__REQUEST_REMINDER_LEAD` | Server | duration | `7d` | how long before `due_at` of an open privacy request the owners get `gdpr.request_due`; less than one month | active |
 | `privacy.object_delete_delay` | `BOTHY_PRIVACY__OBJECT_DELETE_DELAY` | Server | duration | `24h` | maximum time until deleted objects are removed | active |
 | `privacy.deletion_journal_retention` | `BOTHY_PRIVACY__DELETION_JOURNAL_RETENTION` | Server | duration | `400d` | retention of the deletion journal; at least the backup period | active |
-| `privacy.audit_ip_key_period` | `BOTHY_PRIVACY__AUDIT_IP_KEY_PERIOD` | Server | duration | `30d` | period per key for IP pseudonyms | active |
+| `privacy.audit_ip_key_period` | `BOTHY_PRIVACY__AUDIT_IP_KEY_PERIOD` | Server | duration | `30d` | period per key for IP pseudonyms; a changed value takes effect with the next key (03 `audit_ip_keys`) | active |
 | `privacy.audit_ip_key_retention` | `BOTHY_PRIVACY__AUDIT_IP_KEY_RETENTION` | Server | duration | `90d` | keys are destroyed after this | active |
 | `privacy.audit_ip_kek_ref` | `BOTHY_PRIVACY__AUDIT_IP_KEK_REF` | Server | secret_ref | `file:<secrets.dir>/audit_ip_kek` | reference to the key that encrypts the IP keys in `audit_ip_keys` | active |
 | `privacy.telemetry_pseudonym_rotation` | `BOTHY_PRIVACY__TELEMETRY_PSEUDONYM_ROTATION` | Server | duration | `30d` | rotation of the key for pseudonymous IDs in telemetry | active |

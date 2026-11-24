@@ -247,8 +247,28 @@ of `BothyAuditChainBroken`. If it verifies, the backup or the repository is dama
 again.
 
 ### bothyauditchainbroken
-Treat as a security incident: who had write access to the database? Determine the last good point
-of the chain, compare backups, inform the owner.
+The job `audit.chain_verify` found a break and signs no checkpoint until it is resolved. The
+newest error entry of `audit.verify` names `first_broken_seq` and `failure_reason`; the log line
+`audit chain verification failed` names the reason. First rule out a restore: if the database was
+restored to an earlier point in time since the last successful run and the reason is
+`checkpoint_mismatch`, the sink is ahead of the database; move the sink as
+[backup-restore.md](../operations/backup-restore.md) 8.1 describes. Otherwise treat it as a
+security incident: who had write access to the database or to the sink? Per reason:
+
+- `hash_mismatch` or `link_mismatch`: a row was changed or its hash rewritten. Export the log
+  around `first_broken_seq` (`exportAuditEvents`), compare with the newest backup that still
+  verifies, inform the owner.
+- `seq_gap`: rows are missing. Check whether a retention trim ran without its anchor entry; else
+  as above.
+- `checkpoint_mismatch`: a checkpoint of the sink no longer matches its row, its row is gone or
+  the database lost checkpoints it had exported. Outside a restore, rows were rewritten together
+  with `audit_checkpoints`; compare the sink with a backup.
+- `checkpoint_invalid`: a checkpoint does not verify (another key, another instance, a broken
+  link). Check that no object of the sink was removed or replaced (backup-restore.md 8) and that
+  the signing keys of purpose `audit_checkpoint` are complete.
+
+After the cause is fixed, run "Check chain" in the audit log of the admin console; the alert ends
+with the next successful run.
 
 ### bothyvolumefull
 Which volume? `files`: retention, quotas; `pgdata`: event log partitions, bloat;

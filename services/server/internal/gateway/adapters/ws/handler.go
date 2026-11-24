@@ -38,6 +38,8 @@ const (
 	attrCloseCode       = "bothy.close.code"
 	attrPrincipalKind   = "bothy.principal.kind"
 	logKeyErrorType     = "error.type"
+	logKeyDuration      = "bothy.connection.duration"
+	msgConnectionClosed = "gateway connection closed"
 	msgEncodeFailed     = "gateway frame not encodable"
 	msgPanic            = "panic recovered"
 	errorTypeEncode     = "encode"
@@ -183,11 +185,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	base := reqmeta.WithTransport(authorize.WithoutRequestScope(context.WithoutCancel(r.Context())),
 		reqmeta.Transport{Peer: peer.Addr().Unmap(), Header: r.Header.Clone(), Action: actionConnect})
 	ctx, span := h.d.Tracer.Tracer(instrumentationName).Start(base, SpanName, trace.WithSpanKind(trace.SpanKindServer))
-	h.run(ctx, ws, span)
+	h.run(ctx, ws, span, h.d.Clock.Now())
 }
 
-// run serves one connection and ends the span with its outcome.
-func (h *Handler) run(ctx context.Context, ws *websocket.Conn, span trace.Span) {
+// run serves one connection, started at started, and ends the span with its outcome.
+func (h *Handler) run(ctx context.Context, ws *websocket.Conn, span trace.Span, started time.Time) {
 	conn := newConn(ws, h.cfg.OutboundQueueMax, h.d.Snapshot, h.d.Log)
 	conn.metrics, conn.clock = h.d.Metrics, h.d.Clock
 	conn.beforeWrite = h.beforeWrite
@@ -203,7 +205,7 @@ func (h *Handler) run(ctx context.Context, ws *websocket.Conn, span trace.Span) 
 		conn.Close(domain.CloseUnknownError, domain.CloseUnknownError.Name())
 		conn.closed.Wait()
 		wg.Wait()
-		h.end(span, domain.CloseUnknownError, false, "")
+		h.end(ctx, span, domain.CloseUnknownError, false, "", started)
 		return
 	}
 	conn.bind(c)
@@ -220,17 +222,21 @@ func (h *Handler) run(ctx context.Context, ws *websocket.Conn, span trace.Span) 
 	conn.closed.Wait()
 	wg.Wait()
 	code, ready, kind := c.Result()
-	h.end(span, code, ready, string(kind))
+	h.end(ctx, span, code, ready, string(kind), started)
 }
 
-// end sets the attributes of the span gateway.connect and ends it.
-func (h *Handler) end(span trace.Span, code domain.CloseCode, ready bool, kind string) {
+// end sets the attributes of the span gateway.connect, ends it and writes one info line with the
+// close code, the outcome, the principal kind and the duration since started; no frame contents.
+func (h *Handler) end(ctx context.Context, span trace.Span, code domain.CloseCode, ready bool, kind string, started time.Time) {
 	if kind == "" {
 		kind = "anonymous"
 	}
-	span.SetAttributes(attribute.String(attrOutcome, domain.Outcome(code, ready)), attribute.Int(attrCloseCode, int(code)),
+	outcome := domain.Outcome(code, ready)
+	span.SetAttributes(attribute.String(attrOutcome, outcome), attribute.Int(attrCloseCode, int(code)),
 		attribute.String(attrPrincipalKind, kind))
 	span.End()
+	h.d.Log.LogAttrs(ctx, slog.LevelInfo, msgConnectionClosed, slog.Int(attrCloseCode, int(code)), slog.String(attrOutcome, outcome),
+		slog.String(attrPrincipalKind, kind), slog.Float64(logKeyDuration, h.d.Clock.Now().Sub(started).Seconds()))
 }
 
 // recover turns a panic of a connection goroutine into the close 4000 (02 "Panics"); the log line

@@ -128,6 +128,9 @@ type Config struct {
 	ReminderLead time.Duration
 	// PageSizeDefault and PageSizeMax are api.page_size_default and api.page_size_max.
 	PageSizeDefault, PageSizeMax int
+	// ReasonMaxChars is audit.reason_max_chars, the longest reason of a request and of a
+	// decision (SEC-AUD-5).
+	ReasonMaxChars int
 }
 
 // Deps are the collaborators of the use cases.
@@ -169,8 +172,8 @@ func New(cfg Config, d Deps) (*Service, error) {
 		return nil, errors.New("privacy: the use cases need every collaborator")
 	}
 	if cfg.ExportTTL <= 0 || cfg.ReminderLead <= 0 || !cfg.DeletionContent.Valid() || cfg.PageSizeDefault < 1 ||
-		cfg.PageSizeMax < cfg.PageSizeDefault {
-		return nil, errors.New("privacy: privacy.export_ttl, privacy.request_reminder_lead, privacy.account_deletion_content or the page sizes are invalid")
+		cfg.PageSizeMax < cfg.PageSizeDefault || cfg.ReasonMaxChars < 1 {
+		return nil, errors.New("privacy: privacy.export_ttl, privacy.request_reminder_lead, privacy.account_deletion_content, the page sizes or audit.reason_max_chars are invalid")
 	}
 	if d.Clock == nil {
 		d.Clock = clock.System()

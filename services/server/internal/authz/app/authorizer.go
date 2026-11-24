@@ -194,15 +194,22 @@ func (a *Authorizer) audit(ctx context.Context, p authorize.Principal, act autho
 		if fe, ok := errs.As(failure); ok && fe.Cause == errs.CauseUnknownAction {
 			e.Reason = auditing.ReasonUnknownAction
 		}
-		err = a.recorder.RecordDetached(ctx, e)
+		// The entry outlives the request: a timeout or a client that went away must not lose
+		// the audit of a decision error (R-AZ-04); the unit of work bounds it by
+		// database.statement_timeout.
+		err = a.recorder.RecordDetached(context.WithoutCancel(ctx), e)
 	} else {
 		e.Decision, e.Reason = auditing.DecisionDeny, auditing.Reason(d.Reason)
 		e.Attrs = actingForDetails(p, denialDetails(d, tok))
 		err = a.recorder.RecordDenial(ctx, e)
 	}
 	if err != nil {
+		kind := "anonymous"
+		if p != nil && p.PrincipalKind() != "" {
+			kind = p.PrincipalKind()
+		}
 		a.log.LogAttrs(ctx, slog.LevelError, msgAuditFailed, slog.String(keyAction, string(act)),
-			slog.String(keyErrorType, "audit"))
+			slog.String(keyErrorType, "audit"), slog.String(keyPrincipalKind, kind))
 	}
 }
 
@@ -404,7 +411,14 @@ func (s *actingPrincipal) liveness() domain.Liveness {
 
 // principalOf loads the acting principal at version v and time t and checks liveness and the
 // pending rule for act. A non-allow decision ends the call before any resource is read (SR7).
+// The marker of the check without a request is checked first (checkRecheck), so Authorize, Scope,
+// AdminScope, EffectiveRights and the explanation share one bound (R-AZ-29).
 func (a *Authorizer) principalOf(ctx context.Context, p authorize.Principal, act string, v int64, t time.Time) (*actingPrincipal, domain.Decision, error) {
+	// An unknown action parses to the zero value, which the marker refuses as well.
+	parsed, _ := authorize.ParseAction(act)
+	if err := checkRecheck(p, parsed); err != nil {
+		return nil, domain.Decision{}, err
+	}
 	s := &actingPrincipal{id: p.PrincipalID(), kind: p.PrincipalKind(), p: p}
 	s.ref = authz.CredentialRef{PrincipalID: s.id, SessionID: p.SessionRef(), DeviceID: p.DeviceRef(), TokenID: p.TokenRef()}
 	switch s.kind {
@@ -438,7 +452,9 @@ func (a *Authorizer) principalOf(ctx context.Context, p authorize.Principal, act
 			// The view ended; a new one needs a fresh step-up (07 section 9.2, no own reason code).
 			return nil, domain.Decision{Outcome: domain.OutcomeStepUpRequired, Reason: domain.ReasonStepUpRequired}, nil
 		}
-		ve, err := a.load(ctx, authz.CredentialRef{PrincipalID: id}, v, t)
+		// The viewed person without a session, the owner role from the owner list (R-AZ-29), so
+		// the view of an owner shows the owner view (07 section 9.2), never more than the viewer.
+		ve, err := a.loadRecheck(ctx, authz.CredentialRef{PrincipalID: id}, v, t)
 		if err != nil {
 			return nil, domain.Decision{}, err
 		}
@@ -648,14 +664,9 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 	return a.decideFor(ctx, s, act, r, spec, req, preview, t)
 }
 
-// acting loads the acting principal at the current rights version (principalOf), after the
-// check of the re-check marker (checkRecheck).
+// acting loads the acting principal at the current rights version (principalOf, which checks
+// the re-check marker).
 func (a *Authorizer) acting(ctx context.Context, p authorize.Principal, action string, t time.Time) (*actingPrincipal, domain.Decision, error) {
-	// An unknown action parses to the zero value, which the marker refuses as well.
-	act, _ := authorize.ParseAction(action)
-	if err := checkRecheck(p, act); err != nil {
-		return nil, domain.Decision{}, err
-	}
 	v, err := a.version(ctx)
 	if err != nil {
 		return nil, domain.Decision{}, err

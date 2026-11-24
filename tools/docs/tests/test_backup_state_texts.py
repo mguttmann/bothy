@@ -266,7 +266,8 @@ def test_the_guide_reads_the_table_as_the_image_test_does() -> None:
     text = (REPO / GUIDE).read_text(encoding="utf-8")
     assert SECTION in text, f"{GUIDE} has no section {SECTION!r}"
     calls = psql_calls(text)
-    assert len(calls) >= 2, f"{GUIDE} names no psql call for the runs and for the manifest"
+    runs = [call for call in calls if "backup_runs" in call["sql"]]
+    assert len(runs) >= 2, f"{GUIDE} names no psql call for the runs and for the manifest"
     services = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))["services"]
     columns = table_columns(MIGRATION.read_text(encoding="utf-8"))
     assert {"kind", "state", "started_at", "manifest", "checks", "error"} <= columns
@@ -278,7 +279,10 @@ def test_the_guide_reads_the_table_as_the_image_test_does() -> None:
         # The image test runs the same call in the database container of the real image.
         proven = f'"psql", "-v", "ON_ERROR_STOP=1", "-U", "{call["user"]}", "-d", '
         assert proven + f'"{call["database"]}", "-Atc"' in image_test, call
-        assert "backup_runs" in call["sql"], call
+        if call not in runs:
+            # Another table of the guide (the audit checkpoints of section 8.1): the columns
+            # below are those of backup_runs.
+            continue
         words = set(_WORD.findall(re.sub(r"'[^']*'", "", call["sql"]).lower()))
         assert words - _SQL_WORDS <= columns, sorted(words - _SQL_WORDS - columns)
 

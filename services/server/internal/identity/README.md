@@ -1,6 +1,6 @@
 # Module `identity`
 
-Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); device approval with the verification code, device pairing and the expiry of unconfirmed devices built (M1-38); passkey login, enrollment, registration and step-up built (M1-40); the OIDC login with PKCE, identity linking, provisioning and the re-login rule built (M1-41); the login with the trusted proxy header and its per-request binding built (M1-43); the principal writer for agent principals built (M1-51); disabling a person, revoking a device, ending a session and the inactive device sweep built (M1-45); groups from the OIDC group claim built (M1-42); local accounts with password and TOTP built (M1-39); the writer of `device.pending` and `Devices.ActiveForUsers` built (M3-19).
+Status: built. Each section below names the ticket that built or changed its part; the decision fragments in `docs/decisions.d/` hold the history.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -66,7 +66,8 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
 - `adapters/identitytest`: `NewDeviceKey`, `SignDPoPProof`, `SignJWS`; only tests import it
   (`TestIdentitytest_NotInBinary`).
 - Migration `migrations/00008_identity_devices.sql`: `devices` and `device_keys` as 03 section 4.2
-  states them (retention class `security`); `bothy_app` may read, insert and update, not delete.
+  states them (retention class `security`); `bothy_app` may read, insert and update; delete only
+  through the job `retention.security` (migration 00076).
 - Tests: ID-T14 without the Bearer case (`TestDPoP_IDT14`), ID-T29 and SEC-T07 for devices
   (`TestRegister_Validation`), `TestDPoP_NonceAcrossVerifiers`, `TestDPoP_ReplayConcurrent`,
   the HTTP tests of the three operations and the fuzz targets `FuzzParseJWK`,
@@ -215,7 +216,8 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
 - `adapters/postgres`: `queries/sessions.sql`, `queries/refresh.sql`, `sessions.go`.
 - Migration `migrations/00011_identity_sessions.sql`: `auth_sessions`, `refresh_token_families`
   and `refresh_tokens` as 03 section 4.2 (the foreign key of `identity_id` follows with M1-36);
-  `bothy_app` may read, insert and update, not delete.
+  `bothy_app` may read, insert and update; delete only through the job `retention.security`
+  (migration 00076).
 - Configuration: `auth.access_token_ttl`, `auth.refresh_token_ttl`, `auth.session_max_age`,
   `auth.refresh_reuse_grace`, `auth.clock_leeway`, `auth.token_pepper_ref`,
   `identity.last_active_granularity`, `server.public_url`, `api.page_size_default`,
@@ -531,8 +533,9 @@ is the runner (docs/decisions.d/A1-01.md D-A1-01-4).
   row in the ambient unit, `RecordFailedAttempt` in an own transaction after the rollback,
   `MarkUsed`); `Service` with `CompleteLogin` (the only place that creates devices, sessions and
   tokens for logins: `TrustConfirmed` makes a new device `active`, `TrustUnconfirmed` `pending`; a
-  known device of the same person with the same active key is reused unchanged, any other known
-  device id is `409`; the proof key must be the registered `dpop` key; one allow entry of
+  known device of the same person with the same active key is reused unchanged, except that a
+  `TrustConfirmed` login on a known `pending` device is `409` with reason `device_pending` (the code
+  stays unused, AUD-PKG-P07-server-security), any other known device id is `409`; the proof key must be the registered `dpop` key; one allow entry of
   `auth.login.complete` with the person as actor), `RedeemEnrollmentCode`,
   `CreateEnrollmentCode`, `BootstrapOwner` and `IssueRecoveryCode`; outgoing port
   `EnrollmentStore`.
@@ -568,7 +571,7 @@ is the runner (docs/decisions.d/A1-01.md D-A1-01-4).
 - `adapters/postgres`: `queries/enrollment_codes.sql`, `enrollment.go`.
 - Migration `migrations/00016_identity_enrollment_codes.sql`: `enrollment_codes` as 03 section
   4.2, the deferred foreign key `auth_challenges.enrollment_code_id`, `bothy_app` may read, insert
-  and update codes (not delete) and set `instance.setup_completed_at`.
+  and update codes (delete only through the job `retention.security`, migration 00076) and set `instance.setup_completed_at`.
 - Configuration: `auth.enrollment_code_ttl`, `auth.enrollment_code_max_attempts`,
   `auth.token_pepper_ref` and the session keys of M1-34.
 - Tests: `domain/enrollment_test.go` (format, normalisation, ID-T27, purposes),
@@ -625,7 +628,8 @@ is the runner (docs/decisions.d/A1-01.md D-A1-01-4).
   step-up in `sessions.sql`. A device row takes `created_at` from the login (the pending window
   counts from the clock of the request).
 - Migration `migrations/00018_identity_device_pairings.sql`: `device_pairings` as 03 section 4.2;
-  `bothy_app` may read, insert and update pairings (not delete).
+  `bothy_app` may read, insert and update pairings; `identity.auth_cleanup` deletes the closed
+  ones (migration 00076).
 - Configuration: `auth.device_pending_ttl`, `auth.device_verification_code_digits`,
   `auth.pairing_code_ttl`, `auth.pairing_code_chars`, `auth.token_pepper_ref`,
   `auth.step_up_max_age`, `auth.cleanup_interval`.
@@ -698,7 +702,8 @@ is the runner (docs/decisions.d/A1-01.md D-A1-01-4).
 - `adapters/postgres`: `queries/passkey_credentials.sql`, `passkeys.go`; `InsertChallenge` writes
   `enrollment_code_id` and `webauthn_session`; `LockEnrollmentCode`.
 - Migration `migrations/00019_identity_passkey_credentials.sql`: `passkey_credentials` as 03
-  section 4.2; `bothy_app` may read, insert and update (not delete).
+  section 4.2; `bothy_app` may read, insert and update; delete only through the job
+  `retention.security` (migration 00076).
 - Configuration: `auth.login_flow_ttl`, `auth.webauthn_rp_id`, `auth.webauthn_origins` (cross-check
   `webauthn_relying_party`), `auth.token_pepper_ref`.
 - Tests: `domain/ceremony_test.go`, `adapters/webauthn/webauthn_test.go`,
@@ -967,7 +972,8 @@ of work without changing it; the command register serializes the registrations o
   (`golang.org/x/text/unicode/norm`).
 - `adapters/postgres`: `queries/local_credentials.sql`, `local.go`. Migration
   `migrations/00029_identity_local_credentials.sql`: `local_credentials` as 03 section 4.2 with
-  both checks; `bothy_app` may read, insert and update, not delete.
+  both checks; `bothy_app` may read, insert and update; the erasure of an account deletes its
+  row (migration 00079).
 - Configuration: `auth.local_password_enabled`, `auth.password_min_length`, `auth.argon2id_*`,
   `auth.login_fail_limit`, `auth.login_fail_window`, `auth.login_lock_duration`,
   `auth.totp_key_ref`, `server.public_url`.
@@ -1184,8 +1190,10 @@ longer keeps its device.
 
 ## Personal data (M7-06)
 
-`app.PersonalData` (`app.NewPersonalData(lifecycle, repo)`) is the participant of identity in the
-privacy requests (kernel port `personaldata`, 20 sections 4.4 and 5.2). It lives in `app`,
+`app.PersonalData` (`app.NewPersonalData(lifecycle, repo, redactor)`) is the participant of identity
+in the privacy requests (kernel port `personaldata`, 20 sections 4.4 and 5.2). Step 6 also rewrites
+handle, display name, locale and time zone of the stored `user.updated` events of the person to the
+pseudonymized values through the `eventlog.Redactor` of sync. It lives in `app`,
 because the account deletion reuses the revocation paths of `user.disable`; its SQL is in
 `adapters/postgres` (`PersonalDataStore`, queries `personaldata.sql`).
 
@@ -1240,7 +1248,7 @@ revocation of identity.
 
 ## Port (root package `internal/identity`)
 
-- Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `LocalCredentials` (M1-39), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`, `PrincipalWrites` (M2-24), `Avatars` (M3-10), `ImportPeople` (M8-03); declares `AvatarFiles` (implemented by `files`, bound by `internal/wire`, M3-10), `AppInstallations` (M2-24), `PushTargets` (implemented by `notify`, bound by `internal/wire`, M3-22).
+- Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `LocalCredentials` (M1-39), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`, `PrincipalWrites` (M2-24), `Avatars` (M3-10), `ImportPeople` (M8-03), `DeviceApproval` (M1-38), `HostedTokens` (A1-01), `Console` (M6-01); declares `AvatarFiles` (implemented by `files`, bound by `internal/wire`, M3-10), `AppInstallations` (M2-24), `PushTargets` (implemented by `notify`, bound by `internal/wire`, M3-22).
 - Emits in-tx events: `DeviceRevoked`, `SessionEnded`.
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: kernel `actor.Authenticator`, `authz.PrincipalSource` (with `HasActivePasskey`, M1-40), `authz.CredentialSource` (session, device, token for the check `check_active`, 07 section 4.2), `authz.TokenExpirySource` (`app.TokenExpiry`: the agent and app tokens expiring within a window for "Expiring soon", ids and expiry only, never personal tokens or token values, M6-07), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.

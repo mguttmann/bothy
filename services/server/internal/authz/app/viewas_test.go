@@ -31,6 +31,18 @@ func TestAZM46_ViewAsAlexCannotReadMarketing(t *testing.T) {
 	w.allow(t, w.user(w.owner), authorize.ActionMessageRead, w.msg(w.kampagnen, w.sam))
 }
 
+// TestViewAsOwnerShowsOwnerView (07 section 9.2): the view of a second owner shows what that
+// owner sees with the owner role, not only the owner's own grants.
+func TestViewAsOwnerShowsOwnerView(t *testing.T) {
+	w := newWorld(t)
+	w.expect(t, w.asPerson(w.alex, w.clk.Now()), authorize.ActionMessageRead, w.msg(w.kampagnen, w.sam), notFound, "no_grant")
+	w.principals.Put(authz.PrincipalFacts{ID: w.alex, Kind: actor.KindUser, Status: authz.PrincipalActive, IsOwner: true})
+	w.versions.Bump()
+	w.allow(t, w.asPerson(w.alex, w.clk.Now()), authorize.ActionMessageRead, w.msg(w.kampagnen, w.sam))
+	// Still read-only.
+	w.expect(t, w.asPerson(w.alex, w.clk.Now()), authorize.ActionMessageCreate, w.thread(w.kampagnen), forbidden, "view_as_read_only")
+}
+
 // TestAZM47_ViewAsIsReadOnly: Alex may write in Support/Allgemein, the owner as Alex may not
 // (07 section 4.2 step 7, AZ-M47).
 func TestAZM47_ViewAsIsReadOnly(t *testing.T) {

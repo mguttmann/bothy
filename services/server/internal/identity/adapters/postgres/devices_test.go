@@ -102,13 +102,6 @@ func TestDevices_InsertReadAndList(t *testing.T) {
 	if _, ok, err := e.repo.ActiveKey(ctx, ids.New(), identity.KeyPurposeDPoP); ok || err != nil {
 		t.Fatalf("ActiveKey of an unknown device = %v, %v", ok, err)
 	}
-	byJKT, ok, err := e.repo.KeyByJKT(ctx, stored.StepUpKeyThumbprint)
-	if err != nil || !ok || byJKT.Purpose != identity.KeyPurposeStepUp {
-		t.Fatalf("KeyByJKT = %+v, %v, %v", byJKT, ok, err)
-	}
-	if _, ok, err := e.repo.KeyByJKT(ctx, "unknown"); ok || err != nil {
-		t.Fatalf("KeyByJKT of an unknown thumbprint = %v, %v", ok, err)
-	}
 }
 
 // TestDevices_TakenStepUpKeyNamesTheStepUpField: a second device with the step-up key of the
