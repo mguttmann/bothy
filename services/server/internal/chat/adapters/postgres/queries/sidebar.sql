@@ -1,7 +1,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 -- Queries on user_space_states (chat module, M1-52) and user_channel_states (M4-51;
 -- docs/spec/03-data-model.md section 4.5, 04 section 14). Only this module reads and writes the
--- tables (03 Grundsatz 12).
+-- tables (03 principle 12).
 
 -- name: UpsertSidebarState :one
 -- Last write wins per space: the row of the person for the space, version + 1, the device of the

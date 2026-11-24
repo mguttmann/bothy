@@ -150,6 +150,8 @@ type SnapshotChannel struct {
 	ForumDefaultSort                     string
 	DefaultNotificationLevel             string
 	ReadOnly                             bool
+	// AllowAutonomousRuns is channels.allow_autonomous_runs (09 5.8.6).
+	AllowAutonomousRuns bool
 	// ProjectBound reports a project binding of the forum (03 project_bindings, R-DM-54).
 	ProjectBound             bool
 	MainThreadID             ids.ID

@@ -113,14 +113,16 @@ type Operation struct {
 	// (02 section 14.2): interviewAgent waits for the builder agent up to agents.interview.timeout
 	// and gets that wait plus http.request_timeout (A1-07). It never applies to a transfer.
 	Timeout time.Duration
-	// AuthorizedInBand marks the one route whose handler authorizes its action on the connection
-	// it opens instead of in the request: GET /api/v1/gateway (M1-64), which upgrades to a
-	// WebSocket and authenticates and authorizes gateway.connect with the identify or resume
-	// frame (04 section 6.3, R-SY-01). Chain.Wrap then runs no per-route stage for it: no
-	// authentication of the upgrade request, no rate limit, body limit or deadline and no proof
-	// of an authorize check for the 101 response; the outer steps 1 to 4 still apply. The
-	// registration check counts the route with its action and class (AZ-P1), and a test in
-	// internal/wire holds that no other route sets the marker.
+	// AuthorizedInBand marks a route whose handler authorizes its action on the connection it
+	// opens instead of in the request. There are four, all WebSocket upgrades: GET /api/v1/gateway
+	// (M1-64), which authenticates and authorizes gateway.connect with the identify or resume
+	// frame (04 section 6.3, R-SY-01), and the terminal routes of host control, device stream and
+	// host data (internal/wire terminal.go and terminal_streams.go, M2-43 and M2-44). Chain.Wrap
+	// then runs no per-route stage for it: no authentication of the upgrade request, no rate
+	// limit, body limit or deadline and no proof of an authorize check for the 101 response; the
+	// outer steps 1 to 4 still apply. Wrap refuses the marker on a pattern outside
+	// Deps.InBandPatterns, the closed list wire.InBandPatterns; the registration check counts each
+	// route with its action and class (AZ-P1).
 	AuthorizedInBand bool
 	// BodyLimit, when above zero, replaces http.max_json_body_bytes as the body limit of this
 	// operation, and BodyLimitKey is the configuration key a 413 payload_too_large names in its

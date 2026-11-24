@@ -19,7 +19,7 @@ type RunRow struct {
 	// AgentSessionID is runs.agent_session_id: the agent_sessions row the run attached at its
 	// start or at the first agent_session.report (M2-12); zero for NULL, always for a guest run.
 	AgentSessionID ids.ID
-	// TriggerKind is message, command or interaction.
+	// TriggerKind is message, command, interaction, team or wake.
 	TriggerKind string
 	// TriggeringMessageID, TriggeringCommandID, TriggeringInteractionID and TriggeringWakeID (a wake
 	// run, AR-04) name the trigger.
@@ -77,8 +77,9 @@ type StepRow struct {
 // NewRun is the input of Repository.InsertRun: a run in queued with version 1.
 type NewRun struct {
 	ID, ThreadID, AgentID, TriggeredBy ids.ID
-	// TriggerKind is message, command or interaction; TriggeringMessageID is set for message,
-	// TriggeringCommandID for command (M2-16) and TriggeringInteractionID for interaction (M2-15).
+	// TriggerKind is message, command, interaction, team or wake; TriggeringMessageID is set for
+	// message and team, TriggeringCommandID for command (M2-16), TriggeringInteractionID for
+	// interaction (M2-15) and TriggeringWakeID for wake.
 	TriggerKind                                                       string
 	TriggeringMessageID, TriggeringCommandID, TriggeringInteractionID ids.ID
 	// TriggeringWakeID is the wake-up of a wake run (AR-04); zero otherwise.

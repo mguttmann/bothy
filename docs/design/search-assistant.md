@@ -59,7 +59,7 @@ SQL and the page check, so the assistant adds no second permission logic.
 
 The question is natural language ("I am looking for the takeover of the steering session by the new tool"). As a
 `websearch_to_tsquery` text it would be an AND of every word and find nothing. The server therefore
-turns it into terms: words of at least `search.prefix_min_chars` letters that are not on the stop
+turns it into terms: words of at least three letters (14 4.10 point 2) that are not on the stop
 word list of the instance languages (German and English, a fixed data file of the module), at most
 `search.assist.max_terms` of them. The query text is the terms joined with `or`
 (`websearch_to_tsquery` syntax), so a session matches with any of them, and the ranking of 14 4.5

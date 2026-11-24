@@ -40,3 +40,13 @@ func TestSearchReads_MapStatementTimeout(t *testing.T) {
 		}
 	}
 }
+
+// TestMentionsOfMessages_EmptyListReadsNothing: no message ids answer an empty map without a
+// statement (the repository has no pool here, so a read would fail).
+func TestMentionsOfMessages_EmptyListReadsNothing(t *testing.T) {
+	t.Parallel()
+	got, err := (&Repository{}).MentionsOfMessages(context.Background(), nil)
+	if err != nil || got == nil || len(got) != 0 {
+		t.Fatalf("got %v, %v; want an empty map", got, err)
+	}
+}

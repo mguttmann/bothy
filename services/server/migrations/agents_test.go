@@ -62,7 +62,6 @@ func TestAgentsMigration_Schema(t *testing.T) {
 	idx := []string{
 		"CREATE INDEX agents_credential_holder_personal_idx ON public.agents USING btree (credential_holder_id) WHERE (billing_mode = 'personal'::text)",
 		"CREATE INDEX agents_hosted_by_idx ON public.agents USING btree (hosted_by) WHERE (hosted_by IS NOT NULL)",
-		"CREATE INDEX agents_last_heartbeat_at_idx ON public.agents USING btree (last_heartbeat_at)",
 		"CREATE UNIQUE INDEX agents_pkey ON public.agents USING btree (principal_id)",
 	}
 	if got := principalColumns(t, conn, "agents"); !reflect.DeepEqual(got, columns) {

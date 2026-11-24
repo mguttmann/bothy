@@ -18,7 +18,8 @@ const configFlagUsage = "configuration file"
 
 // backupCommand runs "bothy-backupd backup <kind> [--config FILE]": one run of kind now, for the
 // runbook and the tests (brief M7-02 design note 1). It returns 0 when the run succeeded, 1 when
-// it failed or the slot of the kind runs already, 2 for a usage or configuration error. The run
+// it failed, 2 for a usage or configuration error. The slot of a kind is per process, so a run of
+// the same kind in the service next to it is not detected (D-M7-03-11). The run
 // writes its backup_runs row and, on success, its manifest; the metrics of the run, the WAL
 // archive and the volumes are exported before the command ends.
 func backupCommand(ctx context.Context, args, env []string, stderr io.Writer) int {
@@ -98,8 +99,8 @@ func expireCommand(ctx context.Context, args, env []string, stderr io.Writer) in
 
 // restoreTestCommand runs "bothy-backupd restore-test [--config FILE]": the automatic restore
 // test once now (docs/spec/16-operations.md 8.3, brief M7-03), for the runbook and the tests. It
-// returns 0 when every check passed, 1 when a check failed or a test runs already, 2 for a usage
-// or configuration error. The test writes its restore_test row of backup_runs; its metrics are
+// returns 0 when every check passed, 1 when a check failed, 2 for a usage or configuration error. A
+// test of the service running at the same time is not detected (D-M7-03-11). The test writes its restore_test row of backup_runs; its metrics are
 // exported before the command ends.
 func restoreTestCommand(ctx context.Context, args, env []string, stderr io.Writer) int {
 	fs := flag.NewFlagSet("bothy-backupd restore-test", flag.ContinueOnError)

@@ -296,6 +296,9 @@ class _Turn:
     seen_work: bool = False
     own_turns: int = 1
     internal: bool = False
+    # The run waits for the thread's busy Hermes session before its turn (17.6): what that
+    # session's turn does meanwhile has no run (no tool, no answer, no card).
+    waiting: bool = False
     hermes_open: bool = False
     failed_turn: bool = False
     failed_result: bool = False
@@ -459,7 +462,10 @@ class HermesHandler(AgentHandler):
             if not turn.ended and actual.sdk_mode != turn.mode_used and turn.abort_reason is None:
                 _LOG.warning("run %s: actual mode changed during the turn", turn.run_id)
                 turn.abort_reason = "billing_mode_mismatch"
-                self._spawn(self._interrupt(turn))
+                turn.wake.set()  # ends a wait for a busy session (`_session_free`)
+                if not turn.waiting:
+                    # A waiting run has no Hermes turn; the busy one is not the run's.
+                    self._spawn(self._interrupt(turn))
         return actual, self._tool_class, self.capabilities()
 
     # ---- run start ---------------------------------------------------------------------------
@@ -855,6 +861,18 @@ class HermesHandler(AgentHandler):
 
     async def _run_turn(self, inv: Invocation, turn: _Turn) -> None:
         payload = inv.payload
+        # A run's turn is a turn of its own: on a busy session Hermes would steer the text into
+        # the running turn, which has no run, and admit no turn for the run (17.6).
+        turn.waiting = True
+        try:
+            await self._session_free(turn)
+        finally:
+            turn.waiting = False
+        if turn.dropped:
+            return  # the stop's handler ends the run (`_abandon`)
+        if turn.abort_reason is not None:
+            await self._abort_unstarted(turn)
+            return
         request = TurnRequest(
             run_id=turn.run_id,
             thread_id=turn.thread_id,
@@ -874,6 +892,37 @@ class HermesHandler(AgentHandler):
             request = replace(request, new_session=True)
         outcome = await self.runtime.start_turn(request)
         await self._end_turn(turn, outcome, switched)
+
+    async def _session_free(self, turn: _Turn) -> None:
+        """Wait for the thread's free Hermes session; an abort of the run ends the wait."""
+        wait = asyncio.ensure_future(self.runtime.session_free(turn.thread_id))
+        try:
+            while not wait.done() and turn.abort_reason is None:
+                turn.wake.clear()
+                woken = asyncio.ensure_future(turn.wake.wait())
+                try:
+                    await asyncio.wait({wait, woken}, return_when=asyncio.FIRST_COMPLETED)
+                finally:
+                    woken.cancel()
+        finally:
+            if not wait.done():
+                wait.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await wait
+        if wait.done() and not wait.cancelled():
+            wait.result()
+
+    async def _abort_unstarted(self, turn: _Turn) -> None:
+        """End a run aborted before its turn: no Hermes turn ran and no session switch was tried.
+
+        Nothing is reported about the session (a bind that never ran is no failed bind).
+        """
+        turn.ended = True
+        if turn.live is not None:
+            turn.live.end(failed=True)
+        await self._end_stages(turn)
+        metrics, costs = self._usage(turn)
+        await turn.handle.finish("failed", reason=turn.abort_reason, metrics=metrics, costs=costs)
 
     def _starts_session(self, turn: _Turn) -> bool:
         """Whether the turn runs on a new Hermes session of the thread (`_before_turn`).
@@ -1677,6 +1726,8 @@ class HermesHandler(AgentHandler):
             return "stopped"
         if turn.ended:
             return "turn_ended"
+        if turn.waiting:
+            return "session_busy"
         return "turn_answered"
 
     async def _files_final(self, turn: _Turn, run: RunHandle, message: Message) -> Message:
@@ -1762,7 +1813,13 @@ class HermesHandler(AgentHandler):
         Returns:
             Whether the text was passed.
         """
-        if self.busy_mode != BusyMode.STEER or turn.ended or turn.dropped or turn.final_reply:
+        if (
+            self.busy_mode != BusyMode.STEER
+            or turn.ended
+            or turn.dropped
+            or turn.final_reply
+            or turn.waiting
+        ):
             # After the answer Hermes may have drained its last steer already; the server's
             # follow-on run takes the follow-up instead (09 7).
             return False
@@ -2041,7 +2098,7 @@ class HermesHandler(AgentHandler):
 
     def _active(self, thread_id: UUID) -> _Turn | None:
         turn = self._turns.get(thread_id)
-        if turn is None or turn.dropped or turn.ended or turn.live is None:
+        if turn is None or turn.dropped or turn.ended or turn.live is None or turn.waiting:
             return None
         if turn.abort_reason is not None:
             return None  # the run ends with the abort; nothing of the turn is sent any more
@@ -2420,7 +2477,7 @@ class HermesHandler(AgentHandler):
     def on_usage(self, thread_id: UUID, usage: Usage) -> None:
         """Token counts of one model request of the running turn."""
         turn = self._turns.get(thread_id)
-        if turn is not None and not turn.dropped:
+        if turn is not None and not turn.dropped and not turn.waiting:
             turn.usage.append(usage)
 
     def on_model_reply(
@@ -2433,7 +2490,7 @@ class HermesHandler(AgentHandler):
         of a reply that asked for tools is kept: a later send of it is progress (`on_interim`).
         """
         turn = self._turns.get(thread_id)
-        if turn is not None and not turn.dropped:
+        if turn is not None and not turn.dropped and not turn.waiting:
             turn.final_reply = not tool_calls
             turn.tool_text = (text or "").strip() if tool_calls else ""
 
@@ -2466,7 +2523,7 @@ class HermesHandler(AgentHandler):
             failed: Whether Hermes reports the turn failed or interrupted.
         """
         turn = self._turns.get(thread_id)
-        if turn is None or turn.dropped:
+        if turn is None or turn.dropped or turn.waiting:
             return
         turn.hermes_open = False
         if not turn.internal and (turn.own_turns > 0 or not turn.held):
@@ -2490,6 +2547,7 @@ class HermesHandler(AgentHandler):
         return (
             turn is not None
             and not turn.dropped
+            and not turn.waiting
             and not turn.ended
             and turn.abort_reason is None
             and not turn.handle.finished

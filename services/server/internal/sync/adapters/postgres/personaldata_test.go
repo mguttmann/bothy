@@ -15,6 +15,7 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/personaldata"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
@@ -266,5 +267,64 @@ func TestPersonalDataErase(t *testing.T) {
 				t.Errorf("%d events for Sam", n)
 			}
 		})
+	}
+}
+
+// draftUpdated returns a stored draft.updated of draft with text, as Personal appends it.
+func draftUpdated(draft ids.ID, text string) eventlog.Event {
+	return eventlog.Event{Type: "draft.updated", SchemaVersion: 1, ActorKind: eventlog.ActorSystem, ResourceKind: "draft",
+		ResourceID: draft, ResourceVersion: 1, ReceiveAction: "self", AudiencePrincipalID: draft,
+		Payload: []byte(`{"draft":{"id":"` + draft.String() + `","content_md":"` + text + `","version":1}}`)}
+}
+
+// draftTexts returns content_md of the stored draft.updated events per draft id.
+func (f *personalFixture) draftTexts(t *testing.T) map[string]string {
+	t.Helper()
+	rows, err := f.e.db.SuperConn(t).Query(context.Background(),
+		`SELECT resource_id::text, payload->'draft'->>'content_md' FROM event_log WHERE type = 'draft.updated' ORDER BY seq`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var id, text string
+		if err := rows.Scan(&id, &text); err != nil {
+			t.Fatal(err)
+		}
+		out[id] = text
+	}
+	return out
+}
+
+// TestDeletedDraftLeavesNoTextInTheLog (audit srv-gateway-sync-12, 20-privacy "redaction on
+// deletion"): deleting a draft, by the person or in the erasure of the account, blanks content_md
+// of its stored draft.updated events; the drafts of others keep theirs.
+func TestDeletedDraftLeavesNoTextInTheLog(t *testing.T) {
+	t.Parallel()
+	f := newPersonalFixture(t)
+	other := ids.New()
+	if _, err := f.e.appendUnit(context.Background(), draftUpdated(f.alexThreadDraft, "alex draft"),
+		draftUpdated(f.alexChannelDraft, "new post"), draftUpdated(other, "sam draft")); err != nil {
+		t.Fatal(err)
+	}
+	repo := postgres.NewPersonalRepository(f.e.pool)
+	if err := f.e.uow.Do(context.Background(), func(ctx context.Context) error {
+		_, found, err := repo.DeleteDraft(ctx, f.alex, f.thread, ids.ID{})
+		if !found {
+			t.Error("the thread draft was not found")
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.draftTexts(t); got[f.alexThreadDraft.String()] != "" || got[f.alexChannelDraft.String()] != "new post" || got[other.String()] != "sam draft" {
+		t.Fatalf("after deleting the thread draft %v", got)
+	}
+	if err := f.participant(t).Erase(context.Background(), personaldata.StepPersonal, personaldata.Erasure{Subject: f.alex, RequestID: ids.New()}); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.draftTexts(t); got[f.alexChannelDraft.String()] != "" || got[other.String()] != "sam draft" {
+		t.Fatalf("after the erasure %v", got)
 	}
 }

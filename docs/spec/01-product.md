@@ -80,6 +80,7 @@ built in several milestones, the remark names the build milestones from the
 | Fixed thread ID, auto title with source, edit title | core | D, M | `thread.title.update` | a manual title is never overwritten automatically |
 | Set Done, a new message reopens | core | D, M | `thread.close`, `thread.reopen` | section 6.1 |
 | Move a thread (only channels with the same operator) | core | D | `thread.move` | the dialog shows only valid targets |
+| Create a space; create a plain text channel in a space | core | D, M | `space.create` (`createSpace`), `channel.create` (`createChannel`) | section 6.25; renaming a space or a channel and the topic of a channel stay API operations |
 | Delete a space, channel, project or chat, with undo; optionally the project folder to the trash | core | D, M | `space.delete`, `channel.delete`, `thread.delete` and their restores | section 6.18; not in the web console (addendum of 2026-11-01) |
 | Direct messages between people | later | D, M | `dm.create` | switch `dm.enabled`; without an agent |
 | Threads in threads | never | | | one level is enough; deeper trees fragment agent sessions |
@@ -2450,6 +2451,28 @@ desktop sidebar (D1) and to the phone sidebar (M1), in every space.
    changes the channel, its rights, its order for others or the person's notifications. Archiving
    a channel for oneself (6.22) keeps its pin, which applies again after "Restore". Pinning is not
    the pin of a message (6.7, `pin.create`), which marks a message for everyone in a thread.
+
+### 6.25 Creating a space and a channel
+
+Addendum of 2026-11-23 (rulings in docs/decisions.d/FEAT-SPACE-CHANNEL-CREATE.md). Reason: a fresh
+installation ended at "No spaces yet" without any action; a space or a plain channel could be
+created only through the API or the Discord import. Applies to the desktop sidebar (D1) and to the
+phone sidebar (M1).
+
+1. **Create space.** An owner (`space.create`) finds "Create space..." in the menu of every space
+   and, while the sidebar has no space, as a button below "No spaces yet". Its dialog asks for a
+   name and creates the space (`createSpace` with an `Idempotency-Key`); the space shows in the
+   sidebar once the sync delivers it. A person who is no owner sees neither.
+2. **Create channel.** The menu of a space has "Create channel..." for a person whose access to the
+   space has `manage` (`channel.create`), above "Create team channel..." (6.23 item 6). Its dialog
+   asks for a name, creates a text channel (`createChannel` with kind `text` and an
+   `Idempotency-Key`) and opens it. Forums come from "New project" (6.9) and "Add forums for
+   existing folders" (6.10).
+3. **Refusals and lost answers.** A refusal stays in the dialog with the server's reason, and the
+   next press is a new request. Without an answer, or while the first request still runs
+   (`409 request_in_progress`), the next press repeats the same request, so it never creates a
+   second space or channel. Renaming a space or a channel and the topic of a channel have no view
+   yet (section 3.1).
 
 ## 7. Keyboard shortcuts
 

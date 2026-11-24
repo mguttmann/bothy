@@ -77,7 +77,7 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 - The event of a host goes to everyone who may read it on every change, never with a key or the
   pairing code.
 - `EndSessions` writes the end of every session as a system action into the audit. The remaining
-  actions stay deferred until M2-40 to M2-44.
+  actions are described in the sections of M2-40 to M2-47 below.
 
 ## Built in M2-40
 

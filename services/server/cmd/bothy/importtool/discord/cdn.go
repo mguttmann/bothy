@@ -236,8 +236,16 @@ func (f *Fetcher) get(ctx context.Context, rawURL string) (*Download, error) {
 	if _, err := checkCDNURL(rawURL, f.hosts); err != nil {
 		return nil, &CallError{Op: op, Kind: err}
 	}
+	transient := 0
 	for attempt := 0; ; attempt++ {
 		d, retry, wait, err := f.attempt(ctx, op, rawURL, attempt)
+		if !retry && transient < transientRetries && isTransient(ctx, err) {
+			if serr := sleepTransient(ctx, f.sleep, f.logger, op, transient); serr != nil {
+				return nil, &CallError{Op: op, Kind: serr}
+			}
+			transient++
+			continue
+		}
 		if !retry {
 			return d, err
 		}
@@ -262,7 +270,7 @@ func (f *Fetcher) attempt(ctx context.Context, op, rawURL string, attempt int) (
 	}
 	resp, err := f.http.Do(req)
 	if err != nil {
-		return nil, false, 0, &CallError{Op: op, Kind: err}
+		return nil, false, 0, &CallError{Op: op, Kind: err, transport: true}
 	}
 	status := resp.StatusCode
 	f.logger.LogAttrs(ctx, slog.LevelDebug, "discord cdn fetch",

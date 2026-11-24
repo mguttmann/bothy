@@ -71,8 +71,7 @@ type Modules struct {
 	// binds the use cases (Subscribers.Bind).
 	TerminalSubscribers *terminalapp.Subscribers
 	// StatusSubscribers are the in-transaction subscribers of status (AgentDisabled removes the
-	// components of the agent, M7-09); required. The status step binds the appender
-	// (Subscribers.Bind).
+	// components of the agent, M7-09); required.
 	StatusSubscribers *statusapp.Subscribers
 	// TestSubscribers registers the subscribers of a test after every production one (a veto
 	// after files.OnThreadMoved or runs.OnFileFinalized, M3-07; wire.Deps.TxnTestSubscribers);

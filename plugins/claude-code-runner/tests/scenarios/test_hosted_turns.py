@@ -214,6 +214,78 @@ async def test_the_per_turn_mcp_file_holds_the_secret_during_the_turn(
     await world.until(lambda: not turn_mcp.exists())
 
 
+TEMPLATE_DRAFT = (
+    Path(__file__).resolve().parents[4]
+    / "tests"
+    / "agent-definitions"
+    / "valid"
+    / "template-research-summarizer.json"
+)
+
+
+def _template_draft() -> dict[str, Any]:
+    # The server's draft of the shipped template research-summarizer, held equal to the template
+    # by the server test TestTheResearchSummarizerDraftIsTheCorpusFixture.
+    return dict(json.loads(TEMPLATE_DRAFT.read_text())["definition"])
+
+
+async def test_a_template_s_env_secret_resolves_from_the_agent_s_own_folder(
+    world: HostingWorld, monkeypatch: pytest.MonkeyPatch, logs: LogLines
+) -> None:
+    # Issue 1425: a template names its secret as env:<NAME>; on the runner it is the file NAME
+    # in <runner.hosted_secrets_dir>/<agent_id>/, never a variable of the runner's environment.
+    backend = await _hosted(world, "scoped", None)
+    draft = _template_draft()
+    [header] = draft["mcp_servers"][0]["headers"]
+    assert header == {"name": "Authorization", "secret_ref": "env:SEARCH_MCP_TOKEN"}
+    folder = world.secrets_dir / str(backend.agent_id)
+    folder.mkdir(mode=0o700)
+    (folder / "SEARCH_MCP_TOKEN").write_text(SECRET + "\n")
+    (folder / "SEARCH_MCP_TOKEN").chmod(0o600)
+    monkeypatch.setenv("SEARCH_MCP_TOKEN", "runner-env-canary")
+    backend.fake.set_definition(draft, announce=False)
+    gate = world.gate("turn_gate")
+    world.scenario(fixture="plain", turn_gate=str(gate))
+    await world.start()
+    await world.until(lambda: bool(_beats(backend)))
+    run = await backend.fake.trigger("Hello")
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    [turn] = world.turns()
+    turn_mcp = Path(turn["argv"][turn["argv"].index("--mcp-config") + 1])
+    servers = json.loads(turn_mcp.read_text())["mcpServers"]
+    assert servers["search"] == {
+        "type": "http",
+        "url": "https://search.example.com/mcp",
+        "headers": {"Authorization": SECRET},
+    }
+    world.release(gate)
+    assert await _ended(world, backend, run.run_id) == "completed"
+    await world.until(lambda: not turn_mcp.exists())
+    assert SECRET not in json.dumps(turn["env"])
+    assert SECRET not in logs.text
+    assert "runner-env-canary" not in logs.text
+
+
+async def test_a_template_s_env_secret_without_its_file_ends_the_run_without_a_turn(
+    world: HostingWorld, monkeypatch: pytest.MonkeyPatch, logs: LogLines
+) -> None:
+    # The variable of the same name in the runner's environment is never a fallback.
+    backend = await _hosted(world, "scoped", _template_draft())
+    (world.secrets_dir / str(backend.agent_id)).mkdir(mode=0o700)
+    monkeypatch.setenv("SEARCH_MCP_TOKEN", "runner-env-canary")
+    await world.start()
+    await world.until(lambda: bool(_beats(backend)))
+    run = await backend.fake.trigger("Hello")
+    assert await _ended(world, backend, run.run_id) == "failed"
+    assert backend.fake.run_state(run.run_id).state_reason == "adapter_error"
+    assert _finish(backend)["summary"] == cause("mcp_reference_unavailable")
+    assert world.turns() == []
+    assert "secret_unavailable" in logs.text
+    assert "runner-env-canary" not in logs.text
+    for _path, content in world.all_files():
+        assert b"runner-env-canary" not in content
+
+
 async def test_a_definition_change_is_applied_before_the_next_turn(world: HostingWorld) -> None:
     backend = await _hosted(world, "scoped", None)
     backend.fake.set_definition(_definition(world, backend.agent_id, skills=[]), announce=False)
@@ -440,10 +512,11 @@ async def test_an_unreadable_secret_ends_the_run_without_a_turn(world: HostingWo
 
 @pytest.mark.parametrize("place", ["runner_token", "runner_env", "other_agent"])
 async def test_a_secret_outside_the_agent_s_scope_ends_the_run_without_a_turn(
-    world: HostingWorld, monkeypatch: pytest.MonkeyPatch, place: str
+    world: HostingWorld, monkeypatch: pytest.MonkeyPatch, logs: LogLines, place: str
 ) -> None:
     # Red team of A1-05: a definition must not send the runner's own credentials, its
-    # environment or another hosted agent's secrets to a URL of the owner's choice.
+    # environment or another hosted agent's secrets to a URL of the owner's choice. An env:
+    # reference names a file of the agent's own folder (issue 1425); the variable stays unread.
     other = world.secrets_dir / "0192f4a0-7b1c-7d07-84b0-358556a08a98"
     other.mkdir(mode=0o700)
     other_file = other / "docs_token"
@@ -467,6 +540,7 @@ async def test_a_secret_outside_the_agent_s_scope_ends_the_run_without_a_turn(
     assert world.turns() == []
     turns = world.agents_root / f"{backend.agent_id}.control" / "turns"
     assert not turns.exists() or not any(turns.glob("*.mcp.json"))
+    assert "runner-env-canary" not in logs.text
 
 
 def _alive(pid: int) -> bool:

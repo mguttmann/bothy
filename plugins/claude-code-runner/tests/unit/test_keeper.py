@@ -25,6 +25,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 import pytest
 from bothy_sdk.testing._patience import PATIENCE
@@ -307,11 +308,38 @@ def test_a_keeper_killed_closes_its_write_end(tmp_path: Path, launches: list[Lau
     assert not launch.file("exit").exists()
 
 
+def _link_targets(fds: Path) -> list[str]:
+    """Read the target of each descriptor link, skipping one closed after the listing."""
+    targets = []
+    for fd in fds.iterdir():
+        try:
+            targets.append(str(fd.readlink()))
+        except FileNotFoundError:
+            continue
+    return targets
+
+
+def test_a_descriptor_closed_after_the_listing_is_skipped(tmp_path: Path) -> None:
+    fds = tmp_path / "fd"
+    fds.mkdir()
+    (fds / "0").symlink_to("/dev/null")
+    real_readlink = Path.readlink
+
+    def readlink(self: Path) -> Path:
+        if self.name == "1":
+            raise FileNotFoundError(str(self))
+        return real_readlink(self)
+
+    (fds / "1").symlink_to("/dev/zero")
+    with mock.patch.object(Path, "readlink", readlink):
+        assert _link_targets(fds) == ["/dev/null"]
+
+
 def _open_fds(pid: int) -> str:
     lsof = shutil.which("lsof", path="/usr/sbin:/usr/bin:/sbin:/bin")
     fds = Path(f"/proc/{pid}/fd")
     if fds.is_dir():
-        return "\n".join(str(fd.readlink()) for fd in fds.iterdir())
+        return "\n".join(_link_targets(fds))
     assert lsof, "lsof is needed to list the keeper's descriptors on this platform"
     out = subprocess.run(
         [lsof, "-n", "-P", "-p", str(pid)], capture_output=True, text=True, check=False

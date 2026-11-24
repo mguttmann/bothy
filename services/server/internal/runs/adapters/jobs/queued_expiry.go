@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package jobs is the adapter of the runs module to platform/jobs (M2-08): the scheduled job
-// runs.queued_expiry on the queue default, which fails a run that nobody started within
-// run.queued_max_age (docs/spec/09-agents.md 5.5, D-AG-16; 02 "Job catalogue"), and the
-// ExpiryScheduler of the use cases over jobs.Inserter.InsertTx.
+// Package jobs is the adapter of the runs module to platform/jobs (M2-08): the job kinds of runs
+// (runs.queued_expiry, which fails a run that nobody started within run.queued_max_age,
+// docs/spec/09-agents.md 5.5, D-AG-16; runs.cancel_timeout, runs.stall_check,
+// runs.invocation_hold_timeout, runs.component_expiry, runs.wake_due, runs.team_input and the app
+// dispatch; 02 "Job catalogue") and the schedulers of the use cases over jobs.Inserter.InsertTx.
 //
 // Example:
 //

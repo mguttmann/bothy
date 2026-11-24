@@ -853,12 +853,13 @@ material, the client e-mail, the project ID, an ID of the hint, `error.message`,
 
 - Transient errors increase `failure_count`, and an accepted push sets it back to `0`. They do
   not disable a registration: an outage of the provider or of the way to it says nothing about
-  the token, and a disabled registration comes back only when the app registers again, which it
-  does for a new token or a new login. Of the answers to a send, only one about the token
-  disables (7.1, 7.2). `push.max_consecutive_failures` ([03-data-model.md](03-data-model.md)) is `0` by
-  default; an instance that sets it above `0` disables a registration with `repeated_failures`
-  at that many transient failures in a row, and such a registration stays disabled like every
-  other one (docs/decisions.d/AUD-srv-notify-01.md).
+  the token, and a disabled registration comes back only when the app registers again (section
+  13). Of the answers to a send, only one about the token disables (7.1, 7.2).
+  `push.max_consecutive_failures` ([03-data-model.md](03-data-model.md)) is `0` by default; an
+  instance that sets it above `0` disables a registration with `repeated_failures` at that many
+  transient failures in a row, and such a registration stays disabled until the app registers its
+  token again, which it does at its next start or return to the foreground (section 13;
+  docs/decisions.d/AUD-srv-notify-01.md, docs/decisions.d/FIX-PUSH-RENEW.md).
 - A notification that has not reached the provider after `push.max_age` is discarded.
   An old notification disturbs more than it helps; the unread counter carries the state.
 - Device revoked (`device.revoke`): all registrations `device_revoked`, immediately.
@@ -1178,6 +1179,18 @@ same `404`, and afterwards the token is free and its preview token worthless. Ne
 writes an audit entry or an event; the person's clients see the registrations of a device, without
 tokens, in `Device.push_registrations`.
 
+Renewal by the app (docs/decisions.d/FIX-PUSH-RENEW.md): the app registers its provider token when
+it differs from the token it registered last or no registration is stored. Otherwise, at every
+start and every return to the foreground, it reads its stored registration with `getDevice` of its
+own device (`Device.push_registrations`) and registers the same token again when the registration
+is missing there or is disabled with `repeated_failures`; the takeover above then deletes the
+disabled row, and the new row is active with `failure_count` `0` and a new preview token. It does
+not register again for `logout` or `device_revoked` (its session or device ended) nor for
+`token_invalid`, `topic_mismatch` or `sender_mismatch` (an answer of the provider about this token
+or app, which a new token of the provider replaces). A registration that failed, and a read that
+failed, are tried again at the next start or return to the foreground. Phones and the Mac do this
+alike; Windows has no push (5.3).
+
 ## 14. Tests
 
 | Test | Holds |
@@ -1187,6 +1200,7 @@ tokens, in `Device.push_registrations`.
 | Revocation between event and sending | no push; preview `404` |
 | Mention of a person without read permission | no push, no trace in the result |
 | `auth.logout`, `device.revoke`, `user.disable` | registrations disabled, preview token worthless, no push |
+| App start and return to the foreground with the same token and a stored registration that is active, missing, or disabled with each reason; `registerPush` of the token of a disabled row | the app registers again only for a missing row or `repeated_failures`; the new row is active with `failure_count` `0` (section 13) |
 | Fake APNs (HTTP/2) with every response from 7.1 | disabling, retrying, alert as in the table |
 | Fake FCM with every response from 7.2 | as in the table, `Retry-After` respected |
 | JWT cache | at most one new JWT per `push.apns.jwt_refresh_interval`; start error outside 20 to 60 minutes |

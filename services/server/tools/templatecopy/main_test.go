@@ -81,3 +81,28 @@ func TestCopyErrors(t *testing.T) {
 		t.Fatalf("root link: %v", err)
 	}
 }
+
+// TestCopyKeepsTheOutputOnAnError (audit finding api-contract-codegen-15): a refused source
+// leaves the output of the earlier run as it was, and no temporary folder stays next to it.
+func TestCopyKeepsTheOutputOnAnError(t *testing.T) {
+	t.Parallel()
+	src, parent := t.TempDir(), t.TempDir()
+	out := filepath.Join(parent, "agents")
+	write(t, out, "notes/template.yaml", "kept\n")
+	write(t, src, "a/template.yaml", "new\n")
+	write(t, src, "notes/CLAUDE.md", "x\n")
+	if err := os.Symlink(filepath.Join(src, "notes", "CLAUDE.md"), filepath.Join(src, "notes", "link.md")); err != nil {
+		t.Fatal(err)
+	}
+	if err := Copy(src, out); err == nil {
+		t.Fatal("Copy = nil, want the link refused")
+	}
+	got, err := os.ReadFile(filepath.Join(out, "notes", "template.yaml")) //nolint:gosec // a file the test wrote
+	if err != nil || string(got) != "kept\n" {
+		t.Fatalf("output after the error: %q, %v", got, err)
+	}
+	entries, err := os.ReadDir(parent)
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("next to the output: %v, %v", entries, err)
+	}
+}

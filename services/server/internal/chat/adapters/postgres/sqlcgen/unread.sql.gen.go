@@ -31,7 +31,7 @@ type UnreadCandidatesRow struct {
 // SPDX-License-Identifier: Apache-2.0
 // The threads that can be unread for somebody, for the badge of notify (M3-19 design note 16 a;
 // docs/spec/13-push-notifications.md section 8). Only this module reads threads and channels
-// (03 Grundsatz 12).
+// (03 principle 12).
 // The threads of the given channels (the channels the recipient can see, from authz Scope) that
 // are not deleted (D-DEL-3), with a
 // message above unread_floor_seq, with the kind of their channel and both counters, ascending by

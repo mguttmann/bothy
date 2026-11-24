@@ -3,9 +3,11 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -186,7 +188,9 @@ func (r *Measurement) evictOldestLocked(d *drops) {
 	}
 }
 
-// take swaps the counters out and returns them as rows in ascending minute.
+// take swaps the counters out and returns them as rows sorted by the whole key (minute, metric,
+// channel, agent, dimension, currency). The order of a Go map would let two processes that flush
+// at the same time lock shared rows of stats_minutes in different orders and deadlock.
 func (r *Measurement) take() []MinuteRow {
 	r.mu.Lock()
 	minutes, order := r.minutes, r.order
@@ -202,7 +206,28 @@ func (r *Measurement) take() []MinuteRow {
 			})
 		}
 	}
+	slices.SortFunc(rows, compareRows)
 	return rows
+}
+
+// compareRows orders rows by the whole key of stats_minutes.
+func compareRows(a, b MinuteRow) int {
+	if n := a.BucketStart.Compare(b.BucketStart); n != 0 {
+		return n
+	}
+	if n := strings.Compare(a.Metric, b.Metric); n != 0 {
+		return n
+	}
+	if n := bytes.Compare(a.ChannelID[:], b.ChannelID[:]); n != 0 {
+		return n
+	}
+	if n := bytes.Compare(a.AgentID[:], b.AgentID[:]); n != 0 {
+		return n
+	}
+	if n := strings.Compare(a.Dimension, b.Dimension); n != 0 {
+		return n
+	}
+	return strings.Compare(a.Currency, b.Currency)
 }
 
 // restore merges rows of a failed write back, marked as retried, then drops the oldest keys while

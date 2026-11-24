@@ -87,7 +87,7 @@ type Deletions interface {
 	SpaceDeletion(ctx context.Context, a actor.Actor, id ids.ID) (DeletionInfo, error)
 	// DeleteChannel deletes a channel (manage, step-up); trashFolder also requests the move of
 	// the project folder (channel.project.bind and an ok folder check). Errors: conflict
-	// dm_channel, project_folder_refused; validation_failed not_project_bound on
+	// dm_channel, project_folder_refused; validation_failed with the field code not_allowed on
 	// /trash_project_folder for a channel without a binding.
 	DeleteChannel(ctx context.Context, a actor.Actor, id ids.ID, trashFolder bool) (DeletionInfo, error)
 	// RestoreChannel undoes a pending deletion and drops a folder request. Errors: conflict

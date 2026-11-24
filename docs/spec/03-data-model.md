@@ -697,7 +697,8 @@ PK: `id`. FK: `group_id` -> `groups(id)` ON DELETE RESTRICT; `user_id` ->
 RESTRICT. Unique: partial index `(group_id, user_id) WHERE removed_at IS NULL`.
 Indexes: `(user_id) WHERE removed_at IS NULL` for "groups of a person" when building permissions;
 `(expires_at) WHERE removed_at IS NULL AND expires_at IS NOT NULL` for the reminder and the
-expiry report.
+expiry report; `(expires_at) WHERE removed_at IS NULL AND expires_at IS NOT NULL AND
+expiry_reported_at IS NULL` for the expiry sweep, which so never reads memberships it reported.
 Retention: `account`.
 Only the sync at login changes memberships in groups with `source = 'oidc_claim'`
 (system action `group.member.sync`, [08-identity.md](08-identity.md), section 3.4); there
@@ -749,7 +750,9 @@ Indexes: `(subject_principal_id) WHERE revoked_at IS NULL` and `(subject_group_i
 revoked_at IS NULL` for building the permissions of a principal; `(target_space_id) WHERE revoked_at
 IS NULL` and `(target_channel_id) WHERE revoked_at IS NULL` for "Who has access?" and the
 I1 check; `(target_host_id) WHERE revoked_at IS NULL` for the I6 check and SR10; `(expires_at) WHERE revoked_at IS NULL AND expires_at IS NOT NULL` for the reminder and the
-expiry report. Retention: `account`.
+expiry report; `(expires_at) WHERE revoked_at IS NULL AND expires_at IS NOT NULL AND
+expiry_reported_at IS NULL` for the expiry sweep, which so never reads grants it reported.
+Retention: `account`.
 
 Grants are never changed, only revoked and created anew (R-DM-09). The only allowed updates are
 the revocation columns and the expiry bookkeeping (`expiry_reminded_at`,
@@ -797,8 +800,9 @@ PK: `principal_id`. FK: `principal_id` -> `principals(id)` ON DELETE RESTRICT;
 Checks: `(billing_mode = 'personal') = (credential_holder_id IS NOT NULL)`;
 `(adapter_kind = 'claude_agent') = (hosted_by IS NOT NULL)`; `hosted_by <> principal_id`.
 Indexes: `(credential_holder_id) WHERE billing_mode = 'personal'` for the I1 check on
-changes to a person; `(last_heartbeat_at)` for the presence evaluation; `(hosted_by) WHERE
-hosted_by IS NOT NULL` for the hosted list of a runner.
+changes to a person; `(hosted_by) WHERE hosted_by IS NOT NULL` for the hosted list of a
+runner. No index on `last_heartbeat_at`: presence reads and writes the row by its key, and an
+index on the column would keep every persisted heartbeat from being a HOT update.
 Retention: `account`.
 
 Heartbeat fields are written at most once per `agent.heartbeat_persist_interval`;
@@ -1695,7 +1699,7 @@ Purpose: one agent turn; at the same time the live box. Module: `runs`.
 | `triggered_by` | `uuid` | no | | person who triggered |
 | `state` | `text` | no | `'queued'` | `CHECK (state IN ('queued','running','waiting_input','completed','failed','cancelled'))` |
 | `state_reason` | `text` | yes | | reason code from [09-agents.md](09-agents.md), section 5.2, for example `billing_mode_mismatch`, `access_revoked`, `stale`, `user_cancelled`, `channel_read_only`; while `queued` the wait reason of 09 5.2.1 (`invocation_held`, `slots_full`, `thread_busy`) or NULL, cleared by `run.start` (addendum of 2026-11-04, R-AG-41) |
-| `version` | `bigint` | no | `1` | rises with every stored change; basis of the patches |
+| `version` | `bigint` | no | `1` | rises with every stored change; basis of the patches; one exception: setting `agent_session_id` does not raise it and sends no event (the session row announces itself with `agent_session.changed`, the run document shows the column at the next read) |
 | `billing_mode_expected` | `text` | no | | configured mode from `agents.billing_mode` at the last delivery; every delivery sets it anew |
 | `billing_mode_used` | `text` | yes | | reported mode, as reported by the adapter per run |
 | `billing_evidence` | `jsonb` | no | `'{}'` | schema `billing_evidence.v1` from `run.start`: `provider`, `key_type`, `method`; never a value, never a prefix |
@@ -2352,7 +2356,8 @@ PK: `id`. FK: `user_id` -> `users(principal_id)` ON DELETE CASCADE; `device_id` 
 `devices(id)` ON DELETE CASCADE; `auth_session_id` -> `auth_sessions(id)` ON DELETE CASCADE.
 Checks: `(disabled_at IS NULL) = (disabled_reason IS NULL)`. Unique: `(provider, token)`;
 `preview_token_hash` as a partial index `WHERE preview_token_hash IS NOT NULL`. Indexes: `(user_id)
-WHERE disabled_at IS NULL` for sending; `(auth_session_id)`; `(device_id)` for the foreign key check when a device is deleted.
+WHERE disabled_at IS NULL` for sending; `(auth_session_id)`; `(device_id)` for the foreign key check when a device is deleted; `(disabled_at, id) WHERE
+disabled_at IS NOT NULL` for the retention job.
 Retention: `security`.
 
 ### 4.11 Integrations (`apps`, `importer`)
@@ -2407,8 +2412,9 @@ Purpose: delivery attempts per event and subscription. Module: `apps`.
 | `delivered_at` | `timestamptz` | yes | | |
 
 PK: `id`. FK: `subscription_id` -> `webhook_subscriptions(id)` ON DELETE CASCADE.
-Unique: `(subscription_id, event_seq)`. Indexes: `(next_attempt_at) WHERE status = 'pending'`
-for the worker. Retention: `transient`.
+Unique: `(subscription_id, event_seq)`. Indexes: `(subscription_id, event_seq) WHERE status =
+'pending'` for the head and the pending count of a subscription in the worker;
+`(coalesce(delivered_at, created_at), id) WHERE status <> 'pending'` for the retention job. Retention: `transient`.
 
 #### `incoming_webhooks`
 

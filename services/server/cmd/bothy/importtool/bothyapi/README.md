@@ -65,7 +65,8 @@ redirects.
 
 `Limits` carries `import.login_poll_interval`, `import.discord.max_429_retries`,
 `import.discord.max_rate_wait`, `import.http_timeout` and `egress.max_response_bytes`;
-`DefaultLimits` returns the defaults until the tool's configuration loader (M8-04) fills them.
+`DefaultLimits` returns the defaults; every command (`login` and `logout` too) fills them from
+the tool configuration with `importtool.Config.ServerLimits`.
 
 ## Test fake
 

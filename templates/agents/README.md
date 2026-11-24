@@ -29,7 +29,8 @@ templates/agents/<slug>/
 `model_hint` (becomes `settings.model`), `required_secrets` (the names of the secrets the MCP
 servers use) and `mcp_servers` (the shape of `agent_definition.v1`). A `secret_ref` in a template
 is always `env:<NAME>` with `NAME` listed in `required_secrets`; the host operator provides the
-value to the hosting runner, never the template.
+value to the hosting runner as the file `NAME` in `<runner.hosted_secrets_dir>/<agent_id>/`
+(docs/spec/26-builtin-agents.md 4.2), never the template.
 
 The template becomes a definition draft one to one: `CLAUDE.md` is `instructions`, each skill is
 `name`, `description` from its frontmatter and the text after the frontmatter as `body`, and

@@ -62,6 +62,21 @@ void main() {
     expect(backend.values.values, isNot(contains('bothy_pvw_EXAMPLE1')));
   });
 
+  test('the foreground registers the same token again when the server '
+      'disabled it after transient failures', () async {
+    host.authorized = true;
+    await push.signedIn(account(), previewMode: 'full');
+    await push.foreground();
+    expect(registrations.calls, hasLength(1));
+    registrations.states['reg-1'] = const PushRegistrationState.disabled(
+      'repeated_failures',
+    );
+    await push.foreground();
+    expect(registrations.calls, hasLength(2));
+    expect(registrations.calls.last, registrations.calls.first);
+    expect(host.store[instance]!.registrationId, 'reg-2');
+  });
+
   test('a token change registers again, the same token does not', () async {
     host.authorized = true;
     await push.signedIn(account(), previewMode: 'full');

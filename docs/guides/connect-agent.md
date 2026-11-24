@@ -32,8 +32,10 @@ requests are administrative: the owner confirms them with a fresh step-up, as th
 of the app and the console do before an admin action. Those screens call the same operations for
 the agent and for access: "Add adapter agent" in the agent list creates the agent of step 1, its
 page creates the token of step 2 (and holds its tool class, its features, "Disable" and
-"Enable"), and the grant dialog gives the grants. The space, the channel, its operator and its
-switches have no screen of their own; the owner sends those requests as shown.
+"Enable"), and the grant dialog gives the grants. The app creates the space ("Create space..."
+of the space menu or of the empty sidebar) and a plain text channel ("Create channel..." of the
+space menu), but no forum outside "New project"; the forum channel of this guide, its operator and
+its switches have no screen of their own, so the owner sends those requests as shown.
 
 ## Prerequisites
 

@@ -13,6 +13,21 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// RetriggerMessageWithResponse Trigger a failed message again
+//
+// Runs the trigger decision (09 3.4) again for an own message whose `trigger_state` is `failed` with `trigger_state_reason` `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel`, after the cause was fixed (a runner set as operator, a folder created), so the person does not have to write the message again (09 3.7, addendum of 2026-11-04). Only the author may do this (`403 forbidden` with `reason` `not_self` otherwise); a message that is not readable is `404`; another state or reason, or a deleted message, is `409 invalid_state_transition`. When the message's thread is a thread whose fixed operator is not the channel's effective operator and never completed a run in it, the thread takes the channel's effective operator first (an exception to R-DM-12, recorded as `thread.updated`). A caller without `trigger` on the thread (`agent.invoke` in filter mode with the thread's operator refuses with `level_insufficient` or `no_grant`) gets `403 agent_invocation_denied`. Then the acceptance runs as for a new message: `agent.invoke` in request mode for the caller (authz audits a denial), and the message's `trigger_state` and `trigger_state_reason` follow it (`received` and a queued run, or `failed` with the reason of now). The answer is the message after the decision. Repeating the request after a successful retrigger answers `409 invalid_state_transition`, because the message is no longer `failed`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /messages/{message_id}/retrigger (the `RetriggerMessage` operationId).
+func (c *ClientWithResponses) RetriggerMessageWithResponse(ctx context.Context, messageId MessageIdPath, params *RetriggerMessageParams, reqEditors ...RequestEditorFn) (*RetriggerMessageResponse, error) {
+	rsp, err := c.RetriggerMessage(ctx, messageId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRetriggerMessageResponse(rsp)
+}
+
 // ListMessageRevisionsWithResponse Read earlier versions
 //
 // Returns a wrapper object for the known response body format(s).
@@ -771,9 +786,12 @@ func (c *ClientWithResponses) AnswerSearchAssistWithResponse(ctx context.Context
 // `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
 // hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
 // Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
-// `search.query_max_chars` or without a term is `400 validation_failed`; more than
-// `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
-// `503 unavailable` with reason `search_timeout`.
+// `search.query_max_chars` or without a term is `400 validation_failed`, as is an earlier
+// question in `history` longer than `search.query_max_chars` (`too_long` on
+// `/history/<i>/q`); more than `search.assist.max_turns` turns in `history` is
+// `too_many_items`. A statement timeout is `503 unavailable` with reason `search_timeout`;
+// when only the second search with the assistant's terms fails, the answer keeps the picks
+// and the hits of the first search.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -796,9 +814,12 @@ func (c *ClientWithResponses) AssistSearchWithBodyWithResponse(ctx context.Conte
 // `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
 // hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
 // Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
-// `search.query_max_chars` or without a term is `400 validation_failed`; more than
-// `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
-// `503 unavailable` with reason `search_timeout`.
+// `search.query_max_chars` or without a term is `400 validation_failed`, as is an earlier
+// question in `history` longer than `search.query_max_chars` (`too_long` on
+// `/history/<i>/q`); more than `search.assist.max_turns` turns in `history` is
+// `too_many_items`. A statement timeout is `503 unavailable` with reason `search_timeout`;
+// when only the second search with the assistant's terms fails, the answer keeps the picks
+// and the hits of the first search.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

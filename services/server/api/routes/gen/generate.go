@@ -27,7 +27,7 @@ type config struct {
 	spec, catalog, list string // inputs: openapi.yaml, actions.yaml, operations.yaml
 	asyncapi            string // asyncapi.yaml for the gateway protocol versions and ops; "" for none
 	codegenConfig       string // api/rest/oapi-codegen.yaml
-	restDir             string // output directory of models.gen.go and rest.gen.go
+	restDir             string // output directory of models.gen.go, rest.gen.go, rest2.gen.go, the objects parts and openapi.gen.yaml
 	routesDir           string // output directory of routes.gen.go, catalog.gen.go, build.gen.go
 	restPkg             string // import path of the package in restDir
 	corePkg             string // import path of api/routes; "" when routesDir is api/routes itself
@@ -49,7 +49,7 @@ func generate(ctx context.Context, c config) (err error) {
 		if in.gatewayVersions, err = readGatewayVersions(c.asyncapi); err != nil {
 			return err
 		}
-		if in.gatewayOps, err = loadGatewayOps(in, c.spec, c.list, c.asyncapi); err != nil {
+		if in.gatewayOps, err = loadGatewayOps(c.spec, c.list, c.asyncapi); err != nil {
 			return err
 		}
 	}
@@ -57,13 +57,7 @@ func generate(ctx context.Context, c config) (err error) {
 	if err != nil {
 		return err
 	}
-	var enabled []opMeta
-	for _, op := range in.ops {
-		if in.enabled[op.ID] {
-			enabled = append(enabled, op)
-		}
-	}
-	if err := checkFiltered(filtered, enabled); err != nil {
+	if err := checkFiltered(filtered, enabledOps(in)); err != nil {
 		return err
 	}
 	routeFiles, err := renderRoutes(in, c.corePkg, c.restPkg)
@@ -74,9 +68,36 @@ func generate(ctx context.Context, c config) (err error) {
 	if err != nil {
 		return err
 	}
-	models, rest, rest2, objects, objects2, err := splitAll(rest)
+	outputs, err := outputFiles(c, in.specData, rest, routeFiles)
 	if err != nil {
 		return err
+	}
+	if err := checkSizes(outputs); err != nil {
+		return err
+	}
+	if err := writeAll(outputs); err != nil {
+		return err
+	}
+	return removeStaleObjects(c.restDir, outputs)
+}
+
+// enabledOps returns the operations of the enable list in the order of the spec.
+func enabledOps(in *inputs) []opMeta {
+	var enabled []opMeta
+	for _, op := range in.ops {
+		if in.enabled[op.ID] {
+			enabled = append(enabled, op)
+		}
+	}
+	return enabled
+}
+
+// outputFiles splits the package oapi-codegen wrote (splitAll) and returns every output by its
+// path: the REST files, the contract copy and the route files.
+func outputFiles(c config, specData, rest []byte, routeFiles map[string][]byte) (map[string][]byte, error) {
+	models, rest, rest2, objects, err := splitAll(rest)
+	if err != nil {
+		return nil, err
 	}
 	// openapi.gen.yaml is the contract byte for byte, next to the server generated from it, so the
 	// request validator of platform/httpserver embeds exactly what the generator read
@@ -85,14 +106,49 @@ func generate(ctx context.Context, c config) (err error) {
 		filepath.Join(c.restDir, "models.gen.go"):    models,
 		filepath.Join(c.restDir, "rest.gen.go"):      rest,
 		filepath.Join(c.restDir, "rest2.gen.go"):     rest2,
-		filepath.Join(c.restDir, "objects.gen.go"):   objects,
-		filepath.Join(c.restDir, "objects2.gen.go"):  objects2,
-		filepath.Join(c.restDir, "openapi.gen.yaml"): in.specData,
+		filepath.Join(c.restDir, "openapi.gen.yaml"): specData,
+	}
+	for i, part := range objects {
+		outputs[filepath.Join(c.restDir, objectsName(i))] = part
 	}
 	for name, src := range routeFiles {
 		outputs[filepath.Join(c.routesDir, name)] = src
 	}
-	return writeAll(outputs)
+	return outputs, nil
+}
+
+// checkSizes refuses a generated Go file above repo.max_file_kb, so the generator itself fails
+// before the hook check-added-large-files does (audit finding api-contract-codegen-3); the cut of
+// such a file belongs into splitAll. openapi.gen.yaml is a copy of the contract and has its own
+// limit, api.contract_max_file_kb.
+func checkSizes(outputs map[string][]byte) error {
+	for _, path := range slices.Sorted(maps.Keys(outputs)) {
+		if strings.HasSuffix(path, ".go") && len(outputs[path]) > maxFileBytes {
+			return fmt.Errorf("%s would have %d bytes, above repo.max_file_kb (%d bytes)", path, len(outputs[path]), maxFileBytes)
+		}
+	}
+	return nil
+}
+
+// objectsPart matches the file names objectsName gives the second and every later part.
+var objectsPart = regexp.MustCompile(`^objects[0-9]+\.gen\.go$`)
+
+// removeStaleObjects removes the parts of the objects that an earlier run wrote into restDir and
+// this run did not write, so a smaller contract leaves no stale part behind.
+func removeStaleObjects(restDir string, outputs map[string][]byte) error {
+	entries, err := os.ReadDir(restDir)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		path := filepath.Join(restDir, e.Name())
+		if _, written := outputs[path]; objectsPart.MatchString(e.Name()) && !written {
+			if err := os.Remove(path); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // writeAll writes every output to a temporary file next to its target and renames the files only

@@ -3362,9 +3362,12 @@ export interface paths {
          *     `search.assist.max_hits` hits: the assistant's picks with a reason first, then full-text
          *     hits. Without an assistant answer `mode` is `fulltext` and `fallback_reason` says why.
          *     Nothing is stored; only persons may ask (agents and apps get `403`). `q` longer than
-         *     `search.query_max_chars` or without a term is `400 validation_failed`; more than
-         *     `search.assist.max_turns` turns in `history` is `too_many_items`. A statement timeout is
-         *     `503 unavailable` with reason `search_timeout`.
+         *     `search.query_max_chars` or without a term is `400 validation_failed`, as is an earlier
+         *     question in `history` longer than `search.query_max_chars` (`too_long` on
+         *     `/history/<i>/q`); more than `search.assist.max_turns` turns in `history` is
+         *     `too_many_items`. A statement timeout is `503 unavailable` with reason `search_timeout`;
+         *     when only the second search with the assistant's terms fails, the answer keeps the picks
+         *     and the hits of the first search.
          */
         post: operations["assistSearch"];
         delete?: never;
@@ -8317,7 +8320,10 @@ export interface components {
         };
         /** @description The server resolves the mentions of the resulting content again; `mention_ids` is an optional check as in `MessageCreate`. */
         MessageUpdate: {
-            /** @example @support-agent the invoice export fails since 08:00. */
+            /**
+             * @description Empty or white space only content is allowed only when the message has at least one attachment (removing the caption); otherwise `400 validation_failed` with `errors[].code` `empty`.
+             * @example @support-agent the invoice export fails since 08:00.
+             */
             content_md?: string;
             mention_ids?: components["schemas"]["Uuid"][];
         };
@@ -13589,7 +13595,7 @@ export interface components {
         Location: string;
         /** @description Console cookie or its clearing value (08, 7.5). */
         "Set-Cookie": string;
-        /** @description Authentication challenge, e.g. `DPoP error="use_dpop_nonce"` (RFC 9449). */
+        /** @description Authentication challenge, present on every 401 (RFC 9110 section 15.5.2), e.g. `DPoP error="use_dpop_nonce"` (RFC 9449) or, with `step_up_required`, `DPoP error="insufficient_user_authentication"` (RFC 9470). */
         "WWW-Authenticate": string;
         /** @description Fresh server nonce for the next DPoP proof (RFC 9449). */
         "DPoP-Nonce": string;

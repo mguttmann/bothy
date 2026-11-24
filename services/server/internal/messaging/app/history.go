@@ -83,8 +83,10 @@ func (s *Service) History(ctx context.Context, q messaging.HistoryQuery) (messag
 	slices.Reverse(page)
 	page = append(page, rows.Above[:w.Above]...)
 	out := messaging.HistoryPage{Items: make([]messaging.Message, 0, len(page)), HasMoreBefore: w.HasMoreBefore, HasMoreAfter: w.HasMoreAfter}
-	authors := map[ids.ID]messaging.PrincipalRef{}
-	fctx := authorize.Filter(ctx)
+	// All messages of the page lie in one thread: the structure scope reads its thread and
+	// channel once for every check of the page.
+	fctx := authorize.Filter(authorize.WithStructureScope(ctx))
+	kept := make([]domain.Message, 0, len(page))
 	for _, m := range page {
 		ok, err := s.allowed(fctx, a, authorize.ActionMessageRead, historyResource(m))
 		if err != nil {
@@ -94,11 +96,10 @@ func (s *Service) History(ctx context.Context, q messaging.HistoryQuery) (messag
 			s.historyFilterMismatch(ctx)
 			continue
 		}
-		v, err := s.listed(ctx, m, authors)
-		if err != nil {
-			return messaging.HistoryPage{}, err
-		}
-		out.Items = append(out.Items, v)
+		kept = append(kept, m)
+	}
+	if out.Items, err = s.listed(ctx, kept, map[ids.ID]messaging.PrincipalRef{}); err != nil {
+		return messaging.HistoryPage{}, err
 	}
 	if err := s.decorate(ctx, scope.ChannelIDs, out.Items); err != nil {
 		return messaging.HistoryPage{}, err
@@ -200,25 +201,15 @@ func (s *Service) historyFilterMismatch(ctx context.Context) {
 	}
 }
 
-// listed returns the list representation of m: the representation of Get with content_md cut at
-// message.list_content_max_bytes. authors caches the authors of one page.
-func (s *Service) listed(ctx context.Context, m domain.Message, authors map[ids.ID]messaging.PrincipalRef) (messaging.Message, error) {
-	author, ok := authors[m.AuthorID]
-	if !ok {
-		var err error
-		if author, err = s.author(ctx, m.AuthorID); err != nil {
-			return messaging.Message{}, err
-		}
-		authors[m.AuthorID] = author
+// listed returns the list representations of list: the representations of Get with content_md
+// cut at message.list_content_max_bytes. authors caches the authors of one request.
+func (s *Service) listed(ctx context.Context, list []domain.Message, authors map[ids.ID]messaging.PrincipalRef) ([]messaging.Message, error) {
+	out, err := s.views(ctx, list, authors)
+	if err != nil {
+		return nil, err
 	}
-	var mentions []ids.ID
-	if m.DeletedAt.IsZero() {
-		var err error
-		if mentions, err = s.d.Store.Mentions(ctx, m.ID); err != nil {
-			return messaging.Message{}, err
-		}
+	for i := range out {
+		out[i].ContentMD, out[i].ContentTruncated = domain.CutForList(out[i].ContentMD, s.cfg.ListContentMaxBytes)
 	}
-	v := view(m, author, mentions)
-	v.ContentMD, v.ContentTruncated = domain.CutForList(v.ContentMD, s.cfg.ListContentMaxBytes)
-	return v, nil
+	return out, nil
 }

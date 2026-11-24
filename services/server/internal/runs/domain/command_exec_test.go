@@ -145,9 +145,9 @@ func TestCommandInvokedPayload(t *testing.T) {
 	if _, err := domain.CommandInvokedPayload(in); err == nil {
 		t.Fatal("zero command accepted")
 	}
-	run, err := domain.InvokedRunID(p)
-	if err != nil || run != in.RunID {
-		t.Fatalf("InvokedRunID %v %v", run, err)
+	facts, err := domain.InvokedFactsOf(p)
+	if err != nil || facts.RunID != in.RunID {
+		t.Fatalf("InvokedFactsOf %+v %v", facts, err)
 	}
 }
 

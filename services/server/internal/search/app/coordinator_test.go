@@ -137,6 +137,43 @@ func TestCoordinator_PageCheckMismatchCounts(t *testing.T) {
 	}
 }
 
+// TestCoordinator_PageCheckDeletedThreadIsSilent (audit fn-search-6): a hit refused because its
+// thread was deleted before the purge is dropped without a filter_mismatch line or count.
+func TestCoordinator_PageCheckDeletedThreadIsSilent(t *testing.T) {
+	t.Parallel()
+	ch := ids.New()
+	e := newEnv(t, authorize.Scope{ChannelIDs: []ids.ID{ch}})
+	h1, h2 := hit(ch), hit(ch)
+	e.az.deny[h2.ID] = true
+	e.str.deleted = map[ids.ID]bool{h2.ThreadID: true}
+	e.index.page = searchkit.Page{Hits: []searchkit.Hit{h1, h2}}
+	res, err := e.coord.Query(context.Background(), e.alex, search.Request{Q: "invoice"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 1 || res.Hits[0].ID != h1.ID {
+		t.Fatalf("hits %+v, want the hit of the live thread only", res.Hits)
+	}
+	if len(e.errors.counts) != 0 || len(e.log.records) != 0 {
+		t.Fatalf("a deleted thread counted %v and logged %d records", e.errors.counts, len(e.log.records))
+	}
+}
+
+// TestCoordinator_PageCheckThreadReadFails: when the thread check of a refused hit fails, the query
+// answers that error and keeps no hit.
+func TestCoordinator_PageCheckThreadReadFails(t *testing.T) {
+	t.Parallel()
+	ch := ids.New()
+	e := newEnv(t, authorize.Scope{ChannelIDs: []ids.ID{ch}})
+	h1, h2 := hit(ch), hit(ch)
+	e.az.deny[h2.ID] = true
+	e.str.hitErr = errs.New(errs.CodeInternalError, "chat: down")
+	e.index.page = searchkit.Page{Hits: []searchkit.Hit{h1, h2}}
+	if _, err := e.coord.Query(context.Background(), e.alex, search.Request{Q: "invoice"}); codeOf(err) != errs.CodeInternalError {
+		t.Fatalf("err = %v, want the internal error of the thread check", err)
+	}
+}
+
 func TestCoordinator_NextFollowsLastRow(t *testing.T) {
 	t.Parallel()
 	ch := ids.New()

@@ -3,7 +3,6 @@
 package domain
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -148,54 +147,4 @@ func (a *Agent) SetToolClass(c ToolClass) (changed bool) {
 	a.ToolClass = c
 	a.Bump()
 	return true
-}
-
-// EffectiveToolClass is the higher of the target class and the reported class.
-func (a Agent) EffectiveToolClass() ToolClass {
-	return EffectiveToolClass(a.ToolClass, a.Reported.ToolClass)
-}
-
-// PresenceView is the reported state as the API shows it (schema AgentRuntimeStatus).
-type PresenceView struct {
-	State                 RuntimeState
-	ReportedBillingMode   BillingMode
-	RuntimeVersion        string
-	LastHeartbeatAt       time.Time
-	BillingModesSupported []BillingMode
-	ReportedToolClass     ToolClass
-	// BillingModeMatches is false only when a reported mode exists and differs from the target.
-	BillingModeMatches bool
-}
-
-// Presence returns the presence view of a.
-func (a Agent) Presence() PresenceView {
-	r := a.Reported
-	state := r.State
-	if state == "" {
-		state = RuntimeUnknown
-	}
-	return PresenceView{
-		State: state, ReportedBillingMode: r.BillingMode, RuntimeVersion: r.RuntimeVersion, LastHeartbeatAt: r.LastHeartbeatAt,
-		BillingModesSupported: append([]BillingMode(nil), r.BillingModesSupported...), ReportedToolClass: r.ToolClass,
-		BillingModeMatches: r.BillingMode == "" || r.BillingMode == a.Policy.Mode,
-	}
-}
-
-// ReportedDetailsFromStore reads billing_modes_supported from agents.reported_details (schema
-// agent_heartbeat.v1); unknown values are left out, because the server shows only modes it knows.
-// Errors: a value that is not a JSON object.
-func ReportedDetailsFromStore(raw []byte) ([]BillingMode, error) {
-	var d struct {
-		BillingModesSupported []string `json:"billing_modes_supported"`
-	}
-	if err := json.Unmarshal(raw, &d); err != nil {
-		return nil, err
-	}
-	var out []BillingMode
-	for _, s := range d.BillingModesSupported {
-		if m := BillingMode(s); m.Valid() {
-			out = append(out, m)
-		}
-	}
-	return out, nil
 }

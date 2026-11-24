@@ -160,7 +160,8 @@ func (s *Service) resulting(ctx context.Context, a actor.Actor, c messaging.Upda
 	content := row.ContentMD
 	if c.Content != nil {
 		content = *c.Content
-		if err := domain.CheckContent(content, s.cfg.MaxContentBytes); err != nil {
+		// A message with attachments may have an empty content, as when it was sent (D-M3-07-4).
+		if err := domain.CheckNewContent(content, s.cfg.MaxContentBytes, row.HasAttachments); err != nil {
 			return "", nil, chat.ThreadInfo{}, err
 		}
 	}

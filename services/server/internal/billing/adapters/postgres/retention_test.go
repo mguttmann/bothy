@@ -16,7 +16,9 @@ import (
 // TestPurgeOnlyExpired (M7-05, DP-T05): the participant of billing deletes cost entries that
 // occurred before the cutoff and price rows closed before it; an entry at or after the cutoff, an
 // open price row and one closed at the cutoff stay, and an expired entry whose kept correction
-// names it stays with it while an expired correction chain goes completely.
+// names it stays with it while an expired correction chain goes completely. The chain has the
+// shape Reconcile writes (every correction copies occurred_at of the entry it supersedes and gets
+// a newer ID), and the job runs with batch 1, the smallest allowed retention.batch_size.
 func TestPurgeOnlyExpired(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -49,8 +51,9 @@ func TestPurgeOnlyExpired(t *testing.T) {
 	ptr := func(t time.Time) *time.Time { return &t }
 	gone := entry(before, nil)
 	chainA := entry(before.Add(-time.Hour), nil)
-	chainB := entry(before, &chainA)
-	heldA := entry(before.Add(-time.Hour), nil)
+	chainB := entry(before.Add(-time.Hour), &chainA)
+	chainC := entry(before.Add(-time.Hour), &chainB)
+	heldA := entry(before.Add(-2*time.Hour), nil)
 	heldB := entry(cutoff, &heldA)
 	after := entry(cutoff.Add(time.Second), nil)
 	oldPrice := price(cutoff.Add(-48*time.Hour), ptr(before))
@@ -74,6 +77,7 @@ func TestPurgeOnlyExpired(t *testing.T) {
 		want  bool
 	}{
 		{"cost_entries", gone, false}, {"cost_entries", chainA, false}, {"cost_entries", chainB, false},
+		{"cost_entries", chainC, false},
 		{"cost_entries", heldA, true}, {"cost_entries", heldB, true}, {"cost_entries", after, true},
 		{"price_table", oldPrice, false}, {"price_table", edgePrice, true}, {"price_table", openPrice, true},
 	} {

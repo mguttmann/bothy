@@ -58,7 +58,7 @@ type walker struct {
 	pinsFull map[string]bool            // thread origin keys whose thread holds pin.max_per_thread pins
 	present  time.Time
 
-	// halt reports a stop request (SIGINT, SIGTERM) of the read mirror; the walker checks it after
+	// halt reports a stop request (SIGINT, SIGTERM) of a writing run; the walker checks it after
 	// every batch and ends with errHalted, so the current batch always finishes. nil never halts.
 	halt func() bool
 	// noStats leaves the counters out of the cursor writes: the read mirror keeps stats.tool at the
@@ -70,7 +70,7 @@ type walker struct {
 	agents   map[string]person
 }
 
-// errHalted ends a mirror round after a batch because of a stop request.
+// errHalted ends a full run or a mirror round after a batch because of a stop request.
 var errHalted = errors.New("importtool: stopped by a signal")
 
 // stats returns the counters of the cursor writes, nil when they are left out.

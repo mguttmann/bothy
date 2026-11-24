@@ -37,6 +37,39 @@ func (s *Service) author(ctx context.Context, id ids.ID) (messaging.PrincipalRef
 	return messaging.PrincipalRef{ID: p.ID, Kind: string(p.Kind), Handle: p.Handle, DisplayName: p.DisplayName, AvatarFileID: p.AvatarFileID}, nil
 }
 
+// views returns the representation of each message of list with its author and mentions now,
+// without reactions and pin (decorate adds them): the mentions of all live messages in one read,
+// so a page costs one statement instead of one per message, and each author once through
+// authors, which caches the authors of one request.
+func (s *Service) views(ctx context.Context, list []domain.Message, authors map[ids.ID]messaging.PrincipalRef) ([]messaging.Message, error) {
+	live := make([]ids.ID, 0, len(list))
+	for _, m := range list {
+		if m.DeletedAt.IsZero() {
+			live = append(live, m.ID)
+		}
+	}
+	mentions := map[ids.ID][]ids.ID{}
+	if len(live) > 0 {
+		var err error
+		if mentions, err = s.d.Store.MentionsOfMessages(ctx, live); err != nil {
+			return nil, err
+		}
+	}
+	out := make([]messaging.Message, 0, len(list))
+	for _, m := range list {
+		author, ok := authors[m.AuthorID]
+		if !ok {
+			var err error
+			if author, err = s.author(ctx, m.AuthorID); err != nil {
+				return nil, err
+			}
+			authors[m.AuthorID] = author
+		}
+		out = append(out, view(m, author, mentions[m.ID]))
+	}
+	return out, nil
+}
+
 // base returns the representation of a stored message with its author and mentions now, without
 // reactions and pin (decorate adds them).
 func (s *Service) base(ctx context.Context, m domain.Message) (messaging.Message, error) {

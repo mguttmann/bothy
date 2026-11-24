@@ -13677,7 +13677,9 @@ type MessageRevisionList struct {
 
 // MessageUpdate The server resolves the mentions of the resulting content again; `mention_ids` is an optional check as in `MessageCreate`.
 type MessageUpdate struct {
-	// ContentMd Examples: @support-agent the invoice export fails since 08:00.
+	// ContentMd Empty or white space only content is allowed only when the message has at least one attachment (removing the caption); otherwise `400 validation_failed` with `errors[].code` `empty`.
+	//
+	// Examples: @support-agent the invoice export fails since 08:00.
 	ContentMd  *string `json:"content_md,omitempty"`
 	MentionIds *[]Uuid `json:"mention_ids,omitempty"`
 }

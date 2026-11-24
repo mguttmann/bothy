@@ -155,6 +155,8 @@ func TestChatChannelsMigration_Schema(t *testing.T) {
 			"FOREIGN KEY (parent_message_id) REFERENCES messages(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED",
 			"PRIMARY KEY (id)",
 		}, []string{
+			"CREATE INDEX threads_channel_activity_idx ON public.threads USING btree (channel_id, last_activity_at DESC, id DESC) WHERE ((kind = 'thread'::text) AND (deleted_at IS NULL))",
+			"CREATE INDEX threads_channel_created_idx ON public.threads USING btree (channel_id, created_at DESC, id DESC) WHERE ((kind = 'thread'::text) AND (deleted_at IS NULL))",
 			"CREATE INDEX threads_channel_state_activity_idx ON public.threads USING btree (channel_id, state, last_activity_at DESC)",
 			"CREATE INDEX threads_purge_pending_idx ON public.threads USING btree (deleted_at) WHERE ((deleted_at IS NOT NULL) AND (purged_at IS NULL))",
 			"CREATE INDEX threads_operator_agent_channel_idx ON public.threads USING btree (operator_agent_id, channel_id) WHERE (operator_agent_id IS NOT NULL)",

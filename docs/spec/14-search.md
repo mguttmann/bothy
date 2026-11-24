@@ -342,8 +342,8 @@ built on the search of this chapter; a model only chooses among the hits and add
 1. **Who asks.** `assistSearch` (`search.assist`, persons only, `rl.trigger`). The body holds the
    question `q` (at most `search.query_max_chars`, `400 validation_failed` with `too_long` on `/q`)
    and `history`, the earlier questions of the same popup with the `terms` and `thread_ids` of
-   their answers, at most `search.assist.max_turns` (`too_many_items` on `/history`). Nothing of it
-   is stored.
+   their answers, at most `search.assist.max_turns` (`too_many_items` on `/history`); each earlier
+   question has the limit of `q` (`too_long` on `/history/<i>/q`). Nothing of it is stored.
 2. **Terms.** The words of `q` (runs of letters and digits, lower case) without the stop words of
    the module's word lists (German and English, with the words of asking for a search) and without
    words shorter than three letters, then the terms of the earlier turns from the newest, at most
@@ -382,7 +382,9 @@ built on the search of this chapter; a model only chooses among the hits and add
    after the wait `410 gone`.
 7. **The result.** The picks in the model's order with their reason (`source = assistant`), then
    the other candidates, then what a second pass of point 3 with the new terms of the answer finds
-   (`source = fulltext`), at most `search.assist.max_hits`, one hit per thread. Each hit names the
+   (`source = fulltext`), at most `search.assist.max_hits`, one hit per thread. A second pass that
+   fails (a statement timeout, the end of the request) adds nothing; the picks and the first pass
+   stay the answer. Each hit names the
    thread, the jump target, the channel (for a development session the project forum), the space,
    the time and the excerpt. `terms` are the terms of both passes; `cost_estimate` is the sum of
    the answer's `amount_micros` in one currency, for information only and not booked in

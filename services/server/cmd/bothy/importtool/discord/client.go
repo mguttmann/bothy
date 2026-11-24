@@ -423,8 +423,17 @@ func (c *Client) call(ctx context.Context, rt route, major string, q url.Values)
 	u := *c.base
 	u.Path += strings.Replace(rt.template, rt.placeholder, major, 1)
 	u.RawQuery = q.Encode()
+	transient := 0
 	for attempt := 0; ; attempt++ {
 		body, retry, err := c.attempt(ctx, rt, major, &u, attempt)
+		if !retry && transient < transientRetries && isTransient(ctx, err) {
+			// Every call is an idempotent GET: a 5xx or a broken connection is asked again.
+			if serr := sleepTransient(ctx, c.sleep, c.logger, rt.op(), transient); serr != nil {
+				return nil, &CallError{Op: rt.op(), Kind: serr}
+			}
+			transient++
+			continue
+		}
 		if !retry {
 			return body, err
 		}
@@ -515,12 +524,12 @@ func (c *Client) send(ctx context.Context, rt route, u *url.URL) (int, http.Head
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return 0, nil, nil, &CallError{Op: rt.op(), Kind: err}
+		return 0, nil, nil, &CallError{Op: rt.op(), Kind: err, transport: true}
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return 0, nil, nil, &CallError{Op: rt.op(), Status: resp.StatusCode, Kind: err}
+		return 0, nil, nil, &CallError{Op: rt.op(), Status: resp.StatusCode, Kind: err, transport: true}
 	}
 	return resp.StatusCode, resp.Header, body, nil
 }
@@ -529,6 +538,41 @@ func (c *Client) send(ctx context.Context, rt route, u *url.URL) (int, http.Head
 func (c *Client) authorize(req *http.Request) error {
 	return c.token.setAuthorization(req, c.api)
 }
+
+// transientRetries and transientWait bound the retries of a 5xx or a transport error of one GET
+// (audit finding srv-import-10): up to three more requests after waits of 1 s, 2 s and 4 s, so a
+// short failure of Discord or of the connection no longer ends a full run or loses an attachment.
+// Named values, not keys of 22 19.
+const (
+	transientRetries = 3
+	transientWait    = time.Second
+)
+
+// isTransient reports an error worth another request: a 5xx (ErrServer) or a failure of the
+// connection (a *CallError without a status whose kind is no sentinel of this package), while ctx
+// is still live.
+func isTransient(ctx context.Context, err error) bool {
+	if err == nil || ctx.Err() != nil {
+		return false
+	}
+	if errors.Is(err, ErrServer) {
+		return true
+	}
+	var ce *CallError
+	return errors.As(err, &ce) && ce.transport
+}
+
+// sleepTransient waits transientWait * 2^n before the retry n+1 of op.
+func sleepTransient(ctx context.Context, sleep Sleeper, log *slog.Logger, op string, n int) error {
+	d := transientWait << n
+	log.LogAttrs(ctx, slog.LevelInfo, "discord retry after a server or connection error",
+		slog.String(attrOp, op), slog.Duration(attrWait, d))
+	return sleep(ctx, d)
+}
+
+// NewRound starts a new round of a read mirror (22 4.3 item 4): a channel an earlier 403 ended is
+// asked again, and the rate-limit state of buckets that have refilled is dropped.
+func (c *Client) NewRound() { c.guard.newRound() }
 
 // String describes the client without the token.
 func (c *Client) String() string { return "discord.Client(" + c.api.host + ")" }

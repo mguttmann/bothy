@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
 )
@@ -28,7 +29,12 @@ const (
 )
 
 // Log messages of the handler wrapper; constant text (signals.md "Logs").
-const msgPanic = "job panicked"
+const (
+	msgPanic = "job panicked"
+	// msgFailed is the line of a failed attempt: Warn while River retries, Error for the last
+	// attempt, after which River discards the job.
+	msgFailed = "job attempt failed"
+)
 
 // errTypePanic is the error.type of a recovered panic.
 const errTypePanic = "panic"
@@ -92,7 +98,42 @@ func (w *worker[A]) Work(ctx context.Context, j *river.Job[A]) (err error) {
 	if err == nil && ctx.Err() != nil {
 		err = ctx.Err()
 	}
+	if err != nil && outcomeOf(ctx, err) == outcomeFailed && !errors.Is(err, errPanicked) {
+		w.logFailed(ctx, j, err)
+	}
 	return err
+}
+
+// logFailed writes the line of a failed attempt with bothy.job.kind and error.type, never the
+// error text or the arguments, which may carry content: Warn while attempts remain, Error for the
+// last one. A panic has its own line (run).
+func (w *worker[A]) logFailed(ctx context.Context, j *river.Job[A], err error) {
+	level := slog.LevelWarn
+	if j.JobRow != nil && j.Attempt >= j.MaxAttempts {
+		level = slog.LevelError
+	}
+	w.d.log.Log(context.WithoutCancel(ctx), level, msgFailed,
+		slog.String(attr.JobKind, w.kind), slog.String(attr.ErrorType, errorType(err)))
+}
+
+// errPanicked marks the error of an attempt whose handler panicked.
+var errPanicked = errors.New("panicked")
+
+// errorType returns the class of a failed attempt for the log: the SQLSTATE of a database error,
+// timeout for the end of a deadline (River's job timeout or the handler's own), canceled, or the
+// kind of a kernel/errs error.
+func errorType(err error) string {
+	var pgErr interface{ SQLState() string }
+	switch {
+	case errors.As(err, &pgErr):
+		return pgErr.SQLState()
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	default:
+		return errs.KindOf(err).String()
+	}
 }
 
 // run calls the handler and turns a panic into an error. The log line names the kind and the
@@ -101,7 +142,7 @@ func (w *worker[A]) run(ctx context.Context, j *river.Job[A]) (err error) {
 	defer func() {
 		if recover() != nil {
 			w.d.log.ErrorContext(ctx, msgPanic, slog.String(attr.JobKind, w.kind), slog.String(attr.ErrorType, errTypePanic))
-			err = fmt.Errorf("jobs: job %s panicked", w.kind)
+			err = fmt.Errorf("jobs: job %s %w", w.kind, errPanicked)
 		}
 	}()
 	return w.h.Work(ctx, Job[A]{ID: j.ID, Attempt: j.Attempt, Args: j.Args})
@@ -125,12 +166,15 @@ func (w *worker[A]) Timeout(*river.Job[A]) time.Duration {
 	return w.o.Timeout
 }
 
-// outcomeOf maps the result of an attempt to bothy.outcome.
+// outcomeOf maps the result of an attempt to bothy.outcome. Only a canceled context is
+// cancelled: the stop of the runtime or a cancellation of the job. River's job timeout ends the
+// context with context.DeadlineExceeded; such an attempt failed and uses up an attempt, so it is
+// failed.
 func outcomeOf(ctx context.Context, err error) string {
 	switch {
 	case err == nil:
 		return outcomeCompleted
-	case ctx.Err() != nil && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)):
+	case errors.Is(ctx.Err(), context.Canceled) && errors.Is(err, context.Canceled):
 		return outcomeCancelled
 	default:
 		return outcomeFailed

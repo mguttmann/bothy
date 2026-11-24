@@ -74,3 +74,12 @@ real, allowed difference by the same factor as the operations, so `TimingSame` r
 top-level test that does not call `t.Parallel` (Semgrep rule `bothy-go-test-timing-parallel`): Go
 starts the parallel tests of the package only after every such test has finished. Other packages
 of the same `go test` run still load the machine; that is not excluded.
+
+Detection limit: `TimingSame` is built not to flake, at the price of its power. One round within
+the bound passes the comparison, so a real difference is reported only when it shows in every one
+of `TimingRounds` rounds. A round whose faster side is slowed in all its counted samples (load that
+lasts the whole round) shrinks the difference and can hide it; and under the race detector the
+bound is five times wider (`raceTimingFactor`), so a difference below that wider bound passes
+there. A passing `TimingSame` therefore shows that no difference larger than the bound shows
+steadily, not that the two sides take the same time; `TestTimingSame` holds that a constant
+difference just above the bound fails and one at the bound passes.

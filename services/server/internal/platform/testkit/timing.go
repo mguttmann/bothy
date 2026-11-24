@@ -45,7 +45,9 @@ const (
 // the bound in every round next to the parallel tests of its package). Call TimingSame only from a top-level
 // test that does not call t.Parallel, so the parallel tests of the package wait until it is done
 // (Semgrep rule bothy-go-test-timing-parallel); other packages running at the same time are not
-// excluded.
+// excluded. Detection limit: a real difference fails the comparison only when it shows in
+// every round, so load that slows the faster side for a whole round can hide it; a pass shows
+// that no difference above the bound shows steadily (README.md "Timing comparisons").
 func TimingSame(tolerance time.Duration, a, b func() time.Duration) (time.Duration, bool) {
 	bound := TimingBound(tolerance)
 	smallest := time.Duration(-1)

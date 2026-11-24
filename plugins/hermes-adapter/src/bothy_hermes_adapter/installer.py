@@ -21,7 +21,9 @@ module of the package starts a process; docs/DECISIONS.md D-M2-33-12):
   be set (judged by its name), empties the OAuth variables and Hermes's allow list of the
   platform, refuses a login file of another tool in the profile's home and sets
   ``auth.adopt_external_logins: false``; ``personal`` empties the API-key variable and writes
-  Hermes's allow list (``<KEY>_ALLOWED_USERS``) with exactly the credential holder (17.7 layer 3).
+  Hermes's allow list (``<KEY>_ALLOWED_USERS``) with exactly the credential holder and the
+  adapter's control sender (17.7 layer 3): Hermes judges every sender by that list, also the
+  control sender of ``/stop``, ``/new``, ``/resume`` and the control commands (17.4).
 * ``check``: the same reads and the prediction without a change, and whether the gateway can
   load the adapter (``adapter: loadable`` or ``adapter: not loadable: <reasons>``; the command
   then exits with ``1``).
@@ -551,7 +553,9 @@ def switch_mode(bridge: ProfileBridge, mode: str, credential_holder: UUID | None
         if credential_holder is None:
             raise InstallError("personal needs --credential-holder")
         bridge.remove_env(bridge.api_key_variable())
-        bridge.set_env(allowed, str(credential_holder))
+        # The control sender is the adapter's own: no person's event carries it (17.4). Without
+        # it Hermes refuses ``/stop``, and a stopped run's turn goes on in the session.
+        bridge.set_env(allowed, f"{credential_holder},{CONTROL_SENDER}")
     else:
         raise InstallError("mode must be organization or personal")
     after = bridge.read_config()

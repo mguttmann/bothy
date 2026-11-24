@@ -43,7 +43,7 @@ SELECT count(*)::bigint FROM message_attachments WHERE thread_id = ANY ($1::uuid
 `
 
 // The number of files attached to the messages of threads (DeletionInfo.contents.files of chat,
-// FEAT-delete-spaces-chats): a deleted message has no attachment rows left (12 section 9.4), so
+// FEAT-delete-spaces-chats): a deleted message has no attachment rows left (12 section 10), so
 // this counts what a deletion removes. Never authorized: chat authorized the item.
 func (q *Queries) CountFilesOfThreads(ctx context.Context, threadIds []pgtype.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countFilesOfThreads, threadIds)

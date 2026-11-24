@@ -105,7 +105,8 @@ other than the planned operator of the mapping (--force switches anyway, with a 
 channel and prints the owner's steps of reverting (22 13.4).
 
 Exit codes: 0 done; 1 aborted (network, rate limit above the limit, server error, source paused),
-a new run resumes; 2 invocation, mapping file or preflight faulty, nothing written; 3 another run
+a new run resumes; 2 invocation, mapping file or preflight faulty, nothing written, or a token
+Discord refuses or a missing or revoked session in any phase; 3 another run
 holds the lease of the source (use --takeover; with --once the normal case for scheduled calls).
 `
 
@@ -257,18 +258,24 @@ func exitCode(stderr io.Writer, err error) int {
 	var u *usageError
 	var l *leaseError
 	switch {
-	case errors.As(err, &u), errors.Is(err, errSelection):
+	case errors.As(err, &u), errors.Is(err, errSelection), permanent(err):
 		return ExitUsage
 	case errors.As(err, &l):
 		return ExitLease
 	}
-	for _, usage := range []error{bothyapi.ErrNotLoggedIn, bothyapi.ErrSessionRevoked, bothyapi.ErrInsecureSessionFile,
-		bothyapi.ErrInvalidSessionFile, bothyapi.ErrInvalidServerURL} {
+	return ExitAborted
+}
+
+// permanent reports an error that no later attempt changes: a Discord token Discord refuses (401,
+// 22 4.3 item 4) or a missing, revoked or invalid session of the server. It is exit 2.
+func permanent(err error) bool {
+	for _, usage := range []error{discord.ErrUnauthorized, bothyapi.ErrNotLoggedIn, bothyapi.ErrSessionRevoked,
+		bothyapi.ErrInsecureSessionFile, bothyapi.ErrInvalidSessionFile, bothyapi.ErrInvalidServerURL} {
 		if errors.Is(err, usage) {
-			return ExitUsage
+			return true
 		}
 	}
-	return ExitAborted
+	return false
 }
 
 // loadInputs loads the configuration and the bot token (brief design note 1 step b).
@@ -362,10 +369,17 @@ func newBothy(ctx context.Context, cfg Config, sessionFile string, env Env) (*bo
 	if env.Sleep != nil {
 		deps.Sleep = bothyapi.Sleeper(env.Sleep)
 	}
+	return bothyapi.New(ctx, bothyapi.Options{SessionFile: path, Limits: cfg.ServerLimits(), Deps: deps})
+}
+
+// ServerLimits returns the values of the server client from the tool configuration (22 19):
+// import.login_poll_interval, import.discord.max_429_retries, import.discord.max_rate_wait and
+// import.http_timeout; the response limit keeps its default.
+func (c Config) ServerLimits() bothyapi.Limits {
 	lim := bothyapi.DefaultLimits()
 	lim.LoginPollInterval, lim.Max429Retries, lim.MaxRateWait, lim.HTTPTimeout =
-		cfg.LoginPollInterval, cfg.DiscordMax429Retries, cfg.DiscordMaxRateWait, cfg.HTTPTimeout
-	return bothyapi.New(ctx, bothyapi.Options{SessionFile: path, Limits: lim, Deps: deps})
+		c.LoginPollInterval, c.DiscordMax429Retries, c.DiscordMaxRateWait, c.HTTPTimeout
+	return lim
 }
 
 // clock returns the clock of the env.
@@ -466,6 +480,18 @@ func execute(ctx context.Context, o options, env Env, cfg Config, m *Mapping, sf
 	}
 	rep := newReport(o.apply, wk.gs, wk.p)
 	wk.rep = rep
+	if o.apply {
+		// A full run stops the same way: after the current batch, with the lease freed (exit 1,
+		// the next run resumes at the cursor). The batch itself runs on a context the signal does
+		// not cancel.
+		sig, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		// The first signal asks for the stop; releasing the handler then lets a second signal end
+		// the process at once, as without the handler.
+		go func() { <-sig.Done(); stop() }()
+		wk.halt = func() bool { return sig.Err() != nil }
+		ctx = context.WithoutCancel(sig)
+	}
 	if err := walk(ctx, o, env, wk); err != nil {
 		return err
 	}
@@ -635,6 +661,10 @@ func walk(ctx context.Context, o options, env Env, wk *walker) error {
 	}
 	stop(nil)
 	<-done
+	if errors.Is(err, errHalted) {
+		// A stop request: the batch in flight is done, so the lease goes and the counters stay.
+		return errors.Join(err, wk.w.release(ctx, wk.rep.stats()))
+	}
 	if err != nil {
 		return err
 	}

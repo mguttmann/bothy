@@ -21,19 +21,31 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
 	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
-// TestGatewayRoute_AuthorizedInBandOnlyGateway (M1-64): the gateway route is registered with
-// gateway.connect and rl.gateway_connect and passes the catalogue check of the start (AZ-P1);
-// it is the only route marked AuthorizedInBand.
-func TestGatewayRoute_AuthorizedInBandOnlyGateway(t *testing.T) {
+// TestGatewayRoute_AuthorizedInBandOnlyUpgrades (M1-64): the gateway route is registered with
+// gateway.connect and rl.gateway_connect and passes the catalogue check of the start (AZ-P1).
+// The marker AuthorizedInBand is on the gateway and the three terminal upgrades, which make up
+// wire.InBandPatterns, and on no contract route.
+func TestGatewayRoute_AuthorizedInBandOnlyUpgrades(t *testing.T) {
 	t.Parallel()
 	op := wire.GatewayOperation()
 	if !op.AuthorizedInBand || op.Pattern != "GET /api/v1/gateway" || op.Action != "gateway.connect" || op.RateLimitClass != "rl.gateway_connect" {
 		t.Fatalf("gateway operation %+v", op)
+	}
+	var marked []string
+	for _, o := range []httpserver.Operation{wire.GatewayOperation(), wire.HostConnectOperation(), wire.TerminalStreamOperation(), wire.HostDataOperation()} {
+		if !o.AuthorizedInBand {
+			t.Errorf("%s is not marked AuthorizedInBand", o.Pattern)
+		}
+		marked = append(marked, o.Pattern)
+	}
+	if got := wire.InBandPatterns(); !slices.Equal(got, marked) {
+		t.Errorf("InBandPatterns %v, want %v", got, marked)
 	}
 	for _, r := range routes.Enabled() {
 		if wire.HTTPOperation(r).AuthorizedInBand {

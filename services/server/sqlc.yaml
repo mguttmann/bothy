@@ -4,6 +4,9 @@
 # internal/<module>/adapters/postgres/queries/, generated code in .../sqlcgen. Regenerate with
 # `sqlc generate -f sqlc.yaml`; make codegen-check regenerates, compares and fails on drift
 # (docs/spec/02-architecture.md section 7.3).
+# Every block writes file names ending in .gen.go (docs/DECISIONS.md M1-05/7) and, as each reads
+# the whole migrations directory, sets omit_unused_structs so a module's models file holds only
+# the tables its own queries use; tools/ci/tests/test_sqlc_config.py holds every block to both.
 version: "2"
 sql:
   # instance (M1-15): file names end in .gen.go (docs/DECISIONS.md M1-05/7).
@@ -20,6 +23,7 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
+        omit_unused_structs: true
   # identity (M1-26)
   - engine: postgresql
     schema: migrations
@@ -29,6 +33,12 @@ sql:
         package: sqlcgen
         out: internal/identity/adapters/postgres/sqlcgen
         sql_package: pgx/v5
+        output_db_file_name: db.gen.go
+        output_models_file_name: models.gen.go
+        output_querier_file_name: querier.gen.go
+        output_files_suffix: .gen
+        emit_interface: false
+        omit_unused_structs: true
   # audit (M1-24): file names end in .gen.go (docs/DECISIONS.md M1-05/7).
   - engine: postgresql
     schema: migrations
@@ -43,6 +53,7 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
+        omit_unused_structs: true
   # authz (M1-27)
   - engine: postgresql
     schema: migrations
@@ -52,6 +63,12 @@ sql:
         package: sqlcgen
         out: internal/authz/adapters/postgres/sqlcgen
         sql_package: pgx/v5
+        output_db_file_name: db.gen.go
+        output_models_file_name: models.gen.go
+        output_querier_file_name: querier.gen.go
+        output_files_suffix: .gen
+        emit_interface: false
+        omit_unused_structs: true
   # sync (M1-16): file names end in .gen.go (docs/DECISIONS.md M1-05/7).
   - engine: postgresql
     schema: migrations
@@ -66,6 +83,7 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
+        omit_unused_structs: true
   # agents (M1-51)
   - engine: postgresql
     schema: migrations
@@ -75,6 +93,12 @@ sql:
         package: sqlcgen
         out: internal/agents/adapters/postgres/sqlcgen
         sql_package: pgx/v5
+        output_db_file_name: db.gen.go
+        output_models_file_name: models.gen.go
+        output_querier_file_name: querier.gen.go
+        output_files_suffix: .gen
+        emit_interface: false
+        omit_unused_structs: true
   # chat (M1-52)
   - engine: postgresql
     schema: migrations
@@ -84,6 +108,12 @@ sql:
         package: sqlcgen
         out: internal/chat/adapters/postgres/sqlcgen
         sql_package: pgx/v5
+        output_db_file_name: db.gen.go
+        output_models_file_name: models.gen.go
+        output_querier_file_name: querier.gen.go
+        output_files_suffix: .gen
+        emit_interface: false
+        omit_unused_structs: true
   # terminal (M2-39)
   - engine: postgresql
     schema: migrations
@@ -93,6 +123,12 @@ sql:
         package: sqlcgen
         out: internal/terminal/adapters/postgres/sqlcgen
         sql_package: pgx/v5
+        output_db_file_name: db.gen.go
+        output_models_file_name: models.gen.go
+        output_querier_file_name: querier.gen.go
+        output_files_suffix: .gen
+        emit_interface: false
+        omit_unused_structs: true
   # apps (M2-24): file names end in .gen.go (docs/DECISIONS.md M1-05/7).
   - engine: postgresql
     schema: migrations
@@ -107,6 +143,7 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
+        omit_unused_structs: true
   # messaging (M1-56): file names end in .gen.go (docs/DECISIONS.md M1-05/7, M1-57/10).
   - engine: postgresql
     schema: migrations
@@ -121,6 +158,7 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
+        omit_unused_structs: true
   # notify (M3-18): file names end in .gen.go (docs/DECISIONS.md M1-05/7).
   - engine: postgresql
     schema: migrations
@@ -135,6 +173,7 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
+        omit_unused_structs: true
   # files (M3-03)
   - engine: postgresql
     schema: migrations
@@ -149,6 +188,7 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
+        omit_unused_structs: true
   # status (M7-02): backup_runs.
   - engine: postgresql
     schema: migrations
@@ -163,7 +203,8 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
-  # runs (M2-05): runs and run_steps.
+        omit_unused_structs: true
+  # runs (M2-05): runs, run_steps and the other tables of the module.
   - engine: postgresql
     schema: migrations
     queries: internal/runs/adapters/postgres/queries
@@ -177,6 +218,7 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
+        omit_unused_structs: true
   # importer (M8-03): file names end in .gen.go (docs/DECISIONS.md M1-05/7).
   - engine: postgresql
     schema: migrations
@@ -191,6 +233,7 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
+        omit_unused_structs: true
   # gateway (M7-17): file names end in .gen.go (docs/DECISIONS.md M1-05/7).
   - engine: postgresql
     schema: migrations
@@ -205,6 +248,7 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
+        omit_unused_structs: true
   # billing (M2-22): price_table and cost_entries.
   - engine: postgresql
     schema: migrations
@@ -219,6 +263,7 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
+        omit_unused_structs: true
   # stats (M6-13): stats_minutes, the own measurement.
   - engine: postgresql
     schema: migrations
@@ -233,6 +278,7 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
+        omit_unused_structs: true
   # privacy (M7-06): gdpr_requests.
   - engine: postgresql
     schema: migrations
@@ -247,3 +293,4 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
+        omit_unused_structs: true

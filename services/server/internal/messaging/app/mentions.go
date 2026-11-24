@@ -93,13 +93,13 @@ func (s Mentions) ListMine(ctx context.Context, q messaging.MentionListQuery) (m
 	}
 	more := len(rows) > limit
 	rows = rows[:min(len(rows), limit)]
-	msgs := make([]messaging.Message, 0, len(rows))
+	list := make([]domain.Message, 0, len(rows))
 	for _, r := range rows {
-		m, err := s.base(ctx, r.Message)
-		if err != nil {
-			return messaging.MentionPage{}, err
-		}
-		msgs = append(msgs, m)
+		list = append(list, r.Message)
+	}
+	msgs, err := s.views(ctx, list, map[ids.ID]messaging.PrincipalRef{})
+	if err != nil {
+		return messaging.MentionPage{}, err
 	}
 	if err := s.decorate(ctx, sc.ChannelIDs, msgs); err != nil {
 		return messaging.MentionPage{}, err
@@ -167,7 +167,7 @@ func (s *Service) visibleMentions(ctx context.Context, a actor.Actor, mq Mention
 }
 
 // readableMentions appends to out the rows of batch that a may read, up to want in total. A row
-// authorize refuses is a filter mismatch.
+// authorize refuses is a filter mismatch unless its thread is deleted (threadGone).
 func (s *Service) readableMentions(ctx context.Context, a actor.Actor, batch, out []MentionRow, want int) ([]MentionRow, error) {
 	for _, r := range batch {
 		if len(out) == want {
@@ -178,7 +178,13 @@ func (s *Service) readableMentions(ctx context.Context, a actor.Actor, batch, ou
 			return nil, err
 		}
 		if !ok {
-			s.filterMismatch(ctx, authorize.ActionMessageRead)
+			gone, err := s.threadGone(ctx, r.Message.ThreadID)
+			if err != nil {
+				return nil, err
+			}
+			if !gone {
+				s.filterMismatch(ctx, authorize.ActionMessageRead)
+			}
 			continue
 		}
 		out = append(out, r)
@@ -194,6 +200,21 @@ func (s *Service) filterMismatch(ctx context.Context, act authorize.Action) {
 	if s.d.Errors != nil {
 		s.d.Errors.CountError(ctx, reasonFilterMismatch)
 	}
+}
+
+// threadGone reports whether thread is deleted or unknown. authorize answers not_found for every
+// message of a deleted thread (D-DEL-SRV-1), while the statements of the lists filter by channel
+// only, so such a message is no filter mismatch: the caller drops it without the error line and
+// the count. It reads only for a refusal, which is rare.
+func (s *Service) threadGone(ctx context.Context, thread ids.ID) (bool, error) {
+	info, err := s.d.Threads.Info(ctx, thread)
+	if errs.KindOf(err) == errs.KindNotFound {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return info.Deleted, nil
 }
 
 // messageResource describes the message m for authorize: its thread and channel as path hints

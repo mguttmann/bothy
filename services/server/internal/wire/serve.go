@@ -326,8 +326,7 @@ type server struct {
 //     6h. apps (M2-24): build the app use cases and their handlers over identity, the rights hook
 //     and the Authorizer (startApps),
 //     6i. status (M7-09): build the status page, its handlers, the job status.probe with the
-//     checks over stats, files, search and agents, and bind the subscriber of
-//     agents.AgentDisabled (startStatus),
+//     checks over stats, files, search and agents (startStatus),
 //  7. extension points, in this order: signing keys (M1-32), the privacy requests (M7-06: the use
 //     cases, handlers and jobs of privacy over the participants of every module, after the
 //     sessions step that builds the revocation use cases of identity), routes (the catalogue check of
@@ -875,7 +874,13 @@ func newMeasuredChain(cfg httpserver.ChainConfig, auth actor.Authenticator, log 
 	if auth == nil {
 		auth = actor.AnonymousOnly{}
 	}
-	return httpserver.NewChain(cfg, httpserver.Deps{Logger: log, Authenticator: auth, Validator: v, Measure: rec})
+	return httpserver.NewChain(cfg, httpserver.Deps{Logger: log, Authenticator: auth, Validator: v, Measure: rec, InBandPatterns: InBandPatterns()})
+}
+
+// InBandPatterns is the closed list of the routes marked httpserver.Operation.AuthorizedInBand:
+// the gateway and the three terminal upgrades. The chain refuses the marker on any other pattern.
+func InBandPatterns() []string {
+	return []string{GatewayOperation().Pattern, HostConnectOperation().Pattern, TerminalStreamOperation().Pattern, HostDataOperation().Pattern}
 }
 
 // enabledValidator compiles the request validator of the enabled operations once per process: the

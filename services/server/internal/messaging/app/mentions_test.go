@@ -19,6 +19,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
@@ -103,6 +104,84 @@ func (c *counter) CountError(_ context.Context, reason string) {
 	c.reasons = append(c.reasons, reason)
 }
 
+// TestListMyMentions_DeletedThreadIsSilent (audit srv-messaging-search-1): a mention in a thread
+// deleted before the purge, which authorize refuses with not_found, is dropped without the
+// filter_mismatch line and count.
+func TestListMyMentions_DeletedThreadIsSilent(t *testing.T) {
+	t.Parallel()
+	alex, channel, thread := ids.New(), ids.New(), ids.New()
+	m := domain.Message{ID: ids.New(), ThreadID: thread, ChannelID: channel, ThreadSeq: 1, AuthorID: ids.New(),
+		Origin: domain.OriginHuman, Kind: domain.KindText, ContentMD: "@alex", ContentFormat: 1, Version: 1}
+	rows := []app.MentionRow{{Message: m, MentionedAt: time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)}}
+	logs := &httpservertest.LogCapture{}
+	cnt := &counter{}
+	svc, err := app.New(app.Config{MaxContentBytes: 100, MaxMentions: 4, EventPayloadMaxBytes: 1000, TemplateNameMaxChars: 10,
+		TemplateMaxPerScope: 5, ListContentMaxBytes: 100, PageSizeDefault: 3, PageSizeMax: 3, EmojiMaxBytes: 64, MaxDistinctReactions: 20, HandleMaxChars: 32, DisplayNameMaxChars: 64, MaxPinsPerThread: 50}, app.Deps{
+		Store: fakeMentionStore{rows: rows}, UoW: struct{ txn.UnitOfWork }{}, Authorizer: denyOne{deny: m.ID, channel: channel},
+		Events: struct{ eventlog.Appender }{}, Threads: oneThread{info: chat.ThreadInfo{ID: thread, ChannelID: channel, Deleted: true}},
+		Directory: fakeDirectory{}, Cursors: plainCursors{}, Errors: cnt, Log: slog.New(logs),
+		Redactor: struct{ eventlog.Redactor }{}, Audit: struct{ auditing.Recorder }{}, Symbols: anySymbol{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := actor.WithActor(context.Background(), actor.Actor{ID: alex, Kind: actor.KindUser})
+	page, err := svc.Mentions().ListMine(ctx, messaging.MentionListQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 0 || len(cnt.reasons) != 0 || len(logs.Records()) != 0 {
+		t.Fatalf("items %d, counted %v, %d log records", len(page.Items), cnt.reasons, len(logs.Records()))
+	}
+}
+
+// TestListMyMentions_ThreadCheck: a refused mention whose thread is unknown is dropped silently like
+// a deleted one; a failing thread read ends the list with that error.
+func TestListMyMentions_ThreadCheck(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		err      error
+		wantCode errs.Code
+	}{
+		"not found": {err: errs.New(errs.CodeNotFound, "chat: no thread")},
+		"failure":   {err: errs.New(errs.CodeInternalError, "chat: down"), wantCode: errs.CodeInternalError},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			alex, channel, thread := ids.New(), ids.New(), ids.New()
+			m := domain.Message{ID: ids.New(), ThreadID: thread, ChannelID: channel, ThreadSeq: 1, AuthorID: ids.New(),
+				Origin: domain.OriginHuman, Kind: domain.KindText, ContentMD: "@alex", ContentFormat: 1, Version: 1}
+			rows := []app.MentionRow{{Message: m, MentionedAt: time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)}}
+			logs := &httpservertest.LogCapture{}
+			cnt := &counter{}
+			svc, err := app.New(app.Config{MaxContentBytes: 100, MaxMentions: 4, EventPayloadMaxBytes: 1000, TemplateNameMaxChars: 10,
+				TemplateMaxPerScope: 5, ListContentMaxBytes: 100, PageSizeDefault: 3, PageSizeMax: 3, EmojiMaxBytes: 64, MaxDistinctReactions: 20, HandleMaxChars: 32, DisplayNameMaxChars: 64, MaxPinsPerThread: 50}, app.Deps{
+				Store: fakeMentionStore{rows: rows}, UoW: struct{ txn.UnitOfWork }{}, Authorizer: denyOne{deny: m.ID, channel: channel},
+				Events: struct{ eventlog.Appender }{}, Threads: oneThread{err: tc.err},
+				Directory: fakeDirectory{}, Cursors: plainCursors{}, Errors: cnt, Log: slog.New(logs),
+				Redactor: struct{ eventlog.Redactor }{}, Audit: struct{ auditing.Recorder }{}, Symbols: anySymbol{},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx := actor.WithActor(context.Background(), actor.Actor{ID: alex, Kind: actor.KindUser})
+			page, err := svc.Mentions().ListMine(ctx, messaging.MentionListQuery{})
+			if tc.wantCode != "" {
+				if e, ok := errs.As(err); !ok || e.Code != tc.wantCode {
+					t.Fatalf("err = %v, want %s", err, tc.wantCode)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(page.Items) != 0 || len(cnt.reasons) != 0 || len(logs.Records()) != 0 {
+				t.Fatalf("items %d, counted %v, %d log records", len(page.Items), cnt.reasons, len(logs.Records()))
+			}
+		})
+	}
+}
+
 // TestListMyMentions_DropsItemDeniedByAuthorize (07 section 7.4 rule 3): an item the SQL filter
 // kept and authorize refuses is dropped, logged without ids and counted with bothy.reason =
 // filter_mismatch; the page is filled from the following rows.
@@ -122,7 +201,7 @@ func TestListMyMentions_DropsItemDeniedByAuthorize(t *testing.T) {
 	svc, err := app.New(app.Config{MaxContentBytes: 100, MaxMentions: 4, EventPayloadMaxBytes: 1000, TemplateNameMaxChars: 10,
 		TemplateMaxPerScope: 5, ListContentMaxBytes: 100, PageSizeDefault: 3, PageSizeMax: 3, EmojiMaxBytes: 64, MaxDistinctReactions: 20, HandleMaxChars: 32, DisplayNameMaxChars: 64, MaxPinsPerThread: 50}, app.Deps{
 		Store: fakeMentionStore{rows: rows}, UoW: struct{ txn.UnitOfWork }{}, Authorizer: denyOne{deny: denied, channel: channel},
-		Events: struct{ eventlog.Appender }{}, Threads: struct{ chat.Threads }{}, Directory: fakeDirectory{},
+		Events: struct{ eventlog.Appender }{}, Threads: oneThread{}, Directory: fakeDirectory{},
 		Cursors: plainCursors{}, Errors: cnt, Log: slog.New(logs),
 		Redactor: struct{ eventlog.Redactor }{}, Audit: struct{ auditing.Recorder }{}, Symbols: anySymbol{},
 	})

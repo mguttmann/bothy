@@ -97,11 +97,11 @@ func laterGateProblems(list *enableList, features map[string]string) []string {
 
 // TestEnableListComplete is the gate check of V1-01 on the real files.
 func TestEnableListComplete(t *testing.T) {
-	in, err := realInputs()
+	_, err := realInputs()
 	if err != nil {
 		t.Fatalf("an operation of openapi.yaml is neither enabled nor later, or the list breaks a rule: %v", err)
 	}
-	if _, err := loadGatewayOps(in, "../../../../../docs/api/openapi.yaml", "../../operations.yaml", realAsyncAPI); err != nil {
+	if _, err := loadGatewayOps("../../../../../docs/api/openapi.yaml", "../../operations.yaml", realAsyncAPI); err != nil {
 		t.Fatalf("a gateway op of asyncapi.yaml is neither enabled nor later, or gateway_ops breaks a rule: %v", err)
 	}
 	p := &problemsError{}

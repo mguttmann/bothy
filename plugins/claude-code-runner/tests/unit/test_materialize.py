@@ -410,12 +410,62 @@ def _private(path: Path, text: str = "runner-credential\n") -> Path:
     return path
 
 
-@pytest.mark.parametrize("place", ["outside", "other_agent", "link_out", "env", "dotdot"])
-def test_a_reference_outside_the_scope_is_refused(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, place: str
+def test_an_env_name_resolves_as_the_file_of_that_name_in_the_agent_s_own_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``env:NAME``, the form of a template (26 7.1), is the file ``NAME`` of the agent's own
+    subfolder, never a variable of the runner's environment (issue 1425)."""
+    secrets, _value = _scope(tmp_path)
+    _private(secrets / str(AGENT) / "SEARCH_MCP_TOKEN", "search-value\n")
+    monkeypatch.setenv("SEARCH_MCP_TOKEN", "runner-credential")
+    assert definition_resolver(secrets, AGENT, ())("env:SEARCH_MCP_TOKEN") == "search-value"
+
+
+@pytest.mark.parametrize(
+    ("ref", "code"),
+    [
+        ("env:RUNNER_ONLY", "secret_unavailable"),  # no file, the variable stays unread
+        ("env:../x", "secret_unavailable"),
+        ("env:sub/TOKEN", "secret_unavailable"),
+        ("env:docs_token", "secret_unavailable"),  # not a name of the template rule
+        ("env:LINK_OUT", "secret_out_of_scope"),
+        ("env:OTHER", "secret_out_of_scope"),
+    ],
+)
+def test_an_env_name_reads_nothing_outside_the_agent_s_own_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, ref: str, code: str
 ) -> None:
     secrets, _value = _scope(tmp_path)
     monkeypatch.setenv("RUNNER_ONLY", "runner-credential")
+    token = _private(tmp_path / "agent_token")
+    (secrets / str(AGENT) / "LINK_OUT").symlink_to(token)
+    _private(secrets / "0192f4a0-7b1c-7d07-84b0-358556a08a98" / "OTHER")
+    (secrets / str(AGENT) / "OTHER").symlink_to(
+        secrets / "0192f4a0-7b1c-7d07-84b0-358556a08a98" / "OTHER"
+    )
+    with pytest.raises(MaterializeError) as err:
+        definition_resolver(secrets, AGENT, ())(ref)
+    assert err.value.code == code
+    assert "runner-credential" not in str(err.value)
+
+
+def test_an_env_name_of_a_runner_credential_in_the_scope_is_refused(tmp_path: Path) -> None:
+    secrets, value = _scope(tmp_path)
+    (secrets / str(AGENT) / "ALIAS").symlink_to(value)
+    with pytest.raises(MaterializeError) as err:
+        definition_resolver(secrets, AGENT, (value,))("env:ALIAS")
+    assert err.value.code == "secret_out_of_scope"
+
+
+def test_without_the_key_no_env_name_resolves(tmp_path: Path) -> None:
+    with pytest.raises(MaterializeError) as err:
+        definition_resolver(None, AGENT, ())("env:SEARCH_MCP_TOKEN")
+    assert err.value.code == "secret_out_of_scope"
+
+
+@pytest.mark.parametrize("place", ["outside", "other_agent", "link_out", "dotdot"])
+def test_a_reference_outside_the_scope_is_refused(tmp_path: Path, place: str) -> None:
+    secrets, _value = _scope(tmp_path)
     token = _private(tmp_path / "agent_token")
     other = _private(secrets / "0192f4a0-7b1c-7d07-84b0-358556a08a98" / "docs_token")
     link = secrets / str(AGENT) / "link"
@@ -424,7 +474,6 @@ def test_a_reference_outside_the_scope_is_refused(
         "outside": f"file:{token}",
         "other_agent": f"file:{other}",
         "link_out": f"file:{link}",
-        "env": "env:RUNNER_ONLY",
         "dotdot": f"file:{secrets / str(AGENT) / '..' / 'x'}",
     }[place]
     with pytest.raises(MaterializeError) as err:

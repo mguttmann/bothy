@@ -822,6 +822,28 @@ func TestUpdateAndTrigger_KeepAttachments(t *testing.T) {
 	}
 }
 
+// TestUpdate_CaptionRemovable (D-M3-07-4, audit srv-messaging-search-10): an edit of a message
+// with attachments may leave its content empty, as sending it may; without attachments the empty
+// content stays 400 empty.
+func TestUpdate_CaptionRemovable(t *testing.T) {
+	t.Parallel()
+	w := newAttWorld(t, true)
+	c := w.send(t, "caption", ids.New())
+	empty := " "
+	m, err := w.svc.Update(w.ctx(), messaging.UpdateCommand{MessageID: c.Message.ID, IfMatch: 1, Content: &empty})
+	if err != nil {
+		t.Fatalf("removing the caption: %v", err)
+	}
+	if m.ContentMD != empty || len(m.Attachments) != 1 {
+		t.Fatalf("edited %q with %d attachments", m.ContentMD, len(m.Attachments))
+	}
+	plain := w.send(t, "text only")
+	_, err = w.svc.Update(w.ctx(), messaging.UpdateCommand{MessageID: plain.Message.ID, IfMatch: 1, Content: &empty})
+	if e, ok := errs.As(err); !ok || len(e.Fields) != 1 || e.Fields[0].Code != domain.FieldEmpty {
+		t.Fatalf("emptying a message without attachments: %v", err)
+	}
+}
+
 // txnCtx is a context inside a unit of work of the fake world, as runs calls SetTriggerState.
 func txnCtx(t *testing.T, w *attWorld) context.Context {
 	t.Helper()

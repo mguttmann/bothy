@@ -47,8 +47,9 @@ func StoresRevision(k Kind) bool { return k != KindRun }
 
 // Tombstone returns m as deleted by by at at (03 section 6.5): the row with its thread_seq and
 // every other field, content_md empty, has_attachments false (its attachments go with it, M3-07),
-// deleted_at and deleted_by set and the next version. It is the one tombstone function of the
-// module; history (M1-57) renders the stored row of it.
+// deleted_at and deleted_by set and the next version. Production deletes through the statement
+// TombstoneMessage (queries/messages.sql), which writes the same fields; this function is its
+// model for the fake stores of the tests and must change with it.
 func Tombstone(m Message, by ids.ID, at time.Time) Message {
 	m.ContentMD, m.HasAttachments, m.DeletedAt, m.DeletedBy, m.Version = "", false, at, by, m.Version+1
 	return m

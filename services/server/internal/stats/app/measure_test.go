@@ -3,9 +3,11 @@
 package app_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -205,6 +207,51 @@ func TestRecorderAggregatesPerMinuteAndKey(t *testing.T) {
 	}
 	if !slices.IsSortedFunc(rows, func(a, b app.MinuteRow) int { return a.BucketStart.Compare(b.BucketStart) }) {
 		t.Error("rows are not in ascending minute")
+	}
+}
+
+// TestTakeOrdersRowsByFullKey (srv-stats-status-12): take returns the rows sorted by the whole
+// key of stats_minutes (minute, metric, channel, agent, dimension, currency), not in the order of
+// a Go map, so the upserts of two processes that flush at the same time lock shared rows in the
+// same order and cannot deadlock.
+func TestTakeOrdersRowsByFullKey(t *testing.T) {
+	t.Parallel()
+	r, c, _ := newMeasurement(t, 1000)
+	ag := ids.New()
+	for range 2 {
+		for range 16 {
+			ch := ids.New()
+			r.Record(measure.MessagesCreated, measure.Key{ChannelID: ch, Dimension: "human"}, measure.One())
+			r.Record(measure.MessagesCreated, measure.Key{ChannelID: ch, Dimension: "agent"}, measure.One())
+			r.Record(measure.Cost, measure.Key{ChannelID: ch, AgentID: ag, Dimension: "organization", Currency: "EUR"}, measure.Amount(1))
+			r.Record(measure.Cost, measure.Key{ChannelID: ch, AgentID: ag, Dimension: "organization", Currency: "USD"}, measure.Amount(1))
+		}
+		c.Advance(time.Minute)
+	}
+	rows := app.Take(r)
+	if len(rows) != 128 {
+		t.Fatalf("rows = %d, want 128", len(rows))
+	}
+	cmp := func(a, b app.MinuteRow) int {
+		if n := a.BucketStart.Compare(b.BucketStart); n != 0 {
+			return n
+		}
+		if n := strings.Compare(a.Metric, b.Metric); n != 0 {
+			return n
+		}
+		if n := bytes.Compare(a.ChannelID[:], b.ChannelID[:]); n != 0 {
+			return n
+		}
+		if n := bytes.Compare(a.AgentID[:], b.AgentID[:]); n != 0 {
+			return n
+		}
+		if n := strings.Compare(a.Dimension, b.Dimension); n != 0 {
+			return n
+		}
+		return strings.Compare(a.Currency, b.Currency)
+	}
+	if !slices.IsSortedFunc(rows, cmp) {
+		t.Error("rows are not sorted by the full key")
 	}
 }
 

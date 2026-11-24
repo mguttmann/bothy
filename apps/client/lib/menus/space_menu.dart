@@ -3,9 +3,10 @@
 /// The menu of a space in the sidebar (brief M4-33 Scope): its notification level and "Mute
 /// until" (13 3.1), headed by "New project in" and "Add forums for existing folders" for an
 /// owner (01 6.9 item 1, M4-43; 01 6.10 item 1, M4-44), "New agent" for an owner when a runner
-/// hosts agents (01 6.20 item 1, A1-08) and "Create team channel..." for an owner with `manage` on
-/// the space (01 6.23 item 6), and ending with "Delete space..." for an owner (01 6.18 item 1,
-/// D-DEL-14).
+/// hosts agents (01 6.20 item 1, A1-08), "Create channel..." for a person with `manage` on the
+/// space (01 6.25), "Create team channel..." for an owner with `manage` on the space (01 6.23
+/// item 6) and "Create space..." for an owner (01 6.25), and ending with "Delete space..." for an
+/// owner (01 6.18 item 1, D-DEL-14).
 library;
 
 import 'dart:async';
@@ -20,6 +21,8 @@ import '../delete/delete_flow.dart';
 import '../delete/delete_port.dart';
 import '../notifications_settings/providers.dart';
 import '../sidebar/sidebar_drag.dart' show SidebarMoves, sidebarMoveMenuItems;
+import '../structure/structure_create_dialog.dart'
+    show channelCreateMenuItems, spaceCreateMenuItems;
 import '../team/team_create_dialog.dart' show teamCreateMenuItems;
 import 'level_menu.dart';
 
@@ -86,8 +89,12 @@ class SpaceMenu extends StatelessWidget {
             onPressed: agent,
             child: Text(AppLocalizations.of(context).newAgentEntry),
           ),
+        // 01 6.25: a person with `manage` on the space creates a plain text channel.
+        ...channelCreateMenuItems(context, ref, space),
         // 01 6.23 item 6: an owner who may create channels makes a team channel in one step.
         ...teamCreateMenuItems(context, ref, space),
+        // 01 6.25: an owner creates another space.
+        ...spaceCreateMenuItems(context, ref),
         ...levelMenuItems(context, ref, spaceMenuTarget(ref, space)),
         if (moves case final moves?) ...[
           const Divider(),

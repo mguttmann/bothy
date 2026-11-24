@@ -339,6 +339,9 @@ exceptions:
   - query: messaging.ListMentions
     category: after_authorize
     reason: "the mentioned principals of the one message authorize allowed (Message.mention_ids)"
+  - query: messaging.ListMentionsOfMessages
+    category: after_authorize
+    reason: "the mentioned principals of the messages of one page that message.read allowed or that the visible read returned (Message.mention_ids)"
   - query: messaging.GetMessage
     category: authorize_resolution
     reason: "resolves one message (thread, channel) for authorize; the use case returns it only after message.read allowed it"

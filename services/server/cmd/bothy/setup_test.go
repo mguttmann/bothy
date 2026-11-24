@@ -212,8 +212,22 @@ func TestSetupInvalidArgumentsAndInfrastructure(t *testing.T) {
 	if code, out, errText := runSetup(t, bad, "bootstrap-owner", "--handle", "alex", "--display-name", "Alex"); code != exitFailure || out != "" {
 		t.Fatalf("missing pepper: exit %d, stdout %q, stderr %s", code, out, errText)
 	}
-	if code, _, _ := runSetup(t, []string{testPublicURL, "BOTHY_STARTUP__DEPENDENCY_WAIT=nonsense"}, "bootstrap-owner", "--handle", "alex", "--display-name", "Alex"); code != exitFailure {
-		t.Fatalf("bad configuration: exit %d, want %d", code, exitFailure)
+}
+
+// TestSetupConfigErrorExit2 (02 section 3.3, audit finding srv-instance-ops-10): a configuration
+// that does not load is exit 2 for every subcommand of setup, demo included, as for migrate,
+// serve, restore and telemetry.
+func TestSetupConfigErrorExit2(t *testing.T) {
+	t.Parallel()
+	env := []string{testPublicURL, "BOTHY_STARTUP__DEPENDENCY_WAIT=nonsense"}
+	for _, args := range [][]string{
+		{"bootstrap-owner", "--handle", "alex", "--display-name", "Alex"},
+		{"issue-enrollment-code", "--user", "alex"},
+		{"demo", "--data", demoDataDir, "--api", "http://127.0.0.1:1"},
+	} {
+		if code, out, errText := runSetup(t, env, args...); code != exitUsage || out != "" || !strings.Contains(errText, "dependency_wait") {
+			t.Errorf("%v: exit %d, want %d; stdout %q, stderr %s", args, code, exitUsage, out, errText)
+		}
 	}
 }
 

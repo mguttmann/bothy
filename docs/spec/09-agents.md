@@ -86,8 +86,10 @@ The server enforces the owner's part of the capability "Components" (M2-15): a c
 (`kind = card`, section 11) of an agent whose `operator_config` sets `supports_components` to
 `false` is refused with `403 feature_disabled`, and nothing of the request is stored. `runs` reads
 the switch through the agents port (`agents.RunFacts.ComponentsAllowed`). The adapter's part, the
-report `components: true` in the heartbeat, is checked with M2-20; until then a card of an agent
-whose owner allows components is accepted whatever the adapter reports.
+report `components: true` in the heartbeat, is stored but not checked: a card of an agent whose
+owner allows components is accepted whatever the adapter reports. `supports_files_out` and
+`supports_followups` are enforced as their rows say; `supports_title` and `supports_voice` reach no
+adapter and no server check yet, so switching them off has no effect.
 
 ### 2.3 Grants of an agent
 
@@ -715,7 +717,7 @@ or acknowledges a `seq` that process cannot yet deliver.
 
 | Event | When | Payload (schema `<type>.v1`, excerpt) | Token |
 |---|---|---|---|
-| `agent.invocation` | new run | `run`, `thread`, `channel` (`id`, `kind`, `settings_version`), `trigger` (`kind`, IDs, triggering person), `session` (9.1; in openapi the members `session_mode` for `session.mode` and `agent_session` for the session row; `agent_session` is missing for `new` without a row; both are missing for a guest run), `capabilities_effective`; for `trigger_kind = command` the command ID, its name and the parsed options in the order of the definition (`command_id`, `command_name`, `options`, `command_invocation_id`) instead of a message (M2-16) | yes |
+| `agent.invocation` | new run | `run`, `thread`, `channel` (`id`, `kind`, `settings_version`), `trigger` (`kind`, IDs, triggering person), `session` (9.1; in openapi the members `session_mode` for `session.mode` and `agent_session` for the session row; `agent_session` is missing for `new` without a row; both are missing for a guest run); the planned member `capabilities_effective` is not built, the invocation does not carry it; for `trigger_kind = command` the command ID, its name and the parsed options in the order of the definition (`command_id`, `command_name`, `options`, `command_invocation_id`) instead of a message (M2-16) | yes |
 | `agent.followup` | follow-up (section 7) | `run_id`, `message_id`, triggering person | yes |
 | `interaction.created` | component used | `interaction_id`, `component` (`custom_id`, type), `values`, `run_id`, acting person | yes |
 | `command.invoked` | control command executed (10.4) | `command_id`, `command_name`, `options`, location, triggering person; `run_id` exactly when the owner has an active run in the thread at execution time, then that run, never the run of another agent (R-AZ-25) | yes |
@@ -1595,7 +1597,8 @@ triggering message, so the person does not have to write the message again: `ret
 3. The new run is opened like an acceptance (3.4 step 7): same thread, same agent,
    `triggering_message_id` of the old run, `triggered_by` = the caller, a new live box anchor,
    `run.state_changed`, `trigger_state = received` on the message, and `agent.invocation` (held
-   while an attachment of the message is not final, 12 section 10). The old run stays as it is.
+   while an attachment of the message is not final, 12 section 10), whose `triggered_by` is the
+   caller as in the run and the token, not the author of the message. The old run stays as it is.
 4. Idempotent: when the newest run of the thread is already a run of the same agent for the same
    message (an earlier retry), the answer is that run and nothing is written; a repeated request
    with the same `Idempotency-Key` gets the stored answer (06 7).
@@ -1628,7 +1631,9 @@ condition, a short label written by the agent, the reason (`agent`, `recovery`, 
 wake input it produced. For `pr_checks` it also stores the head commit of the pull request at
 creation. The deadline of a `usage_limit` wake-up is at most `run.wake_max_wait` after its
 `not_before` (not after its creation), so a weekly window that resets close to the limit still
-fires; for every other reason it is at most `run.wake_max_wait` after creation.
+fires; for every other reason it is at most `run.wake_max_wait` after creation, and a
+`not_before` later than that is `400 validation_failed` with `invalid` on `/not_before`, because
+such a wake-up could only expire.
 
 | Kind | Condition | Evaluated by | Allowed when |
 |---|---|---|---|
@@ -3068,7 +3073,7 @@ the text with the paths, an approval or confirmation is refused with that text i
 is acknowledged as above unless a file may still come (D-FMS-8). Every follow-up the adapter does
 not steer, also an answer to a card Hermes did not take, gets one log line with its message ID
 and the reason code (`no_turn`, `not_readable`, `stopped`, `run_ended`, `audio`,
-`scan_pending`, `unavailable`, `own_turn`, `busy_mode_queue`, `turn_answered`, `turn_ended`,
+`scan_pending`, `unavailable`, `own_turn`, `busy_mode_queue`, `turn_answered`, `turn_ended`, `session_busy`,
 `card_answer_not_taken`). From 2026-11-02 to
 2026-11-18 every follow-up with a file stayed `queued` until the end of the run (D-FIX-HIMG-3,
 AUD-HA1/3); before 2026-11-02 its text was steered without the file.
@@ -3101,6 +3106,18 @@ sequenceDiagram
 Order as built (M2-33): the SDK checks the token, stores the event with its token in the inbox
 and acknowledges it before the adapter reads `run.context.read`; `run.start` follows after the
 actual mode was determined again (17.8), and the Hermes turn starts only after `200`.
+
+A run's turn is a turn of its own and starts only on a free session (addendum of 2026-11-23,
+FIX-hermes-busy-session): while a processing of Hermes still runs on the thread's session (a turn
+without a run, such as one a stop did not end or one Hermes started itself), the adapter waits
+before the turn (and before it sends `/new` or `/resume`) until that processing and any Hermes
+starts right after it for input it holds have ended. Meanwhile nothing of that session counts as
+the run's: its tool calls are refused, its answers, cards and turn ends are not the run's, and a
+follow-up stays queued (`session_busy`) for the follow-on run. On a busy session Hermes would
+steer the text into the running turn and admit no turn for the event; the run then ended `failed`
+with `runtime_error` at once, and the answer the running turn gave to it found no run. A stop or
+an abort of the run ends the wait (an abort ends the run without a turn and without a session
+report); the late answer of a stopped run's turn stays dropped (D-HERMES-CRON-COMMANDS-5).
 
 The adapter passes on the context (4.6) on the user side of the turn, separate from the text of
 the triggering person, which is the event's text together with the transcripts of its voice
@@ -3231,7 +3248,12 @@ Three layers, each sufficient on its own for "no stranger triggers":
    agent-self, `GET /api/v1/agents/me/triggerers`, returns IDs and `permission_version`). It is
    reloaded when a token carries a higher `permission_version` (4.5 item 9).
 3. **Hermes:** With `personal` the installer also writes Hermes' allowlist of the
-   platform (`allowed_users_env`) with exactly the `credential_holder`. It changes only on
+   platform (`allowed_users_env`) with exactly the `credential_holder` and the adapter's control
+   sender (17.4). Hermes judges every sender by the list, also the control sender, whose
+   `/stop`, `/new`, `/resume` and control commands it would otherwise refuse: a stopped run's
+   turn then went on in the session (addendum of 2026-11-23, FIX-hermes-busy-session; a profile
+   switched before needs `switch-mode personal` again and a gateway restart). No person's event
+   carries the control sender, because the adapter builds every source itself. It changes only on
    a switch (I4), which needs a restart in Hermes anyway. With `organization`
    this list stays empty, and Hermes relies on layer 2; a list that would need a restart on every
    grant would not be operable.

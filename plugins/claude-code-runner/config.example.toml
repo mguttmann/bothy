@@ -88,8 +88,8 @@ hosted_agents_root = ""
 # the capability hosts_agents, which bounds the class an owner can give a hosted agent.
 hosted_max_tool_class = "scoped"
 # Folder of the secrets of hosted agents (26 5.1 item 3): a secret_ref of a definition may name
-# only a file in its subfolder <agent_id>/, never an env: reference, another agent's folder or a
-# credential of the runner. Empty (the default) resolves no secret_ref of a definition, so an MCP
+# only a file in its subfolder <agent_id>/ (env:NAME is the file NAME there, never a variable of
+# the runner's environment), never another agent's folder or a credential of the runner. Empty (the default) resolves no secret_ref of a definition, so an MCP
 # server that names one ends the turn with mcp_reference_unavailable. The start is refused when
 # it is not an absolute folder, when group or others may write it, when it overlaps
 # hosted_agents_root, state_dir or projects_root, or when a credential of the runner lies in it.

@@ -44,13 +44,6 @@ SET state = sqlc.arg(to_state)::text,
     not_after = coalesce(sqlc.narg(not_after)::timestamptz, not_after)
 WHERE kid = sqlc.arg(kid) AND state = sqlc.arg(from_state)::text;
 
--- name: PurposesWithoutActiveKey :many
--- The purposes of the list that have no active key.
-SELECT p::text AS purpose
-FROM unnest(sqlc.arg(purposes)::text[]) AS p
-WHERE NOT EXISTS (SELECT 1 FROM server_signing_keys k WHERE k.purpose = p AND k.state = 'active')
-ORDER BY p;
-
 -- name: ExpiredSigningKeys :many
 -- Retention class security (M7-05): retired keys whose not_after lies before the cutoff, oldest
 -- first. Keys of purpose audit_checkpoint stay: audit.verify checks every checkpoint at

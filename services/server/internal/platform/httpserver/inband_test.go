@@ -36,7 +36,8 @@ func TestWrap_AuthorizedInBand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c, err := httpserver.NewChain(httpserver.DefaultChainConfig(httpservertest.PublicURL), httpserver.Deps{Authenticator: auth, Validator: v})
+	c, err := httpserver.NewChain(httpserver.DefaultChainConfig(httpservertest.PublicURL), httpserver.Deps{Authenticator: auth, Validator: v,
+		InBandPatterns: []string{"GET /api/v1/gateway"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,4 +69,26 @@ func TestWrap_AuthorizedInBand(t *testing.T) {
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("normal operation without proof: status %d, want 500", rec.Code)
 	}
+}
+
+// TestWrap_AuthorizedInBandOutsideTheListPanics: the marker on a pattern outside
+// Deps.InBandPatterns is refused, so no route skips the per-route stages unnoticed.
+func TestWrap_AuthorizedInBandOutsideTheListPanics(t *testing.T) {
+	t.Parallel()
+	v, err := httpserver.NewValidator(httpservertest.Contract, []string{"getThing"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := httpserver.NewChain(httpserver.DefaultChainConfig(httpservertest.PublicURL), httpserver.Deps{Authenticator: &countingAuthenticator{}, Validator: v,
+		InBandPatterns: []string{"GET /api/v1/gateway"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if recover() == nil {
+			t.Error("Wrap accepted AuthorizedInBand on a pattern outside the list")
+		}
+	}()
+	c.Wrap(httpserver.Operation{ID: "other", Method: http.MethodGet, Path: "/api/v1/other", Pattern: "GET /api/v1/other",
+		Action: "other.read", AuthorizedInBand: true}, http.NotFoundHandler())
 }

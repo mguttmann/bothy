@@ -339,7 +339,9 @@ reads the process environment.
 [--credential-holder <principal ID>]` changes the profile environment (10 10.1): `organization`
 needs `ANTHROPIC_API_KEY`, empties the OAuth variables and Hermes' allow list and refuses a login
 file of another tool in the profile's home; `personal` empties the API key and writes Hermes'
-allow list with exactly the credential holder. `check` shows the state. Every command prints the
+allow list with exactly the credential holder and the adapter's control sender (without it Hermes
+refuses the adapter's `/stop`; a profile switched before 2026-11-23 needs `switch-mode personal`
+again). `check` shows the state. Every command prints the
 mode Hermes would now resolve and never a value; none restarts a process. Restart the gateway of
 the profile yourself, and note that a gateway serving several profiles restarts all of them.
 

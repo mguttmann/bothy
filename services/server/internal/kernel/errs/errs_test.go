@@ -5,6 +5,7 @@ package errs
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -705,6 +706,33 @@ func TestFingerprintMismatch_AttemptsRemaining(t *testing.T) {
 		var ext ProblemExtender
 		if !errors.As(err, &ext) || ext.ProblemExtensions()["attempts_remaining"] != n {
 			t.Fatalf("%d: extensions %v", n, ext)
+		}
+	}
+}
+
+// sqlStateError stands in for a driver error with a SQLSTATE.
+type sqlStateError struct{ state string }
+
+func (e sqlStateError) Error() string    { return "database error" }
+func (e sqlStateError) SQLState() string { return e.state }
+
+// TestType: the log class of an error is the SQLSTATE, timeout, canceled or the kind, never the
+// text.
+func TestType(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		err  error
+		want string
+	}{
+		{nil, ""},
+		{fmt.Errorf("wrapped: %w", sqlStateError{"40P01"}), "40P01"},
+		{fmt.Errorf("wrapped: %w", context.DeadlineExceeded), "timeout"},
+		{context.Canceled, "canceled"},
+		{New(CodeConflict, "secret detail"), KindOf(New(CodeConflict, "x")).String()},
+		{errors.New("secret detail"), "internal"},
+	} {
+		if got := Type(c.err); got != c.want {
+			t.Errorf("Type(%v) = %q, want %q", c.err, got, c.want)
 		}
 	}
 }

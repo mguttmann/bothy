@@ -123,6 +123,50 @@ func TestRegisterPush_TakeoverOfKnownToken(t *testing.T) {
 	wantStatus(t, "Sam's token", w.fetch(w.sam, samReg.PreviewToken, msg), http.StatusOK, "")
 }
 
+// TestRegisterPush_RenewsADisabledRegistration: 13 7.3 and 13, docs/decisions.d/FIX-PUSH-RENEW.md.
+// A registration the server disabled after transient failures (an instance with
+// push.max_consecutive_failures above 0, or a row an earlier default disabled) comes back when the
+// app registers the same token again: the disabled row goes, and the new row is active with
+// failure_count 0, a new preview token and its member in Device.push_registrations.
+func TestRegisterPush_RenewsADisabledRegistration(t *testing.T) {
+	w := newWorld(t, nil)
+	tok := apnsToken()
+	old := w.register(w.alex, "apns", tok, apnsTopic)
+	if _, err := w.s.AdminDB().Exec(t.Context(), `UPDATE push_registrations SET disabled_at = now(), disabled_reason = 'repeated_failures',
+		failure_count = 5 WHERE id = $1`, old.ID); err != nil {
+		t.Fatal(err)
+	}
+	msg := w.post(w.alex, w.allgemeinMain, "hello")
+	wantStatus(t, "preview of the disabled row", w.fetch(w.alex, old.PreviewToken, msg), http.StatusUnauthorized, "unauthenticated")
+
+	renewed := w.register(w.alex, "apns", tok, apnsTopic)
+	if _, ok := w.row(old.ID); ok {
+		t.Error("the disabled row still exists after the new registration")
+	}
+	got, ok := w.row(renewed.ID)
+	if !ok || got.Disabled || got.DisabledReason != "" {
+		t.Fatalf("renewed row exists %v disabled %v reason %q, want active", ok, got.Disabled, got.DisabledReason)
+	}
+	if n := w.count(`SELECT count(*) FROM push_registrations WHERE id = $1 AND failure_count = 0`, renewed.ID); n != 1 {
+		t.Error("the renewed row does not start with failure_count 0")
+	}
+	if n := w.count(`SELECT count(*) FROM push_registrations WHERE user_id = $1`, w.alex.PrincipalID); n != 1 {
+		t.Errorf("%d rows of Alex, want 1", n)
+	}
+	wantStatus(t, "preview of the renewed row", w.fetch(w.alex, renewed.PreviewToken, msg), http.StatusOK, "")
+	d := harness.MustDo(t, w.alex, harness.Request{Method: http.MethodGet, Path: "/devices/" + w.alex.DeviceID}, http.StatusOK)
+	var dev struct {
+		PushRegistrations []struct {
+			ID         string `json:"id"`
+			DisabledAt string `json:"disabled_at"`
+		} `json:"push_registrations"`
+	}
+	d.JSON(t, &dev)
+	if len(dev.PushRegistrations) != 1 || dev.PushRegistrations[0].ID != renewed.ID || dev.PushRegistrations[0].DisabledAt != "" {
+		t.Errorf("getDevice registrations %+v, want the renewed one active", dev.PushRegistrations)
+	}
+}
+
 // TestRegisterPush_ConcurrentSameToken: design note 5 g.
 func TestRegisterPush_ConcurrentSameToken(t *testing.T) {
 	var logs bytes.Buffer

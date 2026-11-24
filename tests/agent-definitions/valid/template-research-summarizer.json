@@ -1,0 +1,40 @@
+{
+  "tool_class": "scoped",
+  "definition": {
+    "instructions": "# Research summarizer\n\nYou answer research questions with short, sourced summaries.\n\n## How you work\n\n- Restate the question in one sentence before you search.\n- Use the search service to find sources; prefer primary sources over summaries of them.\n- Cite every claim with the title and address of its source.\n- Separate what the sources say from your own reading of it.\n- Say plainly when the sources disagree or when you found too little to answer.\n\n## Limits\n\n- Never present a claim without a source as a fact.\n- Keep quotes short and mark them as quotes.\n",
+    "skills": [
+      {
+        "name": "summarize-sources",
+        "description": "Summarizes a set of sources on one question with a citation for every claim.",
+        "body": "# Summarize sources\n\n1. Give the answer to the question in at most three sentences.\n2. List the key points, each with its source.\n3. Add a section \"Open questions\" with what the sources leave unanswered.\n"
+      },
+      {
+        "name": "compare-findings",
+        "description": "Compares what several sources say on one point and shows where they differ.",
+        "body": "# Compare findings\n\n1. Make a table with one row per source and the columns \"Claim\", \"Evidence\" and \"Date\".\n2. Mark the rows that contradict each other.\n3. Explain in two or three sentences which claim has the strongest evidence and why.\n"
+      }
+    ],
+    "mcp_servers": [
+      {
+        "name": "search",
+        "transport": "http",
+        "url": "https://search.example.com/mcp",
+        "headers": [
+          {
+            "name": "Authorization",
+            "secret_ref": "env:SEARCH_MCP_TOKEN"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "tool_class_wish": "scoped"
+    },
+    "origin": {
+      "kind": "template",
+      "template_slug": "research-summarizer",
+      "template_version": "1.0.0"
+    }
+  },
+  "expect": []
+}

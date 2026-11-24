@@ -12,10 +12,14 @@
 //     Acquire, Begin and Ping wait at most database.acquire_timeout; an overloaded pool becomes
 //     the kernel/errs error of kind unavailable with the internal cause db_pool_exhausted.
 //   - Timeouts and SetLocalTimeouts: per-transaction deadlines for the unit of work.
-//   - UnitOfWork, Tx and Querier: the unit of work of kernel/txn (M1-13), the only place that
-//     begins and ends transactions, with the phase hooks, the retry on 40P01 and 55P03 and the
-//     ambient transaction for repositories; DBTX and the pool's Exec, Query and QueryRow for
-//     reads outside a unit.
+//   - UnitOfWork, Tx and Querier: the unit of work of kernel/txn (M1-13), where the request and
+//     job paths begin and end transactions, with the phase hooks, the retry on 40P01 and 55P03
+//     and the ambient transaction for repositories; DBTX and the pool's Exec, Query and QueryRow
+//     for reads outside a unit.
+//   - PurgeEach, PurgeStep and ReadSnapshot: the short transactions outside the unit of work,
+//     for the deletes of retention and for reads in one snapshot.
+//   - EphemeralListener: the one LISTEN ephemeral connection of a process, with reconnect.
+//   - CheckTextSearch and the pgtype conversions (UUID, IDOf, Timestamptz, ...).
 //   - CheckSchema and RequiredSchemaVersion: the start refuses a schema older than the
 //     binary needs; a newer one is allowed (expand and contract, docs/operations/upgrade.md).
 //   - Role, Bootstrap, BootstrapRoles and BootstrapDatabase: least-privilege roles, created

@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -127,8 +128,12 @@ func TestSplitRest_RejectsInvalidGo(t *testing.T) {
 // TestRealRest_BelowMaxFileKB: each half of the real REST package stays below repo.max_file_kb
 // (1024 KiB, docs/spec/23-quality.md), the limit the hook check-added-large-files holds.
 func TestRealRest_BelowMaxFileKB(t *testing.T) {
-	for _, name := range []string{"models.gen.go", "rest.gen.go", "rest2.gen.go", "objects.gen.go", "objects2.gen.go"} {
-		info, err := os.Stat(filepath.Join("..", "..", "rest", name))
+	names, err := filepath.Glob(filepath.Join("..", "..", "rest", "*.gen.go"))
+	if err != nil || len(names) < 5 {
+		t.Fatalf("generated files = %v, %v", names, err)
+	}
+	for _, name := range names {
+		info, err := os.Stat(name)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -199,7 +204,7 @@ func TestSplitRest_StrictObjects(t *testing.T) {
 }
 
 // splitTwoOpsInput has the objects of two operations before the strict interface, so
-// halveObjects can cut between them.
+// chunkObjects can cut between them.
 var splitTwoOpsInput = strings.Replace(splitStrictInput, "// StrictServerInterface represents", `type GetThingRequestObject struct {
 	ID string
 }
@@ -213,40 +218,93 @@ func (r GetThing200JSONResponse) VisitGetThingResponse(w http.ResponseWriter) er
 
 // StrictServerInterface represents`, 1)
 
-// TestHalveObjects (M6-01): objects.gen.go is cut at the start of the operation group nearest its
-// middle into two valid files, each with only the imports it uses, so neither reaches
-// repo.max_file_kb; a file with one group keeps it whole and the second file holds only the
-// package clause.
-func TestHalveObjects(t *testing.T) {
+// TestChunkObjects (M6-01, audit finding api-contract-codegen-3): objects.gen.go below the limit
+// stays one part; objects above it are cut between declarations into valid parts below
+// repo.max_file_kb, each with only the imports it uses, that together hold every declaration in
+// order. The parts are named objects.gen.go, objects2.gen.go, objects3.gen.go.
+func TestChunkObjects(t *testing.T) {
 	_, _, objects, err := splitRest([]byte(splitTwoOpsInput))
 	if err != nil {
 		t.Fatal(err)
 	}
-	first, second, err := halveObjects(objects)
+	parts, err := chunkObjects(objects)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, ft, _ := importsOf(t, "objects.gen.go", first)
-	si, st, _ := importsOf(t, "objects2.gen.go", second)
-	if want := []string{"ListThingsRequestObject", "ListThings200JSONResponse"}; !slices.Equal(ft, want) {
-		t.Errorf("first types = %v, want %v", ft, want)
+	if len(parts) != 1 {
+		t.Fatalf("small objects: %d parts, want 1", len(parts))
 	}
-	if want := []string{"GetThingRequestObject", "GetThing200JSONResponse"}; !slices.Equal(st, want) {
-		t.Errorf("second types = %v, want %v", st, want)
+	// Objects of many operations, about three times the limit.
+	var b strings.Builder
+	b.WriteString("package rest\n\nimport \"net/http\"\n\n")
+	pad := strings.Repeat("x", 4000)
+	for i := 0; b.Len() < 3*maxFileBytes; i++ {
+		fmt.Fprintf(&b, "// Op%dRequestObject is a request object. %s\ntype Op%dRequestObject struct{ R *http.Request }\n\n", i, pad, i)
 	}
-	if want := []string{"encoding/json", "net/http"}; !slices.Equal(sortedCopy(si), want) {
-		t.Errorf("second imports = %v, want %v", si, want)
-	}
-	_, _, one, err := splitRest([]byte(splitStrictInput))
+	big := []byte(b.String())
+	parts, err = chunkObjects(big)
 	if err != nil {
 		t.Fatal(err)
 	}
-	whole, empty, err := halveObjects(one)
+	if len(parts) < 3 {
+		t.Fatalf("large objects: %d parts, want at least 3", len(parts))
+	}
+	var all []string
+	for i, part := range parts {
+		if len(part) > maxFileBytes {
+			t.Errorf("%s has %d bytes, above repo.max_file_kb", objectsName(i), len(part))
+		}
+		imports, types, _ := importsOf(t, objectsName(i), part)
+		if !slices.Equal(imports, []string{"net/http"}) {
+			t.Errorf("%s imports %v", objectsName(i), imports)
+		}
+		all = append(all, types...)
+	}
+	_, want, _ := importsOf(t, "objects.gen.go", big)
+	if !slices.Equal(all, want) {
+		t.Errorf("the parts hold %d types, want the %d of the input in order", len(all), len(want))
+	}
+	if got := []string{objectsName(0), objectsName(1), objectsName(2)}; !slices.Equal(got, []string{"objects.gen.go", "objects2.gen.go", "objects3.gen.go"}) {
+		t.Errorf("names = %v", got)
+	}
+}
+
+// TestCheckSizes: the generator refuses a generated Go file above repo.max_file_kb before it writes
+// anything; the contract copy openapi.gen.yaml has its own limit and is not checked here.
+func TestCheckSizes(t *testing.T) {
+	ok := map[string][]byte{"rest/rest.gen.go": make([]byte, maxFileBytes), "rest/openapi.gen.yaml": make([]byte, 2*maxFileBytes)}
+	if err := checkSizes(ok); err != nil {
+		t.Errorf("checkSizes = %v, want nil", err)
+	}
+	ok["rest/models.gen.go"] = make([]byte, maxFileBytes+1)
+	if err := checkSizes(ok); err == nil || !strings.Contains(err.Error(), "models.gen.go") {
+		t.Errorf("checkSizes = %v, want an error naming models.gen.go", err)
+	}
+}
+
+// TestRemoveStaleObjects: a part of the objects that this run did not write is removed; every
+// other file stays.
+func TestRemoveStaleObjects(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"objects.gen.go", "objects2.gen.go", "objects3.gen.go", "rest2.gen.go", "spec.go"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("package rest\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	written := map[string][]byte{filepath.Join(dir, "objects.gen.go"): nil, filepath.Join(dir, "objects2.gen.go"): nil}
+	if err := removeStaleObjects(dir, written); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, types, _ := importsOf(t, "objects2.gen.go", empty); len(types) != 0 || len(whole) == 0 {
-		t.Errorf("one group: second types = %v", types)
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	if want := []string{"objects.gen.go", "objects2.gen.go", "rest2.gen.go", "spec.go"}; !slices.Equal(names, want) {
+		t.Errorf("files = %v, want %v", names, want)
 	}
 }
 

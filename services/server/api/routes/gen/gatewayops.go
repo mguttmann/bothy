@@ -51,11 +51,11 @@ type gatewayOpsList struct {
 // section exists, both parts are sorted and free of duplicates, every entry names such an op,
 // none is in both parts, every op is in one part, and the later entries carry a valid milestone and
 // ticket. It also checks that the body schema of every client op refuses unknown members (W7,
-// SEC-IN-1, as checkRequestSchemasClosed does for request bodies). in supplies nothing yet but
-// keeps the signature next to loadInputs; specPath is the OpenAPI document of the bodies.
+// SEC-IN-1, as checkRequestSchemasClosed does for request bodies); specPath is the OpenAPI
+// document of the bodies.
 //
 // It returns the enabled ops sorted by op; the error is a *problemsError naming every problem.
-func loadGatewayOps(_ *inputs, specPath, listPath, asyncPath string) ([]gatewayOp, error) {
+func loadGatewayOps(specPath, listPath, asyncPath string) ([]gatewayOp, error) {
 	p := &problemsError{}
 	ops := readAsyncGatewayOps(asyncPath, p)
 	list := readGatewaySection(listPath, p)

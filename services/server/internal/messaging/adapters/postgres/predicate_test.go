@@ -25,6 +25,8 @@ var visiblePredicateAllowlist = map[string]string{
 		"the use case authorizes message.create on the thread before it answers with the row",
 	"ListMentions": "the mentions of one message whose row the caller has already read with the visible predicate " +
 		"or written itself, and authorized with message.read or message.create",
+	"ListMentionsOfMessages": "the mentions of the messages of one page that the caller has already read with the visible " +
+		"predicate and authorized with message.read (audit data-layer-2)",
 	"MoveThreadMessages": "the copy messages.channel_id of thread.move (M1-62): writes only the rows of the thread that chat " +
 		"locked and authorized with thread.move in the same unit of work; returns no row content",
 	"SetTriggerState": "the trigger state of runs (M2-05, 09 section 6): runs calls it without a reader for a message it " +

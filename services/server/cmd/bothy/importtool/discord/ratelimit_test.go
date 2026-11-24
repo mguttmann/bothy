@@ -251,6 +251,38 @@ func Test403EndsChannel(t *testing.T) {
 	}
 }
 
+// TestNewRoundForgetsForbiddenAndPassedBuckets (22 4.3 item 4, audit finding srv-import-11): a 403
+// ends a channel until NewRound, which a read mirror calls at the start of every round, so a
+// permission the owner fixed in Discord works again in the next round; NewRound also drops the
+// buckets whose refill time has passed and keeps a bucket that is still exhausted.
+func TestNewRoundForgetsForbiddenAndPassedBuckets(t *testing.T) {
+	h := newHarness(t, nil, nil)
+	ctx := t.Context()
+	h.fake.Inject(path("/channels/"+generalID+"/messages"), discordtest.Status(http.StatusForbidden))
+	if _, err := h.client.MessagesAfter(ctx, generalID, firstMsgID, 10); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("first = %v", err)
+	}
+	h.fake.Inject(path("/channels/"+threadID+"/messages"), discordtest.RemainingZero("60", "t"))
+	if _, err := h.client.MessagesAfter(ctx, threadID, "1", 10); err != nil {
+		t.Fatal(err)
+	}
+	h.client.NewRound()
+	if _, err := h.client.MessagesAfter(ctx, generalID, firstMsgID, 10); err != nil {
+		t.Fatalf("after NewRound: %v, want the channel read again", err)
+	}
+	if got := h.client.guard.pending("/channels/{channel.id}/messages", threadID); got <= 0 {
+		t.Fatalf("pending = %s, want the exhausted bucket kept", got)
+	}
+	h.clock.Advance(time.Minute)
+	h.client.NewRound()
+	g := h.client.guard
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if len(g.forbidden) != 0 || len(g.resetAt) != 0 || len(g.buckets) != 0 {
+		t.Fatalf("after the refill: forbidden %d, resetAt %d, buckets %d, want all empty", len(g.forbidden), len(g.resetAt), len(g.buckets))
+	}
+}
+
 // TestPrivateArchived403KeepsChannel: a 403 on the private archived list does not end the
 // channel; MessagesAfter on it still sends a request and succeeds.
 func TestPrivateArchived403KeepsChannel(t *testing.T) {

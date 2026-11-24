@@ -5,10 +5,12 @@
 // api/operations.yaml, writes a copy of the spec that keeps only the enabled operations into a
 // temporary directory, runs the oapi-codegen pinned in go.mod on it, and writes:
 //
-//   - <rest-dir>/models.gen.go, <rest-dir>/objects.gen.go and <rest-dir>/rest.gen.go: the package
+//   - <rest-dir>/models.gen.go, <rest-dir>/objects.gen.go (with objects2.gen.go and further parts
+//     below repo.max_file_kb), <rest-dir>/rest.gen.go and <rest-dir>/rest2.gen.go: the package
 //     oapi-codegen writes, split into the models of every schema, the request and response
-//     objects of the strict server and the std-http and strict server of the enabled operations
-//     (splitRest),
+//     objects of the strict server, the std-http server and the strict server of the enabled
+//     operations (splitAll); a generated Go file above repo.max_file_kb fails the run,
+//   - <rest-dir>/openapi.gen.yaml: the contract byte for byte, for the request validator,
 //   - <routes-dir>/routes.gen.go, catalog.gen.go, build.gen.go: the operation table, the action
 //     catalogue and the glue for api/routes,
 //   - <routes-dir>/meta.gen.go: the spec version, the gateway protocol versions of -asyncapi and
@@ -24,7 +26,7 @@
 //
 //	go run ./routes/gen -spec ../../../docs/api/openapi.yaml -catalog ../../../docs/spec/actions.yaml \
 //	  -list operations.yaml -codegen-config rest/oapi-codegen.yaml -rest-dir rest -routes-dir routes \
-//	  -rest-pkg github.com/OWNER/bothy/services/server/api/rest
+//	  -rest-pkg github.com/OWNER/bothy/services/server/api/rest -asyncapi ../../../docs/api/asyncapi.yaml
 package main
 
 import (
@@ -64,7 +66,7 @@ func run(ctx context.Context, args []string, stderr io.Writer) int {
 		{&c.catalog, "catalog", "action catalogue (docs/spec/actions.yaml)", true},
 		{&c.list, "list", "enable list (api/operations.yaml)", true},
 		{&c.codegenConfig, "codegen-config", "oapi-codegen configuration (api/rest/oapi-codegen.yaml)", true},
-		{&c.restDir, "rest-dir", "output directory of models.gen.go and rest.gen.go", true},
+		{&c.restDir, "rest-dir", "output directory of models.gen.go, rest.gen.go, rest2.gen.go, the objects parts and openapi.gen.yaml", true},
 		{&c.routesDir, "routes-dir", "output directory of the route files", true},
 		{&c.restPkg, "rest-pkg", "import path of the package in -rest-dir", true},
 		{&c.corePkg, "core-pkg", "import path of api/routes; empty when -routes-dir is api/routes", false},

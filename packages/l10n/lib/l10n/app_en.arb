@@ -16056,9 +16056,9 @@
   "@newAgentSecretsNone": {
     "description": "No MCP server names a secret."
   },
-  "newAgentSecretsHint": "Names only; the values never pass through the server.",
+  "newAgentSecretsHint": "Names only; the values never pass through the server. On the runner host, put each env:NAME secret as the file NAME (mode 0600) in the folder <runner.hosted_secrets_dir>/<agent ID>/ after the agent is created; a file: secret must lie in that folder.",
   "@newAgentSecretsHint": {
-    "description": "Line under the secret names."
+    "description": "Line under the secret names: where the host operator stores each secret on the runner host (docs/spec/26-builtin-agents.md 4.2). runner.hosted_secrets_dir is a configuration key and env:NAME and file: are literal forms; keep them untranslated."
   },
   "newAgentSectionSettings": "Settings",
   "@newAgentSectionSettings": {
@@ -17359,6 +17359,54 @@
   "teamCreateCancel": "Cancel",
   "@teamCreateCancel": {
     "description": "Button that closes the dialog that creates a team channel without creating it."
+  },
+  "structureCreateChannelMenu": "Create channel...",
+  "@structureCreateChannelMenu": {
+    "description": "Entry of the space menu for a person with manage on the space that creates a plain text channel (01 6.25)."
+  },
+  "structureCreateChannelTitle": "New channel in {name}",
+  "@structureCreateChannelTitle": {
+    "description": "Title of the dialog that creates a text channel in a space; name is the space's name (01 6.25).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Engineering"
+      }
+    }
+  },
+  "structureCreateSpaceMenu": "Create space...",
+  "@structureCreateSpaceMenu": {
+    "description": "Entry of the space menu and button of the empty sidebar for owners that creates a space (01 6.25)."
+  },
+  "structureCreateSpaceTitle": "New space",
+  "@structureCreateSpaceTitle": {
+    "description": "Title of the dialog that creates a space (01 6.25)."
+  },
+  "structureCreateName": "Name",
+  "@structureCreateName": {
+    "description": "Label of the name field of the dialog that creates a space or a channel."
+  },
+  "structureCreateSubmit": "Create",
+  "@structureCreateSubmit": {
+    "description": "Button of the dialog that creates the space or the channel."
+  },
+  "structureCreateCancel": "Cancel",
+  "@structureCreateCancel": {
+    "description": "Button that closes the dialog that creates a space or a channel without creating it."
+  },
+  "structureCreateRefused": "Refused: {reason}",
+  "@structureCreateRefused": {
+    "description": "Shown in the dialog that creates a space or a channel when the server refused; reason is the translated reason or problem.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "You lack the right for this"
+      }
+    }
+  },
+  "structureCreateOffline": "No connection. Try again.",
+  "@structureCreateOffline": {
+    "description": "Shown in the dialog that creates a space or a channel when no answer arrived; the next press sends the same request again."
   },
   "teamTitle": "Team channel",
   "@teamTitle": {

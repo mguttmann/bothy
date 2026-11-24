@@ -6,7 +6,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"slices"
+	"strings"
 	gosync "sync"
 	"testing"
 	"time"
@@ -291,13 +293,19 @@ func (r *fakeRecorder) count() int {
 
 // fakePublisher records the ephemeral events.
 type fakePublisher struct {
-	mu  gosync.Mutex
-	evs []eventlog.EphemeralEvent
+	gate *gate // parks a publish, as a hub that reads the database (CatchUp.Admit) or NOTIFY would
+	mu   gosync.Mutex
+	evs  []eventlog.EphemeralEvent
+	err  error // answered by every publish when set
 }
 
 func (p *fakePublisher) PublishEphemeral(_ context.Context, ev eventlog.EphemeralEvent) error {
+	p.gate.wait("PublishEphemeral")
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if p.err != nil {
+		return p.err
+	}
 	p.evs = append(p.evs, ev)
 	return nil
 }
@@ -357,19 +365,39 @@ type tracker struct {
 	rec   *fakeRecorder
 	pub   *fakePublisher
 	rd    *fakeReadiness
+	log   *lockedLog
 	agent actor.Actor
+}
+
+// lockedLog collects the JSON log lines of a tracker; timers may log from their own goroutine.
+type lockedLog struct {
+	mu gosync.Mutex
+	b  bytes.Buffer
+}
+
+func (l *lockedLog) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *lockedLog) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
 }
 
 func newTracker(t *testing.T) *tracker {
 	t.Helper()
 	clk := clock.NewFake(pStart)
 	w := &tracker{t: t, clk: clk, tm: &fakeTimers{clk: clk}, store: newFakeStore(), pr: &fakePrincipals{status: map[ids.ID]identity.Status{}},
-		rec: &fakeRecorder{}, pub: &fakePublisher{}, rd: &fakeReadiness{}}
+		rec: &fakeRecorder{}, pub: &fakePublisher{}, rd: &fakeReadiness{}, log: &lockedLog{}}
 	w.agent = actor.Actor{ID: ids.New(), Kind: actor.KindAgent, TokenID: ids.New()}
 	w.addAgent(w.agent.ID)
 	tr, err := app.NewTracker(app.PresenceConfig{PresenceTimeout: tTimeout, PersistInterval: tPersist, MismatchAlertAfter: tAlert,
 		HeartbeatInterval: tInterval}, app.PresenceDeps{Store: w.store, Principals: w.pr, UoW: runUoW{}, Authorizer: allowAgents{},
-		Audit: w.rec, Publisher: w.pub, Readiness: w.rd, Clock: clk, Timers: w.tm})
+		Audit: w.rec, Publisher: w.pub, Readiness: w.rd, Clock: clk, Timers: w.tm,
+		Log: slog.New(slog.NewJSONHandler(w.log, nil))})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -431,6 +459,22 @@ func TestHeartbeat_PublishesOnlyOnStateOrModeChange(t *testing.T) {
 		last.Resource.ID != w.agent.ID || last.Resource.Version != 0 || !last.Audience.IsZero() || last.Scope != (eventlog.Scope{}) ||
 		string(payload) != `{"agent_id":"`+w.agent.ID.String()+`","state":"degraded","reported_billing_mode":"personal"}` {
 		t.Fatalf("event %+v payload %s", last, payload)
+	}
+}
+
+// TestHeartbeat_PublishErrorIsLogged: a failing publish never fails the heartbeat; it is logged
+// with its error class and without the error text.
+func TestHeartbeat_PublishErrorIsLogged(t *testing.T) {
+	t.Parallel()
+	w := newTracker(t)
+	w.pub.err = errs.New(errs.CodeInternalError, "hub: secret detail")
+	if st := w.beat(`{"state":"online","reported_billing_mode":"organization"}`); st.State != agents.StateOnline {
+		t.Fatalf("state %q, want online", st.State)
+	}
+	line := w.log.String()
+	if !strings.Contains(line, "agent.presence_changed not published") || !strings.Contains(line, `"error.type"`) ||
+		strings.Contains(line, "secret detail") {
+		t.Fatalf("log %q, want the publish error with its class only", line)
 	}
 }
 
@@ -715,16 +759,41 @@ func TestPresenceStartRule(t *testing.T) {
 	}
 }
 
+// TestStatuses_StaleStoredRowIsOffline (audit srv-agents-8): an agent this process does not track
+// and whose stored online row is older than agent.presence_timeout plus
+// agent.heartbeat_persist_interval reads offline, as on the status page; a fresh row reads as
+// stored.
+func TestStatuses_StaleStoredRowIsOffline(t *testing.T) {
+	t.Parallel()
+	w := newTracker(t)
+	fresh, stale := ids.New(), ids.New()
+	w.addAgent(fresh)
+	w.addAgent(stale)
+	w.store.mu.Lock()
+	for id, last := range map[ids.ID]time.Time{fresh: pStart.Add(-tTimeout), stale: pStart.Add(-tTimeout - tPersist)} {
+		row := w.store.rows[id]
+		row.Stored.State, row.LastHeartbeatAt = domain.RuntimeOnline, last
+		w.store.rows[id] = row
+	}
+	w.store.mu.Unlock()
+	st, err := w.tr.Statuses(context.Background(), []ids.ID{fresh, stale})
+	if err != nil || len(st) != 2 || st[0].State != agents.StateOnline || st[1].State != agents.StateOffline {
+		t.Fatalf("statuses %+v, %v", st, err)
+	}
+}
+
 // TestPresenceNoTrackerCallWaitsForAHeartbeatInTheDatabase is the class test of the lock cycle of
 // M2-21 (docs/DECISIONS.md D-M2-21-11): while a heartbeat waits in any of its database calls (a
 // row lock held by another transaction), every other entry of the tracker that takes the entry
 // lock returns at once, inside and outside a unit of work. A caller of those entries may hold the
 // agents row or a channel row the heartbeat waits for (a switch, the guided flow, disable or
-// enable under Idempotency-Key), so any wait here is a cycle that only a lock timeout ends. After
-// the release the heartbeat ends, and a Changed that ran meanwhile keeps its configured values.
+// enable under Idempotency-Key), so any wait here is a cycle that only a lock timeout ends. The
+// publish of agent.presence_changed counts as such a call: the hub may read the database (audit
+// srv-agents-3). After the release the heartbeat ends, and a Changed that ran meanwhile keeps its
+// configured values.
 func TestPresenceNoTrackerCallWaitsForAHeartbeatInTheDatabase(t *testing.T) {
 	t.Parallel()
-	points := []string{"GetPresenceRow", "ApplyProjectReadiness", "LockPresenceRow", "WriteReportedChange", "Record"}
+	points := []string{"GetPresenceRow", "ApplyProjectReadiness", "LockPresenceRow", "WriteReportedChange", "Record", "PublishEphemeral"}
 	inUnit := func() context.Context {
 		u, setPhase := txn.NewUnit(txn.NewRegistry(), txn.Options{})
 		setPhase(txn.PhaseWork)
@@ -756,7 +825,7 @@ func TestPresenceNoTrackerCallWaitsForAHeartbeatInTheDatabase(t *testing.T) {
 				t.Parallel()
 				w := newTracker(t)
 				g := &gate{}
-				w.store.gate, w.rd.gate, w.rec.gate = g, g, g
+				w.store.gate, w.rd.gate, w.rec.gate, w.pub.gate = g, g, g, g
 				w.beat(`{"state":"online","reported_billing_mode":"organization"}`)
 				g.arm(point)
 				beat := make(chan error, 1)

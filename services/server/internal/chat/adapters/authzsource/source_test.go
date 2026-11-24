@@ -100,12 +100,13 @@ func (s chanStore) AllChannels(context.Context) ([]app.ChannelRow, error) { retu
 
 // TestSourceChannels (M1-53): a channel is archived when it or its space is; the effective
 // operator follows inheritance; ChannelsOperatedBy finds the inheriting channel and nothing for
-// the zero id; ChannelDetails omits unknown ids.
+// the zero id; ChannelDetails omits unknown ids and carries allow_autonomous_runs.
 func TestSourceChannels(t *testing.T) {
 	t.Parallel()
 	space, op := ids.New(), ids.New()
 	at := time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
 	live := domain.NewChannel(ids.New(), space, domain.ChannelText, "tickets", "", "a0", ids.New(), 20)
+	live.AllowAutonomousRuns = true
 	gone := domain.NewChannel(ids.New(), space, domain.ChannelForum, "bugs", "", "a1", ids.New(), 20)
 	gone.Archive(at)
 	inSpace := domain.NewChannel(ids.New(), ids.New(), domain.ChannelText, "old", "", "a0", ids.New(), 20)
@@ -138,7 +139,7 @@ func TestSourceChannels(t *testing.T) {
 		t.Fatalf("channels %v", all)
 	}
 	d, err := src.ChannelDetails(ctx, []ids.ID{live.ID, ids.New()})
-	if err != nil || len(d) != 1 || d[live.ID].OperatorMode != "inherit" || d[live.ID].EffectiveOperatorID != op {
+	if err != nil || len(d) != 1 || d[live.ID].OperatorMode != "inherit" || d[live.ID].EffectiveOperatorID != op || !d[live.ID].AllowAutonomousRuns {
 		t.Fatalf("details %+v, %v", d, err)
 	}
 }

@@ -31,14 +31,15 @@ platform:                   # <name>: {depends_on: [<platform names>], vendors: 
   # and the class attribute of bothy.ratelimit.rejected from otel/attr.
   ratelimit: {depends_on: [httpserver, otel], vendors: [otel]}
   # testkit: how tests wait (Patience) and the mark of integration tests; only tests and the
-  # test helpers import it (docs/DECISIONS.md PL/8).
+  # test helpers import it (docs/DECISIONS.md PL/8; depguard rule test-helpers-only-in-tests).
   testkit: {depends_on: [], vendors: []}
-  # pgtest (internal/platform/pg/pgtest) starts the test containers; only tests import it.
+  # pgtest (internal/platform/pg/pgtest) starts the test containers; only tests import it
+  # (depguard rule test-helpers-only-in-tests in .golangci.yml).
   # otel: the declarations of the metric registry for db.client.operation.duration and
   # bothy.db.pool.connections (M1-68).
   pg: {depends_on: [secrets, testkit, otel], vendors: [pgx, goose, otelpgx, otel, testcontainers, mobyapi, mobyclient]}
   # River only here (R-AR-09); jobstest (internal/platform/jobs/jobstest) prepares pgtest
-  # databases for the job runtime; only tests import it.
+  # databases for the job runtime; only tests import it (depguard rule test-helpers-only-in-tests).
   jobs: {depends_on: [pg, otel], vendors: [river, pgx, otel]}
 wire: {vendors: []}
 # cmd/bothy/importtool reads the mapping file of the import tool strictly with yaml.v3 (M8-04);
@@ -231,7 +232,7 @@ modules:
     # attachment state of a message (files.Attachments.Pending); the edge points down
     # (docs/decisions.d/M3-07.md D-M3-07-1).
     depends_on: [instance, chat, agents, messaging, billing, files]
-    adapter_vendors: [pgx, otel]   # sqlc code and the repository of runs and run_steps; adapters/otelmetrics records the run metrics (M2-05)
+    adapter_vendors: [pgx, otel]   # sqlc code and the repository of the tables of runs; adapters/otelmetrics records the run metrics (M2-05)
   search:
     tables: []
     actions: [search.query, search.assist, search.assist.respond]

@@ -520,6 +520,14 @@ class Runtime(Protocol):
         """
         ...
 
+    async def session_free(self, thread_id: UUID) -> None:
+        """Wait until no processing of Hermes runs on the thread's session (17.6).
+
+        Args:
+            thread_id: The thread.
+        """
+        ...
+
     def turn_running(self, thread_id: UUID) -> bool | None:
         """Whether a Hermes turn of the thread's session runs now (Hermes' busy state).
 

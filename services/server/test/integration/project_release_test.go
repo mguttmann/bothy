@@ -187,3 +187,35 @@ func TestReleaseFinalBindings_Repair(t *testing.T) {
 	}
 	w.bind(w.projektB, "website")
 }
+
+// TestRestore_KeepsTheOrderUnique (audit srv-chat-1): a channel or space created during the undo
+// window of a deleted sibling at its place takes the deleted one's sort key; the restore gives the
+// restored one a free key next to it, so a later move between the two still works.
+func TestRestore_KeepsTheOrderUnique(t *testing.T) {
+	t.Parallel()
+	w := newPBWorld(t)
+	gone := w.channel(w.engineering, "text", "gone")
+	w.wantOK(w.deleteChannel("owner", gone, false))
+	twin := w.channel(w.engineering, "text", "twin")
+	w.restoreChannel(gone)
+	if n := w.text(`SELECT count(*) - count(DISTINCT sort_key) FROM channels WHERE space_id = $1 AND archived_at IS NULL`,
+		w.engineering.String()); n != "0" {
+		t.Fatalf("%s live channels share a sort key after the restore", n)
+	}
+	mover := w.channel(w.engineering, "text", "mover")
+	for _, after := range []ids.ID{gone, twin} {
+		w.wantOK(w.do("owner", http.MethodPost, "/api/v1/channels/"+mover.String()+"/move", `{"after_id":"`+after.String()+`"}`, key()...))
+	}
+
+	old := w.space("Old")
+	w.wantOK(w.do("owner", http.MethodPost, "/api/v1/spaces/"+old.String()+"/delete", "", key()...))
+	fresh := w.space("Fresh")
+	w.wantOK(w.do("owner", http.MethodPost, "/api/v1/spaces/"+old.String()+"/restore", "", key()...))
+	if n := w.text(`SELECT count(*) - count(DISTINCT sort_key) FROM spaces WHERE archived_at IS NULL`); n != "0" {
+		t.Fatalf("%s live spaces share a sort key after the restore", n)
+	}
+	moved := w.space("Moved")
+	for _, after := range []ids.ID{old, fresh} {
+		w.wantOK(w.do("owner", http.MethodPost, "/api/v1/spaces/"+moved.String()+"/move", `{"after_id":"`+after.String()+`"}`, key()...))
+	}
+}

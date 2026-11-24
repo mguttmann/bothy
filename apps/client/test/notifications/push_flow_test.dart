@@ -4,7 +4,8 @@
 // the login the extension's App Group gets the instance, `notify.preview_mode` and
 // `client.push.fetch_timeout`; a change of the preview mode follows; logout deletes the keychain
 // items through the push and the wiper. The fake server has no push endpoints, so the
-// registration fails and nothing is stored, which the app survives.
+// registration fails and nothing is stored, which the app survives; every return to the
+// foreground tries it again (13 13).
 
 import 'dart:io';
 
@@ -21,6 +22,7 @@ import 'package:sync_engine/sync_engine.dart';
 import 'package:sync_engine/testing.dart';
 
 import '../support/fake_instance.dart';
+import '../support/fakes.dart';
 import '../support/push_fakes.dart';
 
 void main() {
@@ -29,13 +31,16 @@ void main() {
   late FakeInstance fake;
   late ProviderContainer c;
   late FakePushHost host;
+  late SwitchLifecycle lifecycle;
 
   setUp(() async {
     saved = HttpOverrides.current;
     HttpOverrides.global = null;
     host = FakePushHost()..authorized = true;
+    lifecycle = SwitchLifecycle();
     fake = await FakeInstance.start(
       push: ApplePush(host: host, metrics: ClientMetrics()),
+      lifecycle: lifecycle,
     );
     c = appContainer(fake);
     // The app widget watches the provider; a listener keeps it active the same way.
@@ -82,4 +87,32 @@ void main() {
     await c.read(onboardingControllerProvider.notifier).logout();
     await eventually('deleted', () => host.settings.contains('deleted $id'));
   });
+
+  test(
+    'a return to the foreground tries the failed registration again',
+    () async {
+      await eventually('registration tried', () => host.tokenReads > 0);
+      // Let the attempt of the login end before counting.
+      await eventually(
+        'settings written',
+        () => host.settings.any((l) => l.endsWith(' full 20000')),
+      );
+      final before = host.tokenReads;
+      lifecycle.set(AppActivity.background);
+      expect(
+        host.tokenReads,
+        before,
+        reason: 'the background registers nothing',
+      );
+      // An attempt still running takes in a return at that moment, so the test returns until a
+      // new attempt starts.
+      await eventually('registration tried again', () {
+        lifecycle
+          ..set(AppActivity.background)
+          ..set(AppActivity.foreground);
+        return host.tokenReads > before;
+      });
+      expect(host.keychain, isEmpty, reason: 'the fake has no registerPush');
+    },
+  );
 }

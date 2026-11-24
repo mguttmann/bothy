@@ -13,7 +13,8 @@ import (
 
 // TestRepositoryLocateThreads (M2-05): one read answers the routing data of the known threads of
 // the list with their channel and space, ascending by id; unknown ids are absent; the archived
-// flag covers the channel and its space; inside a unit of work it sees the uncommitted rows.
+// flag covers the channel and its space; a deleted thread is Deleted; inside a unit of work it
+// sees the uncommitted rows.
 func TestRepositoryLocateThreads(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
@@ -33,7 +34,8 @@ func TestRepositoryLocateThreads(t *testing.T) {
 	live, inClosed, inGone := ids.New(), ids.New(), ids.New()
 	e.exec(t, `INSERT INTO threads (id, channel_id, kind, state, closed_at, operator_agent_id, created_by, last_message_seq, unread_floor_seq, version)
 		VALUES ($1, $2, 'thread', 'closed', now(), $3, $4, 7, 2, 5)`, live.String(), forum.String(), robin.String(), alex.String())
-	e.exec(t, `INSERT INTO threads (id, channel_id, kind, created_by) VALUES ($1, $2, 'thread', $3)`, inClosed.String(), closedForum.String(), alex.String())
+	e.exec(t, `INSERT INTO threads (id, channel_id, kind, created_by, deleted_at, deleted_by) VALUES ($1, $2, 'thread', $3, now(), $3)`,
+		inClosed.String(), closedForum.String(), alex.String())
 	e.exec(t, `INSERT INTO threads (id, channel_id, kind, created_by) VALUES ($1, $2, 'thread', $3)`, inGone.String(), gone.String(), alex.String())
 
 	got, err := e.repo.LocateThreads(ctx, []ids.ID{inGone, live, ids.New(), inClosed})
@@ -54,10 +56,10 @@ func TestRepositoryLocateThreads(t *testing.T) {
 	if byID[live] != want {
 		t.Fatalf("live %+v, want %+v", byID[live], want)
 	}
-	if c := byID[inClosed]; !c.ChannelArchived || c.SpaceID != space || c.State != "open" || !c.OperatorAgentID.IsZero() {
+	if c := byID[inClosed]; !c.ChannelArchived || !c.Deleted || c.SpaceID != space || c.State != "open" || !c.OperatorAgentID.IsZero() {
 		t.Fatalf("archived channel %+v", c)
 	}
-	if g := byID[inGone]; !g.ChannelArchived || g.SpaceID != archivedSpace {
+	if g := byID[inGone]; !g.ChannelArchived || g.Deleted || g.SpaceID != archivedSpace {
 		t.Fatalf("archived space %+v", g)
 	}
 	if none, err := e.repo.LocateThreads(ctx, nil); err != nil || len(none) != 0 {

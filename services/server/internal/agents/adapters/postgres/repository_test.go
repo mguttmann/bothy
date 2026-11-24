@@ -152,16 +152,23 @@ func TestRepositoryReportedState(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _, err := e.repo.Agent(ctx, a.ID)
-	if err != nil || got.Reported.State != domain.RuntimeOnline || got.Reported.BillingMode != domain.Personal || got.EffectiveToolClass() != domain.ToolHost ||
+	if err != nil || got.Reported.State != domain.RuntimeOnline || got.Reported.BillingMode != domain.Personal || got.Reported.ToolClass != domain.ToolHost ||
 		got.Reported.RuntimeVersion != "2.3.1" || got.Reported.LastHeartbeatAt.IsZero() || len(got.Reported.BillingModesSupported) != 1 {
 		t.Fatalf("reported %+v, %v", got.Reported, err)
 	}
-	// A stored configuration outside its schema is an internal error, never a client error.
+	// A key a later release stored is ignored (upgrade.md rule M8); a known key outside its schema
+	// is an internal error, never a client error, and never repeats the value.
 	if _, err := e.owner.Exec(ctx, `UPDATE agents SET operator_config = '{"api_key":"x"}' WHERE principal_id = $1`, a.ID.String()); err != nil {
 		t.Fatal(err)
 	}
+	if _, _, err = e.repo.Agent(ctx, a.ID); err != nil {
+		t.Fatalf("unknown stored key: %v", err)
+	}
+	if _, err := e.owner.Exec(ctx, `UPDATE agents SET operator_config = '{"default_model":"bad model x"}' WHERE principal_id = $1`, a.ID.String()); err != nil {
+		t.Fatal(err)
+	}
 	_, _, err = e.repo.Agent(ctx, a.ID)
-	if ee, ok := errs.As(err); !ok || ee.Kind() != errs.KindInternal || strings.Contains(err.Error(), "api_key\":\"x") {
+	if ee, ok := errs.As(err); !ok || ee.Kind() != errs.KindInternal || strings.Contains(err.Error(), "bad model x") {
 		t.Fatalf("broken config: %v", err)
 	}
 }
