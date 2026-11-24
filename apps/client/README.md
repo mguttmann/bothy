@@ -1369,6 +1369,7 @@ In the terminal every key goes to the shell; the shortcuts of the table "In the 
 | Detach session (keeps running) | Cmd+Shift+D | Ctrl+Shift+D |
 | Search in the scrollback | Cmd+F | Ctrl+Shift+F |
 | Font larger / smaller | Cmd+Plus / Cmd+Minus | Ctrl+Shift+Plus / Ctrl+Shift+Minus |
+| Read the visible screen | Cmd+Shift+S | Ctrl+Shift+S |
 
 Tests: `test/terminal/` (group, view, denials, shortcuts, adapters, accessibility),
 `integration_test/terminal_fake_test.dart` (the fake server with an in-process host: opening,

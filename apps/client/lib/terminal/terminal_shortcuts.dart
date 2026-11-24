@@ -47,6 +47,10 @@ enum TerminalShortcutAction {
 
   /// Makes the font of the terminal smaller.
   fontSmaller,
+
+  /// Announces the visible screen to a screen reader (01 8); the renderer of `terminal_ui`
+  /// binds it.
+  readScreen,
 }
 
 /// The intent of one [TerminalShortcutAction] inside the terminal.
@@ -184,16 +188,25 @@ final List<TerminalShortcutRow> terminalShortcutRows = [
       shown: false,
     ),
   ]),
+  TerminalShortcutRow('Read the visible screen', [
+    _key(
+      TerminalShortcutAction.readScreen,
+      LogicalKeyboardKey.keyS,
+      macShift: true,
+    ),
+  ]),
 ];
 
-/// The actions the renderer of `terminal_ui` binds itself (copy, and paste through the guard).
+/// The actions the renderer of `terminal_ui` binds itself (copy, paste through the guard, and
+/// "Read screen").
 const Set<TerminalShortcutAction> rendererActions = {
   TerminalShortcutAction.copy,
   TerminalShortcutAction.paste,
+  TerminalShortcutAction.readScreen,
 };
 
 /// The activators the terminal view hands to the renderer on [platform]: every binding of
-/// [terminalShortcutRows] except copy and paste, which `terminal_ui` binds with the guard.
+/// [terminalShortcutRows] except [rendererActions], which `terminal_ui` binds itself.
 ///
 /// Example: `TerminalPane(shortcuts: terminalActivators(ShortcutPlatform.current), ...)`.
 Map<ShortcutActivator, Intent> terminalActivators(ShortcutPlatform platform) =>
