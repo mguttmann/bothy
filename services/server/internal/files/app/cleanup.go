@@ -264,19 +264,29 @@ func (c *Cleanup) failedRows(ctx context.Context, now time.Time) error {
 			if err != nil || !ok {
 				return err
 			}
-			if cur.Deleted || !domain.FailedRowExpired(cur.Ages, now, c.cfg.FailedRowTTL) {
+			sel, del := c.failedRowDeletion(cur, id, now)
+			if !del {
 				return nil
 			}
-			if cur.Purpose == string(domain.PurposeGDPRExport) && cur.UploadState == domain.UploadPending {
-				return c.deletion().mark(ctx, Deletion{FileIDs: []ids.ID{id}, Purpose: cur.Purpose}, now)
-			}
-			blocked := domain.Final(cur.UploadState, cur.ScanStatus, false) && !domain.IsDeliverable(cur.UploadState, cur.ScanStatus, false)
-			if cur.Purpose != string(domain.PurposeAttachment) || cur.Attached || !blocked {
-				return nil
-			}
-			return c.deletion().mark(ctx, Deletion{FileIDs: []ids.ID{id}}, now)
+			return c.deletion().mark(ctx, sel, now)
 		})
 	})
+}
+
+// failedRowDeletion decides step c for the locked facts cur of id: a pending export package or a
+// failed or blocked attachment without message, both past file.failed_row_ttl.
+func (c *Cleanup) failedRowDeletion(cur CleanupRecord, id ids.ID, now time.Time) (Deletion, bool) {
+	if cur.Deleted || !domain.FailedRowExpired(cur.Ages, now, c.cfg.FailedRowTTL) {
+		return Deletion{}, false
+	}
+	if cur.Purpose == string(domain.PurposeGDPRExport) && cur.UploadState == domain.UploadPending {
+		return Deletion{FileIDs: []ids.ID{id}, Purpose: cur.Purpose}, true
+	}
+	blocked := domain.Final(cur.UploadState, cur.ScanStatus, false) && !domain.IsDeliverable(cur.UploadState, cur.ScanStatus, false)
+	if cur.Purpose != string(domain.PurposeAttachment) || cur.Attached || !blocked {
+		return Deletion{}, false
+	}
+	return Deletion{FileIDs: []ids.ID{id}}, true
 }
 
 // locked locks the files row of id and reads its facts in a new statement; ok is false when the

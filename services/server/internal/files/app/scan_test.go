@@ -299,10 +299,10 @@ func TestScanPassCompletesMultipartBeforePing(t *testing.T) {
 	e.scanner.pingErr = errors.New("connection refused")
 	s := e.seed(t, pngContent, pngContent, true)
 	ctx := context.Background()
-	if err := e.store.store.Delete(ctx, s.File.ObjectKey); err != nil {
+	if err := e.store.Delete(ctx, s.File.ObjectKey); err != nil {
 		t.Fatal(err)
 	}
-	upload, err := e.store.store.CreateMultipart(ctx, s.File.ObjectKey)
+	upload, err := e.store.CreateMultipart(ctx, s.File.ObjectKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +311,7 @@ func TestScanPassCompletesMultipartBeforePing(t *testing.T) {
 	e.repo.mu.Unlock()
 	for n := 1; n <= s.PartCount; n++ {
 		b := pngContent[(n-1)*4 : min(n*4, len(pngContent))]
-		part, err := e.store.store.UploadPart(ctx, s.File.ObjectKey, upload, n, bytes.NewReader(b), int64(len(b)))
+		part, err := e.store.UploadPart(ctx, s.File.ObjectKey, upload, n, bytes.NewReader(b), int64(len(b)))
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -12,7 +12,7 @@ import (
 )
 
 // slot runs ImportFiles.Slot in a unit of work, as the importer does.
-func slot(t *testing.T, e *env, s files.UploadSession) files.ImportSlot {
+func slot(t *testing.T, e *env, s files.UploadSession) {
 	t.Helper()
 	var got files.ImportSlot
 	if err := e.uow.Do(e.ctx, func(ctx context.Context) error {
@@ -25,7 +25,6 @@ func slot(t *testing.T, e *env, s files.UploadSession) files.ImportSlot {
 	if got.Upload.FileID != s.FileID {
 		t.Fatalf("slot %+v", got)
 	}
-	return got
 }
 
 // TestImportSlotReopenWritesFileUpdated pins that reopening the aborted session of an import file
