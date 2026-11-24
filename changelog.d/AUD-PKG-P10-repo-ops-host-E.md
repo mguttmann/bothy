@@ -20,3 +20,12 @@
 - `make signal-check` fails when the dashboards, the rule files, the Sloth files or the panel
   queries hold no expression, and `make templates-check` fails when the template folder holds no
   template, instead of passing with less to check (AUD-PKG-P10-repo-ops-host).
+- The external asset check of the docs site also fails on images, frames, media, objects,
+  embeds and on `<link>` icons, manifests, preconnects and DNS prefetches of another origin, not
+  only on scripts, stylesheets and fonts (AUD-PKG-P10-repo-ops-host).
+- The terminal catalogue gate reports a test table of chapter 24 section 14 with a header other
+  than `ID | Test | Expected` and always compares the title and expected cells, instead of
+  silently comparing IDs only (AUD-PKG-P10-repo-ops-host).
+- `make signal-check` ends with one line and exit code 2 on a dashboard or rule file it cannot
+  read or parse, and the SonarQube sync with one line on a read timeout or a malformed answer of
+  the Web API, instead of a traceback (AUD-PKG-P10-repo-ops-host).
