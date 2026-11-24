@@ -126,7 +126,8 @@ read `design/build/tokens.resolved.json`, which also selects `server`). Shared s
 `tools/node/` with its lock file), the root files of the tools project (`pyproject.toml`,
 `uv.lock`, `conftest.py`) and any tool folder the map does not name yet. A release (`release.yml` calls `ci.yml`)
 runs the jobs of the components of its tag. Documentation (`docs/` outside `docs/api/`, `infra/`,
-the root Markdown files, `LICENSE`, `NOTICE`, the site configuration `mkdocs.yml`) needs no
+the root Markdown files, the fragments of the root changelog `changelog.d/`, `LICENSE`, `NOTICE`,
+the site configuration `mkdocs.yml`) needs no
 conditional job, except the files the map assigns to a component (for example `docs/spec/actions.yaml` to `server` and `apps`, `templates/agents/` to `server`, whose embedded copy codegen-check holds equal (A1-06), and `infra/compose/` and `infra/otel/` to `server`, whose terminal suite starts that stack, M2-48).
 A file under `docs/` that a test, build or generator of a component reads selects that component
 (docs/decisions.d/CI-SPLIT-MERGE-QUEUE.md D-CSMQ-7): `docs/spec/` selects `server` and `apps`,
