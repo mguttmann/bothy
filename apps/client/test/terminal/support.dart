@@ -192,9 +192,14 @@ class FakeHostsApi implements TerminalHostsApi {
     TerminalSessionAttach request,
   ) async => _grant(sessionId, 'shell');
 
+  /// When set, `closeSession` throws it.
+  Object? closeError;
+
   @override
   Future<TerminalSession> closeSession(String sessionId) async {
     closes.add(sessionId);
+    final error = closeError;
+    if (error != null) throw error;
     return session(sessionId);
   }
 

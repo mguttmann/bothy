@@ -2345,7 +2345,9 @@ Tab life cycle in the apps (desktop on macOS and Windows, phone screen M8; FIX-t
 `D-TSL-4` to `D-TSL-6`): "Sessions" lists the person's sessions on the host that are not closed
 with name, start time, "connected" or "detached since" and "Reattach"; a tab whose session ended
 or was blocked offers only "Close", which removes it; "End" ends the session on the host and closes
-its tab; a refresh of the list ends the tab of a session the server closed meanwhile; a tab whose
+its tab once the server confirms it (`closeTerminalSession` answers 200, or 404 for a session it no
+longer has); on any other failure the tab stays detached with the problem and offers "End" again,
+in the apps and in the console; a refresh of the list ends the tab of a session the server closed meanwhile; a tab whose
 stream dropped while it was attached attaches again once when the app's connection is live again
 or the app returns to the front, never in a loop and never for a detach by the person.
 
