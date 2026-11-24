@@ -5,6 +5,7 @@ package wire
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	auditpg "github.com/OWNER/bothy/services/server/internal/audit/adapters/postgres"
@@ -68,6 +69,22 @@ func maintPoolOpener(v *config.Values, sp *secrets.Provider, log *slog.Logger) (
 	}
 	cfg.User, cfg.PasswordRef, cfg.MaxConns = string(pg.RoleMaint), mc.MaintPasswordRef, 1
 	return func(ctx context.Context) (*pg.Pool, error) { return pg.Open(ctx, cfg, sp, log) }, nil
+}
+
+// checkMaintLogin opens one connection as bothy_maint with open and closes it again: the start
+// check of migrate.maint_password_ref, so a missing or wrong password ends the start like the
+// other secrets instead of failing every run of retention.audit. The error names the key and the
+// cause, never the value.
+func checkMaintLogin(ctx context.Context, open func(ctx context.Context) (*pg.Pool, error)) error {
+	pool, err := open(ctx)
+	if err == nil {
+		defer pool.Close()
+		err = pool.Ping(ctx)
+	}
+	if err != nil {
+		return fmt.Errorf("wire: the audit trim cannot log in as bothy_maint (migrate.maint_password_ref): %w", err)
+	}
+	return nil
 }
 
 // registerAuditRetention registers the participants of audit in the job retention.audit (M7-05):

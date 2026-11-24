@@ -12,3 +12,6 @@
 - The incoming webhook routes of the internal listener answer `503 unavailable` with
   `Retry-After` once the shutdown began, instead of writing while the jobs and the pool stop and
   failing with an internal error after the pool closed.
+- The roles `worker` and `all` check the login of `bothy_maint` (`migrate.maint_password_ref`) at
+  the start; a missing or wrong password ends the start instead of failing every run of the audit
+  trim later.

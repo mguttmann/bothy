@@ -956,6 +956,11 @@ func (s *server) startJobs(ctx context.Context) error {
 	if err := s.moduleJobs(&modules); err != nil {
 		return err
 	}
+	for _, check := range modules.StartChecks {
+		if err := check(ctx); err != nil {
+			return err
+		}
+	}
 	if modules.Retention, err = NewRetentionJobs(modules.RetentionParticipants, modules.RetentionConfig, s.deps.Clock); err != nil {
 		return err
 	}
