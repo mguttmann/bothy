@@ -138,11 +138,14 @@ async def _serve(config: RunnerConfig) -> int:
         with contextlib.suppress(NotImplementedError):
             loop.add_signal_handler(sig, on_signal)
     try:
-        reason = await run
+        await asyncio.wait({run})
     except asyncio.CancelledError:
-        if on_signal.failed:
-            return 1
+        run.cancel()  # the serve itself was cancelled: so is the runner
         raise
+    if run.cancelled() and on_signal.failed:
+        return 1  # a failed stop cancelled the runner (StopOnSignal)
+    try:
+        reason = run.result()
     except StartError as err:
         logging.getLogger("claude_code_runner").error(
             '{"event": "start_failed", "code": "%s"}', err

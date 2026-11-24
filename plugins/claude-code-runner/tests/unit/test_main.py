@@ -205,3 +205,70 @@ async def test_the_error_line_of_a_failed_stop_names_only_the_kind(
     assert [r.getMessage() for r in errors] == ['{"event": "stop_failed", "error": "RuntimeError"}']
     assert all(r.exc_info is None for r in errors)
     assert "value-canary" not in caplog.text
+
+
+@pytest.mark.anyio
+async def test_a_failed_stop_ends_the_serve_with_exit_code_1(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import asyncio
+
+    import claude_code_runner.__main__ as entry
+
+    class Hanging:
+        handed_over = False
+
+        def __init__(self, config: object) -> None:
+            pass
+
+        async def run(self) -> None:
+            await asyncio.Event().wait()
+
+        async def stop(self) -> None:
+            raise RuntimeError("stop broke")
+
+    handlers: list[object] = []
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(entry, "Runner", Hanging)
+    monkeypatch.setattr(loop, "add_signal_handler", lambda sig, handler: handlers.append(handler))
+    serve = asyncio.ensure_future(entry._serve(object()))  # type: ignore[arg-type]
+    while not handlers:
+        await asyncio.sleep(0)
+    handlers[0]()  # type: ignore[operator]
+    assert await asyncio.wait_for(serve, 5) == 1
+
+
+@pytest.mark.anyio
+async def test_a_cancelled_serve_cancels_the_runner(monkeypatch: pytest.MonkeyPatch) -> None:
+    import asyncio
+
+    import claude_code_runner.__main__ as entry
+
+    cancelled: list[bool] = []
+
+    class Hanging:
+        handed_over = False
+
+        def __init__(self, config: object) -> None:
+            pass
+
+        async def run(self) -> None:
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                cancelled.append(True)
+                raise
+
+        async def stop(self) -> None:
+            pass
+
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(entry, "Runner", Hanging)
+    monkeypatch.setattr(loop, "add_signal_handler", lambda sig, handler: None)
+    serve = asyncio.ensure_future(entry._serve(object()))  # type: ignore[arg-type]
+    await asyncio.sleep(0.01)
+    serve.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await serve
+    await asyncio.sleep(0)
+    assert cancelled == [True]
