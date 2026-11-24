@@ -464,7 +464,8 @@ connected as long as the app runs.
    (AUD-pkg-local-store-01).
 3. After `catchup.complete` the outbox sends in order.
 4. Gaps in `thread_seq` (an event does not fit the loaded ranges) are loaded by the fetcher through REST
-   before it shows the message.
+   before it shows the message. A failed load is tried again when the thread gets the focus;
+   after an app start the gap is found again from the stored messages behind the loaded range.
 5. Personal data: the echo of one's own device (`updated_by_device_id`) is ignored; a draft with
    `overwrote_newer` shows a notice; read state only increases. The database holds at most one
    draft per thread and per forum, and none from the device's own send on until the next draft

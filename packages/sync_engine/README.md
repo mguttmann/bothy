@@ -177,7 +177,9 @@ same limit after the visible ones) and
   changes nothing.
 - A new message that does not continue the loaded range of its thread is stored, the gap is
   recorded and loaded with `Fetcher.range`; `MessagesDao.watchContiguous` hides it until then. A
-  failed fill stays recorded; `onFocus` retries it.
+  failed fill stays recorded; `onFocus` retries it. The record lives in memory: after an app
+  start `onFocus` finds the gap again from the stored messages behind the newest loaded range
+  (`GapFiller.recover`).
 - A `message.created` of a thread the database does not hold queues one `getThread` after the
   commit (R-SY-28, M4-40): `SyncContext.threadLoads` keeps it to one load per thread while it is
   queued or running, the thread is stored only while its channel is held, and a failed load is

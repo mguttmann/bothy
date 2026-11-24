@@ -770,10 +770,13 @@ final class CatchUpListener implements SessionListener {
     if (erased.isNotEmpty) await _sync.eraser.erase(erased);
   }
 
-  /// The thread [threadId] got the focus: a recorded gap is loaded again (Design note 4).
+  /// The thread [threadId] got the focus: a recorded gap, or one the stored messages show after
+  /// an app start, is loaded again (Design note 4).
   Future<void> onFocus(ThreadId threadId) async {
-    if (_wiped || !gaps.pending.containsKey(threadId)) return;
-    await _inBackground(() => gaps.fill(_sync, threadId));
+    if (_wiped) return;
+    await _inBackground(() async {
+      if (await gaps.recover(_db, threadId)) await gaps.fill(_sync, threadId);
+    });
   }
 
   /// Loads the wake-ups of [id] through REST (`listThreadWakes`, 09 5.8.2) and replaces the
