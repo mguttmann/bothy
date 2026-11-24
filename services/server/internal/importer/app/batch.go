@@ -131,9 +131,9 @@ type batch struct {
 // run first; then one unit of work: import.apply on the source (an owner; authorize records its
 // denials), the row lock (batches, state changes and the cursor of a source are serialized), 404
 // for an unknown source and 409 import_not_running unless it is running, then every item in
-// request order. Afterwards the counters of the new transitions are added to stats.server and one
-// import.progress is appended; a batch that made no new transition writes neither (a replayed
-// batch has no event). A refusal of import.apply by the module is recorded as a denial.
+// request order. Afterwards the counters of the new transitions and of the answers with
+// source_changed are added to stats.server and one import.progress is appended; a batch that
+// counted nothing writes neither (a replayed batch with unchanged content has no event). A refusal of import.apply by the module is recorded as a denial.
 func (s *Service) ApplyBatch(ctx context.Context, a actor.Actor, id ids.ID, b importer.Batch) (importer.BatchResult, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {

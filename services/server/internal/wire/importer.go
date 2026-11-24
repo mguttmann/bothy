@@ -58,7 +58,7 @@ type ImporterDeps struct {
 type Importer struct {
 	// Service implements importer.Imports.
 	Service *importerapp.Service
-	// Handlers are the REST handlers of the eleven import operations.
+	// Handlers are the REST handlers of the operations of the tag Import.
 	Handlers *importerhttp.Imports
 }
 

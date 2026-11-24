@@ -13,6 +13,8 @@ const (
 	KindMessage  = "message"
 	KindFile     = "file"
 	KindUser     = "user"
+	// KindReaction is reserved by the CHECK of import_items.item_kind: reactions are not taken over
+	// (the tool counts them as reactions_not_taken), so nothing writes it.
 	KindReaction = "reaction"
 	KindPin      = "pin"
 )
