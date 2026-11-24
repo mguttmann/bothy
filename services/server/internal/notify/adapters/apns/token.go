@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strconv"
 	"sync"
@@ -47,6 +48,10 @@ type minter struct {
 func (m minter) mint(ctx context.Context, now time.Time) (tok, errType string, err error) {
 	v, _, err := m.secrets.Resolve(ctx, m.cfg.PrivateKeyRef)
 	if err != nil {
+		if ctx.Err() != nil {
+			// The caller gave up; the key is not shown unusable (as fcm, Design note 4 d of M3-21).
+			return "", "", fmt.Errorf("%w: %w", errMintCancelled, ctx.Err())
+		}
 		return "", secrets.ErrorCode(err), err
 	}
 	key, err := ParsePrivateKey(v)
@@ -111,9 +116,16 @@ func (s *envState) acquire(ctx context.Context, now time.Time) (tok string, prob
 	return s.jwt, probe, nil
 }
 
-// createLocked replaces the JWT; on failure it starts a pause.
+// errMintCancelled is a JWT creation that stopped because the caller's context ended; it is
+// transient and starts no pause.
+var errMintCancelled = errors.New("apns: jwt creation cancelled")
+
+// createLocked replaces the JWT; on failure other than errMintCancelled it starts a pause.
 func (s *envState) createLocked(ctx context.Context, now time.Time) error {
 	tok, errType, err := s.mint.mint(ctx, now)
+	if errors.Is(err, errMintCancelled) {
+		return err
+	}
 	if err != nil {
 		s.pauseLocked(ctx, now, true, errType)
 		return err

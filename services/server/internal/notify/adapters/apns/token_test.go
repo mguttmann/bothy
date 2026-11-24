@@ -3,6 +3,7 @@
 package apns_test
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -363,4 +364,23 @@ func TestConfigErrorPausesEnvironment(t *testing.T) {
 			t.Fatalf("probe after the key is back: %+v", res)
 		}
 	})
+}
+
+// TestCancelledContextDoesNotPause: a send whose context ended while a JWT is due is a transient
+// error, never a configuration error that pauses the environment (as fcm.TestCancelledContextDoesNotPause).
+func TestCancelledContextDoesNotPause(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	res, err := w.a.Send(ctx, w.phone, w.hint())
+	if err == nil || !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled send = %+v, %v; want a context error", res, err)
+	}
+	if res := w.send(w.phone, w.hint()); res.Class != domain.ResultAccepted {
+		t.Fatalf("send after a cancelled one = %+v", res)
+	}
+	if n := len(errorsOf(w.log)); n != 0 {
+		t.Fatalf("%d Error records", n)
+	}
 }
