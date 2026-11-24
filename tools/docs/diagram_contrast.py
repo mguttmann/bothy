@@ -90,7 +90,7 @@ def _problem(
 ) -> str | None:
     """Return the problem line of one pair, or None if it meets the gate.
 
-    The rounding is that of the token gate (`rules.ContrastRow.passed`).
+    The comparison is that of the token gate (`rules.ContrastRow.passed`): the unrounded ratio.
     """
     row = rules.ContrastRow(
         theme=theme,

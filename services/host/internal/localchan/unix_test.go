@@ -258,6 +258,7 @@ func TestAdminEndpointOneInstance(t *testing.T) {
 	_ = c.Close()
 	cancel()
 	<-done
+	_ = l.Close() // waits for the close that the end of ServeAdmin started
 	l2, err := ListenAdmin(path)
 	if err != nil {
 		t.Fatalf("after the first closed: %v", err)

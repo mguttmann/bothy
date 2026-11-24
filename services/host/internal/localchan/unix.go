@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"sync"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -184,16 +185,21 @@ func ListenAdmin(path string) (net.Listener, error) {
 	return &lockedListener{Listener: l, lock: lock}, nil
 }
 
-// lockedListener releases the lock of the admin endpoint with the listener.
+// lockedListener releases the lock of the admin endpoint with the listener. Close runs once; a
+// second caller waits until the first has released the lock.
 type lockedListener struct {
 	net.Listener
 	lock *os.File
+	once sync.Once
+	err  error
 }
 
 func (l *lockedListener) Close() error {
-	err := l.Listener.Close()
-	_ = l.lock.Close()
-	return err
+	l.once.Do(func() {
+		l.err = l.Listener.Close()
+		_ = l.lock.Close()
+	})
+	return l.err
 }
 
 // ServeAdmin serves the admin endpoint: only clients with uid allowUID (root, "0") are answered.
