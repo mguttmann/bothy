@@ -58,9 +58,11 @@ class TimelineView extends StatefulWidget {
 }
 
 class _TimelineViewState extends State<TimelineView> {
+  api.StatsTimeline? _timeline;
   TimelineModel? _model;
   TimelinePlayback? _playback;
   String? _error;
+  int _generation = 0;
 
   @override
   void initState() {
@@ -68,7 +70,63 @@ class _TimelineViewState extends State<TimelineView> {
     unawaited(_load());
   }
 
+  @override
+  void didUpdateWidget(TimelineView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (vizInputsChanged(
+      oldLive: oldWidget.live,
+      live: widget.live,
+      oldQueries: oldWidget.queries,
+      queries: widget.queries,
+      oldOptions: oldWidget.options,
+      options: widget.options,
+    )) {
+      _generation++;
+      _playback?.dispose();
+      _playback = null;
+      _timeline = null;
+      _model = null;
+      _error = null;
+      unawaited(_load());
+    } else if (oldWidget.options.names != widget.options.names) {
+      // The directory arrived after the timeline: the bars take the names now.
+      final timeline = _timeline;
+      if (timeline != null) _model = _modelOf(timeline);
+    }
+  }
+
+  TimelineModel _modelOf(api.StatsTimeline timeline) {
+    final all = TimelineModel.fromTimeline(
+      timeline,
+      names: widget.options.names,
+    );
+    // The `cost` buckets count bookings; a count is no amount and has neither currency nor
+    // label, so the rates of the timeline leave them out (25 4 rule 2; D-M6-12-8).
+    return TimelineModel(
+      from: all.from,
+      to: all.to,
+      bars: all.bars,
+      runsTruncated: all.runsTruncated,
+      series: [
+        for (final s in all.series)
+          if (s.metric != api.StatsMetric.cost) s,
+      ],
+    );
+  }
+
+  /// The speeds of `viz.timeline_speeds`; a value without one valid speed falls back to the
+  /// default of the key, so a bad configuration never breaks the view.
+  List<int> _speeds() {
+    final speeds = TimelinePlayback.parseSpeeds(
+      widget.options.config.timelineSpeeds,
+    );
+    return speeds.isNotEmpty
+        ? speeds
+        : TimelinePlayback.parseSpeeds(AppConfig.defaults().timelineSpeeds);
+  }
+
   Future<void> _load() async {
+    final generation = _generation;
     final range = widget.options.range;
     try {
       final timeline = await widget.queries.timeline(
@@ -76,37 +134,22 @@ class _TimelineViewState extends State<TimelineView> {
         to: range.to,
         spaceId: widget.options.scope.spaceId,
       );
-      if (!mounted) return;
-      final all = TimelineModel.fromTimeline(
-        timeline,
-        names: widget.options.names,
-      );
-      // The `cost` buckets count bookings; a count is no amount and has neither currency nor
-      // label, so the rates of the timeline leave them out (25 4 rule 2; D-M6-12-8).
-      final model = TimelineModel(
-        from: all.from,
-        to: all.to,
-        bars: all.bars,
-        runsTruncated: all.runsTruncated,
-        series: [
-          for (final s in all.series)
-            if (s.metric != api.StatsMetric.cost) s,
-        ],
-      );
+      if (!mounted || generation != _generation) return;
+      final model = _modelOf(timeline);
       final playback = TimelinePlayback(
         from: model.from,
         to: model.to,
         clock: widget.options.clock,
-        speeds: TimelinePlayback.parseSpeeds(
-          widget.options.config.timelineSpeeds,
-        ),
+        speeds: _speeds(),
       )..addListener(_changed);
       setState(() {
+        _timeline = timeline;
         _model = model;
         _playback = playback;
       });
-    } on Object catch (error) {
-      if (mounted) setState(() => _error = vizProblemCode(error));
+    } on Object catch (error, stack) {
+      if (!mounted || generation != _generation) return;
+      setState(() => _error = vizProblemCode(error, stack));
     }
   }
 

@@ -66,7 +66,7 @@ sources (M6-16).
 | `LiveTopologyView` (6.1) | `LiveFrameSource` (without one: `getStatsLive` once) | lanes per space and channel, run cards, rates of the last minute, stale and "More runs than shown"; a card tap calls `onOpenThread` |
 | `BackendView` (6.2) | `getStatsBackends`, the `agents` of every live frame | configured and reported mode with "Reported: ...", supported modes, switches, I2 and I3 denials, costs per mode, rate-limit state |
 | `DeliveryView` (6.3) | `LiveFrameSource`, `getStatsTimeline` for the history | instance scope only; in a space scope "Only for the owner" without calling a source |
-| `ExecutiveView` (6.4) | `getUsageStats` (in hours, and in weeks for the active people), `getRunStats`, `getErrorStats`, `getCostStats`, `getStatsSlo` | asks in hours on whole UTC hours (`executiveRange`) and names that period; counts are sums over it, levels (rates in percent, percentiles, the active people of the week) carry "Since: ..."; `forbidden` of the traffic light shows "Only for the owner", of the costs leaves them out; costs in several currencies show the first one with a note; `ExecutiveTileGroups` is reused by A7 |
+| `ExecutiveView` (6.4) | `getUsageStats` (in hours, and in weeks for the active people), `getRunStats`, `getErrorStats`, `getCostStats`, `getStatsSlo` | asks in hours on whole UTC hours (`executiveRange`) and names that period; counts are sums over it, levels (rates in percent, percentiles, the active people of the week) carry "Since: ..."; `forbidden` of the traffic light shows "Only for the owner", of the costs leaves them out; costs in several currencies show the first one with a note |
 | `TimelineView` (6.5) | `getStatsTimeline` once | plays locally with `TimelinePlayback` at `viz.timeline_speeds`; the playhead starts at the end |
 | `TvMode` (6.6) | the views it rotates | overlay, dark, `comfortable`, one font step larger, no controls, `viz.tv_rotation_interval`, costs only with `viz.tv_show_costs`, any key or click ends it |
 
@@ -81,7 +81,12 @@ How a host embeds them:
   `TvMode(views: [...], ..., onExit: ...)` over the screen.
 - The views are columns without their own scroll view; place them in a scrollable area.
 - Errors of a source (`forbidden`, `not_found`, `feature_disabled`, `rate_limited`) show their
-  text, and a live view stops its source until the host starts it again.
+  text, and a live view stops its source until the host starts it again. Any other error shows
+  the general text; an `Error` (a defect such as a `StateError` of a model) also goes with its
+  stack to `FlutterError.reportError`.
+- A view follows new options: another scope, period, live source or query source loads again;
+  new display names only relabel. Equal values (`VizScope`, `VizRange` and `VizNames` compare
+  by value) load nothing, so a host may build its options on every build.
 
 Run from the repository root: `make lint test coverage arch COMPONENTS=apps`. Regenerate the
 goldens with `flutter test --update-goldens test/goldens` in this folder. The API pages come from

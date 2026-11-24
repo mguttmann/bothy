@@ -81,15 +81,25 @@ class _VizTableState extends State<VizTable> {
   int? _sortColumn;
   bool _ascending = true;
 
+  /// The rows in sort order. A row of a tree (a level above 0, such as the agent tree of a
+  /// run in the live topology) stays below the top row it belongs to: the sort orders the
+  /// blocks of a top row and its tree rows by the top row and keeps the order inside a block.
   List<List<VizCell>> get _rows {
     final column = _sortColumn;
-    final rows = [...widget.data.rows];
-    if (column == null) return rows;
-    rows.sort((a, b) {
-      final order = _compare(a[column].sortKey, b[column].sortKey);
+    if (column == null) return [...widget.data.rows];
+    final blocks = <List<List<VizCell>>>[];
+    for (final row in widget.data.rows) {
+      if (blocks.isEmpty || !row.any((c) => c.level > 0)) {
+        blocks.add([row]);
+      } else {
+        blocks.last.add(row);
+      }
+    }
+    blocks.sort((a, b) {
+      final order = _compare(a.first[column].sortKey, b.first[column].sortKey);
       return _ascending ? order : -order;
     });
-    return rows;
+    return [for (final block in blocks) ...block];
   }
 
   static int _compare(Comparable<Object> a, Comparable<Object> b) {

@@ -332,4 +332,21 @@ void main() {
       expect((await own.closed()).$1, 4002);
     },
   );
+
+  test('identify with the token of a revoked session closes with 4012', () async {
+    final alex = h.device();
+    final signed = await signedIn(h, alex);
+    final grant = (await alex.api.getTerminalApi().openTerminalSession(
+      hostId: buildHost().id,
+      terminalSessionOpen: opening('shell'),
+    )).data!;
+    // The token stays fresh on the device; only the server revoked its session.
+    await alex.auth.refresh.ensureFresh();
+    final session = h.server.world.sessions.values.firstWhere(
+      (x) => x.accessToken == signed.token,
+    );
+    h.server.world.revokeSession(session.id);
+    final stream = await _Stream.open(h.server, alex, grant.streamPath);
+    expect((await stream.closed()).$1, 4012);
+  });
 }

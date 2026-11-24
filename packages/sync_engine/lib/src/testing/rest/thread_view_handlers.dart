@@ -16,8 +16,8 @@ int _ifMatch(FakeRequest r) {
   return int.parse(match[1]!);
 }
 
-/// Registers the thread view handlers on [rest]; `createThread` replaces the forum handler of
-/// M4-19 and hands a body without `parent_message_id` to it unchanged.
+/// Registers the thread view handlers on [rest]; `createThread` is registered only here and
+/// hands a body without `parent_message_id` to the forum post of M4-19 unchanged.
 void registerThreadViewHandlers(RestFake rest) {
   final world = rest.world;
   rest

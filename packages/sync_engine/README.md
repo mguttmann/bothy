@@ -562,8 +562,10 @@ both `409 file_blocked`), `wrongDigest` (a damaged
 `createMessage` attaches `attachment_file_ids` by the rules of 12 10 (`409 conflict` with
 `file_not_attachable`); a voice message answers `409 file_not_ready` with `Retry-After` or `409
 file_blocked` until its file is ready, as the server does (12 8.1). Other
-writes with `Idempotency-Key` repeat their
-stored answer with `Idempotent-Replay: true` (04 5.2, 06 7). Later tickets add operations with `server.handle(operationId,
+writes of an operation that declares `Idempotency-Key` repeat their
+stored answer with `Idempotent-Replay: true` (04 5.2, 06 7): a key that is not a UUIDv7 is
+`400 validation_failed` (`#header/Idempotency-Key`), and only a `2xx` or a final error (`400`,
+`403`, `404`, `409`, `410`, `412`, `413`, `415`, `422`) is stored, as the server's stage does. Later tickets add operations with `server.handle(operationId,
 handler)` in their own `rest/` file (D-M4-17-2). Gateway: `hello`, `identify`, `resume`,
 `ready` with the snapshot, catch-up in pages with `cursor` frames, `catchup.complete`,
 `resync_required` for `epoch_changed`, `retention`, `too_far_behind` and `cursor_ahead`, live
@@ -575,7 +577,7 @@ device (`4017`) and the close codes of 04 6.4 for the session checks.
 
 From M4-28 `rest/agent_handlers.dart` serves the agent administration of screen A5:
 `listAgents`, `getAgent` (the card of `FakeWorld.agentJson` with the warnings of 10 8; the fake
-treats `billing.mismatch_alert_after` as zero), `setAgentBillingMode` and `setCredentialHolder`
+counts `billing.mismatch_alert_after` as one heartbeat), `setAgentBillingMode` and `setCredentialHolder`
 (`If-Match`), `setAllAgentsBillingMode` (all or nothing, BR-08) and the agent tokens
 `listTokens`, `createToken` (secret of ADR 0061, shown once) and `revokeToken`. Tests build
 agents with `world.addAgent`, operators with `setSpaceOperator` and `setChannelOperator`, and
@@ -700,8 +702,9 @@ the server; the form covers REST requests and durable events, not gateway frames
 
 ### What the fake simplifies
 
-- Permissions: only visibility and the level per channel; no grants, groups, `manage` or
-  scopes; no rate limits unless injected. Administration: an owner may do everything, anybody
+- Permissions: visibility, the level per channel, the `manage` capability
+  (`grantCapability`) and the grants and groups of the administration handlers; no scopes;
+  no rate limits unless injected. Administration: an owner may do everything, anybody
   else gets `403 forbidden` with `owner_only` outside the own person; lists have no paging;
   members do not expire by time. Step-up (M4-25): `approveDevice`, `approvePairing`
   and `revokeDevice` answer `401 step_up_required` until the session confirmed with its
@@ -726,7 +729,11 @@ the server; the form covers REST requests and durable events, not gateway frames
   Simplified: no purge after the window, no `access.changed` for the rights change, no run
   cancellation, no runner hand-off of the folder.
 - Events: `agent.invocation` and the agent consumer side are not modelled; `device.pending` is
-  not written (it is not in the API documents of this base); `typing.stop` has no effect.
+  not written (the fake has no event for a pending device); `typing.stop` has no effect.
+- Contract check: only the JSON bodies of requests and responses and the gateway frames are
+  validated; path, query and header parameters, the problem code per status
+  (`x-problem-codes`) and the terminal stream frames are not. A handler that throws anything
+  but a `FakeProblem` answers `500 internal_error` and adds a line to `violations`.
 - `cancelRun` ends the run at once with `cancelled`.
 - Wake-ups (AR-08, `world_wakes.dart`, `rest/wake_handlers.dart`; 09 5.8): `listThreadWakes`
   (every wake-up of a thread the caller sees, newest first, one page), `cancelRunWake` (the

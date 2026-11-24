@@ -103,6 +103,14 @@ final class FakeResponse {
   /// `204 No Content`.
   const FakeResponse.noContent() : this(204);
 
+  /// [response] with the [extra] headers added.
+  FakeResponse._withHeaders(FakeResponse response, Map<String, String> extra)
+    : status = response.status,
+      body = response.body,
+      headers = {...response.headers, ...extra},
+      bytes = response.bytes,
+      _contentType = response._contentType;
+
   /// The HTTP status.
   final int status;
 
@@ -302,10 +310,16 @@ final class RestFake {
     FakeResponse response;
     FakeSession? session;
     String? jkt;
+    var previousNonce = false;
     try {
-      (session, jkt) =
-          _ticketSession(op, headers, request.uri) ??
-          _authenticate(route.op, method, htu, headers);
+      final ticket = _ticketSession(op, headers, request.uri);
+      if (ticket != null) {
+        (session, jkt) = ticket;
+      } else {
+        final auth = _authenticate(route.op, method, htu, headers);
+        (session, jkt) = (auth.session, auth.jkt);
+        previousNonce = auth.previousNonce;
+      }
       final requestViolations = contract.request(op, body);
       if (requestViolations.isNotEmpty) {
         violations.add('request $op: ${requestViolations.join('; ')}');
@@ -382,11 +396,29 @@ final class RestFake {
       );
     } on _Unauthorized catch (u) {
       response = u.response;
+    } on Object catch (error) {
+      // A defect of the fake itself (a TypeError, StateError or parse error in a handler): as
+      // the server answers an unexpected error, `500 internal_error`, and the violation fails
+      // every test that checks [violations], so a broken handler cannot pass as an empty
+      // success.
+      violations.add('handler $op threw: $error');
+      response = _problem(
+        500,
+        'internal_error',
+        detail: 'the fake handler failed',
+      );
+    }
+    if (previousNonce) {
+      // 08 7.3: a proof over the previous nonce gets the current one with the answer, also a
+      // successful one, so the client moves on before the previous one goes stale.
+      response = FakeResponse._withHeaders(response, {
+        'DPoP-Nonce': verifier.currentNonce,
+      });
     }
     await _send(request, op, method, path, body, headers, response);
   }
 
-  (FakeSession?, String?) _authenticate(
+  ({FakeSession? session, String? jkt, bool previousNonce}) _authenticate(
     ContractOperation op,
     String method,
     String htu,
@@ -394,9 +426,15 @@ final class RestFake {
   ) {
     final proof = headers['dpop'];
     if (!op.secured) {
-      if (proof == null) return (null, null);
+      if (proof == null) {
+        return (session: null, jkt: null, previousNonce: false);
+      }
       final result = verifier.verify(proof, method: method, htu: htu);
-      return (null, _accept(result));
+      return (
+        session: null,
+        jkt: _accept(result),
+        previousNonce: result is DpopAccepted && result.previousNonce,
+      );
     }
     final authorization = headers['authorization'] ?? '';
     if (authorization.startsWith('Bearer ')) {
@@ -432,7 +470,11 @@ final class RestFake {
     final seen = world.stamp();
     device.lastSeenAt = seen;
     session.lastSeenAt = seen;
-    return (session, jkt);
+    return (
+      session: session,
+      jkt: jkt,
+      previousNonce: result is DpopAccepted && result.previousNonce,
+    );
   }
 
   /// The session of a file ticket (12 9.2) of `downloadFile` and `downloadThumbnail`: only
@@ -480,24 +522,38 @@ final class RestFake {
   }
 
   /// Whether the `exp` of a token issued by the fake lies in the past.
-  bool tokenExpired(String token) {
-    final parts = token.split('.');
-    if (parts.length != 3) return true;
-    try {
-      final payload = jsonDecode(
-        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
-      ) as JsonMap;
-      final exp = payload['exp']! as int;
-      return world.now().millisecondsSinceEpoch ~/ 1000 >= exp;
-    } on Object {
-      return true;
-    }
-  }
+  bool tokenExpired(String token) => world.accessTokenExpired(token);
+
+  /// The error statuses the server stores as the final answer of a key (06 7 point 2, the
+  /// server's `finalStatuses`); `409 request_in_progress` is never stored.
+  static const _finalStatuses = {400, 403, 404, 409, 410, 412, 413, 415, 422};
+
+  static final RegExp _uuid7 = RegExp(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+  );
+
+  static bool _stored(int status, String? code) =>
+      (status >= 200 && status < 300) ||
+      (_finalStatuses.contains(status) && code != 'request_in_progress');
 
   Future<FakeResponse> _idempotent(FakeRequest r, FakeHandler handler) async {
     final key = r.headers['idempotency-key'];
-    if (key == null || r.session == null || r.operationId == 'createMessage') {
+    // As the server's stage: only an operation that declares the header, with a signed-in
+    // caller; anywhere else the header has no effect.
+    if (key == null ||
+        r.session == null ||
+        r.operationId == 'createMessage' ||
+        !contract.operation(r.operationId).idempotencyKey) {
       return handler(r);
+    }
+    if (!_uuid7.hasMatch(key.toLowerCase())) {
+      throw const FakeProblem(
+        400,
+        'validation_failed',
+        errors: [
+          {'pointer': '#header/Idempotency-Key', 'code': 'invalid_format'},
+        ],
+      );
     }
     final hash = sha256
         .convert(utf8.encode('${r.method} ${r.uri.path} ${jsonEncode(r.body)}'))
@@ -523,7 +579,7 @@ final class RestFake {
     } on FakeProblem catch (p) {
       // A `401` is an answer of the authentication in front of the operation (06 7): the
       // repeat after a step-up or refresh with the same key runs the operation again.
-      if (p.status < 500 && p.status != 401) {
+      if (_stored(p.status, p.code)) {
         world.idempotency[slot] = StoredResponse(
           hash,
           p.status,
@@ -538,7 +594,10 @@ final class RestFake {
       }
       rethrow;
     }
-    if (response.status < 500) {
+    final code = response.body is JsonMap
+        ? (response.body! as JsonMap)['code'] as String?
+        : null;
+    if (_stored(response.status, code)) {
       world.idempotency[slot] = StoredResponse(
         hash,
         response.status,
@@ -638,7 +697,14 @@ final class RestFake {
       ),
     );
     final res = request.response..statusCode = out.status;
-    res.headers.set('Correlation-Id', world.nextId());
+    // One correlation ID per answer: a problem body carries the same one as the header.
+    final problemId = out.body is JsonMap
+        ? (out.body! as JsonMap)['correlation_id']
+        : null;
+    res.headers.set(
+      'Correlation-Id',
+      problemId is String && out.status >= 400 ? problemId : world.nextId(),
+    );
     out.headers.forEach(res.headers.set);
     final bytes = out.bytes;
     if (bytes != null) {

@@ -83,19 +83,22 @@ void main() {
     'an Idempotency-Key write repeats its answer; another body gives 422',
     () async {
       final key = h.server.world.nextId();
-      final prefs = alex.api.getPreferencesApi();
-      Future<Response<ReadState>> put(int seq) => prefs.putReadState(
-        threadId: h.seed.releaseNotes,
-        readStatePut: ReadStatePut((b) => b..lastReadSeq = seq),
-        extra: {idempotencyKeyExtra: key},
-      );
-      final first = await put(0);
-      final head = h.server.world.headSeq;
-      final again = await put(0);
-      expect(again.data!.version, first.data!.version);
-      expect(h.server.world.headSeq, head);
+      final me = alex.api.getMeApi();
+      Future<Response<Template>> create(String text) =>
+          me.createPersonalTemplate(
+            templateCreate: TemplateCreate(
+              (b) => b
+                ..name = 'Greeting'
+                ..contentMd = text,
+            ),
+            extra: {idempotencyKeyExtra: key},
+          );
+      final first = await create('Hello Sam');
+      final again = await create('Hello Sam');
+      expect(again.headers.value('idempotent-replay'), 'true');
+      expect(again.data!.id, first.data!.id);
       await expectLater(
-        put(1),
+        create('Hello Robin'),
         throwsA(
           isA<DioException>().having(
             (e) => (e.response?.data as Map?)?['code'],
@@ -104,6 +107,24 @@ void main() {
           ),
         ),
       );
+    },
+  );
+
+  test(
+    'the key has no effect on an operation that does not declare it',
+    () async {
+      final key = h.server.world.nextId();
+      final prefs = alex.api.getPreferencesApi();
+      h.seed.post(h.seed.sam, h.seed.releaseNotes, 'one');
+      Future<Response<ReadState>> put(int seq) => prefs.putReadState(
+        threadId: h.seed.releaseNotes,
+        readStatePut: ReadStatePut((b) => b..lastReadSeq = seq),
+        extra: {idempotencyKeyExtra: key},
+      );
+      await put(0);
+      // As the server: putReadState declares no Idempotency-Key, so the same key with
+      // another body runs the operation instead of answering 422.
+      expect((await put(1)).data!.lastReadSeq, 1);
     },
   );
 }

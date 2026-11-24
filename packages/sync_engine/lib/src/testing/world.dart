@@ -463,6 +463,22 @@ final class FakeWorld {
   /// The time source.
   final DateTime Function() now;
 
+  /// Whether the `exp` of an access [token] issued by the fake lies in the past at [now]; a
+  /// token that is not JWS-shaped counts as expired. REST, the gateway and the terminal stream
+  /// share this check.
+  bool accessTokenExpired(String token) {
+    final parts = token.split('.');
+    if (parts.length != 3) return true;
+    try {
+      final payload = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      ) as JsonMap;
+      return now().millisecondsSinceEpoch ~/ 1000 >= (payload['exp']! as int);
+    } on Object {
+      return true;
+    }
+  }
+
   int _ids = 0;
 
   /// The instance ID.
@@ -2371,9 +2387,14 @@ final class FakeWorld {
   /// Throws [FakeProblem]: `404` for a channel the principal does not see, `403 forbidden`
   /// below `write`, `400 validation_failed` for a forum post without `first_message`
   /// (`required_for_forum_post`, as the server of M1-56), with a tag that is not a tag of the
-  /// forum, and for a thread from a message (`parent_message_id`), which the fake does not
-  /// model. A post without a title gets `title_source = auto`; `first_message.clear_draft`
-  /// deletes the principal's channel draft of the forum with `draft.deleted`.
+  /// forum, `/parent_message_id` `not_allowed_in_forum` for a forum post with a parent message
+  /// and `required_in_text_channel` for a thread of a text channel without one (the server's
+  /// codes; [createThreadFromMessage] serves a thread from a message). A post without a title
+  /// gets `title_source = auto`; `first_message.clear_draft` deletes the principal's channel
+  /// draft of the forum with `draft.deleted`.
+  ///
+  /// As the server's unit of work, the first message is checked before anything is written:
+  /// a refused first message leaves neither a thread nor an event.
   JsonMap createThread(String principalId, String channelId, JsonMap body) {
     final channel = channels[channelId];
     if (channel == null || !seesChannel(principalId, channelId)) {
@@ -2389,13 +2410,17 @@ final class FakeWorld {
         {'pointer': pointer, 'code': code},
       ],
     );
-    if (channel.json['kind'] != 'forum' || body['parent_message_id'] != null) {
-      throw invalid('/parent_message_id', 'not_supported_by_fake');
+    if (channel.json['kind'] != 'forum') {
+      throw invalid('/parent_message_id', 'required_in_text_channel');
+    }
+    if (body['parent_message_id'] != null) {
+      throw invalid('/parent_message_id', 'not_allowed_in_forum');
     }
     final first = body['first_message'] as JsonMap?;
     if (first == null) {
       throw invalid('/first_message', 'required_for_forum_post');
     }
+    _checkFirstMessage(principalId, channelId, first);
     // An empty title is allowed (the server's CheckThreadTitle); the post then waits for its
     // auto title (`title_source = auto`).
     final title = (body['title'] as String?)?.trim() ?? '';
@@ -2425,6 +2450,28 @@ final class FakeWorld {
     ).message;
     if (first['clear_draft'] == true) _dropChannelDraft(principalId, channelId);
     return {'thread': thread, 'first_message': message};
+  }
+
+  /// Checks the first message [first] of a new thread in [channelId] as [createMessage] would,
+  /// before the thread is written (the server's unit of work): `403 channel_read_only`, `400
+  /// validation_failed` for a `client_msg_id` that is not a UUIDv7 and the attachment checks.
+  void _checkFirstMessage(String principalId, String channelId, JsonMap first) {
+    if (channels[channelId]!.json['read_only'] == true) {
+      throw const FakeProblem(403, 'channel_read_only');
+    }
+    final cmid = first['client_msg_id'];
+    if (cmid is! String || !_uuid7.hasMatch(cmid)) {
+      throw const FakeProblem(
+        400,
+        'validation_failed',
+        errors: [
+          {'pointer': '/client_msg_id', 'code': 'invalid_format'},
+        ],
+      );
+    }
+    _attachable(principalId, channelId, [
+      ...?(first['attachment_file_ids'] as List<Object?>?)?.cast<String>(),
+    ], kind: first['kind'] as String? ?? 'text');
   }
 
   /// Marks [threadId] done (`thread.close`) and appends `thread.closed`.

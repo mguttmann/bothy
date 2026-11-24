@@ -38,6 +38,13 @@ final class VizScope {
 
   /// Whether this is the instance scope.
   bool get isInstance => spaceId == null;
+
+  @override
+  bool operator ==(Object other) =>
+      other is VizScope && other.spaceId == spaceId;
+
+  @override
+  int get hashCode => spaceId.hashCode;
 }
 
 /// The period of the REST queries, chosen by the host (for example the selected day).
@@ -50,6 +57,13 @@ final class VizRange {
 
   /// End of the period.
   final DateTime to;
+
+  @override
+  bool operator ==(Object other) =>
+      other is VizRange && other.from == from && other.to == to;
+
+  @override
+  int get hashCode => Object.hash(from, to);
 }
 
 /// What only the host knows, passed to every view (design note 1).

@@ -109,6 +109,25 @@ void main() {
     expect(second.whereType<LiveFrameFrame>(), hasLength(3));
   });
 
+  test('a new start stops the delivery of the running one first', () {
+    final live = _CountingSource(FakeVizClock(start), staleAfter);
+    live
+      ..start()
+      ..start(spaceId: '0192f4a0-7b1c-7000-8a00-000000000002');
+    expect(live.calls, [
+      'start null',
+      'stop',
+      'start 0192f4a0-7b1c-7000-8a00-000000000002',
+    ]);
+  });
+
+  test('a frame derives its model only when asked', () async {
+    final frame = await fixtures.liveFrame('normal');
+    final event = LiveFrameFrame(frame, names: names);
+    expect(event.model.lanes, isNotEmpty);
+    expect(identical(event.model, event.model), isTrue);
+  });
+
   test('stop closes the stream and cancels every timer', () async {
     final (clock, live) = await source(loop: true);
     var done = false;
@@ -180,4 +199,18 @@ void main() {
       );
     });
   });
+}
+
+/// A source that records its starts and stops.
+final class _CountingSource extends LiveFrameSourceBase {
+  _CountingSource(FakeVizClock clock, Duration staleAfter)
+    : super(clock: clock, staleAfter: staleAfter);
+
+  final List<String> calls = [];
+
+  @override
+  void onStart(String? spaceId) => calls.add('start $spaceId');
+
+  @override
+  void onStop() => calls.add('stop');
 }
