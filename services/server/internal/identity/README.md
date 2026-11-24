@@ -533,8 +533,9 @@ is the runner (docs/decisions.d/A1-01.md D-A1-01-4).
   row in the ambient unit, `RecordFailedAttempt` in an own transaction after the rollback,
   `MarkUsed`); `Service` with `CompleteLogin` (the only place that creates devices, sessions and
   tokens for logins: `TrustConfirmed` makes a new device `active`, `TrustUnconfirmed` `pending`; a
-  known device of the same person with the same active key is reused unchanged, any other known
-  device id is `409`; the proof key must be the registered `dpop` key; one allow entry of
+  known device of the same person with the same active key is reused unchanged, except that a
+  `TrustConfirmed` login on a known `pending` device is `409` with reason `device_pending` (the code
+  stays unused, AUD-PKG-P07-server-security), any other known device id is `409`; the proof key must be the registered `dpop` key; one allow entry of
   `auth.login.complete` with the person as actor), `RedeemEnrollmentCode`,
   `CreateEnrollmentCode`, `BootstrapOwner` and `IssueRecoveryCode`; outgoing port
   `EnrollmentStore`.
