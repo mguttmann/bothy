@@ -792,7 +792,11 @@ semgrep: ## Project Semgrep rules (.semgrep/) and their rule tests
 	  [ -n "$$fixture" ] || { echo "semgrep: $$rule has no test fixture"; exit 1; }; \
 	  $(SEMGREP) --test --metrics=off --disable-version-check --config "$$rule" "$$fixture" || exit 1; \
 	done
-	$(SEMGREP) scan --config .semgrep --exclude .semgrep --error --metrics=off --disable-version-check --quiet .
+	@# Without --quiet the log shows what Semgrep skipped: files over the default limit of 1 MB (all
+	@# generated: the OpenAPI documents and the largest *.gen.go) and rule timeouts in generated
+	@# models. --strict stays off: the Go parser of Semgrep reads generic type constraints (~T) only
+	@# partly, so valid files would fail the gate.
+	$(SEMGREP) scan --config .semgrep --exclude .semgrep --error --metrics=off --disable-version-check .
 
 trivy: ## Trivy misconfiguration scan of Dockerfiles, Kubernetes, Helm and Terraform files
 	@# Trivy walks a directory; it scans a copy of the committable files (tools/ci/tracked_tree.py),
