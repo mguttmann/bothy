@@ -399,6 +399,22 @@ func TestRecheck_EndsSessionWithMappedReason(t *testing.T) {
 	}
 }
 
+// TestRecheck_FailedClaudeOpeningKeepsNoNote (audit finding srv-terminal-15): an opening of a
+// claude profile whose recheck ends it leaves no working directory index in the grant notes.
+func TestRecheck_FailedClaudeOpeningKeepsNoNote(t *testing.T) {
+	t.Parallel()
+	w := newSWorld(t, nil)
+	w.authz.recheck = authorize.Decision{Outcome: authorize.OutcomeForbidden, Reason: "capability_missing"}
+	wdi := 0
+	_, err := w.svc.Sessions().Open(context.Background(), w.alex, terminal.OpenSession{HostID: w.r1, Profile: "claude", WorkdirIndex: &wdi, Cols: 1, Rows: 1, CEK: "cek"})
+	if err == nil {
+		t.Fatal("the opening passed its recheck")
+	}
+	if n := w.svc.GrantNotes(); n != 0 {
+		t.Fatalf("%d grant notes left after the failed recheck", n)
+	}
+}
+
 // TestAttach_QuickReattachRaceNeedsStepUp (Design note 6 b): a quick reattach whose locked row is
 // no longer detached with the same device and login session answers 401 with a denial.
 func TestAttach_QuickReattachRaceNeedsStepUp(t *testing.T) {

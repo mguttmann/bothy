@@ -81,6 +81,7 @@ func (s *Service) attachSession(ctx context.Context, p actor.Actor, cmd terminal
 		}
 		return sessionResource(cmd.SessionID, cur, found, true), nil
 	}, h.ID); err != nil {
+		s.notes.take(cmd.SessionID) // no terminal.session_open follows that would take it
 		return terminal.Grant{}, err
 	}
 	s.committed(ctx, sessionOpenSignal(h.ID, cmd.SessionID))
