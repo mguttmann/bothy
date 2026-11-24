@@ -173,7 +173,9 @@ Before 1.0.0, SemVer 0.x applies: a minor version may break; the release notes n
    `make release-prep` ([ADR 0060](../adr/0060-release-automation-in-the-monorepo.md)).
 3. Release notes of the server have fixed sections: upgrade notes (manual work yes or no),
    migrations (expand or contract, duration on large tables), compatibility (supported
-   protocol versions, minimum app version), security, known issues.
+   protocol versions, minimum app version), security, known issues. A release section of
+   `services/server/CHANGELOG.md` without the headings `### Upgrade notes`, `### Migrations` and
+   `### Compatibility` fails `make check` (`tools/ci/changelog_summary.py`).
 4. Every release section `## [<version>] - <date>` starts with a summary for users: a paragraph
    whose first line begins with `Summary: `, before the first `###` heading or entry;
    `make release-prep` writes a placeholder line there, and `make check`

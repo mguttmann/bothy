@@ -50,7 +50,9 @@ by a product release; existing installations raise `BOTHY_VERSION` themselves
    its placeholder line `Summary: (placeholder) ...` with a summary for users (`make
    fragments-check` fails until it is replaced; the release page puts it first,
    [.github/release-template.md](../../.github/release-template.md)), add the
-   mandatory parts of the release notes ([18-release.md](../spec/18-release.md) 4), commit
+   mandatory parts of the release notes ([18-release.md](../spec/18-release.md) 4; `make
+   fragments-check` fails until the section has the headings `### Upgrade notes`,
+   `### Migrations` and `### Compatibility`, each "None" where nothing applies), commit
    `chore(release): server vX.Y.Z` and land it through a pull request.
 3. `make release-trial COMPONENT=server` on the build host (section 2.3) with the release
    commit; it must pass.
