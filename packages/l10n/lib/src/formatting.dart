@@ -93,31 +93,35 @@ class L10nFormat {
     return m == 0 ? '$h${_nbsp}h' : '$h${_nbsp}h $m${_nbsp}min';
   }
 
-  tz.TZDateTime _inZone(DateTime instant, String timeZone) {
+  /// [timeZone] when the bundled time zone database knows it, else `UTC`: the one fallback
+  /// for a zone the server knows and this build does not (another tzdata version), an empty
+  /// or a missing one. The formatting methods use it, so they never throw for a zone.
+  ///
+  /// Example: `L10nFormat.knownTimeZone('Mars/Olympus')` is `UTC`.
+  static String knownTimeZone(String? timeZone) =>
+      timeZone != null && _find(timeZone) != null ? timeZone : 'UTC';
+
+  static tz.Location? _find(String timeZone) {
     _ensureData();
-    final tz.Location location;
     try {
-      location = tz.getLocation(timeZone);
+      return tz.getLocation(timeZone);
     } on tz.LocationNotFoundException {
-      throw ArgumentError.value(timeZone, 'timeZone', 'not an IANA time zone');
+      return null;
     }
-    return tz.TZDateTime.from(instant, location);
   }
+
+  static tz.Location _location(String timeZone) => _find(timeZone) ?? tz.UTC;
+
+  tz.TZDateTime _inZone(DateTime instant, String timeZone) =>
+      tz.TZDateTime.from(instant, _location(timeZone));
 
   /// The instant (UTC) at which the calendar day [year]-[month]-[day] starts in [timeZone]
   /// (IANA name), for a date the person typed in their own time zone.
   ///
   /// Example: `dayStart(2027, 1, 1, timeZone: 'America/New_York')` is 2027-01-01 05:00 UTC.
-  /// Throws an [ArgumentError] when [timeZone] is not in the time zone database.
+  /// A [timeZone] the time zone database lacks counts as UTC ([knownTimeZone]).
   DateTime dayStart(int year, int month, int day, {required String timeZone}) {
-    _ensureData();
-    final tz.Location location;
-    try {
-      location = tz.getLocation(timeZone);
-    } on tz.LocationNotFoundException {
-      throw ArgumentError.value(timeZone, 'timeZone', 'not an IANA time zone');
-    }
-    final start = tz.TZDateTime(location, year, month, day);
+    final start = tz.TZDateTime(_location(timeZone), year, month, day);
     return DateTime.fromMicrosecondsSinceEpoch(
       start.microsecondsSinceEpoch,
       isUtc: true,
@@ -128,7 +132,7 @@ class L10nFormat {
   /// English. The space before AM or PM is the no-break space of the product font: `intl`
   /// writes U+202F, which the font lacks, so each platform drew it with another fallback font.
   ///
-  /// Throws an [ArgumentError] when [timeZone] is not in the time zone database.
+  /// A [timeZone] the time zone database lacks counts as UTC ([knownTimeZone]).
   String time(DateTime instant, {required String timeZone}) {
     final local = _inZone(instant, timeZone);
     return DateFormat.jm(_tag).format(local).replaceAll('\u202F', _nbsp);
@@ -137,7 +141,7 @@ class L10nFormat {
   /// The day of [instant] relative to [now], both seen in [timeZone]: `Today`, `Yesterday`,
   /// the weekday for the five days before, the date otherwise (also for a day after [now]).
   ///
-  /// Throws an [ArgumentError] when [timeZone] is not in the time zone database.
+  /// A [timeZone] the time zone database lacks counts as UTC ([knownTimeZone]).
   String relativeDay(
     DateTime instant, {
     required DateTime now,

@@ -85,7 +85,9 @@ in `docs/api/openapi.yaml` needs its message in both ARB files and a case in
 `L10nFormat(locale)` formats per app locale: `money(1.84, 'USD')` is `1,84 USD` in German and
 `USD 1.84` in English, with a non-breaking space; `elapsed` is the running clock (`4:12`),
 `durationShort` the finished duration (`28 min`, `2 h 5 min`); `time` and `relativeDay` take
-the IANA time zone of the person and, for `relativeDay`, the current time from the caller.
+the IANA time zone of the person and, for `relativeDay`, the current time from the caller; a
+zone the bundled database lacks counts as UTC (`L10nFormat.knownTimeZone`), so formatting never
+throws for a zone.
 
 Run from the repository root: `make lint test coverage arch codegen-check COMPONENTS=apps`. The
 API pages come from `make docs` ([Dart API reference](../../docs/reference/dart-api.md)).

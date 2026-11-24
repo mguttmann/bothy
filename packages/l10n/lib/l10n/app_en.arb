@@ -1641,7 +1641,7 @@
       }
     }
   },
-  "billingLabelPersonalNoHolder": "Backend: Personal, runs on a personal subscription",
+  "billingLabelPersonalNoHolder": "Backend: Personal, uses a personal subscription",
   "@billingLabelPersonalNoHolder": {
     "description": "Screen reader label of the badge `personal` when the holder of the subscription is not known (components.md section 10)."
   },

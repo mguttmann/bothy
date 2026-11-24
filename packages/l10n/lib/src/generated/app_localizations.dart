@@ -1844,7 +1844,7 @@ abstract class AppLocalizations {
   /// Screen reader label of the badge `personal` when the holder of the subscription is not known (components.md section 10).
   ///
   /// In en, this message translates to:
-  /// **'Backend: Personal, runs on a personal subscription'**
+  /// **'Backend: Personal, uses a personal subscription'**
   String get billingLabelPersonalNoHolder;
 
   /// Screen reader label of the badge `organization` (components.md section 10).

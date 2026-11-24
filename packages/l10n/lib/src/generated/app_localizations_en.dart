@@ -1141,7 +1141,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get billingLabelPersonalNoHolder =>
-      'Backend: Personal, runs on a personal subscription';
+      'Backend: Personal, uses a personal subscription';
 
   @override
   String get billingLabelOrganization => 'Backend: Organization';

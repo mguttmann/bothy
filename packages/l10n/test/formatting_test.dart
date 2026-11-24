@@ -94,11 +94,25 @@ void main() {
       );
     });
 
-    test('an unknown time zone fails', () {
+    // design-system-15: a zone name the bundled database lacks (another tzdata version on
+    // the server) formats in UTC instead of failing the build of a widget.
+    test('an unknown time zone formats in UTC', () {
       expect(
-        () => de.time(beforeBerlin, timeZone: 'Mars/Olympus'),
-        throwsArgumentError,
+        de.time(beforeBerlin, timeZone: 'Mars/Olympus'),
+        de.time(beforeBerlin, timeZone: 'UTC'),
       );
+      expect(
+        de.relativeDay(
+          beforeBerlin,
+          now: beforeBerlin,
+          timeZone: 'Mars/Olympus',
+        ),
+        de.relativeDay(beforeBerlin, now: beforeBerlin, timeZone: 'UTC'),
+      );
+      expect(L10nFormat.knownTimeZone('Mars/Olympus'), 'UTC');
+      expect(L10nFormat.knownTimeZone(''), 'UTC');
+      expect(L10nFormat.knownTimeZone(null), 'UTC');
+      expect(L10nFormat.knownTimeZone('Europe/Berlin'), 'Europe/Berlin');
     });
   });
 
@@ -113,8 +127,8 @@ void main() {
       DateTime.utc(2026, 6, 30, 22),
     );
     expect(
-      () => f.dayStart(2026, 1, 1, timeZone: 'Mars/Base'),
-      throwsArgumentError,
+      f.dayStart(2026, 1, 1, timeZone: 'Mars/Base'),
+      DateTime.utc(2026, 1, 1),
     );
   });
 

@@ -289,7 +289,7 @@
   "billingUnknown": "Backend {code}",
   "billingReported": "Ist: {mode}",
   "billingLabelPersonal": "Backend: Persönlich, läuft auf dem Abo von {name}",
-  "billingLabelPersonalNoHolder": "Backend: Persönlich, läuft auf einem persönlichen Abo",
+  "billingLabelPersonalNoHolder": "Backend: Persönlich, nutzt ein persönliches Abo",
   "billingLabelOrganization": "Backend: Organisation",
   "costEstimate": "Schätzung",
   "costInformationOnly": "nur Information",
