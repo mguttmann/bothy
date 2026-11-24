@@ -13,6 +13,11 @@ Every Gradle build of the repository raises Gradle's own retries of a repository
 of Gradle 9.3.1 (`ErrorHandlingModuleComponentRepository`, which retries on 408, 429 and 5xx), so
 the wrapper version is held here and an upgrade must check them again (docs/quality/gates.md,
 "Gradle downloads").
+
+A cold cache still downloads everything, and a job that fails saves no cache, so every cached
+Gradle job also installs the init script `tools/ci/gradle/maven-central-mirror.init.gradle`
+before its first Gradle run: every build of the build tree (the Flutter Gradle plugin is an
+included build) asks Google's public mirror of Maven Central first. The release build does not.
 """
 
 from __future__ import annotations
@@ -71,6 +76,8 @@ RETRY_PROPERTIES = {
     "systemProp.org.gradle.internal.repository.initial.backoff": "2000",
 }
 VERIFIED_GRADLE = "gradle-9.3.1-bin.zip"
+MIRROR_SCRIPT = "tools/ci/gradle/maven-central-mirror.init.gradle"
+MIRROR_URL = "https://maven-central.storage-download.googleapis.com/maven2/"
 
 
 def _jobs(workflow: str) -> dict[str, Any]:
@@ -172,3 +179,53 @@ def test_every_gradle_build_retries_repository_requests(root: Path) -> None:
     )
     # A Gradle upgrade must check the internal property names again (module docstring).
     assert VERIFIED_GRADLE in wrapper, f"{root}: Gradle changed, check the retry properties"
+
+
+def _mirror_steps(steps: list[dict[str, Any]]) -> list[int]:
+    return [i for i, step in enumerate(steps) if MIRROR_SCRIPT in str(step.get("run", ""))]
+
+
+@pytest.mark.parametrize(
+    ("workflow", "job"), [(wf, job) for wf, jobs in GRADLE_JOBS.items() for job in jobs]
+)
+def test_a_gradle_job_asks_the_mirror_before_its_first_gradle_run(workflow: str, job: str) -> None:
+    steps = _jobs(workflow)[job]["steps"]
+    [mirror] = _mirror_steps(steps)
+    assert "$HOME/.gradle/init.d/" in steps[mirror]["run"]
+    [cache] = _gradle_caches(steps)
+    assert steps[mirror].get("if") == steps[cache].get("if")
+    gradle = next(
+        i
+        for i, s in enumerate(steps)
+        if _uses(s, "reactivecircus/android-emulator-runner")
+        or ("make " in str(s.get("run", "")) and "bootstrap" not in str(s["run"]))
+    )
+    assert cache < mirror < gradle
+
+
+@pytest.mark.parametrize(
+    ("workflow", "job"),
+    [
+        (wf, job)
+        for table in (NO_GRADLE_JOBS, UNCACHED_GRADLE_JOBS)
+        for wf, jobs in table.items()
+        for job in jobs
+    ],
+)
+def test_other_jobs_install_no_mirror(workflow: str, job: str) -> None:
+    assert _mirror_steps(_jobs(workflow)[job]["steps"]) == []
+
+
+def test_the_mirror_comes_first_in_every_build_of_the_tree() -> None:
+    script = (REPO / MIRROR_SCRIPT).read_text(encoding="utf-8")
+    assert f"'{MIRROR_URL}'" in script
+    assert "addFirst" in script
+    # Plugin resolution of the settings and the repositories of every project, in every build
+    # of the tree (an included build too): the Flutter plugin loader failed in its buildscript.
+    for hook in (
+        "beforeSettings",
+        "pluginManagement.repositories",
+        "allprojects",
+        "buildscript.repositories",
+    ):
+        assert hook in script, hook

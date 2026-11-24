@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: Apache-2.0
+// Gradle init script of the CI jobs that run Gradle (AUD-PKG-P10-repo-ops-host, ruling B5).
+// Every build of the build tree (also the Flutter Gradle plugin, an included build) asks
+// Google's public mirror of Maven Central first, because Maven Central answers the shared CI
+// runners with HTTP 429. The mirror serves the same files with the same checksums, and the
+// lock files pin the versions; a module the mirror lacks still comes from the repositories
+// the build declares. The release build does not use this script.
+def mirrorUrl = 'https://maven-central.storage-download.googleapis.com/maven2/'
+
+def mirrorFirst = { RepositoryHandler repos ->
+    def mirror = repos.maven {
+        name = 'MavenCentralMirror'
+        url = mirrorUrl
+    }
+    repos.remove(mirror)
+    repos.addFirst(mirror)
+}
+
+beforeSettings { settings ->
+    mirrorFirst(settings.pluginManagement.repositories)
+}
+
+allprojects {
+    mirrorFirst(buildscript.repositories)
+    mirrorFirst(repositories)
+}

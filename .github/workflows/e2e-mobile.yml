@@ -53,6 +53,8 @@ jobs:
             ~/.gradle/caches/modules-2
             ~/.gradle/wrapper/dists
           key: gradle-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('apps/*/android/**/*.gradle.kts', 'apps/*/android/**/*.lockfile', 'apps/*/android/gradle/wrapper/gradle-wrapper.properties', 'packages/*/android/**/*.gradle.kts', 'packages/*/android/**/*.lockfile', 'packages/*/android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.lock') }}
+      - name: Ask the Maven Central mirror first in Gradle
+        run: install -D -m 0644 tools/ci/gradle/maven-central-mirror.init.gradle "$HOME/.gradle/init.d/maven-central-mirror.gradle"
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version: "0.13.7"
