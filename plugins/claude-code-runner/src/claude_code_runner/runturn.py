@@ -139,6 +139,7 @@ from claude_code_runner.bgtranscript import (
     prompt_taken,
     replayed_records,
     side_inputs,
+    tool_called,
 )
 from claude_code_runner.causes import (
     ADAPTER_STOPPED,
@@ -253,7 +254,7 @@ if TYPE_CHECKING:
     from claude_code_runner.config import RunnerConfig
     from claude_code_runner.transcribe import Transcriber
 
-__all__ = ["COMPACT_IN_PRINT_MODE", "RunState", "RunTurn", "TurnRuntime"]
+__all__ = ["COMPACT_IN_PRINT_MODE", "LOGIN_RETRY_WAIT", "RunState", "RunTurn", "TurnRuntime"]
 
 _LOG = logging.getLogger("claude_code_runner")
 _EXPECTED_KEY_SOURCE = {"organization": "ANTHROPIC_API_KEY", "personal": "none"}
@@ -266,6 +267,12 @@ the command ``compact`` of Claude Code 2.1.259 has ``supportsNonInteractive: tru
 installed pinned CLI; again in 2.1.288, read 2026-10-29, in 2.1.321, read 2026-11-10, and in
 2.1.325, read 2026-11-16) and the Agent SDK page on slash commands sends ``/compact`` as a prompt
 (https://code.claude.com/docs/en/agent-sdk/slash-commands, retrieved 2026-10-24)."""
+
+LOGIN_RETRY_WAIT = 10.0
+"""Seconds a run waits after a request without the login before it checks the login again and
+tries the turn once more (09 18.3, FIX-RUNNER-LOGIN-BLIP-RETRY). The two requests of the
+24.11. incident were sent 2 seconds apart, and a request of another session 2 seconds later
+used the login again."""
 
 
 def _bound_baseline(session: AgentSession | None) -> dict[str, Any] | None:
@@ -462,6 +469,9 @@ class _Outcome:
     """The cause a background session's turn failed for, as its summary names it (18.9)."""
     uncounted: bool = False
     """The process was a background session: lost work is named without a count (18.4)."""
+    login_retry: bool = False
+    """The counter-check stopped the session for a request without the login, and the run
+    tries the turn once more (18.3, FIX-RUNNER-LOGIN-BLIP-RETRY)."""
 
 
 @dataclass
@@ -508,6 +518,10 @@ class RunTurn:
     crash_point: Callable[[str, str], None] | None = None
     """A test-only hook called after each step of the launch handshake (09 18.19.5) with the
     step and the attempt's kind; never set in a normal start (AR-T04)."""
+
+    login_retry_wait: float = LOGIN_RETRY_WAIT
+    """Seconds between the stop of a session after a request without the login and the check
+    of the login before the one retry (18.3); a test sets a shorter one."""
 
     def __init__(self, handler: TurnRuntime, state: RunState, run: RunHandle) -> None:  # noqa: PLR0915 - one attribute per part of a run
         """Create the turn of a started run; nothing starts before `run`."""
@@ -623,6 +637,11 @@ class RunTurn:
         counts the check as not passed unless the record says so."""
         self._bg_requests = 0
         """How many request records of the session this runner read (for the log only)."""
+        self._bg_offset = 0
+        """The launch offset of the transcript of the current session process."""
+        self.login_retried = False
+        """The run tried a turn again after a request without the login: never a second time
+        (18.3, FIX-RUNNER-LOGIN-BLIP-RETRY)."""
         self._bg_rest: list[tuple[str, bytes]] = []
         self._bg_cause: str | None = None
         self.owner_codes: OwnerCodes | None = None
@@ -730,6 +749,12 @@ class RunTurn:
                     attempt, repeat=repeat, worked_before=worked_before
                 )
                 repeat = None
+                if outcome is not None and outcome.login_retry:
+                    retry = await self._login_retry()
+                    if retry is None:
+                        return
+                    attempt, outcome, precheck = retry, None, False  # `_login_retry` checked
+                    continue
                 if outcome is None or outcome.handled:
                     return
             self._crash("attempt_ended")
@@ -3466,6 +3491,7 @@ class RunTurn:
         self.bg_own = {line_uuid for line_uuid, _ in inputs}
         self.bg_login = False
         self._bg_requests = 0
+        self._bg_offset = offset
         self.bg_record = {
             "name": name,
             "socket": str(files.socket),
@@ -3845,7 +3871,7 @@ class RunTurn:
                 self._persist()  # an adopter reads whether the check has passed
         elif not self.bg_login and _is_output(message):
             code = "request_without_login" if self._bg_requests else "no_request_record"
-            return await self._login_unproven(session, code)
+            return await self._login_unproven(session, code, attempt)
         if kind == "system" and subtype == "init" and attempt is not None:
             await self._report_session(message, attempt)
             if message.get("session_id") and self.phase == "starting":
@@ -3874,19 +3900,94 @@ class RunTurn:
         )
         return _Outcome(TurnEvidence(), self._worked, handled=True)
 
-    async def _login_unproven(self, session: BgSession, code: str) -> _Outcome:
+    async def _login_unproven(
+        self, session: BgSession, code: str, attempt: _Attempt | None
+    ) -> _Outcome:
         """The counter-check of 18.3 did not pass: stop the session, ``billing_mode_mismatch``.
+
+        Once per run a request without the login may be a moment in which the stored login
+        was rewritten: when nothing of the turn can have acted yet (`_login_retry_refusal`),
+        the outcome asks `_drive` for one more try instead of the end (18.3,
+        FIX-RUNNER-LOGIN-BLIP-RETRY). Every other case ends the run as before.
 
         Args:
             session: The session.
             code: Why, for the log: ``request_without_login`` (the session put something out
                 after a request record that does not list the login beta) or
                 ``no_request_record`` (it did so before this runner read any request record).
+            attempt: The attempt of an own turn; ``None`` for an adopted one.
         """
         _warn("counter_check_failed", code=code, **self.ids)
         await self._terminate(session, self.ids)
+        if code == "request_without_login":
+            refusal = self._login_retry_refusal(session, attempt)
+            if refusal is None:
+                return _Outcome(TurnEvidence(), self._worked, login_retry=True)
+            _warn("login_retry_refused", code=refusal, **self.ids)
         await self._finish("failed", reason="billing_mode_mismatch")
         return _Outcome(TurnEvidence(), self._worked, handled=True)
+
+    def _login_retry_refusal(  # noqa: PLR0911 - one exit per refusal
+        self, session: BgSession, attempt: _Attempt | None
+    ) -> str | None:
+        """Why the turn of a request without the login is not tried again, or ``None`` (18.3).
+
+        The retry runs the turn's inputs once more, so it is allowed only while the stopped
+        attempt cannot have acted: no output of it was accepted before, its process is gone,
+        and its transcript after the launch offset holds no tool call (`tool_called`, which
+        fails closed). Also never for an adopted turn, never a second time in a run, and never
+        during a stop.
+
+        Returns:
+            ``None`` when the retry is allowed, else the code of the refusal for the log:
+            ``adopted``, ``retried_before``, ``stopping``, ``output_accepted``,
+            ``session_alive``, ``tool_called`` or ``nothing_to_repeat``.
+        """
+        if attempt is None:
+            return "adopted"
+        if self.login_retried:
+            return "retried_before"
+        if self._stop_requested() or self.server_ended:
+            return "stopping"
+        if self._worked:
+            return "output_accepted"
+        if session.alive():
+            return "session_alive"
+        if tool_called(self._transcript(session.session_id), self._bg_offset):
+            return "tool_called"
+        if not self.ledger.unanswered():
+            return "nothing_to_repeat"
+        return None
+
+    async def _login_retry(self) -> _Attempt | None:
+        """Wait, check the login again, then resume the session with the same inputs (18.3).
+
+        The wait is `login_retry_wait`; a stop or a run the server ended during it ends the
+        run as at any other point. The check is the pre-check of the run's start (M2-34), and
+        its refusal ends the run with its reason. The inputs that no ``result`` answered go to
+        the new process, as at every other recovery (12 f 3).
+
+        Returns:
+            The attempt to start, or ``None`` when the run ended here.
+        """
+        self.login_retried = True
+        self.retry_inputs = [(u, self.lines[u]) for u in self.ledger.unanswered()]
+        _log("login_retry_wait", seconds=self.login_retry_wait, **self.ids)
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self.login_retry_wait
+        while loop.time() < deadline and self.stop_reason is None and not self.handle.patch.ended:
+            await asyncio.sleep(min(self.cfg.poll_interval, max(0.0, deadline - loop.time())))
+        if self.stop_reason is not None:
+            await self._finish_cancelled()
+            return None
+        if self.handle.patch.ended or self.server_ended:
+            self.server_ended = True
+            self._ended_by_server()
+            return None
+        if not await self._precheck_again():
+            return None
+        _log("login_retry_started", **self.ids)
+        return _Attempt(resume=True, label="resume_same_reference")
 
     async def _session_started(self, session: BgSession) -> None:
         """The session took the prompt: the further inputs of a recovery, then held follow-ups."""

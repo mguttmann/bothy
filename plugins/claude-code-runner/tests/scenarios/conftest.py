@@ -38,6 +38,7 @@ from bothy_sdk.testing.fakeserver import FakeServer
 
 from claude_code_runner.app import Runner
 from claude_code_runner.config import RunnerConfig, load_config
+from claude_code_runner.runturn import RunTurn
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fake_claude"))
 import helper
@@ -466,12 +467,15 @@ BACKGROUND = {
 
 
 @pytest.fixture
-def bg_world(short_dir: Path, world: World) -> World:
+def bg_world(short_dir: Path, world: World, monkeypatch: pytest.MonkeyPatch) -> World:
     """The scenario world for background mode: ``personal`` runs and a short state folder.
 
     ``short_dir`` comes first, so it is removed after the world has stopped its runners: a
-    runner writes its state while it stops, which would create the folder again.
+    runner writes its state while it stops, which would create the folder again. The wait
+    before the retry after a request without the login is short here (18.3); a runner process
+    of its own keeps the real one.
     """
+    monkeypatch.setattr(RunTurn, "login_retry_wait", 0.2)
     world.state = short_dir / "state"
     world.fake.world.billing_mode = "personal"
     return world

@@ -4017,6 +4017,26 @@ The check fails closed:
   background mode"), written at every request record that changes it. A runner that adopts
   the turn takes it from the record alone and counts the check as not passed when the record
   does not say so.
+- One retry after a request without the login (addendum of 2026-11-24,
+  FIX-RUNNER-LOGIN-BLIP-RETRY): the CLI can send one request without the stored login in the
+  moment that login is rewritten on the host, and the next request of the same or another
+  session uses it again (runner log and transcripts of 2026-11-24). When the check fails for
+  that reason (log code `request_without_login`), the session is stopped as above and nothing
+  of it is posted; then, once per run, the turn is tried again, but only while that attempt
+  cannot have acted: it is the run's own turn (not an adopted one), no output of its process
+  was accepted before, its process is gone, and its transcript after the launch offset holds
+  no assistant record with a tool call (the CLI writes that record before it runs the tool;
+  a file or line that cannot be read counts as a call). The runner then waits
+  `LOGIN_RETRY_WAIT` (10 seconds, log `login_retry_wait` with `seconds`), runs the pre-check
+  of this section again, and resumes the session with the inputs that no `result` answered,
+  as at the other recoveries of 18.9 (log `login_retry_started`). A refused pre-check ends the
+  run with its reason; a stop or a run the server ended during the wait ends the run as at
+  any other point. The retry is checked like every process. Every other case ends the run
+  `billing_mode_mismatch` at once, as above, with the warning `login_retry_refused` and one of
+  the codes `adopted`, `retried_before`, `stopping`, `output_accepted`, `session_alive`,
+  `tool_called` or `nothing_to_repeat`: a second request without the login in the run, a
+  check that failed before any request record (`no_request_record`), and every mode or
+  account the pre-check does not accept, which never reaches a turn.
 
 The transcript has no member that names the credential of a request more directly; the records
 that name the account are never read (18.4). The pre-check stays binding.
@@ -4656,7 +4676,8 @@ count only while no `system/init` came (afterwards `runtime_error`); otherwise `
 with the `errors` of the last `result` (the Agent SDK reference names them) and the exit code or
 signal name. stderr is read only to match fragments; its text never reaches a step, a log line or
 a finish body. No end other than a full context, a missing session or an existing session starts
-a process (section 1 point 5, R-AG-17); every further process of a run uses the environment,
+a process (section 1 point 5, R-AG-17), apart from the one retry after a request without the
+login in background mode (18.3, addendum of 2026-11-24); every further process of a run uses the environment,
 flags, pre-check and counter-check of 18.2 and 18.3 and the run's slot of
 `runner.max_parallel_runs`.
 
