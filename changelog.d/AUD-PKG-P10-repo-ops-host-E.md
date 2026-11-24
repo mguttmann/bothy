@@ -9,3 +9,7 @@
 - The root `osv-scanner.toml` drops the license overrides of `jni` 1.1.0 and `jni_flutter`
   1.0.4+1, which the lock no longer holds, and a test fails on such an orphaned Pub override
   (AUD-PKG-P10-repo-ops-host).
+- The SPDX header gate also checks OpenTofu, SQL, C and C++ and PowerShell files; the OpenTofu
+  modules, one SQL query file and the Windows and iOS runner sources that lacked the header carry
+  it now, and the Windows runner states the Apache-2.0 license as its legal copyright instead of
+  "All rights reserved", like the macOS app (AUD-PKG-P10-repo-ops-host).

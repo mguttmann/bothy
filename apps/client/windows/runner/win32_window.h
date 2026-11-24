@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 #ifndef RUNNER_WIN32_WINDOW_H_
 #define RUNNER_WIN32_WINDOW_H_
 

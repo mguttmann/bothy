@@ -28,6 +28,7 @@ SPDX = "SPDX-License-Identifier: Apache-2.0"
 HEADER_SEARCH_LINES = 5
 SOURCE_SUFFIXES = frozenset(
     {".go", ".py", ".dart", ".ts", ".tsx", ".js", ".mjs", ".cjs", ".sh", ".kt", ".kts", ".swift"}
+    | {".tf", ".sql", ".c", ".cc", ".cpp", ".h", ".ps1"}
 )
 GENERATED = (
     "*/node_modules/*",
@@ -44,6 +45,8 @@ GENERATED = (
     # The configuration @grafana/create-plugin scaffolds and owns (`npx @grafana/create-plugin
     # update` rewrites it); it carries no license header (M7-25, docs/DECISIONS.md D-M7-25-1).
     "*/grafana-bothy-live/.config/*",
+    # The plugin registrant `flutter` rewrites on every build of a desktop runner.
+    "*/flutter/generated_plugin_registrant.*",
 )
 # Go files that only a generator writes (by name or below a directory named generated, which
 # GENERATED and sonar.exclusions skip); the Go convention marks them with GO_GENERATED_MARKER

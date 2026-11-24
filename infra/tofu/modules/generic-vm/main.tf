@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Host setup of a Linux host for the chat server (brief M7-15, ADR 0012, infra/tofu/README.md).
 #
 # One script, two delivery paths (docs/DECISIONS.md D-M7-15-1): the static script

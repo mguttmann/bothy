@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Test root of the module generic-vm (brief M7-15). tools/ci/tests/test_tofu_generic_vm.py plans it
 # for every edge_mode, and `make tofu-vm-test` (tools/ci/tofu_vm_test.py) applies it twice against a
 # local VM: first with cloud-init, then with the SSH delivery. Only documentation addresses and
