@@ -111,21 +111,8 @@ func (p s3PartStore) uploadID(ctx context.Context, s SessionRecord) (string, err
 		}
 		return err
 	})
-	if err != nil && stored {
-		// The unit wrote the id, but its commit failed: whether the row names the upload is
-		// unknown, so the upload stays and the caller retries the part.
-		return "", err
-	}
-	if stored {
-		return created, nil
-	}
-	if err != nil {
-		// The id is stored nowhere: abort the own upload even when the request ended, so no
-		// multipart upload stays open that no row names (12 3.2). The first error wins.
-		if aerr := p.store.AbortMultipart(context.WithoutCancel(ctx), s.File.ObjectKey, created); aerr != nil {
-			return "", errors.Join(err, aerr)
-		}
-		return "", err
+	if stored || err != nil {
+		return p.settleCreated(ctx, s, created, stored, err)
 	}
 	// Another request stored its upload first, or the session ended: drop the own upload.
 	if err := p.store.AbortMultipart(ctx, s.File.ObjectKey, created); err != nil {
@@ -135,6 +122,23 @@ func (p s3PartStore) uploadID(ctx context.Context, s SessionRecord) (string, err
 		return "", errs.New(errs.CodeGone, "")
 	}
 	return current.StorageUploadID, nil
+}
+
+// settleCreated ends uploadID for an upload id the unit stored or failed to store. A stored id
+// whose commit failed is an error and the upload stays, because whether the row names it is
+// unknown; the caller retries the part. An id stored nowhere is aborted even when the request
+// ended, so no multipart upload stays open that no row names (12 3.2); the first error wins.
+func (p s3PartStore) settleCreated(ctx context.Context, s SessionRecord, created string, stored bool, err error) (string, error) {
+	switch {
+	case err != nil && stored:
+		return "", err
+	case stored:
+		return created, nil
+	}
+	if aerr := p.store.AbortMultipart(context.WithoutCancel(ctx), s.File.ObjectKey, created); aerr != nil {
+		return "", errors.Join(err, aerr)
+	}
+	return "", err
 }
 
 func (p s3PartStore) Discard(ctx context.Context, s SessionRecord) error {
