@@ -13,3 +13,7 @@
   modules, one SQL query file and the Windows and iOS runner sources that lacked the header carry
   it now, and the Windows runner states the Apache-2.0 license as its legal copyright instead of
   "All rights reserved", like the macOS app (AUD-PKG-P10-repo-ops-host).
+- The design-token generator ends with exit code 2 and one line naming the theme and the role
+  when a role is missing in one theme, and naming the member when the rule file lacks
+  `contrast_pairs` or `palette_guards`, instead of a `KeyError` traceback
+  (AUD-PKG-P10-repo-ops-host).

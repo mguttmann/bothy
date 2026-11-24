@@ -180,6 +180,9 @@ def generate() -> tuple[dict[Path, str], list[str]]:
     """Build all outputs in memory; returns (path to text, gate problems)."""
     m = model.build(RESOLVER)
     rule_data = json.loads(RULES.read_text(encoding="utf-8"))
+    for member in ("contrast_pairs", "palette_guards"):
+        if member not in rule_data:
+            raise rules.RuleError(f"{RULES.relative_to(ROOT).as_posix()} lacks {member!r}")
     themes = m.full["theme"]
     rows = rules.check_contrast(themes, rule_data["contrast_pairs"])
     default = rule_data.get("accent_variants", {}).get("default", "")
