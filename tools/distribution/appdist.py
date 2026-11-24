@@ -77,6 +77,9 @@ PLACEHOLDERS: tuple[tuple[str, Any], ...] = (
     ("windows.package_name", lambda v: v.startswith("com.example.")),
     ("windows.publisher", lambda v: v == "CN=Example Publisher"),
     ("windows.update_url", lambda v: bool(_EXAMPLE_HOST.match(v))),
+    # Optional in the schema for the trials; a release without it signs without a timestamp,
+    # and the MSIX stops installing when the certificate expires.
+    ("windows.timestamp_url", lambda v: not v),
     ("android.package_name", lambda v: v.startswith("com.example.")),
     ("firebase.project_id", lambda v: v.startswith("example-")),
     ("ios.update_url", lambda v: "EXAMPLE" in v or bool(_EXAMPLE_HOST.match(v))),
@@ -202,8 +205,19 @@ def value(cfg: dict[str, Any], key: str) -> Any:
 
 
 def placeholders(cfg: dict[str, Any]) -> list[str]:
-    """Return the keys of `cfg` that still hold a placeholder of the template (PLACEHOLDERS)."""
-    return [key for key, test in PLACEHOLDERS if test(value(cfg, key))]
+    """Return the keys of `cfg` that still hold a placeholder of the template (PLACEHOLDERS).
+
+    An optional key that is missing counts as its empty value.
+    """
+    found = []
+    for key, test in PLACEHOLDERS:
+        try:
+            v = value(cfg, key)
+        except KeyError:
+            v = ""
+        if test(v):
+            found.append(key)
+    return found
 
 
 def require_publisher_values(cfg: dict[str, Any]) -> None:

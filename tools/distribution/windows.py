@@ -12,7 +12,8 @@
    `appdist.appx_manifest` (identity, toast activator, URL scheme) and the logos taken from
    the app icon;
 3. `makeappx pack` and `signtool sign` with the publisher's certificate (and its timestamp
-   server when `windows.timestamp_url` names one), then `signtool verify /pa`;
+   server of `windows.timestamp_url`, which a release requires and only the trial leaves
+   empty), then `signtool verify /pa`;
 4. `beta.appinstaller` pointing at the new MSIX (`appdist.appinstaller`); promotion writes
    `stable.appinstaller` later (`appdist.py promote-appinstaller`).
 

@@ -57,8 +57,9 @@ windows:
   update_url: https://updates.example.com/windows/
   # Hours between two update checks of App Installer at the start of the app (0 to 255).
   hours_between_update_checks: 24
-  # Optional: the RFC 3161 timestamp server of the certificate authority; without it a signed
-  # MSIX stops installing when the certificate expires.
+  # The RFC 3161 timestamp server of the certificate authority; without it a signed MSIX stops
+  # installing when the certificate expires. A release refuses the empty value; only the trials
+  # sign without a timestamp.
   timestamp_url: ""
 
 android:

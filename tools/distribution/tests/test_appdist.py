@@ -169,6 +169,7 @@ def test_publisher_values_pass(template: dict[str, Any], ed: Ed25519PrivateKey) 
     real["windows"]["package_name"] = "Acme.Chat"
     real["windows"]["publisher"] = 'CN=Acme Chat, O="Acme, Inc.", C=DE'
     real["windows"]["update_url"] = "https://updates.acme.test/windows/"
+    real["windows"]["timestamp_url"] = "http://timestamp.acme.test"
     real["android"]["package_name"] = "org.acme.chat"
     real["android"]["update_url"] = "https://play.google.com/store/apps/details?id=org.acme.chat"
     real["ios"]["update_url"] = "https://testflight.apple.com/join/AbCdEf12"
@@ -176,6 +177,17 @@ def test_publisher_values_pass(template: dict[str, Any], ed: Ed25519PrivateKey) 
     dist.validate(real)
     assert dist.placeholders(real) == []
     dist.require_publisher_values(real)
+
+
+def test_a_release_needs_a_timestamp_server(template: dict[str, Any]) -> None:
+    # Without a timestamp a signed MSIX stops installing when the certificate expires, and a
+    # published build is never replaced (R-RL-07); only the trials sign without one.
+    assert "windows.timestamp_url" in dist.placeholders(template)
+    del template["windows"]["timestamp_url"]
+    dist.validate(template)
+    assert "windows.timestamp_url" in dist.placeholders(template)
+    with pytest.raises(dist.DistributionError, match=r"windows\.timestamp_url"):
+        dist.require_publisher_values(template)
 
 
 def test_the_mobile_values_of_the_template(template: dict[str, Any]) -> None:
