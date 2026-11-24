@@ -21,6 +21,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/personaldata"
+	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 )
 
 // releasingFiles is the avatar port of the module files for the account deletion: it only
@@ -52,7 +53,7 @@ func newPersonalWorld(t *testing.T) *personalWorld {
 	w := &personalWorld{lifeWorld: newLifeWorld(t), files: &releasingFiles{}, provider: ids.New()}
 	w.sql(`INSERT INTO identity_providers (id, kind, name, config) VALUES ($1, 'local', 'Local accounts', '{}')`, w.provider.String())
 	w.p.BindAvatarFiles(w.files)
-	p, err := app.NewPersonalData(w.l, w.repo)
+	p, err := app.NewPersonalData(w.l, w.repo, syncpg.NewRedactor(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -468,6 +469,13 @@ func TestPersonalDataErase(t *testing.T) {
 				AND payload->'user'->>'status' = 'deleted' AND payload->'user'->>'handle' LIKE 'deleted-%'`, alex.ID.String()); n != 1 {
 				t.Errorf("%d user.updated events carry the pseudonym", n)
 			}
+			// The stored earlier user.updated events of Alex no longer carry the old handle or name
+			// (20 section 2, event_log: redaction on deletion).
+			if n := w.count(`SELECT count(*) FROM event_log WHERE type = 'user.updated' AND resource_id = $1
+				AND (payload->'user'->>'handle' NOT LIKE 'deleted-%' OR payload->'user'->>'display_name' NOT LIKE 'Deleted person %')`,
+				alex.ID.String()); n != 0 {
+				t.Errorf("%d stored user.updated events of Alex keep the old handle or name", n)
+			}
 
 			// Sam is untouched.
 			if after := w.identityCounts(sam.ID); !mapsEqual(after, samBefore) {
@@ -520,7 +528,7 @@ func TestPersonalDataEraseLastOwner(t *testing.T) {
 // the identity tables of 20 section 2.
 func TestNewPersonalData_Refuses(t *testing.T) {
 	t.Parallel()
-	if _, err := app.NewPersonalData(nil, nil); err == nil {
+	if _, err := app.NewPersonalData(nil, nil, nil); err == nil {
 		t.Error("NewPersonalData without collaborators passed")
 	}
 	w := newPersonalWorld(t)

@@ -21,3 +21,6 @@
 - The challenge cleanup keeps the used passkey challenge of a live session's current step-up, so
   a console session no longer loses its user-verified step-up (and gets `passkey_required` at the
   terminal) when the job runs between the step-up and the opening.
+- The deletion of an account rewrites the stored `user.updated` events of the person to the
+  pseudonymized handle and name, so the old handle and display name no longer stay in the event
+  log until `sync.event_retention`.

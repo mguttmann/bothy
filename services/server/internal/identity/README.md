@@ -1189,8 +1189,10 @@ longer keeps its device.
 
 ## Personal data (M7-06)
 
-`app.PersonalData` (`app.NewPersonalData(lifecycle, repo)`) is the participant of identity in the
-privacy requests (kernel port `personaldata`, 20 sections 4.4 and 5.2). It lives in `app`,
+`app.PersonalData` (`app.NewPersonalData(lifecycle, repo, redactor)`) is the participant of identity
+in the privacy requests (kernel port `personaldata`, 20 sections 4.4 and 5.2). Step 6 also rewrites
+handle, display name, locale and time zone of the stored `user.updated` events of the person to the
+pseudonymized values through the `eventlog.Redactor` of sync. It lives in `app`,
 because the account deletion reuses the revocation paths of `user.disable`; its SQL is in
 `adapters/postgres` (`PersonalDataStore`, queries `personaldata.sql`).
 

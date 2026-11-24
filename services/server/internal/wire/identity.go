@@ -634,7 +634,8 @@ func (i *Identity) Start(r *lifecycle.Runner) {
 }
 
 // PersonalData returns the participant of identity in the privacy requests (M7-06): steps 1, 2
-// and 6 of the account deletion reuse the revocation paths of user.disable.
-func (i *Identity) PersonalData() (*app.PersonalData, error) {
-	return app.NewPersonalData(i.Lifecycle, i.repo)
+// and 6 of the account deletion reuse the revocation paths of user.disable; redactor rewrites the
+// stored user.updated events of a pseudonymized person.
+func (i *Identity) PersonalData(redactor eventlog.Redactor) (*app.PersonalData, error) {
+	return app.NewPersonalData(i.Lifecycle, i.repo, redactor)
 }

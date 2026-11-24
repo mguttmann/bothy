@@ -591,7 +591,7 @@ impact assessment (Art. 35 GDPR); agents with access to employee data can be a r
 | ID | Test | Expected |
 |---|---|---|
 | DP-T01 | Delete a message | content, revisions, attachments, search hits, event payloads empty; journal entry |
-| DP-T02 | Delete an account with `keep_pseudonymized` and with `delete` | steps from 4.4 verifiable; no clear data in `principals`, `users`; the audit chain still verifies (`audit.verify`) |
+| DP-T02 | Delete an account with `keep_pseudonymized` and with `delete` | steps from 4.4 verifiable; no clear data in `principals`, `users` and the stored `user.updated` events of the person in `event_log`; the audit chain still verifies (`audit.verify`) |
 | DP-T03 | Export | package matches the schema; no foreign messages, no secrets, no hashes; checksums match |
 | DP-T04 | Export expiry | package deleted after `privacy.export_ttl` |
 | DP-T05 | Retention job per class with a controlled clock | only expired data removed |
