@@ -10,6 +10,8 @@ const List<AppConfigKey> appConfigKeys = <AppConfigKey>[
   AppConfigKey('auth.device_pending_ttl', 'Server', AppConfigKind.duration, '24h'),
   AppConfigKey('client.cache_max_age', 'Server', AppConfigKind.duration, '30d'),
   AppConfigKey('client.cache_max_bytes', 'App', AppConfigKind.bytes, '1GiB'),
+  AppConfigKey('client.http_connect_timeout', 'App', AppConfigKind.duration, '30s'),
+  AppConfigKey('client.http_receive_timeout', 'App', AppConfigKind.duration, '2m'),
   AppConfigKey('client.metrics.flush_interval', 'App', AppConfigKind.duration, '5m'),
   AppConfigKey('client.outbox_retry_base', 'App', AppConfigKind.duration, '2s'),
   AppConfigKey('client.outbox_retry_cap', 'App', AppConfigKind.duration, '5m'),
@@ -90,6 +92,10 @@ extension AppConfigValues on AppConfig {
   Duration get cacheMaxAge => value<Duration>('client.cache_max_age');
   /// `client.cache_max_bytes` (bytes, default `1GiB`).
   int get cacheMaxBytes => value<int>('client.cache_max_bytes');
+  /// `client.http_connect_timeout` (duration, default `30s`).
+  Duration get httpConnectTimeout => value<Duration>('client.http_connect_timeout');
+  /// `client.http_receive_timeout` (duration, default `2m`).
+  Duration get httpReceiveTimeout => value<Duration>('client.http_receive_timeout');
   /// `client.metrics.flush_interval` (duration, default `5m`).
   Duration get metricsFlushInterval => value<Duration>('client.metrics.flush_interval');
   /// `client.outbox_retry_base` (duration, default `2s`).

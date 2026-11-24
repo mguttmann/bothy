@@ -17,9 +17,13 @@ import 'package:dio/dio.dart';
 /// response error carries an [ApiProblem] (`ApiProblem.of`). The generated auth interceptors
 /// of openapi-generator are not installed.
 ///
-/// [adapter] replaces the network (tests and the fake server of M4-17); [connectTimeout]
-/// comes from the caller's configuration, the default is the one of `Dio`. There is no global
-/// state: each call returns an independent client. Throws an [ArgumentError] when [baseUrl]
+/// [adapter] replaces the network (tests and the fake server of M4-17). [connectTimeout] and
+/// [receiveTimeout] come from the caller's configuration (the apps pass
+/// `client.http_connect_timeout` and `client.http_receive_timeout`, 15 22); without them the
+/// defaults of `Dio` apply, which wait without end. The receive timeout bounds the wait for the
+/// answer's headers and each pause between chunks of its body, so a server that accepts and
+/// stays silent ends the request; no send timeout is set, so an upload of any length is not cut.
+/// There is no global state: each call returns an independent client. Throws an [ArgumentError] when [baseUrl]
 /// is not an absolute `http` or `https` address.
 ///
 /// Example:
@@ -39,6 +43,7 @@ ApiClient createApiClient({
   List<Interceptor> authInterceptors = const [],
   HttpClientAdapter? adapter,
   Duration? connectTimeout,
+  Duration? receiveTimeout,
 }) {
   if (!baseUrl.isAbsolute ||
       !(baseUrl.isScheme('https') || baseUrl.isScheme('http'))) {
@@ -54,6 +59,7 @@ ApiClient createApiClient({
       baseUrl: '$root${ApiClient.basePath}',
       responseType: ResponseType.json,
       connectTimeout: connectTimeout,
+      receiveTimeout: receiveTimeout,
     ),
   );
   if (adapter != null) dio.httpClientAdapter = adapter;

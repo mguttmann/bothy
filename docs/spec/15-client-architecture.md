@@ -539,7 +539,9 @@ changes (docs/decisions.d/AUD-client-settings-01.md).
 - **REST:** `api_client` (openapi-generator `dart-dio`, baseline R-Clients) with interceptors for
   DPoP, `Idempotency-Key`, correlation ID, retry only for reads (`Retry-After` plus jitter; a
   `Retry-After` above `client.outbox_retry_cap` goes to the caller instead of a wait); the
-  outbox retries writes. An outbox executor that reads within an attempt opts out of the read
+  outbox retries writes. The apps' client has the connect timeout `client.http_connect_timeout`
+  and the receive timeout `client.http_receive_timeout` and no send timeout, so a connection that
+  accepts and stays silent ends the request (and frees its outbox lane) as a network error. An outbox executor that reads within an attempt opts out of the read
   retry, so a refused read is retried once, with its entry ([12](12-files.md) 3.8). In the
   agent interface the read retry is the one place that repeats a refused read: the provider
   that passes the failure of a read on (the document of an ended run) turns off the retry of
@@ -1412,6 +1414,8 @@ it runs on and marks in its summary whether that is a reference device of sectio
 | `client.sync.parse_offload_bytes` | `262144` | from this page size on, decoding happens in the background isolate |
 | `client.sync.connect_timeout` | `30s` | deadline of one connection attempt from its start in `Connecting`, before the socket opens, to `ready` or `resumed`; it also covers a connect that never completes; when it passes, the attempt ends and the backoff applies (7.2) |
 | `client.sync.read_timeout` | `30s` | deadline of one REST read of the sync engine (`Fetcher`): the connect, the sending and each wait for data of the answer may take this long; when it passes, the read fails like a network error and is retried like one (7.3) |
+| `client.http_connect_timeout` | `30s` | longest wait of a REST request of the apps (`createApiClient`) for its connection |
+| `client.http_receive_timeout` | `2m` | longest silence of a REST answer to the apps (`createApiClient`): before its headers and between two chunks of its body; it lies above the longest server deadline of a request (`agents.interview.timeout` plus `http.request_timeout`); a request body has no limit (uploads), and the reads of the sync engine keep `client.sync.read_timeout` |
 | `client.outbox_stuck_after` | `2m` | from then on a waiting entry shows "Sending delayed" |
 | `client.push.fetch_timeout` | `20s` | time that the NSE or the Android service uses to fetch the text |
 | `client.voice.bitrate` | `64kbps` | bitrate of the AAC recording |
