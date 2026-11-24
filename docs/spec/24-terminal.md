@@ -612,9 +612,11 @@ The following paragraphs record how `bothy-host` implements this section; the ro
   `organization` (`claude_api_key`, read by the sessions), it holds the pairing record
   (`pairing.json`: server URL, host ID, instance ID, fingerprint) and the last declaration
   (`declaration.json`), both without secrets and without a subscription login, on Linux and
-  macOS the admin endpoint `admin.sock`, and on macOS and Windows the log of the host service
-  (`bothy-host.log` and its predecessor `bothy-host.log.1`; 4.2, AUD-host-01). Every file but the
-  log is written atomically with mode `0600`; the log has the same mode and is appended to.
+  macOS the admin endpoint `admin.sock` with its lock `admin.sock.lock` (a second `run` of the
+  same directory ends before it touches the endpoint), and on macOS and Windows the log of the
+  host service (`bothy-host.log` and its predecessor `bothy-host.log.1`; 4.2, AUD-host-01). Every
+  file but the log is written atomically with mode `0600`; the log has the same mode and is
+  appended to.
 - **Declaration from `ready`** (D-M2-42-15): the host service learns `hosts.llm_credentials` only
   from `ready`; the server sends `ready` again on every change of the declaration, and the host
   service treats each `ready` as the current declaration and evaluates HD6 again. Until a `ready`
@@ -1063,7 +1065,8 @@ theft stays unnoticed until it returns (threat model T-TM-05).
 
 Files of the state directory (D-M2-42-4): `keys` (both private keys; on Windows a DPAPI blob of
 `CryptProtectData` without `CRYPTPROTECT_LOCAL_MACHINE`), `pairing.json`, `bindings.json`,
-`declaration.json`, `claude_api_key` (only at `organization`) and on Linux and macOS `admin.sock`.
+`declaration.json`, `claude_api_key` (only at `organization`) and on Linux and macOS `admin.sock`
+with its lock `admin.sock.lock`.
 `pair` generates both key pairs locally and stores them only after the server accepted them.
 On macOS and Windows, where the service manager keeps no output of a service, the directory also
 holds the log of the host service, `bothy-host.log` and its predecessor `bothy-host.log.1`
