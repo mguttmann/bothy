@@ -1688,6 +1688,127 @@ def test_a_forged_line_in_the_shape_of_the_followup_stays_foreign() -> None:
     assert not any(m.get("isReplay") and m.get("uuid") != "prompt-uuid" for m in out)
 
 
+# ---- a follow-up dequeued before the turn's final answer is written (FIX-RUNNER-CLI-331) ------
+
+FOLLOWUP_BEFORE_LATE_ANSWER = OWN_NOTICE.with_name("followup_before_late_answer.jsonl")
+"""Real records of Claude Code 2.1.331 from the live probe of 2026-11-24 (structure only: texts,
+ids and paths replaced), up to the request of the follow-up's turn. 2.1.331 writes the record
+of the turn's final answer only after its stop hooks: a follow-up of the run's owner that
+arrived meanwhile was dequeued before that record, which carries the earlier timestamp. The
+runner then took the turn's end as the follow-up's answer, stopped the session while the model
+worked on the follow-up, and the run failed with ``runtime_error``."""
+
+
+def _followup_before_late_answer() -> tuple[list[dict[str, Any]], str, OwnerLines]:
+    records = [json.loads(x) for x in FOLLOWUP_BEFORE_LATE_ANSWER.read_text("utf-8").splitlines()]
+    [peer] = [r for r in records if (r.get("origin") or {}).get("kind") == "peer"]
+    body = peer["origin"]["body"]
+    [code] = re.findall(r"owner code ([0-9a-f]{32}):", body)
+    owner = OwnerLines()
+    owner.add(peer["uuid"], code, body)
+    return records, peer["uuid"], owner
+
+
+def test_a_followup_dequeued_before_the_late_final_answer_starts_after_the_result() -> None:
+    records, line, owner = _followup_before_late_answer()
+    # The record order of 2.1.331: the dequeue before the final answer it follows in time.
+    kinds = [
+        (r["type"], r.get("operation") or (r.get("message") or {}).get("stop_reason"))
+        for r in records
+    ]
+    dequeue = kinds.index(("queue-operation", "dequeue"))
+    answer = kinds.index(("assistant", "end_turn"))
+    assert dequeue < answer
+    assert records[answer]["timestamp"] < records[dequeue]["timestamp"]
+    mapper = TranscriptMapper("prompt-uuid", {line}.__contains__, owner=owner)
+    out = [m for r in records for m in mapper.map(r)]
+    assert foreign(out) == []
+    turns = [shape(m) for m in out if shape(m) not in ("bg_totals", "system/bg_request")]
+    # As in a print stream: the turn ends with its answer, then the follow-up's turn starts.
+    assert turns[-7:] == [
+        "tool_result",
+        "command/queued",
+        "assistant",
+        "result",
+        "command/started",
+        "system/init",
+        "echo",
+    ]
+    [result] = [m for m in out if m["type"] == "result"]
+    assert result["result"] == "I started the command in the background and answer when it ends."
+    assert mapper.turn_open  # the follow-up's turn runs on
+
+
+def test_a_followup_dequeued_before_the_late_final_answer_keeps_the_session() -> None:
+    records, line, owner = _followup_before_late_answer()
+    mapper = TranscriptMapper("prompt-uuid", {line}.__contains__, owner=owner)
+    state = ProcessState(has_stdin=True)
+    now, echoed, found = 0.0, False, []
+    for message in [m for r in records for m in mapper.map(r)]:
+        now += 1.0
+        state.apply(message, now)
+        echoed = echoed or (message.get("isReplay") is True and message.get("uuid") == line)
+        if message.get("type") == "result" or message.get("isReplay") is True:
+            found.append(_decide_pending(state, now, pending=0 if echoed else 1))
+    found.append(_decide_pending(state, now + 31.0, pending=0))
+    assert "close" not in found
+    assert found[-1] == "none"
+
+
+def _stamped(record: dict[str, Any], second: int) -> dict[str, Any]:
+    return {**record, "timestamp": f"2026-11-24T07:32:{second:02d}.000Z"}
+
+
+def _stamped_answer(stop: str, second: int) -> dict[str, Any]:
+    return _stamped(
+        {
+            "type": "assistant",
+            "isSidechain": False,
+            "message": {
+                "id": f"msg_{second}",
+                "model": "claude-opus-5-5",
+                "role": "assistant",
+                "content": [{"type": "text", "text": "Working."}],
+                "stop_reason": stop,
+            },
+        },
+        second,
+    )
+
+
+def test_a_dequeue_before_an_output_written_after_it_starts_at_that_output() -> None:
+    # A dequeue while a request waits for its output, and an output with a later timestamp:
+    # the turn went on after the dequeue, so the input's start is given on before that output
+    # as before, and the turn's end is a result like any other.
+    mapper = started("prompt-uuid")
+    records = [
+        _stamped(REQUEST, 10),
+        _stamped({"type": "queue-operation", "operation": "enqueue"}, 11),
+        _stamped({"type": "queue-operation", "operation": "dequeue"}, 12),
+        _stamped_answer("end_turn", 13),
+        _stamped(TURN_ENDS, 14),
+    ]
+    shapes = [shape(m) for r in records for m in mapper.map(r)]
+    assert shapes.index("command/started") < shapes.index("assistant") < shapes.index("result")
+    assert shapes[-1] == "result"
+    assert not mapper.turn_open
+
+
+def test_a_dequeue_without_timestamps_is_given_on_at_the_next_output() -> None:
+    # Records without a readable timestamp prove no late answer: the start comes before it.
+    mapper = started("prompt-uuid")
+    records = [
+        REQUEST,
+        {"type": "queue-operation", "operation": "enqueue"},
+        {"type": "queue-operation", "operation": "dequeue", "timestamp": "not a time"},
+        _stamped_answer("end_turn", 13) | {"timestamp": None},
+        TURN_ENDS,
+    ]
+    shapes = [shape(m) for r in records for m in mapper.map(r)]
+    assert shapes.index("command/started") < shapes.index("assistant") < shapes.index("result")
+    assert shapes[-1] == "result"
+
+
 def _decide_pending(state: ProcessState, now: float, *, pending: int) -> str:
     return state.decide(
         now, stdin_open=True, pending=pending, followup_grace=30.0, stop_grace=10.0

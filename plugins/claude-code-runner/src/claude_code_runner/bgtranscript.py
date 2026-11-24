@@ -39,7 +39,11 @@ The mapping, record by record (only records of the main conversation, ``isSidech
 * ``queue-operation``: ``enqueue`` is ``command_lifecycle`` ``queued``; ``dequeue`` is
   ``started`` and the start of a turn (``system/init``); after the final answer of a turn
   (``end_turn``, no request since) and before its end, after that turn's ``result`` (the CLI
-  may dequeue the next input before it writes the turn's end); ``remove`` with
+  may dequeue the next input before it writes the turn's end). So is one while a request waits
+  for its output, when the output that follows carries an earlier ``timestamp`` than the
+  dequeue: 2.1.331 writes the record of a turn's final answer only after its stop hooks
+  (FIX-RUNNER-CLI-331); an output written after the dequeue, or one without a readable
+  ``timestamp``, gives the start on before it, as one in a working turn; ``remove`` with
   ``absorbed_mid_turn``
   is the echo of the runner's line with ``commandUuid``. The records of one queue are matched
   in their order, because ``enqueue`` and ``dequeue`` carry no id.
@@ -107,6 +111,7 @@ import re
 import time
 from collections import Counter, deque
 from collections.abc import AsyncIterator, Callable, Mapping
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -136,9 +141,16 @@ _LOG = logging.getLogger("claude_code_runner")
 
 READ_FIELDS: dict[str, tuple[str, ...]] = {
     "user": ("isSidechain", "message", "origin", "sessionId", "toolUseResult", "uuid"),
-    "assistant": ("apiErrorParams", "error", "isApiErrorMessage", "isSidechain", "message"),
-    "api-request": ("params",),
-    "queue-operation": ("commandUuid", "operation", "reason"),
+    "assistant": (
+        "apiErrorParams",
+        "error",
+        "isApiErrorMessage",
+        "isSidechain",
+        "message",
+        "timestamp",
+    ),
+    "api-request": ("params", "timestamp"),
+    "queue-operation": ("commandUuid", "operation", "reason", "timestamp"),
     "attachment": ("attachment", "isSidechain"),
     "attachment/queued_command": ("commandMode", "origin", "prompt", "source_uuid", "type"),
     "origin/task-notification": ("kind", "producer", "subkind"),
@@ -192,6 +204,18 @@ _NOTICE_USAGE = (
     ("tool_uses", "tool_uses"),
     ("duration_ms", "duration_ms"),
 )
+
+
+def _stamp(record: Mapping[str, Any]) -> datetime | None:
+    """The ``timestamp`` of a record as an aware time, or ``None`` when it has no readable one."""
+    value = record.get("timestamp")
+    if not isinstance(value, str):
+        return None
+    try:
+        stamp = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return stamp if stamp.tzinfo is not None else None
 
 
 def _content(record: Mapping[str, Any]) -> object:
@@ -339,6 +363,10 @@ class TranscriptMapper:
         """The start of an input the CLI dequeued before it wrote the end of the turn before."""
         self._answered = False
         """The open turn's last output is a final answer (``end_turn``) and no request followed."""
+        self._awaiting = False
+        """A request record came and no output after it yet."""
+        self._dequeued_at: datetime | None = None
+        """The time of the first deferred dequeue, if its record named a readable one."""
         self._commands = 0
         self._texts: dict[str, list[str]] = {}
         self._last_message: str | None = None
@@ -425,9 +453,10 @@ class TranscriptMapper:
             # real transcript of the pinned CLI), so an input open here is sealed and judged
             # at the first output of this request: no output can answer it before
             # (FIX-RUNNER-BG-NOTICE-ORDER).
-            out = [*self._unattributed(self._sealed), *self._resume_deferred()]
+            out = [*self._unattributed(self._sealed), *self._resume_deferred(record)]
             self._sealed |= self._open
             self._open.clear()
+            self._awaiting = True
             return [*out, *self._request(record)]
         if kind == "cost-state":
             usage = record.get("modelUsage")
@@ -590,8 +619,13 @@ class TranscriptMapper:
         if not isinstance(message, Mapping):
             self.skipped["assistant"] += 1
             return []
-        out = [*self._unattributed(self._sealed), *self._resume_deferred(), *self._turn_start()]
+        out = [
+            *self._unattributed(self._sealed),
+            *self._resume_deferred(record),
+            *self._turn_start(),
+        ]
         self._answered = message.get("stop_reason") == "end_turn"
+        self._awaiting = False
         model = message.get("model")
         error = record.get("isApiErrorMessage") is True
         items: list[dict[str, Any]] = []
@@ -773,13 +807,17 @@ class TranscriptMapper:
         if operation == "dequeue":
             # The queued input starts a turn of its own (a line of the inbox, a notification).
             started = {"type": "command_lifecycle", "command_uuid": command, "state": "started"}
-            if self.turn_open and self._answered:
+            if self.turn_open and (self._answered or self._awaiting):
                 # 2.1.326 may dequeue the next input after the turn's final answer but before
                 # it writes the turn's end (real transcript of a live run,
-                # FIX-RUNNER-FOLLOWUP-AT-TURN-END). Its start follows that turn's ``result``, as
-                # in a print stream, so the result never counts as the answer of the turn the
-                # input starts. A dequeue while the turn still works (no final answer yet, or a
-                # request after it) is given on at once, as before.
+                # FIX-RUNNER-FOLLOWUP-AT-TURN-END), and 2.1.331 writes that answer only after
+                # the dequeue, with the earlier timestamp (FIX-RUNNER-CLI-331). Its start
+                # follows that turn's ``result``, as in a print stream, so the result never
+                # counts as the answer of the turn the input starts. An output the turn gives
+                # after the dequeue (`_resume_deferred`) gives the start on before it; a dequeue
+                # after a tool result, before the next request, is given on at once, as before.
+                if not self._deferred:
+                    self._dequeued_at = _stamp(record)
                 self._deferred.append(started)
                 return []
             return [started, self._init()]
@@ -803,12 +841,24 @@ class TranscriptMapper:
     def _end_turn(self) -> list[dict[str, Any]]:
         """The ``result`` of the turn, then the start of each input dequeued before it."""
         deferred, self._deferred = self._deferred, []
-        self._answered = False
+        self._answered = self._awaiting = False
+        self._dequeued_at = None
         return [self._turn_end(), *((*deferred, self._init()) if deferred else ())]
 
-    def _resume_deferred(self) -> list[dict[str, Any]]:
-        """The turn went on after its final answer: a deferred start is given on now."""
+    def _resume_deferred(self, record: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """The turn went on after the dequeue: a deferred start is given on now.
+
+        A record whose ``timestamp`` is earlier than the deferred dequeue's was written late
+        (2.1.331 writes a turn's final answer after its stop hooks): the turn gave it before
+        the dequeue, so the start stays deferred. Without a readable time on either record the
+        start is given on, as before.
+        """
+        if self._deferred and self._dequeued_at is not None:
+            written = _stamp(record)
+            if written is not None and written < self._dequeued_at:
+                return []
         self._answered = False
+        self._dequeued_at = None
         deferred, self._deferred = self._deferred, []
         return [*deferred, *(self._turn_start() if deferred else ())]
 

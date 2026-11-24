@@ -466,6 +466,8 @@ class Player:
         self.held = 0
         self.job_running = False
         self.turn_open = False
+        self.late: dict[str, Any] | None = None
+        """A line dequeued before the record of the turn's final answer (2.1.331)."""
         self._status: tuple[str, str | None] | None = None
         sys.argv[1:] = self.argv  # the fixtures expand {{add_dir}} from the launch's arguments
 
@@ -486,8 +488,11 @@ class Player:
             "version": self.fake.pinned,
         }
 
-    def record(self, kind: str, **members: Any) -> str:
+    def record(self, kind: str, *, stamp: str | None = None, **members: Any) -> str:
         ident = str(members.pop("uuid", None) or uuid.uuid4())
+        envelope = self._envelope()
+        if stamp is not None:
+            envelope["timestamp"] = stamp
         self.write(
             {
                 "parentUuid": self.last_uuid,
@@ -495,7 +500,7 @@ class Player:
                 "type": kind,
                 "uuid": ident,
                 **members,
-                **self._envelope(),
+                **envelope,
             }
         )
         self.last_uuid = ident
@@ -571,8 +576,20 @@ class Player:
         for block in blocks:
             self.record("assistant", message={**message, "content": [block]}, **members)
 
-    def text(self, value: str, ident: str | None = None) -> None:
+    def text(self, value: str, ident: str | None = None, *, late: bool = False) -> None:
+        """A final answer; ``late``: written after a line that came meanwhile was dequeued.
+
+        Like 2.1.331 (live probe of 2026-11-24): the record of a turn's final answer is written
+        only after the turn's stop hooks, with the time the answer came, so the dequeue of a
+        line that arrived meanwhile stands before it in the file.
+        """
         self.request()
+        stamp = _now()
+        if late:
+            self.late = self.next_line(0.0)
+            if self.late is not None:
+                time.sleep(0.01)  # the dequeue's time is later than the answer's
+                self.plain("queue-operation", operation="dequeue")
         self.assistant(
             {
                 "id": ident or f"msg_{uuid.uuid4().hex[:12]}",
@@ -582,7 +599,8 @@ class Player:
                 "content": [{"type": "text", "text": value}],
                 "stop_reason": "end_turn",
                 "usage": {"input_tokens": 100, "output_tokens": 5},
-            }
+            },
+            stamp=stamp,
         )
 
     def api_error(self, text: str, members: dict[str, Any] | None) -> None:
@@ -858,7 +876,7 @@ class Player:
         final.update(scenario.get("result_override", {}))
         text = self.fake.expand(str(final.get("result") or ""))
         if text != last_text:
-            self.text(text, ident="msg_final")
+            self.text(text, ident="msg_final", late=bool(scenario.get("bg_answer_after_dequeue")))
         # Like the result of a print turn, the fixture names the session's totals after it.
         self.add_usage(final.get("modelUsage"), absolute=True)
         early = None
@@ -868,6 +886,7 @@ class Player:
             early = self.next_line(0.0)
             if early is not None:
                 self.plain("queue-operation", operation="dequeue")
+        early = early or self.late
         self.turn_end()
         if early is not None:
             self.followup_turn(early, dequeued=True)
