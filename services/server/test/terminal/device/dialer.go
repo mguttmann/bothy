@@ -38,7 +38,7 @@ func (d *Dialer) DialContext(ctx context.Context, network, addr string) (net.Con
 	if addr != net.JoinHostPort(d.Host, strconv.Itoa(d.Port)) {
 		return nil, fmt.Errorf("device: refusing to dial %s: only the instance origin is reachable", addr)
 	}
-	var nd net.Dialer // nosemgrep: bothy-go-egress-only -- test client: it dials only the TLS front of the test stack on 127.0.0.1
+	var nd net.Dialer
 	c, err := nd.DialContext(ctx, network, net.JoinHostPort("127.0.0.1", strconv.Itoa(d.Mapped)))
 	if err != nil {
 		return nil, err

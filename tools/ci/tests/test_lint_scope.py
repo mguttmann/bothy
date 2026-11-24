@@ -193,3 +193,34 @@ def test_mypy_reads_every_tool_folder() -> None:
     expected = [folder for folder in _tool_folders() if folder not in NOT_TYPE_CHECKED]
     assert sorted(config["tool"]["mypy"]["files"]) == expected
     assert set(NOT_TYPE_CHECKED) <= set(_tool_folders()), "an exception without its folder"
+
+
+def test_actionlint_checks_workflow_shell_with_the_pinned_shellcheck(tmp_path: Path) -> None:
+    """The real recipe line of actionlint, run with a recording actionlint.
+
+    An empty `-shellcheck=` switched the check of the `run:` blocks off, so a
+    `# shellcheck disable` comment in a workflow had nothing to disable.
+    """
+    log = tmp_path / "calls.jsonl"
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    for name in ("actionlint", "shellcheck"):
+        (bin_dir / name).write_text(_FAKE.format(python=sys.executable), encoding="utf-8")
+        (bin_dir / name).chmod(0o755)
+    fetch = bin_dir / "fetch"
+    fetch.write_text(f'#!/bin/sh\necho "{bin_dir}/$2"\n', encoding="utf-8")
+    fetch.chmod(0o755)
+    env = {k: v for k, v in os.environ.items() if k not in _DROPPED}
+    env["FAKE_LOG"] = str(log)
+    [command] = [c for c in _lint_commands(f"FETCH={fetch}", env=env) if "-pyflakes=" in c]
+    done = subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", command],
+        cwd=REPO,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert done.returncode == 0, done.stdout + done.stderr
+    [args] = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+    assert f"-shellcheck={bin_dir}/shellcheck" in args

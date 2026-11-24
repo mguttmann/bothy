@@ -155,7 +155,7 @@ func Dial(t testing.TB, ctx context.Context, baseURL string, opts ...Option) (*C
 	if err != nil {
 		return nil, err
 	}
-	ws, resp, err := websocket.Dial(ctx, wsURL(baseURL), &websocket.DialOptions{HTTPHeader: o.header, CompressionMode: websocket.CompressionDisabled})
+	ws, resp, err := websocket.Dial(ctx, wsURL(baseURL), &websocket.DialOptions{HTTPHeader: o.header, CompressionMode: websocket.CompressionDisabled}) // nosemgrep: bothy-go-egress-only -- the test harness, imported only by tests; it dials only the server of the test
 	if resp != nil && resp.Body != nil {
 		_ = resp.Body.Close()
 	}
@@ -194,7 +194,7 @@ func DialStatus(ctx context.Context, baseURL string, opts ...Option) (int, error
 	for _, f := range opts {
 		f(&o)
 	}
-	ws, resp, err := websocket.Dial(ctx, wsURL(baseURL), &websocket.DialOptions{HTTPHeader: o.header, CompressionMode: websocket.CompressionDisabled})
+	ws, resp, err := websocket.Dial(ctx, wsURL(baseURL), &websocket.DialOptions{HTTPHeader: o.header, CompressionMode: websocket.CompressionDisabled}) // nosemgrep: bothy-go-egress-only -- the test harness, imported only by tests; it dials only the server of the test
 	if resp != nil && resp.Body != nil {
 		_ = resp.Body.Close()
 	}
