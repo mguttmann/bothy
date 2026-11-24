@@ -574,6 +574,9 @@ func (s *server) register() {
 	}
 	r.OnStop(lifecycle.StopStep{Name: "telemetry", Phase: lifecycle.PhaseTelemetry, Budget: s.cfg.TelemetryFlushTimeout, Run: s.stopTelemetry})
 	r.OnStop(lifecycle.StopStep{Name: "pool", Phase: lifecycle.PhaseDatabase, Run: s.stopDatabase})
+	// audit_denials and stats_flush register during the start of their components (Audit.Start,
+	// Measure.Start); their budgets count in the sum Run checks before the start.
+	r.Reserve(databaseFlushSteps * s.cfg.DatabaseFlushTimeout)
 	r.OnStop(lifecycle.StopStep{Name: "internal_listener", Phase: lifecycle.PhaseInternalListener, Run: s.stopInternal})
 }
 

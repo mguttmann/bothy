@@ -28,7 +28,7 @@ func (e *env) restoreTo(head, cp int64) {
 
 // copySinkUpTo copies the checkpoint files of the instance with a seq up to cp into a new sink
 // root and returns the root: the operator path after a restore (docs/operations/backup-restore.md
-// 5.2 and 8): a new sink location that holds the checkpoints of the restored database only, the
+// 8.1): a new sink location that holds the checkpoints of the restored database only, the
 // old one kept as evidence.
 func (e *env) copySinkUpTo(cp int64) string {
 	e.t.Helper()

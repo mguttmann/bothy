@@ -588,6 +588,22 @@ func TestBudgetSumAboveTotalFailsAtWiring(t *testing.T) {
 	}
 }
 
+// TestReservedBudgetCountsAtWiring: a budget reserved for steps that register only during the
+// start counts in the sum Run checks before any component starts.
+func TestReservedBudgetCountsAtWiring(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t, 10*time.Second)
+	h.r.OnStop(step(h.rec, "drain", lifecycle.PhaseDrain, 6*time.Second))
+	h.r.Reserve(5 * time.Second)
+	h.r.Add(&component{name: "never", rec: h.rec, r: h.r})
+	if code := wait(t, h.runAsync(context.Background())); code != lifecycle.ExitUsage {
+		t.Fatalf("exit = %d, want 2", code)
+	}
+	if err := h.r.Err(); err == nil || !strings.Contains(err.Error(), "11s") {
+		t.Fatalf("Err() = %v, want the sum with the reserve", err)
+	}
+}
+
 func TestRunTwicePanics(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t, time.Minute)
