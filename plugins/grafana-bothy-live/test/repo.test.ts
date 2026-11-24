@@ -10,6 +10,8 @@ import path from 'node:path';
 import { dark, light } from '../../../design/build/ts/tokens.gen';
 import pluginJson from '../src/plugin.json';
 import { QUERIES, VIEW_NAMES } from '../src/queries.gen';
+import { DEFAULT_OPTIONS } from '../src/types';
+import { SPEEDS } from '../src/views/Timeline';
 
 const ROOT = path.resolve(__dirname, '..');
 const REPO = path.resolve(ROOT, '..', '..');
@@ -150,5 +152,24 @@ describe('osv-scanner.toml', () => {
     for (const block of blocks) {
       expect(block).toMatch(/^reason = ".{20,}"$/m);
     }
+  });
+});
+
+describe('defaults shared with the product configuration', () => {
+  const spec = readFileSync(path.join(REPO, 'docs/spec/25-visualization.md'), 'utf8');
+  const defaultOf = (key: string): string => {
+    const row = spec.split('\n').find((line) => line.startsWith(`| \`${key}\` |`));
+    if (row === undefined) {
+      throw new Error(`no row for ${key}`);
+    }
+    return (row.split('|')[3] ?? '').trim().replace(/`/g, '');
+  };
+
+  it('plays at the speeds of viz.timeline_speeds', () => {
+    expect(defaultOf('viz.timeline_speeds').split(',').map(Number)).toEqual([...SPEEDS]);
+  });
+
+  it('warns below the remaining budget of stats.slo_warn_budget_ratio by default', () => {
+    expect(Number(defaultOf('stats.slo_warn_budget_ratio'))).toBe(DEFAULT_OPTIONS.warnBudgetRatio);
   });
 });

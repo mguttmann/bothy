@@ -423,6 +423,22 @@ Where the list is:
   Tests: `test_a_rerun_of_a_reported_run_with_a_new_flake_artifact_is_seen_again`,
   `test_the_attempts_of_one_run_count_once_with_the_flakes_of_each`.
 
+Known class, the scenario waits of the Claude Code runner (`plugins/claude-code-runner/tests/scenarios`):
+a few scenarios ran out of their wait in CI (`test_br_05_counter_check_aborts_turn`,
+`test_resume_same_reference_attempt`). The failed waits lasted the whole of
+`quality.test.patience`, so a longer bound would not have changed them, and the bound stays. Their
+errors carried no evidence of what the runner was doing, and most waits for a runner process
+called `Popen.wait`, which blocked the event loop that the FakeServer of the test runs on. In the `test_*.py`
+files of the scenarios, the waits for a condition and for the exit of a runner process now go
+through `World.until` (a process through `World.exited`, which polls through it), and a wait that
+runs out fails with the end of every runner process log, the state of every runner process and
+the last Fake-Claude records (`World.diagnostics`). Tests: `tests/scenarios/test_world_waits.py`,
+which also fails on a new `Popen.wait` with a bound, a `to_thread` of a process wait or an own
+deadline loop in those files. Not covered: the `stop --turns` commands that `test_handover.py` and
+`test_launch_crash_points.py` run with `subprocess.run` and a time limit, and the teardown of the
+worlds in `tests/scenarios/conftest.py` and `tests/hosting_world.py`; a time limit there fails
+without that evidence. The cause of the long waits is open until such a report names it.
+
 ## Red runs
 
 Keeping `main` green is a duty of the maintainers (GOVERNANCE.md, "Roles"): they read the runs of

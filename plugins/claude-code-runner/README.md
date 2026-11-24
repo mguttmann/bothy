@@ -420,7 +420,9 @@ none.
   `tests/unit/test_crash_points.py` enumerates every first and second crash point. A file in
   `turns/` that is no record the runner wrote (no regular file, not named after its run, or
   without UUIDs for the thread and the session) is logged with `turn_record_unreadable` and
-  left where it is; a process ID the system cannot hold names no process. With
+  left where it is; a record whose adoption fails otherwise is kept and logged with
+  `turn_adoption_failed`, and the start goes on with the next record; a process ID the system
+  cannot hold names no process. With
   `runner.turn_handover` the record of a run in `preparing` or `waiting_lock` carries no session
   yet; the next runner reads it and removes it ("Phases" below). Turns of
   hosted agents are not adopted: see "What a crash leaves" under "Hosting built-in agents".
@@ -512,7 +514,8 @@ against a server that accepts the heartbeat capability `turn_handover` and has
   was closed and a compaction are adopted with reading rights only; a record without a named pipe
   is adopted as before.
 - **`claude-code-runner stop --turns --config <path>`.** Stops every turn on purpose: a running
-  runner (named in `<runner.state_dir>/runner.pid`) gets the marker `stop-turns` and SIGTERM and
+  runner (named in `<runner.state_dir>/runner.pid`) gets the marker `stop-turns` (it names the
+  command's process and counts only while that process lives) and SIGTERM and
   stops its own and adopted turns as in 18.6; the command then stops the turns of the records left
   itself, each run ending `cancelled` with `adapter_stopped`, and exits 0. Run it before unloading
   or uninstalling the service, and before switching `runner.turn_handover` off.
@@ -793,15 +796,19 @@ uv run --locked claude-code-runner run --config /etc/claude-code-runner.toml
 ```
 
 `check-config` contacts no server; it prints one code per check (`ok`, `unset` or the problem).
-`run` logs JSON lines on stderr (event codes and IDs, never content, tokens or keys) and stops on
-SIGINT or SIGTERM. Before it stops, every turn it started itself is ended as a stop by a person
+`run` logs JSON lines on stderr (event codes and IDs, never content, tokens or keys; each line
+with `ts`, `level` and `logger`, the request lines of the HTTP client left out) and stops on
+SIGINT, SIGTERM or SIGHUP. Before it stops, every turn it started itself is ended as a stop by a person
 ends it (SIGINT, SIGTERM and SIGKILL to its group, each escalation logged as `stop_escalated`), and
 its run finishes `cancelled` with the reason `adapter_stopped` and a note in the thread, which
 names the background tasks the stop ended (their results are lost; FIX-runner-silent-stop); the
 turn record goes only once no process of the turn is left. With `runner.turn_handover` a restart
 hands the turns over instead and no background task is lost (a turn in background mode is
 stopped in both cases, see "Background sessions"). Turns adopted after a crash keep running and
-keep their records for the next start (docs/spec/09-agents.md 18.6, 18.9).
+keep their records for the next start (docs/spec/09-agents.md 18.6, 18.9). A stop can take
+`runner.stop_grace` plus `runner.kill_grace` plus `runner.cli_probe_timeout`: give the service
+manager a stop timeout above that sum (launchd `ExitTimeOut`, systemd `TimeoutStopSec`), or it
+kills the runner in the middle of the stop.
 
 ## Folder creation (M4-43)
 

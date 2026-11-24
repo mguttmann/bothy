@@ -48,6 +48,7 @@ from bothy_sdk.message_format import MESSAGE_FORMAT_RULES, MESSAGE_FORMAT_TITLE
 
 __all__ = [
     "CUT_MARK",
+    "CUT_NOTE",
     "FORMAT_HEADING",
     "SYSTEM_NOTE",
     "BuiltContext",
@@ -56,6 +57,7 @@ __all__ = [
     "build_context",
     "command_user_side",
     "cut_utf8",
+    "cut_with_note",
     "find_message_text",
 ]
 
@@ -73,6 +75,9 @@ FORMAT_HEADING: Final = f"{MESSAGE_FORMAT_TITLE} of every reply in this chat:"
 
 CUT_MARK: Final = "[content cut: longer than the inline limit]"
 """Line appended inside the data block of an attachment text that was cut."""
+
+CUT_NOTE: Final = "\n\n(cut)"
+"""The end of a message the adapter cut to ``hermes_adapter.max_message_bytes`` (09 14)."""
 
 _PROFILE_HEADING: Final = "Channel instructions of this agent's profile:"
 
@@ -227,6 +232,29 @@ def cut_utf8(data: bytes, limit: int) -> tuple[str, bool]:
     while end > 0 and data[end] & 0xC0 == 0x80:
         end -= 1
     return data[:end].decode("utf-8", errors="replace"), True
+
+
+def cut_with_note(text: str, limit: int) -> tuple[str, bool]:
+    r"""Cut ``text`` to at most ``limit`` UTF-8 bytes, ending a cut text with `CUT_NOTE`.
+
+    Args:
+        text: The message text.
+        limit: The most bytes the message may have.
+
+    Returns:
+        The text and whether it was cut.
+
+    Examples:
+        >>> cut_with_note("abcdefghijklmnop", 12)
+        ('abcde\n\n(cut)', True)
+        >>> cut_with_note("short", 12)
+        ('short', False)
+    """
+    data = text.encode("utf-8")
+    if len(data) <= limit:
+        return text, False
+    head, _ = cut_utf8(data, max(0, limit - len(CUT_NOTE.encode("utf-8"))))
+    return head + CUT_NOTE, True
 
 
 def _wanted(attachment: Any) -> bool:

@@ -459,8 +459,9 @@ class WebhookKeyCache:
     Args:
         client: A generated core client without credentials, or the hand-layer client.
         clock: Time source of the cache age; default `bothy_sdk.clock.SystemClock`.
-        settings: ``webhook_keys_max_age`` without a ``max-age`` and
-            ``jwks_refresh_min_interval`` as the shortest age; default `SdkSettings()`.
+        settings: ``webhook_keys_max_age`` without a ``max-age``,
+            ``jwks_refresh_min_interval`` as the shortest age and ``http_timeout`` as the
+            bound of a fetch with a generated core client; default `SdkSettings()`.
 
     Examples:
         >>> from bothy_sdk.generated.client import Client as CoreClient
@@ -496,6 +497,8 @@ class WebhookKeyCache:
             ProblemError: ``getWebhookKeys`` answered with a problem; the next call tries
                 again.
             RuntimeError: The answer could not be read; the next call tries again.
+            TimeoutError: A generated core client got no answer within ``sdk.http_timeout``;
+                the next call tries again.
         """
         if self._cached is not None and self._clock.monotonic() < self._expires:
             return list(self._cached)
@@ -513,7 +516,10 @@ class WebhookKeyCache:
     async def _get(self) -> Response[Any]:
         if isinstance(self._client, Client):
             return await self._client.call_detailed(get_webhook_keys.asyncio_detailed)
-        response = await get_webhook_keys.asyncio_detailed(client=self._client)
+        # A core client may have no timeout (its default); `sdk.http_timeout` bounds the fetch
+        # every caller shares, so a server that never answers cannot hold it forever.
+        async with asyncio.timeout(self._settings.http_timeout):
+            response = await get_webhook_keys.asyncio_detailed(client=self._client)
         status = int(response.status_code)
         if not 200 <= status < 300:
             # The generated parser has read the body as a problem object already.

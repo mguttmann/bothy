@@ -169,6 +169,21 @@ copies `platforms.<key>.channel_skill_bindings` outside `extra` only for Discord
 write the bindings into `extra` for this platform. The adapter reads them at the gateway start;
 restart the gateway after a change.
 
+### Size of the turn's context
+
+The format rules, the channel instructions, the note and the run context the server delivers
+reach Hermes as one hook context, and Hermes takes at most `hooks.output_spill.max_chars`
+characters of it (Hermes' default unless the profile's `config.yaml` sets it) before it spills the rest
+to a file. The adapter keeps the context within that limit: it keeps the rules and the channel
+instructions whole and leaves out the oldest messages first (channel messages before thread
+messages), then the inlined attachment texts, and a line in the context names what was left out.
+A later run of the thread does not deliver what was left out. So a large
+`history_backfill_limit` on the server does not mean the agent sees that many messages: in the
+first run of a long thread it often sees only the newest few. Raise
+`hooks.output_spill.max_chars` in the profile to give the agent more context. When even the bare
+trigger does not fit, the gateway log shows the warning `user side above the hook limit without
+older messages and file texts` and Hermes spills (09 17.6, D-FHUSC-3, D-FHUSC-7).
+
 ## Thread actions
 
 The agent sets a thread's title, marks it done (the state of the app's Done button) and reopens
@@ -181,7 +196,9 @@ python -m bothy_hermes_adapter thread close <thread ID> --profile-home <home>
 python -m bothy_hermes_adapter thread reopen <thread ID> --profile-home <home>
 ```
 
-Run it with the Python of the profile and the `PYTHONPATH` of `install` (above);
+Run it with the Python of the profile and the `PYTHONPATH` of `install` (above), or, from a
+skill or a shell of the profile, through the plugin's starter as `python
+<home>/plugins/<platform key>/run.py thread ...` (section "External jobs");
 `--platform-key` names another platform section than `bothy`. It prints one JSON line with
 the keys `ok`, `thread_id`, `state`, `title` and `title_source` on success, for example
 `{"ok": true, "thread_id": "<ID>", "state": "closed", "title": "Done", "title_source": "auto"}`,
@@ -217,16 +234,19 @@ only after the PID's start time matched again.
 
 ```sh
 # In a shell of Hermes' terminal tool: HERMES_HOME and HERMES_SESSION_THREAD_ID are set.
-python -m bothy_hermes_adapter job register --profile-home "$HERMES_HOME" \
+BOTHY="$HERMES_HOME/plugins/bothy/run.py"   # the plugin's starter; bothy is the platform key
+python "$BOTHY" job register --profile-home "$HERMES_HOME" \
   --thread "$HERMES_SESSION_THREAD_ID" --pid "$SUPERVISOR_PID" --title "Rebuild the index" \
   --log /path/to/run.log            # prints {"ok": true, "job_id": "..."}
-python -m bothy_hermes_adapter job deregister --profile-home "$HERMES_HOME" --job-id "$JOB_ID"
-python -m bothy_hermes_adapter job list --profile-home "$HERMES_HOME"
-python -m bothy_hermes_adapter job stop --profile-home "$HERMES_HOME" --job-id "$JOB_ID"
+python "$BOTHY" job deregister --profile-home "$HERMES_HOME" --job-id "$JOB_ID"
+python "$BOTHY" job list --profile-home "$HERMES_HOME"
+python "$BOTHY" job stop --profile-home "$HERMES_HOME" --job-id "$JOB_ID"
 ```
 
-Run it with the Python of the profile, or put the plugin's `vendor` folder
-(`<profile home>/plugins/<platform key>/vendor`) on `PYTHONPATH`; the module
+Run it with the Python of the profile. Hermes' environment holds nothing of the adapter, so
+`python -m bothy_hermes_adapter` alone does not find the module there; the starter `run.py`, which
+`install` writes into the plugin directory, loads the packages `packages.json` names and then runs
+the module. The module
 `bothy_hermes_adapter.jobs` needs only the standard library, so a script can also call
 `JobRegistry(jobs_dir(home, "bothy")).register(thread, pid, title)` directly. Register the
 process that leads the job's process group (the one started with `start_new_session`), register
@@ -246,12 +266,12 @@ the file right before it starts the command; reading starts at the file's size t
 an earlier call never show again.
 
 ```sh
-# In a shell of Hermes' terminal tool, before the chain starts:
-python -m bothy_hermes_adapter stages register --profile-home "$HERMES_HOME" \
+# In a shell of Hermes' terminal tool, before the chain starts (the starter as above):
+python "$BOTHY" stages register --profile-home "$HERMES_HOME" \
   --thread "$HERMES_SESSION_THREAD_ID" --file "$CHAIN_HOME/tickets/$KEY/stages.jsonl" \
   --ticket "$KEY"                    # prints {"ok": true, "source_id": "...", "offset": ...}
-python -m bothy_hermes_adapter stages list --profile-home "$HERMES_HOME"
-python -m bothy_hermes_adapter stages deregister --profile-home "$HERMES_HOME" --source-id "$ID"
+python "$BOTHY" stages list --profile-home "$HERMES_HOME"
+python "$BOTHY" stages deregister --profile-home "$HERMES_HOME" --source-id "$ID"
 ```
 
 The adapter reads the file every `hermes_adapter.background_poll_interval` while a run of the
@@ -403,6 +423,13 @@ a content or a key value. After a
 restart, runs that were accepted but not started start again (an expired token is renewed);
 runs whose turn was running are not resumed (the server ends them `interrupted`). The adapter
 connects only after Hermes finished its startup restore.
+
+Run the gateway under a supervisor (a service manager that restarts it) and look for the
+adapter's connection in the gateway log after each start: under load Hermes' own start can stop
+or come up without the platform, and the server sees no reason for an agent that stays offline.
+When the adapter's connection to the server fails after a successful start (for example the
+discovery or the first key fetch), the adapter reports a retryable fatal error
+(`bothy_adapter_loop_failed`) and Hermes reconnects the platform in the background.
 
 ## What the tests prove and what they do not
 

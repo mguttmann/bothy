@@ -236,6 +236,35 @@ async def test_handler_exception_reasons(fake: FakeServer, error: Exception, rea
 
 
 @pytest.mark.anyio
+async def test_lost_end_is_sent_again(fake: FakeServer) -> None:
+    from bothy_sdk.testing.faults import Fault
+
+    handler = RecordingHandler()
+    adapter = make_adapter(fake, handler, "lost-end")
+    # Every attempt of the client fails, and the first resend as well.
+    fake.inject("finishRun", Fault.disconnect(), times=fake.sdk_settings.retry_max_attempts + 1)
+    async with running(adapter, fake=fake):
+        triggered = await fake.trigger()
+        await until(fake, lambda: fake.run_state(triggered.run_id).state == "completed")
+        await until(fake, lambda: triggered.run_id not in adapter._runs)
+        entries = await adapter.inbox.for_run(triggered.run_id)
+        assert all(e.state is EntryState.CLOSED for e in entries)
+    assert fake.run_state(triggered.run_id).state_reason is None
+    assert handler.count("execute") == 1
+
+
+@pytest.mark.anyio
+async def test_failed_start_closes_the_adapter(fake: FakeServer) -> None:
+    from bothy_sdk.testing.faults import Fault
+
+    adapter = make_adapter(fake, RecordingHandler(), "failed-start")
+    fake.inject("getDiscovery", Fault.problem("forbidden"))
+    with pytest.raises(Exception):  # noqa: B017, PT011 - any start failure
+        await within_patience(adapter.run())
+    assert adapter.client.http.is_closed
+
+
+@pytest.mark.anyio
 async def test_restart_resumes_accepted_and_closes_started(
     fake: FakeServer, tmp_path: Path
 ) -> None:

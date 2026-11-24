@@ -570,7 +570,7 @@ async def test_a_hosted_turn_left_by_a_crashed_runner_is_stopped_at_the_next_sta
     await world.until(lambda: record.exists() and "pid" in json.loads(record.read_text()))
     [turn] = world.turns()
     first.send_signal(signal.SIGKILL)
-    first.wait(PATIENCE)
+    await world.exited(first)
     assert _alive(turn["pid"])
 
     beats = len(_beats(backend))
@@ -630,7 +630,7 @@ async def test_the_end_of_a_hosting_runner_keeps_an_adopted_turn_that_works(
     await world.until(lambda: record.exists() and "pid" in json.loads(record.read_text()))
     [own_turn] = world.turns()
     first.send_signal(signal.SIGKILL)
-    first.wait(PATIENCE)
+    await world.exited(first)
     assert _alive(own_turn["pid"])
 
     try:

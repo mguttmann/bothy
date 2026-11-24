@@ -180,5 +180,6 @@ describe("logs", () => {
     ]);
     expect(allowedFields(undefined)).toEqual({});
     expect(LOG_ATTRIBUTES).toContain("reason");
+    expect(LOG_ATTRIBUTES).not.toContain("step");
   });
 });

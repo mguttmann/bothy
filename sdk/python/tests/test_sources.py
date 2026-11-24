@@ -38,10 +38,12 @@ from bothy_sdk.sources import (
     GatewaySource,
     PollingSource,
     SourceReady,
+    _page_envelopes,
     envelope_from,
 )
 from bothy_sdk.testing import FakeClock, fingerprint
 from bothy_sdk.testing._patience import eventually
+from bothy_sdk.tolerance import UnknownEvent
 
 pytestmark = pytest.mark.anyio
 
@@ -144,6 +146,29 @@ def test_envelope_interview_with_a_member_of_a_wrong_type_raises_value_error() -
     }
     with pytest.raises(ValueError, match="wrong type"):
         envelope_from(data)
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        lambda data: data.pop("payload"),  # KeyError in the generated model
+        lambda data: data.update(occurred_at="not a time"),  # ValueError
+        lambda data: data.update(payload="not an object"),  # AttributeError or TypeError
+    ],
+    ids=["missing member", "wrong value", "wrong type"],
+)
+def test_envelope_of_a_known_type_that_does_not_decode_is_passed_on_as_unknown(
+    broken: Callable[[dict[str, Any]], object],
+) -> None:
+    data = _envelope(11)
+    broken(data)
+    env = envelope_from(data)
+    assert isinstance(env.event, UnknownEvent)
+    assert env.event.type == "agent.invocation"
+    assert env.event.seq == 11
+    assert env.seq == 11
+    # A page with such an event keeps it, so it is acknowledged like any other.
+    assert [e.seq for e in _page_envelopes([data, _envelope(12)])] == [11, 12]
 
 
 # Ack window ------------------------------------------------------------------------------------
@@ -375,6 +400,44 @@ async def test_polling_heartbeat_every_interval_ms() -> None:
         await _until(lambda: len(responder.heartbeats) == 3)
         assert responder.heartbeats == pytest.approx([0.0, 3.0, 8.0])
         await running.stop(clock)
+
+
+async def test_polling_heartbeat_survives_a_failing_callback(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    clock = FakeClock()
+    responder = _Responder(clock, [])
+    responder.intervals_ms = [3000, 3000, 3000]
+    settings = SdkSettings(poll_interval=1000.0)
+    beat = Heartbeat.from_dict({"state": "online"})
+    calls = 0
+
+    def heartbeat() -> Heartbeat:
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            raise ValueError("runtime status out of range")
+        return beat
+
+    async with _client(clock, responder, settings) as client:
+        source = PollingSource(
+            client, CONSUMER, settings=settings, clock=clock, heartbeat=heartbeat
+        )
+        running = _Running(source)
+        await _until(lambda: len(responder.heartbeats) == 1 and clock.sleepers == 2)
+        await clock.advance(3)
+        # The callback fails: the last valid heartbeat goes out instead, and the loop goes on.
+        await _until(lambda: len(responder.heartbeats) == 2 and clock.sleepers == 2)
+        await clock.advance(3)
+        await _until(lambda: len(responder.heartbeats) == 3)
+        await running.stop(clock)
+    # The log names the kind of the failure only: its text may carry a value of the status.
+    failed = [r for r in caplog.records if "heartbeat callback failed" in r.getMessage()]
+    assert failed
+    for record in failed:
+        assert "ValueError" in record.getMessage()
+        assert "out of range" not in record.getMessage()
+        assert record.exc_info is None
 
 
 async def test_polling_without_heartbeat_sends_none() -> None:

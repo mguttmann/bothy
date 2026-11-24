@@ -351,13 +351,13 @@ export class Outbox {
           !(error instanceof RequestInProgress)
         )
           return this.fail(entry, error.code);
-        this.logger.info(`outbox entry ${entry.entryId} stays pending`, {
+        this.logger.warn(`outbox entry ${entry.entryId} stays pending`, {
           code: error.code,
         });
         return entry;
       }
       if (error instanceof TransportError) {
-        this.logger.info(`outbox entry ${entry.entryId} stays pending`, {
+        this.logger.warn(`outbox entry ${entry.entryId} stays pending`, {
           error: error.name,
         });
         return entry;

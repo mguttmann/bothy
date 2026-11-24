@@ -618,7 +618,7 @@ export class PollingSource implements EventSource {
       }
       // A server restart or an outage outlasted the retries: wait with full jitter between zero
       // and sync.reconnect_backoff_cap, then poll again.
-      this.logger.info("poll failed; polling again", {
+      this.logger.warn("poll failed; polling again", {
         error: error instanceof Error ? error.name : "unknown",
       });
       return { kind: "retry" };
@@ -645,7 +645,14 @@ export class PollingSource implements EventSource {
   private async beat(): Promise<void> {
     let interval = this.settings.pollIntervalMs;
     while (!this.stopped.signal.aborted) {
-      const body = this.heartbeat?.();
+      let body: S["Heartbeat"] | undefined;
+      try {
+        body = this.heartbeat?.();
+      } catch (error) {
+        this.logger.error("agent heartbeat could not be built", {
+          error: error instanceof Error ? error.name : "unknown",
+        });
+      }
       if (body !== undefined) {
         try {
           const ack = await unwrap(
@@ -659,7 +666,7 @@ export class PollingSource implements EventSource {
             interval = next;
         } catch {
           // A failed heartbeat is retried in the next interval.
-          this.logger.info("heartbeat failed; retrying in the next interval");
+          this.logger.warn("heartbeat failed; retrying in the next interval");
         }
       }
       await this.wait(interval);
@@ -714,7 +721,7 @@ export class PollingSource implements EventSource {
         throw error;
       // ack is cumulative: a later one covers this seq; without one the server delivers again
       // after agent.ack_timeout and the inbox settles the duplicate.
-      this.logger.info("ack failed", { seq, error: error.name });
+      this.logger.warn("ack failed", { seq, error: error.name });
     }
   }
 

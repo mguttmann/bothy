@@ -130,8 +130,8 @@ def build_app(
             return web.Response(status=413)
         try:
             reply = await route(RawRequest(request.headers, body))
-        except Exception:
-            log.error("http.failed", status=503, reason="internal")
+        except Exception as exc:
+            log.error("http.failed", status=503, reason="internal", code=type(exc).__name__)
             reply = Reply(503)
         return _response(reply)
 

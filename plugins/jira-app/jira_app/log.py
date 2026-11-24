@@ -36,7 +36,6 @@ LOG_ATTRIBUTES: tuple[str, ...] = (
     "webhook_id",
     "job_id",
     "job_kind",
-    "step",
     "operation",
     "status",
     "outcome",

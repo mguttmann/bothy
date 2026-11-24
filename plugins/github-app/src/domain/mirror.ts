@@ -12,7 +12,7 @@
  *
  * @example
  * ```ts
- * const decision = mirrorDecision(message, ownId, (thread) => store.keyOfThread(thread));
+ * const decision = mirrorDecision(message, ownId, (thread) => store.state().thread_keys[thread]);
  * if (decision.mirror) queue(decision.key);
  * ```
  *

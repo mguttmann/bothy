@@ -57,6 +57,7 @@ import asyncio
 import contextlib
 import logging
 import time
+import traceback
 import unicodedata
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, replace
@@ -115,10 +116,12 @@ from bothy_hermes_adapter.context_format import (
     build_context,
     command_user_side,
     cut_utf8,
+    cut_with_note,
 )
 from bothy_hermes_adapter.hermes_commands import (
     BUILT_IN,
     COMMAND_CLASSES,
+    COMMAND_FAILED,
     INPUT_OPTION,
     command_text,
     option_values,
@@ -192,6 +195,7 @@ __all__ = [
     "BusyMode",
     "HermesHandler",
     "PrepareRefused",
+    "stack_of",
 ]
 
 _LOG = logging.getLogger("bothy_hermes_adapter")
@@ -221,8 +225,8 @@ JOB_WITHOUT_RUN: Final = (
     "A background job runs in this thread without a run: **{title}** (process {pid}, started "
     "{since}, job {job_id}). Its run has ended, for example at a restart of the agent, or it was "
     "started outside a run, so it has no stop button here. The operator of the agent can stop it "
-    "on the host with `python -m bothy_hermes_adapter job stop --profile-home <profile home> "
-    "--job-id {job_id}`."
+    "on the host with `python <profile home>/plugins/<platform key>/run.py job stop "
+    "--profile-home <profile home> --job-id {job_id}`."
 )
 """The message that shows a live registered job no open run covers (09 17.12 point 8)."""
 
@@ -687,11 +691,32 @@ class HermesHandler(AgentHandler):
                 # the resume: that handler ends the run ``cancelled`` once the work is stopped.
                 # Returning before it would let the SDK end the run ``completed`` (AUD-HA1/6).
                 await turn.abandoned.wait()
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, Exception):
+            # Every other way out stops the work too: the SDK then fails the run, and no
+            # delegation, process or job may go on without it (R-AG-44).
             await self._abandon(turn)
             raise
         finally:
             self._forget(turn)
+
+    async def on_not_started(self, inv: Invocation) -> None:
+        """Free what ``prepare`` kept for a run that does not reach ``execute`` here.
+
+        The SDK calls it after a refused, superseded or failed start (and after a ``prepare``
+        that raised); a later attempt of the same run calls ``prepare`` again.
+
+        Args:
+            inv: The invocation.
+        """
+        run_id = inv.claims.run_id
+        if run_id is None:
+            return
+        self._prepared.pop(run_id, None)
+        self._anchors.pop(run_id, None)
+        self._inbound.pop(run_id, None)
+        self._teams.pop(run_id, None)
+        self._notices.discard(run_id)
+        self._mirror_runs.discard(run_id)
 
     async def _transcribed(
         self, run: RunHandle, ctx: RunContext, channel: ChannelBehavior | None
@@ -1535,6 +1560,8 @@ class HermesHandler(AgentHandler):
                 )
         except ProblemError as exc:
             _LOG.info("run %s: session report refused code=%s", turn.run_id, exc.code)
+        except httpx.TransportError:
+            _LOG.info("run %s: session report not sent code=transport_error", turn.run_id)
 
     async def _set_title(self, turn: _Turn) -> None:
         """The title after the first completed run of a new session (09 12 points 3 to 5).
@@ -1564,6 +1591,8 @@ class HermesHandler(AgentHandler):
                 _LOG.info("run %s: title not set code=%s", turn.run_id, exc.code)
             else:
                 _LOG.info("run %s: title refused code=%s", turn.run_id, exc.code)
+        except httpx.TransportError:
+            _LOG.info("run %s: title not set code=transport_error", turn.run_id)
 
     async def _abandon(self, turn: _Turn) -> None:
         """A cancelled run: interrupt the turn, cancel its work, drop later callbacks (09 8)."""
@@ -1902,6 +1931,8 @@ class HermesHandler(AgentHandler):
                 )
             except ProblemError as exc:  # the server disabled it with the follow-up already
                 _LOG.info("run %s: component not disabled code=%s", turn.run_id, exc.code)
+            except httpx.TransportError:
+                _LOG.info("run %s: component not disabled code=transport_error", turn.run_id)
 
     async def on_interaction(self, inv: Invocation, run: RunHandle) -> None:
         """An interaction with a card of the run (09 11.4, 17.3; Design note 12).
@@ -1969,6 +2000,8 @@ class HermesHandler(AgentHandler):
             )
         except ProblemError as exc:
             _LOG.info("run %s: interaction answer refused code=%s", run.run_id, exc.code)
+        except httpx.TransportError:
+            _LOG.info("run %s: interaction answer not sent code=transport_error", run.run_id)
 
     async def _until_settled(self, turn: _Turn) -> None:
         """Wait until the run's ``execute`` returned or the run waits for a card again.
@@ -2025,9 +2058,9 @@ class HermesHandler(AgentHandler):
         )
         try:
             texts = await self.runtime.run_command(request)
-        except Exception as exc:  # Hermes failed the command; the person sees no reply
+        except Exception as exc:  # Hermes failed the command: a notice instead of its reply
             _LOG.warning("command %s failed in Hermes: %s", payload.command_id, type(exc).__name__)
-            return
+            texts = [COMMAND_FAILED.format(name=name)]
         for text in texts:
             if not text.strip():
                 continue
@@ -2049,9 +2082,9 @@ class HermesHandler(AgentHandler):
         client = self._client
         if client is None:
             raise ReportError("the adapter is not connected")
-        body, was_cut = cut_utf8(text.encode("utf-8"), self.settings.max_message_bytes)
+        body, was_cut = cut_with_note(text, self.settings.max_message_bytes)
         if was_cut:
-            _LOG.info("thread %s: message cut to the message limit", thread_id)
+            _LOG.warning("thread %s: message cut to the message limit code=message_cut", thread_id)
         try:
             with client.unbound():
                 return await direct_send(client, thread_id, body)
@@ -2351,6 +2384,9 @@ class HermesHandler(AgentHandler):
                 )
             except ProblemError as exc:
                 _LOG.info("run %s: answer edit refused code=%s", turn.run_id, exc.code)
+                continue
+            except httpx.TransportError:
+                _LOG.info("run %s: answer edit not sent code=transport_error", turn.run_id)
                 continue
             new_version = getattr(result, "version", None)
             turn.answers[key] = (message_id, int(new_version) if new_version else version + 1)
@@ -2674,12 +2710,27 @@ def _with_team(built: BuiltContext, facts: TeamFacts, speaker: Speaker) -> Built
     return BuiltContext(user_side=side, user_text=_labelled(speaker.label, built.user_text))
 
 
+def stack_of(exc: BaseException) -> str:
+    """The traceback of ``exc`` without its text: files, lines and functions only (SEC-LOG).
+
+    An exception's text can carry content (a message, a path of a person's file); its stack
+    names only code, so an unexpected failure is logged with this instead of ``exc_info``.
+
+    Args:
+        exc: The exception.
+
+    Returns:
+        The formatted stack frames, oldest first.
+    """
+    return "".join(traceback.format_tb(exc.__traceback__)).rstrip()
+
+
 def _log_task_failure(task: asyncio.Task[Any]) -> None:
     if task.cancelled():
         return
     exc = task.exception()
     if exc is not None:
-        _LOG.warning("handler task failed: %s", type(exc).__name__)
+        _LOG.error("handler task failed: %s\n%s", type(exc).__name__, stack_of(exc))
 
 
 @dataclass(frozen=True)

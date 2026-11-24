@@ -48,8 +48,6 @@ def world_real_time() -> bool:
 
 @pytest.fixture
 def world_timings() -> dict[str, float]:
-    from bothy_sdk.testing._patience import PATIENCE
-
     return {"agent.cancel_grace": 100 * PATIENCE, "agent.invocation_token_ttl": 100 * PATIENCE}
 
 
@@ -191,7 +189,7 @@ async def killed_after_the_owner_s_line(world: World, text: str) -> tuple[Any, A
     assert own["uuid"] in record(world, run.run_id)["bg"]["own"]
     assert record(world, run.run_id)["bg"]["owner_codes"] == [code]
     first.send_signal(signal.SIGKILL)
-    first.wait(PATIENCE)
+    await world.exited(first)
     return run, gate, message_id, code
 
 

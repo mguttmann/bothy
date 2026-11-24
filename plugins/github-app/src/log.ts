@@ -27,7 +27,6 @@ export const LOG_ATTRIBUTES: readonly string[] = Object.freeze([
   "webhook_id",
   "job_id",
   "job_kind",
-  "step",
   "operation",
   "status",
   "outcome",

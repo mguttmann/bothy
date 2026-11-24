@@ -14,7 +14,7 @@ Python SDK for agent adapters (among them the Hermes adapter) and apps that use 
 |---|---|
 | `src/bothy_sdk/generated/` | Generated core: models and functions of every REST operation of `docs/api/openapi.yaml`, written by openapi-python-client 0.29.1. Never edited by hand. |
 | `src/bothy_sdk/tolerance.py` | Tolerance layer (gate G5), installed on import of `bothy_sdk`. |
-| `src/bothy_sdk/*.py` | Hand layer (M2-29): `adapter`, `inbox`, `invocation`, `gateway`, `sources`, `runs`, `context`, `components`, `commands`, `outbox`, `long_answers` (M4-47), `heartbeat`, `client`, `sync`, `retry`, `auth`, `errors`, `settings`, `clock`, `ids`, and `webhooks` (M2-50); reference page [docs/sdk/python.md](../../docs/sdk/python.md). |
+| `src/bothy_sdk/*.py` | Hand layer (M2-29): `adapter`, `inbox`, `invocation`, `gateway`, `sources`, `runs`, `context`, `components`, `commands`, `outbox`, `long_answers` (M4-47), `uploads` (M3-12), `search_assist`, `message_format`, `agent_interview` (A1-07), `heartbeat`, `client`, `sync`, `retry`, `auth`, `errors`, `settings`, `clock`, `ids`, and `webhooks` (M2-50); reference page [docs/sdk/python.md](../../docs/sdk/python.md). |
 | `src/bothy_sdk/testing/` | FakeServer (extra `testing`), faults, scenario functions, doubles and recorded fixtures. |
 | `src/bothy_sdk/__init__.py` | Package entry; calls `tolerance.install()`. |
 | `tests/` | G4 and G5 tests (pytest); the fixtures are shared with the TypeScript SDK in [`../testdata/tolerance/`](../testdata/tolerance/README.md). |
@@ -138,6 +138,17 @@ cancels `execute` and finishes. A second request for the same run changes nothin
 a run that this process holds but has not started yet reaches `on_followup` too, so a handler can
 keep it until its runtime starts.
 
+The end of a run: `RunHandle.finish` counts as done once the server
+answered. When `finishRun` gets no answer, or a `5xx`, `401` or `429`, after the retries of the
+client, the server still holds the run as running: `finish` raises, `finished` stays `False` and
+`finish_pending` is `True`. The first end asked for stays the run's end, so a later `finish` sends
+that end again, whatever it asks for (`retry_finish` sends it again). The `Adapter` keeps such a
+run in `active_runs` of its heartbeat, so the server does not end it as `interrupted` (09 5.5),
+and sends the end again with waits that double from `sync.reconnect_backoff_base` up to
+`sync.reconnect_backoff_cap`, until the server stores or refuses it. A run of an adapter that
+stops meanwhile is left to the server, like every run a stopped adapter holds (09 4.9); the
+pending end is not written to disk.
+
 Handover at a restart (AR-03, docs/spec/09-agents.md 18.19.3 and 18.19.7): a runtime whose
 processes outlive the adapter process can hand its runs over instead of stopping them.
 `await adapter.stop(hand_over=True)` stops the source, and from then on `send_heartbeat` sends
@@ -191,6 +202,10 @@ async def receive(raw_body: bytes, headers: Mapping[str, str]) -> int:
 (`SdkSettings.webhook_receiver_tolerance`); the key list is fetched again only after the
 `max-age` of its answer (without one `agent.jwks_max_age`), never because a verification failed.
 Tests sign deliveries with `bothy_sdk.testing.sign_webhook` and `webhook_public_key`.
+
+The generated core client has no timeout of its own, so the cache bounds each fetch with
+`sdk.http_timeout` (`SdkSettings.http_timeout`); a fetch that ends without an answer raises
+`TimeoutError`, and the next call to `keys` fetches again.
 
 ## Tests
 
@@ -264,4 +279,4 @@ transcript carries the mark of its message). The FakeServer serves `getFile` and
 
 ## Not built
 
-Helpers for agent sessions, file upload and transcripts (adapters call the generated operations through `Client.call`).
+Helpers for agent sessions and transcripts (adapters call the generated operations through `Client.call`).

@@ -35,6 +35,8 @@ export interface Cost {
 /** One lane: an agent with its numbers. */
 export interface Lane extends Record<RunState, number> {
   readonly agent: string;
+  /** Active runs in a state outside {@link RUN_STATES}, so a new state of the server still counts. */
+  readonly other: number;
   readonly toolStepsPerMinute: number | null;
   readonly costs: Cost[];
 }
@@ -48,21 +50,26 @@ export interface Lane extends Record<RunState, number> {
 export function topologyModel(frames: readonly DataFrame[]): Lane[] {
   const lanes = new Map<
     string,
-    { agent: string; toolStepsPerMinute: number | null; costs: Cost[] } & Record<RunState, number>
+    { agent: string; other: number; toolStepsPerMinute: number | null; costs: Cost[] } & Record<RunState, number>
   >();
   const lane = (agent: string) => {
     let l = lanes.get(agent);
     if (!l) {
-      l = { agent, running: 0, waiting_input: 0, queued: 0, toolStepsPerMinute: null, costs: [] };
+      l = { agent, running: 0, waiting_input: 0, queued: 0, other: 0, toolStepsPerMinute: null, costs: [] };
       lanes.set(agent, l);
     }
     return l;
   };
   for (const s of seriesOf(frames, 'active')) {
-    const state = label(s, 'bothy_run_state') as RunState;
+    const state = label(s, 'bothy_run_state');
     const v = lastValue(s);
-    if (v !== null && RUN_STATES.includes(state)) {
-      lane(label(s, 'bothy_agent_handle'))[state] += v;
+    if (v !== null) {
+      const l = lane(label(s, 'bothy_agent_handle'));
+      if ((RUN_STATES as readonly string[]).includes(state)) {
+        l[state as RunState] += v;
+      } else {
+        l.other += v;
+      }
     }
   }
   for (const s of seriesOf(frames, 'tool_steps')) {
@@ -106,7 +113,7 @@ export function TopologyView({ frames, theme, options }: ViewProps) {
   if (lanes.length === 0) {
     return <p style={st.empty}>No agent activity in this period.</p>;
   }
-  const total = lanes.reduce((n, l) => n + l.running + l.waiting_input + l.queued, 0);
+  const total = lanes.reduce((n, l) => n + l.running + l.waiting_input + l.queued + l.other, 0);
   const stepColor = (state: RunState) =>
     state === 'waiting_input' ? theme.colors.run.waiting : theme.colors.run[state];
   return (
@@ -141,6 +148,12 @@ export function TopologyView({ frames, theme, options }: ViewProps) {
                       <span>{`${STATE_TEXT[s]} ${l[s]}`}</span>
                     </span>
                   ))}
+                  {l.other > 0 && (
+                    <span style={{ marginRight: 12, whiteSpace: 'nowrap' }}>
+                      <Dot color={theme.colors.run.cancelled} testId={`state-dot-${l.agent}-other`} />
+                      <span>{`other state ${l.other}`}</span>
+                    </span>
+                  )}
                 </td>
                 <td style={{ ...st.td, ...st.mono }}>{formatValue(l.toolStepsPerMinute, 'per_minute')}</td>
                 {options.showCosts && (

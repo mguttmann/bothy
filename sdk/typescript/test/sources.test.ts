@@ -29,6 +29,7 @@ import {
   type Delivery,
   type EventSource,
 } from "../src/gateway/index.js";
+import { silentLogger } from "../src/logger.js";
 import { FakeClock } from "../src/testing/clock.js";
 import { FIXTURES } from "../src/testing/fake/fixtures.js";
 import { eventually as patiently } from "../src/testing/patience.js";
@@ -522,6 +523,39 @@ describe("PollingSource", () => {
       await running.stop(clock);
     },
   );
+
+  it("reports a heartbeat that cannot be built as an error and keeps polling", async () => {
+    const clock = new FakeClock();
+    const responder = new Responder(clock, []);
+    const settings = { pollIntervalMs: 1000 };
+    const errors: string[] = [];
+    const unhandled: unknown[] = [];
+    const record = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on("unhandledRejection", record);
+    try {
+      const running = new Running(
+        new PollingSource(client(clock, responder, settings), CONSUMER, {
+          settings,
+          clock,
+          heartbeat: () => {
+            throw new RangeError("adapter name breaks the heartbeat form");
+          },
+          logger: { ...silentLogger, error: (msg: string) => errors.push(msg) },
+        }),
+      );
+      await until(() => responder.polls.length === 1 && errors.length === 1);
+      await clock.advance(1000);
+      await until(() => responder.polls.length >= 2 && errors.length >= 2);
+      await turns();
+      expect(responder.heartbeats).toEqual([]);
+      expect(unhandled).toEqual([]);
+      await running.stop(clock);
+    } finally {
+      process.off("unhandledRejection", record);
+    }
+  });
 
   it("sends no heartbeat without a heartbeat source", async () => {
     const clock = new FakeClock();

@@ -44,6 +44,7 @@ from bothy_sdk.generated.models import CommandOption, CommandOptionType
 __all__ = [
     "BUILT_IN",
     "COMMAND_CLASSES",
+    "COMMAND_FAILED",
     "CONTROL_DESCRIPTIONS",
     "INPUT_OPTION",
     "command_text",
@@ -57,6 +58,9 @@ _LOG = logging.getLogger("bothy_hermes_adapter")
 
 BUILT_IN: Final = frozenset({"stop", "status", "new", "resume", "title", "close"})
 """The server's built-in commands (09 10.1); ``registerCommand`` refuses these names."""
+
+COMMAND_FAILED: Final = "The command /{name} failed in Hermes and gave no reply."
+"""The agent's message without a run when Hermes fails a control command (09 17.3)."""
 
 INPUT_OPTION: Final = "input"
 """The one option of a skill command: the text Hermes passes to the skill."""

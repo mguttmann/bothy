@@ -83,6 +83,7 @@ and starts it. It uses only the public REST API (no SDK) and the Python standard
    | `token_ref` | required | `secret_ref` of the app token |
    | `admin_key_ref` | required | `secret_ref` of the provider's admin key |
    | `min_request_interval` | `60s` | Least time between two requests to the cost API, also across passes |
+   | `pass_interval` | `1h` | Wait between the end of one pass and the start of the next |
    | `lookback` | `3d` | This many complete UTC days before today are reconciled; a whole number of days |
    | `http_timeout` | `30s` (the default of `sdk.http_timeout`) | Time limit of one HTTP request |
    | `workspace_map` | none, at least one entry | Sub-table: provider workspace ID to the list of agent IDs |
@@ -100,6 +101,7 @@ and starts it. It uses only the public REST API (no SDK) and the Python standard
    token_ref = "file:/etc/cost-reconciler/token"
    admin_key_ref = "file:/etc/cost-reconciler/admin_key"
    min_request_interval = "60s"
+   pass_interval = "1h"
    lookback = "3d"
 
    [reconciler.workspace_map]
@@ -117,7 +119,9 @@ and starts it. It uses only the public REST API (no SDK) and the Python standard
    ```
 
    Without `--once` the app runs passes until `SIGTERM` or `SIGINT`, which end it after the
-   current request, and waits `reconciler.min_request_interval` between passes. With `--once` it
+   current request, and waits `reconciler.pass_interval` between passes. Every pass submits every
+   day of the lookback again, and the server writes an audit entry for each submission, also when
+   nothing changed, so do not lower the pass interval far. With `--once` it
    runs one pass. A schedule (cron, a timer unit) that runs `--once` must not start the app more
    often than `reconciler.min_request_interval`, because the interval is kept only inside one
    process. Secrets are read again at the start of every pass, so a rotation needs no restart.
@@ -216,4 +220,7 @@ fake clock, so no test waits real time for the request interval. Admin keys and 
 tests are random canary values created at run time; `tests/test_canary.py` checks that the key
 reaches the cost API in every request and appears in no request to the server, no log line and no
 error. `tests/test_doc_gate.py` proves that the docstring gate of ruff fails on an undocumented
-public function.
+public function. The pages of the cost report in `tests/fixtures` are written after the
+provider's documentation; the app has not been run against the provider's cost API, and the
+server side of the reconciliation is proven against the server of this repository
+(`services/server/test/reconcile`).

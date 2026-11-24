@@ -605,7 +605,10 @@ API.
 | Cron reports | incoming webhook in the format `native` or a report from an agent | M2-27 |
 
 Tests never call a real service: the counterparts are fake APIs with webhook fixtures from the
-public documentation of the provider. The apps have their own `VERSION` and `CHANGELOG.md` in their
+public documentation of the provider. No app has run against the real service of its provider
+(GitHub, Jira, or the provider's cost API of the reconciliation app in
+[10-backend-policy.md](10-backend-policy.md) section 12.4), so what the tests prove holds against
+these fakes; the README of each app says so. The apps have their own `VERSION` and `CHANGELOG.md` in their
 folder, but are not a release component from [18-release.md](18-release.md): instance operators
 build them from the repository. Reason: they are patterns for your own apps, not a maintained
 product with commitments.
@@ -625,7 +628,8 @@ Built as `plugins/github-app` (M2-49, [plugins/github-app/README.md](../../plugi
 | Grants | `write` on the forum |
 | Loops | the app never mirrors back its own messages (author = app); only messages with `origin = human` and `kind = text` in a linked thread are mirrored; the `issues` `opened` event of an issue the app created and the `issue_comment` `created` event of a comment the app created are not posted |
 | Foreign text | GitHub text never becomes a mention or a link in the chat: logins in code spans, bodies in fenced code blocks whose delimiter is longer than any backtick run of the text (03 content format rule 2); a link only to the event's `https` address; messages and titles cut to the limits of `getInstance`; titles without control and bidi characters (SEC-IN-4) |
-| State | a state directory of mode `0700` with the thread map, drafts, created objects and seen identifiers, a lock file against a second process, and a queue of jobs worked in creation order; a write to GitHub is attempted at most once, a write to the server carries its stored `client_msg_id` or `Idempotency-Key` |
+| State | a state directory of mode `0700` with the thread map, drafts, created objects and seen identifiers, a lock file with the process ID against a second process on the same host (two containers on one volume can share a PID, so one instance per state directory), and a queue of jobs worked in creation order; a failed write of the state keeps the job queued; a write to GitHub is attempted at most once, a write to the server carries its stored `client_msg_id` or `Idempotency-Key` |
+| Limits | GitHub does not redeliver a failed delivery by itself: a delivery answered `503` (app not ready, full queue, failing store or secret file) is lost until an operator redelivers it (README "Operation and limits"); the app uses repository webhooks and the token of one GitHub account, not a GitHub App |
 
 ### 10.2 Ticket system (Jira)
 
@@ -711,7 +715,8 @@ synchronous hull) and `sources` (gateway and REST polling as event sources). The
 `webhooks` module was added with the Jira app, its first Python consumer (M2-50).
 
 The TypeScript hand layer (M2-30) has the same modules with the camelCase names of the Python
-functions and the Python class names (`Adapter`, `RunPatcher`, `Gateway`, `GatewaySource`,
+functions and the Python class names, except for the parts its README lists under "Differences
+from the Python SDK" (`sdk/typescript/README.md`) (`Adapter`, `RunPatcher`, `Gateway`, `GatewaySource`,
 `PollingSource`, `InvocationVerifier`); `inbox` and `adapter` live in `invocation` and `runs`.
 It has three entry points: `.` (Node.js only, everything except `testing`), `./core` (the
 browser-safe subset without secrets: generated types, tolerance layer, errors, settings,

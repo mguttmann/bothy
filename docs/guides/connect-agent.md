@@ -320,7 +320,8 @@ acknowledges an event (`ack`) only after it stored the event with its token in t
 Start it from the repository root with the values the owner handed over; step 4 of the guide
 shows the command. It prints one line per action the server confirmed, ``Step <n>: <text>``,
 where ``<n>`` is the step of the guide that explains it, and never a message text, a prompt, a
-token or a key. The SDK logs to stderr under the same rule. Ctrl+C ends it cleanly.
+token or a key. The SDK logs to stderr under the same rule.
+Ctrl+C or SIGTERM ends it cleanly.
 """
 
 from __future__ import annotations
@@ -540,11 +541,14 @@ async def serve(args: argparse.Namespace) -> int:
         task.add_done_callback(stopping.discard)
 
     loop = asyncio.get_running_loop()
-    loop.add_signal_handler(signal.SIGINT, on_sigint)
+    # Ctrl+C, and the SIGTERM of a service manager, stop the adapter the same way.
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, on_sigint)
     reason = await adapter.run()
     # A Ctrl+C can arrive twice (the terminal and uv both pass it on); the adapter has stopped,
     # so a late one must not interrupt the exit.
-    loop.remove_signal_handler(signal.SIGINT)
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.remove_signal_handler(sig)
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     if interrupted.is_set():
         report(10, "stopped")

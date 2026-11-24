@@ -635,6 +635,24 @@ async def test_cache_failed_fetch_raises_and_is_retried() -> None:
 
 
 @pytest.mark.anyio
+async def test_cache_fetch_without_an_answer_ends_after_the_http_timeout() -> None:
+    # A core client without a timeout, as the README builds it, and a server that never answers.
+    async def silent(request: httpx.Request) -> httpx.Response:
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable")
+
+    client = CoreClient(base_url=BASE_URL, httpx_args={"transport": httpx.MockTransport(silent)})
+    cache = WebhookKeyCache(client, clock=FakeClock(), settings=SdkSettings(http_timeout=0.05))
+    for _ in range(2):  # the next call fetches again
+        fetch = asyncio.ensure_future(cache.keys())
+        done, _pending = await asyncio.wait({fetch}, timeout=5)
+        if not done:
+            fetch.cancel()
+        assert done, "the fetch did not end"
+        assert isinstance(fetch.exception(), TimeoutError)
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize(
     ("status", "body"),
     [

@@ -21,6 +21,7 @@ from bothy_sdk.testing.fakeserver import FakeServer
 from bothy_sdk.testing.faults import Fault
 
 from bothy_hermes_adapter import hermes_commands as hc
+from bothy_hermes_adapter.context_format import CUT_NOTE
 from bothy_hermes_adapter.hermes_commands import declared_commands
 from bothy_hermes_adapter.installer import InstallError, InstallRequest, plan_install
 from bothy_hermes_adapter.reports import ReportError, report_title, standalone_send
@@ -173,14 +174,18 @@ async def test_other_commands_never_reach_hermes(tmp_path: Path, name: str, cont
     assert r.requests("createMessage") == []
 
 
-async def test_a_failing_command_posts_nothing(tmp_path: Path) -> None:
-    rt = FakeRuntime(command_error=RuntimeError("Hermes failed"))
+async def test_a_failing_command_posts_a_notice(tmp_path: Path) -> None:
+    rt = FakeRuntime(command_error=RuntimeError("Hermes failed with secret detail"))
     async with rig(tmp_path, runtime=rt, commands=declared_commands({})) as r:
         await r.until(lambda: len(r.fake.commands) == 2, "the control commands")
         await r.fake.invoke_command("version", thread_id=r.fake.main_thread())
         await r.until(lambda: rt.commands, "the command in Hermes")
-        await r.fake.pass_time(0.2)
-    assert r.requests("createMessage") == []
+        await r.until(lambda: _bodies(r, "createMessage"), "the notice")
+    notices = _bodies(r, "createMessage")
+    assert len(notices) == 1
+    assert notices[0]["content_md"] == hc.COMMAND_FAILED.format(name="version")
+    assert "secret" not in notices[0]["content_md"]
+    assert "run_id" not in notices[0]
 
 
 # ---- skill commands as model commands --------------------------------------------------------
@@ -257,10 +262,15 @@ async def test_report_into_a_fixed_thread(tmp_path: Path) -> None:
     assert r.requests("getChannel") == []
 
 
-async def test_report_is_cut_to_the_message_limit(tmp_path: Path) -> None:
-    async with rig(tmp_path, max_message_bytes=16) as r:
+async def test_report_is_cut_to_the_message_limit_with_a_note(tmp_path: Path) -> None:
+    async with rig(tmp_path, max_message_bytes=32) as r:
         await r.handler.on_report(str(r.fake.world.channel_id), None, "abcdefghij" * 5)
-    assert len(_bodies(r, "createMessage")[0]["content_md"].encode()) <= 16
+        await r.handler.on_report(str(r.fake.world.channel_id), None, "short")
+    long, short = (b["content_md"] for b in _bodies(r, "createMessage"))
+    assert len(long.encode()) <= 32
+    assert long.endswith(CUT_NOTE)
+    assert long.startswith("abcdefghij")
+    assert short == "short"
 
 
 @pytest.mark.parametrize(

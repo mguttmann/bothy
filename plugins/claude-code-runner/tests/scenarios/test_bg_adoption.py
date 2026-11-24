@@ -91,7 +91,7 @@ async def crashed(world: World, **scenario: Any) -> tuple[UUID, Path]:
     await world.until(lambda: "short_id" in record(world, run.run_id).get("bg", {}))
     await world.until(lambda: record(world, run.run_id).get("steps", {}).get("tools"))
     first.send_signal(signal.SIGKILL)
-    first.wait(PATIENCE)
+    await world.exited(first)
     assert alive(players(world)[0]["pid"])  # the session belongs to the supervisor
     return run.run_id, gate
 
@@ -132,7 +132,7 @@ async def test_a_second_kill_of_the_adopter_is_adopted_again(bg_world: World) ->
     second = world.spawn(**BACKGROUND)
     await world.until(lambda: active(world, run_id, seen))
     second.send_signal(signal.SIGKILL)
-    second.wait(PATIENCE)
+    await world.exited(second)
     assert alive(players(world)[0]["pid"])
     await restart(world)
     world.release(gate)
@@ -241,7 +241,7 @@ async def test_a_runner_killed_before_it_learnt_the_session_id_finds_it_by_name(
     await world.until(lambda: len(world.calls("gate_wait")) == 1)
     assert "short_id" not in record(world, run.run_id)["bg"]  # only the name is recorded
     first.send_signal(signal.SIGKILL)
-    first.wait(PATIENCE)
+    await world.exited(first)
     world.release(hold)
     await world.until(lambda: len(players(world)) == 1)
     await restart(world)

@@ -7,9 +7,26 @@ against the FakeServer and the real server, the typedoc reference and the build 
 
 ## Purpose
 
-TypeScript SDK for apps, integrations and agent adapters in JavaScript environments. It has the
-modules and the behaviour of the Python SDK of M2-29 (`sdk/python`); class names are the Python
-class names, function names the camelCase form of the Python names (docs/decisions.d/M2-30.md D-M2-30-1).
+TypeScript SDK for apps, integrations and agent adapters in JavaScript environments. It follows
+the modules and the behaviour of the Python SDK of M2-29 (`sdk/python`) except for the parts in
+"Differences from the Python SDK" below; class names are the Python class names, function names
+the camelCase form of the Python names (docs/decisions.d/M2-30.md D-M2-30-1).
+
+## Differences from the Python SDK
+
+Since the port the Python SDK gained parts that the TypeScript SDK does not have. Its only user in
+this repository is the app `plugins/github-app` (client, `unwrap`, webhook keys); an agent adapter
+on this SDK does without:
+
+| Python SDK | TypeScript SDK |
+|---|---|
+| `AgentHandler.on_search_assist` and `on_agent_interview` with the modules `search_assist` and `agent_interview` | none: the adapter does not answer `search.assist_requested` or `agent.interview_requested`; a handler sees a known type only in `onEvent` |
+| `AgentHandler.runtime_status` (heartbeat members that change at run time, degraded reasons among them) | none: the heartbeat carries the members of `AdapterConfig` and is always `online` |
+| `AgentHandler.on_not_started`, `on_ready`, `on_heartbeat_ack`, `on_commands_reconciled`, `on_autocomplete_sent` and `on_cancel` | none: on a cancel the adapter stops awaiting `execute` and ends the run itself |
+| `RunHandle.finish` sends again without `costs` when a server before cost booking refuses them (D-M2-33-7) | the refusal fails the end |
+| `uploads` (upload parts of a file) | none |
+| `message_format` (`MESSAGE_FORMAT_RULES` for replies) | none |
+| `sync` (synchronous client for scripts) | none (by design: JavaScript has no synchronous HTTP) |
 
 ## Layout
 
@@ -45,11 +62,11 @@ ESM only; `engines.node = ">=24"` (on 2026-10-12 Node.js 24 is the only line in 
 |---|---|
 | `config` | `SdkSettings` and `DEFAULTS`, one member per configuration key the SDK uses; `test/config-defaults.test.ts` holds them equal to `docs/operations/configuration.md`. |
 | `errors` | `ProblemError` and its subclasses after the problem format, `TransportError`, `TimeoutError`, `KNOWN_PROBLEM_CODES`; a `404` means "not there or not visible". |
-| `client` | `createApiClient` with `Bearer` or DPoP, `DPoP-Nonce` and one nonce retry, `sdk.http_timeout`, retries of idempotent requests, one deprecation warning per operation, `bindRun` for `Invocation-Token` (07 SR9). |
+| `client` | `createApiClient` with `Bearer` or DPoP, `DPoP-Nonce` and one nonce retry, `sdk.http_timeout` per attempt over the answer and its body (a stalled body ends as `TimeoutError`), retries of idempotent requests, an abort by the caller also ends the wait between attempts, one deprecation warning per operation, `bindRun` for `Invocation-Token` (07 SR9). |
 | `auth` | `Secret`, `DpopKey`, `loadDpopKey`, `createDpopProof`, `dpopThumbprint`. |
 | `retry` | `IDEMPOTENT_EXEMPT_OPERATIONS` (held equal to `openapi.yaml`), classification and backoff. |
-| `gateway` | `Gateway` (hello, identify, resume, heartbeat, close codes, reconnect with full jitter), `GatewaySource` and `PollingSource` with the acknowledgement window `AckWindow`. `PollingSource` sends the heartbeat every `HeartbeatAck.interval_ms` and keeps its interval when an answer names none above zero. |
-| `invocation` | `InvocationVerifier` (09 4.5 with its JWKS cache; a run from a model command compares the payload's `command_id`), `MemoryInboxStore` and `FileInboxStore` with the retention of "Adapter state" below. |
+| `gateway` | `Gateway` (hello, identify, resume, heartbeat, close codes, reconnect with full jitter), `GatewaySource` and `PollingSource` with the acknowledgement window `AckWindow`. `PollingSource` sends the heartbeat every `HeartbeatAck.interval_ms` and keeps its interval when an answer names none above zero. `sync.ws_max_frame_bytes` is checked after a frame has arrived (the global `WebSocket` has no size option); unread events are bounded by the server's `agent.max_inflight_events`. |
+| `invocation` | `InvocationVerifier` (09 4.5 with its JWKS cache, which keeps a key list for its `max-age` and for `agent.jwks_max_age` when the answer names none; a run from a model command compares the payload's `command_id`), `MemoryInboxStore` and `FileInboxStore` with the retention of "Adapter state" below. |
 | `runs` | `Adapter` (09 4.9: acknowledgement after the inbox, start only after `200`), `RunHandle`, `RunPatcher`, `renderContext`. An end the server did not store is sent again ("The end of a run" below). |
 | `components` | Builders, `approvalCard`, `questionCard`, `respond`, `update`. |
 | `commands` | `reconcileCommands`, `guardedAutocomplete`; an autocomplete handler never calls a model. |

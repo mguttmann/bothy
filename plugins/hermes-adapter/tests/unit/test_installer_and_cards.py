@@ -19,6 +19,7 @@ from bothy_hermes_adapter import cards
 from bothy_hermes_adapter.__main__ import build_parser
 from bothy_hermes_adapter.installer import (
     CONTROL_SENDER,
+    STARTER_FILE,
     InstallError,
     InstallRequest,
     check,
@@ -94,6 +95,7 @@ def test_install_switch_and_check_without_values(tmp_path: Path) -> None:
         tmp_path / "plugins" / "bothy" / "plugin.yaml",
         tmp_path / "plugins" / "bothy" / "__init__.py",
         tmp_path / "plugins" / "bothy" / "packages.json",
+        tmp_path / "plugins" / "bothy" / STARTER_FILE,
     }
     assert "predicted mode: organization" in "\n".join(lines)
     with pytest.raises(InstallError, match="credential-holder"):
@@ -207,6 +209,40 @@ def _src_env() -> dict[str, str]:
         str(Path(bothy_sdk.__file__).parents[1]),
     ]
     return {**os.environ, "PYTHONPATH": os.pathsep.join(paths)}
+
+
+def test_the_plugins_starter_runs_the_module_with_the_listed_packages(tmp_path: Path) -> None:
+    import json
+
+    import bothy_sdk
+
+    import bothy_hermes_adapter
+
+    plugin = tmp_path / "plugins" / "bothy"
+    plugin.mkdir(parents=True)
+    for name, text in plugin_entry("bothy").items():
+        (plugin / name).write_text(text, encoding="utf-8")
+    first = {
+        "bothy_hermes_adapter": str(Path(bothy_hermes_adapter.__file__).parent),
+        "bothy_sdk": str(Path(bothy_sdk.__file__).parent),
+    }
+    (plugin / "packages.json").write_text(json.dumps({"first": first, "last": {}}), "utf-8")
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    done = subprocess.run(
+        [
+            sys.executable,
+            str(plugin / STARTER_FILE),
+            *("job", "deregister", "--job-id", "none", "--profile-home", str(tmp_path)),
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=tmp_path,
+        check=False,
+    )
+    # The module ran: the helper refuses the made-up job ID in its JSON line.
+    assert done.returncode == 2, done.stderr
+    assert json.loads(done.stdout.splitlines()[-1])["ok"] is False
 
 
 def test_plugin_entry_and_parser() -> None:

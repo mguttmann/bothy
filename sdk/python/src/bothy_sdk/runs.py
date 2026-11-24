@@ -87,6 +87,10 @@ METRIC_FIELDS = (
 """Number members of ``run_metrics.v1`` an adapter may set (``/metrics/<field>``)."""
 
 _STEP_FIELDS = ("status", "title", "detail", "finished_at")
+# Refused before the run was touched: the request never reached the run.
+_NOT_STORED = frozenset({401, 429})
+# The end of a run as `RunHandle.finish` was asked for it: state, reason, summary, metrics, costs.
+_End = tuple[str, str | None, str | None, RunMetrics | None, tuple[CostReport, ...]]
 _FOLLOWUP_ORDER = {"delivered": 1, "absorbed": 2}
 
 
@@ -147,6 +151,25 @@ PATCH_PATHS: tuple[PatchPath, ...] = (
 
 def _allowed(op: str, path: str) -> bool:
     return any(p.matches(path) and op in p.ops for p in PATCH_PATHS)
+
+
+def end_not_stored(error: BaseException) -> bool:
+    """Tell whether a failed ``finishRun`` left the end of the run unstored.
+
+    No answer arrived (``httpx.TransportError``, a timeout included), or the server answered
+    ``5xx``, ``401`` or ``429``. Any other answer is the server's decision about the end.
+
+    Args:
+        error: What the call raised.
+
+    Returns:
+        True when the run is still running on the server.
+    """
+    if isinstance(error, httpx.TransportError):
+        return True
+    return isinstance(error, ProblemError) and (
+        error.status >= httpx.codes.INTERNAL_SERVER_ERROR or error.status in _NOT_STORED
+    )
 
 
 def is_run_ended(error: ProblemError) -> bool:
@@ -526,6 +549,11 @@ class RunPatcher:
             return await self._send(list(ops))
 
     async def _send(self, ops: list[JsonPatchOperation]) -> int:
+        # Bound to the run itself, not to the context of whoever started the throttle timer.
+        with self.client.rebind(self.run_id):
+            return await self._send_bound(ops)
+
+    async def _send_bound(self, ops: list[JsonPatchOperation]) -> int:
         if self._gateway is not None:
             return await self._send_gateway(ops)
         rounds = max(1, self.settings.retry_max_attempts)
@@ -609,7 +637,8 @@ class RunHandle:
         token_jti: The ``jti`` of the token the run started or resumed with (``None`` before).
         outbox: The outbox for replies (`bothy_sdk.outbox.Outbox`).
         cancelled: Set when the run was cancelled or ended on the server.
-        finished: True once `finish` ran.
+        finished: True once `finish` ran; False again when the server did not store the end
+            (see `finish_pending`).
         waiting: True while the run waits for input.
     """
 
@@ -635,6 +664,30 @@ class RunHandle:
         self._settings = settings
         self._on_waiting = on_waiting
         self._patch: RunPatcher | None = None
+        # The first end asked for; it is the run's end, also when it has to be sent again.
+        self._end: _End | None = None
+
+    @property
+    def finish_pending(self) -> bool:
+        """Whether `finish` was called and the server did not store the end.
+
+        No answer arrived, or it answered ``5xx``, ``401`` or ``429``: the run is still running
+        on the server. The adapter keeps the run and sends the end again (`retry_finish`).
+        """
+        return self._end is not None and not self.finished
+
+    async def retry_finish(self) -> None:
+        """Send the end again that `finish` asked for and the server did not store.
+
+        Does nothing when no end is pending.
+
+        Raises:
+            ProblemError: A refusal of the server.
+            httpx.TransportError: No answer arrived (the end stays pending).
+        """
+        if self.finish_pending and self._end is not None:
+            state, reason, summary, metrics, costs = self._end
+            await self.finish(state, reason, summary, metrics, costs)
 
     def started(self, run: Run, token_jti: str) -> None:
         """Note that ``startRun`` or ``resumeRun`` answered ``200`` with ``run``.
@@ -744,6 +797,10 @@ class RunHandle:
         A flush that finds the run ended is dropped, and a ``finishRun`` answered with
         ``run_inactive`` or ``run_not_active`` is logged as already ended, not raised.
 
+        When the server did not store the end (no answer, ``5xx``, ``401`` or ``429``), the
+        call raises and the handle stays unfinished with `finish_pending` set. The first end
+        asked for is the run's end: a later call sends that end again, whatever it asks for.
+
         Args:
             state: ``completed``, ``failed`` or ``cancelled``.
             reason: The reason code (for example ``runtime_error``).
@@ -753,14 +810,36 @@ class RunHandle:
 
         Raises:
             ProblemError: Another refusal of the server.
+            httpx.TransportError: No answer arrived.
         """
         if self.finished:
             return
         self.finished = True
-        if self._patch is not None:
+        again = self._end is not None
+        if self._end is None:
+            self._end = (state, reason, summary, metrics, tuple(costs))
+        state, reason, summary, metrics, costs = self._end
+        # The patcher was flushed and stopped by the first call.
+        if not again and self._patch is not None:
             with contextlib.suppress(ProblemError):
                 await self._patch.flush()
             await self._patch.aclose()
+        try:
+            await self._send_finish(state, reason, summary, metrics, costs)
+        except Exception as exc:
+            # Without a decision of the server the run is still running there: not finished.
+            if end_not_stored(exc):
+                self.finished = False
+            raise
+
+    async def _send_finish(
+        self,
+        state: str,
+        reason: str | None,
+        summary: str | None,
+        metrics: RunMetrics | None,
+        costs: Sequence[CostReport],
+    ) -> None:
         body = RunFinish(state=RunFinishState(state))
         if reason is not None:
             body.reason = reason

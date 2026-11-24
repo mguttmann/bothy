@@ -356,6 +356,10 @@ export class AgentHandler {
   /**
    * Handles an event without an invocation token (for example `agent.config_changed`).
    *
+   * The adapter awaits it inside its delivery loop: until it returns, no later event is handled
+   * or acknowledged, a `run.cancel_requested` included. Keep it short and move longer work to a
+   * task of its own.
+   *
    * @param envelope - The event.
    * @returns A promise that resolves when handled.
    */
@@ -532,6 +536,8 @@ export class Adapter {
    * @param handler - The runtime side.
    * @param options - Clock, source, inbox, outbox store, `fetch`, WebSocket and logger.
    * @throws `TypeError` when `baseUrl` uses clear text off the loopback host.
+   * @throws `RangeError` when a configured name or version breaks the heartbeat forms, so the
+   *   fault shows here and not as a heartbeat that never goes out.
    */
   constructor(
     config: AdapterConfig,
@@ -540,6 +546,7 @@ export class Adapter {
   ) {
     this.config = config;
     this.handler = handler;
+    this.heartbeat();
     this.clock = options.clock ?? systemClock;
     this.settings = resolveSettings(config.settings);
     this.client = createApiClient({
@@ -582,6 +589,9 @@ export class Adapter {
   /**
    * Runs until the source stops or {@link Adapter.stop} is called.
    *
+   * A failed call to the server while handling an event does not end it: the event stays
+   * unsettled and the server delivers it again.
+   *
    * @returns Why the adapter stopped (for example `4015` when another process took the
    *   consumer over, or `1000` after {@link Adapter.stop}).
    * @throws {@link ProblemError} when the discovery or the first JWKS fetch failed.
@@ -622,7 +632,7 @@ export class Adapter {
         if (delivery instanceof SourceReady) this.spawn(() => this.onReady());
         else if (delivery instanceof CursorAdvance)
           await source.advance(delivery.seq);
-        else await this.onEnvelope(delivery);
+        else await this.deliver(delivery);
         if (this.stopping) break;
       }
     } finally {
@@ -871,6 +881,23 @@ export class Adapter {
   private async settle(env: Envelope): Promise<void> {
     if (env.seq !== undefined && this.source !== undefined)
       await this.source.settle(env.seq);
+  }
+
+  /**
+   * Handles one delivery. A call to the server that failed (no answer, or a refusal the step
+   * does not handle) leaves the event unsettled, so the server delivers it again after
+   * `agent.ack_timeout`; only other errors, a failed inbox store among them, end the loop.
+   */
+  private async deliver(env: Envelope): Promise<void> {
+    try {
+      await this.onEnvelope(env);
+    } catch (error) {
+      if (!(error instanceof ProblemError || error instanceof TransportError))
+        throw error;
+      this.logger.warn(`event ${env.id} failed; not settled`, {
+        error: errorName(error),
+      });
+    }
   }
 
   private async onEnvelope(env: Envelope): Promise<void> {

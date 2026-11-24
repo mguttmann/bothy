@@ -128,8 +128,11 @@ def _listed(messages: object) -> list[RunContextMessage]:
 
 
 def _code(status: str) -> str:
-    """A scan status that is not fetched, as the problem code the server would answer."""
-    return "file_blocked" if status == "blocked" else "file_not_ready"
+    """A scan status that is not fetched, as the problem code the server would answer.
+
+    The server sends the file's raw status: ``infected`` and ``error`` never become ready.
+    """
+    return "file_blocked" if status in _BLOCKED or status == "blocked" else "file_not_ready"
 
 
 _BLOCKED = frozenset({"infected", "error"})
