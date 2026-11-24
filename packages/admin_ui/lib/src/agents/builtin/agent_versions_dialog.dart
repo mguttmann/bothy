@@ -107,8 +107,7 @@ class _AgentVersionsDialogState extends State<AgentVersionsDialog> {
     }
   }
 
-  static NewAgentFailure _failureOf(Object e) =>
-      e is NewAgentFailure ? e : const NewAgentFailure.offline();
+  static NewAgentFailure _failureOf(Object e) => NewAgentFailure.of(e);
 
   Future<void> _open(int version, {required bool restore}) async {
     setState(() {

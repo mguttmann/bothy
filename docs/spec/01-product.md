@@ -1346,7 +1346,9 @@ the same.
 ### 5.5 Web console (administration, statistics and terminal)
 
 Same administration screens as A1 to A8, the views from D12 and D13 and the terminal from D11,
-navigation on the left. No chat (ADR 0028); links to threads open the app via deep link. The run
+navigation on the left. No chat (ADR 0028); links to threads open the app via deep link (build
+state: discovery names no link into the apps yet, so the console shows the thread ID with a copy
+action, D-M6-02-7). The run
 graph D14 and the control room D10 are not part of the console (addendum of 2026-10-24): both
 show run content that the console, without chat, has no place for; D12 stays its live view. The run
 history of D12 (addendum of 2026-11-04, 25 6.7) is part of the console with its detail and step

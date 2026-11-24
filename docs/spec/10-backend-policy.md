@@ -423,7 +423,8 @@ the environment of each of its turns by 18.3 of [09-agents.md](09-agents.md) fro
    mode or holder is refused with the same reason while one of its hosted agents is `personal`
    with the old holder.
 3. The creation flow offers `personal` only when the creating owner is that credential holder and
-   the only owner (SR1), and says so otherwise.
+   the only owner (SR1), and says so otherwise; while the person's context is not read it says
+   that, and a failed read offers to read it again.
 
 ### 10.4 Wake runs and wake inputs
 

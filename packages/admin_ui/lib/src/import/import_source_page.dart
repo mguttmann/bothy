@@ -336,11 +336,13 @@ class _ImportSourcePageState extends State<ImportSourcePage> {
               ],
             ),
             if (_notice case final n?) selfNoticeBanner(n),
-            if (error != null && (source == null || details == null))
-              ProblemBanner(problem: loadProblem(error), onRetry: _refresh)
-            else if (source == null || details == null)
-              const Center(child: CircularProgressIndicator())
-            else
+            // A failed read shows also above a source read before: what is shown may be old.
+            if (error != null)
+              ProblemBanner(problem: loadProblem(error), onRetry: _refresh),
+            if (source == null || details == null) ...[
+              if (error == null)
+                const Center(child: CircularProgressIndicator()),
+            ] else
               ..._body(l, source, details, secondary),
           ],
         );

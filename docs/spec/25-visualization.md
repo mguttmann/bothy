@@ -295,7 +295,8 @@ box, [components.md](../design/components.md) section 2), current tool as a tool
 the backend policy, costs (mode `organization` as "Estimate", mode `personal` as "information
 only", addendum of 2026-11-01, FIX-cost-display) and a note "Approval waiting" when an approval
 card is open. A click on a card whose chat the server named opens the thread via deep link
-(console: "Open in the app"); a card without a chat is no button. Data: `stats.live`.
+(console: "Open in the app" with the thread ID and a copy action, because discovery names no link
+into the apps yet); a card without a chat is no button. Data: `stats.live`.
 
 A queued card says why it waits (addendum of 2026-11-04, F-WARTESCHLANGE-GRUND,
 [09-agents.md](09-agents.md) 5.2.1), never only "queued": "Waiting for a free slot (4 of 4 in
@@ -427,7 +428,11 @@ a chat form one row per channel and agent without a name and without a link. Con
 `getStatsTimeline`; the client loads once and plays locally. Limits: at most
 `stats.timeline_max_runs` runs (`runs_truncated`), period within `retention.stats_minutes`;
 day boundaries according to `stats.time_zone`
-([admin-statistics.md](../observability/admin-statistics.md), section 5, item 4).
+([admin-statistics.md](../observability/admin-statistics.md), section 5, item 4). Built state
+(D-M6-16-6, AUD-PKG-P03-admin-console): the page "Live" of the apps and the console has no
+period picker yet; its REST views query the last 24 hours up to the last full minute before the
+page opened, changed its scope or its tab, or ended TV mode, so a day further back is not
+replayable there (the statistics A7 have their own period selection).
 `getStatsTimeline` (M6-14, `D-M6-14-1`): `from` and `to` lie on full minutes, `from < to`,
 `to - from <= stats.timeline_max_range` and `from >= now - retention.stats_minutes`, otherwise
 `400 validation_failed`. Rows are those of the requested metrics with `bucket_start` in the range;
@@ -441,7 +446,9 @@ Full screen, dark theme, density `comfortable` with the font one step larger, ro
 selected views every `viz.tv_rotation_interval`, without controls; a key press or a click ends
 it. It runs in the session of the logged-in person and shows only what this person sees. It shows
 costs only with `viz.tv_show_costs`. Motion follows `motion.*`; with reduced motion it switches
-without a transition. Desktop app and web console; not mobile.
+without a transition. Desktop app and web console; not mobile. The period of the REST views moves with the clock:
+at each rotation it is shifted by the whole minutes since TV mode started, so a screen that runs
+for hours shows the current period, not the one of its start.
 
 There is no separate kiosk token without a person in this version. Reason: a token that reads the
 instance statistics without device binding would be access without a person and without step-up; a

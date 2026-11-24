@@ -79,18 +79,22 @@ PLATFORMS = (
     ("linux", "arm64"),
     ("windows", "amd64"),
 )
-# The Linux packages (kind, architecture) of infra/host/linux/nfpm.yaml.
-LINUX_PACKAGES = (("deb", "amd64"), ("deb", "arm64"), ("rpm", "amd64"), ("rpm", "arm64"))
-APPLE_ARCHES = ("arm64", "amd64")
 # Package kinds as internal/buildinfo names them.
 KIND_DEB, KIND_RPM, KIND_PKG, KIND_MSI = "deb", "rpm", "pkg", "msi"
+# The Linux packages (kind, architecture) of infra/host/linux/nfpm.yaml.
+LINUX_PACKAGES = (
+    (KIND_DEB, "amd64"),
+    (KIND_DEB, "arm64"),
+    (KIND_RPM, "amd64"),
+    (KIND_RPM, "arm64"),
+)
+APPLE_ARCHES = ("arm64", "amd64")
 # Identifier of the .pkg component (white label: example.com, brief rule 8).
 PKG_IDENTIFIER = "com.example.bothy-host"
 # Where the packages put the binary and the service definition (internal/install, 16 4.4).
 DARWIN_PROGRAM_DIR = Path("/Library/Application Support/bothy-host/bin")
 DARWIN_PLIST = Path("/Library/LaunchDaemons/bothy-host.plist")
 DARWIN_SHARE = Path("/Library/Application Support/bothy-host/share")
-LINUX_BINARY = "/opt/bothy-host/bin/bothy-host"
 # WiX Toolset: the nupkg of the .NET tool, checked against its SHA-256 before use (brief rule 9).
 # Version 5 is the last one without the maintenance fee agreement of later versions.
 WIX_VERSION = "5.0.2"

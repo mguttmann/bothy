@@ -7009,11 +7009,11 @@ abstract class AppLocalizations {
   /// **'{product} console'**
   String consoleTitle(String product);
 
-  /// Web console screen 01 section 5.5: body of a navigation entry whose screen is not built yet.
+  /// Web console screen 01 section 5.5: the title of the browser tab on a page of the signed-in console (WCAG 2.4.2): the page, then the console.
   ///
   /// In en, this message translates to:
-  /// **'This page comes with a later version of the console.'**
-  String get consolePlaceholderPage;
+  /// **'{page} - {console}'**
+  String consoleDocumentTitle(String page, String console);
 
   /// Web console screen 01 section 5.5: header line with the signed-in person.
   ///
@@ -13488,6 +13488,12 @@ abstract class AppLocalizations {
   /// **'Open terminal'**
   String get consoleTerminalOpen;
 
+  /// Web console terminal view (01 5.5, WCAG 2.1.2): the note below the buttons of the terminal that names the keys which leave the terminal, because Tab goes to the shell.
+  ///
+  /// In en, this message translates to:
+  /// **'{keys} moves the focus from the terminal to the buttons above it.'**
+  String consoleTerminalLeaveHint(String keys);
+
   /// Web console terminal: button that closes the view of a session that no longer runs and shows the host again.
   ///
   /// In en, this message translates to:
@@ -17427,7 +17433,7 @@ abstract class AppLocalizations {
   /// Why the billing mode personal is not offered (10 10.3 item 3).
   ///
   /// In en, this message translates to:
-  /// **'{reason, select, notOnlyOwner{Personal is offered only when you are the only owner.} runnerNotPersonal{Personal needs a hosting runner on a personal subscription.} notHolder{Personal needs you to hold the credentials of the runner.} other{The hosting runner does not report Personal.}}'**
+  /// **'{reason, select, notOnlyOwner{Personal is offered only when you are the only owner.} runnerNotPersonal{Personal needs a hosting runner on a personal subscription.} notHolder{Personal needs you to hold the credentials of the runner.} contextUnknown{Personal needs your account details, which are not loaded.} other{The hosting runner does not report Personal.}}'**
   String newAgentPersonalNot(String reason);
 
   /// Section of the hosting runner.
@@ -18873,6 +18879,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'the channel is read-only'**
   String get teamReasonReadOnly;
+
+  /// Notice of an administration page after a change answered 412 version_conflict: the page read the record again.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone else changed this in the meantime. The page now shows the current state; make your change again.'**
+  String get adminVersionReloaded;
+
+  /// Button on the app page that opens the consent of the installed app (scopes and events).
+  ///
+  /// In en, this message translates to:
+  /// **'Change consent'**
+  String get adminAppChangeConsent;
+
+  /// Title of the dialog that changes the granted scopes and events of an installed app.
+  ///
+  /// In en, this message translates to:
+  /// **'Consent for {name}'**
+  String adminAppChangeConsentTitle(String name);
+
+  /// Body of the dialog that changes the granted scopes and events of an installed app.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose what the app may use and which events it receives; required items stay on.'**
+  String get adminAppChangeConsentBody;
 }
 
 class _AppLocalizationsDelegate

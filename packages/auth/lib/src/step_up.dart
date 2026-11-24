@@ -98,15 +98,25 @@ final class StepUpService {
     final session = _core.tokens.state?.session;
     if (session == null) throw const NotSignedIn();
     if (!await _prompt.ask(purposeText)) throw const StepUpCancelled();
-    final jws = await signCompactJws(
-      signer: key,
-      header: {'alg': key.alg},
-      payload: {
-        'challenge': challenge.challenge,
-        'sid': session.sid,
-        'iat': _core.clock.now().millisecondsSinceEpoch ~/ 1000,
-      },
-    );
+    final String jws;
+    try {
+      jws = await signCompactJws(
+        signer: key,
+        header: {'alg': key.alg},
+        payload: {
+          'challenge': challenge.challenge,
+          'sid': session.sid,
+          'iat': _core.clock.now().millisecondsSinceEpoch ~/ 1000,
+        },
+      );
+    } on AuthException {
+      // The signer may say more itself.
+      rethrow;
+    } on Object {
+      // The operating system's confirmation was refused or cancelled (the port promises this
+      // mapping, ports.dart): the person cancelled, the request had no network error.
+      throw const StepUpCancelled();
+    }
     await _core.api.getAuthApi().completeStepUpWithDeviceKey(
       stepUpDeviceKeyRequest: StepUpDeviceKeyRequest(
         (b) => b

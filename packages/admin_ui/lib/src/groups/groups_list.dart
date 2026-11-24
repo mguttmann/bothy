@@ -52,17 +52,31 @@ class _GroupsListState extends State<GroupsList>
     _load();
   }
 
+  /// The number of the newest load: an older answer is dropped, so a late page of an old
+  /// search or filter never replaces the list of the new one.
+  int _generation = 0;
+
+  /// Whether "Load more" waits for its page; it asks once.
+  bool _loadingMore = false;
+
   Future<void> _load({bool more = false}) async {
+    if (more && _loadingMore) return;
+    final generation = ++_generation;
+    if (more) setState(() => _loadingMore = true);
     try {
       final page = await widget.repository.groups(cursor: more ? _next : null);
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() {
         _groups = [if (more) ...?_groups, ...page.items];
         _next = page.nextCursor;
         _problem = null;
       });
     } on Object catch (e) {
-      if (mounted) setState(() => _problem = loadProblem(e));
+      if (mounted && generation == _generation) {
+        setState(() => _problem = loadProblem(e));
+      }
+    } finally {
+      if (more && mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -118,13 +132,15 @@ class _GroupsListState extends State<GroupsList>
         noticeBanner(),
         if (_problem case final problem?)
           ProblemBanner(problem: problem, onRetry: _load)
-        else if (groups != null && groups.isEmpty)
+        else if (groups == null)
+          const Center(child: CircularProgressIndicator())
+        else if (groups.isEmpty)
           Text(
             l.adminGroupsEmpty,
             style: dsTextStyle(DsType.body)
                 .copyWith(color: colors.textSecondary),
           )
-        else if (groups != null)
+        else
           for (final group in groups) ...[
             // A button for screen readers: an InkWell row has a tap but no role (brief M4-32).
             DsTappable(
@@ -168,7 +184,7 @@ class _GroupsListState extends State<GroupsList>
             alignment: Alignment.centerLeft,
             child: TextButton(
               key: const ValueKey('groups.more'),
-              onPressed: () => _load(more: true),
+              onPressed: _loadingMore ? null : () => _load(more: true),
               child: Text(l.adminLoadMore),
             ),
           ),

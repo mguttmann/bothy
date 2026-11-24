@@ -22,6 +22,7 @@ import 'package:yaml/yaml.dart';
 
 import 'access_repository.dart';
 import 'admin_repository.dart' show AdminPage;
+import 'request_keys.dart';
 import 'self_repository.dart';
 
 /// The state of an installation (`AppInstallation.state`, 11 4.3).
@@ -773,10 +774,14 @@ final class ApiAppsRepository implements AppsRepository {
   /// Creates the repository over `api` (the client of the signed-in session, so DPoP, refresh
   /// and the step-up interceptor apply); [newIdempotencyKey] returns a fresh UUIDv7.
   ApiAppsRepository(this._api, {required String Function() newIdempotencyKey})
-    : _newKey = newIdempotencyKey;
+    : _newKey = newIdempotencyKey,
+      _keys = RequestKeys(newIdempotencyKey);
 
   final ApiClient _api;
   final String Function() _newKey;
+
+  /// The keys of creating requests across repetitions after a lost answer.
+  final RequestKeys _keys;
 
   AppsApi get _apps => _api.getAppsApi();
   WebhooksApi get _hooks => _api.getWebhooksApi();
@@ -806,16 +811,20 @@ final class ApiAppsRepository implements AppsRepository {
     String? purpose,
     bool idempotent = false,
   }) async {
-    final response = await _api.dio.request<Object>(
+    Future<Response<Object>> send(String? key) => _api.dio.request<Object>(
       path,
       data: body,
       options: Options(
         method: method,
         contentType: 'application/json',
-        headers: {if (idempotent) 'Idempotency-Key': _newKey()},
+        headers: {'Idempotency-Key': ?key},
         extra: {..._secure, if (purpose != null) ..._purpose(purpose)},
       ),
     );
+    // The fingerprint of the server: method, path and body (06 7 item 6).
+    final response = idempotent
+        ? await _keys.run('$method $path\n$body', send)
+        : await send(null);
     final data = response.data;
     return data is String ? jsonDecode(data) : data;
   }

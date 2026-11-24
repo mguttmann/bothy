@@ -69,6 +69,61 @@ void main() {
       t.data ?? t.textSpan?.toPlainText() ?? '',
   ].join(' | ');
 
+  testWidgets('Change consent grants and removes optional scopes and events '
+      'after the install', (tester) async {
+    repository
+      ..stepUpFresh = true
+      ..seedApp(
+        repoBridgeManifest(),
+        grantedScopes: const ['messages:write', 'commands:write'],
+      );
+    final changed = <int>[];
+    await pumpInApp(
+      tester,
+      AppPage(
+        repository: repository,
+        appId: 'app-repo-bridge',
+        clock: testClock,
+        onChanged: () => changed.add(1),
+      ),
+      navigatorKey: navigator,
+    );
+    await tester.pumpAndSettle();
+    expect(pageText(tester), isNot(contains('Receive events and catch up')));
+
+    await tap(tester, 'appPage.consent');
+    expect(find.byKey(const ValueKey('scopes.dialog')), findsOneWidget);
+    // A required scope stays on; the optional ones and the event follow the installation.
+    final required = tester.widget<CheckboxListTile>(
+      find.byKey(const ValueKey('scopes.scope.messages:write')),
+    );
+    expect(required.value, isTrue);
+    expect(required.onChanged, isNull);
+    await tap(tester, 'scopes.scope.events:subscribe');
+    await tap(tester, 'scopes.event.message.created');
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('scopes.submit')))
+          .onPressed,
+      isNull,
+    );
+    await type(tester, 'scopes.reason', 'Mirror the tickets');
+    await tap(tester, 'scopes.submit');
+
+    expect(
+      repository.calls.last,
+      'setScopes app-repo-bridge messages:write,commands:write,events:subscribe '
+      'message.created Mirror the tickets',
+    );
+    expect(find.byKey(const ValueKey('scopes.dialog')), findsNothing);
+    expect(pageText(tester), contains('Receive events and catch up'));
+    expect(
+      pageText(tester),
+      contains('The new consent for Repo Bridge is saved.'),
+    );
+    expect(changed, [1]);
+  });
+
   testWidgets('the page shows what the app may do in plain words', (
     tester,
   ) async {

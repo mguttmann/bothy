@@ -6457,9 +6457,19 @@
       }
     }
   },
-  "consolePlaceholderPage": "This page comes with a later version of the console.",
-  "@consolePlaceholderPage": {
-    "description": "Web console screen 01 section 5.5: body of a navigation entry whose screen is not built yet."
+  "consoleDocumentTitle": "{page} - {console}",
+  "@consoleDocumentTitle": {
+    "description": "Web console screen 01 section 5.5: the title of the browser tab on a page of the signed-in console (WCAG 2.4.2): the page, then the console.",
+    "placeholders": {
+      "page": {
+        "type": "String",
+        "example": "People"
+      },
+      "console": {
+        "type": "String",
+        "example": "Team Chat console"
+      }
+    }
   },
   "consoleSignedInAs": "Signed in: {name}",
   "@consoleSignedInAs": {
@@ -12792,6 +12802,16 @@
   "@consoleTerminalOpen": {
     "description": "Web console page 'Hosts and terminal' (01 section 5.5): button on the page of a host that opens the terminal."
   },
+  "consoleTerminalLeaveHint": "{keys} moves the focus from the terminal to the buttons above it.",
+  "@consoleTerminalLeaveHint": {
+    "description": "Web console terminal view (01 5.5, WCAG 2.1.2): the note below the buttons of the terminal that names the keys which leave the terminal, because Tab goes to the shell.",
+    "placeholders": {
+      "keys": {
+        "type": "String",
+        "example": "Ctrl+Shift+F6"
+      }
+    }
+  },
   "consoleTerminalBack": "Back to host",
   "@consoleTerminalBack": {
     "description": "Web console terminal: button that closes the view of a session that no longer runs and shows the host again."
@@ -16130,7 +16150,7 @@
   "@newAgentBillingPersonal": {
     "description": "Billing mode personal."
   },
-  "newAgentPersonalNot": "{reason, select, notOnlyOwner{Personal is offered only when you are the only owner.} runnerNotPersonal{Personal needs a hosting runner on a personal subscription.} notHolder{Personal needs you to hold the credentials of the runner.} other{The hosting runner does not report Personal.}}",
+  "newAgentPersonalNot": "{reason, select, notOnlyOwner{Personal is offered only when you are the only owner.} runnerNotPersonal{Personal needs a hosting runner on a personal subscription.} notHolder{Personal needs you to hold the credentials of the runner.} contextUnknown{Personal needs your account details, which are not loaded.} other{The hosting runner does not report Personal.}}",
   "@newAgentPersonalNot": {
     "description": "Why the billing mode personal is not offered (10 10.3 item 3).",
     "placeholders": {
@@ -17638,5 +17658,27 @@
   "teamReasonReadOnly": "the channel is read-only",
   "@teamReasonReadOnly": {
     "description": "Reason channel_read_only of a refused team operation."
+  },
+  "adminVersionReloaded": "Someone else changed this in the meantime. The page now shows the current state; make your change again.",
+  "@adminVersionReloaded": {
+    "description": "Notice of an administration page after a change answered 412 version_conflict: the page read the record again."
+  },
+  "adminAppChangeConsent": "Change consent",
+  "@adminAppChangeConsent": {
+    "description": "Button on the app page that opens the consent of the installed app (scopes and events)."
+  },
+  "adminAppChangeConsentTitle": "Consent for {name}",
+  "@adminAppChangeConsentTitle": {
+    "description": "Title of the dialog that changes the granted scopes and events of an installed app.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Repo bridge"
+      }
+    }
+  },
+  "adminAppChangeConsentBody": "Choose what the app may use and which events it receives; required items stay on.",
+  "@adminAppChangeConsentBody": {
+    "description": "Body of the dialog that changes the granted scopes and events of an installed app."
   }
 }

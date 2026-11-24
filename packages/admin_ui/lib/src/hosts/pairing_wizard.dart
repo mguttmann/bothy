@@ -110,6 +110,9 @@ class PairingWizard extends StatefulWidget {
     DateTime Function() clock = DateTime.now,
   }) => showDialog<AdminHost>(
     context: context,
+    // The one-time code and the filled form stay until "Close": a tap beside the dialog does
+    // not drop them.
+    barrierDismissible: false,
     builder: (dialog) => Dialog(
       key: const ValueKey('pairing.dialog'),
       backgroundColor: dialog.dsColors.surfaceRaised,
@@ -242,10 +245,31 @@ class _PairingWizardState extends State<PairingWizard>
     _tick();
   }
 
+  /// The host of the wizard; after a failed read following "Create" it is read again by the
+  /// ID of the issued code, and a failure shows its reason instead of a silent button.
+  Future<AdminHost?> _currentHost() async {
+    final known = _host;
+    if (known != null) return known;
+    final id = _code?.hostId;
+    if (id == null) return null;
+    try {
+      final host = await widget.repository.host(id);
+      if (mounted) setState(() => _host = host);
+      return host;
+    } on Object catch (e) {
+      if (!mounted) return null;
+      final failure = adminFailure(AppLocalizations.of(context), e);
+      if (failure != null) {
+        setState(() => notice = SelfNotice(failure.text, tone: DsTone.danger));
+      }
+      return null;
+    }
+  }
+
   Future<void> _newCode() async {
     final l = AppLocalizations.of(context);
-    final h = _host;
-    if (h == null) return;
+    final h = await _currentHost();
+    if (h == null || !mounted) return;
     var reason = _reason.text.trim();
     if (reason.isEmpty) {
       final typed = await askHostReason(
@@ -277,8 +301,8 @@ class _PairingWizardState extends State<PairingWizard>
   }
 
   Future<void> _next() async {
-    final h = _host;
-    if (h == null) return;
+    final h = await _currentHost();
+    if (h == null || !mounted) return;
     try {
       final fresh = await widget.repository.host(h.id);
       if (!mounted) return;
@@ -376,6 +400,7 @@ class _PairingWizardState extends State<PairingWizard>
       }
       return SelfNotice(l.hostConfirmed(h.name));
     });
+    if (!mounted) return;
     if (confirmed case final host?) widget.onDone?.call(host);
   }
 
@@ -569,67 +594,71 @@ class _PairingWizardState extends State<PairingWizard>
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final colors = context.dsColors;
-    return Column(
-      key: const ValueKey('pairing.wizard'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Semantics(
-                header: true,
-                child: Text(
-                  _host == null
-                      ? l.hostPairingTitle
-                      : '${l.hostPairingTitle}: ${_host!.name}',
-                  style: dsTextStyle(DsType.title)
-                      .copyWith(color: colors.textPrimary),
+    // Escape and the back action are refused while a call runs, like "Close".
+    return PopScope(
+      canPop: !busy,
+      child: Column(
+        key: const ValueKey('pairing.wizard'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Semantics(
+                  header: true,
+                  child: Text(
+                    _host == null
+                        ? l.hostPairingTitle
+                        : '${l.hostPairingTitle}: ${_host!.name}',
+                    style: dsTextStyle(DsType.title)
+                        .copyWith(color: colors.textPrimary),
+                  ),
                 ),
               ),
-            ),
-            Text(
-              l.adminWizardStep(_step + 1, 3),
-              key: const ValueKey('pairing.step'),
-              style: dsTextStyle(DsType.bodySm)
-                  .copyWith(color: colors.textSecondary),
-            ),
-          ],
-        ),
-        const SizedBox(height: DsSpace.s16),
-        switch (_step) {
-          0 => _stepOne(),
-          1 => _stepTwo(l),
-          _ => _stepThree(l),
-        },
-        const SizedBox(height: DsSpace.s12),
-        noticeBanner(),
-        Wrap(
-          alignment: WrapAlignment.end,
-          spacing: DsSpace.s8,
-          children: [
-            if (widget.onClose case final close?)
-              TextButton(
-                key: const ValueKey('pairing.close'),
-                onPressed: close,
-                child: Text(l.hostPairingClose),
-              ),
-            if (_step == 2) ...[
-              if (_code != null)
-                TextButton(
-                  key: const ValueKey('pairing.back'),
-                  onPressed: () => setState(() => _step = 1),
-                  child: Text(l.adminWizardBack),
-                ),
-              FilledButton(
-                key: const ValueKey('pairing.confirm'),
-                onPressed: _ready ? _confirm : null,
-                child: Text(l.hostConfirmSubmit),
+              Text(
+                l.adminWizardStep(_step + 1, 3),
+                key: const ValueKey('pairing.step'),
+                style: dsTextStyle(DsType.bodySm)
+                    .copyWith(color: colors.textSecondary),
               ),
             ],
-          ],
-        ),
-      ],
+          ),
+          const SizedBox(height: DsSpace.s16),
+          switch (_step) {
+            0 => _stepOne(),
+            1 => _stepTwo(l),
+            _ => _stepThree(l),
+          },
+          const SizedBox(height: DsSpace.s12),
+          noticeBanner(),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: DsSpace.s8,
+            children: [
+              if (widget.onClose case final close?)
+                TextButton(
+                  key: const ValueKey('pairing.close'),
+                  onPressed: busy ? null : close,
+                  child: Text(l.hostPairingClose),
+                ),
+              if (_step == 2) ...[
+                if (_code != null)
+                  TextButton(
+                    key: const ValueKey('pairing.back'),
+                    onPressed: () => setState(() => _step = 1),
+                    child: Text(l.adminWizardBack),
+                  ),
+                FilledButton(
+                  key: const ValueKey('pairing.confirm'),
+                  onPressed: _ready ? _confirm : null,
+                  child: Text(l.hostConfirmSubmit),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

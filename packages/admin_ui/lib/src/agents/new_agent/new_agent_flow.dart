@@ -96,6 +96,9 @@ enum PersonalOffer {
 
   /// The runner does not report `personal` in `billing_modes_supported`.
   notSupported,
+
+  /// The person's context (owners, spaces) is not read yet or could not be read.
+  contextUnknown,
 }
 
 /// The JSON Pointers of the preview fields that are not part of the definition; the definition's
@@ -254,8 +257,24 @@ final class NewAgentFlow extends ChangeNotifier {
   /// Gives the context once it is read.
   void setContext(NewAgentContext value) {
     _context = value;
+    _contextFailed = false;
     if (personalOffer != PersonalOffer.offered) _billing = 'organization';
     _notify();
+  }
+
+  /// Whether the last read of the context failed; the preview then offers to read it again.
+  bool get contextFailed => _contextFailed;
+  bool _contextFailed = false;
+
+  /// Reads the context (`getMe` and the spaces, 26 6.1); a failure keeps [contextFailed] until
+  /// a later read succeeds.
+  Future<void> loadContext() async {
+    try {
+      setContext(await _port.context());
+    } on Object {
+      _contextFailed = true;
+      _notify();
+    }
   }
 
   /// The draft the preview edits, or null before a way in was chosen.
@@ -388,7 +407,8 @@ final class NewAgentFlow extends ChangeNotifier {
   PersonalOffer get personalOffer {
     final r = _runner;
     final c = _context;
-    if (c == null || !c.onlyOwner) return PersonalOffer.notOnlyOwner;
+    if (c == null) return PersonalOffer.contextUnknown;
+    if (!c.onlyOwner) return PersonalOffer.notOnlyOwner;
     if (r == null || r.billingMode != 'personal') {
       return PersonalOffer.runnerNotPersonal;
     }

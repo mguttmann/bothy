@@ -4,6 +4,8 @@
 // devices and the session of each device (origin from auth_method); approve with the code
 // and step-up; reject asks once and then for step-up (08 5.2).
 
+import 'dart:async';
+
 import 'package:admin_ui/admin_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +13,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support.dart';
 
 void main() {
+  _loadingTests();
+
   late GlobalKey<NavigatorState> navigator;
   late FakeAdminRepository repository;
   late int changed;
@@ -153,4 +157,97 @@ void main() {
     await tap(tester, 'admin.nav.devices');
     expect(places, [const AdminLocation(AdminSection.devices)]);
   });
+
+  testWidgets(
+    'the shell counts again only after a change that can touch a device, and '
+    'one count at a time',
+    (tester) async {
+      final counting = _CountingRepository(
+        prompt: StepUpDialogPrompt(() => navigator.currentContext),
+      );
+      tester.view
+        ..physicalSize = const Size(1400, 1000)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      Future<void> shell(AdminSection section) => pumpInApp(
+        tester,
+        SizedBox(
+          height: 900,
+          child: AdminShell(
+            repository: counting,
+            location: AdminLocation(section),
+            onNavigate: (_) {},
+            timeZone: 'Europe/Berlin',
+            clock: testClock,
+          ),
+        ),
+        navigatorKey: navigator,
+      );
+      void changed() =>
+          tester.widget<AdminBody>(find.byType(AdminBody)).onChanged!();
+
+      await shell(AdminSection.groups);
+      expect(counting.counts, 1);
+      // A group, a grant or an agent never changes the waiting devices.
+      changed();
+      await tester.pumpAndSettle();
+      expect(counting.counts, 1);
+
+      await shell(AdminSection.devices);
+      // The queue on the screen reads the devices too.
+      final base = counting.counts;
+      counting.gate = Completer<void>();
+      changed();
+      changed();
+      changed();
+      await tester.pump();
+      expect(counting.counts, base + 1, reason: 'the later changes wait');
+      counting.gate!.complete();
+      counting.gate = null;
+      await tester.pumpAndSettle();
+      expect(counting.counts, base + 2, reason: 'one more for the changes');
+    },
+  );
+}
+
+void _loadingTests() {
+  testWidgets('the queue shows that it loads until the devices are there', (
+    tester,
+  ) async {
+    final navigator = GlobalKey<NavigatorState>();
+    final counting = _CountingRepository(
+      prompt: StepUpDialogPrompt(() => navigator.currentContext),
+    )..gate = Completer<void>();
+    await pumpInApp(
+      tester,
+      WaitingDevicesView(
+        repository: counting,
+        timeZone: 'Europe/Berlin',
+        clock: testClock,
+      ),
+      navigatorKey: navigator,
+      settle: false,
+    );
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    counting.gate!.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byKey(const ValueKey('waiting.sam-tablet')), findsOneWidget);
+  });
+}
+
+/// Counts the reads of the waiting devices; a set [gate] holds a read until it completes.
+class _CountingRepository extends FakeAdminRepository {
+  _CountingRepository({required super.prompt});
+
+  int counts = 0;
+  Completer<void>? gate;
+
+  @override
+  Future<List<WaitingDevice>> waitingDevices() async {
+    counts++;
+    await gate?.future;
+    return super.waitingDevices();
+  }
 }

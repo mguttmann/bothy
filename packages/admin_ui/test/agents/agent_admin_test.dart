@@ -236,9 +236,8 @@ void main() {
       },
     );
 
-    testWidgets('a change of another device is refused and changes nothing', (
-      tester,
-    ) async {
+    testWidgets('a change of another device is refused, changes nothing and '
+        'reads the agent again', (tester) async {
       await page(tester, 'texter');
       // Another owner changed the agent since the page loaded.
       repository.agentRecordsById['texter'] = fakeAgentRecord(
@@ -252,8 +251,12 @@ void main() {
       await tap(tester, 'confirm.submit');
       await stepUp(tester, 'Set the tool class of Texter');
 
+      // The page reads the agent again, so the next attempt sends the current version.
       expect(
-        find.text('Someone else changed this in the meantime'),
+        find.text(
+          'Someone else changed this in the meantime. The page now shows the current '
+          'state; make your change again.',
+        ),
         findsOneWidget,
       );
       expect(repository.agentRecordsById['texter']!.toolClass, 'chat');

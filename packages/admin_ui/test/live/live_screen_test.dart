@@ -8,6 +8,7 @@
 import 'dart:io';
 
 import 'package:admin_ui/admin_ui.dart';
+import 'package:api_client/api_client.dart' show ApiProblem;
 import 'package:bothy_viz/bothy_viz.dart';
 import 'package:design_system/design_system.dart';
 import 'package:design_system/testing.dart';
@@ -103,9 +104,11 @@ Future<_World> _pump(
   VizFormFactor formFactor = VizFormFactor.desktop,
   Uri? dashboard,
   AppConfig? config,
+  void Function(_World world)? before,
 }) async {
   final world = _World(dashboard: dashboard, config: config);
   await tester.runAsync(world.load);
+  before?.call(world);
   tester.view
     ..physicalSize = const Size(1600, 1200)
     ..devicePixelRatio = 1;
@@ -304,6 +307,59 @@ void main() {
     await _settle(tester, world);
     expect(find.text('Only for the owner'), findsOneWidget);
   });
+
+  testWidgets(
+    'a tab change and the end of TV mode query the period up to now, not the '
+    'one of the opening',
+    (tester) async {
+      final world = await _pump(tester);
+      VizRange range() =>
+          tester.widget<TimelineView>(find.byType(TimelineView)).options.range;
+      await tester.ensureVisible(_tab(VizViewKind.timeline));
+      await tester.tap(_tab(VizViewKind.timeline));
+      await _settle(tester, world);
+      expect(range().to, liveQueryRangeAt(_now).to);
+
+      world.clock.advance(const Duration(hours: 5));
+      await tester.ensureVisible(_tab(VizViewKind.backend));
+      await tester.tap(_tab(VizViewKind.backend));
+      await _settle(tester, world);
+      await tester.ensureVisible(_tab(VizViewKind.timeline));
+      await tester.tap(_tab(VizViewKind.timeline));
+      await _settle(tester, world);
+      expect(range().to, liveQueryRangeAt(world.clock.now()).to);
+
+      await tester.tap(find.byKey(const ValueKey('live.tv')));
+      await tester.pumpAndSettle();
+      await _settle(tester, world);
+      world.clock.advance(const Duration(hours: 2));
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pumpAndSettle();
+      await _settle(tester, world);
+      expect(find.byType(TvMode), findsNothing);
+      expect(range().to, liveQueryRangeAt(world.clock.now()).to);
+    },
+  );
+
+  testWidgets(
+    'a person the instance scope refuses (a space manager) starts in the first '
+    'space, without "All spaces"',
+    (tester) async {
+      final world = await _pump(
+        tester,
+        before: (w) => w.queries.failOn['live'] = const ApiProblem(
+          status: 403,
+          code: 'forbidden',
+        ),
+      );
+      expect(world.live.spaceId, _support);
+      final scope = tester.widget<DropdownButton<String?>>(
+        find.byKey(const ValueKey('live.scope')),
+      );
+      expect(scope.value, _support);
+      expect(scope.items!.map((i) => i.value), isNot(contains(null)));
+    },
+  );
 
   test('the queries cover the last day up to the last full minute', () {
     final range = liveQueryRangeAt(DateTime.utc(2026, 10, 15, 10, 30, 45, 120));

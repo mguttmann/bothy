@@ -4305,8 +4305,9 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get consolePlaceholderPage =>
-      'Diese Seite kommt mit einer späteren Version der Konsole.';
+  String consoleDocumentTitle(String page, String console) {
+    return '$page - $console';
+  }
 
   @override
   String consoleSignedInAs(String name) {
@@ -8446,6 +8447,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get consoleTerminalOpen => 'Terminal öffnen';
 
   @override
+  String consoleTerminalLeaveHint(String keys) {
+    return '$keys bringt den Fokus vom Terminal zu den Knöpfen darüber.';
+  }
+
+  @override
   String get consoleTerminalBack => 'Zurück zum Rechner';
 
   @override
@@ -10905,6 +10911,8 @@ class AppLocalizationsDe extends AppLocalizations {
           'Persönlich braucht einen Runner mit einem persönlichen Abonnement.',
       'notHolder':
           'Persönlich braucht dich als Inhaber der Zugangsdaten des Runners.',
+      'contextUnknown':
+          'Persönlich braucht deine Kontodaten, die nicht geladen sind.',
       'other': 'Der Runner meldet Persönlich nicht.',
     });
     return '$_temp0';
@@ -11901,4 +11909,20 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get teamReasonReadOnly => 'der Kanal ist schreibgeschützt';
+
+  @override
+  String get adminVersionReloaded =>
+      'Jemand anderes hat das inzwischen geändert. Die Seite zeigt jetzt den aktuellen Stand; nimm deine Änderung erneut vor.';
+
+  @override
+  String get adminAppChangeConsent => 'Zustimmung ändern';
+
+  @override
+  String adminAppChangeConsentTitle(String name) {
+    return 'Zustimmung für $name';
+  }
+
+  @override
+  String get adminAppChangeConsentBody =>
+      'Wähle, was die App nutzen darf und welche Ereignisse sie erhält; erforderliche Punkte bleiben an.';
 }

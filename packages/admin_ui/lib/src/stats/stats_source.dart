@@ -275,6 +275,3 @@ List<String> requiredCurrencies(Object error) {
   // The executive page reads the same refusal: one rule for both ([vizRequiredCurrencies]).
   return problem == null ? const [] : vizRequiredCurrencies(problem);
 }
-
-/// The metrics of [bucket] as a plain map.
-Map<String, double> metricsOf(api.StatsBucket bucket) => bucket.metrics.toMap();

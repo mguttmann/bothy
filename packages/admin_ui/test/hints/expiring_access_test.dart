@@ -153,6 +153,9 @@ void main() {
 
       expect(find.byKey(const ValueKey('hints.extendDialog')), findsOneWidget);
       expect(find.text('Extend the access grant for Sam'), findsOneWidget);
+      // Extending keeps who and where: the wizard cannot go back to change them, because the
+      // old grant is revoked afterwards.
+      expect(find.byKey(const ValueKey('wizard.back')), findsNothing);
       expect(
         find.text(
           'Extending creates a new access grant with a new reason and the last '

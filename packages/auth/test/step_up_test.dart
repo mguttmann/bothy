@@ -398,6 +398,24 @@ void main() {
     },
   );
 
+  test('a failure of the platform in the signer (a cancelled Touch ID) is '
+      'StepUpCancelled, not a network error', () async {
+    h.stepUpKey.failWith = StateError('user_cancelled');
+    await expectLater(
+      h.session.stepUp.confirm(purposeText: 'x'),
+      throwsA(isA<StepUpCancelled>()),
+    );
+    expect(h.server.to('/auth/step-up/device-key'), isEmpty);
+  });
+
+  test('an error of the login layer from the signer passes as it is', () async {
+    h.stepUpKey.failWith = const StepUpUnavailable();
+    await expectLater(
+      h.session.stepUp.confirm(purposeText: 'x'),
+      throwsA(isA<StepUpUnavailable>()),
+    );
+  });
+
   test(
     'a second step_up_required after confirmation is returned, never looped',
     () async {

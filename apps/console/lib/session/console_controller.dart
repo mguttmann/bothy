@@ -170,7 +170,7 @@ class ConsoleController extends ChangeNotifier {
       ],
       prompt: () => stepUpPrompt,
       onOidc: stepUpWithOidc,
-      onConfirmed: () => _loadSession(own: true),
+      onConfirmed: _readAfterActionStepUp,
     );
     api = createConsoleApiClient(
       origin: environment.origin,
@@ -180,10 +180,16 @@ class ConsoleController extends ChangeNotifier {
           dio: () => api.dio,
           stepUp: actionStepUp.confirm,
           active: () => _state is ConsoleSignedIn,
+          viewEnded: _storedViewEnded,
         ),
       ],
       adapter: environment.adapter,
     );
+    // A tab that becomes visible again reads its session: a logout or another person's login
+    // in another tab of the browser changed the cookie the requests of this tab send.
+    _visibility = environment.visibility?.changes.listen((hidden) {
+      if (!hidden && _state is ConsoleSignedIn) unawaited(_readQuietly());
+    });
   }
 
   /// The browser ports and the origin.
@@ -203,6 +209,7 @@ class ConsoleController extends ChangeNotifier {
   ConsoleStepUpPrompt? stepUpPrompt;
 
   final Random _random;
+  StreamSubscription<bool>? _visibility;
   bool _started = false;
   bool _ending = false;
   ConsoleState _state = const ConsoleStarting();
@@ -395,7 +402,8 @@ class ConsoleController extends ChangeNotifier {
   void openAdmin(AdminLocation location) =>
       openRoute(ConsoleRoute.forAdmin(location));
 
-  /// Reads the session again; a `401` moves to E7 through the interceptor.
+  /// Reads the session again; a `401` moves to E7 through the interceptor, and a read without an
+  /// answer (no connection, a server error) throws its `DioException` for the caller to show.
   ///
   /// [afterViewEnd] is for the end of a stored view by its time: the server answers the first
   /// request after the end with `401 step_up_required` (07 9.2), so this read leaves that answer
@@ -612,6 +620,31 @@ class ConsoleController extends ChangeNotifier {
   String _redirect(ConsolePage page) =>
       environment.origin.replace(path: page.fullPath).toString();
 
+  /// Reads the session after the step-up of an action; the request of the action repeats either
+  /// way, so a read without an answer changes nothing here.
+  Future<void> _readAfterActionStepUp() => _readQuietly(own: true);
+
+  /// Reads the session and leaves a failure without an answer to the next read.
+  Future<void> _readQuietly({bool own = false}) async {
+    try {
+      await _loadSession(own: own);
+    } on DioException {
+      // The session stays as it was read last; the next request or read shows the failure.
+    }
+  }
+
+  /// Whether a `step_up_required` answer came from the end of the stored view rather than from
+  /// an action that needs a step-up (07 9.2): with a stored view the session is read again, and
+  /// the view is gone after the read. The browser's clock decides nothing.
+  Future<bool> _storedViewEnded() async {
+    if (session?.viewAs == null) return false;
+    await _readQuietly(own: true);
+    return _state is ConsoleSignedIn && session?.viewAs == null;
+  }
+
+  /// Reads the session. At the start a failure decides the screen (the login after a `401`,
+  /// "unavailable" otherwise); later a `401` leads to E7 through the interceptor, and any other
+  /// failure reaches the caller, who shows it.
   Future<void> _loadSession({bool own = false, bool again = false}) async {
     try {
       _applySession(
@@ -639,6 +672,11 @@ class ConsoleController extends ChangeNotifier {
         } else {
           _set(const ConsoleUnavailable());
         }
+        return;
+      }
+      // A cancelled step-up of the read is the person's choice, not a failure to show.
+      if (e.response?.statusCode != 401 && e.error is! StepUpCancelled) {
+        rethrow;
       }
     }
   }
@@ -709,6 +747,12 @@ class ConsoleController extends ChangeNotifier {
       busy = false;
       notifyListeners();
     }
+  }
+
+  @override
+  void dispose() {
+    unawaited(_visibility?.cancel());
+    super.dispose();
   }
 
   void _set(ConsoleState state) {

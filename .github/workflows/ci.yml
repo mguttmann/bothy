@@ -755,7 +755,7 @@ jobs:
           # As every step that reaches `make test` (docs/quality/gates.md, "Individual gates").
           MMDC_PUPPETEER_CONFIG: tools/node/puppeteer-ci.json
           COMPONENTS: apps
-        run: make test coverage COMPONENTS="$COMPONENTS" AREAS=none
+        run: make test coverage console-web-test COMPONENTS="$COMPONENTS" AREAS=none
       # The flakes of the job (failed tests that passed in a rerun, tools/ci/flakes.py) for the
       # tracking issue (flakes.yml); no artifact without a flake.
       - name: Upload the flakes

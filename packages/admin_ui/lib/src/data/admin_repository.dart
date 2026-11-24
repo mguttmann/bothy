@@ -23,6 +23,7 @@ import 'agents_repository.dart';
 import 'apps_repository.dart';
 import 'hosts_repository.dart';
 import 'instance_repository.dart';
+import 'request_keys.dart';
 import 'self_repository.dart';
 
 /// The state of a person (`UserStatus`).
@@ -484,6 +485,20 @@ Future<List<AdminPerson>> allPeople(
   return people;
 }
 
+/// Every group of [repository], all pages of `listGroups`.
+///
+/// Example: `final groups = await allGroups(admin);`
+Future<List<AdminGroup>> allGroups(AdminRepository repository) async {
+  final groups = <AdminGroup>[];
+  String? cursor;
+  do {
+    final page = await repository.groups(cursor: cursor);
+    groups.addAll(page.items);
+    cursor = page.nextCursor;
+  } while (cursor != null);
+  return groups;
+}
+
 /// [AdminRepository] over the generated client of `api_client`.
 ///
 /// The `api` argument is the client of the signed-in session (`AuthSession.api`), so DPoP,
@@ -499,6 +514,7 @@ final class ApiAdminRepository implements AdminRepository {
   /// Creates the repository.
   ApiAdminRepository(this._api, {required String Function() newIdempotencyKey})
     : _newKey = newIdempotencyKey,
+      _keys = RequestKeys(newIdempotencyKey),
       _access = ApiAccessRepository(_api, newIdempotencyKey: newIdempotencyKey),
       _agents = ApiAgentsRepository(_api, newIdempotencyKey: newIdempotencyKey),
       _hosts = ApiHostsRepository(_api, newIdempotencyKey: newIdempotencyKey),
@@ -516,6 +532,7 @@ final class ApiAdminRepository implements AdminRepository {
 
   final ApiClient _api;
   final String Function() _newKey;
+  final RequestKeys _keys;
   final ApiAccessRepository _access;
   final ApiAgentsRepository _agents;
   final ApiHostsRepository _hosts;
@@ -1478,19 +1495,23 @@ final class ApiAdminRepository implements AdminRepository {
     String name, {
     required String description,
     required String purpose,
-  }) => _call(
-    () async => _group(
-      (await _groups.createGroup(
-        groupCreate: GroupCreate(
-          (b) => b
-            ..name = name
-            ..description = description.isEmpty ? null : description,
+  }) => _call(() async {
+    final body = GroupCreate(
+      (b) => b
+        ..name = name
+        ..description = description.isEmpty ? null : description,
+    );
+    return _group(
+      (await _keys.run(
+        'createGroup $body',
+        (key) => _groups.createGroup(
+          groupCreate: body,
+          idempotencyKey: key,
+          extra: _purpose(purpose),
         ),
-        idempotencyKey: _newKey(),
-        extra: _purpose(purpose),
       )).data!,
-    ),
-  );
+    );
+  });
 
   @override
   Future<AdminGroup> renameGroup(

@@ -48,7 +48,8 @@ import 'switch_mode_dialog.dart';
 /// compares the two modes itself (15 1 principle 1). [presence] is the live presence (the
 /// desktop app maps the engine's `EphemeralStore` to it; the console passes null and the
 /// state comes from `getAgent`, Design note 1): its latest value replaces the shown state and,
-/// when it carries one, the shown reported mode.
+/// when it carries one, the shown reported mode. The page listens to the stream it got first
+/// for its agent; another stream of the same agent on a rebuild is not listened to again.
 ///
 /// "Switch backend" ([SwitchModeDialog]) and, for a personal agent, "Change holder"
 /// ([HolderDialog]) ask a reason and go through the step-up interceptor; a `409
@@ -145,11 +146,14 @@ class _AgentPageState extends State<AgentPage>
   @override
   void didUpdateWidget(AgentPage old) {
     super.didUpdateWidget(old);
-    if (old.presence != widget.presence) _listen();
     if (old.agentId != widget.agentId) {
-      _live = null;
+      _listen();
       _conflicts = null;
       _load();
+    } else if ((old.presence == null) != (widget.presence == null)) {
+      // A host may hand a new stream of the same agent on every rebuild; only a page that
+      // gains or loses its presence listens anew.
+      _listen();
     }
   }
 
@@ -234,7 +238,7 @@ class _AgentPageState extends State<AgentPage>
         }
         rethrow;
       }
-    });
+    }, reload: _load);
     if (!ok || !mounted) return;
     widget.onChanged?.call();
     await _load();

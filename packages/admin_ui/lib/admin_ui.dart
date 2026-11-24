@@ -37,7 +37,7 @@
 /// M4-28 adds screen A5 (01 5.2; 10 5.4, 8, 9, 11, 13): the [AgentsList] with the
 /// [AgentModeBadge], the [AgentPage] with the configured next to the reported mode and the
 /// server's warnings, [SwitchModeDialog], [HolderDialog], [SwitchAllDialog], the
-/// [I1Explanation], the agent's [AgentTokens] with [TokenSecretView], the guided flow
+/// [I1Explanation], the agent's [AgentTokens], the guided flow
 /// ([GuidedSwitch], [GuidedFlow], [GuidedResult]) in the grant preview, the group members and
 /// the owners, and the data source [AgentsRepository] ([ApiAgentsRepository]), which
 /// [AdminRepository] includes.
@@ -156,6 +156,7 @@ export 'src/apps/deliveries_view.dart';
 export 'src/apps/install_dialog.dart';
 export 'src/apps/lifecycle_dialog.dart';
 export 'src/apps/manifest_picker.dart';
+export 'src/apps/scopes_dialog.dart';
 export 'src/apps/subscriptions_section.dart';
 export 'src/apps/update_dialog.dart';
 export 'src/apps/webhook_keys_card.dart';

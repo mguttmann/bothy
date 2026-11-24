@@ -7,6 +7,7 @@ library;
 
 import 'dart:async';
 
+import 'package:api_client/api_client.dart' as api;
 import 'package:bothy_viz/bothy_viz.dart';
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart' show AppConfig;
@@ -15,8 +16,8 @@ import 'package:l10n/l10n.dart';
 
 import '../stats/stats_source.dart';
 
-/// The hours of the REST queries of the views: the last day up to the time the page opened or
-/// changed its scope (the longest timeline range is `stats.timeline_max_range`, a day by
+/// The hours of the REST queries of the views: the last day up to the time the page opened,
+/// changed its scope or its tab, or ended TV mode (the longest timeline range is `stats.timeline_max_range`, a day by
 /// default; the server answers `validation_failed` above it).
 const Duration liveQueryRange = Duration(hours: 24);
 
@@ -123,6 +124,10 @@ class _LiveScreenState extends State<LiveScreen> {
   bool _tv = false;
   int _generation = 0;
 
+  /// The server refused the instance scope (a space manager, 25 4): the page shows the first
+  /// space and offers no "All spaces", as the statistics A7 do.
+  bool _instanceRefused = false;
+
   @override
   void initState() {
     super.initState();
@@ -147,6 +152,24 @@ class _LiveScreenState extends State<LiveScreen> {
       _agents = agents ?? const {};
       _dashboard = instance?.telemetryDashboardUrl;
     });
+    if (_spaces.isNotEmpty) unawaited(_probeInstance());
+  }
+
+  /// Asks the server once whether the person may read the instance scope (`getStatsLive`
+  /// without a space); a `403` moves the page to the first space.
+  Future<void> _probeInstance() async {
+    try {
+      await widget.queries.live();
+    } on api.ApiProblem catch (problem) {
+      if (problem.status != 403 || !mounted || _spaceId != null) return;
+      setState(() {
+        _instanceRefused = true;
+        _spaceId = _spaces.first.id;
+        _range = _rangeNow();
+      });
+    } on Object {
+      // Any other failure shows in the views themselves.
+    }
   }
 
   VizHostOptions _options() {
@@ -179,7 +202,10 @@ class _LiveScreenState extends State<LiveScreen> {
     });
   }
 
-  Future<void> _startTv(VizHostOptions options) async {
+  Future<void> _startTv() async {
+    // TV mode moves the period with the clock from here (tv_mode.dart).
+    _range = _rangeNow();
+    final options = _options();
     final views = [
       for (final spec in vizViewsFor(options))
         if (spec.kind != VizViewKind.tvMode &&
@@ -207,6 +233,7 @@ class _LiveScreenState extends State<LiveScreen> {
     setState(() {
       _tv = false;
       _generation++;
+      _range = _rangeNow();
     });
   }
 
@@ -245,7 +272,10 @@ class _LiveScreenState extends State<LiveScreen> {
                 ),
             ],
             selected: {kind},
-            onSelectionChanged: (s) => setState(() => _kind = s.first),
+            onSelectionChanged: (s) => setState(() {
+              _kind = s.first;
+              _range = _rangeNow();
+            }),
           ),
         ),
         if (_spaces.isNotEmpty)
@@ -263,7 +293,8 @@ class _LiveScreenState extends State<LiveScreen> {
                 value: _spaceId,
                 onChanged: _setScope,
                 items: [
-                  DropdownMenuItem<String?>(child: Text(l.statsScopeAll)),
+                  if (!_instanceRefused)
+                    DropdownMenuItem<String?>(child: Text(l.statsScopeAll)),
                   for (final s in _spaces)
                     DropdownMenuItem<String?>(value: s.id, child: Text(s.name)),
                 ],
@@ -273,7 +304,7 @@ class _LiveScreenState extends State<LiveScreen> {
         if (tvAllowed)
           OutlinedButton(
             key: const ValueKey('live.tv'),
-            onPressed: _tv ? null : () => unawaited(_startTv(options)),
+            onPressed: _tv ? null : () => unawaited(_startTv()),
             child: Text(l.vizViewTv),
           ),
       ],

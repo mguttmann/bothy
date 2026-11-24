@@ -5,6 +5,8 @@
 // devices of a person; owners with the last-owner rejection. Every change asks once, then for
 // the step-up through the dialog (01 5.2, 05 2.4).
 
+import 'dart:async';
+
 import 'package:admin_ui/admin_ui.dart';
 import 'package:api_client/api_client.dart';
 import 'package:flutter/material.dart';
@@ -58,6 +60,86 @@ void main() {
     expect(find.text(purpose), findsOneWidget);
     await tap(tester, 'stepUp.continue');
   }
+
+  group('loads in order', () {
+    late _GatedRepository gated;
+
+    setUp(() {
+      gated = _GatedRepository(
+        prompt: StepUpDialogPrompt(() => navigator.currentContext),
+      );
+    });
+
+    Future<void> gatedList(WidgetTester tester) => pumpInApp(
+      tester,
+      PeopleList(
+        repository: gated,
+        timeZone: 'Europe/Berlin',
+        onOpen: opened.add,
+      ),
+      navigatorKey: navigator,
+    );
+
+    testWidgets(
+      'a late answer to an older search never replaces the newer one',
+      (tester) async {
+        await gatedList(tester);
+        final slow = gated.gates['sa'] = Completer<void>();
+        await tester.enterText(
+          find.byKey(const ValueKey('people.search')),
+          'sa',
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pump();
+        await tester.enterText(
+          find.byKey(const ValueKey('people.search')),
+          'rob',
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('person.robin')), findsOneWidget);
+        slow.complete();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('person.robin')), findsOneWidget);
+        expect(find.byKey(const ValueKey('person.sam')), findsNothing);
+      },
+    );
+
+    testWidgets('"Load more" asks once while its page loads', (tester) async {
+      gated.pageSize = 1;
+      await gatedList(tester);
+      final page = gated.gates['|1'] = Completer<void>();
+      await tester.tap(find.byKey(const ValueKey('people.more')));
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const ValueKey('people.more')),
+        warnIfMissed: false,
+      );
+      await tester.pump();
+      page.complete();
+      await tester.pumpAndSettle();
+      expect(gated.pageReads, ['|', '|1']);
+    });
+  });
+
+  testWidgets('the group filter offers the groups of every page', (
+    tester,
+  ) async {
+    final paged = _GatedRepository(
+      prompt: StepUpDialogPrompt(() => navigator.currentContext),
+    )..groupsOnSecondPage = true;
+    await pumpInApp(
+      tester,
+      PeopleList(
+        repository: paged,
+        timeZone: 'Europe/Berlin',
+        onOpen: opened.add,
+      ),
+      navigatorKey: navigator,
+    );
+    await tap(tester, 'people.group');
+    expect(find.byKey(const ValueKey('people.group.support')), findsWidgets);
+  });
 
   testWidgets('the list shows people, owners and opens a person', (
     tester,
@@ -336,4 +418,41 @@ void main() {
     expect(find.byKey(const ValueKey('admin.denied')), findsOneWidget);
     expect(find.byKey(const ValueKey('person.disable')), findsNothing);
   });
+}
+
+/// Holds a read of `people` until the gate of its `query|cursor` completes.
+class _GatedRepository extends FakeAdminRepository {
+  _GatedRepository({required super.prompt});
+
+  final Map<String, Completer<void>> gates = {};
+  final List<String> pageReads = [];
+
+  /// The groups come on a second page of `listGroups`, after an empty first one.
+  bool groupsOnSecondPage = false;
+
+  @override
+  Future<AdminPage<AdminGroup>> groups({String? cursor}) async {
+    if (groupsOnSecondPage && cursor == null) {
+      return const AdminPage([], nextCursor: '1');
+    }
+    return super.groups(cursor: cursor);
+  }
+
+  @override
+  Future<AdminPage<AdminPerson>> people({
+    String? query,
+    AdminPersonStatus? status,
+    String? cursor,
+  }) async {
+    final key = '${query ?? ''}|${cursor ?? ''}';
+    pageReads.add(key);
+    final gate = gates[key] ?? gates[query ?? ''];
+    final page = await super.people(
+      query: query,
+      status: status,
+      cursor: cursor,
+    );
+    await gate?.future;
+    return page;
+  }
 }

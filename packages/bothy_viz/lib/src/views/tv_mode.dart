@@ -73,12 +73,15 @@ class TvMode extends StatefulWidget {
 class _TvModeState extends State<TvMode> {
   int _index = 0;
   VizTimer? _timer;
+  late final DateTime _started;
+  late VizHostOptions _options = widget.options;
   bool _ended = false;
   final FocusNode _focus = FocusNode(debugLabel: 'tv-mode');
 
   @override
   void initState() {
     super.initState();
+    _started = widget.options.clock.now();
     _schedule();
     // Autofocus does not take the focus from a host control that already holds it, which is
     // the normal case for an overlay over a screen; TV mode takes it explicitly, so every key
@@ -93,9 +96,25 @@ class _TvModeState extends State<TvMode> {
       widget.options.config.tvRotationInterval,
       () {
         if (!mounted) return;
-        setState(() => _index = (_index + 1) % widget.views.length);
+        setState(() {
+          _index = (_index + 1) % widget.views.length;
+          _options = _movedOptions();
+        });
         _schedule();
       },
+    );
+  }
+
+  /// The host's options with the period moved by the whole minutes since TV mode started, so a
+  /// screen that runs for hours queries the current period and not the one of its start; whole
+  /// minutes keep a period on full minutes (`getStatsTimeline`, 25 11).
+  VizHostOptions _movedOptions() {
+    final minutes = widget.options.clock.now().difference(_started).inMinutes;
+    if (minutes <= 0) return widget.options;
+    final shift = Duration(minutes: minutes);
+    final range = widget.options.range;
+    return widget.options.withRange(
+      VizRange(from: range.from.add(shift), to: range.to.add(shift)),
     );
   }
 
@@ -194,7 +213,7 @@ class _TvModeState extends State<TvMode> {
                             kind,
                             live: widget.live,
                             queries: widget.queries,
-                            options: widget.options,
+                            options: _options,
                             onOpenThread: _ignoreThread,
                           ),
                         ),

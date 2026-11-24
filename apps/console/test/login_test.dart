@@ -526,6 +526,40 @@ void main() {
     });
   });
 
+  group('a session read without an answer after the start', () {
+    testWidgets('after a step-up says so instead of staying silent', (
+      tester,
+    ) async {
+      // console-terminal-ui-4: the step-up succeeded, the session read after it failed.
+      final b = TestBrowser();
+      var stepped = false;
+      b.server.routes['GET /api/v1/console/session'] = (_) => stepped
+          ? const Answer(503, {'code': 'unavailable', 'status': 503})
+          : Answer(200, consoleSession(methods: ['password_totp']));
+      b.server.routes['POST /api/v1/auth/step-up/challenge'] = (_) =>
+          const Answer(200, {
+            'challenge_id': _challenge,
+            'challenge': 'YmFy',
+            'expires_at': '2026-10-10T09:30:00.000Z',
+          });
+      b.server.routes['POST /api/v1/auth/step-up/password'] = (_) {
+        stepped = true;
+        return const Answer(200, stepUpResult);
+      };
+      final c = await pumpConsole(tester, b);
+      expect(c.state, isA<ConsoleNeedsStepUp>());
+      unawaited(c.stepUpWithPassword('secret-1', '492039'));
+      await tester.pumpAndSettle();
+      expect(c.notice, ConsoleNotice.unavailable);
+      expect(
+        find.text(
+          'The server cannot be reached. Check the connection and try again.',
+        ),
+        findsOneWidget,
+      );
+    });
+  });
+
   group('session and E7', () {
     testWidgets('a reload with a stepped-up session opens the console', (
       tester,

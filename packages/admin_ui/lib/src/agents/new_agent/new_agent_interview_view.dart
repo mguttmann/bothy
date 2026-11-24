@@ -165,6 +165,12 @@ class _NewAgentInterviewViewState extends State<NewAgentInterviewView> {
                   spacing: DsSpace.s8,
                   runSpacing: DsSpace.s8,
                   children: [
+                    if (i.canRetry)
+                      FilledButton(
+                        key: const ValueKey('newAgent.interview.retry'),
+                        onPressed: i.pending ? null : i.retry,
+                        child: Text(l.selfRetry),
+                      ),
                     OutlinedButton(
                       key: const ValueKey('newAgent.interview.toTemplates'),
                       onPressed: widget.onTemplates,

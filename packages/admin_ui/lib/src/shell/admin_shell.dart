@@ -5,6 +5,8 @@
 /// `/admin`, the console at its root (M6-04).
 library;
 
+import 'dart:async';
+
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
@@ -164,13 +166,44 @@ class _AdminShellState extends State<AdminShell> {
     }
   }
 
-  Future<void> _count() async {
+  Future<void>? _counting;
+  bool _countAgain = false;
+
+  /// Counts the waiting devices; a count asked for while one runs runs once after it, so the
+  /// reads of every person ([AdminRepository.waitingDevices], one per person until the API has
+  /// a list of the instance's waiting devices) never run side by side.
+  Future<void> _count() {
+    if (_counting case final running?) {
+      _countAgain = true;
+      return running;
+    }
+    return _counting = _countPasses();
+  }
+
+  Future<void> _countPasses() async {
     try {
-      final waiting = await widget.repository.waitingDevices();
-      if (mounted) setState(() => _waiting = waiting.length);
-    } on Object {
-      // Without an answer the entry shows no count.
-      if (mounted) setState(() => _waiting = null);
+      do {
+        _countAgain = false;
+        try {
+          final waiting = await widget.repository.waitingDevices();
+          if (mounted) setState(() => _waiting = waiting.length);
+        } on Object {
+          // Without an answer the entry shows no count.
+          if (mounted) setState(() => _waiting = null);
+        }
+      } while (_countAgain && mounted);
+    } finally {
+      _counting = null;
+    }
+  }
+
+  /// After a change on a screen: only people and devices can change the waiting devices (a
+  /// device approved, rejected or revoked, a person disabled), so only their changes count
+  /// again.
+  void _changed() {
+    final section = widget.location.section;
+    if (section == AdminSection.devices || section == AdminSection.people) {
+      unawaited(_count());
     }
   }
 
@@ -236,7 +269,7 @@ class _AdminShellState extends State<AdminShell> {
               repository: widget.repository,
               location: widget.location,
               onNavigate: widget.onNavigate,
-              onChanged: _count,
+              onChanged: _changed,
               timeZone: widget.timeZone,
               clock: widget.clock,
               saveTarget: widget.saveTarget,
