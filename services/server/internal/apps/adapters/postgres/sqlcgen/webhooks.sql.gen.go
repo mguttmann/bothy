@@ -113,6 +113,22 @@ func (q *Queries) DeleteWebhookDelivery(ctx context.Context, arg DeleteWebhookDe
 	return result.RowsAffected(), nil
 }
 
+const expireAllPending = `-- name: ExpireAllPending :execrows
+UPDATE webhook_deliveries SET status = 'dead', last_error = 'event_expired', next_attempt_at = NULL
+WHERE status = 'pending' AND event_seq <= $1
+`
+
+// bothy restore finalize (ADR 0059): every delivery still pending from the old timeline, at or
+// below the head of the restored log, becomes dead with event_expired in the caller's transaction,
+// so receivers get no event of the old timeline.
+func (q *Queries) ExpireAllPending(ctx context.Context, headSeq int64) (int64, error) {
+	result, err := q.db.Exec(ctx, expireAllPending, headSeq)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const expirePending = `-- name: ExpirePending :many
 UPDATE webhook_deliveries SET status = 'dead', last_error = 'event_expired', next_attempt_at = NULL
 WHERE subscription_id = $1 AND status = 'pending' AND event_seq < $2

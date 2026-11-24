@@ -336,5 +336,15 @@ func (r *Repository) MoveAllSubscriptionCursors(ctx context.Context, headSeq int
 	return q.MoveAllSubscriptionCursors(ctx, headSeq)
 }
 
+// ExpireAllPending ends every pending delivery at or below headSeq as dead with event_expired in
+// the unit of work of ctx (app.CursorMoveStore, bothy restore finalize) and returns their number.
+func (r *Repository) ExpireAllPending(ctx context.Context, headSeq int64) (int64, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return q.ExpireAllPending(ctx, headSeq)
+}
+
 // Compile-time check: Repository moves the cursors of bothy restore finalize.
 var _ app.CursorMoveStore = (*Repository)(nil)

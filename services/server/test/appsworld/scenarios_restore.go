@@ -103,3 +103,26 @@ func ScenarioWebhookCarriesEpochAfterRestore(t *testing.T) {
 		t.Fatalf("delivery of seq %d carries sync_epoch %q, want the new epoch %s", msg.Seq, got, res.SyncEpoch)
 	}
 }
+
+// ScenarioRestoreEndsPendingDeliveries (ADR 0059: server-side cursors catch up nothing from the
+// old timeline; AUD-P08B/2): a delivery still pending from the backup ends dead with
+// event_expired at bothy restore finalize and never reaches the receiver.
+func ScenarioRestoreEndsPendingDeliveries(t *testing.T) {
+	t.Parallel()
+	w := NewWorld(t)
+	_, _, created := subscribed(t, w, false)
+	sub := SubscriptionID(created)
+	esk(w, "Pending in the backup")
+	w.Round()
+	if d := w.Deliveries(sub); len(d) != 1 || d[0].Status != "pending" {
+		t.Fatalf("rows before finalize %+v", d)
+	}
+	w.FinalizeRestore()
+	if d := w.Deliveries(sub); len(d) != 1 || d[0].Status != "dead" || d[0].LastError != "event_expired" || d[0].NextAttemptAt != nil {
+		t.Fatalf("rows after finalize %+v", d)
+	}
+	w.Pump(5)
+	if n := len(w.Hooks().Got()); n != 0 {
+		t.Fatalf("the receiver got %d requests from the old timeline", n)
+	}
+}

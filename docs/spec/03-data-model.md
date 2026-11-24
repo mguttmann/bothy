@@ -3058,7 +3058,9 @@ with the same numbers. Therefore:
 1. `instance.sync_epoch` names the timeline. After every restore, `bothy restore finalize` sets
    a new UUIDv7, sets `agent_consumer_cursors.acked_seq`,
    `webhook_subscriptions.last_delivered_seq` and `event_consumer_cursors.last_seq` to the new
-   `head_seq` and writes an audit entry, all in one transaction.
+   `head_seq`, ends every `pending` row of `webhook_deliveries` as `dead` with `event_expired`
+   (webhooks catch up nothing from the old timeline, ADR 0059) and writes an audit entry, all in
+   one transaction.
 2. Clients store the epoch together with the cursor. If it differs, the server requires a resync
    ([04-sync-protocol.md](04-sync-protocol.md), section 7.5).
 3. A move without data loss ([16-operations.md](16-operations.md), section 11) keeps the epoch.

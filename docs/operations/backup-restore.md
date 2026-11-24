@@ -260,7 +260,8 @@ and to the replay time of a restore. The value bounds the data loss under low lo
    deleted after the target time is deleted again through the normal deletion, also the accounts
    of deletion requests completed after the target time; an error stops the command here and it
    can run again. Then, in one transaction: new `sync_epoch`, cursors of the agents, webhooks and
-   worker consumers to `head_seq`, `permission_version` raised once, the next number of the
+   worker consumers to `head_seq`, open webhook deliveries of the old timeline ended (`dead`,
+   `event_expired`), `permission_version` raised once, the next number of the
    journal stored, audit entry (03 section 6.7). It also stores the identity of the restored
    database (`instance.pg_system_identifier`, `instance.pg_timeline_id`, R-DM-50) in that
    transaction; on an error there nothing of it changes and the command can run again. It prints
