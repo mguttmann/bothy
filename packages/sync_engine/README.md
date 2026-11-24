@@ -198,8 +198,8 @@ through the `Fetcher` instead.
 | `message.deleted` | `messages` (tombstone), `reactions_summary`, `my_mentions`, `message_components`, `message_attachments`, `search_index` | version |
 | `reaction.added`, `reaction.removed` | `reactions_summary` | seq |
 | `pin.added`, `pin.removed` | `messages.pinned` | seq |
-| `thread.created`, `thread.updated`, `thread.closed`, `thread.reopened`, `thread.moved` | `threads`, `thread_tags`, `search_index` (title); with `deleted_at` the removal (D-DEL-5) | version |
-| `thread.moved_out` | everything of the thread (`removeTargets`) when it is still in the source channel | seq |
+| `thread.created`, `thread.updated`, `thread.closed`, `thread.reopened`, `thread.moved` | `threads`, `thread_tags`, `search_index` (title); a new channel moves the stored messages, attachments, runs, read state, drafts and search rows along (`moveContent`); with `deleted_at` the removal (D-DEL-5) | version |
+| `thread.moved_out` | everything of the thread (`removeTargets`) when it is still in the source channel, so the `thread.moved` before it (04 8.1) did not reach this device | seq |
 | `space.created`, `space.updated`, `space.archived` | `spaces`; with `deleted_at` the removal, the undo reloads the structure (D-DEL-5) | version |
 | `channel.created`, `channel.updated`, `channel.archived` | `channels` (`project_bound` included, R-DM-54), `channel_operators`; with `deleted_at` the removal, the undo reloads the structure (D-DEL-5) | version |
 | `run.state_changed` | `runs` | version |

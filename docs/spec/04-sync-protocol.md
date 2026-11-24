@@ -520,6 +520,12 @@ change the path or the read-only state of a resource. `channel.archived` and `sp
 in addition permission changes with their own `access.changed` (05, column "Permissions";
 [07-permissions.md](07-permissions.md), section 4.5); the others come without a new permission version.
 
+A move of a thread writes `thread.moved` (receive action `thread.read`, so only readers of the
+target get it) and then `thread.moved_out` (`channel.read` on the source) with the next `seq`. A
+client that sees the target already holds the thread there when `thread.moved_out` arrives and
+keeps it with its messages; a client that still holds the thread in the source channel removes it
+with its content (section 8.3, item 3).
+
 ### 8.2 What happens on a change
 
 Every transaction that changes permissions (grant, group, owner, operator, backend policy,

@@ -112,6 +112,52 @@ final class ThreadsDao {
         return true;
       });
 
+  /// Moves the stored rows below the thread [id] into the channel [channelId] of [spaceId] (null
+  /// for a direct message): messages, attachments, run summaries, the read state, drafts and
+  /// search rows. The server moves the content with the thread (`thread.move`, brief M1-62
+  /// note 1f) and the client learns only the thread's new channel, so a later removal of the
+  /// source channel (04 8.3) must not take the moved thread with it. Runs in one transaction.
+  Future<void> moveContent(
+    ThreadId id,
+    ChannelId channelId, {
+    SpaceId? spaceId,
+  }) => _db.transaction(() async {
+    final args = [
+      Variable<String>(channelId.value),
+      Variable<String>(id.value),
+    ];
+    for (final (table, info) in <(String, TableInfo<Table, Object?>)>[
+      ('messages', _db.messages),
+      ('message_attachments', _db.messageAttachments),
+      ('runs', _db.runs),
+      ('read_states', _db.readStates),
+      ('drafts', _db.drafts),
+    ]) {
+      await _db.customUpdate(
+        'UPDATE $table SET channel_id = ? WHERE thread_id = ?',
+        variables: args,
+        updates: {info},
+      );
+    }
+    // FTS5 columns are text; an absent space is stored as an empty text (`SearchDao`).
+    final search = [
+      Variable<String>(channelId.value),
+      Variable<String>(spaceId?.value ?? ''),
+      Variable<String>(id.value),
+    ];
+    await _db.customUpdate(
+      'UPDATE search_index SET channel_id = ?, space_id = ? WHERE rowid IN '
+      '(SELECT id FROM search_rows WHERE thread_id = ?)',
+      variables: search,
+      updates: {_db.searchIndex},
+    );
+    await _db.customUpdate(
+      'UPDATE search_rows SET channel_id = ?, space_id = ? WHERE thread_id = ?',
+      variables: search,
+      updates: {_db.searchRows},
+    );
+  });
+
   /// Records that the person has thread [id] on screen now; the cleanup keeps the content of
   /// a thread accessed within `client.cache_max_age` (15 6.3). A thread that is not stored is
   /// left alone. The write wakes no watcher of the threads: no value this package hands out

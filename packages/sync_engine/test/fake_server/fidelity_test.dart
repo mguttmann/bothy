@@ -173,7 +173,7 @@ void main() {
       expect(h.server.violations, isEmpty);
     });
 
-    test('writes thread.moved_out to the source before thread.moved and drops the tags', () async {
+    test('writes thread.moved to the target before thread.moved_out and drops the tags', () async {
       world.threads[h.seed.releaseNotes]!['tag_ids'] = ['tag-1'];
       final head = world.headSeq;
       final moved = (await threads.moveThread(
@@ -184,9 +184,9 @@ void main() {
       final events = world.eventsAfter(head).toList();
       expect(
         [for (final e in events) e.type],
-        ['thread.moved_out', 'thread.moved'],
+        ['thread.moved', 'thread.moved_out'],
       );
-      final out = events.first;
+      final out = events.last;
       expect(out.scope['channel_id'], h.seed.general);
       expect(out.envelope['resource'], {
         'kind': 'channel',
@@ -198,7 +198,7 @@ void main() {
       });
       // Sam sees only the source channel: he gets thread.moved_out, not thread.moved.
       expect(world.mayReceive(h.seed.sam.id, out), isTrue);
-      expect(world.mayReceive(h.seed.sam.id, events.last), isFalse);
+      expect(world.mayReceive(h.seed.sam.id, events.first), isFalse);
       expect(h.server.violations, isEmpty);
     });
   });

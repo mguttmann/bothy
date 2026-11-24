@@ -239,9 +239,9 @@ func TestMoveThreadSameChannel(t *testing.T) {
 	}
 }
 
-// TestMoveThreadEvents: exactly thread.moved_out and then thread.moved with consecutive seq; the
+// TestMoveThreadEvents: exactly thread.moved and then thread.moved_out with consecutive seq; the
 // thread.moved_out row names the target nowhere; both payloads validate against their schemas
-// and hold no JSON null (brief M1-62 note 1g).
+// and hold no JSON null (brief M1-62 note 1g, order by ruling AUD-PKG-P04/E1).
 func TestMoveThreadEvents(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t)
@@ -264,10 +264,10 @@ func TestMoveThreadEvents(t *testing.T) {
 		got = append(got, r)
 	}
 	must(t, rows.Err())
-	if len(got) != 2 || got[0].typ != "thread.moved_out" || got[1].typ != "thread.moved" || got[1].seq != got[0].seq+1 {
+	if len(got) != 2 || got[0].typ != "thread.moved" || got[1].typ != "thread.moved_out" || got[1].seq != got[0].seq+1 {
 		t.Fatalf("events %+v", got)
 	}
-	out, in := got[0], got[1]
+	in, out := got[0], got[1]
 	if strings.Contains(out.raw, w.eskalation.String()) {
 		t.Fatalf("thread.moved_out names the target: %s", out.raw)
 	}

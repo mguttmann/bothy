@@ -130,7 +130,10 @@ func movePlace(c ChannelRow) domain.MovePlace {
 
 // moveWrite performs the checked move of the locked thread th from source to target (brief M1-62
 // notes 1e to 1h): the thread row, the tags, ThreadMoved for the copies of messaging and sync,
-// thread.moved_out and thread.moved in this order, and the audit entry.
+// thread.moved and thread.moved_out in this order, and the audit entry. thread.moved comes first
+// so a client that sees both channels already holds the thread in the target when
+// thread.moved_out arrives and keeps it; a client that holds it in the source still removes it
+// (04 8.1, ruling AUD-PKG-P04/E1).
 func (s *Service) moveWrite(ctx context.Context, th domain.Thread, source, target ChannelRow, reason string) (chat.Thread, error) {
 	moved, err := s.d.Store.MoveThread(ctx, th.ID, target.Channel.ID, s.now())
 	if err != nil {
@@ -149,10 +152,10 @@ func (s *Service) moveWrite(ctx context.Context, th domain.Thread, source, targe
 	if err != nil {
 		return chat.Thread{}, err
 	}
-	if err := s.emitMovedOut(ctx, th.ID, source); err != nil {
+	if err := s.emitMoved(ctx, v, source.Channel.ID, target.Channel.SpaceID); err != nil {
 		return chat.Thread{}, err
 	}
-	if err := s.emitMoved(ctx, v, source.Channel.ID, target.Channel.SpaceID); err != nil {
+	if err := s.emitMovedOut(ctx, th.ID, source); err != nil {
 		return chat.Thread{}, err
 	}
 	return v, s.d.Audit.Record(ctx, auditing.Entry{

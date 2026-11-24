@@ -191,8 +191,8 @@ extension ThreadViewWorld on FakeWorld {
   /// `moveThread`: moves [threadId] into [targetChannelId] (05 `thread.move`: `manage` on
   /// source and target; the same effective operator, else `409 operator_mismatch`); the ID
   /// stays. As the server (`moveWrite`): the tags of the thread are removed, then
-  /// `thread.moved_out` goes to the source channel (without a version and without the
-  /// target) and `thread.moved` with the source channel to the target.
+  /// `thread.moved` with the source channel goes to the target and `thread.moved_out` to the
+  /// source channel (without a version and without the target).
   JsonMap moveThread(
     String principalId,
     String threadId,
@@ -225,13 +225,6 @@ extension ThreadViewWorld on FakeWorld {
       if (run['thread_id'] == threadId) run['channel_id'] = targetChannelId;
     }
     append(
-      'thread.moved_out',
-      resource: {'kind': 'channel', 'id': source},
-      scope: {'space_id': ?channels[source]!.spaceId, 'channel_id': source},
-      payload: {'thread_id': threadId, 'channel_id': source},
-      actor: principalId,
-    );
-    append(
       'thread.moved',
       resource: {
         'kind': 'thread',
@@ -240,6 +233,13 @@ extension ThreadViewWorld on FakeWorld {
       },
       scope: _scopeOf(threadId),
       payload: {'thread': thread, 'from_channel_id': source},
+      actor: principalId,
+    );
+    append(
+      'thread.moved_out',
+      resource: {'kind': 'channel', 'id': source},
+      scope: {'space_id': ?channels[source]!.spaceId, 'channel_id': source},
+      payload: {'thread_id': threadId, 'channel_id': source},
       actor: principalId,
     );
     return thread;
