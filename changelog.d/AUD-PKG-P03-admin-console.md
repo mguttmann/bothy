@@ -34,8 +34,9 @@
   console instead of nothing.
 - When the console cannot read its session after a step-up or after starting "View as person", it
   says so instead of staying on the old screen.
-- The confirmation of an action in the console uses a challenge created after the person answered
-  the dialog, so a slow answer no longer fails a correct password.
+- The confirmation of an action in the console takes a new challenge when the person needed
+  more than half of the first one's lifetime, so a slow answer no longer fails a correct
+  password.
 - When the server ends a stored "View as person" before the browser's clock does, the console
   reads its session instead of asking for a step-up.
 - The console reads the profile and instance view again after a failed read, ignores a late

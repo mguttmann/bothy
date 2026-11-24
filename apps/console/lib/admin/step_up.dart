@@ -113,7 +113,15 @@ class ConsoleActionStepUp {
     required this.prompt,
     required this.onOidc,
     required this.onConfirmed,
-  });
+    DateTime Function()? clock,
+  }) : _clock = clock ?? DateTime.now;
+
+  /// Renews the challenge when the person answered after half of this long at the latest: the
+  /// default of `auth.step_up_challenge_ttl` caps the lifetime the console reads from
+  /// `expires_at`, so a browser clock that runs behind never keeps an expired challenge.
+  static const Duration challengeLifeCap = Duration(minutes: 2);
+
+  final DateTime Function() _clock;
 
   /// The console's API.
   final ApiClient Function() api;
@@ -137,6 +145,13 @@ class ConsoleActionStepUp {
   final Future<void> Function() onConfirmed;
 
   static const Map<String, Object?> _own = {consoleNoStepUpExtra: true};
+
+  /// Whether [challenge], received at [issued], is too old to confirm over now.
+  bool _stale(StepUpChallenge challenge, DateTime issued) {
+    var life = challenge.expiresAt.difference(issued);
+    if (life > challengeLifeCap) life = challengeLifeCap;
+    return _clock().difference(issued) * 2 >= life;
+  }
 
   Future<void>? _running;
 
@@ -162,6 +177,7 @@ class ConsoleActionStepUp {
     if (dialog == null) throw const StepUpCancelled();
     final auth = api().getAuthApi();
     final challenge = (await auth.createStepUpChallenge(extra: _own)).data!;
+    final issued = _clock();
     final available = methods();
     final options = challenge.passkeyOptions;
     final ways = ConsoleStepUpWays(
@@ -178,10 +194,12 @@ class ConsoleActionStepUp {
       onOidc(answer.provider);
       throw const StepUpCancelled();
     }
-    // The first challenge only told which ways there are. The person may take longer than
-    // `auth.step_up_challenge_ttl` in the dialog, so the confirmation runs over a challenge
-    // created after the answer, as packages/auth does.
-    final fresh = (await auth.createStepUpChallenge(extra: _own)).data!;
+    // The person may take longer than `auth.step_up_challenge_ttl` in the dialog: after half
+    // of the challenge's lifetime the confirmation runs over a new one. A quick answer keeps
+    // the first, because every challenge counts in `rl.public_auth` of the client address.
+    final fresh = _stale(challenge, issued)
+        ? (await auth.createStepUpChallenge(extra: _own)).data!
+        : challenge;
     switch (answer) {
       case StepUpWithPasskey():
         final freshOptions = fresh.passkeyOptions;

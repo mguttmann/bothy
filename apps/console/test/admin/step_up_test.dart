@@ -31,6 +31,9 @@ class FakePrompt implements ConsoleStepUpPrompt {
 
 /// The API of a console whose action step-up uses [prompt] over [b].
 class Harness {
+  /// The console's clock: two minutes before the `expires_at` of the fake challenge.
+  DateTime now = DateTime.utc(2026, 10, 10, 9, 33);
+
   Harness(
     this.b,
     this.prompt, {
@@ -69,6 +72,7 @@ class Harness {
       prompt: () => prompt,
       onOidc: oidc.add,
       onConfirmed: () async => confirmed++,
+      clock: () => now,
     );
     client = createConsoleApiClient(
       origin: Uri.parse('https://chat.example.com'),
@@ -127,37 +131,55 @@ void stepUpFirst(FakeServer server, String route, {int times = 1}) {
 }
 
 void main() {
+  /// A password step-up over [h] whose prompt answers after [delay] on the console's clock;
+  /// returns the number of challenges and the challenge the confirmation used.
+  Future<(int, Object?)> passwordStepUp(Duration delay) async {
+    final b = TestBrowser();
+    late final Harness h;
+    final prompt = _DelayedPrompt(
+      const StepUpWithPassword('secret-1', ' 492039 '),
+      () => h.now = h.now.add(delay),
+    );
+    h = Harness(
+      b,
+      prompt,
+      methods: const [StepUpMethod.passwordTotp],
+      passkeyOptions: false,
+    );
+    var issued = 0;
+    b.server.routes['POST /api/v1/auth/step-up/challenge'] = (_) {
+      issued++;
+      return Answer(200, {
+        'challenge_id': '0192f4a0-7b1c-747c-835d-13eca158d3c$issued',
+        'challenge': 'Zm9vYmFy',
+        'expires_at': '2026-10-10T09:35:00.000Z',
+      });
+    };
+    stepUpFirst(b.server, 'POST /api/v1/groups');
+    await h.createGroup();
+    final confirm = b.server.to('POST', '/api/v1/auth/step-up/password').single;
+    return (issued, (confirm.body! as Map)['challenge_id']);
+  }
+
   test(
-    'the confirmation uses a challenge created after the dialog answered',
+    'a slow answer confirms over a challenge created after the dialog answered',
     () async {
       // fn-sign-in-devices-15: a person who needs longer than auth.step_up_challenge_ttl in the
       // dialog must not confirm over an expired challenge.
-      final b = TestBrowser();
-      final h = Harness(
-        b,
-        FakePrompt(const StepUpWithPassword('secret-1', ' 492039 ')),
-        methods: const [StepUpMethod.passwordTotp],
-        passkeyOptions: false,
-      );
-      var issued = 0;
-      b.server.routes['POST /api/v1/auth/step-up/challenge'] = (_) {
-        issued++;
-        return Answer(200, {
-          'challenge_id': '0192f4a0-7b1c-747c-835d-13eca158d3c$issued',
-          'challenge': 'Zm9vYmFy',
-          'expires_at': '2026-10-10T09:35:00.000Z',
-        });
-      };
-      stepUpFirst(b.server, 'POST /api/v1/groups');
-      await h.createGroup();
+      final (issued, used) = await passwordStepUp(const Duration(seconds: 90));
       expect(issued, 2);
-      final confirm = b.server
-          .to('POST', '/api/v1/auth/step-up/password')
-          .single;
-      expect(
-        (confirm.body! as Map)['challenge_id'],
-        '0192f4a0-7b1c-747c-835d-13eca158d3c2',
-      );
+      expect(used, '0192f4a0-7b1c-747c-835d-13eca158d3c2');
+    },
+  );
+
+  test(
+    'a quick answer confirms over the first challenge, without a second one',
+    () async {
+      // Every challenge counts in rl.public_auth of the client address (burst 10): two per
+      // step-up ran the administration suites of console-e2e into 429.
+      final (issued, used) = await passwordStepUp(const Duration(seconds: 5));
+      expect(issued, 1);
+      expect(used, '0192f4a0-7b1c-747c-835d-13eca158d3c1');
     },
   );
 
@@ -398,4 +420,17 @@ void main() {
     expect((error! as DioException).response?.statusCode, 401);
     expect(h.prompt.purposes, isEmpty);
   });
+}
+
+/// A prompt that runs [onAsk] (the time the person needs) before it answers.
+class _DelayedPrompt extends FakePrompt {
+  _DelayedPrompt(super.answer, this.onAsk);
+
+  final void Function() onAsk;
+
+  @override
+  Future<ConsoleStepUpAnswer?> ask(String purpose, ConsoleStepUpWays w) {
+    onAsk();
+    return super.ask(purpose, w);
+  }
 }
