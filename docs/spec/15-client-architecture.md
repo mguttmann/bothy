@@ -541,8 +541,8 @@ changes (docs/decisions.d/AUD-client-settings-01.md).
   `Retry-After` above `client.outbox_retry_cap` goes to the caller instead of a wait); the
   outbox retries writes. The apps' client has the connect timeout `client.http_connect_timeout`
   and the receive timeout `client.http_receive_timeout` and no send timeout, so a connection that
-  accepts and stays silent ends the request (and frees its outbox lane) as a network error. An outbox executor that reads within an attempt opts out of the read
-  retry, so a refused read is retried once, with its entry ([12](12-files.md) 3.8). In the
+  accepts and stays silent ends the request (and frees its outbox lane) as a network error. An
+  outbox executor that reads within an attempt opts out of the read retry, so a refused read is retried once, with its entry ([12](12-files.md) 3.8). In the
   agent interface the read retry is the one place that repeats a refused read: the provider
   that passes the failure of a read on (the document of an ended run) turns off the retry of
   Riverpod, and the read a person waits for in a dialog (`/status`, `/resume`) opts out of the
@@ -584,8 +584,8 @@ changes (docs/decisions.d/AUD-client-settings-01.md).
   refreshed before its proof hashes the token, and each interceptor answers only its own problem
   code (`token_expired`, `use_dpop_nonce`, `invalid_dpop_proof`, `step_up_required`) with at most
   one repeat each. A repeat stays without the `StepUpInterceptor` when the request came
-  through a client without it (the terminal's, 23.1). On `invalid_dpop_proof` the proof is signed anew (new `iat`, new `jti`, the
-  current nonce); the error never ends the session, because the server revokes nothing for it
+  through a client without it (the terminal's, 23.1). On `invalid_dpop_proof` the proof is
+  signed anew (new `iat`, new `jti`, the current nonce); the error never ends the session, because the server revokes nothing for it
   ([08](08-identity.md) section 7.3). A refresh request has connect, send and receive timeouts
   that end it well before `auth.dpop_proof_max_age`, so a request held while the device sleeps
   fails as a network error instead of arriving minutes later with an expired proof. A request
