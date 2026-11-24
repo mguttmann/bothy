@@ -1015,7 +1015,10 @@ system roots, proxy from the environment, and never skips the verification. It p
 protocol version both sides support (none: it stops and logs "update the host service or the
 server", with the update route of its package, as after `4114`; [18-release.md](18-release.md)
 9.1). It sends `heartbeat` every `heartbeat_interval_ms` and treats `heartbeat_interval_ms`
-times (`heartbeat_miss_limit` + 1) without a frame of the server as a dead connection.
+times (`heartbeat_miss_limit` + 1) without a frame of the server as a dead connection. Before
+`hello` a fixed bound of the program holds one attempt: the dial with TLS and the upgrade, then
+the wait for `hello`; a server, proxy or edge that accepts and stays silent past it counts as
+unreachable and the attempt is retried with the backoff.
 `is_server_host` is HD5 or the peer of the connection is an address of the host itself (2.3). Its
 reaction per close code: `1000`, `1001`, `4000`, `4002`, `4009`, `4014`, `4113` and any unknown
 code reconnect with exponential backoff with full jitter from
@@ -2544,6 +2547,9 @@ Column "Place": Server = configuration reference of the server; Host service = c
 | `host_service.local_confirm_timeout` | Host service | `60s` | Deadline for the consent on the host |
 | `host_service.reconnect_backoff_base` | Host service | `1s` | first delay of the exponential backoff with full jitter before a new control connection (3.5) |
 | `host_service.reconnect_backoff_cap` | Host service | `5m` | largest delay of that backoff; also the total time the login of a refused start keeps trying (3.5) |
+
+Every duration of `host_service` is above zero: the host service refuses a configuration with a
+zero duration at its start (`config_invalid`), naming the key.
 
 Values of other chapters that this chapter refers to: `auth.clock_leeway`
 ([08-identity.md](08-identity.md)), `cluster.mode` ([02-architecture.md](02-architecture.md)),

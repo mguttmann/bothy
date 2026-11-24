@@ -19,6 +19,7 @@ const (
 	msgClosed       = "control connection closed"
 	msgUpdate       = "update the host service or the server"
 	msgServerError  = "server answered an op with an error"
+	msgNoHello      = "server sent no hello in time"
 	logCode         = "code"
 	logOp           = "op"
 	reasonNoVersion = "no common protocol version"
@@ -190,7 +191,16 @@ func (k *conn) end(err error) outcome {
 // serve runs the login and the ops of one connection (Design note 12 b to e of M2-43).
 func (k *conn) serve(ctx context.Context) outcome {
 	c := k.c
-	f, ok := <-k.frames
+	wait := c.cfg.Clock.NewTimer(c.handshakeTimeout())
+	var f frameOrEnd
+	ok := false
+	select {
+	case f, ok = <-k.frames:
+		wait.Stop()
+	case <-wait.C():
+		c.log.LogAttrs(ctx, slog.LevelWarn, msgNoHello)
+		return outcome{Reaction: Reaction{Kind: Backoff}}
+	}
 	if !ok || f.err != nil {
 		return k.end(f.err)
 	}

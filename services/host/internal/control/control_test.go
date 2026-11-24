@@ -674,3 +674,62 @@ func TestLaterReadiesApplyInOrder(t *testing.T) {
 		t.Errorf("applied %v, want %v", applied, want)
 	}
 }
+
+// TestHandshakeIsBounded (audit host-service-3): a server that accepts the TCP connection and
+// never answers, and one that upgrades and never sends hello, do not hold the client: after
+// HandshakeTimeout it gives the connection up and dials again.
+func TestHandshakeIsBounded(t *testing.T) {
+	t.Parallel()
+	const bound = 200 * time.Millisecond
+	t.Run("silent TCP peer", func(t *testing.T) {
+		t.Parallel()
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = ln.Close() })
+		accepted := make(chan net.Conn, 4)
+		go func() {
+			for {
+				nc, err := ln.Accept()
+				if err != nil {
+					return
+				}
+				accepted <- nc // never answers
+			}
+		}()
+		c, err := control.New(control.Config{ServerURL: "https://" + ln.Addr().String(), HostID: hostID, AuthKey: key(), HostVersion: "1.0.0",
+			BackoffBase: base, BackoffCap: capDelay, HandshakeTimeout: bound}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = c.Close() })
+		go func() { _, _ = c.Login(context.Background()) }()
+		for i := range 2 {
+			select {
+			case nc := <-accepted:
+				t.Cleanup(func() { _ = nc.Close() })
+			case <-ctx(t).Done():
+				t.Fatalf("connection %d never came: the first dial hangs", i+1)
+			}
+		}
+	})
+	t.Run("no hello", func(t *testing.T) {
+		t.Parallel()
+		srv := controltest.New(t)
+		c, err := control.New(control.Config{ServerURL: srv.URL, HostID: hostID, AuthKey: key(), HostVersion: "1.0.0", BackoffBase: base,
+			BackoffCap: capDelay, RootCAs: srv.Pool, HandshakeTimeout: bound}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = c.Close() })
+		go func() { _, _ = c.Login(context.Background()) }()
+		first := srv.Accept(ctx(t)) // never sends hello
+		select {
+		case <-first.Done():
+		case <-ctx(t).Done():
+			t.Fatal("the client kept a connection without hello")
+		}
+		srv.Accept(ctx(t))
+	})
+}

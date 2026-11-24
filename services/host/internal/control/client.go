@@ -64,7 +64,15 @@ type Config struct {
 	// (buildinfo.UpdatePath); the client logs it in one line when the server refuses the version
 	// with 4114 or shares no protocol version (docs/spec/18-release.md 9.1).
 	UpdatePath string
+	// HandshakeTimeout bounds one login up to hello: the dial with TLS and the upgrade, then the
+	// wait for hello. A server, proxy or edge that accepts the connection and stays silent would
+	// otherwise hold the client offline without a new attempt. Zero means DefaultHandshakeTimeout.
+	HandshakeTimeout time.Duration
 }
+
+// DefaultHandshakeTimeout is the bound of HandshakeTimeout: a program constant of the dial, not a
+// product window; the heartbeats of hello bound the connection after it.
+const DefaultHandshakeTimeout = 30 * time.Second
 
 // Client is the control connection of the host service. It implements startup.Control. It is
 // safe for concurrent use.
@@ -378,7 +386,8 @@ func (c *Client) dial(ctx context.Context) (*websocket.Conn, net.IP, error) {
 		}
 		return nc, err
 	}
-	hc := &http.Client{Transport: tr, CheckRedirect: c.http.CheckRedirect} // nosemgrep: bothy-go-egress-only -- the transport of New with the address recorded for PeerIsLocal (24 2.3)
+	// websocket.Dial turns Timeout into a deadline of the handshake alone (TCP, TLS, upgrade).
+	hc := &http.Client{Transport: tr, CheckRedirect: c.http.CheckRedirect, Timeout: c.handshakeTimeout()} // nosemgrep: bothy-go-egress-only -- the transport of New with the address recorded for PeerIsLocal (24 2.3)
 	ws, resp, err := websocket.Dial(ctx, c.url, &websocket.DialOptions{HTTPClient: hc, CompressionMode: websocket.CompressionDisabled})
 	if resp != nil && resp.Body != nil {
 		_ = resp.Body.Close()
@@ -389,6 +398,14 @@ func (c *Client) dial(ctx context.Context) (*websocket.Conn, net.IP, error) {
 	mu.Lock()
 	defer mu.Unlock()
 	return ws, remote, nil
+}
+
+// handshakeTimeout is HandshakeTimeout or its default.
+func (c *Client) handshakeTimeout() time.Duration {
+	if c.cfg.HandshakeTimeout > 0 {
+		return c.cfg.HandshakeTimeout
+	}
+	return DefaultHandshakeTimeout
 }
 
 // connect runs one connection to its end (Design note 12 a to f of M2-43).
