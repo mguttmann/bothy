@@ -278,3 +278,16 @@ func TestReconnectBackoffKeys(t *testing.T) {
 		}
 	}
 }
+
+// TestDurationsAboveZero (audit host-service-9): a zero bound or interval is refused with the key
+// named; credential_check_interval 0s would run the checks back to back, local_confirm_timeout 0s
+// would refuse every opening.
+func TestDurationsAboveZero(t *testing.T) {
+	for _, key := range []string{"credential_check_interval", "entry_scan_timeout", "auth_status_timeout", "local_confirm_timeout"} {
+		_, err := Parse([]byte("host_service:\n  "+key+": 0s\n"), linux)
+		var ke *KeyError
+		if !errors.As(err, &ke) || ke.Key != "host_service."+key {
+			t.Errorf("%s 0s: %v, want a KeyError of the key", key, err)
+		}
+	}
+}

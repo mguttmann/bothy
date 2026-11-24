@@ -85,7 +85,7 @@ const (
 	pointerName   = "/name"
 )
 
-// errNotObject is the detail of a configuration that is no JSON object.
+// detailNotObject is the detail of a configuration that is no JSON object.
 const detailNotObject = "The configuration must be a JSON object."
 
 // NewName returns the trimmed provider name. Errors: validation_failed at /name when it is empty

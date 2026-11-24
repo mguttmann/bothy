@@ -15,6 +15,7 @@ import (
 	"github.com/OWNER/bothy/services/host/internal/buildinfo"
 	"github.com/OWNER/bothy/services/host/internal/config"
 	"github.com/OWNER/bothy/services/host/internal/control"
+	"github.com/OWNER/bothy/services/host/internal/localchan"
 	"github.com/OWNER/bothy/services/host/internal/profiles"
 	"github.com/OWNER/bothy/services/host/internal/startup"
 	"github.com/OWNER/bothy/services/host/internal/state"
@@ -118,6 +119,10 @@ func runService(ctx context.Context, cfgPath string, once bool, stderr io.Writer
 		log.WarnContext(ctx, "log file unavailable")
 	}
 	admin, err := sys.listenAdmin(st.File(state.AdminSocket))
+	if errors.Is(err, localchan.ErrAdminInUse) {
+		log.ErrorContext(ctx, "another instance of the host service runs with this state directory")
+		return exitFailed
+	}
 	if err != nil {
 		log.ErrorContext(ctx, "admin endpoint unavailable")
 		return exitFailed

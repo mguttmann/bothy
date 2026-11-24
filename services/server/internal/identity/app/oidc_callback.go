@@ -172,7 +172,7 @@ func (o *OIDC) failCallback(ctx context.Context, f LoginFlowRecord, code, cause 
 	return withQuery(f.AppRedirectURI, url.Values{queryError: {code}, queryLoginAttemptID: {f.ID.String()}})
 }
 
-// appRedirect appends params to the app redirect URI, keeping its own query.
+// withQuery appends params to the app redirect URI, keeping its own query.
 func withQuery(base string, params url.Values) (string, error) {
 	u, err := url.Parse(base)
 	if err != nil {

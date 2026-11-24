@@ -58,8 +58,9 @@ type Events interface {
 // ErrUnreachable is the answer of NoControl: the host cannot reach the server (24 2.2).
 var ErrUnreachable = errors.New("startup: server unreachable")
 
-// NoControl is the Control of this ticket: every Login fails with ErrUnreachable, so run behaves
-// like a host that cannot reach the server until M2-43 replaces the wiring.
+// NoControl is the Control of a host without a usable pairing (no record, or keys or CA that
+// cannot be read) and of doctor-once: every Login fails with ErrUnreachable, so run behaves like a
+// host that cannot reach the server.
 type NoControl struct{}
 
 // Login implements Control.

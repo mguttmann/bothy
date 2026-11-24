@@ -155,18 +155,45 @@ func handoff(c net.Conn, allowUID string) (*net.UnixConn, error) {
 	return fdConn(fds[0])
 }
 
-// ListenAdmin opens the admin endpoint at path (a Unix socket in the state directory).
+// ListenAdmin opens the admin endpoint at path (a Unix socket in the state directory). It first
+// takes an exclusive lock on path.lock, held until the listener closes, so a second run with the
+// same state directory fails with ErrAdminInUse before it touches the socket of the first.
 func ListenAdmin(path string) (net.Listener, error) {
+	lock, err := os.OpenFile(path+".lock", os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // G304: a fixed name in the state directory
+	if err != nil {
+		return nil, fmt.Errorf("localchan: admin endpoint: %w", err)
+	}
+	if err := unix.Flock(int(lock.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
+		_ = lock.Close()
+		if errors.Is(err, unix.EWOULDBLOCK) {
+			return nil, ErrAdminInUse
+		}
+		return nil, fmt.Errorf("localchan: admin endpoint: %w", err)
+	}
 	_ = os.Remove(path) // a stale socket of an earlier run
 	l, err := (&net.ListenConfig{}).Listen(context.Background(), "unix", path)
 	if err != nil {
+		_ = lock.Close()
 		return nil, fmt.Errorf("localchan: admin endpoint: %w", err)
 	}
 	if err := os.Chmod(path, 0o600); err != nil {
 		_ = l.Close()
+		_ = lock.Close()
 		return nil, fmt.Errorf("localchan: admin endpoint: %w", err)
 	}
-	return l, nil
+	return &lockedListener{Listener: l, lock: lock}, nil
+}
+
+// lockedListener releases the lock of the admin endpoint with the listener.
+type lockedListener struct {
+	net.Listener
+	lock *os.File
+}
+
+func (l *lockedListener) Close() error {
+	err := l.Listener.Close()
+	_ = l.lock.Close()
+	return err
 }
 
 // ServeAdmin serves the admin endpoint: only clients with uid allowUID (root, "0") are answered.

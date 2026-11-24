@@ -8,7 +8,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"io"
+	"log/slog"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -672,5 +677,150 @@ func TestLaterReadiesApplyInOrder(t *testing.T) {
 	}
 	if want := []string{"personal", "organization"}; !slices.Equal(applied, want) {
 		t.Errorf("applied %v, want %v", applied, want)
+	}
+}
+
+// TestHandshakeIsBounded (audit host-service-3): a server that accepts the TCP connection and
+// never answers, and one that upgrades and never sends hello, do not hold the client: after
+// HandshakeTimeout it gives the connection up and dials again.
+func TestHandshakeIsBounded(t *testing.T) {
+	t.Parallel()
+	const bound = 200 * time.Millisecond
+	t.Run("silent TCP peer", func(t *testing.T) {
+		t.Parallel()
+		ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = ln.Close() })
+		accepted := make(chan net.Conn, 4)
+		go func() {
+			for {
+				nc, err := ln.Accept()
+				if err != nil {
+					return
+				}
+				accepted <- nc // never answers
+			}
+		}()
+		c, err := control.New(control.Config{ServerURL: "https://" + ln.Addr().String(), HostID: hostID, AuthKey: key(), HostVersion: "1.0.0",
+			BackoffBase: base, BackoffCap: capDelay, HandshakeTimeout: bound}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = c.Close() })
+		go func() { _, _ = c.Login(context.Background()) }()
+		for i := range 2 {
+			select {
+			case nc := <-accepted:
+				t.Cleanup(func() { _ = nc.Close() })
+			case <-ctx(t).Done():
+				t.Fatalf("connection %d never came: the first dial hangs", i+1)
+			}
+		}
+	})
+	t.Run("no hello", func(t *testing.T) {
+		t.Parallel()
+		srv := controltest.New(t)
+		c, err := control.New(control.Config{ServerURL: srv.URL, HostID: hostID, AuthKey: key(), HostVersion: "1.0.0", BackoffBase: base,
+			BackoffCap: capDelay, RootCAs: srv.Pool, HandshakeTimeout: bound}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = c.Close() })
+		go func() { _, _ = c.Login(context.Background()) }()
+		first := srv.Accept(ctx(t)) // never sends hello
+		select {
+		case <-first.Done():
+		case <-ctx(t).Done():
+			t.Fatal("the client kept a connection without hello")
+		}
+		srv.Accept(ctx(t))
+	})
+}
+
+// TestServerHostFlagNotFromProxy (audit host-service-12, 24 section 2.3): through a proxy the TCP
+// peer is the proxy, not the server; a proxy on loopback does not make the host the server host.
+func TestServerHostFlagNotFromProxy(t *testing.T) {
+	t.Parallel()
+	srv := controltest.New(t)
+	proxy := connectProxy(t)
+	c, err := control.New(control.Config{ServerURL: srv.URL, HostID: hostID, AuthKey: key(), HostVersion: "1.0.0", BackoffBase: base,
+		BackoffCap: capDelay, RootCAs: srv.Pool, Proxy: func(*http.Request) (*url.URL, error) { return proxy, nil }}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+	go func() { _, _ = c.Login(ctx(t)) }()
+	conn, _ := handshake(t, srv, 60000, "none")
+	if err := c.Report(ctx(t), sampleReport("Debian 13")); err != nil {
+		t.Fatal(err)
+	}
+	var r startup.Report
+	if err := controltest.Strict(conn.Expect(t, ctx(t), "report"), &r); err != nil || r.IsServerHost {
+		t.Fatalf("is_server_host through a loopback proxy %+v %v", r, err)
+	}
+}
+
+// connectProxy starts an HTTP CONNECT proxy on loopback and returns its URL.
+func connectProxy(t *testing.T) *url.URL {
+	t.Helper()
+	ps := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodConnect {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		up, err := (&net.Dialer{}).DialContext(r.Context(), "tcp", r.Host)
+		if err != nil {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		down, _, err := http.NewResponseController(w).Hijack()
+		if err != nil {
+			_ = up.Close()
+			return
+		}
+		go func() { _, _ = io.Copy(up, down); _ = up.Close() }()
+		_, _ = io.Copy(down, up)
+		_ = down.Close()
+	}))
+	t.Cleanup(ps.Close)
+	u, err := url.Parse(ps.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u
+}
+
+// TestUnreachableNamesTheCause (audit host-service-14): "server unreachable" carries a fixed code
+// of the error class, never an address.
+func TestUnreachableNamesTheCause(t *testing.T) {
+	t.Parallel()
+	srv := controltest.New(t)
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed := ln.Addr().String()
+	_ = ln.Close()
+	for url, want := range map[string]string{srv.URL: "tls_unknown_authority", "https://" + closed: "refused"} {
+		var buf syncBuffer
+		c, err := control.New(control.Config{ServerURL: url, HostID: hostID, AuthKey: key(), HostVersion: "1.0.0", BackoffBase: base,
+			BackoffCap: capDelay, Log: slog.New(slog.NewJSONHandler(&buf, nil))}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := c.Login(ctx(t)); !errors.Is(err, startup.ErrUnreachable) {
+			t.Errorf("%s: %v", want, err)
+		}
+		_ = c.Close()
+		out := buf.String()
+		if !strings.Contains(out, `"msg":"server unreachable","cause":"`+want+`"`) {
+			t.Errorf("want cause %s in %s", want, out)
+		}
+		if strings.Contains(out, "127.0.0.1") {
+			t.Errorf("an address in the log: %s", out)
+		}
 	}
 }

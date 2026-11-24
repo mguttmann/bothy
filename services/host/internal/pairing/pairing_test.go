@@ -19,11 +19,13 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/OWNER/bothy/services/host/internal/config"
 	"github.com/OWNER/bothy/services/host/internal/doctor"
 	"github.com/OWNER/bothy/services/host/internal/fingerprint"
 	"github.com/OWNER/bothy/services/host/internal/hostos/hostostest"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/host/internal/state"
 )
 
@@ -290,5 +292,31 @@ func TestPairStoresServerCA(t *testing.T) {
 	}
 	if got, err := o.State.ReadServerCA(); err != nil || got != nil {
 		t.Fatalf("removed CA %q %v", got, err)
+	}
+}
+
+// TestPairIsBounded (audit host-service-11): a server that takes the request and never answers
+// does not hold pair (and the admin endpoint that runs it): after Timeout pair fails as
+// unreachable and stores nothing.
+func TestPairIsBounded(t *testing.T) {
+	release := make(chan struct{})
+	_, o := setup(t, func(map[string]any) (int, any) {
+		<-release
+		return http.StatusServiceUnavailable, nil
+	})
+	t.Cleanup(func() { close(release) })
+	o.Timeout = 200 * time.Millisecond
+	done := make(chan error, 1)
+	go func() { _, err := Pair(context.Background(), o); done <- err }()
+	select {
+	case err := <-done:
+		if err == nil || !strings.Contains(err.Error(), "server unreachable") {
+			t.Fatalf("pair: %v, want server unreachable", err)
+		}
+	case <-time.After(testkit.Patience):
+		t.Fatal("pair waits for a silent server")
+	}
+	if _, err := os.Stat(o.State.File(state.KeysFile)); !errors.Is(err, os.ErrNotExist) {
+		t.Error("keys stored without an answer")
 	}
 }
