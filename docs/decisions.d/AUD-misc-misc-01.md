@@ -40,6 +40,13 @@ Platform runs (V1-13), read from run 42556146760 of 2026-11-09 on commit `7c46cb
   `win.profile <session user>: profile 80070070` (the disk is full). Either the profiles of
   earlier tests stay behind or the system drive of the runner is too small for the suite.
 - macOS: the tests after `TestPlatform_EntryScanMeasurement` have never run on a hosted runner.
+- Linux, cause not known, read from run 45105747612 of 2026-11-23 (after the reset of `/opt` of
+  ruling 1): `helper_untrusted` is gone, but the eight tests that set `claude_bin` or working
+  directories below the folder of the suite fail with `claude_bin_untrusted`,
+  `program_location_untrusted` and `shared_location` for both session users, which points to a
+  folder on the way to `/opt/bothy-platform` that a session user can write. Since
+  AUD-PKG-P10-repo-ops-host a failed job prints the owner, mode and ACL of every folder on the way
+  to the program folders (and the free disk space on Windows), so the next red run names the place.
 - No run on a Windows 10 or Windows 11 machine is recorded (M2 exit criterion 8, TM-T29 (i)).
 - A failed scheduled run of `host-platform.yml` reports to nobody. AUD-misc-testing-01 built the
   report (`red-runs.yml`); it writes the issue "Red runs of host-platform.yml" only once the
