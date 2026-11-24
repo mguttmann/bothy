@@ -84,7 +84,7 @@ final class TerminalStreamFake {
           }
           final failure = _identify(message, session, path);
           if (failure != null) {
-            close(4004, failure);
+            close(failure.code, failure.reason);
             break;
           }
           // 24 6.2: one device stream per session; an older one of the same device gives way.
@@ -154,8 +154,24 @@ final class TerminalStreamFake {
     }
   }
 
-  /// Checks `terminal.identify` in [text]; returns the failure, or null when it passes.
-  String? _identify(String text, FakeTerminalSession session, String path) {
+  /// Checks `terminal.identify` in [text]; returns the close code and reason of the failure,
+  /// or null when it passes. As the server (24 5): a revoked session or device closes with
+  /// `4012`, every other failure (an expired token included) with `4004`.
+  ({int code, String reason})? _identify(
+    String text,
+    FakeTerminalSession session,
+    String path,
+  ) {
+    final reason = _identifyFailure(text, session, path);
+    if (reason == null) return null;
+    return (code: reason == 'revoked' ? 4012 : 4004, reason: reason);
+  }
+
+  String? _identifyFailure(
+    String text,
+    FakeTerminalSession session,
+    String path,
+  ) {
     final Object? json;
     try {
       json = jsonDecode(text);
@@ -174,7 +190,14 @@ final class TerminalStreamFake {
           (s) => s.accessToken == token || s.olderAccessTokens.contains(token),
         )
         .firstOrNull;
-    if (login == null || login.revoked) return 'unknown token';
+    if (login == null) return 'unknown token';
+    if (login.revoked || world.devices[login.deviceId]?.state == 'revoked') {
+      return 'revoked';
+    }
+    if (world.accessTokenExpired(token)) return 'token expired';
+    if (world.devices[login.deviceId]?.state == 'pending') {
+      return 'device pending';
+    }
     final result = verifier.verify(
       d['dpop'] as String?,
       method: 'GET',

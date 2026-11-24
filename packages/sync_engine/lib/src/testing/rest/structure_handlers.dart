@@ -86,13 +86,6 @@ void registerStructureHandlers(RestFake rest) {
       (r) => FakeResponse(200, {'items': world.tagsOf(visibleChannel(r))}),
     )
     ..handle(
-      'createThread',
-      (r) => FakeResponse(
-        201,
-        world.createThread(r.person.id, r.param('channel_id'), r.json),
-      ),
-    )
-    ..handle(
       'getThread',
       (r) => FakeResponse(
         200,

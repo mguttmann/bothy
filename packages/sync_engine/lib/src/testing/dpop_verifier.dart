@@ -99,15 +99,14 @@ final class DpopVerifier {
   /// lower case, default port removed, no query).
   ///
   /// [accessToken] requires a matching `ath`; [expectedJkt] requires the proof's key to be the
-  /// bound one; [nonces] replaces the accepted nonces (the gateway accepts only the nonce of
-  /// its `hello` or `reauth_required`).
+  /// bound one. The current and the previous nonce are accepted; [DpopAccepted.previousNonce]
+  /// tells a proof over the previous one, which REST answers with the current nonce.
   DpopResult verify(
     String? proof, {
     required String method,
     required String htu,
     String? accessToken,
     String? expectedJkt,
-    Set<String>? nonces,
   }) {
     if (proof == null || proof.isEmpty) {
       return const DpopRejected('invalid_dpop_proof', 'no proof');
@@ -166,7 +165,7 @@ final class DpopVerifier {
       return const DpopRejected('invalid_dpop_proof', 'iat');
     }
     final nonce = payload['nonce'];
-    final accepted = nonces ?? {_current, ?_previous};
+    final accepted = {_current, ?_previous};
     if (nonce is! String || !accepted.contains(nonce)) {
       return const DpopRejected('use_dpop_nonce', 'nonce missing or stale');
     }
@@ -177,10 +176,7 @@ final class DpopVerifier {
     if (!_seen.add('$htu|$jti')) {
       return const DpopRejected('invalid_dpop_proof', 'jti reused');
     }
-    return DpopAccepted(
-      jkt,
-      previousNonce: nonces == null && nonce != _current,
-    );
+    return DpopAccepted(jkt, previousNonce: nonce != _current);
   }
 
   /// The `ath` of [accessToken]: base64url of its SHA-256 (RFC 9449 4.2).
