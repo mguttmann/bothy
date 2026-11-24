@@ -74,3 +74,7 @@
   failing to show the screen.
 - The collapsed section "Archived (n)" of the sidebar shows the unread mark and the mentions of
   the archived channels it hides.
+- A chat moved between two channels you can both see no longer disappears from your device with
+  its messages; it shows up in the new channel with its history, unread count and search hits.
+- The terminal's screen reader hint for "Read screen" names the keys in the app's language, for
+  example "Strg+Umschalt+S" in German.
