@@ -25,6 +25,30 @@
   still marked `failed` instead of staying `running`.
 - An export package whose request did not take it (failed completion, or the request ended
   meanwhile) is deleted at once, also when the job's context has ended.
+- An enrollment code redeemed on a device that is already known and pending is refused with
+  `409 conflict` and reason `device_pending` and stays usable, instead of being spent while the
+  device stays pending.
+- `identity.unlink` no longer counts the keyless web device of a console login as a device that
+  can approve a pairing, so it cannot remove the last usable login method.
+- The flush steps of the database phase in the shutdown (`audit_denials`, `stats_flush`) get
+  their own budget, the new key `shutdown.database_flush_timeout`, which the wait for cancelled
+  jobs no longer takes; before, a hanging job could spend the whole total and the open denial
+  aggregations were neither written nor reported as dropped.
+- The incoming webhook routes of the internal listener answer `503 unavailable` with
+  `Retry-After` once the shutdown began, instead of writing while the jobs and the pool stop and
+  failing with an internal error after the pool closed.
+- The roles `worker` and `all` check the login of `bothy_maint` (`migrate.maint_password_ref`) at
+  the start; a missing or wrong password ends the start instead of failing every run of the audit
+  trim later.
+- The gateway writes one info line `gateway connection closed` per connection with the close
+  code, the outcome, the principal kind and the duration (new log attribute
+  `bothy.connection.duration`), so the disconnects of a device can be followed in the log.
+- The challenge cleanup keeps the used passkey challenge of a live session's current step-up, so
+  a console session no longer loses its user-verified step-up (and gets `passkey_required` at the
+  terminal) when the job runs between the step-up and the opening.
+- The deletion of an account rewrites the stored `user.updated` events of the person to the
+  pseudonymized handle and name, so the old handle and display name no longer stay in the event
+  log until `sync.event_retention`.
 
 ### Changed
 
