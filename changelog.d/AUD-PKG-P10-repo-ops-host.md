@@ -19,8 +19,8 @@
 
 - CI jobs that run Gradle restore a cache of their downloaded dependencies per job, and both
   Gradle builds retry a repository request that fails with 408, 429 or a 5xx six times with a
-  growing pause, because Maven Central refused downloads with HTTP 429; those jobs ask Google's
-  public mirror of Maven Central first (AUD-PKG-P10-repo-ops-host).
+  growing pause, because Maven Central refused downloads with HTTP 429; in those jobs every
+  Gradle build gets Maven Central from Google's public mirror of it (AUD-PKG-P10-repo-ops-host).
 - The Dart API pages of the documentation site link a video of Flutter's doc comments instead of
   embedding it from another origin (AUD-PKG-P10-repo-ops-host).
 - The Android emulator jobs fail without a device instead of passing without a test, and `ci-ok`

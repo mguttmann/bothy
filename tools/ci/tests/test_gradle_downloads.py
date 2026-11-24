@@ -17,7 +17,7 @@ the wrapper version is held here and an upgrade must check them again (docs/qual
 A cold cache still downloads everything, and a job that fails saves no cache, so every cached
 Gradle job also installs the init script `tools/ci/gradle/maven-central-mirror.init.gradle`
 before its first Gradle run: every build of the build tree (the Flutter Gradle plugin is an
-included build) asks Google's public mirror of Maven Central first. The release build does not.
+included build) gets Maven Central from Google's public mirror of it. The release build does not.
 """
 
 from __future__ import annotations
@@ -216,25 +216,26 @@ def test_other_jobs_install_no_mirror(workflow: str, job: str) -> None:
     assert _mirror_steps(_jobs(workflow)[job]["steps"]) == []
 
 
-def test_the_mirror_comes_first_in_every_build_of_the_tree() -> None:
-    """The init script only puts the mirror in front of repositories a build uses.
+def test_every_build_of_the_tree_gets_maven_central_from_the_mirror() -> None:
+    """The init script points every Maven Central repository of every build at the mirror.
 
     Text checks only: CI has no Gradle outside the jobs that build. The behaviour was checked
-    with Gradle 9.3.1 on a copy of the Flutter Gradle plugin's build (ruling AUD-PKG-P10/B5).
+    with Gradle 9.3.1 and Maven Central unreachable (ruling AUD-PKG-P10/B5).
     """
     script = (REPO / MIRROR_SCRIPT).read_text(encoding="utf-8")
     assert f"'{MIRROR_URL}'" in script
-    assert "addFirst" in script
-    # Plugin repositories before the settings script runs (a settings plugin resolves while it
-    # runs), the Plugin Portal kept for a build that declares no plugin repository, the
-    # buildscript repositories when the classpath resolves, and project repositories only in
-    # PREFER_PROJECT: the Flutter Gradle plugin's build sets FAIL_ON_PROJECT_REPOS.
+    for central in ("https://repo.maven.apache.org/maven2/", "https://repo1.maven.org/maven2/"):
+        assert central in script, central
+    # Maven Central in the settings, in every buildscript block and project (also those added
+    # later, configureEach), the mirror in front of the plugin repositories before the settings
+    # script runs, and the Plugin Portal kept for a build that declares no plugin repository.
     for hook in (
         "beforeSettings",
-        "settingsEvaluated",
-        "gradlePluginPortal()",
+        "beforeProject",
+        "configureEach",
         "buildscript.repositories",
-        "beforeResolve",
-        "RepositoriesMode.PREFER_PROJECT",
+        "dependencyResolutionManagement.repositories",
+        "addFirst",
+        "gradlePluginPortal()",
     ):
         assert hook in script, hook

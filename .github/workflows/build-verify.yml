@@ -417,7 +417,7 @@ jobs:
             ~/.gradle/wrapper/dists
           key: gradle-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('apps/*/android/**/*.gradle.kts', 'apps/*/android/**/*.lockfile', 'apps/*/android/gradle/wrapper/gradle-wrapper.properties', 'packages/*/android/**/*.gradle.kts', 'packages/*/android/**/*.lockfile', 'packages/*/android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.lock') }}
       - if: hashFiles('packages/*/android/gradlew') != ''
-        name: Ask the Maven Central mirror first in Gradle
+        name: Get Maven Central from its mirror in Gradle
         run: install -D -m 0644 tools/ci/gradle/maven-central-mirror.init.gradle "$HOME/.gradle/init.d/maven-central-mirror.gradle"
       - if: hashFiles('packages/*/android/gradlew') != ''
         uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
@@ -993,7 +993,7 @@ jobs:
             ~/.gradle/caches/modules-2
             ~/.gradle/wrapper/dists
           key: gradle-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('apps/*/android/**/*.gradle.kts', 'apps/*/android/**/*.lockfile', 'apps/*/android/gradle/wrapper/gradle-wrapper.properties', 'packages/*/android/**/*.gradle.kts', 'packages/*/android/**/*.lockfile', 'packages/*/android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.lock') }}
-      - name: Ask the Maven Central mirror first in Gradle
+      - name: Get Maven Central from its mirror in Gradle
         run: install -D -m 0644 tools/ci/gradle/maven-central-mirror.init.gradle "$HOME/.gradle/init.d/maven-central-mirror.gradle"
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -1090,7 +1090,7 @@ jobs:
             ~/.gradle/caches/modules-2
             ~/.gradle/wrapper/dists
           key: gradle-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('apps/*/android/**/*.gradle.kts', 'apps/*/android/**/*.lockfile', 'apps/*/android/gradle/wrapper/gradle-wrapper.properties', 'packages/*/android/**/*.gradle.kts', 'packages/*/android/**/*.lockfile', 'packages/*/android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.lock') }}
-      - name: Ask the Maven Central mirror first in Gradle
+      - name: Get Maven Central from its mirror in Gradle
         run: install -D -m 0644 tools/ci/gradle/maven-central-mirror.init.gradle "$HOME/.gradle/init.d/maven-central-mirror.gradle"
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
@@ -1148,7 +1148,7 @@ jobs:
             ~/.gradle/caches/modules-2
             ~/.gradle/wrapper/dists
           key: gradle-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('apps/*/android/**/*.gradle.kts', 'apps/*/android/**/*.lockfile', 'apps/*/android/gradle/wrapper/gradle-wrapper.properties', 'packages/*/android/**/*.gradle.kts', 'packages/*/android/**/*.lockfile', 'packages/*/android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.lock') }}
-      - name: Ask the Maven Central mirror first in Gradle
+      - name: Get Maven Central from its mirror in Gradle
         run: install -D -m 0644 tools/ci/gradle/maven-central-mirror.init.gradle "$HOME/.gradle/init.d/maven-central-mirror.gradle"
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:

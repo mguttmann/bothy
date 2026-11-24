@@ -72,18 +72,19 @@ seconds), through the system properties `org.gradle.internal.repository.max.tent
 classes of the pinned Gradle 9.3.1 (`ErrorHandlingModuleComponentRepository`,
 `NetworkingIssueVerifier`), so `tools/ci/tests/test_gradle_downloads.py` fails on a new wrapper
 version until they are checked again; the same test holds the jobs, the paths and the key.
-A cold cache still downloads everything, and the retries did not outlast the refusals of the
-first run of this change (`apps (Android API 26)`, in the Flutter Gradle plugin, an included
-build). So each of these jobs also installs `tools/ci/gradle/maven-central-mirror.init.gradle`
-into `~/.gradle/init.d/` after its cache step: every build of the build tree asks Google's public
-mirror of Maven Central (`maven-central.storage-download.googleapis.com`) first, and the
-repositories the build declares after it. The script puts the mirror only in front of
-repository lists a build uses: the plugin repositories before the settings script runs (a
-build that declares none keeps the Plugin Portal behind the mirror), the repositories of the
-settings and of a `buildscript` block, and the project repositories only in `PREFER_PROJECT`
-mode (the Flutter Gradle plugin's build refuses project repositories). The mirror serves the
-same files (the same SHA-1 checked for the module that failed), and the lock files pin the
-versions. The release build does not use the mirror.
+A cold cache still downloads everything, and Gradle stops at a 429 of Maven Central even when
+a later repository has the module (`apps (Android API 26)` and `apps (Android API 36)` failed
+that way in the first runs of this change, in the Flutter Gradle plugin and in the `buildscript`
+of the plugin `patrol`). So each of these jobs also installs
+`tools/ci/gradle/maven-central-mirror.init.gradle` into `~/.gradle/init.d/` after its cache step:
+in every build of the build tree, every Maven Central repository (in the settings, a
+`buildscript` block or a project) is pointed at Google's public mirror of Maven Central
+(`maven-central.storage-download.googleapis.com`), and the plugin repositories get the mirror in
+front before the settings script runs (the Plugin Portal sends Maven Central modules to Maven
+Central; a build that declares no plugin repository keeps the Portal behind the mirror). No
+repository is added to a project, so a build that refuses project repositories is unaffected.
+The mirror serves the same files (the same SHA-1 checked for the module that failed), and the
+lock files pin the versions. The release build does not use the mirror.
 
 The Go tests run in shards at the same time (`tools/ci/go_shards.py`): every package of
 `go list ./...` in every Go module is assigned to exactly one shard, balanced by the package
