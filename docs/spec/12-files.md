@@ -244,8 +244,9 @@ needs no public reachability of the storage.
    `200` with the file object. A completed session answers `200` with the file again. From now
    on the client may attach the file to a message.
 
-The job `files.scan` reads the bytes **exactly once** (on S3 after `CompleteMultipartUpload`)
-and splits the stream into:
+The job `files.scan` reads the bytes **exactly once** (on S3 after `CompleteMultipartUpload`,
+which the pass runs before it checks clamd, so a scanner outage never keeps a confirmed upload
+open) and splits the stream into:
 
 - SHA-256 and byte counter. If they differ from the declaration: `upload_state = 'failed'`,
   reason `checksum_mismatch` or `size_mismatch` respectively in the session, delete the
@@ -552,7 +553,8 @@ File system rules (M3-01, `internal/files/adapters/fs`, docs/DECISIONS.md M3-01/
   verified].
 - The bucket is private. The instance operator sets up server-side encryption and the lifecycle
   rule "abort incomplete multipart uploads" on the storage; the server does not rely on them
-  and aborts expired uploads itself (section 12).
+  and aborts expired uploads itself (section 12). The rule's age must be longer than
+  `file.upload_session_ttl`, so it never aborts an upload whose session is still open.
 
 S3 driver rules (M3-02, `internal/files/adapters/s3`, docs/DECISIONS.md M3-02/1 to M3-02/14):
 

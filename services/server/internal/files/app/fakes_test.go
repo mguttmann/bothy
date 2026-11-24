@@ -404,8 +404,24 @@ func (s *store) UploadPart(ctx context.Context, _, uploadID string, n int, body 
 	return app.Part{Number: n, ETag: fmt.Sprintf(`"s3-%x"`, sum[:4])}, nil
 }
 
-func (s *store) CompleteMultipart(ctx context.Context, _, _ string, _ []app.Part) error {
-	return s.enter(ctx, "CompleteMultipart")
+// CompleteMultipart joins the parts of uploadID in order into key, as S3 does.
+func (s *store) CompleteMultipart(ctx context.Context, key, uploadID string, parts []app.Part) error {
+	if err := s.enter(ctx, "CompleteMultipart"); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	u, ok := s.uploads[uploadID]
+	if !ok {
+		return app.ErrUploadNotFound
+	}
+	var joined []byte
+	for _, p := range parts {
+		joined = append(joined, u[p.Number]...)
+	}
+	s.objects[key] = joined
+	delete(s.uploads, uploadID)
+	return nil
 }
 
 func (s *store) AbortMultipart(ctx context.Context, _, uploadID string) error {

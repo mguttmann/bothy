@@ -289,6 +289,61 @@ func TestScanPassTransientReschedules(t *testing.T) {
 	}
 }
 
+// TestScanPassCompletesMultipartBeforePing pins that the pass completes the open S3 multipart
+// upload of a confirmed file before it asks clamd, so an unreachable scanner never leaves the
+// bytes in an incomplete upload that a storage lifecycle rule may abort; the file stays pending
+// and is not deliverable until the scan.
+func TestScanPassCompletesMultipartBeforePing(t *testing.T) {
+	t.Parallel()
+	e := newScanEnv(t, scanCfg)
+	e.scanner.pingErr = errors.New("connection refused")
+	s := e.seed(t, pngContent, pngContent, true)
+	ctx := context.Background()
+	if err := e.store.store.Delete(ctx, s.File.ObjectKey); err != nil {
+		t.Fatal(err)
+	}
+	upload, err := e.store.store.CreateMultipart(ctx, s.File.ObjectKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.repo.mu.Lock()
+	e.repo.parts[s.FileID] = map[int]app.PartRecord{}
+	e.repo.mu.Unlock()
+	for n := 1; n <= s.PartCount; n++ {
+		b := pngContent[(n-1)*4 : min(n*4, len(pngContent))]
+		part, err := e.store.store.UploadPart(ctx, s.File.ObjectKey, upload, n, bytes.NewReader(b), int64(len(b)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		e.repo.mu.Lock()
+		e.repo.parts[s.FileID][n] = app.PartRecord{FileID: s.FileID, PartNumber: n, SizeBytes: int64(len(b)), ETag: part.ETag}
+		e.repo.mu.Unlock()
+	}
+	e.repo.mu.Lock()
+	sess := e.repo.sessions[s.FileID]
+	sess.StorageUploadID = upload
+	e.repo.sessions[s.FileID] = sess
+	e.repo.mu.Unlock()
+
+	res, err := e.pass.Run(ctx, s.FileID, 0)
+	if err != nil || res.Outcome != app.OutcomeRetry || res.RetryReason != app.RetryUnreachable {
+		t.Fatalf("Run = %+v, %v; want a retry for the unreachable scanner", res, err)
+	}
+	if !e.store.has(s.File.ObjectKey) {
+		t.Fatal("the multipart upload was not completed before the ping")
+	}
+	if f := e.file(s.FileID); f.UploadState != "pending" || f.ScanStatus != "pending" {
+		t.Fatalf("file %+v; want it pending until the scan", f)
+	}
+	e.scanner.pingErr = nil
+	if res, err := e.pass.Run(ctx, s.FileID, 1); err != nil || res.Outcome == app.OutcomeRetry {
+		t.Fatalf("second round = %+v, %v; want a finished pass", res, err)
+	}
+	if f := e.file(s.FileID); f.ScanStatus != "clean" {
+		t.Fatalf("file %+v; want it scanned clean", f)
+	}
+}
+
 func TestScanPassNotAwaiting(t *testing.T) {
 	t.Parallel()
 	e := newScanEnv(t, scanCfg)

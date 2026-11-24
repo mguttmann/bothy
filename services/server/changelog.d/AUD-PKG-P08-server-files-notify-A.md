@@ -8,3 +8,6 @@
   after length and SHA-256 match; a refused package is purged through its row, and a package whose
   store ended early is removed by the cleanup after `file.failed_row_ttl`, so no object with
   personal data is left without a row that names it.
+- With the S3 driver the scan pass completes the multipart upload of a confirmed file before it
+  checks clamd, so a scanner outage no longer keeps the bytes in an incomplete upload that a
+  storage lifecycle rule may abort.
