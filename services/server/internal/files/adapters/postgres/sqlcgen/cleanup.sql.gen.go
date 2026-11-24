@@ -164,8 +164,9 @@ type ExpiredOpenSessionsRow struct {
 // file id or by state and time (the exceptions of AZ-P12 in tools/lint/sql_visibility.yaml,
 // category system_job). deleteFile resolves its resource by id (authorize_resolution) and locks it
 // after authorize (after_authorize). The candidate reads page by a key of (time, id), so a
-// candidate that stays (a held draft, a failed unit) is never read twice in one run. No index is
-// added (03 4.7 names the indexes of files; docs/decisions.d/M3-08.md D-M3-08-17).
+// candidate that stays (a held draft, a failed unit) is never read twice in one run. The steps b
+// and c have no index of their own (docs/decisions.d/M3-08.md D-M3-08-15); the deleted rows have
+// (deleted_at, id) WHERE deleted_at IS NOT NULL (migration 00123).
 // Step a: open sessions past expires_at of files that are not deleted, over the partial index
 // (expires_at) WHERE state = 'open'.
 func (q *Queries) ExpiredOpenSessions(ctx context.Context, arg ExpiredOpenSessionsParams) ([]ExpiredOpenSessionsRow, error) {
