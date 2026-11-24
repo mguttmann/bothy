@@ -24,3 +24,5 @@
 - The deletion of an account rewrites the stored `user.updated` events of the person to the
   pseudonymized handle and name, so the old handle and display name no longer stay in the event
   log until `sync.event_retention`.
+- `bothy config check` reports stop step budgets of the configured role that exceed
+  `shutdown.total_timeout` (cross-check `shutdown_budgets`), which the start refuses.

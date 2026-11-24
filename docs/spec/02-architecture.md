@@ -1505,7 +1505,8 @@ the rest of the total deadline. During wiring, the sum of the step budgets
 (`shutdown.drain_delay`, `shutdown.http_grace`, `shutdown.jobs_soft_timeout`,
 `shutdown.telemetry_flush_timeout`, and `shutdown.database_flush_timeout` for each of the two
 flush steps `audit_denials` and `stats_flush`) must not exceed `shutdown.total_timeout`, otherwise the
-start aborts (exit code `2`). The orchestrator must wait longer: Compose sets `stop_grace_period`
+start aborts (exit code `2`); `bothy config check` reports it before (cross-check
+`shutdown_budgets` over the steps of `server.role`). The orchestrator must wait longer: Compose sets `stop_grace_period`
 greater than `shutdown.total_timeout` ([infra/compose/compose.yaml](../../infra/compose/compose.yaml),
 a test holds it).
 

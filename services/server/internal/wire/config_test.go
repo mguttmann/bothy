@@ -1660,3 +1660,32 @@ func TestUploadBurstHoldsTwoAttachmentBatches(t *testing.T) {
 		t.Errorf("ratelimit.rl.upload.per_minute = %d below its burst", perMinute)
 	}
 }
+
+// TestConfig_ShutdownBudgetsWithinTotal: the stop step budgets of the role (drain and HTTP for api
+// and all, the soft stop of River for worker and all, the telemetry flush and the two database
+// flushes) must fit into shutdown.total_timeout (cross-check shutdown_budgets), so bothy config
+// check finds what the start would refuse with exit code 2.
+func TestConfig_ShutdownBudgetsWithinTotal(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		role, total string
+		ok          bool
+	}{
+		{"all", "60s", true},
+		{"all", "54s", true},
+		{"all", "53s", false},
+		{"worker", "29s", true},
+		{"worker", "28s", false},
+		{"api", "34s", true},
+		{"api", "33s", false},
+	} {
+		got := load(t, "BOTHY_SERVER__ROLE="+c.role, "BOTHY_SHUTDOWN__TOTAL_TIMEOUT="+c.total)
+		if (len(got) == 0) != c.ok {
+			t.Errorf("role %s, total %s: problems %v, want ok %v", c.role, c.total, got, c.ok)
+			continue
+		}
+		if len(got) > 0 && !strings.Contains(got[0].String(), "shutdown.total_timeout") {
+			t.Errorf("problem %q does not name shutdown.total_timeout", got[0].String())
+		}
+	}
+}
