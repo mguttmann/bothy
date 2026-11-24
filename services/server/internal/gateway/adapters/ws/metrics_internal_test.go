@@ -13,12 +13,13 @@ import (
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/otel/trace/noop"
+
 	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/wstest"
 	"github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
-	"go.opentelemetry.io/otel/trace/noop"
 )
 
 // recMetrics records what the adapter measures.

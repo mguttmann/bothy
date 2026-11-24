@@ -47,13 +47,13 @@ func TestShutdownGateRefusesWebhooksDuringTheShutdown(t *testing.T) {
 		w.WriteHeader(http.StatusAccepted)
 	}))
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/hooks/x", strings.NewReader("{}")))
+	h.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/hooks/x", strings.NewReader("{}")))
 	if rec.Code != http.StatusAccepted || reached != 1 {
 		t.Fatalf("before the shutdown: %d, reached %d", rec.Code, reached)
 	}
 	reg.SetShuttingDown()
 	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/hooks/x", strings.NewReader("{}")))
+	h.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/hooks/x", strings.NewReader("{}")))
 	if rec.Code != http.StatusServiceUnavailable || rec.Header().Get("Retry-After") != "60" || reached != 1 ||
 		!strings.Contains(rec.Body.String(), `"unavailable"`) {
 		t.Fatalf("during the shutdown: %d %q %s, reached %d", rec.Code, rec.Header().Get("Retry-After"), rec.Body.String(), reached)

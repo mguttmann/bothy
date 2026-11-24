@@ -546,17 +546,10 @@ func pseudonymizeUserUpdated(u identity.UserView) eventlog.RedactFunc {
 		if err := json.Unmarshal(outer["user"], &user); err != nil {
 			return nil, errs.Wrap(errs.CodeInternalError, err, "identity: stored user.updated payload")
 		}
-		for key, value := range map[string]string{"handle": u.Handle, "display_name": u.DisplayName, "locale": u.Locale, "time_zone": u.TimeZone} {
-			if value == "" && key != "handle" && key != "display_name" {
-				delete(user, key) // locale and time_zone are left out when empty
-				continue
-			}
-			b, err := json.Marshal(value)
-			if err != nil {
-				return nil, errs.Wrap(errs.CodeInternalError, err, "identity: user.updated member")
-			}
-			user[key] = b
-		}
+		setMember(user, "handle", u.Handle, false)
+		setMember(user, "display_name", u.DisplayName, false)
+		setMember(user, "locale", u.Locale, true)
+		setMember(user, "time_zone", u.TimeZone, true)
 		delete(user, "avatar_file_id")
 		b, err := json.Marshal(user)
 		if err != nil {
@@ -565,6 +558,17 @@ func pseudonymizeUserUpdated(u identity.UserView) eventlog.RedactFunc {
 		outer["user"] = b
 		return json.Marshal(outer)
 	}
+}
+
+// setMember sets the string member key of m to value; with omitEmpty an empty value removes it,
+// as the omitempty members of userJSON are left out.
+func setMember(m map[string]json.RawMessage, key, value string, omitEmpty bool) {
+	if omitEmpty && value == "" {
+		delete(m, key)
+		return
+	}
+	b, _ := json.Marshal(value) // a string always encodes
+	m[key] = b
 }
 
 // emitUpdated appends user.updated for u with the system as actor (05 rule 10).
