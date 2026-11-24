@@ -4,6 +4,7 @@
 // note 5).
 
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:auth/auth.dart';
 import 'package:crypto/crypto.dart';
@@ -606,5 +607,75 @@ void main() {
       expect(r.headers['authorization'], startsWith('DPoP '));
       expect(h.log.last, 'delete refresh_token');
     });
+  });
+
+  test('the four logins that post their app form by hand use paths whose 201 '
+      'answer is a TokenResponse in docs/api/openapi.yaml (D-M6-01-11)', () async {
+    final contract = File('../../docs/api/openapi.yaml').readAsStringSync();
+    // The operation block of [path]: from its line to the next path of the contract.
+    String block(String path) {
+      final start = contract.indexOf('\n  $path:\n');
+      expect(start, isNot(-1), reason: '$path is not in the contract');
+      final end = contract.indexOf(RegExp(r'\n  /'), start + 1);
+      return contract.substring(start, end == -1 ? contract.length : end);
+    }
+
+    final sent = <String>[];
+    Route token(String path) => (r) {
+      sent.add(r.path);
+      return tokens();
+    };
+    const oidc = '/auth/oidc/complete';
+    const password = '/auth/password/login';
+    const header = '/auth/trusted-header/login';
+    const passkey = '/auth/passkey/complete';
+    for (final path in [oidc, password, header, passkey]) {
+      h.server.routes['POST $path'] = token(path);
+    }
+    h.server.routes['POST /auth/oidc/begin'] = (_) => const FakeReply(200, {
+      'login_attempt_id': attemptId,
+      'authorization_url': 'https://idp.example.com/authorize?client_id=c',
+      'expires_at': '2026-10-15T10:10:00.000Z',
+    });
+    h.redirects.next = Uri.parse(
+      'http://127.0.0.1:49152/callback?login_code=LC-canary&login_attempt_id=$attemptId',
+    );
+    h.server.routes['POST /auth/passkey/begin'] = (_) => const FakeReply(200, {
+      'challenge_id': '0192f4a0-7b1c-7000-8000-0000000000b1',
+      'public_key': {'challenge': 'abc', 'rpId': 'chat.example.com'},
+      'expires_at': '2026-10-15T10:10:00.000Z',
+    });
+
+    expect(await h.session.login.beginOidc(providerId), isA<LoginSignedIn>());
+    expect(
+      await h.session.login.loginWithPassword(
+        loginName: 'alex',
+        password: 'pw-canary',
+        totpCode: '123456',
+      ),
+      isA<LoginSignedIn>(),
+    );
+    expect(
+      await h.session.login.loginWithTrustedHeader(),
+      isA<LoginSignedIn>(),
+    );
+    expect(await h.session.login.loginWithPasskey(), isA<LoginSignedIn>());
+
+    expect(sent, [oidc, password, header, passkey]);
+    for (final path in sent) {
+      final operation = block(path);
+      expect(operation, contains('\n    post:\n'), reason: path);
+      final created = operation.indexOf("\n        '201':\n");
+      expect(created, isNot(-1), reason: '$path has no 201 answer');
+      final next = operation.indexOf(
+        RegExp(r"\n        '\d{3}':\n"),
+        created + 1,
+      );
+      expect(
+        operation.substring(created, next == -1 ? operation.length : next),
+        contains("\$ref: '#/components/schemas/TokenResponse'"),
+        reason: '$path does not answer 201 with a TokenResponse',
+      );
+    }
   });
 }
