@@ -252,7 +252,7 @@ func TestReplyTablesMatchContract(t *testing.T) {
 			Schemas map[string]schema `yaml:"schemas"`
 		} `yaml:"components"`
 	}
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "docs", "api", "openapi.yaml")) //nolint:gosec // G304: a fixed path below the repository root, not input.
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "docs", "api", "openapi.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
