@@ -2307,7 +2307,10 @@ One Flutter widget for all clients. Renderer: package `xterm` by TerminalStudio,
   [15-client-architecture.md](15-client-architecture.md), section 23.4.
 
 The package is taken as is; the blocks of 11.2 live in `terminal_ui` in front of the renderer and
-hold with own tests (TM-T14), independent of the renderer version (docs/decisions.d/M4-35.md).
+hold with own tests (TM-T14), independent of the renderer version (docs/decisions.d/M4-35.md),
+except rule 3a, which drops the sequences that make xterm 4.0.0 throw or hang as that version reads
+them; `terminal_ui` therefore pins xterm to exactly 4.0.0, and a new version is taken only with a
+check of rule 3a, the cursor report fix, the marks painter and the mouse selection.
 
 Web console (M6-18, ADR 0070): the console runs the same view with its own ports (15-client-architecture.md
 section 23.1): the browser WebSocket on the same origin, authenticated by the cookie of the upgrade

@@ -81,7 +81,9 @@ app implements them its own way:
 ## Blocks
 
 - **Escape filter** (`EscapeFilter`, 24 11.2, SEC-TERM-6, TM-T14): on the byte stream before
-  UTF-8 decoding, in front of xterm, so the locks do not depend on the renderer version. Text,
+  UTF-8 decoding, in front of xterm, so the locks do not depend on the renderer version, except
+  the drops of rule 3a, which follow how xterm 4.0.0 reads parameters (the dependency is pinned
+  to exactly that version). Text,
   C0 controls and plain ESC sequences pass. CSI passes except window operations and reports
   (final `t`), status and other reports (`n` other than CPR `6 n`), device attributes other
   than DA1 and DA2, `$` requests, DECREQTPARM and XTVERSION; so the answers that reach the host
