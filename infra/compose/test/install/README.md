@@ -13,6 +13,10 @@ folder is written.
 | `INSTALL_TEST_NATIVE=1 make install-test` | the same runner on the host |
 | `sh infra/compose/test/install/run.sh test_gateway_ipv6` | only the named tests |
 
+`make test` runs `make install-test` only with the area `tools` (`AREAS` of the root `Makefile`): in
+CI once in the job `test (tools)`, and in the pre-push gate for every push that changes a file
+other than component source code.
+
 The runner writes only into a folder from `mktemp -d` under `${TMPDIR:-/tmp}` and removes it at the
 end. It prints `ok` or `not ok` per test (with the output of a failed test), then a summary line.
 Exit codes: `0` all tests passed or were skipped, `1` a test failed, `2` a precondition of the runner

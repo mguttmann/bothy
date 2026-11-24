@@ -39,8 +39,11 @@ by a product release; existing installations raise `BOTHY_VERSION` themselves
 
 ### 2.1 Server
 
-1. Once before the first tag of the private phase (owner step): create the key pair of the
-   private phase (section 2.4), commit its public key as
+1. The repository is public, so a tag takes the keyless path of the public phase (section 5)
+   and needs no key pair. That path and its attestations have not run yet: `make release-trial`
+   proves the private path only (section 2.3), and the first run of the public path is part of
+   the plan row V1-05. Only while the repository is private (owner step, once before the first
+   tag): create the key pair of the private phase (section 2.4), commit its public key as
    `quality/release/cosign-private-phase.pub`, and store the private key and its password as the
    secrets `COSIGN_PRIVATE_KEY` and `COSIGN_PASSWORD` of the environment `release`.
 2. `make release-prep COMPONENT=server [CHANNEL=beta]` writes `services/server/VERSION`, renames
@@ -126,6 +129,9 @@ probes that must fail (changed ZIP, missing SBOM). It needs Node.js and npm, no 
 ([18-release.md](../spec/18-release.md) 6.2).
 
 ### 2.4 Key pair of the private phase (owner)
+
+Only while the repository is private (`release.yml` signs with the key pair when the repository
+is not public).
 
 ```
 COSIGN_PASSWORD='<new password>' cosign generate-key-pair

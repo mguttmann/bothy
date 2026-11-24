@@ -406,6 +406,16 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      # Gradle's downloads, one cache per job (Maven Central answered HTTP 429; docs/quality/gates.md,
+      # "Gradle downloads"; tools/ci/tests/test_gradle_downloads.py).
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        name: Restore the Gradle dependency cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches/modules-2
+            ~/.gradle/wrapper/dists
+          key: gradle-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('apps/*/android/**/*.gradle.kts', 'apps/*/android/**/*.lockfile', 'apps/*/android/gradle/wrapper/gradle-wrapper.properties', 'packages/*/android/**/*.gradle.kts', 'packages/*/android/**/*.lockfile', 'packages/*/android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.lock') }}
       - if: hashFiles('packages/*/android/gradlew') != ''
         uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
       - name: Restore pinned binaries and hook environments
@@ -971,6 +981,15 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      # Gradle's downloads, one cache per job (Maven Central answered HTTP 429; docs/quality/gates.md,
+      # "Gradle downloads"; tools/ci/tests/test_gradle_downloads.py).
+      - name: Restore the Gradle dependency cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches/modules-2
+            ~/.gradle/wrapper/dists
+          key: gradle-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('apps/*/android/**/*.gradle.kts', 'apps/*/android/**/*.lockfile', 'apps/*/android/gradle/wrapper/gradle-wrapper.properties', 'packages/*/android/**/*.gradle.kts', 'packages/*/android/**/*.lockfile', 'packages/*/android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.lock') }}
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
@@ -1057,6 +1076,15 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      # Gradle's downloads, one cache per job (Maven Central answered HTTP 429; docs/quality/gates.md,
+      # "Gradle downloads"; tools/ci/tests/test_gradle_downloads.py).
+      - name: Restore the Gradle dependency cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches/modules-2
+            ~/.gradle/wrapper/dists
+          key: gradle-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('apps/*/android/**/*.gradle.kts', 'apps/*/android/**/*.lockfile', 'apps/*/android/gradle/wrapper/gradle-wrapper.properties', 'packages/*/android/**/*.gradle.kts', 'packages/*/android/**/*.lockfile', 'packages/*/android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.lock') }}
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version: "0.13.7"
@@ -1104,6 +1132,15 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      # Gradle's downloads, one cache per job (Maven Central answered HTTP 429; docs/quality/gates.md,
+      # "Gradle downloads"; tools/ci/tests/test_gradle_downloads.py).
+      - name: Restore the Gradle dependency cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches/modules-2
+            ~/.gradle/wrapper/dists
+          key: gradle-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('apps/*/android/**/*.gradle.kts', 'apps/*/android/**/*.lockfile', 'apps/*/android/gradle/wrapper/gradle-wrapper.properties', 'packages/*/android/**/*.gradle.kts', 'packages/*/android/**/*.lockfile', 'packages/*/android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.lock') }}
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version: "0.13.7"
