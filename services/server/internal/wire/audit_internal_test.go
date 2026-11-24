@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 type internalKEK struct{}
@@ -74,9 +75,7 @@ func TestCheckMaintLogin_MissingPasswordFailsTheStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	err = checkMaintLogin(ctx, open)
+	err = checkMaintLogin(testkit.Context(t), open)
 	if err == nil || !strings.Contains(err.Error(), "migrate.maint_password_ref") {
 		t.Fatalf("checkMaintLogin = %v, want an error naming migrate.maint_password_ref", err)
 	}
