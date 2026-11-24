@@ -57,12 +57,17 @@ class _DeliveryViewState extends State<DeliveryView> with VizLiveSubscription {
   DeliveryModel? _model;
   List<SeriesModel>? _history;
   String? _queryError;
+  int _generation = 0;
 
   bool get _ownerOnly => !widget.options.scope.isInstance;
 
   @override
   void initState() {
     super.initState();
+    _start();
+  }
+
+  void _start() {
     if (_ownerOnly) return;
     unawaited(_loadHistory());
     final live = widget.live;
@@ -73,7 +78,29 @@ class _DeliveryViewState extends State<DeliveryView> with VizLiveSubscription {
     }
   }
 
+  @override
+  void didUpdateWidget(DeliveryView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!vizInputsChanged(
+      oldLive: oldWidget.live,
+      live: widget.live,
+      oldQueries: oldWidget.queries,
+      queries: widget.queries,
+      oldOptions: oldWidget.options,
+      options: widget.options,
+    )) {
+      return;
+    }
+    _generation++;
+    _model = null;
+    _history = null;
+    _queryError = null;
+    restartLive(null, widget.options.scope);
+    _start();
+  }
+
   Future<void> _loadHistory() async {
+    final generation = _generation;
     final range = widget.options.range;
     try {
       final timeline = await widget.queries.timeline(
@@ -81,30 +108,33 @@ class _DeliveryViewState extends State<DeliveryView> with VizLiveSubscription {
         to: range.to,
         metrics: deliveryHistoryMetrics,
       );
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() {
         _history = [
           for (final s in TimelineModel.fromTimeline(timeline).series)
             if (deliveryHistoryMetrics.contains(s.metric)) s,
         ];
       });
-    } on Object catch (error) {
-      _fail(error);
+    } on Object catch (error, stack) {
+      _fail(error, stack, generation);
     }
   }
 
   Future<void> _loadFrame() async {
+    final generation = _generation;
     try {
       final frame = await widget.queries.live();
-      if (mounted) setState(() => _model = DeliveryModel.fromFrame(frame));
-    } on Object catch (error) {
-      _fail(error);
+      if (mounted && generation == _generation) {
+        setState(() => _model = DeliveryModel.fromFrame(frame));
+      }
+    } on Object catch (error, stack) {
+      _fail(error, stack, generation);
     }
   }
 
-  void _fail(Object error) {
-    if (!mounted) return;
-    setState(() => _queryError ??= vizProblemCode(error));
+  void _fail(Object error, StackTrace stack, int generation) {
+    if (!mounted || generation != _generation) return;
+    setState(() => _queryError ??= vizProblemCode(error, stack));
     unawaited(stopLive());
   }
 

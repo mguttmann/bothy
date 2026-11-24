@@ -47,7 +47,6 @@ final class VizViewSpec {
   /// Creates an entry.
   const VizViewSpec({
     required this.kind,
-    required this.titleKey,
     required this.title,
     required this.glyph,
     required this.instanceOnly,
@@ -57,9 +56,6 @@ final class VizViewSpec {
 
   /// The view.
   final VizViewKind kind;
-
-  /// Name of the `l10n` key of the title, for example `vizViewLiveTopology`.
-  final String titleKey;
 
   /// The title in the language of [AppLocalizations].
   final String Function(AppLocalizations l10n) title;
@@ -83,7 +79,6 @@ final class VizViewSpec {
 final List<VizViewSpec> vizViewRegistry = List.unmodifiable([
   VizViewSpec(
     kind: VizViewKind.liveTopology,
-    titleKey: 'vizViewLiveTopology',
     title: (l) => l.vizViewLiveTopology,
     glyph: DsIcons.agent,
     instanceOnly: false,
@@ -91,7 +86,6 @@ final List<VizViewSpec> vizViewRegistry = List.unmodifiable([
   ),
   VizViewSpec(
     kind: VizViewKind.runHistory,
-    titleKey: 'vizViewRunHistory',
     title: (l) => l.vizViewRunHistory,
     glyph: DsIcons.runCompleted,
     instanceOnly: false,
@@ -100,7 +94,6 @@ final List<VizViewSpec> vizViewRegistry = List.unmodifiable([
   ),
   VizViewSpec(
     kind: VizViewKind.backend,
-    titleKey: 'vizViewBackend',
     title: (l) => l.vizViewBackend,
     glyph: DsIcons.billingOrganization,
     instanceOnly: false,
@@ -108,7 +101,6 @@ final List<VizViewSpec> vizViewRegistry = List.unmodifiable([
   ),
   VizViewSpec(
     kind: VizViewKind.delivery,
-    titleKey: 'vizViewDelivery',
     title: (l) => l.vizViewDelivery,
     glyph: DsIcons.stateReconnecting,
     instanceOnly: true,
@@ -116,7 +108,6 @@ final List<VizViewSpec> vizViewRegistry = List.unmodifiable([
   ),
   VizViewSpec(
     kind: VizViewKind.executive,
-    titleKey: 'vizViewExecutive',
     title: (l) => l.vizViewExecutive,
     glyph: DsIcons.adminStats,
     instanceOnly: false,
@@ -124,7 +115,6 @@ final List<VizViewSpec> vizViewRegistry = List.unmodifiable([
   ),
   VizViewSpec(
     kind: VizViewKind.timeline,
-    titleKey: 'vizViewTimeline',
     title: (l) => l.vizViewTimeline,
     glyph: DsIcons.runQueued,
     instanceOnly: false,
@@ -132,7 +122,6 @@ final List<VizViewSpec> vizViewRegistry = List.unmodifiable([
   ),
   VizViewSpec(
     kind: VizViewKind.tvMode,
-    titleKey: 'vizViewTv',
     title: (l) => l.vizViewTv,
     glyph: DsIcons.adminConsole,
     instanceOnly: false,

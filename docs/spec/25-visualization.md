@@ -525,6 +525,16 @@ as `PollingLiveFrameSource` (stopped while the tab is hidden); both use `ApiStat
 route over the window, "Open in Grafana" only with `telemetry_dashboard_url`). VZ-T16 is
 `tools/arch-check/no_webview.py` in `make arch`.
 
+Built state (AUD-PKG-P04-client-packages): a view follows new host options without a new key:
+another scope, period, live source or query source loads again and drops answers of the old
+inputs; new display names only relabel; equal values load nothing (`VizScope`, `VizRange` and
+`VizNames` compare by value). A source error that is no problem answer shows the general text,
+and a defect (a Dart `Error`) also goes with its stack to `FlutterError.reportError`; an invalid
+`viz.timeline_speeds` falls back to the default speeds. Sorting a table with tree rows (the agent
+tree of the live topology) moves each run with its tree rows. `LiveFrameSourceBase.start` stops
+the running delivery before it starts the next one, and a frame derives its topology model only
+when a reader asks for it.
+
 No charting library: the basic forms are custom `CustomPainter`s. Reason: the forms (lanes,
 run cards with live box colors) exist in no library; custom forms keep tokens,
 semantics and golden tests under our control. The build ticket can propose a library with a license

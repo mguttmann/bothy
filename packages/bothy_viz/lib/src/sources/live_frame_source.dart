@@ -43,11 +43,9 @@ enum LiveFrameErrorCode {
 sealed class LiveFrameEvent {
   const LiveFrameEvent();
 
-  /// A new frame with its derived model.
-  const factory LiveFrameEvent.frame(
-    api.StatsLiveFrame frame,
-    LiveTopologyModel model,
-  ) = LiveFrameFrame;
+  /// A new frame; its model is derived with [names] on first use.
+  factory LiveFrameEvent.frame(api.StatsLiveFrame frame, {VizNames names}) =
+      LiveFrameFrame;
 
   /// No frame arrived for `viz.stale_after`: the view marks its data as stale.
   const factory LiveFrameEvent.stale() = LiveFrameStale;
@@ -58,14 +56,21 @@ sealed class LiveFrameEvent {
 
 /// A frame of the stream.
 final class LiveFrameFrame extends LiveFrameEvent {
-  /// Creates the event.
-  const LiveFrameFrame(this.frame, this.model);
+  /// Creates the event; [names] label the [model].
+  LiveFrameFrame(this.frame, {this.names = const VizNames()});
 
   /// The frame as the server sent it, for the views that derive their own model.
   final api.StatsLiveFrame frame;
 
-  /// The live topology of [frame].
-  final LiveTopologyModel model;
+  /// The names of [model].
+  final VizNames names;
+
+  /// The live topology of [frame], derived on first use: the views derive their own model
+  /// with the host's names, so a frame nobody asks for costs no derivation.
+  late final LiveTopologyModel model = LiveTopologyModel.fromFrame(
+    frame,
+    names: names,
+  );
 }
 
 /// No frame for `viz.stale_after`.
@@ -131,6 +136,9 @@ abstract class LiveFrameSourceBase implements LiveFrameSource {
 
   @override
   Stream<LiveFrameEvent> start({String? spaceId}) {
+    // A running delivery of the previous scope ends first, so no subclass can leak frames of
+    // the old scope into the new stream.
+    if (isRunning) onStop();
     _close();
     final controller = StreamController<LiveFrameEvent>(sync: true);
     _controller = controller;
@@ -153,18 +161,13 @@ abstract class LiveFrameSourceBase implements LiveFrameSource {
   @protected
   void onStop();
 
-  /// Reports a new [frame]: emits it with its model and restarts the stale timer.
+  /// Reports a new [frame]: emits it and restarts the stale timer.
   @protected
   void emitFrame(api.StatsLiveFrame frame) {
     final controller = _controller;
     if (controller == null) return;
     _stale = false;
-    controller.add(
-      LiveFrameEvent.frame(
-        frame,
-        LiveTopologyModel.fromFrame(frame, names: names),
-      ),
-    );
+    controller.add(LiveFrameEvent.frame(frame, names: names));
     _armStale();
   }
 

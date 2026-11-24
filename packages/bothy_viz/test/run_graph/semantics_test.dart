@@ -166,6 +166,55 @@ void main() {
     expect(find.byKey(const ValueKey('runGraph.row.t')), findsNothing);
   });
 
+  testWidgets(
+    'the arrow keys scroll the selection into view and keep it on its step',
+    (tester) async {
+      List<Map<String, Object?>> steps({bool extra = false}) => [
+        if (extra) step('new', 0, status: 'running', start: 1),
+        for (var i = 1; i <= 40; i++)
+          step('r$i', i, status: 'running', start: i),
+      ];
+      Widget graphOf(List<Map<String, Object?>> s) => SizedBox(
+        height: 240,
+        child: RunGraphView(
+          graph: _graph(s, 60),
+          visibleSteps: 3,
+          announceMinInterval: const Duration(seconds: 10),
+          clock: () => t0,
+          initiallyAsList: true,
+          onAnnounce: (_, _) {},
+        ),
+      );
+      await tester.pumpWidget(app(graphOf(steps())));
+      await dsPumpIcons(tester);
+      await tester.tap(find.byKey(ValueKey('runGraph.row.$runId')));
+      await tester.pump();
+      for (var i = 0; i < 30; i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+        await tester.pump();
+      }
+      // The scroll of the last move paints in the next frame.
+      await tester.pump();
+      final row = find.byKey(const ValueKey('runGraph.row.r30'));
+      expect(row, findsOneWidget);
+      final view = tester.getRect(find.byType(RunGraphView));
+      final rect = tester.getRect(row);
+      expect(rect.bottom, lessThanOrEqualTo(view.bottom + 0.5));
+      expect(rect.top, greaterThanOrEqualTo(view.top - 0.5));
+      bool selected(String id) =>
+          (tester.widget(
+                find.byKey(ValueKey('runGraph.row.$id'), skipOffstage: false),
+              ) as dynamic).selected
+              as bool;
+      expect(selected('r30'), isTrue);
+      // A step added above moves the index, not the selection.
+      await tester.pumpWidget(app(graphOf(steps(extra: true))));
+      await tester.pump();
+      expect(selected('r30'), isTrue);
+      expect(selected('r29'), isFalse);
+    },
+  );
+
   testWidgets('"n earlier steps" opens with a tap', (tester) async {
     final graph = _graph([for (var i = 1; i <= 5; i++) step('r$i', i)], 30);
     await _pump(tester, graph, () => t0, []);

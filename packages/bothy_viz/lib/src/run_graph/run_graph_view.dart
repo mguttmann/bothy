@@ -124,7 +124,39 @@ class RunGraphViewState extends State<RunGraphView> {
   late RunGraphAnnouncer _announcer;
   Timer? _flush;
   int _selected = 0;
+
+  /// The selected row by identity: a step added above it or folded into "earlier steps"
+  /// moves its index, not the selection.
+  String? _selectedKey;
   List<RunGraphRow> _rows = const [];
+
+  /// The context of every built row, to scroll a selection into view.
+  final Map<String, BuildContext> _rowContexts = {};
+
+  static String _keyOf(RunGraphRow row) => switch (row) {
+    RunGraphNodeRow(:final node) => 'node:${node.id}',
+    RunGraphEarlierRow(:final parentId) => 'earlier:$parentId',
+  };
+
+  /// Selects row [index] and scrolls it into view after the frame.
+  void _select(int index) {
+    final down = index > _selected;
+    _selected = index;
+    _selectedKey = _keyOf(_rows[index]);
+    final key = _selectedKey!;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final row = _rowContexts[key];
+      if (!mounted || row == null || !row.mounted) return;
+      unawaited(
+        Scrollable.ensureVisible(
+          row,
+          alignmentPolicy: down
+              ? ScrollPositionAlignmentPolicy.keepVisibleAtEnd
+              : ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+        ),
+      );
+    });
+  }
 
   /// Whether the list form shows.
   bool get asList => _asList;
@@ -225,9 +257,9 @@ class RunGraphViewState extends State<RunGraphView> {
     final key = event.logicalKey;
     final row = _rows[_selected.clamp(0, _rows.length - 1)];
     if (key == LogicalKeyboardKey.arrowDown) {
-      setState(() => _selected = math.min(_selected + 1, _rows.length - 1));
+      setState(() => _select(math.min(_selected + 1, _rows.length - 1)));
     } else if (key == LogicalKeyboardKey.arrowUp) {
-      setState(() => _selected = math.max(_selected - 1, 0));
+      setState(() => _select(math.max(_selected - 1, 0)));
     } else if (key == LogicalKeyboardKey.arrowRight) {
       if (row is RunGraphNodeRow && row.hasChildren && !row.expanded) {
         _toggle(row);
@@ -241,7 +273,7 @@ class RunGraphViewState extends State<RunGraphView> {
         // To the parent: the nearest row above with a smaller depth.
         for (var i = _selected - 1; i >= 0; i--) {
           if (_rows[i].depth < row.depth) {
-            setState(() => _selected = i);
+            setState(() => _select(i));
             break;
           }
         }
@@ -271,7 +303,14 @@ class RunGraphViewState extends State<RunGraphView> {
       expanded: _expanded,
       collapsed: _collapsed,
     );
-    if (_selected >= _rows.length) _selected = _rows.length - 1;
+    final kept = _selectedKey == null
+        ? -1
+        : _rows.indexWhere((r) => _keyOf(r) == _selectedKey);
+    if (kept >= 0) {
+      _selected = kept;
+    } else if (_selected >= _rows.length) {
+      _selected = _rows.length - 1;
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth.isFinite
@@ -326,38 +365,44 @@ class RunGraphViewState extends State<RunGraphView> {
                     _asList ? 'runGraph.outline' : 'runGraph.trace',
                   ),
                   itemCount: _rows.length,
-                  itemBuilder: (context, i) => switch (_rows[i]) {
-                    final RunGraphNodeRow row => _NodeRow(
-                      key: ValueKey('runGraph.row.${row.node.id}'),
-                      graph: graph,
-                      row: row,
-                      asList: _asList,
-                      narrow: narrow,
-                      touch: widget.touch,
-                      labelWidth: labelWidth,
-                      trackStart: trackStart,
-                      selected: i == _selected && _focus.hasFocus,
-                      onToggle: () {
-                        _focus.requestFocus();
-                        setState(() => _selected = i);
-                        _toggle(row);
-                      },
-                      onSelect: () {
-                        _focus.requestFocus();
-                        setState(() => _selected = i);
-                      },
-                    ),
-                    final RunGraphEarlierRow row => _EarlierRow(
-                      key: ValueKey('runGraph.earlier.${row.parentId}'),
-                      row: row,
-                      selected: i == _selected && _focus.hasFocus,
-                      onTap: () {
-                        _focus.requestFocus();
-                        setState(() => _selected = i);
-                        _showEarlier(row);
-                      },
-                    ),
-                  },
+                  itemBuilder: (context, i) => Builder(
+                    builder: (context) {
+                      // The row's context, so a keyboard selection scrolls it into view.
+                      _rowContexts[_keyOf(_rows[i])] = context;
+                      return switch (_rows[i]) {
+                        final RunGraphNodeRow row => _NodeRow(
+                          key: ValueKey('runGraph.row.${row.node.id}'),
+                          graph: graph,
+                          row: row,
+                          asList: _asList,
+                          narrow: narrow,
+                          touch: widget.touch,
+                          labelWidth: labelWidth,
+                          trackStart: trackStart,
+                          selected: i == _selected && _focus.hasFocus,
+                          onToggle: () {
+                            _focus.requestFocus();
+                            setState(() => _select(i));
+                            _toggle(row);
+                          },
+                          onSelect: () {
+                            _focus.requestFocus();
+                            setState(() => _select(i));
+                          },
+                        ),
+                        final RunGraphEarlierRow row => _EarlierRow(
+                          key: ValueKey('runGraph.earlier.${row.parentId}'),
+                          row: row,
+                          selected: i == _selected && _focus.hasFocus,
+                          onTap: () {
+                            _focus.requestFocus();
+                            setState(() => _select(i));
+                            _showEarlier(row);
+                          },
+                        ),
+                      };
+                    },
+                  ),
                 ),
               ),
             ),
