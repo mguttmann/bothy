@@ -873,15 +873,33 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
             ),
           );
       }
+      // The label is the accessible name of its input (WCAG 4.1.2): merged into the text
+      // field and the switch, the group label of the choices.
+      final visible = ExcludeSemantics(child: Text(f.label, style: labelStyle));
+      final column = Column(
+        crossAxisAlignment: onActivated == null
+            ? CrossAxisAlignment.start
+            : CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          visible,
+          const SizedBox(height: DsSpace.s4),
+          input,
+        ],
+      );
       fields
         ..add(
-          Semantics(
-            label: f.label,
-            child: ExcludeSemantics(child: Text(f.label, style: labelStyle)),
-          ),
+          f.type == DsFieldType.choice
+              ? Semantics(
+                  container: true,
+                  explicitChildNodes: true,
+                  label: f.label,
+                  child: column,
+                )
+              : MergeSemantics(
+                  child: Semantics(label: f.label, child: column),
+                ),
         )
-        ..add(const SizedBox(height: DsSpace.s4))
-        ..add(input)
         ..add(const SizedBox(height: DsSpace.s8));
     }
     return Column(
