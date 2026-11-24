@@ -1288,7 +1288,9 @@ fetches the files and uploads them through the import interface: `createImportFi
 parts and the completion with the rules of 3.2 and 3.4 under `import.apply` instead of
 `file.upload`, so a read-only mirror channel accepts them (05 rule 1.8 and 4.12). The item becomes
 `posted` in the unit of work of the completion; a repeated `createImportFile` returns the same
-file ID, with a new session after an aborted or expired one. After the completion the same path
+file ID, with a new session after an aborted or expired one. Reopening sets a failed file
+`pending` again with `file.updated` for the uploader, and aborts after the commit the multipart
+upload that the old session still named (an open session past its expiry). After the completion the same path
 from 3.4 applies: checksum, type, scan, metadata, thumbnails. Differences: no quota (the open
 sessions and the free space still hold); the jobs `files.scan` and `files.thumbnail` of an import
 file stand on the queue `files` with the lowest River job priority (their arguments carry the

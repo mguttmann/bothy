@@ -111,7 +111,7 @@ func (s *Service) importSession(ctx context.Context, fileID ids.ID) (SessionReco
 
 // Slot implements files.ImportFiles (22 7.2 item 3, M8-11 design note 6 d): a completed session is
 // Completed; an open one that has not expired is answered; an aborted or expired one, also an open
-// one past expires_at, opens again for the same file ID with a new expiry.
+// one past expires_at, opens again for the same file ID with a new expiry (reopened).
 func (p ImportFilesPort) Slot(ctx context.Context, fileID ids.ID) (files.ImportSlot, error) {
 	s := p.s
 	if err := needImportUnit(ctx, "Slot"); err != nil {
@@ -132,11 +132,41 @@ func (p ImportFilesPort) Slot(ctx context.Context, fileID ids.ID) (files.ImportS
 	if !ok {
 		return files.ImportSlot{}, errs.New(errs.CodeInternalError, "files: the repository cannot reopen an import session")
 	}
-	rec.State, rec.CreatedAt, rec.ExpiresAt = domain.SessionOpen, now, now.Add(s.cfg.SessionTTL)
+	old := rec
+	rec.State, rec.CreatedAt, rec.ExpiresAt, rec.StorageUploadID = domain.SessionOpen, now, now.Add(s.cfg.SessionTTL), ""
 	if err := re.ReopenSession(ctx, fileID, rec.CreatedAt, rec.ExpiresAt); err != nil {
 		return files.ImportSlot{}, err
 	}
+	if err := s.reopened(ctx, old); err != nil {
+		return files.ImportSlot{}, err
+	}
 	return files.ImportSlot{FileID: fileID, Upload: sessionView(rec)}, nil
+}
+
+// reopened finishes the reopening of the session old in the caller's unit of work: a file that
+// was failed (an aborted session) announces pending again with file.updated, and a multipart
+// upload the session still named (an open session past its expiry) is aborted after the commit,
+// so no upload is left that no row names (02 8.5: no object store call inside the unit). A failed
+// abort is logged with the file id only; the lifecycle rule of the bucket ends such an upload.
+func (s *Service) reopened(ctx context.Context, old SessionRecord) error {
+	if old.File.UploadState != stateOpenFile || old.File.ScanStatus != stateOpenFile {
+		after := old.File
+		after.UploadState, after.ScanStatus = stateOpenFile, stateOpenFile
+		if err := s.changes().recordFileChange(ctx, caller(ctx), old.File, after); err != nil {
+			return err
+		}
+	}
+	if old.StorageUploadID == "" {
+		return nil
+	}
+	if !txn.AfterCommit(ctx, func() {
+		if err := s.d.Parts.Discard(txn.Detach(context.WithoutCancel(ctx)), old); err != nil {
+			s.logDiscard(ctx, old, err)
+		}
+	}) {
+		return errs.New(errs.CodeInternalError, "files: ImportFiles.Slot outside a unit of work")
+	}
+	return nil
 }
 
 // UploadPart implements files.ImportFiles: the session of the file by its uploader without

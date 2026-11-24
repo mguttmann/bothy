@@ -14,6 +14,9 @@
 - The media type detector keeps its own read limit of `file.sniff_bytes` instead of changing a
   process-wide limit of the library in its constructor, so a second detector can no longer make
   Office documents read as ZIP archives.
+- Reopening the session of an import file sets a failed file pending again with `file.updated`
+  for the uploader, and aborts after the commit the S3 multipart upload that the old session still
+  named, instead of dropping its id and leaving the upload open.
 
 ### Changed
 

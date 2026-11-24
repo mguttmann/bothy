@@ -145,7 +145,8 @@ Normative: [09-agents.md](../../../../docs/spec/09-agents.md) 3.9.2, [12-files.m
   file and its session of mode `direct` like `createUpload` without the quota (12 11), in the
   caller's unit of work; `Slot` answers a reserved file: completed, its open session, or a session
   opened again for the same file ID after an abort or expiry (`app.ImportRepository.ReopenSession`,
-  `queries/import.sql`); `UploadPart` and `Complete` use the rules of `uploadPart` and
+  `queries/import.sql`; a failed file announces `pending` with `file.updated`, and the multipart
+  upload the old session named is aborted after the commit); `UploadPart` and `Complete` use the rules of `uploadPart` and
   `completeUpload` (`storePart`, `closeSession`) for the session of the uploader.
 - Priority: `Complete` marks its context with `app.WithBulkJobs`, so `adapters/jobs.Queue` inserts
   `files.scan` with the argument `bulk = 1` and the lowest River priority (`platform/jobs.PriorityLowest`); the

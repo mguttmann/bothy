@@ -253,6 +253,24 @@ func (r *repo) AbortSession(ctx context.Context, fileID ids.ID) error {
 	return nil
 }
 
+// ReopenSession implements app.ImportRepository as the query ReopenImportSession and
+// PendImportFile do: the session opens without upload id and parts, its file is pending again.
+func (r *repo) ReopenSession(ctx context.Context, fileID ids.ID, createdAt, expiresAt time.Time) error {
+	if err := needUnit(ctx); err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	s := r.sessions[fileID]
+	s.State, s.CreatedAt, s.ExpiresAt, s.StorageUploadID = domain.SessionOpen, createdAt, expiresAt, ""
+	r.sessions[fileID] = s
+	f := r.files[fileID]
+	f.UploadState, f.ScanStatus = "pending", "pending"
+	r.files[fileID] = f
+	delete(r.parts, fileID)
+	return nil
+}
+
 func (r *repo) File(_ context.Context, fileID ids.ID) (app.FileRecord, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
