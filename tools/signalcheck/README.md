@@ -15,7 +15,8 @@ a bucket bound (R-OB-06).
 | 6 | every dashboard query and every panel query parses: it becomes a recording rule of a temporary file checked by the pinned `promtool check rules`; a failure names the file and the panel or query |
 
 Panels and targets whose datasource is not Prometheus (Loki) are skipped. Exit 0 prints one
-summary line, exit 1 one line per finding (`<file>: <location>: rule <n>: <message>`).
+summary line, exit 1 one line per finding (`<file>: <location>: rule <n>: <message>`), exit 2
+one line `signal-check: check aborted: <reason>` for a source that cannot be read or parsed.
 
 ```sh
 make signal-check

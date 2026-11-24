@@ -201,6 +201,18 @@ def test_main_exit_codes(repo: Path, capsys: pytest.CaptureFixture[str]) -> None
     assert out[0].startswith(f"{SLO}: slo 'latency' error_query: rule 4:")
 
 
+def test_unreadable_source_ends_in_one_line(
+    monkeypatch: pytest.MonkeyPatch, repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A broken dashboard is a one-line error with exit code 2, not a traceback."""
+    monkeypatch.setattr(sc, "promtool_path", lambda: None)
+    (repo / DASHBOARD).write_text("{ not json", encoding="utf-8")
+    assert sc.main(["--root", str(repo)]) == 2
+    err = capsys.readouterr().err.strip().splitlines()
+    assert len(err) == 1
+    assert err[0].startswith("signal-check: check aborted: ")
+
+
 def test_selectors_lexing() -> None:
     expr = (
         'sum without (instance) (rate(a_total{x="a{b}",y=~"$env"}[$__rate_interval] offset 5m))'

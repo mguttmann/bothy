@@ -34,7 +34,8 @@ query the metrics to it:
 Usage:
   signalcheck.py [--root <repository root>]
 
-Exit 0 with a one-line summary; 1 with one line per finding (file, location, rule).
+Exit 0 with a one-line summary; 1 with one line per finding (file, location, rule); 2 with one
+line `signal-check: check aborted: <reason>` when a source cannot be read or parsed.
 
 Example:
   uv run --project tools --locked --quiet python tools/signalcheck/signalcheck.py
@@ -768,7 +769,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (fetch_tools.LockError, fetch_tools.FetchError) as err:
         print(f"signal-check: promtool unavailable: {err}", file=sys.stderr)
         return 1
-    findings, summary = run(args.root, promtool)
+    try:
+        findings, summary = run(args.root, promtool)
+    except (OSError, ValueError, yaml.YAMLError, subprocess.SubprocessError) as err:
+        print(f"signal-check: check aborted: {err}", file=sys.stderr)
+        return 2
     for f in findings:
         print(f)
     if findings:
