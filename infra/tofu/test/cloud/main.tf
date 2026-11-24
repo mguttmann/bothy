@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Test root of the cloud modules hetzner, aws and azure (brief M7-16). It holds no resource: the
 # test files beside it (`tofu test`, run by `make tofu-check`) call each module with mocked
 # providers, so no plan or apply ever reaches a provider account and no credential is needed

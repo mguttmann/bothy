@@ -111,18 +111,6 @@ def _problem(
     )
 
 
-def class_colours(source: str) -> list[tuple[str, str | None, str]]:
-    """Return (label, color or None, fill) of every `classDef` and `style` with a fill.
-
-    The label is e.g. `classDef person` or `style N`.
-    """
-    return [
-        (label, props.get("color"), props["fill"])
-        for label, props in class_props(source)
-        if "fill" in props and not label.startswith("linkStyle")
-    ]
-
-
 def class_props(source: str) -> list[tuple[str, dict[str, str]]]:
     """Return (label, properties) of every `classDef`, `style` and `linkStyle` of `source`.
 

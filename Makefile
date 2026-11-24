@@ -197,8 +197,8 @@ bootstrap: bootstrap-ci ## Install pinned tools and the git hooks (once per clon
 
 bootstrap-ci: ## Install pinned tools without git hooks (CI)
 	@command -v $(UV) >/dev/null || { echo "uv is required: https://docs.astral.sh/uv/"; exit 1; }
-	@node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>22||(a===22&&b>=13)?0:1)' \
-	  || { echo "Node.js >= 22.13 is required"; exit 1; }
+	@node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>24||(a===24&&b>=0)?0:1)' \
+	  || { echo "Node.js >= 24.0 is required"; exit 1; }
 	$(UV) sync --project tools --locked --quiet
 	npm ci --prefix tools/node --ignore-scripts --no-audit --no-fund --loglevel=error
 	@# The browser for mermaid-cli, unless MMDC_PUPPETEER_CONFIG names its own executable.

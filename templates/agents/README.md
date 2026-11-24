@@ -47,6 +47,7 @@ the domain `example.com` and the people Alex, Sam and Robin.
 `make templates-check` (`tools/templates/template_gate.py`, part of `make check` and of the
 pull request CI) fails on:
 
+- a template folder without any template;
 - a file or folder outside the layout, among them `.claude/`, `.mcp.json`, `.lsp.json`,
   `CLAUDE.local.md`, a plugin manifest, `hooks/`, `commands/`, `agents/`, `output-styles/`,
   `monitors/`, `bin/`, an extra skill file and a symbolic link;

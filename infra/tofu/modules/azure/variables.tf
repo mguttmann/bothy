@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Inputs of the module azure. The shared inputs (instance_name to tags) are the contract of every
 # target module (infra/tofu/README.md "Structure" item 2) with the types and checks of
 # generic-vm; the setup inputs pass through to generic-vm unchanged; the inputs below them are

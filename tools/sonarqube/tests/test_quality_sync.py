@@ -187,6 +187,21 @@ def test_apply_then_check_on_cloud_api() -> None:
         assert checked.gaps == []
 
 
+def test_main_reports_a_read_timeout_in_one_line(
+    server: tuple[State, str], capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A timeout or a malformed answer of the Web API is one line with exit code 1."""
+    _, url = server
+    monkeypatch.setenv("SONAR_TOKEN", TOKEN)
+
+    def slow(*_: object) -> qs.Report:
+        raise TimeoutError("The read operation timed out")
+
+    monkeypatch.setattr(qs, "check", slow)
+    assert qs.main(["check", "--url", url]) == 1
+    assert capsys.readouterr().err == "quality_sync: The read operation timed out\n"
+
+
 def test_token_is_sent_as_bearer_and_never_printed(
     server: tuple[State, str], capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:

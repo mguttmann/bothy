@@ -375,6 +375,15 @@ def test_secret_refs_of_a_template_name_declared_secrets(tmp_path: Path) -> None
     ]
 
 
+def test_main_refuses_a_root_without_templates(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An emptied template folder is an error, not a pass with zero templates."""
+    (tmp_path / "empty").mkdir()
+    assert gate.main(["--root", str(tmp_path / "empty"), "--repo", str(REPO)]) == 2
+    assert "no template" in capsys.readouterr().err
+
+
 def test_main_refuses_a_missing_root_and_a_broken_configuration(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

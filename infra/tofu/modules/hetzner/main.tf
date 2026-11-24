@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # The chat server on Hetzner Cloud (brief M7-16, ADR 0012, infra/tofu/README.md "Structure" item 1): a
 # firewall that admits only the edge port from the internet, the SSH keys, and one cloud server
 # whose cloud-init user data comes from generic-vm, which installs Docker, verifies the release

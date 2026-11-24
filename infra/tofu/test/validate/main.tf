@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Validation root of `make tofu-check` (briefs M7-15 and M7-16): calls all four modules, so
 # `tofu validate` checks every module and the shared contract of their inputs together. It is
 # never planned or applied; the values are documentation examples (example.com, 192.0.2.0/24,

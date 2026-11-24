@@ -624,7 +624,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         config = load_config(args.config)
         report = apply(client, config) if args.command == "apply" else check(client, config)
-    except (SonarError, LookupError, urllib.error.URLError) as exc:
+    except (SonarError, LookupError, OSError, ValueError) as exc:
         print(f"quality_sync: {exc}", file=sys.stderr)
         return 1
     if report.skipped_languages:

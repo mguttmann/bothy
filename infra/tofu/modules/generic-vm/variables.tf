@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Inputs of the module generic-vm. The shared inputs (instance_name to tags) are the contract of
 # every target module (infra/tofu/README.md); the inputs below them are this module's own.
 # Secrets are never inputs of this module: the setup wizard install.sh generates them on the host
