@@ -270,9 +270,8 @@ installed pinned CLI; again in 2.1.288, read 2026-10-29, in 2.1.321, read 2026-1
 
 LOGIN_RETRY_WAIT = 10.0
 """Seconds a run waits after a request without the login before it checks the login again and
-tries the turn once more (09 18.3, FIX-RUNNER-LOGIN-BLIP-RETRY). The two requests of the
-24.11. incident were sent 2 seconds apart, and a request of another session 2 seconds later
-used the login again."""
+tries the turn once more (09 18.3, FIX-RUNNER-LOGIN-BLIP-RETRY). In the observed transcripts
+a request of another session about 2 seconds later used the login again."""
 
 
 def _bound_baseline(session: AgentSession | None) -> dict[str, Any] | None:
@@ -3971,23 +3970,33 @@ class RunTurn:
             The attempt to start, or ``None`` when the run ended here.
         """
         self.login_retried = True
-        self.retry_inputs = [(u, self.lines[u]) for u in self.ledger.unanswered()]
         _log("login_retry_wait", seconds=self.login_retry_wait, **self.ids)
         loop = asyncio.get_running_loop()
         deadline = loop.time() + self.login_retry_wait
         while loop.time() < deadline and self.stop_reason is None and not self.handle.patch.ended:
             await asyncio.sleep(min(self.cfg.poll_interval, max(0.0, deadline - loop.time())))
-        if self.stop_reason is not None:
-            await self._finish_cancelled()
-            return None
-        if self.handle.patch.ended or self.server_ended:
-            self.server_ended = True
-            self._ended_by_server()
+        if not await self._still_wanted():
             return None
         if not await self._precheck_again():
             return None
+        if not await self._still_wanted():  # the server may end the run during the check
+            return None
+        async with self.write_lock:
+            # Under the lock: a follow-up whose write was still running is in or out for good.
+            self.retry_inputs = [(u, self.lines[u]) for u in self.ledger.unanswered()]
         _log("login_retry_started", **self.ids)
         return _Attempt(resume=True, label="resume_same_reference")
+
+    async def _still_wanted(self) -> bool:
+        """After the wait or the check of a login retry: a stop or a server end ends the run."""
+        if self.stop_reason is not None:
+            await self._finish_cancelled()
+            return False
+        if self.handle.patch.ended or self.server_ended:
+            self.server_ended = True
+            self._ended_by_server()
+            return False
+        return True
 
     async def _session_started(self, session: BgSession) -> None:
         """The session took the prompt: the further inputs of a recovery, then held follow-ups."""

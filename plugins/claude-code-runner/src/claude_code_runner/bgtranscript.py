@@ -888,9 +888,9 @@ def prompt_taken(path: Path | None, offset: int) -> bool:
 def tool_called(path: Path | None, offset: int) -> bool:
     """Whether a session called any tool after ``offset``: the retry rule of 18.3 asks it.
 
-    The CLI writes the record of an assistant message with a tool call before it runs the
-    tool (real transcript of the pinned CLI, FIX-RUNNER-LOGIN-BLIP-RETRY), so once the session
-    process is gone a call it made is in the file. Every ``assistant`` record counts, of the
+    In the observed transcripts of the pinned CLI the record of an assistant message with a
+    tool call is written before the tool runs (FIX-RUNNER-LOGIN-BLIP-RETRY), so once the
+    session process is gone a call it made is in the file. Every ``assistant`` record counts, of the
     main conversation and of a side chain, and every content item whose type ends in
     ``tool_use``. It fails closed: a file or a line that cannot be read counts as a call.
 

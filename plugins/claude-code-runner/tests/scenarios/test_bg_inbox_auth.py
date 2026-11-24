@@ -883,6 +883,29 @@ async def test_a_login_gone_after_the_wait_ends_the_run_without_a_retry(
     await nothing_left(world)
 
 
+async def test_a_stop_during_the_login_check_ends_the_run_without_a_retry(
+    bg_world: World, logs: LogLines, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world = bg_world
+    monkeypatch.setattr(RunTurn, "login_retry_wait", 2.0)
+    scenario: dict[str, Any] = {"fixture": "plain", "per_launch": {"0": {"bg_no_login": True}}}
+    world.scenario(**scenario)
+    await start(world)
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: events(logs, "login_retry_wait"))
+    # The check of the login before the retry waits on a gate; the run is stopped meanwhile.
+    gate = world.gate("auth_gate")
+    world.scenario(**scenario, auth_gate=str(gate))
+    await world.until(lambda: any(c["gate"] == "auth_gate" for c in world.calls("gate_wait")))
+    await world.fake.cancel(run.run_id, "user_cancelled")
+    world.release(gate)
+    assert await world.ended(run.run_id) == "cancelled"
+    assert texts(world) == []
+    assert events(logs, "login_retry_started") == []
+    assert len(launches(world)) == 1
+    await nothing_left(world)
+
+
 async def test_an_adopted_turn_is_never_tried_again(bg_world: World, logs: LogLines) -> None:
     world = bg_world
     # The runner is killed before the session's request without the login; the next runner

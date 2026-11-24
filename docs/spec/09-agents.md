@@ -4019,24 +4019,27 @@ The check fails closed:
   does not say so.
 - One retry after a request without the login (addendum of 2026-11-24,
   FIX-RUNNER-LOGIN-BLIP-RETRY): the CLI can send one request without the stored login in the
-  moment that login is rewritten on the host, and the next request of the same or another
-  session uses it again (runner log and transcripts of 2026-11-24). When the check fails for
+  moment that login is rewritten on the host, and the next request of the session uses it
+  again (observed in the transcripts of the pinned CLI, D-FIX-RUNNER-LOGIN-BLIP-RETRY). When the check fails for
   that reason (log code `request_without_login`), the session is stopped as above and nothing
   of it is posted; then, once per run, the turn is tried again, but only while that attempt
   cannot have acted: it is the run's own turn (not an adopted one), no output of its process
   was accepted before, its process is gone, and its transcript after the launch offset holds
-  no assistant record with a tool call (the CLI writes that record before it runs the tool;
-  a file or line that cannot be read counts as a call). The runner then waits
+  no assistant record with a tool call (in the observed transcripts the CLI writes that
+  record before it runs the tool, which is no documented guarantee, and nothing proves that
+  a forced kill after `runner.stop_grace` never loses a record; a file or line that cannot
+  be read counts as a call). The runner then waits
   `LOGIN_RETRY_WAIT` (10 seconds, log `login_retry_wait` with `seconds`), runs the pre-check
   of this section again, and resumes the session with the inputs that no `result` answered,
   as at the other recoveries of 18.9 (log `login_retry_started`). A refused pre-check ends the
   run with its reason; a stop or a run the server ended during the wait ends the run as at
-  any other point. The retry is checked like every process. Every other case ends the run
-  `billing_mode_mismatch` at once, as above, with the warning `login_retry_refused` and one of
-  the codes `adopted`, `retried_before`, `stopping`, `output_accepted`, `session_alive`,
-  `tool_called` or `nothing_to_repeat`: a second request without the login in the run, a
-  check that failed before any request record (`no_request_record`), and every mode or
-  account the pre-check does not accept, which never reaches a turn.
+  any other point, also when it comes during the check. The retry is checked like every
+  process. A `request_without_login` that is not retried ends the run `billing_mode_mismatch`
+  at once, as above, with the warning `login_retry_refused` and one of the codes `adopted`,
+  `retried_before` (a second one in the run), `stopping`, `output_accepted`,
+  `session_alive`, `tool_called` or `nothing_to_repeat`. A check that failed before any
+  request record (`no_request_record`) is never retried and logs no such warning; neither
+  does a pre-check that refuses before the retry, which ends the run with its own reason.
 
 The transcript has no member that names the credential of a request more directly; the records
 that name the account are never read (18.4). The pre-check stays binding.
