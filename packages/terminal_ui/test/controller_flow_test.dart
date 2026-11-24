@@ -345,6 +345,43 @@ void main() {
     expect(h.controller.state.phase, TerminalPhase.ended);
   });
 
+  // fn-terminal-hosts-9, console-terminal-ui-5: a failed close keeps the tab, which says so
+  // and offers End again; only a session the server no longer has counts as ended.
+  test('a failed close leaves the tab detached with the problem', () async {
+    final h = await Harness.create();
+    await h.open();
+    await h.connected();
+    h.api.closeError = const ApiProblem(status: 503, code: 'unavailable');
+    expect(await h.controller.end(), isFalse);
+    expect(h.controller.state.phase, TerminalPhase.detached);
+    expect(h.controller.state.detachCause, DetachCause.person);
+    expect(h.controller.state.problemCode, 'unavailable');
+    expect(h.controller.state.sessionId, isNotNull);
+
+    h.api.closeError = null;
+    expect(await h.controller.end(), isTrue);
+    expect(h.controller.state.phase, TerminalPhase.ended);
+  });
+
+  test('a close without an answer leaves the tab detached', () async {
+    final h = await Harness.create();
+    await h.open();
+    await h.connected();
+    h.api.closeError = StateError('offline');
+    expect(await h.controller.end(), isFalse);
+    expect(h.controller.state.phase, TerminalPhase.detached);
+    expect(h.controller.state.problemCode, 'end_failed');
+  });
+
+  test('a session the server no longer has counts as ended', () async {
+    final h = await Harness.create();
+    await h.open();
+    await h.connected();
+    h.api.closeError = const ApiProblem(status: 404, code: 'not_found');
+    expect(await h.controller.end(), isTrue);
+    expect(h.controller.state.phase, TerminalPhase.ended);
+  });
+
   test('a closed session from the host events ends the tab', () async {
     final events = FakeHostEvents();
     final h = await Harness.create(events: events);

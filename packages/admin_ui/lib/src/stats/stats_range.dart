@@ -65,15 +65,7 @@ final class StatsDays {
 
   static const L10nFormat _format = L10nFormat(Locale('en'));
 
-  static String _known(String? zone) {
-    if (zone == null || zone.isEmpty) return 'UTC';
-    try {
-      _format.dayStart(2000, 1, 1, timeZone: zone);
-      return zone;
-    } on ArgumentError {
-      return 'UTC';
-    }
-  }
+  static String _known(String? zone) => L10nFormat.knownTimeZone(zone);
 
   /// The instant at which the calendar day [date] (only its year, month and day count) starts.
   DateTime start(DateTime date) =>

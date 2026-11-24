@@ -11,7 +11,9 @@ import 'package:flutter/widgets.dart';
 import 'package:terminal_ui/src/render/terminal_screen.dart';
 
 /// Wraps the renderer in one semantics node whose label is the line at the cursor and whose
-/// custom action "Read screen" announces the visible lines.
+/// custom action "Read screen" announces the visible lines; its hint names [readScreenKeys],
+/// the keys of the same command, because macOS, Windows and the browser do not offer custom
+/// actions to a screen reader.
 ///
 /// The label follows the screen on every rebuild, but the node is not a live region, so a
 /// screen reader reads it when the person moves there, not while a program prints.
@@ -25,6 +27,7 @@ class TerminalScreenSemantics extends StatelessWidget {
     super.key,
     required this.screen,
     required this.child,
+    this.readScreenKeys,
   });
 
   /// The screen whose cursor line and visible lines are read.
@@ -32,6 +35,9 @@ class TerminalScreenSemantics extends StatelessWidget {
 
   /// The renderer.
   final Widget child;
+
+  /// The keys of "Read screen" the hint names, or null for no hint.
+  final String? readScreenKeys;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +48,9 @@ class TerminalScreenSemantics extends StatelessWidget {
         container: true,
         liveRegion: false,
         label: l.terminalScreenLabel(screen.cursorLine()),
+        hint: readScreenKeys == null
+            ? null
+            : l.terminalReadScreenHint(readScreenKeys!),
         customSemanticsActions: {
           CustomSemanticsAction(label: l.terminalReadScreen): () =>
               readScreen(context, screen),
@@ -53,7 +62,8 @@ class TerminalScreenSemantics extends StatelessWidget {
   }
 }
 
-/// Announces the visible lines of [screen] once (the command "Read screen").
+/// Announces the visible lines of [screen] once (the command "Read screen", its custom action
+/// and its keys).
 void readScreen(BuildContext context, TerminalScreen screen) {
   final text = screen.visibleText();
   if (text.isEmpty) return;

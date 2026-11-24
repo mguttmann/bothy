@@ -12,8 +12,10 @@ environment:
 
 # The members of 15 3.1 rule 7 (design_system, auth, api_client, bothy_noise, domain) and,
 # through design_system, l10n; xterm is the renderer of 24 12 (latest release, assessed in
-# docs/spec/24-terminal.md 12); built_collection and cryptography are the types of the
-# api_client and bothy_noise surfaces this package touches, already in the workspace lock.
+# docs/spec/24-terminal.md 12), pinned to exactly 4.0.0 because the escape filter (rule 3a),
+# the cursor report fix, the marks painter and the mouse selection rebuild its behavior;
+# built_collection and cryptography are the types of the api_client and bothy_noise surfaces
+# this package touches, already in the workspace lock.
 dependencies:
   api_client: any
   auth: any
@@ -25,7 +27,7 @@ dependencies:
   flutter:
     sdk: flutter
   l10n: any
-  xterm: ^4.0.0
+  xterm: 4.0.0
 
 dev_dependencies:
   alchemist: ^0.14.1

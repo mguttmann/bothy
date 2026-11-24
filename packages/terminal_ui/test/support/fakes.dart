@@ -253,10 +253,15 @@ final class FakeApi implements TerminalServerApi {
     );
   }
 
+  /// When set, `closeSession` throws it.
+  Object? closeError;
+
   @override
   Future<TerminalSession> closeSession(String sessionId) async {
     log.add('close');
     closes.add(sessionId);
+    final error = closeError;
+    if (error != null) throw error;
     return grant().session;
   }
 }

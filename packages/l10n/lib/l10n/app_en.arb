@@ -100,6 +100,46 @@
   "@liveBoxReasonProjectNotReady": {
     "description": "Translated state reason `project_not_ready` of a run (components.md section 2.1)."
   },
+  "liveBoxReasonAgentUnavailable": "Agent was not available in time",
+  "@liveBoxReasonAgentUnavailable": {
+    "description": "Translated state reason `agent_unavailable` of a run (09 section 5.2)."
+  },
+  "liveBoxReasonRuntimeError": "The runtime reported an error",
+  "@liveBoxReasonRuntimeError": {
+    "description": "Translated state reason `runtime_error` of a run (09 section 5.2)."
+  },
+  "liveBoxReasonRuntimeNotAuthenticated": "The runtime is not logged in",
+  "@liveBoxReasonRuntimeNotAuthenticated": {
+    "description": "Translated state reason `runtime_not_authenticated` of a run (09 section 5.2)."
+  },
+  "liveBoxReasonAdapterStopped": "Ended by a restart or update of the adapter",
+  "@liveBoxReasonAdapterStopped": {
+    "description": "Translated state reason `adapter_stopped` of a run (09 section 5.2)."
+  },
+  "liveBoxReasonUsageLimited": "Usage limit of the subscription reached",
+  "@liveBoxReasonUsageLimited": {
+    "description": "Translated state reason `usage_limited` of a run (09 section 5.2)."
+  },
+  "liveBoxReasonChannelReadOnly": "Channel became read-only or archived",
+  "@liveBoxReasonChannelReadOnly": {
+    "description": "Translated state reason `channel_read_only` of a run (09 section 5.2)."
+  },
+  "liveBoxReasonUserDisabled": "The person who triggered it was disabled",
+  "@liveBoxReasonUserDisabled": {
+    "description": "Translated state reason `user_disabled` of a run (09 section 5.2)."
+  },
+  "liveBoxReasonToolClassOwnerOnly": "This tool class is for owners only",
+  "@liveBoxReasonToolClassOwnerOnly": {
+    "description": "Translated state reason `tool_class_owner_only` of a run (09 section 5.2)."
+  },
+  "liveBoxReasonToolClassMismatch": "The tool class is higher than allowed",
+  "@liveBoxReasonToolClassMismatch": {
+    "description": "Translated state reason `tool_class_mismatch` of a run (09 section 5.2)."
+  },
+  "liveBoxReasonInvalidInvocationToken": "The run's authorization was invalid",
+  "@liveBoxReasonInvalidInvocationToken": {
+    "description": "Translated state reason `invalid_invocation_token` of a run (09 section 5.2)."
+  },
   "liveBoxWaitSlotsFull": "Waiting for a free slot ({used} of {total} in use)",
   "@liveBoxWaitSlotsFull": {
     "description": "State text of a queued run whose agent has every slot of `runner.max_parallel_runs` in use (wait reason `slots_full`, 09 5.2.1).",
@@ -1069,6 +1109,24 @@
       }
     }
   },
+  "liveBoxSemanticsLabelNoContext": "Run of {agent}: {state}, for {duration}",
+  "@liveBoxSemanticsLabelNoContext": {
+    "description": "Screen reader label of the live box container when no context use is measured (components.md section 2.4).",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Robin"
+      },
+      "state": {
+        "type": "String",
+        "example": "Running"
+      },
+      "duration": {
+        "type": "String",
+        "example": "4:12"
+      }
+    }
+  },
   "liveBoxFollowupHint": "Messages in this thread reach the agent as a follow-up",
   "@liveBoxFollowupHint": {
     "description": "Note in the footer of a running live box (components.md section 2.1)."
@@ -1582,6 +1640,10 @@
         "example": "Alex"
       }
     }
+  },
+  "billingLabelPersonalNoHolder": "Backend: Personal, uses a personal subscription",
+  "@billingLabelPersonalNoHolder": {
+    "description": "Screen reader label of the badge `personal` when the holder of the subscription is not known (components.md section 10)."
   },
   "billingLabelOrganization": "Backend: Organization",
   "@billingLabelOrganization": {
@@ -7716,6 +7778,16 @@
   "terminalReadScreen": "Read screen",
   "@terminalReadScreen": {
     "description": "Screen reader action that reads the visible terminal screen (01 section 8)."
+  },
+  "terminalReadScreenHint": "{keys} reads the screen",
+  "@terminalReadScreenHint": {
+    "description": "Screen reader hint of the terminal screen that names the keys of the command Read screen (01 section 8).",
+    "placeholders": {
+      "keys": {
+        "type": "String",
+        "example": "Ctrl+Shift+S"
+      }
+    }
   },
   "terminalScreenLabel": "Terminal, line at the cursor: {line}",
   "@terminalScreenLabel": {

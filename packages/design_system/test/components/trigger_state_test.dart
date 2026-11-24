@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import 'dart:io';
+
 import 'package:design_system/design_system.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -187,6 +189,23 @@ void main() {
       'operator_not_in_channel',
       'operator_cannot_serve_project',
     ]) {
+      expect(dsReasonText(l, code), isNotNull, reason: code);
+    }
+  });
+
+  test('every run reason of 09 5.2 has a text', () async {
+    final l = await en();
+    // The table of docs/spec/09-agents.md 5.2, read from the spec so a new reason there
+    // fails here until it has a text (fn-agents-runs-6).
+    final spec = File('../../docs/spec/09-agents.md').readAsStringSync();
+    final start = spec.indexOf('### 5.2 Reasons');
+    final end = spec.indexOf('### 5.2.1', start);
+    final codes = RegExp(
+      r'^\| `([a-z_]+)` \|',
+      multiLine: true,
+    ).allMatches(spec.substring(start, end)).map((m) => m.group(1)!).toList();
+    expect(codes, hasLength(greaterThan(15)));
+    for (final code in codes) {
       expect(dsReasonText(l, code), isNotNull, reason: code);
     }
   });

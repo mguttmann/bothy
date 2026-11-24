@@ -62,6 +62,7 @@ String terminalShortcutRowLabel(AppLocalizations l, TerminalShortcutRow row) =>
       TerminalShortcutAction.search => l.shortcutTerminalSearch,
       TerminalShortcutAction.fontLarger ||
       TerminalShortcutAction.fontSmaller => l.shortcutTerminalFontSize,
+      TerminalShortcutAction.readScreen => l.terminalReadScreen,
     };
 
 /// The key names of the language of [l].

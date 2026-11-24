@@ -40,7 +40,8 @@ L10nFormat dsFormat(BuildContext context) =>
 /// The translated text of a run or trigger reason [code], or null for a code this app does
 /// not translate (the caller then shows the code in `type.code-sm`).
 ///
-/// Covers the run reasons of components.md 2.1 and the acceptance reasons of 09 3.5. [name]
+/// Covers the run reasons of 09 5.2 (components.md 2.1) and the acceptance reasons of 09 3.5
+/// (both held by test/components/trigger_state_test.dart). [name]
 /// fills `user_cancelled` ("Canceled by Sam"); without it the text names no one.
 String? dsReasonText(AppLocalizations l, String? code, {String? name}) {
   return switch (code) {
@@ -67,6 +68,16 @@ String? dsReasonText(AppLocalizations l, String? code, {String? name}) {
     'adapter_error' => l.liveBoxReasonAdapterError,
     'cancel_timeout' => l.liveBoxReasonCancelTimeout,
     'project_not_ready' => l.liveBoxReasonProjectNotReady,
+    'agent_unavailable' => l.liveBoxReasonAgentUnavailable,
+    'runtime_error' => l.liveBoxReasonRuntimeError,
+    'runtime_not_authenticated' => l.liveBoxReasonRuntimeNotAuthenticated,
+    'adapter_stopped' => l.liveBoxReasonAdapterStopped,
+    'usage_limited' => l.liveBoxReasonUsageLimited,
+    'channel_read_only' => l.liveBoxReasonChannelReadOnly,
+    'user_disabled' => l.liveBoxReasonUserDisabled,
+    'tool_class_owner_only' => l.liveBoxReasonToolClassOwnerOnly,
+    'tool_class_mismatch' => l.liveBoxReasonToolClassMismatch,
+    'invalid_invocation_token' => l.liveBoxReasonInvalidInvocationToken,
     _ => null,
   };
 }
@@ -206,6 +217,7 @@ class DsTappable extends StatefulWidget {
     this.label,
     this.hint,
     this.hoverColor,
+    this.pressedColor,
     this.radius = DsRadius.sm,
     this.selected,
     this.expanded,
@@ -231,6 +243,12 @@ class DsTappable extends StatefulWidget {
 
   /// The hover background, or null for `color.surface.hover`.
   final Color? hoverColor;
+
+  /// The pressed background, or null for `color.surface.selected`.
+  ///
+  /// Hover and pressed are ink of this surface, painted below the child: a child with an
+  /// opaque fill paints that fill with [Ink] instead (as [DsButton] does), so they show.
+  final Color? pressedColor;
 
   /// The corner radius of the hover, splash and ring.
   final double radius;
@@ -293,7 +311,7 @@ class _DsTappableState extends State<DsTappable> {
         borderRadius: shape,
         hoverColor: widget.hoverColor ?? colors.surfaceHover,
         focusColor: Colors.transparent,
-        highlightColor: colors.surfaceSelected,
+        highlightColor: widget.pressedColor ?? colors.surfaceSelected,
         splashFactory: NoSplash.splashFactory,
         onFocusChange: (focused) => setState(() => _focused = focused),
         child: content,

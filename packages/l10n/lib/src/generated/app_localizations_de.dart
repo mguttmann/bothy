@@ -81,6 +81,44 @@ class AppLocalizationsDe extends AppLocalizations {
   String get liveBoxReasonProjectNotReady => 'Projekt nicht bereit';
 
   @override
+  String get liveBoxReasonAgentUnavailable =>
+      'Agent war nicht rechtzeitig verfügbar';
+
+  @override
+  String get liveBoxReasonRuntimeError => 'Die Laufzeit meldete einen Fehler';
+
+  @override
+  String get liveBoxReasonRuntimeNotAuthenticated =>
+      'Die Laufzeit ist nicht angemeldet';
+
+  @override
+  String get liveBoxReasonAdapterStopped =>
+      'Durch Neustart oder Update des Adapters beendet';
+
+  @override
+  String get liveBoxReasonUsageLimited => 'Nutzungsgrenze des Abos erreicht';
+
+  @override
+  String get liveBoxReasonChannelReadOnly =>
+      'Kanal wurde schreibgeschützt oder archiviert';
+
+  @override
+  String get liveBoxReasonUserDisabled =>
+      'Die auslösende Person wurde deaktiviert';
+
+  @override
+  String get liveBoxReasonToolClassOwnerOnly =>
+      'Diese Werkzeugklasse ist nur für Owner';
+
+  @override
+  String get liveBoxReasonToolClassMismatch =>
+      'Die Werkzeugklasse liegt über der erlaubten';
+
+  @override
+  String get liveBoxReasonInvalidInvocationToken =>
+      'Die Berechtigung des Laufs war ungültig';
+
+  @override
   String liveBoxWaitSlotsFull(int used, int total) {
     return 'Wartet auf einen freien Platz ($used von $total belegt)';
   }
@@ -777,6 +815,15 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String liveBoxSemanticsLabelNoContext(
+    String agent,
+    String state,
+    String duration,
+  ) {
+    return 'Lauf von $agent: $state, seit $duration';
+  }
+
+  @override
   String get liveBoxFollowupHint =>
       'Nachrichten in diesem Thread erreichen den Agenten als Nachtrag';
 
@@ -1101,6 +1148,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String billingLabelPersonal(String name) {
     return 'Backend: Persönlich, läuft auf dem Abo von $name';
   }
+
+  @override
+  String get billingLabelPersonalNoHolder =>
+      'Backend: Persönlich, nutzt ein persönliches Abo';
 
   @override
   String get billingLabelOrganization => 'Backend: Organisation';
@@ -5143,6 +5194,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get terminalReadScreen => 'Bildschirm vorlesen';
+
+  @override
+  String terminalReadScreenHint(String keys) {
+    return '$keys liest den Bildschirm vor';
+  }
 
   @override
   String terminalScreenLabel(String line) {

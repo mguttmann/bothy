@@ -34,13 +34,35 @@ class GuardedPasteIntent extends Intent {
   const GuardedPasteIntent();
 }
 
+/// The intent of the command "Read screen" (01 7 and 8): announces the visible lines. Its keys
+/// reach a screen reader where the platform ignores custom semantics actions (macOS, Windows,
+/// the browser).
+class ReadScreenIntent extends Intent {
+  /// Creates the intent.
+  const ReadScreenIntent();
+}
+
+bool _apple(TargetPlatform platform) =>
+    platform == TargetPlatform.macOS || platform == TargetPlatform.iOS;
+
+/// The keys of "Read screen" on [platform] as the screen names them: Cmd+Shift+S on Apple
+/// systems, Ctrl+Shift+S elsewhere (R-PR-10: only with the platform modifier).
+String terminalReadScreenKeys(TargetPlatform platform) =>
+    _apple(platform) ? 'Cmd+Shift+S' : 'Ctrl+Shift+S';
+
 /// The shortcuts of the screen: copy and paste only with the platform modifier (Cmd on Apple,
-/// Ctrl+Shift elsewhere, so Ctrl+C and Ctrl+V stay with the shell, 15 23.4). The remaining
-/// shortcuts of the app come in through [TerminalScreenView.shortcuts] (M4-36).
+/// Ctrl+Shift elsewhere, so Ctrl+C and Ctrl+V stay with the shell, 15 23.4), and "Read screen"
+/// ([terminalReadScreenKeys]). The remaining shortcuts of the app come in through
+/// [TerminalScreenView.shortcuts] (M4-36).
 Map<ShortcutActivator, Intent> terminalShortcuts(TargetPlatform platform) {
-  final apple =
-      platform == TargetPlatform.macOS || platform == TargetPlatform.iOS;
+  final apple = _apple(platform);
   return {
+    SingleActivator(
+      LogicalKeyboardKey.keyS,
+      meta: apple,
+      control: !apple,
+      shift: true,
+    ): const ReadScreenIntent(),
     SingleActivator(
       LogicalKeyboardKey.keyC,
       meta: apple,
@@ -56,11 +78,12 @@ Map<ShortcutActivator, Intent> terminalShortcuts(TargetPlatform platform) {
   };
 }
 
-/// Whether the screen reads only the hardware keyboard on [platform]: Windows, whose embedder
-/// refuses the text input client of xterm 4.0.0 (it names no view). Elsewhere the client stays,
-/// so dead keys, input methods and the soft keyboard keep working (D-M4-36-10).
-bool hardwareKeyboardOnlyOn(TargetPlatform platform) =>
-    platform == TargetPlatform.windows;
+/// Whether the screen reads only the hardware keyboard on [platform]: the Windows app, whose
+/// embedder refuses the text input client of xterm 4.0.0 (it names no view). Elsewhere the
+/// client stays, so dead keys, input methods and the soft keyboard keep working (D-M4-36-10);
+/// also in a browser on Windows ([web], where the platform is the browser's system).
+bool hardwareKeyboardOnlyOn(TargetPlatform platform, {bool web = kIsWeb}) =>
+    !web && platform == TargetPlatform.windows;
 
 /// The family of the terminal font: JetBrains Mono, bundled with this package (`fonts/`,
 /// `fonts/MANIFEST.json`, docs/decisions.d/FIX-terminal-font.md).
@@ -241,6 +264,9 @@ class _TerminalScreenViewState extends State<TerminalScreenView>
             GuardedPasteIntent: CallbackAction<GuardedPasteIntent>(
               onInvoke: (_) => _paste(),
             ),
+            ReadScreenIntent: CallbackAction<ReadScreenIntent>(
+              onInvoke: (_) => readScreen(context, _c.screen),
+            ),
           },
           child: Stack(
             children: [
@@ -269,6 +295,7 @@ class _TerminalScreenViewState extends State<TerminalScreenView>
                     onPointerCancel: (_) => _mouse.up(),
                     child: TerminalScreenSemantics(
                       screen: _c.screen,
+                      readScreenKeys: terminalReadScreenKeys(platform),
                       child: _privateInput(
                         private,
                         TerminalView(
