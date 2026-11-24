@@ -467,7 +467,7 @@ class Player:
         self.job_running = False
         self.turn_open = False
         self.late: dict[str, Any] | None = None
-        """A line dequeued before the record of the turn's final answer (2.1.331)."""
+        """A line dequeued before the record of the turn's final answer (written late)."""
         self._status: tuple[str, str | None] | None = None
         sys.argv[1:] = self.argv  # the fixtures expand {{add_dir}} from the launch's arguments
 
@@ -579,9 +579,9 @@ class Player:
     def text(self, value: str, ident: str | None = None, *, late: bool = False) -> None:
         """A final answer; ``late``: written after a line that came meanwhile was dequeued.
 
-        Like 2.1.331 (live probe of 2026-11-24): the record of a turn's final answer is written
-        only after the turn's stop hooks, with the time the answer came, so the dequeue of a
-        line that arrived meanwhile stands before it in the file.
+        Like the pinned CLI in live runs (2.1.330 on 2026-11-23, 2.1.331 on 2026-11-24): the
+        record of a turn's final answer may be written seconds after the answer came, with the
+        time it came, so the dequeue of a line that arrived meanwhile stands before it.
         """
         self.request()
         stamp = _now()

@@ -44,3 +44,6 @@ Open minors (for the next run in this area of the runner):
 - The scenario test waits a fixed two seconds to show that the session is not released.
 - No test yet for a start that was deferred and then given on by a request before the turn's
   end; the fixture `subagent_notice/s.jsonl` carries no `stop_reason`.
+
+Addendum of 2026-11-24: a `dequeue` while a request waits for its output is deferred too, and
+a late final answer is recognised by its earlier `timestamp` (FIX-RUNNER-CLI-331).

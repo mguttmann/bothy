@@ -960,7 +960,11 @@ def test_every_member_the_runner_reads_is_one_the_pinned_cli_wrote() -> None:
         written = set(table["records"][record])
         # Read in the CLI's file, not recorded: the stand-in sends no usage window, and no
         # recorded session got a delivery of another sender (``subkind``).
-        assert set(members) - {"apiErrorParams", "subkind"} <= written, record
+        # ``queueTranscriptOnly`` is read in real transcripts: no recorded session resumed with
+        # a notification left by the process before.
+        assert set(members) - {"apiErrorParams", "subkind", "queueTranscriptOnly"} <= written, (
+            record
+        )
     assert {"kind", "producer", "subkind"} == set(READ_FIELDS["origin/task-notification"])
     read = {"id", "sessionId", "pid", "status", "waitingFor", "kind", "name"}
     assert read <= set(table["session_entry"])
@@ -1692,11 +1696,11 @@ def test_a_forged_line_in_the_shape_of_the_followup_stays_foreign() -> None:
 
 FOLLOWUP_BEFORE_LATE_ANSWER = OWN_NOTICE.with_name("followup_before_late_answer.jsonl")
 """Real records of Claude Code 2.1.331 from the live probe of 2026-11-24 (structure only: texts,
-ids and paths replaced), up to the request of the follow-up's turn. 2.1.331 writes the record
-of the turn's final answer only after its stop hooks: a follow-up of the run's owner that
-arrived meanwhile was dequeued before that record, which carries the earlier timestamp. The
-runner then took the turn's end as the follow-up's answer, stopped the session while the model
-worked on the follow-up, and the run failed with ``runtime_error``."""
+ids and paths replaced), up to the request of the follow-up's turn. The CLI wrote the record
+of the turn's final answer seconds late (so did 2.1.330 in a production run): a follow-up of
+the run's owner that arrived meanwhile was dequeued before that record, which carries the
+earlier timestamp. The runner then took the turn's end as the follow-up's answer, stopped the
+session while the model worked on the follow-up, and the run failed with ``runtime_error``."""
 
 
 def _followup_before_late_answer() -> tuple[list[dict[str, Any]], str, OwnerLines]:
@@ -1711,7 +1715,7 @@ def _followup_before_late_answer() -> tuple[list[dict[str, Any]], str, OwnerLine
 
 def test_a_followup_dequeued_before_the_late_final_answer_starts_after_the_result() -> None:
     records, line, owner = _followup_before_late_answer()
-    # The record order of 2.1.331: the dequeue before the final answer it follows in time.
+    # The record order of the live run: the dequeue before the final answer it follows in time.
     kinds = [
         (r["type"], r.get("operation") or (r.get("message") or {}).get("stop_reason"))
         for r in records
@@ -1753,6 +1757,56 @@ def test_a_followup_dequeued_before_the_late_final_answer_keeps_the_session() ->
     found.append(_decide_pending(state, now + 31.0, pending=0))
     assert "close" not in found
     assert found[-1] == "none"
+
+
+TRANSCRIPT_ONLY_NOTICE = OWN_NOTICE.with_name("transcript_only_notice_after_late_answer.jsonl")
+"""Real records of the pinned CLI from a resumed runner session (structure only): the CLI
+queued the notification of a background command the process before had left, dequeued it after
+the late records of the prompt's final answer, and wrote it after the turn's end with
+``queueTranscriptOnly``: it is only noted and starts no request. In production the run ended
+``completed``."""
+
+
+def test_a_transcript_only_input_after_the_late_answer_ends_its_own_turn() -> None:
+    records = [json.loads(x) for x in TRANSCRIPT_ONLY_NOTICE.read_text("utf-8").splitlines()]
+    [prompt] = [r for r in records if (r.get("origin") or {}).get("kind") == "human"]
+    [notice] = [r for r in records if r.get("queueTranscriptOnly") is True]
+    assert records.index(notice) == len(records) - 2  # nothing but the totals after it
+    mapper = TranscriptMapper(prompt["uuid"])
+    out = [m for r in records for m in mapper.map(r)]
+    shapes = [shape(m) for m in out if shape(m) not in ("bg_totals", "system/bg_request")]
+    # The notification's start follows the prompt's answer; it ends without a request.
+    assert shapes[-5:] == [
+        "result",
+        "command/started",
+        "system/init",
+        "system/bg_foreign",
+        "result",
+    ]
+    results = [m for m in out if m["type"] == "result"]
+    assert results[0]["result"] != ""
+    assert results[-1]["num_turns"] == 0
+    assert results[-1]["result"] == ""
+    assert not mapper.turn_open
+    state = ProcessState(has_stdin=True)
+    for message in out:
+        state.apply(message, 1.0)
+    # The run is answered: the stdin rule releases the session after the grace.
+    assert _decide_pending(state, 40.0, pending=0) == "close"
+
+
+def test_a_transcript_only_input_inside_a_working_turn_ends_nothing() -> None:
+    mapper = started("prompt-uuid")
+    notice = {
+        "type": "user",
+        "isSidechain": False,
+        "queueTranscriptOnly": True,
+        "origin": {"kind": "task-notification", "producer": "session-task"},
+        "message": {"role": "user", "content": "<task-notification>\n</task-notification>"},
+    }
+    out = [m for r in (REQUEST, notice) for m in mapper.map(r)]
+    assert "result" not in [shape(m) for m in out]
+    assert mapper.turn_open
 
 
 def _stamped(record: dict[str, Any], second: int) -> dict[str, Any]:

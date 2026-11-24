@@ -443,7 +443,7 @@ async def test_a_followup_taken_as_the_turn_ends_is_answered_before_the_release(
 async def test_a_followup_dequeued_before_the_late_final_answer_is_answered(
     bg_world: World,
 ) -> None:
-    # Live probe of 2026-11-24 with 2.1.331 (FIX-RUNNER-CLI-331): the CLI wrote the record of
+    # Live runs on 2.1.330 and 2.1.331 (FIX-RUNNER-CLI-331): the CLI wrote the record of
     # the turn's final answer after the dequeue of the follow-up; the runner took the turn's
     # end as the follow-up's answer, stopped the session while the model worked on the
     # follow-up, and the run failed with ``runtime_error``.
@@ -474,7 +474,7 @@ async def test_a_followup_dequeued_before_the_late_final_answer_is_answered(
     assert len(players(world)) == 1
     records = transcript(world, players(world)[0])
     order = [r.get("operation") or (r.get("message") or {}).get("id") for r in records]
-    assert order.index("dequeue") < order.index("msg_final")  # the order of 2.1.331
+    assert order.index("dequeue") < order.index("msg_final")  # the order of the live runs
 
 
 def _transcriber(world: World) -> str:
@@ -984,6 +984,7 @@ def members_seen(world: World) -> set[str]:
             "error",
             "isApiErrorMessage",
             "origin",
+            "queueTranscriptOnly",
         } <= set(record), name
         inner = record.get("attachment")
         origin = record.get("origin") if name == "user" else None
