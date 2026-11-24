@@ -199,7 +199,7 @@
       "method": "on_processing_complete"
     }
   ],
-  "inputs_sha256": "a46fe617d5c9ef8f86b532b3d07b8e6b1f49abe2a38637bfb48c4781b9b3b5a3",
+  "inputs_sha256": "8a17610f27343e4c2e3cdfdcc47a5e1acfa07592164be1f4d07ae2d5052e4d2d",
   "model_requests": [
     {
       "credential": "none",
@@ -211,7 +211,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:38bd3792a05398435a7a5f5797a319350f8b700e412184b563cd6c9e51519964:5184",
+        "sha256:add198fe42c621ecaded9fe584d60a1acc09b7c2da916d34c2c8fd4b85383792:5007",
         "sha256:266d5c8789166e7a74817866b97360a713aee0852f2b0b617fe1125397f43594:40"
       ],
       "roles": [
@@ -235,7 +235,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:38bd3792a05398435a7a5f5797a319350f8b700e412184b563cd6c9e51519964:5184",
+        "sha256:add198fe42c621ecaded9fe584d60a1acc09b7c2da916d34c2c8fd4b85383792:5007",
         "sha256:266d5c8789166e7a74817866b97360a713aee0852f2b0b617fe1125397f43594:40",
         "sha256:e084269741111444ebbbec8aa05fb451b67cf2183522655e222280b5cbdcee55:46",
         "sha256:84c14bc5889fcc52f14eb25366f13cf9498cb6dfc38d1b1abf947d3204152632:448"
@@ -284,11 +284,6 @@
       "tool_call_ids": [],
       "tools": [],
       "turn": null
-    },
-    {
-      "credential": "none",
-      "route": "openai.models",
-      "scripted": false
     }
   ],
   "pattern": [
@@ -377,7 +372,7 @@
     }
   ],
   "pin": {
-    "commit": "f7e2898aaefc8f967dbf7345e3999a65672fe60e",
+    "commit": "0f602c5f6f18615632535251d62a2db74ce93b69",
     "tag": null
   },
   "scenario": "busy_interrupt"
