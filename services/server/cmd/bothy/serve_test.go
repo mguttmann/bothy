@@ -83,8 +83,12 @@ func serveTestEnv(t *testing.T, db *pgtest.DB, extra ...string) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
+	maint, err := os.ReadFile(filepath.Join(db.SecretsDir(), "db_maint_password"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	for name, b := range map[string][]byte{
-		"db_app_password": pw, "telemetry_pseudonym_key": bytes.Repeat([]byte("k"), 48),
+		"db_app_password": pw, "db_maint_password": maint, "telemetry_pseudonym_key": bytes.Repeat([]byte("k"), 48),
 		"audit_ip_kek": []byte(strings.Repeat("6b", 32)), "token_pepper": []byte(strings.Repeat("7c", 32)),
 		"totp_key": []byte(strings.Repeat("5d", 32)), "webhook_hmac_master_key": []byte(strings.Repeat("4e", 32)),
 		"file_ticket_key": []byte(strings.Repeat("3f", 32)),
