@@ -1914,9 +1914,11 @@ class HermesHandler(AgentHandler):
             or turn.dropped
             or turn.final_reply
             or turn.waiting
+            or turn.session_command is not None
         ):
             # After the answer Hermes may have drained its last steer already; the server's
-            # follow-on run takes the follow-up instead (09 7).
+            # follow-on run takes the follow-up instead (09 7). A run of a session command has
+            # no turn of its own to steer into (09 17.3).
             return False
         await self.runtime.steer(turn.thread_id, text, message_id)
         return True

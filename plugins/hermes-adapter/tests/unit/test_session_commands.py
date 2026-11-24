@@ -9,6 +9,7 @@ and exactly one of the session commands, sends the command. Everything else stay
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -19,7 +20,7 @@ from adapter_kit import FakeRuntime, rig
 from bothy_sdk.generated.models import MessageOrigin, PrincipalKind
 
 from bothy_hermes_adapter.hermes_commands import COMMAND_FAILED
-from bothy_hermes_adapter.runtime import TurnOutcome, TurnRequest
+from bothy_hermes_adapter.runtime import CommandRequest, TurnOutcome, TurnRequest
 from bothy_hermes_adapter.session_commands import (
     NOT_ANSWERED,
     command_line,
@@ -181,3 +182,25 @@ async def test_a_silent_hermes_turn_stays_silent(tmp_path: Path) -> None:
         run = await r.fake.trigger("Hello @Lotse")
         await r.until(lambda: r.finished(run.run_id))
     assert [m["content_md"] for m in r.fake.messages if m.get("run_id")] == []
+
+
+@pytest.mark.anyio
+async def test_a_followup_during_a_session_command_is_not_steered(tmp_path: Path) -> None:
+    """The command run has no turn: a follow-up meanwhile is never passed into Hermes."""
+    gate = asyncio.Event()
+
+    class Blocking(FakeRuntime):
+        async def run_command(self, command: CommandRequest) -> list[str]:
+            self.commands.append(command)
+            await gate.wait()
+            return ["Dropped 1 lost turn."]
+
+    rt = Blocking()
+    async with rig(tmp_path, runtime=rt, tool_class="host") as r:
+        run = await r.fake.trigger("/discard", author="robin")
+        await r.until(lambda: rt.commands)
+        await r.fake.deliver_followup(run.run_id, "and this", author="robin")
+        await asyncio.sleep(0.2)
+        gate.set()
+        await r.until(lambda: r.finished(run.run_id))
+    assert rt.steered == []

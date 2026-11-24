@@ -2956,24 +2956,32 @@ is a manual option. While the pin follows upstream main, the newest release is o
 | Title | after the first completed run of a new session, the Hermes session title as an automatic suggestion (`auto = true`, section 12 point 5), read through Hermes' storage interface (`persistence_assembly`), on a Hermes without it through `hermes_state.SessionDB` (D-HAM-1) |
 
 Session commands typed as a message (addendum of 2026-11-24, FIX-hermes-session-commands): Hermes
-pauses a thread's session when a turn was lost in a restart (a reboot, a crash) and tells the
-person to send `/discard` or `/reset`. A person's text reaches Hermes with `allow_gateway_control`
-off (17.4), so such a text was a plain turn and never the command. The adapter therefore sends
+pauses a thread's session when a turn was lost in a restart (a reboot, a crash) and tells the person
+to send `/discard` or `/reset`. A person's text reaches Hermes with `allow_gateway_control` off
+(17.4), so such a text was a plain turn and never the command. The adapter therefore sends
 `/discard`, `/reset`, `/new` or `/stop` as the Hermes command, from its control sender (17.4),
 instead of a turn exactly when all of these hold: the run has `trigger_kind = message`; its token
 carries `tool_class = host`, for which the server lets only an active owner trigger the agent (07
 SR2, checked at acceptance and before every delivery; a ready dev environment, the other way SR2
-allows, the server does not set yet); the triggering message has `origin = human`, an author of
-kind `user` equal to the token's `sub`, no attachments, and its whole text (white space around it
-and the case of the name aside) is one of these four commands without an argument. Every other
-run keeps the text as a turn, among them a `team` run (a member's reply or an owner's copy, 3.9.9),
-a follow-up, a command run and a run of an agent of tool class `chat` or `scoped`. A confirmation
-Hermes asks for (`/new`, `/reset`) is answered "once"; each text Hermes answers, for a confirmed
-command the text its confirmation returns, becomes the run's answer, no answer at all the notice
-"The command /<name> failed in Hermes and gave no reply.", and the run ends `completed`. A new Hermes session after `/reset` or `/new` is reported with
-`agent_session.report` like any session change of a run (a different reference replaces the
-stored one, 9.5 point 3). The registered command table keeps `discard` refused: no
-command is offered in the apps, and a non-owner never sends it.
+allows, the server does not set yet); the triggering message has `origin = human`, an author of kind
+`user` equal to the token's `sub`, no attachments, and its whole text (white space around it and the
+case of the name aside) is one of these four commands without an argument. Every other run keeps the
+text as a turn, among them a `team` run (a member's reply or an owner's copy, 3.9.9), a follow-up, a
+command run and a run of an agent of tool class `chat` or `scoped`. A confirmation Hermes asks for
+(`/new`, `/reset`) is answered "once"; each text Hermes answers, for a confirmed command the text
+its confirmation returns, becomes the run's answer, no answer at all the notice "The command /<name>
+failed in Hermes and gave no reply.", and the run ends `completed`. A new Hermes session after
+`/reset` or `/new` is reported with `agent_session.report` like any session change of a run (a
+different reference replaces the stored one, 9.5 point 3). The registered command table keeps
+`discard` refused: no command is offered in the apps, and a non-owner never sends it. Source of the
+Hermes behaviour, the pinned version of `plugins/hermes-adapter/tests/hermes_pin.toml`
+(https://github.com/NousResearch/hermes-agent/tree/0f602c5f6f18615632535251d62a2db74ce93b69,
+retrieved 2026-11-24): `gateway/platforms/event.py` (`is_command` needs `allow_gateway_control`),
+`gateway/session_ingress.py` (`admit_message`, `pause_notice`: one notice per pause, later messages
+admitted without a reply), `gateway/slash_commands_session.py` (`_handle_discard_command`,
+`discard_lost_turns`) and `tools/slash_confirm.py` (`resolve` returns the confirmed command's reply
+instead of sending it); measured in
+`plugins/hermes-adapter/tests/fake_hermes/test_paused_session.py` [verified].
 
 Long replies stay one message (Baseline section 4; addendum of 2026-10-29, 01 6.13, D-M4-47-5):
 the adapter gives Hermes `MAX_MESSAGE_LENGTH` = `NO_SPLIT_LENGTH` (as a class attribute and as
@@ -3146,8 +3154,9 @@ message, answers only the first one of a pause with its notice and every later o
 When Hermes reports the event's processing complete, no turn of the thread passed `pre_llm_call`
 while the run was open and the run has no answer, the adapter posts the notice "Hermes saved this
 message but did not answer it: its conversation in this thread is paused or waiting. If Hermes
-said that a previous turn did not finish when it restarted, an owner can send /discard to drop
-that turn and continue, or /reset to start a fresh conversation." as the run's answer and ends the
+said that a previous turn did not finish when it restarted, an owner can start a fresh
+conversation with /new, or, on an agent with host tools, send /discard to drop that turn and
+continue." as the run's answer and ends the
 run `completed`. A turn that ran and answered nothing on purpose (a silent reply) gets no notice.
 
 The adapter passes on the context (4.6) on the user side of the turn, separate from the text of

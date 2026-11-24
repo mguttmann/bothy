@@ -43,7 +43,8 @@ CONFIRMED: Final = frozenset({"new", "reset"})
 NOT_ANSWERED: Final = (
     "Hermes saved this message but did not answer it: its conversation in this thread is paused "
     "or waiting. If Hermes said that a previous turn did not finish when it restarted, an owner "
-    "can send /discard to drop that turn and continue, or /reset to start a fresh conversation."
+    "can start a fresh conversation with /new, or, on an agent with host tools, send /discard "
+    "to drop that turn and continue."
 )
 """The run's answer when Hermes ran no turn and sent nothing for the run's message (09 17.6)."""
 
