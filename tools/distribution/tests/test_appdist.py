@@ -330,6 +330,18 @@ def test_promotion_removes_only_the_channel(cfg: dict[str, Any], ed: Ed25519Priv
         dist.promote_appcast(promoted, 7, ed)
 
 
+def test_promotion_starts_the_phased_rollout_at_the_promotion(
+    cfg: dict[str, Any], ed: Ed25519PrivateKey
+) -> None:
+    # Sparkle counts the groups of a phased rollout from the pubDate of the entry; a build that
+    # stayed in beta longer than the rollout would otherwise reach every stable user at once.
+    feed = dist.add_items(dist.new_appcast("ExampleChat", cfg), [_item(cfg, "0.1.0", b"n", ed)], ed)
+    promoted = dist.promote_appcast(feed, 1000, ed, now=datetime(2026, 11, 24, 9, 30, tzinfo=UTC))
+    item = ET.fromstring(dist.feed_content(promoted)).find("channel/item")  # noqa: S314
+    assert item is not None
+    assert item.findtext("pubDate") == "Tue, 24 Nov 2026 09:30:00 +0000"
+
+
 def test_merge_adds_the_entries_of_a_release(cfg: dict[str, Any], ed: Ed25519PrivateKey) -> None:
     published = dist.add_items(
         dist.new_appcast("ExampleChat", cfg), [_item(cfg, "0.1.0", b"n", ed)], ed
