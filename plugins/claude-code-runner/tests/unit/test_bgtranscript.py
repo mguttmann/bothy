@@ -2034,3 +2034,48 @@ def test_a_dequeue_while_the_turn_still_works_starts_nothing_after_its_end() -> 
     for message in out:
         state.apply(message, 1.0)
     assert _decide_pending(state, 40.0, pending=0) == "close"
+
+
+# ---- the same race in the records of FOLLOWUP_AT_TURN_END (cross-check of the Hermes side) ----
+
+FOLLOWUP_BEFORE_FINAL_ANSWER = OWN_NOTICE.with_name("followup_before_final_answer.jsonl")
+"""The records of `FOLLOWUP_AT_TURN_END` in the order the CLI wrote them in the live probe of
+2026-11-24 (2.1.331) and in production runs on 2.1.330: ``enqueue`` and ``dequeue`` of the
+follow-up before the ``assistant`` record of the turn's final answer, whose timestamp is older
+than the dequeue."""
+
+
+def test_a_followup_dequeued_before_the_final_answer_keeps_the_session_until_its_answer() -> None:
+    records = [json.loads(x) for x in FOLLOWUP_BEFORE_FINAL_ANSWER.read_text("utf-8").splitlines()]
+    [peer_record] = [r for r in records if (r.get("origin") or {}).get("kind") == "peer"]
+    line = peer_record["uuid"]
+    kinds = [(r["type"], r.get("operation") or r.get("subtype")) for r in records]
+    final = max(i for i, r in enumerate(records) if r["type"] == "assistant")
+    dequeue = kinds.index(("queue-operation", "dequeue"))
+    assert dequeue < final < kinds.index(("system", "turn_duration"))
+    mapper = TranscriptMapper("prompt-uuid", {line}.__contains__)
+    out = [m for r in records for m in mapper.map(r)]
+    state = ProcessState(has_stdin=True)
+    found, echoed = [], False
+    for now, message in enumerate(out, start=1):
+        state.apply(message, float(now))
+        echoed = echoed or (message.get("isReplay") is True and message.get("uuid") == line)
+        if message.get("type") == "result" or message.get("isReplay") is True:
+            found.append(_decide_pending(state, float(now), pending=0 if echoed else 1))
+    # The session is not released while the follow-up's turn runs (it has no result yet).
+    assert "close" not in found
+    assert mapper.turn_open
+
+
+def test_an_input_the_cli_only_notes_after_a_result_does_not_hold_the_session() -> None:
+    # ``queueTranscriptOnly`` right after a turn end, with no dequeue of its own: no turn.
+    mapper = started("mine")
+    mapper.map(ASSISTANT)
+    ended = mapper.map(TURN_ENDS)
+    noted = {**peer("made-by-the-cli"), "origin": OWN_NOTIFICATION, "queueTranscriptOnly": True}
+    out = mapper.map(noted)
+    assert [shape(m) for m in out] == ["system/init"]
+    state = ProcessState(has_stdin=True)
+    for message in [*ended, *out]:
+        state.apply(message, 1.0)
+    assert _decide_pending(state, 2.0, pending=0) == "close"
