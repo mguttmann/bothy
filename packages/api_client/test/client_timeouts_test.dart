@@ -3,7 +3,6 @@
 // The REST client ends a request whose server accepts the connection and never answers
 // (`client.http_receive_timeout`, 15 22), so it cannot hold an outbox lane forever.
 
-import 'dart:async';
 import 'dart:io';
 
 import 'package:api_client/api_client.dart';
