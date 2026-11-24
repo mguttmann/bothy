@@ -15,3 +15,6 @@
 - The roles `worker` and `all` check the login of `bothy_maint` (`migrate.maint_password_ref`) at
   the start; a missing or wrong password ends the start instead of failing every run of the audit
   trim later.
+- The gateway writes one info line `gateway connection closed` per connection with the close
+  code, the outcome, the principal kind and the duration (new log attribute
+  `bothy.connection.duration`), so the disconnects of a device can be followed in the log.
