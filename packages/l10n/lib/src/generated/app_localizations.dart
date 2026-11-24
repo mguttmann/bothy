@@ -230,6 +230,66 @@ abstract class AppLocalizations {
   /// **'Project not ready'**
   String get liveBoxReasonProjectNotReady;
 
+  /// Translated state reason `agent_unavailable` of a run (09 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Agent was not available in time'**
+  String get liveBoxReasonAgentUnavailable;
+
+  /// Translated state reason `runtime_error` of a run (09 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'The runtime reported an error'**
+  String get liveBoxReasonRuntimeError;
+
+  /// Translated state reason `runtime_not_authenticated` of a run (09 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'The runtime is not logged in'**
+  String get liveBoxReasonRuntimeNotAuthenticated;
+
+  /// Translated state reason `adapter_stopped` of a run (09 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Ended by a restart or update of the adapter'**
+  String get liveBoxReasonAdapterStopped;
+
+  /// Translated state reason `usage_limited` of a run (09 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Usage limit of the subscription reached'**
+  String get liveBoxReasonUsageLimited;
+
+  /// Translated state reason `channel_read_only` of a run (09 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Channel became read-only or archived'**
+  String get liveBoxReasonChannelReadOnly;
+
+  /// Translated state reason `user_disabled` of a run (09 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'The person who triggered it was disabled'**
+  String get liveBoxReasonUserDisabled;
+
+  /// Translated state reason `tool_class_owner_only` of a run (09 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'This tool class is for owners only'**
+  String get liveBoxReasonToolClassOwnerOnly;
+
+  /// Translated state reason `tool_class_mismatch` of a run (09 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'The tool class is higher than allowed'**
+  String get liveBoxReasonToolClassMismatch;
+
+  /// Translated state reason `invalid_invocation_token` of a run (09 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'The run\'s authorization was invalid'**
+  String get liveBoxReasonInvalidInvocationToken;
+
   /// State text of a queued run whose agent has every slot of `runner.max_parallel_runs` in use (wait reason `slots_full`, 09 5.2.1).
   ///
   /// In en, this message translates to:
@@ -1327,6 +1387,16 @@ abstract class AppLocalizations {
     int percent,
   );
 
+  /// Screen reader label of the live box container when no context use is measured (components.md section 2.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Run of {agent}: {state}, for {duration}'**
+  String liveBoxSemanticsLabelNoContext(
+    String agent,
+    String state,
+    String duration,
+  );
+
   /// Note in the footer of a running live box (components.md section 2.1).
   ///
   /// In en, this message translates to:
@@ -1770,6 +1840,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Backend: Personal, runs on the subscription of {name}'**
   String billingLabelPersonal(String name);
+
+  /// Screen reader label of the badge `personal` when the holder of the subscription is not known (components.md section 10).
+  ///
+  /// In en, this message translates to:
+  /// **'Backend: Personal, runs on a personal subscription'**
+  String get billingLabelPersonalNoHolder;
 
   /// Screen reader label of the badge `organization` (components.md section 10).
   ///
@@ -8238,6 +8314,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Read screen'**
   String get terminalReadScreen;
+
+  /// Screen reader hint of the terminal screen that names the keys of the command Read screen (01 section 8).
+  ///
+  /// In en, this message translates to:
+  /// **'{keys} reads the screen'**
+  String terminalReadScreenHint(String keys);
 
   /// Screen reader label of the terminal screen.
   ///

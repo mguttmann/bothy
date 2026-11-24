@@ -58,7 +58,9 @@ class DsBillingBadge extends StatelessWidget {
         glyph: DsIcons.billingPersonal,
         background: colors.badgePersonalBg,
         foreground: colors.badgePersonalFg,
-        semanticsLabel: l.billingLabelPersonal(holderName ?? ''),
+        semanticsLabel: holderName == null
+            ? l.billingLabelPersonalNoHolder
+            : l.billingLabelPersonal(holderName!),
       ),
       DsBillingMode.organization => DsBadge(
         text: l.billingOrganization,
