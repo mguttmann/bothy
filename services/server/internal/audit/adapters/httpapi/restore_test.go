@@ -45,7 +45,7 @@ func (e *env) copySinkUpTo(cp int64) string {
 		if err != nil {
 			e.t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(dst, name), raw, 0o600); err != nil {
+		if err := os.WriteFile(filepath.Join(dst, name), raw, 0o600); err != nil { //nolint:gosec // G703: a file of the copied sink below t.TempDir
 			e.t.Fatal(err)
 		}
 	}
