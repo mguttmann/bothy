@@ -398,6 +398,30 @@ abstract class AppLocalizations {
   /// **'Offline'**
   String get connectionOffline;
 
+  /// Banner text after the server closed the connection with 4017 because a newer connection of the same device is active; the app connects again only when the person asks (15 section 7.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Offline: a newer connection of this device is active.'**
+  String get connectionDeviceReplaced;
+
+  /// Banner text after the server closed the connection with 4018 (the login is valid, but connecting is not allowed); the app connects again only when the person asks (15 section 7.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Offline: the server does not let this account connect.'**
+  String get connectionForbidden;
+
+  /// Banner text after the server closed the connection with 4015, which it does not expect from a person's app; the app connects again only when the person asks (15 section 7.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Offline: the server ended the connection.'**
+  String get connectionEndedByServer;
+
+  /// Action of the offline banner after 4015, 4017 or 4018: connects to the server again (15 section 7.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect'**
+  String get connectionReconnect;
+
   /// A time stamp of today, in the time zone of the person.
   ///
   /// In en, this message translates to:

@@ -755,7 +755,10 @@ the entry the sidebar lists ([15-client-architecture.md](15-client-architecture.
    because the file becomes ready by itself ([12](12-files.md) 8.1, addendum of 2026-10-31).
 5. Permanent errors (`400`, `404`, `410`, `413`, `422`) end the retries. The entry stays
    visible as "failed" with a reason; the person can edit it, send it again (new ID) or discard
-   it. Nothing is discarded silently.
+   it. Nothing is discarded silently. Exception (addendum of 2026-11-24): a refused read state
+   or draft write (`putReadState`, `putThreadDraft`, `deleteThreadDraft`) is not a thing the
+   person wrote to the conversation and no view shows it; the client deletes it and logs the
+   refusal, and the next read position or draft write carries the current state again.
 6. When the echo event `message.created` with a matching `client_msg_id` arrives, the client
    replaces the waiting entry with the server message.
 

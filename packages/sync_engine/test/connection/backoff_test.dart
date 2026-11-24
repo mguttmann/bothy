@@ -163,6 +163,16 @@ void main() {
         expect(h.transport.attempts, 2, reason: 'the backoff reconnects');
       });
 
+      test(
+        'the transport gets the deadline, so it aborts a stalled open',
+        () async {
+          await h.signIn();
+          h.connection.start();
+          await settle();
+          expect(h.transport.timeouts, [deadline]);
+        },
+      );
+
       test('a socket without hello is closed and ends in backoff', () async {
         await h.signIn();
         h.connection.start();

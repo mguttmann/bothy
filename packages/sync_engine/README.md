@@ -37,7 +37,8 @@ the first after a random fraction; a missing `heartbeat_ack` within one interval
 `resumed`; a network change or the foreground starts an attempt at once without raising `n`.
 An attempt that has not reached `ready` or `resumed` within `client.sync.connect_timeout` (a
 stalled connect, no `hello`, no answer to `identify` or `resume`) is dropped and waits the
-backoff like a failed connect.
+backoff like a failed connect; the transport gets the same deadline and aborts a stalled open,
+so it never runs on beside the next attempt.
 A server frame that does not decode is counted (`decodeErrors`) and skipped; unknown ops and
 fields are ignored.
 
@@ -176,7 +177,9 @@ same limit after the visible ones) and
   changes nothing.
 - A new message that does not continue the loaded range of its thread is stored, the gap is
   recorded and loaded with `Fetcher.range`; `MessagesDao.watchContiguous` hides it until then. A
-  failed fill stays recorded; `onFocus` retries it.
+  failed fill stays recorded; `onFocus` retries it. The record lives in memory: after an app
+  start `onFocus` finds the gap again from the stored messages behind the newest loaded range
+  (`GapFiller.recover`).
 - A `message.created` of a thread the database does not hold queues one `getThread` after the
   commit (R-SY-28, M4-40): `SyncContext.threadLoads` keeps it to one load per thread while it is
   queued or running, the thread is stored only while its channel is held, and a failed load is
@@ -267,6 +270,9 @@ Life cycle of an entry:
 | `waiting` | backing off until `next_attempt_at` | `sending` |
 | `failed` | refused for good, with the problem code and reason; after `412` also the `current` revision | edited, sent again with a new ID, or discarded by the person |
 
+A refused `putReadState`, `putThreadDraft` or `deleteThreadDraft` without dependents does not
+become `failed`: no view shows it, so the row is deleted and the refusal logged.
+
 - One worker per FIFO lane sends the oldest entry and the next only after the response (04 13.2
   item 2). The lane is the thread, or the lane the executor names for writes outside a thread
   (`setting:<key>`, `message:<id>`, the client's `upload:<channel id>`); lanes run in parallel, bounded only by the
@@ -283,6 +289,10 @@ Life cycle of an entry:
   `enqueue` resolves the IDs it is given through the replacements and confirmations of the
   running outbox; an ID gone before the outbox was created is unknown and fails the entry the
   same way.
+- A change over several rows (a replacement and the delete of the failed entry, a failed chain
+  and the delete of the discarded entry, the slots of the dependents and the delete of a
+  confirmed entry) is one database transaction, so a process that ends between its steps
+  leaves the rows as they were before it.
 - `start()` sends (M4-17 calls it after `catchup.complete`, 04 13.4), `pause()` lets running
   requests finish and starts none. The first `start()` resets `sending` entries of an earlier run
   to `pending`; they are sent again with their stored IDs.

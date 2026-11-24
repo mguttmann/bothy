@@ -5,6 +5,7 @@
 library;
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:web_socket_channel/io.dart';
 
@@ -31,9 +32,28 @@ final class IoGatewayTransport implements GatewayTransport {
   /// The interval of WebSocket pings of `dart:io`, or `null` for none.
   final Duration? pingInterval;
 
+  /// Each attempt has its own [HttpClient], so a handshake that passes [timeout] is aborted
+  /// with it instead of running on beside the next attempt (04 6.1); a socket that still
+  /// opens later is closed at once.
   @override
-  Future<GatewayChannel> connect(Uri url) async {
-    final channel = IOWebSocketChannel.connect(url, pingInterval: pingInterval);
+  Future<GatewayChannel> connect(Uri url, {Duration? timeout}) async {
+    final client = HttpClient();
+    final opening = WebSocket.connect(url.toString(), customClient: client);
+    final WebSocket socket;
+    try {
+      socket = timeout == null ? await opening : await opening.timeout(timeout);
+    } on TimeoutException {
+      client.close(force: true);
+      unawaited(
+        opening.then<void>((late) => late.close(1000), onError: (Object _) {}),
+      );
+      rethrow;
+    } finally {
+      // The socket of an upgrade is detached from the client, so closing it keeps the socket.
+      client.close();
+    }
+    socket.pingInterval = pingInterval;
+    final channel = IOWebSocketChannel(socket);
     await channel.ready;
     return _IoChannel(channel);
   }

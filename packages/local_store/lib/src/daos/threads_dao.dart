@@ -74,21 +74,27 @@ final class ThreadsDao {
         readsFrom: {_db.threads, _db.threadTags},
       )
       .watch()
-      .asyncMap((_) async {
-        final rows =
-            await (_db.select(_db.threads)
-                  ..where((t) => t.channelId.equals(channelId.value))
-                  ..orderBy([
-                    (t) => OrderingTerm(
-                      expression: t.lastActivityAt,
-                      mode: OrderingMode.desc,
-                    ),
-                  ]))
-                .get();
-        return [
-          for (final row in rows) threadFromRow(row, await _tags(row.id)),
-        ];
-      });
+      .asyncMap(
+        // One read of the threads and one of their tags, in one transaction, instead of a tag
+        // query per thread on every emission.
+        (_) => _db.transaction(() async {
+          final rows =
+              await (_db.select(_db.threads)
+                    ..where((t) => t.channelId.equals(channelId.value))
+                    ..orderBy([
+                      (t) => OrderingTerm(
+                        expression: t.lastActivityAt,
+                        mode: OrderingMode.desc,
+                      ),
+                    ]))
+                  .get();
+          final tags = await _tagsOfChannel(channelId);
+          return [
+            for (final row in rows)
+              threadFromRow(row, tags[row.id] ?? const []),
+          ];
+        }),
+      );
 
   /// Moves the `last_activity_at` of the stored thread [id] forward to [at] when [at] is later;
   /// returns whether it changed. A new message advances its thread's activity on the server
@@ -118,6 +124,28 @@ final class ThreadsDao {
         Variable<String>(id.value),
       ],
     );
+  }
+
+  /// The tags of every stored thread of [channelId], by thread ID, each list ordered by tag.
+  Future<Map<String, List<ForumTagId>>> _tagsOfChannel(
+    ChannelId channelId,
+  ) async {
+    final rows = await _db
+        .customSelect(
+          'SELECT tt.thread_id AS thread_id, tt.tag_id AS tag_id FROM thread_tags tt '
+          'JOIN threads t ON t.id = tt.thread_id WHERE t.channel_id = ? '
+          'ORDER BY tt.thread_id, tt.tag_id',
+          variables: [Variable<String>(channelId.value)],
+          readsFrom: {_db.threads, _db.threadTags},
+        )
+        .get();
+    final byThread = <String, List<ForumTagId>>{};
+    for (final row in rows) {
+      (byThread[row.read<String>('thread_id')] ??= []).add(
+        ForumTagId.parse(row.read<String>('tag_id')),
+      );
+    }
+    return byThread;
   }
 
   Future<List<ForumTagId>> _tags(String threadId) async {

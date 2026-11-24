@@ -201,8 +201,8 @@ final class _MeasuredTransport implements GatewayTransport {
   GatewayChannel? _last;
 
   @override
-  Future<GatewayChannel> connect(Uri url) async {
-    final channel = await _inner.connect(url);
+  Future<GatewayChannel> connect(Uri url, {Duration? timeout}) async {
+    final channel = await _inner.connect(url, timeout: timeout);
     final previous = _last;
     if (previous != null) {
       _m.metrics.record(

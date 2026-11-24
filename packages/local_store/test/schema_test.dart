@@ -4,6 +4,8 @@
 // state of M4-40 included, the columns a client may see with their 03 source, and none of the
 // columns 15 6.1 excludes.
 
+import 'dart:io';
+
 import 'package:local_store/local_store.dart';
 import 'package:test/test.dart';
 
@@ -368,6 +370,23 @@ void main() {
     final tables = {for (final r in rows) r.read<String>('name')};
     expect(tables, expected.keys.toSet());
   });
+
+  test(
+    'the README and the library comment name the current schema version',
+    () {
+      final version = 'schema version ${db.schemaVersion}';
+      final readme = File('README.md').readAsStringSync();
+      final library = File('lib/src/database.dart').readAsStringSync();
+      expect(
+        RegExp(r'schema version \d+').allMatches(readme).map((m) => m[0]),
+        everyElement(version),
+      );
+      expect(
+        library.split('\n').firstWhere((l) => l.startsWith('///')),
+        contains(version),
+      );
+    },
+  );
 
   for (final entry in expected.entries) {
     test('${entry.key} has the documented columns', () async {

@@ -55,7 +55,7 @@ final class FakeChannel implements GatewayChannel {
 final class FakeTransport implements GatewayTransport {
   final List<FakeChannel> channels = [];
   @override
-  Future<GatewayChannel> connect(Uri url) async {
+  Future<GatewayChannel> connect(Uri url, {Duration? timeout}) async {
     final c = FakeChannel();
     channels.add(c);
     return c;

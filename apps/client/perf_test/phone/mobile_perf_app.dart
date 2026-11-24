@@ -312,8 +312,8 @@ final class PerfTransport implements GatewayTransport {
   int? completeAt;
 
   @override
-  Future<GatewayChannel> connect(Uri url) async =>
-      _TimedChannel(await record.connect(url), this);
+  Future<GatewayChannel> connect(Uri url, {Duration? timeout}) async =>
+      _TimedChannel(await record.connect(url, timeout: timeout), this);
 }
 
 final class _TimedChannel implements GatewayChannel {
