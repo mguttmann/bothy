@@ -137,7 +137,7 @@ groups:
         labels:
           severity: ticket
         annotations:
-          summary: "Malware scanning fails; uploads stay in state pending."
+          summary: "Malware scans end only with error; the files are blocked as check failed."
           runbook_url: "docs/observability/alerting.md#bothymalwarescanfailing"
 
   - name: bothy-data

@@ -169,6 +169,7 @@ def test_publisher_values_pass(template: dict[str, Any], ed: Ed25519PrivateKey) 
     real["windows"]["package_name"] = "Acme.Chat"
     real["windows"]["publisher"] = 'CN=Acme Chat, O="Acme, Inc.", C=DE'
     real["windows"]["update_url"] = "https://updates.acme.test/windows/"
+    real["windows"]["timestamp_url"] = "http://timestamp.acme.test"
     real["android"]["package_name"] = "org.acme.chat"
     real["android"]["update_url"] = "https://play.google.com/store/apps/details?id=org.acme.chat"
     real["ios"]["update_url"] = "https://testflight.apple.com/join/AbCdEf12"
@@ -176,6 +177,17 @@ def test_publisher_values_pass(template: dict[str, Any], ed: Ed25519PrivateKey) 
     dist.validate(real)
     assert dist.placeholders(real) == []
     dist.require_publisher_values(real)
+
+
+def test_a_release_needs_a_timestamp_server(template: dict[str, Any]) -> None:
+    # Without a timestamp a signed MSIX stops installing when the certificate expires, and a
+    # published build is never replaced (R-RL-07); only the trials sign without one.
+    assert "windows.timestamp_url" in dist.placeholders(template)
+    del template["windows"]["timestamp_url"]
+    dist.validate(template)
+    assert "windows.timestamp_url" in dist.placeholders(template)
+    with pytest.raises(dist.DistributionError, match=r"windows\.timestamp_url"):
+        dist.require_publisher_values(template)
 
 
 def test_the_mobile_values_of_the_template(template: dict[str, Any]) -> None:
@@ -328,6 +340,18 @@ def test_promotion_removes_only_the_channel(cfg: dict[str, Any], ed: Ed25519Priv
         dist.promote_appcast(promoted, 1001, ed)
     with pytest.raises(dist.DistributionError, match="no entry with build 7"):
         dist.promote_appcast(promoted, 7, ed)
+
+
+def test_promotion_starts_the_phased_rollout_at_the_promotion(
+    cfg: dict[str, Any], ed: Ed25519PrivateKey
+) -> None:
+    # Sparkle counts the groups of a phased rollout from the pubDate of the entry; a build that
+    # stayed in beta longer than the rollout would otherwise reach every stable user at once.
+    feed = dist.add_items(dist.new_appcast("ExampleChat", cfg), [_item(cfg, "0.1.0", b"n", ed)], ed)
+    promoted = dist.promote_appcast(feed, 1000, ed, now=datetime(2026, 11, 24, 9, 30, tzinfo=UTC))
+    item = ET.fromstring(dist.feed_content(promoted)).find("channel/item")  # noqa: S314
+    assert item is not None
+    assert item.findtext("pubDate") == "Tue, 24 Nov 2026 09:30:00 +0000"
 
 
 def test_merge_adds_the_entries_of_a_release(cfg: dict[str, Any], ed: Ed25519PrivateKey) -> None:

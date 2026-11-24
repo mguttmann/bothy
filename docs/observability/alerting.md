@@ -185,8 +185,11 @@ line names only the error code. Check the file in the secret provider: present, 
 or `0600`, owned by the service user (SEC-SEC-1). Until this is fixed, a rotation has no effect.
 
 ### bothymalwarescanfailing
-`docker compose logs clamav`; signatures loaded? Enough memory? Until then, uploads stay in the
-state `pending` and are not served.
+`docker compose logs clamav`; signatures loaded? Enough memory? Scan limits exceeded? A scan
+that ends with `error` blocks its file as "Check failed" ([12-files.md](../spec/12-files.md) 5.2); it is not served. The
+alert counts only such final results: while clamd is unreachable or a scan runs into its time
+limit, the pass retries and counts nothing, so uploads stay `pending` without this alert. The
+alert on the age of the oldest `pending` file is not built (plan row V3-31).
 
 ### bothybackupstale
 The newest rows of `backup_runs` and `docker compose logs backup`
