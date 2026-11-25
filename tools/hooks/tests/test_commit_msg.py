@@ -329,8 +329,19 @@ SIGNED = "Fixes the gate.\n\nSigned-off-by: Alex Example <alex@example.com>\n"
         # A sign-off inside an HTML comment of the template is not part of the commit text.
         ("Text\n<!--\nSigned-off-by: Alex Example <alex@example.com>\n-->\n", False),
         ("Signed-off-by: Alex Example\n", False),
+        # Git reads a sign-off only in the trailer block at the end of the message.
+        ("Signed-off-by: Alex Example <alex@example.com>\n\nMore text.\n", False),
+        (SIGNED + "<!-- a closing comment of the template -->\n", True),
     ],
-    ids=["signed", "unsigned", "empty", "in a comment", "without e-mail"],
+    ids=[
+        "signed",
+        "unsigned",
+        "empty",
+        "in a comment",
+        "without e-mail",
+        "text after the sign-off",
+        "comment after the sign-off",
+    ],
 )
 def test_pull_request_body_needs_a_signoff(body: str, *, passes: bool) -> None:
     assert (commit_msg.check_pr_body(body, author="alex") == []) is passes

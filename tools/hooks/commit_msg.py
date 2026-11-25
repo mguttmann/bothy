@@ -21,7 +21,8 @@ Rules (docs/quality/push-discipline.md):
     author GitHub reports): that bot's own commits need no sign-off; the header rules still
     apply, and every other commit of the range still needs its sign-off (D-DEPS-3)
   * --pr-body: the body of the pull request becomes the message of the squash commit on
-    `main`, so it carries a `Signed-off-by: Name <e-mail>` line outside HTML comments, unless
+    `main`, so its last line outside HTML comments is `Signed-off-by: Name <e-mail>` (git
+    reads a sign-off only in the trailer block at the end of a message), unless
     the author is a bot of PR_BODY_BOTS (#872); which identity signs is OQ-25
 """
 
@@ -77,11 +78,12 @@ def check_pr_body(body: str, *, author: str) -> list[str]:
     """
     if author in PR_BODY_BOTS:
         return []
-    if _SIGNOFF.search(_HTML_COMMENT.sub("", body)):
+    lines = [ln for ln in _HTML_COMMENT.sub("", body).splitlines() if ln.strip()]
+    if lines and _SIGNOFF.fullmatch(lines[-1].strip()):
         return []
     return [
-        "missing 'Signed-off-by: Name <e-mail>' line: the body becomes the squash commit on "
-        "main (CONTRIBUTING.md, Pull requests)"
+        "the body must end with a 'Signed-off-by: Name <e-mail>' line: it becomes the squash "
+        "commit on main (CONTRIBUTING.md, Pull requests)"
     ]
 
 
