@@ -1,9 +1,10 @@
 ### Added
 
 - The workflow `red-runs.yml` reports the failed runs that no pull request shows: the scheduled
-  runs of every workflow with a schedule and the pushes to `main` of `ci.yml`. It is switched
-  off for writing: until the repository variable `BOTHY_RED_RUN_ISSUES` is `true` it only lists
-  the red runs with their jobs and steps in the log of its job. With the variable set it keeps
+  runs of every workflow with a schedule and the pushes to `main` of `ci.yml`. It writes only
+  while the repository variable `BOTHY_RED_RUN_ISSUES` is `true` (switched on by the owner on
+  2026-11-25); without it, it only lists the red runs with their jobs and steps in the log of
+  its job. With the variable set it keeps
   one issue per workflow, `Red runs of <file>` with the label `red-run`, with a comment per
   failed run, and closes it when the workflow passed again. A run that GitHub lists as
   cancelled counts when one of its jobs ran and did not pass (AUD-MISC-TESTING-01/1 to /3 and
