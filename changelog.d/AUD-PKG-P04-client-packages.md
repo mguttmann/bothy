@@ -44,7 +44,8 @@
   when the thread gets the focus and loaded, so messages behind it no longer stay hidden.
 - A refused read position or draft write no longer stays in the outbox for good; it is deleted
   and logged.
-- The stored sync cursor never moves back within one sync epoch, whatever the caller passes.
+- The stored sync cursor never moves back within one sync epoch while pages are applied; a resync
+  still takes the position of the server's snapshot.
 - The statistics views load again when the host changes the space, the period or the source, and
   the timeline shows agent names that arrive after it loaded, instead of short IDs.
 - A defect inside a statistics view is reported to the app's error handler instead of showing

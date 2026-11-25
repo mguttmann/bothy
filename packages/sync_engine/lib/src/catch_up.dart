@@ -728,6 +728,7 @@ final class CatchUpListener implements SessionListener {
       },
       cursor: cursor,
       syncEpoch: syncEpoch,
+      replace: true,
     );
     if (erased.isNotEmpty) after.steps.add(() => _sync.eraser.erase(erased));
   }
