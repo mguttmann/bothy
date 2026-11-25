@@ -7,8 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
+
+	"go.yaml.in/yaml/v3"
 
 	"github.com/OWNER/bothy/services/server/internal/apps/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -217,3 +223,80 @@ func TestReplyReasons(t *testing.T) {
 
 // ptr returns a pointer to v.
 func ptr[T any](v T) *T { return &v }
+
+// jsonMembers returns the sorted JSON member names of the struct type t.
+func jsonMembers(t reflect.Type) []string {
+	var out []string
+	for f := range t.Fields() {
+		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+		if name != "" && name != "-" {
+			out = append(out, name)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// TestReplyTablesMatchContract holds the hand-kept member sets and enums of the reply decoder
+// and the top-level members of domain.Manifest equal to docs/api/openapi.yaml, so a new member
+// or enum value of MessageCreate, ComponentCreate or AppManifest fails here instead of turning
+// valid app answers into invalid_reply or valid manifests into an unknown-member error.
+func TestReplyTablesMatchContract(t *testing.T) {
+	t.Parallel()
+	type schema struct {
+		Enum       []string                  `yaml:"enum"`
+		Properties map[string]map[string]any `yaml:"properties"`
+	}
+	var spec struct {
+		Components struct {
+			Schemas map[string]schema `yaml:"schemas"`
+		} `yaml:"components"`
+	}
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "docs", "api", "openapi.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := yaml.Unmarshal(raw, &spec); err != nil {
+		t.Fatal(err)
+	}
+	schemas := spec.Components.Schemas
+	members := func(name string) []string {
+		var out []string
+		for k := range schemas[name].Properties {
+			out = append(out, k)
+		}
+		slices.Sort(out)
+		return out
+	}
+	enum := func(v []string) []string {
+		out := slices.Clone(v)
+		slices.Sort(out)
+		return out
+	}
+	var kind []string
+	if e, ok := schemas["MessageCreate"].Properties["kind"]["enum"].([]any); ok {
+		for _, v := range e {
+			kind = append(kind, v.(string))
+		}
+	}
+	want := map[string][]string{
+		"MessageCreate":        members("MessageCreate"),
+		"ComponentCreate":      members("ComponentCreate"),
+		"CommandChoice":        members("CommandChoice"),
+		"MessageCreate.kind":   enum(kind),
+		"ComponentType":        enum(schemas["ComponentType"].Enum),
+		"Capability":           enum(schemas["Capability"].Enum),
+		"ComponentRestriction": enum(schemas["ComponentRestriction"].Enum),
+		"AppManifest":          members("AppManifest"),
+	}
+	got := domain.ReplyContractTables()
+	got["AppManifest"] = jsonMembers(reflect.TypeFor[domain.Manifest]())
+	for name, w := range want {
+		if len(w) == 0 {
+			t.Fatalf("%s: nothing read from the contract", name)
+		}
+		if !slices.Equal(got[name], w) {
+			t.Errorf("%s: decoder %v, contract %v", name, got[name], w)
+		}
+	}
+}

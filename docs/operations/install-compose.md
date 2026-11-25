@@ -18,7 +18,7 @@ follows the manual path.
 | Runtime | Docker Engine 26 or newer with Compose 2.26 or newer; on the Mac Docker Desktop or Colima |
 | Architecture | linux/amd64 or linux/arm64 |
 | Memory of the Docker VM (Mac, Windows) | enough for all services; ClamAV alone needs at least 3 GiB (vendor) |
-| Disk | according to the model in [16-operations.md](../spec/16-operations.md) 13 |
+| Disk | according to the model in [16-operations.md](../spec/16-operations.md) 13; with the file system driver, put the volume `files` (`file.fs.root`) on a disk of its own where you can, because `file.fs.min_free_bytes` is checked only when an upload starts and does not protect the database from a full disk ([12-files.md](../spec/12-files.md) 3.1) |
 | Network | egress to push services, OIDC provider, off-site target, ClamAV signatures |
 | Edge | a reverse proxy with TLS (profile `direct`) or a tailnet (profile `tailscale`) |
 | Off-site target | S3-compatible bucket with Object Lock (`s3:https://...`, [backup-restore.md](backup-restore.md) 2); SFTP is not supported |

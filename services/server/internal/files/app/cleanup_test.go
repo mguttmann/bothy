@@ -507,6 +507,43 @@ func TestCleanup_FailedRows(t *testing.T) {
 	}
 }
 
+// TestCleanup_StaleExportPackage: an export package that stayed pending (its store ended before
+// the last step) goes with its object after file.failed_row_ttl, not before; a complete package
+// stays (its request removes it).
+func TestCleanup_StaleExportPackage(t *testing.T) {
+	e := newCleanupEnv(t, "fs", nil)
+	stale := e.seed(t, e.alex.ID, domain.SessionCompleted, domain.UploadPending, domain.ScanSkipped)
+	done := e.seed(t, e.alex.ID, domain.SessionCompleted, domain.UploadComplete, domain.ScanSkipped)
+	e.repo.mu.Lock()
+	for _, id := range []ids.ID{stale.ID, done.ID} {
+		f := e.repo.files[id]
+		f.Purpose, f.ScopeChannelID = string(domain.PurposeGDPRExport), ids.ID{}
+		e.repo.files[id] = f
+		delete(e.repo.sessions, id)
+	}
+	e.repo.mu.Unlock()
+	e.clk.Advance(e.cfg.FailedRowTTL - time.Second)
+	if err := e.cleanup.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := e.row(stale.ID); !ok || got.Deleted {
+		t.Fatal("the stale package went before file.failed_row_ttl")
+	}
+	e.clk.Advance(time.Second)
+	if err := e.cleanup.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := e.row(stale.ID); ok {
+		t.Error("the stale export package stays")
+	}
+	if e.hasObject(stale.ObjectKey) {
+		t.Error("the object of the stale package stays")
+	}
+	if got, ok := e.row(done.ID); !ok || got.Deleted {
+		t.Error("the complete export package went")
+	}
+}
+
 // TestDelete_Answers holds the table of design note 9.
 func TestDelete_Answers(t *testing.T) {
 	e := newCleanupEnv(t, "fs", nil)

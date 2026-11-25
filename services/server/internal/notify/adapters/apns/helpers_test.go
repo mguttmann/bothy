@@ -102,16 +102,27 @@ type switchable struct {
 	mu   sync.Mutex
 	next apns.SecretResolver
 	fail error
+	// hook, when set, runs before the next resolution and its error is returned instead.
+	hook func() error
 }
 
 func (s *switchable) Resolve(ctx context.Context, raw string) (secrets.Value, secrets.Version, error) {
 	s.mu.Lock()
-	fail := s.fail
+	fail, hook := s.fail, s.hook
 	s.mu.Unlock()
+	if hook != nil {
+		return secrets.Value{}, "", hook()
+	}
 	if fail != nil {
 		return secrets.Value{}, "", fail
 	}
 	return s.next.Resolve(ctx, raw)
+}
+
+func (s *switchable) setHook(hook func() error) {
+	s.mu.Lock()
+	s.hook = hook
+	s.mu.Unlock()
 }
 
 func (s *switchable) setFail(err error) {

@@ -19,7 +19,8 @@ import (
 // through the event log tail (M2-44 Design note 11).
 
 // Signals is the outgoing port of the signals. Stage runs inside the unit of work (phase work),
-// Committed after UnitOfWork.Do returned nil, Send outside any unit.
+// Committed after UnitOfWork.Do returned nil and the outermost unit committed, Send outside any
+// unit.
 type Signals interface {
 	// Stage registers s in the transaction of ctx: with several nodes the notification is
 	// delivered only after the commit and never after a rollback. Errors: those of the store.
@@ -92,9 +93,15 @@ func (s *Service) stage(ctx context.Context, sig domain.Signal) error {
 	return s.clusterSignals().Stage(ctx, sig)
 }
 
-// committed hands a staged signal over after the commit.
+// committed hands a staged signal over after the commit: inside an outer unit of work (the
+// Idempotency-Key stage runs the whole request in one) after its outermost commit and never after
+// its rollback, like sendReady, with a context outside the finished unit; outside one at once
+// (audit finding srv-terminal-5).
 func (s *Service) committed(ctx context.Context, sig domain.Signal) {
-	s.clusterSignals().Committed(ctx, sig)
+	sigs := s.clusterSignals()
+	if !txn.AfterCommit(ctx, func() { sigs.Committed(txn.Detach(context.WithoutCancel(ctx)), sig) }) {
+		sigs.Committed(ctx, sig)
+	}
 }
 
 // sendReady sends ready again on the control connection of hostID once the change is durable:

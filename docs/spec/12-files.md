@@ -159,6 +159,9 @@ The server checks in this order:
    seconds and at least one (D-M3-03-8).
 6. File system driver only: free space after the upload at least `file.fs.min_free_bytes`.
    Otherwise `503 unavailable` with `reason` `storage_full` and a warning to the status page.
+   The check compares the free space at this moment with the declared size; it does not count
+   other open sessions, the joined copy of the scan pass or the variants of the image job, so the
+   reserve is a guide, not a guarantee.
 
 Steps 4 to 6 run under a transaction-level advisory lock of the principal, so two parallel
 announcements cannot both pass a limit (D-M3-03-7).
@@ -244,8 +247,9 @@ needs no public reachability of the storage.
    `200` with the file object. A completed session answers `200` with the file again. From now
    on the client may attach the file to a message.
 
-The job `files.scan` reads the bytes **exactly once** (on S3 after `CompleteMultipartUpload`)
-and splits the stream into:
+The job `files.scan` reads the bytes **exactly once** (on S3 after `CompleteMultipartUpload`,
+which the pass runs before it checks clamd, so a scanner outage never keeps a confirmed upload
+open) and splits the stream into:
 
 - SHA-256 and byte counter. If they differ from the declaration: `upload_state = 'failed'`,
   reason `checksum_mismatch` or `size_mismatch` respectively in the session, delete the
@@ -552,7 +556,8 @@ File system rules (M3-01, `internal/files/adapters/fs`, docs/DECISIONS.md M3-01/
   verified].
 - The bucket is private. The instance operator sets up server-side encryption and the lifecycle
   rule "abort incomplete multipart uploads" on the storage; the server does not rely on them
-  and aborts expired uploads itself (section 12).
+  and aborts expired uploads itself (section 12). The rule's age must be longer than
+  `file.upload_session_ttl`, so it never aborts an upload whose session is still open.
 
 S3 driver rules (M3-02, `internal/files/adapters/s3`, docs/DECISIONS.md M3-02/1 to M3-02/14):
 
@@ -671,7 +676,9 @@ A small client of our own is enough; the protocol is small, and the well-known G
 
 On `infected` an audit entry is written with `action = 'file.upload'`, `decision = 'deny'`,
 `deny_reason = 'malware_detected'` and, in `details`, the signature, the SHA-256 and the size,
-never content (05: `file.upload` with audit on malware detection). The uploader and the owner see the reason; everyone else sees only "blocked".
+never content (05: `file.upload` with audit on malware detection). The owner sees that reason in
+the audit log. The API does not deliver the session's `failure_reason` yet (planned): the uploader
+and everyone else see only the state of the file (failed or blocked).
 
 ### 5.3 When ClamAV is missing or not ready
 
@@ -1286,7 +1293,9 @@ fetches the files and uploads them through the import interface: `createImportFi
 parts and the completion with the rules of 3.2 and 3.4 under `import.apply` instead of
 `file.upload`, so a read-only mirror channel accepts them (05 rule 1.8 and 4.12). The item becomes
 `posted` in the unit of work of the completion; a repeated `createImportFile` returns the same
-file ID, with a new session after an aborted or expired one. After the completion the same path
+file ID, with a new session after an aborted or expired one. Reopening sets a failed file
+`pending` again with `file.updated` for the uploader, and aborts after the commit the multipart
+upload that the old session still named (an open session past its expiry). After the completion the same path
 from 3.4 applies: checksum, type, scan, metadata, thumbnails. Differences: no quota (the open
 sessions and the free space still hold); the jobs `files.scan` and `files.thumbnail` of an import
 file stand on the queue `files` with the lowest River job priority (their arguments carry the
@@ -1307,6 +1316,7 @@ uploaded for (10).
 | Session open and expired | after `file.upload_session_ttl`: delete the parts, abort the multipart upload, `upload_state = 'failed'` with `file.updated`, session `expired` |
 | Failed or blocked | delete the objects immediately: the transaction of the transition to `failed`, `infected` or `error` queues `files.purge_objects` beside the deletes after the commit; the row of an attachment file that hangs on no message stays until `file.failed_row_ttl` for display to the uploader and is then deleted. Blocked files (`complete` with `infected` or `error`) follow this row. An attached blocked file keeps its row |
 | Avatar and branding rows | not touched by the cleanup: they go when their release marks them deleted (row above) |
+| Export package not completed | The store of an export package (20 5.2) inserts its row `pending` before it writes the object and sets it `complete` only after length and SHA-256 match, so every object has a row that names its key. A refused package is marked deleted at once and goes through `files.purge_objects`; a package whose store ended before the last step stays `pending`, is never handed out and is deleted by the cleanup after `file.failed_row_ttl` |
 | Retention periods | class `content`; periods and GDPR deletion in [20-privacy.md](20-privacy.md) |
 | Backups | Deleted objects remain in backups until the backup period expires ([16-operations.md](16-operations.md)) |
 
@@ -1364,10 +1374,14 @@ completes the session itself (3.7).
 
 ## 14. Observability
 
-Signals (names binding in `docs/observability/signals.md`, Team F): uploads by result,
-bytes, duration of the verification pass and the scan, scan results by `scan_status`, age of the
-oldest `pending` file, clamd reachability, image jobs by result, deletion backlog (the gauge
-`bothy.file.purge.backlog`: files marked deleted whose purge is still due, M3-08). No file names,
+Signals (names binding in `docs/observability/signals.md`, Team F): the upload size
+(`bothy.file.upload.size`), scan results by outcome and the duration of the scan
+(`bothy.file.scan`, `bothy.file.scan.duration`), the scan queue (`bothy.file.scan.queue`) and the
+deletion backlog (the gauge `bothy.file.purge.backlog`: files marked deleted whose purge is still
+due, M3-08). Planned, not built yet: uploads by result, the age of the oldest `pending` file with
+its alert (`file.scan.pending_alert_after`), clamd reachability, image jobs by result and storage
+errors per operation; until then a permanent image error (pixel limit, undecodable image) ends
+`files.thumbnail` as a completed job and shows only in its log line. No file names,
 no content, no signature names in metric attributes (cardinality and privacy);
 signature names only in the audit log.
 
@@ -1483,7 +1497,7 @@ Values from other chapters (reference only): `file.max_upload_bytes`, `message.m
 | `file.ticket_key_ref` | `file:<secrets.dir>/file_ticket_key` | reference to the ticket key in the secret provider |
 | `file.not_ready_retry_after` | `5s` | `Retry-After` of the `409 file_not_ready` responses (in whole seconds) |
 | `file.unattached_ttl` | `24h` | period for never attached files |
-| `file.failed_row_ttl` | `7d` | period for rows of failed or blocked files |
+| `file.failed_row_ttl` | `7d` | period for rows of failed or blocked files and of export packages that were not completed |
 | `file.gc_interval` | `10m` | interval of the cleanup job |
 | `file.gc_batch_size` | `500` | candidates per batch of a cleanup step |
 | `voice.max_duration` | `15m` | longest voice message |

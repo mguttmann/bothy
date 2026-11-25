@@ -60,7 +60,7 @@ func (s *Subscribers) OnDeviceRevoked(ctx context.Context, ev identity.DeviceRev
 	if err != nil {
 		return err
 	}
-	return store.DisableOfDevice(ctx, ev.DeviceID, domain.DisabledDeviceRevoked, s.now(ev.At))
+	return store.DisableOfDevice(ctx, ev.DeviceID, domain.DisableDeviceRevoked, s.now(ev.At))
 }
 
 // now returns at, the time of the revocation the event carries, or the clock time when the event

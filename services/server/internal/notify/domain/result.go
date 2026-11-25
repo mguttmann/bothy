@@ -31,9 +31,10 @@ const (
 
 // The values of push_registrations.disabled_reason (03).
 const (
-	// DisableTokenInvalid: the provider reports the token as unknown or expired.
+	// DisableTokenInvalid: the provider reports the token as unknown or expired, or a newer
+	// registration of the same app installation replaced it (brief M3-22 design note 5 d).
 	DisableTokenInvalid = "token_invalid"
-	// DisableDeviceRevoked: the device was revoked (M3-22).
+	// DisableDeviceRevoked: the device was revoked or its person disabled (M3-22).
 	DisableDeviceRevoked = "device_revoked"
 	// DisableLogout: the session of the registration ended (M3-22).
 	DisableLogout = "logout"

@@ -130,6 +130,13 @@ LIMIT @lim;
 -- log, in the caller's transaction, so receivers get no event of the old timeline.
 UPDATE webhook_subscriptions SET last_delivered_seq = @head_seq;
 
+-- name: ExpireAllPending :execrows
+-- bothy restore finalize (ADR 0059): every delivery still pending from the old timeline, at or
+-- below the head of the restored log, becomes dead with event_expired in the caller's transaction,
+-- so receivers get no event of the old timeline.
+UPDATE webhook_deliveries SET status = 'dead', last_error = 'event_expired', next_attempt_at = NULL
+WHERE status = 'pending' AND event_seq <= @head_seq;
+
 -- name: ExpiredWebhookDeliveries :many
 -- Retention class transient (M7-05): finished deliveries (every status but pending) whose end lies
 -- before the cutoff, oldest first. The end is delivered_at of a delivered row; a failed or dead

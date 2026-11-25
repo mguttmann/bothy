@@ -33,7 +33,7 @@ func (h *Files) DeleteFile(ctx context.Context, req rest.DeleteFileRequestObject
 }
 
 // FileREST converts a file into the schema File: zero values are absent members, never JSON null
-// (ADR 0053), and thumbnails is an empty list until M3-06.
+// (ADR 0053), and thumbnails is always a list, empty when the file has no thumbnail.
 func FileREST(f files.File) rest.File {
 	out := rest.File{
 		Id: rest.Uuid(f.ID), SizeBytes: f.SizeBytes, MimeType: f.MIMEType, OriginalName: f.OriginalName,

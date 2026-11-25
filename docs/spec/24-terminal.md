@@ -2069,7 +2069,9 @@ for byte streams. With one node, everything is trivial.
 
 Build details (M2-47; the rows `D-M2-47-<n>` of [DECISIONS.md](../DECISIONS.md) give the reasons).
 With `cluster.mode = single` nothing of this runs and no `NOTIFY` is sent; one node uses the same
-handler with a local transport (D-M2-47-4).
+handler with a local transport (D-M2-47-4), which hands a signal to the handler only after the
+outermost commit of the request (also when an `Idempotency-Key` runs the whole request in one
+transaction) and never after its rollback, like the `NOTIFY` of several nodes.
 
 **Signals between nodes** (D-M2-47-3, R-TM-31). A use case that acts on a live connection after its
 commit stages a signal in its transaction; with several nodes it is a `NOTIFY ephemeral` in that

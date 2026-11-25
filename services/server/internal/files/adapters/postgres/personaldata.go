@@ -59,6 +59,16 @@ func (r *Repository) InsertExportFile(ctx context.Context, f app.FileRecord) err
 	}), "inserting an export package")
 }
 
+// CompleteExportFile implements app.PersonalDataStore.
+func (r *Repository) CompleteExportFile(ctx context.Context, id ids.ID) (bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return false, err
+	}
+	n, err := q.CompleteExportFile(ctx, uuid(id))
+	return n == 1, mapError(err, "completing an export package")
+}
+
 // idList converts id columns.
 func idList(rows []pgtype.UUID) []ids.ID {
 	out := make([]ids.ID, 0, len(rows))

@@ -16,7 +16,7 @@ Apps and manifests, installations, scopes, outgoing webhooks with consumer and d
 - `adapters/httpapi/` (M2-24): the strict-server handlers of the nine operations and `Cursors`.
 - `adapters/identitysource/` (M2-24): `Source`, the implementation of `identity.AppInstallations`.
 - `internal/apps` (`webhooks.go`, M2-26): the port `Webhooks` with `CreateSubscription`, `UpdateSubscription`, `DeleteSubscription`, `ListSubscriptions`, `ListDeliveries`, `Redeliver`, `ResumeInstallation`, its DTOs and the constants of the subscription states, delivery statuses and `last_error` codes.
-- `domain/` (M2-26): `subscription.go` (states, `NextSubscriptionState`, `ParseAllowedHosts`, `ValidateTarget`, `AllowsHost`, `ValidateEventTypes`, `AppSubscribable`), `delivery.go` (`Classify`, `Backoff`, `ParseRetryAfter`, `NextAttempt`), `signature.go` (`SignedContent`, `DeriveHMACKey`, `FormatSecret`, `ParseSecret`, `HMACSignature`, `SignatureHeader`, `HMACGenerations`).
+- `domain/` (M2-26): `subscription.go` (states, `NextSubscriptionState`, `ParseAllowedHosts`, `ValidateTarget`, `AllowsHost`, `ValidateEventTypes`, `AppSubscribable`), `delivery.go` (`Classify`, `Backoff`, `ParseRetryAfter`, `NextAttempt`), `signature.go` (`SignedContent`, `DeriveHMACKey`, `FormatSecret`, `HMACSignature`, `SignatureHeader`, `HMACGenerations`).
 - `app/` (M2-26): `WebhookService` (`webhooks.go`, the use cases of the port), `Consumer` (`consumer.go`, the handler of the worker consumer `webhooks` with the loss hook), `Deliver` (`deliver.go`, the attempt of the job) and the outgoing ports in `webhookports.go` (`WebhookStore`, `DeliveryScheduler`, `WebhookSender`, `HMACMasterKey`, `Signers`).
 - `adapters/postgres/` (M2-26): `queries/webhooks.sql` and `webhooks.go`, the `WebhookStore` of `Repository`.
 - `adapters/jobs/` (M2-26): the job `apps.webhook_deliver` (`WebhookDeliver`, `Register`) and `Scheduler`, the `DeliveryScheduler` over `jobs.Inserter.InsertTx`.
@@ -172,7 +172,7 @@ sections 6 and 7, ADR 0016 and 0051. Rulings: `docs/DECISIONS.md` D-M2-26-1 to D
   `retention.webhook_deliveries`, never `pending` ones.
 - **Attempt** (job `apps.webhook_deliver`): claim the due head under the subscription lock, check
   routing and `webhook_out.deliver` in filter mode with the current grants and scopes (no request
-  without access), sign, take a lease of `webhook.delivery_timeout` with a wake-up job, send
+  without access), sign, take a lease of twice `webhook.delivery_timeout` (also the River timeout of the job, so a hanging receiver ends as a failed attempt before the lease wake-up claims the head again) with a wake-up job, send
   through the egress client outside any transaction, record the outcome and chain the next job.
   Strictly in `seq` order; at least once with the same `webhook-id`.
 - **Signatures**: `v1a` with every signer of the purpose `webhook_out` (`instance.Keys.Signers`);

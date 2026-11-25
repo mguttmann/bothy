@@ -47,6 +47,9 @@ type PersonalDataStore interface {
 	// InsertExportFile inserts the files row of an export package, without an upload session.
 	// It needs a unit of work.
 	InsertExportFile(ctx context.Context, f FileRecord) error
+	// CompleteExportFile sets upload_state complete on the pending, not deleted export package
+	// id and reports whether it did. It needs a unit of work.
+	CompleteExportFile(ctx context.Context, id ids.ID) (bool, error)
 }
 
 // The section of files/files.json the participant writes.

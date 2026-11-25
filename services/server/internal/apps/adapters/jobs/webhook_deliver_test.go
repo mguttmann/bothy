@@ -28,7 +28,7 @@ func TestWebhookDeliverJob(t *testing.T) {
 	t.Parallel()
 	reg := jobs.NewRegistry()
 	d := &deliverer{}
-	if err := appsjobs.Register(reg, d); err != nil {
+	if err := appsjobs.Register(reg, d, time.Minute); err != nil {
 		t.Fatal(err)
 	}
 	if q, ok := reg.Queue(appsjobs.KindWebhookDeliver); !ok || q != jobs.QueueDelivery {

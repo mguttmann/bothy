@@ -164,8 +164,9 @@ type ExpiredOpenSessionsRow struct {
 // file id or by state and time (the exceptions of AZ-P12 in tools/lint/sql_visibility.yaml,
 // category system_job). deleteFile resolves its resource by id (authorize_resolution) and locks it
 // after authorize (after_authorize). The candidate reads page by a key of (time, id), so a
-// candidate that stays (a held draft, a failed unit) is never read twice in one run. No index is
-// added (03 4.7 names the indexes of files; docs/decisions.d/M3-08.md D-M3-08-17).
+// candidate that stays (a held draft, a failed unit) is never read twice in one run. The steps b
+// and c have no index of their own (docs/decisions.d/M3-08.md D-M3-08-15); the deleted rows have
+// (deleted_at, id) WHERE deleted_at IS NOT NULL (migration 00123).
 // Step a: open sessions past expires_at of files that are not deleted, over the partial index
 // (expires_at) WHERE state = 'open'.
 func (q *Queries) ExpiredOpenSessions(ctx context.Context, arg ExpiredOpenSessionsParams) ([]ExpiredOpenSessionsRow, error) {
@@ -196,9 +197,10 @@ func (q *Queries) ExpiredOpenSessions(ctx context.Context, arg ExpiredOpenSessio
 const failedRowCandidates = `-- name: FailedRowCandidates :many
 SELECT f.id, f.created_at
 FROM files f
-WHERE f.purpose = 'attachment' AND f.deleted_at IS NULL
-  AND (f.upload_state = 'failed' OR f.scan_status IN ('infected', 'error')) AND f.created_at <= $1
-  AND NOT EXISTS (SELECT 1 FROM message_attachments a WHERE a.file_id = f.id)
+WHERE f.deleted_at IS NULL AND f.created_at <= $1
+  AND ((f.purpose = 'attachment' AND (f.upload_state = 'failed' OR f.scan_status IN ('infected', 'error'))
+        AND NOT EXISTS (SELECT 1 FROM message_attachments a WHERE a.file_id = f.id))
+    OR (f.purpose = 'gdpr_export' AND f.upload_state = 'pending'))
   AND (f.created_at, f.id) > ($2::timestamptz, $3::uuid)
 ORDER BY f.created_at, f.id
 LIMIT $4
@@ -216,8 +218,9 @@ type FailedRowCandidatesRow struct {
 	CreatedAt pgtype.Timestamptz
 }
 
-// Step c: failed or blocked attachment files that are not deleted and not attached, created at or
-// before the cutoff.
+// Step c: failed or blocked attachment files that are not deleted and not attached, and export
+// packages that stayed pending (their store ended before the last step), created at or before the
+// cutoff.
 func (q *Queries) FailedRowCandidates(ctx context.Context, arg FailedRowCandidatesParams) ([]FailedRowCandidatesRow, error) {
 	rows, err := q.db.Query(ctx, failedRowCandidates,
 		arg.Cutoff,

@@ -469,12 +469,15 @@ still answered and its new messages are still taken over, so a later run goes on
 it lies in now decides the mirror.
 
 The answer to a key with a different hash (item 4) carries the stored item with the member
-`source_changed = true` (`ImportItem`), and the server raises its counter
-`server.source_changed` in `import_sources.stats`; nothing else changes and no other event is
-written (M8-03). A key that exists is locked before it is read, so a concurrent batch with the
-same key waits for the commit of the other (section 7.4). A batch whose items all existed already writes no event at all, unless its
-posted thread item applies a mirror change (section 12.2 step 3), which writes one `thread.updated`
-and one `import.progress`.
+`source_changed = true` (`ImportItem`), and the server raises its counter `server.source_changed`
+in `import_sources.stats` and writes one `import.progress` for the batch; nothing else changes and
+no other event is written (M8-03), except that a posted thread whose mirror step changes its title,
+state or last activity writes `thread.updated` (section 12.2 step 3). The counter counts such
+answers, not distinct items: every later run that sends the same changed item again raises it
+again. A key that exists is locked before it is read, so a concurrent batch with the same key waits
+for the commit of the other (section 7.4). A batch whose items all existed already with the stored
+hash writes no event at all, unless its posted thread item applies a mirror change (section 12.2
+step 3), which writes one `thread.updated` and one `import.progress`.
 
 ### 7.3 Cursor
 

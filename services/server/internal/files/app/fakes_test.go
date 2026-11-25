@@ -253,6 +253,24 @@ func (r *repo) AbortSession(ctx context.Context, fileID ids.ID) error {
 	return nil
 }
 
+// ReopenSession implements app.ImportRepository as the query ReopenImportSession and
+// PendImportFile do: the session opens without upload id and parts, its file is pending again.
+func (r *repo) ReopenSession(ctx context.Context, fileID ids.ID, createdAt, expiresAt time.Time) error {
+	if err := needUnit(ctx); err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	s := r.sessions[fileID]
+	s.State, s.CreatedAt, s.ExpiresAt, s.StorageUploadID = domain.SessionOpen, createdAt, expiresAt, ""
+	r.sessions[fileID] = s
+	f := r.files[fileID]
+	f.UploadState, f.ScanStatus = "pending", "pending"
+	r.files[fileID] = f
+	delete(r.parts, fileID)
+	return nil
+}
+
 func (r *repo) File(_ context.Context, fileID ids.ID) (app.FileRecord, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -404,8 +422,24 @@ func (s *store) UploadPart(ctx context.Context, _, uploadID string, n int, body 
 	return app.Part{Number: n, ETag: fmt.Sprintf(`"s3-%x"`, sum[:4])}, nil
 }
 
-func (s *store) CompleteMultipart(ctx context.Context, _, _ string, _ []app.Part) error {
-	return s.enter(ctx, "CompleteMultipart")
+// CompleteMultipart joins the parts of uploadID in order into key, as S3 does.
+func (s *store) CompleteMultipart(ctx context.Context, key, uploadID string, parts []app.Part) error {
+	if err := s.enter(ctx, "CompleteMultipart"); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	u, ok := s.uploads[uploadID]
+	if !ok {
+		return app.ErrUploadNotFound
+	}
+	var joined []byte
+	for _, p := range parts {
+		joined = append(joined, u[p.Number]...)
+	}
+	s.objects[key] = joined
+	delete(s.uploads, uploadID)
+	return nil
 }
 
 func (s *store) AbortMultipart(ctx context.Context, _, uploadID string) error {

@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package postgres is the PostgreSQL adapter of the files module (M3-03): the sqlc queries in
-// queries/, the generated code in sqlcgen/ and Repository, which implements app.Repository over
-// the tables files, file_upload_sessions and file_upload_parts (docs/spec/03-data-model.md 4.7).
+// Package postgres is the PostgreSQL adapter of the files module: the sqlc queries in queries/, the
+// generated code in sqlcgen/ and Repository, which implements app.Repository and the other store
+// ports of app over the tables files, file_upload_sessions, file_upload_parts, file_thumbnails,
+// file_text_extracts, message_attachments and message_attachment_relays
+// (docs/spec/03-data-model.md 4.7).
 // Only this package runs SQL on them (03 principle 12). Every read is keyed by a file id or by the
 // uploader (07 7.4 rule 1).
 //

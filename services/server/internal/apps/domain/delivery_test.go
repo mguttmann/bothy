@@ -85,9 +85,6 @@ func TestClassify(t *testing.T) {
 			if o.Kind != c.kind || o.Error != c.code || o.Counted() != c.counted {
 				t.Fatalf("Classify(%d, %v) = %+v counted %v, want %v %q counted %v", c.status, c.err, o, o.Counted(), c.kind, c.code, c.counted)
 			}
-			if retry := c.kind == domain.OutcomeThrottled || c.kind == domain.OutcomeFailed; o.Retry() != retry {
-				t.Fatalf("Retry() = %v, want %v", o.Retry(), retry)
-			}
 		})
 	}
 }

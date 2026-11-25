@@ -297,16 +297,6 @@ func LoneSideOutcome(side Side, state string) LoneOutcome {
 	return LoneOutcome{}
 }
 
-// LoneDeadline returns the instant a lone side becomes unpaired: the acceptance of its identify
-// plus terminal.open_timeout, inclusive (LoneExpired).
-func LoneDeadline(identifiedAt time.Time, openTimeout time.Duration) time.Time {
-	return identifiedAt.Add(openTimeout)
-}
-
-// LoneExpired reports whether a side with the lone deadline is unpaired at now: from the deadline
-// on, inclusive.
-func LoneExpired(deadline, now time.Time) bool { return !now.Before(deadline) }
-
 // HostCloseCode returns the close code of the control connections of a host after
 // terminal.host_close, from the state read after the signal (the codes of M2-43's single-node
 // path): 4112 for disabled with duplicate_connection, 4111 for disabled and retired, 4110 for a

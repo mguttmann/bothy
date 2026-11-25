@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -385,9 +386,9 @@ func TestPersonalDataErase(t *testing.T) {
 }
 
 // TestExportPackages holds files.ExportPackages: Store writes the object and a complete
-// gdpr_export row of the subject without scan and channel, Open returns the bytes, a wrong length
-// or digest stores nothing, Delete marks the row in the caller's unit with redaction and purge
-// and leaves other files and a second call alone.
+// gdpr_export row of the subject without scan and channel, Open returns the bytes, Delete marks
+// the row in the caller's unit with redaction and purge and leaves other files and a second call
+// alone. TestExportPackagesRefused holds the refused packages.
 func TestExportPackages(t *testing.T) {
 	p := newPDWorld(t)
 	pkgs, err := app.NewExportPackages(p.svc, p.repo)
@@ -428,20 +429,6 @@ func TestExportPackages(t *testing.T) {
 		t.Fatalf("the export package counts against the upload quota: %d, %v", used, err)
 	}
 
-	before := p.count(`SELECT count(*) FROM files`)
-	for _, bad := range []files.StoreExport{
-		{SubjectID: p.alex, Name: name, SizeBytes: int64(len(body)) + 1, SHA256: hexSum, Body: bytes.NewReader(body)},
-		{SubjectID: p.alex, Name: name, SizeBytes: int64(len(body)), SHA256: hex.EncodeToString(make([]byte, 32)), Body: bytes.NewReader(body)},
-		{SubjectID: p.alex, Name: "", SizeBytes: int64(len(body)), SHA256: hexSum, Body: bytes.NewReader(body)},
-		{SubjectID: ids.ID{}, Name: name, SizeBytes: int64(len(body)), SHA256: hexSum, Body: bytes.NewReader(body)},
-	} {
-		if _, err := pkgs.Store(ctx, bad); errs.KindOf(err) != errs.KindInternal {
-			t.Fatalf("Store of a bad package: %v, want internal", err)
-		}
-	}
-	if p.count(`SELECT count(*) FROM files`) != before {
-		t.Fatal("a refused Store left a row")
-	}
 	err = p.uow.Do(ctx, func(ctx context.Context) error {
 		_, err := pkgs.Store(ctx, files.StoreExport{SubjectID: p.alex, Name: name, SizeBytes: int64(len(body)), SHA256: hexSum, Body: bytes.NewReader(body)})
 		return err
@@ -481,5 +468,193 @@ func TestExportPackages(t *testing.T) {
 	}
 	if _, err := pkgs.Open(ctx, id); errs.KindOf(err) != errs.KindNotFound {
 		t.Fatalf("Open of a deleted package: %v, want not_found", err)
+	}
+}
+
+// rowProbe is the body of an export package that, at its first read, counts the pending export
+// rows of its subject: the row must exist before any byte reaches the object store.
+type rowProbe struct {
+	p       *pdWorld
+	subject ids.ID
+	body    io.Reader
+	seen    int
+	probed  bool
+}
+
+func (r *rowProbe) Read(b []byte) (int, error) {
+	if !r.probed {
+		r.probed = true
+		r.seen = r.p.count(`SELECT count(*) FROM files WHERE uploaded_by = $1 AND purpose = 'gdpr_export'
+			AND upload_state = 'pending' AND deleted_at IS NULL`, r.subject)
+	}
+	return r.body.Read(b)
+}
+
+// TestExportPackagesRefused pins that no object of an export package is ever without a row that
+// names its key (20 section 5.2): the row is pending while the bytes are written, Open refuses a
+// package that is not complete, a wrong length or digest marks the row deleted and queues the
+// purge of its object, and a malformed command writes nothing at all.
+func TestExportPackagesRefused(t *testing.T) {
+	p := newPDWorld(t)
+	pkgs, err := app.NewExportPackages(p.svc, p.repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	body := []byte("PK zip of Robin")
+	sum := sha256.Sum256(body)
+	hexSum := hex.EncodeToString(sum[:])
+	name := "export-" + p.robin.String() + "-2026-11-23.zip"
+
+	probe := &rowProbe{p: p, subject: p.robin, body: bytes.NewReader(body)}
+	id, err := pkgs.Store(ctx, files.StoreExport{SubjectID: p.robin, Name: name, SizeBytes: int64(len(body)), SHA256: hexSum, Body: probe})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if probe.seen != 1 {
+		t.Fatalf("%d pending export rows while the bytes were written, want 1", probe.seen)
+	}
+	if p.count(`SELECT count(*) FROM files WHERE id = $1 AND upload_state = 'complete'`, id) != 1 {
+		t.Fatal("the stored package is not complete")
+	}
+
+	pending := p.stored(p.robin, ids.ID{}, "gdpr_export", "pending", "skipped", name, "application/zip", body)
+	if _, err := pkgs.Open(ctx, pending); errs.KindOf(err) != errs.KindNotFound {
+		t.Fatalf("Open of a pending package: %v, want not_found", err)
+	}
+	cands, err := p.repo.FailedRowCandidates(ctx, p.clk.Now(), app.Candidate{}, 10)
+	if err != nil || len(cands) != 1 || cands[0].FileID != pending {
+		t.Fatalf("FailedRowCandidates = %v, %v; want the pending package only", cands, err)
+	}
+
+	_, _, purges := p.rec.counts()
+	for _, bad := range []files.StoreExport{
+		{SubjectID: p.robin, Name: name, SizeBytes: int64(len(body)) + 1, SHA256: hexSum, Body: bytes.NewReader(body)},
+		{SubjectID: p.robin, Name: name, SizeBytes: int64(len(body)), SHA256: hex.EncodeToString(make([]byte, 32)), Body: bytes.NewReader(body)},
+	} {
+		if _, err := pkgs.Store(ctx, bad); errs.KindOf(err) != errs.KindInternal {
+			t.Fatalf("Store of a bad package: %v, want internal", err)
+		}
+	}
+	if n := p.count(`SELECT count(*) FROM files WHERE uploaded_by = $1 AND deleted_at IS NULL`, p.robin); n != 2 {
+		t.Fatalf("%d live rows of Robin, want the stored and the pending package only", n)
+	}
+	if n := p.count(`SELECT count(*) FROM files WHERE uploaded_by = $1 AND purpose = 'gdpr_export' AND deleted_at IS NOT NULL`, p.robin); n != 2 {
+		t.Fatalf("%d refused packages marked deleted, want 2", n)
+	}
+	if _, _, q := p.rec.counts(); q != purges+2 {
+		t.Fatalf("%d purges queued for the refused packages, want 2", q-purges)
+	}
+
+	before := p.count(`SELECT count(*) FROM files`)
+	for _, bad := range []files.StoreExport{
+		{SubjectID: p.robin, Name: "", SizeBytes: int64(len(body)), SHA256: hexSum, Body: bytes.NewReader(body)},
+		{SubjectID: ids.ID{}, Name: name, SizeBytes: int64(len(body)), SHA256: hexSum, Body: bytes.NewReader(body)},
+	} {
+		if _, err := pkgs.Store(ctx, bad); errs.KindOf(err) != errs.KindInternal {
+			t.Fatalf("Store of a malformed command: %v, want internal", err)
+		}
+	}
+	if p.count(`SELECT count(*) FROM files`) != before {
+		t.Fatal("a malformed command left a row")
+	}
+}
+
+// failingBody is an export body whose read fails, as a broken source of the export job does.
+type failingBody struct{}
+
+func (failingBody) Read([]byte) (int, error) { return 0, errors.New("source broke") }
+
+// deletingProbe marks the pending export row of its subject deleted while the bytes are written,
+// as the cleanup of a stale package does.
+type deletingProbe struct {
+	p       *pdWorld
+	subject ids.ID
+	body    io.Reader
+	done    bool
+}
+
+func (r *deletingProbe) Read(b []byte) (int, error) {
+	if !r.done {
+		r.done = true
+		r.p.exec(`UPDATE files SET deleted_at = now() WHERE uploaded_by = $1 AND purpose = 'gdpr_export'
+			AND upload_state = 'pending' AND deleted_at IS NULL`, r.subject)
+	}
+	return r.body.Read(b)
+}
+
+// TestExportPackagesStoreErrorsLeaveNoLiveRow pins the error paths of Store (20 section 5.2): a
+// body that fails while it is written and a row deleted meanwhile both refuse the package, and no
+// live row of it is left; the refused row is marked deleted, so the purge removes its object.
+func TestExportPackagesStoreErrorsLeaveNoLiveRow(t *testing.T) {
+	p := newPDWorld(t)
+	pkgs, err := app.NewExportPackages(p.svc, p.repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	body := []byte("PK zip of Robin")
+	sum := sha256.Sum256(body)
+	hexSum := hex.EncodeToString(sum[:])
+	name := "export-" + p.robin.String() + "-2026-11-25.zip"
+
+	for _, src := range []io.Reader{
+		failingBody{},
+		&deletingProbe{p: p, subject: p.robin, body: bytes.NewReader(body)},
+	} {
+		if _, err := pkgs.Store(ctx, files.StoreExport{SubjectID: p.robin, Name: name, SizeBytes: int64(len(body)), SHA256: hexSum, Body: src}); err == nil {
+			t.Fatalf("Store with body %T = nil, want an error", src)
+		}
+	}
+	if n := p.count(`SELECT count(*) FROM files WHERE uploaded_by = $1 AND deleted_at IS NULL`, p.robin); n != 0 {
+		t.Fatalf("%d live rows of refused packages, want 0", n)
+	}
+	if n := p.count(`SELECT count(*) FROM files WHERE uploaded_by = $1 AND purpose = 'gdpr_export' AND deleted_at IS NOT NULL`, p.robin); n != 2 {
+		t.Fatalf("%d refused packages marked deleted, want 2", n)
+	}
+}
+
+// purgingProbe removes the pending export row of its subject while the bytes are written, as the
+// cleanup of a stale package followed by its purge does, and keeps the object key the row named.
+type purgingProbe struct {
+	p       *pdWorld
+	subject ids.ID
+	body    io.Reader
+	key     string
+}
+
+func (r *purgingProbe) Read(b []byte) (int, error) {
+	if r.key == "" {
+		if err := r.p.conn.QueryRow(context.Background(), `DELETE FROM files WHERE uploaded_by = $1 AND purpose = 'gdpr_export'
+			AND upload_state = 'pending' RETURNING object_key`, r.subject.String()).Scan(&r.key); err != nil {
+			r.p.t.Fatal(err)
+		}
+	}
+	return r.body.Read(b)
+}
+
+// TestExportPackagesRowGoneDeletesTheObject pins that a package whose row was removed while its
+// bytes were written deletes the object it stored (20 section 5.2): no object with personal data
+// is left under a key that no row names.
+func TestExportPackagesRowGoneDeletesTheObject(t *testing.T) {
+	p := newPDWorld(t)
+	pkgs, err := app.NewExportPackages(p.svc, p.repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	body := []byte("PK zip of Robin")
+	sum := sha256.Sum256(body)
+	probe := &purgingProbe{p: p, subject: p.robin, body: bytes.NewReader(body)}
+	name := "export-" + p.robin.String() + "-2026-11-26.zip"
+	if _, err := pkgs.Store(ctx, files.StoreExport{SubjectID: p.robin, Name: name, SizeBytes: int64(len(body)),
+		SHA256: hex.EncodeToString(sum[:]), Body: probe}); err == nil {
+		t.Fatal("Store of a package whose row is gone = nil, want an error")
+	}
+	if probe.key == "" {
+		t.Fatal("the probe found no pending export row")
+	}
+	if _, err := p.store.Head(ctx, probe.key); !errors.Is(err, app.ErrNotFound) {
+		t.Fatalf("Head of the object of the removed row = %v, want not found", err)
 	}
 }

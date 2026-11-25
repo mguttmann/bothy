@@ -1536,7 +1536,8 @@ PK: `id`. FK: `uploaded_by` -> `principals(id)` ON DELETE RESTRICT; `scope_chann
 NULL)`. Unique: `object_key`. Indexes: `(uploaded_by, created_at DESC)` for export and
 quota; `(scan_status) WHERE scan_status = 'pending'` for the scan queue;
 `(upload_state, created_at) WHERE upload_state = 'pending'` for cleaning up aborted
-uploads; GIN `(search_vector)`. Retention: `content`.
+uploads; `(deleted_at, id) WHERE deleted_at IS NOT NULL` for the catch-up of purges; GIN
+`(search_vector)`. Retention: `content`.
 No deduplication across files (R-DM-13). Download only through the server after
 `file.read`, also for media players through short-lived file tickets instead of presigned GET
 ([12-files.md](12-files.md), section 9;
@@ -3057,7 +3058,9 @@ with the same numbers. Therefore:
 1. `instance.sync_epoch` names the timeline. After every restore, `bothy restore finalize` sets
    a new UUIDv7, sets `agent_consumer_cursors.acked_seq`,
    `webhook_subscriptions.last_delivered_seq` and `event_consumer_cursors.last_seq` to the new
-   `head_seq` and writes an audit entry, all in one transaction.
+   `head_seq`, ends every `pending` row of `webhook_deliveries` as `dead` with `event_expired`
+   (webhooks catch up nothing from the old timeline, ADR 0059) and writes an audit entry, all in
+   one transaction.
 2. Clients store the epoch together with the cursor. If it differs, the server requires a resync
    ([04-sync-protocol.md](04-sync-protocol.md), section 7.5).
 3. A move without data loss ([16-operations.md](16-operations.md), section 11) keeps the epoch.

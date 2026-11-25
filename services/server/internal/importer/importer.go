@@ -42,7 +42,9 @@ const (
 	ItemPending = "pending"
 	ItemPosted  = "posted"
 	ItemSkipped = "skipped"
-	ItemFailed  = "failed"
+	// ItemFailed is reserved (03 import_items): nothing writes it yet, a refused item rolls its
+	// batch back.
+	ItemFailed = "failed"
 )
 
 // Leads of a mapped channel (22 12.1).

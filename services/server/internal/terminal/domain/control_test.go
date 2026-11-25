@@ -400,9 +400,6 @@ func TestHeartbeatDeadline(t *testing.T) {
 	if !dl.Equal(last.Add(80 * time.Second)) {
 		t.Fatalf("deadline %v", dl)
 	}
-	if domain.HeartbeatMissed(dl, dl) || !domain.HeartbeatMissed(dl, dl.Add(time.Nanosecond)) {
-		t.Fatal("open exactly at the deadline, closed after it")
-	}
 }
 
 // TestSupportedProtocolVersionsMatchAsyncAPI holds SupportedProtocolVersions equal to

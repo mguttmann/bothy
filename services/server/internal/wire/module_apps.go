@@ -36,7 +36,7 @@ func appsWiring() moduleWiring {
 			if ap == nil {
 				return errors.New("wire: the jobs step needs the apps step")
 			}
-			m.Deliveries = ap.Webhooks
+			m.Deliveries, m.DeliveriesTimeout = ap.Webhooks, ap.Webhooks.Lease()
 			return m.registerRetention(appspg.NewRetention(s.currentPool()), m.RetentionConfig.WebhookDeliveries)
 		},
 		bindJobs: func(s *server, ins jobs.Inserter) {

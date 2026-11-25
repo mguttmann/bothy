@@ -10,9 +10,10 @@ Hosts and pairing, declaration of the LLM login (I6), session users per person (
 
 - `internal/terminal` (`hosts.go`): port `Hosts` with `List`, `Get`, `Create`, `Update`, `SetState` and the DTOs (`HostView` field by field like the schema `Host`, `CreateHost`, `UpdateHost`, `SetHostState`, `PairingCodeIssued` with the pairing code as a redacting `identity.Token`); `Register` registers `host.updated`.
 - `domain/`: `Transition` is the one place that knows the life cycle of 24, section 3.1 (M2-41 and M2-43 call it for their transitions); `CloseReasons` and `CloseDetails` are the closed lists of 24, section 10.3; `NewHostName`, `NewOSUser` and `CheckReason` check the texts (SEC-IN-4); `PlanAssignments` plans assignment and end of session users after T12 (exactly a reported name, uniqueness per host without case over all rows, at most one valid assignment per person, every `400` before any `409`); `reported.go` reads the reported columns.
-- `app/`: the five use cases (`Service`), `EndSessions` (the one way of every end by the server), `HostSource` (implementation of `authz.HostSource`), the view `view.go`, the outgoing ports `Store`, `PairingCodes`, `People`, `Presence` and `Cursors`; `NoConnections` is the presence without control connections.
+- `app/`: one `Service` with the host use cases (`hosts.go`), pairing (`pairing.go`), the terminal sessions (`sessions_*.go`), the control connection (`control.go`), the callbacks of the relay (`sessions_relay.go`), the signals between api nodes (`signals.go`), `terminal.sweep` (`sweep.go`), the revocation subscriptions (`revocation.go`, `subscribers.go`) and the metrics port (`metrics.go`); `EndSessions` and `finish` are the one way of every end, `HostSource` implements `authz.HostSource`, the view is `view.go`, the outgoing ports are in `ports.go` and `sessions_ports.go`.
 - `adapters/postgres/`: the sqlc queries in `queries/`, the generated code in `sqlcgen/` and `Repository`.
-- `adapters/httpapi/`: the handlers of `listHosts`, `createHost`, `getHost`, `updateHost`, `setHostState`, `setHostLlmCredentials` (M2-40), `issueHostPairingCode`, `pairHost` and `confirmHost` (M2-41).
+- `adapters/httpapi/`: the handlers of `listHosts`, `createHost`, `getHost`, `updateHost`, `setHostState`, `setHostLlmCredentials` (M2-40), `issueHostPairingCode`, `pairHost` and `confirmHost` (M2-41) and of the terminal session routes (M2-44).
+- `adapters/wsrelay/`: the control connection, the data connections of the host, the device streams and the relay between them, and the hub of the signals (M2-43, M2-44, M2-47); `adapters/jobs/`: the job `terminal.sweep`; `adapters/otelmetrics/`: the session metrics (M2-46); `adapters/hosttest/`: test helpers for hosts.
 - Test code under `services/server/test/`: `terminaltest` creates hosts in every state with reported profiles, session users and check results as well as assignments and sessions directly in SQL (in production M2-41, M2-43 and M2-44 write these); `terminalworld` is the HTTP test world of M2-39.
 
 ## Retention (M7-05)
@@ -48,7 +49,7 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 
 | Table | Retention class | Deleted by |
 |---|---|---|
-| `terminal_sessions` | `security` (`retention.security_after_end` after `closed_at`) | the job `retention.security` of M7-05 (DP-T05), not this module |
+| `terminal_sessions` | `security` (`retention.security_after_end` after `closed_at`) | the participant `adapters/postgres.Retention` of this module in the job `retention.security` (M7-05, DP-T05; see "Retention (M7-05)") |
 
 `terminal_sessions` holds metadata only: times, state, close reason and detail, exit code, byte counts and IDs; never terminal content, commands, environment variables, paths or profile command lines. There is no content recording (OQ-04 default, D-M2-46-15). The retention of `hosts` and `host_session_users` follows their rows in [20-privacy.md](../../../../docs/spec/20-privacy.md).
 
@@ -90,8 +91,10 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
   `personal` or of the holder of the login, ends the sessions of everyone else with `i6_violation`
   (`domain.EndsForeignSessions`, `SessionSelector.ExceptUserID`); `authz` checks I6 in phase 3.1, a
   violation rolls everything back (`409 i6_violation`).
-- `RecordSessionUserReport` and `ApplySessionUserReport` (for `pairHost` of M2-41 and `report` of
-  M2-43): the reported session users are rights state. An equal report (`domain.SameReport`)
+- `ApplySessionUserReport` (called inside the unit of `report` of M2-43 through `writeReport` in
+  `control.go`; `pairHost` of M2-41 stores its report through `Store.StorePairing` in `pairWrite`;
+  `RecordSessionUserReport` wraps it in its own rights change and has no caller outside the
+  tests): the reported session users are rights state. An equal report (`domain.SameReport`)
   changes nothing; a different one is written with a new version of the host, ends the sessions of
   the people whose assigned name is missing (`domain.VanishedNames`, `access_revoked`) and writes
   `host.updated`.
@@ -182,13 +185,11 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 
 ## Extension points
 
-- M2-44: calls `identity.StepUp.ConsumeFresh` in the transactions of `openTerminalSession` and `attachTerminalSession`, sets `Resource.HostID` and `Resource.Terminal` and adds `host_not_active` and `terminal_profile_unknown` after SR12.
-- M2-44: produces `session.open` and `session.close` through `app.ControlLinks` (`ErrHostNotConnected` and `ErrHostNotReady` map to `409 host_unavailable`) and reuses the login of `Authenticate` for `hostData`.
-- M2-47 (built, see "Built in M2-47"): the duplicate probe and the presence across nodes behind `app.ControlLinks`, the signals through `app.Signals` and `app.SignalHandler`.
-- M7-17 (built): the rest of the operation of several nodes on the same `cluster.mode`; the terminal's listener became a route of the one `LISTEN ephemeral` connection of the process (`platform/pg.EphemeralListener`, docs/decisions.d/M7-17.md D-M7-17-2). A signal kind for the re-sent `ready` (D-M2-47-17) was not needed.
-- M2-44: sessions and relay; adds `terminal_session.changed`, the close code `4100` and `session.close` to the host service to `EndSessions`.
-- M2-46 (built, see "Built in M2-46"): revocation through the three subscriptions, the limits in the relay and in `terminal.sweep`, the session limits, the rate limits of the channels and the session metrics.
-- M2-48: runs TM-T06, TM-T10 and TM-T11 against the real host service in a container; M7-05: deletes `terminal_sessions` rows with `retention.security`.
+The extension points named by M2-39 to M2-43 are built: M2-44 (sessions, relay, step-up in the
+transactions of opening and attaching, `session.open` and `session.close` through
+`app.ControlLinks`), M2-46 (revocation, limits, rate limits, metrics), M2-47 and M7-17 (several api
+nodes), M2-48 (the TM tests against the real host service in a container) and M7-05 (retention).
+The sections "Built in ..." below record what each ticket added.
 
 ## Notes for the build
 
@@ -296,7 +297,7 @@ sections 3.4 and 9; the reasons are the rows `D-M2-47-<n>` of
   announced elsewhere (`terminal.host_duplicate_probe_timeout`, `4009` or the duplicate verdict with
   `4112`); a new connection gets no `session.open` before `domain.ProbationEnd` (twice the probe
   timeout after its first announcement), then the session is checked again in the database.
-- Lone side (`domain.LoneSideOutcome`, `LoneDeadline`): each side has its own timer of
+- Lone side (`domain.LoneSideOutcome`): each side has its own timer of
   `terminal.open_timeout` from its accepted `identify`; a lone side closes with `4102` and counts
   `bothy.terminal.relay.unpaired` with `bothy.terminal.side`; an `opening` ends `open_failed` with
   `open_timeout` through the compare-and-swap `RelayOpeningTimedOut`; a `detached` session stays
@@ -319,8 +320,8 @@ sections 3.4 and 9; the reasons are the rows `D-M2-47-<n>` of
   reconciliation, openings through them end `open_failed`). The re-sent `ready` of
   `setHostLlmCredentials` and `confirmHost` stays local to the node that served the call
   (D-M2-47-17).
-- What M7-17 adds: `NOTIFY ephemeral` for gateway, `runs` and `agents`, possibly one shared
-  listener per process, rate limits and the rest of the operation of several nodes.
+- M7-17 (built) added `NOTIFY ephemeral` for gateway, `runs` and `agents`, one shared listener
+  per process (`platform/pg.EphemeralListener`) and the rest of the operation of several nodes.
 - Tests: `domain/cluster_test.go` (codec, fuzz, payload bound, order, presence, probation, lone
   side), `app` (`LocalSignals`, staged signals), `adapters/wsrelay` (the handler), `internal/wire`
   (key and wiring), `test/terminal/multinode` (TM-T15 and the cross-node tests over two in-process

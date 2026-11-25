@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package httpapi holds the REST handlers of the files module as part of
-// rest.StrictServerInterface: createUpload, uploadPart, getUpload, completeUpload and abortUpload
-// (uploads.go) and getFile (files.go) of docs/api/openapi.yaml (M3-03). The use cases authorize;
-// the handlers only convert and pass errors to the problem writer of the chain unchanged.
+// rest.StrictServerInterface (docs/api/openapi.yaml): the uploads createUpload, uploadPart,
+// getUpload, completeUpload and abortUpload (uploads.go), getFile and deleteFile (files.go), the
+// downloads downloadFile, downloadThumbnail and createFileTicket (download.go), and the
+// transcripts getTranscript, requestTranscription and submitTranscript (transcripts.go). The use
+// cases authorize; the handlers only convert and pass errors to the problem writer of the chain
+// unchanged.
 //
 // Example:
 //
-//	h := httpapi.New(svc, svc)
+//	h := httpapi.New(svc, svc, svc)
 //	built, err := routes.Build(wire.Handlers{Files: h}, wire.RouteOptions(), cat)
 package httpapi
 

@@ -240,6 +240,11 @@ A thread that is moved into another channel in Bothy follows the channel it lies
 run no longer rename, close or reopen it; in another channel that Discord leads they do. New
 Discord messages of the thread are still copied into it.
 
+A rename in Discord reaches only a thread whose title the server derived itself
+(`title_source = auto`, 22 12.2 step 3); a thread imported with its own Discord name keeps the
+title it got at the import. Where a team keeps a status in thread titles, compare the titles in
+Discord during parallel operation, not in Bothy.
+
 Spot checks during parallel operation, per channel:
 
 - the messages of a channel taken over and skipped, summed over the reports of its runs (pilot,

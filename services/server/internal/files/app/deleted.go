@@ -42,6 +42,13 @@ func (s *Service) markDeleted(ctx context.Context, d Deletion) error {
 // Callers: DeleteForMessage (a deleted message takes its attachments), ReleaseImage (a replaced
 // avatar or logo, M3-10), Delete (deleteFile) and the cleanup steps of never attached files and of
 // failed rows (M3-08).
+//
+// Lock order: the callers lock the files rows first, and AbortOpenSessions then writes the open
+// session rows, while abort, expiry and the scan pass lock the session before the file (M3-03).
+// The two orders can meet only on a file with an open session that is deleted while it is
+// aborted or expires; PostgreSQL then ends one unit with a deadlock, which the unit of work of
+// platform/pg retries (SQLSTATE 40P01) up to database.tx_retry_max times, so the cost is usually a
+// delay of deadlock_timeout; with no retry left the unit fails with CodeUnavailable.
 func (d deletion) mark(ctx context.Context, sel Deletion, now time.Time) error {
 	if len(sel.FileIDs) == 0 {
 		return nil

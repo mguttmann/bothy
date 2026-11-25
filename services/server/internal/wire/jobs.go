@@ -116,6 +116,9 @@ type JobModules struct {
 	ChainVerifyInterval time.Duration
 	// Deliveries is the use case of apps.webhook_deliver (M2-26).
 	Deliveries appsjobs.Deliverer
+	// DeliveriesTimeout is the River timeout of apps.webhook_deliver, the lease of an attempt
+	// (app.WebhookConfig.Lease); zero means River's default.
+	DeliveriesTimeout time.Duration
 	// Reconciliation is the use case of billing.reconcile (M2-28); never periodic.
 	Reconciliation billingjobs.Applier
 	// FilesScan is the scan pass of files.scan (M3-04); nil in the role api.
@@ -254,7 +257,7 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if err := auditjobs.Register(reg, m.ChainVerify, m.ChainVerifyInterval); err != nil {
 		return nil, err
 	}
-	if err := appsjobs.Register(reg, m.Deliveries); err != nil {
+	if err := appsjobs.Register(reg, m.Deliveries, m.DeliveriesTimeout); err != nil {
 		return nil, err
 	}
 	if err := billingjobs.Register(reg, m.Reconciliation); err != nil {

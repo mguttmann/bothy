@@ -110,5 +110,10 @@ func TestUpdateWebhookSubscription(t *testing.T) { appsworld.ScenarioUpdateWebho
 // TestWebhookCarriesEpoch runs appsworld.ScenarioWebhookCarriesEpochAfterRestore (M7-04).
 func TestWebhookCarriesEpoch(t *testing.T) { appsworld.ScenarioWebhookCarriesEpochAfterRestore(t) }
 
+// TestRestoreEndsPendingDeliveries: see appsworld.ScenarioRestoreEndsPendingDeliveries.
+func TestRestoreEndsPendingDeliveries(t *testing.T) {
+	appsworld.ScenarioRestoreEndsPendingDeliveries(t)
+}
+
 // TestAgentWebhookDelivery runs appsworld.ScenarioAgentWebhookDelivery (V1-01).
 func TestAgentWebhookDelivery(t *testing.T) { appsworld.ScenarioAgentWebhookDelivery(t) }

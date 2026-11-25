@@ -48,7 +48,8 @@ func (c *Counts) Add(kind, state string) {
 	c.byKind[kind][state]++
 }
 
-// SourceChanged counts one item answered with source_changed.
+// SourceChanged counts one answer with source_changed: an item sent again with the same changed
+// hash in a later batch is counted again (22 7.2).
 func (c *Counts) SourceChanged() { c.sourceChanged++ }
 
 // Zero reports that nothing was counted.

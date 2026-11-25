@@ -21,9 +21,9 @@ import (
 // mediaTypeZip is files.mime_type of an export package (20 section 5.2: a ZIP archive).
 const mediaTypeZip = "application/zip"
 
-// msgExportCleanup is the Warn line of an object of a refused export package that could not be
-// removed; the next store never reuses its key, so it only costs space.
-const msgExportCleanup = "export package object could not be removed after a failed store"
+// msgExportCleanup is the Warn line of a refused export package whose row could not be marked
+// deleted; the row stays pending, Open refuses it and the cleanup removes it later.
+const msgExportCleanup = "export package could not be discarded after a failed store"
 
 // ExportPackages implements files.ExportPackages over the files use cases (M7-06): the export
 // packages of 20 section 5.2 are files of purpose gdpr_export that the server writes itself, so
@@ -51,15 +51,18 @@ func NewExportPackages(s *Service, store PersonalDataStore) (*ExportPackages, er
 }
 
 // Store implements files.ExportPackages: outside any unit of work it checks the free space of the
-// file system driver, writes the object under the original key of a new file id while it counts
-// and hashes the body, and only when length and SHA-256 match cmd inserts the row: purpose
-// gdpr_export, uploaded_by the subject, no scope channel, upload_state complete, scan_status
-// skipped (the server wrote the bytes, nobody uploaded them), application/zip, no event. A refused
-// package leaves no row, and its object is removed again.
+// file system driver, inserts the row of a new file id first (purpose gdpr_export, uploaded_by the
+// subject, no scope channel, upload_state pending, scan_status skipped: the server writes the
+// bytes, nobody uploads them; application/zip; no event), writes the object under its original
+// key while it counts and hashes the body, and only when length and SHA-256 match cmd sets the row
+// complete. So every object of a package has a row that names its key: a refused package is
+// marked deleted and goes with files.purge_objects, and a package whose process ended before the
+// last step stays a pending row that Open refuses and the cleanup removes after
+// file.failed_row_ttl (step c).
 //
 // Errors: internal for a call inside a unit of work, a missing subject, name or body, a malformed
-// digest, a length or digest that differs; 503 storage_full; 503 for the storage; those of the
-// insert.
+// digest, a length or digest that differs, a row deleted meanwhile; 503 storage_full; 503 for the
+// storage; those of the insert.
 func (x *ExportPackages) Store(ctx context.Context, cmd files.StoreExport) (ids.ID, error) {
 	if txn.InUnit(ctx) {
 		return ids.ID{}, errs.New(errs.CodeInternalError, "files: storing an export package runs outside a unit of work")
@@ -76,35 +79,62 @@ func (x *ExportPackages) Store(ctx context.Context, cmd files.StoreExport) (ids.
 	if err != nil {
 		return ids.ID{}, err
 	}
+	rec := FileRecord{
+		ID: id, ObjectKey: key, SizeBytes: cmd.SizeBytes, MIMEType: mediaTypeZip, OriginalName: cmd.Name,
+		UploadedBy: cmd.SubjectID, Purpose: string(domain.PurposeGDPRExport), UploadState: domain.UploadPending,
+		ScanStatus: domain.ScanSkipped, TranscriptStatus: transcriptNone, CreatedAt: x.s.now(),
+	}
+	copy(rec.SHA256[:], want)
+	if err := x.s.d.UoW.Do(ctx, func(ctx context.Context) error { return x.store.InsertExportFile(ctx, rec) }); err != nil {
+		return ids.ID{}, err
+	}
 	h := sha256.New()
 	err = x.s.d.Store.Put(ctx, key, io.TeeReader(cmd.Body, h), cmd.SizeBytes)
 	switch {
 	case errors.Is(err, ErrSizeMismatch):
+		x.discard(ctx, id)
 		return ids.ID{}, errs.Wrap(errs.CodeInternalError, err, "files: the export package has another length")
 	case err != nil:
+		x.discard(ctx, id)
 		return ids.ID{}, imageStorageError(err)
 	}
-	var sum [sha256.Size]byte
-	copy(sum[:], h.Sum(nil))
-	if subtle.ConstantTimeCompare(sum[:], want) != 1 {
-		x.removeObject(ctx, id, key)
+	if subtle.ConstantTimeCompare(h.Sum(nil), want) != 1 {
+		x.discard(ctx, id)
 		return ids.ID{}, errs.New(errs.CodeInternalError, "files: the export package has another SHA-256")
 	}
-	rec := FileRecord{
-		ID: id, ObjectKey: key, SHA256: sum, SizeBytes: cmd.SizeBytes, MIMEType: mediaTypeZip, OriginalName: cmd.Name,
-		UploadedBy: cmd.SubjectID, Purpose: string(domain.PurposeGDPRExport), UploadState: domain.UploadComplete,
-		ScanStatus: domain.ScanSkipped, TranscriptStatus: transcriptNone, CreatedAt: x.s.now(),
-	}
-	if err := x.s.d.UoW.Do(ctx, func(ctx context.Context) error { return x.store.InsertExportFile(ctx, rec) }); err != nil {
-		x.removeObject(ctx, id, key)
+	var done bool
+	if err := x.s.d.UoW.Do(ctx, func(ctx context.Context) error {
+		var err error
+		done, err = x.store.CompleteExportFile(ctx, id)
+		return err
+	}); err != nil || !done {
+		x.discard(ctx, id)
+		if err == nil {
+			// The row went while the bytes were written (the cleanup of a stale package, perhaps
+			// already purged): delete the object here, since no row may name it any more.
+			x.dropObject(ctx, key)
+			err = errs.New(errs.CodeInternalError, "files: the export package was deleted while it was stored")
+		}
 		return ids.ID{}, err
 	}
 	return id, nil
 }
 
-// removeObject deletes the object of a refused package; a failure is logged with the file id only.
-func (x *ExportPackages) removeObject(ctx context.Context, id ids.ID, key string) {
-	if err := x.s.d.Store.Delete(context.WithoutCancel(ctx), key); err != nil {
+// dropObject deletes the object key of a package whose row is gone, even when ctx has ended; a
+// failure is logged with its error type only, as discard does.
+func (x *ExportPackages) dropObject(ctx context.Context, key string) {
+	ctx = context.WithoutCancel(ctx)
+	if err := x.s.d.Store.Delete(ctx, key); err != nil {
+		x.s.d.Log.LogAttrs(ctx, slog.LevelWarn, msgExportCleanup, slog.String(logKeyErrorType, errorType(err)))
+	}
+}
+
+// discard marks the row of a refused package deleted, so files.purge_objects removes its object
+// and row, even when ctx has ended; a failure is logged with the file id only, and the row stays
+// for the cleanup.
+func (x *ExportPackages) discard(ctx context.Context, id ids.ID) {
+	ctx = context.WithoutCancel(ctx)
+	if err := x.s.d.UoW.Do(ctx, func(ctx context.Context) error { return x.Delete(ctx, id) }); err != nil {
 		x.s.d.Log.LogAttrs(ctx, slog.LevelWarn, msgExportCleanup, slog.String(logKeyFileID, id.String()),
 			slog.String(logKeyErrorType, errorType(err)))
 	}
@@ -118,7 +148,7 @@ func (x *ExportPackages) Open(ctx context.Context, id ids.ID) (files.ExportConte
 	if err != nil {
 		return files.ExportContent{}, err
 	}
-	if !found || f.Purpose != string(domain.PurposeGDPRExport) {
+	if !found || f.Purpose != string(domain.PurposeGDPRExport) || f.UploadState != domain.UploadComplete {
 		return files.ExportContent{}, notFound()
 	}
 	body, err := x.s.d.Store.Get(ctx, f.ObjectKey, nil)

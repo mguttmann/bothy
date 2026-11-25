@@ -186,6 +186,15 @@ func (p *ScanPass) Run(ctx context.Context, fileID ids.ID, round int64) (PassRes
 	if !found || !awaiting(target) {
 		return PassResult{Outcome: OutcomeNone}, nil
 	}
+	// An open S3 upload is completed before the scanner is asked, so a long clamd outage never
+	// leaves confirmed bytes in an incomplete upload that a lifecycle rule may abort (12 3.2).
+	if err := p.completeOpenUpload(ctx, target); err != nil {
+		if ctx.Err() != nil {
+			return PassResult{}, ctx.Err()
+		}
+		p.d.Log.ErrorContext(ctx, msgScanStorage, slog.String(logKeyFileID, fileID.String()), slog.String(logKeyErrorType, RetryStorage))
+		return p.retry(ctx, fileID, round, RetryStorage)
+	}
 	if p.cfg.Mode == ScanModeRequired {
 		pctx, cancel := context.WithTimeout(ctx, p.cfg.HealthInterval)
 		err := p.d.Scanner.Ping(pctx)
@@ -308,6 +317,19 @@ func (p *ScanPass) source(ctx context.Context, t SessionRecord) (io.ReadCloser, 
 		return nil, false, err
 	}
 	return r, false, nil
+}
+
+// completeOpenUpload completes the multipart upload of t when it has one and object_key does not
+// exist yet; the file system layout and an object already joined need nothing.
+func (p *ScanPass) completeOpenUpload(ctx context.Context, t SessionRecord) error {
+	if t.StorageUploadID == "" {
+		return nil
+	}
+	_, err := p.d.Store.Head(ctx, t.File.ObjectKey)
+	if !errors.Is(err, ErrNotFound) {
+		return err
+	}
+	return p.completeMultipart(ctx, t)
 }
 
 // completeMultipart joins the confirmed parts of an S3 upload into object_key.

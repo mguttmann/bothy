@@ -813,7 +813,16 @@ func ScenarioDeliveryCrashAfterSend(t *testing.T) {
 	if err := svc.Deliver(context.Background(), sub); err != nil || len(w.Hooks().Got()) != 1 {
 		t.Fatalf("the retry inside the lease sent again: %v, %d requests", err, len(w.Hooks().Got()))
 	}
+	// The lease outlasts the send limit (srv-apps-billing-1): one send limit after the claim the head is
+	// still leased, no wake-up is due and a retry sends nothing.
 	w.Clk.Advance(3 * time.Second)
+	if due := w.DueJobs(); len(due) != 0 {
+		t.Fatalf("%d jobs due inside the lease", len(due))
+	}
+	if err := svc.Deliver(context.Background(), sub); err != nil || len(w.Hooks().Got()) != 1 {
+		t.Fatalf("a retry after the send limit sent again: %v, %d requests", err, len(w.Hooks().Got()))
+	}
+	w.Clk.Advance(2 * time.Second)
 	due := w.DueJobs()
 	if len(due) == 0 {
 		t.Fatal("no lease wake-up job")

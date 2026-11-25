@@ -14,6 +14,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 )
 
 // problem returns code and reason of err, or "ok".
@@ -293,6 +294,67 @@ func TestS3PartStrategy(t *testing.T) {
 	}
 	if e.store.total() != before {
 		t.Fatal("completion called the object store")
+	}
+}
+
+// TestS3PartStoreAbortsItsUploadWhenTheFileIsGone pins that a multipart upload created for a
+// first part is aborted when its id cannot be stored because the file was deleted meanwhile:
+// no upload is left that no row names.
+func TestS3PartStoreAbortsItsUploadWhenTheFileIsGone(t *testing.T) {
+	e := newEnv(t, "s3", testCfg)
+	s, err := e.svc.Create(e.ctx, createCmd("report.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale, _, _ := e.repo.Session(e.ctx, s.FileID, e.alex.ID)
+	e.repo.mu.Lock()
+	f := e.repo.files[s.FileID]
+	f.Deleted = true
+	e.repo.files[s.FileID] = f
+	gone := e.repo.sessions[s.FileID]
+	gone.State = domain.SessionAborted
+	e.repo.sessions[s.FileID] = gone
+	e.repo.mu.Unlock()
+
+	parts := app.NewS3PartStore(e.store, e.repo, e.uow)
+	if _, err := parts.Put(e.ctx, stale, 1, bytes.NewReader(content[:4]), 4); problem(err) != "not_found" {
+		t.Fatalf("Put = %v; want not_found", err)
+	}
+	if e.store.count("CreateMultipart") != 1 || e.store.count("AbortMultipart") != 1 {
+		t.Fatalf("create %d, abort %d; want the own upload aborted", e.store.count("CreateMultipart"), e.store.count("AbortMultipart"))
+	}
+	if len(e.store.uploads) != 0 {
+		t.Fatalf("%d multipart uploads left open", len(e.store.uploads))
+	}
+}
+
+// lostCommitUoW runs fn like the unit of work and then fails as a lost COMMIT does: fn saw its
+// writes succeed, but the outcome of the commit is unknown to the caller.
+type lostCommitUoW struct{ inner *uow }
+
+func (u lostCommitUoW) Do(ctx context.Context, fn func(ctx context.Context) error, opts ...txn.Option) error {
+	if err := u.inner.Do(ctx, fn, opts...); err != nil {
+		return err
+	}
+	return errs.New(errs.CodeUnavailable, "")
+}
+
+// TestS3PartStoreReportsALostCommitOfItsUploadID pins that a first part whose upload id was
+// written in a unit that then failed at commit is an error, not an uploaded part: the caller
+// retries, and the upload is not aborted, because the row may name it.
+func TestS3PartStoreReportsALostCommitOfItsUploadID(t *testing.T) {
+	e := newEnv(t, "s3", testCfg)
+	s, err := e.svc.Create(e.ctx, createCmd("report.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess, _, _ := e.repo.Session(e.ctx, s.FileID, e.alex.ID)
+	parts := app.NewS3PartStore(e.store, e.repo, lostCommitUoW{inner: e.uow})
+	if _, err := parts.Put(e.ctx, sess, 1, bytes.NewReader(content[:4]), 4); err == nil {
+		t.Fatal("Put = nil; want the error of the lost commit")
+	}
+	if e.store.count("UploadPart") != 0 || e.store.count("AbortMultipart") != 0 {
+		t.Fatalf("upload part %d, abort %d; want neither", e.store.count("UploadPart"), e.store.count("AbortMultipart"))
 	}
 }
 

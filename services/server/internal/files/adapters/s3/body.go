@@ -92,11 +92,15 @@ func (b *exactBody) Read(p []byte) (int, error) {
 	return 1, nil
 }
 
-// readOne fills buf with one byte of the source or fails.
+// readOne fills buf with one byte of the source or fails. An error other than io.EOF that
+// comes with the byte fails the body as well (io.Reader allows n > 0 together with an error).
 func (b *exactBody) readOne(buf []byte) error {
 	for range maxEmptyReads {
 		n, err := b.src.Read(buf)
 		if n == 1 {
+			if err != nil && !errors.Is(err, io.EOF) {
+				return err
+			}
 			return nil
 		}
 		if errors.Is(err, io.EOF) {

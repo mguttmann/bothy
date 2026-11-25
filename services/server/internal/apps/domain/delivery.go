@@ -64,9 +64,6 @@ type Outcome struct {
 // only failures count, throttles do not).
 func (o Outcome) Counted() bool { return o.Kind == OutcomeFailed }
 
-// Retry reports whether the delivery is tried again (throttle or failure).
-func (o Outcome) Retry() bool { return o.Kind == OutcomeThrottled || o.Kind == OutcomeFailed }
-
 // BlockedError is a refusal of the egress client in the terms of this package: the sender adapter
 // converts egress.BlockedError into it, so the pure classification needs no platform import.
 // Reason is the egress reason (address_blocked, host_not_allowed, scheme_not_allowed,

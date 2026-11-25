@@ -153,7 +153,8 @@ func (a *Adapter) Name() string { return providerName }
 // ExpiredProviderToken renews the JWT and retries once.
 //
 // Errors: a request without an answer (name resolution, connection, TLS, HTTP/2, deadline,
-// egress refusal with errors.Is(err, egress.ErrBlocked), an oversize answer). They carry fixed
+// egress refusal with errors.Is(err, egress.ErrBlocked), an oversize answer) and a JWT
+// creation that stopped because ctx ended. They carry fixed
 // text and the egress error, which names method, scheme and host only; the job counts them as
 // transient.
 func (a *Adapter) Send(ctx context.Context, reg app.Registration, n app.Notification) (domain.SendResult, error) {
@@ -163,6 +164,9 @@ func (a *Adapter) Send(ctx context.Context, reg app.Registration, n app.Notifica
 	}
 	st := a.envs[reg.Environment]
 	tok, probe, err := st.acquire(ctx, a.clock.Now())
+	if errors.Is(err, errMintCancelled) {
+		return domain.SendResult{}, err
+	}
 	if err != nil {
 		return domain.SendResult{Class: domain.ResultConfigError}, nil
 	}
@@ -190,7 +194,10 @@ func (a *Adapter) exchange(ctx context.Context, st *envState, reg app.Registrati
 	if err != nil || !v.renew {
 		return v, false, err
 	}
-	next, ok := st.renew(ctx, tok, a.clock.Now())
+	next, ok, err := st.renew(ctx, tok, a.clock.Now())
+	if err != nil {
+		return verdict{}, false, err
+	}
 	if !ok {
 		if probe {
 			st.settle(ctx, true, true, reasonExpiredProviderToken, a.clock.Now())

@@ -161,6 +161,7 @@ func (s *Service) openAttempt(ctx context.Context, p actor.Actor, cmd terminal.O
 		return terminal.Grant{}, s.stepUpDenied(ctx, err, authorize.ActionTerminalOpen, authorize.ResourceHost, h.ID)
 	}
 	if err := s.recheck(ctx, p, authorize.ActionTerminalOpen, ses.ID, s.openRecheck(ctx, p, cmd), h.ID); err != nil {
+		s.notes.take(ses.ID) // no terminal.session_open follows that would take it
 		return terminal.Grant{}, err
 	}
 	// The relay of every node expects the session, the node of the control connection sends

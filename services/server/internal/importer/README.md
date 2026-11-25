@@ -31,7 +31,9 @@ Import sources, batches with origin key (`import.apply`), ownership list and rea
   (`INSERT ... ON CONFLICT DO NOTHING`), the target through `chat.ImportStructure` or
   `identity.ImportPeople`, then `posted` or `skipped`; an existing key is locked and answered with
   its stored item (with `source_changed` when the hash differs). Only a batch that made a new
-  transition writes the counters and `import.progress`, so a repeated batch appends no event.
+  transition, met a changed hash or changed a mirrored thread writes the counters and
+  `import.progress`, so a repeated batch with unchanged content and no mirror change appends no event; `server.source_changed` counts the answers with
+  `source_changed`, so a run that sends a changed item again counts it again.
   `import.progress` carries the whole source while its payload is smaller than
   `sync.event_payload_max_bytes`; a larger source (the cursor of the tool grows with every thread)
   gets the reduced payload without `cursor` and with an empty `config`, and `truncated` in the
