@@ -1,0 +1,25 @@
+cd {folder} && python3 - <<'EOF'
+p='Makefile'
+s=open(p).read()
+old='''TOOL_VERSION := 1.0.0
+'''
+new='''TOOL_VERSION := 1.0.0
+# A schema at a fixed address, checked by its SHA-256.
+SCHEMA_URL := https://example.com/schema.v2.json
+SCHEMA_SHA256 := 0000000000000000000000000000000000000000000000000000000000000000
+SCHEMA := .cache/schemas/schema-$(SCHEMA_SHA256).json
+'''
+assert old in s; s=s.replace(old,new,1)
+old='''	$(UVRUN) check-jsonschema --schemafile https://example.com/schema.v2.json config.yaml
+'''
+new='''	@# Fetched once into .cache (offline afterwards); a file whose SHA-256 differs is removed and fails.
+	@f=$(SCHEMA); mkdir -p $$(dirname "$$f") && \\
+	{ [ -f "$$f" ] || { curl -fsSL --retry 3 -o "$$f.tmp" "$(SCHEMA_URL)" && mv "$$f.tmp" "$$f"; }; } && \\
+	$(UVRUN) python -c 'import hashlib, sys; p, want = sys.argv[1:]; got = hashlib.sha256(open(p, "rb").read()).hexdigest(); sys.exit(0 if got == want else f"{p}: SHA-256 {got}, expected {want}")' "$$f" $(SCHEMA_SHA256) || \\
+	{ rm -f "$$f" "$$f.tmp"; exit 1; }
+	$(UVRUN) check-jsonschema --schemafile $(SCHEMA) config.yaml
+'''
+assert old in s; s=s.replace(old,new,1)
+open(p,'w').write(s)
+EOF
+grep -n "^UVRUN" Makefile

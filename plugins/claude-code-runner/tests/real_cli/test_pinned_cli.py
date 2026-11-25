@@ -119,6 +119,10 @@ BACKGROUND_TOKENS = (
     "--messaging-socket-path",
     "crossSessionInbound",
     "bgIsolation",
+    # FIX-RUNNER-BG-NO-PROMPT: the setting of every settings file that refuses a tool call
+    # where the session would wait for a person, with the start of the CLI's own description.
+    "denyInsteadOfPrompting",
+    "Never wait for a person to answer a tool permission prompt",
     "hasTrustDialogAccepted",
     "queue-operation",
     "absorbed_mid_turn",

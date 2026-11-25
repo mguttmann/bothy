@@ -48,6 +48,11 @@ What background mode rests on, each run here with the functions the runner uses:
     A new session, which is what the runner starts in its place, carries none of it. The
     transcript of a released session shows the line to the runner's judgment of 18.5 rule 4,
     and that of a session that took only its prompt shows nothing.
+14. A command whose removal the CLI's check cannot parse with certainty (an edit through a
+    quoted heredoc that holds ``rm -f "$$f"``) leaves a session in bypass mode waiting for a
+    person without the runner's ``permissions.denyInsteadOfPrompting``; with the runner's
+    settings file the call is refused at once, the model gets the refusal as the tool's
+    result, the turn ends and the session never waits (FIX-RUNNER-BG-NO-PROMPT).
 
 Level two (``CLAUDE_CODE_RUNNER_REAL_TURN=1`` in addition, the owner's decision) is one short
 background turn on the stored login of the host user: it proves the path of the turn and the
@@ -231,7 +236,8 @@ def test_launch_list_stop_and_remove() -> None:
             assert "AskUserQuestion" not in script.tools()
             # The settings file of the launch is the runner's: it widens nothing (18.5).
             settings = json.loads((place.root / "post.settings.json").read_text("utf-8"))
-            assert set(settings) == {"worktree", "env"}
+            assert set(settings) == {"worktree", "env", "permissions"}
+            assert settings["permissions"] == {"denyInsteadOfPrompting": True}
             assert set(settings["env"]) == set(RUN_ENV_NAMES)
             # The runner's reader over the live session: one turn, its answer, no background work.
             reader = TranscriptReader(
@@ -495,6 +501,65 @@ def test_no_class_offers_the_tools_that_reach_other_sessions() -> None:
             assert not asked.get("tools")
             for tool in DENIED_TOOLS:
                 assert tool not in json.dumps(asked.get("messages"))
+
+    asyncio.run(scenario())
+
+
+def test_a_call_that_would_wait_for_a_person_is_refused_and_the_turn_goes_on() -> None:
+    # 14. The command of a real agent that left a background session waiting, so that the
+    # runner stopped the session and every agent of it (FIX-RUNNER-BG-NO-PROMPT).
+    async def scenario() -> None:
+        async with world() as (place, script):
+            place.accept_bypass()
+            script.folder = str(place.work)
+            # Without the setting: the CLI asks a person, even in bypass mode, and the session
+            # waits for an answer a run can never give.
+            out = await place.launch(
+                "asks", "Context.\n\nRMSTEP edit", tool_class="host", drop_settings=["permissions"]
+            )
+            assert out.refusal is None, out.refusal
+            assert out.short_id is not None
+            waiting = await place.until_status(out.short_id, "waiting")
+            assert waiting.waiting_for == "permission prompt"
+            assert turn_ends(place.records(waiting.session_id)) == 0
+            await place.stop(out.short_id)
+            await place.cli.remove(out.short_id)
+            # With the runner's settings file: the call is refused at once, the model gets the
+            # refusal, and the turn ends with its answer.
+            out = await place.launch("refuses", "Context.\n\nRMSTEP edit", tool_class="host")
+            assert out.refusal is None, out.refusal
+            assert out.short_id is not None
+            entry = await place.until_entry(out.short_id)
+            records = await place.until_turns(entry.session_id, 1)
+            refusal = script.tool_result("RMSTEP")
+            assert "safety check" in refusal
+            assert "NOT run" in refusal
+            [result] = [
+                block
+                for r in records
+                if r.get("type") == "user"
+                for block in (r.get("message") or {}).get("content") or []
+                if isinstance(block, dict) and block.get("type") == "tool_result"
+            ]
+            assert result.get("is_error") is True
+            assert not (place.work / "Makefile").exists()  # nothing ran
+            idle = await place.until_status(out.short_id, "idle")
+            assert idle.waiting_for is None
+            # The runner's reader over the session: one answer, no cause to stop it.
+            reader = TranscriptReader(
+                lambda: place.transcript(entry.session_id),
+                0.05,
+                lambda: False,
+                TranscriptMapper("prompt-uuid"),
+                sessions=place.sessions,
+                short_id=out.short_id,
+                pid=entry.pid or 0,
+            )
+            read = [m async for m in reader.items() if m is not None]
+            assert [m.get("bg_cause") for m in read if m.get("bg_cause")] == []
+            results = [m for m in read if m["type"] == "result"]
+            assert [(r["is_error"], r["result"]) for r in results] == [(False, "Answer 1")]
+            await place.stop(out.short_id)
 
     asyncio.run(scenario())
 

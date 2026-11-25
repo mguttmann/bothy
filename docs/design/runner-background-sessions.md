@@ -284,13 +284,20 @@ Only the turns of the runner's own agent in billing mode `personal`. In print mo
    `runner.state_dir`, when the socket path is longer than a socket address of the system
    allows.
 3. **The settings file** of the run (mode `0600`, in that folder) holds exactly:
-   `worktree.bgIsolation` `"none"`, and `env` with `CLAUDE_PRODUCT_RUN`, `DISABLE_AUTOUPDATER`,
+   `worktree.bgIsolation` `"none"`, `permissions.denyInsteadOfPrompting` `true` (a hosted turn
+   keeps the members of its own `permissions` beside it), and `env` with `CLAUDE_PRODUCT_RUN`, `DISABLE_AUTOUPDATER`,
    the run's `TMPDIR` and `SSH_AUTH_SOCK`, every name in every file (the agent socket with
    `runner.forward_ssh_agent`, else the empty text; 4.16). It sets `crossSessionInbound`
    `"accept"` only when the host user's own `settings.json` gives that setting the value
    `"hold"` (4.14). Reasons: the launching command's environment does not reach the session (item 7);
    without `bgIsolation` `"none"` the session would move into a worktree of its own, against
-   18.1, and its transcript would move with it (item 12).
+   18.1, and its transcript would move with it (item 12). `denyInsteadOfPrompting` (read in the
+   file of the pinned CLI: "Never wait for a person to answer a tool permission prompt", read
+   from `--settings` too, `true` from any source wins) turns a tool call that would wait for a
+   person into a refusal the model reads: the CLI's check of a removal in a command it cannot
+   parse with certainty asks even in bypass mode, and before the setting such a call of one
+   agent left the session waiting and the runner stopped it with every agent of it
+   (FIX-RUNNER-BG-NO-PROMPT).
 4. **The prompt** is the two parts of the first stdin line of 18.2 (the context with trust
    marks, then the trigger part) joined by a blank line, as one text. It never starts with `/`
    or `!`, because the context part comes first. Alternative: the positional argument. Refused:
@@ -383,9 +390,14 @@ and that `uuid`. The checks of 18.5 before the write are unchanged.
   background work, the quiet window `runner.followup_grace` end the run (4.7).
 - **A session that waits for a person** (`waitingFor` present) is stopped, and the run ends
   `failed` with `runtime_error`, a box note that names the kind and the cause
-  `background_session_waiting`. The class flags prevent
+  `background_session_waiting`, and the runner logs the warning `background_session_stopped`
+  with the cause and what the session waited for. The class flags prevent
   it: `dontAsk` refuses what would prompt, `bypassPermissions` does not prompt, and
-  `AskUserQuestion` is disallowed (item 21).
+  `AskUserQuestion` is disallowed (item 21). Bypass mode still prompts for the CLI's own
+  checks that it cannot skip (a removal in a command the CLI cannot parse with certainty);
+  `permissions.denyInsteadOfPrompting` of the settings file refuses those calls instead
+  (FIX-RUNNER-BG-NO-PROMPT). A message of another session that the CLI holds for an approval
+  still shows as waiting.
 - Alternative for the turn end and the answer: a `Stop` hook of the runner in `--settings`,
   whose input carries `last_assistant_message`; the documentation prefers that field to the
   transcript ("the transcript file isn't guaranteed to include the final message at Stop time
