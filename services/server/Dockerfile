@@ -24,10 +24,12 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       echo "go mod download failed (attempt $attempt of 3), retrying" >&2; sleep 10; \
     done
 # Declared after the download, so a new version does not discard the module cache layer.
-ARG VERSION
+ARG VERSION REVISION
 COPY services/server/VERSION ./
 # Labels and binary must never disagree: the binary embeds VERSION through buildinfo (a test
-# holds the constant equal to the file), the labels take the build argument.
+# holds the constant equal to the file), the labels take the build argument. REVISION goes into
+# the binary through -ldflags -X and into the label org.opencontainers.image.revision, so
+# `bothy version` names the commit of the label (TestVersionMatchesLabels of test/image).
 RUN want="$(tr -d '[:space:]' < VERSION)"; \
     if [ -z "$VERSION" ]; then echo "build argument VERSION is required (services/server/VERSION says $want)" >&2; exit 1; fi; \
     if [ "$VERSION" != "$want" ]; then echo "build argument VERSION=$VERSION differs from services/server/VERSION ($want)" >&2; exit 1; fi
@@ -38,7 +40,9 @@ COPY services/server/migrations ./migrations
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOTOOLCHAIN=local GOFLAGS=-mod=readonly \
-    go build -trimpath -buildvcs=false -ldflags "-s -w" -o /out/bothy ./cmd/bothy
+    go build -trimpath -buildvcs=false \
+      -ldflags "-s -w -X github.com/OWNER/bothy/services/server/internal/platform/buildinfo.revision=${REVISION}" \
+      -o /out/bothy ./cmd/bothy
 # Empty key store of secrets.signing_key_dir (18 "Server images" rule 3, ADR 0066) and empty root
 # file.fs.root of the file system driver (M3-03): a named volume mounted there takes owner 65532
 # and mode 0700 from the image on first use, which the start check of the driver requires. The

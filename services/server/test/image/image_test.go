@@ -405,6 +405,18 @@ func TestSigningKeyDir(t *testing.T) {
 	}
 }
 
+// TestVersionMatchesLabels (AUD-PKG-R2-owner-server, #1624): `bothy version` in the image prints
+// the version and the commit of the labels, so the process and the image name the same build.
+func TestVersionMatchesLabels(t *testing.T) {
+	image := env(t, "BOTHY_TEST_IMAGE")
+	labels := inspect(t, image).Config.Labels
+	code, stdout, stderr := run(t, image, "version")
+	want := labels["org.opencontainers.image.version"] + " " + labels["org.opencontainers.image.revision"] + "\n"
+	if code != 0 || stdout != want {
+		t.Errorf("bothy version: exit %d, stdout %q (stderr %q), want %q", code, stdout, stderr, want)
+	}
+}
+
 func TestBinaryIsStatic(t *testing.T) {
 	image := env(t, "BOTHY_TEST_IMAGE")
 	bin, ok := exportFS(t, image)[binaryPath]

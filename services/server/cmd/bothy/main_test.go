@@ -33,7 +33,8 @@ func TestRunWithoutArgumentsPrintsUsageAndExits2(t *testing.T) {
 		"  secrets      Create the secrets of the Compose stack or export them encrypted\n" +
 		"  serve        Start the server in the role api, worker or all\n" +
 		"  setup        Create the first owner or a recovery code on the host\n" +
-		"  telemetry    Map a principal id to its telemetry pseudonym for the owner\n"
+		"  telemetry    Map a principal id to its telemetry pseudonym for the owner\n" +
+		"  version      Print the server version and the commit of the build\n"
 	if stderr.String() != want {
 		t.Errorf("stderr = %q, want %q", stderr.String(), want)
 	}
