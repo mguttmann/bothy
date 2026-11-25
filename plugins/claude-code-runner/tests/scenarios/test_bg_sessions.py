@@ -440,6 +440,43 @@ async def test_a_followup_taken_as_the_turn_ends_is_answered_before_the_release(
     assert len(players(world)) == 1
 
 
+async def test_a_followup_dequeued_before_the_late_final_answer_is_answered(
+    bg_world: World,
+) -> None:
+    # Live runs on 2.1.330 and 2.1.331 (FIX-RUNNER-CLI-331): the CLI wrote the record of
+    # the turn's final answer after the dequeue of the follow-up; the runner took the turn's
+    # end as the follow-up's answer, stopped the session while the model worked on the
+    # follow-up, and the run failed with ``runtime_error``.
+    world = bg_world
+    gate = world.gate("turn_gate")
+    answer = world.gate("followup_gate")
+    world.scenario(
+        fixture="plain",
+        turn_gate=str(gate),
+        followup_gate=str(answer),
+        bg_answer_after_dequeue=True,
+        result_override={"result": "Done, finally."},
+    )
+    await start(world, followup_grace="200ms")
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    message_id = await world.fake.deliver_followup(run.run_id, "One more", author="alex")
+    await world.until(lambda: world.fake.followup_state(run.run_id, message_id) == "delivered")
+    world.release(gate)
+    await world.until(lambda: world.fake.followup_state(run.run_id, message_id) == "absorbed")
+    await world.until(lambda: len(world.calls("gate_wait")) == 2)  # the model works on it
+    await asyncio.sleep(10 * 0.2)  # well past runner.followup_grace
+    assert world.state_of(run.run_id) == "running"
+    assert world.calls("bg_player_end") == []
+    world.release(answer)
+    assert await world.ended(run.run_id) == "completed"
+    assert texts(world) == ["Done, finally.", "Follow-up 1 handled."]
+    assert len(players(world)) == 1
+    records = transcript(world, players(world)[0])
+    order = [r.get("operation") or (r.get("message") or {}).get("id") for r in records]
+    assert order.index("dequeue") < order.index("msg_final")  # the order of the live runs
+
+
 def _transcriber(world: World) -> str:
     path = world.root / "transcribe"
     path.write_text(
@@ -947,6 +984,7 @@ def members_seen(world: World) -> set[str]:
             "error",
             "isApiErrorMessage",
             "origin",
+            "queueTranscriptOnly",
         } <= set(record), name
         inner = record.get("attachment")
         origin = record.get("origin") if name == "user" else None

@@ -961,7 +961,11 @@ def test_every_member_the_runner_reads_is_one_the_pinned_cli_wrote() -> None:
         written = set(table["records"][record])
         # Read in the CLI's file, not recorded: the stand-in sends no usage window, and no
         # recorded session got a delivery of another sender (``subkind``).
-        assert set(members) - {"apiErrorParams", "subkind"} <= written, record
+        # ``queueTranscriptOnly`` is read in real transcripts: no recorded session resumed with
+        # a notification left by the process before.
+        assert set(members) - {"apiErrorParams", "subkind", "queueTranscriptOnly"} <= written, (
+            record
+        )
     assert {"kind", "producer", "subkind"} == set(READ_FIELDS["origin/task-notification"])
     read = {"id", "sessionId", "pid", "status", "waitingFor", "kind", "name"}
     assert read <= set(table["session_entry"])
@@ -1711,6 +1715,313 @@ def test_a_forged_line_in_the_shape_of_the_followup_stays_foreign() -> None:
     assert not any(m.get("isReplay") and m.get("uuid") != "prompt-uuid" for m in out)
 
 
+# ---- a follow-up dequeued before the turn's final answer is written (FIX-RUNNER-CLI-331) ------
+
+FOLLOWUP_BEFORE_LATE_ANSWER = OWN_NOTICE.with_name("followup_before_late_answer.jsonl")
+"""Real records of Claude Code 2.1.331 from the live probe of 2026-11-24 (structure only: texts,
+ids and paths replaced), up to the request of the follow-up's turn. The CLI wrote the record
+of the turn's final answer seconds late (so did 2.1.330 in a production run): a follow-up of
+the run's owner that arrived meanwhile was dequeued before that record, which carries the
+earlier timestamp. The runner then took the turn's end as the follow-up's answer, stopped the
+session while the model worked on the follow-up, and the run failed with ``runtime_error``."""
+
+
+def _followup_before_late_answer() -> tuple[list[dict[str, Any]], str, OwnerLines]:
+    records = [json.loads(x) for x in FOLLOWUP_BEFORE_LATE_ANSWER.read_text("utf-8").splitlines()]
+    [peer] = [r for r in records if (r.get("origin") or {}).get("kind") == "peer"]
+    body = peer["origin"]["body"]
+    [code] = re.findall(r"owner code ([0-9a-f]{32}):", body)
+    owner = OwnerLines()
+    owner.add(peer["uuid"], code, body)
+    return records, peer["uuid"], owner
+
+
+def test_a_followup_dequeued_before_the_late_final_answer_starts_after_the_result() -> None:
+    records, line, owner = _followup_before_late_answer()
+    # The record order of the live run: the dequeue before the final answer it follows in time.
+    kinds = [
+        (r["type"], r.get("operation") or (r.get("message") or {}).get("stop_reason"))
+        for r in records
+    ]
+    dequeue = kinds.index(("queue-operation", "dequeue"))
+    answer = kinds.index(("assistant", "end_turn"))
+    assert dequeue < answer
+    assert records[answer]["timestamp"] < records[dequeue]["timestamp"]
+    mapper = TranscriptMapper("prompt-uuid", {line}.__contains__, owner=owner)
+    out = [m for r in records for m in mapper.map(r)]
+    assert foreign(out) == []
+    turns = [shape(m) for m in out if shape(m) not in ("bg_totals", "system/bg_request")]
+    # As in a print stream: the turn ends with its answer, then the follow-up's turn starts.
+    assert turns[-7:] == [
+        "tool_result",
+        "command/queued",
+        "assistant",
+        "result",
+        "command/started",
+        "system/init",
+        "echo",
+    ]
+    [result] = [m for m in out if m["type"] == "result"]
+    assert result["result"] == "I started the command in the background and answer when it ends."
+    assert mapper.turn_open  # the follow-up's turn runs on
+
+
+def test_a_followup_dequeued_before_the_late_final_answer_keeps_the_session() -> None:
+    records, line, owner = _followup_before_late_answer()
+    mapper = TranscriptMapper("prompt-uuid", {line}.__contains__, owner=owner)
+    state = ProcessState(has_stdin=True)
+    now, echoed, found = 0.0, False, []
+    for message in [m for r in records for m in mapper.map(r)]:
+        now += 1.0
+        state.apply(message, now)
+        echoed = echoed or (message.get("isReplay") is True and message.get("uuid") == line)
+        if message.get("type") == "result" or message.get("isReplay") is True:
+            found.append(_decide_pending(state, now, pending=0 if echoed else 1))
+    found.append(_decide_pending(state, now + 31.0, pending=0))
+    assert "close" not in found
+    assert found[-1] == "none"
+
+
+TRANSCRIPT_ONLY_NOTICE = OWN_NOTICE.with_name("transcript_only_notice_after_late_answer.jsonl")
+"""Real records of the pinned CLI from a resumed runner session (structure only): the CLI
+queued the notification of a background command the process before had left, dequeued it after
+the late records of the prompt's final answer, and wrote it after the turn's end with
+``queueTranscriptOnly``: it is only noted and starts no request. In production the run ended
+``completed``."""
+
+
+def test_a_transcript_only_input_after_the_late_answer_ends_its_own_turn() -> None:
+    records = [json.loads(x) for x in TRANSCRIPT_ONLY_NOTICE.read_text("utf-8").splitlines()]
+    [prompt] = [r for r in records if (r.get("origin") or {}).get("kind") == "human"]
+    [notice] = [r for r in records if r.get("queueTranscriptOnly") is True]
+    assert records.index(notice) == len(records) - 2  # nothing but the totals after it
+    mapper = TranscriptMapper(prompt["uuid"])
+    out = [m for r in records for m in mapper.map(r)]
+    shapes = [shape(m) for m in out if shape(m) not in ("bg_totals", "system/bg_request")]
+    # The notification's start follows the prompt's answer; it ends without a request.
+    assert shapes[-5:] == [
+        "result",
+        "command/started",
+        "system/init",
+        "system/bg_foreign",
+        "result",
+    ]
+    results = [m for m in out if m["type"] == "result"]
+    assert results[0]["result"] != ""
+    assert results[-1]["num_turns"] == 0
+    assert results[-1]["result"] == ""
+    assert not mapper.turn_open
+    state = ProcessState(has_stdin=True)
+    for message in out:
+        state.apply(message, 1.0)
+    # The run is answered: the stdin rule releases the session after the grace.
+    assert _decide_pending(state, 40.0, pending=0) == "close"
+
+
+def test_two_transcript_only_inputs_dequeued_together_end_their_turn_with_the_last() -> None:
+    # The CLI dequeues several notifications at once (real 2.1.326 transcript): two starts
+    # behind the late answer, two noted records, no request.
+    records = [json.loads(x) for x in TRANSCRIPT_ONLY_NOTICE.read_text("utf-8").splitlines()]
+    [prompt] = [r for r in records if (r.get("origin") or {}).get("kind") == "human"]
+    [notice] = [r for r in records if r.get("queueTranscriptOnly") is True]
+    enqueue = next(r for r in records if r.get("operation") == "enqueue")
+    dequeue = next(r for r in records if r.get("operation") == "dequeue")
+    doubled: list[dict[str, Any]] = []
+    for record in records:
+        doubled.append(record)
+        if record in (enqueue, dequeue):
+            doubled.append(dict(record))
+        if record is notice:
+            doubled.append({**notice, "uuid": "00000000-0000-4000-8000-0000000000aa"})
+    mapper = TranscriptMapper(prompt["uuid"])
+    out = [m for r in doubled for m in mapper.map(r)]
+    results = [m for m in out if m["type"] == "result"]
+    assert [r["num_turns"] for r in results][-1] == 0
+    assert len(results) == 2  # the prompt's answer, then one end of the noted inputs
+    assert not mapper.turn_open
+    state = ProcessState(has_stdin=True)
+    for message in out:
+        state.apply(message, 1.0)
+    assert _decide_pending(state, 40.0, pending=0) == "close"
+
+
+_NOTED = {
+    "type": "user",
+    "isSidechain": False,
+    "queueTranscriptOnly": True,
+    "origin": {"kind": "task-notification", "producer": "session-task"},
+    "message": {"role": "user", "content": "<task-notification>\n</task-notification>"},
+}
+
+
+def test_noted_inputs_dequeued_together_after_the_turn_end_end_their_turn() -> None:
+    # Real 2.1.326 pattern: after a turn ended, two notifications are enqueued and dequeued in
+    # the same millisecond and both only noted, with no request.
+    mapper = started("prompt-uuid")
+    records = [
+        REQUEST,
+        _stamped_answer("end_turn", 10),
+        TURN_ENDS,
+        *[{"type": "queue-operation", "operation": "enqueue"}] * 2,
+        *[{"type": "queue-operation", "operation": "dequeue"}] * 2,
+        _NOTED,
+        _NOTED | {"uuid": "noted-2"},
+    ]
+    out = [m for r in records for m in mapper.map(r)]
+    assert [shape(m) for m in out].count("result") == 2
+    assert out[-1]["type"] == "result"
+    assert out[-1]["num_turns"] == 0
+    assert not mapper.turn_open
+    state = ProcessState(has_stdin=True)
+    for message in out:
+        state.apply(message, 1.0)
+    assert _decide_pending(state, 40.0, pending=0) == "close"
+
+
+def test_a_noted_input_beside_a_line_after_the_turn_end_ends_nothing() -> None:
+    mapper = started("prompt-uuid", "line-1")
+    records = [
+        REQUEST,
+        _stamped_answer("end_turn", 10),
+        TURN_ENDS,
+        *[{"type": "queue-operation", "operation": "enqueue"}] * 2,
+        *[{"type": "queue-operation", "operation": "dequeue"}] * 2,
+        _NOTED,
+    ]
+    out = [m for r in records for m in mapper.map(r)]
+    assert [shape(m) for m in out].count("result") == 1
+    assert mapper.turn_open  # the line's turn still comes
+
+
+def test_each_deferred_dequeue_is_judged_by_its_own_time() -> None:
+    # Dequeues at 10 and 20, then the turn's output written at 15: the first input joined the
+    # working turn, the second came after the answer and starts after the turn's result.
+    mapper = started("prompt-uuid")
+    records = [
+        _stamped(REQUEST, 5),
+        *[_stamped({"type": "queue-operation", "operation": "enqueue"}, 9)] * 2,
+        _stamped({"type": "queue-operation", "operation": "dequeue"}, 10),
+        _stamped({"type": "queue-operation", "operation": "dequeue"}, 20),
+        _stamped_answer("end_turn", 15),
+        _stamped(TURN_ENDS, 21),
+    ]
+    shapes = [shape(m) for r in records for m in mapper.map(r)]
+    first = shapes.index("command/started")
+    second = shapes.index("command/started", first + 1)
+    assert first < shapes.index("assistant") < shapes.index("result") < second
+    assert mapper.turn_open
+
+
+def test_a_noted_input_before_the_turn_end_ends_its_turn_after_the_start() -> None:
+    # The noted record of an input deferred behind the late answer comes before turn_duration.
+    mapper = started("prompt-uuid")
+    records = [
+        _stamped(REQUEST, 5),
+        _stamped({"type": "queue-operation", "operation": "enqueue"}, 9),
+        _stamped({"type": "queue-operation", "operation": "dequeue"}, 10),
+        _stamped_answer("end_turn", 8),
+        _NOTED,
+        _stamped(TURN_ENDS, 11),
+    ]
+    out = [m for r in records for m in mapper.map(r)]
+    shapes = [shape(m) for m in out if shape(m) != "system/bg_request"]
+    assert shapes[-4:] == ["result", "command/started", "system/init", "result"]
+    assert out[-1]["num_turns"] == 0
+    assert not mapper.turn_open
+
+
+def test_a_noted_input_beside_a_line_that_starts_work_ends_nothing() -> None:
+    # Two inputs opened the turn: a noted notification and a line the model answers.
+    mapper = started("prompt-uuid", "line-1")
+    records = [
+        REQUEST,
+        _stamped_answer("end_turn", 10),
+        {"type": "queue-operation", "operation": "enqueue"},
+        {"type": "queue-operation", "operation": "enqueue"},
+        {"type": "queue-operation", "operation": "dequeue"},
+        {"type": "queue-operation", "operation": "dequeue"},
+        TURN_ENDS,
+        {
+            "type": "user",
+            "isSidechain": False,
+            "queueTranscriptOnly": True,
+            "origin": {"kind": "task-notification", "producer": "session-task"},
+            "message": {"role": "user", "content": "<task-notification>\n</task-notification>"},
+        },
+    ]
+    out = [m for r in records for m in mapper.map(r)]
+    assert [shape(m) for m in out].count("result") == 1
+    assert mapper.turn_open  # the line's turn still comes
+
+
+def test_a_transcript_only_input_inside_a_working_turn_ends_nothing() -> None:
+    mapper = started("prompt-uuid")
+    notice = {
+        "type": "user",
+        "isSidechain": False,
+        "queueTranscriptOnly": True,
+        "origin": {"kind": "task-notification", "producer": "session-task"},
+        "message": {"role": "user", "content": "<task-notification>\n</task-notification>"},
+    }
+    out = [m for r in (REQUEST, notice) for m in mapper.map(r)]
+    assert "result" not in [shape(m) for m in out]
+    assert mapper.turn_open
+
+
+def _stamped(record: dict[str, Any], second: int) -> dict[str, Any]:
+    return {**record, "timestamp": f"2026-11-24T07:32:{second:02d}.000Z"}
+
+
+def _stamped_answer(stop: str, second: int) -> dict[str, Any]:
+    return _stamped(
+        {
+            "type": "assistant",
+            "isSidechain": False,
+            "message": {
+                "id": f"msg_{second}",
+                "model": "claude-opus-5-5",
+                "role": "assistant",
+                "content": [{"type": "text", "text": "Working."}],
+                "stop_reason": stop,
+            },
+        },
+        second,
+    )
+
+
+def test_a_dequeue_before_an_output_written_after_it_starts_at_that_output() -> None:
+    # A dequeue while a request waits for its output, and an output with a later timestamp:
+    # the turn went on after the dequeue, so the input's start is given on before that output
+    # as before, and the turn's end is a result like any other.
+    mapper = started("prompt-uuid")
+    records = [
+        _stamped(REQUEST, 10),
+        _stamped({"type": "queue-operation", "operation": "enqueue"}, 11),
+        _stamped({"type": "queue-operation", "operation": "dequeue"}, 12),
+        _stamped_answer("end_turn", 13),
+        _stamped(TURN_ENDS, 14),
+    ]
+    shapes = [shape(m) for r in records for m in mapper.map(r)]
+    assert shapes.index("command/started") < shapes.index("assistant") < shapes.index("result")
+    assert shapes[-1] == "result"
+    assert not mapper.turn_open
+
+
+def test_a_dequeue_without_timestamps_is_given_on_at_the_next_output() -> None:
+    # Records without a readable timestamp prove no late answer: the start comes before it.
+    mapper = started("prompt-uuid")
+    records = [
+        REQUEST,
+        {"type": "queue-operation", "operation": "enqueue"},
+        {"type": "queue-operation", "operation": "dequeue", "timestamp": "not a time"},
+        _stamped_answer("end_turn", 13) | {"timestamp": None},
+        TURN_ENDS,
+    ]
+    shapes = [shape(m) for r in records for m in mapper.map(r)]
+    assert shapes.index("command/started") < shapes.index("assistant") < shapes.index("result")
+    assert shapes[-1] == "result"
+
+
 def _decide_pending(state: ProcessState, now: float, *, pending: int) -> str:
     return state.decide(
         now, stdin_open=True, pending=pending, followup_grace=30.0, stop_grace=10.0
@@ -1746,3 +2057,48 @@ def test_a_dequeue_while_the_turn_still_works_starts_nothing_after_its_end() -> 
     for message in out:
         state.apply(message, 1.0)
     assert _decide_pending(state, 40.0, pending=0) == "close"
+
+
+# ---- the same race in the records of FOLLOWUP_AT_TURN_END (cross-check of the Hermes side) ----
+
+FOLLOWUP_BEFORE_FINAL_ANSWER = OWN_NOTICE.with_name("followup_before_final_answer.jsonl")
+"""The records of `FOLLOWUP_AT_TURN_END` in the order the CLI wrote them in the live probe of
+2026-11-24 (2.1.331) and in production runs on 2.1.330: ``enqueue`` and ``dequeue`` of the
+follow-up before the ``assistant`` record of the turn's final answer, whose timestamp is older
+than the dequeue."""
+
+
+def test_a_followup_dequeued_before_the_final_answer_keeps_the_session_until_its_answer() -> None:
+    records = [json.loads(x) for x in FOLLOWUP_BEFORE_FINAL_ANSWER.read_text("utf-8").splitlines()]
+    [peer_record] = [r for r in records if (r.get("origin") or {}).get("kind") == "peer"]
+    line = peer_record["uuid"]
+    kinds = [(r["type"], r.get("operation") or r.get("subtype")) for r in records]
+    final = max(i for i, r in enumerate(records) if r["type"] == "assistant")
+    dequeue = kinds.index(("queue-operation", "dequeue"))
+    assert dequeue < final < kinds.index(("system", "turn_duration"))
+    mapper = TranscriptMapper("prompt-uuid", {line}.__contains__)
+    out = [m for r in records for m in mapper.map(r)]
+    state = ProcessState(has_stdin=True)
+    found, echoed = [], False
+    for now, message in enumerate(out, start=1):
+        state.apply(message, float(now))
+        echoed = echoed or (message.get("isReplay") is True and message.get("uuid") == line)
+        if message.get("type") == "result" or message.get("isReplay") is True:
+            found.append(_decide_pending(state, float(now), pending=0 if echoed else 1))
+    # The session is not released while the follow-up's turn runs (it has no result yet).
+    assert "close" not in found
+    assert mapper.turn_open
+
+
+def test_an_input_the_cli_only_notes_after_a_result_does_not_hold_the_session() -> None:
+    # ``queueTranscriptOnly`` right after a turn end, with no dequeue of its own: no turn.
+    mapper = started("mine")
+    mapper.map(ASSISTANT)
+    ended = mapper.map(TURN_ENDS)
+    noted = {**peer("made-by-the-cli"), "origin": OWN_NOTIFICATION, "queueTranscriptOnly": True}
+    out = mapper.map(noted)
+    assert [shape(m) for m in out] == ["system/init"]
+    state = ProcessState(has_stdin=True)
+    for message in [*ended, *out]:
+        state.apply(message, 1.0)
+    assert _decide_pending(state, 2.0, pending=0) == "close"
