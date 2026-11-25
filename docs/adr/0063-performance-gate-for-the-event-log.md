@@ -58,8 +58,10 @@ repeatable. Basis: [02-architecture.md](../spec/02-architecture.md), section 17,
    durability settings from item 2 does not end green, but shows the measurement. Reason for
    `emulated`: a dedicated machine exactly matching the profile would be a question of cost; limiting
    to the profile measures the same parallelism that a CPU count in the profile means.
-4. `make perf` runs at the end of every milestone, in the release and in every ticket that touches a
-   performance target ([PLAN.md](../PLAN.md), section 3, rule 6); not in the pre-push.
+4. `make perf` runs at the end of every milestone, before every release and in every ticket that
+   touches a performance target ([PLAN.md](../PLAN.md), section 3, rule 6); not in the pre-push
+   and in no CI workflow: it runs by hand on a maintainer machine, because the project uses no
+   paid runners (owner rule 2026-10-30, docs/decisions.d/AUD-PKG-R2-owner-ops.md).
 5. No ticket lowers the threshold unless its brief says so explicitly (PLAN, section 3,
    rule 6). If the target is missed, a new ADR decides on the pattern (for example sequences
    per space, 02 section 16).

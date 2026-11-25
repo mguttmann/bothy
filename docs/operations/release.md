@@ -29,6 +29,8 @@ gates and runners (team H); this procedure names only the steps that belong to t
    the review of M1 to M12 is the only check, and the rollback by one version of
    [18-release.md](../spec/18-release.md) 10 is not tested.
 5. Minimum app versions and deprecation dates in the release notes match ADR 0014.
+6. For `server`: `make perf` ran by hand on a maintainer machine for the commit of the release
+   and met the targets on `perf.reference_profile`; no workflow runs it (ADR 0063 item 4).
 
 ## 2. Server and product
 
