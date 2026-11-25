@@ -122,15 +122,15 @@ func NewSearch(cfg searchapp.Config, assist searchapp.AssistConfig, languages []
 // bindAssistRelay binds the relay of search.assist_requested (gateway/adapters/assistrelay over the
 // hub of gw, with the correlator of the event log) into the search assistant. Without the search
 // module or without a hub it binds nothing, and every question falls back to full text with
-// assistant_unavailable.
-func bindAssistRelay(sr *Search, gw *Gateway, facts agents.Facts) error {
+// assistant_unavailable. The agent facts of ag bind the policy; without them the assistant stays
+// off (AUD-PKG-R2-owner-server).
+func bindAssistRelay(sr *Search, gw *Gateway, ag *Agents) error {
 	if sr == nil || sr.Assistant == nil || gw == nil || gw.Hub == nil {
 		return nil
 	}
-	if facts != nil {
-		// Only an organization agent gets the questions (AUD-PKG-R2-owner-server); without the
-		// facts nothing is bound and the assistant stays off.
-		if err := sr.Assistant.BindPolicy(assistPolicy{facts: facts}); err != nil {
+	if ag != nil && ag.Service != nil {
+		// Only an organization agent gets the questions.
+		if err := sr.Assistant.BindPolicy(assistPolicy{facts: ag.Service}); err != nil {
 			return err
 		}
 	}

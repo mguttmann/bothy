@@ -7,7 +7,6 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/OWNER/bothy/services/server/internal/agents"
 	interviewrelay "github.com/OWNER/bothy/services/server/internal/gateway/adapters/interviewrelay"
 	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
@@ -102,11 +101,7 @@ func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelim
 	s.mu.Lock()
 	sr := s.searchModule
 	s.mu.Unlock()
-	var facts agents.Facts
-	if ag != nil && ag.Service != nil {
-		facts = ag.Service
-	}
-	if err := bindAssistRelay(sr, gw, facts); err != nil {
+	if err := bindAssistRelay(sr, gw, ag); err != nil {
 		return err
 	}
 	if err := bindInterviewRelay(ag, gw); err != nil {

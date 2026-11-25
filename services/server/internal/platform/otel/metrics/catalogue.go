@@ -55,6 +55,7 @@ const (
 	keyVolume        = "bothy.volume"
 	keyRunState      = "bothy.run.state"
 	keyPushProvider  = "bothy.push.provider"
+	keyJobKind       = "bothy.job.kind"
 	unitNotification = "{notification}"
 	unitRequest      = "{request}"
 	unitConnection   = "{connection}"
@@ -379,7 +380,7 @@ var (
 		Name: "bothy.job.duration", Kind: KindHistogram, Unit: "s",
 		Description: "Duration of one job attempt.",
 		Attrs: []Attr{
-			{Key: "bothy.job.kind", Source: SourceJobKinds},
+			{Key: keyJobKind, Source: SourceJobKinds},
 			{Key: keyOutcome, Values: []string{"completed", valueFailed, valueCancelled, "snoozed"}},
 		},
 		Buckets: BucketsLong,
@@ -389,14 +390,14 @@ var (
 	JobQueue = Spec{
 		Name: "bothy.job.queue", Kind: KindGauge, Unit: "{job}",
 		Description: "Jobs waiting to run: states available, scheduled and retryable.",
-		Attrs:       []Attr{{Key: "bothy.job.kind", Source: SourceJobKinds}},
+		Attrs:       []Attr{{Key: keyJobKind, Source: SourceJobKinds}},
 	}
 	// JobDiscarded is bothy.job.discarded (4.4, AUD-PKG-R2-owner-server): one per job whose last
 	// attempt failed, so River discards it; the rule BothyJobFinallyFailed reads it.
 	JobDiscarded = Spec{
 		Name: "bothy.job.discarded", Kind: KindCounter, Unit: "{job}",
 		Description: "Jobs whose last attempt failed.",
-		Attrs:       []Attr{{Key: "bothy.job.kind", Source: SourceJobKinds}},
+		Attrs:       []Attr{{Key: keyJobKind, Source: SourceJobKinds}},
 	}
 	// EgressBlocked is bothy.egress.blocked (4.4).
 	EgressBlocked = Spec{

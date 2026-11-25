@@ -34,8 +34,11 @@ func NewRetention(pool *pg.Pool) *Retention { return &Retention{pool: pool} }
 // Class returns retention.ClassContent.
 func (*Retention) Class() retention.Class { return retention.ClassContent }
 
+// tableRuns is the table runs, which also names the module.
+const tableRuns = "runs"
+
 // Tables returns the tables whose texts Purge empties, in that order.
-func (*Retention) Tables() []string { return []string{"runs", "run_steps", "run_wakes"} }
+func (*Retention) Tables() []string { return []string{tableRuns, "run_steps", "run_wakes"} }
 
 // Purge implements retention.Participant: at most batch rows per table, each table in its own
 // short statement. deleted counts the emptied rows; more is true while a statement emptied a full

@@ -383,7 +383,7 @@ func (s *Service) contentItem(ctx context.Context, a actor.Actor, run *threadRun
 	} else {
 		target, err = s.pin(ctx, a, run, x.pin)
 	}
-	var rejected rejectedContent
+	var rejected rejectedContentError
 	if errors.As(err, &rejected) {
 		// The server refuses the content itself (22 7.2, AUD-PKG-R2-owner-server): the item is
 		// failed with the code, nothing of it was written, and the batch goes on.
@@ -440,15 +440,17 @@ func (s *Service) message(ctx context.Context, run *threadRun, itemID ids.ID, d 
 	return out[0], nil
 }
 
-// rejectedContent is a message whose content the server refuses by its content rules
+// rejectedContentError is a message whose content the server refuses by its content rules
 // (messaging.ImportMessages.Check): the item becomes failed with code instead of ending the batch.
-type rejectedContent struct {
+type rejectedContentError struct {
 	code string
 }
 
-func (r rejectedContent) Error() string { return "importer: the server refuses the content: " + r.code }
+func (r rejectedContentError) Error() string {
+	return "importer: the server refuses the content: " + r.code
+}
 
-// rejection turns a validation_failed of the content rules into rejectedContent with the code of
+// rejection turns a validation_failed of the content rules into rejectedContentError with the code of
 // its first field, "validation_failed" without one; any other error passes unchanged.
 func rejection(err error) error {
 	e, ok := errs.As(err)
@@ -459,7 +461,7 @@ func rejection(err error) error {
 	if len(e.Fields) > 0 && e.Fields[0].Code != "" {
 		code = e.Fields[0].Code
 	}
-	return rejectedContent{code: code}
+	return rejectedContentError{code: code}
 }
 
 // importedFiles checks that every file is the target of a posted file item of the source (M8-11
