@@ -319,6 +319,12 @@ request header field on unless the configuration redefines it, and an empty valu
 [verified]. The example edge sets `X-Forwarded-For` and removes `Forwarded`
 (`infra/compose/edge/nginx.conf`).
 
+Compression happens at the TLS edge and only for the static files of the web console under
+`/console/`; the server compresses no response and the gateway keeps permessage-deflate off
+(R-OP-22, example in [install-compose.md](../operations/install-compose.md) 5.1). Reason: a
+compressed response that carries a secret next to text an attacker can inject leaks that secret
+through its length (BREACH), and every API response and WebSocket frame carries such data.
+
 Reverse proxies in front of the public listener redact the path after `/api/v1/hooks/{webhook_id}/`
 in their access logs, because the token of `postIncomingWebhook` is the last path segment (RK-20,
 [webhooks.md](../api/webhooks.md), section 8 point 5). The server itself logs only the route
@@ -1703,6 +1709,7 @@ Column "Place": Server = configuration reference of the server; Installation scr
 | R-OP-19 | Hash routing over the session ID for both stream paths of the terminal as an operational requirement with several nodes. | No broker in the server; one node holds both ends of a session ([24-terminal.md](24-terminal.md), section 9). |
 | R-OP-20 | Setup wizard as the POSIX shell script `install.sh` on the host, a release artifact with built-in version, checksum and download address of the bundle (18 2.1); no wizard in the container. | Compose must run on the host; a wizard in the container would need the Docker socket, that is root permissions on the host. The shell exists everywhere Docker runs. |
 | R-OP-21 | The Claude Code runner runs as a service that restarts it after a non-zero exit, under systemd with `KillMode=process`; until `runner.turn_handover` is on, its restarts happen only while no turn runs, and the server of stage AR runs before a runner switches the stage's keys on (10.1, addendum of 2026-11-06). | The handover relies on the keeper surviving the service's stop; a restart before it is on still ends live turns; the closed heartbeat capabilities refuse unknown keys. |
+| R-OP-22 | Response compression only at the TLS edge and only for the static web console under `/console/`; none in the server, none for API responses or WebSocket frames (4.3). | API responses carry secrets next to text a user controls, so compressing them opens BREACH; the static console files carry no secret. |
 
 ## 16. Demo instance
 

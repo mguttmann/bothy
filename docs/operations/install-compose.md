@@ -204,6 +204,27 @@ header from the request, which it would otherwise pass on as the client sent it 
 a request that arrives with both counts as a request of the proxy itself, so everyone who sends
 such requests shares one rate limit ([16-operations.md](../spec/16-operations.md), section 4.3).
 
+Compress only the static files of the web console under `/console/`, never API responses or the
+WebSocket paths: a compressed response that carries a secret next to text an attacker can inject
+leaks that secret through its length (BREACH; 16-operations.md 4.3, R-OP-22). A Caddy edge for the
+profile `direct`, with `chat.example.com` and the default `BOTHY_HTTP_PUBLISH_PORT` `8090`:
+
+```
+chat.example.com {
+	@console path /console/*
+	encode @console zstd gzip
+	reverse_proxy 127.0.0.1:8090 {
+		header_up -Forwarded
+	}
+}
+```
+
+Caddy sets `X-Forwarded-For` itself and ignores the client's value, passes WebSocket upgrades on
+and passes every other request header through, so `header_up -Forwarded` removes the header the
+server must not see next to it
+(https://caddyserver.com/docs/caddyfile/directives/reverse_proxy and
+https://caddyserver.com/docs/caddyfile/directives/encode, retrieved 2026-11-25).
+
 ### 5.2 Profile `tailscale`
 
 See [tailscale.md](tailscale.md).

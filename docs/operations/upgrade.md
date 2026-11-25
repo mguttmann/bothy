@@ -47,18 +47,38 @@ shows only the version of the specification, neither the server nor the schema v
 
 ### 2.1 Installations from a bundle
 
-This procedure replaces the images only. An installation made by `install.sh` also holds the files
-of its bundle, among them `compose.yaml`, `.env.example`, `infra/otel` and `infra/observability`
-with the Grafana panel plugin, and the marker `.bothy-install`, which names the version of that
-bundle. No step replaces them yet: after the procedure above they are still those of the installed
-bundle, also when the new release changed them, and a variable that the new `.env.example` adds is
-missing in `.env`. `install.sh` of another version refuses the folder instead of upgrading it,
-because a newer bundle over a `.env` that keeps the old `BOTHY_VERSION` would mix two releases.
-The OpenTofu modules do not upgrade either: the cloud modules ignore a changed `bothy_version` on
-an existing server, and over SSH the setup ends in that refusal. A step that upgrades the bundle
-is not built (docs/decisions.d/AUD-infra-compose-01.md, ruling AUD-IC1/5). Until it is, a release
-whose bundle changed needs manual work, and the section "Upgrade notes" of its release notes
-(section 1, item 1) is the place that says so.
+The procedure above replaces the images only. An installation made by `install.sh` also holds the
+files of its bundle, among them `compose.yaml`, `.env.example`, `infra/otel` and
+`infra/observability` with the Grafana panel plugin, and the marker `.bothy-install`, which names
+the version of that bundle. `install.sh` of another version refuses the folder instead of
+upgrading it, because a newer bundle over a `.env` that keeps the old `BOTHY_VERSION` would mix two
+releases, and there is no upgrade mode of `install.sh` before version 1.0
+(docs/decisions.d/AUD-PKG-R2-owner-ops.md). The OpenTofu modules do not upgrade either: the cloud
+modules ignore a changed `bothy_version` on an existing server, and over SSH the setup ends in that
+refusal; run the steps below on the server. `<dir>` is the folder of the installation, `<old>` and
+`<new>` are the two versions:
+
+1. Keep a copy of the installation, with modes, in a folder only root reads:
+   `cp -Rp <dir> <dir>.before-<new>`. It holds `.env` and `infra/compose/secrets/`.
+2. Download the bundle `bothy-compose-<new>.tar.gz` of the new product release and its
+   signature `bothy-compose-<new>.tar.gz.sigstore.json`, and check both as in
+   [release.md](release.md) 5.
+3. Unpack it into a new, empty folder and check that every member lies under `bothy-<new>/` and
+   that it holds neither `infra/compose/.env` nor `infra/compose/secrets/`.
+4. Copy the bundle over the installation: `cp -R <unpacked>/bothy-<new>/. <dir>/`. This replaces
+   every file of the bundle and leaves `.env` and `secrets/` as they are. A file that the new
+   bundle no longer has stays behind; the release notes name such files under "Upgrade notes".
+5. Compare the two templates,
+   `diff <dir>.before-<new>/infra/compose/.env.example <dir>/infra/compose/.env.example`, add
+   every new variable to `infra/compose/.env` with its value, and set `BOTHY_VERSION` there to
+   `<new>`.
+6. Advance the marker: `printf 'version=%s\n' <new> > <dir>/.bothy-install`.
+7. In `<dir>/infra/compose` run the procedure of section 2 and its checks.
+
+The way back to `<old>` (section 3 item 1) puts the files of the copy back before
+`docker compose up -d`: every file of `<dir>.before-<new>` except `infra/compose/secrets/`, which
+keeps its newer state. Remove the copy once the new version runs and the way back is no longer
+needed; it holds secrets.
 
 ## 3. Rollback
 
