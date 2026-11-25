@@ -75,18 +75,43 @@ def _build_output(root: Path, *exes: str) -> Path:
     return output
 
 
+def _vs_root(root: Path, version: str = "14.44.35112", year: str = "2022") -> Path:
+    """A Visual Studio tree with the redist of `version` as the toolchain's default."""
+    vc = root / year / "Enterprise" / "VC"
+    (vc / "Auxiliary" / "Build").mkdir(parents=True)
+    (vc / "Auxiliary" / "Build" / "Microsoft.VCRedistVersion.default.txt").write_text(
+        version + "\n", encoding="utf-8"
+    )
+    crt = vc / "Redist" / "MSVC" / version / "x64" / "Microsoft.VC143.CRT"
+    crt.mkdir(parents=True)
+    for dll in windows.VC_RUNTIME:
+        (crt / dll).write_bytes(f"redist {version} {dll}".encode())
+    return root
+
+
+def test_vc_redist_takes_the_toolchain_default_of_the_newest_install(tmp_path: Path) -> None:
+    root = _vs_root(tmp_path / "vs", "14.29.30133", "2019")
+    _vs_root(root, "14.44.35112", "2022")
+    # A folder of another version next to the default one is never taken.
+    (root / "2022" / "Enterprise" / "VC" / "Redist" / "MSVC" / "14.50.1" / "x64").mkdir(
+        parents=True
+    )
+    crt, version = windows.vc_redist(root)
+    assert version == "14.44.35112"
+    assert crt == root / "2022/Enterprise/VC/Redist/MSVC/14.44.35112/x64/Microsoft.VC143.CRT"
+    with pytest.raises(common.StepError, match="no Visual C\\+\\+ redist"):
+        windows.vc_redist(tmp_path / "none")
+
+
 def test_stage_lays_out_the_package(tmp_path: Path, cfg: dict[str, Any]) -> None:
     output = _build_output(tmp_path, "client.exe")
-    system32 = tmp_path / "System32"
-    system32.mkdir()
-    for dll in windows.VC_RUNTIME:
-        (system32 / dll).write_bytes(b"system " + dll.encode())
+    vs = _vs_root(tmp_path / "vs")
     branding = {"app_name": "ExampleChat", "url_scheme": "chat-example"}
     package = windows.stage(
-        output, cfg, appdist.app_version("0.1.1"), branding, tmp_path / "pkg", system32
+        output, cfg, appdist.app_version("0.1.1"), branding, tmp_path / "pkg", vs
     )
     assert (package / "vcruntime140.dll").read_bytes() == b"dll"
-    assert (package / "msvcp140.dll").read_bytes() == b"system msvcp140.dll"
+    assert (package / "msvcp140.dll").read_bytes() == b"redist 14.44.35112 msvcp140.dll"
     for logo in windows.LOGOS:
         assert (package / "Assets" / logo).read_bytes().startswith(b"\x89PNG")
     root = ET.fromstring((package / "AppxManifest.xml").read_text("utf-8"))  # noqa: S314
@@ -105,8 +130,12 @@ def test_stage_needs_one_executable_and_the_runtime(tmp_path: Path, cfg: dict[st
     with pytest.raises(common.StepError, match="expected one executable"):
         windows.stage(two, cfg, version, branding, tmp_path / "p1", tmp_path)
     one = _build_output(tmp_path / "one", "a.exe")
-    with pytest.raises(common.StepError, match=r"msvcp140\.dll is neither in the build"):
+    with pytest.raises(common.StepError, match=r"no Visual C\+\+ redist"):
         windows.stage(one, cfg, version, branding, tmp_path / "p2", tmp_path / "none")
+    vs = _vs_root(tmp_path / "vs")
+    next(vs.rglob("msvcp140.dll")).unlink()
+    with pytest.raises(common.StepError, match=r"msvcp140\.dll is neither in the build"):
+        windows.stage(one, cfg, version, branding, tmp_path / "p3", vs)
 
 
 def test_sign_with_and_without_a_timestamp(tmp_path: Path, sdk: Path) -> None:
@@ -127,11 +156,7 @@ def test_release_step(
     client = tmp_path / "client"
     monkeypatch.setattr(windows, "CLIENT", client)
     monkeypatch.setattr(common, "CLIENT", client)
-    system32 = tmp_path / "System32"
-    system32.mkdir()
-    for dll in windows.VC_RUNTIME:
-        (system32 / dll).write_bytes(b"dll")
-    monkeypatch.setattr(windows, "SYSTEM32", system32)
+    monkeypatch.setattr(windows, "VS_ROOT", _vs_root(tmp_path / "vs"))
 
     def flutter(args: list[str], opts: dict[str, Any]) -> None:
         runner = client / "build" / "windows" / "x64" / "runner"
