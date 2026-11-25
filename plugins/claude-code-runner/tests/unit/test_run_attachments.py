@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
-from bothy_sdk.generated.models import RunContext
+import pytest
+from bothy_sdk.generated.models import RunContext, RunContextAttachment
 from bothy_sdk.ids import uuid7
 
 from claude_code_runner.attachments import run_attachments
@@ -67,3 +70,30 @@ def test_a_team_run_takes_the_new_files_of_its_thread_context_only() -> None:
     names = [a.original_name for a in run_attachments(ctx, True)]
     assert names == ["trigger.png", "context-input.png"]
     assert [a.original_name for a in run_attachments(ctx, False)] == ["trigger.png"]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("status", "text"),
+    [
+        ("infected", "unavailable: file_blocked"),
+        ("error", "unavailable: file_blocked"),
+        ("pending", "unavailable: file_not_ready"),
+    ],
+)
+async def test_a_trigger_attachment_the_scan_refused_is_blocked(
+    tmp_path: Path, status: str, text: str
+) -> None:
+    """The server sends the raw scan status: infected and error never become ready."""
+    from claude_code_runner.attachments import fetch_attachments
+
+    item = RunContextAttachment(
+        file_id=uuid4(),
+        original_name="a.txt",
+        mime_type="text/plain",
+        size_bytes=1,
+        scan_status=status,
+    )
+    texts, stored = await fetch_attachments(None, [item], tmp_path)  # type: ignore[arg-type]
+    assert texts == {item.file_id: text}
+    assert stored == 0

@@ -815,7 +815,11 @@ export class InvocationVerifier {
     }
     this.keys = usable;
     this.loaded = true;
-    this.expires = this.clock.monotonic() + Math.max(0, maxAgeMs ?? 0);
+    // Without a usable max-age (a proxy may drop the header) the list lives for
+    // agent.jwks_max_age, the age the server announces; an unknown key still reloads at once.
+    this.expires =
+      this.clock.monotonic() +
+      Math.max(0, maxAgeMs ?? this.settings.jwksMaxAgeMs);
   }
 }
 

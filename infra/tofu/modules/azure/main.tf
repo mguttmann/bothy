@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # The chat server on Azure (brief M7-16, ADR 0012, infra/tofu/README.md "Structure" item 1): a
 # resource group (or an existing one), a virtual network with one subnet, a network security group that
 # admits only the edge port from the internet and denies every other inbound packet, a static

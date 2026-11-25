@@ -11,7 +11,8 @@ manager that restarts on failure starts the next runner, which adopts them.
 
 Only ``claude-code-runner stop --turns`` (`stop_turns`) or a stop of a run ends a turn on
 purpose: it asks a running runner (named in ``<runner.state_dir>/runner.pid``) for the stop of
-every turn as in 18.6 by the marker ``<runner.state_dir>/stop-turns`` and SIGTERM, waits for it to
+every turn as in 18.6 by the marker ``<runner.state_dir>/stop-turns`` (naming the command's
+process; it counts only while that process lives) and SIGTERM, waits for it to
 exit, then stops what is left of the turn records itself (the turns of a runner that is not
 running), finishing each run ``cancelled`` with the reason ``adapter_stopped``, and exits 0.
 
@@ -114,15 +115,22 @@ def handover_records(state_dir: Path) -> list[Path]:
 
 
 def stop_turns_requested(state_dir: Path) -> bool:
-    """Whether ``stop --turns`` asked for the stop of every turn (the marker exists).
+    """Whether ``stop --turns`` asked for the stop of every turn.
+
+    The marker names the process of the command; it counts only while that process lives, so a
+    marker a killed command left behind never turns a later SIGTERM into a stop of every turn.
 
     Args:
         state_dir: ``runner.state_dir``.
 
     Returns:
-        True while the marker exists.
+        True while the marker exists and its command still runs.
     """
-    return (state_dir / _STOP_MARKER).exists()
+    try:
+        pid = int(json.loads((state_dir / _STOP_MARKER).read_text())["pid"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+    return pid > 1 and not _gone(pid)
 
 
 async def hand_over(handler: RunnerHandler, adapter: Adapter | None) -> int:
@@ -190,8 +198,10 @@ def stop_turns(config: RunnerConfig) -> int:
     marker = state_dir / _STOP_MARKER
     pid = _runner_pid(state_dir, config.cli_probe_timeout)
     if pid is not None:
-        marker.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        marker.touch(mode=0o600)
+        from claude_code_runner.statedir import ensure_private_dir, write_private  # noqa: PLC0415
+
+        ensure_private_dir(state_dir)
+        write_private(marker, json.dumps({"pid": os.getpid()}), atomic=True)
         with contextlib.suppress(ProcessLookupError):
             os.kill(pid, signal.SIGTERM)
         # The runner waits stop_grace plus kill_grace plus cli_probe_timeout per stop (18.19.2).

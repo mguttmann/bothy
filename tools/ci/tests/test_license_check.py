@@ -22,7 +22,13 @@ def test_modified_license_is_reported(tmp_path: Path) -> None:
     assert lc.license_findings(f) == [f"{f}: not the canonical Apache-2.0 text"]
 
 
-@pytest.mark.parametrize("name", ["a.go", "b.py", "c.dart", "d.ts", "e.sh", "f.kt", "g.swift"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        *("a.go", "b.py", "c.dart", "d.ts", "e.sh", "f.kt", "g.swift"),
+        *("h.tf", "i.sql", "j.c", "k.cc", "l.cpp", "m.h", "n.ps1"),
+    ],
+)
 def test_source_without_header_is_reported(tmp_path: Path, name: str) -> None:
     (tmp_path / name).write_text("package main\n")
     assert lc.header_findings(tmp_path, [name]) == [
@@ -61,6 +67,8 @@ def test_other_license_identifier_is_reported(tmp_path: Path) -> None:
         "sdk/typescript/src/generated/schema.ts",
         "tools/node/node_modules/x/index.js",
         "plugins/grafana-bothy-live/.config/webpack/webpack.config.ts",
+        "apps/client/windows/flutter/generated_plugin_registrant.cc",
+        "apps/client/linux/flutter/generated_plugin_registrant.h",
     ],
 )
 def test_non_source_and_generated_files_are_skipped(tmp_path: Path, name: str) -> None:

@@ -39,8 +39,11 @@ by a product release; existing installations raise `BOTHY_VERSION` themselves
 
 ### 2.1 Server
 
-1. Once before the first tag of the private phase (owner step): create the key pair of the
-   private phase (section 2.4), commit its public key as
+1. The repository is public, so a tag takes the keyless path of the public phase (section 5)
+   and needs no key pair. That path and its attestations have not run yet: `make release-trial`
+   proves the private path only (section 2.3), and the first run of the public path is part of
+   the plan row V1-05. Only while the repository is private (owner step, once before the first
+   tag): create the key pair of the private phase (section 2.4), commit its public key as
    `quality/release/cosign-private-phase.pub`, and store the private key and its password as the
    secrets `COSIGN_PRIVATE_KEY` and `COSIGN_PASSWORD` of the environment `release`.
 2. `make release-prep COMPONENT=server [CHANNEL=beta]` writes `services/server/VERSION`, renames
@@ -50,7 +53,9 @@ by a product release; existing installations raise `BOTHY_VERSION` themselves
    its placeholder line `Summary: (placeholder) ...` with a summary for users (`make
    fragments-check` fails until it is replaced; the release page puts it first,
    [.github/release-template.md](../../.github/release-template.md)), add the
-   mandatory parts of the release notes ([18-release.md](../spec/18-release.md) 4), commit
+   mandatory parts of the release notes ([18-release.md](../spec/18-release.md) 4; `make
+   fragments-check` fails until the section has the headings `### Upgrade notes`,
+   `### Migrations` and `### Compatibility`, each "None" where nothing applies), commit
    `chore(release): server vX.Y.Z` and land it through a pull request.
 3. `make release-trial COMPONENT=server` on the build host (section 2.3) with the release
    commit; it must pass.
@@ -127,6 +132,9 @@ probes that must fail (changed ZIP, missing SBOM). It needs Node.js and npm, no 
 
 ### 2.4 Key pair of the private phase (owner)
 
+Only while the repository is private (`release.yml` signs with the key pair when the repository
+is not public).
+
 ```
 COSIGN_PASSWORD='<new password>' cosign generate-key-pair
 mv cosign.pub quality/release/cosign-private-phase.pub
@@ -198,6 +206,11 @@ decides (OQ-08) a host release can run only as the trial.
    registry in the ticket].
 3. Beta: pre-release, npm tag `beta`.
 
+Not built yet: `sdk/python`, `sdk/typescript`, `plugins/hermes-adapter` and
+`plugins/claude-code-runner` have no target `release-build`, and `release.yml` has no step
+that publishes on PyPI or npm; the package names and accounts are the open question OQ-17. Until
+then step 2 is a plan, and a tag of these components does not produce a release.
+
 ## 4. Apps
 
 The publisher builds the apps with their `distribution.yaml` ([18-release.md](../spec/18-release.md) 8).
@@ -209,6 +222,10 @@ The publisher builds the apps with their `distribution.yaml` ([18-release.md](..
 | Windows | job `build-windows` (`tools/distribution/windows.py release`): build and sign the MSIX with a PFX (section 4.1 for certificates whose key stays in a key service), `signtool verify /pa`, `beta.appinstaller` to the new version; once proven, `stable.appinstaller` (`appdist.py promote-appinstaller`) |
 | Android | job `build-android` (`make -C apps/client release-android`): the App Bundle signed with the upload key, its checks (jarsigner, bundletool, apksigner), the internal test track of Google Play; once proven, the same build on `android.stable_track` (`tools/distribution/android.py promote --version-code <n>`) |
 | Web console | with the server release (proposal, ADR 0028) |
+
+Not built yet: `apps/client` has no `VERSION` and no `CHANGELOG.md`, so a tag `client/vX.Y.Z`
+does not resolve and the jobs above are not reached by a tag (docs/decisions.d/M7-12.md,
+D-M7-12-0); the trials of the pull requests run them with a test publisher.
 
 Before the switch to stable: check the crash rate of the beta build (if a target for
 crash reports is configured) and no open bugs of severity critical.

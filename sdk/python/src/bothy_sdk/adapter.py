@@ -662,28 +662,27 @@ class Adapter:
             consumer over, or ``1000`` after `stop`).
 
         Raises:
-            ProblemError: The discovery or the first JWKS fetch failed.
+            ProblemError: The discovery or the first JWKS fetch failed; the adapter is closed.
         """
-        discovery = await self.client.discover()
-        if discovery.instance_id != self.config.instance_id:
-            _LOG.error("the server is another instance than configured; stopping")
-            await self._close()
-            return CloseReason(1000, "instance_mismatch")
-        self.verifier = InvocationVerifier(
-            instance_id=self.config.instance_id,
-            agent_id=self.config.agent_id,
-            jwks=self._fetcher(discovery.jwks_uri),
-            replay=self.inbox,
-            settings=self.settings,
-            clock=self.clock,
-            allowlist=self._load_triggerers if self.config.allowlist else None,
-        )
-        await self.verifier.refresh()
-        if self.source is None:
-            self.source = self._default_source(discovery.gateway.url)
-        await self._recover()
-        await self.outbox.flush()
         try:
+            discovery = await self.client.discover()
+            if discovery.instance_id != self.config.instance_id:
+                _LOG.error("the server is another instance than configured; stopping")
+                return CloseReason(1000, "instance_mismatch")
+            self.verifier = InvocationVerifier(
+                instance_id=self.config.instance_id,
+                agent_id=self.config.agent_id,
+                jwks=self._fetcher(discovery.jwks_uri),
+                replay=self.inbox,
+                settings=self.settings,
+                clock=self.clock,
+                allowlist=self._load_triggerers if self.config.allowlist else None,
+            )
+            await self.verifier.refresh()
+            if self.source is None:
+                self.source = self._default_source(discovery.gateway.url)
+            await self._recover()
+            await self.outbox.flush()
             async for delivery in self.source:
                 if isinstance(delivery, SourceReady):
                     self._spawn(self._on_ready())
@@ -694,6 +693,8 @@ class Adapter:
                 if self._stopping:
                     break
         finally:
+            # A failure at the start closes the stores and the client and stops the run
+            # tasks `_recover` started, as a stop does.
             await self._close()
         return self.source.close_reason or CloseReason(1000, "stopped")
 
@@ -927,6 +928,10 @@ class Adapter:
             await self.source.settle(env.seq)
 
     async def _on_envelope(self, env: Envelope) -> None:
+        if isinstance(env.event, UnknownEvent):
+            # Unknown, or a known type that did not decode (`envelope_from`): only acknowledged.
+            await self._settle(env)
+            return
         if env.type == _SEARCH_ASSIST:
             self._spawn(self._search_assist(env))
             return
@@ -1325,7 +1330,33 @@ class Adapter:
         return None
 
     async def _execute(self, state: _RunState, token: Secret, work: Any, inv: Invocation) -> None:
-        """Run handler work of a started run and end the run as 09 4.9 says."""
+        """Run handler work of a started run and end the run as 09 4.9 says.
+
+        An end the server did not store (`RunHandle.finish_pending`) is sent again until the
+        server stores or refuses it (`_resend_end`).
+        """
+        handle = state.handle
+        try:
+            try:
+                await self._work_and_end(state, token, work, inv)
+            except Exception:
+                # Only an end the server did not store is taken up here; it goes out again below.
+                if not handle.finish_pending:
+                    raise
+            if handle.finish_pending:
+                _LOG.warning("end of run %s not stored; sending it again", state.run_id)
+                await self._resend_end(state, token)
+        finally:
+            if handle.finished or handle.cancelled.is_set():
+                with contextlib.suppress(Exception):
+                    await self.inbox.set_state(state.event_id, EntryState.CLOSED)
+                self._runs.pop(state.run_id, None)
+                self.client.release_run(state.run_id)
+
+    async def _work_and_end(
+        self, state: _RunState, token: Secret, work: Any, inv: Invocation
+    ) -> None:
+        """The handler work of `_execute` and the end that follows from it."""
         handle = state.handle
         try:
             with self.client.bind_run(state.run_id, token):
@@ -1335,24 +1366,50 @@ class Adapter:
         except asyncio.CancelledError:
             # A handover leaves the run to the next process, which ends it (09 18.19.3).
             if state.cancel_reason is not None and not handle.finished and not self._handing_over:
-                with self.client.bind_run(state.run_id, token), contextlib.suppress(ProblemError):
+                with (
+                    self.client.bind_run(state.run_id, token),
+                    contextlib.suppress(ProblemError, httpx.TransportError),
+                ):
                     await handle.finish("cancelled", reason=state.cancel_reason)
             raise
         except RuntimeFailure:
+            if handle.finish_pending:
+                raise  # the end asked for stays the run's end
             with self.client.bind_run(state.run_id, token), contextlib.suppress(ProblemError):
                 await handle.finish("failed", reason="runtime_error")
         except Exception as exc:
+            # The end was asked for and the server did not store it: that is no failure of the
+            # handler, and the end asked for stays the run's end.
+            if handle.finish_pending:
+                raise
             _LOG.exception("handler failed for run %s", state.run_id)
             with self.client.bind_run(state.run_id, token), contextlib.suppress(ProblemError):
                 await handle.finish(
                     "failed", reason="adapter_error", summary=unexpected_error_summary(exc)
                 )
-        finally:
-            if handle.finished or handle.cancelled.is_set():
-                with contextlib.suppress(Exception):
-                    await self.inbox.set_state(state.event_id, EntryState.CLOSED)
-                self._runs.pop(state.run_id, None)
-                self.client.release_run(state.run_id)
+
+    async def _resend_end(self, state: _RunState, token: Secret) -> None:
+        """Send the end of a run again until the server stored or refused it, or the adapter stops.
+
+        The run stays in ``active_runs`` of the heartbeat meanwhile, so the server does not end
+        it as interrupted (09 5.5). The waits double from ``sync.reconnect_backoff_base`` up to
+        ``sync.reconnect_backoff_cap``. After a stop the run is left to the server, like every
+        run a stopped adapter still holds (09 4.9). The pending end is kept in memory only.
+        """
+        handle = state.handle
+        attempt = 0
+        while handle.finish_pending and not self._stopping:
+            wait = min(
+                self.settings.reconnect_backoff_cap,
+                self.settings.reconnect_backoff_base * (2**attempt),
+            )
+            await self.clock.sleep(wait)
+            attempt += 1
+            try:
+                with self.client.bind_run(state.run_id, self._run_tokens.get(state.run_id, token)):
+                    await handle.retry_finish()
+            except (ProblemError, httpx.TransportError) as exc:
+                _LOG.info("end of run %s not sent (%s)", state.run_id, type(exc).__name__)
 
     async def _finish_refused(
         self, state: _RunState, reason: str, summary: str | None = None
@@ -1415,7 +1472,8 @@ class Adapter:
             with self.client.bind_run(state.run_id, token):
                 await work(inv, handle)
             return
-        if running_here and not state.handle.finished:
+        # A run whose end only waits to be sent again takes no more work.
+        if running_here and not state.handle.finished and not state.handle.finish_pending:
             with self.client.bind_run(
                 state.run_id, self._run_tokens.get(state.run_id, entry.token)
             ):
@@ -1532,7 +1590,7 @@ class Adapter:
             if entry.token is not None:
                 with (
                     self.client.bind_run(state.run_id, entry.token),
-                    contextlib.suppress(ProblemError),
+                    contextlib.suppress(ProblemError, httpx.TransportError),
                 ):
                     await state.handle.finish("cancelled", reason=state.cancel_reason)
             await self.inbox.set_state(state.event_id, EntryState.CLOSED)

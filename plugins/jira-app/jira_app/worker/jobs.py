@@ -202,7 +202,7 @@ class JobRunner:
             log.error("job.transient", **base, reason="store")
             return "retry"
         if not isinstance(exc, _CallFailedError):
-            log.error("job.failed", **base, reason="internal")
+            log.error("job.failed", **base, reason="internal", code=type(exc).__name__)
             return "done"
         err = exc.error
         fields = {**base, "operation": exc.operation, "status": err.status, "code": err.code}

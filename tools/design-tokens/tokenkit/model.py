@@ -41,6 +41,11 @@ def build(resolver_path: Path) -> Model:
     dependent: dict[str, set[str]] = {}
     for name, contexts in doc.modifiers().items():
         full[name] = {ctx: doc.resolve({**defaults, name: ctx}) for ctx in contexts}
+        every_path = set().union(*(set(tokens) for tokens in full[name].values()))
+        for ctx in contexts:
+            missing = sorted(every_path - set(full[name][ctx]))
+            if missing:
+                raise dtcg.TokenError(f"modifier {name}: context {ctx} lacks {', '.join(missing[:5])}")
         owned: set[str] = set()
         for ctx in contexts:
             sources = doc.data["modifiers"][name]["contexts"][ctx]

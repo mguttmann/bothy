@@ -70,6 +70,36 @@ describe('TimelineView', () => {
     expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
   });
 
+  it('stays paused after a playback that ended when the playhead jumps to the start', () => {
+    jest.useFakeTimers();
+    renderView(TimelineView, frames);
+    fireEvent.change(screen.getByLabelText('Speed'), { target: { value: '900' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+    act(() => {
+      jest.advanceTimersByTime(TICK_MS * 20);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Jump to start' }));
+    act(() => {
+      jest.advanceTimersByTime(TICK_MS * 4);
+    });
+    expect(screen.getByLabelText('Playhead')).toHaveTextContent('2026-10-10 12:00:00');
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+  });
+
+  it('plays from the start again when Play is pressed at the end', () => {
+    jest.useFakeTimers();
+    renderView(TimelineView, frames);
+    fireEvent.click(screen.getByRole('button', { name: 'Jump to end' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+    expect(screen.getByLabelText('Playhead')).toHaveTextContent('2026-10-10 12:00:00');
+    act(() => {
+      jest.advanceTimersByTime(TICK_MS * 4);
+    });
+    // 4 ticks of 250 ms at 60 s per second: 60 s of time of day.
+    expect(screen.getByLabelText('Playhead')).toHaveTextContent('2026-10-10 12:01:00');
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+  });
+
   it('draws the active runs as an area with the series roles of the theme', () => {
     const { unmount } = renderView(TimelineView, frames);
     expect(screen.getByTestId('timeline-area')).toHaveAttribute('fill', light.viz.areaFill);

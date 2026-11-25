@@ -691,7 +691,8 @@ The worker checks clamd every `file.scan.health_interval` with `PING`. The resul
 status page component "Virus scan" (`status_components.health_source = 'clamd'`). If the
 oldest file has been in `pending` longer than `file.scan.pending_alert_after`, the component
 becomes `degraded` and an alert fires ([17-observability.md](17-observability.md)); this
-threshold is not built (plan row V3-31), the built alert is `BothyMalwareScanFailing`. At startup
+threshold is not built (plan row V3-31). The built alert `BothyMalwareScanFailing` counts only
+scans that end with `error`, not files that stay `pending` while clamd is unreachable. At startup
 clamd takes a long time to load signatures; official images have a startup time limit for
 this, default 1800 s [Q9, verified]. Uploads during this time simply wait.
 

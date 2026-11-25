@@ -36,6 +36,7 @@ def error_of(data: dict[str, Any]) -> ConfigError:
 def test_defaults_of_chapter_17() -> None:
     config = parse_config(base())
     assert config.min_request_interval_ms == 60_000
+    assert config.pass_interval_ms == 3_600_000
     assert config.lookback_days == 3
     assert config.http_timeout_ms == 30_000
     assert config.server_url == "https://chat.example.com"
@@ -48,12 +49,14 @@ def test_explicit_values() -> None:
     config = parse_config(
         base(
             min_request_interval="500ms",
+            pass_interval="10m",
             lookback="72h",
             http_timeout="1m",
             server_url="https://chat.example.com/base/",
         )
     )
     assert config.min_request_interval_ms == 500
+    assert config.pass_interval_ms == 600_000
     assert config.lookback_days == 3
     assert config.http_timeout_ms == 60_000
     assert config.server_url == "https://chat.example.com/base"
@@ -112,6 +115,8 @@ def test_unreadable_and_invalid_files(tmp_path: Path) -> None:
         (base(min_request_interval="106752d"), "reconciler.min_request_interval"),
         (base(min_request_interval=60), "reconciler.min_request_interval"),
         (base(min_request_interval="0s"), "reconciler.min_request_interval"),
+        (base(pass_interval="0s"), "reconciler.pass_interval"),
+        (base(pass_interval="1.5h"), "reconciler.pass_interval"),
         (base(lookback="36h"), "reconciler.lookback"),
         (base(lookback="0d"), "reconciler.lookback"),
         (base(lookback="90m"), "reconciler.lookback"),

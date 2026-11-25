@@ -57,6 +57,7 @@ import asyncio
 import contextlib
 import logging
 import time
+import traceback
 import unicodedata
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, replace
@@ -115,10 +116,12 @@ from bothy_hermes_adapter.context_format import (
     build_context,
     command_user_side,
     cut_utf8,
+    cut_with_note,
 )
 from bothy_hermes_adapter.hermes_commands import (
     BUILT_IN,
     COMMAND_CLASSES,
+    COMMAND_FAILED,
     INPUT_OPTION,
     command_text,
     option_values,
@@ -170,6 +173,11 @@ from bothy_hermes_adapter.runtime import (
     TurnRequest,
     Usage,
 )
+from bothy_hermes_adapter.session_commands import (
+    NOT_ANSWERED,
+    confirmed,
+    owner_session_command,
+)
 from bothy_hermes_adapter.stages import StageCursor, StageRegistry, StageSteps
 from bothy_hermes_adapter.store import CallbackStore
 from bothy_hermes_adapter.team import (
@@ -192,6 +200,7 @@ __all__ = [
     "BusyMode",
     "HermesHandler",
     "PrepareRefused",
+    "stack_of",
 ]
 
 _LOG = logging.getLogger("bothy_hermes_adapter")
@@ -221,8 +230,8 @@ JOB_WITHOUT_RUN: Final = (
     "A background job runs in this thread without a run: **{title}** (process {pid}, started "
     "{since}, job {job_id}). Its run has ended, for example at a restart of the agent, or it was "
     "started outside a run, so it has no stop button here. The operator of the agent can stop it "
-    "on the host with `python -m bothy_hermes_adapter job stop --profile-home <profile home> "
-    "--job-id {job_id}`."
+    "on the host with `python <profile home>/plugins/<platform key>/run.py job stop "
+    "--profile-home <profile home> --job-id {job_id}`."
 )
 """The message that shows a live registered job no open run covers (09 17.12 point 8)."""
 
@@ -259,6 +268,10 @@ class _Turn:
     team: TeamFacts | None = None
     speaker: Speaker | None = None
     notice_input: bool = False
+    # The owner's session command the run sends instead of a turn (09 17.3), else ``None``.
+    session_command: str | None = None
+    # Whether Hermes ran a turn of the thread (``pre_llm_call``) while the run was open.
+    hermes_ran: bool = False
     user_id: UUID | None = None
     user_name: str = ""
     answers: dict[str, tuple[UUID, int]] = field(default_factory=dict)
@@ -370,6 +383,9 @@ class HermesHandler(AgentHandler):
         # Team runs whose input is another member's notice of an unanswered request: a silent
         # answer to it stays silent (FIX-TEAM-HANDOFF-NOT-NOTHING).
         self._notices: set[UUID] = set()
+        # An owner's session command typed as the run's message, from prepare to execute
+        # (09 17.3 "Session commands"): the command line the run sends instead of a turn.
+        self._commands: dict[UUID, str] = {}
         self._channels: dict[UUID, tuple[int, ChannelBehavior]] = {}
         # Runs that stop their work now, by thread: the run's start in wall time. Such a run
         # still covers its jobs until they are stopped (09 17.12 point 8).
@@ -517,6 +533,15 @@ class HermesHandler(AgentHandler):
             actual = self.actual_mode()
             return StartOptions(billing_evidence=BillingEvidence.from_dict(actual.evidence))
         ctx = await run.load_context()
+        command = owner_session_command(inv.claims, ctx.trigger_message)
+        if command is not None:
+            # An owner's /discard, /reset, /new or /stop: sent as the command, no turn and no
+            # context (09 17.3 "Session commands").
+            _LOG.info("run %s: session command of the owner", run.run_id)
+            self._commands[run.run_id] = command
+            self._prepared[run.run_id] = BuiltContext(command_user_side(channel), command)
+            actual = self.actual_mode()
+            return StartOptions(billing_evidence=BillingEvidence.from_dict(actual.evidence))
         if team is not None:
             trigger = ctx.trigger_message
             self._teams[run.run_id] = (team, input_speaker(team, trigger.origin, trigger.author))
@@ -673,6 +698,7 @@ class HermesHandler(AgentHandler):
             team=team[0] if team is not None else None,
             speaker=team[1] if team is not None else None,
             notice_input=self._pop_notice(run.run_id),
+            session_command=self._commands.pop(run.run_id, None),
             user_id=inv.claims.sub,
             user_name=str(payload.triggered_by.display_name),
         )
@@ -687,11 +713,33 @@ class HermesHandler(AgentHandler):
                 # the resume: that handler ends the run ``cancelled`` once the work is stopped.
                 # Returning before it would let the SDK end the run ``completed`` (AUD-HA1/6).
                 await turn.abandoned.wait()
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, Exception):
+            # Every other way out stops the work too: the SDK then fails the run, and no
+            # delegation, process or job may go on without it (R-AG-44).
             await self._abandon(turn)
             raise
         finally:
             self._forget(turn)
+
+    async def on_not_started(self, inv: Invocation) -> None:
+        """Free what ``prepare`` kept for a run that does not reach ``execute`` here.
+
+        The SDK calls it after a refused, superseded or failed start (and after a ``prepare``
+        that raised); a later attempt of the same run calls ``prepare`` again.
+
+        Args:
+            inv: The invocation.
+        """
+        run_id = inv.claims.run_id
+        if run_id is None:
+            return
+        self._prepared.pop(run_id, None)
+        self._anchors.pop(run_id, None)
+        self._inbound.pop(run_id, None)
+        self._teams.pop(run_id, None)
+        self._notices.discard(run_id)
+        self._commands.pop(run_id, None)
+        self._mirror_runs.discard(run_id)
 
     async def _transcribed(
         self, run: RunHandle, ctx: RunContext, channel: ChannelBehavior | None
@@ -890,8 +938,51 @@ class HermesHandler(AgentHandler):
         if switched is SessionSwitch.NEW and not request.new_session:
             # A refused bind falls back to a new session (9.5): it loads the bound skills too.
             request = replace(request, new_session=True)
-        outcome = await self.runtime.start_turn(request)
+        if turn.session_command is not None:
+            outcome = await self._session_command(turn, request, turn.session_command)
+        else:
+            outcome = await self.runtime.start_turn(request)
+            await self._never_silent(turn, outcome)
         await self._end_turn(turn, outcome, switched)
+
+    async def _session_command(self, turn: _Turn, request: TurnRequest, line: str) -> TurnOutcome:
+        """Send an owner's session command and post Hermes' reply as the run's answer (17.3).
+
+        The command goes out from the adapter's control sender like every Hermes command
+        (17.4); a confirmation Hermes asks for (``/new``, ``/reset``) is answered "once". When
+        Hermes answers nothing, the run's answer is the notice of a failed command.
+        """
+        try:
+            replies = await self.runtime.run_command(
+                CommandRequest(
+                    thread_id=turn.thread_id,
+                    channel_id=turn.channel_id,
+                    user_id=request.user_id,
+                    user_name=request.user_name,
+                    text=line,
+                    confirm=confirmed(line),
+                )
+            )
+        except Exception as exc:  # the run's answer says so; never the error's text
+            _LOG.warning("run %s: session command failed: %s", turn.run_id, type(exc).__name__)
+            replies = []
+        texts = [r for r in replies if r.strip()] or [COMMAND_FAILED.format(name=line[1:])]
+        for text in texts:
+            await self._post_answer(turn, text, None)
+        return TurnOutcome.COMPLETED
+
+    async def _never_silent(self, turn: _Turn, outcome: TurnOutcome) -> None:
+        """Answer a run whose message Hermes took without a turn and without a reply (17.6).
+
+        Hermes admits a message onto a paused session (a turn lost in a restart) and answers
+        only the first one with its notice; every later run would end with nothing to show.
+        """
+        if outcome is not TurnOutcome.COMPLETED or turn.abort_reason is not None or turn.dropped:
+            return
+        if turn.hermes_ran or turn.answers or turn.previews:
+            return
+        _LOG.info("run %s: Hermes ran no turn and sent no answer code=not_answered", turn.run_id)
+        await self._post_answer(turn, NOT_ANSWERED, None)
 
     async def _session_free(self, turn: _Turn) -> None:
         """Wait for the thread's free Hermes session; an abort of the run ends the wait."""
@@ -1535,6 +1626,8 @@ class HermesHandler(AgentHandler):
                 )
         except ProblemError as exc:
             _LOG.info("run %s: session report refused code=%s", turn.run_id, exc.code)
+        except httpx.TransportError:
+            _LOG.info("run %s: session report not sent code=transport_error", turn.run_id)
 
     async def _set_title(self, turn: _Turn) -> None:
         """The title after the first completed run of a new session (09 12 points 3 to 5).
@@ -1564,6 +1657,8 @@ class HermesHandler(AgentHandler):
                 _LOG.info("run %s: title not set code=%s", turn.run_id, exc.code)
             else:
                 _LOG.info("run %s: title refused code=%s", turn.run_id, exc.code)
+        except httpx.TransportError:
+            _LOG.info("run %s: title not set code=transport_error", turn.run_id)
 
     async def _abandon(self, turn: _Turn) -> None:
         """A cancelled run: interrupt the turn, cancel its work, drop later callbacks (09 8)."""
@@ -1819,9 +1914,11 @@ class HermesHandler(AgentHandler):
             or turn.dropped
             or turn.final_reply
             or turn.waiting
+            or turn.session_command is not None
         ):
             # After the answer Hermes may have drained its last steer already; the server's
-            # follow-on run takes the follow-up instead (09 7).
+            # follow-on run takes the follow-up instead (09 7). A run of a session command has
+            # no turn of its own to steer into (09 17.3).
             return False
         await self.runtime.steer(turn.thread_id, text, message_id)
         return True
@@ -1902,6 +1999,8 @@ class HermesHandler(AgentHandler):
                 )
             except ProblemError as exc:  # the server disabled it with the follow-up already
                 _LOG.info("run %s: component not disabled code=%s", turn.run_id, exc.code)
+            except httpx.TransportError:
+                _LOG.info("run %s: component not disabled code=transport_error", turn.run_id)
 
     async def on_interaction(self, inv: Invocation, run: RunHandle) -> None:
         """An interaction with a card of the run (09 11.4, 17.3; Design note 12).
@@ -1969,6 +2068,8 @@ class HermesHandler(AgentHandler):
             )
         except ProblemError as exc:
             _LOG.info("run %s: interaction answer refused code=%s", run.run_id, exc.code)
+        except httpx.TransportError:
+            _LOG.info("run %s: interaction answer not sent code=transport_error", run.run_id)
 
     async def _until_settled(self, turn: _Turn) -> None:
         """Wait until the run's ``execute`` returned or the run waits for a card again.
@@ -2025,9 +2126,9 @@ class HermesHandler(AgentHandler):
         )
         try:
             texts = await self.runtime.run_command(request)
-        except Exception as exc:  # Hermes failed the command; the person sees no reply
+        except Exception as exc:  # Hermes failed the command: a notice instead of its reply
             _LOG.warning("command %s failed in Hermes: %s", payload.command_id, type(exc).__name__)
-            return
+            texts = [COMMAND_FAILED.format(name=name)]
         for text in texts:
             if not text.strip():
                 continue
@@ -2049,9 +2150,9 @@ class HermesHandler(AgentHandler):
         client = self._client
         if client is None:
             raise ReportError("the adapter is not connected")
-        body, was_cut = cut_utf8(text.encode("utf-8"), self.settings.max_message_bytes)
+        body, was_cut = cut_with_note(text, self.settings.max_message_bytes)
         if was_cut:
-            _LOG.info("thread %s: message cut to the message limit", thread_id)
+            _LOG.warning("thread %s: message cut to the message limit code=message_cut", thread_id)
         try:
             with client.unbound():
                 return await direct_send(client, thread_id, body)
@@ -2352,6 +2453,9 @@ class HermesHandler(AgentHandler):
             except ProblemError as exc:
                 _LOG.info("run %s: answer edit refused code=%s", turn.run_id, exc.code)
                 continue
+            except httpx.TransportError:
+                _LOG.info("run %s: answer edit not sent code=transport_error", turn.run_id)
+                continue
             new_version = getattr(result, "version", None)
             turn.answers[key] = (message_id, int(new_version) if new_version else version + 1)
             turn.posted[key] = body
@@ -2507,6 +2611,7 @@ class HermesHandler(AgentHandler):
             _LOG.info("thread %s: a Hermes turn without a run", thread_id)
             return
         turn.hermes_open = True
+        turn.hermes_ran = True
         if turn.own_turns == 0:
             turn.internal = True
         self._touch(turn)
@@ -2674,12 +2779,27 @@ def _with_team(built: BuiltContext, facts: TeamFacts, speaker: Speaker) -> Built
     return BuiltContext(user_side=side, user_text=_labelled(speaker.label, built.user_text))
 
 
+def stack_of(exc: BaseException) -> str:
+    """The traceback of ``exc`` without its text: files, lines and functions only (SEC-LOG).
+
+    An exception's text can carry content (a message, a path of a person's file); its stack
+    names only code, so an unexpected failure is logged with this instead of ``exc_info``.
+
+    Args:
+        exc: The exception.
+
+    Returns:
+        The formatted stack frames, oldest first.
+    """
+    return "".join(traceback.format_tb(exc.__traceback__)).rstrip()
+
+
 def _log_task_failure(task: asyncio.Task[Any]) -> None:
     if task.cancelled():
         return
     exc = task.exception()
     if exc is not None:
-        _LOG.warning("handler task failed: %s", type(exc).__name__)
+        _LOG.error("handler task failed: %s\n%s", type(exc).__name__, stack_of(exc))
 
 
 @dataclass(frozen=True)

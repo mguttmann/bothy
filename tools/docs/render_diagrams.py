@@ -12,9 +12,12 @@ so the docs site can show each graphic in its colour scheme. Each names the desi
 no wider or taller than MAX_ASPECT. `--write` stamps each SVG with the SHA-256 of its `.mmd`
 source and of its theme's Mermaid configuration (STAMP_PREFIX); the gate recomputes it and names
 every SVG whose source or theme changed since it was rendered. The stamp replaces a byte
-comparison of the SVG, which depends on the browser. Texts and lines of every graphic meet the
-contrast gate of the design tokens in both themes (diagram_contrast.py). Colours written in a
-`*.mmd` file must be design-token colours. The ERDs must match the data model (erd_check.py).
+comparison of the SVG, which depends on the browser. Its limits: the stamp holds neither the
+SVG content nor the mermaid-cli version, so a hand-edited SVG with its stamp intact and the SVGs
+of an older mermaid-cli pass; after a raise of the pin, run `--write` in the same change.
+Texts and lines of every graphic meet the contrast gate of the design tokens in both themes
+(diagram_contrast.py). Colours written in a `*.mmd` file must be design-token colours. The ERDs
+must match the data model (erd_check.py).
 `--write` re-renders every `*.svg` and `*.dark.svg` (docs/quality/gates.md).
 
 Environment: MMDC_PUPPETEER_CONFIG may point to a Puppeteer config file, e.g. to use a

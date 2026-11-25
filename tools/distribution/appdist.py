@@ -77,6 +77,9 @@ PLACEHOLDERS: tuple[tuple[str, Any], ...] = (
     ("windows.package_name", lambda v: v.startswith("com.example.")),
     ("windows.publisher", lambda v: v == "CN=Example Publisher"),
     ("windows.update_url", lambda v: bool(_EXAMPLE_HOST.match(v))),
+    # Optional in the schema for the trials; a release without it signs without a timestamp,
+    # and the MSIX stops installing when the certificate expires.
+    ("windows.timestamp_url", lambda v: not v),
     ("android.package_name", lambda v: v.startswith("com.example.")),
     ("firebase.project_id", lambda v: v.startswith("example-")),
     ("ios.update_url", lambda v: "EXAMPLE" in v or bool(_EXAMPLE_HOST.match(v))),
@@ -202,8 +205,19 @@ def value(cfg: dict[str, Any], key: str) -> Any:
 
 
 def placeholders(cfg: dict[str, Any]) -> list[str]:
-    """Return the keys of `cfg` that still hold a placeholder of the template (PLACEHOLDERS)."""
-    return [key for key, test in PLACEHOLDERS if test(value(cfg, key))]
+    """Return the keys of `cfg` that still hold a placeholder of the template (PLACEHOLDERS).
+
+    An optional key that is missing counts as its empty value.
+    """
+    found = []
+    for key, test in PLACEHOLDERS:
+        try:
+            v = value(cfg, key)
+        except KeyError:
+            v = ""
+        if test(v):
+            found.append(key)
+    return found
 
 
 def require_publisher_values(cfg: dict[str, Any]) -> None:
@@ -518,11 +532,15 @@ def merge_appcast(cfg: dict[str, Any], appcast: bytes, new: bytes, key: Ed25519P
     return add_items(appcast, items, key)
 
 
-def promote_appcast(appcast: bytes, build: int, key: Ed25519PrivateKey) -> bytes:
+def promote_appcast(
+    appcast: bytes, build: int, key: Ed25519PrivateKey, *, now: datetime | None = None
+) -> bytes:
     """Move build `build` from beta to stable: remove its `sparkle:channel`; sign again.
 
-    The entry, the archive and its signature stay as they are, so stable gets the very build
-    beta tested (18 5 rule 1, R-RL-03).
+    The archive and its signature stay as they are, so stable gets the very build beta tested
+    (18 5 rule 1, R-RL-03). `pubDate` becomes the time of the promotion (`now`, the current
+    time by default): Sparkle counts the groups of a phased rollout from it, so a build that
+    stayed in beta longer than the rollout would otherwise reach every stable user at once.
 
     Raises:
         DistributionError: no entry with this build number, or it is not in the channel beta.
@@ -535,6 +553,10 @@ def promote_appcast(appcast: bytes, build: int, key: Ed25519PrivateKey) -> bytes
         if channel is None or (channel.text or "").strip() != BETA:
             raise DistributionError(f"build {build} is not in the channel {BETA}")
         item.remove(channel)
+        pub_date = item.find("pubDate")
+        if pub_date is None:
+            pub_date = ET.SubElement(item, "pubDate")
+        pub_date.text = email.utils.format_datetime(now or datetime.now(UTC))
         return sign_feed(_serialize(root), key)
     raise DistributionError(f"the appcast has no entry with build {build}")
 

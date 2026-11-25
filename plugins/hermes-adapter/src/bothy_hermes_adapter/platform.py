@@ -112,7 +112,7 @@ from bothy_hermes_adapter.config import (
 )
 from bothy_hermes_adapter.context_format import ComposedUserSide
 from bothy_hermes_adapter.defaults import DEFAULT_MAX_MESSAGE_BYTES, NO_SPLIT_LENGTH
-from bothy_hermes_adapter.handler import TOOL_REFUSED, HermesHandler
+from bothy_hermes_adapter.handler import TOOL_REFUSED, HermesHandler, stack_of
 from bothy_hermes_adapter.heartbeat import ADAPTER_NAME, RUNTIME_NAME, HermesAdapterLoop
 from bothy_hermes_adapter.hermes_commands import declared_commands
 from bothy_hermes_adapter.installer import CONTROL_SENDER
@@ -139,7 +139,7 @@ from bothy_hermes_adapter.runtime import (
 from bothy_hermes_adapter.stages import STAGES_DIR, StageRegistry
 from bothy_hermes_adapter.store import CallbackStore
 
-__all__ = ["CONTROL_SENDER", "ServerPlatform", "dispatch_hook"]
+__all__ = ["CONTROL_SENDER", "FATAL_LOOP_FAILED", "ServerPlatform", "dispatch_hook"]
 
 _LOG = logging.getLogger("bothy_hermes_adapter")
 
@@ -161,6 +161,8 @@ _INTERIM: Final = "interim text is shown as the run's progress"
 # How often the adapter looks at the gateway's startup restore before it connects; a poll of a
 # flag, not a deadline (the wait ends when Hermes is ready).
 _READY_POLL_S: Final = 0.1
+FATAL_LOOP_FAILED: Final = "bothy_adapter_loop_failed"
+"""Hermes' fatal error code of a platform whose SDK loop failed (retryable, 09 17.3)."""
 # Bytes of an approval card that are not the command: Hermes' header, fences, reason label,
 # deadline and smart-deny lines and the cut notice of a longer command (D-HAM-3).
 _EA_CARD_RESERVE: Final = 4096
@@ -236,7 +238,8 @@ class ServerPlatform(BasePlatformAdapter):
     """
 
     # M4-47: Hermes hands every answer whole to `send` (no split, no cut of cron output); the
-    # handler keeps it one message and attaches the rest above hermes_adapter.max_message_bytes.
+    # handler keeps a run's answer one message and attaches the rest above
+    # hermes_adapter.max_message_bytes, and cuts a report there with a closing note (09 17.9).
     splits_long_messages = True
     MAX_MESSAGE_LENGTH = NO_SPLIT_LENGTH
     supports_status_text = True
@@ -258,6 +261,10 @@ class ServerPlatform(BasePlatformAdapter):
         self._allow_list_variable = f"{platform_key.upper()}_ALLOWED_USERS"
         self._loop: asyncio.AbstractEventLoop | None = None
         self._serve_task: asyncio.Task[Any] | None = None
+        # Set by `disconnect`: an end of the SDK loop after it is no failure to report.
+        self._closing = False
+        # The task that reports a failed SDK loop to Hermes (kept: asyncio holds weak refs).
+        self._fatal_task: asyncio.Task[Any] | None = None
         self._sdk: HermesAdapterLoop | None = None
         self.handler: HermesHandler | None = None
         self._turns: dict[str, asyncio.Future[TurnOutcome]] = {}
@@ -268,6 +275,10 @@ class ServerPlatform(BasePlatformAdapter):
         # keeps such a session live on that thread's route until the gateway restarts.
         self._ran_here: dict[str, uuid.UUID] = {}
         self._control: dict[uuid.UUID, int] = {}
+        # Threads whose running typed session command Hermes may confirm: the adapter answers
+        # "once", collects the confirmed command's reply into that command's replies and keeps
+        # the command's own resolver tasks, which it waits for (17.3).
+        self._confirming: dict[uuid.UUID, tuple[list[str], set[asyncio.Task[Any]]]] = {}
         self._confirms: set[asyncio.Task[Any]] = set()
         self._store: CallbackStore | None = None
         # Replies of a running control command by the command's message ID, and the IDs given
@@ -316,6 +327,7 @@ class ServerPlatform(BasePlatformAdapter):
             return False
         settings = self.settings
         self._loop = asyncio.get_running_loop()
+        self._closing = False
         try:
             credentials = Credentials(
                 load_token(settings.token_file),
@@ -421,10 +433,20 @@ class ServerPlatform(BasePlatformAdapter):
             reason = await loop.run()
             if reason.code == 4015:
                 _LOG.warning("another process took the consumer over; disconnected")
-            else:
-                _LOG.info("adapter loop stopped code=%s", reason.code)
+            elif not self._closing:
+                _LOG.warning("adapter loop stopped code=%s", reason.code)
         except Exception as exc:
-            _LOG.error("adapter loop failed: %s", type(exc).__name__)
+            _LOG.error("adapter loop failed: %s\n%s", type(exc).__name__, stack_of(exc))
+            if not self._closing:
+                # Hermes reconnects a platform only after a fatal error it was told about; a
+                # loop that ended on a failure (discovery, keys, a defect) would otherwise
+                # leave the agent offline until the gateway restarts (09 17.3).
+                self._set_fatal_error(
+                    FATAL_LOOP_FAILED, f"adapter loop failed: {type(exc).__name__}", retryable=True
+                )
+                # Not awaited here: Hermes' handler calls `disconnect`, which awaits the task
+                # that runs this method; it reports once this task has left `_serve`.
+                self._fatal_task = asyncio.ensure_future(self._notify_fatal_error())
         finally:
             if watch is not None:
                 watch.cancel()
@@ -433,6 +455,7 @@ class ServerPlatform(BasePlatformAdapter):
 
     async def disconnect(self) -> None:
         """Stop the SDK loop (close ``1000``); the server ends open runs ``interrupted``."""
+        self._closing = True
         if self._sdk is not None:
             await self._sdk.stop()
         if self._serve_task is not None:
@@ -745,6 +768,9 @@ class ServerPlatform(BasePlatformAdapter):
         message_id = f"ctl-{uuid.uuid4().hex}"
         replies: list[str] = []
         self._replies[message_id] = replies
+        own: tuple[list[str], set[asyncio.Task[Any]]] = (replies, set())
+        if command.confirm:
+            self._confirming[thread_id] = own
         try:
             event = self._event(
                 thread_id, command.text, user=(CONTROL_SENDER, "adapter"), message_id=message_id
@@ -752,7 +778,13 @@ class ServerPlatform(BasePlatformAdapter):
             await self._dispatch(event)
             if getattr(event, "_gateway_accepted", True):
                 await self._command_settled(event)
+            while own[1]:
+                # Only this command's confirmations; ``wait`` cancels none of them when the
+                # caller is cancelled.
+                await asyncio.wait(set(own[1]))
         finally:
+            if command.confirm and self._confirming.get(thread_id) is own:
+                del self._confirming[thread_id]
             self._replies.pop(message_id, None)
             for key in [k for k in self._reply_ids if k.startswith(f"{message_id}-")]:
                 del self._reply_ids[key]
@@ -1300,15 +1332,24 @@ class ServerPlatform(BasePlatformAdapter):
         confirm_id: str,
         metadata: dict[str, Any] | None = None,
     ) -> SendResult:
-        """A slash confirmation as a card; the adapter's own ``/new`` is confirmed at once."""
+        """A slash confirmation as a card; the adapter's own ``/new`` is confirmed at once.
+
+        So is an owner's ``/new`` or ``/reset`` typed as a message (17.3 "Session commands").
+        """
         thread = self._thread(chat_id, metadata)
-        if thread is not None and thread in self._control:
-            # The server already checked the reset (17.3 "Hermes commands"): answer "once".
+        if thread is not None and (thread in self._control or thread in self._confirming):
+            # The server already checked the reset (17.3 "Hermes commands"), or proved the
+            # owner of a typed session command: answer "once". Hermes returns the confirmed
+            # command's reply from the resolver, never through `send`.
+            own = self._confirming.get(thread)
             task = asyncio.ensure_future(
-                slash_confirm.resolve(str(session_key), str(confirm_id), "once")
+                self._confirm_once(str(session_key), str(confirm_id), own[0] if own else None)
             )
             self._confirms.add(task)
             task.add_done_callback(self._confirms.discard)
+            if own is not None:
+                own[1].add(task)
+                task.add_done_callback(own[1].discard)
             return SendResult(success=True, message_id=f"ctl-{confirm_id}")
         request = CardRequest(
             CardKind.SLASH_CONFIRM,
@@ -1319,6 +1360,13 @@ class ServerPlatform(BasePlatformAdapter):
             str(title),
         )
         return await self._card(chat_id, metadata, request)
+
+    @staticmethod
+    async def _confirm_once(session_key: str, confirm_id: str, replies: list[str] | None) -> None:
+        """Answer a confirmation "once"; its reply joins the running typed command's replies."""
+        result = await slash_confirm.resolve(session_key, confirm_id, "once")
+        if replies is not None and isinstance(result, str) and result.strip():
+            replies.append(result)
 
     # ---- hooks -------------------------------------------------------------------------------
 

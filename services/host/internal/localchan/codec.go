@@ -74,7 +74,7 @@ type Message struct {
 var (
 	ErrTooLarge    = errors.New("localchan: message too large")
 	ErrUnknownKind = errors.New("localchan: unknown message kind")
-	ErrFrameKind   = errors.New("localchan: session frames are not accepted on this channel yet")
+	ErrFrameKind   = errors.New("localchan: session frames are not accepted on a control channel")
 	ErrMalformed   = errors.New("localchan: malformed message")
 )
 

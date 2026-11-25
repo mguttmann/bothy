@@ -7,8 +7,11 @@ import { randomUUID } from "node:crypto";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { createLogger } from "../src/log.js";
+import { startHttpServer } from "../src/http/server.js";
 import { TEXTS } from "../src/worker/jobs.js";
 import { FakeChat } from "./fakes/chat.js";
+import { FlakyStore } from "./helpers/flaky-store.js";
 import { fixture } from "./helpers/fixtures.js";
 import { eventually } from "./helpers/patience.js";
 import { envelope, FORUM, startWorld, type World } from "./helpers/world.js";
@@ -69,6 +72,42 @@ describe("answers of the server", () => {
     expect(ids.size).toBe(1);
     expect(world.logs.filter((l) => l.msg === "worker.paused")).toHaveLength(2);
     expect(world.chat.threadsOf(FORUM)).toHaveLength(1);
+  });
+
+  it("keeps a job queued after a failed store write and runs it again", async () => {
+    const store = new FlakyStore({ now: () => Date.now() }, 86_400_000);
+    // Write 1 admits the job; write 2 is the job's first progress.
+    store.failJobWrites.add(2);
+    world = await startWorld({ store });
+    await world.deliver("issues", fixture("issues", "opened", { number: 1 }));
+    await world.app.idle();
+    expect(world.chat.threadsOf(FORUM)).toHaveLength(1);
+    expect(
+      world.logs.filter(
+        (l) =>
+          l.msg === "job.transient" &&
+          l.reason === "store" &&
+          l.code === "ENOSPC",
+      ),
+    ).toHaveLength(1);
+    expect(world.logs.filter((l) => l.msg === "job.failed")).toHaveLength(0);
+  });
+
+  it("names the class of an unexpected failure in job.failed", async () => {
+    world = await startWorld();
+    Object.assign(world.chat, {
+      createForumThread: () => Promise.reject(new RangeError("unexpected")),
+    });
+    await world.deliver("issues", fixture("issues", "opened", { number: 1 }));
+    await world.app.idle();
+    expect(
+      world.logs.filter(
+        (l) =>
+          l.msg === "job.failed" &&
+          l.reason === "internal" &&
+          l.code === "RangeError",
+      ),
+    ).toHaveLength(1);
   });
 
   it.each([
@@ -201,5 +240,41 @@ describe("answers of the server", () => {
         )
       ).status,
     ).toBe(400);
+  });
+});
+
+describe("the HTTP surface", () => {
+  it("names the class of a failing route in http.failed", async () => {
+    const lines: Record<string, unknown>[] = [];
+    const server = await startHttpServer({
+      host: "127.0.0.1",
+      port: 0,
+      maxBodyBytes: 1024,
+      routes: { "/x": () => Promise.reject(new TypeError("broken")) },
+      ready: () => true,
+      logger: createLogger({
+        write: (l) => lines.push(JSON.parse(l) as Record<string, unknown>),
+      }),
+    });
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:${String(server.port)}/x`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        },
+      );
+      expect(response.status).toBe(503);
+      expect(lines).toContainEqual(
+        expect.objectContaining({
+          msg: "http.failed",
+          reason: "internal",
+          code: "TypeError",
+        }),
+      );
+    } finally {
+      await server.close();
+    }
   });
 });

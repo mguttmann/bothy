@@ -6,7 +6,7 @@ rules:
     paths:
       include: ["*_test.go"]
       # The use cases of the gateway run on an injected clock; testkit defines the patient windows.
-      exclude: ["services/*/internal/gateway/app/*", "services/*/internal/gateway/domain/*", "services/*/internal/platform/testkit/*"]
+      exclude: ["/services/*/internal/gateway/app/*", "/services/*/internal/gateway/domain/*", "/services/*/internal/platform/testkit/*"]
     message: >-
       A gateway test sets a heartbeat, identify or resume window of its own. On a loaded host and
       under -race any step can take longer than such a window, and the gateway then closes the

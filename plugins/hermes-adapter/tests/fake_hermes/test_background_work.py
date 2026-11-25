@@ -13,7 +13,16 @@ import asyncio
 from typing import Any
 
 import pytest
-from fake_hermes_kit import BoundTurn, HermesRig, HermesWorld, Profile, gateway_log, hermes_rig
+from fake_hermes_kit import (
+    BoundTurn,
+    HermesRig,
+    HermesWorld,
+    Profile,
+    _start_gateway,
+    gateway_log,
+    hermes_rig,
+    new_environment,
+)
 from hermes_harness.fake_model import ScriptTurn
 
 from bothy_hermes_adapter.handler import TOOL_REFUSED
@@ -218,16 +227,20 @@ async def test_a_detached_job_that_registers_is_a_job_of_the_run(world: HermesWo
 
     The ``terminal`` call starts a supervisor in a new session (its launcher exits at once, so
     Hermes' registry never sees it) and registers it with the helper, taking the thread and the
-    profile home from the shell Hermes gives the tool.
+    profile home from the shell Hermes gives the tool. The helper runs through the plugin's
+    starter in an environment without the adapter's additions, as in a durable install.
     """
+    # The job lives long enough for the starter to import the adapter on a loaded machine (seen
+    # taking more than four seconds), so the register call finds it running.
     launch = (
         "import subprocess, sys; p = subprocess.Popen([sys.executable, '-c', "
-        "'import time; time.sleep(4)'], start_new_session=True, stdin=subprocess.DEVNULL, "
+        "'import time; time.sleep(20)'], start_new_session=True, stdin=subprocess.DEVNULL, "
         "stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); print(p.pid)"
     )
     python = world.python
     command = (
-        f'SUP=$({python} -c "{launch}") && {python} -m bothy_hermes_adapter job register '
+        f'SUP=$({python} -c "{launch}") && '
+        f'{python} "$HERMES_HOME/plugins/bothy/run.py" job register '
         '--profile-home "$HERMES_HOME" --thread "$HERMES_SESSION_THREAD_ID" --pid "$SUP" '
         '--title "Detached sleep"'
     )
@@ -238,17 +251,23 @@ async def test_a_detached_job_that_registers_is_a_job_of_the_run(world: HermesWo
     ]
     # No approval card for the shell command: the scenario is about the job, not the approval.
     profile = Profile(toolsets=PROFILE.toolsets, config={"approvals": {"mode": "off"}})
-    async with hermes_rig(world, script, profile=profile, tool_class="host") as rig:
-        triggered = await rig.fake.trigger("Start the long job.", session_mode="new")
-        try:
-            await rig.until(lambda: _steps(rig, triggered.run_id, "background_job"), "the job step")
-            assert rig.fake.run_state(triggered.run_id).state == "running"
-            [step] = _steps(rig, triggered.run_id, "background_job")
-            assert (step["name"], step["title"]) == ("external_job", "Detached sleep")
-            await rig.until(lambda: rig.finished(triggered.run_id), "the end of the run")
-        except AssertionError:
-            raise AssertionError(gateway_log(rig) + _hermes_log(rig)[-6000:]) from None
-        assert rig.fake.run_state(triggered.run_id).state == "completed", gateway_log(rig)
+    async with hermes_rig(world, script, profile=profile, tool_class="host", start=False) as rig:
+        with new_environment(world):
+            await _start_gateway(rig)
+            await _detached_job_holds_the_run(rig)
+
+
+async def _detached_job_holds_the_run(rig: HermesRig) -> None:
+    triggered = await rig.fake.trigger("Start the long job.", session_mode="new")
+    try:
+        await rig.until(lambda: _steps(rig, triggered.run_id, "background_job"), "the job step")
+        assert rig.fake.run_state(triggered.run_id).state == "running"
         [step] = _steps(rig, triggered.run_id, "background_job")
-        assert step["status"] == "completed"
-        assert [m["run_id"] for m in rig.fake.messages] == [str(triggered.run_id)]
+        assert (step["name"], step["title"]) == ("external_job", "Detached sleep")
+        await rig.until(lambda: rig.finished(triggered.run_id), "the end of the run")
+    except AssertionError:
+        raise AssertionError(gateway_log(rig) + _hermes_log(rig)[-6000:]) from None
+    assert rig.fake.run_state(triggered.run_id).state == "completed", gateway_log(rig)
+    [step] = _steps(rig, triggered.run_id, "background_job")
+    assert step["status"] == "completed"
+    assert [m["run_id"] for m in rig.fake.messages] == [str(triggered.run_id)]

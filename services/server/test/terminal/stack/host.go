@@ -91,8 +91,8 @@ type ExecResult struct {
 	Code           int
 }
 
-// containerName returns a Docker container name of the parts: lower case, every character other
-// than [a-z0-9.-] replaced by a hyphen.
+// nameRE matches the characters a Docker container name may not hold, every character other than
+// [a-z0-9.-]; NewHost lowers the parts and replaces each run of them by a hyphen.
 var nameRE = regexp.MustCompile(`[^a-z0-9.-]+`)
 
 // NewHost starts a host container named <project>-<scope>-<name> (compose run --detach of the

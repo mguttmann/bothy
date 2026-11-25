@@ -20,7 +20,7 @@ def _get_kwargs(
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
     if not isinstance(idempotency_key, Unset):
-        headers["Idempotency-Key"] = idempotency_key
+        headers["Idempotency-Key"] = str(idempotency_key)
 
     _kwargs: dict[str, Any] = {
         "method": "patch",

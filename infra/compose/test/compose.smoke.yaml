@@ -8,19 +8,19 @@
 #
 # Changes against the installation are removals and the overrides listed here only:
 # - the server services run the local image SMOKE_SERVER_IMAGE (from make image), never pulled;
-# - their environment is the installation's x-server-env without the keys the M1 server rejects
-#   (see x-smoke-env), plus each service's own installation overrides;
+# - their environment is the installation's x-server-env without the keys listed at x-smoke-env,
+#   plus each service's own installation overrides;
 # - api listens on 127.0.0.1:8080 inside its namespace and publishes no port; the probe shares that
 #   namespace (docs/DECISIONS.md M1-73, design note D1);
 # - postgres is the official PostgreSQL 18 image of internal/platform/pg/pgtest, pinned by digest;
-# - backup never starts (bothy-postgres and bothy-backupd arrive with M7);
+# - backup never starts: it needs the image bothy-postgres, and postgres here is the official one;
 # - the collector gets the test overlay "file" and writes its export to a volume.
 
-# The installation's x-server-env (compose.yaml) minus the keys the M1 server rejects as unknown
-# (`docker run --rm <image> config check` with the installation values, 2026-10-19):
-#   BOTHY_FILE__SCAN__CLAMD_ADDRESS  file.scan.clamd_address, planned for M3 (virus scan)
-# The installation file is reconciled with each milestone's schema in M7-14. A test
-# (tools/ci/tests/test_compose_smoke.py) holds this anchor equal to x-server-env minus that list.
+# The installation's x-server-env (compose.yaml) minus the keys below. The server knows them; they
+# stay out because the smoke stack does not run the service they point to:
+#   BOTHY_FILE__SCAN__CLAMD_ADDRESS  file.scan.clamd_address; the smoke stack has no clamd
+# A test (tools/ci/tests/test_compose_smoke.py) holds this anchor equal to x-server-env minus
+# that list.
 x-smoke-env: &smoke-env
   BOTHY_INSTANCE__ENVIRONMENT: ${BOTHY_ENVIRONMENT:-prod}
   BOTHY_SERVER__PUBLIC_URL: ${BOTHY_PUBLIC_URL:?set in test/smoke.env}

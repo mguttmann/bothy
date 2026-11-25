@@ -389,6 +389,12 @@ services:
     ports:
       - "127.0.0.1:${BOTHY_OTLP_PUBLISH_PORT:-4318}:4318"   # only for adapters on the same host
     networks: [internal, default]
+    # memory_limiter (BOTHY_OTEL_MEMORY_LIMIT_PERCENT) counts in percent of this limit; without
+    # one it would count in percent of the memory of the whole host.
+    deploy:
+      resources:
+        limits:
+          memory: ${BOTHY_OTELCOL_MEMORY_LIMIT:-1g}
 
   # clamd listens only on its Unix socket in the volume clamav-socket, shared read-only with the
   # worker; no ports, no expose, no TCPSocket (19 SEC-TLS-5, M3-04). The network default stays for

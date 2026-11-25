@@ -37,6 +37,7 @@ import {
   type GatewayEvent,
   type GatewayOptions,
 } from "../src/gateway/index.js";
+import { silentLogger } from "../src/logger.js";
 import { FakeClock } from "../src/testing/clock.js";
 import { FakeServer } from "../src/testing/fakeserver.js";
 import {
@@ -568,6 +569,47 @@ describe("heartbeat", () => {
     });
     expect(gw.lastSeq).toBe(7);
     expect(server.frames).toContainEqual({ op: "ack", d: { seq: 7 } });
+    await gw.close();
+    await collector.finish();
+  });
+
+  it("reports a heartbeat that cannot be built as an error and keeps the connection", async () => {
+    const clock = new FakeClock();
+    const beats: Json[] = [];
+    const errors: string[] = [];
+    const server = await scripted(async (peer) => {
+      peer.send(hello(1000));
+      await peer.recv();
+      peer.send(ready());
+      for (;;) {
+        const frame = await peer.recv();
+        if (frame.op === "heartbeat") {
+          beats.push(frame);
+          peer.send({
+            op: "heartbeat_ack",
+            d: { server_time: "2026-01-01T00:00:00Z" },
+          });
+        }
+      }
+    });
+    const gw = gateway(server.url, {
+      clock,
+      random: scriptedRandom(0.5),
+      heartbeat: () => {
+        throw new RangeError("adapter name breaks the heartbeat form");
+      },
+      logger: { ...silentLogger, error: (msg: string) => errors.push(msg) },
+    });
+    const collector = new Collector(gw);
+    await until(() => collector.seen.length >= 1);
+    await clock.advance(500);
+    await until(() => beats.length >= 1);
+    await clock.advance(1000);
+    await until(() => beats.length >= 2);
+    expect(beats[0]).toEqual({ op: "heartbeat", d: { last_seq: 0 } });
+    expect(errors.length).toBeGreaterThanOrEqual(1);
+    expect(errors[0]).toContain("heartbeat");
+    expect(server.peers).toHaveLength(1);
     await gw.close();
     await collector.finish();
   });

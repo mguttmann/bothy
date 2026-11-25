@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Outputs of the module contract (infra/tofu/README.md, "Structure" item 3) and the rendered
 # user data of the cloud-init delivery. No output carries a secret.
 

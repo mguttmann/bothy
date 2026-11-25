@@ -9,6 +9,7 @@ Keys (docs/spec/10-backend-policy.md section 17, place "Reconciliation app"):
 - `token_ref` (required): `secret_ref` of the app token.
 - `admin_key_ref` (required): `secret_ref` of the provider's admin key.
 - `min_request_interval` (default `60s`): least time between two requests to the cost API.
+- `pass_interval` (default `1h`): time between the end of one pass and the start of the next.
 - `lookback` (default `3d`): this many complete UTC days before today are reconciled.
 - `http_timeout` (default the standard value of `sdk.http_timeout`): time limit of one request.
 - `workspace_map` (required, at least one entry): sub-table of workspace ID to a list of agent IDs.
@@ -45,11 +46,14 @@ SECTION = "reconciler"
 
 # Defaults of 10 17 and, for http_timeout, of `sdk.http_timeout` (configuration.md section 4).
 DEFAULT_MIN_REQUEST_INTERVAL = "60s"
+DEFAULT_INTERVAL_BETWEEN_PASSES = "1h"
 DEFAULT_LOOKBACK = "3d"
 DEFAULT_HTTP_TIMEOUT = "30s"
 
 _REQUIRED = ("server_url", "cost_api_url", "token_ref", "admin_key_ref", "workspace_map")
-_KNOWN = frozenset((*_REQUIRED, "min_request_interval", "lookback", "http_timeout"))
+_KNOWN = frozenset(
+    (*_REQUIRED, "min_request_interval", "pass_interval", "lookback", "http_timeout")
+)
 _SEGMENT = re.compile(r"[a-z][a-z0-9]*(_[a-z0-9]+)*")
 _DURATION = re.compile(r"(0|[1-9][0-9]*)(ms|s|m|h|d)")
 _UNIT_MS = {"ms": 1, "s": 1_000, "m": 60_000, "h": 3_600_000, "d": 86_400_000}
@@ -89,6 +93,7 @@ class Config:
         token_ref: Reference of the app token.
         admin_key_ref: Reference of the admin key.
         min_request_interval_ms: `reconciler.min_request_interval` in milliseconds.
+        pass_interval_ms: `reconciler.pass_interval` in milliseconds.
         lookback_days: `reconciler.lookback` in whole days.
         http_timeout_ms: `reconciler.http_timeout` in milliseconds.
         workspace_map: Workspace ID to the IDs of its agents.
@@ -99,6 +104,7 @@ class Config:
     token_ref: SecretRef
     admin_key_ref: SecretRef
     min_request_interval_ms: int
+    pass_interval_ms: int
     lookback_days: int
     http_timeout_ms: int
     workspace_map: Mapping[str, tuple[str, ...]]
@@ -255,6 +261,11 @@ def parse_config(data: Mapping[str, object]) -> Config:
     if interval == 0:
         # Zero would turn the loop into a busy loop against the cost API and the server.
         raise ConfigError(f"{SECTION}.min_request_interval", "must be greater than zero")
+    pass_interval = parse_duration(
+        section.get("pass_interval", DEFAULT_INTERVAL_BETWEEN_PASSES), f"{SECTION}.pass_interval"
+    )
+    if pass_interval == 0:
+        raise ConfigError(f"{SECTION}.pass_interval", "must be greater than zero")
     lookback = parse_duration(section.get("lookback", DEFAULT_LOOKBACK), f"{SECTION}.lookback")
     if lookback == 0 or lookback % _DAY_MS:
         raise ConfigError(f"{SECTION}.lookback", "must be a whole number of days, at least one")
@@ -269,6 +280,7 @@ def parse_config(data: Mapping[str, object]) -> Config:
         token_ref=_secret_ref(section, "token_ref"),
         admin_key_ref=_secret_ref(section, "admin_key_ref"),
         min_request_interval_ms=interval,
+        pass_interval_ms=pass_interval,
         lookback_days=lookback // _DAY_MS,
         http_timeout_ms=timeout,
         workspace_map=_workspace_map(section["workspace_map"]),

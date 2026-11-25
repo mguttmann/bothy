@@ -70,15 +70,18 @@ export function lastValue(s: Series): number | null {
  * @returns the value, or null before the first point or where that point has no value
  */
 export function valueAt(s: Series, t: number): number | null {
-  let found: number | null = null;
-  for (let i = 0; i < s.times.length; i++) {
-    const time = s.times[i] ?? Number.POSITIVE_INFINITY;
-    if (time > t) {
-      break;
+  // Binary search for the last time at or before t; the timeline asks once per point and tick.
+  let lo = 0;
+  let hi = s.times.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if ((s.times[mid] ?? Number.POSITIVE_INFINITY) <= t) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
     }
-    found = s.values[i] ?? null;
   }
-  return found;
+  return lo === 0 ? null : (s.values[lo - 1] ?? null);
 }
 
 /**

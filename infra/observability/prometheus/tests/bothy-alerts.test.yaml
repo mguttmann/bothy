@@ -464,7 +464,7 @@ tests:
           - exp_labels:
               severity: ticket
             exp_annotations:
-              summary: "Malware scanning fails; uploads stay in state pending."
+              summary: "Malware scans end only with error; the files are blocked as check failed."
               runbook_url: "docs/observability/alerting.md#bothymalwarescanfailing"
 
   - name: BothyMalwareScanFailing fires when no scan ever succeeded
@@ -482,7 +482,7 @@ tests:
           - exp_labels:
               severity: ticket
             exp_annotations:
-              summary: "Malware scanning fails; uploads stay in state pending."
+              summary: "Malware scans end only with error; the files are blocked as check failed."
               runbook_url: "docs/observability/alerting.md#bothymalwarescanfailing"
 
   - name: BothyMalwareScanFailing stays quiet while some scans succeed

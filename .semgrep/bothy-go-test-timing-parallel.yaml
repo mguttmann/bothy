@@ -6,7 +6,7 @@ rules:
     paths:
       include: ["*_test.go"]
       # The tests of TimingSame itself feed it fixed durations; no real time passes.
-      exclude: ["services/*/internal/platform/testkit/*"]
+      exclude: ["/services/*/internal/platform/testkit/*"]
     message: >-
       A timing comparison (testkit.TimingSame) runs in a test that calls t.Parallel. The other
       parallel tests of the package then load the machine for the whole comparison, and load

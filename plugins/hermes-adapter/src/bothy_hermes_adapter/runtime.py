@@ -209,6 +209,8 @@ class CommandRequest:
         user_id: The invoking person.
         user_name: The person's display name.
         text: The Hermes command line (``/<name>``).
+        confirm: Answer Hermes' confirmation of the command at once ("once"): an owner's
+            ``/new`` or ``/reset`` typed as a message (`bothy_hermes_adapter.session_commands`).
     """
 
     thread_id: UUID
@@ -216,6 +218,7 @@ class CommandRequest:
     user_id: UUID
     user_name: str = field(repr=False)
     text: str
+    confirm: bool = False
 
 
 @dataclass(frozen=True)

@@ -50,6 +50,9 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     tmpfs: [/tmp]
+    # worker_rlimit_nofile of edge/nginx.conf
+    ulimits:
+      nofile: 65536
     logging:
       driver: local
       options:

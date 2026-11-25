@@ -28,6 +28,24 @@ def _ops(rig: object) -> list[str]:
     return [r.operation_id for r in rig.fake.requests]  # type: ignore[attr-defined]
 
 
+async def test_failed_discovery_is_retried_by_hermes(world: HermesWorld) -> None:
+    from bothy_sdk.testing.faults import Fault
+    from fake_hermes_kit import _start_gateway
+
+    async with hermes_rig(world, [], start=False) as rig:
+        # The SDK loop of the first connect fails; Hermes reconnects the platform only because
+        # the adapter reports a retryable fatal error, so the agent comes online in this
+        # gateway process (a restart of the gateway would clear its log).
+        rig.fake.inject("getDiscovery", Fault.problem("forbidden"))
+        await _start_gateway(rig)
+        log = gateway_log(rig)
+        assert "bothy_adapter_loop_failed" in log, log
+        assert "queued for reconnection" in log, log
+        await rig.until(
+            lambda: any(f.get("op") == "identify" for f in rig.fake.frames), "the reconnect"
+        )
+
+
 async def test_plugin_found_by_real_discovery(world: HermesWorld) -> None:
     async with hermes_rig(world, []) as rig:
         identify = next(f for f in rig.fake.frames if f.get("op") == "identify")

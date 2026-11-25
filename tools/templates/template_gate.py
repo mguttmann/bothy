@@ -697,10 +697,13 @@ def main(argv: list[str] | None = None) -> int:
     if not root.is_dir():
         print(f"templates: no template folder at {_display(root, repo)}", file=sys.stderr)
         return 2
+    count = sum(1 for p in root.iterdir() if p.is_dir() and not p.is_symlink())
+    if count == 0:
+        print(f"templates: no template under {_display(root, repo)}", file=sys.stderr)
+        return 2
     findings = check_root(root, ctx, repo)
     for f in findings:
         print(f)
-    count = sum(1 for p in root.iterdir() if p.is_dir() and not p.is_symlink())
     private = "loaded" if ctx.private_loaded else "absent"
     print(
         f"templates: {count} templates checked, {len(findings)} finding(s); "

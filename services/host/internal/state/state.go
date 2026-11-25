@@ -9,7 +9,8 @@
 //   - pairing.json: server URL, host_id, instance_id and fingerprint, no private member;
 //   - bindings.json: session user name to person ID (written by M2-45 at the first session);
 //   - declaration.json: the last llm_credentials learned from a ready message;
-//   - admin.sock (Linux and macOS): the admin endpoint of the running service;
+//   - admin.sock (Linux and macOS): the admin endpoint of the running service, and admin.sock.lock,
+//     whose lock keeps a second run of the same directory from taking the endpoint;
 //   - bothy-host.log and bothy-host.log.1 (macOS and Windows): the log of the host service and
 //     its predecessor, appended by "bothy-host run" where the service manager keeps no output.
 //

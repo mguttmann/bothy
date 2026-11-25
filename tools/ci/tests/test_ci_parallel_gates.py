@@ -171,7 +171,9 @@ def test_gate_jobs_install_every_toolchain_with_caches(job: str) -> None:
     assert flutter["with"]["cache"] is True
     assert step("actions/setup-java")["if"] == ANDROID_IF
     assert step("android-actions/setup-android")["if"] == ANDROID_IF
-    assert ".cache/tools" in step("actions/cache")["with"]["path"]
+    # The jobs that run Gradle restore a second cache (tools/ci/tests/test_gradle_downloads.py).
+    caches = [s for s in steps if str(s.get("uses", "")).startswith("actions/cache@")]
+    assert any(".cache/tools" in c["with"]["path"] for c in caches)
     runs = [str(s.get("run", "")) for s in steps]
     assert runs.index("make bootstrap-ci") < max(
         i for i, r in enumerate(runs) if "make " in r and "bootstrap" not in r

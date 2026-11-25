@@ -23,6 +23,7 @@ import {
   writeAtomic,
 } from "../src/store/file-store.js";
 import { MemoryBacking, MemoryStore } from "../src/store/memory-store.js";
+import { FlakyStore } from "./helpers/flaky-store.js";
 import {
   StoreLockedError,
   type NewJob,
@@ -204,6 +205,33 @@ describe.each(factories)("%s", (_name, factory) => {
     await again.open();
     expect(again.state().seen.first).toEqual({ at: 0, status: 202 });
     await again.close();
+  });
+});
+
+describe("admit after a failed state write", () => {
+  it("takes the job back, so the queue, the sequence and a redelivery stay consistent", async () => {
+    const store = new FlakyStore(new FakeClock(), WINDOW);
+    await store.open();
+    store.failStateWrites.add(1);
+    await expect(
+      store.admit({ seenKey: "a", status: 202, job: job("1"), maxJobs: 10 }),
+    ).rejects.toMatchObject({ name: "StoreError", code: "ENOSPC" });
+    expect(store.jobs()).toEqual([]);
+    expect(store.backing.jobs.size).toBe(0);
+    expect(store.state().seen.a).toBeUndefined();
+    // The sender's redelivery is admitted once, with the first free sequence number.
+    expect(
+      (
+        await store.admit({
+          seenKey: "a",
+          status: 202,
+          job: job("2"),
+          maxJobs: 10,
+        })
+      ).kind,
+    ).toBe("accepted");
+    expect(store.jobs().map((j) => [j.id, j.seq])).toEqual([["2", 1]]);
+    await store.close();
   });
 });
 

@@ -99,6 +99,14 @@ func (l *helperLink) answer(id string, a startAnswer) {
 	l.mu.Unlock()
 	if ch != nil {
 		ch <- a
+		return
+	}
+	if a.detail == "" {
+		// pty.started of a start the host no longer waits for (the opening ran out while the
+		// helper was still starting the PTY, so it ignored the pty.stop of the end): stop the
+		// PTY now, no PTY runs without a session. Not from the read loop itself: a send there
+		// could wait on a helper that is writing to the host at the same time.
+		go l.stop(id)
 	}
 }
 

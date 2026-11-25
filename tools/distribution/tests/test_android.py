@@ -63,6 +63,7 @@ def cfg() -> dict[str, Any]:
     doc["windows"]["package_name"] = "Acme.Chat"
     doc["windows"]["publisher"] = "CN=Acme Chat"
     doc["windows"]["update_url"] = "https://updates.acme.test/windows/"
+    doc["windows"]["timestamp_url"] = "http://timestamp.acme.test"
     doc["android"]["package_name"] = PACKAGE
     doc["android"]["update_url"] = f"https://play.google.com/store/apps/details?id={PACKAGE}"
     doc["firebase"]["project_id"] = "acme-chat"

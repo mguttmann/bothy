@@ -246,7 +246,8 @@ Android, with a JDK 17 and the Android SDK (`ANDROID_HOME`), from `android/`:
   `KeyStoreAccess` (DER conversion, alias, error mapping, the core's rules); `make test` runs them.
 - `sh run_instrumented_tests.sh`: the instrumented tests against the real Keystore on the one
   attached device or emulator (`make apps-platform` runs it when `adb devices` lists exactly one,
-  prints `SKIP ... android: no device` without one and fails with two). On an emulator without a
+  prints `SKIP ... android: no device` without one and fails with two; the CI jobs with
+  `--system android` fail without one). On an emulator without a
   screen lock it sets a temporary PIN, because the step-up key needs a secure lock screen, and
   clears it afterwards. `strongBoxWhenAvailable` skips with `strongbox not available on this
   device` on emulators; the step-up tests skip where the device has no authenticator for the key

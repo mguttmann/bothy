@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # The chat server on AWS (brief M7-16, ADR 0012, infra/tofu/README.md "Structure" item 1): a
 # VPC with one public subnet, a security group that admits only the edge port from the internet, one EC2
 # host with an elastic address whose user data comes from generic-vm (Docker, the verified

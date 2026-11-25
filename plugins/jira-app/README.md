@@ -152,16 +152,28 @@ The processor register of the operator lists Jira when the app is used
 
 Logs are JSON lines on stdout with `time`, `level`, a fixed `msg` code and only the attributes
 `event`, `delivery_id` (the first 16 hex digits of the SHA-256 of a Jira body), `webhook_id`,
-`job_id`, `job_kind`, `step`, `operation`, `status`, `outcome`, `reason`, `code`, `issue_id`,
+`job_id`, `job_kind`, `operation`, `status`, `outcome`, `reason`, `code`, `issue_id`,
 `thread_id` and `channel_id`; never summaries, descriptions, comments, form values, names,
 e-mail addresses, account IDs, issue or project keys, URLs, header values, tokens or secrets.
 
 `state_dir` holds `state.sqlite3` (thread map, drafts, created objects, seen identifiers, queued
 jobs) and `lock`, held with `flock` while the process runs; a second process on the same
 directory does not start, and the kernel releases the lock when the process ends. Jobs run one at
-a time in creation order. A write to Jira is attempted at most once: after a crash during it the
-outcome counts as unknown, and the person is told to check the project. SIGTERM and SIGINT stop
+a time in creation order. A write to Jira is attempted at most once: when `/issue` meets a crash
+during it, the outcome counts as unknown and the person is told to check the project; a mirrored
+reply that Jira refused or did not confirm is only logged and not retried. SIGTERM and SIGINT stop
 accepting (`503`), let the running step finish and exit with code 0.
+
+## Limits
+
+- Credentials: the app signs in to Jira Cloud with the e-mail address and API token of one account
+  (basic authentication), not with OAuth; when that token expires or is revoked, `/issue` and
+  mirroring are refused with status `401`, visible only in the log lines.
+- Evidence: the tests use the Fake-Jira API and fixtures written by hand after the Jira
+  documentation ([tests/fixtures/README.md](tests/fixtures/README.md)); the target API, the hex
+  encoding of the signature and the payload members the app reads are assumed
+  ([docs/spec/11-extensions.md](../../docs/spec/11-extensions.md) section 10.2), and the app has not
+  been run against a Jira site.
 
 ## Tests
 

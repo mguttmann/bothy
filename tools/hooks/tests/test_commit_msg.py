@@ -97,7 +97,40 @@ def test_fixup_allowed_locally_rejected_in_ranges() -> None:
 
 
 def test_merge_commit_message_is_accepted() -> None:
-    assert _check("Merge branch 'main' into feat/x\n") == []
+    assert (
+        commit_msg.check_message(
+            "Merge branch 'main' into feat/x\n", require_signoff=True, author=ALEX, merge=True
+        )
+        == []
+    )
+
+
+def test_merge_header_of_an_ordinary_commit_is_checked() -> None:
+    """Only a real merge skips the rules, never a header that merely starts with `Merge `."""
+    errors = _check("Merge whatever I like\n", signoff=True)
+    assert any("header must be" in e for e in errors)
+    assert any("Signed-off-by" in e for e in errors)
+
+
+def test_range_mode_checks_a_one_parent_commit_named_merge(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    base = git(repo, "rev-parse", "HEAD").strip()
+    (repo / "b").write_text("b\n")
+    commit(repo, "Merge whatever I like, no type, no sign-off")
+    rc = commit_msg.main(["--repo", str(repo), "--range", f"{base}..HEAD", "--require-signoff"])
+    assert rc == 1
+    assert "Merge whatever" in capsys.readouterr().out
+
+
+def test_file_mode_accepts_the_message_of_a_merge_in_progress(repo: Path, tmp_path: Path) -> None:
+    """`git merge` runs the commit-msg hook with MERGE_HEAD in the git directory."""
+    msg = tmp_path / "MSG"
+    msg.write_text("Merge branch 'main' into feat/x\n")
+    assert commit_msg.main(["--repo", str(repo), str(msg)]) == 1
+    head = git(repo, "rev-parse", "HEAD").strip()
+    (repo / ".git" / "MERGE_HEAD").write_text(head + "\n")
+    assert commit_msg.main(["--repo", str(repo), str(msg)]) == 0
 
 
 @pytest.fixture
@@ -147,8 +180,12 @@ def test_file_mode_without_signoff_needs_no_identity(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     ("title", "passes"),
-    [("fix: keep the gates green", True), ("Keep the gates green", False)],
-    ids=["conventional title", "plain title"],
+    [
+        ("fix: keep the gates green", True),
+        ("Keep the gates green", False),
+        ("Merge anything into main", False),
+    ],
+    ids=["conventional title", "plain title", "title starting with Merge"],
 )
 def test_commitlint_recipe_checks_the_pull_request_title(title: str, *, passes: bool) -> None:
     """The CI job gates sets PR_TITLE on every pull request, on a runner without git identity."""

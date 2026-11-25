@@ -331,6 +331,11 @@ func TestRunCommand(t *testing.T) {
 	if code, _, _ := runCmd("run", "--config", f.cfg); code != 1 {
 		t.Errorf("no admin endpoint: %d", code)
 	}
+	// A second run of the same state directory says so (audit host-service-13).
+	sys.listenAdmin = func(string) (net.Listener, error) { return nil, localchan.ErrAdminInUse }
+	if code, _, stderr := runCmd("run", "--config", f.cfg); code != 1 || !strings.Contains(stderr, "another instance of the host service runs") {
+		t.Errorf("second instance: %d %q", code, stderr)
+	}
 }
 
 func TestPtyHelperCommand(t *testing.T) {

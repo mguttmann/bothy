@@ -225,6 +225,30 @@ describe("auth schemes", () => {
     expect(f.seen[0]?.headers.get("authorization")).toBeNull();
   });
 
+  it("throws a failure to build the request as it is, without a retry", async () => {
+    const f = fakeFetch(() => ok());
+    const { retry, waits } = recordedRetry();
+    const broken = new Error("the request cannot be built");
+    const key = await DpopKey.generate();
+    const dpopKey = {
+      alg: key.alg,
+      publicJwk: key.publicJwk,
+      sign: () => Promise.reject(broken),
+    };
+    const api = createApiClient({
+      baseUrl: BASE,
+      token: new Secret(CANARY),
+      dpopKey,
+      fetch: f.fetch,
+      retry,
+    });
+    await expect(
+      api.GET("/runs/{run_id}", { params: { path: { run_id: RUN } } }),
+    ).rejects.toBe(broken);
+    expect(f.seen).toHaveLength(0);
+    expect(waits).toHaveLength(0);
+  });
+
   it("sends DPoP with a fresh ES256 proof per attempt", async () => {
     const key = await DpopKey.generate();
     const f = fakeFetch((_, i) =>
@@ -632,6 +656,80 @@ describe("retries", () => {
     } finally {
       process.off("unhandledRejection", record);
     }
+  });
+
+  it("limits the reading of the body with sdk.http_timeout and types its failure", async () => {
+    // Headers arrive, the body stalls: one stream errors on the abort like the real fetch, the
+    // other ignores it. Both end as TimeoutError, never as a raw DOMException.
+    for (const honours of [true, false]) {
+      let calls = 0;
+      const { retry } = recordedRetry({ maxAttempts: 2 });
+      const api = createApiClient({
+        baseUrl: BASE,
+        timeoutMs: 20,
+        retry,
+        fetch: (request: Request) => {
+          calls++;
+          const body = new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode('{"id":'));
+              if (honours)
+                request.signal.addEventListener("abort", () => {
+                  controller.error(request.signal.reason);
+                });
+            },
+          });
+          return Promise.resolve(
+            new Response(body, {
+              status: 200,
+              headers: { "content-type": "application/json" },
+            }),
+          );
+        },
+      });
+      const err: unknown = await getRun(api).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(TimeoutError);
+      expect(calls).toBe(2);
+    }
+  });
+
+  it("an answer read in time is not aborted later by the attempt's timer", async () => {
+    let signal: AbortSignal | undefined;
+    const api = createApiClient({
+      baseUrl: BASE,
+      timeoutMs: 20,
+      fetch: (request: Request) => {
+        signal = request.signal;
+        return Promise.resolve(ok());
+      },
+    });
+    await unwrap(getRun(api), "getRun");
+    await new Promise<void>((done) => setTimeout(done, 60));
+    expect(signal?.aborted).toBe(false);
+  });
+
+  it("an abort by the caller ends the wait between attempts", async () => {
+    const controller = new AbortController();
+    const api = createApiClient({
+      baseUrl: BASE,
+      retry: {
+        random: () => 0.5,
+        // A wait that only an abort ends.
+        sleep: () => new Promise<void>(() => undefined),
+      },
+      fetch: () => {
+        setImmediate(() => controller.abort(new Error("caller abort")));
+        return Promise.resolve(
+          problem(503, "unavailable", { "Retry-After": "3600" }),
+        );
+      },
+    });
+    await expect(
+      api.GET("/runs/{run_id}", {
+        params: { path: { run_id: RUN } },
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow("caller abort");
   });
 
   it("an abort by the caller is not repeated", async () => {

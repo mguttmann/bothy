@@ -115,3 +115,23 @@ async def test_slot_pool_cancelled_wait_takes_nothing() -> None:
 def test_slot_pool_needs_one_slot() -> None:
     with pytest.raises(ValueError, match="at least one"):
         SlotPool(0)
+
+
+@pytest.mark.anyio
+async def test_an_adopted_turn_occupies_a_slot_without_waiting() -> None:
+    # A restart with live turns: they count against runner.max_parallel_runs, also above it, and
+    # a new turn waits until the count is below the bound again.
+    pool = SlotPool(1)
+    pool.occupy()
+    pool.occupy()
+    assert (pool.used, pool.full) == (1, True)  # reported at most total
+    new = asyncio.ensure_future(pool.acquire())
+    await asyncio.sleep(0.02)
+    pool.release()
+    await asyncio.sleep(0.02)
+    assert not new.done()  # one adopted turn still runs: the bound is reached
+    pool.release()
+    await asyncio.wait_for(new, PATIENCE)
+    assert (pool.used, pool.full) == (1, True)
+    pool.release()
+    assert (pool.used, pool.full) == (0, False)

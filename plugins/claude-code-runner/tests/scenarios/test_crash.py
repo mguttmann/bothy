@@ -87,7 +87,7 @@ async def crashed_turn(
         await world.until(lambda: before_kill(run.run_id))
     pid = world.turns()[0]["pid"]
     first.send_signal(signal.SIGKILL)
-    first.wait(PATIENCE)
+    await world.exited(first)
     assert alive(pid)
     return run.run_id, pid, gate
 
@@ -297,7 +297,7 @@ async def _crashed_bound_turn(world: World) -> tuple[UUID, int, Path, UUID]:
     await world.until(lambda: "pid" in json.loads(record_path(world, run.run_id).read_text()))
     pid = world.turns()[0]["pid"]
     first.send_signal(signal.SIGKILL)
-    first.wait(PATIENCE)
+    await world.exited(first)
     return run.run_id, pid, gate, thread
 
 
@@ -379,7 +379,7 @@ async def test_second_crash_of_an_adopting_runner_keeps_the_unsent_step(world: W
     world.release(gate)
     await world.until(lambda: bool(steps(run_id).get("ended")))
     second.send_signal(signal.SIGKILL)
-    second.wait(PATIENCE)
+    await world.exited(second)
     for operation in ("patchRun", "createMessage", "finishRun"):
         world.fake._faults[operation].clear()  # the server works again
     await world.until(lambda: not alive(pid))
@@ -410,12 +410,12 @@ async def test_second_crash_during_an_adopted_compaction_keeps_its_kind(world: W
     await world.until(lambda: record().get("kind") == "compaction" and "pid" in record())
     pid = record()["pid"]
     first.send_signal(signal.SIGKILL)
-    first.wait(PATIENCE)
+    await world.exited(first)
     written = path.stat().st_ino
     second = world.spawn()
     await world.until(lambda: path.stat().st_ino != written)  # the adopter saved the record
     second.send_signal(signal.SIGKILL)
-    second.wait(PATIENCE)
+    await world.exited(second)
     assert record()["kind"] == "compaction"
     world.release(gate)
     await world.until(lambda: not alive(pid))

@@ -29,6 +29,11 @@ type Expect struct {
 // ErrPeerMismatch is the failure of a peer check; nothing was sent on the channel.
 var ErrPeerMismatch = errors.New("localchan: peer check failed")
 
+// ErrAdminInUse is a second service of the same state directory: another process holds the admin
+// endpoint (Linux and macOS: its lock). On Windows the second pipe of the first instance is refused
+// with an error of its own, not this one.
+var ErrAdminInUse = errors.New("localchan: admin endpoint in use by another instance")
+
 // VerifyPeer compares got with want; any difference is ErrPeerMismatch. The error names neither
 // IDs nor paths.
 func VerifyPeer(got Peer, want Expect) error {

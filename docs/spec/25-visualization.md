@@ -635,9 +635,14 @@ As built (M7-25):
    values the catalogue allows (`bothy.agent.handle`, `bothy.run.state`, `bothy.billing_mode`,
    `bothy.reason`, `bothy.currency`, `bothy.cost.estimate`, `sloth_service`, `sloth_slo`). Every
    view shows its values as a table or as labelled text, so colour never carries meaning alone.
+   A failed query shows "Query failed" with Grafana's message above the frames that did arrive,
+   a first load shows "Loading"; the empty texts of the views appear only when every query
+   returned.
 2. Live topology and backend view use instant queries at the end of the dashboard period (active
    runs, tool steps per minute, increases over `$__range`); delivery and sync shows the latest
-   p95 values and fan-out lag with a sparkline over the period.
+   p95 values and fan-out lag with a sparkline over the period. Counts from `increase()` are
+   rounded before zero counts are left out; a run state outside the catalogue counts as "other
+   state" in its lane and in the total.
 3. Executive page: traffic light per SLO from the three recording rules with the colours and
    texts of 6.4: green "on target" (remaining budget at least the panel option
    `warnBudgetRatio`, default 0.25 like `stats.slo_warn_budget_ratio`), yellow "budget tight",
@@ -648,7 +653,8 @@ As built (M7-25):
 4. Timeline: playback over the dashboard period with play, pause, jump to start or end and the
    speeds of `viz.timeline_speeds` (60, 300, 900); the area shows active runs, the table the
    values of every query at the playhead. A dashboard refresh keeps the playhead inside the new
-   period.
+   period. The playhead starts at the start of the period (the app starts at its end, 6.5); play at
+   the end plays from the start again, as in the app.
 5. TV mode: the plugin adds no full-screen mode. Grafana 13.2 documents kiosk mode as "the main
    menu and top navigation bar of a dashboard are hidden", turned on with "Enable kiosk mode"
    in the user menu or `d k` and off with `Esc`

@@ -220,6 +220,25 @@ def test_external_font_links_are_removed_from_the_pages(tmp_path: Path) -> None:
     assert 'href="static-assets/styles.css"' in text
 
 
+def test_external_frames_become_links(tmp_path: Path) -> None:
+    # Flutter's doc comments embed videos ({@youtube}), which dart doc renders as an iframe of
+    # another origin in every inherited member; the page keeps a link to the video instead.
+    page = tmp_path / "pkg" / "member.html"
+    page.parent.mkdir()
+    page.write_text(
+        "<p>See the video.</p>\n"
+        '<iframe src="https://www.youtube.com/embed/abc?rel=0" frameborder="0"\n'
+        "  allowfullscreen></iframe>\n"
+        '<iframe src="local.html"></iframe>\n',
+        encoding="utf-8",
+    )
+    assert dart_api_docs.strip_external_links(tmp_path) == 1
+    text = page.read_text(encoding="utf-8")
+    assert '<iframe src="https' not in text
+    assert '<a href="https://www.youtube.com/embed/abc?rel=0">' in text
+    assert '<iframe src="local.html"></iframe>' in text
+
+
 def test_flutter_and_dart_run_without_the_git_variables_of_a_hook(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

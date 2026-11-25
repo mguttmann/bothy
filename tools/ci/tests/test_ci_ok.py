@@ -12,7 +12,9 @@ body is still going; ci-ok completes that check run with its own conclusion.
 from __future__ import annotations
 
 import json
+import os
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -160,6 +162,46 @@ def test_sonar_may_be_skipped() -> None:
     assert ci_ok.check_needs({**GREEN, "sonar": "skipped"}, ALL) == []
     failed = {**GREEN, "test-server": "failure", "sonar": "skipped"}
     assert ci_ok.check_needs(failed, ALL) == ["test-server: failure"]
+
+
+@pytest.mark.parametrize("failed", ["test-server", "test-apps", "test-server-coverage"])
+def test_sonar_of_a_pull_request_with_the_secrets_must_run(failed: str) -> None:
+    """In a pull request of the repository itself (the plan's private_checks), sonar is skipped
+    only after a failed or cancelled job it needs, which fails through that job (ci-gates-11)."""
+    skipped = {**GREEN, "sonar": "skipped"}
+    assert ci_ok.check_needs(skipped, ALL, sonar_expected=True) == [
+        "sonar: skipped, but a pull request with the private checks needs it"
+    ]
+    assert ci_ok.check_needs({**GREEN}, ALL, sonar_expected=True) == []
+    for result in ("failure", "cancelled"):
+        broken = {**skipped, failed: result}
+        assert ci_ok.check_needs(broken, ALL, sonar_expected=True) == [f"{failed}: {result}"]
+
+
+def test_sonar_needs_match_the_workflow() -> None:
+    assert set(_load(CI)["jobs"]["sonar"]["needs"]) == ci_ok.SONAR_NEEDS
+
+
+def test_ci_ok_tells_whether_sonar_must_run() -> None:
+    [check] = [
+        s for s in _load(CI)["jobs"]["ci-ok"]["steps"] if "ci_ok.py needs" in str(s.get("run", ""))
+    ]
+    assert check["env"]["SONAR_EXPECTED"] == (
+        "${{ github.event_name == 'pull_request' && needs.plan.outputs.private_checks == 'true' }}"
+    )
+
+
+def test_cli_requires_sonar_when_expected(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GITHUB_JOB", "ci-ok")
+    monkeypatch.setenv("RESULTS", _needs({**GREEN, "sonar": "skipped"}))
+    monkeypatch.setenv("CI_JOBS", " ".join(sorted(ALL)))
+    monkeypatch.setenv("SONAR_EXPECTED", "false")
+    assert ci_ok.main(["needs"]) == 0
+    monkeypatch.setenv("SONAR_EXPECTED", "true")
+    assert ci_ok.main(["needs"]) == 1
+    assert "ci-ok: sonar: skipped, but a pull request" in capsys.readouterr().out
 
 
 def test_fork_path_passes() -> None:
@@ -329,6 +371,8 @@ def test_the_plan_job_marks_ci_ok_pending_first() -> None:
     assert "name=ci-ok" in run
     assert "status=in_progress" in run
     assert plan["outputs"]["marker"] == "${{ steps.mark.outputs.marker }}"
+    assert plan["outputs"]["marker_attempt"] == "${{ steps.mark.outputs.attempt }}"
+    assert 'echo "attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"' in run
 
 
 def test_ci_ok_completes_the_pending_check_run_with_its_conclusion() -> None:
@@ -342,10 +386,55 @@ def test_ci_ok_completes_the_pending_check_run_with_its_conclusion() -> None:
     assert done["env"]["MARKER"] == "${{ needs.plan.outputs.marker }}"
     conclusion = "${{ steps.check.outcome == 'success' && 'success' || 'failure' }}"
     assert done["env"]["CONCLUSION"] == conclusion
-    run = str(done["run"])
-    assert "-X PATCH" in run
-    assert "status=completed" in run
-    assert 'conclusion="$CONCLUSION"' in run
+    assert done["env"]["MARKER_ATTEMPT"] == "${{ needs.plan.outputs.marker_attempt }}"
+    assert done["env"]["RUN_ATTEMPT"] == "${{ github.run_attempt }}"
+    assert done["env"]["HEAD_SHA"] == "${{ github.event.pull_request.head.sha }}"
+
+
+def _complete(tmp_path: Path, marker_attempt: str, run_attempt: str) -> list[str]:
+    """Run the script of the step that completes ci-ok, with a `gh` that records its arguments."""
+    done = _load(CI)["jobs"]["ci-ok"]["steps"][-1]
+    log = tmp_path / "gh.log"
+    gh = tmp_path / "bin" / "gh"
+    gh.parent.mkdir()
+    gh.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$GH_LOG"\n', encoding="utf-8")
+    gh.chmod(0o755)
+    env = {
+        "PATH": f"{gh.parent}{os.pathsep}{os.environ['PATH']}",
+        "GH_LOG": str(log),
+        "REPO": "owner/repo",
+        "MARKER": "138401268843",
+        "MARKER_ATTEMPT": marker_attempt,
+        "RUN_ATTEMPT": run_attempt,
+        "HEAD_SHA": "dc2c000fc48903822bd6cd7f21624c946b745007",
+        "DETAILS_URL": "https://github.com/owner/repo/actions/runs/1/attempts/" + run_attempt,
+        "CONCLUSION": "success",
+    }
+    subprocess.run(["bash", "-e", "-c", str(done["run"])], env=env, check=True)
+    return log.read_text(encoding="utf-8").splitlines()
+
+
+def test_ci_ok_of_the_attempt_that_marked_completes_the_mark(tmp_path: Path) -> None:
+    calls = _complete(tmp_path, marker_attempt="1", run_attempt="1")
+    assert len(calls) == 1
+    assert calls[0].startswith("api -X PATCH repos/owner/repo/check-runs/138401268843 ")
+    assert "status=completed" in calls[0]
+    assert "conclusion=success" in calls[0]
+
+
+def test_ci_ok_of_a_rerun_of_failed_jobs_creates_its_own_check_run(tmp_path: Path) -> None:
+    """A rerun of the failed jobs keeps plan and the mark of the first attempt. Updating that
+    check run from attempt 3 of run 45380914447 left its previous "failure" behind as a newer
+    check run ci-ok (138505634360), so the required check stayed red under a green ci-ok. A
+    later attempt leaves the mark alone and creates a new, completed ci-ok for the head commit."""
+    calls = _complete(tmp_path, marker_attempt="1", run_attempt="3")
+    assert len(calls) == 1
+    assert "PATCH" not in calls[0]
+    assert calls[0].startswith("api -X POST repos/owner/repo/check-runs ")
+    assert "name=ci-ok" in calls[0]
+    assert "head_sha=dc2c000fc48903822bd6cd7f21624c946b745007" in calls[0]
+    assert "status=completed" in calls[0]
+    assert "conclusion=success" in calls[0]
 
 
 def test_release_grants_the_called_workflow_its_check_permission() -> None:

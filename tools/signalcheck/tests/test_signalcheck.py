@@ -84,6 +84,23 @@ def test_fixture_passes_recording_rules_window_variables_by_lists_and_buckets(
     assert [str(f) for f in findings] == []
 
 
+@pytest.mark.parametrize(
+    "folder",
+    [
+        "infra/observability/grafana/dashboards",
+        "infra/observability/prometheus/rules",
+        "infra/observability/slo",
+        "plugins/grafana-bothy-live",
+    ],
+)
+def test_a_source_without_expressions_fails(repo: Path, folder: str) -> None:
+    """A moved or emptied folder is a finding, not a pass with fewer expressions."""
+    shutil.rmtree(repo / folder)
+    findings, _ = sc.run(repo, None)
+    source = sc.PANEL_QUERIES.as_posix() if folder.startswith("plugins") else folder
+    assert (source, "no expressions found") in [(f.file, f.message) for f in findings], findings
+
+
 def test_dashboard_syntax_error_fails(repo: Path, promtool: Path) -> None:
     mutate(
         repo,
@@ -182,6 +199,18 @@ def test_main_exit_codes(repo: Path, capsys: pytest.CaptureFixture[str]) -> None
     out = capsys.readouterr().out.strip().splitlines()
     assert len(out) == 1
     assert out[0].startswith(f"{SLO}: slo 'latency' error_query: rule 4:")
+
+
+def test_unreadable_source_ends_in_one_line(
+    monkeypatch: pytest.MonkeyPatch, repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A broken dashboard is a one-line error with exit code 2, not a traceback."""
+    monkeypatch.setattr(sc, "promtool_path", lambda: None)
+    (repo / DASHBOARD).write_text("{ not json", encoding="utf-8")
+    assert sc.main(["--root", str(repo)]) == 2
+    err = capsys.readouterr().err.strip().splitlines()
+    assert len(err) == 1
+    assert err[0].startswith("signal-check: check aborted: ")
 
 
 def test_selectors_lexing() -> None:

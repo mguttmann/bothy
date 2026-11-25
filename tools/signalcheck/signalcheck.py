@@ -10,7 +10,8 @@ query the metrics to it:
    `_seconds`, `By` to `_bytes`, counters `_total`, units in braces dropped); every histogram
    has exactly one row in 4.7, and 4.7 names only histograms; no attribute column names a
    person or an ID attribute.
-2. Names: every metric name in the `expr` of the dashboards (Prometheus targets, recursively),
+2. Names: each of the four sources below holds at least one expression; every metric name in
+   the `expr` of the dashboards (Prometheus targets, recursively),
    in the `expr` of the rule files, in `error_query`/`total_query` of the Sloth files and in the
    `expr` of the panel queries plugins/grafana-bothy-live/queries.yaml (M7-25) is a
    Prometheus name of the catalogue (histograms also with `_bucket`, `_count`, `_sum`), a
@@ -33,7 +34,8 @@ query the metrics to it:
 Usage:
   signalcheck.py [--root <repository root>]
 
-Exit 0 with a one-line summary; 1 with one line per finding (file, location, rule).
+Exit 0 with a one-line summary; 1 with one line per finding (file, location, rule); 2 with one
+line `signal-check: check aborted: <reason>` when a source cannot be read or parsed.
 
 Example:
   uv run --project tools --locked --quiet python tools/signalcheck/signalcheck.py
@@ -739,7 +741,16 @@ def run(root: Path, promtool: Path | None) -> tuple[list[Finding], str]:
     rules, records = rule_expressions(root)
     dashboards = list(dashboard_expressions(root))
     panel = panel_query_expressions(root)
-    exprs = [*dashboards, *rules, *slo_expressions(root), *panel]
+    slos = slo_expressions(root)
+    for source, found in (
+        (DASHBOARD_DIR, dashboards),
+        (RULES_DIR, rules),
+        (SLO_DIR, slos),
+        (PANEL_QUERIES, panel),
+    ):
+        if not found:
+            findings.append(Finding(source.as_posix(), "-", 2, "no expressions found"))
+    exprs = [*dashboards, *rules, *slos, *panel]
     for e in exprs:
         findings.extend(check_expression(e, cat, records))
     if promtool is not None:
@@ -758,7 +769,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (fetch_tools.LockError, fetch_tools.FetchError) as err:
         print(f"signal-check: promtool unavailable: {err}", file=sys.stderr)
         return 1
-    findings, summary = run(args.root, promtool)
+    try:
+        findings, summary = run(args.root, promtool)
+    except (OSError, ValueError, yaml.YAMLError, subprocess.SubprocessError) as err:
+        print(f"signal-check: check aborted: {err}", file=sys.stderr)
+        return 2
     for f in findings:
         print(f)
     if findings:

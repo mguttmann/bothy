@@ -735,6 +735,8 @@ async def test_drafts_then_the_answer_give_one_message_and_patch_only_their_run(
     answer = "The trip to the lake is planned for Saturday morning."
 
     async def script(turn: TurnRequest, rt: FakeRuntime) -> TurnOutcome:
+        # Both runs are Hermes turns (``pre_llm_call``); the quiet one answers silently.
+        rt.events.on_turn_started(turn.thread_id)
         if "draft" in turn.user_text:
             rt.events.on_draft(turn.thread_id, answer[:8])
             rt.events.on_draft(turn.thread_id, answer[:30])
@@ -1377,3 +1379,63 @@ async def test_typed_answer_to_an_expired_clarify_card_tells_the_person(tmp_path
     assert rt.answered == ["Blue, please"]
     assert state == "queued"
     assert texts == [cards.CLARIFY_EXPIRED_TYPED, "I went on with red."]
+
+
+# ---- error paths at the end of a run and runs that never start ------------------------------
+
+
+async def test_session_report_transport_failure_keeps_a_completed_run(tmp_path: Path) -> None:
+    rt = FakeRuntime()
+    async with rig(tmp_path, runtime=rt) as r:
+        r.fake.inject("reportAgentSession", Fault.disconnect(), times=10)
+        triggered = await r.fake.trigger(session_mode="new")
+        await r.until(lambda: r.finished(triggered.run_id))
+    assert r.fake.run_state(triggered.run_id).state == "completed"
+
+
+async def test_an_unexpected_failure_of_the_turn_stops_its_work(tmp_path: Path) -> None:
+    rt = FakeRuntime()
+    async with rig(tmp_path, runtime=rt) as r:
+        cancelled: list[UUID] = []
+
+        async def broken(inv: Any, turn: Any) -> None:
+            raise RuntimeError("boom")
+
+        async def cancel_work(turn: Any) -> None:
+            cancelled.append(turn.run_id)
+
+        r.handler._run_turn = broken  # type: ignore[method-assign] # a defect inside the turn
+        r.handler._cancel_work = cancel_work  # type: ignore[method-assign]
+        triggered = await r.fake.trigger()
+        await r.until(lambda: r.finished(triggered.run_id))
+    assert cancelled == [triggered.run_id]
+    assert rt.interrupted == [triggered.thread_id]
+    assert r.fake.run_state(triggered.run_id).state == "failed"
+
+
+async def test_a_refused_start_forgets_what_prepare_kept(tmp_path: Path) -> None:
+    rt = FakeRuntime()
+    async with rig(tmp_path, runtime=rt) as r:
+        r.fake.inject("startRun", Fault.problem("forbidden"))
+        triggered = await r.fake.trigger()
+        await r.until(lambda: r.requests("startRun"), "the refused start")
+        await r.fake.pass_time(0.2)
+        assert rt.turns == []
+        assert triggered.run_id not in r.handler._prepared
+        assert triggered.run_id not in r.handler._anchors
+        assert triggered.run_id not in r.handler._inbound
+
+
+async def test_a_failed_handler_task_logs_its_stack_without_the_text(tmp_path: Path) -> None:
+    async def fails_deep_inside() -> None:
+        content = " ".join(["text", "of", "a", "person"])  # only at run time, not in the source
+        raise KeyError(content)
+
+    async with rig(tmp_path) as r:
+        with captured_logs() as logs:
+            r.handler._spawn(fails_deep_inside())
+            await r.fake.pass_time(0.1)
+    text = logs.text()
+    assert "handler task failed: KeyError" in text
+    assert "fails_deep_inside" in text  # the stack names the function and its line
+    assert "text of a person" not in text

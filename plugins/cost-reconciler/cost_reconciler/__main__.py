@@ -4,7 +4,7 @@
 With `--once` the app runs one pass and exits with `0` when every submission succeeded, `1` when
 anything failed and `2` for a configuration error (also a secret file with an open mode).
 Without it the app runs passes until SIGTERM or SIGINT, which end it after the current request,
-and waits `reconciler.min_request_interval` between passes; it then exits with `0`, or with `2`
+and waits `reconciler.pass_interval` between passes; it then exits with `0`, or with `2`
 when the configuration file is wrong at the start. In that mode a secret that cannot be read
 fails only the pass, so a rotation in progress does not stop the service.
 
@@ -137,7 +137,7 @@ def run(argv: Sequence[str], runtime: Runtime) -> int:
         return {PassResult.OK: EXIT_OK, PassResult.CONFIG_ERROR: EXIT_CONFIG}.get(
             result, EXIT_FAILED
         )
-    interval_s = config.min_request_interval_ms / 1000
+    interval_s = config.pass_interval_ms / 1000
     while not runtime.stop.is_set():
         run_pass(ctx)
         if runtime.stop.wait(interval_s):

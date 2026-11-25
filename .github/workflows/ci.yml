@@ -80,6 +80,7 @@ jobs:
       components: ${{ steps.jobs.outputs.components }}
       jobs: ${{ steps.jobs.outputs.jobs }}
       marker: ${{ steps.mark.outputs.marker }}
+      marker_attempt: ${{ steps.mark.outputs.attempt }}
       private_checks: ${{ steps.plan.outputs.private_checks }}
     steps:
       # ci-ok is the last job, and a job with `needs` gets its check run only when the jobs it
@@ -87,7 +88,9 @@ jobs:
       # edit of title or body, or before a reopen) never stands while this run goes, the first
       # step creates a check run `ci-ok` in progress; it is the latest ci-ok of the commit, and
       # ci-ok completes it with its own conclusion (tools/ci/ci_ok.py). Not for a fork or a
-      # dependency bot's run: their token cannot write checks (D-DEPS-3).
+      # dependency bot's run: their token cannot write checks (D-DEPS-3). The step also records
+      # the attempt that created the mark: "Re-run failed jobs" does not run plan again, and
+      # ci-ok of a later attempt then creates its own check run instead of updating this one.
       - id: mark
         name: Mark ci-ok pending for the head commit
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' && github.actor != 'renovate[bot]'
@@ -105,6 +108,7 @@ jobs:
           case "$marker" in '' | *[!0-9]*) echo "unexpected check run id: $marker"; exit 1 ;; esac
           echo "ci-ok pending: check run $marker"
           echo "marker=$marker" >> "$GITHUB_OUTPUT"
+          echo "attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -133,7 +137,7 @@ jobs:
         run: |
           if [ "$EVENT" = pull_request ]; then
             stage=full
-            if [ "$MERGE_QUEUE" = true ]; then stage=pr; fi
+            if [ "$MERGE_QUEUE" = true ]; then stage="pr"; fi
             plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --base "$BASE_SHA" --head "$HEAD_SHA" --public "$PUBLIC" --stage "$stage")
           elif [ "$EVENT" = merge_group ]; then
             plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --base "$QUEUE_BASE_SHA" --head "$QUEUE_HEAD_SHA" --public "$PUBLIC" --stage queue)
@@ -186,14 +190,14 @@ jobs:
           cache: npm
           cache-dependency-path: tools/node/package-lock.json
       # One Go for every tracked module: all modules share the go and toolchain lines
-      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS.md D-M2-38-1).
+      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS-FOUNDATION.md D-M2-38-1).
       - if: hashFiles('services/*/go.mod') != ''
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
           cache-dependency-path: services/*/go.sum
       # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
-      # workspace (docs/DECISIONS.md D-M4-01-1).
+      # workspace (docs/decisions.d/M4-01.md D-M4-01-1).
       - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -201,7 +205,7 @@ jobs:
           flutter-version-file: pubspec.yaml
           cache: true
       # JDK and Android SDK for the JVM tests of the Android core that `make test` runs
-      # (brief M5-01; docs/DECISIONS.md D-M5-01-5).
+      # (brief M5-01; docs/decisions.d/M5-01.md D-M5-01-5).
       - if: hashFiles('packages/*/android/gradlew') != ''
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
@@ -253,14 +257,14 @@ jobs:
           cache: npm
           cache-dependency-path: tools/node/package-lock.json
       # One Go for every tracked module: all modules share the go and toolchain lines
-      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS.md D-M2-38-1).
+      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS-FOUNDATION.md D-M2-38-1).
       - if: hashFiles('services/*/go.mod') != ''
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
           cache-dependency-path: services/*/go.sum
       # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
-      # workspace (docs/DECISIONS.md D-M4-01-1).
+      # workspace (docs/decisions.d/M4-01.md D-M4-01-1).
       - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -268,7 +272,7 @@ jobs:
           flutter-version-file: pubspec.yaml
           cache: true
       # JDK and Android SDK for the JVM tests of the Android core that `make test` runs
-      # (brief M5-01; docs/DECISIONS.md D-M5-01-5).
+      # (brief M5-01; docs/decisions.d/M5-01.md D-M5-01-5).
       - if: hashFiles('packages/*/android/gradlew') != ''
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
@@ -325,14 +329,14 @@ jobs:
           cache: npm
           cache-dependency-path: tools/node/package-lock.json
       # One Go for every tracked module: all modules share the go and toolchain lines
-      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS.md D-M2-38-1).
+      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS-FOUNDATION.md D-M2-38-1).
       - if: hashFiles('services/*/go.mod') != ''
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
           cache-dependency-path: services/*/go.sum
       # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
-      # workspace (docs/DECISIONS.md D-M4-01-1).
+      # workspace (docs/decisions.d/M4-01.md D-M4-01-1).
       - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -340,7 +344,7 @@ jobs:
           flutter-version-file: pubspec.yaml
           cache: true
       # JDK and Android SDK for the JVM tests of the Android core that `make test` runs
-      # (brief M5-01; docs/DECISIONS.md D-M5-01-5).
+      # (brief M5-01; docs/decisions.d/M5-01.md D-M5-01-5).
       - if: hashFiles('packages/*/android/gradlew') != ''
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
@@ -392,14 +396,14 @@ jobs:
           cache: npm
           cache-dependency-path: tools/node/package-lock.json
       # One Go for every tracked module: all modules share the go and toolchain lines
-      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS.md D-M2-38-1).
+      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS-FOUNDATION.md D-M2-38-1).
       - if: hashFiles('services/*/go.mod') != ''
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
           cache-dependency-path: services/*/go.sum
       # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
-      # workspace (docs/DECISIONS.md D-M4-01-1).
+      # workspace (docs/decisions.d/M4-01.md D-M4-01-1).
       - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -407,7 +411,7 @@ jobs:
           flutter-version-file: pubspec.yaml
           cache: true
       # JDK and Android SDK for the JVM tests of the Android core that `make test` runs
-      # (brief M5-01; docs/DECISIONS.md D-M5-01-5).
+      # (brief M5-01; docs/decisions.d/M5-01.md D-M5-01-5).
       - if: hashFiles('packages/*/android/gradlew') != ''
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
@@ -470,14 +474,14 @@ jobs:
           cache: npm
           cache-dependency-path: tools/node/package-lock.json
       # One Go for every tracked module: all modules share the go and toolchain lines
-      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS.md D-M2-38-1).
+      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS-FOUNDATION.md D-M2-38-1).
       - if: hashFiles('services/*/go.mod') != ''
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
           cache-dependency-path: services/*/go.sum
       # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
-      # workspace (docs/DECISIONS.md D-M4-01-1).
+      # workspace (docs/decisions.d/M4-01.md D-M4-01-1).
       - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -485,7 +489,7 @@ jobs:
           flutter-version-file: pubspec.yaml
           cache: true
       # JDK and Android SDK for the JVM tests of the Android core that `make test` runs
-      # (brief M5-01; docs/DECISIONS.md D-M5-01-5).
+      # (brief M5-01; docs/decisions.d/M5-01.md D-M5-01-5).
       - if: hashFiles('packages/*/android/gradlew') != ''
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
@@ -561,14 +565,14 @@ jobs:
           cache: npm
           cache-dependency-path: tools/node/package-lock.json
       # One Go for every tracked module: all modules share the go and toolchain lines
-      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS.md D-M2-38-1).
+      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS-FOUNDATION.md D-M2-38-1).
       - if: hashFiles('services/*/go.mod') != ''
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
           cache-dependency-path: services/*/go.sum
       # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
-      # workspace (docs/DECISIONS.md D-M4-01-1).
+      # workspace (docs/decisions.d/M4-01.md D-M4-01-1).
       - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -576,7 +580,7 @@ jobs:
           flutter-version-file: pubspec.yaml
           cache: true
       # JDK and Android SDK for the JVM tests of the Android core that `make test` runs
-      # (brief M5-01; docs/DECISIONS.md D-M5-01-5).
+      # (brief M5-01; docs/decisions.d/M5-01.md D-M5-01-5).
       - if: hashFiles('packages/*/android/gradlew') != ''
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
@@ -719,14 +723,14 @@ jobs:
           cache: npm
           cache-dependency-path: tools/node/package-lock.json
       # One Go for every tracked module: all modules share the go and toolchain lines
-      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS.md D-M2-38-1).
+      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS-FOUNDATION.md D-M2-38-1).
       - if: hashFiles('services/*/go.mod') != ''
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
           cache-dependency-path: services/*/go.sum
       # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
-      # workspace (docs/DECISIONS.md D-M4-01-1).
+      # workspace (docs/decisions.d/M4-01.md D-M4-01-1).
       - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -734,12 +738,25 @@ jobs:
           flutter-version-file: pubspec.yaml
           cache: true
       # JDK and Android SDK for the JVM tests of the Android core that `make test` runs
-      # (brief M5-01; docs/DECISIONS.md D-M5-01-5).
+      # (brief M5-01; docs/decisions.d/M5-01.md D-M5-01-5).
       - if: hashFiles('packages/*/android/gradlew') != ''
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: "17"
+      # Gradle's downloads, one cache per job (Maven Central answered HTTP 429; docs/quality/gates.md,
+      # "Gradle downloads"; tools/ci/tests/test_gradle_downloads.py).
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        name: Restore the Gradle dependency cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches/modules-2
+            ~/.gradle/wrapper/dists
+          key: gradle-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('apps/*/android/**/*.gradle.kts', 'apps/*/android/**/*.lockfile', 'apps/*/android/gradle/wrapper/gradle-wrapper.properties', 'packages/*/android/**/*.gradle.kts', 'packages/*/android/**/*.lockfile', 'packages/*/android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.lock') }}
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        name: Get Maven Central from its mirror in Gradle
+        run: install -D -m 0644 tools/ci/gradle/maven-central-mirror.init.gradle "$HOME/.gradle/init.d/maven-central-mirror.gradle"
       - if: hashFiles('packages/*/android/gradlew') != ''
         uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
       - name: Restore pinned binaries and hook environments
@@ -833,14 +850,14 @@ jobs:
           cache: npm
           cache-dependency-path: tools/node/package-lock.json
       # One Go for every tracked module: all modules share the go and toolchain lines
-      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS.md D-M2-38-1).
+      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS-FOUNDATION.md D-M2-38-1).
       - if: hashFiles('services/*/go.mod') != ''
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
           cache-dependency-path: services/*/go.sum
       # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
-      # workspace (docs/DECISIONS.md D-M4-01-1).
+      # workspace (docs/decisions.d/M4-01.md D-M4-01-1).
       - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -848,7 +865,7 @@ jobs:
           flutter-version-file: pubspec.yaml
           cache: true
       # JDK and Android SDK for the JVM tests of the Android core that `make test` runs
-      # (brief M5-01; docs/DECISIONS.md D-M5-01-5).
+      # (brief M5-01; docs/decisions.d/M5-01.md D-M5-01-5).
       - if: hashFiles('packages/*/android/gradlew') != ''
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
@@ -1037,7 +1054,7 @@ jobs:
           cache: npm
           cache-dependency-path: tools/node/package-lock.json
       # Go and Flutter as the scan saw them when it followed `make test` in this job: the Go
-      # toolchain on the PATH and the Dart workspace resolved (docs/DECISIONS.md D-M2-38-1,
+      # toolchain on the PATH and the Dart workspace resolved (docs/DECISIONS-FOUNDATION.md D-M2-38-1,
       # D-M4-01-1). No JDK or Android SDK: those only served the JVM tests.
       - if: hashFiles('services/*/go.mod') != ''
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -1208,7 +1225,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # Platform tests of the apps (make apps-platform, docs/DECISIONS.md D-M4-01-7): native code
+  # Platform tests of the apps (make apps-platform, docs/decisions.d/M4-01.md D-M4-01-7): native code
   # and desktop integration tests need macOS and Windows (ADR 0039), Android code an emulator
   # (apps-android-*, D-M5-01-5), the pure gates run on Linux. Only when the change touches a
   # member of the Dart workspace, its root manifest or lock file (tools/ci/components.py
@@ -1438,6 +1455,17 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      # Gradle's downloads, one cache per job (Maven Central answered HTTP 429; docs/quality/gates.md,
+      # "Gradle downloads"; tools/ci/tests/test_gradle_downloads.py).
+      - name: Restore the Gradle dependency cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches/modules-2
+            ~/.gradle/wrapper/dists
+          key: gradle-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('apps/*/android/**/*.gradle.kts', 'apps/*/android/**/*.lockfile', 'apps/*/android/gradle/wrapper/gradle-wrapper.properties', 'packages/*/android/**/*.gradle.kts', 'packages/*/android/**/*.lockfile', 'packages/*/android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.lock') }}
+      - name: Get Maven Central from its mirror in Gradle
+        run: install -D -m 0644 tools/ci/gradle/maven-central-mirror.init.gradle "$HOME/.gradle/init.d/maven-central-mirror.gradle"
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
@@ -1536,6 +1564,17 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      # Gradle's downloads, one cache per job (Maven Central answered HTTP 429; docs/quality/gates.md,
+      # "Gradle downloads"; tools/ci/tests/test_gradle_downloads.py).
+      - name: Restore the Gradle dependency cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches/modules-2
+            ~/.gradle/wrapper/dists
+          key: gradle-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('apps/*/android/**/*.gradle.kts', 'apps/*/android/**/*.lockfile', 'apps/*/android/gradle/wrapper/gradle-wrapper.properties', 'packages/*/android/**/*.gradle.kts', 'packages/*/android/**/*.lockfile', 'packages/*/android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.lock') }}
+      - name: Get Maven Central from its mirror in Gradle
+        run: install -D -m 0644 tools/ci/gradle/maven-central-mirror.init.gradle "$HOME/.gradle/init.d/maven-central-mirror.gradle"
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version: "0.13.7"
@@ -1591,6 +1630,17 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      # Gradle's downloads, one cache per job (Maven Central answered HTTP 429; docs/quality/gates.md,
+      # "Gradle downloads"; tools/ci/tests/test_gradle_downloads.py).
+      - name: Restore the Gradle dependency cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches/modules-2
+            ~/.gradle/wrapper/dists
+          key: gradle-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}-${{ hashFiles('apps/*/android/**/*.gradle.kts', 'apps/*/android/**/*.lockfile', 'apps/*/android/gradle/wrapper/gradle-wrapper.properties', 'packages/*/android/**/*.gradle.kts', 'packages/*/android/**/*.lockfile', 'packages/*/android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.lock') }}
+      - name: Get Maven Central from its mirror in Gradle
+        run: install -D -m 0644 tools/ci/gradle/maven-central-mirror.init.gradle "$HOME/.gradle/init.d/maven-central-mirror.gradle"
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version: "0.13.7"
@@ -1622,7 +1672,8 @@ jobs:
     # ended, holds no runner while they run, and reports on every run, also after a failed,
     # skipped or cancelled job. tools/ci/ci_ok.py checks the results against the plan: a needed
     # job must succeed, a job that ran must pass, a missing plan fails. It then completes the
-    # pending check run that the plan job created (docs/quality/push-discipline.md).
+    # pending check run that the plan job created, or in a later attempt creates its own
+    # (docs/quality/push-discipline.md).
     needs: [plan, gates, gates-docs, gates-security, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, test-adapters-e2e, denylist, denylist-fork, sonar, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-ios, apps-windows, apps-android-26, apps-android-36, desktop-trial-macos, desktop-trial-windows, mobile-trial-ios, mobile-trial-android, host-trial-macos, host-trial-windows]
     if: always()
     runs-on: ubuntu-24.04
@@ -1643,19 +1694,39 @@ jobs:
         env:
           RESULTS: ${{ toJSON(needs) }}
           CI_JOBS: ${{ needs.plan.outputs.jobs }}
+          # A pull request with the private checks must run sonar (tools/ci/ci_ok.py).
+          SONAR_EXPECTED: ${{ github.event_name == 'pull_request' && needs.plan.outputs.private_checks == 'true' }}
         run: |
           printf '%s' "$RESULTS" | jq -r 'to_entries[] | "| \(.key) | \(.value.result) |"' \
             | { echo "| job | result |"; echo "|---|---|"; cat; } >> "$GITHUB_STEP_SUMMARY"
           uv run --no-project --python 3.14 tools/ci/ci_ok.py needs
+      # The check run of the plan job belongs to the attempt that ran plan. "Re-run failed jobs"
+      # keeps plan and its outputs, and an update of that check run from a later attempt leaves
+      # its previous conclusion behind as a newer check run ci-ok (run 45380914447, attempts 2
+      # and 3), which the branch rule then reads. So ci-ok of a later attempt leaves it alone and
+      # creates a new, completed check run ci-ok for the head commit: the latest ci-ok is always
+      # the conclusion of the current attempt (docs/quality/push-discipline.md, "No stale green").
       - name: Complete the pending ci-ok check run
         if: always() && needs.plan.outputs.marker != ''
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           MARKER: ${{ needs.plan.outputs.marker }}
+          MARKER_ATTEMPT: ${{ needs.plan.outputs.marker_attempt }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DETAILS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
           CONCLUSION: ${{ steps.check.outcome == 'success' && 'success' || 'failure' }}
         run: |
           case "$MARKER" in *[!0-9]*) echo "unexpected check run id: $MARKER"; exit 1 ;; esac
-          gh api -X PATCH "repos/$REPO/check-runs/$MARKER" -f status=completed \
-            -f conclusion="$CONCLUSION" -f "output[title]=ci-ok: $CONCLUSION" \
-            -f 'output[summary]=The conclusion of the job ci-ok of this run.' --silent
+          if [ "$MARKER_ATTEMPT" = "$RUN_ATTEMPT" ]; then
+            gh api -X PATCH "repos/$REPO/check-runs/$MARKER" -f status=completed \
+              -f conclusion="$CONCLUSION" -f "output[title]=ci-ok: $CONCLUSION" \
+              -f 'output[summary]=The conclusion of the job ci-ok of this run.' --silent
+          else
+            gh api -X POST "repos/$REPO/check-runs" -f name=ci-ok -f head_sha="$HEAD_SHA" \
+              -f status=completed -f conclusion="$CONCLUSION" -f details_url="$DETAILS_URL" \
+              -f "output[title]=ci-ok: $CONCLUSION" \
+              -f "output[summary]=The conclusion of the job ci-ok of attempt $RUN_ATTEMPT of this run." \
+              --silent
+          fi

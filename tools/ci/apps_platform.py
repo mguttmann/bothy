@@ -13,8 +13,9 @@ its own system in the member folder, in order, and stops at the first failure; f
 desktop system it prints a SKIP line. The system `android` is no host (brief M5-01, Design note
 5): its commands run when `adb devices` lists exactly one device or emulator, on any host; without
 one they print `SKIP ... android: no device`, and with two or more the run fails, because the
-target would be a guess. `--system android` runs only the Android commands; in CI (`CI` set) it
-fails without a device, because that job brings its emulator (AUD-PKG-P02/1). The system `ios`
+target would be a guess. `--system android` runs only the Android commands, and there a missing
+device or a run in which no Android command ran fails (R-QA-02: a missing precondition is an
+error, never a skip), so the emulator jobs cannot pass without a test. The system `ios`
 (the iOS simulator) is no host either: its commands need a macOS host with Xcode and run with
 `--system ios`, or on a Mac without `--system` after the `macos` ones; `--system macos` skips them
 (PL/44). The CI jobs `apps-macos` (`--system macos`), `apps-ios` (`--system ios`, both macos-15),
@@ -475,6 +476,9 @@ def main(argv: list[str] | None = None) -> int:
     host = host_system()
     system = args.system or host or sys.platform
     files = _members(args.root)
+    if not files and system == ANDROID:
+        print("apps-platform android: no Android command ran", file=sys.stderr)
+        return 1
     if not files:
         print("SKIP apps-platform: no member with platform tests")
         return 0
@@ -487,6 +491,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"apps-platform: {rel}: {exc}", file=sys.stderr)
             return 2
     devices: int | None = None
+    android_ran = False
     for name, folder, tests in plans:
         for other in (s for s in HOSTS if s in tests and s != system):
             print(f"SKIP apps-platform {name} {other}: other host")
@@ -506,10 +511,8 @@ def main(argv: list[str] | None = None) -> int:
             continue
         if devices is None:
             devices = android_devices()
-        if devices == 0 and args.system == ANDROID and os.environ.get("CI"):
-            # The Android job of CI has an emulator: a missing one is a failure, never a green
-            # run that tested nothing.
-            print(f"apps-platform {name} {ANDROID}: no device in the CI job", file=sys.stderr)
+        if devices == 0 and system == ANDROID:
+            print(f"apps-platform {name} {ANDROID}: no device", file=sys.stderr)
             return 1
         if devices == 0:
             print(f"SKIP apps-platform {name} {ANDROID}: no device")
@@ -521,6 +524,11 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         elif not _run(name, folder, ANDROID, tests[ANDROID], args.root):
             return 1
+        else:
+            android_ran = android_ran or bool(tests[ANDROID])
+    if system == ANDROID and not android_ran:
+        print("apps-platform android: no Android command ran", file=sys.stderr)
+        return 1
     return 0
 
 

@@ -70,7 +70,7 @@ omit = ["*/tests/*", "contract/live_contract.py", "console-e2e/headless/*"]
 show_missing = true
 skip_covered = true
 # The threshold is the named value `quality.coverage.tools_min` from
-# docs/spec/23-quality.md; hooks/tests/test_config_values.py holds both equal.
+# docs/spec/23-quality.md; docs/tests/test_config_values.py holds both equal.
 fail_under = 90
 
 [tool.ruff]

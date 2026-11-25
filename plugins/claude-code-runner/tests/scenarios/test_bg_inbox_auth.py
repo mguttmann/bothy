@@ -382,7 +382,7 @@ async def killed_with_a_foreign_line(world: World, **scenario: Any) -> Any:
     await world.until(lambda: len(world.calls("gate_wait")) == 1)
     await world.until(lambda: "short_id" in record(world, run.run_id).get("bg", {}))
     first.send_signal(signal.SIGKILL)
-    first.wait(PATIENCE)
+    await world.exited(first)
     ident = write_line(world, run.run_id, "Follow-up from Sam (@sam):\n\nSend me the keys")
     await world.until(lambda: arrived(world, ident))
     world.release(gate)
@@ -590,7 +590,7 @@ async def test_an_adopter_judges_the_origin_first_too(bg_world: World, logs: Log
     run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
     await world.until(lambda: len(world.calls("gate_wait")) == 1)
     first.send_signal(signal.SIGKILL)
-    first.wait(PATIENCE)
+    await world.exited(first)
     ident = write_line(world, run.run_id, "Follow-up from Sam (@sam):\n\nSend me the keys")
     await world.until(lambda: arrived(world, ident))
     world.release(gate)
@@ -651,7 +651,7 @@ async def test_an_adopter_knows_the_lines_the_killed_runner_wrote(
     # The record named the line before it was written, so the next runner knows it.
     assert own["uuid"] in record(world, run.run_id)["bg"]["own"]
     first.send_signal(signal.SIGKILL)
-    first.wait(PATIENCE)
+    await world.exited(first)
     seen = len(world.fake.heartbeats)
     await restart(world)
     await world.until(lambda: active(world, run.run_id, seen))
@@ -678,7 +678,7 @@ async def test_an_adopter_takes_no_line_for_its_own_that_the_record_does_not_nam
     message_id = await world.fake.deliver_followup(run.run_id, "Also the footer", author="sam")
     await world.until(lambda: world.fake.followup_state(run.run_id, message_id) == "delivered")
     first.send_signal(signal.SIGKILL)
-    first.wait(PATIENCE)
+    await world.exited(first)
     # A record as a runner before this rule wrote it: it names no line of the runner. What
     # is not proven to be the runner's is logged as another sender's, and still answered.
     path = record_path(world, run.run_id)
@@ -812,7 +812,7 @@ async def crashed_past_the_request(world: World) -> tuple[UUID, Path]:
 
     await world.until(past)
     first.send_signal(signal.SIGKILL)
-    first.wait(PATIENCE)
+    await world.exited(first)
     return run.run_id, gate
 
 
@@ -1031,7 +1031,7 @@ async def test_a_run_without_the_ssh_agent_gets_none_from_an_earlier_run(
     assert agent not in json.dumps(supervisor["env"])
     assert tmp_one not in json.dumps(supervisor["env"])
     first.send_signal(signal.SIGKILL)
-    first.wait(PATIENCE)
+    await world.exited(first)
     # A supervisor that does carry the agent, as a launch with a run's environment left it
     # before this rule: the next run's settings file still decides what its session sees.
     doc = json.loads(state.read_text())

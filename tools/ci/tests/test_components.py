@@ -68,6 +68,9 @@ import pytest
         (["docs/spec/05-actions.md"], ["apps", "server"]),
         (["docs/decisions.d/M2-48.md"], []),
         (["mkdocs.yml"], []),
+        # A fragment of the root changelog is read only by fragments-check, which always runs.
+        (["changelog.d/AUD-1.md"], []),
+        (["changelog.d/AUD-1.md", "docs/spec/05-actions.md"], ["apps", "server"]),
         # The terminal suite of the server starts the Compose stack with its test overlays and
         # the collector configuration, so infra/compose/ and infra/otel/ run the server gates
         # (brief M2-48 Design note 14).

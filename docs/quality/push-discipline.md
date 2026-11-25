@@ -185,7 +185,12 @@ text of the pull request goes through the same deny list as every commit:
   first step of the job `plan` creates a check run `ci-ok` with status `in_progress` for the
   head commit (`checks: write`), the latest `ci-ok` of that commit, and the job `ci-ok`
   completes it with its own conclusion. A fork or a dependency bot's run gets a token that
-  cannot write checks; it skips the mark.
+  cannot write checks; it skips the mark. "Re-run failed jobs" does not run `plan` again and
+  keeps the mark of the attempt that ran it; GitHub turns an update of that check run from a
+  later attempt into a newer `ci-ok` with its previous conclusion. So `ci-ok` of a later
+  attempt leaves the mark alone and creates a new, completed `ci-ok` for the head commit with
+  its own conclusion: after a rerun of the failed jobs the required check is the result of
+  that attempt, and "Re-run all jobs" is not needed for it.
 - **Rules.** The body is checked like a commit message: every line gets the private and
   the generic rules. A `Signed-off-by` or `Co-authored-by` line of the exact form
   `Key: Name <local@domain>` (a plain address) gets the private list as a whole and the
@@ -212,8 +217,9 @@ scans what actually reached `main`):
 - an edit of a fork or dependency bot pull request: its run cannot mark `ci-ok` pending, so
   the older result stays the latest until the new `ci-ok` ends (wait for it before the
   merge);
-- a manual `workflow_dispatch` of `ci.yml` on the pull request branch or "Re-run all jobs"
-  of a run from before the edit: both run without the current text (maintainers only);
+- a manual `workflow_dispatch` of `ci.yml` on the pull request branch, or "Re-run all jobs"
+  or "Re-run failed jobs" of a run from before the edit: they run without the current text
+  (maintainers only);
 - a run that waits for a maintainer's approval (first contribution from a fork) has no
   `ci-ok` yet, so the older result stays the latest until the maintainer approves;
 - a message typed into the merge dialog instead of the pull request body.

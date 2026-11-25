@@ -6,7 +6,7 @@ rules:
     paths:
       include: ["*_test.go"]
       # The one place that defines how long a test waits.
-      exclude: ["services/*/internal/platform/testkit/*"]
+      exclude: ["/services/*/internal/platform/testkit/*"]
     message: >-
       A test bounds a wait for something that must happen with its own number of seconds. On a
       loaded host and under -race that fails correct changes. Wait with testkit.Until,

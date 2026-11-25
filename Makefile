@@ -197,8 +197,8 @@ bootstrap: bootstrap-ci ## Install pinned tools and the git hooks (once per clon
 
 bootstrap-ci: ## Install pinned tools without git hooks (CI)
 	@command -v $(UV) >/dev/null || { echo "uv is required: https://docs.astral.sh/uv/"; exit 1; }
-	@node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>22||(a===22&&b>=13)?0:1)' \
-	  || { echo "Node.js >= 22.13 is required"; exit 1; }
+	@node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>24||(a===24&&b>=0)?0:1)' \
+	  || { echo "Node.js >= 24.0 is required"; exit 1; }
 	$(UV) sync --project tools --locked --quiet
 	npm ci --prefix tools/node --ignore-scripts --no-audit --no-fund --loglevel=error
 	@# The browser for mermaid-cli, unless MMDC_PUPPETEER_CONFIG names its own executable.
@@ -219,13 +219,15 @@ bootstrap-ci: ## Install pinned tools without git hooks (CI)
 	  npm ci --prefix "$$(dirname "$$lock")" --ignore-scripts --no-audit --no-fund --loglevel=error || exit 1; done
 
 # ---- aggregate ------------------------------------------------------------------------
-check: gates denylist sonar ## Every gate of the CI jobs of gates, denylist and sonar (before every push)
+# The deny list comes first: it takes seconds and fails at once when the private list is missing.
+check: denylist gates sonar ## Every gate of the CI jobs of gates, denylist and sonar (before every push)
 	@echo "check: all gates passed"
 
 gates: ## All gates except denylist and sonar (CI job "gates")
 # Generated code is checked before lint and type checks, so that stale generator output is
-# reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
-gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check test coverage console-web-test contract-test commitlint fragments-check \
+# reported as drift and not as a confusing compile error. The commit and fragment checks take
+# seconds and come before the long ones. `perf` is not a gate (P-07).
+gates: commitlint fragments-check fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check test coverage console-web-test contract-test \
        docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check signal-check \
        api-clients tokens runners-check labels-check release-pins install-options tofu-check gitleaks semgrep trivy osv licenses templates-check
 
@@ -259,7 +261,8 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
 	$(UVRUN) check-jsonschema --schemafile https://coderabbit.ai/integrations/schema.v2.json .coderabbit.yaml
-	$(call tool,actionlint) -shellcheck= -pyflakes= .github/workflows/*.yml
+	@# The pinned shellcheck also reads the run: blocks of the workflows; pyflakes stays off (no Python in run: blocks).
+	sc=$(call tool,shellcheck) || exit 1; $(call tool,actionlint) -shellcheck="$$sc" -pyflakes= .github/workflows/*.yml
 	@# Every tracked shell script, by its name (*.sh) or its first line (tools/ci/shell_scripts.py);
 	@# each file's shebang selects the dialect.
 	sc=$(call tool,shellcheck) || exit 1; $(UVRUN) python tools/ci/shell_scripts.py --shellcheck "$$sc"
@@ -345,8 +348,10 @@ test: ## All tests with coverage data
 	else for p in $(PY_PROJECTS); do (cd $$p && $(UV) run --locked pytest --cov --cov-report=xml:coverage.xml); done; fi
 	@if [ -z "$(TS_ON)" ]; then $(call skip,ts-test,no TypeScript project selected); \
 	else for p in $(TS_PROJECTS); do npm --prefix $$p test; done; fi
-	@# The setup wizard infra/compose/install.sh with stubs, in a pinned container (docs/quality/gates.md).
-	@if [ ! -f infra/compose/test/install/run.sh ]; then $(call skip,install-test,no tests of infra/compose/install.sh); \
+	@# The setup wizard infra/compose/install.sh with stubs, in a pinned container (docs/quality/gates.md),
+	@# with the area tools only: in CI once in test (tools), not in every test job (ci-gates-17).
+	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,install-test); \
+	elif [ ! -f infra/compose/test/install/run.sh ]; then $(call skip,install-test,no tests of infra/compose/install.sh); \
 	else $(MAKE) --no-print-directory install-test || exit 1; fi
 
 # G7 (06 "Contract tests and gate"): the Go test starts the server of this tree with a throwaway
@@ -363,7 +368,8 @@ coverage: test ## Coverage thresholds (named values quality.coverage.*)
 	else cd tools && uv run --locked --quiet coverage report >/dev/null && echo "  tools coverage: ok (fail_under in tools/pyproject.toml)"; fi
 	@# Production code only: packages under <module>/test/ and <module>/perf/ are test code
 	@# (docs/spec/02-architecture.md "Code layout"), and generated files (*.gen.go, docs/DECISIONS.md
-	@# M1-05/7 and M1-17) are not hand-written code. The total comes from a filtered copy;
+	@# M1-05/7 and M1-17, and *_gen.go of catalogen and designkeysgen) are not hand-written code.
+	@# The total comes from a filtered copy;
 	@# coverage.out stays as go test wrote it, so SonarQube reads the same file in
 	@# `make check` and in the CI job sonar, which scans the reports of the job gates.
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-coverage,no Go module selected); \
@@ -371,7 +377,7 @@ coverage: test ## Coverage thresholds (named values quality.coverage.*)
 	  mod=$$(awk '$$1 == "module" { gsub(/"/, "", $$2); print $$2; exit }' $$m/go.mod); \
 	  [ -n "$$mod" ] || { echo "coverage: no module path in $$m/go.mod" >&2; exit 1; }; \
 	  f=$$(mktemp "$${TMPDIR:-/tmp}/bothy-coverage.XXXXXX") || exit 1; \
-	  awk -v p="$$mod/" 'NR == 1 || (index($$0, p "test/") != 1 && index($$0, p "perf/") != 1 && index($$0, ".gen.go:") == 0)' \
+	  awk -v p="$$mod/" 'NR == 1 || (index($$0, p "test/") != 1 && index($$0, p "perf/") != 1 && index($$0, ".gen.go:") == 0 && index($$0, "_gen.go:") == 0)' \
 	    $$m/coverage.out > "$$f" || { rm -f "$$f"; exit 1; }; \
 	  out=$$(cd $$m && go tool cover -func="$$f") || { rm -f "$$f"; exit 1; }; rm -f "$$f"; \
 	  total=$$(printf '%s\n' "$$out" | awk '/^total:/ {sub("%","",$$3); print $$3}'); \
@@ -788,7 +794,11 @@ semgrep: ## Project Semgrep rules (.semgrep/) and their rule tests
 	  [ -n "$$fixture" ] || { echo "semgrep: $$rule has no test fixture"; exit 1; }; \
 	  $(SEMGREP) --test --metrics=off --disable-version-check --config "$$rule" "$$fixture" || exit 1; \
 	done
-	$(SEMGREP) scan --config .semgrep --exclude .semgrep --error --metrics=off --disable-version-check --quiet .
+	@# Without --quiet the log shows what Semgrep skipped: files over the default limit of 1 MB (all
+	@# generated: the OpenAPI documents and the largest *.gen.go) and rule timeouts in generated
+	@# models. --strict stays off: the Go parser of Semgrep reads generic type constraints (~T) only
+	@# partly, so valid files would fail the gate.
+	$(SEMGREP) scan --config .semgrep --exclude .semgrep --error --metrics=off --disable-version-check .
 
 trivy: ## Trivy misconfiguration scan of Dockerfiles, Kubernetes, Helm and Terraform files
 	@# Trivy walks a directory; it scans a copy of the committable files (tools/ci/tracked_tree.py),

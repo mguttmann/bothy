@@ -88,7 +88,7 @@ def normalized(env: dict[str, Any]) -> dict[str, str]:
 
 
 def dropped_keys() -> list[str]:
-    """The keys the overlay header documents as rejected by the M1 server."""
+    """The keys of x-server-env the overlay header lists as left out."""
     return re.findall(r"^#\s+(BOTHY_[A-Z0-9_]+)\s+\S", OVERLAY.read_text(encoding="utf-8"), re.M)
 
 

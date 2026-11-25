@@ -176,8 +176,12 @@ export async function startHttpServer(
       let reply: Reply;
       try {
         reply = await route({ headers: request.headers, body });
-      } catch {
-        logger.error("http.failed", { status: 503, reason: "internal" });
+      } catch (err) {
+        logger.error("http.failed", {
+          status: 503,
+          reason: "internal",
+          code: err instanceof Error ? err.name : "unknown",
+        });
         reply = { status: 503 };
       }
       send(response, reply);

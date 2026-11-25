@@ -20,6 +20,7 @@ Examples:
 from __future__ import annotations
 
 import asyncio
+import collections
 import contextlib
 import fcntl
 import os
@@ -114,25 +115,55 @@ class SlotPool:
         if total < 1:
             raise ValueError("a slot pool needs at least one slot")
         self.total = total
-        self._free = asyncio.Semaphore(total)
         self._used = 0
+        self._waiters: collections.deque[asyncio.Future[None]] = collections.deque()
 
     @property
     def used(self) -> int:
-        """The slots that turns of any agent hold now."""
-        return self._used
+        """The slots that turns of any agent hold now, at most ``total`` (``run_slots.used``).
+
+        Adopted turns (`occupy`) may hold more than ``total``; the report stays at ``total``,
+        the most the server accepts (09 4.8 ``run_slots``).
+        """
+        return min(self._used, self.total)
 
     @property
     def full(self) -> bool:
         """True when every slot is in use, so the next turn waits (``slots_full``)."""
-        return self._free.locked()
+        return self._used >= self.total
 
     async def acquire(self) -> None:
         """Wait for a free slot and take it; a cancelled wait takes nothing."""
-        await self._free.acquire()
+        while self.full:
+            waiter = asyncio.get_running_loop().create_future()
+            self._waiters.append(waiter)
+            try:
+                await waiter
+            except asyncio.CancelledError:
+                if waiter.done() and not waiter.cancelled():
+                    self._wake()  # pass a wake-up this waiter can no longer use on
+                raise
+            finally:
+                with contextlib.suppress(ValueError):
+                    self._waiters.remove(waiter)
+        self._used += 1
+
+    def occupy(self) -> None:
+        """Take a slot without waiting, also above ``total``: a live turn the runner adopted.
+
+        The bound holds for the turns the runner starts itself: they wait until the count is
+        below ``total`` again (09 18.2 "host and rate limits").
+        """
         self._used += 1
 
     def release(self) -> None:
-        """Give one slot back (once per `acquire`)."""
+        """Give one slot back (once per `acquire` or `occupy`)."""
         self._used -= 1
-        self._free.release()
+        if not self.full:
+            self._wake()
+
+    def _wake(self) -> None:
+        for waiter in self._waiters:
+            if not waiter.done():
+                waiter.set_result(None)
+                return
