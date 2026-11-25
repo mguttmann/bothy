@@ -41,7 +41,11 @@ func messagingWiring() moduleWiring {
 			}
 			m.MessagingPurge = ms.Service.Purge(c.Service, m.RetentionConfig.BatchSize)
 			m.MessagingPurgeInterval = s.values.Duration("chat.delete_purge_interval")
-			return m.registerRetention(ms.Service.Retention(), m.RetentionConfig.ContentPeriod())
+			if err := m.registerRetention(ms.Service.Retention(), m.RetentionConfig.ContentPeriod()); err != nil {
+				return err
+			}
+			// Thread titles follow the same period (AUD-PKG-R2-owner-server).
+			return m.registerRetention(c.Service.TitleRetention(), m.RetentionConfig.ContentPeriod())
 		},
 	}
 }

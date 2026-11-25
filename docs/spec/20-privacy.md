@@ -73,10 +73,10 @@ personal data, also of third parties and also special categories under Art. 9),
 | `file_text_extracts` | content | text extracted from files | `content` | with the file |
 | `message_attachments` | no | assignment | `content` | with the message |
 | `message_attachment_relays` | no | assignment of a file to a team copy of its message (FIX-TEAM-CHANNEL-ATTACHMENTS) | `content` | with the copy, the source or the file |
-| `runs` | content | trigger, status line, last text excerpt, metrics | `content` | with the thread |
-| `run_steps` | content | tool names, details (can contain paths, commands, data) | `content` | with the run |
+| `runs` | content | trigger, status line, last text excerpt, metrics | `content` | with the thread; texts after `retention.content` (4.1) |
+| `run_steps` | content | tool names, details (can contain paths, commands, data) | `content` | with the run; title and detail after `retention.content` (4.1) |
 | `run_followups` | indirect | assignment | `content` | with the run |
-| `run_wakes` | content | the person a wake-up acts for, the agent's label, condition and result (stage AR, 09 5.8) | `content` | with the thread or the source run |
+| `run_wakes` | content | the person a wake-up acts for, the agent's label, condition and result (stage AR, 09 5.8) | `content` | with the thread or the source run; label, condition and result after `retention.content` (4.1) |
 | `run_autonomy` | indirect | counts of autonomous inputs per thread and person (stage AR, 09 5.8.6) | `content` | with the thread or the person |
 | `team_channels` | indirect | the owner who sponsors a team channel and its brake counts ([09-agents.md](09-agents.md) 3.9) | `config` | with the channel or when team mode is switched off; the sponsor stays with a pseudonymous ID |
 | `team_members` | indirect | which agent works for a team channel, its handle, added by | `config` | with the team, the channel, the agent or the work thread; the adder stays with a pseudonymous ID |
@@ -188,6 +188,13 @@ How the jobs `retention.<class>` work (M7-05, ruling D-M7-05-1 to D-M7-05-6):
   4.2 (tombstone, redaction, attachments through the purge of 4.3), without an actor: no audit
   entry, `message.deleted` without `deleted_by`. Spaces, channels, threads and runs are not
   removed by time (03, principle 7); they go with their parent or by archiving as in section 2.
+  Their texts follow the same period (AUD-PKG-R2-owner-server): a live thread whose
+  `last_activity_at` lies before it loses its title (`title_source` stays; one `thread.updated`
+  without an actor per thread, no audit entry); a run that finished before it loses its status
+  line, text excerpt, summary and plan, its steps their titles and details, and a wake-up that
+  ended before it its label, condition and result. A run that has not finished and a pending
+  wake-up keep their texts. The stored payloads of the run events and of `thread.created` and
+  `thread.updated` keep the former texts until `sync.event_retention`.
 - `transient`: finished deliveries of outgoing webhooks after `retention.webhook_deliveries`.
 - `audit`: the trim of 4.5 and the destruction of the IP keys.
 - `cost`: cost entries and closed price rows after `retention.cost`.
@@ -254,14 +261,15 @@ transaction, and a run that stops anywhere is resumed by the next.
   deletes them or the account is erased (recorded in the decisions of the ticket). Deleting a
   draft, also through sending it or the erasure of the account, blanks `content_md` of its stored
   `draft.updated` events in the same transaction.
-- Not covered by any deletion path: the texts of a run. `runs.status_line`, `last_text_excerpt`,
+- Not covered by this purge: the texts of a run. `runs.status_line`, `last_text_excerpt`,
   `summary` and `plan`, the titles and details of `run_steps` and the label, condition and
-  result of `run_wakes` stay in their rows after this purge, after a content period (4.1), after
-  the deletion of the answer message (4.2) and after an account deletion in the mode `delete`
-  (4.4), because the rows stay with their thread and a thread is never removed (03 principle 7).
-  A run of a deleted chat is no longer readable (`404`); a run of a live chat still answers its
-  texts with `getRun`. Whether these texts get a tombstone is open
-  (`docs/decisions.d/M7-05.md` D-M7-05-7, `docs/decisions.d/AUD-srv-runs-01.md` AUD-RUN1/4).
+  result of `run_wakes` stay in their rows after this purge, after the deletion of the answer
+  message (4.2) and after an account deletion in the mode `delete` (4.4), because the rows stay
+  with their thread and a thread is never removed (03 principle 7); only a content period (4.1)
+  empties them. A run of a deleted chat is no longer readable (`404`); a run of a live chat still
+  answers its texts with `getRun` until the period. Whether the other paths get a tombstone for
+  these texts is open (`docs/decisions.d/M7-05.md` D-M7-05-7,
+  `docs/decisions.d/AUD-srv-runs-01.md` AUD-RUN1/4).
 - A project folder is never removed: on request the serving runner moves it to the trash of its
   host once the deletion is final ([09-agents.md](09-agents.md) 18.15).
 
