@@ -737,8 +737,10 @@ func TestImportFileInReadOnlyChannel(t *testing.T) {
 	}
 }
 
-// TestAttachmentRules (12 10, M8-11 design note 4 d): a file of another channel, a pending file and
-// more files than message.max_attachments are refused, and the batch writes nothing.
+// TestAttachmentRules (12 10, M8-11 design note 4 d): a file of another channel and a pending file
+// are refused, and the batch writes nothing. More files than message.max_attachments break a
+// content rule of the message: since AUD-PKG-R2-owner-server (#818) that message is a failed item
+// with limit_reached, nothing of it is written, and the batch goes on.
 func TestAttachmentRules(t *testing.T) {
 	t.Parallel()
 	w := newIW(t)
@@ -754,18 +756,21 @@ func TestAttachmentRules(t *testing.T) {
 	if !p.hasError("/items/1/data/attachment_file_ids/0", "not_imported") {
 		t.Errorf("pending file %+v", p)
 	}
+	if n := w.count(`SELECT count(*) FROM import_items WHERE source_id = $1 AND item_kind IN ('thread', 'message')`, id); n != 0 {
+		t.Errorf("%d items of refused batches", n)
+	}
 	max, _ := strconv.Atoi(w.s.ConfigValue("message.max_attachments"))
 	many := make([]string, max+1)
 	for i := range many {
 		many[i] = other
 	}
-	p = w.wantProblem(w.threadBatch(id, "thread:7301", thread, msgObj("8301", userAlex, "x", tsStart, map[string]any{"attachment_file_ids": many})),
-		http.StatusBadRequest, "validation_failed", "")
-	if !p.hasError("/items/1/data/attachment_file_ids", "limit_reached") {
-		t.Errorf("too many files %+v", p)
+	res := w.mustThreadBatch(id, "thread:7301", thread, msgObj("8301", userAlex, "x", tsStart, map[string]any{"attachment_file_ids": many}))
+	if len(res.Items) != 2 || res.Items[0].State != "posted" || res.Items[1].State != "failed" ||
+		res.Items[1].Error != "limit_reached" || res.Items[1].TargetID != "" {
+		t.Errorf("too many files %+v, want the thread posted and the message failed with limit_reached", res)
 	}
-	if n := w.count(`SELECT count(*) FROM import_items WHERE source_id = $1 AND item_kind IN ('thread', 'message')`, id); n != 0 {
-		t.Errorf("%d items of refused batches", n)
+	if n := w.count(`SELECT count(*) FROM messages WHERE thread_id = $1`, res.Items[0].TargetID); n != 0 {
+		t.Errorf("%d messages of the failed item", n)
 	}
 }
 
@@ -806,8 +811,8 @@ func TestImportFileScanPriority(t *testing.T) {
 }
 
 // TestImportContentLimits (22 5.1.1, 22 6.2, 22 7.2 item 3): a thread name above
-// thread.title_max_chars is cut, content_md above message.max_content_bytes is 400 too_long at
-// the item, and a file above file.max_upload_bytes is refused with 413.
+// thread.title_max_chars is cut, content_md above message.max_content_bytes is a failed item with
+// too_long (the batch goes on), and a file above file.max_upload_bytes is refused with 413.
 func TestImportContentLimits(t *testing.T) {
 	t.Parallel()
 	w := newIW(t)
@@ -818,10 +823,13 @@ func TestImportContentLimits(t *testing.T) {
 		t.Errorf("title of %d chars, want %d", len([]rune(got)), maxTitle)
 	}
 	maxContent, _ := strconv.Atoi(w.s.ConfigValue("message.max_content_bytes"))
-	p := w.wantProblem(w.threadBatch(id, "thread:7401", msgObj("8401", userAlex, strings.Repeat("a", maxContent+1), tsStart, nil)),
-		http.StatusBadRequest, "validation_failed", "")
-	if !p.hasError("/items/0/data/content_md", "too_long") {
-		t.Errorf("long content %+v", p)
+	// A content above the limit is a failed item with too_long; the batch goes on with the next
+	// message (AUD-PKG-R2-owner-server, #818).
+	long := w.mustThreadBatch(id, "thread:7401", msgObj("8401", userAlex, strings.Repeat("a", maxContent+1), tsStart, nil),
+		msgObj("8402", userAlex, "fits", tsStart, nil))
+	if len(long.Items) != 2 || long.Items[0].State != "failed" || long.Items[0].Error != "too_long" ||
+		long.Items[1].State != "posted" {
+		t.Errorf("long content %+v, want a failed item with too_long and the next one posted", long)
 	}
 	maxFile, _ := strconv.ParseInt(w.s.ConfigValue("file.max_upload_bytes"), 10, 64)
 	body := fileBody("file:9401", items["channel:"+chForum].TargetID, w.alex.PrincipalID, []byte("x"))

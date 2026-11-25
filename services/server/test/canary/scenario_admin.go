@@ -57,6 +57,9 @@ func (sc *Scenario) people() {
 	sc.get(o, "/access/expiring?space_id="+research, ok...)
 	sc.get(o, "/access/hints", ok...)
 	sc.get(o, "/access/hints?space_id="+research, ok...)
+	// The time-limited membership gets a later expiry on the same row (extendGroupMember).
+	sc.post(o, "/groups/"+g+"/members/"+alex.PrincipalID+"/extend",
+		map[string]any{"expires_at": timestamp(time.Now().Add(48 * time.Hour))}, ok...)
 	sc.del(o, "/groups/"+g+"/members/"+alex.PrincipalID, none...)
 
 	// Grants.
