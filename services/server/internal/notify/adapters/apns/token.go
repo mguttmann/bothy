@@ -136,29 +136,34 @@ func (s *envState) createLocked(ctx context.Context, now time.Time) error {
 
 // renew handles 403 ExpiredProviderToken for a request that used used (Design note 4 b): it
 // returns the token for the one retry, or ok false when the answer is a configuration error, in
-// which case the pause has started.
-func (s *envState) renew(ctx context.Context, used string, now time.Time) (tok string, ok bool) {
+// which case the pause has started. err is a creation that stopped because ctx ended
+// (errMintCancelled): no pause, and the send fails transiently.
+func (s *envState) renew(ctx context.Context, used string, now time.Time) (tok string, ok bool, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	switch {
 	case !s.pausedUntil.IsZero():
-		return "", false
+		return "", false, nil
 	case s.jwt != "" && s.replaced == used:
 		// A parallel send already replaced the same token; this one reuses the replacement.
-		return s.jwt, true
+		return s.jwt, true, nil
 	case s.jwt != "" && s.jwt != used:
 		// The token was renewed meanwhile; retry with the current one.
-		return s.jwt, true
+		return s.jwt, true, nil
 	case !s.forcedAt.IsZero() && now.Before(s.forcedAt.Add(s.interval)):
 		// A fresh token did not help within this interval: the clock or the key is wrong.
 		s.pauseLocked(ctx, now, false, reasonExpiredProviderToken)
-		return "", false
+		return "", false, nil
 	}
 	if err := s.createLocked(ctx, now); err != nil {
-		return "", false
+		if errors.Is(err, errMintCancelled) {
+			// The caller gave up during the creation: a transient error, not a configuration answer.
+			return "", false, err
+		}
+		return "", false, nil
 	}
 	s.forcedAt, s.replaced = now, used
-	return s.jwt, true
+	return s.jwt, true, nil
 }
 
 // settle records the answer of a send: configErr starts a pause (once; errType is the Apple

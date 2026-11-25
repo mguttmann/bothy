@@ -384,3 +384,28 @@ func TestCancelledContextDoesNotPause(t *testing.T) {
 		t.Fatalf("%d Error records", n)
 	}
 }
+
+// TestCancelledRenewalIsAnError pins that a context which ends while the JWT is renewed after
+// 403 ExpiredProviderToken is a transient error of Send, not a configuration answer: the hint
+// is retried and the environment does not pause.
+func TestCancelledRenewalIsAnError(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t)
+	if res := w.send(w.phone, w.hint()); res.Class != domain.ResultAccepted {
+		t.Fatalf("first send = %+v", res)
+	}
+	w.prod.Script(w.phone.Token, apnstest.Response{Status: 403, Reason: "ExpiredProviderToken"})
+	ctx, cancel := context.WithCancel(context.Background())
+	w.resolver.setHook(func() error {
+		cancel()
+		return context.Canceled
+	})
+	res, err := w.a.Send(ctx, w.phone, w.hint())
+	if err == nil || !errors.Is(err, context.Canceled) {
+		t.Fatalf("send cancelled during the renewal = %+v, %v; want a context error", res, err)
+	}
+	w.resolver.setHook(nil)
+	if res := w.send(w.phone, w.hint()); res.Class != domain.ResultAccepted {
+		t.Fatalf("send after the cancelled renewal = %+v; want accepted, no pause", res)
+	}
+}

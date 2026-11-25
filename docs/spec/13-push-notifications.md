@@ -975,7 +975,8 @@ SLIs (targets, windows and thresholds in `docs/observability/slos.md`, Team F):
 The load test `perf/push_handoff` (`make perf`) measures t1 minus t0 for `mention` hints against
 Fake-APNs under the sustained load `perf.sustained_messages_per_s`, with t0 read as `occurred_at`
 of the triggering transaction and t1 as the `200` of the Fake; the value is held by
-`perf.push_handoff_p95` (02 section 17). The operational SLI above stays as written.
+`perf.push_handoff_p95` (02 section 17). The operational SLI above is the target; what is
+measured in operation is stated below.
 
 As built: the operational SLO of push is the provider acceptance (`sli.push_acceptance`,
 `docs/observability/slos.md`); t1 minus t0 is measured only by `perf/push_handoff`, t2 minus t0
@@ -1115,7 +1116,7 @@ no person, device or thread IDs.
    rows counts as offline after `cluster.presence_ttl`, so its person gets the push.
 
 5. Per registration one job `notify.push_send` (job catalogue in 02, section 12.3) with
-   retries according to section 7. HTTP/2 connections to APNs are shared while in use and close after 90 seconds idle (the egress client's idle timeout; there are no HTTP/2 keepalive pings, so the next send after a quiet period opens a new connection); at most `push.max_concurrent_requests` at the same time.
+   retries according to section 7. HTTP/2 connections to APNs are shared while in use and close after the idle timeout of the egress client (there are no HTTP/2 keepalive pings, so the next send after a quiet period opens a new connection); at most `push.max_concurrent_requests` at the same time.
 
    As built (M3-19): the job is `notify.push_send` on the queue `delivery`, one per active
    registration of a hint, with only IDs and numbers as arguments (the kind as a fixed code that

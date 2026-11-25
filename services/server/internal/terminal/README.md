@@ -91,7 +91,8 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
   `personal` or of the holder of the login, ends the sessions of everyone else with `i6_violation`
   (`domain.EndsForeignSessions`, `SessionSelector.ExceptUserID`); `authz` checks I6 in phase 3.1, a
   violation rolls everything back (`409 i6_violation`).
-- `ApplySessionUserReport` (called inside the units of `pairHost` of M2-41 and `report` of M2-43;
+- `ApplySessionUserReport` (called inside the unit of `report` of M2-43 through `writeReport` in
+  `control.go`; `pairHost` of M2-41 stores its report through `Store.StorePairing` in `pairWrite`;
   `RecordSessionUserReport` wraps it in its own rights change and has no caller outside the
   tests): the reported session users are rights state. An equal report (`domain.SameReport`)
   changes nothing; a different one is written with a new version of the host, ends the sessions of

@@ -613,3 +613,48 @@ func TestExportPackagesStoreErrorsLeaveNoLiveRow(t *testing.T) {
 		t.Fatalf("%d refused packages marked deleted, want 2", n)
 	}
 }
+
+// purgingProbe removes the pending export row of its subject while the bytes are written, as the
+// cleanup of a stale package followed by its purge does, and keeps the object key the row named.
+type purgingProbe struct {
+	p       *pdWorld
+	subject ids.ID
+	body    io.Reader
+	key     string
+}
+
+func (r *purgingProbe) Read(b []byte) (int, error) {
+	if r.key == "" {
+		if err := r.p.conn.QueryRow(context.Background(), `DELETE FROM files WHERE uploaded_by = $1 AND purpose = 'gdpr_export'
+			AND upload_state = 'pending' RETURNING object_key`, r.subject.String()).Scan(&r.key); err != nil {
+			r.p.t.Fatal(err)
+		}
+	}
+	return r.body.Read(b)
+}
+
+// TestExportPackagesRowGoneDeletesTheObject pins that a package whose row was removed while its
+// bytes were written deletes the object it stored (20 section 5.2): no object with personal data
+// is left under a key that no row names.
+func TestExportPackagesRowGoneDeletesTheObject(t *testing.T) {
+	p := newPDWorld(t)
+	pkgs, err := app.NewExportPackages(p.svc, p.repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	body := []byte("PK zip of Robin")
+	sum := sha256.Sum256(body)
+	probe := &purgingProbe{p: p, subject: p.robin, body: bytes.NewReader(body)}
+	name := "export-" + p.robin.String() + "-2026-11-26.zip"
+	if _, err := pkgs.Store(ctx, files.StoreExport{SubjectID: p.robin, Name: name, SizeBytes: int64(len(body)),
+		SHA256: hex.EncodeToString(sum[:]), Body: probe}); err == nil {
+		t.Fatal("Store of a package whose row is gone = nil, want an error")
+	}
+	if probe.key == "" {
+		t.Fatal("the probe found no pending export row")
+	}
+	if _, err := p.store.Head(ctx, probe.key); !errors.Is(err, app.ErrNotFound) {
+		t.Fatalf("Head of the object of the removed row = %v, want not found", err)
+	}
+}

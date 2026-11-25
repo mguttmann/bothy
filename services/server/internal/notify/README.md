@@ -175,7 +175,7 @@ APNs is enabled exactly when `push.apns.team_id`, `push.apns.key_id` and `push.a
 
 ### Endpoints and connection
 
-`https://api.push.apple.com` for `environment = production`, `https://api.sandbox.push.apple.com` for `sandbox`, request `POST /3/device/<token>`. One egress client with `Options.HTTP2` serves both; its host policy allows exactly these two hosts on `https` port `443`, so no `egress.allowed_hosts` entry is needed. `net/http` shares one multiplexed HTTP/2 connection per host while sends arrive; the egress client closes it after 90 seconds idle and sends no HTTP/2 pings, so the next send after a quiet period opens a new connection. `Deps.Endpoints` exists only for tests.
+`https://api.push.apple.com` for `environment = production`, `https://api.sandbox.push.apple.com` for `sandbox`, request `POST /3/device/<token>`. One egress client with `Options.HTTP2` serves both; its host policy allows exactly these two hosts on `https` port `443`, so no `egress.allowed_hosts` entry is needed. `net/http` shares one multiplexed HTTP/2 connection per host while sends arrive; the egress client closes it after its idle timeout and sends no HTTP/2 pings, so the next send after a quiet period opens a new connection. `Deps.Endpoints` exists only for tests.
 
 ### JWT cache and pause
 

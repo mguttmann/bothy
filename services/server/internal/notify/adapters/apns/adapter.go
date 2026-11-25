@@ -194,7 +194,10 @@ func (a *Adapter) exchange(ctx context.Context, st *envState, reg app.Registrati
 	if err != nil || !v.renew {
 		return v, false, err
 	}
-	next, ok := st.renew(ctx, tok, a.clock.Now())
+	next, ok, err := st.renew(ctx, tok, a.clock.Now())
+	if err != nil {
+		return verdict{}, false, err
+	}
 	if !ok {
 		if probe {
 			st.settle(ctx, true, true, reasonExpiredProviderToken, a.clock.Now())

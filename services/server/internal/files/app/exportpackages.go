@@ -110,11 +110,23 @@ func (x *ExportPackages) Store(ctx context.Context, cmd files.StoreExport) (ids.
 	}); err != nil || !done {
 		x.discard(ctx, id)
 		if err == nil {
+			// The row went while the bytes were written (the cleanup of a stale package, perhaps
+			// already purged): delete the object here, since no row may name it any more.
+			x.dropObject(ctx, key)
 			err = errs.New(errs.CodeInternalError, "files: the export package was deleted while it was stored")
 		}
 		return ids.ID{}, err
 	}
 	return id, nil
+}
+
+// dropObject deletes the object key of a package whose row is gone, even when ctx has ended; a
+// failure is logged with its error type only, as discard does.
+func (x *ExportPackages) dropObject(ctx context.Context, key string) {
+	ctx = context.WithoutCancel(ctx)
+	if err := x.s.d.Store.Delete(ctx, key); err != nil {
+		x.s.d.Log.LogAttrs(ctx, slog.LevelWarn, msgExportCleanup, slog.String(logKeyErrorType, errorType(err)))
+	}
 }
 
 // discard marks the row of a refused package deleted, so files.purge_objects removes its object

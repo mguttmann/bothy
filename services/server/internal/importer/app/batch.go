@@ -133,7 +133,9 @@ type batch struct {
 // for an unknown source and 409 import_not_running unless it is running, then every item in
 // request order. Afterwards the counters of the new transitions and of the answers with
 // source_changed are added to stats.server and one import.progress is appended; a batch that
-// counted nothing writes neither (a replayed batch with unchanged content has no event). A refusal of import.apply by the module is recorded as a denial.
+// counted nothing and changed no mirrored thread writes neither (a replayed batch with unchanged
+// content and no mirror change has no event). A refusal of import.apply by the module is
+// recorded as a denial.
 func (s *Service) ApplyBatch(ctx context.Context, a actor.Actor, id ids.ID, b importer.Batch) (importer.BatchResult, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {
