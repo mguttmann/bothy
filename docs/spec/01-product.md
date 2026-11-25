@@ -768,6 +768,12 @@ overview.
 Before it is submitted, every changing administration action with step-up shows the confirmation
 with passkey or device key ([08-identity.md](08-identity.md)).
 
+The reason the audit log stores is typed by the owner for the security-relevant changes: a grant
+(create and revoke), the owner role (add and remove) and the revocation of a device; their
+confirmation stays disabled while the reason is empty. The other changes (disable or enable a
+person, reject a waiting device, disable an agent) offer the field and send the default text
+"Changed in the administration" when it stays empty (AUD-PKG-R2-owner-server).
+
 **A1 People.** List, create (no self-registration, no invitation links), queue of new devices with
 the origin of the login.
 

@@ -272,13 +272,13 @@ class _PersonDetailState extends State<PersonDetail>
       body: l.devicesRevokeBody,
       confirmLabel: l.devicesRevoke,
       destructive: true,
-      withReason: true,
+      reasonRequired: true,
     );
-    if (reason == null || !mounted) return;
+    if (reason == null || reason.isEmpty || !mounted) return;
     await _change('${device.id}.revoke', () async {
       await widget.repository.revokeDevice(
         device.id,
-        reason: reason.isEmpty ? l.adminDefaultReason : reason,
+        reason: reason,
         purpose: l.stepUpPurposeRevokeDevice(device.name),
       );
       return SelfNotice(l.devicesRevoked(device.name));

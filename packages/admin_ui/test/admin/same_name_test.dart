@@ -124,6 +124,11 @@ void main() {
     expectBothHandles('owners.pick');
 
     await tap(tester, 'owners.pick.sam2');
+    await tester.enterText(
+      find.byKey(const ValueKey('confirm.reason')),
+      'Second admin',
+    );
+    await tester.pump();
     await tap(tester, 'confirm.submit');
     await stepUp(tester, 'Make Sam (@sam.k) an owner');
     expect(repository.calls.last, startsWith('addOwner sam2'));

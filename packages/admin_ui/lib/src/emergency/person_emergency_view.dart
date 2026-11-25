@@ -207,12 +207,13 @@ class _PersonEmergencyViewState extends State<PersonEmergencyView>
       body: l.emergencyRevokeDeviceBody(device.name, p.displayName),
       stepUp: true,
       confirmLabel: l.devicesRevoke,
+      reasonRequired: true,
     );
-    if (reason == null || !mounted) return;
+    if (reason == null || reason.isEmpty || !mounted) return;
     await _run('${device.id}.revoke', () async {
       await widget.repository.revokeDevice(
         device.id,
-        reason: reason.isEmpty ? l.adminDefaultReason : reason,
+        reason: reason,
         purpose: l.stepUpPurposeRevokeDevice(device.name),
       );
       return SelfNotice(l.devicesRevoked(device.name));

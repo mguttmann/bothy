@@ -156,11 +156,17 @@ void main() {
     expect(find.textContaining('at once'), findsOneWidget);
     expect(find.text(en.emergencyConfirmFaceId), findsOneWidget);
 
+    // A revocation needs a typed reason (AUD-PKG-R2-owner-server).
+    final confirm = find.byKey(const ValueKey('emergency.sheet.confirm'));
+    expect(tester.widget<DsButton>(confirm).onPressed, isNull);
+    await tester.enterText(
+      find.byKey(const ValueKey('emergency.sheet.reason')),
+      'Laptop lost',
+    );
+    await tester.pump();
     await tap(tester, 'emergency.sheet.confirm');
     expect(prompt.asked, [en.stepUpPurposeRevokeDevice('Sam laptop')]);
-    expect(repository.calls, [
-      'revokeDevice sam-laptop ${en.adminDefaultReason}',
-    ]);
+    expect(repository.calls, ['revokeDevice sam-laptop Laptop lost']);
     expect(find.text(en.devicesRevoked('Sam laptop')), findsOneWidget);
     expect(find.byKey(const ValueKey('device.sam-laptop')), findsNothing);
   });
@@ -172,6 +178,11 @@ void main() {
     await pumpPhone(tester, person('sam'), navigatorKey: navigator);
 
     await tap(tester, 'device.sam-laptop.revoke');
+    await tester.enterText(
+      find.byKey(const ValueKey('emergency.sheet.reason')),
+      'Laptop lost',
+    );
+    await tester.pump();
     await tap(tester, 'emergency.sheet.confirm');
 
     expect(prompt.asked, hasLength(1));

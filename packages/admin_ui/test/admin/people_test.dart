@@ -384,10 +384,23 @@ void main() {
     expect(repository.calls.last, 'endSession s-laptop');
     expect(find.byKey(const ValueKey('session.s-laptop')), findsNothing);
 
+    // A revocation needs a typed reason: "Confirm" stays disabled until one is typed
+    // (AUD-PKG-R2-owner-server).
     await tap(tester, 'device.sam-laptop.revoke');
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('confirm.submit')))
+          .onPressed,
+      isNull,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('confirm.reason')),
+      'Laptop lost',
+    );
+    await tester.pump();
     await tap(tester, 'confirm.submit');
     await stepUp(tester, 'Revoke the device Sam laptop');
-    expect(repository.calls.last, startsWith('revokeDevice sam-laptop'));
+    expect(repository.calls.last, 'revokeDevice sam-laptop Laptop lost');
   });
 
   testWidgets('owners: add one, and the last owner cannot be revoked', (
@@ -395,8 +408,18 @@ void main() {
   ) async {
     await list(tester);
 
+    // The owner role needs a typed reason both ways (AUD-PKG-R2-owner-server).
     await tap(tester, 'owner.alex.revoke');
     expect(find.text('Revoke the owner Alex?'), findsOneWidget);
+    expect(
+      find.text('Reason (required, stored in the audit log)'),
+      findsOneWidget,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('confirm.reason')),
+      'Handover',
+    );
+    await tester.pump();
     await tap(tester, 'confirm.submit');
     await stepUp(tester, 'Revoke the owner Alex');
     expect(find.text('At least one active owner must remain'), findsOneWidget);
@@ -406,8 +429,19 @@ void main() {
     await tap(tester, 'owners.pick');
     await tester.tap(find.text('Sam').last);
     await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('confirm.submit')))
+          .onPressed,
+      isNull,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('confirm.reason')),
+      'Second admin',
+    );
+    await tester.pump();
     await tap(tester, 'confirm.submit');
-    expect(repository.calls.last, startsWith('addOwner sam'));
+    expect(repository.calls.last, startsWith('addOwner sam Second admin'));
     expect(find.text('Sam is now an owner.'), findsOneWidget);
     expect(find.byKey(const ValueKey('owner.sam')), findsOneWidget);
   });
