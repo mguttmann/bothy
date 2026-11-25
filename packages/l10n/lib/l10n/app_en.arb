@@ -7635,6 +7635,10 @@
   "@terminalStateBlockedProtocol": {
     "description": "Hard warning after close code 4002 or an unexpected message."
   },
+  "terminalStepUpUnavailable": "This device cannot open the terminal: the terminal needs a fresh confirmation with the device key, and this device (Windows) has none yet. Open the terminal in the web console of this instance in your browser, or on a Mac, an iPhone or an Android phone.",
+  "@terminalStepUpUnavailable": {
+    "description": "Banner of a terminal tab on a device without a step-up key (Windows, 08 6.3): the opening or attach needs the fresh step-up such a device cannot give."
+  },
   "terminalStateFailed": "The terminal could not be opened: {problem}",
   "@terminalStateFailed": {
     "description": "Banner of a refused opening with the problem text.",

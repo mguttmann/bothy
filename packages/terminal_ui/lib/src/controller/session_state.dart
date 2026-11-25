@@ -6,6 +6,12 @@ library;
 
 import 'package:flutter/foundation.dart';
 
+/// The `problemCode` of a tab whose opening or attach needs the fresh step-up a device without
+/// a step-up key cannot give (Windows, D-M4-11-2; `StepUpUnavailable` of `auth`): the banner
+/// says so and points to a device that can, instead of a generic failure
+/// (AUD-PKG-R2-owner-server, #677).
+const String stepUpUnavailableCode = 'step_up_unavailable';
+
 /// Where the flow of 15 23.2 stands.
 enum TerminalPhase {
   /// Nothing opened yet, or the opening was cancelled before a session existed.

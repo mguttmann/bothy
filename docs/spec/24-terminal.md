@@ -2303,7 +2303,7 @@ Reason: the runner locks sessions and runs with secrets of the instance operator
 
 | Client | Milestone | Special feature |
 |---|---|---|
-| Desktop (macOS, Windows) | M4 | hardware keyboard, keyboard shortcuts without conflict with the shell (app shortcuts only with the platform modifier) |
+| Desktop (macOS, Windows) | M4 | hardware keyboard, keyboard shortcuts without conflict with the shell (app shortcuts only with the platform modifier); a Windows device has no step-up key yet (08 6.3, D-M4-11-2), so it cannot give the fresh step-up of an opening or an attach: the tab shows the hint `step_up_unavailable` that names the web console and the other apps instead of a failure, and sends no request (AUD-PKG-R2-owner-server; the Windows step-up is planned separately) |
 | Mobile (iOS, Android) | M5 | extra keys bar: Esc, Tab, Ctrl, Alt, arrows, `\|`, `~`, `/`, `-`; hardware keyboard |
 | Web console | M6 | step-up only by passkey with `userVerification = required` ([ADR 0070](../adr/0070-terminal-in-the-web-console.md)); same CSP (19, section 5); ports and measured state below (M6-18) |
 

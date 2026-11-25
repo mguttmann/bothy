@@ -5049,6 +5049,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'The connection broke the terminal protocol. No new attempt is made.';
 
   @override
+  String get terminalStepUpUnavailable =>
+      'This device cannot open the terminal: the terminal needs a fresh confirmation with the device key, and this device (Windows) has none yet. Open the terminal in the web console of this instance in your browser, or on a Mac, an iPhone or an Android phone.';
+
+  @override
   String terminalStateFailed(String problem) {
     return 'The terminal could not be opened: $problem';
   }

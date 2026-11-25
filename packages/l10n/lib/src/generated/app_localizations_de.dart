@@ -5073,6 +5073,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die Verbindung hat das Terminal-Protokoll verletzt. Es gibt keinen neuen Versuch.';
 
   @override
+  String get terminalStepUpUnavailable =>
+      'Dieses Gerät kann das Terminal nicht öffnen: Das Terminal braucht eine frische Bestätigung mit dem Geräteschlüssel, und dieses Gerät (Windows) hat noch keinen. Öffne das Terminal in der Web-Konsole dieser Instanz im Browser oder auf einem Mac, einem iPhone oder einem Android-Telefon.';
+
+  @override
   String terminalStateFailed(String problem) {
     return 'Das Terminal konnte nicht geöffnet werden: $problem';
   }

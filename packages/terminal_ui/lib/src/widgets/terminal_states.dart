@@ -23,6 +23,13 @@ String detachedText(AppLocalizations l, DetachCause? cause) => switch (cause) {
   DetachCause.rateLimited => l.terminalStateDetachedRateLimited,
 };
 
+/// The text of the problem [code] of a tab: the hint of a device without a step-up key for
+/// [stepUpUnavailableCode], the problem text of `l10n` otherwise.
+String terminalProblemText(AppLocalizations l, String code, {String? reason}) =>
+    code == stepUpUnavailableCode
+    ? l.terminalStepUpUnavailable
+    : problemText(l, code, reason: reason);
+
 /// The banner of [state], or nothing while connected or idle.
 ///
 /// ```dart
@@ -52,7 +59,7 @@ class TerminalStateBanner extends StatelessWidget {
         text: [
           detachedText(l, state.detachCause),
           if (state.problemCode case final code?)
-            problemText(l, code, reason: state.problemReason),
+            terminalProblemText(l, code, reason: state.problemReason),
         ].join(' '),
         actionLabel: onReattach == null ? null : l.terminalReattach,
         onAction: onReattach,
@@ -78,6 +85,8 @@ class TerminalStateBanner extends StatelessWidget {
           BlockCause.handshakeFailed || null => l.terminalStateBlockedHandshake,
         },
       ),
+      TerminalPhase.failed when state.problemCode == stepUpUnavailableCode =>
+        DsBanner(tone: DsTone.warning, text: l.terminalStepUpUnavailable),
       TerminalPhase.failed => DsBanner(
         tone: DsTone.danger,
         text: l.terminalStateFailed(

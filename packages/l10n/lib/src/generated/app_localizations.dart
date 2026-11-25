@@ -8153,6 +8153,12 @@ abstract class AppLocalizations {
   /// **'The connection broke the terminal protocol. No new attempt is made.'**
   String get terminalStateBlockedProtocol;
 
+  /// Banner of a terminal tab on a device without a step-up key (Windows, 08 6.3): the opening or attach needs the fresh step-up such a device cannot give.
+  ///
+  /// In en, this message translates to:
+  /// **'This device cannot open the terminal: the terminal needs a fresh confirmation with the device key, and this device (Windows) has none yet. Open the terminal in the web console of this instance in your browser, or on a Mac, an iPhone or an Android phone.'**
+  String get terminalStepUpUnavailable;
+
   /// Banner of a refused opening with the problem text.
   ///
   /// In en, this message translates to:
