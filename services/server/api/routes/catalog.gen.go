@@ -151,6 +151,7 @@ var catalogEntries = []CatalogEntry{
 	{ID: "passkey.revoke", Right: "self or owner", RateLimitClass: "rl.admin"},
 	{ID: "pin.create", Right: "manage", RateLimitClass: "rl.write"},
 	{ID: "pin.delete", Right: "manage", RateLimitClass: "rl.write"},
+	{ID: "price.load_start", Right: "system", RateLimitClass: "none"},
 	{ID: "price.manage", Right: "owner", RateLimitClass: "rl.admin"},
 	{ID: "price.read", Right: "owner", RateLimitClass: "rl.read"},
 	{ID: "push.deliver", Right: "read", RateLimitClass: "none"},

@@ -421,7 +421,10 @@ transaction it ensures the signing keys ([ADR 0066](../adr/0066-signing-keys-in-
 5. Audit entry with `actor_principal_id = NULL` and system action `instance.bootstrap` (05).
 6. `setup_completed_at = now()`.
 
-After the commit it writes the code exactly once to standard output, as the only line there;
+After the commit, in a transaction of its own, it loads the start prices into an empty price
+table (system action `price.load_start`, [10-backend-policy.md](10-backend-policy.md) 12.3); a
+failure there is logged and does not change the outcome of the bootstrap
+(AUD-PKG-R2-owner-server). Then it writes the code exactly once to standard output, as the only line there;
 logs go to standard error and never contain it. That way scripts read the code without a format
 of their own. `bothy setup issue-enrollment-code` outputs its code the same way. Exit codes per
 [02-architecture.md](02-architecture.md), section 3.3. The block until

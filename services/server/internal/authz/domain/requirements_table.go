@@ -125,7 +125,7 @@ var requirementGroups = []struct {
 	{"agent-self (runner of the environment)", AgentSelf, []string{"dev_environment.report"}},
 	{"system", System, []string{
 		"device.expire", "grant.expire", "group.member.expire", "group.member.sync",
-		"instance.bootstrap", "owner.recover", "signing_key.transition", "terminal.terminate",
+		"instance.bootstrap", "owner.recover", "price.load_start", "signing_key.transition", "terminal.terminate",
 		"webhook_out.transition",
 	}},
 	{"self or owner", Any(Self, Owner), []string{

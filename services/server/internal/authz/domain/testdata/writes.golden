@@ -106,6 +106,7 @@ passkey.register
 passkey.revoke
 pin.create
 pin.delete
+price.load_start
 price.manage
 push.register
 push.unregister

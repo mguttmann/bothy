@@ -2543,6 +2543,19 @@ actions:
   rights_change: false
   rl_class: rl.admin
   effect: write
+- id: price.load_start
+  section: operations
+  description: load the start prices of the product into an empty price table, once, right after
+    the first owner was created by `bothy setup bootstrap-owner` ([10-backend-policy.md](10-backend-policy.md),
+    section 12.3)
+  resource: instance
+  right: system
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: none
+  effect: write
 - id: cost.reconcile
   section: operations
   description: reconcile estimates with the invoice by hand

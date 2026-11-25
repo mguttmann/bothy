@@ -4,9 +4,9 @@
 // section 12.3, PLAN row M2-22): start_prices.json, schema start_prices.v1, with the base prices
 // per unit of the five token units for every model of the main price table of the public pricing
 // page, its source and the time it was read. The file is product data embedded in the binary and
-// checked by tests; the server never loads it at runtime, because loading it on the host needs a
-// system action that 05 does not have (spec gap, ruling D-M2-22-20). Until one exists the owner
-// enters prices with createPrice.
+// checked by tests; the system action price.load_start (billing/app.StartPriceLoader) loads it
+// once into an empty price table right after bothy setup bootstrap-owner
+// (AUD-PKG-R2-owner-server). Later prices go through createPrice.
 //
 // Example:
 //

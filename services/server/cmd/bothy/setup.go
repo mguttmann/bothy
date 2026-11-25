@@ -30,7 +30,8 @@ bootstrap-owner        creates the first owner in one transaction: the local ide
                        if missing, the person, its owner role and local identity, a one-time
                        enrollment code (first_login), the audit entry instance.bootstrap and
                        the setup mark. Until then the server answers every request except
-                       discovery with 503 setup_required.
+                       discovery with 503 setup_required. Then it loads the start prices into
+                       an empty price table (price.load_start); a failure there is logged only.
 issue-enrollment-code  issues a recovery code for an active owner who lost every device.
 demo                   turns an empty instance into the demo with made-up data
                        (docs/spec/16-operations.md 16): the owner of the data set through

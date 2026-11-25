@@ -305,6 +305,8 @@ const (
 	ActionPinCreate Action = "pin.create"
 	// ActionPinDelete is the action pin.delete.
 	ActionPinDelete Action = "pin.delete"
+	// ActionPriceLoadStart is the action price.load_start.
+	ActionPriceLoadStart Action = "price.load_start"
 	// ActionPriceManage is the action price.manage.
 	ActionPriceManage Action = "price.manage"
 	// ActionPriceRead is the action price.read.
@@ -637,6 +639,7 @@ var actionByID = map[string]Action{
 	"passkey.revoke":               ActionPasskeyRevoke,
 	"pin.create":                   ActionPinCreate,
 	"pin.delete":                   ActionPinDelete,
+	"price.load_start":             ActionPriceLoadStart,
 	"price.manage":                 ActionPriceManage,
 	"price.read":                   ActionPriceRead,
 	"push.deliver":                 ActionPushDeliver,
@@ -878,6 +881,7 @@ var actionList = []Action{
 	ActionPasskeyRevoke,
 	ActionPinCreate,
 	ActionPinDelete,
+	ActionPriceLoadStart,
 	ActionPriceManage,
 	ActionPriceRead,
 	ActionPushDeliver,

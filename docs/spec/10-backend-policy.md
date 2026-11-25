@@ -657,12 +657,16 @@ Start file and price changes (M2-22):
   base prices of the five token units per model with the public pricing page as `source_url`, its
   time of reading as `retrieved_at` and `valid_from = retrieved_at`. It is embedded in the binary
   and checked by tests (every row has source and retrieval time, passes the rules of `createPrice`
-  below, one currency per provider and model, no overlap). The server never loads it: loading it
-  on the host needs a system action that [05-actions.md](05-actions.md) does not have (spec gap).
-  Until one exists the owner enters prices with `createPrice`, through the API only: no app and no
-  CLI calls `listPrices`, `createPrice` or `closePrice`, and no client shows "Price missing" for an
-  `unpriced` entry (12.1) yet; both are plan row V3-25. On an installation where nobody
-  entered prices every booking is `adapter_reported` or `unpriced`.
+  below, one currency per provider and model, no overlap). It is loaded once: right after
+  `bothy setup bootstrap-owner` created the first owner, the system action `price.load_start`
+  ([05-actions.md](05-actions.md), audited with the number of rows) inserts every row with that
+  owner as `created_by`, in a unit of work of its own and only while `price_table` has no row at
+  all (closed ones included), so it never runs again and never touches prices an owner entered. A
+  failed load does not fail the bootstrap; it is logged, and the owner enters the prices
+  (AUD-PKG-R2-owner-server). Later maintenance goes through `createPrice` and `closePrice`, through
+  the API only: no app and no CLI calls `listPrices`, `createPrice` or `closePrice`, and no client
+  shows "Price missing" for an `unpriced` entry (12.1) yet; both are plan row V3-25. An instance
+  set up before this load existed has no start prices until the owner enters them.
 - **`listPrices`** (`price.read`, owner, no step-up, no audit) returns every row, closed ones
   included, ordered by `provider`, `model`, `unit`, `valid_from`, `id`; it is a small unpaginated
   list ([06-api.md](06-api.md) section 6 point 6).
