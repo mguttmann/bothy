@@ -78,6 +78,9 @@ func (s *Service) checkImported(m messaging.ImportedMessage) error {
 	return domain.CheckNewContent(m.ContentMD, s.cfg.MaxContentBytes, len(m.AttachmentIDs) > 0)
 }
 
+// Check implements messaging.ImportMessages: the content rules of checkImported, nothing written.
+func (p ImportMessagesPort) Check(m messaging.ImportedMessage) error { return p.s.checkImported(m) }
+
 // checkImportedReply allows a reply only to a message of the thread (22 6.2); every other target
 // is not_in_thread on the origin key of the reply.
 func (s *Service) checkImportedReply(ctx context.Context, target, thread ids.ID) error {

@@ -28,6 +28,40 @@ func (q *Queries) ControlledChannel(ctx context.Context, channelID pgtype.UUID) 
 	return controlled, err
 }
 
+const failItem = `-- name: FailItem :one
+UPDATE import_items
+SET state = 'failed', error = $1, updated_at = $2
+WHERE id = $3
+RETURNING id, source_id, origin_key, item_kind, target_kind, target_id, state, content_sha256, error, created_at, updated_at
+`
+
+type FailItemParams struct {
+	Error     pgtype.Text
+	UpdatedAt pgtype.Timestamptz
+	ID        pgtype.UUID
+}
+
+// The pending item the server refused becomes failed with the code of the refusal, in the
+// transaction of its batch, which goes on (AUD-PKG-R2-owner-server).
+func (q *Queries) FailItem(ctx context.Context, arg FailItemParams) (ImportItem, error) {
+	row := q.db.QueryRow(ctx, failItem, arg.Error, arg.UpdatedAt, arg.ID)
+	var i ImportItem
+	err := row.Scan(
+		&i.ID,
+		&i.SourceID,
+		&i.OriginKey,
+		&i.ItemKind,
+		&i.TargetKind,
+		&i.TargetID,
+		&i.State,
+		&i.ContentSha256,
+		&i.Error,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const finishItem = `-- name: FinishItem :one
 UPDATE import_items
 SET state = $1, target_kind = $2, target_id = $3, updated_at = $4

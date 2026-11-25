@@ -10247,6 +10247,7 @@ export interface components {
             target_kind?: string;
             target_id?: components["schemas"]["Uuid"];
             state: components["schemas"]["ImportItemState"];
+            /** @description With `state = failed` the field code of the content rule the message broke (`too_long`, `empty`, `invalid`, `limit_reached`); the batch went on (22, 8). */
             error?: string;
             /** @description Present and `true` when a repeated key came with a `content_sha256` different from the stored one; nothing was changed (22, 7.2 item 4). */
             source_changed?: boolean;

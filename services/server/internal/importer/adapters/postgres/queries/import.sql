@@ -52,6 +52,14 @@ SET state = @state, target_kind = sqlc.narg(target_kind), target_id = sqlc.narg(
 WHERE id = @id
 RETURNING *;
 
+-- name: FailItem :one
+-- The pending item the server refused becomes failed with the code of the refusal, in the
+-- transaction of its batch, which goes on (AUD-PKG-R2-owner-server).
+UPDATE import_items
+SET state = 'failed', error = @error, updated_at = @updated_at
+WHERE id = @id
+RETURNING *;
+
 -- name: ListItems :many
 -- Ascending id, optionally of one state; the index (source_id, state) serves the filter.
 SELECT * FROM import_items

@@ -44,6 +44,7 @@ const (
 	itemPending = "pending"
 	itemPosted  = "posted"
 	itemSkipped = "skipped"
+	itemFailed  = "failed"
 
 	sourceRunning = "running"
 
@@ -216,8 +217,10 @@ type EarlierSession struct {
 // item is one stored import item.
 type item struct {
 	id, key, kind, state, targetKind, targetID, sha string
-	created                                         time.Time
-	data                                            map[string]any
+	// errCode is the code of a failed item, "" otherwise.
+	errCode string
+	created time.Time
+	data    map[string]any
 }
 
 // file is the file of a file item with its upload session.
@@ -245,6 +248,14 @@ type apiError struct {
 	status       int
 	code, reason string
 	fields       []fieldError
+	// failItem marks a refusal of the content of one message: the item becomes failed with the
+	// code of the first field and the batch goes on (AUD-PKG-R2-owner-server), never an answer.
+	failItem bool
+}
+
+// failed is the refusal of the content of a message item with code: the item is failed.
+func failed(code string) *apiError {
+	return &apiError{failItem: true, fields: []fieldError{{Code: code}}}
 }
 
 // fieldError is one entry of Problem.errors.
@@ -875,6 +886,9 @@ func itemJSON(it *item, changed bool) map[string]any {
 	if it.targetID != "" {
 		out["target_id"], out["target_kind"] = it.targetID, it.targetKind
 	}
+	if it.errCode != "" {
+		out["error"] = it.errCode
+	}
 	if changed {
 		out["source_changed"] = true
 	}
@@ -1238,12 +1252,15 @@ func (t *tx) one(o objectIn, target func() (string, string, *apiError)) (map[str
 		return itemJSON(old, changed), old, nil
 	}
 	kind, id, e := target()
-	if e != nil {
+	if e != nil && !e.failItem {
 		return nil, nil, e
 	}
 	it := &item{id: newID(), key: o.OriginKey, kind: o.ItemKind, state: itemPosted, targetKind: kind, targetID: id,
 		sha: o.ContentSHA256, created: t.now, data: o.Data}
-	if id == "" {
+	switch {
+	case e != nil:
+		it.state, it.targetKind, it.targetID, it.errCode = itemFailed, "", "", e.fields[0].Code
+	case id == "":
 		it.state, it.targetKind = itemSkipped, ""
 	}
 	t.items = append(t.items, it)
@@ -1554,9 +1571,10 @@ func (t *tx) messageTarget(o objectIn) (string, string, *apiError) {
 	if len(f) > 0 {
 		return "", "", invalid(f...)
 	}
-	// A message without a file needs a visible character (22 6.3, messaging.CheckNewContent).
+	// A message without a file needs a visible character (22 6.3, messaging.CheckNewContent); the
+	// server stores a refused content as a failed item and goes on (AUD-PKG-R2-owner-server).
 	if len(list) == 0 && strings.IndexFunc(str(o.Data, "content_md"), func(r rune) bool { return !unicode.IsSpace(r) }) < 0 {
-		return "", "", invalid(fieldError{Pointer: "/content_md", Code: codeEmpty})
+		return "", "", failed(codeEmpty)
 	}
 	t.appended = append(t.appended, o.OriginKey)
 	return kindMessage, newID(), nil

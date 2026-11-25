@@ -124,6 +124,14 @@ func (s *store) FinishItem(_ context.Context, id ids.ID, state, kind string, tar
 	return s.items[i], nil
 }
 
+func (s *store) FailItem(_ context.Context, id ids.ID, code string, _ time.Time) (app.ItemRow, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	i := slices.IndexFunc(s.items, func(r app.ItemRow) bool { return r.ID == id })
+	s.items[i].State, s.items[i].Error = importer.ItemFailed, code
+	return s.items[i], nil
+}
+
 func (s *store) Items(_ context.Context, source ids.ID, state string, after ids.ID, limit int) ([]app.ItemRow, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

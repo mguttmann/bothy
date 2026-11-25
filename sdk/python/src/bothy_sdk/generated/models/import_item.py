@@ -27,7 +27,8 @@ class ImportItem:
         created_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         target_kind (str | Unset):
         target_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        error (str | Unset):
+        error (str | Unset): With `state = failed` the field code of the content rule the message broke (`too_long`,
+            `empty`, `invalid`, `limit_reached`); the batch went on (22, 8).
         source_changed (bool | Unset): Present and `true` when a repeated key came with a `content_sha256` different
             from the stored one; nothing was changed (22, 7.2 item 4).
         session (ImportItemSession | Unset): Present on a `thread` item that carried `earlier_session` and has a thread

@@ -62,6 +62,9 @@ type Store interface {
 	Item(ctx context.Context, source ids.ID, originKey string) (row ItemRow, found bool, err error)
 	// FinishItem sets state, target and updated_at of the item id and returns the stored row.
 	FinishItem(ctx context.Context, id ids.ID, state, targetKind string, targetID ids.ID, at time.Time) (ItemRow, error)
+	// FailItem sets the item id to failed with the error code and updated_at and returns the
+	// stored row (AUD-PKG-R2-owner-server).
+	FailItem(ctx context.Context, id ids.ID, code string, at time.Time) (ItemRow, error)
 	// Items returns at most limit items of source after the id after (zero for the first page),
 	// ascending, of one state ("" for every state).
 	Items(ctx context.Context, source ids.ID, state string, after ids.ID, limit int) ([]ItemRow, error)

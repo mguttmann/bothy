@@ -31099,6 +31099,7 @@ components:
           $ref: '#/components/schemas/ImportItemState'
         error:
           type: string
+          description: With `state = failed` the field code of the content rule the message broke (`too_long`, `empty`, `invalid`, `limit_reached`); the batch went on (22, 8).
         source_changed:
           type: boolean
           description: Present and `true` when a repeated key came with a `content_sha256` different from the stored one; nothing was changed (22, 7.2 item 4).

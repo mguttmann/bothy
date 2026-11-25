@@ -252,9 +252,9 @@ func wantField(t *testing.T, what string, resp *restclient.ApplyImportBatchRespo
 
 // TestFakeRefusesWhatTheServerRefuses: the fake applies the rules of the server that valid Discord
 // data can break (22 5.1, 5.1.1, 6.3, 6.6): a topic with a control character or above the limit, a
-// thread or tag name with a bidi control, a message without a visible character and without a
-// file, and a pin above the limit of its thread. Each refusal names the item, and the refused
-// batch stores nothing.
+// thread or tag name with a bidi control, and a pin above the limit of its thread. Each refusal
+// names the item, and the refused batch stores nothing. A message without a visible character and
+// without a file is no refusal of the batch: it becomes a failed item (AUD-PKG-R2-owner-server).
 func TestFakeRefusesWhatTheServerRefuses(t *testing.T) {
 	e := newImportEnv(t)
 	e.fake.AddUser("sam", "Sam", true)
@@ -283,8 +283,13 @@ func TestFakeRefusesWhatTheServerRefuses(t *testing.T) {
 	wantField(t, "a tag name with a bidi control", e.apply(t, src, restclient.ImportBatch{Items: []restclient.ImportObject{
 		obj(restclient.ImportObjectItemKindForumTag, "forum_tag:"+channelID+":1029384800", "",
 			map[string]any{"channel_origin_key": "channel:" + channelID, "name": "open\u200f"})}}), "/items/0/data/name", "bidi_control")
-	wantField(t, "a message without content", e.apply(t, src, batch(thread("Login fails"),
-		message("1029384710", samID, map[string]any{"content_md": " \n"}))), "/items/1/data/content_md", "empty")
+	// A message without content is a failed item with the code empty; the batch goes on
+	// (AUD-PKG-R2-owner-server).
+	empty := e.apply(t, src, batch(thread("Login fails"), message("1029384719", samID, map[string]any{"content_md": " \n"})))
+	if empty.JSON200 == nil || len(empty.JSON200.Items) != 2 || empty.JSON200.Items[1].State != restclient.ImportItemStateFailed ||
+		empty.JSON200.Items[1].Error == nil || *empty.JSON200.Items[1].Error != "empty" {
+		t.Errorf("a message without content = %d %s, want a failed item with the code empty", empty.StatusCode(), empty.Body)
+	}
 
 	e.fake.SetPinLimit(1)
 	pin := func(id string) restclient.ImportObject {

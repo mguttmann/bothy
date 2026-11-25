@@ -2474,9 +2474,9 @@ Purpose: an imported item with a unique origin key. Module: `importer`.
 | `item_kind` | `text` | no | | `CHECK (item_kind IN ('space','channel','forum_tag','thread','message','file','user','reaction','pin'))` |
 | `target_kind` | `text` | yes | | |
 | `target_id` | `uuid` | yes | | created object |
-| `state` | `text` | no | `'pending'` | `CHECK (state IN ('pending','posted','skipped','failed'))`; `failed` is reserved: nothing writes it yet, a refused item rolls its batch back ([22-import-migration.md](22-import-migration.md) section 8) |
+| `state` | `text` | no | `'pending'` | `CHECK (state IN ('pending','posted','skipped','failed'))`; `failed` is a message item whose content the server refuses by the content rules of a message; its batch goes on, every other refusal rolls the batch back ([22-import-migration.md](22-import-migration.md) section 8) |
 | `content_sha256` | `bytea` | yes | | detects changes at the source |
-| `error` | `text` | yes | | without content or secrets; reserved with the state `failed`, not written yet |
+| `error` | `text` | yes | | without content or secrets; with the state `failed` the field code of the refusal (`too_long`, `empty`, `invalid`, `limit_reached`) |
 | `created_at` | `timestamptz` | no | `now()` | |
 | `updated_at` | `timestamptz` | no | `now()` | |
 

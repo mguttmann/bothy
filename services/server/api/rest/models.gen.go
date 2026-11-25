@@ -12476,7 +12476,9 @@ type ImportForumTagData struct {
 type ImportItem struct {
 	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	CreatedAt Timestamp `json:"created_at"`
-	Error     *string   `json:"error,omitempty"`
+
+	// Error With `state = failed` the field code of the content rule the message broke (`too_long`, `empty`, `invalid`, `limit_reached`); the batch went on (22, 8).
+	Error *string `json:"error,omitempty"`
 
 	// Id UUIDv7 (RFC 9562), lowercase canonical form.
 	Id       Uuid               `json:"id"`

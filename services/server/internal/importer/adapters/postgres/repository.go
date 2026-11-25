@@ -242,6 +242,19 @@ func (r *Repository) FinishItem(ctx context.Context, id ids.ID, state, targetKin
 	return toItem(row), nil
 }
 
+// FailItem implements app.Store.
+func (r *Repository) FailItem(ctx context.Context, id ids.ID, code string, at time.Time) (app.ItemRow, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return app.ItemRow{}, err
+	}
+	row, err := q.FailItem(ctx, sqlcgen.FailItemParams{ID: uuid(id), Error: optionalText(code), UpdatedAt: stamp(at)})
+	if err != nil {
+		return app.ItemRow{}, mapError(err, "failing an item")
+	}
+	return toItem(row), nil
+}
+
 // Items implements app.Store.
 func (r *Repository) Items(ctx context.Context, source ids.ID, state string, after ids.ID, limit int) ([]app.ItemRow, error) {
 	rows, err := r.read(ctx).ListItems(ctx, sqlcgen.ListItemsParams{
