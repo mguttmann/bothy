@@ -499,17 +499,18 @@ The scheduled workflows are `advisories.yml`, `codeql.yml`, `docs.yml`, `e2e-des
 `e2e-mobile.yml`, `flakes.yml`, `hermes-pin.yml`, `host-platform.yml`, `red-runs.yml` and
 `scorecard.yml`
 (`tools/docs/tests/test_red_runs_doc.py` holds this list to the workflows with a `schedule`
-trigger). A red run of one of them, or of `ci.yml` on `main`, opens no issue today: until a
-maintainer looks at the Actions page it reaches at most that one person.
+trigger). Without the alert below, a red run of one of them, or of `ci.yml` on `main`, would
+reach at most that one person until a maintainer looks at the Actions page.
 
-The alert for these runs is built and switched off. Whether a workflow may write public issues
-for red runs without a person in between is a question for the owner (ruling AUD-CG1/7 in
-`docs/decisions.d/AUD-misc-ci-gates-01.md`; docs/decisions.d/AUD-misc-testing-01.md, ruling 11).
-The scheduled workflow `red-runs.yml` runs `tools/ci/red_runs.py report` every hour (tests
-`tools/ci/tests/test_red_runs.py`). Until the repository variable `BOTHY_RED_RUN_ISSUES` is
-`true` it passes `--dry-run`: the tool reads the runs and the issues, writes nothing, and
-prints to the log of its job the red runs with the `gh` commands it would run. With the
-variable set it does what the rest of this section describes:
+The alert for these runs is switched on: the owner decided on 2026-11-25 that a workflow may
+write public issues for red runs without a person in between (the question of ruling AUD-CG1/7
+in `docs/decisions.d/AUD-misc-ci-gates-01.md` and of docs/decisions.d/AUD-misc-testing-01.md,
+ruling 11; decided in docs/decisions.d/AUD-PKG-R2-owner-ops.md), and the repository variable
+`BOTHY_RED_RUN_ISSUES` is `true` since that day. The scheduled workflow `red-runs.yml` runs
+`tools/ci/red_runs.py report` every hour (tests `tools/ci/tests/test_red_runs.py`). With any
+other value of the variable it passes `--dry-run`: the tool reads the runs and the issues,
+writes nothing, and prints to the log of its job the red runs with the `gh` commands it would
+run. With the variable `true` it does what the rest of this section describes:
 
 * Watched are the scheduled runs of every workflow with a `schedule` trigger and the pushes to
   `main` of `ci.yml` (`MAIN_PUSH_WORKFLOWS` in `tools/ci/check_runners.py`), the full suite of a

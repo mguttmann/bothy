@@ -7,10 +7,11 @@
 # from this folder). A run GitHub lists as cancelled counts when one of its jobs ran and did not
 # pass: a job that hits its time limit ends that way.
 #
-# Switched off until the owner decides (AUD-CG1/7, AUD-MISC-TESTING-01/11): whether a workflow
-# may write public issues for red runs is his question. Unless the repository variable
-# BOTHY_RED_RUN_ISSUES is `true`, the report is a dry run: it reads, writes nothing, and prints
-# the red runs with their jobs and steps to the log of this job. With the variable set it adds
+# Switched on: the owner decided on 2026-11-25 that this workflow may write public issues for red
+# runs (the question of AUD-CG1/7 and AUD-MISC-TESTING-01/11, decided in
+# docs/decisions.d/AUD-PKG-R2-owner-ops.md), and the repository variable BOTHY_RED_RUN_ISSUES is
+# `true` since that day. With any other value the report is a dry run: it reads, writes nothing,
+# and prints the red runs with their jobs and steps to the log of this job. With `true` it adds
 # one comment per failed run to the open issue "Red runs of <file>" labelled `red-run` (created
 # when there is none) and closes an issue when its workflow passed again and stayed quiet for the
 # time AGE of the tool. Only the default GITHUB_TOKEN; a permission cannot depend on a variable,
