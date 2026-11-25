@@ -707,7 +707,11 @@ api-breaking: ## G6: no breaking change of the API against the last server relea
 	@# and a change under docs/api/ selects every gate component, the server included.
 	@if [ -z "$(call want,server)" ]; then $(call skip,api-breaking,component server not selected); \
 	elif [ ! -f docs/api/openapi.yaml ]; then $(call skip,api-breaking,docs/api/openapi.yaml does not exist yet); \
-	else $(UVRUN) python tools/api-checks/breaking.py check; fi
+	else allow=; case ",$${PR_LABELS:-}," in *",breaking change,"*) allow=--allow-break ;; esac; \
+	  $(UVRUN) python tools/api-checks/breaking.py check --base "$${API_BREAKING_BASE:-origin/main}" $$allow; fi
+	@# Before the first release the baseline is the merge base with the pull request's base
+	@# (CI sets API_BREAKING_BASE); the label "breaking change" (PR_LABELS, comma-separated)
+	@# releases a deliberate break while info.version is below 1.0 (#1508).
 
 signal-check: ## Dashboards, rules and SLOs use only catalogue metrics and labels; SLO thresholds are bucket bounds (M1-68)
 	$(UVRUN) python tools/signalcheck/signalcheck.py

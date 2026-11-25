@@ -220,14 +220,60 @@ def _write_current(repo: Path, doc: dict[str, Any]) -> None:
     (repo / "docs/api/openapi.yaml").write_text(yaml.safe_dump(doc), encoding="utf-8")
 
 
-def test_check_without_tag_passes_with_notice(tmp_path: Path) -> None:
+def test_check_without_tag_and_base_passes_with_notice(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init", "-q", "-b", "main")
     _write_current(repo, _load(FIXTURES / "base.yaml"))
     lines: list[str] = []
     assert breaking.check(repo, out=lines.append) == 0
-    assert lines == ["api-breaking: no published version (no tag server/v*); nothing to compare"]
+    assert lines == [
+        "api-breaking: no published version (no tag server/v*) and no merge base with "
+        "origin/main; nothing to compare"
+    ]
+
+
+def _pre_release_repo(tmp_path: Path, version: str) -> Path:
+    """A main without a server tag and a working tree that removes a field at `version`."""
+    base = _load(FIXTURES / "base.yaml")
+    base["info"]["version"] = "0.2.0" if version.startswith("0.") else "1.2.0"
+    repo = _fixture_repo(tmp_path, [("start", base)])
+    revision = copy.deepcopy(base)
+    del revision["components"]["schemas"]["Thing"]["properties"]["size"]
+    revision["info"]["version"] = version
+    _write_current(repo, revision)
+    return repo
+
+
+def test_check_without_tag_compares_with_the_merge_base(tmp_path: Path) -> None:
+    """Before the first release the baseline is the merge base with main (#1508)."""
+    repo = _pre_release_repo(tmp_path, "0.3.0")
+    lines: list[str] = []
+    assert breaking.check(repo, out=lines.append, base_ref="main") == 1
+    assert "property removed" in lines[0]
+    assert "against the merge base " in lines[-1]
+    assert "the label 'breaking change'" in lines[-1]
+
+
+def test_label_accepts_a_break_before_1_0(tmp_path: Path) -> None:
+    repo = _pre_release_repo(tmp_path, "0.3.0")
+    lines: list[str] = []
+    assert breaking.check(repo, out=lines.append, base_ref="main", allow_break=True) == 0
+    assert lines[0].startswith("api-breaking: accepted (label 'breaking change', before 1.0): ")
+    assert lines[-1].endswith("accepted by the label 'breaking change' before 1.0")
+
+
+def test_label_accepts_no_break_from_1_0_on(tmp_path: Path) -> None:
+    repo = _pre_release_repo(tmp_path, "1.3.0")
+    lines: list[str] = []
+    assert breaking.check(repo, out=lines.append, base_ref="main", allow_break=True) == 1
+
+
+def test_main_reads_base_and_label(tmp_path: Path) -> None:
+    repo = _pre_release_repo(tmp_path, "0.3.0")
+    args = ["check", "--root", str(repo), "--base", "main"]
+    assert breaking.main(args) == 1
+    assert breaking.main([*args, "--allow-break"]) == 0
 
 
 def test_check_compares_with_the_stable_tag(tmp_path: Path) -> None:

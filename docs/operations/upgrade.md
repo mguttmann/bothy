@@ -119,8 +119,10 @@ times the number of messages of the instance in millions.
 
 Not built: a gate that runs every migration against the schema of the previous version with test
 data and then the test suite of the previous version against the new schema (N-1 compatibility;
-plan row V3-37). Until then rules M1 to M12 hold by review, and `make migrations-lint` checks
-numbers, checksums and form rules only.
+plan row V3-37). Before V1 no such gate runs: it would take hours per change, and there is no
+release to go back to (docs/decisions.d/AUD-PKG-R2-owner-ops.md). Until then rules M1 to M12 hold
+by review, `make migrations-lint` checks numbers, checksums and form rules only, and an older
+build is not tested against a newer schema (section 3 item 1).
 
 ## 5. Schema check at startup
 

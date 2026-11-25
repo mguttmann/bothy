@@ -186,9 +186,12 @@ refuses. Tests: `tests/test_client_routes.py`.
 selected) compares `docs/api/openapi.yaml` of the working tree with the same file of the base
 tag and prints one line per finding, `api-breaking: <06 rule>: <location>: <detail>`, exit 1.
 The base is the newest stable tag `server/vX.Y.Z` merged into `HEAD`; a pre-release tag only
-while no stable tag exists; without a tag the gate passes with a notice. When `info.version`
-raised its major version against the base, every finding is printed as `accepted` and the gate
-passes (06 13 items 4 and 5). Tests: `uv run --project tools --locked pytest -q
+while no stable tag exists; without a tag the merge base of `HEAD` with `--base` (default
+`origin/main`; CI passes the base of the pull request as `API_BREAKING_BASE`), and only without
+that either the gate passes with a notice. When `info.version` raised its major version against
+the base, every finding is printed as `accepted` and the gate passes (06 13 items 4 and 5); so
+it does with `--allow-break` while `info.version` is below 1.0 (`make api-breaking` sets it when
+`PR_LABELS`, comma-separated, holds the pull request label `breaking change`). Tests: `uv run --project tools --locked pytest -q
 tools/api-checks/tests/test_breaking.py`; every file in `tests/fixtures/g6/cases/` patches
 `tests/fixtures/g6/base.yaml` and lists its findings exactly.
 
