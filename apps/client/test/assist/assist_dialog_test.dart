@@ -229,10 +229,7 @@ void main() {
       '(AUD-PKG-R2-owner-server)', (tester) async {
     final h = Host(tester);
     await h.open();
-    await h.answer(
-      0,
-      AssistAnswer(hits: [release], terms: const ['larkspur']),
-    );
+    await h.answer(0, AssistAnswer(hits: [release], terms: const ['larkspur']));
     expect(find.byKey(const ValueKey('assist.capped.0')), findsNothing);
     await tester.enterText(find.byKey(const ValueKey('assist.field')), 'older');
     await tester.tap(find.byKey(const ValueKey('assist.send')));

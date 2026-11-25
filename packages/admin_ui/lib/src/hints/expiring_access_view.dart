@@ -216,9 +216,8 @@ class _ExtendMemberDialogState extends State<_ExtendMemberDialog> {
     if (day == null) return null;
     final next = DateTime.utc(day.year, day.month, day.day + 1);
     try {
-      return L10nFormat(
-        Localizations.localeOf(context),
-      ).dayStart(next.year, next.month, next.day, timeZone: widget.timeZone);
+      return L10nFormat(Localizations.localeOf(context))
+          .dayStart(next.year, next.month, next.day, timeZone: widget.timeZone);
     } on ArgumentError {
       return next;
     }
