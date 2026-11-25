@@ -70,3 +70,11 @@ The example covers the API under the Commercial Terms. An agent with `billing_mo
 runs on a personal subscription under consumer terms: the DPA above does not apply to it, and the
 messages of other people in its runs reach the provider under the retention and training rules of
 that subscription. Enter it as its own row of section 2 and assess the role `<...>`.
+
+The Claude Code runner starts the Claude Code CLI. Besides the model calls, the CLI can send
+usage metrics to its vendor and to third-party logging services and error reports to a
+third-party error tracking service
+([data usage of Claude Code](https://code.claude.com/docs/en/data-usage), retrieved 2026-11-25).
+The runner turns all three switches off by default (`runner.cli_telemetry` `false`,
+docs/spec/09-agents.md 18.2); an operator who sets it to `true` enters these services as rows of
+section 2.

@@ -58,6 +58,7 @@ from claude_code_runner.bgsession import (
     supervisor_verdict,
 )
 from claude_code_runner.commandline import ArgumentError
+from claude_code_runner.environment import TELEMETRY_OFF
 from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
 from claude_code_runner.prompt import user_line
 
@@ -300,6 +301,11 @@ def test_the_settings_file_holds_the_isolation_and_the_run_s_environment() -> No
     forwarded = settings_document({**env, "SSH_AUTH_SOCK": "/tmp/agent.sock"})
     assert forwarded["env"]["SSH_AUTH_SOCK"] == "/tmp/agent.sock"
     assert set(forwarded["env"]) == set(RUN_ENV_NAMES)
+    # runner.cli_telemetry false: the opt-outs of the turn's environment reach the session too,
+    # which otherwise keeps whatever the long-lived supervisor carries.
+    quiet = settings_document({**env, **dict(TELEMETRY_OFF)})
+    assert set(quiet["env"]) == set(RUN_ENV_NAMES) | set(dict(TELEMETRY_OFF))
+    assert all(quiet["env"][name] == value for name, value in TELEMETRY_OFF)
 
 
 def test_the_settings_file_never_widens_what_the_session_takes_from_other_sessions(

@@ -134,6 +134,13 @@ docs/operations/configuration.md (generated from 09 21). Operator rules:
   loads no settings of the user ("Turns of built-in agents").
 - `runner.forward_ssh_agent` gives every turn the runner user's SSH keys; keep it off unless the
   projects need it.
+- `runner.cli_telemetry` (default `false`) keeps the Claude Code CLI from sending usage metrics,
+  error reports and other non-essential traffic to its vendor: the runner sets
+  `DISABLE_TELEMETRY`, `DISABLE_ERROR_REPORTING` and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`
+  for every CLI it starts, so only the model calls leave the host. The CLI documents that these
+  switches also turn off its feature-flag evaluation; the runner's background mode is tested
+  with them set. `true` sets none of them; a value in the runner's own environment never reaches
+  the CLI either way.
 - Keep `runner.progress_patch_interval` below `run.stall_after` of the server, else a run whose
   only progress is a long running tool gets the stall notice; the runner cannot read the server
   value.

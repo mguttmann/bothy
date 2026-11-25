@@ -30,6 +30,7 @@ from claude_code_runner.bgpaths import bg_files
 from claude_code_runner.bgsession import GUARD_TIMEOUT, send_guard_command
 from claude_code_runner.bgtranscript import READ_FIELDS
 from claude_code_runner.causes import ADAPTER_STOPPED, RUN_ENDED_IDLE, cause
+from claude_code_runner.environment import TELEMETRY_OFF
 from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
 
 from .conftest import API_KEY, BACKGROUND, LogLines, World, _group_alive, live_files
@@ -177,6 +178,8 @@ async def test_a_new_post_runs_as_one_background_session(bg_world: World) -> Non
             "DISABLE_AUTOUPDATER": "1",
             "TMPDIR": tmpdir,
             "SSH_AUTH_SOCK": "",
+            # runner.cli_telemetry false (the default): the CLI's opt-outs reach the session.
+            **dict(TELEMETRY_OFF),
         },
         # A run can never answer a permission prompt: the CLI refuses instead of waiting.
         "permissions": {"denyInsteadOfPrompting": True},

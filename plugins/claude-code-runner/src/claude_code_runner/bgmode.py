@@ -116,7 +116,12 @@ class BackgroundMode:
         self._version = version
         try:
             env = build_environment(
-                environ, mode="personal", api_key=None, config_dir=None, forward_ssh_agent=False
+                environ,
+                mode="personal",
+                api_key=None,
+                config_dir=None,
+                forward_ssh_agent=False,
+                cli_telemetry=config.cli_telemetry,
             )
         except RunEnvironmentError:
             env = {"PATH": ":".join(clean_path(environ.get("PATH", "")))}

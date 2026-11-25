@@ -84,6 +84,7 @@ from claude_code_runner.commandline import (
     hosted_class_flags,
 )
 from claude_code_runner.config import check_argument
+from claude_code_runner.environment import TELEMETRY_OFF
 from claude_code_runner.statedir import ensure_private_dir, write_private
 from claude_code_runner.stop import escalation_due
 from claude_code_runner.usage import claude_config_dir
@@ -379,7 +380,8 @@ def settings_document(
     to the empty text: a session inherits the environment of the supervisor, which lives across
     runs, and a value in the ``env`` block goes before an inherited one (run with the pinned
     CLI). So a run that must not have the SSH agent gets an empty ``SSH_AUTH_SOCK`` whatever
-    the supervisor carries.
+    the supervisor carries. The CLI's opt-outs `TELEMETRY_OFF` that the turn's environment holds
+    (``runner.cli_telemetry`` false) are set as well.
 
     The document sets ``crossSessionInbound`` ``accept`` only when the host user's own
     settings say ``hold`` (`host_inbound_value`). Without any value the CLI decides per
@@ -414,7 +416,8 @@ def settings_document(
 
     Returns:
         The document; ``env`` holds ``CLAUDE_PRODUCT_RUN``, ``DISABLE_AUTOUPDATER``, the run's
-        ``TMPDIR`` and ``SSH_AUTH_SOCK``, which is empty unless the turn's environment has it.
+        ``TMPDIR`` and ``SSH_AUTH_SOCK``, which is empty unless the turn's environment has it,
+        and the opt-outs of `TELEMETRY_OFF` the turn's environment holds.
     """
     session_env = {
         "CLAUDE_PRODUCT_RUN": "1",
@@ -422,6 +425,7 @@ def settings_document(
         "TMPDIR": env.get("TMPDIR", ""),
         "SSH_AUTH_SOCK": env.get("SSH_AUTH_SOCK", ""),
     }
+    session_env.update({name: env[name] for name, _ in TELEMETRY_OFF if name in env})
     permissions = dict((base or {}).get("permissions") or {})
     permissions[NO_PROMPT_SETTING] = True
     document = {
