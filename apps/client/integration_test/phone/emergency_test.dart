@@ -95,6 +95,12 @@ void main() {
           find.text(en.emergencyRevokeDeviceBody('Pixel', 'Sam')),
           findsOneWidget,
         );
+        // Revoking a device requires a typed reason (AUD-PKG-R2-owner-server).
+        await tester.enterText(
+          find.byKey(const ValueKey('emergency.sheet.reason')),
+          'Lost phone',
+        );
+        await tester.pump();
         await tap('emergency.sheet.confirm');
         await app.waitFor(find.byKey(const ValueKey('stepUp.dialog')));
         await tester.tap(find.byKey(const ValueKey('stepUp.cancel')));
@@ -107,6 +113,11 @@ void main() {
 
         // Again, confirmed: the request repeats with the same key and succeeds.
         await tap('device.$pixel.revoke');
+        await tester.enterText(
+          find.byKey(const ValueKey('emergency.sheet.reason')),
+          'Lost phone',
+        );
+        await tester.pump();
         await tap('emergency.sheet.confirm');
         await confirmStepUp();
         await until(

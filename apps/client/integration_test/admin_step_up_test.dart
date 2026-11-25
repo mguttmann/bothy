@@ -109,10 +109,21 @@ void main() {
         await tap('owners.pick');
         await tester.tap(find.text('Sam').last);
         await tester.pumpAndSettle();
+        // The owner role requires a typed reason (AUD-PKG-R2-owner-server).
+        await tester.enterText(
+          find.byKey(const ValueKey('confirm.reason')),
+          'Second owner',
+        );
+        await tester.pump();
         await tap('confirm.submit');
       });
       await check('revokeOwner', () async {
         await tap('owner.$sam.revoke');
+        await tester.enterText(
+          find.byKey(const ValueKey('confirm.reason')),
+          'No longer needed',
+        );
+        await tester.pump();
         await tap('confirm.submit');
       });
 
