@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -556,5 +557,59 @@ func TestExportPackagesRefused(t *testing.T) {
 	}
 	if p.count(`SELECT count(*) FROM files`) != before {
 		t.Fatal("a malformed command left a row")
+	}
+}
+
+// failingBody is an export body whose read fails, as a broken source of the export job does.
+type failingBody struct{}
+
+func (failingBody) Read([]byte) (int, error) { return 0, errors.New("source broke") }
+
+// deletingProbe marks the pending export row of its subject deleted while the bytes are written,
+// as the cleanup of a stale package does.
+type deletingProbe struct {
+	p       *pdWorld
+	subject ids.ID
+	body    io.Reader
+	done    bool
+}
+
+func (r *deletingProbe) Read(b []byte) (int, error) {
+	if !r.done {
+		r.done = true
+		r.p.exec(`UPDATE files SET deleted_at = now() WHERE uploaded_by = $1 AND purpose = 'gdpr_export'
+			AND upload_state = 'pending' AND deleted_at IS NULL`, r.subject)
+	}
+	return r.body.Read(b)
+}
+
+// TestExportPackagesStoreErrorsLeaveNoLiveRow pins the error paths of Store (20 section 5.2): a
+// body that fails while it is written and a row deleted meanwhile both refuse the package, and no
+// live row of it is left; the refused row is marked deleted, so the purge removes its object.
+func TestExportPackagesStoreErrorsLeaveNoLiveRow(t *testing.T) {
+	p := newPDWorld(t)
+	pkgs, err := app.NewExportPackages(p.svc, p.repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	body := []byte("PK zip of Robin")
+	sum := sha256.Sum256(body)
+	hexSum := hex.EncodeToString(sum[:])
+	name := "export-" + p.robin.String() + "-2026-11-25.zip"
+
+	for _, src := range []io.Reader{
+		failingBody{},
+		&deletingProbe{p: p, subject: p.robin, body: bytes.NewReader(body)},
+	} {
+		if _, err := pkgs.Store(ctx, files.StoreExport{SubjectID: p.robin, Name: name, SizeBytes: int64(len(body)), SHA256: hexSum, Body: src}); err == nil {
+			t.Fatalf("Store with body %T = nil, want an error", src)
+		}
+	}
+	if n := p.count(`SELECT count(*) FROM files WHERE uploaded_by = $1 AND deleted_at IS NULL`, p.robin); n != 0 {
+		t.Fatalf("%d live rows of refused packages, want 0", n)
+	}
+	if n := p.count(`SELECT count(*) FROM files WHERE uploaded_by = $1 AND purpose = 'gdpr_export' AND deleted_at IS NOT NULL`, p.robin); n != 2 {
+		t.Fatalf("%d refused packages marked deleted, want 2", n)
 	}
 }

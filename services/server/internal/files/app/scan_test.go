@@ -344,6 +344,35 @@ func TestScanPassCompletesMultipartBeforePing(t *testing.T) {
 	}
 }
 
+// TestScanPassRetriesWhenTheMultipartCannotComplete pins that a confirmed file whose open S3
+// upload cannot be completed is retried as a storage error and stays pending: it is never
+// scanned or delivered from bytes that are not in its object.
+func TestScanPassRetriesWhenTheMultipartCannotComplete(t *testing.T) {
+	t.Parallel()
+	e := newScanEnv(t, scanCfg)
+	s := e.seed(t, pngContent, pngContent, true)
+	ctx := context.Background()
+	if err := e.store.Delete(ctx, s.File.ObjectKey); err != nil {
+		t.Fatal(err)
+	}
+	e.repo.mu.Lock()
+	sess := e.repo.sessions[s.FileID]
+	sess.StorageUploadID = "upload-the-store-does-not-know"
+	e.repo.sessions[s.FileID] = sess
+	e.repo.mu.Unlock()
+
+	res, err := e.pass.Run(ctx, s.FileID, 0)
+	if err != nil || res.Outcome != app.OutcomeRetry || res.RetryReason != app.RetryStorage {
+		t.Fatalf("Run = %+v, %v; want a retry for the storage error", res, err)
+	}
+	if scans, pings := e.scanner.counts(); scans != 0 || pings != 0 {
+		t.Fatalf("scanner asked %d times, pinged %d times; want neither before the upload is complete", scans, pings)
+	}
+	if f := e.file(s.FileID); f.UploadState != "pending" || f.ScanStatus != "pending" {
+		t.Fatalf("file %+v; want it pending", f)
+	}
+}
+
 func TestScanPassNotAwaiting(t *testing.T) {
 	t.Parallel()
 	e := newScanEnv(t, scanCfg)
