@@ -58,11 +58,12 @@ modules ignore a changed `bothy_version` on an existing server, and over SSH the
 refusal; run the steps below on the server. `<dir>` is the folder of the installation, `<old>` and
 `<new>` are the two versions:
 
-1. Keep a copy of the installation, with modes, in a folder only root reads:
+1. Keep a copy of the installation, with modes, in a folder only its owner reads:
    `cp -Rp <dir> <dir>.before-<new>` and then `chmod 700 <dir>.before-<new>`. It holds `.env` and
    `infra/compose/secrets/`. The folder must not exist yet: a copy left from an earlier attempt
-   would receive `<dir>` inside it, and the later steps would read its older files. Remove or
-   rename an old copy first.
+   would receive `<dir>` inside it. When you repeat an upgrade that stopped after step 4, keep
+   the copy of the first attempt, which still holds `<old>`, skip this step and continue at
+   step 2; remove or rename a copy only when no attempt got past step 3.
 2. Download the bundle `bothy-compose-<new>.tar.gz` of the new product release and its
    signature `bothy-compose-<new>.tar.gz.sigstore.json`, and check both as in
    [release.md](release.md) 5.
@@ -80,12 +81,15 @@ refusal; run the steps below on the server. `<dir>` is the folder of the install
 7. In `<dir>/infra/compose` run the procedure of section 2 and its checks. Then recreate the
    services that read files of the bundle only at their start, because Compose keeps a container
    whose image did not change:
-   `docker compose up -d --force-recreate --no-deps otel-collector clamav`, and with the profile
-   `observability` also `prometheus alertmanager loki tempo grafana`.
+   `docker compose up -d --force-recreate --no-deps otel-collector`, with the profile `scan` also
+   `clamav`, and with the profile `observability` also `prometheus alertmanager loki tempo
+   grafana`. Name a service of a profile only when that profile is enabled: Compose starts a
+   service that is named on the command line even when its profile is off.
 
 The way back to `<old>` (section 3 item 1) puts the files of the copy back before
 `docker compose up -d`: every file of `<dir>.before-<new>` except `infra/compose/secrets/`, which
-keeps its newer state; then recreate the same services as in step 7. Remove the copy once the
+keeps its newer state; then recreate the same services as in step 7, under the same profile
+conditions. Remove the copy once the
 new version runs and the way back is no longer needed; it holds secrets.
 
 ## 3. Rollback
