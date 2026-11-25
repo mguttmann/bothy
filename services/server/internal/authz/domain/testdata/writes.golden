@@ -78,6 +78,7 @@ group.create
 group.delete
 group.member.add
 group.member.expire
+group.member.extend
 group.member.remove
 group.member.sync
 group.update
@@ -106,6 +107,7 @@ passkey.register
 passkey.revoke
 pin.create
 pin.delete
+price.load_start
 price.manage
 push.register
 push.unregister

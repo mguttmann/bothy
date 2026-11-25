@@ -176,6 +176,7 @@ rules:
         - group.create
         - group.delete
         - group.member.add
+        - group.member.extend
         - group.member.remove
         - group.read
         - group.update
@@ -464,6 +465,7 @@ rules:
         - group.create
         - group.delete
         - group.member.add
+        - group.member.extend
         - group.member.remove
         - group.read
         - group.update

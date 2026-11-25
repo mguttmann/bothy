@@ -8153,6 +8153,12 @@ abstract class AppLocalizations {
   /// **'The connection broke the terminal protocol. No new attempt is made.'**
   String get terminalStateBlockedProtocol;
 
+  /// Banner of a terminal tab on a device without a step-up key (Windows, 08 6.3): the opening or attach needs the fresh step-up such a device cannot give.
+  ///
+  /// In en, this message translates to:
+  /// **'This device cannot open the terminal: the terminal needs a fresh confirmation with the device key, and this device (Windows) has none yet. Open the terminal in the web console of this instance in your browser, or on a Mac, an iPhone or an Android phone.'**
+  String get terminalStepUpUnavailable;
+
   /// Banner of a refused opening with the problem text.
   ///
   /// In en, this message translates to:
@@ -10660,6 +10666,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Extend'**
   String get hintsExtend;
+
+  /// Title of the dialog that gives an expiring group membership a later last day (extendGroupMember).
+  ///
+  /// In en, this message translates to:
+  /// **'Extend the membership'**
+  String get expiringExtendMemberTitle;
+
+  /// Text of the dialog that extends an expiring group membership.
+  ///
+  /// In en, this message translates to:
+  /// **'The person stays in the group without a gap. Enter the new last day; it must come after the current one.'**
+  String get expiringExtendMemberBody;
+
+  /// Error under the last day of the extension dialog when the day is not after the current last day.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a day after the current last day.'**
+  String get expiringExtendMemberLater;
+
+  /// Notice after a group membership was extended.
+  ///
+  /// In en, this message translates to:
+  /// **'The membership is extended.'**
+  String get expiringMemberExtended;
+
+  /// Step-up purpose of extendGroupMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Extend a group membership'**
+  String get stepUpPurposeExtendMember;
 
   /// Action of the hint for an agent in mode personal that opens the page of the agent.
   ///
@@ -16972,6 +17008,12 @@ abstract class AppLocalizations {
   /// **'No session found'**
   String get assistNothing;
 
+  /// Note under an answer whose search reached the candidate limit (candidates_capped).
+  ///
+  /// In en, this message translates to:
+  /// **'Many sessions matched; the newest were searched, older ones may be missing. Ask more narrowly to reach them.'**
+  String get assistCapped;
+
   /// Marks a hit the search assistant did not pick.
   ///
   /// In en, this message translates to:
@@ -18541,12 +18583,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Voice input'**
   String get adminAgentFeatureVoice;
-
-  /// Feature switch `supports_title` of an agent.
-  ///
-  /// In en, this message translates to:
-  /// **'Title suggestions'**
-  String get adminAgentFeatureTitle;
 
   /// Feature switch `supports_files_out` of an agent.
   ///

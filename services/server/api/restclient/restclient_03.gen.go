@@ -16,6 +16,261 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// NewListGrantsRequest constructs an http.Request for the ListGrants method
+func NewListGrantsRequest(server string, params *ListGrantsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/grants")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.TargetKind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "target_kind", *params.TargetKind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.TargetId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "target_id", *params.TargetId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.SubjectKind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "subject_kind", *params.SubjectKind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.SubjectId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "subject_id", *params.SubjectId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.IncludeRevoked != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_revoked", *params.IncludeRevoked, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateGrantRequest calls the generic CreateGrant builder with application/json body
+func NewCreateGrantRequest(server string, params *CreateGrantParams, body CreateGrantJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateGrantRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewCreateGrantRequestWithBody constructs an http.Request for the CreateGrant method, with any body, and a specified content type
+func NewCreateGrantRequestWithBody(server string, params *CreateGrantParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/grants")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewPreviewGrantRequest calls the generic PreviewGrant builder with application/json body
+func NewPreviewGrantRequest(server string, body PreviewGrantJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPreviewGrantRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPreviewGrantRequestWithBody constructs an http.Request for the PreviewGrant method, with any body, and a specified content type
+func NewPreviewGrantRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/grants/preview")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetGrantRequest constructs an http.Request for the GetGrant method
+func NewGetGrantRequest(server string, grantId GrantIdPath) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "grant_id", grantId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/grants/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewRevokeGrantRequest calls the generic RevokeGrant builder with application/json body
 func NewRevokeGrantRequest(server string, grantId GrantIdPath, params *RevokeGrantParams, body RevokeGrantJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -512,6 +767,75 @@ func NewRemoveGroupMemberRequest(server string, groupId GroupIdPath, userId User
 	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewExtendGroupMemberRequest calls the generic ExtendGroupMember builder with application/json body
+func NewExtendGroupMemberRequest(server string, groupId GroupIdPath, userId UserIdPath, params *ExtendGroupMemberParams, body ExtendGroupMemberJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewExtendGroupMemberRequestWithBody(server, groupId, userId, params, "application/json", bodyReader)
+}
+
+// NewExtendGroupMemberRequestWithBody constructs an http.Request for the ExtendGroupMember method, with any body, and a specified content type
+func NewExtendGroupMemberRequestWithBody(server string, groupId GroupIdPath, userId UserIdPath, params *ExtendGroupMemberParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "group_id", groupId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "user_id", userId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/groups/%s/members/%s/extend", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: "uuid"})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
 	}
 
 	return req, nil
@@ -13024,6 +13348,24 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with DELETE /groups/{group_id}/members/{user_id} (the `RemoveGroupMember` operationId).
 	RemoveGroupMemberWithResponse(ctx context.Context, groupId GroupIdPath, userId UserIdPath, reqEditors ...RequestEditorFn) (*RemoveGroupMemberResponse, error)
 
+	// ExtendGroupMemberWithBodyWithResponse Extend a time-limited membership
+	//
+	// Gives the time-limited membership of the person that is in effect a later `expires_at`, on the same membership, so access never lapses (07 9.4). A membership without an expiry is `400 validation_failed` at `/expires_at` with `not_time_limited`, an expiry not after the current one with `not_later`; a person without a membership in effect is `404`; a group with `source = oidc_claim` is `409 conflict` with `claim_managed_group`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /groups/{group_id}/members/{user_id}/extend (the `ExtendGroupMember` operationId).
+	ExtendGroupMemberWithBodyWithResponse(ctx context.Context, groupId GroupIdPath, userId UserIdPath, params *ExtendGroupMemberParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ExtendGroupMemberResponse, error)
+
+	// ExtendGroupMemberWithResponse Extend a time-limited membership
+	//
+	// Gives the time-limited membership of the person that is in effect a later `expires_at`, on the same membership, so access never lapses (07 9.4). A membership without an expiry is `400 validation_failed` at `/expires_at` with `not_time_limited`, an expiry not after the current one with `not_later`; a person without a membership in effect is `404`; a group with `source = oidc_claim` is `409 conflict` with `claim_managed_group`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /groups/{group_id}/members/{user_id}/extend (the `ExtendGroupMember` operationId).
+	ExtendGroupMemberWithResponse(ctx context.Context, groupId GroupIdPath, userId UserIdPath, params *ExtendGroupMemberParams, body ExtendGroupMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*ExtendGroupMemberResponse, error)
+
 	// PostIncomingWebhookWithBearerWithBodyWithResponse Post a message through an incoming webhook with the token in Authorization
 	//
 	// The token of the incoming webhook is sent as `Authorization: Bearer <token>`; the path ends with the webhook ID. Use this variant where the sender can set a header, so the token never appears in a URL. Of the root security only `bearerAuth` applies here, with the token of the incoming webhook; any other scheme or credential counts as a wrong token (`404`).
@@ -23404,308 +23746,4 @@ func (r CompletePasskeyLoginResponse) GetJSON201() *TokenResponse {
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
 func (r CompletePasskeyLoginResponse) GetApplicationproblemJSON400() *BadRequest {
 	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r CompletePasskeyLoginResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r CompletePasskeyLoginResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r CompletePasskeyLoginResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r CompletePasskeyLoginResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r CompletePasskeyLoginResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CompletePasskeyLoginResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r CompletePasskeyLoginResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// LoginWithPasswordResponse200Headers the declared response headers of an HTTP 200 response for LoginWithPassword
-type LoginWithPasswordResponse200Headers struct {
-	CorrelationId *CorrelationId
-	SetCookie     *string
-}
-
-// LoginWithPasswordResponse201Headers the declared response headers of an HTTP 201 response for LoginWithPassword
-type LoginWithPasswordResponse201Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// LoginWithPasswordResponse400Headers the declared response headers of an HTTP 400 response for LoginWithPassword
-type LoginWithPasswordResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// LoginWithPasswordResponse401Headers the declared response headers of an HTTP 401 response for LoginWithPassword
-type LoginWithPasswordResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// LoginWithPasswordResponse404Headers the declared response headers of an HTTP 404 response for LoginWithPassword
-type LoginWithPasswordResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// LoginWithPasswordResponse429Headers the declared response headers of an HTTP 429 response for LoginWithPassword
-type LoginWithPasswordResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// LoginWithPasswordResponseDefaultHeaders the declared response headers of an HTTP default response for LoginWithPassword
-type LoginWithPasswordResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type LoginWithPasswordResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *ConsoleLogin
-	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *TokenResponse
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *LoginWithPasswordResponse200Headers
-	// Headers201 the parsed response headers for an HTTP 201 response
-	Headers201 *LoginWithPasswordResponse201Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *LoginWithPasswordResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *LoginWithPasswordResponse401Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *LoginWithPasswordResponse404Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *LoginWithPasswordResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *LoginWithPasswordResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r LoginWithPasswordResponse) GetJSON200() *ConsoleLogin {
-	return r.JSON200
-}
-
-// GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r LoginWithPasswordResponse) GetJSON201() *TokenResponse {
-	return r.JSON201
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r LoginWithPasswordResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r LoginWithPasswordResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r LoginWithPasswordResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r LoginWithPasswordResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r LoginWithPasswordResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r LoginWithPasswordResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r LoginWithPasswordResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r LoginWithPasswordResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r LoginWithPasswordResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// CreateStepUpChallengeResponse200Headers the declared response headers of an HTTP 200 response for CreateStepUpChallenge
-type CreateStepUpChallengeResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// CreateStepUpChallengeResponse401Headers the declared response headers of an HTTP 401 response for CreateStepUpChallenge
-type CreateStepUpChallengeResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// CreateStepUpChallengeResponse403Headers the declared response headers of an HTTP 403 response for CreateStepUpChallenge
-type CreateStepUpChallengeResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateStepUpChallengeResponse429Headers the declared response headers of an HTTP 429 response for CreateStepUpChallenge
-type CreateStepUpChallengeResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// CreateStepUpChallengeResponseDefaultHeaders the declared response headers of an HTTP default response for CreateStepUpChallenge
-type CreateStepUpChallengeResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type CreateStepUpChallengeResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *StepUpChallenge
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *CreateStepUpChallengeResponse200Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *CreateStepUpChallengeResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *CreateStepUpChallengeResponse403Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *CreateStepUpChallengeResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *CreateStepUpChallengeResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r CreateStepUpChallengeResponse) GetJSON200() *StepUpChallenge {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r CreateStepUpChallengeResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r CreateStepUpChallengeResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r CreateStepUpChallengeResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r CreateStepUpChallengeResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r CreateStepUpChallengeResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r CreateStepUpChallengeResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CreateStepUpChallengeResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r CreateStepUpChallengeResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// CompleteStepUpWithDeviceKeyResponse200Headers the declared response headers of an HTTP 200 response for CompleteStepUpWithDeviceKey
-type CompleteStepUpWithDeviceKeyResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
 }

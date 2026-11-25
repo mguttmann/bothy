@@ -10,8 +10,11 @@ import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
 import '../common/admin_action.dart';
+import '../common/confirm_change.dart';
 import '../data/access_repository.dart';
 import '../grants/grant_labels.dart' show lastDayLabel;
+import '../groups/member_editor.dart' show parseDay;
+import '../self/self_feedback.dart' show SelfNotice;
 import '../shell/admin_routes.dart';
 import 'access_list.dart';
 import 'hint_texts.dart';
@@ -26,7 +29,8 @@ import 'hint_texts.dart';
 /// An agent token has "Renew token", which opens the agent's page with its tokens (M4-28: a new
 /// token shown once, then revoking the old one); an app token has no screen in the
 /// administration yet and says how to renew it (08 12: a new token, then revoking the old one).
-/// A membership opens its group.
+/// A membership has "Extend" (a later last day on the same membership through
+/// `extendGroupMember`, so access never lapses) and opens its group.
 /// A refused list shows the translated reason (15 1 principle 1).
 ///
 /// Example:
@@ -83,6 +87,12 @@ class _ExpiringAccessViewState extends State<ExpiringAccessView>
     return switch (entry.kind) {
       ExpiringKind.grant when grant != null => grantActions(key, grant),
       ExpiringKind.membership when group != null => [
+        if (entry.userId case final user?)
+          TextButton(
+            key: ValueKey('$key.extend'),
+            onPressed: busy ? null : () => _extendMember(entry, group, user),
+            child: Text(l.hintsExtend),
+          ),
         TextButton(
           key: ValueKey('$key.group'),
           onPressed: () =>
@@ -100,6 +110,34 @@ class _ExpiringAccessViewState extends State<ExpiringAccessView>
       ],
       _ => const [],
     };
+  }
+
+  /// "Extend" of a membership (AUD-PKG-R2-owner-server): the new last day, then
+  /// `extendGroupMember` on the same membership, so access never lapses (07 9.4).
+  Future<void> _extendMember(
+    ExpiringEntry entry,
+    String group,
+    String user,
+  ) async {
+    final l = AppLocalizations.of(context);
+    final until = await showDialog<DateTime>(
+      context: context,
+      builder: (_) => _ExtendMemberDialog(
+        current: entry.expiresAt,
+        timeZone: widget.timeZone,
+      ),
+    );
+    if (until == null || !mounted) return;
+    final ok = await runChange('${_keyOf(entry)}.extend', () async {
+      await widget.repository.extendMember(
+        group,
+        user,
+        expiresAt: until,
+        purpose: l.stepUpPurposeExtendMember,
+      );
+      return SelfNotice(l.expiringMemberExtended);
+    }, reload: reload);
+    if (ok) widget.onChanged?.call();
   }
 
   Widget _row(ExpiringEntry entry) {
@@ -140,6 +178,77 @@ class _ExpiringAccessViewState extends State<ExpiringAccessView>
         noticeBanner(),
         ...listBody('expiring', empty: l.expiringEmpty, row: _row),
       ],
+    );
+  }
+}
+
+/// The new last day of a membership that ends at [current]: a day as `YYYY-MM-DD` in
+/// [timeZone]; the membership then ends at the start of the following day. "Confirm" stays
+/// disabled until the end lies after [current]. Pops that end, or null for "Cancel".
+class _ExtendMemberDialog extends StatefulWidget {
+  const _ExtendMemberDialog({required this.current, required this.timeZone});
+
+  final DateTime current;
+  final String timeZone;
+
+  @override
+  State<_ExtendMemberDialog> createState() => _ExtendMemberDialogState();
+}
+
+class _ExtendMemberDialogState extends State<_ExtendMemberDialog> {
+  final TextEditingController _day = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _day.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _day.dispose();
+    super.dispose();
+  }
+
+  /// The end of the typed last day: the start of the next day in the time zone.
+  DateTime? _until() {
+    final day = parseDay(_day.text.trim());
+    if (day == null) return null;
+    final next = DateTime.utc(day.year, day.month, day.day + 1);
+    try {
+      return L10nFormat(Localizations.localeOf(context))
+          .dayStart(next.year, next.month, next.day, timeZone: widget.timeZone);
+    } on ArgumentError {
+      return next;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final text = _day.text.trim();
+    final until = _until();
+    final later = until != null && until.isAfter(widget.current);
+    String? error;
+    if (text.isNotEmpty && until == null) {
+      error = l.adminMemberUntilInvalid;
+    } else if (until != null && !later) {
+      error = l.expiringExtendMemberLater;
+    }
+    return ConfirmChange(
+      title: l.expiringExtendMemberTitle,
+      body: l.expiringExtendMemberBody,
+      confirmLabel: l.hintsExtend,
+      canConfirm: later,
+      onConfirm: (_) => Navigator.of(context).pop(until),
+      fields: TextField(
+        key: const ValueKey('extendMember.lastDay'),
+        controller: _day,
+        decoration: InputDecoration(
+          labelText: l.adminTokenLastDay,
+          errorText: error,
+        ),
+      ),
     );
   }
 }

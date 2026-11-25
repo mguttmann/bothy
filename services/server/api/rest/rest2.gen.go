@@ -467,6 +467,9 @@ type StrictServerInterface interface {
 	// RemoveGroupMember Remove a member
 	// (DELETE /groups/{group_id}/members/{user_id})
 	RemoveGroupMember(ctx context.Context, request RemoveGroupMemberRequestObject) (RemoveGroupMemberResponseObject, error)
+	// ExtendGroupMember Extend a time-limited membership
+	// (POST /groups/{group_id}/members/{user_id}/extend)
+	ExtendGroupMember(ctx context.Context, request ExtendGroupMemberRequestObject) (ExtendGroupMemberResponseObject, error)
 	// PostIncomingWebhookWithBearer Post a message through an incoming webhook with the token in Authorization
 	// (POST /hooks/{webhook_id})
 	PostIncomingWebhookWithBearer(ctx context.Context, request PostIncomingWebhookWithBearerRequestObject) (PostIncomingWebhookWithBearerResponseObject, error)
@@ -5610,6 +5613,41 @@ func (sh *strictHandler) RemoveGroupMember(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RemoveGroupMemberResponseObject); ok {
 		if err := validResponse.VisitRemoveGroupMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ExtendGroupMember operation middleware
+func (sh *strictHandler) ExtendGroupMember(w http.ResponseWriter, r *http.Request, groupId GroupIdPath, userId UserIdPath, params ExtendGroupMemberParams) {
+	var request ExtendGroupMemberRequestObject
+
+	request.GroupId = groupId
+	request.UserId = userId
+	request.Params = params
+
+	var body ExtendGroupMemberJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ExtendGroupMember(ctx, request.(ExtendGroupMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ExtendGroupMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ExtendGroupMemberResponseObject); ok {
+		if err := validResponse.VisitExtendGroupMemberResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -65,7 +65,8 @@ func newWorker[A Args](h Handler[A], o HandlerOptions, kind string, d workerDeps
 }
 
 // Work runs one attempt inside the CONSUMER span "job <kind>" with bothy.job.kind and
-// bothy.outcome, and records its duration with the same two attributes in bothy.job.duration. A
+// bothy.outcome, and records its duration with the same two attributes in bothy.job.duration; a
+// failed last attempt also counts bothy.job.discarded with bothy.job.kind. A
 // nil result while ctx has ended becomes ctx.Err(): a handler that swallowed
 // the cancellation would otherwise mark an unfinished job as done, and a rerun is safe because
 // jobs are idempotent (docs/DECISIONS.md M1-14). In maintenance mode (Config.Maintenance) a kind
@@ -87,6 +88,9 @@ func (w *worker[A]) Work(ctx context.Context, j *river.Job[A]) (err error) {
 		outcome := outcomeOf(ctx, err)
 		if w.d.metrics != nil {
 			w.d.metrics.observed(ctx, w.kind, outcome, time.Since(start))
+			if outcome == outcomeFailed && lastAttempt(j) {
+				w.d.metrics.discardedJob(ctx, w.kind)
+			}
 		}
 		span.SetAttributes(attribute.String(attr.Outcome, outcome))
 		if outcome == outcomeFailed {
@@ -109,11 +113,16 @@ func (w *worker[A]) Work(ctx context.Context, j *river.Job[A]) (err error) {
 // last one. A panic has its own line (run).
 func (w *worker[A]) logFailed(ctx context.Context, j *river.Job[A], err error) {
 	level := slog.LevelWarn
-	if j.JobRow != nil && j.Attempt >= j.MaxAttempts {
+	if lastAttempt(j) {
 		level = slog.LevelError
 	}
 	w.d.log.Log(context.WithoutCancel(ctx), level, msgFailed,
 		slog.String(attr.JobKind, w.kind), slog.String(attr.ErrorType, errorType(err)))
+}
+
+// lastAttempt reports whether j runs its last attempt, after which River discards a failed job.
+func lastAttempt[A Args](j *river.Job[A]) bool {
+	return j.JobRow != nil && j.Attempt >= j.MaxAttempts
 }
 
 // errPanicked marks the error of an attempt whose handler panicked.

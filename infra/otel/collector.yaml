@@ -172,6 +172,7 @@ processors:
       - bothy.push.provider
       - bothy.ratelimit.class
       - bothy.reason
+      - bothy.request.duration
       - bothy.run.id
       - bothy.run.state
       - bothy.server.role

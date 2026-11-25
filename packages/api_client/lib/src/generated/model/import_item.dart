@@ -19,7 +19,7 @@ part 'import_item.g.dart';
 /// * [targetKind]
 /// * [targetId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [state]
-/// * [error]
+/// * [error] - With `state = failed` the field code of the content rule the message broke (`too_long`, `empty`, `invalid`, `limit_reached`); the batch went on (22, 8).
 /// * [sourceChanged] - Present and `true` when a repeated key came with a `content_sha256` different from the stored one; nothing was changed (22, 7.2 item 4).
 /// * [session] - Present on a `thread` item that carried `earlier_session` and has a thread (22, 9 step 1): `taken_over` when the earlier `agent_sessions` row was written by this batch, `already_present` when a row of the same thread, agent and reference with `end_reason = import` existed, `dropped_late` when the thread has had a current session since the import and nothing was written (22, 9 step 6).
 /// * [createdAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -47,6 +47,7 @@ abstract class ImportItem implements Built<ImportItem, ImportItemBuilder> {
   ImportItemState get state;
   // enum stateEnum {  pending,  posted,  skipped,  failed,  };
 
+  /// With `state = failed` the field code of the content rule the message broke (`too_long`, `empty`, `invalid`, `limit_reached`); the batch went on (22, 8).
   @BuiltValueField(wireName: r'error')
   String? get error;
 

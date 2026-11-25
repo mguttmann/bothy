@@ -11,7 +11,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/OWNER/bothy/services/server/internal/billing/domain/startprices"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
@@ -89,5 +93,28 @@ func TestIDT06_RequestsBeforeSetupGet503(t *testing.T) {
 	}
 	if code, body, _ := call(t, public, http.MethodGet, "/api/v1/me", ""); code != http.StatusUnauthorized {
 		t.Fatalf("after setup without a restart: %d %s, want 401", code, body)
+	}
+	checkStartPrices(t, db, res.OwnerID)
+}
+
+// checkStartPrices (AUD-PKG-R2-owner-server, #894): the bootstrap loaded every row of the start
+// file with the first owner as created_by and wrote one audit entry price.load_start.
+func checkStartPrices(t *testing.T, db *pgtest.DB, owner ids.ID) {
+	t.Helper()
+	want, err := startprices.Rows()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	pool := db.Pool(t, pg.RoleOwner)
+	var rows, byOwner, audits int
+	if err := pool.QueryRow(ctx, `SELECT count(*), count(*) FILTER (WHERE created_by = $1) FROM price_table`, owner).Scan(&rows, &byOwner); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE action = 'price.load_start'`).Scan(&audits); err != nil {
+		t.Fatal(err)
+	}
+	if rows != len(want) || byOwner != len(want) || audits != 1 {
+		t.Fatalf("price rows %d (by the owner %d), audit entries %d; want %d rows by the owner and one entry", rows, byOwner, audits, len(want))
 	}
 }

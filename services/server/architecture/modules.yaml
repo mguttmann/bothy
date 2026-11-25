@@ -66,8 +66,8 @@ modules:
     adapter_vendors: [otel, pgx]   # adapters/otelmetrics counts the CSP violation reports (M6-03); sqlc code and the repository (M1-15)
   billing:
     tables: [price_table, cost_entries]
-    actions: [cost.read.thread, cost.read.aggregate, price.read, price.manage, cost.reconcile,
-              cost.reconcile.read, cost.reconcile.submit]
+    actions: [cost.read.thread, cost.read.aggregate, price.read, price.manage, price.load_start,
+              cost.reconcile, cost.reconcile.read, cost.reconcile.submit]
     events: []
     ephemeral_events: []
     ws_ops: []
@@ -84,7 +84,7 @@ modules:
   authz:
     tables: [groups, group_memberships, grants]
     actions: [access.explain, access.hints.read, access.preview, access.view_as, group.read, group.create,
-              group.update, group.delete, group.member.add, group.member.remove,
+              group.update, group.delete, group.member.add, group.member.extend, group.member.remove,
               group.member.expire, group.member.sync, grant.read, grant.create, grant.revoke,
               grant.expire]
     events: [grant.changed, group.changed, access.changed, access.expiring]

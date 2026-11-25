@@ -155,6 +155,7 @@ Operating values of the own measurement ([25-visualization.md](../spec/25-visual
 | `bothy.search.duration` | Histogram | `s` | `bothy.outcome` (`ok`, `client_error`, `timeout`, `server_error`) | api: one full-text search (`search`) from the start of the use case to its end; the prefix search is measured by `http.server.request.duration` (M3-14) | `bothy_search_duration_seconds` |
 | `bothy.job.duration` | Histogram | `s` | `bothy.job.kind`, `bothy.outcome` (`completed`, `failed`, `cancelled`, `snoozed`) | worker | `bothy_job_duration_seconds` |
 | `bothy.job.queue` | Gauge | `{job}` | `bothy.job.kind` | worker | `bothy_job_queue` |
+| `bothy.job.discarded` | Counter | `{job}` | `bothy.job.kind` | worker: one per job whose last attempt failed, so River discards it; read by `BothyJobFinallyFailed` | `bothy_job_discarded_total` |
 | `bothy.egress.blocked` | Counter | `{request}` | `bothy.reason` (`url_not_allowed`, `scheme_not_allowed`, `host_not_allowed`, `address_blocked`, `redirect_not_allowed`) | api, worker: connection rejected by the egress client ([19-security.md](../spec/19-security.md) SEC-NET-5) | `bothy_egress_blocked_total` |
 
 ### 4.5 Database
@@ -309,6 +310,7 @@ This list equals the allowlist in [infra/otel/collector.yaml](../../infra/otel/c
 | `bothy.push.provider` | `apns`, `fcm`, `unifiedpush`, `wns` | |
 | `bothy.ratelimit.class` | class from [05-actions.md](../spec/05-actions.md) 3 | |
 | `bothy.reason` | fixed list per signal | never free text |
+| `bothy.request.duration` | seconds from the start of an HTTP request until its handler returned | only in the access log `http request` (info), never on metrics; latency figures come from `http.server.request.duration` |
 | `bothy.run.state` | run state | |
 | `bothy.server.role` | `api`, `worker`, `all` | resource |
 | `bothy.signing_key.purpose` | `access_token`, `invocation`, `webhook_out`, `audit_checkpoint` | only in logs of key transitions ([19-security.md](../spec/19-security.md) 10) |

@@ -5073,6 +5073,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die Verbindung hat das Terminal-Protokoll verletzt. Es gibt keinen neuen Versuch.';
 
   @override
+  String get terminalStepUpUnavailable =>
+      'Dieses Gerät kann das Terminal nicht öffnen: Das Terminal braucht eine frische Bestätigung mit dem Geräteschlüssel, und dieses Gerät (Windows) hat noch keinen. Öffne das Terminal in der Web-Konsole dieser Instanz im Browser oder auf einem Mac, einem iPhone oder einem Android-Telefon.';
+
+  @override
   String terminalStateFailed(String problem) {
     return 'Das Terminal konnte nicht geöffnet werden: $problem';
   }
@@ -6688,6 +6692,24 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get hintsExtend => 'Verlängern';
+
+  @override
+  String get expiringExtendMemberTitle => 'Mitgliedschaft verlängern';
+
+  @override
+  String get expiringExtendMemberBody =>
+      'Die Person bleibt ohne Lücke in der Gruppe. Gib den neuen letzten Tag ein; er muss nach dem bisherigen liegen.';
+
+  @override
+  String get expiringExtendMemberLater =>
+      'Wähle einen Tag nach dem bisherigen letzten Tag.';
+
+  @override
+  String get expiringMemberExtended => 'Die Mitgliedschaft ist verlängert.';
+
+  @override
+  String get stepUpPurposeExtendMember =>
+      'Eine Gruppenmitgliedschaft verlängern';
 
   @override
   String get hintsOpenAgent => 'Agent öffnen';
@@ -10634,6 +10656,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get assistNothing => 'Keine Sitzung gefunden';
 
   @override
+  String get assistCapped =>
+      'Viele Sitzungen passen; durchsucht wurden die neuesten, ältere können fehlen. Frag genauer, um sie zu finden.';
+
+  @override
   String get assistFulltext => 'Volltext, ohne den Assistenten';
 
   @override
@@ -11708,9 +11734,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get adminAgentFeatureVoice => 'Spracheingabe';
-
-  @override
-  String get adminAgentFeatureTitle => 'Titelvorschläge';
 
   @override
   String get adminAgentFeatureFilesOut => 'Dateien senden';

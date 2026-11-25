@@ -232,6 +232,40 @@ func (q *Queries) DecrementMessageCount(ctx context.Context, id pgtype.UUID) (in
 	return result.RowsAffected(), nil
 }
 
+const expiredThreadTitles = `-- name: ExpiredThreadTitles :many
+SELECT id FROM threads
+WHERE title <> '' AND deleted_at IS NULL AND last_activity_at < $1
+ORDER BY last_activity_at, id
+LIMIT $2
+`
+
+type ExpiredThreadTitlesParams struct {
+	Cutoff   pgtype.Timestamptz
+	RowLimit int32
+}
+
+// The threads of the job retention.content (20 4.1, AUD-PKG-R2-owner-server): a live thread with
+// a title whose last activity lies before the cutoff, oldest first.
+func (q *Queries) ExpiredThreadTitles(ctx context.Context, arg ExpiredThreadTitlesParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, expiredThreadTitles, arg.Cutoff, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getThread = `-- name: GetThread :one
 
 SELECT id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,

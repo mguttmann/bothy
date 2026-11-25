@@ -17,6 +17,7 @@ import (
 	auditpg "github.com/OWNER/bothy/services/server/internal/audit/adapters/postgres"
 	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
 	billingpg "github.com/OWNER/bothy/services/server/internal/billing/adapters/postgres"
+	chatapp "github.com/OWNER/bothy/services/server/internal/chat/app"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	importerpg "github.com/OWNER/bothy/services/server/internal/importer/adapters/postgres"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
@@ -24,6 +25,7 @@ import (
 	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
 	notifypg "github.com/OWNER/bothy/services/server/internal/notify/adapters/postgres"
 	privacypg "github.com/OWNER/bothy/services/server/internal/privacy/adapters/postgres"
+	runspg "github.com/OWNER/bothy/services/server/internal/runs/adapters/postgres"
 	statuspg "github.com/OWNER/bothy/services/server/internal/status/adapters/postgres"
 	terminalpg "github.com/OWNER/bothy/services/server/internal/terminal/adapters/postgres"
 )
@@ -66,10 +68,7 @@ var withParent = map[string]string{
 	"interactions":              "message_components",
 	"thread_tags":               "threads",
 	"agent_sessions":            "threads",
-	"runs":                      "threads",
-	"run_steps":                 "runs",
 	"run_followups":             "runs",
-	"run_wakes":                 "runs",
 	"run_autonomy":              "threads",
 	"team_inputs":               "messages",
 	"team_mirrors":              "messages",
@@ -84,7 +83,6 @@ var withParent = map[string]string{
 var withoutEndTime = map[string]string{
 	"spaces":                 "archiving; never removed by time (03 principle 7)",
 	"channels":               "archiving; never removed by time (03 principle 7)",
-	"threads":                "never removed by time (03 principle 7); its messages go by retention.content",
 	"forum_tags":             "changed by the owner of the channel",
 	"message_templates":      "personal ones with the account (M7-06)",
 	"local_credentials":      "with the account (M7-06)",
@@ -105,6 +103,7 @@ func retentionParticipants(t *testing.T) []retention.Participant {
 		terminalpg.NewRetention(nil), appspg.NewRetention(nil), billingpg.NewRetention(nil),
 		new(messagingapp.Service).Retention(), trim, auditapp.NewIPKeys(auditpg.NewRepository(nil), nil),
 		statuspg.NewRetention(nil), privacypg.NewRetention(nil), importerpg.NewRetention(nil),
+		runspg.NewRetention(nil), new(chatapp.Service).TitleRetention(),
 	}
 }
 

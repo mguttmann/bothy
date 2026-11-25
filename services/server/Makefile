@@ -26,6 +26,10 @@ help: ## Show the targets
 # Static binaries without cgo, built like the binary in services/server/Dockerfile (same flags),
 # so the release binary and the one in the image come from the same build rule. release.yml
 # signs them and adds SBOMs and checksums (docs/spec/18-release.md section 6).
+# REVISION is the commit `bothy version` reports (buildinfo.Revision); release.yml builds in a
+# checkout, so the default is its HEAD.
+REVISION ?= $(shell git rev-parse HEAD 2>/dev/null)
+
 release-build: ## Server binaries (cmd/bothy) for linux/amd64 and linux/arm64: make release-build VERSION=<x.y.z> OUT=<dir>
 	@[ -n "$${OUT:-}" ] && [ -n "$${VERSION:-}" ] || { echo "usage: make release-build VERSION=<x.y.z> OUT=<dir>"; exit 2; }
 	@[ "$$(tr -d '[:space:]' < VERSION)" = "$$VERSION" ] || { echo "release-build: VERSION file says $$(tr -d '[:space:]' < VERSION), not $$VERSION"; exit 1; }
@@ -34,5 +38,7 @@ release-build: ## Server binaries (cmd/bothy) for linux/amd64 and linux/arm64: m
 	  os=$${p%/*}; arch=$${p#*/}; out="$$OUT/bothy_$${VERSION}_$${os}_$${arch}"; \
 	  echo "  build $$out"; \
 	  CGO_ENABLED=0 GOTOOLCHAIN=local GOFLAGS=-mod=readonly GOOS=$$os GOARCH=$$arch \
-	    go build -trimpath -buildvcs=false -ldflags "-s -w" -o "$$out" ./cmd/bothy || exit 1; \
+	    go build -trimpath -buildvcs=false \
+	      -ldflags "-s -w -X github.com/OWNER/bothy/services/server/internal/platform/buildinfo.revision=$(REVISION)" \
+	      -o "$$out" ./cmd/bothy || exit 1; \
 	done

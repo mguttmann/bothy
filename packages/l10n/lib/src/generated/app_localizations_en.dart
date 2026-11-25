@@ -5049,6 +5049,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'The connection broke the terminal protocol. No new attempt is made.';
 
   @override
+  String get terminalStepUpUnavailable =>
+      'This device cannot open the terminal: the terminal needs a fresh confirmation with the device key, and this device (Windows) has none yet. Open the terminal in the web console of this instance in your browser, or on a Mac, an iPhone or an Android phone.';
+
+  @override
   String terminalStateFailed(String problem) {
     return 'The terminal could not be opened: $problem';
   }
@@ -6654,6 +6658,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hintsExtend => 'Extend';
+
+  @override
+  String get expiringExtendMemberTitle => 'Extend the membership';
+
+  @override
+  String get expiringExtendMemberBody =>
+      'The person stays in the group without a gap. Enter the new last day; it must come after the current one.';
+
+  @override
+  String get expiringExtendMemberLater =>
+      'Choose a day after the current last day.';
+
+  @override
+  String get expiringMemberExtended => 'The membership is extended.';
+
+  @override
+  String get stepUpPurposeExtendMember => 'Extend a group membership';
 
   @override
   String get hintsOpenAgent => 'Open agent';
@@ -10576,6 +10597,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistNothing => 'No session found';
 
   @override
+  String get assistCapped =>
+      'Many sessions matched; the newest were searched, older ones may be missing. Ask more narrowly to reach them.';
+
+  @override
   String get assistFulltext => 'Full text, without the assistant';
 
   @override
@@ -11643,9 +11668,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get adminAgentFeatureVoice => 'Voice input';
-
-  @override
-  String get adminAgentFeatureTitle => 'Title suggestions';
 
   @override
   String get adminAgentFeatureFilesOut => 'Sending files';

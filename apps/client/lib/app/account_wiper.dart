@@ -8,6 +8,7 @@ library;
 
 import 'dart:io';
 
+import 'package:auth/auth.dart' show SessionSecretKeys;
 import 'package:domain/domain.dart' show canonicalUuid;
 
 import '../platform/device_key_signer.dart';
@@ -105,7 +106,8 @@ final class UnfinishedWipe {
 /// device keys, deletes the push items of the shared keychain ([forgetPush], M5-04), the child
 /// session of the Share Extension and the shared data of sharing ([forgetShare], M5-06) and
 /// deletes every secret of the instance (tokens, database key, device ID).
-/// Only the server address stays, which is not an instance secret ([AppPreferences]). Each
+/// Only the server address stays, which is not an instance secret ([AppPreferences]); after an
+/// expired session the device keys and the device ID stay too ([wipe] with `keepDevice`). Each
 /// step runs even when an earlier one failed, so a broken database never keeps a key alive.
 ///
 /// [wipe] throws a [StateError] that names the failed steps; the caller keeps an
@@ -150,9 +152,22 @@ final class AccountWiper {
   Future<void>? _running;
 
   /// Deletes everything; a second call waits for the first and does nothing more.
-  Future<void> wipe() => _running ??= _wipe();
+  ///
+  /// With [keepDevice] (an expired session, `refreshRejected`, AUD-PKG-R2-owner-server) the
+  /// device keys, the device ID and the record of the keys stay, so the next login registers
+  /// the same device, which the server takes back as active (08 5.1); everything else goes as
+  /// for every other cause. Only a revocation deletes the device itself.
+  Future<void> wipe({bool keepDevice = false}) =>
+      _running ??= _wipe(keepDevice);
 
-  Future<void> _wipe() async {
+  /// Whether the secret [key] of the instance belongs to the device that [wipe] keeps with
+  /// `keepDevice`: the device ID of the session and the record of the device keys.
+  static bool isDeviceSecret(String key) =>
+      key == RegisteredDeviceKeys.keyName ||
+      (key.startsWith('${SessionSecretKeys.root}/') &&
+          key.endsWith('/${SessionSecretKeys.deviceIdName}'));
+
+  Future<void> _wipe(bool keepDevice) async {
     final failures = <Object>[];
     Future<void> step(Future<void> Function() body) async {
       try {
@@ -167,12 +182,16 @@ final class AccountWiper {
     await step(() async {
       if (await folder.exists()) await folder.delete(recursive: true);
     });
-    await step(() => _keys.delete(keyScope));
+    if (!keepDevice) await step(() => _keys.delete(keyScope));
     final forgetPush = _forgetPush;
     if (forgetPush != null) await step(() => forgetPush(instanceId));
     final forgetShare = _forgetShare;
     if (forgetShare != null) await step(() => forgetShare(instanceId));
-    await step(_secrets.deleteAll);
+    await step(
+      keepDevice
+          ? () => _secrets.deleteAllExcept(isDeviceSecret)
+          : _secrets.deleteAll,
+    );
     if (failures.isNotEmpty) {
       throw StateError(
         'wipe incomplete: ${failures.map((f) => f.runtimeType).join(', ')}',

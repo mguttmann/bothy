@@ -98,6 +98,7 @@ alerts of `bothy-alerts.yaml`.
 | `BothyAuthzError` | page | permission check reports a programming error (`authz_not_checked`, `unknown_action`) or a difference between the SQL filter and `authorize` (`filter_mismatch`) | |
 | `BothySecretRefreshFailing` | ticket | re-reading a secret fails | |
 | `BothyMalwareScanFailing` | ticket | only errors, no result | |
+| `BothyJobFinallyFailed` | ticket | a job of the kinds `privacy.erase`, `instance.key_rotation` or `sync.partition_maintenance` failed its last attempt in the last 24 hours, per kind | |
 | `BothyBackupStale` | page | no backup for 26 h | `backup.max_age` |
 | `BothyBackupRunFailed` | ticket | a backup run failed in the last 24 hours, per kind of `backup_runs` (`pg_full`, `pg_diff`, `logical`, `objects`) | |
 | `BothyWalArchiveStale` | page | no WAL segment for 15 minutes | above `backup.pg.archive_timeout` |
@@ -190,6 +191,15 @@ that ends with `error` blocks its file as "Check failed" ([12-files.md](../spec/
 alert counts only such final results: while clamd is unreachable or a scan runs into its time
 limit, the pass retries and counts nothing, so uploads stay `pending` without this alert. The
 alert on the age of the oldest `pending` file is not built (plan row V3-31).
+
+### bothyjobfinallyfailed
+River discarded a job of the named kind after its last attempt (`bothy.job.discarded`). The
+worker log has the line `job attempt failed` at level `ERROR` with `bothy.job.kind` and
+`error.type`; the error texts of the attempts stay in `river_job.errors` of the discarded row
+(`services/server/internal/platform/jobs/README.md`). Fix the cause. `instance.key_rotation` and
+`sync.partition_maintenance` are periodic jobs and run again at their next interval;
+`privacy.erase` is inserted only by the approval of its erasure request, so check that request
+([20-privacy.md](../spec/20-privacy.md)).
 
 ### bothybackupstale
 The newest rows of `backup_runs` and `docker compose logs backup`

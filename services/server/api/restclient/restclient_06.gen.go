@@ -13,6 +13,384 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// PutQuietHoursRuleWithBodyWithResponse Change a quiet hours rule
+//
+// Replaces the whole rule; an absent time_zone clears it (the rule then follows the person's time zone). Equal values answer 200 without event and without a new version. time_zone and the list size are checked as for createQuietHoursRule (unknown_time_zone, limit_reached).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /me/quiet-hours/{rule_id} (the `PutQuietHoursRule` operationId).
+func (c *ClientWithResponses) PutQuietHoursRuleWithBodyWithResponse(ctx context.Context, ruleId RuleIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutQuietHoursRuleResponse, error) {
+	rsp, err := c.PutQuietHoursRuleWithBody(ctx, ruleId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutQuietHoursRuleResponse(rsp)
+}
+
+// PutQuietHoursRuleWithResponse Change a quiet hours rule
+//
+// Replaces the whole rule; an absent time_zone clears it (the rule then follows the person's time zone). Equal values answer 200 without event and without a new version. time_zone and the list size are checked as for createQuietHoursRule (unknown_time_zone, limit_reached).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /me/quiet-hours/{rule_id} (the `PutQuietHoursRule` operationId).
+func (c *ClientWithResponses) PutQuietHoursRuleWithResponse(ctx context.Context, ruleId RuleIdPath, body PutQuietHoursRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*PutQuietHoursRuleResponse, error) {
+	rsp, err := c.PutQuietHoursRule(ctx, ruleId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutQuietHoursRuleResponse(rsp)
+}
+
+// ListMyReadStatesWithResponse List own read positions
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me/read-states (the `ListMyReadStates` operationId).
+func (c *ClientWithResponses) ListMyReadStatesWithResponse(ctx context.Context, params *ListMyReadStatesParams, reqEditors ...RequestEditorFn) (*ListMyReadStatesResponse, error) {
+	rsp, err := c.ListMyReadStates(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMyReadStatesResponse(rsp)
+}
+
+// ListMySessionsWithResponse List own sessions
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me/sessions (the `ListMySessions` operationId).
+func (c *ClientWithResponses) ListMySessionsWithResponse(ctx context.Context, params *ListMySessionsParams, reqEditors ...RequestEditorFn) (*ListMySessionsResponse, error) {
+	rsp, err := c.ListMySessions(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMySessionsResponse(rsp)
+}
+
+// CreateExtensionSessionWithBodyWithResponse Create a child session for an app extension
+//
+// Creates a child session of the calling app session for the notification or share extension, with its own refresh family on the same device key (08, 7.4). An active child of the same component is replaced. The refresh token is shown once; the request carries no `Idempotency-Key` because a repeat only replaces the child.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/sessions/extensions (the `CreateExtensionSession` operationId).
+func (c *ClientWithResponses) CreateExtensionSessionWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateExtensionSessionResponse, error) {
+	rsp, err := c.CreateExtensionSessionWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateExtensionSessionResponse(rsp)
+}
+
+// CreateExtensionSessionWithResponse Create a child session for an app extension
+//
+// Creates a child session of the calling app session for the notification or share extension, with its own refresh family on the same device key (08, 7.4). An active child of the same component is replaced. The refresh token is shown once; the request carries no `Idempotency-Key` because a repeat only replaces the child.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/sessions/extensions (the `CreateExtensionSession` operationId).
+func (c *ClientWithResponses) CreateExtensionSessionWithResponse(ctx context.Context, body CreateExtensionSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateExtensionSessionResponse, error) {
+	rsp, err := c.CreateExtensionSession(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateExtensionSessionResponse(rsp)
+}
+
+// ListMySettingsWithResponse List own settings
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me/settings (the `ListMySettings` operationId).
+func (c *ClientWithResponses) ListMySettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMySettingsResponse, error) {
+	rsp, err := c.ListMySettings(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMySettingsResponse(rsp)
+}
+
+// DeleteMySettingWithResponse Reset an own setting to default
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /me/settings/{key} (the `DeleteMySetting` operationId).
+func (c *ClientWithResponses) DeleteMySettingWithResponse(ctx context.Context, key KeyPath, reqEditors ...RequestEditorFn) (*DeleteMySettingResponse, error) {
+	rsp, err := c.DeleteMySetting(ctx, key, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteMySettingResponse(rsp)
+}
+
+// PutMySettingWithBodyWithResponse Set an own setting
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /me/settings/{key} (the `PutMySetting` operationId).
+func (c *ClientWithResponses) PutMySettingWithBodyWithResponse(ctx context.Context, key KeyPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutMySettingResponse, error) {
+	rsp, err := c.PutMySettingWithBody(ctx, key, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutMySettingResponse(rsp)
+}
+
+// PutMySettingWithResponse Set an own setting
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /me/settings/{key} (the `PutMySetting` operationId).
+func (c *ClientWithResponses) PutMySettingWithResponse(ctx context.Context, key KeyPath, body PutMySettingJSONRequestBody, reqEditors ...RequestEditorFn) (*PutMySettingResponse, error) {
+	rsp, err := c.PutMySetting(ctx, key, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutMySettingResponse(rsp)
+}
+
+// GetMySidebarWithResponse Read own sidebar state
+//
+// The caller's rows of the spaces they may read that are not archived (`items`) and of the channels they may read that are not archived and lie in a space that is not archived (`channels`, the personal post order).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me/sidebar (the `GetMySidebar` operationId).
+func (c *ClientWithResponses) GetMySidebarWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMySidebarResponse, error) {
+	rsp, err := c.GetMySidebar(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMySidebarResponse(rsp)
+}
+
+// PutMySidebarChannelWithBodyWithResponse Reorder the posts of a channel, archive or pin it for oneself
+//
+// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order), whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state), whether it is pinned to the top of its space (`pinned`; absent keeps the stored state) and the posts pinned to the top of the forum (`pinned_threads`; an empty list unpins every post, absent keeps the stored list). The server checks the form of the lists (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving or pinning twice keeps the first `hidden_at` or `pinned_at`. A body without a known member is 400. Archiving and pinning are personal: they change neither the channel, its rights, its runs nor the caller's notifications (01 6.22, 6.24). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /me/sidebar/channels/{channel_id} (the `PutMySidebarChannel` operationId).
+func (c *ClientWithResponses) PutMySidebarChannelWithBodyWithResponse(ctx context.Context, channelId ChannelIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutMySidebarChannelResponse, error) {
+	rsp, err := c.PutMySidebarChannelWithBody(ctx, channelId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutMySidebarChannelResponse(rsp)
+}
+
+// PutMySidebarChannelWithResponse Reorder the posts of a channel, archive or pin it for oneself
+//
+// Stores the caller's personal state of a channel the caller can read, version + 1, last write wins, no If-Match: the order of its posts (`thread_order`; an empty list returns to the default order, absent keeps the stored order), whether the channel is archived in the caller's sidebar (`hidden`; absent keeps the stored state), whether it is pinned to the top of its space (`pinned`; absent keeps the stored state) and the posts pinned to the top of the forum (`pinned_threads`; an empty list unpins every post, absent keeps the stored list). The server checks the form of the lists (unique items, at most `sidebar.order_max_items`), not whether each ID names a thread the caller can see. A body that changes nothing returns the stored state without a new version and without an event, so archiving or pinning twice keeps the first `hidden_at` or `pinned_at`. A body without a known member is 400. Archiving and pinning are personal: they change neither the channel, its rights, its runs nor the caller's notifications (01 6.22, 6.24). A channel the caller cannot read and an unknown one give the same 404. Writes `sidebar_channel.updated` for the caller.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /me/sidebar/channels/{channel_id} (the `PutMySidebarChannel` operationId).
+func (c *ClientWithResponses) PutMySidebarChannelWithResponse(ctx context.Context, channelId ChannelIdPath, body PutMySidebarChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*PutMySidebarChannelResponse, error) {
+	rsp, err := c.PutMySidebarChannel(ctx, channelId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutMySidebarChannelResponse(rsp)
+}
+
+// PutMySidebarSpaceWithBodyWithResponse Collapse or reorder a space for oneself
+//
+// Stores the caller's row of the space, version + 1, last write wins, no If-Match. `channel_order` absent keeps the stored channel order, a list replaces it and an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a channel the caller can see. Writes `sidebar.updated` for the caller.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /me/sidebar/spaces/{space_id} (the `PutMySidebarSpace` operationId).
+func (c *ClientWithResponses) PutMySidebarSpaceWithBodyWithResponse(ctx context.Context, spaceId SpaceIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutMySidebarSpaceResponse, error) {
+	rsp, err := c.PutMySidebarSpaceWithBody(ctx, spaceId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutMySidebarSpaceResponse(rsp)
+}
+
+// PutMySidebarSpaceWithResponse Collapse or reorder a space for oneself
+//
+// Stores the caller's row of the space, version + 1, last write wins, no If-Match. `channel_order` absent keeps the stored channel order, a list replaces it and an empty list returns to the default order. The server checks the form of the list (unique items, at most `sidebar.order_max_items`), not whether each ID names a channel the caller can see. Writes `sidebar.updated` for the caller.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /me/sidebar/spaces/{space_id} (the `PutMySidebarSpace` operationId).
+func (c *ClientWithResponses) PutMySidebarSpaceWithResponse(ctx context.Context, spaceId SpaceIdPath, body PutMySidebarSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*PutMySidebarSpaceResponse, error) {
+	rsp, err := c.PutMySidebarSpace(ctx, spaceId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutMySidebarSpaceResponse(rsp)
+}
+
+// ListMyTemplatesWithResponse List own personal templates
+//
+// Personal templates of the caller, without a channel context. Channel templates come from `listTemplates`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me/templates (the `ListMyTemplates` operationId).
+func (c *ClientWithResponses) ListMyTemplatesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMyTemplatesResponse, error) {
+	rsp, err := c.ListMyTemplates(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMyTemplatesResponse(rsp)
+}
+
+// CreatePersonalTemplateWithBodyWithResponse Create a personal template
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/templates (the `CreatePersonalTemplate` operationId).
+func (c *ClientWithResponses) CreatePersonalTemplateWithBodyWithResponse(ctx context.Context, params *CreatePersonalTemplateParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePersonalTemplateResponse, error) {
+	rsp, err := c.CreatePersonalTemplateWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreatePersonalTemplateResponse(rsp)
+}
+
+// CreatePersonalTemplateWithResponse Create a personal template
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/templates (the `CreatePersonalTemplate` operationId).
+func (c *ClientWithResponses) CreatePersonalTemplateWithResponse(ctx context.Context, params *CreatePersonalTemplateParams, body CreatePersonalTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePersonalTemplateResponse, error) {
+	rsp, err := c.CreatePersonalTemplate(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreatePersonalTemplateResponse(rsp)
+}
+
+// DeleteMessageWithResponse Delete a message
+//
+// Idempotent; an already deleted message also gives 204. Moderation of other people's messages
+// needs `manage`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /messages/{message_id} (the `DeleteMessage` operationId).
+func (c *ClientWithResponses) DeleteMessageWithResponse(ctx context.Context, messageId MessageIdPath, reqEditors ...RequestEditorFn) (*DeleteMessageResponse, error) {
+	rsp, err := c.DeleteMessage(ctx, messageId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteMessageResponse(rsp)
+}
+
+// GetMessageWithResponse Read a message
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /messages/{message_id} (the `GetMessage` operationId).
+func (c *ClientWithResponses) GetMessageWithResponse(ctx context.Context, messageId MessageIdPath, reqEditors ...RequestEditorFn) (*GetMessageResponse, error) {
+	rsp, err := c.GetMessage(ctx, messageId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMessageResponse(rsp)
+}
+
+// UpdateMessageWithBodyWithResponse Edit own message
+//
+// `If-Match` carries the expected version. A deleted message gives 410 `message_deleted`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /messages/{message_id} (the `UpdateMessage` operationId).
+func (c *ClientWithResponses) UpdateMessageWithBodyWithResponse(ctx context.Context, messageId MessageIdPath, params *UpdateMessageParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateMessageResponse, error) {
+	rsp, err := c.UpdateMessageWithBody(ctx, messageId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateMessageResponse(rsp)
+}
+
+// UpdateMessageWithResponse Edit own message
+//
+// `If-Match` carries the expected version. A deleted message gives 410 `message_deleted`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /messages/{message_id} (the `UpdateMessage` operationId).
+func (c *ClientWithResponses) UpdateMessageWithResponse(ctx context.Context, messageId MessageIdPath, params *UpdateMessageParams, body UpdateMessageJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateMessageResponse, error) {
+	rsp, err := c.UpdateMessage(ctx, messageId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateMessageResponse(rsp)
+}
+
+// UnpinMessageWithResponse Unpin a message
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /messages/{message_id}/pin (the `UnpinMessage` operationId).
+func (c *ClientWithResponses) UnpinMessageWithResponse(ctx context.Context, messageId MessageIdPath, reqEditors ...RequestEditorFn) (*UnpinMessageResponse, error) {
+	rsp, err := c.UnpinMessage(ctx, messageId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUnpinMessageResponse(rsp)
+}
+
+// PinMessageWithResponse Pin a message
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /messages/{message_id}/pin (the `PinMessage` operationId).
+func (c *ClientWithResponses) PinMessageWithResponse(ctx context.Context, messageId MessageIdPath, reqEditors ...RequestEditorFn) (*PinMessageResponse, error) {
+	rsp, err := c.PinMessage(ctx, messageId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePinMessageResponse(rsp)
+}
+
+// ListReactionsWithResponse List who reacted
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /messages/{message_id}/reactions (the `ListReactions` operationId).
+func (c *ClientWithResponses) ListReactionsWithResponse(ctx context.Context, messageId MessageIdPath, params *ListReactionsParams, reqEditors ...RequestEditorFn) (*ListReactionsResponse, error) {
+	rsp, err := c.ListReactions(ctx, messageId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListReactionsResponse(rsp)
+}
+
+// RemoveReactionWithResponse Remove own reaction
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /messages/{message_id}/reactions/{emoji} (the `RemoveReaction` operationId).
+func (c *ClientWithResponses) RemoveReactionWithResponse(ctx context.Context, messageId MessageIdPath, emoji EmojiPath, reqEditors ...RequestEditorFn) (*RemoveReactionResponse, error) {
+	rsp, err := c.RemoveReaction(ctx, messageId, emoji, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRemoveReactionResponse(rsp)
+}
+
+// AddReactionWithResponse Add own reaction
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /messages/{message_id}/reactions/{emoji} (the `AddReaction` operationId).
+func (c *ClientWithResponses) AddReactionWithResponse(ctx context.Context, messageId MessageIdPath, emoji EmojiPath, reqEditors ...RequestEditorFn) (*AddReactionResponse, error) {
+	rsp, err := c.AddReaction(ctx, messageId, emoji, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAddReactionResponse(rsp)
+}
+
 // RetriggerMessageWithResponse Trigger a failed message again
 //
 // Runs the trigger decision (09 3.4) again for an own message whose `trigger_state` is `failed` with `trigger_state_reason` `project_not_ready`, `operator_cannot_serve_project` or `operator_not_in_channel`, after the cause was fixed (a runner set as operator, a folder created), so the person does not have to write the message again (09 3.7, addendum of 2026-11-04). Only the author may do this (`403 forbidden` with `reason` `not_self` otherwise); a message that is not readable is `404`; another state or reason, or a deleted message, is `409 invalid_state_transition`. When the message's thread is a thread whose fixed operator is not the channel's effective operator and never completed a run in it, the thread takes the channel's effective operator first (an exception to R-DM-12, recorded as `thread.updated`). A caller without `trigger` on the thread (`agent.invoke` in filter mode with the thread's operator refuses with `level_insufficient` or `no_grant`) gets `403 agent_invocation_denied`. Then the acceptance runs as for a new message: `agent.invoke` in request mode for the caller (authz audits a denial), and the message's `trigger_state` and `trigger_state_reason` follow it (`received` and a queued run, or `failed` with the reason of now). The answer is the message after the decision. Repeating the request after a successful retrigger answers `409 invalid_state_transition`, because the message is no longer `failed`.
@@ -21558,417 +21936,6 @@ func ParseDisableChannelTeamResponse(rsp *http.Response) (*DisableChannelTeamRes
 		response.Headers429 = &headers
 	case true:
 		var headers DisableChannelTeamResponseDefaultHeaders
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.HeadersDefault = &headers
-	}
-
-	return response, nil
-}
-
-// ParseGetChannelTeamResponse parses an HTTP response from a GetChannelTeamWithResponse call
-func ParseGetChannelTeamResponse(rsp *http.Response) (*GetChannelTeamResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetChannelTeamResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Team
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSONDefault = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 200:
-		var headers GetChannelTeamResponse200Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		response.Headers200 = &headers
-	case rsp.StatusCode == 400:
-		var headers GetChannelTeamResponse400Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers400 = &headers
-	case rsp.StatusCode == 401:
-		var headers GetChannelTeamResponse401Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("DPoP-Nonce"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "DPoP-Nonce", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.DPoPNonce = &value
-		}
-		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.SetCookie = &value
-		}
-		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.WWWAuthenticate = &value
-		}
-		response.Headers401 = &headers
-	case rsp.StatusCode == 403:
-		var headers GetChannelTeamResponse403Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers403 = &headers
-	case rsp.StatusCode == 404:
-		var headers GetChannelTeamResponse404Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers404 = &headers
-	case rsp.StatusCode == 429:
-		var headers GetChannelTeamResponse429Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = &value
-		}
-		response.Headers429 = &headers
-	case true:
-		var headers GetChannelTeamResponseDefaultHeaders
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.HeadersDefault = &headers
-	}
-
-	return response, nil
-}
-
-// ParseEnableChannelTeamResponse parses an HTTP response from a EnableChannelTeamWithResponse call
-func ParseEnableChannelTeamResponse(rsp *http.Response) (*EnableChannelTeamResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &EnableChannelTeamResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Team
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest Conflict
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON409 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSONDefault = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 200:
-		var headers EnableChannelTeamResponse200Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		response.Headers200 = &headers
-	case rsp.StatusCode == 400:
-		var headers EnableChannelTeamResponse400Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers400 = &headers
-	case rsp.StatusCode == 401:
-		var headers EnableChannelTeamResponse401Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("DPoP-Nonce"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "DPoP-Nonce", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.DPoPNonce = &value
-		}
-		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.SetCookie = &value
-		}
-		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.WWWAuthenticate = &value
-		}
-		response.Headers401 = &headers
-	case rsp.StatusCode == 403:
-		var headers EnableChannelTeamResponse403Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers403 = &headers
-	case rsp.StatusCode == 404:
-		var headers EnableChannelTeamResponse404Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers404 = &headers
-	case rsp.StatusCode == 409:
-		var headers EnableChannelTeamResponse409Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers409 = &headers
-	case rsp.StatusCode == 429:
-		var headers EnableChannelTeamResponse429Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = &value
-		}
-		response.Headers429 = &headers
-	case true:
-		var headers EnableChannelTeamResponseDefaultHeaders
 		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
 			var value CorrelationId
 			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {

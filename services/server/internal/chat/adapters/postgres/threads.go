@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/chat/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 )
 
 // parentConstraint is the unique index of threads.parent_message_id: a message starts at most one
@@ -38,6 +39,16 @@ func (r *Repository) LockThread(ctx context.Context, id ids.ID) (domain.Thread, 
 	}
 	row, err := q.LockThread(ctx, uuid(id))
 	return oneThread(threadRow(row), err, "locking a thread")
+}
+
+// ExpiredThreadTitles implements app.Store.
+func (r *Repository) ExpiredThreadTitles(ctx context.Context, cutoff time.Time, limit int) ([]ids.ID, error) {
+	rows, err := r.read(ctx).ExpiredThreadTitles(ctx, sqlcgen.ExpiredThreadTitlesParams{
+		Cutoff: pgtype.Timestamptz{Time: cutoff, Valid: true}, RowLimit: pg.Limit(limit)})
+	if err != nil {
+		return nil, mapError(err, "reading the expired thread titles")
+	}
+	return idsOf(rows), nil
 }
 
 // ShareThread implements app.Store.

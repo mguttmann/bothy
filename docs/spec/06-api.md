@@ -930,6 +930,7 @@ Generated from openapi.yaml.
 | DELETE | `/api/v1/groups/{group_id}` | `deleteGroup` | `group.delete` | Delete a group and revoke its grants |
 | GET | `/api/v1/groups/{group_id}/members` | `listGroupMembers` | `group.read` | List members |
 | POST | `/api/v1/groups/{group_id}/members` | `addGroupMember` | `group.member.add` | Add a member |
+| POST | `/api/v1/groups/{group_id}/members/{user_id}/extend` | `extendGroupMember` | `group.member.extend` | Extend a time-limited membership |
 | DELETE | `/api/v1/groups/{group_id}/members/{user_id}` | `removeGroupMember` | `group.member.remove` | Remove a member |
 
 #### Access

@@ -234,6 +234,47 @@ func TestGroupMembers(t *testing.T) {
 	mustOK(t, err)
 }
 
+// TestExtendGroupMember (AUD-PKG-R2-owner-server, #828): a time-limited membership in effect gets
+// a later expiry on the same row, with an audit entry, and stays in effect past its old expiry; a
+// membership without expiry, an expiry that is not later, a person without a membership in
+// effect and an expired membership are refused.
+func TestExtendGroupMember(t *testing.T) {
+	t.Parallel()
+	w := newPGWorld(t)
+	ctx := context.Background()
+	owner := w.user(w.owner)
+	first := w.clk.Now().Add(time.Hour)
+	added, err := w.admin.AddGroupMember(ctx, owner, w.leser, authz.AddMemberCmd{UserID: w.robin, ExpiresAt: first})
+	mustOK(t, err)
+	_, err = w.admin.ExtendGroupMember(ctx, owner, w.leser, w.robin, first)
+	wantField(t, err, "/expires_at", "not_later")
+	_, err = w.admin.AddGroupMember(ctx, owner, w.leser, authz.AddMemberCmd{UserID: w.alex})
+	mustOK(t, err)
+	_, err = w.admin.ExtendGroupMember(ctx, owner, w.leser, w.alex, first.Add(time.Hour))
+	wantField(t, err, "/expires_at", "not_time_limited")
+	_, err = w.admin.ExtendGroupMember(ctx, owner, w.leser, ids.New(), first.Add(time.Hour))
+	wantErr(t, err, errs.CodeNotFound, "")
+
+	later := first.Add(48 * time.Hour)
+	aseq := w.auditSeq(t)
+	m, err := w.admin.ExtendGroupMember(ctx, owner, w.leser, w.robin, later)
+	mustOK(t, err)
+	if m.ID != added.ID || !m.ExpiresAt.Equal(later) {
+		t.Fatalf("extended %+v, want the same membership %v until %v", m, added.ID, later)
+	}
+	if rows := w.allows(t, aseq); len(rows) != 1 || !strings.Contains(rows[0].Details, "previous_expires_at") {
+		t.Fatalf("audit of the extension: %+v", rows)
+	}
+	// Past the old expiry the membership is still in effect: adding again is a conflict.
+	w.clk.Advance(2 * time.Hour)
+	_, err = w.admin.AddGroupMember(ctx, w.user(w.owner), w.leser, authz.AddMemberCmd{UserID: w.robin})
+	wantErr(t, err, errs.CodeConflict, "")
+	// Once expired, nothing is extended any more.
+	w.clk.Advance(72 * time.Hour)
+	_, err = w.admin.ExtendGroupMember(ctx, w.user(w.owner), w.leser, w.robin, w.clk.Now().Add(time.Hour))
+	wantErr(t, err, errs.CodeNotFound, "")
+}
+
 // TestGrantTargets: an unknown target and a host are not found, an archived channel or space is
 // conflict, a missing reason validation_failed; a revoked grant revoked again is without effect.
 func TestGrantTargets(t *testing.T) {

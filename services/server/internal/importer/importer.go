@@ -42,8 +42,9 @@ const (
 	ItemPending = "pending"
 	ItemPosted  = "posted"
 	ItemSkipped = "skipped"
-	// ItemFailed is reserved (03 import_items): nothing writes it yet, a refused item rolls its
-	// batch back.
+	// ItemFailed is a message item whose content the server refuses by its content rules: it
+	// keeps the code in Error and its batch goes on (AUD-PKG-R2-owner-server). Every other refusal
+	// still rolls the batch back.
 	ItemFailed = "failed"
 )
 

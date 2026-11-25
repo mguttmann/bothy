@@ -200,6 +200,9 @@ type Store interface {
 	// InsertThread inserts the thread th of kind thread and returns the stored row. Errors:
 	// conflict on /parent_message_id when the parent message already started a thread.
 	InsertThread(ctx context.Context, th domain.Thread) (domain.Thread, error)
+	// ExpiredThreadTitles returns at most limit live threads with a title whose last activity
+	// lies before cutoff, oldest first (retention.content, AUD-PKG-R2-owner-server).
+	ExpiredThreadTitles(ctx context.Context, cutoff time.Time, limit int) ([]ids.ID, error)
 	// SaveThread writes title, title source, state, closed_at, closed_by, the fixed operator and
 	// version of th.
 	SaveThread(ctx context.Context, th domain.Thread) error

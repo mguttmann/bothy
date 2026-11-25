@@ -19,6 +19,7 @@ part 'search_assist_result.g.dart';
 /// * [fallbackReason] - Only with `mode = fulltext`.
 /// * [terms] - The search terms of this question (the person's and the assistant's); the app sends them back in `history`.
 /// * [costEstimate]
+/// * [candidatesCapped] - A search of this question reached `search.max_candidates`; the newest matches were taken, so older sessions may be missing. Ask more narrowly to reach them.
 @BuiltValue()
 abstract class SearchAssistResult
     implements Built<SearchAssistResult, SearchAssistResultBuilder> {
@@ -42,6 +43,10 @@ abstract class SearchAssistResult
 
   @BuiltValueField(wireName: r'cost_estimate')
   SearchAssistCost? get costEstimate;
+
+  /// A search of this question reached `search.max_candidates`; the newest matches were taken, so older sessions may be missing. Ask more narrowly to reach them.
+  @BuiltValueField(wireName: r'candidates_capped')
+  bool? get candidatesCapped;
 
   SearchAssistResult._();
 
@@ -96,6 +101,13 @@ class _$SearchAssistResultSerializer
       yield serializers.serialize(
         object.costEstimate,
         specifiedType: const FullType(SearchAssistCost),
+      );
+    }
+    if (object.candidatesCapped != null) {
+      yield r'candidates_capped';
+      yield serializers.serialize(
+        object.candidatesCapped,
+        specifiedType: const FullType(bool),
       );
     }
   }
@@ -165,6 +177,14 @@ class _$SearchAssistResultSerializer
           ) as SearchAssistCost?;
           if (valueDes == null) continue;
           result.costEstimate.replace(valueDes);
+          break;
+        case r'candidates_capped':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(bool),
+          ) as bool?;
+          if (valueDes == null) continue;
+          result.candidatesCapped = valueDes;
           break;
         default:
           unhandled.add(key);

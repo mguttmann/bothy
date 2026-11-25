@@ -29,7 +29,6 @@ String agentFeatureLabel(AppLocalizations l, String key) => switch (key) {
   'supports_followups' => l.adminAgentFeatureFollowups,
   'supports_components' => l.adminAgentFeatureComponents,
   'supports_voice' => l.adminAgentFeatureVoice,
-  'supports_title' => l.adminAgentFeatureTitle,
   'supports_files_out' => l.adminAgentFeatureFilesOut,
   _ => key,
 };

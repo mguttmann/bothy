@@ -55,7 +55,7 @@ Future<void> showSearchAssistant(
 ///
 /// Keys: `assist.dialog`, `assist.field`, `assist.send`, `assist.close`, `assist.question.<i>`,
 /// `assist.pending`, `assist.failure.<i>`, `assist.fallback.<i>`, `assist.cost.<i>`,
-/// `assist.nothing.<i>`, `assist.hit.<i>.<thread>`.
+/// `assist.nothing.<i>`, `assist.capped.<i>`, `assist.hit.<i>.<thread>`.
 class SearchAssistantDialog extends ConsumerStatefulWidget {
   /// Creates the popup; a non-empty [initialQuestion] is asked when it opens.
   const SearchAssistantDialog({
@@ -376,6 +376,15 @@ class _ExchangeView extends ConsumerWidget {
               ),
             ),
           for (final hit in answer.hits) AssistHitTile(index: index, hit: hit),
+          if (answer.candidatesCapped)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: DsSpace.s16),
+              child: Text(
+                l.assistCapped,
+                key: ValueKey('assist.capped.$index'),
+                style: note,
+              ),
+            ),
           if (answer.costMicros case final micros?)
             Padding(
               padding: const EdgeInsets.symmetric(

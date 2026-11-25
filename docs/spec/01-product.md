@@ -768,6 +768,12 @@ overview.
 Before it is submitted, every changing administration action with step-up shows the confirmation
 with passkey or device key ([08-identity.md](08-identity.md)).
 
+The reason the audit log stores is typed by the owner for the security-relevant changes: a grant
+(create and revoke), the owner role (add and remove) and the revocation of a device; their
+confirmation stays disabled while the reason is empty. The other changes (disable or enable a
+person, reject a waiting device, disable an agent) offer the field and send the default text
+"Changed in the administration" when it stays empty (AUD-PKG-R2-owner-server).
+
 **A1 People.** List, create (no self-registration, no invitation links), queue of new devices with
 the origin of the login.
 
@@ -1570,7 +1576,11 @@ local data. The lock detaches terminal sessions (they keep running on the host, 
 sentence "The data of this device has been deleted" (04, section 8.5, R-SY-14) and "Log in again"
 (E2). For a disabled person there is no login button, only "Contact the owner". When a part of the
 data could not be deleted, the sentence says so instead and names the next start, at which the
-app deletes the rest (addendum of 2026-11-11, 15 section 9).
+app deletes the rest (addendum of 2026-11-11, 15 section 9). After the expiry of the session
+(`refreshRejected`) the app deletes the data the same way but keeps the device keys and the device
+ID: "Log in again" signs in the same device, which the server takes back as active (08 5.1), so
+it never waits for approval again. Only a revocation, a rejection in E4 or a lost key deletes the
+device itself (AUD-PKG-R2-owner-server, replaces this part of D-M4-18-2).
 
 ```text
 +--------------------------------------+

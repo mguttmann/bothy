@@ -36,11 +36,11 @@ var _ personaldata.Participant = (*PersonalData)(nil)
 func NewPersonalData(pool *pg.Pool) *PersonalData { return &PersonalData{pool: pool} }
 
 // Module returns "runs".
-func (*PersonalData) Module() string { return "runs" }
+func (*PersonalData) Module() string { return tableRuns }
 
 // Tables returns the tables of runs with personal data of 20 section 2.
 func (*PersonalData) Tables() []string {
-	return []string{"runs", "run_steps", "run_followups", "run_wakes", "run_autonomy", "message_components", "interactions", "team_channels", "team_members", "team_inputs", "run_feeders"}
+	return []string{tableRuns, "run_steps", "run_followups", "run_wakes", "run_autonomy", "message_components", "interactions", "team_channels", "team_members", "team_inputs", "run_feeders"}
 }
 
 // exportRun is one line of runs.jsonl (docs/api/gdpr-export/v1/lines/runs.schema.json). The

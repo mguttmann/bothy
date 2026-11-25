@@ -10,13 +10,18 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/routes"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
+	billingpg "github.com/OWNER/bothy/services/server/internal/billing/adapters/postgres"
+	billingapp "github.com/OWNER/bothy/services/server/internal/billing/app"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
 	"github.com/OWNER/bothy/services/server/internal/instance"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
+	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
 	"github.com/OWNER/bothy/services/server/migrations"
@@ -61,6 +66,7 @@ type Setup struct {
 	pool  *pg.Pool
 	audit *Audit
 	id    *Identity
+	log   *slog.Logger
 }
 
 // NewSetup assembles the setup over the loaded values v and the process environment env, with log
@@ -79,7 +85,7 @@ func NewSetup(ctx context.Context, v *config.Values, env []string, log *slog.Log
 	if err != nil {
 		return nil, err
 	}
-	s := &Setup{pool: pool}
+	s := &Setup{pool: pool, log: log}
 	if err := s.build(ctx, v, sp, log); err != nil {
 		pool.Close()
 		return nil, err
@@ -223,9 +229,38 @@ func (s *Setup) identity(ctx context.Context, v *config.Values, sp *secrets.Prov
 	return s.id.BindSessions(keys.Keys, rec.InstanceID)
 }
 
-// BootstrapOwner runs bothy setup bootstrap-owner (identity app.Service.BootstrapOwner).
+// BootstrapOwner runs bothy setup bootstrap-owner (identity app.Service.BootstrapOwner) and then,
+// in a unit of work of its own, the system action price.load_start: the start prices of the
+// product go into an empty price table with the new owner as created_by (10 12.3,
+// AUD-PKG-R2-owner-server). A failed load never fails the bootstrap, whose enrollment code must
+// still be printed: it is logged, and the owner enters the prices with createPrice.
 func (s *Setup) BootstrapOwner(ctx context.Context, cmd BootstrapOwnerCmd) (BootstrapResult, error) {
-	return s.id.Logins.BootstrapOwner(ctx, cmd)
+	res, err := s.id.Logins.BootstrapOwner(ctx, cmd)
+	if err != nil {
+		return res, err
+	}
+	n, lerr := s.loadStartPrices(ctx, res.OwnerID)
+	if lerr != nil {
+		s.log.LogAttrs(ctx, slog.LevelWarn, msgStartPricesFailed, slog.String(attr.ErrorType, errs.KindOf(lerr).String()))
+	} else if n > 0 {
+		s.log.LogAttrs(ctx, slog.LevelInfo, msgStartPricesLoaded)
+	}
+	return res, nil
+}
+
+// The log lines of the start prices after the bootstrap.
+const (
+	msgStartPricesLoaded = "setup: start prices loaded"
+	msgStartPricesFailed = "setup: loading the start prices failed; enter the prices with createPrice"
+)
+
+// loadStartPrices runs price.load_start for the owner id.
+func (s *Setup) loadStartPrices(ctx context.Context, owner ids.ID) (int, error) {
+	l, err := billingapp.NewStartPriceLoader(s.audit.UoW(), billingpg.NewRepository(s.pool), s.audit.Recorder(), nil)
+	if err != nil {
+		return 0, err
+	}
+	return l.Load(ctx, owner)
 }
 
 // IssueRecoveryCode runs bothy setup issue-enrollment-code (app.Service.IssueRecoveryCode).

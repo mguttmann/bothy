@@ -348,7 +348,8 @@ readable text.
 
 The length of a Discord message is far below `message.max_content_bytes`. A message is
 never split; the origin key needs no part index. A converted message that is longer all the same
-is counted as a failed message in the report and not imported.
+is counted as a failed message in the report and not imported; one the tool sends all the same
+becomes a failed item on the server (section 8).
 
 ### 6.4 No notifications, no unread backlog
 
@@ -553,7 +554,14 @@ optional thread item of that key first (`ImportThreadData`), then message items
 and a content item in a batch without `thread_origin_key`, is `400 validation_failed` at its
 `item_kind`. A thread that is neither posted nor created by the batch is `409 conflict` with
 `reason` `thread_not_imported`; a message or file whose author item is skipped or missing is
-`409 conflict` with `reason` `author_not_imported`. A file item comes through
+`409 conflict` with `reason` `author_not_imported`. A message item whose content breaks the
+content rules of a message (`message.max_content_bytes`, U+0000, no visible character without a
+file, `message.max_attachments`; the checks of `messaging.ImportMessages.Check`) refuses no batch:
+the item is stored with the state `failed` and the field code of the refusal as `error`
+(`too_long`, `empty`, `invalid`, `limit_reached`), nothing of the message is written, its counter
+`stats.server.message.failed` grows, the answer names the item with `state = failed`, and the
+batch goes on with the next item (AUD-PKG-R2-owner-server). The console lists such items under
+"Failed items". Every other refusal of an item still rolls the batch back. A file item comes through
 `createImportFile` (`ImportFileCreate` with `sha256`), its parts and completion through
 `uploadImportFilePart` and `completeImportFile`, which authorize `import.apply` instead of
 `file.upload`: `uploadPart` and `completeUpload` are write actions that rule 1.8 refuses in a

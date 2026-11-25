@@ -466,6 +466,15 @@ abstract interface class AdminRepository
     String userId, {
     required String purpose,
   });
+
+  /// Gives the time-limited membership of [userId] in [groupId] the later [expiresAt] on the
+  /// same membership, without a gap in access (`extendGroupMember`).
+  Future<void> extendMember(
+    String groupId,
+    String userId, {
+    required DateTime expiresAt,
+    required String purpose,
+  });
 }
 
 /// Every person of [repository] in [status] (all states when null), following the cursor of
@@ -1584,6 +1593,24 @@ final class ApiAdminRepository implements AdminRepository {
     () => _groups.removeGroupMember(
       groupId: groupId,
       userId: userId,
+      extra: _purpose(purpose),
+    ),
+  );
+
+  @override
+  Future<void> extendMember(
+    String groupId,
+    String userId, {
+    required DateTime expiresAt,
+    required String purpose,
+  }) => _call(
+    () => _groups.extendGroupMember(
+      groupId: groupId,
+      userId: userId,
+      groupMemberExtend: GroupMemberExtend(
+        (b) => b..expiresAt = expiresAt.toUtc(),
+      ),
+      idempotencyKey: _newKey(),
       extra: _purpose(purpose),
     ),
   );

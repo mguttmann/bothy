@@ -13,6 +13,11 @@ comparison with `instance.min_server_version` (M1-15) and the image labels (M1-2
 ## Interface
 
 - `Version() string`: SemVer 2.0.0 without a leading `v`, never empty.
+- `Revision() string`: the commit the build paths embed with
+  `-ldflags "-X github.com/OWNER/bothy/services/server/internal/platform/buildinfo.revision=<sha>"`
+  (`services/server/Dockerfile` from the build argument `REVISION`, the one of the label
+  `org.opencontainers.image.revision`, and `make -C services/server release-build`), or `unknown`
+  for a plain `go build`. `bothy version` prints both (AUD-PKG-R2-owner-server).
 
 ## Rules
 

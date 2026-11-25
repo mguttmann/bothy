@@ -87,6 +87,14 @@ var commands = []command{
 		run:     restoreCommand,
 	},
 	{
+		name:    "version",
+		summary: "Print the server version and the commit of the build",
+		// No configuration, secrets or database: the values are compiled in (buildinfo).
+		run: func(_ context.Context, args, _ []string, stdout, stderr io.Writer) int {
+			return versionCommand(args, stdout, stderr)
+		},
+	},
+	{
 		name:    "telemetry",
 		summary: "Map a principal id to its telemetry pseudonym for the owner",
 		run: func(ctx context.Context, args, env []string, stdout, stderr io.Writer) int {

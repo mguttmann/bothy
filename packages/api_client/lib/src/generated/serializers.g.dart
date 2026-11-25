@@ -353,6 +353,7 @@ Serializers _$serializers =
           ..add(GroupCreate.serializer)
           ..add(GroupMember.serializer)
           ..add(GroupMemberAdd.serializer)
+          ..add(GroupMemberExtend.serializer)
           ..add(GroupMemberPage.serializer)
           ..add(GroupPage.serializer)
           ..add(GroupSource.serializer)

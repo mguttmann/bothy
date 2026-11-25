@@ -60,7 +60,7 @@ keys of the column "Reported" below; any other key is refused.
 | Follow-ups | `supports_followups` | `followups: steer` or `queue` | Section 7 |
 | Components | `supports_components` | `components: true` | Section 11; otherwise text only |
 | Voice input | `supports_voice` | `voice_input: true` | Section 13 |
-| Title suggestion | `supports_title` | `title: true` | Section 12 |
+| Title suggestion | no key; reported only (the owner switch `supports_title` was struck, AUD-PKG-R2-owner-server) | `title: true` | Section 12 |
 | Sending files | `supports_files_out` | `files_out: true` | Agent additionally needs `+upload` (an operator holds it by the operator rule, 2.3). If `supports_files_out` is off, the server rejects messages of an agent with attachments with `403 feature_disabled`. |
 | Hosting built-in agents | no key; reported only | `hosts_agents: chat`, `scoped` or `host` (the highest class it loads for a hosted agent) | Only a runner that reports it can be chosen as `hosted_by` ([26-builtin-agents.md](26-builtin-agents.md) 3.1); only a Claude Code runner with `runner.hosted_agents` reports it (addendum of 2026-11-06); `getAgent` and `listAgents` show the stored value to owners only as `AgentRuntimeStatus.hosts_agents`, for the "New agent" entry of 26 8.1 (addendum of 2026-11-07, A1-03b) |
 | Turn handover | no key; reported only | `turn_handover: true` | The runner hands live turns over at a restart and adopts them with full rights (18.19.3 to 18.19.7); only a Claude Code runner with `runner.turn_handover` reports it (addendum of 2026-11-06, stage AR) |
@@ -76,7 +76,6 @@ secrets; an invalid value yields `400 validation_failed` with a JSON Pointer.
 | `supports_followups` | Boolean | allowed | Allows follow-ups |
 | `supports_components` | Boolean | allowed | Allows components |
 | `supports_voice` | Boolean | allowed | Allows voice input |
-| `supports_title` | Boolean | allowed | Allows title suggestions |
 | `supports_files_out` | Boolean | allowed | Allows sending files |
 
 A missing key allows, because the owner switches features off and the adapter reports only what
@@ -88,8 +87,10 @@ The server enforces the owner's part of the capability "Components" (M2-15): a c
 the switch through the agents port (`agents.RunFacts.ComponentsAllowed`). The adapter's part, the
 report `components: true` in the heartbeat, is stored but not checked: a card of an agent whose
 owner allows components is accepted whatever the adapter reports. `supports_files_out` and
-`supports_followups` are enforced as their rows say; `supports_title` and `supports_voice` reach no
-adapter and no server check yet, so switching them off has no effect.
+`supports_followups` are enforced as their rows say; `supports_voice` reaches no adapter and no
+server check yet, so switching it off has no effect. The earlier key `supports_title` is no part of
+the schema anymore: a write that sends it gets `400 validation_failed`, and a stored row that still
+holds it is read without it (AUD-PKG-R2-owner-server).
 
 ### 2.3 Grants of an agent
 
@@ -717,7 +718,7 @@ or acknowledges a `seq` that process cannot yet deliver.
 
 | Event | When | Payload (schema `<type>.v1`, excerpt) | Token |
 |---|---|---|---|
-| `agent.invocation` | new run | `run`, `thread`, `channel` (`id`, `kind`, `settings_version`), `trigger` (`kind`, IDs, triggering person), `session` (9.1; in openapi the members `session_mode` for `session.mode` and `agent_session` for the session row; `agent_session` is missing for `new` without a row; both are missing for a guest run); the planned member `capabilities_effective` is not built, the invocation does not carry it; for `trigger_kind = command` the command ID, its name and the parsed options in the order of the definition (`command_id`, `command_name`, `options`, `command_invocation_id`) instead of a message (M2-16) | yes |
+| `agent.invocation` | new run | `run`, `thread`, `channel` (`id`, `kind`, `settings_version`), `trigger` (`kind`, IDs, triggering person), `session` (9.1; in openapi the members `session_mode` for `session.mode` and `agent_session` for the session row; `agent_session` is missing for `new` without a row; both are missing for a guest run); for `trigger_kind = command` the command ID, its name and the parsed options in the order of the definition (`command_id`, `command_name`, `options`, `command_invocation_id`) instead of a message (M2-16) | yes |
 | `agent.followup` | follow-up (section 7) | `run_id`, `message_id`, triggering person | yes |
 | `interaction.created` | component used | `interaction_id`, `component` (`custom_id`, type), `values`, `run_id`, acting person | yes |
 | `command.invoked` | control command executed (10.4) | `command_id`, `command_name`, `options`, location, triggering person; `run_id` exactly when the owner has an active run in the thread at execution time, then that run, never the run of another agent (R-AZ-25) | yes |
@@ -6082,7 +6083,7 @@ of 2026-10-10). All except E-AG-16 are in the core contract.
 | E-AG-15 | `agents.tool_class` as a column | adopted, 03 `agents` |
 | E-AG-16 | Setting the operator requires the agent to have `write` | not adopted; instead the operator rule (05 section 2.3, R-AZ-13), because it follows the operator without a second grant |
 | E-AG-17 | App commands without `agent.invoke`; personal events for apps | adopted, 05 sections 4.10 and 6, R-AZ-18 |
-| E-AG-18 | `supports_title`, `supports_files_out` | adopted, 03 `agents` |
+| E-AG-18 | `supports_title`, `supports_files_out` | `supports_files_out` adopted, 03 `agents`; `supports_title` struck again (AUD-PKG-R2-owner-server) |
 | E-AG-19 | `external_session_ref` in `run.start` optional | adopted, 04 section 15.3, 05 `agent_session.report` |
 | E-AG-20 | Rejection reason `run_active` for model commands | adopted, 05 `command.invoke` |
 | E-AG-21 | Guest agent only with `billing_mode = organization` | adopted, 05 section 5 item 3, R-AZ-19 |

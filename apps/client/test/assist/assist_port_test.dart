@@ -133,6 +133,19 @@ void main() {
     expect(assistTargetOf(full), '/t/${threadId(2).value}');
   });
 
+  test('candidates_capped reaches the answer; a missing member is false '
+      '(AUD-PKG-R2-owner-server)', () {
+    AssistAnswer map(Map<String, Object?> extra) => assistAnswerFromRest(
+      rest.standardSerializers.deserializeWith(
+        rest.SearchAssistResult.serializer,
+        {'mode': 'fulltext', 'terms': <String>[], 'hits': <Object>[], ...extra},
+      )!,
+    );
+    expect(map({'candidates_capped': true}).candidatesCapped, isTrue);
+    expect(map({'candidates_capped': false}).candidatesCapped, isFalse);
+    expect(map({}).candidatesCapped, isFalse);
+  });
+
   test('a full-text answer names its reason', () {
     for (final (wire, want) in [
       ('assistant_not_configured', AssistFallback.notConfigured),

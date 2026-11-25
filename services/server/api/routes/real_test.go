@@ -145,6 +145,10 @@ func (stubServer) RemoveGroupMember(context.Context, rest.RemoveGroupMemberReque
 	return nil, nil
 }
 
+func (stubServer) ExtendGroupMember(context.Context, rest.ExtendGroupMemberRequestObject) (rest.ExtendGroupMemberResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListGrants(context.Context, rest.ListGrantsRequestObject) (rest.ListGrantsResponseObject, error) {
 	return nil, nil
 }
@@ -1486,6 +1490,7 @@ func TestRealTable_Enabled(t *testing.T) {
 		"listGroupMembers":  {"GET /api/v1/groups/{group_id}/members", "group.read", "rl.read"},
 		"addGroupMember":    {"POST /api/v1/groups/{group_id}/members", "group.member.add", "rl.admin"},
 		"removeGroupMember": {"DELETE /api/v1/groups/{group_id}/members/{user_id}", "group.member.remove", "rl.admin"},
+		"extendGroupMember": {"POST /api/v1/groups/{group_id}/members/{user_id}/extend", "group.member.extend", "rl.admin"},
 		"listGrants":        {"GET /api/v1/grants", "grant.read", "rl.read"},
 		"createGrant":       {"POST /api/v1/grants", "grant.create", "rl.admin"},
 		"getGrant":          {"GET /api/v1/grants/{grant_id}", "grant.read", "rl.read"},

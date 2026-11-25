@@ -159,6 +159,7 @@ type item struct {
 	TargetKind    string `json:"target_kind"`
 	TargetID      string `json:"target_id"`
 	State         string `json:"state"`
+	Error         string `json:"error"`
 	SourceChanged bool   `json:"source_changed"`
 }
 

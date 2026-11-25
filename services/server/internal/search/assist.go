@@ -75,6 +75,9 @@ type AssistResult struct {
 	Terms []string
 	// Cost is nil without an estimate.
 	Cost *AssistCost
+	// CandidatesCapped reports that a search of the question reached search.max_candidates: the
+	// newest matches were taken, so older sessions may be missing (AUD-PKG-R2-owner-server).
+	CandidatesCapped bool
 }
 
 // AssistPick is one pick of an answer (schema SearchAssistPick).
@@ -124,4 +127,18 @@ type AssistRelay interface {
 	// connection exists, it was not admitted or its outbound queue dropped the frame. Errors only
 	// report programming faults.
 	AskAssistant(ctx context.Context, agentID ids.ID, ev eventlog.EphemeralEvent) (sent bool, err error)
+}
+
+// AssistAgentPolicy is the source port of search that tells whether the assistant agent runs on
+// the backend of the organization (billing_mode organization, AUD-PKG-R2-owner-server): only such
+// an agent gets the questions and excerpts of every person; internal/wire implements it over the
+// agent facts.
+//
+// Example:
+//
+//	ok, err := policy.OrganizationAgent(ctx, agentID)
+type AssistAgentPolicy interface {
+	// OrganizationAgent reports whether agentID is an agent with billing_mode organization; an
+	// unknown id is false. Errors: those of the storage.
+	OrganizationAgent(ctx context.Context, agentID ids.ID) (bool, error)
 }

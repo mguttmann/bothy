@@ -20,15 +20,17 @@ import (
 // (signals.md 4.4), as an SQL list of River's enum literals.
 const queueStates = "('available', 'scheduled', 'retryable')"
 
-// jobMetrics are bothy.job.duration and bothy.job.queue of the runtime, declared in the metric
-// registry; bothy.job.kind takes its values from the kinds registered at startup.
+// jobMetrics are bothy.job.duration, bothy.job.queue and bothy.job.discarded of the runtime,
+// declared in the metric registry; bothy.job.kind takes its values from the kinds registered at
+// startup.
 type jobMetrics struct {
-	duration *metrics.Histogram
-	queue    *metrics.ObservableGauge
-	kinds    []string
+	duration  *metrics.Histogram
+	queue     *metrics.ObservableGauge
+	discarded *metrics.Counter
+	kinds     []string
 }
 
-// newJobMetrics creates both instruments on mp (nil means the global provider) for kinds.
+// newJobMetrics creates the instruments on mp (nil means the global provider) for kinds.
 func newJobMetrics(mp metric.MeterProvider, kinds []string) (*jobMetrics, error) {
 	v := metrics.Values{metrics.SourceJobKinds: kinds}
 	d, err := metrics.NewHistogram(mp, metrics.JobDuration, v)
@@ -39,7 +41,21 @@ func newJobMetrics(mp metric.MeterProvider, kinds []string) (*jobMetrics, error)
 	if err != nil {
 		return nil, fmt.Errorf("jobs: %w", err)
 	}
-	return &jobMetrics{duration: d, queue: q, kinds: kinds}, nil
+	c, err := metrics.NewCounter(mp, metrics.JobDiscarded, v)
+	if err != nil {
+		return nil, fmt.Errorf("jobs: %w", err)
+	}
+	// Every series of bothy.job.discarded starts at 0, so the first discarded job is an increase
+	// that BothyJobFinallyFailed sees.
+	for _, k := range kinds {
+		c.Add(context.Background(), 0, k)
+	}
+	return &jobMetrics{duration: d, queue: q, discarded: c, kinds: kinds}, nil
+}
+
+// discardedJob counts one job of kind whose last attempt failed.
+func (m *jobMetrics) discardedJob(ctx context.Context, kind string) {
+	m.discarded.Add(context.WithoutCancel(ctx), 1, kind)
 }
 
 // observed records one attempt of kind that ran for d with outcome.

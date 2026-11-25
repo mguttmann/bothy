@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
@@ -111,8 +112,8 @@ func holderFrom(ctx context.Context) *routeHolder {
 // telemetry.traces.trust_remote_parent the incoming context is the parent. The span is named
 // "<METHOD>" until RecordRoute names the route, then "<METHOD> <route>"; a request without a
 // route gets http.route "unmatched". The access log has the message "http request" and only
-// http.request.method, http.route, http.response.status_code, error.type (5xx) and
-// user_agent.original: User-Agent is the only header read for logging, and the path and query
+// http.request.method, http.route, http.response.status_code, error.type (5xx),
+// user_agent.original and bothy.request.duration (seconds until the handler returned): User-Agent is the only header read for logging, and the path and query
 // never appear (SEC-LOG-2, SEC-LOG-3).
 //
 // Example:
@@ -159,6 +160,7 @@ func ObservedMiddleware(next http.Handler, done func(route string, status int)) 
 // returns, so a panicking request is not in that metric.
 func serveInner(w http.ResponseWriter, r *http.Request, next http.Handler, done func(route string, status int)) {
 	sw := &statusWriter{ResponseWriter: w}
+	started := time.Now()
 	returned := false
 	defer func() {
 		if returned {
@@ -174,7 +176,7 @@ func serveInner(w http.ResponseWriter, r *http.Request, next http.Handler, done 
 		if status >= http.StatusInternalServerError {
 			span.SetStatus(codes.Error, "")
 		}
-		finishRequest(r, status)
+		finishRequest(r, status, time.Since(started))
 		if p != nil {
 			panic(p)
 		}
@@ -183,15 +185,16 @@ func serveInner(w http.ResponseWriter, r *http.Request, next http.Handler, done 
 	next.ServeHTTP(sw, r)
 	returned = true
 	status := sw.code()
-	route := finishRequest(r, status)
+	route := finishRequest(r, status, time.Since(started))
 	if done != nil {
 		done(route, status)
 	}
 }
 
-// finishRequest completes the route, sets error.type for a 5xx status and writes the access log;
-// it returns http.route as the metric gets it ("unmatched" for a request without a route).
-func finishRequest(r *http.Request, status int) string {
+// finishRequest completes the route, sets error.type for a 5xx status and writes the access log
+// with the duration d of the request; it returns http.route as the metric gets it ("unmatched"
+// for a request without a route).
+func finishRequest(r *http.Request, status int, d time.Duration) string {
 	ctx := r.Context()
 	route := ""
 	if h := holderFrom(ctx); h != nil {
@@ -213,11 +216,12 @@ func finishRequest(r *http.Request, status int) string {
 	} else {
 		r.Pattern = route
 	}
-	attrs := make([]slog.Attr, 0, 5)
+	attrs := make([]slog.Attr, 0, 6)
 	attrs = append(attrs,
 		slog.String(attr.HTTPRequestMethod, logMethod(r.Method)),
 		slog.String(attr.HTTPRoute, route),
-		slog.Int(attr.HTTPResponseStatusCode, status))
+		slog.Int(attr.HTTPResponseStatusCode, status),
+		slog.Float64(attr.RequestDuration, d.Seconds()))
 	if status >= http.StatusInternalServerError {
 		errType := strconv.Itoa(status)
 		trace.SpanFromContext(ctx).SetAttributes(attribute.String(attr.ErrorType, errType))

@@ -11619,6 +11619,12 @@ type GroupMemberAdd struct {
 	UserId Uuid `json:"user_id"`
 }
 
+// GroupMemberExtend The later expiry of a time-limited membership in effect (`extendGroupMember`).
+type GroupMemberExtend struct {
+	// ExpiresAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	ExpiresAt Timestamp `json:"expires_at"`
+}
+
 // GroupMemberPage One page. `next_cursor` is absent on the last page.
 type GroupMemberPage struct {
 	Items []GroupMember `json:"items"`
@@ -12476,7 +12482,9 @@ type ImportForumTagData struct {
 type ImportItem struct {
 	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	CreatedAt Timestamp `json:"created_at"`
-	Error     *string   `json:"error,omitempty"`
+
+	// Error With `state = failed` the field code of the content rule the message broke (`too_long`, `empty`, `invalid`, `limit_reached`); the batch went on (22, 8).
+	Error *string `json:"error,omitempty"`
 
 	// Id UUIDv7 (RFC 9562), lowercase canonical form.
 	Id       Uuid               `json:"id"`
@@ -16419,6 +16427,9 @@ type SearchAssistRequestedPayload struct {
 
 // SearchAssistResult defines model for SearchAssistResult.
 type SearchAssistResult struct {
+	// CandidatesCapped A search of this question reached `search.max_candidates`; the newest matches were taken, so older sessions may be missing. Ask more narrowly to reach them.
+	CandidatesCapped *bool `json:"candidates_capped,omitempty"`
+
 	// CostEstimate Estimate of the assistant's model call, for information only; not booked as a cost entry.
 	CostEstimate *SearchAssistCost `json:"cost_estimate,omitempty"`
 
@@ -20329,6 +20340,12 @@ type AddGroupMemberParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// ExtendGroupMemberParams defines parameters for ExtendGroupMember.
+type ExtendGroupMemberParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListHostsParams defines parameters for ListHosts.
 type ListHostsParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -21401,6 +21418,9 @@ type UpdateGroupJSONRequestBody = GroupUpdate
 
 // AddGroupMemberJSONRequestBody defines body for AddGroupMember for application/json ContentType.
 type AddGroupMemberJSONRequestBody = GroupMemberAdd
+
+// ExtendGroupMemberJSONRequestBody defines body for ExtendGroupMember for application/json ContentType.
+type ExtendGroupMemberJSONRequestBody = GroupMemberExtend
 
 // PostIncomingWebhookWithBearerJSONRequestBody defines body for PostIncomingWebhookWithBearer for application/json ContentType.
 type PostIncomingWebhookWithBearerJSONRequestBody = IncomingWebhookPost

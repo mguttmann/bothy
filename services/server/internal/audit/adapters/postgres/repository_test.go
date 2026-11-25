@@ -173,15 +173,12 @@ func TestAuditIPKeys_NewPeriodNewKey(t *testing.T) {
 	if id1 == id2 || bytes.Equal(k1, k2) {
 		t.Fatal("a new period reused the key")
 	}
-	rec, ok, err := e.repo.IPKeyByID(ctx, id2)
-	if err != nil || !ok {
-		t.Fatalf("IPKeyByID = %v, %v", ok, err)
+	rec, ok, err := e.repo.CurrentIPKey(ctx, now.Add(period))
+	if err != nil || !ok || rec.ID != id2 {
+		t.Fatalf("CurrentIPKey = %+v, %v, %v", rec, ok, err)
 	}
 	if !rec.ValidFrom.Equal(time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)) || !rec.ValidUntil.Equal(rec.ValidFrom.Add(period)) || rec.KeyRef != ref {
 		t.Fatalf("row = %+v", rec)
-	}
-	if _, ok, err := e.repo.IPKeyByID(ctx, ids.New()); err != nil || ok {
-		t.Fatalf("IPKeyByID of an unknown id = %v, %v", ok, err)
 	}
 }
 

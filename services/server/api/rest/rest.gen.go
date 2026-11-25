@@ -465,6 +465,9 @@ type ServerInterface interface {
 	// RemoveGroupMember Remove a member
 	// (DELETE /groups/{group_id}/members/{user_id})
 	RemoveGroupMember(w http.ResponseWriter, r *http.Request, groupId GroupIdPath, userId UserIdPath)
+	// ExtendGroupMember Extend a time-limited membership
+	// (POST /groups/{group_id}/members/{user_id}/extend)
+	ExtendGroupMember(w http.ResponseWriter, r *http.Request, groupId GroupIdPath, userId UserIdPath, params ExtendGroupMemberParams)
 	// PostIncomingWebhookWithBearer Post a message through an incoming webhook with the token in Authorization
 	// (POST /hooks/{webhook_id})
 	PostIncomingWebhookWithBearer(w http.ResponseWriter, r *http.Request, webhookId WebhookIdPath)
@@ -7287,6 +7290,65 @@ func (siw *ServerInterfaceWrapper) RemoveGroupMember(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RemoveGroupMember(w, r, groupId, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExtendGroupMember operation middleware
+func (siw *ServerInterfaceWrapper) ExtendGroupMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "group_id" -------------
+	var groupId GroupIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "group_id", r.PathValue("group_id"), &groupId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "group_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "user_id" -------------
+	var userId UserIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ExtendGroupMemberParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExtendGroupMember(w, r, groupId, userId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -15488,6 +15550,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/groups/{group_id}", wrapper.UpdateGroup)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/groups/{group_id}/members", wrapper.ListGroupMembers)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/groups/{group_id}/members", wrapper.AddGroupMember)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/groups/{group_id}/members/{user_id}/extend", wrapper.ExtendGroupMember)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/groups/{group_id}/members/{user_id}", wrapper.RemoveGroupMember)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/grants", wrapper.ListGrants)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grants", wrapper.CreateGrant)

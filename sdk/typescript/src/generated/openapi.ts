@@ -1287,6 +1287,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/groups/{group_id}/members/{user_id}/extend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Extend a time-limited membership
+         * @description Gives the time-limited membership of the person that is in effect a later `expires_at`, on the same membership, so access never lapses (07 9.4). A membership without an expiry is `400 validation_failed` at `/expires_at` with `not_time_limited`, an expiry not after the current one with `not_later`; a person without a membership in effect is `404`; a group with `source = oidc_claim` is `409 conflict` with `claim_managed_group`.
+         */
+        post: operations["extendGroupMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/groups/{group_id}/members/{user_id}": {
         parameters: {
             query?: never;
@@ -7551,6 +7571,10 @@ export interface components {
             expires_at?: components["schemas"]["Timestamp"];
             resolve_i1?: components["schemas"]["ResolveI1"];
         };
+        /** @description The later expiry of a time-limited membership in effect (`extendGroupMember`). */
+        GroupMemberExtend: {
+            expires_at: components["schemas"]["Timestamp"];
+        };
         /**
          * @description `host` is a connected host for the terminal; it has no level and only the capability `terminal` (24, 8.1).
          * @enum {string}
@@ -8609,6 +8633,8 @@ export interface components {
             /** @description The search terms of this question (the person's and the assistant's); the app sends them back in `history`. */
             terms: string[];
             cost_estimate?: components["schemas"]["SearchAssistCost"];
+            /** @description A search of this question reached `search.max_candidates`; the newest matches were taken, so older sessions may be missing. Ask more narrowly to reach them. */
+            candidates_capped?: boolean;
         };
         /** @description One session the search found; open it at `/t/<thread_id>?m=<message_id>`. */
         SearchAssistHit: {
@@ -10245,6 +10271,7 @@ export interface components {
             target_kind?: string;
             target_id?: components["schemas"]["Uuid"];
             state: components["schemas"]["ImportItemState"];
+            /** @description With `state = failed` the field code of the content rule the message broke (`too_long`, `empty`, `invalid`, `limit_reached`); the batch went on (22, 8). */
             error?: string;
             /** @description Present and `true` when a repeated key came with a `content_sha256` different from the stored one; nothing was changed (22, 7.2 item 4). */
             source_changed?: boolean;
@@ -16198,6 +16225,46 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["UnprocessableEntity"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    extendGroupMember: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                group_id: components["parameters"]["GroupIdPath"];
+                user_id: components["parameters"]["UserIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupMemberExtend"];
+            };
+        };
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupMember"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

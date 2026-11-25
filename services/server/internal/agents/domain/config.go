@@ -16,7 +16,6 @@ const (
 	CapabilityFollowups  Capability = "supports_followups"
 	CapabilityComponents Capability = "supports_components"
 	CapabilityVoice      Capability = "supports_voice"
-	CapabilityTitle      Capability = "supports_title"
 	CapabilityFilesOut   Capability = "supports_files_out"
 )
 
@@ -36,7 +35,6 @@ type operatorConfigV1 struct {
 	SupportsFollowups  *bool   `json:"supports_followups,omitempty"`
 	SupportsComponents *bool   `json:"supports_components,omitempty"`
 	SupportsVoice      *bool   `json:"supports_voice,omitempty"`
-	SupportsTitle      *bool   `json:"supports_title,omitempty"`
 	SupportsFilesOut   *bool   `json:"supports_files_out,omitempty"`
 }
 
@@ -49,8 +47,6 @@ func (c *operatorConfigV1) flag(k Capability) **bool {
 		return &c.SupportsComponents
 	case CapabilityVoice:
 		return &c.SupportsVoice
-	case CapabilityTitle:
-		return &c.SupportsTitle
 	case CapabilityFilesOut:
 		return &c.SupportsFilesOut
 	}
@@ -147,7 +143,7 @@ func (o OperatorConfig) Map() map[string]any {
 	if o.c.DefaultModel != nil {
 		m[keyDefaultModel] = *o.c.DefaultModel
 	}
-	for _, k := range []Capability{CapabilityFollowups, CapabilityComponents, CapabilityVoice, CapabilityTitle, CapabilityFilesOut} {
+	for _, k := range []Capability{CapabilityFollowups, CapabilityComponents, CapabilityVoice, CapabilityFilesOut} {
 		if f := *o.c.flag(k); f != nil {
 			m[string(k)] = *f
 		}

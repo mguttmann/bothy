@@ -653,6 +653,23 @@ func (s *store) InsertThread(_ context.Context, th domain.Thread) (domain.Thread
 	return th, s.fail
 }
 
+func (s *store) ExpiredThreadTitles(_ context.Context, cutoff time.Time, limit int) ([]ids.ID, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var list []domain.Thread
+	for _, th := range s.threads {
+		if th.Title != "" && !th.Deletion.Deleted() && th.LastActivityAt.Before(cutoff) {
+			list = append(list, th)
+		}
+	}
+	slices.SortFunc(list, func(a, b domain.Thread) int { return a.LastActivityAt.Compare(b.LastActivityAt) })
+	out := make([]ids.ID, 0, min(limit, len(list)))
+	for _, th := range list[:min(limit, len(list))] {
+		out = append(out, th.ID)
+	}
+	return out, s.fail
+}
+
 func (s *store) SaveThread(_ context.Context, th domain.Thread) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

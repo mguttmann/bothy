@@ -3,8 +3,11 @@
 package wire
 
 import (
+	"context"
 	"errors"
 	"log/slog"
+
+	"github.com/OWNER/bothy/services/server/internal/agents"
 
 	authztelemetry "github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	"github.com/OWNER/bothy/services/server/internal/chat"
@@ -14,6 +17,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/assistrelay"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 	messaginghttp "github.com/OWNER/bothy/services/server/internal/messaging/adapters/httpapi"
@@ -118,12 +122,34 @@ func NewSearch(cfg searchapp.Config, assist searchapp.AssistConfig, languages []
 // bindAssistRelay binds the relay of search.assist_requested (gateway/adapters/assistrelay over the
 // hub of gw, with the correlator of the event log) into the search assistant. Without the search
 // module or without a hub it binds nothing, and every question falls back to full text with
-// assistant_unavailable.
-func bindAssistRelay(sr *Search, gw *Gateway) error {
+// assistant_unavailable. The agent facts of ag bind the policy; without them the assistant stays
+// off (AUD-PKG-R2-owner-server).
+func bindAssistRelay(sr *Search, gw *Gateway, ag *Agents) error {
 	if sr == nil || sr.Assistant == nil || gw == nil || gw.Hub == nil {
 		return nil
 	}
+	if ag != nil && ag.Service != nil {
+		// Only an organization agent gets the questions.
+		if err := sr.Assistant.BindPolicy(assistPolicy{facts: ag.Service}); err != nil {
+			return err
+		}
+	}
 	return sr.Assistant.BindRelay(assistrelay.New(gw.Hub, synctelemetry.Correlator{}), nil)
+}
+
+// assistPolicy implements search.AssistAgentPolicy over the agent facts: billing_mode organization.
+type assistPolicy struct {
+	facts agents.Facts
+}
+
+// OrganizationAgent implements search.AssistAgentPolicy.
+func (p assistPolicy) OrganizationAgent(ctx context.Context, id ids.ID) (bool, error) {
+	f, err := p.facts.RunFacts(ctx, []ids.ID{id})
+	if err != nil {
+		return false, err
+	}
+	v, ok := f[id]
+	return ok && v.BillingMode == agents.BillingOrganization, nil
 }
 
 // fillHandlers sets the nil search handler of h to the one s built; a nil s (a role or a test

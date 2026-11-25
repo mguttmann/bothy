@@ -436,6 +436,12 @@ type Admin interface {
 	// that never was a member is 404; a membership already removed or expired succeeds without
 	// change.
 	RemoveGroupMember(ctx context.Context, caller actor.Actor, groupID, userID ids.ID) error
+	// ExtendGroupMember gives the time-limited membership of userID in effect in a local group
+	// the later expiresAt, on the same row (group.member.extend, AUD-PKG-R2-owner-server), so
+	// access never lapses. No membership in effect is 404; one without expiry is 400
+	// validation_failed on /expires_at with not_time_limited, an expiry not after the current one
+	// with not_later; a claim group is 409 claim_managed_group.
+	ExtendGroupMember(ctx context.Context, caller actor.Actor, groupID, userID ids.ID, expiresAt time.Time) (Membership, error)
 	// CreateGrant creates a grant (grant.create, rights change for the subject or the members of
 	// the subject group) within the delegation limits of 07 section 2.6. A subject that does not
 	// exist is 400 validation_failed on /subject_id with code unknown_subject, decided after

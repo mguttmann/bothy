@@ -121,32 +121,6 @@ func (q *Queries) HashAt(ctx context.Context, seq int64) ([]byte, error) {
 	return hash, err
 }
 
-const iPKeyByID = `-- name: IPKeyByID :one
-SELECT id, valid_from, valid_until, key_ciphertext, key_ref FROM audit_ip_keys WHERE id = $1
-`
-
-type IPKeyByIDRow struct {
-	ID            pgtype.UUID
-	ValidFrom     pgtype.Timestamptz
-	ValidUntil    pgtype.Timestamptz
-	KeyCiphertext []byte
-	KeyRef        string
-}
-
-// One IP key by the ip_key_id of an audit row.
-func (q *Queries) IPKeyByID(ctx context.Context, id pgtype.UUID) (IPKeyByIDRow, error) {
-	row := q.db.QueryRow(ctx, iPKeyByID, id)
-	var i IPKeyByIDRow
-	err := row.Scan(
-		&i.ID,
-		&i.ValidFrom,
-		&i.ValidUntil,
-		&i.KeyCiphertext,
-		&i.KeyRef,
-	)
-	return i, err
-}
-
 const insertCheckpoint = `-- name: InsertCheckpoint :exec
 INSERT INTO audit_checkpoints (seq, hash, previous_checkpoint_hash, signature, kid)
 VALUES ($1, $2, $3, $4, $5)

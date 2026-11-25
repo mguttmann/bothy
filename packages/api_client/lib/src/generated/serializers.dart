@@ -273,6 +273,7 @@ import 'package:api_client/src/generated/model/group_changed_payload.dart';
 import 'package:api_client/src/generated/model/group_create.dart';
 import 'package:api_client/src/generated/model/group_member.dart';
 import 'package:api_client/src/generated/model/group_member_add.dart';
+import 'package:api_client/src/generated/model/group_member_extend.dart';
 import 'package:api_client/src/generated/model/group_member_page.dart';
 import 'package:api_client/src/generated/model/group_page.dart';
 import 'package:api_client/src/generated/model/group_source.dart';
@@ -963,6 +964,7 @@ part 'serializers.g.dart';
   GroupCreate,
   GroupMember,
   GroupMemberAdd,
+  GroupMemberExtend,
   GroupMemberPage,
   GroupPage,
   GroupSource,

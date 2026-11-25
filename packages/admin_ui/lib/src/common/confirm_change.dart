@@ -38,6 +38,7 @@ class ConfirmChange extends StatefulWidget {
     required this.confirmLabel,
     this.destructive = false,
     this.withReason = false,
+    this.reasonRequired = false,
     this.fields,
     this.canConfirm = true,
     this.onConfirm,
@@ -58,6 +59,11 @@ class ConfirmChange extends StatefulWidget {
   /// Whether a reason field is shown (the server stores the reason in the audit log).
   final bool withReason;
 
+  /// Whether the reason must be typed: "Confirm" stays disabled while the field is empty. Only
+  /// the security-relevant changes (roles, permissions, revocations) require one; the others
+  /// send the default reason for an empty field (AUD-PKG-R2-owner-server).
+  final bool reasonRequired;
+
   /// Form fields between the text and the reason, or null.
   final Widget? fields;
 
@@ -75,6 +81,7 @@ class ConfirmChange extends StatefulWidget {
     required String confirmLabel,
     bool destructive = false,
     bool withReason = false,
+    bool reasonRequired = false,
   }) => showDialog<String>(
     context: context,
     builder: (_) => ConfirmChange(
@@ -82,7 +89,8 @@ class ConfirmChange extends StatefulWidget {
       body: body,
       confirmLabel: confirmLabel,
       destructive: destructive,
-      withReason: withReason,
+      withReason: withReason || reasonRequired,
+      reasonRequired: reasonRequired,
     ),
   );
 
@@ -92,6 +100,12 @@ class ConfirmChange extends StatefulWidget {
 
 class _ConfirmChangeState extends State<ConfirmChange> {
   final TextEditingController _reason = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.reasonRequired) _reason.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
@@ -149,7 +163,11 @@ class _ConfirmChangeState extends State<ConfirmChange> {
                 TextField(
                   key: const ValueKey('confirm.reason'),
                   controller: _reason,
-                  decoration: InputDecoration(labelText: l.adminReason),
+                  decoration: InputDecoration(
+                    labelText: widget.reasonRequired
+                        ? l.adminReasonRequired
+                        : l.adminReason,
+                  ),
                 ),
               ],
             ],
@@ -171,7 +189,11 @@ class _ConfirmChangeState extends State<ConfirmChange> {
                   foregroundColor: colors.dangerOnBg,
                 )
               : null,
-          onPressed: widget.canConfirm ? _confirm : null,
+          onPressed:
+              widget.canConfirm &&
+                  (!widget.reasonRequired || _reason.text.trim().isNotEmpty)
+              ? _confirm
+              : null,
           child: Text(widget.confirmLabel),
         ),
       ],

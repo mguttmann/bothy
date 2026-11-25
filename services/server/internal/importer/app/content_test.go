@@ -196,6 +196,14 @@ func (m *messages) Append(_ context.Context, thread ids.ID, msgs []messaging.Imp
 	return out, nil
 }
 
+// Check refuses a content of more than 20 bytes as too_long, like message.max_content_bytes.
+func (m *messages) Check(msg messaging.ImportedMessage) error {
+	if len(msg.ContentMD) > 20 {
+		return errs.New(errs.CodeValidationFailed, "too long").WithFields(errs.FieldError{Pointer: "/content_md", Code: "too_long"})
+	}
+	return nil
+}
+
 func (m *messages) ThreadOf(_ context.Context, id ids.ID) (ids.ID, bool, error) {
 	if err := m.f.err("Messages.ThreadOf"); err != nil {
 		return ids.ID{}, false, err
@@ -383,6 +391,42 @@ func TestContentBatches(t *testing.T) {
 		if !ok || e.Code != r.code || (r.reason != "" && e.Reason != r.reason) {
 			t.Errorf("%s: %v", r.name, err)
 		}
+	}
+}
+
+// TestContentRejectedMessageFails (AUD-PKG-R2-owner-server, #818): a message whose content the
+// server refuses becomes a failed item with the code of the refusal; the batch goes on with the
+// next message, nothing of the refused one is appended, and server.message.failed counts it.
+func TestContentRejectedMessageFails(t *testing.T) {
+	t.Parallel()
+	c := newContentEnv(t)
+	ctx := context.Background()
+	long := `{"author_origin_key":"user:30","content_md":"` + strings.Repeat("x", 21) + `","created_at":"2025-03-01T08:00:00Z"}`
+	res, err := c.svc.ApplyBatch(ctx, c.owner, c.src.ID, thread("channel:20",
+		o("message:70", "message", long), o("message:71", "message", alexMsg)))
+	if err != nil || len(res.Items) != 2 {
+		t.Fatalf("batch %+v, %v; want two items", res, err)
+	}
+	failed, posted := res.Items[0], res.Items[1]
+	if failed.State != importer.ItemFailed || failed.Error != "too_long" || !failed.TargetID.IsZero() {
+		t.Errorf("refused item %+v, want failed with too_long", failed)
+	}
+	if posted.State != importer.ItemPosted || posted.TargetID.IsZero() {
+		t.Errorf("next item %+v, want posted", posted)
+	}
+	c.messages.mu.Lock()
+	appended := len(c.messages.thread)
+	c.messages.mu.Unlock()
+	if appended != 1 {
+		t.Errorf("appended %d messages, want only the valid one", appended)
+	}
+	list, err := c.svc.ListItems(ctx, c.owner, c.src.ID, importer.ItemQuery{Page: importer.Page{Limit: 10}, State: importer.ItemFailed})
+	if err != nil || len(list.Items) != 1 || list.Items[0].OriginKey != "message:70" {
+		t.Fatalf("failed items %+v, %v", list, err)
+	}
+	src, err := c.svc.GetSource(ctx, c.owner, c.src.ID)
+	if err != nil || !strings.Contains(string(src.Stats), `"failed":1`) {
+		t.Errorf("stats %s, %v; want a failed message counted", src.Stats, err)
 	}
 }
 

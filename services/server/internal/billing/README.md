@@ -67,7 +67,7 @@ An entry is valid when no entry has `supersedes_id` equal to its `id` (03 4.9). 
 
 ## Start file
 
-`domain/startprices/start_prices.json` (schema `start_prices.v1`) holds the base prices of the five token units for the models whose identifiers the model overview of the provider's documentation names, with the pricing page as `source_url`, its time of reading as `retrieved_at` and `valid_from = retrieved_at` (D-M2-22-20). It is embedded and checked by tests; the server never loads it, because loading it on the host needs a system action that 05 does not have (spec gap). Until one exists the owner enters prices with `createPrice`. Booking tests never read it: they take their prices from `createPrice` or the test helper.
+`domain/startprices/start_prices.json` (schema `start_prices.v1`) holds the base prices of the five token units for the models whose identifiers the model overview of the provider's documentation names, with the pricing page as `source_url`, its time of reading as `retrieved_at` and `valid_from = retrieved_at` (D-M2-22-20). It is embedded and checked by tests. `app.StartPriceLoader` (system action `price.load_start`, AUD-PKG-R2-owner-server) loads it once, right after `bothy setup bootstrap-owner`, into a `price_table` without any row, with the first owner as `created_by` and one audit entry with the number of rows (`TestStartPriceLoader_LoadsOnceIntoAnEmptyTable`, the check of `TestIDT06_RequestsBeforeSetupGet503`); later the owner maintains prices with `createPrice` and `closePrice`. Booking tests never read it: they take their prices from `createPrice` or the test helper.
 
 ## Reconciliation (M2-28)
 
@@ -112,7 +112,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 
 ## Actions (05-actions.md)
 
-`cost.read.thread`, `cost.read.aggregate`, `price.read`, `price.manage`, `cost.reconcile`, `cost.reconcile.read`, `cost.reconcile.submit`.
+`cost.read.thread`, `cost.read.aggregate`, `price.read`, `price.manage`, `price.load_start`, `cost.reconcile`, `cost.reconcile.read`, `cost.reconcile.submit`.
 
 ## Events and WebSocket ops
 

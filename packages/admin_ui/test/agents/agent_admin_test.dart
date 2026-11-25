@@ -316,7 +316,7 @@ void main() {
         operatorConfig: const {
           'default_model': 'model-medium',
           'supports_voice': false,
-          'supports_title': true,
+          'supports_components': true,
         },
       );
       await page(tester, 'texter');

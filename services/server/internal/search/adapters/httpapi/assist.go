@@ -32,8 +32,10 @@ func (h *Finder) AssistSearch(ctx context.Context, req rest.AssistSearchRequestO
 	if err != nil {
 		return nil, err
 	}
+	capped := res.CandidatesCapped
 	out := rest.SearchAssistResult{
 		Mode: rest.SearchAssistResultMode(res.Mode), Terms: res.Terms, Hits: make([]rest.SearchAssistHit, 0, len(res.Hits)),
+		CandidatesCapped: &capped,
 	}
 	if out.Terms == nil {
 		out.Terms = []string{}

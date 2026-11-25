@@ -14,6 +14,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	runspg "github.com/OWNER/bothy/services/server/internal/runs/adapters/postgres"
 	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
 )
 
@@ -52,7 +53,8 @@ func runsWiring() moduleWiring {
 			}
 			// runs.stall_check runs every agent.presence_timeout (M2-09, D-M2-09-19).
 			m.StallInterval = s.values.Duration(keyPresenceTimeout)
-			return nil
+			// The texts of runs, steps and wake-ups follow retention.content (AUD-PKG-R2-owner-server).
+			return m.registerRetention(runspg.NewRetention(s.currentPool()), m.RetentionConfig.ContentPeriod())
 		},
 		bindJobs: func(s *server, ins jobs.Inserter) {
 			s.mu.Lock()

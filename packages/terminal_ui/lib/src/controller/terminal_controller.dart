@@ -18,7 +18,7 @@ import 'package:api_client/api_client.dart'
         TerminalSessionGrant,
         TerminalSessionOpen,
         TerminalSessionState;
-import 'package:auth/auth.dart' show Clock, StepUpCancelled;
+import 'package:auth/auth.dart' show Clock, StepUpCancelled, StepUpUnavailable;
 import 'package:bothy_noise/bothy_noise.dart';
 import 'package:cryptography/cryptography.dart' show SimpleKeyPair;
 import 'package:domain/domain.dart' show AppConfig, AppConfigValues, HostId;
@@ -330,7 +330,9 @@ final class TerminalController extends ChangeNotifier {
       _set(
         epoch,
         before.copyWith(
-          problemCode: problem?.code ?? 'attach_failed',
+          problemCode: e is StepUpUnavailable
+              ? stepUpUnavailableCode
+              : problem?.code ?? 'attach_failed',
           problemReason: problem?.reason,
         ),
       );
@@ -910,7 +912,9 @@ final class TerminalController extends ChangeNotifier {
         detachedAt: _state.sessionId == null
             ? null
             : (_state.detachedAt ?? _clock.now()),
-        problemCode: problem?.code ?? 'open_failed',
+        problemCode: error is StepUpUnavailable
+            ? stepUpUnavailableCode
+            : problem?.code ?? 'open_failed',
         problemReason: problem?.reason,
       ),
     );

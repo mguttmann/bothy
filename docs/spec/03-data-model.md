@@ -777,7 +777,7 @@ Module: `agents`.
 | `principal_id` | `uuid` | no | | `kind = 'agent'` checked by a trigger |
 | `adapter_kind` | `text` | no | | free-form identifier of the adapter, for example `hermes`, `code_runner`, `custom`; `claude_agent` marks a built-in agent ([26-builtin-agents.md](26-builtin-agents.md), R-DM-58) |
 | `description` | `text` | no | `''` | |
-| `operator_config` | `jsonb` | no | `'{}'` | schema `agent_operator_config.v1` ([09-agents.md](09-agents.md), section 2.2): default model (`default_model`) and allowed adapter features (`supports_followups`, `supports_components`, `supports_voice`, `supports_title`, `supports_files_out`); a missing key allows; no secrets. An adapter feature is effective only when the adapter also reports it ([09-agents.md](09-agents.md), section 2.2) |
+| `operator_config` | `jsonb` | no | `'{}'` | schema `agent_operator_config.v1` ([09-agents.md](09-agents.md), section 2.2): default model (`default_model`) and allowed adapter features (`supports_followups`, `supports_components`, `supports_voice`, `supports_files_out`); a missing key allows; no secrets. An adapter feature is effective only when the adapter also reports it ([09-agents.md](09-agents.md), section 2.2) |
 | `billing_mode` | `text` | no | `'organization'` | `CHECK (billing_mode IN ('personal','organization'))` |
 | `credential_holder_id` | `uuid` | yes | | required for `personal`, otherwise NULL |
 | `billing_mode_changed_at` | `timestamptz` | yes | | |
@@ -2474,9 +2474,9 @@ Purpose: an imported item with a unique origin key. Module: `importer`.
 | `item_kind` | `text` | no | | `CHECK (item_kind IN ('space','channel','forum_tag','thread','message','file','user','reaction','pin'))` |
 | `target_kind` | `text` | yes | | |
 | `target_id` | `uuid` | yes | | created object |
-| `state` | `text` | no | `'pending'` | `CHECK (state IN ('pending','posted','skipped','failed'))`; `failed` is reserved: nothing writes it yet, a refused item rolls its batch back ([22-import-migration.md](22-import-migration.md) section 8) |
+| `state` | `text` | no | `'pending'` | `CHECK (state IN ('pending','posted','skipped','failed'))`; `failed` is a message item whose content the server refuses by the content rules of a message; its batch goes on, every other refusal rolls the batch back ([22-import-migration.md](22-import-migration.md) section 8) |
 | `content_sha256` | `bytea` | yes | | detects changes at the source |
-| `error` | `text` | yes | | without content or secrets; reserved with the state `failed`, not written yet |
+| `error` | `text` | yes | | without content or secrets; with the state `failed` the field code of the refusal (`too_long`, `empty`, `invalid`, `limit_reached`) |
 | `created_at` | `timestamptz` | no | `now()` | |
 | `updated_at` | `timestamptz` | no | `now()` | |
 

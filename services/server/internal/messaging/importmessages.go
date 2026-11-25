@@ -40,6 +40,12 @@ type ImportMessages interface {
 	// (not_in_thread) or /attachment_file_ids (limit_reached); conflict file_not_attachable from
 	// files with the pointer of the entry in detail.
 	Append(ctx context.Context, threadID ids.ID, msgs []ImportedMessage) ([]ids.ID, error)
+	// Check applies the content rules of Append to m without writing anything: the size,
+	// U+0000, a visible character without attachments and the number of attachments. The
+	// importer stores a message that breaks them as a failed item and goes on
+	// (AUD-PKG-R2-owner-server). Errors: validation_failed on /content_md or
+	// /attachment_file_ids.
+	Check(m ImportedMessage) error
 	// ThreadOf returns the thread of a message, deleted ones included; found is false for an
 	// unknown id.
 	ThreadOf(ctx context.Context, messageID ids.ID) (threadID ids.ID, found bool, err error)

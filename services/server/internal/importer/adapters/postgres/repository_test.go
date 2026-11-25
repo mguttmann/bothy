@@ -126,6 +126,21 @@ func TestRepository(t *testing.T) {
 	if posted, err := r.ItemsOfKind(ctx, src, "channel", "posted"); err != nil || len(posted) != 1 {
 		t.Errorf("of kind %+v %v", posted, err)
 	}
+	// A refused item is failed with its code (AUD-PKG-R2-owner-server, #818).
+	do(func(ctx context.Context) error {
+		bad, _, err := r.InsertPendingItem(ctx, app.NewItem{ID: ids.New(), SourceID: src, OriginKey: "message:3", ItemKind: "message", At: at})
+		if err != nil {
+			return err
+		}
+		failed, err := r.FailItem(ctx, bad.ID, "too_long", at)
+		if err == nil && (failed.State != "failed" || failed.Error != "too_long" || !failed.TargetID.IsZero()) {
+			t.Errorf("failed item %+v", failed)
+		}
+		return err
+	})
+	if failed, err := r.Items(ctx, src, "failed", ids.ID{}, 10); err != nil || len(failed) != 1 || failed[0].Error != "too_long" {
+		t.Errorf("failed items %+v %v", failed, err)
+	}
 	if c, err := r.ControlledChannel(ctx, channel); err != nil || !c {
 		t.Errorf("controlled %v %v", c, err)
 	}

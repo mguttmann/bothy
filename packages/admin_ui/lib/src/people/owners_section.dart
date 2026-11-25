@@ -92,13 +92,13 @@ class _OwnersSectionState extends State<OwnersSection>
       body: l.adminOwnersRevokeBody(owner.displayName),
       confirmLabel: l.adminOwnersRevoke,
       destructive: true,
-      withReason: true,
+      reasonRequired: true,
     );
-    if (reason == null || !mounted) return;
+    if (reason == null || reason.isEmpty || !mounted) return;
     final ok = await runChange('${owner.userId}.revoke', () async {
       await widget.repository.revokeOwner(
         owner.userId,
-        reason: reason.isEmpty ? l.adminDefaultReason : reason,
+        reason: reason,
         purpose: l.stepUpPurposeRevokeOwner(owner.displayName),
       );
       return SelfNotice(l.adminOwnersRevoked(owner.displayName));
@@ -135,8 +135,8 @@ class _OwnersSectionState extends State<OwnersSection>
     );
     if (picked == null || !mounted) return;
     setState(() => _guided = null);
-    final (person, typed) = picked;
-    final reason = typed.isEmpty ? l.adminDefaultReason : typed;
+    final (person, reason) = picked;
+    if (reason.isEmpty) return;
     var conflicts = const <InvariantFinding>[];
     final ok = await runChange('add', () async {
       try {
@@ -318,6 +318,7 @@ class _AddOwnerDialogState extends State<_AddOwnerDialog> {
       body: l.adminOwnersAddBody,
       confirmLabel: l.adminOwnersAdd,
       withReason: true,
+      reasonRequired: true,
       canConfirm: _picked != null,
       onConfirm: (reason) => Navigator.of(context).pop((_picked!, reason)),
       fields: DropdownButton<AdminPerson>(

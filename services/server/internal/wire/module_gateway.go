@@ -101,7 +101,7 @@ func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelim
 	s.mu.Lock()
 	sr := s.searchModule
 	s.mu.Unlock()
-	if err := bindAssistRelay(sr, gw); err != nil {
+	if err := bindAssistRelay(sr, gw, ag); err != nil {
 		return err
 	}
 	if err := bindInterviewRelay(ag, gw); err != nil {

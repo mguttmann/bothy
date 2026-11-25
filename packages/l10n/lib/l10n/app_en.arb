@@ -7635,6 +7635,10 @@
   "@terminalStateBlockedProtocol": {
     "description": "Hard warning after close code 4002 or an unexpected message."
   },
+  "terminalStepUpUnavailable": "This device cannot open the terminal: the terminal needs a fresh confirmation with the device key, and this device (Windows) has none yet. Open the terminal in the web console of this instance in your browser, or on a Mac, an iPhone or an Android phone.",
+  "@terminalStepUpUnavailable": {
+    "description": "Banner of a terminal tab on a device without a step-up key (Windows, 08 6.3): the opening or attach needs the fresh step-up such a device cannot give."
+  },
   "terminalStateFailed": "The terminal could not be opened: {problem}",
   "@terminalStateFailed": {
     "description": "Banner of a refused opening with the problem text.",
@@ -10130,6 +10134,26 @@
   "hintsExtend": "Extend",
   "@hintsExtend": {
     "description": "Action that replaces an expiring access grant with a new one (07 section 9.4)."
+  },
+  "expiringExtendMemberTitle": "Extend the membership",
+  "@expiringExtendMemberTitle": {
+    "description": "Title of the dialog that gives an expiring group membership a later last day (extendGroupMember)."
+  },
+  "expiringExtendMemberBody": "The person stays in the group without a gap. Enter the new last day; it must come after the current one.",
+  "@expiringExtendMemberBody": {
+    "description": "Text of the dialog that extends an expiring group membership."
+  },
+  "expiringExtendMemberLater": "Choose a day after the current last day.",
+  "@expiringExtendMemberLater": {
+    "description": "Error under the last day of the extension dialog when the day is not after the current last day."
+  },
+  "expiringMemberExtended": "The membership is extended.",
+  "@expiringMemberExtended": {
+    "description": "Notice after a group membership was extended."
+  },
+  "stepUpPurposeExtendMember": "Extend a group membership",
+  "@stepUpPurposeExtendMember": {
+    "description": "Step-up purpose of extendGroupMember."
   },
   "hintsOpenAgent": "Open agent",
   "@hintsOpenAgent": {
@@ -15785,6 +15809,10 @@
   "@assistNothing": {
     "description": "An answer without hits."
   },
+  "assistCapped": "Many sessions matched; the newest were searched, older ones may be missing. Ask more narrowly to reach them.",
+  "@assistCapped": {
+    "description": "Note under an answer whose search reached the candidate limit (candidates_capped)."
+  },
   "assistFulltext": "Full text, without the assistant",
   "@assistFulltext": {
     "description": "Marks a hit the search assistant did not pick."
@@ -17347,10 +17375,6 @@
   "adminAgentFeatureVoice": "Voice input",
   "@adminAgentFeatureVoice": {
     "description": "Feature switch `supports_voice` of an agent."
-  },
-  "adminAgentFeatureTitle": "Title suggestions",
-  "@adminAgentFeatureTitle": {
-    "description": "Feature switch `supports_title` of an agent."
   },
   "adminAgentFeatureFilesOut": "Sending files",
   "@adminAgentFeatureFilesOut": {

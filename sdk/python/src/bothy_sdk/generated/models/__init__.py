@@ -370,6 +370,7 @@ from .group_changed_payload_change import GroupChangedPayloadChange
 from .group_create import GroupCreate
 from .group_member import GroupMember
 from .group_member_add import GroupMemberAdd
+from .group_member_extend import GroupMemberExtend
 from .group_member_page import GroupMemberPage
 from .group_page import GroupPage
 from .group_source import GroupSource
@@ -1284,6 +1285,7 @@ __all__ = (
     "GroupCreate",
     "GroupMember",
     "GroupMemberAdd",
+    "GroupMemberExtend",
     "GroupMemberPage",
     "GroupPage",
     "GroupSource",

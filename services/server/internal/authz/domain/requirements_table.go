@@ -25,7 +25,7 @@ var requirementGroups = []struct {
 		"agent.update", "app.install", "app.read", "app.resume", "app.scopes.update", "app.suspend",
 		"app.uninstall", "audit.read", "audit.verify", "channel.operator.set", "channel.project.bind",
 		"cost.reconcile", "dev_environment.manage", "feature_flag.read", "feature_flag.update",
-		"gdpr.request.decide", "group.create", "group.delete", "group.member.add", "group.member.remove",
+		"gdpr.request.decide", "group.create", "group.delete", "group.member.add", "group.member.extend", "group.member.remove",
 		"group.update", "identity_provider.manage", "identity_provider.read", "import.manage",
 		"import.read", "instance.branding.update", "instance.settings.read", "instance.settings.update",
 		"owner.add", "owner.remove", "price.manage", "price.read", "signing_key.rotate", "space.archive",
@@ -125,7 +125,7 @@ var requirementGroups = []struct {
 	{"agent-self (runner of the environment)", AgentSelf, []string{"dev_environment.report"}},
 	{"system", System, []string{
 		"device.expire", "grant.expire", "group.member.expire", "group.member.sync",
-		"instance.bootstrap", "owner.recover", "signing_key.transition", "terminal.terminate",
+		"instance.bootstrap", "owner.recover", "price.load_start", "signing_key.transition", "terminal.terminate",
 		"webhook_out.transition",
 	}},
 	{"self or owner", Any(Self, Owner), []string{

@@ -180,6 +180,14 @@ FROM (
 ) AS t
 ORDER BY array_position(sqlc.arg(channel_ids)::uuid[], t.channel_id), t.last_activity_at DESC, t.id DESC;
 
+-- name: ExpiredThreadTitles :many
+-- The threads of the job retention.content (20 4.1, AUD-PKG-R2-owner-server): a live thread with
+-- a title whose last activity lies before the cutoff, oldest first.
+SELECT id FROM threads
+WHERE title <> '' AND deleted_at IS NULL AND last_activity_at < @cutoff
+ORDER BY last_activity_at, id
+LIMIT @row_limit;
+
 -- name: SaveThreadDeletion :exec
 -- Writes a delete or restore of thread.delete and thread.restore (D-DEL-3) and the version.
 UPDATE threads SET deleted_at = sqlc.narg(deleted_at), deleted_by = sqlc.narg(deleted_by), version = @version WHERE id = @id;

@@ -47,6 +47,9 @@ const (
 	keyPicks      = "bothy.search.picks"
 	msgSecondPass = "search: assist second pass failed"
 	keyErrorKind  = "error.type"
+	// msgNotOrganization is the warning when search.assist.agent_id names an agent that is not an
+	// organization agent: the question stays with the full-text search.
+	msgNotOrganization = "search: the assistant agent is no organization agent"
 )
 
 // hitKindMessage is the kind of a message hit of the coordinator.
@@ -109,10 +112,11 @@ type openAssist struct {
 
 // Assistant implements search.Assistant (14 4.10). It is safe for concurrent use.
 type Assistant struct {
-	cfg   AssistConfig
-	d     AssistDeps
-	agent ids.ID
-	box   atomic.Pointer[assistBox]
+	cfg    AssistConfig
+	d      AssistDeps
+	agent  ids.ID
+	box    atomic.Pointer[assistBox]
+	policy atomic.Pointer[search.AssistAgentPolicy]
 
 	mu   gosync.Mutex
 	open map[ids.ID]*openAssist
@@ -162,6 +166,29 @@ func (a *Assistant) BindRelay(relay search.AssistRelay, after func(d time.Durati
 	return nil
 }
 
+// BindPolicy sets the port that tells whether the assistant agent is an organization agent;
+// internal/wire calls it once the agents module exists. Without it, and for an agent that is not
+// an organization agent, every question falls back to full text with assistant_not_configured:
+// questions and excerpts of every person never go to an agent on a personal subscription
+// (AUD-PKG-R2-owner-server).
+func (a *Assistant) BindPolicy(p search.AssistAgentPolicy) error {
+	if p == nil {
+		return errors.New("search: BindPolicy needs the policy")
+	}
+	a.policy.Store(&p)
+	return nil
+}
+
+// organizationAgent reports whether the configured agent may get questions: a bound policy that
+// says organization.
+func (a *Assistant) organizationAgent(ctx context.Context) (bool, error) {
+	p := a.policy.Load()
+	if p == nil {
+		return false, nil
+	}
+	return (*p).OrganizationAgent(ctx, a.agent)
+}
+
 // candidate is one fused thread of a search pass.
 type candidate struct {
 	thread, channel, message  ids.ID
@@ -185,11 +212,11 @@ func (a *Assistant) Assist(ctx context.Context, p actor.Actor, r search.AssistRe
 	if err != nil {
 		return search.AssistResult{}, err
 	}
-	first, err := a.pass(ctx, p, terms)
+	first, capped, err := a.pass(ctx, p, terms)
 	if err != nil {
 		return search.AssistResult{}, err
 	}
-	res := search.AssistResult{Mode: search.ModeFulltext, Terms: terms}
+	res := search.AssistResult{Mode: search.ModeFulltext, Terms: terms, CandidatesCapped: capped}
 	answer, reason, sent, err := a.ask(ctx, r, first)
 	if err != nil {
 		return search.AssistResult{}, err
@@ -200,12 +227,14 @@ func (a *Assistant) Assist(ctx context.Context, p actor.Actor, r search.AssistRe
 		extra := a.newTerms(answer.Terms, terms)
 		if len(extra) > 0 {
 			res.Terms = append(slices.Clone(terms), extra...)
-			if second, err = a.pass(ctx, p, extra); err != nil {
+			var more bool
+			if second, more, err = a.pass(ctx, p, extra); err != nil {
 				// The answer is paid for: a failed second pass (search_timeout, the end of the
 				// request) adds no hits instead of discarding the picks and the first pass.
 				a.d.Log.LogAttrs(ctx, slog.LevelWarn, msgSecondPass, slog.String(keyErrorKind, errs.KindOf(err).String()))
 				second = nil
 			}
+			res.CandidatesCapped = res.CandidatesCapped || more
 		}
 		res.Cost = estimate(answer.Costs)
 	}
@@ -253,22 +282,24 @@ func (a *Assistant) newTerms(answer, have []string) []string {
 
 // pass runs the thread title and the message search with the person's rights and fuses them per
 // thread. A query text without a term of the database (only stop words of every configuration)
-// gives no hits.
-func (a *Assistant) pass(ctx context.Context, p actor.Actor, terms []string) ([]candidate, error) {
+// gives no hits. capped reports that one of the two searches reached search.max_candidates, so
+// older matches may be missing (AUD-PKG-R2-owner-server).
+func (a *Assistant) pass(ctx context.Context, p actor.Actor, terms []string) (cands []candidate, capped bool, err error) {
 	q := a.queryText(terms)
 	if q == "" {
-		return nil, nil
+		return nil, false, nil
 	}
 	var lists [2][]search.ResultHit
 	for i, t := range []search.Type{search.TypeThreads, search.TypeMessages} {
 		res, err := a.d.Search.Query(ctx, p, search.Request{Type: t, Q: q, Sort: searchkit.SortRelevance, Limit: a.cfg.MaxCandidates})
 		if isEmptyQuery(err) {
-			return nil, nil
+			return nil, false, nil
 		}
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		lists[i] = res.Hits
+		capped = capped || res.CandidatesCapped
 	}
 	f := fusion{byThread: map[ids.ID]*candidate{}}
 	order := domain.FuseThreads(f.rank(lists[0]), f.rank(lists[1]))
@@ -276,7 +307,7 @@ func (a *Assistant) pass(ctx context.Context, p actor.Actor, terms []string) ([]
 	for _, t := range order[:min(len(order), a.cfg.MaxCandidates)] {
 		out = append(out, *f.byThread[t])
 	}
-	return out, nil
+	return out, capped, nil
 }
 
 // fusion collects the candidates of one pass by thread.
@@ -319,6 +350,14 @@ func (a *Assistant) queryText(terms []string) string {
 // the candidates. Errors: the context of the request, programming faults of the relay.
 func (a *Assistant) ask(ctx context.Context, r search.AssistRequest, cands []candidate) (domain.AssistAnswer, string, map[string]candidate, error) {
 	if a.agent.IsZero() {
+		return domain.AssistAnswer{}, search.FallbackNotConfigured, nil, nil
+	}
+	org, err := a.organizationAgent(ctx)
+	if err != nil {
+		return domain.AssistAnswer{}, "", nil, errs.Wrap(errs.CodeInternalError, err, "search: the billing mode of the assistant agent")
+	}
+	if !org {
+		a.d.Log.LogAttrs(ctx, slog.LevelWarn, msgNotOrganization)
 		return domain.AssistAnswer{}, search.FallbackNotConfigured, nil, nil
 	}
 	box := a.box.Load()

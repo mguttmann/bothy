@@ -26,3 +26,12 @@ func TestVersionMatchesVERSIONFile(t *testing.T) {
 		t.Errorf("Version() = %q, services/server/VERSION says %q", got, want)
 	}
 }
+
+// TestRevisionWithoutLinkerFlag (AUD-PKG-R2-owner-server, #1624): a build without the -X flag of
+// the build paths reports "unknown", never an empty string.
+func TestRevisionWithoutLinkerFlag(t *testing.T) {
+	t.Parallel()
+	if got := buildinfo.Revision(); got != "unknown" {
+		t.Errorf("Revision() = %q, want unknown for a test build", got)
+	}
+}

@@ -21,7 +21,7 @@ import 'package:api_client/api_client.dart'
         TerminalSessionGrantPrologueVersionEnum,
         TerminalSessionOpen;
 import 'package:api_client/api_client.dart' as api show TerminalSessionState;
-import 'package:auth/auth.dart' show Clock, StepUpCancelled;
+import 'package:auth/auth.dart' show Clock, StepUpCancelled, StepUpUnavailable;
 import 'package:built_collection/built_collection.dart';
 import 'package:domain/domain.dart' show AppConfig, HostId;
 import 'package:terminal_ui/terminal_ui.dart';
@@ -279,6 +279,7 @@ final class Harness {
   static Future<Harness> create({
     String selfUserId = alexId,
     bool cancelStepUp = false,
+    bool stepUpUnavailable = false,
     FakePins? pins,
     TerminalPrompts? prompts,
     HostEvents? events,
@@ -300,6 +301,7 @@ final class Harness {
         h.stepUps.add(purposeText);
         await h.stepUpGate?.future;
         if (cancelStepUp) throw const StepUpCancelled();
+        if (stepUpUnavailable) throw const StepUpUnavailable();
       },
       links: h.links,
       clock: h.clock,

@@ -735,7 +735,7 @@ Source: [14-search.md](../spec/14-search.md), section 15.
 | `search.extract.tika_url` | `BOTHY_SEARCH__EXTRACT__TIKA_URL` | Server |  | empty | Tika server; empty = off (V3, not yet in the schema) | planned (V3) |
 | `search.extract.refresh_interval` | `BOTHY_SEARCH__EXTRACT__REFRESH_INTERVAL` | Server | duration | `24h` | interval of the maintenance job that re-extracts rows of older extractor versions | active |
 | `search.extract.refresh_batch_size` | `BOTHY_SEARCH__EXTRACT__REFRESH_BATCH_SIZE` | Server | int | `500` | files per run of the maintenance job | active |
-| `search.assist.agent_id` | `BOTHY_SEARCH__ASSIST__AGENT_ID` | Server | string | empty | agent of the search assistant; empty = full text only (4.10) | active |
+| `search.assist.agent_id` | `BOTHY_SEARCH__ASSIST__AGENT_ID` | Server | string | empty | agent of the search assistant, only an agent with `billing_mode = organization`; empty or another agent = full text only (4.10) | active |
 | `search.assist.timeout` | `BOTHY_SEARCH__ASSIST__TIMEOUT` | Server | duration | `10s` | longest wait for the assistant's answer; below `http.request_timeout` | active |
 | `search.assist.max_candidates` | `BOTHY_SEARCH__ASSIST__MAX_CANDIDATES` | Server | int | `20` | hits per search of a question and most candidates to the assistant | active |
 | `search.assist.max_hits` | `BOTHY_SEARCH__ASSIST__MAX_HITS` | Server | int | `8` | most hits of an answer and most picks | active |
