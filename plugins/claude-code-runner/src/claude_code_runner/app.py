@@ -98,6 +98,7 @@ from claude_code_runner.environment import (
     RunEnvironmentError,
     build_environment,
     clean_path,
+    fallback_environment,
     find_program,
     kept_environment,
 )
@@ -1193,7 +1194,7 @@ class RunnerHandler(AgentHandler):
                 cli_telemetry=self.config.cli_telemetry,
             )
         except RunEnvironmentError:
-            return {"PATH": os.pathsep.join(self.path_entries)}
+            return fallback_environment(self.path_entries, cli_telemetry=self.config.cli_telemetry)
 
     async def refresh_probe(self) -> Probe:
         """Probe ``claude --version`` now and keep the outcome.

@@ -35,7 +35,12 @@ from uuid import UUID
 from claude_code_runner.adoption import read_identity
 from claude_code_runner.bgsession import SessionCli, SessionList
 from claude_code_runner.config import RunnerConfig
-from claude_code_runner.environment import RunEnvironmentError, build_environment, clean_path
+from claude_code_runner.environment import (
+    RunEnvironmentError,
+    build_environment,
+    clean_path,
+    fallback_environment,
+)
 from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION, extra_tested_version
 from claude_code_runner.usage import claude_config_dir
 
@@ -124,7 +129,9 @@ class BackgroundMode:
                 cli_telemetry=config.cli_telemetry,
             )
         except RunEnvironmentError:
-            env = {"PATH": ":".join(clean_path(environ.get("PATH", "")))}
+            env = fallback_environment(
+                clean_path(environ.get("PATH", "")), cli_telemetry=config.cli_telemetry
+            )
         self.env = launch_environment(env)
         self.cli = SessionCli(
             claude_bin or config.claude_bin, self.env, config.state_dir, config.cli_probe_timeout

@@ -36,6 +36,7 @@ __all__ = [
     "RunEnvironmentError",
     "build_environment",
     "clean_path",
+    "fallback_environment",
     "find_program",
     "kept_environment",
 ]
@@ -107,6 +108,25 @@ def find_program(name: str, entries: Sequence[str]) -> str | None:
         if candidate.is_file() and os.access(candidate, os.X_OK):
             return str(candidate)
     return None
+
+
+def fallback_environment(path_entries: Sequence[str], *, cli_telemetry: bool) -> dict[str, str]:
+    """Return the environment of a CLI call when `build_environment` cannot build one.
+
+    The cleaned ``PATH`` alone and, while ``runner.cli_telemetry`` is false, `TELEMETRY_OFF`:
+    a missing ``HOME`` never lets the CLI send its telemetry.
+
+    Args:
+        path_entries: The cleaned ``PATH`` entries.
+        cli_telemetry: ``runner.cli_telemetry``.
+
+    Returns:
+        The environment.
+    """
+    env = {"PATH": os.pathsep.join(path_entries)}
+    if not cli_telemetry:
+        env.update(TELEMETRY_OFF)
+    return env
 
 
 def kept_environment(parent: Mapping[str, str]) -> dict[str, str]:

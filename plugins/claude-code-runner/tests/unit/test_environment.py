@@ -15,6 +15,7 @@ from claude_code_runner.environment import (
     RunEnvironmentError,
     build_environment,
     clean_path,
+    fallback_environment,
     find_program,
 )
 
@@ -134,6 +135,17 @@ def test_cli_telemetry_on_sets_no_opt_out(tmp_path: Path) -> None:
         cli_telemetry=True,
     )
     assert set(env) == BASE_KEYS - set(dict(TELEMETRY_OFF))
+
+
+def test_fallback_environment_keeps_the_opt_outs(tmp_path: Path) -> None:
+    """The environment of a probe without ``HOME``: the cleaned ``PATH`` and, by default, the
+    CLI's opt-outs (#907)."""
+    good = str(tmp_path)
+    assert fallback_environment([good], cli_telemetry=False) == {
+        "PATH": good,
+        **dict(TELEMETRY_OFF),
+    }
+    assert fallback_environment([good], cli_telemetry=True) == {"PATH": good}
 
 
 def test_ssh_agent_only_with_switch(tmp_path: Path) -> None:
