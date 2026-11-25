@@ -231,6 +231,9 @@ exceptions:
   - query: messaging.ExpiredMessages
     category: system_job
     reason: "the job retention.content reads the ids and channels of messages created before the cutoff, without a principal; it serves nothing to a reader, each candidate is deleted through the deletion path with its channel (M7-05)"
+  - query: chat.ExpiredThreadTitles
+    category: system_job
+    reason: "the job retention.content reads the ids of live threads with a title whose last activity lies before the cutoff, without a principal; it serves nothing to a reader, each candidate only loses its title (AUD-PKG-R2-owner-server)"
   - query: files.ListPersonalFiles
     category: system_job
     reason: "the job privacy.export reads the own uploads of the person by uploader, without a principal; the files go only into the export package of that person (M7-06)"
