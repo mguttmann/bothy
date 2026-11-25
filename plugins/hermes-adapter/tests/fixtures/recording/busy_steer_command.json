@@ -214,7 +214,7 @@
       "method": "on_processing_complete"
     }
   ],
-  "inputs_sha256": "8a17610f27343e4c2e3cdfdcc47a5e1acfa07592164be1f4d07ae2d5052e4d2d",
+  "inputs_sha256": "92e9400f03f7b644076d8be3cf83ec40c3a69f2a455b64e7e31db41a69e5b955",
   "model_requests": [
     {
       "credential": "none",
@@ -226,7 +226,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:afc8974c4600f1e8510c9afc1e73cffa625dbc52776bbf1352a8904e36d10ce1:5007",
+        "sha256:c62ae5bf1777f9afd95dda40a85d0c720f7bb5e0c0ba553eadf6225ed8a1aa5f:5010",
         "sha256:266d5c8789166e7a74817866b97360a713aee0852f2b0b617fe1125397f43594:40"
       ],
       "roles": [
@@ -255,7 +255,7 @@
       "credential": "none",
       "model": "fake-model",
       "other_texts": [
-        "sha256:afc8974c4600f1e8510c9afc1e73cffa625dbc52776bbf1352a8904e36d10ce1:5007",
+        "sha256:c62ae5bf1777f9afd95dda40a85d0c720f7bb5e0c0ba553eadf6225ed8a1aa5f:5010",
         "sha256:266d5c8789166e7a74817866b97360a713aee0852f2b0b617fe1125397f43594:40",
         "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855:0",
         "sha256:8253d3acdd57a6ecc68eb181655fa42459cdf1b2181aaa213d57ee1d7824694c:177",
@@ -399,7 +399,7 @@
     }
   ],
   "pin": {
-    "commit": "0f602c5f6f18615632535251d62a2db74ce93b69",
+    "commit": "b39dd91f689a1857d48dd8fda778f2d623b16226",
     "tag": null
   },
   "scenario": "busy_steer_command"
