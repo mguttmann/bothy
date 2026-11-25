@@ -229,6 +229,38 @@ func TestLogsNeverContainSecretsHeadersOrRawPaths(t *testing.T) {
 	}
 }
 
+// TestAccessLogHasDuration (AUD-PKG-R2-owner-server, #1607): the access log line carries the time
+// until the handler returned as bothy.request.duration in seconds, on stdout and on the exported
+// record, so a Compose installation without Prometheus can still read latencies from its logs.
+func TestAccessLogHasDuration(t *testing.T) {
+	tt := setupTest(t, testConfig(), nil, nil, nil)
+	const pause = 20 * time.Millisecond
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/slow", func(w http.ResponseWriter, r *http.Request) {
+		RecordRoute(r, r.Pattern)
+		time.Sleep(pause)
+		w.WriteHeader(http.StatusOK)
+	})
+	serve(Middleware(mux), httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/slow", nil))
+	tt.flush(t)
+
+	recs := decodeLines(t, tt.stdout.String())
+	if len(recs) != 1 {
+		t.Fatalf("got %d stdout lines, want 1", len(recs))
+	}
+	got, ok := recs[0][attr.RequestDuration].(float64)
+	if !ok || got < pause.Seconds() || got > 60 {
+		t.Fatalf("stdout %s = %v, want seconds of at least %v", attr.RequestDuration, recs[0][attr.RequestDuration], pause.Seconds())
+	}
+	records := tt.logs.get()
+	if len(records) != 1 {
+		t.Fatalf("got %d exported records, want 1", len(records))
+	}
+	if v, ok := recordAttr(&records[0], attr.RequestDuration); !ok || v.AsFloat64() < pause.Seconds() {
+		t.Errorf("exported record %s = %v (%v)", attr.RequestDuration, v.AsFloat64(), ok)
+	}
+}
+
 // TestUnknownMethodNormalized: a method outside the standard set opens no new span name, log
 // value or metric series.
 func TestUnknownMethodNormalized(t *testing.T) {

@@ -137,8 +137,11 @@ and `bothy.outcome` (`completed`, `failed`, `cancelled`; `snoozed` stays unused 
 A runtime that works jobs (roles `worker` and `all`) observes `bothy.job.queue` from `Start` to
 `Stop`: one grouped count over River's job table in the states `available`, `scheduled` and
 `retryable` per collection, bounded by `database.statement_timeout` (`Config.StatementTimeout`),
-0 for a registered kind without waiting jobs. `Config.MeterProvider` nil means the global
-provider.
+0 for a registered kind without waiting jobs. A failed last attempt, after which River discards
+the job, also counts `bothy.job.discarded` with `bothy.job.kind`; every series of it starts at 0,
+and the alert `BothyJobFinallyFailed` reads it for `privacy.erase`, `instance.key_rotation` and
+`sync.partition_maintenance` (AUD-PKG-R2-owner-server, `TestJobsMetrics_DiscardedOnLastFailedAttempt`).
+`Config.MeterProvider` nil means the global provider.
 
 ## Logs
 

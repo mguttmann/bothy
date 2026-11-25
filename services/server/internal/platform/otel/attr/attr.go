@@ -120,6 +120,9 @@ const (
 	RatelimitClass = "bothy.ratelimit.class"
 	// Reason is a value of the fixed list of a signal, never free text.
 	Reason = "bothy.reason"
+	// RequestDuration is the time in seconds from the start of an HTTP request until its handler
+	// returned; logs only, on the access log line (AUD-PKG-R2-owner-server).
+	RequestDuration = "bothy.request.duration"
 	// RunState is a run state.
 	RunState = "bothy.run.state"
 	// SigningKeyPurpose is the purpose of a server signing key (access_token, invocation,
@@ -187,7 +190,7 @@ var scopes = map[string]scope{
 	Decision: scopeSpanLog, EgressPurpose: scopeSpanLog, EventDurability: scopeSpanLog,
 	EventSeq: scopeSpanLog, EventType: scopeSpanLog, JobKind: scopeSpanLog,
 	Outcome: scopeSpanLog, PrincipalKind: scopeSpanLog, PrincipalPseudoID: scopeSpanLog,
-	PushProvider: scopeSpanLog, RatelimitClass: scopeSpanLog, Reason: scopeSpanLog,
+	PushProvider: scopeSpanLog, RatelimitClass: scopeSpanLog, Reason: scopeSpanLog, RequestDuration: scopeSpanLog,
 	RunState: scopeSpanLog, StepKind: scopeSpanLog, VersionOwn: scopeSpanLog, VersionRequired: scopeSpanLog,
 	SigningKeyPurpose: scopeSpanLog, SigningKeyKID: scopeSpanLog, SigningKeyFromState: scopeSpanLog,
 	SigningKeyToState: scopeSpanLog, WebhookSubscriptionID: scopeSpanLog, TerminalSide: scopeSpanLog,

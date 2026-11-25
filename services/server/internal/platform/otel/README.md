@@ -120,8 +120,8 @@ reader (`MetricsDeps.Reader`) reads.
 3. Log records that reach the logger provider another way are filtered the same way in the log
    processor.
 4. HTTP: the access log (message `http request`) has only `http.request.method`, `http.route`
-   (pattern or `unmatched`), `http.response.status_code`, `error.type` for 5xx and
-   `user_agent.original`. `User-Agent` is the only header read for logging. A method outside the
+   (pattern or `unmatched`), `http.response.status_code`, `error.type` for 5xx,
+   `user_agent.original` and `bothy.request.duration` (seconds). `User-Agent` is the only header read for logging. A method outside the
    nine standard methods is `_OTHER` in logs and metrics and `HTTP` in span names, so a client
    cannot open new values.
 5. The collector allowlist (`infra/otel/collector.yaml`) is the second line;

@@ -140,6 +140,18 @@ groups:
           summary: "Malware scans end only with error; the files are blocked as check failed."
           runbook_url: "docs/observability/alerting.md#bothymalwarescanfailing"
 
+      # One rule for the job kinds whose loss leaves an obligation undone: an erasure of personal
+      # data, the rotation of the instance key and the partition maintenance of sync. It reads
+      # bothy.job.discarded, one per job whose last attempt failed; the series start at 0 with
+      # the worker, so the first discarded job is an increase.
+      - alert: BothyJobFinallyFailed
+        expr: sum by (bothy_job_kind) (increase(bothy_job_discarded_total{bothy_job_kind=~"privacy\\.erase|instance\\.key_rotation|sync\\.partition_maintenance"}[1d])) > 0
+        labels:
+          severity: ticket
+        annotations:
+          summary: "A job of kind {{ $labels.bothy_job_kind }} failed for good in the last 24 hours."
+          runbook_url: "docs/observability/alerting.md#bothyjobfinallyfailed"
+
   - name: bothy-data
     rules:
       # The three alerts on a last timestamp fail closed: a gauge without a value in a window as

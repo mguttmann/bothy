@@ -391,6 +391,13 @@ var (
 		Description: "Jobs waiting to run: states available, scheduled and retryable.",
 		Attrs:       []Attr{{Key: "bothy.job.kind", Source: SourceJobKinds}},
 	}
+	// JobDiscarded is bothy.job.discarded (4.4, AUD-PKG-R2-owner-server): one per job whose last
+	// attempt failed, so River discards it; the rule BothyJobFinallyFailed reads it.
+	JobDiscarded = Spec{
+		Name: "bothy.job.discarded", Kind: KindCounter, Unit: "{job}",
+		Description: "Jobs whose last attempt failed.",
+		Attrs:       []Attr{{Key: "bothy.job.kind", Source: SourceJobKinds}},
+	}
 	// EgressBlocked is bothy.egress.blocked (4.4).
 	EgressBlocked = Spec{
 		Name: "bothy.egress.blocked", Kind: KindCounter, Unit: unitRequest,
@@ -679,7 +686,7 @@ func All() []Spec {
 		GatewayClose, GatewayOutboundDropped, GatewayPresenceWriteFailures,
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
 		EventConsumerPendingAge, DeliveryDuration, AgentHeartbeatAge, AgentBillingModeMismatchAge,
-		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue, FilePurgeBacklog, RetentionDeleted,
+		JobDuration, JobQueue, JobDiscarded, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue, FilePurgeBacklog, RetentionDeleted,
 		PushSent, PushSendDuration, PushSkipped, PushRegistrationsActive, PushFetch, SearchDuration,
 		RunActive, RunStartLatency, RunDuration, RunFinished, RunSteps, RunCost, AgentInvocationDenied, AgentBillingModeMismatch,
 		RunWakePending, RunWakeEnded, RunAutonomyCapReached,

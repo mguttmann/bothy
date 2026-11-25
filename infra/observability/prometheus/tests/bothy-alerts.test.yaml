@@ -509,6 +509,66 @@ tests:
         alertname: BothyMalwareScanFailing
         exp_alerts: []
 
+  # The series start at 0 with the worker (signals.md 4.4), so the first discarded job is an
+  # increase. Only the three kinds of the rule count: a discarded job of another kind is quiet.
+  - name: BothyJobFinallyFailed fires at once for the kind that failed for good
+    interval: 1m
+    input_series:
+      - series: 'bothy_job_discarded_total{job="bothy/bothy-server", bothy_job_kind="privacy.erase"}'
+        values: '0 1 1'
+      - series: 'bothy_job_discarded_total{job="bothy/bothy-server", bothy_job_kind="instance.key_rotation"}'
+        values: '0 0 0'
+      - series: 'bothy_job_discarded_total{job="bothy/bothy-server", bothy_job_kind="files.scan"}'
+        values: '0 1 1'
+    alert_rule_test:
+      # No `for`: quiet before the first discarded job, firing at the first evaluation after it.
+      - eval_time: 0m
+        alertname: BothyJobFinallyFailed
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: BothyJobFinallyFailed
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              bothy_job_kind: privacy.erase
+            exp_annotations:
+              summary: "A job of kind privacy.erase failed for good in the last 24 hours."
+              runbook_url: "docs/observability/alerting.md#bothyjobfinallyfailed"
+
+  - name: BothyJobFinallyFailed covers key rotation and partition maintenance
+    interval: 1m
+    input_series:
+      - series: 'bothy_job_discarded_total{job="bothy/bothy-server", bothy_job_kind="instance.key_rotation"}'
+        values: '0 1 1'
+      - series: 'bothy_job_discarded_total{job="bothy/bothy-server", bothy_job_kind="sync.partition_maintenance"}'
+        values: '0 1 1'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: BothyJobFinallyFailed
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              bothy_job_kind: instance.key_rotation
+            exp_annotations:
+              summary: "A job of kind instance.key_rotation failed for good in the last 24 hours."
+              runbook_url: "docs/observability/alerting.md#bothyjobfinallyfailed"
+          - exp_labels:
+              severity: ticket
+              bothy_job_kind: sync.partition_maintenance
+            exp_annotations:
+              summary: "A job of kind sync.partition_maintenance failed for good in the last 24 hours."
+              runbook_url: "docs/observability/alerting.md#bothyjobfinallyfailed"
+
+  - name: BothyJobFinallyFailed stays quiet without discarded jobs
+    interval: 1m
+    input_series:
+      - series: 'bothy_job_discarded_total{job="bothy/bothy-server", bothy_job_kind="privacy.erase"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: BothyJobFinallyFailed
+        exp_alerts: []
+
   # ---- bothy-data -------------------------------------------------------------------------
 
   # Every kind reports a value in the two threshold cases: a kind without one fires too (the

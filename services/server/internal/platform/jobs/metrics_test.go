@@ -3,6 +3,7 @@
 package jobs_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -45,5 +46,33 @@ func TestJobsMetrics_DurationAndQueue(t *testing.T) {
 			t.Fatalf("job duration completed = %v, queue = %v; want 1 and 1", done, queued)
 		}
 		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+// TestJobsMetrics_DiscardedOnLastFailedAttempt (AUD-PKG-R2-owner-server, Refs #1456): a failed
+// attempt with attempts left counts nothing in bothy.job.discarded; a failed last attempt, also a
+// panicking one, counts one with bothy.job.kind, the series BothyJobFinallyFailed reads.
+func TestJobsMetrics_DiscardedOnLastFailedAttempt(t *testing.T) {
+	metricstest.Strict(t)
+	mp, reader := metricstest.Provider(t)
+	if err := jobs.WorkFailingWithMetricsForTest(mp, errors.New("x"), 1, 3); err == nil {
+		t.Fatal("Work = nil")
+	}
+	got := metricstest.Collect(t, reader)
+	if len(metricstest.Points(got["bothy.job.discarded"])) != 1 {
+		t.Fatalf("discarded points %v, want the series of the kind at 0", metricstest.Points(got["bothy.job.discarded"]))
+	}
+	if n := metricstest.Sum(got["bothy.job.discarded"], map[string]string{"bothy.job.kind": "jobs.timeout"}); n != 0 {
+		t.Fatalf("discarded after a retried attempt = %v, want 0", n)
+	}
+	if err := jobs.WorkFailingWithMetricsForTest(mp, errors.New("x"), 3, 3); err == nil {
+		t.Fatal("Work = nil")
+	}
+	if err := jobs.WorkFailingWithMetricsForTest(mp, nil, 2, 2); err == nil {
+		t.Fatal("Work of a panic = nil")
+	}
+	got = metricstest.Collect(t, reader)
+	if n := metricstest.Sum(got["bothy.job.discarded"], map[string]string{"bothy.job.kind": "jobs.timeout"}); n != 2 {
+		t.Fatalf("discarded after two failed last attempts = %v, want 2", n)
 	}
 }

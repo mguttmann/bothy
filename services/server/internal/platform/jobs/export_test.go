@@ -9,6 +9,7 @@ import (
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
@@ -71,6 +72,18 @@ func (h failingHandler) Work(context.Context, Job[timeoutArgs]) error {
 func WorkFailingForTest(log *slog.Logger, err error, attempt, maxAttempts int) error {
 	w := newWorker[timeoutArgs](failingHandler{err: err}, HandlerOptions{}, "jobs.timeout",
 		workerDeps{tracer: noop.NewTracerProvider().Tracer("test"), log: log})
+	return w.Work(context.Background(), &river.Job[timeoutArgs]{JobRow: &rivertype.JobRow{Attempt: attempt, MaxAttempts: maxAttempts}})
+}
+
+// WorkFailingWithMetricsForTest is WorkFailingForTest with the job metrics of the kind
+// jobs.timeout on mp.
+func WorkFailingWithMetricsForTest(mp metric.MeterProvider, err error, attempt, maxAttempts int) error {
+	m, merr := newJobMetrics(mp, []string{"jobs.timeout"})
+	if merr != nil {
+		return merr
+	}
+	w := newWorker[timeoutArgs](failingHandler{err: err}, HandlerOptions{}, "jobs.timeout",
+		workerDeps{tracer: noop.NewTracerProvider().Tracer("test"), log: slog.New(slog.DiscardHandler), metrics: m})
 	return w.Work(context.Background(), &river.Job[timeoutArgs]{JobRow: &rivertype.JobRow{Attempt: attempt, MaxAttempts: maxAttempts}})
 }
 
