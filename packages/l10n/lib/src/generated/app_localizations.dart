@@ -18542,12 +18542,6 @@ abstract class AppLocalizations {
   /// **'Voice input'**
   String get adminAgentFeatureVoice;
 
-  /// Feature switch `supports_title` of an agent.
-  ///
-  /// In en, this message translates to:
-  /// **'Title suggestions'**
-  String get adminAgentFeatureTitle;
-
   /// Feature switch `supports_files_out` of an agent.
   ///
   /// In en, this message translates to:

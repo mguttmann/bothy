@@ -3065,7 +3065,6 @@
   "adminAgentFeatureFollowups": "Nachrichten als Nachtrag",
   "adminAgentFeatureComponents": "Komponenten",
   "adminAgentFeatureVoice": "Spracheingabe",
-  "adminAgentFeatureTitle": "Titelvorschläge",
   "adminAgentFeatureFilesOut": "Dateien senden",
   "adminAgentFeaturesAll": "Alles, was der Adapter meldet, ist erlaubt.",
   "adminAgentFeaturesOff": "Ausgeschaltet: {features}",

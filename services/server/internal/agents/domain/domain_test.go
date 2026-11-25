@@ -36,7 +36,9 @@ func TestOperatorConfigV1Validation(t *testing.T) {
 		{"model with space", map[string]any{"default_model": "big model"}, "/operator_config/default_model"},
 		{"model empty", map[string]any{"default_model": ""}, "/operator_config/default_model"},
 		{"flag not a boolean", map[string]any{"supports_voice": "yes"}, "/operator_config/supports_voice"},
-		{"flag null", map[string]any{"supports_title": nil}, "/operator_config/supports_title"},
+		{"flag null", map[string]any{"supports_files_out": nil}, "/operator_config/supports_files_out"},
+		// AUD-PKG-R2-owner-server (#776): the owner switch supports_title is no key of the schema.
+		{"struck title switch", map[string]any{"supports_title": false}, "/operator_config/supports_title"},
 	}
 	for _, c := range bad {
 		_, err := domain.ParseOperatorConfig(c.in)
@@ -54,13 +56,13 @@ func TestOperatorConfigV1Validation(t *testing.T) {
 	}
 	full, err := domain.ParseOperatorConfig(map[string]any{
 		"default_model": "vendor/model-1.5:fast@2", "supports_followups": false, "supports_components": true,
-		"supports_voice": true, "supports_title": false, "supports_files_out": true,
+		"supports_voice": true, "supports_files_out": true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := `{"default_model":"vendor/model-1.5:fast@2","supports_followups":false,"supports_components":true,` +
-		`"supports_voice":true,"supports_title":false,"supports_files_out":true}`
+		`"supports_voice":true,"supports_files_out":true}`
 	if string(full.JSON()) != want {
 		t.Fatalf("full = %s", full.JSON())
 	}
@@ -68,7 +70,7 @@ func TestOperatorConfigV1Validation(t *testing.T) {
 	if err != nil || string(back.JSON()) != want {
 		t.Fatalf("from store = %s, %v", back.JSON(), err)
 	}
-	if !full.Allows(domain.CapabilityVoice) || full.Allows(domain.CapabilityFollowups) || !empty.Allows(domain.CapabilityTitle) {
+	if !full.Allows(domain.CapabilityVoice) || full.Allows(domain.CapabilityFollowups) || !empty.Allows(domain.CapabilityFilesOut) {
 		t.Fatal("a missing key must allow, a false key must forbid")
 	}
 }
@@ -156,11 +158,12 @@ func TestBillingPolicyTransitions(t *testing.T) {
 
 // TestOperatorConfigFromStore_IgnoresUnknownKeys (audit srv-agents-6, upgrade.md rule M8): a key a
 // later release stored is ignored on read, so a rollback by one release keeps the lists of agents
-// working; the known keys still count and a write stays strict.
+// working; the known keys still count and a write stays strict. The struck switch
+// supports_title (AUD-PKG-R2-owner-server, #776) of an older row is ignored the same way.
 func TestOperatorConfigFromStore_IgnoresUnknownKeys(t *testing.T) {
 	t.Parallel()
-	c, err := domain.OperatorConfigFromStore([]byte(`{"supports_title":false,"supports_future":true}`))
-	if err != nil || c.Allows(domain.CapabilityTitle) || string(c.JSON()) != `{"supports_title":false}` {
+	c, err := domain.OperatorConfigFromStore([]byte(`{"supports_voice":false,"supports_title":false,"supports_future":true}`))
+	if err != nil || c.Allows(domain.CapabilityVoice) || string(c.JSON()) != `{"supports_voice":false}` {
 		t.Fatalf("stored config %s, %v", c.JSON(), err)
 	}
 	if _, err := domain.ParseOperatorConfig(map[string]any{"supports_future": true}); err == nil {

@@ -11710,9 +11710,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get adminAgentFeatureVoice => 'Spracheingabe';
 
   @override
-  String get adminAgentFeatureTitle => 'Titelvorschläge';
-
-  @override
   String get adminAgentFeatureFilesOut => 'Dateien senden';
 
   @override

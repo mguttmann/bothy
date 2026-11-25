@@ -11645,9 +11645,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get adminAgentFeatureVoice => 'Voice input';
 
   @override
-  String get adminAgentFeatureTitle => 'Title suggestions';
-
-  @override
   String get adminAgentFeatureFilesOut => 'Sending files';
 
   @override

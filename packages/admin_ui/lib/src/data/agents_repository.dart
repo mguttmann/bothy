@@ -50,7 +50,6 @@ const List<String> agentFeatureKeys = [
   'supports_followups',
   'supports_components',
   'supports_voice',
-  'supports_title',
   'supports_files_out',
 ];
 

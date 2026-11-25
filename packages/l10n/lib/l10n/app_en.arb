@@ -17348,10 +17348,6 @@
   "@adminAgentFeatureVoice": {
     "description": "Feature switch `supports_voice` of an agent."
   },
-  "adminAgentFeatureTitle": "Title suggestions",
-  "@adminAgentFeatureTitle": {
-    "description": "Feature switch `supports_title` of an agent."
-  },
   "adminAgentFeatureFilesOut": "Sending files",
   "@adminAgentFeatureFilesOut": {
     "description": "Feature switch `supports_files_out` of an agent."

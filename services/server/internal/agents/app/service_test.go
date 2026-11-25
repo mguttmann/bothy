@@ -44,8 +44,8 @@ func TestCreateAndUpdate(t *testing.T) {
 	a := w.create(owner, "lotse")
 	name, desc := "Lotse Zwei", "Pilot"
 	got, err := w.svc.Update(ctx, owner, a.ID, agents.UpdateCmd{DisplayName: &name, Description: &desc,
-		OperatorConfig: map[string]any{"supports_title": false}, IfMatch: match(1)})
-	if err != nil || got.Version != 2 || got.DisplayName != name || got.Description != desc || got.OperatorConfig["supports_title"] != false {
+		OperatorConfig: map[string]any{"supports_voice": false}, IfMatch: match(1)})
+	if err != nil || got.Version != 2 || got.DisplayName != name || got.Description != desc || got.OperatorConfig["supports_voice"] != false {
 		t.Fatalf("update %+v, %v", got, err)
 	}
 	got, err = w.svc.Update(ctx, owner, a.ID, agents.UpdateCmd{DisplayName: &name, IfMatch: match(2)})
@@ -56,7 +56,7 @@ func TestCreateAndUpdate(t *testing.T) {
 	if got, err = w.svc.Update(ctx, owner, a.ID, agents.UpdateCmd{DisplayName: &newName, IfMatch: match(2)}); err != nil || got.Version != 3 {
 		t.Fatalf("rename %+v, %v", got, err)
 	}
-	_, err = w.svc.Update(ctx, owner, a.ID, agents.UpdateCmd{OperatorConfig: map[string]any{"supports_title": 1.0}, IfMatch: match(3)})
+	_, err = w.svc.Update(ctx, owner, a.ID, agents.UpdateCmd{OperatorConfig: map[string]any{"supports_voice": 1.0}, IfMatch: match(3)})
 	wantCode(t, err, errs.CodeValidationFailed)
 	if got, err = w.svc.SetToolClass(ctx, owner, a.ID, agents.ToolClassCmd{ToolClass: agents.ToolHost, Reason: "Shell", IfMatch: match(3)}); err != nil ||
 		got.ToolClass != agents.ToolHost || got.Version != 4 {

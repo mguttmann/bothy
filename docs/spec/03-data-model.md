@@ -777,7 +777,7 @@ Module: `agents`.
 | `principal_id` | `uuid` | no | | `kind = 'agent'` checked by a trigger |
 | `adapter_kind` | `text` | no | | free-form identifier of the adapter, for example `hermes`, `code_runner`, `custom`; `claude_agent` marks a built-in agent ([26-builtin-agents.md](26-builtin-agents.md), R-DM-58) |
 | `description` | `text` | no | `''` | |
-| `operator_config` | `jsonb` | no | `'{}'` | schema `agent_operator_config.v1` ([09-agents.md](09-agents.md), section 2.2): default model (`default_model`) and allowed adapter features (`supports_followups`, `supports_components`, `supports_voice`, `supports_title`, `supports_files_out`); a missing key allows; no secrets. An adapter feature is effective only when the adapter also reports it ([09-agents.md](09-agents.md), section 2.2) |
+| `operator_config` | `jsonb` | no | `'{}'` | schema `agent_operator_config.v1` ([09-agents.md](09-agents.md), section 2.2): default model (`default_model`) and allowed adapter features (`supports_followups`, `supports_components`, `supports_voice`, `supports_files_out`); a missing key allows; no secrets. An adapter feature is effective only when the adapter also reports it ([09-agents.md](09-agents.md), section 2.2) |
 | `billing_mode` | `text` | no | `'organization'` | `CHECK (billing_mode IN ('personal','organization'))` |
 | `credential_holder_id` | `uuid` | yes | | required for `personal`, otherwise NULL |
 | `billing_mode_changed_at` | `timestamptz` | yes | | |
