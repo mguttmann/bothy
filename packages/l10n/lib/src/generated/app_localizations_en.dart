@@ -10576,6 +10576,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistNothing => 'No session found';
 
   @override
+  String get assistCapped =>
+      'Many sessions matched; the newest were searched, older ones may be missing. Ask more narrowly to reach them.';
+
+  @override
   String get assistFulltext => 'Full text, without the assistant';
 
   @override

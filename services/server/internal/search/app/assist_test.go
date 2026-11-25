@@ -32,6 +32,7 @@ type fakeSearch struct {
 	asked    []search.Request
 	err      error
 	failOn   map[string]error // by query text
+	capped   map[string]bool  // CandidatesCapped by query text
 }
 
 func (f *fakeSearch) Query(_ context.Context, _ actor.Actor, r search.Request) (search.Result, error) {
@@ -52,7 +53,7 @@ func (f *fakeSearch) Query(_ context.Context, _ actor.Actor, r search.Request) (
 	if r.Limit > 0 && len(hits) > r.Limit {
 		hits = hits[:r.Limit]
 	}
-	return search.Result{Hits: slices.Clone(hits)}, nil
+	return search.Result{Hits: slices.Clone(hits), CandidatesCapped: f.capped[r.Q]}, nil
 }
 
 func (f *fakeSearch) ThreadTitles(context.Context, actor.Actor, search.PrefixRequest) ([]searchkit.TitleHit, error) {
@@ -208,6 +209,26 @@ func (p *fakePolicy) OrganizationAgent(_ context.Context, id ids.ID) (bool, erro
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.org[id], nil
+}
+
+// TestAssist_MarksACappedSearch (AUD-PKG-R2-owner-server, #673): when a search of the question
+// reached search.max_candidates, the result says so; the ranking stays as it is.
+func TestAssist_MarksACappedSearch(t *testing.T) {
+	t.Parallel()
+	e := newAssistEnv(t, false)
+	q := "takeover or larkspur"
+	e.search.threads[q] = []search.ResultHit{threadHit(ids.New(), e.general, "Takeover of Larkspur", day)}
+	res, err := e.as.Assist(context.Background(), e.alex, search.AssistRequest{Q: "takeover of Larkspur"})
+	if err != nil || res.CandidatesCapped {
+		t.Fatalf("uncapped: %+v, %v; want no mark", res, err)
+	}
+	e.search.mu.Lock()
+	e.search.capped = map[string]bool{q: true}
+	e.search.mu.Unlock()
+	res, err = e.as.Assist(context.Background(), e.alex, search.AssistRequest{Q: "takeover of Larkspur"})
+	if err != nil || !res.CandidatesCapped || len(res.Hits) != 1 {
+		t.Fatalf("capped: %+v, %v; want the mark and the same hit", res, err)
+	}
 }
 
 // TestAssist_OnlyAnOrganizationAgentGetsQuestions (AUD-PKG-R2-owner-server, #1483): an assistant

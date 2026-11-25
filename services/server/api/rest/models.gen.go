@@ -16419,6 +16419,9 @@ type SearchAssistRequestedPayload struct {
 
 // SearchAssistResult defines model for SearchAssistResult.
 type SearchAssistResult struct {
+	// CandidatesCapped A search of this question reached `search.max_candidates`; the newest matches were taken, so older sessions may be missing. Ask more narrowly to reach them.
+	CandidatesCapped *bool `json:"candidates_capped,omitempty"`
+
 	// CostEstimate Estimate of the assistant's model call, for information only; not booked as a cost entry.
 	CostEstimate *SearchAssistCost `json:"cost_estimate,omitempty"`
 

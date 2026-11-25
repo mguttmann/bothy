@@ -2805,6 +2805,7 @@
   "assistSend": "Fragen",
   "assistSearching": "Suche läuft",
   "assistNothing": "Keine Sitzung gefunden",
+  "assistCapped": "Viele Sitzungen passen; durchsucht wurden die neuesten, ältere können fehlen. Frag genauer, um sie zu finden.",
   "assistFulltext": "Volltext, ohne den Assistenten",
   "assistFallbackNotConfigured": "Auf diesem Server ist kein Suchassistent eingerichtet; das sind Volltexttreffer.",
   "assistFallbackUnavailable": "Der Suchassistent ist nicht erreichbar; das sind Volltexttreffer.",

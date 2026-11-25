@@ -15785,6 +15785,10 @@
   "@assistNothing": {
     "description": "An answer without hits."
   },
+  "assistCapped": "Many sessions matched; the newest were searched, older ones may be missing. Ask more narrowly to reach them.",
+  "@assistCapped": {
+    "description": "Note under an answer whose search reached the candidate limit (candidates_capped)."
+  },
   "assistFulltext": "Full text, without the assistant",
   "@assistFulltext": {
     "description": "Marks a hit the search assistant did not pick."

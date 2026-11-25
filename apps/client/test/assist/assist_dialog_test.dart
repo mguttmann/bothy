@@ -225,6 +225,30 @@ void main() {
     expect(h.location, '/t/${threadId(2).value}');
   });
 
+  testWidgets('a capped search says that older sessions may be missing '
+      '(AUD-PKG-R2-owner-server)', (tester) async {
+    final h = Host(tester);
+    await h.open();
+    await h.answer(
+      0,
+      AssistAnswer(hits: [release], terms: const ['larkspur']),
+    );
+    expect(find.byKey(const ValueKey('assist.capped.0')), findsNothing);
+    await tester.enterText(find.byKey(const ValueKey('assist.field')), 'older');
+    await tester.tap(find.byKey(const ValueKey('assist.send')));
+    await tester.pump();
+    await h.answer(
+      1,
+      AssistAnswer(
+        hits: [release],
+        terms: const ['older'],
+        candidatesCapped: true,
+      ),
+    );
+    expect(find.byKey(const ValueKey('assist.capped.1')), findsOneWidget);
+    expect(find.text(en.assistCapped), findsOneWidget);
+  });
+
   testWidgets('a timeout asks to narrow and a rate limit names the wait', (
     tester,
   ) async {

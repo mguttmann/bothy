@@ -75,6 +75,9 @@ type AssistResult struct {
 	Terms []string
 	// Cost is nil without an estimate.
 	Cost *AssistCost
+	// CandidatesCapped reports that a search of the question reached search.max_candidates: the
+	// newest matches were taken, so older sessions may be missing (AUD-PKG-R2-owner-server).
+	CandidatesCapped bool
 }
 
 // AssistPick is one pick of an answer (schema SearchAssistPick).

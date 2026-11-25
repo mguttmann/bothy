@@ -100,6 +100,7 @@ final class AssistAnswer {
     this.fallback,
     this.costMicros,
     this.currency,
+    this.candidatesCapped = false,
   });
 
   /// The sessions: the picks first, then full-text hits.
@@ -116,6 +117,10 @@ final class AssistAnswer {
 
   /// The currency of [costMicros].
   final String? currency;
+
+  /// Whether a search of the question reached `search.max_candidates`: the newest matches were
+  /// taken, so older sessions may be missing (`candidates_capped`, 14 4.10).
+  final bool candidatesCapped;
 }
 
 /// Why a question failed, as far as the popup treats it differently.
@@ -289,6 +294,7 @@ AssistAnswer assistAnswerFromRest(rest.SearchAssistResult result) {
     },
     costMicros: result.costEstimate?.amountMicros,
     currency: result.costEstimate?.currency,
+    candidatesCapped: result.candidatesCapped ?? false,
   );
 }
 

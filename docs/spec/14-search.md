@@ -391,7 +391,10 @@ built on the search of this chapter; a model only chooses among the hits and add
    thread, the jump target, the channel (for a development session the project forum), the space,
    the time and the excerpt. `terms` are the terms of both passes; `cost_estimate` is the sum of
    the answer's `amount_micros` in one currency, for information only and not booked in
-   `cost_entries` (03), which belong to runs.
+   `cost_entries` (03), which belong to runs. `candidates_capped` is `true` when a search of
+   either pass reached `search.max_candidates` (R-SU-04): the ranking stays as it is, but older
+   sessions may be missing, and the popup says so and asks to narrow the question
+   (AUD-PKG-R2-owner-server).
 8. **Not stored, not logged.** No question, term, reference or reason is stored, audited or
    logged; one log line per question names the mode, the fallback reason and the counts of
    candidates and picks. An allowed question is not audited (like `search.query`); denials are

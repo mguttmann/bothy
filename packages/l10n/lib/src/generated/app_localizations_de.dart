@@ -10634,6 +10634,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get assistNothing => 'Keine Sitzung gefunden';
 
   @override
+  String get assistCapped =>
+      'Viele Sitzungen passen; durchsucht wurden die neuesten, ältere können fehlen. Frag genauer, um sie zu finden.';
+
+  @override
   String get assistFulltext => 'Volltext, ohne den Assistenten';
 
   @override

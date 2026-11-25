@@ -165,6 +165,8 @@ class _$SearchAssistResult extends SearchAssistResult {
   final BuiltList<String> terms;
   @override
   final SearchAssistCost? costEstimate;
+  @override
+  final bool? candidatesCapped;
 
   factory _$SearchAssistResult([
     void Function(SearchAssistResultBuilder)? updates,
@@ -176,6 +178,7 @@ class _$SearchAssistResult extends SearchAssistResult {
     this.fallbackReason,
     required this.terms,
     this.costEstimate,
+    this.candidatesCapped,
   }) : super._();
   @override
   SearchAssistResult rebuild(
@@ -194,7 +197,8 @@ class _$SearchAssistResult extends SearchAssistResult {
         mode == other.mode &&
         fallbackReason == other.fallbackReason &&
         terms == other.terms &&
-        costEstimate == other.costEstimate;
+        costEstimate == other.costEstimate &&
+        candidatesCapped == other.candidatesCapped;
   }
 
   @override
@@ -205,6 +209,7 @@ class _$SearchAssistResult extends SearchAssistResult {
     _$hash = $jc(_$hash, fallbackReason.hashCode);
     _$hash = $jc(_$hash, terms.hashCode);
     _$hash = $jc(_$hash, costEstimate.hashCode);
+    _$hash = $jc(_$hash, candidatesCapped.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -216,7 +221,8 @@ class _$SearchAssistResult extends SearchAssistResult {
           ..add('mode', mode)
           ..add('fallbackReason', fallbackReason)
           ..add('terms', terms)
-          ..add('costEstimate', costEstimate))
+          ..add('costEstimate', costEstimate)
+          ..add('candidatesCapped', candidatesCapped))
         .toString();
   }
 }
@@ -250,6 +256,11 @@ class SearchAssistResultBuilder
   set costEstimate(SearchAssistCostBuilder? costEstimate) =>
       _$this._costEstimate = costEstimate;
 
+  bool? _candidatesCapped;
+  bool? get candidatesCapped => _$this._candidatesCapped;
+  set candidatesCapped(bool? candidatesCapped) =>
+      _$this._candidatesCapped = candidatesCapped;
+
   SearchAssistResultBuilder() {
     SearchAssistResult._defaults(this);
   }
@@ -262,6 +273,7 @@ class SearchAssistResultBuilder
       _fallbackReason = $v.fallbackReason;
       _terms = $v.terms.toBuilder();
       _costEstimate = $v.costEstimate?.toBuilder();
+      _candidatesCapped = $v.candidatesCapped;
       _$v = null;
     }
     return this;
@@ -295,6 +307,7 @@ class SearchAssistResultBuilder
             fallbackReason: fallbackReason,
             terms: terms.build(),
             costEstimate: _costEstimate?.build(),
+            candidatesCapped: candidatesCapped,
           );
     } catch (_) {
       late String _$failedField;

@@ -212,11 +212,11 @@ func (a *Assistant) Assist(ctx context.Context, p actor.Actor, r search.AssistRe
 	if err != nil {
 		return search.AssistResult{}, err
 	}
-	first, err := a.pass(ctx, p, terms)
+	first, capped, err := a.pass(ctx, p, terms)
 	if err != nil {
 		return search.AssistResult{}, err
 	}
-	res := search.AssistResult{Mode: search.ModeFulltext, Terms: terms}
+	res := search.AssistResult{Mode: search.ModeFulltext, Terms: terms, CandidatesCapped: capped}
 	answer, reason, sent, err := a.ask(ctx, r, first)
 	if err != nil {
 		return search.AssistResult{}, err
@@ -227,12 +227,14 @@ func (a *Assistant) Assist(ctx context.Context, p actor.Actor, r search.AssistRe
 		extra := a.newTerms(answer.Terms, terms)
 		if len(extra) > 0 {
 			res.Terms = append(slices.Clone(terms), extra...)
-			if second, err = a.pass(ctx, p, extra); err != nil {
+			var more bool
+			if second, more, err = a.pass(ctx, p, extra); err != nil {
 				// The answer is paid for: a failed second pass (search_timeout, the end of the
 				// request) adds no hits instead of discarding the picks and the first pass.
 				a.d.Log.LogAttrs(ctx, slog.LevelWarn, msgSecondPass, slog.String(keyErrorKind, errs.KindOf(err).String()))
 				second = nil
 			}
+			res.CandidatesCapped = res.CandidatesCapped || more
 		}
 		res.Cost = estimate(answer.Costs)
 	}
@@ -280,22 +282,24 @@ func (a *Assistant) newTerms(answer, have []string) []string {
 
 // pass runs the thread title and the message search with the person's rights and fuses them per
 // thread. A query text without a term of the database (only stop words of every configuration)
-// gives no hits.
-func (a *Assistant) pass(ctx context.Context, p actor.Actor, terms []string) ([]candidate, error) {
+// gives no hits. capped reports that one of the two searches reached search.max_candidates, so
+// older matches may be missing (AUD-PKG-R2-owner-server).
+func (a *Assistant) pass(ctx context.Context, p actor.Actor, terms []string) (cands []candidate, capped bool, err error) {
 	q := a.queryText(terms)
 	if q == "" {
-		return nil, nil
+		return nil, false, nil
 	}
 	var lists [2][]search.ResultHit
 	for i, t := range []search.Type{search.TypeThreads, search.TypeMessages} {
 		res, err := a.d.Search.Query(ctx, p, search.Request{Type: t, Q: q, Sort: searchkit.SortRelevance, Limit: a.cfg.MaxCandidates})
 		if isEmptyQuery(err) {
-			return nil, nil
+			return nil, false, nil
 		}
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		lists[i] = res.Hits
+		capped = capped || res.CandidatesCapped
 	}
 	f := fusion{byThread: map[ids.ID]*candidate{}}
 	order := domain.FuseThreads(f.rank(lists[0]), f.rank(lists[1]))
@@ -303,7 +307,7 @@ func (a *Assistant) pass(ctx context.Context, p actor.Actor, terms []string) ([]
 	for _, t := range order[:min(len(order), a.cfg.MaxCandidates)] {
 		out = append(out, *f.byThread[t])
 	}
-	return out, nil
+	return out, capped, nil
 }
 
 // fusion collects the candidates of one pass by thread.

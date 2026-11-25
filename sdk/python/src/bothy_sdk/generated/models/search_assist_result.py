@@ -32,6 +32,8 @@ class SearchAssistResult:
         fallback_reason (SearchAssistResultFallbackReason | Unset): Only with `mode = fulltext`.
         cost_estimate (SearchAssistCost | Unset): Estimate of the assistant's model call, for information only; not
             booked as a cost entry.
+        candidates_capped (bool | Unset): A search of this question reached `search.max_candidates`; the newest matches
+            were taken, so older sessions may be missing. Ask more narrowly to reach them.
     """
 
     hits: list[SearchAssistHit]
@@ -39,6 +41,7 @@ class SearchAssistResult:
     terms: list[str]
     fallback_reason: SearchAssistResultFallbackReason | Unset = UNSET
     cost_estimate: SearchAssistCost | Unset = UNSET
+    candidates_capped: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -59,6 +62,8 @@ class SearchAssistResult:
         if not isinstance(self.cost_estimate, Unset):
             cost_estimate = self.cost_estimate.to_dict()
 
+        candidates_capped = self.candidates_capped
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -72,6 +77,8 @@ class SearchAssistResult:
             field_dict["fallback_reason"] = fallback_reason
         if cost_estimate is not UNSET:
             field_dict["cost_estimate"] = cost_estimate
+        if candidates_capped is not UNSET:
+            field_dict["candidates_capped"] = candidates_capped
 
         return field_dict
 
@@ -106,12 +113,15 @@ class SearchAssistResult:
         else:
             cost_estimate = SearchAssistCost.from_dict(_cost_estimate)
 
+        candidates_capped = d.pop("candidates_capped", UNSET)
+
         search_assist_result = cls(
             hits=hits,
             mode=mode,
             terms=terms,
             fallback_reason=fallback_reason,
             cost_estimate=cost_estimate,
+            candidates_capped=candidates_capped,
         )
 
         search_assist_result.additional_properties = d

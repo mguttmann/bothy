@@ -16972,6 +16972,12 @@ abstract class AppLocalizations {
   /// **'No session found'**
   String get assistNothing;
 
+  /// Note under an answer whose search reached the candidate limit (candidates_capped).
+  ///
+  /// In en, this message translates to:
+  /// **'Many sessions matched; the newest were searched, older ones may be missing. Ask more narrowly to reach them.'**
+  String get assistCapped;
+
   /// Marks a hit the search assistant did not pick.
   ///
   /// In en, this message translates to:

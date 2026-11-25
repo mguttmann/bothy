@@ -8609,6 +8609,8 @@ export interface components {
             /** @description The search terms of this question (the person's and the assistant's); the app sends them back in `history`. */
             terms: string[];
             cost_estimate?: components["schemas"]["SearchAssistCost"];
+            /** @description A search of this question reached `search.max_candidates`; the newest matches were taken, so older sessions may be missing. Ask more narrowly to reach them. */
+            candidates_capped?: boolean;
         };
         /** @description One session the search found; open it at `/t/<thread_id>?m=<message_id>`. */
         SearchAssistHit: {
