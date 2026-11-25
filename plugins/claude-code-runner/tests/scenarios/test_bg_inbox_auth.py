@@ -38,7 +38,7 @@ import pytest
 from bothy_sdk.testing._patience import PATIENCE
 
 from claude_code_runner.bgpaths import bg_files
-from claude_code_runner.causes import cause
+from claude_code_runner.causes import ADAPTER_STOPPED, cause
 from claude_code_runner.runturn import RunTurn
 
 from .conftest import BACKGROUND, LogLines, World
@@ -900,6 +900,26 @@ async def test_a_stop_during_the_login_check_ends_the_run_without_a_retry(
     await world.fake.cancel(run.run_id, "user_cancelled")
     world.release(gate)
     assert await world.ended(run.run_id) == "cancelled"
+    assert texts(world) == []
+    assert events(logs, "login_retry_started") == []
+    assert len(launches(world)) == 1
+    await nothing_left(world)
+
+
+async def test_an_orderly_stop_of_the_runner_during_the_wait_finishes_the_run(
+    bg_world: World, logs: LogLines, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world = bg_world
+    # The stopped session took the prompt already: the run is finished, never left for a
+    # start from the inbox that would run the prompt again (18.6).
+    monkeypatch.setattr(RunTurn, "login_retry_wait", 30.0)
+    world.scenario(fixture="plain", per_launch={"0": {"bg_no_login": True}})
+    runner = await start(world)
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: events(logs, "login_retry_wait"))
+    await world.stop(runner)
+    assert world.state_of(run.run_id) == "cancelled"
+    assert world.fake.run_state(run.run_id).state_reason == ADAPTER_STOPPED
     assert texts(world) == []
     assert events(logs, "login_retry_started") == []
     assert len(launches(world)) == 1

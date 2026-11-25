@@ -641,6 +641,9 @@ class RunTurn:
         self.login_retried = False
         """The run tried a turn again after a request without the login: never a second time
         (18.3, FIX-RUNNER-LOGIN-BLIP-RETRY)."""
+        self.login_waiting = False
+        """The run waits for the retry after a request without the login: its stopped session
+        took the prompt, so a cancellation finishes the run like one during a launch."""
         self._bg_rest: list[tuple[str, bytes]] = []
         self._bg_cause: str | None = None
         self.owner_codes: OwnerCodes | None = None
@@ -917,16 +920,17 @@ class RunTurn:
         await self._finish_cancelled()
 
     async def _cancelled_launch(self) -> None:
-        """A cancellation during the launch of a background session: the run ends ``cancelled``.
+        """A cancellation during a background launch or a login retry wait: ``cancelled``.
 
+        Also during the wait for a login retry (18.3), whose stopped session took the prompt.
         The session of the launch was stopped and removed (`_run_background`), but it may
         have taken the prompt already, so the run is not left for a start from the inbox,
         which would run the prompt again. Like a process the cancellation stopped, the run
         finishes ``cancelled`` with ``adapter_stopped`` (18.6).
         """
-        if not self.bg_launching:
+        if not (self.bg_launching or self.login_waiting):
             return
-        self.bg_launching = False
+        self.bg_launching = self.login_waiting = False
         if self.stop_reason is None:
             self.stop_reason = ADAPTER_STOPPED
         if self.server_ended or self.handle.patch.ended or self.handle.finished:
@@ -3359,6 +3363,7 @@ class RunTurn:
             offset = _size(transcript) if transcript is not None else 0
             argv = await self._prepare_launch(attempt, inputs, name, offset)
             self.bg_launching = True
+            self.login_waiting = False  # from here on the launch's own rule applies
             try:
                 out = await self._launch(bg, argv, prompt)
             except BaseException:
@@ -3970,6 +3975,7 @@ class RunTurn:
             The attempt to start, or ``None`` when the run ended here.
         """
         self.login_retried = True
+        self.login_waiting = True
         _log("login_retry_wait", seconds=self.login_retry_wait, **self.ids)
         loop = asyncio.get_running_loop()
         deadline = loop.time() + self.login_retry_wait
@@ -3979,11 +3985,11 @@ class RunTurn:
             return None
         if not await self._precheck_again():
             return None
-        if not await self._still_wanted():  # the server may end the run during the check
-            return None
         async with self.write_lock:
             # Under the lock: a follow-up whose write was still running is in or out for good.
             self.retry_inputs = [(u, self.lines[u]) for u in self.ledger.unanswered()]
+        if not await self._still_wanted():  # the run may end during the check or the lock
+            return None
         _log("login_retry_started", **self.ids)
         return _Attempt(resume=True, label="resume_same_reference")
 
