@@ -691,7 +691,7 @@ request per subscription. Delivery, retry, verification at the receiver and inco
    console and the check of `min_api_version` at an app installation compare values that are equal
    for every state, and a client must not use them as a compatibility signal before the first
    release. No gate holds the
-   steps of items 1 and 2; without a tag G6 (item 7) compares with the merge base of the pull
+   steps of items 1 and 2; below 1.0 G6 (item 7) compares with the merge base of the pull
    request, and the label `breaking change` releases a break. The rule and its gate from the first
    release on are plan row V3-57.
 2. **Gateway.** Protocol versions are in `hello` and `identify`; an unsupported version closes with
@@ -732,11 +732,13 @@ request per subscription. Delivery, retry, verification at the receiver and inco
    stated in the security advisory and in the changelog.
 7. **Check (G6, as built by M7-11).** `make api-breaking` compares `docs/api/openapi.yaml` of the
    working tree, including the frame and event schemas in its `components.schemas`, with the same
-   file of the base tag and fails on every row of the right column of the table above. The base is
-   the newest stable tag `server/vX.Y.Z` merged into `HEAD`, read with `git show`; a pre-release tag
-   (for example `-beta.N`) is the base only while no stable tag exists; without any tag the base is
-   the merge base of `HEAD` with the base of the pull request (`API_BREAKING_BASE` in CI, locally
-   `origin/main`), and only without that either the gate passes with a notice. A break passes only
+   file of the base and fails on every row of the right column of the table above. While
+   `info.version` of the working tree is below 1.0 the base is the merge base of `HEAD` with the
+   base of the pull request (`API_BREAKING_BASE` in CI, locally `origin/main`), so a break the
+   label below accepted is not found again by a later pull request. From 1.0 on the base is the
+   newest stable tag `server/vX.Y.Z` merged into `HEAD`, read with `git show`; a pre-release tag
+   (for example `-beta.N`) is the base only while no stable tag exists. Each falls back to the
+   other, and only without both the gate passes with a notice. A break passes only
    when `info.version` raised its major version against the base (items 4 and 5), or, while
    `info.version` is below 1.0, when the pull request carries the label `breaking change` (a
    deliberate break before 1.0, docs/decisions.d/AUD-PKG-R2-owner-ops.md); nothing else lowers

@@ -269,6 +269,39 @@ def test_label_accepts_no_break_from_1_0_on(tmp_path: Path) -> None:
     assert breaking.check(repo, out=lines.append, base_ref="main", allow_break=True) == 1
 
 
+def test_a_labelled_break_before_1_0_stays_accepted_after_a_pre_release_tag(
+    tmp_path: Path,
+) -> None:
+    """server/v0.2.0 has the field, a labelled pull request removed it on main; the next
+    additive pull request compares with main, not again with the tag."""
+    base = _load(FIXTURES / "base.yaml")
+    base["info"]["version"] = "0.2.0"
+    removed = copy.deepcopy(base)
+    del removed["components"]["schemas"]["Thing"]["properties"]["size"]
+    removed["info"]["version"] = "0.3.0"
+    repo = _fixture_repo(tmp_path, [("server/v0.2.0", base), ("after-the-label", removed)])
+    additive = copy.deepcopy(removed)
+    additive["components"]["schemas"]["Extra"] = {"type": "object"}
+    _write_current(repo, additive)
+    lines: list[str] = []
+    assert breaking.check(repo, out=lines.append, base_ref="main") == 0, lines
+    assert "against the merge base " in lines[-1]
+    # A new unlabelled break of the same pull request still fails.
+    del additive["components"]["schemas"]["Thing"]["properties"]["tags"]
+    _write_current(repo, additive)
+    assert breaking.check(repo, out=lines.append, base_ref="main") == 1
+
+
+def test_from_1_0_on_the_release_tag_stays_the_base(tmp_path: Path) -> None:
+    base = _load(FIXTURES / "base.yaml")
+    removed = copy.deepcopy(base)
+    del removed["components"]["schemas"]["Thing"]["properties"]["size"]
+    repo = _fixture_repo(tmp_path, [("server/v1.2.0", base), ("later", removed)])
+    lines: list[str] = []
+    assert breaking.check(repo, out=lines.append, base_ref="main") == 1
+    assert "against server/v1.2.0" in lines[-1]
+
+
 def test_main_reads_base_and_label(tmp_path: Path) -> None:
     repo = _pre_release_repo(tmp_path, "0.3.0")
     args = ["check", "--root", str(repo), "--base", "main"]
