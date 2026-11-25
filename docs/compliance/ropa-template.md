@@ -185,7 +185,7 @@ Table of agents (one row per agent):
 | Data categories | the question and earlier questions of the popup, per candidate thread the title, channel and space name, time and an excerpt; only candidates the assistant agent may read itself |
 | Recipients | the agent named in `search.assist.agent_id`, its runtime and LLM provider `<name, region>` |
 | Deletion periods | the server stores and logs no question, term or candidate; at the runtime and the LLM provider according to their periods `<enter>` |
-| Measures | M2 (the agent's own grants filter the candidates); off while `search.assist.agent_id` is empty |
+| Measures | M2 (the agent's own grants filter the candidates); only an organization agent (`billing_mode = organization`) gets questions, never one on a personal subscription; off while `search.assist.agent_id` is empty |
 
 ### V12 Built-in agents and the interview
 

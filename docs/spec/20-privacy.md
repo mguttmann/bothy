@@ -535,7 +535,9 @@ The owner rectifies other data; a `rectification` request documents that.
   messages (03, `channels`) and authors as handle and kind, no email addresses.
 - Personal mode (`billing_mode = personal`): the person uses their own subscription for their own
   purposes; the product stores no credentials (baseline I5).
-- Search assistant (14 4.10): when `search.assist.agent_id` names an agent, a question to the
+- Search assistant (14 4.10): only an organization agent (`billing_mode = organization`) can be
+  the assistant, so the questions of every person never run through the personal subscription of
+  one holder (AUD-PKG-R2-owner-server). When `search.assist.agent_id` names such an agent, a question to the
   assistant sends the question, the earlier questions of the popup and, per candidate the agent may
   read itself, the thread title, channel and space name, a time and an excerpt to that agent and so
   to its LLM provider. Nothing of it is stored on the server. The instance operator names this flow

@@ -47,6 +47,9 @@ const (
 	keyPicks      = "bothy.search.picks"
 	msgSecondPass = "search: assist second pass failed"
 	keyErrorKind  = "error.type"
+	// msgNotOrganization is the warning when search.assist.agent_id names an agent that is not an
+	// organization agent: the question stays with the full-text search.
+	msgNotOrganization = "search: the assistant agent is no organization agent"
 )
 
 // hitKindMessage is the kind of a message hit of the coordinator.
@@ -109,10 +112,11 @@ type openAssist struct {
 
 // Assistant implements search.Assistant (14 4.10). It is safe for concurrent use.
 type Assistant struct {
-	cfg   AssistConfig
-	d     AssistDeps
-	agent ids.ID
-	box   atomic.Pointer[assistBox]
+	cfg    AssistConfig
+	d      AssistDeps
+	agent  ids.ID
+	box    atomic.Pointer[assistBox]
+	policy atomic.Pointer[search.AssistAgentPolicy]
 
 	mu   gosync.Mutex
 	open map[ids.ID]*openAssist
@@ -160,6 +164,29 @@ func (a *Assistant) BindRelay(relay search.AssistRelay, after func(d time.Durati
 	}
 	a.box.Store(&assistBox{relay: relay, after: after})
 	return nil
+}
+
+// BindPolicy sets the port that tells whether the assistant agent is an organization agent;
+// internal/wire calls it once the agents module exists. Without it, and for an agent that is not
+// an organization agent, every question falls back to full text with assistant_not_configured:
+// questions and excerpts of every person never go to an agent on a personal subscription
+// (AUD-PKG-R2-owner-server).
+func (a *Assistant) BindPolicy(p search.AssistAgentPolicy) error {
+	if p == nil {
+		return errors.New("search: BindPolicy needs the policy")
+	}
+	a.policy.Store(&p)
+	return nil
+}
+
+// organizationAgent reports whether the configured agent may get questions: a bound policy that
+// says organization.
+func (a *Assistant) organizationAgent(ctx context.Context) (bool, error) {
+	p := a.policy.Load()
+	if p == nil {
+		return false, nil
+	}
+	return (*p).OrganizationAgent(ctx, a.agent)
 }
 
 // candidate is one fused thread of a search pass.
@@ -319,6 +346,14 @@ func (a *Assistant) queryText(terms []string) string {
 // the candidates. Errors: the context of the request, programming faults of the relay.
 func (a *Assistant) ask(ctx context.Context, r search.AssistRequest, cands []candidate) (domain.AssistAnswer, string, map[string]candidate, error) {
 	if a.agent.IsZero() {
+		return domain.AssistAnswer{}, search.FallbackNotConfigured, nil, nil
+	}
+	org, err := a.organizationAgent(ctx)
+	if err != nil {
+		return domain.AssistAnswer{}, "", nil, errs.Wrap(errs.CodeInternalError, err, "search: the billing mode of the assistant agent")
+	}
+	if !org {
+		a.d.Log.LogAttrs(ctx, slog.LevelWarn, msgNotOrganization)
 		return domain.AssistAnswer{}, search.FallbackNotConfigured, nil, nil
 	}
 	box := a.box.Load()

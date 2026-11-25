@@ -354,7 +354,10 @@ built on the search of this chapter; a model only chooses among the hits and add
    and a page of `search.assist.max_candidates`: thread titles and messages. They are fused per
    thread by reciprocal rank (`1/(60 + rank)` per list, the title list counts twice; equal scores:
    the newer first). The first message hit of a thread is its jump target and excerpt.
-4. **The assistant.** When `search.assist.agent_id` names an agent, the candidates it may read
+4. **The assistant.** When `search.assist.agent_id` names an agent with `billing_mode =
+   organization` (an agent on a personal subscription gets no question: the search falls back to
+   full text with `assistant_not_configured` and the server logs a warning;
+   AUD-PKG-R2-owner-server), the candidates it may read
    itself (`thread.read` on the thread and `message.read` on the jump target, filter mode in a fresh
    request scope) go to it as the ephemeral event `search.assist_requested` on one live gateway
    connection (consumer `default`, else the newest attached one; 09 10.6). The payload holds the
@@ -721,7 +724,7 @@ the configuration schema; `make perf` reads them from this table.
 | `search.extract.tika_url` | Server | empty | Tika server; empty = off (V3, not yet in the schema) |
 | `search.extract.refresh_interval` | Server | `24h` | interval of the maintenance job that re-extracts rows of older extractor versions |
 | `search.extract.refresh_batch_size` | Server | `500` | files per run of the maintenance job |
-| `search.assist.agent_id` | Server | empty | agent of the search assistant; empty = full text only (4.10) |
+| `search.assist.agent_id` | Server | empty | agent of the search assistant, only an agent with `billing_mode = organization`; empty or another agent = full text only (4.10) |
 | `search.assist.timeout` | Server | `10s` | longest wait for the assistant's answer; below `http.request_timeout` |
 | `search.assist.max_candidates` | Server | `20` | hits per search of a question and most candidates to the assistant |
 | `search.assist.max_hits` | Server | `8` | most hits of an answer and most picks |

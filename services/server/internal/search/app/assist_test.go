@@ -149,6 +149,7 @@ type assistEnv struct {
 	search  *fakeSearch
 	az      *assistAuthorizer
 	relay   *fakeRelay
+	policy  *fakePolicy
 	timer   *manualTimer
 	alex    actor.Actor
 	helper  actor.Actor
@@ -189,8 +190,57 @@ func newAssistEnv(t *testing.T, configured bool) *assistEnv {
 	if err := as.BindRelay(e.relay, e.timer.after); err != nil {
 		t.Fatal(err)
 	}
+	e.policy = &fakePolicy{org: map[ids.ID]bool{e.helper.ID: true}}
+	if err := as.BindPolicy(e.policy); err != nil {
+		t.Fatal(err)
+	}
 	e.as = as
 	return e
+}
+
+// fakePolicy answers OrganizationAgent from org.
+type fakePolicy struct {
+	mu  sync.Mutex
+	org map[ids.ID]bool
+}
+
+func (p *fakePolicy) OrganizationAgent(_ context.Context, id ids.ID) (bool, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.org[id], nil
+}
+
+// TestAssist_OnlyAnOrganizationAgentGetsQuestions (AUD-PKG-R2-owner-server, #1483): an assistant
+// agent that is not an organization agent, or no bound policy at all, gets no question; the
+// search falls back to full text with assistant_not_configured.
+func TestAssist_OnlyAnOrganizationAgentGetsQuestions(t *testing.T) {
+	t.Parallel()
+	e := newAssistEnv(t, true)
+	e.policy.mu.Lock()
+	e.policy.org[e.helper.ID] = false
+	e.policy.mu.Unlock()
+	res, err := e.as.Assist(context.Background(), e.alex, search.AssistRequest{Q: "takeover of Larkspur"})
+	if err != nil || res.Mode != search.ModeFulltext || res.FallbackReason != search.FallbackNotConfigured {
+		t.Fatalf("personal agent: %+v, %v; want full text, assistant_not_configured", res, err)
+	}
+	unbound, err := app.NewAssistant(assistConfig(e.helper.ID), app.AssistDeps{
+		Search: e.search, Authorizer: e.az, Clock: clock.NewFake(day), Log: slog.New(slog.DiscardHandler),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := unbound.BindRelay(e.relay, e.timer.after); err != nil {
+		t.Fatal(err)
+	}
+	res, err = unbound.Assist(context.Background(), e.alex, search.AssistRequest{Q: "takeover of Larkspur"})
+	if err != nil || res.FallbackReason != search.FallbackNotConfigured {
+		t.Fatalf("no policy: %+v, %v; want assistant_not_configured", res, err)
+	}
+	e.relay.mu.Lock()
+	defer e.relay.mu.Unlock()
+	if len(e.relay.events) != 0 {
+		t.Fatalf("the relay got %d questions, want none", len(e.relay.events))
+	}
 }
 
 // threadHit is a hit of the thread search; messageHit one of the message search.

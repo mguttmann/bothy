@@ -146,6 +146,12 @@ func TestSearchAssist_AgentsMayNotAsk(t *testing.T) {
 	w.want(w.do("lotse-token", http.MethodPost, "/api/v1/search/assist", `{"q":"larkspur"}`), http.StatusForbidden, "")
 }
 
+// organizationPolicy says every assistant agent is an organization agent (the agent of this
+// world has the default billing_mode organization).
+type organizationPolicy struct{}
+
+func (organizationPolicy) OrganizationAgent(context.Context, ids.ID) (bool, error) { return true, nil }
+
 // capturingRelay records the payloads and answers each request through answer.
 type capturingRelay struct {
 	mu       sync.Mutex
@@ -192,6 +198,7 @@ func TestSearchAssist_TheAssistantNeverSeesWhatItMayNotRead(t *testing.T) {
 		answers <- as.AnswerAssist(context.Background(), lotse, search.AssistAnswer{RequestID: req, Picks: firstPick(relay.last())})
 	}
 	must(t, as.BindRelay(relay, nil))
+	must(t, as.BindPolicy(organizationPolicy{}))
 
 	res, err := as.Assist(context.Background(), w.actor("robin"), search.AssistRequest{Q: askTakeover})
 	must(t, err)
