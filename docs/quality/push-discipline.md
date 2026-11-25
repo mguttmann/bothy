@@ -32,7 +32,10 @@ commit per feature, signed and linear.
 6. **Pull request.** One pull request per finished feature. The title is a
    Conventional Commit header line, because on merge it becomes the header line of the commit on `main`;
    CI checks it (`PR_TITLE` in `make commitlint`). The body becomes the message of that
-   commit, so title and body are written fresh, in your own words: what and why, how it
+   commit, so it ends with a `Signed-off-by: Name <e-mail>` line outside HTML comments, which
+   `make commitlint` requires (`PR_BODY`; not for a pull request of `dependabot[bot]`,
+   `renovate[bot]` or `github-actions[bot]`, `PR_BODY_BOTS` in `tools/hooks/commit_msg.py`;
+   which identity signs is OQ-25), and title and body are written fresh, in your own words: what and why, how it
    was verified, which commit the independent review covered with which verdict and what
    was fixed. Never paste a raw review report, bot or agent output, local paths, user or
    machine names, temporary folder names or notes about tools. Section

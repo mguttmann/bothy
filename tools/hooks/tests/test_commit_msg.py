@@ -190,7 +190,11 @@ def test_file_mode_without_signoff_needs_no_identity(tmp_path: Path) -> None:
 def test_commitlint_recipe_checks_the_pull_request_title(title: str, *, passes: bool) -> None:
     """The CI job gates sets PR_TITLE on every pull request, on a runner without git identity."""
     env = {k: v for k, v in os.environ.items() if k not in _MAKE_VARIABLES}
-    env.update(COMMIT_RANGE="HEAD..HEAD", PR_TITLE=title)
+    env.update(
+        COMMIT_RANGE="HEAD..HEAD",
+        PR_TITLE=title,
+        PR_BODY="Body.\n\nSigned-off-by: Alex Example <alex@example.com>\n",
+    )
     run = subprocess.run(
         ["make", "-s", "-C", str(REPO), "commitlint"],
         env=env,
@@ -310,3 +314,56 @@ def test_commitlint_recipe_passes_the_pull_request_author(
     output = run.stdout + run.stderr
     assert (run.returncode == 0) is passes, output
     assert ("missing 'Signed-off-by:'" in output) is not passes, output
+
+
+# ---- the squash commit text: pull request body (#872) ------------------------------------
+SIGNED = "Fixes the gate.\n\nSigned-off-by: Alex Example <alex@example.com>\n"
+
+
+@pytest.mark.parametrize(
+    ("body", "passes"),
+    [
+        (SIGNED, True),
+        ("Fixes the gate.\n", False),
+        ("", False),
+        # A sign-off inside an HTML comment of the template is not part of the commit text.
+        ("Text\n<!--\nSigned-off-by: Alex Example <alex@example.com>\n-->\n", False),
+        ("Signed-off-by: Alex Example\n", False),
+    ],
+    ids=["signed", "unsigned", "empty", "in a comment", "without e-mail"],
+)
+def test_pull_request_body_needs_a_signoff(body: str, *, passes: bool) -> None:
+    assert (commit_msg.check_pr_body(body, author="alex") == []) is passes
+
+
+@pytest.mark.parametrize("login", ["dependabot[bot]", "renovate[bot]", "github-actions[bot]"])
+def test_pull_request_body_of_a_bot_needs_no_signoff(login: str) -> None:
+    assert commit_msg.check_pr_body("Bumps example.\n", author=login) == []
+
+
+def test_pr_body_mode_reads_the_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    body = tmp_path / "BODY"
+    body.write_text("Fixes the gate.\n", encoding="utf-8")
+    assert commit_msg.main(["--pr-body", str(body), "--pr-author", "alex"]) == 1
+    assert "pull request body: " in capsys.readouterr().out
+    body.write_text(SIGNED, encoding="utf-8")
+    assert commit_msg.main(["--pr-body", str(body), "--pr-author", "alex"]) == 0
+
+
+@pytest.mark.parametrize(
+    ("body", "passes"), [(SIGNED, True), ("Fixes the gate.\n", False), ("", False)]
+)
+def test_commitlint_recipe_checks_the_pull_request_body(body: str, *, passes: bool) -> None:
+    """With PR_TITLE set (every pull request) the body, the rest of the squash text, is checked."""
+    env = {k: v for k, v in os.environ.items() if k not in _MAKE_VARIABLES}
+    env.update(COMMIT_RANGE="HEAD..HEAD", PR_TITLE="fix: keep the gates green", PR_BODY=body)
+    run = subprocess.run(
+        ["make", "-s", "-C", str(REPO), "commitlint"],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=300,
+    )
+    output = run.stdout + run.stderr
+    assert (run.returncode == 0) is passes, output

@@ -5,6 +5,7 @@ Usage:
   commit_msg.py [--require-signoff] MSGFILE      commit-msg hook (one message)
   commit_msg.py [--require-signoff] --range A..B [--pr-author LOGIN]
                                                  check every non-merge commit in a range
+  commit_msg.py --pr-body FILE --pr-author LOGIN  the pull request body (squash text)
 
 Rules (docs/quality/push-discipline.md):
   * header `type(scope)!: description`, type from TYPES, at most HEADER_MAX_LENGTH chars
@@ -19,6 +20,9 @@ Rules (docs/quality/push-discipline.md):
   * with --pr-author naming a dependency bot of BOT_AUTHORS (CI passes the pull request
     author GitHub reports): that bot's own commits need no sign-off; the header rules still
     apply, and every other commit of the range still needs its sign-off (D-DEPS-3)
+  * --pr-body: the body of the pull request becomes the message of the squash commit on
+    `main`, so it carries a `Signed-off-by: Name <e-mail>` line outside HTML comments, unless
+    the author is a bot of PR_BODY_BOTS (#872); which identity signs is OQ-25
 """
 
 from __future__ import annotations
@@ -59,6 +63,26 @@ BOT_AUTHORS = {
     "dependabot[bot]": "49699333+dependabot[bot]@users.noreply.github.com",
     "renovate[bot]": "29139614+renovate[bot]@users.noreply.github.com",
 }
+# Pull request authors whose body needs no sign-off: the dependency bots and the bot of the
+# repository's own workflows (hermes-pin.yml opens its pull requests as github-actions[bot]).
+PR_BODY_BOTS = frozenset({*BOT_AUTHORS, "github-actions[bot]"})
+_HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+
+
+def check_pr_body(body: str, *, author: str) -> list[str]:
+    """Return the errors of a pull request body; empty means it passes (#872).
+
+    The body becomes the message of the squash commit on `main`, so it needs a DCO sign-off
+    of its own; HTML comments of the template never reach the commit and do not count.
+    """
+    if author in PR_BODY_BOTS:
+        return []
+    if _SIGNOFF.search(_HTML_COMMENT.sub("", body)):
+        return []
+    return [
+        "missing 'Signed-off-by: Name <e-mail>' line: the body becomes the squash commit on "
+        "main (CONTRIBUTING.md, Pull requests)"
+    ]
 
 
 def _clean(message: str) -> str:
@@ -163,8 +187,15 @@ def main(argv: list[str] | None = None) -> int:
         help="login of the pull request author; exempts a dependency bot's own commits "
         "from the sign-off",
     )
+    parser.add_argument("--pr-body", type=Path, help="file with the pull request body")
     parser.add_argument("msgfile", nargs="?", type=Path)
     args = parser.parse_args(argv)
+
+    if args.pr_body is not None:
+        body_errors = check_pr_body(args.pr_body.read_text(encoding="utf-8"), author=args.pr_author)
+        for err in body_errors:
+            print(f"pull request body: {err}")
+        return 1 if body_errors else 0
 
     if args.rev_range:
         failed = 0

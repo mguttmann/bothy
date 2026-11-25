@@ -429,6 +429,11 @@ commitlint: ## Conventional Commits and DCO sign-off for commits not yet on the 
 	@# The pull request title becomes the squash commit on main (CI sets PR_TITLE).
 	@if [ -n "$${PR_TITLE:-}" ]; then f=$$(mktemp); printf '%s\n' "$$PR_TITLE" > "$$f"; \
 	  rc=0; $(UVRUN) python tools/hooks/commit_msg.py "$$f" || rc=$$?; rm -f "$$f"; exit $$rc; fi
+	@# So does the body (CI sets PR_BODY): it needs a DCO sign-off unless a bot opened the pull
+	@# request (#872). PR_TITLE marks a pull request; an empty body fails.
+	@if [ -n "$${PR_TITLE:-}" ]; then f=$$(mktemp); printf '%s\n' "$${PR_BODY:-}" > "$$f"; \
+	  rc=0; $(UVRUN) python tools/hooks/commit_msg.py --pr-body "$$f" --pr-author "$${PR_AUTHOR:-}" || rc=$$?; \
+	  rm -f "$$f"; exit $$rc; fi
 
 # ---- server gates ---------------------------------------------------------------------
 # Each server gate checks its prerequisites first (go, a Docker-compatible runtime, the pins
