@@ -915,7 +915,12 @@ final class InstanceSecrets implements SecretStore {
   /// Deletes every secret of this instance: tokens, device ID and database key (R-SY-14).
   /// From this call on [write] stores nothing; a write the backend has not answered yet is
   /// waited for, so its item is deleted with the others.
-  Future<void> deleteAll() async {
+  Future<void> deleteAll() => deleteAllExcept((_) => false);
+
+  /// [deleteAll] that keeps the secrets whose key (without the instance prefix) [keep] names:
+  /// after an expired session the device ID and the record of the device keys stay, so the
+  /// next login is the same device (AUD-PKG-R2-owner-server).
+  Future<void> deleteAllExcept(bool Function(String key) keep) async {
     _ended = true;
     for (final writing in _writing.toList()) {
       try {
@@ -925,7 +930,9 @@ final class InstanceSecrets implements SecretStore {
       }
     }
     for (final key in await _backend.keys()) {
-      if (key.startsWith(_prefix)) await _backend.delete(key);
+      if (key.startsWith(_prefix) && !keep(key.substring(_prefix.length))) {
+        await _backend.delete(key);
+      }
     }
   }
 }

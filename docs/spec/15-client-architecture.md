@@ -598,8 +598,12 @@ changes (docs/decisions.d/AUD-client-settings-01.md).
   `token_expired` (a refresh that still gets `invalid_dpop_proof` after its repeat keeps the
   stored refresh token and reports `RefreshFailed`), a revoked pending device, the
   gateway close `4012` and `logout` end in the event `SignedOut(reason)` of `packages/auth` after
-  the secret store is cleared; for a revoked session or device (`deleteLocalData`) the app deletes
-  the local data of that server (R-SY-14).
+  the secret store is cleared; the app then deletes the local data of that server for every
+  reason (R-SY-14). The device keys and the device ID go with it only when the device ends: a
+  revoked session or device (`deleteLocalData`), `logout` and a lost key. A rejected refresh
+  (`refreshRejected`, the end of a session by `auth.session_max_age` or idleness) keeps them, so
+  the next login is the same device (`AccountWiper.wipe(keepDevice: true)`,
+  AUD-PKG-R2-owner-server).
 - **Terminal stream:** per session its own WebSocket connection next to the gateway (section
   23.2); it never runs through `sync_engine`.
 

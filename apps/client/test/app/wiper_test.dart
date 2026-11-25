@@ -87,6 +87,42 @@ void main() {
     await services.auth.dispose();
   });
 
+  test('an expired session keeps the device keys, the device ID and the key '
+      'record; the data goes (AUD-PKG-R2-owner-server)', () async {
+    final backend = MemorySecureBackend();
+    final keys = SoftwareKeyStore();
+    final ports = testPorts(
+      dataRoot: root,
+      secureBackend: backend,
+      deviceKeys: keys,
+    );
+    final services = await InstanceServices.open(ports, instance());
+    const deviceId = 'auth/https://chat.example.com/device_id';
+    await services.secrets.write(deviceId, 'd-1');
+    await services.secrets.write(
+      'auth/https://chat.example.com/refresh_token',
+      'rt',
+    );
+    await services.secrets.write('device_keys', '{"dpop":"x"}');
+    final folder = Directory('${root.path}/instances/$instanceId');
+    expect(keys.scopes, {instanceId});
+
+    await services.wiper.wipe(keepDevice: true);
+
+    expect(folder.existsSync(), isFalse);
+    expect(keys.scopes, {instanceId});
+    final left = InstanceSecrets(backend, instanceId);
+    expect(await left.read(deviceId), 'd-1');
+    expect(await left.read('device_keys'), '{"dpop":"x"}');
+    expect(
+      await left.read('auth/https://chat.example.com/refresh_token'),
+      isNull,
+    );
+    final kept = backend.values.keys.where((k) => k.contains(instanceId));
+    expect(kept, hasLength(2), reason: 'only the device ID and the key record');
+    await services.auth.dispose();
+  });
+
   test('a failing step does not stop the others and is reported', () async {
     final backend = MemorySecureBackend();
     final keys = SoftwareKeyStore();

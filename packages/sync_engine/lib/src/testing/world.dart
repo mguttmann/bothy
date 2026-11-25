@@ -293,6 +293,10 @@ final class FakeSession {
   /// Whether the session was revoked.
   bool revoked = false;
 
+  /// Whether the session ended by `auth.session_max_age` or idleness: a refresh is
+  /// `401 unauthenticated`, which the app takes as `refreshRejected`, while the device stays.
+  bool expired = false;
+
   /// The app session that created this child session of an extension (08 7.4), or null.
   String? parentId;
 

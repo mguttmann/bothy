@@ -203,6 +203,45 @@ void main() {
     });
   });
 
+  test('an expired session keeps the device: the next login is the same '
+      'device (AUD-PKG-R2-owner-server)', () async {
+    final keys = SoftwareKeyStore();
+    f = await FakeInstance.start(deviceKeys: keys);
+    final control = await signedIn();
+    final instanceId = f.server.world.instanceId;
+    final devicesBefore = f.server.world.devices.keys.toSet();
+    final jwk = (await keys.ensure(instanceId)).dpop.publicJwk;
+    for (final s in f.server.world.sessions.values) {
+      s.expired = true;
+    }
+    try {
+      await state().services!.auth.refresh.refreshNow();
+    } on Object {
+      // The refused refresh ends the session; the controller takes it from the event.
+    }
+    await eventually('E7', () => state().step == OnboardingStep.signedOut);
+    expect(state().cause, SignOutCause.sessionExpired);
+    // The data is gone, the device keys and the device ID stay.
+    expect(f.instanceFolder.existsSync(), isFalse);
+    expect(keys.scopes, {instanceId});
+    expect(
+      f.secure.values.keys.where(
+        (k) => k.contains(instanceId) && k.endsWith('/device_id'),
+      ),
+      hasLength(1),
+    );
+
+    await control.loginAgain();
+    await control.loginWithPassword(
+      WorldSeed.alexLogin,
+      WorldSeed.password,
+      WorldSeed.totp,
+    );
+    expect(state().step, OnboardingStep.signedIn);
+    expect(f.server.world.devices.keys.toSet(), devicesBefore);
+    expect((await keys.ensure(instanceId)).dpop.publicJwk, jwk);
+  });
+
   test('logout reaches the server while the metrics sender runs', () async {
     // The sender depends on this controller: reading it in the logout step threw a circular
     // dependency, which the step swallowed, and the server logout was never sent.

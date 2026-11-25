@@ -159,6 +159,10 @@ void registerAuthHandlers(RestFake rest, {required Duration accessTokenTtl}) {
       if (session == null || session.revoked) {
         throw const FakeProblem(401, 'session_revoked');
       }
+      if (session.expired) {
+        // The end of a session by its age or idleness (08 7.1): the refresh is refused.
+        throw const FakeProblem(401, 'unauthenticated');
+      }
       if (r.proofJkt != session.jkt) {
         // A refresh with another key than the family's (08 13).
         throw const FakeProblem(401, 'invalid_dpop_proof');

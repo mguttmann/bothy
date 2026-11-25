@@ -1190,7 +1190,11 @@ class OnboardingController extends _$OnboardingController {
       }
       var complete = true;
       try {
-        await services.wiper.wipe();
+        // An expired session keeps the device (AUD-PKG-R2-owner-server): only a revocation
+        // or a lost key ends it, so the next login is the same device again.
+        await services.wiper.wipe(
+          keepDevice: cause == SignOutCause.sessionExpired,
+        );
       } on Object catch (error, stack) {
         // The wiper ran every step regardless of failures; its error names the failed ones.
         complete = false;
