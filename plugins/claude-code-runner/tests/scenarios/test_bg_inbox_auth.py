@@ -939,7 +939,7 @@ async def test_an_adopted_turn_is_never_tried_again(bg_world: World, logs: LogLi
     run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
     await world.until(lambda: "short_id" in record(world, run.run_id).get("bg", {}))
     first.send_signal(signal.SIGKILL)
-    first.wait(PATIENCE)
+    await world.exited(first)
     world.release(gate)
     await restart(world)
     assert await world.ended(run.run_id) == "failed"
