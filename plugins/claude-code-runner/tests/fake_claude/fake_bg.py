@@ -880,13 +880,13 @@ class Player:
         # Like the result of a print turn, the fixture names the session's totals after it.
         self.add_usage(final.get("modelUsage"), absolute=True)
         early = None
-        if scenario.get("bg_dequeue_at_turn_end"):
+        if scenario.get("bg_dequeue_at_turn_end") and self.late is None:
             # Like the pinned CLI in a live run: a line that arrived as the turn ended is
             # dequeued before the turn's ``turn_duration``, its record follows after it.
             early = self.next_line(0.0)
             if early is not None:
                 self.plain("queue-operation", operation="dequeue")
-        early = early or self.late
+        early = self.late or early
         self.turn_end()
         if early is not None:
             self.followup_turn(early, dequeued=True)

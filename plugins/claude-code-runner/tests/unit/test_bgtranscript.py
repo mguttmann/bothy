@@ -1912,6 +1912,40 @@ def test_each_deferred_dequeue_is_judged_by_its_own_time() -> None:
     assert mapper.turn_open
 
 
+def test_an_answer_with_the_dequeue_s_time_keeps_the_start_behind_the_result() -> None:
+    # The CLI writes milliseconds: the same time proves no order, so the start waits.
+    mapper = started("prompt-uuid")
+    records = [
+        _stamped(REQUEST, 5),
+        _stamped({"type": "queue-operation", "operation": "enqueue"}, 9),
+        _stamped({"type": "queue-operation", "operation": "dequeue"}, 10),
+        _stamped_answer("end_turn", 10),
+        _stamped(TURN_ENDS, 11),
+    ]
+    shapes = [shape(m) for r in records for m in mapper.map(r)]
+    assert shapes.index("assistant") < shapes.index("result") < shapes.index("command/started")
+    assert mapper.turn_open
+
+
+def test_a_noted_input_of_a_start_still_deferred_survives_a_partial_release() -> None:
+    # Dequeues at 10 and 20, the noted record of the later input, then an output at 15: the
+    # first input joins the working turn, the noted one still ends its own turn.
+    mapper = started("prompt-uuid")
+    records = [
+        _stamped(REQUEST, 5),
+        *[_stamped({"type": "queue-operation", "operation": "enqueue"}, 9)] * 2,
+        _stamped({"type": "queue-operation", "operation": "dequeue"}, 10),
+        _stamped({"type": "queue-operation", "operation": "dequeue"}, 20),
+        _NOTED,
+        _stamped_answer("end_turn", 15),
+        _stamped(TURN_ENDS, 21),
+    ]
+    out = [m for r in records for m in mapper.map(r)]
+    assert out[-1]["type"] == "result"
+    assert out[-1]["num_turns"] == 0
+    assert not mapper.turn_open
+
+
 def test_a_noted_input_before_the_turn_end_ends_its_turn_after_the_start() -> None:
     # The noted record of an input deferred behind the late answer comes before turn_duration.
     mapper = started("prompt-uuid")

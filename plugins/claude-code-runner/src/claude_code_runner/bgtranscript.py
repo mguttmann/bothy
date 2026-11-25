@@ -906,7 +906,9 @@ class TranscriptMapper:
 
         Each deferred dequeue is judged by its own ``timestamp``: a record with an earlier time
         than a dequeue's was written late (the CLI may write a turn's final answer seconds
-        late), the turn gave it before that dequeue, so that start stays deferred. Without a
+        late), the turn gave it before that dequeue, so that start stays deferred. The same
+        time proves no order (the CLI writes milliseconds), so that start stays deferred too
+        and follows the turn's result, or a later record of a turn that goes on. Without a
         readable time on either record the start is given on, as before.
         """
         if not self._deferred:
@@ -916,17 +918,19 @@ class TranscriptMapper:
         released = [
             started
             for started, at in self._deferred
-            if written is None or at is None or not written < at
+            if written is None or at is None or written > at
         ]
         if not released:
             return []
         self._deferred = [
             (started, at)
             for started, at in self._deferred
-            if written is not None and at is not None and written < at
+            if written is not None and at is not None and written <= at
         ]
         self._answered = False
-        self._noted_early = 0  # the inputs joined a turn that works
+        # The released inputs joined a turn that works; a noted record counted before stays
+        # with the starts still deferred, as many as there are.
+        self._noted_early = min(self._noted_early, len(self._deferred))
         return [*released, *self._turn_start()]
 
     def _turn_end(self) -> dict[str, Any]:
