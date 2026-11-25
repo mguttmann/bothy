@@ -121,6 +121,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - explainSpaceAccess
   - exportAuditEvents
   - exportChannel
+  - extendGroupMember
   - finishRun
   - fireRunWake
   - getAgent

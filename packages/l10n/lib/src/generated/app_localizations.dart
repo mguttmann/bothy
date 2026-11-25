@@ -10661,6 +10661,36 @@ abstract class AppLocalizations {
   /// **'Extend'**
   String get hintsExtend;
 
+  /// Title of the dialog that gives an expiring group membership a later last day (extendGroupMember).
+  ///
+  /// In en, this message translates to:
+  /// **'Extend the membership'**
+  String get expiringExtendMemberTitle;
+
+  /// Text of the dialog that extends an expiring group membership.
+  ///
+  /// In en, this message translates to:
+  /// **'The person stays in the group without a gap. Enter the new last day; it must come after the current one.'**
+  String get expiringExtendMemberBody;
+
+  /// Error under the last day of the extension dialog when the day is not after the current last day.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a day after the current last day.'**
+  String get expiringExtendMemberLater;
+
+  /// Notice after a group membership was extended.
+  ///
+  /// In en, this message translates to:
+  /// **'The membership is extended.'**
+  String get expiringMemberExtended;
+
+  /// Step-up purpose of extendGroupMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Extend a group membership'**
+  String get stepUpPurposeExtendMember;
+
   /// Action of the hint for an agent in mode personal that opens the page of the agent.
   ///
   /// In en, this message translates to:

@@ -752,6 +752,18 @@ actions:
   rights_change: true
   rl_class: rl.admin
   effect: write
+- id: group.member.extend
+  section: grants
+  description: give a time-limited membership in effect a later expiry, on the same membership and
+    without a gap in access; not in groups with `source = oidc_claim`
+  resource: group
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
 - id: group.member.expire
   section: grants
   description: 'report an expired membership (job `authz.expiry_sweep`): permission version, `access.changed`,

@@ -301,6 +301,7 @@ export 'package:api_client/src/generated/model/group_changed_payload.dart';
 export 'package:api_client/src/generated/model/group_create.dart';
 export 'package:api_client/src/generated/model/group_member.dart';
 export 'package:api_client/src/generated/model/group_member_add.dart';
+export 'package:api_client/src/generated/model/group_member_extend.dart';
 export 'package:api_client/src/generated/model/group_member_page.dart';
 export 'package:api_client/src/generated/model/group_page.dart';
 export 'package:api_client/src/generated/model/group_source.dart';

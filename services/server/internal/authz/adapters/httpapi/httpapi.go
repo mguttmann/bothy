@@ -162,6 +162,20 @@ func (h *Access) RemoveGroupMember(ctx context.Context, req rest.RemoveGroupMemb
 	return rest.RemoveGroupMember204Response{}, nil
 }
 
+// ExtendGroupMember implements rest.StrictServerInterface (POST
+// /groups/{group_id}/members/{user_id}/extend, AUD-PKG-R2-owner-server).
+func (h *Access) ExtendGroupMember(ctx context.Context, req rest.ExtendGroupMemberRequestObject) (rest.ExtendGroupMemberResponseObject, error) {
+	var expiresAt time.Time
+	if req.Body != nil {
+		expiresAt = req.Body.ExpiresAt
+	}
+	m, err := h.admin.ExtendGroupMember(ctx, principal(ctx), ids.ID(req.GroupId), ids.ID(req.UserId), expiresAt)
+	if err != nil {
+		return nil, err
+	}
+	return rest.ExtendGroupMember200JSONResponse{Body: memberREST(m)}, nil
+}
+
 // ListGrants implements rest.StrictServerInterface (GET /grants).
 func (h *Access) ListGrants(ctx context.Context, req rest.ListGrantsRequestObject) (rest.ListGrantsResponseObject, error) {
 	prm := req.Params

@@ -6690,6 +6690,24 @@ class AppLocalizationsDe extends AppLocalizations {
   String get hintsExtend => 'Verlängern';
 
   @override
+  String get expiringExtendMemberTitle => 'Mitgliedschaft verlängern';
+
+  @override
+  String get expiringExtendMemberBody =>
+      'Die Person bleibt ohne Lücke in der Gruppe. Gib den neuen letzten Tag ein; er muss nach dem bisherigen liegen.';
+
+  @override
+  String get expiringExtendMemberLater =>
+      'Wähle einen Tag nach dem bisherigen letzten Tag.';
+
+  @override
+  String get expiringMemberExtended => 'Die Mitgliedschaft ist verlängert.';
+
+  @override
+  String get stepUpPurposeExtendMember =>
+      'Eine Gruppenmitgliedschaft verlängern';
+
+  @override
   String get hintsOpenAgent => 'Agent öffnen';
 
   @override

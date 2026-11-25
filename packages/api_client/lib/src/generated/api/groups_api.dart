@@ -13,6 +13,7 @@ import 'package:api_client/src/generated/model/group.dart';
 import 'package:api_client/src/generated/model/group_create.dart';
 import 'package:api_client/src/generated/model/group_member.dart';
 import 'package:api_client/src/generated/model/group_member_add.dart';
+import 'package:api_client/src/generated/model/group_member_extend.dart';
 import 'package:api_client/src/generated/model/group_member_page.dart';
 import 'package:api_client/src/generated/model/group_page.dart';
 import 'package:api_client/src/generated/model/group_update.dart';
@@ -305,6 +306,137 @@ class GroupsApi {
     );
 
     return _response;
+  }
+
+  /// Extend a time-limited membership
+  /// Gives the time-limited membership of the person that is in effect a later &#x60;expires_at&#x60;, on the same membership, so access never lapses (07 9.4). A membership without an expiry is &#x60;400 validation_failed&#x60; at &#x60;/expires_at&#x60; with &#x60;not_time_limited&#x60;, an expiry not after the current one with &#x60;not_later&#x60;; a person without a membership in effect is &#x60;404&#x60;; a group with &#x60;source &#x3D; oidc_claim&#x60; is &#x60;409 conflict&#x60; with &#x60;claim_managed_group&#x60;.
+  ///
+  /// Parameters:
+  /// * [groupId]
+  /// * [userId]
+  /// * [groupMemberExtend]
+  /// * [idempotencyKey] - UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [GroupMember] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<GroupMember>> extendGroupMember({
+    required String groupId,
+    required String userId,
+    required GroupMemberExtend groupMemberExtend,
+    String? idempotencyKey,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/groups/{group_id}/members/{user_id}/extend'
+        .replaceAll(
+          '{'
+          r'group_id'
+          '}',
+          encodeQueryParameter(
+            _serializers,
+            groupId,
+            const FullType(String),
+          ).toString(),
+        )
+        .replaceAll(
+          '{'
+          r'user_id'
+          '}',
+          encodeQueryParameter(
+            _serializers,
+            userId,
+            const FullType(String),
+          ).toString(),
+        );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(GroupMemberExtend);
+      _bodyData = _serializers.serialize(
+        groupMemberExtend,
+        specifiedType: _type,
+      );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    GroupMember? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(GroupMember),
+            ) as GroupMember;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<GroupMember>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
   }
 
   /// Read a group

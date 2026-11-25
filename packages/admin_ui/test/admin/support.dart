@@ -51,6 +51,7 @@ const Map<String, bool> stepUpOf = {
   'deleteGroup': true,
   'addMember': true,
   'removeMember': true,
+  'extendMember': true,
   'endSession': false,
   ...accessStepUpOf,
   // 05: audit.read (list and export) and audit.verify have step-up.
@@ -846,6 +847,20 @@ class FakeAdminRepository
   }) async {
     await _change('removeMember', '$groupId $userId', purpose);
     membersById[groupId]!.removeWhere((m) => m.userId == userId);
+  }
+
+  @override
+  Future<void> extendMember(
+    String groupId,
+    String userId, {
+    required DateTime expiresAt,
+    required String purpose,
+  }) async {
+    await _change(
+      'extendMember',
+      '$groupId $userId ${expiresAt.toUtc().toIso8601String()}',
+      purpose,
+    );
   }
 }
 

@@ -375,6 +375,7 @@ section 6.3). A failed check of the credentials of `identify`, `resume` or `reau
 | `group.delete` | delete a group (soft); its grants are revoked | group | owner | yes | yes | yes | yes | `rl.admin` |
 | `group.member.add` | add a member, optionally with expiry and `resolve_i1`; not in groups with `source = oidc_claim` | group | owner | yes | yes | yes | yes | `rl.admin` |
 | `group.member.remove` | remove a member; not in groups with `source = oidc_claim` | group | owner | yes | yes | yes | yes | `rl.admin` |
+| `group.member.extend` | give a time-limited membership in effect a later expiry, on the same membership and without a gap in access; not in groups with `source = oidc_claim` | group | owner | yes | yes | yes | yes | `rl.admin` |
 | `group.member.expire` | report an expired membership (job `authz.expiry_sweep`): permission version, `access.changed`, cancellation of affected runs | group | system | no | no | yes | yes | `none` |
 | `group.member.sync` | when an OIDC login completes, align a person's memberships in groups with `source = oidc_claim` of their provider with the group claim; one audit entry per login with the groups ([08-identity.md](08-identity.md), section 3.4) | user | system | no | no | yes | yes | `none` |
 | `grant.read` | read the grants of a target or subject; with `manage` only grants on targets within one's own `manage` scope ([07-permissions.md](07-permissions.md), section 2.6); grants on hosts only owners | space, channel, host, principal | owner or manage | no | no | no | no | `rl.read` |

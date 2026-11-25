@@ -5,7 +5,8 @@
 // grant's subject, target, level and capabilities, an empty reason and a new last day, and
 // confirming creates the new grant first and then revokes the old one, with one step-up for
 // both; "Explain" opens "Who has access?"; "Renew token" opens the agent's page with its
-// tokens, an app token has no action; a membership opens its group.
+// tokens, an app token has no action; a membership has "Extend" (a later last day on the same
+// membership) and opens its group.
 
 import 'package:admin_ui/admin_ui.dart';
 import 'package:api_client/api_client.dart' show ApiProblem;
@@ -109,7 +110,7 @@ void main() {
     expect(find.byKey(const ValueKey('$grant.revoke')), findsOneWidget);
     expect(find.byKey(const ValueKey('$grant.extend')), findsOneWidget);
     expect(find.byKey(const ValueKey('$membership.group')), findsOneWidget);
-    expect(find.byKey(const ValueKey('$membership.extend')), findsNothing);
+    expect(find.byKey(const ValueKey('$membership.extend')), findsOneWidget);
     expect(find.byKey(const ValueKey('$membership.revoke')), findsNothing);
     expect(find.byKey(const ValueKey('$agentToken.renew')), findsOneWidget);
     expect(find.byKey(const ValueKey('$appToken.renew')), findsNothing);
@@ -253,6 +254,37 @@ void main() {
       tester.widget<WhoHasAccess>(find.byType(WhoHasAccess)).target,
       campaigns,
     );
+  });
+
+  testWidgets('"Extend" gives a membership a later last day on the same '
+      'membership (AUD-PKG-R2-owner-server)', (tester) async {
+    await pump(tester);
+
+    await tap(tester, '$membership.extend');
+    bool canConfirm() =>
+        tester
+            .widget<FilledButton>(find.byKey(const ValueKey('confirm.submit')))
+            .onPressed !=
+        null;
+    // The current end is 2026-10-22 22:00 UTC, the start of 2026-10-23 in Berlin: a last day
+    // of 2026-10-22 is no extension.
+    await type(tester, 'extendMember.lastDay', '2026-10-22');
+    expect(canConfirm(), isFalse);
+    expect(
+      find.text('Choose a day after the current last day.'),
+      findsOneWidget,
+    );
+    await type(tester, 'extendMember.lastDay', '2026-11-30');
+    expect(canConfirm(), isTrue);
+    await tap(tester, 'confirm.submit');
+    expect(find.text('Extend a group membership'), findsOneWidget);
+    await tap(tester, 'stepUp.continue');
+
+    expect(
+      repository.calls.last,
+      'extendMember support robin 2026-11-30T23:00:00.000Z',
+    );
+    expect(find.text('The membership is extended.'), findsOneWidget);
   });
 
   testWidgets('"Renew token" opens the agent, a membership its group', (

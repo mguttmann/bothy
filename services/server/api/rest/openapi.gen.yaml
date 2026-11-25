@@ -4292,6 +4292,69 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /groups/{group_id}/members/{user_id}/extend:
+    post:
+      operationId: extendGroupMember
+      summary: Extend a time-limited membership
+      description: 'Gives the time-limited membership of the person that is in effect a later `expires_at`, on the same membership, so access never lapses (07 9.4). A membership without an expiry is `400 validation_failed` at `/expires_at` with `not_time_limited`, an expiry not after the current one with `not_later`; a person without a membership in effect is `404`; a group with `source = oidc_claim` is `409 conflict` with `claim_managed_group`.'
+      tags: [Groups]
+      x-authz-action: group.member.extend
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/GroupIdPath'
+      - $ref: '#/components/parameters/UserIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupMemberExtend'
+            examples:
+              default:
+                summary: Request
+                value:
+                  expires_at: '2026-12-31T23:00:00.000Z'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupMember'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    user:
+                      id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      kind: user
+                      handle: alex
+                      display_name: Alex
+                    added_at: '2026-10-10T09:30:00.000Z'
+                    expires_at: '2026-12-31T23:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /groups/{group_id}/members/{user_id}:
     delete:
       operationId: removeGroupMember
@@ -26296,6 +26359,13 @@ components:
           $ref: '#/components/schemas/Timestamp'
         resolve_i1:
           $ref: '#/components/schemas/ResolveI1'
+    GroupMemberExtend:
+      type: object
+      additionalProperties: false
+      required: [expires_at]
+      properties:
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
     TargetKind:
       type: string
       description: '`host` is a connected host for the terminal; it has no level and only the capability `terminal` (24, 8.1).'

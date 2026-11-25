@@ -227,6 +227,8 @@ const (
 	ActionGroupMemberAdd Action = "group.member.add"
 	// ActionGroupMemberExpire is the action group.member.expire.
 	ActionGroupMemberExpire Action = "group.member.expire"
+	// ActionGroupMemberExtend is the action group.member.extend.
+	ActionGroupMemberExtend Action = "group.member.extend"
 	// ActionGroupMemberRemove is the action group.member.remove.
 	ActionGroupMemberRemove Action = "group.member.remove"
 	// ActionGroupMemberSync is the action group.member.sync.
@@ -600,6 +602,7 @@ var actionByID = map[string]Action{
 	"group.delete":                 ActionGroupDelete,
 	"group.member.add":             ActionGroupMemberAdd,
 	"group.member.expire":          ActionGroupMemberExpire,
+	"group.member.extend":          ActionGroupMemberExtend,
 	"group.member.remove":          ActionGroupMemberRemove,
 	"group.member.sync":            ActionGroupMemberSync,
 	"group.read":                   ActionGroupRead,
@@ -842,6 +845,7 @@ var actionList = []Action{
 	ActionGroupDelete,
 	ActionGroupMemberAdd,
 	ActionGroupMemberExpire,
+	ActionGroupMemberExtend,
 	ActionGroupMemberRemove,
 	ActionGroupMemberSync,
 	ActionGroupRead,

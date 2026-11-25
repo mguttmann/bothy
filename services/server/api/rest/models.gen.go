@@ -11619,6 +11619,12 @@ type GroupMemberAdd struct {
 	UserId Uuid `json:"user_id"`
 }
 
+// GroupMemberExtend defines model for GroupMemberExtend.
+type GroupMemberExtend struct {
+	// ExpiresAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	ExpiresAt Timestamp `json:"expires_at"`
+}
+
 // GroupMemberPage One page. `next_cursor` is absent on the last page.
 type GroupMemberPage struct {
 	Items []GroupMember `json:"items"`
@@ -20334,6 +20340,12 @@ type AddGroupMemberParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// ExtendGroupMemberParams defines parameters for ExtendGroupMember.
+type ExtendGroupMemberParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListHostsParams defines parameters for ListHosts.
 type ListHostsParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -21406,6 +21418,9 @@ type UpdateGroupJSONRequestBody = GroupUpdate
 
 // AddGroupMemberJSONRequestBody defines body for AddGroupMember for application/json ContentType.
 type AddGroupMemberJSONRequestBody = GroupMemberAdd
+
+// ExtendGroupMemberJSONRequestBody defines body for ExtendGroupMember for application/json ContentType.
+type ExtendGroupMemberJSONRequestBody = GroupMemberExtend
 
 // PostIncomingWebhookWithBearerJSONRequestBody defines body for PostIncomingWebhookWithBearer for application/json ContentType.
 type PostIncomingWebhookWithBearerJSONRequestBody = IncomingWebhookPost

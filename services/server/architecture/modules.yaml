@@ -84,7 +84,7 @@ modules:
   authz:
     tables: [groups, group_memberships, grants]
     actions: [access.explain, access.hints.read, access.preview, access.view_as, group.read, group.create,
-              group.update, group.delete, group.member.add, group.member.remove,
+              group.update, group.delete, group.member.add, group.member.extend, group.member.remove,
               group.member.expire, group.member.sync, grant.read, grant.create, grant.revoke,
               grant.expire]
     events: [grant.changed, group.changed, access.changed, access.expiring]

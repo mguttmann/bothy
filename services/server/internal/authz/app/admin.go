@@ -642,6 +642,81 @@ func (s *AdminService) RemoveGroupMember(ctx context.Context, caller actor.Actor
 	})
 }
 
+// The field codes of extendGroupMember on /expires_at (AUD-PKG-R2-owner-server).
+const (
+	codeNotTimeLimited = "not_time_limited"
+	codeNotLater       = "not_later"
+)
+
+// ExtendGroupMember implements authz.Admin in one rights change: loadGroup authorizes
+// group.member.extend, then the membership in effect of userID gets the later expiry on its own
+// row (Store.ExtendMembership, which also clears the reminder marks), with an audit entry. Access
+// never lapses, unlike removing and adding again (07 9.4, #828).
+func (s *AdminService) ExtendGroupMember(ctx context.Context, caller actor.Actor, groupID, userID ids.ID, expiresAt time.Time) (authz.Membership, error) {
+	ctx, err := withCaller(ctx, caller)
+	if err != nil {
+		return authz.Membership{}, err
+	}
+	var out domain.Membership
+	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = s.extendMember(ctx, caller, groupID, userID, expiresAt)
+		return err
+	}, rights(authorize.ActionGroupMemberExtend, authorize.ResourceGroup, groupID, userID))
+	if err != nil {
+		return authz.Membership{}, err
+	}
+	refs, err := s.refs(ctx, []ids.ID{out.UserID})
+	if err != nil {
+		return authz.Membership{}, err
+	}
+	return membershipOut(out, refs[out.UserID]), nil
+}
+
+// extendMember is ExtendGroupMember inside its unit of work.
+func (s *AdminService) extendMember(ctx context.Context, caller actor.Actor, groupID, userID ids.ID, expiresAt time.Time) (domain.Membership, error) {
+	g, err := s.loadGroup(ctx, caller, authorize.ActionGroupMemberExtend, groupID, true)
+	if err != nil {
+		return domain.Membership{}, err
+	}
+	if g.Source == domain.GroupSourceOIDCClaim {
+		return domain.Membership{}, errs.New(errs.CodeConflict, "The members of a claim group follow its claim.").WithReason(reasonClaimGroup)
+	}
+	history, err := s.d.Store.MembershipsOfUserInGroup(ctx, g.ID, userID)
+	if err != nil {
+		return domain.Membership{}, err
+	}
+	now := s.d.Clock.Now()
+	var active *domain.Membership
+	for i := range history {
+		if history[i].RemovedAt.IsZero() && history[i].InEffect(g, now) {
+			active = &history[i]
+		}
+	}
+	switch {
+	case active == nil:
+		return domain.Membership{}, errNotFound()
+	case active.ExpiresAt.IsZero():
+		return domain.Membership{}, fieldCode("/expires_at", codeNotTimeLimited, "the membership has no expiry")
+	case !expiresAt.After(active.ExpiresAt):
+		return domain.Membership{}, fieldCode("/expires_at", codeNotLater, "the new expiry must be after the current one")
+	}
+	if ok, err := s.d.Store.ExtendMembership(ctx, active.ID, expiresAt, now); err != nil || !ok {
+		if err == nil {
+			err = internal("the membership in effect vanished")
+		}
+		return domain.Membership{}, err
+	}
+	previous := active.ExpiresAt
+	active.ExpiresAt = expiresAt
+	attrs := auditing.Attrs{attrUserID: auditing.ID(userID), attrExpiresAt: auditing.Time(expiresAt),
+		attrPreviousExpiry: auditing.Time(previous)}
+	return *active, s.record(ctx, authorize.ActionGroupMemberExtend, authorize.ResourceGroup, g.ID, attrs)
+}
+
+// attrPreviousExpiry is the audit attribute of the expiry an extension replaced.
+const attrPreviousExpiry = "previous_expires_at"
+
 // removeMember loads and authorizes; a person that never was a member is not found, a
 // membership already removed or expired is a call without effect; with apply it removes the
 // membership in effect.

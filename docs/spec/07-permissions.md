@@ -1311,8 +1311,13 @@ before membership before token, then ID. With `space_id` a person with `manage` 
 sees only grants on the space and its channels and the memberships of groups that hold such a
 grant in effect, and no tokens. "Extend" opens the grant wizard with subject, target, level and
 capabilities of the old grant, an empty reason and a new expiry; confirming creates the new
-grant first and then revokes the old one, so the access never lapses in between. A token is
-renewed by creating a new one (its secret shown once) and revoking the old one.
+grant first and then revokes the old one, so the access never lapses in between. "Extend" of a
+membership asks for a new last day after the current one and calls `extendGroupMember`
+(`group.member.extend`, owner with step-up, audited with the old and the new expiry): the same
+membership gets the later `expires_at`, its reminder marks are cleared, and the person stays a
+member throughout; a membership without an expiry, an expiry that is not later and a claim group
+are refused (AUD-PKG-R2-owner-server). A token is renewed by creating a new one (its secret
+shown once) and revoking the old one.
 
 ### 9.5 Further obligations
 

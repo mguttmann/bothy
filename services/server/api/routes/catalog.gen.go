@@ -112,6 +112,7 @@ var catalogEntries = []CatalogEntry{
 	{ID: "group.delete", Right: "owner", RateLimitClass: "rl.admin"},
 	{ID: "group.member.add", Right: "owner", RateLimitClass: "rl.admin"},
 	{ID: "group.member.expire", Right: "system", RateLimitClass: "none"},
+	{ID: "group.member.extend", Right: "owner", RateLimitClass: "rl.admin"},
 	{ID: "group.member.remove", Right: "owner", RateLimitClass: "rl.admin"},
 	{ID: "group.member.sync", Right: "system", RateLimitClass: "none"},
 	{ID: "group.read", Right: "owner or self", RateLimitClass: "rl.read"},
