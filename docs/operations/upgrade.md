@@ -59,7 +59,10 @@ refusal; run the steps below on the server. `<dir>` is the folder of the install
 `<new>` are the two versions:
 
 1. Keep a copy of the installation, with modes, in a folder only root reads:
-   `cp -Rp <dir> <dir>.before-<new>`. It holds `.env` and `infra/compose/secrets/`.
+   `cp -Rp <dir> <dir>.before-<new>` and then `chmod 700 <dir>.before-<new>`. It holds `.env` and
+   `infra/compose/secrets/`. The folder must not exist yet: a copy left from an earlier attempt
+   would receive `<dir>` inside it, and the later steps would read its older files. Remove or
+   rename an old copy first.
 2. Download the bundle `bothy-compose-<new>.tar.gz` of the new product release and its
    signature `bothy-compose-<new>.tar.gz.sigstore.json`, and check both as in
    [release.md](release.md) 5.
