@@ -754,6 +754,8 @@ Source: [15-client-architecture.md](../spec/15-client-architecture.md), section 
 | `client.sync.parse_offload_bytes` |  | App |  | `262144` | from this page size on, decoding happens in the background isolate |  |
 | `client.sync.connect_timeout` |  | App |  | `30s` | deadline of one connection attempt from its start in `Connecting`, before the socket opens, to `ready` or `resumed`; it also covers a connect that never completes; when it passes, the attempt ends and the backoff applies (7.2) |  |
 | `client.sync.read_timeout` |  | App |  | `30s` | deadline of one REST read of the sync engine (`Fetcher`): the connect, the sending and each wait for data of the answer may take this long; when it passes, the read fails like a network error and is retried like one (7.3) |  |
+| `client.http_connect_timeout` |  | App |  | `30s` | longest wait of a REST request of the apps (`createApiClient`) for its connection |  |
+| `client.http_receive_timeout` |  | App |  | `2m` | longest silence of a REST answer to the apps (`createApiClient`): before its headers and between two chunks of its body; it lies above the longest server deadline of a request (`agents.interview.timeout` plus `http.request_timeout`); a request body has no limit (uploads), and the reads of the sync engine keep `client.sync.read_timeout` |  |
 | `client.outbox_stuck_after` |  | App |  | `2m` | from then on a waiting entry shows "Sending delayed" |  |
 | `client.push.fetch_timeout` |  | App |  | `20s` | time that the NSE or the Android service uses to fetch the text |  |
 | `client.voice.bitrate` |  | App |  | `64kbps` | bitrate of the AAC recording |  |

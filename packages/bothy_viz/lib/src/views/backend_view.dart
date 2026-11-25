@@ -54,6 +54,7 @@ class BackendView extends StatefulWidget {
 class _BackendViewState extends State<BackendView> with VizLiveSubscription {
   api.StatsBackendReport? _report;
   String? _queryError;
+  int _generation = 0;
 
   @override
   void initState() {
@@ -62,7 +63,28 @@ class _BackendViewState extends State<BackendView> with VizLiveSubscription {
     startLive(widget.live, widget.options.scope);
   }
 
+  @override
+  void didUpdateWidget(BackendView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!vizInputsChanged(
+      oldLive: oldWidget.live,
+      live: widget.live,
+      oldQueries: oldWidget.queries,
+      queries: widget.queries,
+      oldOptions: oldWidget.options,
+      options: widget.options,
+    )) {
+      return;
+    }
+    _generation++;
+    _report = null;
+    _queryError = null;
+    unawaited(_load());
+    restartLive(widget.live, widget.options.scope);
+  }
+
   Future<void> _load() async {
+    final generation = _generation;
     final range = widget.options.range;
     try {
       final report = await widget.queries.backends(
@@ -70,10 +92,12 @@ class _BackendViewState extends State<BackendView> with VizLiveSubscription {
         to: range.to,
         spaceId: widget.options.scope.spaceId,
       );
-      if (mounted) setState(() => _report = report);
-    } on Object catch (error) {
-      if (!mounted) return;
-      setState(() => _queryError = vizProblemCode(error));
+      if (mounted && generation == _generation) {
+        setState(() => _report = report);
+      }
+    } on Object catch (error, stack) {
+      if (!mounted || generation != _generation) return;
+      setState(() => _queryError = vizProblemCode(error, stack));
       unawaited(stopLive());
     }
   }

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Gaps in thread_seq (04 4, 15 7.3 item 4, brief M4-14 Tests): thread_seq 10 then 13 loads 11
-// to 12 through REST before 13 is visible; a fetch error keeps the gap recorded.
+// to 12 through REST before 13 is visible; a fetch error keeps the gap recorded, and the stored
+// messages behind it bring it back after an app start.
 
 import 'package:domain/domain.dart';
 import 'package:test/test.dart';
@@ -80,4 +81,34 @@ void main() {
     expect(w.catchUp.gaps.pending, isEmpty);
     expect(await w.visibleSeqs(1), [for (var s = 1; s <= 13; s++) s]);
   });
+
+  test('a gap forgotten by an app start is loaded on the next focus', () async {
+    await liveWithTen();
+    w.rest.routes['GET /threads/${threadId(1)}/messages'] = (_) =>
+        FakeReply.problem(503, 'unavailable');
+    await w.dispatch([messageCreated(50, 13)]);
+    // An app start keeps the database and loses the gaps held in memory.
+    w.catchUp.gaps.clear();
+    w.rest.routes['GET /threads/${threadId(1)}/messages'] = (_) =>
+        FakeReply(200, {
+          'items': [for (var s = 11; s <= 13; s++) messageJson(1, s)],
+          'has_more_before': true,
+          'has_more_after': false,
+        });
+    await w.catchUp.onFocus(t1());
+    await w.idle();
+    expect(w.catchUp.gaps.pending, isEmpty);
+    expect(await w.visibleSeqs(1), [for (var s = 1; s <= 13; s++) s]);
+  });
+
+  test(
+    'a focus without stored messages behind the loaded range loads nothing',
+    () async {
+      await liveWithTen();
+      await w.catchUp.onFocus(t1());
+      await w.idle();
+      expect(w.rest.requests, isEmpty);
+      expect(w.catchUp.gaps.pending, isEmpty);
+    },
+  );
 }

@@ -15,6 +15,7 @@ import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 import 'package:sync_engine/sync_engine.dart';
 
+import '../app/layout/offline_reason.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../app/router.dart';
@@ -451,21 +452,40 @@ class PhoneConnectionBanner extends ConsumerWidget {
   const PhoneConnectionBanner({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => PhoneBanner(
-    phase: ref.watch(connectionStateProvider).value?.phase,
-    waiting: ref.watch(outboxWaitingProvider).value ?? 0,
-  );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final connection = ref.watch(connectionStateProvider).value;
+    return PhoneBanner(
+      phase: connection?.phase,
+      reason: connection?.reason,
+      waiting: ref.watch(outboxWaitingProvider).value ?? 0,
+      onReconnect: () =>
+          unawaited(ref.read(syncEngineProvider)?.connection.connectNow()),
+    );
+  }
 }
 
 /// "Offline" with the number of outbox entries [waiting] while the engine has no connection
-/// ([phase] offline, backoff or suspended), "Update required" after `4007` (15 15), nothing
+/// ([phase] offline, backoff or suspended), after `4015`, `4017` or `4018` the [reason] with
+/// "Reconnect" ([onReconnect], 15 7.2), "Update required" after `4007` (15 15), nothing
 /// otherwise.
 class PhoneBanner extends StatelessWidget {
   /// Creates the banner.
-  const PhoneBanner({super.key, required this.phase, required this.waiting});
+  const PhoneBanner({
+    super.key,
+    required this.phase,
+    required this.waiting,
+    this.reason,
+    this.onReconnect,
+  });
 
   /// The connection phase, or null before the engine reports one.
   final ConnectionPhase? phase;
+
+  /// The reason of the connection state, or null.
+  final ConnectionReason? reason;
+
+  /// Connects again after a close that waits for the person; null hides the action.
+  final VoidCallback? onReconnect;
 
   /// The outbox entries that are not final.
   final int waiting;
@@ -477,11 +497,10 @@ class PhoneBanner extends StatelessWidget {
       ConnectionPhase.updateRequired => const UpdateRequiredBanner(),
       ConnectionPhase.offline ||
       ConnectionPhase.backoff ||
-      ConnectionPhase.suspended => DsBanner(
-        key: const ValueKey('shell.offline'),
-        tone: DsTone.info,
+      ConnectionPhase.suspended => OfflineBanner(
         text: l.phoneOfflineWaiting(waiting),
-        liveRegion: true,
+        reason: reason,
+        onReconnect: onReconnect,
       ),
       _ => const SizedBox.shrink(),
     };

@@ -532,8 +532,9 @@ Rules:
 - No glow, no scanline effect, no imitation of old screens.
 - Motion: the cursor blinks only in the `full` context of `motion.*`; in the `reduced` context it
   stays still.
-- Semantics: the line at the cursor and, on command, the visible screen are readable; running output
-  is not read aloud (01, section 8). Extra keys carry labels ("Control, latched").
+- Semantics: the line at the cursor and, on command, the visible screen are readable; the command is
+  a custom action "Read screen" and the keys Cmd+Shift+S (Apple) or Ctrl+Shift+S, which the hint
+  of the screen names; running output is not read aloud (01, sections 7 and 8). Extra keys carry labels ("Control, latched").
 - Golden tests in light and dark with warning, detached and extra keys bar (M4-35).
 
 ## 13. Review list (not automatically checkable)

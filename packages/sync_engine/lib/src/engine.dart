@@ -172,6 +172,7 @@ final class SyncEngine {
             nowMillis: () => time.now().millisecondsSinceEpoch,
             random: _secureBits(Random.secure()),
           ),
+      logHook: logHook,
     );
     final runs = RunStore(fetch: _ApiRunFetcher(api), ticker: ticker);
     late final EngineFocus focus;
@@ -184,7 +185,7 @@ final class SyncEngine {
       eraser: eraser,
       draftEditing: draftEditing,
       openThreads: () => focus.threads,
-      onEcho: (clientMsgId, message) => unawaited(
+      onEcho: (clientMsgId, message) => _inBackground(
         outbox.confirmByEcho(
           clientMsgId.value,
           result: {
@@ -192,9 +193,11 @@ final class SyncEngine {
             'version': message.version.value,
           },
         ),
+        'echo confirmation',
+        logHook,
       ),
       onRunUpdated: runs.onRunUpdated,
-      onLive: () => unawaited(outbox.start()),
+      onLive: () => _inBackground(outbox.start(), 'outbox start', logHook),
       logHook: logHook,
       random: rnd,
     );
@@ -219,7 +222,9 @@ final class SyncEngine {
     // 04 7.3: a resync skips the events of the gap, so a focused run that ended there gets no
     // run.state_changed; the new snapshot's runs decide (15 7.4).
     final resyncs = catchUp.notices.listen((n) {
-      if (n is Resynced) unawaited(focus._dropEndedRuns(store));
+      if (n is Resynced) {
+        _inBackground(focus._dropEndedRuns(store), 'run cleanup', logHook);
+      }
     });
     return SyncEngine._(
       api: api,
@@ -518,6 +523,19 @@ final class _EngineListener implements SessionListener {
     unawaited(_outbox.pause());
   }
 }
+
+/// Runs [step] without waiting for it; a failure (the database closed by a wipe or a dispose)
+/// goes to [log] as one line instead of becoming an unhandled error of the zone.
+void _inBackground(
+  Future<Object?> step,
+  String what,
+  void Function(String line)? log,
+) => unawaited(
+  step.then<void>(
+    (_) {},
+    onError: (Object e) => log?.call('engine: $what failed (${e.runtimeType})'),
+  ),
+);
 
 /// Uniform random values of up to 62 bits from [random], 30 bits at a time.
 int Function(int bits) _secureBits(Random random) => (bits) {

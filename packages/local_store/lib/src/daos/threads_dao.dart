@@ -74,21 +74,27 @@ final class ThreadsDao {
         readsFrom: {_db.threads, _db.threadTags},
       )
       .watch()
-      .asyncMap((_) async {
-        final rows =
-            await (_db.select(_db.threads)
-                  ..where((t) => t.channelId.equals(channelId.value))
-                  ..orderBy([
-                    (t) => OrderingTerm(
-                      expression: t.lastActivityAt,
-                      mode: OrderingMode.desc,
-                    ),
-                  ]))
-                .get();
-        return [
-          for (final row in rows) threadFromRow(row, await _tags(row.id)),
-        ];
-      });
+      .asyncMap(
+        // One read of the threads and one of their tags, in one transaction, instead of a tag
+        // query per thread on every emission.
+        (_) => _db.transaction(() async {
+          final rows =
+              await (_db.select(_db.threads)
+                    ..where((t) => t.channelId.equals(channelId.value))
+                    ..orderBy([
+                      (t) => OrderingTerm(
+                        expression: t.lastActivityAt,
+                        mode: OrderingMode.desc,
+                      ),
+                    ]))
+                  .get();
+          final tags = await _tagsOfChannel(channelId);
+          return [
+            for (final row in rows)
+              threadFromRow(row, tags[row.id] ?? const []),
+          ];
+        }),
+      );
 
   /// Moves the `last_activity_at` of the stored thread [id] forward to [at] when [at] is later;
   /// returns whether it changed. A new message advances its thread's activity on the server
@@ -106,6 +112,52 @@ final class ThreadsDao {
         return true;
       });
 
+  /// Moves the stored rows below the thread [id] into the channel [channelId] of [spaceId] (null
+  /// for a direct message): messages, attachments, run summaries, the read state, drafts and
+  /// search rows. The server moves the content with the thread (`thread.move`, brief M1-62
+  /// note 1f) and the client learns only the thread's new channel, so a later removal of the
+  /// source channel (04 8.3) must not take the moved thread with it. Runs in one transaction.
+  Future<void> moveContent(
+    ThreadId id,
+    ChannelId channelId, {
+    SpaceId? spaceId,
+  }) => _db.transaction(() async {
+    final args = [
+      Variable<String>(channelId.value),
+      Variable<String>(id.value),
+    ];
+    for (final (table, info) in <(String, TableInfo<Table, Object?>)>[
+      ('messages', _db.messages),
+      ('message_attachments', _db.messageAttachments),
+      ('runs', _db.runs),
+      ('read_states', _db.readStates),
+      ('drafts', _db.drafts),
+    ]) {
+      await _db.customUpdate(
+        'UPDATE $table SET channel_id = ? WHERE thread_id = ?',
+        variables: args,
+        updates: {info},
+      );
+    }
+    // FTS5 columns are text; an absent space is stored as an empty text (`SearchDao`).
+    final search = [
+      Variable<String>(channelId.value),
+      Variable<String>(spaceId?.value ?? ''),
+      Variable<String>(id.value),
+    ];
+    await _db.customUpdate(
+      'UPDATE search_index SET channel_id = ?, space_id = ? WHERE rowid IN '
+      '(SELECT id FROM search_rows WHERE thread_id = ?)',
+      variables: search,
+      updates: {_db.searchIndex},
+    );
+    await _db.customUpdate(
+      'UPDATE search_rows SET channel_id = ?, space_id = ? WHERE thread_id = ?',
+      variables: search,
+      updates: {_db.searchRows},
+    );
+  });
+
   /// Records that the person has thread [id] on screen now; the cleanup keeps the content of
   /// a thread accessed within `client.cache_max_age` (15 6.3). A thread that is not stored is
   /// left alone. The write wakes no watcher of the threads: no value this package hands out
@@ -118,6 +170,28 @@ final class ThreadsDao {
         Variable<String>(id.value),
       ],
     );
+  }
+
+  /// The tags of every stored thread of [channelId], by thread ID, each list ordered by tag.
+  Future<Map<String, List<ForumTagId>>> _tagsOfChannel(
+    ChannelId channelId,
+  ) async {
+    final rows = await _db
+        .customSelect(
+          'SELECT tt.thread_id AS thread_id, tt.tag_id AS tag_id FROM thread_tags tt '
+          'JOIN threads t ON t.id = tt.thread_id WHERE t.channel_id = ? '
+          'ORDER BY tt.thread_id, tt.tag_id',
+          variables: [Variable<String>(channelId.value)],
+          readsFrom: {_db.threads, _db.threadTags},
+        )
+        .get();
+    final byThread = <String, List<ForumTagId>>{};
+    for (final row in rows) {
+      (byThread[row.read<String>('thread_id')] ??= []).add(
+        ForumTagId.parse(row.read<String>('tag_id')),
+      );
+    }
+    return byThread;
   }
 
   Future<List<ForumTagId>> _tags(String threadId) async {

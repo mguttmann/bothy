@@ -44,16 +44,27 @@ final class SyncStateDao {
 
   /// Runs [apply] and stores [cursor] (and [syncEpoch] when given) in one transaction (15 7.3
   /// item 1, 04 7.5): when [apply] throws, neither its rows nor the cursor change, and the
-  /// error propagates.
+  /// error propagates. Inside one epoch (no [syncEpoch], or the stored one) the stored cursor
+  /// never falls: a lower [cursor] keeps the stored value (04 7.5). [replace] marks the
+  /// replacement of the whole mirror by a snapshot (04 7.3): it stores [cursor] as the server
+  /// gave it, also a lower one in the same epoch (a resync for `cursor_ahead`, R-SY-04).
   Future<void> commitPage(
     Future<void> Function(LocalTxn txn) apply, {
     required GlobalSeq cursor,
     String? syncEpoch,
+    bool replace = false,
   }) => _db.transaction(() async {
     await apply(LocalTxn._(_db));
+    final stored = await read();
+    final sameEpoch = syncEpoch == null || syncEpoch == stored.syncEpoch;
+    final keep =
+        !replace &&
+        sameEpoch &&
+        stored.cursor != null &&
+        stored.cursor!.value > cursor.value;
     await _write(
       SyncStateTableCompanion(
-        cursor: Value(cursor.value),
+        cursor: Value(keep ? stored.cursor!.value : cursor.value),
         syncEpoch: syncEpoch == null ? const Value.absent() : Value(syncEpoch),
       ),
     );

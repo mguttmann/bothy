@@ -24,12 +24,22 @@ final Map<String, Applier> threadAppliers = {
   'thread.moved_out': _movedOut,
 };
 
-/// Stores [thread] by the version rule and indexes its title (14 6); runs inside the caller's
-/// transaction.
-Future<void> storeThread(LocalDatabase db, Thread thread) async {
-  if (!await db.threadsDao.upsertIfNewer(thread)) return;
+/// Stores [thread] by the version rule and indexes its title (14 6); a thread stored in another
+/// channel before takes its stored content along (a move, 04 8.1). Returns whether it applied;
+/// runs inside the caller's transaction.
+Future<bool> storeThread(LocalDatabase db, Thread thread) async {
+  final before = await db.threadsDao.byId(thread.id);
+  if (!await db.threadsDao.upsertIfNewer(thread)) return false;
   final channel = await db.structureDao.channelById(thread.channelId);
+  if (before != null && before.channelId != thread.channelId) {
+    await db.threadsDao.moveContent(
+      thread.id,
+      thread.channelId,
+      spaceId: channel?.spaceId,
+    );
+  }
   await db.searchDao.indexThreadTitle(thread, spaceId: channel?.spaceId);
+  return true;
 }
 
 Future<void> _thread(ApplyContext c) async {
@@ -53,12 +63,22 @@ Future<void> _thread(ApplyContext c) async {
   }
   // A thread that moves into a visible channel is visible again after a `thread.moved_out`.
   c.sync.removedTargets.remove(thread.id.value);
-  return storeThread(c.db, thread);
+  if (!await storeThread(c.db, thread)) return;
+  // The sidebar sums the counters per channel (brief M4-19 Design note 1): a moved thread
+  // counts in its new channel.
+  final sync = c.sync;
+  c.after.steps.add(() {
+    final counted = sync.counterChannels[thread.id];
+    if (counted == null || counted == thread.channelId) return;
+    sync.counterChannels[thread.id] = thread.channelId;
+    sync.counterChanges.add(thread.id);
+  });
 }
 
-/// `thread.moved_out` names only the source channel (API `ThreadMovedOutPayload`). When the
-/// thread is still stored in that channel, no `thread.moved` into a visible channel came before
-/// it, so the target is not visible here and the thread with its content goes (04 8.3 item 3).
+/// `thread.moved_out` names only the source channel (API `ThreadMovedOutPayload`). The server
+/// writes it right after the `thread.moved` of the same move (04 8.1). When the thread is still
+/// stored in the source channel, that `thread.moved` did not reach this device, so the target is
+/// not visible here and the thread with its content goes (04 8.3 item 3).
 Future<void> _movedOut(ApplyContext c) async {
   final p = c.payload;
   final threadId = ThreadId.parse(str(p, 'thread_id'));

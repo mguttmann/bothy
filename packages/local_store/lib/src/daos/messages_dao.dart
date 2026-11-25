@@ -150,6 +150,18 @@ final class MessagesDao {
     );
   }
 
+  /// The highest `thread_seq` of the stored messages of [threadId], or null without one.
+  Future<ThreadSeq?> newestStoredSeq(ThreadId threadId) async {
+    final newest = _db.messages.threadSeq.max();
+    final row =
+        await (_db.selectOnly(_db.messages)
+              ..addColumns([newest])
+              ..where(_db.messages.threadId.equals(threadId.value)))
+            .getSingle();
+    final value = row.read(newest);
+    return value == null ? null : ThreadSeq(value);
+  }
+
   /// The loaded ranges of [threadId].
   Future<LoadedRanges> loadedRanges(ThreadId threadId) async {
     final rows =

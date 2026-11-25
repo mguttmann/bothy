@@ -33,6 +33,9 @@ final class FakeTime {
   /// The time source.
   DateTime clock() => now;
 
+  /// The timers that are neither fired nor cancelled.
+  int get activeTimers => _timers.where((t) => t.isActive).length;
+
   /// The timer factory the outbox receives.
   Timer timer(Duration delay, void Function() callback) {
     final t = _FakeTimer(now.add(delay), callback);
@@ -163,6 +166,7 @@ final class Harness {
     OutboxExecutors? executors,
     int seed = 7,
     bool hookFails = false,
+    void Function(String line)? log,
   }) {
     final t = time ?? FakeTime();
     final d = db ?? openInMemoryForTests(clock: t.clock);
@@ -183,6 +187,7 @@ final class Harness {
         if (hookFails) throw StateError('storage failed');
         confirmed.add(entry.id);
       },
+      logHook: log,
     );
     return Harness._(d, t, registry, outbox, confirmed);
   }

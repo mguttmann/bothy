@@ -5,6 +5,7 @@ library;
 
 import 'dart:async';
 
+import 'package:api_client/api_client.dart' as api;
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 
@@ -59,7 +60,9 @@ class LiveTopologyView extends StatefulWidget {
 class _LiveTopologyViewState extends State<LiveTopologyView>
     with VizLiveSubscription {
   LiveTopologyModel? _model;
+  api.StatsLiveFrame? _frame;
   String? _queryError;
+  int _generation = 0;
   final Map<(String, String), (LaneModel, Widget)> _lanes = {};
   final Map<String, (RunCardModel, Widget)> _cards = {};
 
@@ -75,19 +78,22 @@ class _LiveTopologyViewState extends State<LiveTopologyView>
   }
 
   Future<void> _loadOnce() async {
+    final generation = _generation;
     try {
       final frame = await widget.queries.live(
         spaceId: widget.options.scope.spaceId,
       );
-      if (!mounted) return;
-      setState(
-        () => _model = LiveTopologyModel.fromFrame(
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _frame = frame;
+        _model = LiveTopologyModel.fromFrame(
           frame,
           names: widget.options.names,
-        ),
-      );
-    } on Object catch (error) {
-      if (mounted) setState(() => _queryError = vizProblemCode(error));
+        );
+      });
+    } on Object catch (error, stack) {
+      if (!mounted || generation != _generation) return;
+      setState(() => _queryError = vizProblemCode(error, stack));
     }
   }
 
@@ -108,6 +114,37 @@ class _LiveTopologyViewState extends State<LiveTopologyView>
     if (oldWidget.onOpenThread != widget.onOpenThread) {
       _lanes.clear();
       _cards.clear();
+    }
+    if (vizInputsChanged(
+      oldLive: oldWidget.live,
+      live: widget.live,
+      oldQueries: oldWidget.queries,
+      queries: widget.queries,
+      oldOptions: oldWidget.options,
+      options: widget.options,
+    )) {
+      // Another source, scope or range: the old frame is not of this view any more.
+      _generation++;
+      _model = null;
+      _frame = null;
+      _queryError = null;
+      _lanes.clear();
+      _cards.clear();
+      final live = widget.live;
+      if (live != null) {
+        restartLive(live, widget.options.scope);
+      } else {
+        unawaited(stopLive());
+        unawaited(_loadOnce());
+      }
+    } else if (oldWidget.options.names != widget.options.names) {
+      final frame = liveFrame?.frame ?? _frame;
+      if (frame != null) {
+        _model = LiveTopologyModel.fromFrame(
+          frame,
+          names: widget.options.names,
+        );
+      }
     }
   }
 

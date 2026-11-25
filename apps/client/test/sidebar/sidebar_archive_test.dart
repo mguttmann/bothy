@@ -11,7 +11,8 @@
 import 'dart:convert';
 
 import 'package:client/sidebar/sidebar_column.dart';
-import 'package:design_system/design_system.dart' show DsChannelRow, DsSpaceRow;
+import 'package:design_system/design_system.dart'
+    show DsBadge, DsChannelRow, DsSpaceRow;
 import 'package:domain/domain.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -348,6 +349,21 @@ void main() {
     await host.settle(tester);
     expect(onScreen(tester), [2, 3, 4]);
     expect(section, findsOneWidget);
+    // fn-chat-messages-6: the collapsed section carries the unread mark and the mentions of
+    // the channels it does not show, as "All posts" does for its posts.
+    final en = lookupAppLocalizations(const Locale('en'));
+    expect(
+      tester.getSemantics(section).label,
+      [
+        en.sidebarArchived(1),
+        en.threadRowUnread(3),
+        en.threadRowMentions(1),
+      ].join(', '),
+    );
+    expect(
+      find.descendant(of: section, matching: find.byType(DsBadge)),
+      findsOneWidget,
+    );
     // Collapsing the space keeps its unread dot from the archived channel.
     await tester.tap(find.byKey(ValueKey('sidebar.space.${spaceId(1).value}')));
     await host.settle(tester);

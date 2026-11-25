@@ -238,6 +238,11 @@ const Map<String, String> fastConfig = {
   'sync.reconnect_backoff_cap': '100ms',
   'client.outbox_retry_base': '20ms',
   'client.outbox_retry_cap': '200ms',
+  // No REST timeouts (`0s` is none for Dio): a widget test moves its fake clock by minutes
+  // while the fake server answers over real IO, so a timeout would cut a request whose answer
+  // is on its way and leave the timers of its read retries pending after the test.
+  'client.http_connect_timeout': '0s',
+  'client.http_receive_timeout': '0s',
 };
 
 /// The ports of a test: memory secrets, software keys, a temporary data folder, plain HTTP

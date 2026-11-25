@@ -469,17 +469,7 @@ final class GatewayFake implements GatewayFaultTarget {
     return session;
   }
 
-  bool _expired(String token) {
-    try {
-      final payload = jsonDecode(
-        utf8.decode(base64Url.decode(base64Url.normalize(token.split('.')[1]))),
-      ) as JsonMap;
-      return world.now().millisecondsSinceEpoch ~/ 1000 >=
-          (payload['exp']! as int);
-    } on Object {
-      return true;
-    }
-  }
+  bool _expired(String token) => world.accessTokenExpired(token);
 
   void _start(_Conn c, String op, JsonMap d) {
     if (c.identified) {
@@ -503,10 +493,14 @@ final class GatewayFake implements GatewayFaultTarget {
     } else {
       gs = _sessions[d['gateway_session_id']];
       final at = gs?.disconnectedAt;
+      // As the server: a session whose old connection still looks open (a half-open socket
+      // after a network change) is resumable; the old connection then closes with `4017`
+      // below. Only an unknown or foreign session, or one past the resume window, is `4006`.
+      final bound = gs != null && _open.any((o) => o != c && o.session == gs);
       if (gs == null ||
           gs.deviceId != session.deviceId ||
-          at == null ||
-          world.now().difference(at) > timings.resumeWindow) {
+          (at == null && !bound) ||
+          (at != null && world.now().difference(at) > timings.resumeWindow)) {
         _close(c, 4006, 'session invalid');
         return;
       }

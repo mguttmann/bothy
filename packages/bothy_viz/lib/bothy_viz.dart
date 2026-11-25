@@ -12,8 +12,8 @@
 /// * Basic forms: [LaneMark], [RunCardMark], [AreaMark], [BarMark], [TrafficLightMark] and
 ///   [MetricTileMark], each a `CustomPainter` with semantics, colored only by the tokens.
 /// * [VizFixtures] decodes the files of `fixtures/`; [sloCatalog] lists the SLOs.
-/// * The six views ([LiveTopologyView], [BackendView], [DeliveryView], [ExecutiveView],
-///   [TimelineView], [TvMode]) with their table views, the registry [vizViewRegistry] of
+/// * The views ([LiveTopologyView], [RunHistoryView], [BackendView], [DeliveryView],
+///   [ExecutiveView], [TimelineView], [TvMode]) with their table views, the registry [vizViewRegistry] of
 ///   [VizViewKind] and the [VizHostOptions] the hosts pass; [TimelinePlayback] plays the
 ///   timeline on a [VizClock]. The views know no transport: the hosts plug in the sources.
 ///

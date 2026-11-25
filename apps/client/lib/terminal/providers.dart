@@ -512,10 +512,10 @@ final class TerminalTabs extends ChangeNotifier
     if (!_disposed) notifyListeners();
   }
 
-  /// "End": ends the session of [tab] on the host and closes its tab.
+  /// "End": ends the session of [tab] on the host and closes its tab; a close the server did
+  /// not confirm keeps the tab, detached with the problem, so the person can end it again.
   Future<void> end(TerminalController tab) async {
-    await tab.end();
-    close(tab);
+    if (await tab.end()) close(tab);
   }
 
   /// The detach causes of a stream that dropped while the tab was attached: those attach again

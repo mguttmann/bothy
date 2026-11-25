@@ -219,7 +219,7 @@ void main() {
           threadMove: to(other),
         ),
       ),
-      422,
+      409,
     );
     world.setOperator(h.seed.general, h.seed.robin.id);
     final trigger = h.seed.post(h.seed.alex, h.seed.releaseNotes, 'Run it');
@@ -235,7 +235,8 @@ void main() {
     )).data!;
     expect(moved.id, h.seed.releaseNotes);
     expect(moved.channelId, other);
-    expect(world.log.last.type, 'thread.moved');
+    expect(world.log.last.type, 'thread.moved_out');
+    expect(world.log[world.log.length - 2].type, 'thread.moved');
     // The run of the thread moves along: its history entry and getRun name the new channel.
     final runs = alex.api.getRunsApi();
     final history = (await runs.listRunHistory()).data!.items.single;

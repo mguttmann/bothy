@@ -55,6 +55,7 @@ Sorted by deadline.
 | OQ-20 | Grafana Cloud account for signing the plugin | unsigned and local until the publication | before V3-17 |
 | OQ-21 | Problem types as absolute URIs | relative URIs in API v1 | before API v2 |
 | OQ-22 | API documentation from the code or from the contract | spec-first according to ADR 0013 | before M1-17 |
+| OQ-28 | Text alternative for uploaded images | none: a screen reader hears the file name of an image | before V1-02 |
 
 ## Questions
 
@@ -413,6 +414,19 @@ Sorted by deadline.
   after a no it replaces the notification plugin or the Java library calls that need the
   backport.
 - **Due by:** before the first distributed Android build, at the latest the date of the entry.
+
+### OQ-28: Text alternative for uploaded images
+
+- **Question:** Does an attachment get an optional description (alternative text) that people and
+  agents write and screen readers read instead of the file name?
+- **Why only the owner:** It is a new product feature with a contract change: an optional field per
+  attachment in the API (additive), an input in the composer and on the attachment tile, and its
+  use by agents. WCAG 1.1.1 asks it for content and EN 301 549 11.8.2 for tools that create
+  content; the build stays without it until the owner decides.
+- **Default:** No description; the preview of an image is read as "Open image" with its file name.
+- **What the plan does with it:** After a yes, one ticket adds the field to the contract, the
+  composer, the attachment tile and the label of the preview.
+- **Due by:** before V1-02.
 
 ## Decided
 

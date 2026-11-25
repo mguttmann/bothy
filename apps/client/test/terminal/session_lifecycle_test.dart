@@ -9,7 +9,8 @@
 import 'dart:async';
 
 import 'package:api_client/api_client.dart' as api show TerminalSessionState;
-import 'package:api_client/api_client.dart' show TerminalCloseReason;
+import 'package:api_client/api_client.dart'
+    show ApiProblem, TerminalCloseReason;
 import 'package:client/terminal/providers.dart';
 import 'package:client/terminal/reconnect.dart';
 import 'package:flutter/material.dart';
@@ -72,6 +73,23 @@ void main() {
     expect(w.api.closes, [id]);
     await tester.pump();
     expect(find.byKey(const ValueKey('terminal.empty')), findsOneWidget);
+  });
+
+  testWidgets('End that the server does not confirm keeps the tab to end '
+      'again', (tester) async {
+    final w = await TerminalWorld.create(tester);
+    final c = await w.pump(tester);
+    final tabs = await openShell(tester, c);
+    final tab = tabs.current!;
+    w.api.closeError = const ApiProblem(status: 503, code: 'unavailable');
+    await tester.tap(find.widgetWithText(OutlinedButton, en.terminalEnd));
+    await pumpUntil(tester, () => tab.state.phase == TerminalPhase.detached);
+    expect(tabs.tabs, [tab]);
+    expect(tab.state.problemCode, 'unavailable');
+    w.api.closeError = null;
+    await tester.tap(find.widgetWithText(OutlinedButton, en.terminalEnd));
+    await pumpUntil(tester, () => tabs.tabs.isEmpty);
+    expect(w.api.closes, hasLength(2));
   });
 
   testWidgets('an ended tab closes with Close and leaves no ghost tab', (

@@ -9,6 +9,7 @@
 /// [AppLifecycle]; tests use fakes, so every flow runs without I/O (15 1 principle 5).
 library;
 
+import 'dart:async' show TimeoutException;
 import 'dart:math';
 
 /// Opens WebSocket connections to the gateway.
@@ -16,8 +17,10 @@ abstract interface class GatewayTransport {
   /// Opens a connection to [url] (`wss://<host>/api/v1/gateway`, 04 6.1).
   ///
   /// Completes when the upgrade succeeded; throws on any failure (DNS, TCP, TLS, HTTP status),
-  /// which the connection treats like a drop and answers with backoff (04 6.5).
-  Future<GatewayChannel> connect(Uri url);
+  /// which the connection treats like a drop and answers with backoff (04 6.5). With
+  /// [timeout] (`client.sync.connect_timeout`, 15 7.2) an open that takes longer throws a
+  /// [TimeoutException] and is aborted, so no stalled socket outlives its attempt.
+  Future<GatewayChannel> connect(Uri url, {Duration? timeout});
 }
 
 /// One open WebSocket of the gateway: text frames in both directions (04 2.3).

@@ -3,6 +3,7 @@
 // Retry only for reads, with Retry-After or the caller's full-jitter backoff (brief M4-02
 // Design note 4; 15 8: the outbox retries writes).
 
+import 'dart:async';
 import 'dart:math';
 
 import 'package:api_client/api_client.dart';
@@ -84,6 +85,68 @@ void main() {
       clock.sleeps.single,
       lessThanOrEqualTo(const Duration(milliseconds: 100)),
     );
+  });
+
+  test('a Retry-After above the cap is not waited for: the read fails at once '
+      'with it', () async {
+    final clock = FakeClock();
+    final adapter = FakeAdapter()
+      ..problem(
+        429,
+        problem(429, 'rate_limited'),
+        headers: {'Retry-After': '86400'},
+      )
+      ..json(200, _instance);
+
+    await expectLater(
+      fakeClient(adapter, clock: clock).dio.get<Object>('/instance'),
+      throwsA(
+        isA<DioException>().having(
+          (e) => ApiProblem.of(e)?.retryAfter,
+          'retryAfter',
+          const Duration(days: 1),
+        ),
+      ),
+    );
+    expect(adapter.requests, hasLength(1));
+    expect(clock.sleeps, isEmpty);
+  });
+
+  test('cancelling a read ends its wait before a retry', () async {
+    final adapter = FakeAdapter()
+      ..socketError()
+      ..json(200, _instance);
+    final waiting = Completer<void>();
+    final client = createApiClient(
+      baseUrl: Uri.parse('https://chat.example.com'),
+      traceContext: fixedTrace,
+      readRetry: ReadRetryPolicy(
+        base: const Duration(seconds: 1),
+        cap: const Duration(seconds: 1),
+        maxAttempts: 2,
+        sleep: (_) {
+          if (!waiting.isCompleted) waiting.complete();
+          return Completer<void>().future;
+        },
+      ),
+      adapter: adapter,
+    );
+    final cancel = CancelToken();
+    final read = client.dio.get<Object>('/instance', cancelToken: cancel);
+    await waiting.future;
+    cancel.cancel('left the screen');
+
+    await expectLater(
+      read,
+      throwsA(
+        isA<DioException>().having(
+          (e) => e.type,
+          'type',
+          DioExceptionType.cancel,
+        ),
+      ),
+    );
+    expect(adapter.requests, hasLength(1));
   });
 
   test('GET is not retried after 404', () async {

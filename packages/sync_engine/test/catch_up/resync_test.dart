@@ -117,6 +117,35 @@ void main() {
     );
   }
 
+  test('cursor_ahead in the same epoch stores the lower head_seq of the snapshot (R-SY-04)', () async {
+    final w = World();
+    addTearDown(w.dispose);
+    await w.connect(cursor: 30);
+    await w.dispatch([threadCreated(31, 1), messageCreated(32, 1)]);
+    await w.push('cursor', {'seq': 32});
+    expect(await w.cursor(), 32);
+    w.rest.routes['GET /sync/snapshot'] = (_) => FakeReply(
+      200,
+      snapshotJson(headSeq: 20, epoch: 'epoch-1', channels: [channelView(1)]),
+    );
+
+    await w.push('resync_required', {
+      'reason': 'cursor_ahead',
+      'head_seq': 20,
+      'sync_epoch': 'epoch-1',
+    });
+
+    expect(w.notices.whereType<Resynced>().single.reason, 'cursor_ahead');
+    expect(
+      await w.cursor(),
+      20,
+      reason: 'the server fell back within its epoch',
+    );
+    await w.dispatch([threadCreated(21, 3)]);
+    expect(await w.db.threadsDao.byId(ThreadId.parse(threadId(3))), isNotNull);
+    expect(await w.cursor(), 21);
+  });
+
   test(
     'frames during the resync wait and apply after it with the duplicate rule',
     () async {

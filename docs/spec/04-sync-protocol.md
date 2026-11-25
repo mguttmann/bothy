@@ -520,6 +520,12 @@ change the path or the read-only state of a resource. `channel.archived` and `sp
 in addition permission changes with their own `access.changed` (05, column "Permissions";
 [07-permissions.md](07-permissions.md), section 4.5); the others come without a new permission version.
 
+A move of a thread writes `thread.moved` (receive action `thread.read`, so only readers of the
+target get it) and then `thread.moved_out` (`channel.read` on the source) with the next `seq`. A
+client that sees the target already holds the thread there when `thread.moved_out` arrives and
+keeps it with its messages; a client that still holds the thread in the source channel removes it
+with its content (section 8.3, item 3).
+
 ### 8.2 What happens on a change
 
 Every transaction that changes permissions (grant, group, owner, operator, backend policy,
@@ -755,7 +761,10 @@ the entry the sidebar lists ([15-client-architecture.md](15-client-architecture.
    because the file becomes ready by itself ([12](12-files.md) 8.1, addendum of 2026-10-31).
 5. Permanent errors (`400`, `404`, `410`, `413`, `422`) end the retries. The entry stays
    visible as "failed" with a reason; the person can edit it, send it again (new ID) or discard
-   it. Nothing is discarded silently.
+   it. Nothing is discarded silently. Exception (addendum of 2026-11-24): a refused read state
+   or draft write (`putReadState`, `putThreadDraft`, `deleteThreadDraft`) is not a thing the
+   person wrote to the conversation and no view shows it; the client deletes it and logs the
+   refusal, and the next read position or draft write carries the current state again.
 6. When the echo event `message.created` with a matching `client_msg_id` arrives, the client
    replaces the waiting entry with the server message.
 

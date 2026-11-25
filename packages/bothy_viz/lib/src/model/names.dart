@@ -49,4 +49,21 @@ final class VizNames {
   /// The last characters of [id]: the random part of a UUIDv7, which tells IDs apart.
   static String short(String id) =>
       id.length <= _shortLength ? id : id.substring(id.length - _shortLength);
+
+  /// Equal names give equal labels, so a view that receives new but equal names keeps its
+  /// derived models.
+  @override
+  bool operator ==(Object other) =>
+      other is VizNames &&
+      _same(other.agents, agents) &&
+      _same(other.spaces, spaces) &&
+      _same(other.channels, channels);
+
+  @override
+  int get hashCode =>
+      Object.hash(agents.length, spaces.length, channels.length);
+
+  static bool _same(Map<String, String> a, Map<String, String> b) =>
+      identical(a, b) ||
+      (a.length == b.length && a.entries.every((e) => b[e.key] == e.value));
 }

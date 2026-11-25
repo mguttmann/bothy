@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The shared frame of the six views: header with the switch "As table", the notes (stale,
+/// The shared frame of the views: header with the switch "As table", the notes (stale,
 /// more runs than shown, errors, "Only for the owner") and the body (brief M6-12, design
 /// notes 1 and 3).
 library;
@@ -14,6 +14,7 @@ import 'package:l10n/l10n.dart';
 
 import '../marks/viz_texts.dart';
 import '../sources/live_frame_source.dart';
+import '../sources/stats_query_source.dart';
 import 'table/viz_table.dart';
 import 'viz_host_options.dart';
 
@@ -77,8 +78,40 @@ final class VizOwnerOnly extends VizViewStatus {
 
 /// The wire code of an error a source threw: the code of an [api.ApiProblem], else
 /// `internal`.
-String vizProblemCode(Object error) =>
-    error is api.ApiProblem ? error.code : 'internal';
+///
+/// An [Error] (a `TypeError`, `StateError` or `ArgumentError` of a model or a decoder) is a
+/// defect, not an answer of the server: besides the general text it goes with [stack] to
+/// [FlutterError.reportError], so the host's error handler sees it. A transport failure (an
+/// [Exception] without a problem body) shows the general text only.
+String vizProblemCode(Object error, [StackTrace? stack]) {
+  if (error is api.ApiProblem) return error.code;
+  if (error is Error) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stack ?? error.stackTrace,
+        library: 'bothy_viz',
+        context: ErrorDescription('while loading a view'),
+      ),
+    );
+  }
+  return 'internal';
+}
+
+/// Whether a view must load again for its new widget: another live source, other queries,
+/// another scope or another range. New names only relabel, so they never reload.
+bool vizInputsChanged({
+  required LiveFrameSource? oldLive,
+  required LiveFrameSource? live,
+  required StatsQuerySource oldQueries,
+  required StatsQuerySource queries,
+  required VizHostOptions oldOptions,
+  required VizHostOptions options,
+}) =>
+    !identical(oldLive, live) ||
+    !identical(oldQueries, queries) ||
+    oldOptions.scope != options.scope ||
+    oldOptions.range != options.range;
 
 /// The frame of a view: title, notes, the switch "As table", the link "Open in Grafana" and
 /// either the chart or the tables with the same values.
@@ -356,6 +389,16 @@ mixin VizLiveSubscription<T extends StatefulWidget> on State<T> {
       }
       onLiveChanged();
     });
+  }
+
+  /// Stops the current subscription, forgets its frame, stale state and error, and starts
+  /// [source] for [scope]: what a view does when the host hands it another source or scope.
+  void restartLive(LiveFrameSource? source, VizScope scope) {
+    unawaited(stopLive());
+    liveFrame = null;
+    liveStale = false;
+    liveError = null;
+    startLive(source, scope);
   }
 
   /// Ends the subscription and stops the source.

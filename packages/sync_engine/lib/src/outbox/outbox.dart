@@ -45,6 +45,8 @@ final class Outbox {
   /// The clock is the database's (`LocalDatabase.clock`); [timer] creates the timers of the
   /// backoff and of the delayed display, [random] draws the jitter (a secure source by
   /// default), and [onConfirmed] stores what a `2xx` returned before the entry leaves.
+  /// [logHook] receives one line for a step that nobody awaits and that failed (a send or the
+  /// next pump on a closed database), never content.
   Outbox({
     required LocalDatabase db,
     required OutboxExecutors executors,
@@ -53,6 +55,7 @@ final class Outbox {
     OutboxTimerFactory? timer,
     Random? random,
     OutboxConfirmationHook? onConfirmed,
+    void Function(String line)? logHook,
   }) : _db = db,
        _dao = db.outboxDao,
        _executors = executors,
@@ -69,9 +72,11 @@ final class Outbox {
       timer: _timer,
       random: random ?? Random.secure(),
       lock: _lock,
+      transaction: db.transaction,
       dependencies: _deps,
       onChanged: _changed,
       onConfirmed: onConfirmed,
+      log: logHook,
     );
   }
 
@@ -99,9 +104,9 @@ final class Outbox {
   /// becomes its replacement; a discarded or unknown one is never taken as confirmed, so the
   /// entry is stored as failed with `dependency_discarded` (D-M4-15-10).
   Future<OutboxEntry> enqueue(OutboxRequest request) async {
-    final entry = await _lock.run(() => _store(request));
+    final entry = await _lock.run(() => _db.transaction(() => _store(request)));
     _changed();
-    unawaited(_sender.pump());
+    _sender.pumpInBackground();
     return entry;
   }
 
@@ -124,7 +129,7 @@ final class Outbox {
       }),
     );
     _changed();
-    unawaited(_sender.pump());
+    _sender.pumpInBackground();
     return entries;
   }
 
@@ -154,7 +159,7 @@ final class Outbox {
   ///
   /// Throws a [StateError] for an unknown ID or an operation without a follow-up edit.
   Future<String> edit(String id, Map<String, Object?> payload) async {
-    final result = await _lock.run(() async {
+    final result = await _locked(() async {
       final e = await _require(id);
       if (e.state == OutboxState.failed) {
         // The person's edit is the newest text: follow-up edits queued behind the failed entry
@@ -206,7 +211,7 @@ final class Outbox {
       )).id;
     });
     _changed();
-    unawaited(_sender.pump());
+    _sender.pumpInBackground();
     return result;
   }
 
@@ -216,7 +221,7 @@ final class Outbox {
   /// follow-up delete (`followUpRemove`) waits behind it and its pending follow-ups. Throws a
   /// [StateError] for an unknown ID or an operation without a follow-up delete.
   Future<String?> remove(String id) async {
-    final result = await _lock.run<String?>(() async {
+    final result = await _locked<String?>(() async {
       final e = await _require(id);
       if (e.state == OutboxState.failed || e.attempts == 0) {
         await _discard(e);
@@ -233,7 +238,7 @@ final class Outbox {
       )).id;
     });
     _changed();
-    unawaited(_sender.pump());
+    _sender.pumpInBackground();
     return result;
   }
 
@@ -241,7 +246,7 @@ final class Outbox {
   /// item 5); the entries that waited for it wait for the new one. Returns the new ID. Throws a [StateError] when the entry does not exist or has
   /// not failed.
   Future<String> retry(String id) async {
-    final result = await _lock.run(() async {
+    final result = await _locked(() async {
       final e = await _require(id);
       if (e.state != OutboxState.failed) {
         throw StateError('only a failed entry is sent again');
@@ -249,7 +254,7 @@ final class Outbox {
       return _replaceFailed(e, decodePayload(e.payload));
     });
     _changed();
-    unawaited(_sender.pump());
+    _sender.pumpInBackground();
     return result;
   }
 
@@ -257,12 +262,12 @@ final class Outbox {
   /// `dependency_discarded`, so nothing is sent without what it needs and nothing is dropped
   /// silently (04 13.2 item 5). An unknown ID changes nothing.
   Future<void> discard(String id) async {
-    await _lock.run(() async {
+    await _locked(() async {
       final e = await _dao.byId(id);
       if (e != null) await _discard(e);
     });
     _changed();
-    unawaited(_sender.pump());
+    _sender.pumpInBackground();
   }
 
   /// Confirms the entry whose ID is [clientMsgId] because its echo `message.created` arrived
@@ -274,7 +279,7 @@ final class Outbox {
     String clientMsgId, {
     Map<String, Object?> result = const {},
   }) async {
-    final found = await _lock.run(() async {
+    final found = await _locked(() async {
       final e = await _dao.byId(clientMsgId);
       if (e == null) return false;
       await _sender.confirm(e, result);
@@ -283,7 +288,7 @@ final class Outbox {
     });
     if (found) {
       _changed();
-      unawaited(_sender.pump());
+      _sender.pumpInBackground();
     }
     return found;
   }
@@ -346,6 +351,8 @@ final class Outbox {
         }, onError: controller.addError);
       },
       onCancel: () async {
+        // A publish still reading the database sees the new generation and arms no timer.
+        generation++;
         delayTimer?.cancel();
         await sub?.cancel();
       },
@@ -410,6 +417,13 @@ final class Outbox {
   void _changed() {
     if (!_changes.isClosed) _changes.add(null);
   }
+
+  /// Runs [action] under the lock and in one database transaction: a change over several rows
+  /// (a replacement and the delete of the failed entry, a failed chain and the delete of the
+  /// discarded entry) is stored whole or not at all, also when the process ends between its
+  /// steps.
+  Future<T> _locked<T>(Future<T> Function() action) =>
+      _lock.run(() => _db.transaction(action));
 
   Future<OutboxEntry> _require(String id) async {
     final e = await _dao.byId(id);

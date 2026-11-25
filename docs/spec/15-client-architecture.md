@@ -417,9 +417,9 @@ stateDiagram-v2
 
 `4004`: the app renews the access token and reconnects; if the refresh fails, it logs out.
 `4018`: the app shows the reason and reconnects only on user action; a new token does not help.
-As built: the engine reconnects after `4015` and `4018` on `GatewayConnection.connectNow`, but no
-view of `apps/client` offers that action yet, so the connection stays offline until the app
-starts again. The "network change" of the diagram is, as built, the return to the foreground:
+As built: after `4015`, `4017` and `4018` the offline banner of both shells of `apps/client` names
+the reason and offers "Reconnect", which calls `GatewayConnection.connectNow`.
+The "network change" of the diagram is, as built, the return to the foreground:
 the apps have no network listener (`LifecycleNetworkStatus`, D-M4-18-8), and a lost network shows
 through the failed connects and the heartbeat (04 6.5).
 `4016`: the device waits for approval; the app polls `GET /api/v1/devices/{id}` (`LoginService.pollPendingDevice`) and reconnects when the device is `active`.
@@ -464,7 +464,8 @@ connected as long as the app runs.
    (AUD-pkg-local-store-01).
 3. After `catchup.complete` the outbox sends in order.
 4. Gaps in `thread_seq` (an event does not fit the loaded ranges) are loaded by the fetcher through REST
-   before it shows the message.
+   before it shows the message. A failed load is tried again when the thread gets the focus;
+   after an app start the gap is found again from the stored messages behind the loaded range.
 5. Personal data: the echo of one's own device (`updated_by_device_id`) is ignored; a draft with
    `overwrote_newer` shows a notice; read state only increases. The database holds at most one
    draft per thread and per forum, and none from the device's own send on until the next draft
@@ -537,9 +538,12 @@ changes (docs/decisions.d/AUD-client-settings-01.md).
 ## 8. Network and login
 
 - **REST:** `api_client` (openapi-generator `dart-dio`, baseline R-Clients) with interceptors for
-  DPoP, `Idempotency-Key`, correlation ID, retry only for reads (`Retry-After` plus jitter); the
-  outbox retries writes. An outbox executor that reads within an attempt opts out of the read
-  retry, so a refused read is retried once, with its entry ([12](12-files.md) 3.8). In the
+  DPoP, `Idempotency-Key`, correlation ID, retry only for reads (`Retry-After` plus jitter; a
+  `Retry-After` above `client.outbox_retry_cap` goes to the caller instead of a wait); the
+  outbox retries writes. The apps' client has the connect timeout `client.http_connect_timeout`
+  and the receive timeout `client.http_receive_timeout` and no send timeout, so a connection that
+  accepts and stays silent ends the request (and frees its outbox lane) as a network error. An
+  outbox executor that reads within an attempt opts out of the read retry, so a refused read is retried once, with its entry ([12](12-files.md) 3.8). In the
   agent interface the read retry is the one place that repeats a refused read: the provider
   that passes the failure of a read on (the document of an ended run) turns off the retry of
   Riverpod, and the read a person waits for in a dialog (`/status`, `/resume`) opts out of the
@@ -572,16 +576,24 @@ changes (docs/decisions.d/AUD-client-settings-01.md).
   stops asking when the password path is locked (reason `password_locked`); the web
   console uses WebAuthn passkeys. For
   `terminal.open` and `terminal.attach` the step-up is fresh and is consumed (08, section
-  6.3); for this the console uses only a passkey with `userVerification = required`.
+  6.3); for this the console uses only a passkey with `userVerification = required`. The app
+  creates the challenge after the person answered the prompt, because it lives only
+  `auth.step_up_challenge_ttl`, and runs one step-up at a time: requests that need one while a
+  step-up runs wait for it and repeat after it (the terminal's fresh step-up never joins).
 - **Interceptor order:** `packages/auth` fills the auth slot of `createApiClient` with
   `RefreshInterceptor`, `DpopInterceptor` and `StepUpInterceptor` in this order, so a request is
   refreshed before its proof hashes the token, and each interceptor answers only its own problem
   code (`token_expired`, `use_dpop_nonce`, `invalid_dpop_proof`, `step_up_required`) with at most
-  one repeat each. On `invalid_dpop_proof` the proof is signed anew (new `iat`, new `jti`, the
-  current nonce); the error never ends the session, because the server revokes nothing for it
+  one repeat each. A repeat stays without the `StepUpInterceptor` when the request came
+  through a client without it (the terminal's, 23.1). On `invalid_dpop_proof` the proof is
+  signed anew (new `iat`, new `jti`, the current nonce); the error never ends the session, because the server revokes nothing for it
   ([08](08-identity.md) section 7.3). A refresh request has connect, send and receive timeouts
   that end it well before `auth.dpop_proof_max_age`, so a request held while the device sleeps
-  fails as a network error instead of arriving minutes later with an expired proof.
+  fails as a network error instead of arriving minutes later with an expired proof. A request
+  waits at most `refreshCallerDeadline` for a refresh and then fails as a network error;
+  the refresh keeps its single-flight slot until it ends, so a hanging store or signer call
+  never starts a second refresh with the same token. A sign-out emits `SignedOut` also when the
+  `SecretStore` fails to delete, so the app still deletes its local data.
 - **Signed out:** `401 session_revoked`, a refresh rejected with `unauthenticated` or
   `token_expired` (a refresh that still gets `invalid_dpop_proof` after its repeat keeps the
   stored refresh token and reports `RefreshFailed`), a revoked pending device, the
@@ -1403,6 +1415,8 @@ it runs on and marks in its summary whether that is a reference device of sectio
 | `client.sync.parse_offload_bytes` | `262144` | from this page size on, decoding happens in the background isolate |
 | `client.sync.connect_timeout` | `30s` | deadline of one connection attempt from its start in `Connecting`, before the socket opens, to `ready` or `resumed`; it also covers a connect that never completes; when it passes, the attempt ends and the backoff applies (7.2) |
 | `client.sync.read_timeout` | `30s` | deadline of one REST read of the sync engine (`Fetcher`): the connect, the sending and each wait for data of the answer may take this long; when it passes, the read fails like a network error and is retried like one (7.3) |
+| `client.http_connect_timeout` | `30s` | longest wait of a REST request of the apps (`createApiClient`) for its connection |
+| `client.http_receive_timeout` | `2m` | longest silence of a REST answer to the apps (`createApiClient`): before its headers and between two chunks of its body; it lies above the longest server deadline of a request (`agents.interview.timeout` plus `http.request_timeout`); a request body has no limit (uploads), and the reads of the sync engine keep `client.sync.read_timeout` |
 | `client.outbox_stuck_after` | `2m` | from then on a waiting entry shows "Sending delayed" |
 | `client.push.fetch_timeout` | `20s` | time that the NSE or the Android service uses to fetch the text |
 | `client.voice.bitrate` | `64kbps` | bitrate of the AAC recording |

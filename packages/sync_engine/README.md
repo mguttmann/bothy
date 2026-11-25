@@ -37,7 +37,8 @@ the first after a random fraction; a missing `heartbeat_ack` within one interval
 `resumed`; a network change or the foreground starts an attempt at once without raising `n`.
 An attempt that has not reached `ready` or `resumed` within `client.sync.connect_timeout` (a
 stalled connect, no `hello`, no answer to `identify` or `resume`) is dropped and waits the
-backoff like a failed connect.
+backoff like a failed connect; the transport gets the same deadline and aborts a stalled open,
+so it never runs on beside the next attempt.
 A server frame that does not decode is counted (`decodeErrors`) and skipped; unknown ops and
 fields are ignored.
 
@@ -176,7 +177,9 @@ same limit after the visible ones) and
   changes nothing.
 - A new message that does not continue the loaded range of its thread is stored, the gap is
   recorded and loaded with `Fetcher.range`; `MessagesDao.watchContiguous` hides it until then. A
-  failed fill stays recorded; `onFocus` retries it.
+  failed fill stays recorded; `onFocus` retries it. The record lives in memory: after an app
+  start `onFocus` finds the gap again from the stored messages behind the newest loaded range
+  (`GapFiller.recover`).
 - A `message.created` of a thread the database does not hold queues one `getThread` after the
   commit (R-SY-28, M4-40): `SyncContext.threadLoads` keeps it to one load per thread while it is
   queued or running, the thread is stored only while its channel is held, and a failed load is
@@ -195,8 +198,8 @@ through the `Fetcher` instead.
 | `message.deleted` | `messages` (tombstone), `reactions_summary`, `my_mentions`, `message_components`, `message_attachments`, `search_index` | version |
 | `reaction.added`, `reaction.removed` | `reactions_summary` | seq |
 | `pin.added`, `pin.removed` | `messages.pinned` | seq |
-| `thread.created`, `thread.updated`, `thread.closed`, `thread.reopened`, `thread.moved` | `threads`, `thread_tags`, `search_index` (title); with `deleted_at` the removal (D-DEL-5) | version |
-| `thread.moved_out` | everything of the thread (`removeTargets`) when it is still in the source channel | seq |
+| `thread.created`, `thread.updated`, `thread.closed`, `thread.reopened`, `thread.moved` | `threads`, `thread_tags`, `search_index` (title); a new channel moves the stored messages, attachments, runs, read state, drafts and search rows along (`moveContent`); with `deleted_at` the removal (D-DEL-5) | version |
+| `thread.moved_out` | everything of the thread (`removeTargets`) when it is still in the source channel, so the `thread.moved` before it (04 8.1) did not reach this device | seq |
 | `space.created`, `space.updated`, `space.archived` | `spaces`; with `deleted_at` the removal, the undo reloads the structure (D-DEL-5) | version |
 | `channel.created`, `channel.updated`, `channel.archived` | `channels` (`project_bound` included, R-DM-54), `channel_operators`; with `deleted_at` the removal, the undo reloads the structure (D-DEL-5) | version |
 | `run.state_changed` | `runs` | version |
@@ -267,6 +270,9 @@ Life cycle of an entry:
 | `waiting` | backing off until `next_attempt_at` | `sending` |
 | `failed` | refused for good, with the problem code and reason; after `412` also the `current` revision | edited, sent again with a new ID, or discarded by the person |
 
+A refused `putReadState`, `putThreadDraft` or `deleteThreadDraft` without dependents does not
+become `failed`: no view shows it, so the row is deleted and the refusal logged.
+
 - One worker per FIFO lane sends the oldest entry and the next only after the response (04 13.2
   item 2). The lane is the thread, or the lane the executor names for writes outside a thread
   (`setting:<key>`, `message:<id>`, the client's `upload:<channel id>`); lanes run in parallel, bounded only by the
@@ -283,6 +289,10 @@ Life cycle of an entry:
   `enqueue` resolves the IDs it is given through the replacements and confirmations of the
   running outbox; an ID gone before the outbox was created is unknown and fails the entry the
   same way.
+- A change over several rows (a replacement and the delete of the failed entry, a failed chain
+  and the delete of the discarded entry, the slots of the dependents and the delete of a
+  confirmed entry) is one database transaction, so a process that ends between its steps
+  leaves the rows as they were before it.
 - `start()` sends (M4-17 calls it after `catchup.complete`, 04 13.4), `pause()` lets running
   requests finish and starts none. The first `start()` resets `sending` entries of an earlier run
   to `pending`; they are sent again with their stored IDs.
@@ -552,8 +562,10 @@ both `409 file_blocked`), `wrongDigest` (a damaged
 `createMessage` attaches `attachment_file_ids` by the rules of 12 10 (`409 conflict` with
 `file_not_attachable`); a voice message answers `409 file_not_ready` with `Retry-After` or `409
 file_blocked` until its file is ready, as the server does (12 8.1). Other
-writes with `Idempotency-Key` repeat their
-stored answer with `Idempotent-Replay: true` (04 5.2, 06 7). Later tickets add operations with `server.handle(operationId,
+writes of an operation that declares `Idempotency-Key` repeat their
+stored answer with `Idempotent-Replay: true` (04 5.2, 06 7): a key that is not a UUIDv7 is
+`400 validation_failed` (`#header/Idempotency-Key`), and only a `2xx` or a final error (`400`,
+`403`, `404`, `409`, `410`, `412`, `413`, `415`, `422`) is stored, as the server's stage does. Later tickets add operations with `server.handle(operationId,
 handler)` in their own `rest/` file (D-M4-17-2). Gateway: `hello`, `identify`, `resume`,
 `ready` with the snapshot, catch-up in pages with `cursor` frames, `catchup.complete`,
 `resync_required` for `epoch_changed`, `retention`, `too_far_behind` and `cursor_ahead`, live
@@ -565,7 +577,7 @@ device (`4017`) and the close codes of 04 6.4 for the session checks.
 
 From M4-28 `rest/agent_handlers.dart` serves the agent administration of screen A5:
 `listAgents`, `getAgent` (the card of `FakeWorld.agentJson` with the warnings of 10 8; the fake
-treats `billing.mismatch_alert_after` as zero), `setAgentBillingMode` and `setCredentialHolder`
+counts `billing.mismatch_alert_after` as one heartbeat), `setAgentBillingMode` and `setCredentialHolder`
 (`If-Match`), `setAllAgentsBillingMode` (all or nothing, BR-08) and the agent tokens
 `listTokens`, `createToken` (secret of ADR 0061, shown once) and `revokeToken`. Tests build
 agents with `world.addAgent`, operators with `setSpaceOperator` and `setChannelOperator`, and
@@ -690,8 +702,9 @@ the server; the form covers REST requests and durable events, not gateway frames
 
 ### What the fake simplifies
 
-- Permissions: only visibility and the level per channel; no grants, groups, `manage` or
-  scopes; no rate limits unless injected. Administration: an owner may do everything, anybody
+- Permissions: visibility, the level per channel, the `manage` capability
+  (`grantCapability`) and the grants and groups of the administration handlers; no scopes;
+  no rate limits unless injected. Administration: an owner may do everything, anybody
   else gets `403 forbidden` with `owner_only` outside the own person; lists have no paging;
   members do not expire by time. Step-up (M4-25): `approveDevice`, `approvePairing`
   and `revokeDevice` answer `401 step_up_required` until the session confirmed with its
@@ -716,7 +729,11 @@ the server; the form covers REST requests and durable events, not gateway frames
   Simplified: no purge after the window, no `access.changed` for the rights change, no run
   cancellation, no runner hand-off of the folder.
 - Events: `agent.invocation` and the agent consumer side are not modelled; `device.pending` is
-  not written (it is not in the API documents of this base); `typing.stop` has no effect.
+  not written (the fake has no event for a pending device); `typing.stop` has no effect.
+- Contract check: only the JSON bodies of requests and responses and the gateway frames are
+  validated; path, query and header parameters, the problem code per status
+  (`x-problem-codes`) and the terminal stream frames are not. A handler that throws anything
+  but a `FakeProblem` answers `500 internal_error` and adds a line to `violations`.
 - `cancelRun` ends the run at once with `cancelled`.
 - Wake-ups (AR-08, `world_wakes.dart`, `rest/wake_handlers.dart`; 09 5.8): `listThreadWakes`
   (every wake-up of a thread the caller sees, newest first, one page), `cancelRunWake` (the

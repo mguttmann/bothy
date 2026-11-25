@@ -3,6 +3,7 @@
 // Step-up after 08 6.2 and 14.3 and the repeat with the same Idempotency-Key (brief M4-09
 // Design note 6).
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:api_client/api_client.dart';
@@ -414,6 +415,117 @@ void main() {
       h.session.stepUp.confirm(purposeText: 'x'),
       throwsA(isA<StepUpUnavailable>()),
     );
+  });
+
+  test('the challenge is created after the prompt, so a slow answer does not '
+      'send an expired one', () async {
+    final challengesAtPrompt = <int>[];
+    h.prompt.onAsk = (_) =>
+        challengesAtPrompt.add(h.server.to('/auth/step-up/challenge').length);
+    await h.session.stepUp.confirm(purposeText: 'Approve a device');
+    expect(challengesAtPrompt, [0]);
+    expect(h.server.to('/auth/step-up/challenge'), hasLength(1));
+    expect(h.server.to('/auth/step-up/device-key'), hasLength(1));
+  });
+
+  test('a cancelled prompt creates no challenge', () async {
+    h.prompt.answer = false;
+    await expectLater(
+      h.session.stepUp.confirm(purposeText: 'x'),
+      throwsA(isA<StepUpCancelled>()),
+    );
+    expect(h.server.to('/auth/step-up/challenge'), isEmpty);
+  });
+
+  test('two requests that need a step-up at once share one prompt and one '
+      'confirmation', () async {
+    final gate = Completer<bool>();
+    h.prompt.hold = gate;
+    final calls = <String, int>{};
+    for (final id in ['d1', 'd2']) {
+      h.server.routes['POST /devices/$id/revoke'] = (_) {
+        final n = calls[id] = (calls[id] ?? 0) + 1;
+        return n == 1
+            ? FakeReply.problem(401, 'step_up_required')
+            : FakeReply(200, deviceBody(h.deviceId, 'revoked'));
+      };
+    }
+    Future<Response<Device>> revokeOf(String id) =>
+        h.session.api.getDevicesApi().revokeDevice(
+          deviceId: id,
+          reasonBody: ReasonBody((b) => b..reason = 'lost'),
+          extra: {stepUpPurposeExtra: 'Revoke $id'},
+        );
+    final both = Future.wait([revokeOf('d1'), revokeOf('d2')]);
+    await h.settle();
+    gate.complete(true);
+    await both;
+    expect(h.prompt.asked, hasLength(1));
+    expect(h.server.to('/auth/step-up/device-key'), hasLength(1));
+    expect(calls, {'d1': 2, 'd2': 2});
+  });
+
+  test(
+    'the fresh step-up of the terminal never joins a running step-up',
+    () async {
+      final gate = Completer<bool>();
+      h.prompt.hold = gate;
+      final normal = h.session.stepUp.confirm(purposeText: 'Approve a device');
+      await h.settle();
+      final fresh = h.session.stepUp.confirmFresh(
+        purposeText: 'Open the terminal',
+      );
+      await h.settle();
+      gate.complete(true);
+      await Future.wait([normal, fresh]);
+      expect(h.prompt.asked, ['Approve a device', 'Open the terminal']);
+      expect(h.server.to('/auth/step-up/device-key'), hasLength(2));
+    },
+  );
+
+  test('a client without the step-up interceptor keeps step_up_required after '
+      'a nonce repeat (the terminal runs its own step-up)', () async {
+    final terminalApi = createApiClient(
+      baseUrl: serverUrl,
+      traceContext: () => TraceContext(traceId: '1' * 32, sampled: false),
+      readRetry: ReadRetryPolicy(
+        base: Duration.zero,
+        cap: Duration.zero,
+        maxAttempts: 1,
+      ),
+      authInterceptors: [
+        for (final i in h.session.interceptors)
+          if (i is! StepUpInterceptor) i,
+      ],
+      adapter: h.server,
+    );
+    var calls = 0;
+    h.server.routes['POST /devices/${h.deviceId}/revoke'] = (_) {
+      calls++;
+      return calls == 1
+          ? FakeReply.problem(
+              401,
+              'use_dpop_nonce',
+              headers: {'DPoP-Nonce': 'n-1'},
+            )
+          : FakeReply.problem(401, 'step_up_required');
+    };
+    await expectLater(
+      terminalApi.getDevicesApi().revokeDevice(
+        deviceId: h.deviceId,
+        reasonBody: ReasonBody((b) => b..reason = 'lost'),
+      ),
+      throwsA(
+        isA<DioException>().having(
+          (e) => ApiProblem.of(e)?.code,
+          'code',
+          'step_up_required',
+        ),
+      ),
+    );
+    expect(calls, 2);
+    expect(h.prompt.asked, isEmpty);
+    expect(h.server.to('/auth/step-up/challenge'), isEmpty);
   });
 
   test(

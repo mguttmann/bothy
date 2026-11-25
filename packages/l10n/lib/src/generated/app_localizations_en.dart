@@ -81,6 +81,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get liveBoxReasonProjectNotReady => 'Project not ready';
 
   @override
+  String get liveBoxReasonAgentUnavailable => 'Agent was not available in time';
+
+  @override
+  String get liveBoxReasonRuntimeError => 'The runtime reported an error';
+
+  @override
+  String get liveBoxReasonRuntimeNotAuthenticated =>
+      'The runtime is not logged in';
+
+  @override
+  String get liveBoxReasonAdapterStopped =>
+      'Ended by a restart or update of the adapter';
+
+  @override
+  String get liveBoxReasonUsageLimited =>
+      'Usage limit of the subscription reached';
+
+  @override
+  String get liveBoxReasonChannelReadOnly =>
+      'Channel became read-only or archived';
+
+  @override
+  String get liveBoxReasonUserDisabled =>
+      'The person who triggered it was disabled';
+
+  @override
+  String get liveBoxReasonToolClassOwnerOnly =>
+      'This tool class is for owners only';
+
+  @override
+  String get liveBoxReasonToolClassMismatch =>
+      'The tool class is higher than allowed';
+
+  @override
+  String get liveBoxReasonInvalidInvocationToken =>
+      'The run\'s authorization was invalid';
+
+  @override
   String liveBoxWaitSlotsFull(int used, int total) {
     return 'Waiting for a free slot ($used of $total in use)';
   }
@@ -166,6 +204,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get connectionOffline => 'Offline';
+
+  @override
+  String get connectionDeviceReplaced =>
+      'Offline: a newer connection of this device is active.';
+
+  @override
+  String get connectionForbidden =>
+      'Offline: the server does not let this account connect.';
+
+  @override
+  String get connectionEndedByServer =>
+      'Offline: the server ended the connection.';
+
+  @override
+  String get connectionReconnect => 'Reconnect';
 
   @override
   String get relativeDayToday => 'Today';
@@ -768,6 +821,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String liveBoxSemanticsLabelNoContext(
+    String agent,
+    String state,
+    String duration,
+  ) {
+    return 'Run of $agent: $state, for $duration';
+  }
+
+  @override
   String get liveBoxFollowupHint =>
       'Messages in this thread reach the agent as a follow-up';
 
@@ -1091,6 +1153,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String billingLabelPersonal(String name) {
     return 'Backend: Personal, runs on the subscription of $name';
   }
+
+  @override
+  String get billingLabelPersonalNoHolder =>
+      'Backend: Personal, uses a personal subscription';
 
   @override
   String get billingLabelOrganization => 'Backend: Organization';
@@ -5116,6 +5182,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get terminalReadScreen => 'Read screen';
+
+  @override
+  String terminalReadScreenHint(String keys) {
+    return '$keys reads the screen';
+  }
 
   @override
   String terminalScreenLabel(String line) {

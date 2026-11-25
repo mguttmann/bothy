@@ -55,14 +55,16 @@ able to mount them (Colima mounts only the home folder by default, so set `TMPDI
 - `createApiClient` builds the generated `ApiClient` for one server address: base URL plus
   `/api/v1`, JSON responses, and the interceptors in a fixed order: headers, the JSON problem
   body of a download (`BinaryProblemInterceptor`, M4-22), the `authInterceptors` slot, problem
-  mapping, read retry.
+  mapping, read retry. `connectTimeout` and `receiveTimeout` come from the caller (the apps pass
+  `client.http_connect_timeout` and `client.http_receive_timeout`); there is no send timeout.
 - Headers: `traceparent` on every request from the caller's `TraceContext`, with a new span ID
   per request; `Idempotency-Key` on `POST`, `PATCH`, `PUT` and `DELETE` from the request option
   `idempotencyKeyExtra`, never invented; `ResponseMeta.of` exposes `Correlation-Id`.
 - Read retry: only `GET` and `HEAD`, only after a network error, a timeout, `429` or `503`
   (not `503 setup_required`), waiting `Retry-After` plus a full-jitter backoff, or the backoff
   alone without the header, from `ReadRetryPolicy.fromBackoff(base, cap)`, which the apps fill
-  from `client.outbox_retry_base` and `client.outbox_retry_cap`. A read with the request option
+  from `client.outbox_retry_base` and `client.outbox_retry_cap`; a `Retry-After` above the cap
+  is not waited for, the error goes to the caller. A read with the request option
   `noReadRetryExtra` is never retried here (an outbox executor retries it with its entry, and
   the search view shows the failure of its request at once). Writes are retried by the outbox,
   never here.

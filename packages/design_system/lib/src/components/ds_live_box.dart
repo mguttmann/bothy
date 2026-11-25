@@ -233,12 +233,18 @@ class DsLiveBoxState extends State<DsLiveBox> {
   String _label(BuildContext context) {
     final l = dsL10n(context);
     final run = widget.run;
-    return l.liveBoxSemanticsLabel(
-      run.agentName,
-      dsRunStateWord(l, run),
-      dsFormat(context).elapsed(run.elapsed),
-      (run.contextPercent ?? 0).round(),
-    );
+    final state = dsRunStateWord(l, run);
+    final elapsed = dsFormat(context).elapsed(run.elapsed);
+    final percent = run.contextPercent;
+    // Without a measured context the label leaves it out, as the header does.
+    return percent == null
+        ? l.liveBoxSemanticsLabelNoContext(run.agentName, state, elapsed)
+        : l.liveBoxSemanticsLabel(
+            run.agentName,
+            state,
+            elapsed,
+            percent.round(),
+          );
   }
 
   Widget _stopButton(BuildContext context, {required bool compact}) {

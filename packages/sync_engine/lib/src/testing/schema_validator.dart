@@ -64,6 +64,7 @@ final class ContractOperation {
     required this.responseSchemas,
     this.authzAction,
     this.requestOptional = false,
+    this.idempotencyKey = false,
   });
 
   /// The `operationId`.
@@ -92,6 +93,10 @@ final class ContractOperation {
   /// The authorization action of `x-authz-action` (05), or null when the operation names
   /// none.
   final String? authzAction;
+
+  /// Whether the operation declares the header `Idempotency-Key` (06 7); the header has no
+  /// effect on any other operation.
+  final bool idempotencyKey;
 }
 
 /// The API documents of the repository, loaded once per isolate.
@@ -295,6 +300,10 @@ final class ContractSchemas {
               (op['requestBody'] as Map<String, Object?>?)?['required'] ==
               false,
           authzAction: op['x-authz-action'] as String?,
+          idempotencyKey: [
+            ...?(item['parameters'] as List<Object?>?),
+            ...?(op['parameters'] as List<Object?>?),
+          ].any(_isIdempotencyKey),
           responseSchemas: {
             for (final MapEntry(:key, :value)
                 in (op['responses'] as Map<String, Object?>? ?? const {})
@@ -304,6 +313,16 @@ final class ContractSchemas {
         );
       }
     }
+  }
+
+  bool _isIdempotencyKey(Object? parameter) {
+    var p = parameter;
+    if (p is Map<String, Object?> && p[r'$ref'] is String) {
+      p = _resolve(p[r'$ref']! as String);
+    }
+    return p is Map<String, Object?> &&
+        p['in'] == 'header' &&
+        (p['name'] as String?)?.toLowerCase() == 'idempotency-key';
   }
 
   /// The schema name of the JSON content of a request body or response (following a

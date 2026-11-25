@@ -663,6 +663,8 @@ final class InstanceServices {
         cap: ports.config.outboxRetryCap,
       ),
       authInterceptors: interceptors,
+      connectTimeout: ports.config.httpConnectTimeout,
+      receiveTimeout: ports.config.httpReceiveTimeout,
     );
     final auth = AuthSession(
       serverUrl: instance.address,

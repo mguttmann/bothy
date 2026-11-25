@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// The cursor commits with its page (15 7.3 item 1, 04 7.5), the session fields have their own
-// transactions, and the resync empties the mirror but keeps unsent work (04 7.3).
+// The cursor commits with its page (15 7.3 item 1, 04 7.5) and never falls inside an epoch, the
+// session fields have their own transactions, and the resync empties the mirror but keeps
+// unsent work (04 7.3).
 
 import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
@@ -54,6 +55,35 @@ void main() {
     expect(state.cursor, const GlobalSeq(8));
     expect(state.syncEpoch, 'epoch-2');
   });
+
+  test(
+    'a lower cursor of the same epoch never moves the stored one back',
+    () async {
+      final sync = db.syncStateDao;
+      await sync.commitPage(
+        (txn) async {},
+        cursor: const GlobalSeq(20),
+        syncEpoch: 'epoch-1',
+      );
+      await sync.commitPage((txn) async {}, cursor: const GlobalSeq(15));
+      expect((await sync.read()).cursor, const GlobalSeq(20));
+      await sync.commitPage(
+        (txn) async {},
+        cursor: const GlobalSeq(18),
+        syncEpoch: 'epoch-1',
+      );
+      expect((await sync.read()).cursor, const GlobalSeq(20));
+      // A new epoch starts a new time line.
+      await sync.commitPage(
+        (txn) async {},
+        cursor: const GlobalSeq(5),
+        syncEpoch: 'epoch-2',
+      );
+      final state = await sync.read();
+      expect(state.cursor, const GlobalSeq(5));
+      expect(state.syncEpoch, 'epoch-2');
+    },
+  );
 
   test('session fields and the disconnect time leave the cursor and the epoch alone', () async {
     final sync = db.syncStateDao;

@@ -247,6 +247,8 @@ final class FakeServer {
 
   void _onRequest(HttpRequest request) {
     if (_stopped) {
+      // A stopped fake never answers a success: `503` without a body.
+      request.response.statusCode = HttpStatus.serviceUnavailable;
       unawaited(request.response.close());
       return;
     }
@@ -277,7 +279,8 @@ final class FakeServer {
       }
       await rest.serve(request, baseUri);
     } on Object {
-      // A dropped response or a client that went away; the record is in [requests].
+      // A dropped response or a client that went away; the record is in [requests]. A failing
+      // handler never ends here: RestFake answers it with `500` and records a violation.
       try {
         await request.response.close();
       } on Object {
@@ -331,6 +334,12 @@ final class FakeServer {
     await gateway.close();
     await terminalStreams.close();
     await _http.close(force: true);
-    await Future.wait(List.of(_serving));
+    // A handler that waits on a future that never ends, or a long DelayFault, must not hold
+    // the tear-down: the sockets are closed already, so the wait is bounded.
+    await Future.wait(List.of(_serving))
+        .timeout(stopGrace, onTimeout: () => const []);
   }
+
+  /// The longest [stop] waits for requests still being served.
+  static const Duration stopGrace = Duration(seconds: 2);
 }

@@ -15,6 +15,7 @@ import 'backoff.dart';
 import 'classify.dart';
 import 'dependencies.dart';
 import 'executors.dart';
+import 'operations/personal_ops.dart';
 
 /// Called with a confirmed entry and its response before the entry leaves the outbox; stores
 /// what the response returned (for example the server's message).
@@ -42,6 +43,13 @@ final class SerialLock {
   }
 }
 
+/// The kinds whose failed entries no view shows; they are removed instead of kept as failed.
+const Set<String> _unseenWhenFailed = {
+  PersonalOps.putReadState,
+  PersonalOps.putThreadDraft,
+  PersonalOps.deleteThreadDraft,
+};
+
 /// The scheduler and the workers of the outbox.
 final class OutboxSender {
   /// Creates the sender; see `Outbox` for the parameters.
@@ -53,9 +61,11 @@ final class OutboxSender {
     required this.timer,
     required this.random,
     required this.lock,
+    required this.transaction,
     required this.dependencies,
     required this.onChanged,
     this.onConfirmed,
+    this.log,
   });
 
   /// The outbox table.
@@ -79,6 +89,10 @@ final class OutboxSender {
   /// The lock shared with `Outbox`.
   final SerialLock lock;
 
+  /// Runs its action in one database transaction (`LocalDatabase.transaction`), for the steps
+  /// that change several rows.
+  final Future<T> Function<T>(Future<T> Function() action) transaction;
+
   /// The dependency graph shared with `Outbox`.
   final OutboxDependencies dependencies;
 
@@ -87,6 +101,9 @@ final class OutboxSender {
 
   /// Called for a confirmed entry with its response.
   final OutboxConfirmationHook? onConfirmed;
+
+  /// Receives one line for a failed step that nobody awaits.
+  final void Function(String line)? log;
 
   final Set<String> _busy = {};
   bool _started = false;
@@ -143,6 +160,16 @@ final class OutboxSender {
   /// Every entry in the table in FIFO order, final ones included.
   Future<List<OutboxEntry>> allEntries() => dependencies.all();
 
+  /// [pump] for a caller that does not wait: a failure (the database closed by a wipe) is
+  /// logged instead of becoming an unhandled error of the zone.
+  void pumpInBackground() => _background(pump(), 'pump');
+
+  void _background(Future<void> step, String what) => unawaited(
+    step.catchError(
+      (Object e) => log?.call('outbox: $what failed (${e.runtimeType})'),
+    ),
+  );
+
   /// Looks for lanes that can send and starts their workers; safe to call at any time.
   Future<void> pump() async {
     if (_pumping) {
@@ -190,8 +217,10 @@ final class OutboxSender {
           case Readiness.broken:
             // A dependency is gone without a confirmation: the entry and its chain fail
             // visibly instead of going without it (D-M4-15-10).
-            await dao.recordFailure(head.id, code: dependencyDiscarded);
-            await dependencies.failChain(head.id);
+            await transaction(() async {
+              await dao.recordFailure(head.id, code: dependencyDiscarded);
+              await dependencies.failChain(head.id);
+            });
             _again = true;
             continue;
           case Readiness.ready:
@@ -216,13 +245,13 @@ final class OutboxSender {
       _wake?.cancel();
       _wake = nextWake == null
           ? null
-          : timer(nextWake.difference(current), () => unawaited(pump()));
+          : timer(nextWake.difference(current), pumpInBackground);
       return claimed;
     });
     if (claims.isEmpty) return;
     onChanged();
     for (final (lane, entry) in claims) {
-      unawaited(_send(lane, entry));
+      _background(_send(lane, entry), 'send');
     }
   }
 
@@ -303,7 +332,7 @@ final class OutboxSender {
       onChanged();
     } finally {
       _busy.remove(lane);
-      if (!_closed) unawaited(pump());
+      if (!_closed) pumpInBackground();
     }
   }
 
@@ -316,17 +345,30 @@ final class OutboxSender {
     // response changes nothing and adds no second display entry.
     final stored = await dao.byId(sent.id);
     if (stored == null) return;
+    if ((outcome.outcome == OutcomeClass.failed ||
+            outcome.outcome == OutcomeClass.conflict) &&
+        _unseenWhenFailed.contains(stored.kind) &&
+        (await dependentsOf(stored.id)).isEmpty) {
+      // No view shows a failed read state or draft write: a kept row would only grow the
+      // outbox and keep the draft text for good.
+      log?.call('outbox: ${stored.kind} failed (${outcome.code}), removed');
+      await dao.delete(stored.id);
+      return;
+    }
     switch (outcome.outcome) {
       case OutcomeClass.confirmed:
         final r = response ?? const OutboxResponse();
-        await confirm(stored, r.result);
         try {
           await onConfirmed?.call(stored, r);
         } on Object {
           // The write is stored on the server; its echo or the catch-up brings the result
           // again, so a failing hook must not keep the entry and send it once more.
         }
-        await dependencies.removeEntry(stored.id, into: const []);
+        // The slots of the dependents and the delete of the entry go together.
+        await transaction(() async {
+          await confirm(stored, r.result);
+          await dependencies.removeEntry(stored.id, into: const []);
+        });
       case OutcomeClass.retry:
         // Retry-After is the floor; the jitter on top keeps lanes refused together from
         // returning together (addendum of 2026-10-30).

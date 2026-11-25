@@ -39,6 +39,13 @@ void main() {
     );
   });
 
+  test('a browser on Windows keeps the text input client', () {
+    // console-terminal-ui-9: in the browser the target platform is the system of the browser,
+    // and the workaround is for the Windows embedder only.
+    expect(hardwareKeyboardOnlyOn(TargetPlatform.windows, web: true), isFalse);
+    expect(hardwareKeyboardOnlyOn(TargetPlatform.windows, web: false), isTrue);
+  });
+
   for (final platform in [TargetPlatform.windows]) {
     testWidgets(
       '${platform.name}: no text input client, typed keys reach the host',

@@ -177,9 +177,10 @@ class ExecutiveView extends StatefulWidget {
 class _ExecutiveViewState extends State<ExecutiveView> {
   ExecutiveData? _data;
   String? _error;
+  int _generation = 0;
 
   /// The period of the tiles: what the page asks for is what the server answers.
-  late final VizRange _period = executiveRange(widget.options.range);
+  late VizRange _period = executiveRange(widget.options.range);
 
   @override
   void initState() {
@@ -187,10 +188,31 @@ class _ExecutiveViewState extends State<ExecutiveView> {
     unawaited(_load());
   }
 
+  @override
+  void didUpdateWidget(ExecutiveView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!vizInputsChanged(
+      oldLive: oldWidget.live,
+      live: widget.live,
+      oldQueries: oldWidget.queries,
+      queries: widget.queries,
+      oldOptions: oldWidget.options,
+      options: widget.options,
+    )) {
+      return;
+    }
+    _generation++;
+    _period = executiveRange(widget.options.range);
+    _data = null;
+    _error = null;
+    unawaited(_load());
+  }
+
   static bool _forbidden(Object error) =>
       error is api.ApiProblem && error.code == 'forbidden';
 
   Future<void> _load() async {
+    final generation = _generation;
     final q = widget.queries;
     final VizRange(:from, :to) = _period;
     final space = widget.options.scope.spaceId;
@@ -246,9 +268,10 @@ class _ExecutiveViewState extends State<ExecutiveView> {
         sloOwnerOnly: ownerOnly,
         costsOneCurrency: oneCurrency,
       );
-      if (mounted) setState(() => _data = data);
-    } on Object catch (error) {
-      if (mounted) setState(() => _error = vizProblemCode(error));
+      if (mounted && generation == _generation) setState(() => _data = data);
+    } on Object catch (error, stack) {
+      if (!mounted || generation != _generation) return;
+      setState(() => _error = vizProblemCode(error, stack));
     }
   }
 
@@ -304,8 +327,7 @@ class _ExecutiveViewState extends State<ExecutiveView> {
   }
 }
 
-/// The tile groups of the executive page; the statistics screen of the administration (A7)
-/// reuses them.
+/// The tile groups of the executive page.
 class ExecutiveTileGroups extends StatelessWidget {
   /// Creates the groups of [tiles]; [now] and [timeZone] format the "Since: ..." of a level
   /// ([MetricTileMark.now]).

@@ -291,11 +291,17 @@ final class ScriptedAgent {
     final runId = run['id']! as String;
     runIds.add(runId);
     if (anchors) FakeAgentInterface.of(world).postAnchor(agentId, runId);
-    _done = Completer<void>();
-    unawaited(_play(runId, id));
+    // Each run completes its own completer: the end of an older run that overlaps a newer one
+    // must not report the newer one done.
+    final done = _done = Completer<void>();
+    unawaited(_play(runId, id, done));
   }
 
-  Future<void> _play(String runId, String messageId) async {
+  Future<void> _play(
+    String runId,
+    String messageId,
+    Completer<void> done,
+  ) async {
     try {
       for (final step in script.steps) {
         await Future<void>.delayed(script.pause);
@@ -309,7 +315,7 @@ final class ScriptedAgent {
         await _apply(step, runId, messageId);
       }
     } finally {
-      if (!_done.isCompleted) _done.complete();
+      if (!done.isCompleted) done.complete();
     }
   }
 

@@ -15,7 +15,9 @@ import 'dispatcher.dart';
 /// Records gaps per thread and fills them through the [Fetcher] of the [SyncContext].
 ///
 /// A failed fill keeps the gap recorded; [fill] retries it, which the app calls when the
-/// thread gets the focus again (the read retry of M4-02 already ran inside the fetch).
+/// thread gets the focus again (the read retry of M4-02 already ran inside the fetch). The
+/// record lives in memory; after an app start [recover] finds the gap again from the stored
+/// messages behind the loaded range.
 ///
 /// Example:
 /// ```dart
@@ -51,6 +53,20 @@ final class GapFiller {
             known.from < from ? known.from : from,
             known.to > seq ? known.to : seq,
           );
+    return true;
+  }
+
+  /// Records the gap of [threadId] that the database still shows when none is held in memory,
+  /// as after an app start that followed a failed fill: stored messages behind the newest
+  /// loaded range. Returns whether a gap of [threadId] is recorded.
+  Future<bool> recover(LocalDatabase db, ThreadId threadId) async {
+    if (_pending.containsKey(threadId)) return true;
+    final ranges = (await db.messagesDao.loadedRanges(threadId)).ranges;
+    if (ranges.isEmpty) return false;
+    final newest = await db.messagesDao.newestStoredSeq(threadId);
+    final loaded = ranges.last.to;
+    if (newest == null || newest <= loaded) return false;
+    _pending[threadId] = SeqRange(loaded.next, newest);
     return true;
   }
 

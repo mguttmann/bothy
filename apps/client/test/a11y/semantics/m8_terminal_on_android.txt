@@ -11,7 +11,7 @@ button, disabled, label "Detach"
 button, label "End", action tap
 label "Detached. The terminal session keeps going on the host."
 button, label "Reattach", action tap
-label "Terminal, line at the cursor: "
+label "Terminal, line at the cursor: ", hint "Ctrl+Shift+S reads the screen"
 label "End-to-end encrypted"
 label "Profile shell"
 label "Idle timeout active"

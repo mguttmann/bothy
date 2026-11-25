@@ -69,44 +69,63 @@ class DsButton extends StatelessWidget {
             DsButtonStyle.secondary ||
             DsButtonStyle.unknown => (null, c.textPrimary, c.borderControl),
           };
+    // The fill of the primary button is ink of the surface, so the hover and pressed ink of
+    // DsTappable paint over it in color.accent.bg-hover and bg-pressed (components.md "Common
+    // rules"); the other fills have no hover tokens and keep their plain box.
+    final primary = enabled && style == DsButtonStyle.primary;
+    final decoration = BoxDecoration(
+      color: bg,
+      borderRadius: BorderRadius.circular(DsRadius.md),
+      border: border == null
+          ? null
+          : Border.all(color: border, width: DsBorderWidth.hairline),
+    );
+    final content = Row(
+      mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (loading) ...[
+          DsIcon(
+            DsIcons.triggerWorking,
+            size: DsIconSizeRole.sm,
+            color: fg,
+            decorative: true,
+          ),
+          const SizedBox(width: DsSpace.s6),
+        ],
+        Flexible(
+          child: Text(
+            label,
+            style: dsTextStyle(DsType.label).copyWith(color: fg),
+          ),
+        ),
+      ],
+    );
+    final constraints = BoxConstraints(minHeight: context.dsDensity.targetMin);
+    const padding = EdgeInsets.symmetric(horizontal: DsSpace.s12);
     return DsTappable(
       onTap: onPressed,
       label: label,
       hint: loading ? l.componentsSending : null,
       radius: DsRadius.md,
+      hoverColor: primary ? a.accentBgHover : null,
+      pressedColor: primary ? a.accentBgPressed : null,
       excludeChildSemantics: true,
-      child: Container(
-        constraints: BoxConstraints(minHeight: context.dsDensity.targetMin),
-        padding: const EdgeInsets.symmetric(horizontal: DsSpace.s12),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(DsRadius.md),
-          border: border == null
-              ? null
-              : Border.all(color: border, width: DsBorderWidth.hairline),
-        ),
-        child: Row(
-          mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (loading) ...[
-              DsIcon(
-                DsIcons.triggerWorking,
-                size: DsIconSizeRole.sm,
-                color: fg,
-                decorative: true,
+      child: primary
+          ? Ink(
+              decoration: decoration,
+              child: Container(
+                constraints: constraints,
+                padding: padding,
+                child: content,
               ),
-              const SizedBox(width: DsSpace.s6),
-            ],
-            Flexible(
-              child: Text(
-                label,
-                style: dsTextStyle(DsType.label).copyWith(color: fg),
-              ),
+            )
+          : Container(
+              constraints: constraints,
+              padding: padding,
+              decoration: decoration,
+              child: content,
             ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -342,16 +361,23 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
         children: [
           header,
           divider,
-          if (widget.data.title != null)
-            Semantics(
-              container: true,
-              label: widget.data.title,
-              child: const SizedBox.shrink(),
+          // The card title labels the group of the agent's part (text and components): a
+          // node of its own without an area would be dropped from the semantics tree.
+          Semantics(
+            container: widget.data.title != null,
+            explicitChildNodes: true,
+            label: widget.data.title,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.agentText.isNotEmpty)
+                  DsMarkdown(widget.agentText, onOpenLink: widget.onOpenLink),
+                const SizedBox(height: DsSpace.s8),
+                ..._body(context),
+              ],
             ),
-          if (widget.agentText.isNotEmpty)
-            DsMarkdown(widget.agentText, onOpenLink: widget.onOpenLink),
-          const SizedBox(height: DsSpace.s8),
-          ..._body(context),
+          ),
         ],
       ),
     );
@@ -866,15 +892,33 @@ class DsMessageComponentsState extends State<DsMessageComponents> {
             ),
           );
       }
+      // The label is the accessible name of its input (WCAG 4.1.2): merged into the text
+      // field and the switch, the group label of the choices.
+      final visible = ExcludeSemantics(child: Text(f.label, style: labelStyle));
+      final column = Column(
+        crossAxisAlignment: onActivated == null
+            ? CrossAxisAlignment.start
+            : CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          visible,
+          const SizedBox(height: DsSpace.s4),
+          input,
+        ],
+      );
       fields
         ..add(
-          Semantics(
-            label: f.label,
-            child: ExcludeSemantics(child: Text(f.label, style: labelStyle)),
-          ),
+          f.type == DsFieldType.choice
+              ? Semantics(
+                  container: true,
+                  explicitChildNodes: true,
+                  label: f.label,
+                  child: column,
+                )
+              : MergeSemantics(
+                  child: Semantics(label: f.label, child: column),
+                ),
         )
-        ..add(const SizedBox(height: DsSpace.s4))
-        ..add(input)
         ..add(const SizedBox(height: DsSpace.s8));
     }
     return Column(

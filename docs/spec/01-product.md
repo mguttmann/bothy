@@ -2357,7 +2357,9 @@ only.
    only, no right changes, nobody else sees a difference, runs keep going, and an archived channel
    opens from its row in the section, a link, a search hit or a notification as before.
    Notifications, unread counts and mentions of an archived channel still reach the person: its
-   row in the section shows them, and the space shows its unread dot.
+   row in the section shows them, the collapsed row "Archived (n)" carries the unread mark and the
+   mentions of the channels it does not show (as "All posts" does, 6.8 item 5), and the space
+   shows its unread dot.
 5. **Automatic arrangement.** A channel arranged by activity (6.16 item 4) stays in the section while
    archived; activity does not bring it back.
 
@@ -2521,6 +2523,7 @@ shortcut must not swallow any input (R-PR-10).
 | Detach session (keeps running) | Cmd+Shift+D | Ctrl+Shift+D |
 | Search in the scrollback | Cmd+F | Ctrl+Shift+F |
 | Font larger / smaller | Cmd+Plus / Cmd+Minus | Ctrl+Shift+Plus / Ctrl+Shift+Minus |
+| Read the visible screen | Cmd+Shift+S | Ctrl+Shift+S |
 
 ## 8. Accessibility
 
@@ -2543,7 +2546,7 @@ part its tests do not reach; until then the page is the work list.
 | Color | States never only through color; icons differ in shape | Review list in components.md |
 | Language | Language of the app set in the semantics tree; agent text without a language tag is not switched | |
 | Text from assistive tools | Text that dictation and text tools write into a focused text field through the platform accessibility API (macOS AXSelectedText and AXValue) changes the field as typing does: it lands at the cursor or replaces the selection, and the field and what the tool reads back agree (addendum of 2026-10-31) | Integration test `composer_ax_insert_test.dart` (macOS) |
-| Terminal | The line at the cursor and, on command, the visible screen are readable for screen readers; running output is not read aloud; extra keys bar with labels; the font size follows the system setting and can be set separately in the terminal. How much semantics the renderer `xterm` provides is not verified [assumed: little]; the build ticket checks it and adds its own semantics layer | Widget test of the semantics; checklist with VoiceOver, TalkBack, Narrator |
+| Terminal | The line at the cursor and, on command, the visible screen are readable for screen readers (the command is a custom action and the keys of section 7, named in the hint of the screen, because macOS, Windows and the browser do not offer custom actions); running output is not read aloud; extra keys bar with labels; the font size follows the system setting and can be set separately in the terminal. How much semantics the renderer `xterm` provides is not verified [assumed: little]; the build ticket checks it and adds its own semantics layer | Widget test of the semantics; checklist with VoiceOver, TalkBack, Narrator |
 | Visualizations | Every view has a table view with the same values; states with icon and text ([25-visualization.md](25-visualization.md), section 7.4) | Golden and widget tests of `bothy_viz` |
 | Run graph and control room | "As list" shows the run graph as an outline with tree semantics (level, position, state as text, duration, cost) and the control room as the rows of D10; the end of a node and state changes are announced politely under the rule "Live content"; reduced motion: nodes appear without animation (addendum of 2026-10-24) | Semantics snapshots and widget tests of `bothy_viz`; golden test in the context `reduced` |
 

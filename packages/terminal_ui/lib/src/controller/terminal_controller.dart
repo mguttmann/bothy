@@ -391,21 +391,42 @@ final class TerminalController extends ChangeNotifier {
     await _closeStream();
   }
 
-  /// Ends the session: sends `close` on a live stream, then `closeTerminalSession`.
-  Future<void> end() async {
+  /// Ends the session: sends `close` on a live stream, then `closeTerminalSession`, and
+  /// returns whether the session is ended.
+  ///
+  /// The server answers a session it already closed with 200 and one it no longer has with
+  /// 404; both end the tab. Any other failure (offline, 429, 5xx, an expired login) leaves the
+  /// session running on the host, so the tab stays [TerminalPhase.detached] with the problem
+  /// code (`end_failed` without one), and "End" and "Reattach" stay offered.
+  Future<bool> end() async {
     final sessionId = _state.sessionId;
-    if (sessionId == null || _disposed) return;
-    final pump = _state.phase == TerminalPhase.connected ? _pump : null;
+    if (sessionId == null || _disposed) return false;
+    final before = _state;
+    final pump = before.phase == TerminalPhase.connected ? _pump : null;
     // End takes the tab first, so no flow that resumes later can overwrite it.
     final epoch = _supersede();
-    _set(epoch, _state.copyWith(phase: TerminalPhase.ended, replaying: false));
+    _set(epoch, before.copyWith(phase: TerminalPhase.ended, replaying: false));
     if (pump != null) await pump.sendFrame(const CloseFrame());
     await _closeStream();
     try {
       await _api.closeSession(sessionId);
-    } on Object {
-      // The session may already be closed (4100 crossed the request); the server is the truth
-      // and reports it through terminal_session.changed.
+      return true;
+    } on Object catch (error) {
+      final problem = _problemOf(error);
+      if (problem?.status == 404) return true;
+      _set(
+        epoch,
+        before.copyWith(
+          phase: TerminalPhase.detached,
+          detachCause: DetachCause.person,
+          detachedAt: before.detachedAt ?? _clock.now(),
+          replaying: false,
+          problemCode: problem?.code ?? 'end_failed',
+          problemReason: problem?.reason,
+        ),
+      );
+      // A host event may have ended the tab meanwhile; the server is the truth.
+      return _state.phase == TerminalPhase.ended;
     }
   }
 

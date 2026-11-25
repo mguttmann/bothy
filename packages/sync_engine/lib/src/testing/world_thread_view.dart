@@ -189,8 +189,10 @@ extension ThreadViewWorld on FakeWorld {
   }
 
   /// `moveThread`: moves [threadId] into [targetChannelId] (05 `thread.move`: `manage` on
-  /// source and target; the same effective operator, else `422 operator_mismatch`); the ID
-  /// stays and `thread.moved` names the source channel.
+  /// source and target; the same effective operator, else `409 operator_mismatch`); the ID
+  /// stays. As the server (`moveWrite`): the tags of the thread are removed, then
+  /// `thread.moved` with the source channel goes to the target and `thread.moved_out` to the
+  /// source channel (without a version and without the target).
   JsonMap moveThread(
     String principalId,
     String threadId,
@@ -208,10 +210,11 @@ extension ThreadViewWorld on FakeWorld {
     final operator = operatorOf(threadId);
     final target = channels[targetChannelId]!.json['operator'] as JsonMap?;
     if (operator != target?['effective_agent_id']) {
-      throw const FakeProblem(422, 'operator_mismatch');
+      throw const FakeProblem(409, 'operator_mismatch');
     }
     thread
       ..['channel_id'] = targetChannelId
+      ..['tag_ids'] = <Object?>[]
       ..['moved_at'] = stamp()
       ..['version'] = (thread['version']! as int) + 1;
     for (final m in messagesOf(threadId)) {
@@ -232,12 +235,21 @@ extension ThreadViewWorld on FakeWorld {
       payload: {'thread': thread, 'from_channel_id': source},
       actor: principalId,
     );
+    append(
+      'thread.moved_out',
+      resource: {'kind': 'channel', 'id': source},
+      scope: {'space_id': ?channels[source]!.spaceId, 'channel_id': source},
+      payload: {'thread_id': threadId, 'channel_id': source},
+      actor: principalId,
+    );
     return thread;
   }
 
   /// `createThread` with `parent_message_id`: a thread from a message of the main thread of a
   /// text channel, titled from the message (`title_source = auto`), with an optional first
-  /// message. Returns the API `ThreadCreated`.
+  /// message. Returns the API `ThreadCreated`. A forum answers `400` `/parent_message_id`
+  /// `not_allowed_in_forum`; a first message is checked before anything is written, so a
+  /// refused one leaves neither a thread nor an event (the server's unit of work).
   JsonMap createThreadFromMessage(
     String principalId,
     String channelId,
@@ -249,6 +261,15 @@ extension ThreadViewWorld on FakeWorld {
     }
     if (channel.access[principalId] == 'read') {
       throw const FakeProblem(403, 'forbidden');
+    }
+    if (channel.json['kind'] == 'forum') {
+      throw const FakeProblem(
+        400,
+        'validation_failed',
+        errors: [
+          {'pointer': '/parent_message_id', 'code': 'not_allowed_in_forum'},
+        ],
+      );
     }
     final parentId = body['parent_message_id']! as String;
     final parent = messages[parentId];
@@ -263,6 +284,8 @@ extension ThreadViewWorld on FakeWorld {
         ],
       );
     }
+    final first = body['first_message'] as JsonMap?;
+    if (first != null) _checkFirstMessage(principalId, channelId, first);
     final text = (parent['content_md']! as String).trim();
     final title = (body['title'] as String?)?.trim().isNotEmpty ?? false
         ? (body['title']! as String).trim()
@@ -280,7 +303,6 @@ extension ThreadViewWorld on FakeWorld {
       payload: {'thread': thread},
       actor: principalId,
     );
-    final first = body['first_message'] as JsonMap?;
     final message = first == null
         ? null
         : createMessage(principalId, id, first).message;

@@ -95,12 +95,44 @@ class _RunHistoryViewState extends State<RunHistoryView> {
     unawaited(_load(reset: true));
   }
 
+  @override
+  void didUpdateWidget(RunHistoryView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!vizInputsChanged(
+      oldLive: oldWidget.live,
+      live: widget.live,
+      oldQueries: oldWidget.queries,
+      queries: widget.queries,
+      oldOptions: oldWidget.options,
+      options: widget.options,
+    )) {
+      return;
+    }
+    // Another space or source: the loaded runs belong to the old one.
+    _entries.clear();
+    _next = null;
+    _loaded = false;
+    _loadingMore = false;
+    _error = null;
+    _moreError = null;
+    _selected = null;
+    unawaited(_load(reset: true));
+  }
+
   Future<void> _load({required bool reset}) async {
     final generation = reset ? ++_generation : _generation;
+    final state = _state;
     try {
       final page = await widget.queries.runHistory(
         spaceId: widget.options.scope.spaceId,
-        state: _state?.name,
+        // The wire value of the state, not the Dart name of the enum constant.
+        state: state == null
+            ? null
+            : api.standardSerializers.serializeWith(
+                    api.RunState.serializer,
+                    state,
+                  )!
+                  as String,
         cursor: reset ? null : _next,
       );
       if (!mounted || generation != _generation) return;
@@ -113,14 +145,14 @@ class _RunHistoryViewState extends State<RunHistoryView> {
         _error = null;
         _moreError = null;
       });
-    } on Object catch (error) {
+    } on Object catch (error, stack) {
       if (!mounted || generation != _generation) return;
       setState(() {
         // Only a first page that fails has nothing to show.
         if (reset) {
-          _error = vizProblemCode(error);
+          _error = vizProblemCode(error, stack);
         } else {
-          _moreError = vizProblemCode(error);
+          _moreError = vizProblemCode(error, stack);
         }
         _loadingMore = false;
       });
@@ -515,8 +547,8 @@ class _RunHistoryDetailState extends State<RunHistoryDetail> {
     try {
       final run = await widget.queries.run(widget.row.runId);
       if (mounted) setState(() => _run = run);
-    } on Object catch (error) {
-      if (mounted) setState(() => _error = vizProblemCode(error));
+    } on Object catch (error, stack) {
+      if (mounted) setState(() => _error = vizProblemCode(error, stack));
     }
   }
 

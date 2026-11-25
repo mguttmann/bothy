@@ -106,7 +106,9 @@ class ReadRetryPolicy {
 /// Retries `GET` and `HEAD` after a network error, a timeout, `429` or `503` (except
 /// `503 setup_required`, which is final), waiting `Retry-After` plus the full-jitter backoff
 /// when the response has it, so reads refused together do not come back together, and the
-/// backoff alone otherwise. A request with [noReadRetryExtra] is never retried here.
+/// backoff alone otherwise. A `Retry-After` above the policy's cap is not waited for: the
+/// error goes to the caller. A request with [noReadRetryExtra] is never retried here, and a
+/// cancelled request ends its wait (Dio ends an interceptor's work on its `CancelToken`).
 ///
 /// It sits last in the chain, so it sees the mapped [ApiProblem], and a retry runs through
 /// every interceptor again (a new span ID, a new DPoP proof from M4-09).
@@ -134,6 +136,12 @@ class ReadRetryInterceptor extends Interceptor {
     final retryAfter =
         ApiProblem.of(err)?.retryAfter ??
         parseRetryAfter(err.response?.headers.value('retry-after'));
+    // A wait longer than the cap is not held inside one read: the caller gets the refusal with
+    // its Retry-After (ApiProblem.retryAfter) and decides itself.
+    if (retryAfter != null && retryAfter > policy.cap) {
+      handler.next(err);
+      return;
+    }
     final jitter = policy.backoff(attempt - 1);
     // Retry-After is the floor (06 9 item 3); a date in the past counts as no wait.
     final wait = retryAfter == null || retryAfter.isNegative
