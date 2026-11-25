@@ -77,6 +77,11 @@ GO_LICENSES_VERSION := v2.0.1
 GOVULNCHECK_VERSION := v1.8.0
 # renovate: datasource=pypi depName=semgrep
 SEMGREP_VERSION := 1.180.0
+# The CodeRabbit schema that `make lint` checks .coderabbit.yaml against: the vendor's copy at a
+# fixed commit, checked by its SHA-256 (#734); raise both together.
+CODERABBIT_SCHEMA_URL := https://raw.githubusercontent.com/coderabbitai/awesome-coderabbit/41993ea4a799a0bc35e2da1ead3b7f7a08d7de47/schema.v2.json
+CODERABBIT_SCHEMA_SHA256 := 6959497f1c31426b4d9ca8ed42313ee681030bc94204c3eebc9494a7b6d9181a
+CODERABBIT_SCHEMA := .cache/schemas/coderabbit-$(CODERABBIT_SCHEMA_SHA256).json
 REVIEW_BASE ?= main
 # Licenses allowed for dependencies of shipped components (`make licenses`).
 LICENSE_ALLOWLIST := quality/licenses/allowed.txt
@@ -260,7 +265,12 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
-	$(UVRUN) check-jsonschema --schemafile https://coderabbit.ai/integrations/schema.v2.json .coderabbit.yaml
+	@# Fetched once into .cache and checked by its SHA-256 before every use; a changed file fails.
+	@if [ ! -f $(CODERABBIT_SCHEMA) ]; then mkdir -p $(dir $(CODERABBIT_SCHEMA)) && \
+	  curl -fsSL --retry 3 -o $(CODERABBIT_SCHEMA).tmp $(CODERABBIT_SCHEMA_URL) && \
+	  mv $(CODERABBIT_SCHEMA).tmp $(CODERABBIT_SCHEMA); fi
+	@$(UVRUN) python -c 'import hashlib, sys; f, want = sys.argv[1:]; got = hashlib.sha256(open(f, "rb").read()).hexdigest(); sys.exit(None if got == want else f"{f}: SHA-256 {got}, expected {want}")' $(CODERABBIT_SCHEMA) $(CODERABBIT_SCHEMA_SHA256) || { rm -f $(CODERABBIT_SCHEMA); exit 1; }
+	$(UVRUN) check-jsonschema --schemafile $(CODERABBIT_SCHEMA) .coderabbit.yaml
 	@# The pinned shellcheck also reads the run: blocks of the workflows; pyflakes stays off (no Python in run: blocks).
 	sc=$(call tool,shellcheck) || exit 1; $(call tool,actionlint) -shellcheck="$$sc" -pyflakes= .github/workflows/*.yml
 	@# Every tracked shell script, by its name (*.sh) or its first line (tools/ci/shell_scripts.py);

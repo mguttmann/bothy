@@ -206,7 +206,8 @@ text of the pull request goes through the same deny list as every commit:
   the text itself. A `PR_BODY_FILE` that cannot be read fails the scan.
 - **Bots.** CodeRabbit writes its summary into the walkthrough comment, not into the body
   (`high_level_summary_in_walkthrough` in `.coderabbit.yaml`, schema at
-  https://coderabbit.ai/integrations/schema.v2.json, retrieved 2026-10-12), so bot text
+  https://coderabbit.ai/integrations/schema.v2.json, retrieved 2026-10-12; `make lint` checks
+  against the pinned copy named in docs/quality/toolchain.md), so bot text
   does not reach `main` and does not restart CI.
 
 What the gate does not cover, so `denylist-main.yml` stays the check after the merge (it

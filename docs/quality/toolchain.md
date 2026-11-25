@@ -28,7 +28,7 @@ same make target in GitHub Actions. All gate tools run in both places.
 | `markdown-it-py` | `4.2.0` | CommonMark parser as the oracle in the tests of `tools/configdoc` (code spans and code blocks for rule D7) | MIT | CommonMark-compliant parser with GFM tables ([markdown-it-py](https://github.com/executablebooks/markdown-it-py), retrieved 2026-10-12); only in tests, the tool itself stays with the standard library and PyYAML |
 | `pre-commit` | `4.6.2` | hooks for commit, commit-msg, pre-push | MIT | widespread, hooks as a file in the repository |
 | `pre-commit-hooks` | `v6.0.0` | file hygiene hooks | MIT | maintained standard hooks, pinned by commit SHA |
-| `check-jsonschema` | `0.38.2` | schema check of issue forms, Renovate and CodeRabbit configuration | Apache-2.0 | ships the schemas of the formats |
+| `check-jsonschema` | `0.38.2` | schema check of issue forms, Renovate and CodeRabbit configuration; the CodeRabbit schema is the vendor's `schema.v2.json` at a fixed commit of `coderabbitai/awesome-coderabbit`, fetched once into `.cache/schemas/` and checked by its SHA-256 (`CODERABBIT_SCHEMA_URL`, `CODERABBIT_SCHEMA_SHA256` in the `Makefile`) | Apache-2.0 | ships the schemas of the formats |
 | `zizmor` | `1.30.1` | security analysis of the workflows | MIT | required by the planning basis; checks injection, permissions, pinning |
 | `mkdocs` | `1.6.1` | docs site | BSD | ADR 0045 |
 | `mkdocs-material` | `9.7.7` | theme of the docs site | MIT | ADR 0045 |
