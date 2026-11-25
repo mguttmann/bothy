@@ -38,7 +38,8 @@ import pytest
 from bothy_sdk.testing._patience import PATIENCE
 
 from claude_code_runner.bgpaths import bg_files
-from claude_code_runner.causes import cause
+from claude_code_runner.causes import ADAPTER_STOPPED, cause
+from claude_code_runner.runturn import RunTurn
 
 from .conftest import BACKGROUND, LogLines, World
 from .test_bg_adoption import active, crashed, record, record_path, restart
@@ -696,10 +697,10 @@ async def test_an_adopter_takes_no_line_for_its_own_that_the_record_does_not_nam
 # ---- the counter-check of 18.3 fails closed ----------------------------------------------------
 
 
-def mismatch(world: World, run_id: UUID) -> None:
+def mismatch(world: World, run_id: UUID, sessions: int = 1) -> None:
     assert world.fake.run_state(run_id).state_reason == "billing_mode_mismatch"
     assert texts(world) == []
-    assert [c["reason"] for c in world.calls("bg_player_end")] == ["stop"]
+    assert [c["reason"] for c in world.calls("bg_player_end")] == ["stop"] * sessions
 
 
 async def test_a_session_without_a_request_record_is_stopped_before_its_answer(
@@ -733,6 +734,10 @@ async def test_a_request_without_the_login_after_one_with_it_ends_the_run(
     requests = [r for r in transcript(world, players(world)[0]) if r["type"] == "api-request"]
     listed = ["oauth-2025-04-20" in r["params"]["betas"] for r in requests]
     assert listed[:2] == [True, False]
+    # The turn had acted already (its tool call): it is never run again.
+    assert [e["code"] for e in events(logs, "login_retry_refused")] == ["output_accepted"]
+    assert events(logs, "login_retry_wait") == []
+    assert len(launches(world)) == 1
     await nothing_left(world)
 
 
@@ -742,8 +747,11 @@ async def test_a_renamed_login_beta_is_no_login(bg_world: World, logs: LogLines)
     await start(world)
     run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
     assert await world.ended(run.run_id) == "failed"
-    mismatch(world, run.run_id)
-    assert [e["code"] for e in events(logs, "counter_check_failed")] == ["request_without_login"]
+    # Tried once more after the wait (18.3), and the retry did not show the login either.
+    mismatch(world, run.run_id, sessions=2)
+    assert [e["code"] for e in events(logs, "counter_check_failed")] == [
+        "request_without_login"
+    ] * 2
     assert not world.fake.run(run.run_id).get("last_text_excerpt")
 
 
@@ -782,8 +790,181 @@ async def test_any_other_outcome_of_a_request_without_the_login_ends_the_run(
     await start(world)
     run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
     assert await world.ended(run.run_id) == "failed"
-    mismatch(world, run.run_id)
+    mismatch(world, run.run_id, sessions=2)
+    assert [e["code"] for e in events(logs, "counter_check_failed")] == [
+        "request_without_login"
+    ] * 2
+
+
+# ---- one retry after a request without the login (18.3, FIX-RUNNER-LOGIN-BLIP-RETRY) ---------
+
+
+def probes(world: World) -> int:
+    return len(world.calls("auth_status"))
+
+
+async def test_a_single_request_without_the_login_is_tried_once_more_and_answered(
+    bg_world: World, logs: LogLines
+) -> None:
+    world = bg_world
+    # Only the first session makes its request without the login: the moment the stored
+    # login is rewritten. Its answer has no tool call.
+    world.scenario(fixture="plain", per_launch={"0": {"bg_no_login": True}})
+    await start(world)
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: events(logs, "counter_check_failed"))
+    checked = probes(world)
+    assert await world.ended(run.run_id) == "completed"
+    assert texts(world) == ["Done."]  # one answer, from the retry
     assert [e["code"] for e in events(logs, "counter_check_failed")] == ["request_without_login"]
+    assert [e["seconds"] for e in events(logs, "login_retry_wait")] == ["0.2"]
+    assert len(events(logs, "login_retry_started")) == 1
+    assert events(logs, "login_retry_refused") == []
+    assert probes(world) == checked + 1  # the login was checked again before the retry
+    first, second = launches(world)
+    assert "--resume" not in first["argv"]
+    # The retry continues the same session with the same prompt.
+    assert flag(second["argv"], "--resume") == players(world)[0]["session_id"]
+    assert second["prompt"] == first["prompt"]
+    assert world.calls("bg_player_end")[0]["reason"] == "stop"
+    await nothing_left(world)
+
+
+async def test_a_second_request_without_the_login_ends_the_run_as_before(
+    bg_world: World, logs: LogLines
+) -> None:
+    world = bg_world
+    world.scenario(fixture="plain", bg_no_login=True)
+    await start(world)
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "failed"
+    mismatch(world, run.run_id, sessions=2)
+    assert [e["code"] for e in events(logs, "counter_check_failed")] == [
+        "request_without_login"
+    ] * 2
+    assert len(events(logs, "login_retry_wait")) == 1
+    assert len(events(logs, "login_retry_started")) == 1
+    assert [e["code"] for e in events(logs, "login_retry_refused")] == ["retried_before"]
+    assert len(launches(world)) == 2
+    await nothing_left(world)
+
+
+async def test_a_session_that_called_a_tool_without_the_login_is_never_run_again(
+    bg_world: World, logs: LogLines
+) -> None:
+    world = bg_world
+    # The first output of the request without the login is a tool call: the tool may have run.
+    world.scenario(fixture="live_cost", per_launch={"0": {"bg_no_login": True}})
+    await start(world)
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "failed"
+    mismatch(world, run.run_id)
+    assert [e["code"] for e in events(logs, "login_retry_refused")] == ["tool_called"]
+    assert events(logs, "login_retry_wait") == []
+    assert len(launches(world)) == 1
+    await nothing_left(world)
+
+
+async def test_a_login_gone_after_the_wait_ends_the_run_without_a_retry(
+    bg_world: World, logs: LogLines, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world = bg_world
+    monkeypatch.setattr(RunTurn, "login_retry_wait", 2.0)
+    world.scenario(fixture="plain", per_launch={"0": {"bg_no_login": True}})
+    await start(world)
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: events(logs, "login_retry_wait"))
+    (world.home / ".claude" / "fake-login").write_text("none")
+    assert await world.ended(run.run_id) == "failed"
+    assert world.fake.run_state(run.run_id).state_reason == "runtime_not_authenticated"
+    assert texts(world) == []
+    assert events(logs, "login_retry_started") == []
+    assert len(launches(world)) == 1
+    await nothing_left(world)
+
+
+async def test_a_stop_during_the_login_check_ends_the_run_without_a_retry(
+    bg_world: World, logs: LogLines, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world = bg_world
+    monkeypatch.setattr(RunTurn, "login_retry_wait", 2.0)
+    scenario: dict[str, Any] = {"fixture": "plain", "per_launch": {"0": {"bg_no_login": True}}}
+    world.scenario(**scenario)
+    await start(world)
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: events(logs, "login_retry_wait"))
+    # The check of the login before the retry waits on a gate; the run is stopped meanwhile.
+    gate = world.gate("auth_gate")
+    world.scenario(**scenario, auth_gate=str(gate))
+    await world.until(lambda: any(c["gate"] == "auth_gate" for c in world.calls("gate_wait")))
+    await world.fake.cancel(run.run_id, "user_cancelled")
+    world.release(gate)
+    assert await world.ended(run.run_id) == "cancelled"
+    assert texts(world) == []
+    assert events(logs, "login_retry_started") == []
+    assert len(launches(world)) == 1
+    await nothing_left(world)
+
+
+async def test_an_orderly_stop_of_the_runner_during_the_wait_finishes_the_run(
+    bg_world: World, logs: LogLines, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world = bg_world
+    # The stopped session took the prompt already: the run is finished, never left for a
+    # start from the inbox that would run the prompt again (18.6).
+    monkeypatch.setattr(RunTurn, "login_retry_wait", 30.0)
+    world.scenario(fixture="plain", per_launch={"0": {"bg_no_login": True}})
+    runner = await start(world)
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: events(logs, "login_retry_wait"))
+    await world.stop(runner)
+    assert world.state_of(run.run_id) == "cancelled"
+    assert world.fake.run_state(run.run_id).state_reason == ADAPTER_STOPPED
+    assert texts(world) == []
+    assert events(logs, "login_retry_started") == []
+    assert len(launches(world)) == 1
+    await nothing_left(world)
+
+
+async def test_an_adopted_turn_is_never_tried_again(bg_world: World, logs: LogLines) -> None:
+    world = bg_world
+    # The runner is killed before the session's request without the login; the next runner
+    # adopts the turn, finds that request, and ends the run as before (18.3).
+    gate = world.gate("bg_prompt_gate")
+    world.scenario(fixture="plain", bg_no_login=True, bg_prompt_gate=str(gate))
+    first = world.spawn(**BACKGROUND)
+    await world.until(
+        lambda: any(h.get("details", {}).get("adapter") for h in world.fake.heartbeats)
+    )
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: "short_id" in record(world, run.run_id).get("bg", {}))
+    first.send_signal(signal.SIGKILL)
+    await world.exited(first)
+    world.release(gate)
+    await restart(world)
+    assert await world.ended(run.run_id) == "failed"
+    assert world.fake.run_state(run.run_id).state_reason == "billing_mode_mismatch"
+    assert texts(world) == []
+    assert [e["code"] for e in events(logs, "login_retry_refused")] == ["adopted"]
+    assert events(logs, "login_retry_wait") == []
+    assert len(launches(world)) == 1
+
+
+async def test_a_stop_during_the_wait_ends_the_run_without_a_retry(
+    bg_world: World, logs: LogLines, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world = bg_world
+    monkeypatch.setattr(RunTurn, "login_retry_wait", 30.0)
+    world.scenario(fixture="plain", per_launch={"0": {"bg_no_login": True}})
+    await start(world)
+    run = await world.fake.trigger("Fix the form", channel_id=world.forum_a)
+    await world.until(lambda: events(logs, "login_retry_wait"))
+    await world.fake.cancel(run.run_id, "user_cancelled")
+    assert await world.ended(run.run_id) == "cancelled"
+    assert texts(world) == []
+    assert events(logs, "login_retry_started") == []
+    assert len(launches(world)) == 1
+    await nothing_left(world)
 
 
 async def crashed_past_the_request(world: World) -> tuple[UUID, Path]:

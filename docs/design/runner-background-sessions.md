@@ -312,7 +312,8 @@ Only the turns of the runner's own agent in billing mode `personal`. In print mo
    (its id and start time), reports `started = true` as after `system/init`, and runs the
    counter-check of 18.3 on every `api-request` record (item 23, 4.15): a `personal` turn
    with a request that did not use the stored login, or without a request record that shows
-   it before its first output, is stopped and ends `billing_mode_mismatch`. The pre-check
+   it before its first output, is stopped and ends `billing_mode_mismatch` (since 2026-11-24
+   after one retry where the stopped attempt cannot have acted, 4.15). The pre-check
    `claude auth status` stays binding.
 8. **Options per run.** Because of step 1 every flag applies per run as in print mode. The
    system prompt is the exception in both modes: the CLI records it at the conversation's
@@ -841,7 +842,9 @@ did nothing when no record came. Decided:
 - Every request record is judged, and the newest one decides: nothing a session puts out is
   accepted unless the newest request record of its process listed the login beta. At the
   first output after a record without it the session is stopped and the run ends
-  `billing_mode_mismatch`, also when earlier records listed it.
+  `billing_mode_mismatch`, also when earlier records listed it. Since 2026-11-24 a run whose
+  stopped attempt cannot have acted is tried once more first (09 18.3,
+  FIX-RUNNER-LOGIN-BLIP-RETRY).
 - The name is compared as a whole: `oauth-2025-04-20`, a constant of the pinned CLI. A
   recording holds a request record of the pinned CLI with it (`transcript_login.jsonl`: a
   session on a dummy token, item 33) and records without it, a level-one test runs both

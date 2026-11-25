@@ -130,6 +130,7 @@ __all__ = [
     "prompt_taken",
     "replayed_records",
     "side_inputs",
+    "tool_called",
 ]
 
 _LOG = logging.getLogger("claude_code_runner")
@@ -881,6 +882,47 @@ def prompt_taken(path: Path | None, offset: int) -> bool:
         record = _decode(raw)
         if record is not None and _is_input(record) and _sender(record) == _HUMAN:
             return True
+    return False
+
+
+def tool_called(path: Path | None, offset: int) -> bool:
+    """Whether a session called any tool after ``offset``: the retry rule of 18.3 asks it.
+
+    In the observed transcripts of the pinned CLI the record of an assistant message with a
+    tool call is written before the tool runs (FIX-RUNNER-LOGIN-BLIP-RETRY), so once the
+    session process is gone a call it made is in the file. Every ``assistant`` record counts, of the
+    main conversation and of a side chain, and every content item whose type ends in
+    ``tool_use``. It fails closed: a file or a line that cannot be read counts as a call.
+
+    Args:
+        path: The session transcript; ``None`` when the session has none.
+        offset: The launch offset.
+
+    Returns:
+        True when an ``assistant`` record after the offset holds a tool call, or when the
+        transcript cannot be read.
+    """
+    if path is None:
+        return True
+    try:
+        with path.open("rb") as fh:
+            fh.seek(offset)
+            data = fh.read()
+    except OSError:
+        return True
+    for raw in data.split(b"\n"):
+        record = _decode(raw)
+        if record is None and raw.strip():
+            return True  # a line it cannot read may hold a call
+        if record is None or record.get("type") != "assistant":
+            continue
+        message = record.get("message")
+        content = message.get("content") if isinstance(message, Mapping) else None
+        if not isinstance(content, list):
+            continue
+        for item in content:
+            if isinstance(item, Mapping) and str(item.get("type", "")).endswith("tool_use"):
+                return True
     return False
 
 

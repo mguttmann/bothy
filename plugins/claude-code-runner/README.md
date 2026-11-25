@@ -666,11 +666,17 @@ Before you switch it on:
   configuration.
 - **The login check.** Nothing a `personal` turn puts out is accepted unless the newest
   request record of its session lists the login beta of the pinned CLI (`oauth-2025-04-20`);
-  otherwise the session is stopped and the run ends `billing_mode_mismatch`. A CLI version
-  that names the beta differently therefore ends every background turn that way instead of
-  running unchecked; the mode runs only on the pinned version anyway. A login that is gone
-  is no mismatch: the CLI then reports `authentication_failed`, and the run waits for the
-  account as in print mode.
+  otherwise the session is stopped and the run ends `billing_mode_mismatch`. Once per run,
+  when that request was the only problem and the stopped turn is the runner's own (not one
+  it adopted), called no tool and had no accepted output, the runner waits
+  `LOGIN_RETRY_WAIT` (10 seconds) and checks the login with `claude auth status` again;
+  only when that check passes does it resume the session with the same inputs (log
+  `login_retry_wait`, `login_retry_started`, or the warning `login_retry_refused`; a
+  refused check ends the run with its reason). A CLI version that names the beta
+  differently therefore ends every background turn that way instead of running unchecked;
+  the mode runs only on the pinned version anyway. A login that is gone is no mismatch: the
+  CLI then reports `authentication_failed`, and the run waits for the account as in print
+  mode.
 
 How a background turn runs:
 

@@ -43,6 +43,7 @@ from claude_code_runner.bgtranscript import (
     prompt_taken,
     replayed_records,
     side_inputs,
+    tool_called,
 )
 from claude_code_runner.failures import api_error_text
 from claude_code_runner.heartbeat import PINNED_CLAUDE_CODE_VERSION
@@ -1266,6 +1267,28 @@ def test_a_transcript_shows_whether_a_session_took_the_prompt(tmp_path: Path) ->
     assert prompt_taken(path, len(old)) is True
     assert prompt_taken(None, 0) is False
     assert prompt_taken(tmp_path / "missing.jsonl", 0) is False
+
+
+def test_a_tool_call_after_the_launch_offset_is_found_and_doubt_counts_as_one(
+    tmp_path: Path,
+) -> None:
+    # The retry after a request without the login (18.3) runs only when the stopped session
+    # called no tool: the CLI writes the call before it runs the tool.
+    path = tmp_path / "session.jsonl"
+    old = piece(PROMPT, TOOL, TURN_END)
+    path.write_bytes(old + piece(PROMPT, ANSWER))
+    assert tool_called(path, 0) is True
+    assert tool_called(path, len(old)) is False  # only what follows the launch offset counts
+    with path.open("ab") as fh:
+        fh.write(piece({**TOOL, "isSidechain": True}))
+    assert tool_called(path, len(old)) is True  # an agent's call counts too
+    server = record("assistant", message={"content": [{"type": "server_tool_use", "id": "s"}]})
+    path.write_bytes(piece(PROMPT, server))
+    assert tool_called(path, 0) is True
+    path.write_bytes(piece(PROMPT, ANSWER) + b'{"type": "assistant", "message": {"con\n')
+    assert tool_called(path, 0) is True  # a line it cannot read
+    assert tool_called(None, 0) is True
+    assert tool_called(tmp_path / "missing.jsonl", 0) is True
 
 
 def test_an_input_of_a_person_shows_a_taken_prompt_whatever_its_content(tmp_path: Path) -> None:
