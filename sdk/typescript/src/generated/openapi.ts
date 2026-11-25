@@ -7571,6 +7571,7 @@ export interface components {
             expires_at?: components["schemas"]["Timestamp"];
             resolve_i1?: components["schemas"]["ResolveI1"];
         };
+        /** @description The later expiry of a time-limited membership in effect (`extendGroupMember`). */
         GroupMemberExtend: {
             expires_at: components["schemas"]["Timestamp"];
         };

@@ -11,7 +11,8 @@ T = TypeVar("T", bound="GroupMemberExtend")
 
 @_attrs_define
 class GroupMemberExtend:
-    """
+    """The later expiry of a time-limited membership in effect (`extendGroupMember`).
+
     Attributes:
         expires_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
     """

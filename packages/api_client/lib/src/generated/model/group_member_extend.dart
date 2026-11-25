@@ -8,7 +8,7 @@ import 'package:built_value/serializer.dart';
 
 part 'group_member_extend.g.dart';
 
-/// GroupMemberExtend
+/// The later expiry of a time-limited membership in effect (`extendGroupMember`).
 ///
 /// Properties:
 /// * [expiresAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.

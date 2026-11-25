@@ -113,7 +113,8 @@ def sync_detailed(
         group_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         user_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        body (GroupMemberExtend):
+        body (GroupMemberExtend): The later expiry of a time-limited membership in effect
+            (`extendGroupMember`).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -157,7 +158,8 @@ def sync(
         group_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         user_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        body (GroupMemberExtend):
+        body (GroupMemberExtend): The later expiry of a time-limited membership in effect
+            (`extendGroupMember`).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -196,7 +198,8 @@ async def asyncio_detailed(
         group_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         user_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        body (GroupMemberExtend):
+        body (GroupMemberExtend): The later expiry of a time-limited membership in effect
+            (`extendGroupMember`).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -238,7 +241,8 @@ async def asyncio(
         group_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         user_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        body (GroupMemberExtend):
+        body (GroupMemberExtend): The later expiry of a time-limited membership in effect
+            (`extendGroupMember`).
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

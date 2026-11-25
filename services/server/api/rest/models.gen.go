@@ -11619,7 +11619,7 @@ type GroupMemberAdd struct {
 	UserId Uuid `json:"user_id"`
 }
 
-// GroupMemberExtend defines model for GroupMemberExtend.
+// GroupMemberExtend The later expiry of a time-limited membership in effect (`extendGroupMember`).
 type GroupMemberExtend struct {
 	// ExpiresAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	ExpiresAt Timestamp `json:"expires_at"`

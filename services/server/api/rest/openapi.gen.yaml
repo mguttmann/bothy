@@ -26361,6 +26361,7 @@ components:
           $ref: '#/components/schemas/ResolveI1'
     GroupMemberExtend:
       type: object
+      description: 'The later expiry of a time-limited membership in effect (`extendGroupMember`).'
       additionalProperties: false
       required: [expires_at]
       properties:
