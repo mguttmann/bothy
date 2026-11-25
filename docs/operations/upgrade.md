@@ -70,15 +70,20 @@ refusal; run the steps below on the server. `<dir>` is the folder of the install
    bundle no longer has stays behind; the release notes name such files under "Upgrade notes".
 5. Compare the two templates,
    `diff <dir>.before-<new>/infra/compose/.env.example <dir>/infra/compose/.env.example`, add
-   every new variable to `infra/compose/.env` with its value, and set `BOTHY_VERSION` there to
-   `<new>`.
+   every new variable to `infra/compose/.env` with its value, and copy the value of
+   `BOTHY_VERSION` from the new `.env.example` into `.env`: it is the server version the product
+   release pins, which can differ from `<new>`, the version of the product release.
 6. Advance the marker: `printf 'version=%s\n' <new> > <dir>/.bothy-install`.
-7. In `<dir>/infra/compose` run the procedure of section 2 and its checks.
+7. In `<dir>/infra/compose` run the procedure of section 2 and its checks. Then recreate the
+   services that read files of the bundle only at their start, because Compose keeps a container
+   whose image did not change:
+   `docker compose up -d --force-recreate --no-deps otel-collector clamav`, and with the profile
+   `observability` also `prometheus alertmanager loki tempo grafana`.
 
 The way back to `<old>` (section 3 item 1) puts the files of the copy back before
 `docker compose up -d`: every file of `<dir>.before-<new>` except `infra/compose/secrets/`, which
-keeps its newer state. Remove the copy once the new version runs and the way back is no longer
-needed; it holds secrets.
+keeps its newer state; then recreate the same services as in step 7. Remove the copy once the
+new version runs and the way back is no longer needed; it holds secrets.
 
 ## 3. Rollback
 

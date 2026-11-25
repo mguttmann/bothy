@@ -428,8 +428,8 @@ ROWS = (
     (
         "Connections to the database",
         "postgresql.backends, pool metrics",
-        "database.max_conns within max_connections; several api processes, each with a pool of "
-        "its own (no connection pooler)",
+        "database.max_conns; several api processes, each with a pool of its own, the sum of all "
+        "pools plus other clients within max_connections (no connection pooler)",
     ),
     (
         "WebSocket connections",

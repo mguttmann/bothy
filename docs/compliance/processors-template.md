@@ -77,4 +77,5 @@ third-party error tracking service
 ([data usage of Claude Code](https://code.claude.com/docs/en/data-usage), retrieved 2026-11-25).
 The runner turns all three switches off by default (`runner.cli_telemetry` `false`,
 docs/spec/09-agents.md 18.2); an operator who sets it to `true` enters these services as rows of
-section 2.
+section 2. The switches leave the WebFetch domain safety check on: a turn that may use WebFetch
+sends each requested hostname to the vendor before the fetch.
