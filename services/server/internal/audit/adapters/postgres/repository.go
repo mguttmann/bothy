@@ -344,18 +344,6 @@ func (r *Repository) DestroyIPKeys(ctx context.Context, cutoff, at time.Time, li
 	})
 }
 
-// IPKeyByID returns one IP key (app.Store).
-func (r *Repository) IPKeyByID(ctx context.Context, id ids.ID) (domain.IPKey, bool, error) {
-	k, err := r.read(ctx).IPKeyByID(ctx, optionalUUID(id))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.IPKey{}, false, nil
-	}
-	if err != nil {
-		return domain.IPKey{}, false, err
-	}
-	return ipKey(k.ID, k.ValidFrom, k.ValidUntil, k.KeyCiphertext, k.KeyRef), true, nil
-}
-
 // ipKey converts the columns of a row of audit_ip_keys.
 func ipKey(id pgtype.UUID, from, until pgtype.Timestamptz, ciphertext []byte, ref string) domain.IPKey {
 	return domain.IPKey{ID: idOf(id), ValidFrom: from.Time.UTC(), ValidUntil: until.Time.UTC(), Ciphertext: ciphertext, KeyRef: ref}

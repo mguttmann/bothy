@@ -24,8 +24,6 @@ type Store interface {
 	// InsertIPKey inserts k unless a row with the same valid_from exists
 	// (ON CONFLICT (valid_from) DO NOTHING).
 	InsertIPKey(ctx context.Context, k domain.IPKey) error
-	// IPKeyByID returns the row id of audit_ip_keys and true, or false when it is missing.
-	IPKeyByID(ctx context.Context, id ids.ID) (domain.IPKey, bool, error)
 	// Rows returns the rows fromSeq .. toSeq in seq order, as stored (M1-50).
 	Rows(ctx context.Context, fromSeq, toSeq int64) ([]domain.Row, error)
 	// Bounds returns the smallest retained and the largest seq of audit_events, false for an

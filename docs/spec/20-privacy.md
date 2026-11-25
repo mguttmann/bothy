@@ -325,8 +325,9 @@ audit chain and replies with a quote stay consistent (03, principle 7).
   (`privacy.audit_ip_key_period`). The keys are stored encrypted in `audit_ip_keys` (03); the
   key for that comes from the secret provider (`privacy.audit_ip_kek_ref`). Keys are destroyed after
   `privacy.audit_ip_key_retention` (column emptied, row stays as a record). After that
-  the values can no longer be traced back to an IP; the chain stays unchanged. Within the period
-  the owner can check for an investigation whether a known IP matches. Reason for keys in the
+  the values can no longer be traced back to an IP; the chain stays unchanged. Bothy offers no
+  operation and no command that matches a known IP against these values (AUD-PKG-R2-owner-server):
+  the HMAC only lets equal addresses within one period be recognised as equal. Reason for keys in the
   database: they must be destroyable one by one, and the file driver of the secret provider creates
   no keys per period. Backups contain a destroyed key at most until
   the end of their own period (16, section 8.1).

@@ -16,7 +16,6 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/audit/domain"
 	"github.com/OWNER/bothy/services/server/internal/instance"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
-	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 )
 
@@ -84,17 +83,6 @@ func (s *fakeStore) InsertIPKey(_ context.Context, k domain.IPKey) error {
 	}
 	s.keys = append(s.keys, k)
 	return nil
-}
-
-func (s *fakeStore) IPKeyByID(_ context.Context, id ids.ID) (domain.IPKey, bool, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, k := range s.keys {
-		if k.ID == id {
-			return k, true, nil
-		}
-	}
-	return domain.IPKey{}, false, nil
 }
 
 func (s *fakeStore) committed() []domain.Row {

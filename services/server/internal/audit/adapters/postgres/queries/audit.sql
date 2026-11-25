@@ -50,10 +50,6 @@ INSERT INTO audit_ip_keys (id, valid_from, valid_until, key_ciphertext, key_ref)
 VALUES (sqlc.arg(id), sqlc.arg(valid_from), sqlc.arg(valid_until), sqlc.arg(key_ciphertext), sqlc.arg(key_ref))
 ON CONFLICT (valid_from) DO NOTHING;
 
--- name: IPKeyByID :one
--- One IP key by the ip_key_id of an audit row.
-SELECT id, valid_from, valid_until, key_ciphertext, key_ref FROM audit_ip_keys WHERE id = sqlc.arg(id);
-
 -- name: Rows :many
 -- The rows from_seq .. to_seq in chain order: the chain walk and the export (M1-50).
 SELECT seq, id, occurred_at, actor_principal_id, actor_device_id, actor_session_id, action, decision,
