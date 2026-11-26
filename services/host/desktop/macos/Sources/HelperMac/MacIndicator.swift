@@ -25,6 +25,7 @@ public final class MacIndicator: NSObject, Indicator, NSMenuDelegate {
         string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
 
     private let dispatch: (@escaping () -> Void) -> Void
+    private let interrupt: ActionInterrupt
     private let onToggle: () -> Void
     private let onMenuOpen: () -> Void
     private var onStop: (() -> Void)?
@@ -44,13 +45,15 @@ public final class MacIndicator: NSObject, Indicator, NSMenuDelegate {
     /// Creates the indicator; call `install()` on the main thread once the app runs.
     /// - Parameters:
     ///   - dispatch: runs a closure asynchronously in the controller's context.
+    ///   - interrupt: set at once by the stop button, so a running action stops between steps.
     ///   - onToggle: the person clicked "Allow computer control"; runs in the controller's context.
     ///   - onMenuOpen: the menu opens; runs in the controller's context, to refresh permissions.
     public init(
-        dispatch: @escaping (@escaping () -> Void) -> Void, onToggle: @escaping () -> Void,
-        onMenuOpen: @escaping () -> Void
+        dispatch: @escaping (@escaping () -> Void) -> Void, interrupt: ActionInterrupt,
+        onToggle: @escaping () -> Void, onMenuOpen: @escaping () -> Void
     ) {
         self.dispatch = dispatch
+        self.interrupt = interrupt
         self.onToggle = onToggle
         self.onMenuOpen = onMenuOpen
         super.init()
@@ -59,7 +62,7 @@ public final class MacIndicator: NSObject, Indicator, NSMenuDelegate {
     /// Creates the menu bar item. Main thread only.
     public func install() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "Bothy"
+        item.button?.title = "Computer Helper"
         let menu = NSMenu()
         menu.autoenablesItems = false
         menu.delegate = self
@@ -125,6 +128,7 @@ public final class MacIndicator: NSObject, Indicator, NSMenuDelegate {
 
     @objc private func stopClicked() {
         guard let stop = onStop else { return }
+        interrupt.requestStop(.indicatorStop)
         dispatch { stop() }
     }
 
@@ -141,7 +145,7 @@ public final class MacIndicator: NSObject, Indicator, NSMenuDelegate {
         sessionItem.isHidden = !live
         stopItem.isHidden = !live
         sessionSeparator.isHidden = !live
-        statusItem?.button?.title = live ? "Bothy: agent active" : "Bothy"
+        statusItem?.button?.title = live ? "Agent active" : "Computer Helper"
         guard let status else { return }
         switchItem.state = status.enabled ? .on : .off
         captureItem.title =

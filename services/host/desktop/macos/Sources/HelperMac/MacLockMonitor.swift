@@ -13,6 +13,7 @@ import HelperCore
 /// notification is missed.
 public final class MacLockMonitor: LockMonitor {
     private let dispatch: (@escaping () -> Void) -> Void
+    private let interrupt: ActionInterrupt
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
     private var screenLocked = false
     private var screenSaver = false
@@ -21,8 +22,11 @@ public final class MacLockMonitor: LockMonitor {
     private let lock = NSLock()
 
     /// Creates the monitor.
-    /// - Parameter dispatch: runs a closure asynchronously in the controller's context.
-    public init(dispatch: @escaping (@escaping () -> Void) -> Void) {
+    /// - Parameters:
+    ///   - interrupt: told the lock state at once, so a running action stops between two steps.
+    ///   - dispatch: runs a closure asynchronously in the controller's context.
+    public init(interrupt: ActionInterrupt, dispatch: @escaping (@escaping () -> Void) -> Void) {
+        self.interrupt = interrupt
         self.dispatch = dispatch
     }
 
@@ -47,6 +51,7 @@ public final class MacLockMonitor: LockMonitor {
                     [weak self] _ in
                     guard let self else { return }
                     self.lock.withLock { update(self) }
+                    self.interrupt.setLocked(self.isLocked())
                     self.dispatch(onChange)
                 }
                 observers.append((center, token))

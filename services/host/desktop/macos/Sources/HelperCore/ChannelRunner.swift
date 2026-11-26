@@ -4,20 +4,22 @@ import Foundation
 /// the session in the helper and connect again (27 8.4 item 2, D-CU-02-8).
 ///
 /// The runner blocks in `HostChannel.receive()` on its own thread and hands every frame to the
-/// controller through `perform`, which runs a closure synchronously in the controller's serial
-/// context.
+/// controller through `perform`, which queues a closure in the controller's serial context. The
+/// app queues asynchronously, so the reader keeps reading while a long action runs: a `hide`,
+/// a `disable` or a break sets `HelperController.interrupt` at once and stops the action between
+/// two of its steps.
 ///
 /// Example:
 /// ```swift
 /// let runner = ChannelRunner(channel: socket, controller: controller,
-///                            frameMaxBytes: limit, perform: { work in queue.sync(execute: work) })
+///                            frameMaxBytes: limit, perform: { work in queue.async(execute: work) })
 /// Thread { runner.run() }.start()
 /// ```
 public final class ChannelRunner {
     private let channel: HostChannel
     private let controller: HelperController
     private let frameMaxBytes: Int
-    private let perform: (() -> Void) -> Void
+    private let perform: (@escaping () -> Void) -> Void
     private let log: (String) -> Void
 
     /// Creates a runner.
@@ -25,11 +27,11 @@ public final class ChannelRunner {
     ///   - channel: the connection to the host service.
     ///   - controller: the helper's logic.
     ///   - frameMaxBytes: `host_service.computer_frame_max_bytes`.
-    ///   - perform: runs a closure synchronously in the controller's context.
+    ///   - perform: runs a closure in the controller's context, in the order of the calls.
     ///   - log: receives short lines without message contents.
     public init(
         channel: HostChannel, controller: HelperController, frameMaxBytes: Int,
-        perform: @escaping (() -> Void) -> Void, log: @escaping (String) -> Void = { _ in }
+        perform: @escaping (@escaping () -> Void) -> Void, log: @escaping (String) -> Void = { _ in }
     ) {
         self.channel = channel
         self.controller = controller
@@ -54,15 +56,18 @@ public final class ChannelRunner {
             do {
                 decoder.append(try channel.receive())
                 while let frame = try decoder.next() {
-                    var accepted = true
-                    perform { accepted = self.controller.handle(frame) }
-                    if !accepted { break reading }
+                    if case .message(let message) = frame { controller.interrupt.note(message) }
+                    perform {
+                        // A protocol fault closes the channel, which ends the reading below.
+                        if !self.controller.handle(frame) { self.channel.close() }
+                    }
                 }
             } catch {
                 // A closed, broken or too long frame: the connection is unusable.
                 break reading
             }
         }
+        controller.interrupt.requestEnd()
         channel.close()
         perform { self.controller.channelBroken() }
         log("channel closed")

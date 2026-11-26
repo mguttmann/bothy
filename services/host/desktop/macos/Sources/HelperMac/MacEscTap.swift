@@ -13,6 +13,7 @@ import HelperCore
 public final class MacEscTap: EscTap {
     private let dispatch: (@escaping () -> Void) -> Void
     private let ownSourceStateID: Int64?
+    private let interrupt: ActionInterrupt
     private var thread: Thread?
     private var runLoop: CFRunLoop?
     private var tap: CFMachPort?
@@ -23,9 +24,14 @@ public final class MacEscTap: EscTap {
     /// Creates the tap.
     /// - Parameters:
     ///   - ownSourceStateID: the state ID of `MacInjector`'s event source.
+    ///   - interrupt: set at once on a real Esc, so a running action stops between two steps.
     ///   - dispatch: runs a closure asynchronously in the controller's context.
-    public init(ownSourceStateID: Int64?, dispatch: @escaping (@escaping () -> Void) -> Void) {
+    public init(
+        ownSourceStateID: Int64?, interrupt: ActionInterrupt,
+        dispatch: @escaping (@escaping () -> Void) -> Void
+    ) {
         self.ownSourceStateID = ownSourceStateID
+        self.interrupt = interrupt
         self.dispatch = dispatch
     }
 
@@ -93,6 +99,8 @@ public final class MacEscTap: EscTap {
     fileprivate func escapeDown(injected: Bool) -> EscDecision {
         let decision = HelperController.escDecision(injected: injected)
         if decision == .swallow, let handler {
+            // The controller's queue may be busy with a long action; the flag stops it now.
+            interrupt.requestStop(.localEscape)
             dispatch { _ = handler(false) }
         }
         return decision

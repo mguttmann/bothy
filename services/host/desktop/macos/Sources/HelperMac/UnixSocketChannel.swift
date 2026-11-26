@@ -4,9 +4,9 @@ import HelperCore
 
 /// The helper's side of the channel on macOS: a Unix domain socket client (27 9.4).
 ///
-/// Before `hello` the helper checks the host side (D-CU-02-5): the socket's peer (`getpeereid`)
-/// is a user other than the helper's own and owns the endpoint folder, which only the host
-/// service's `install` creates. A development build may name another endpoint in
+/// Before `hello` the helper checks the host side with `PeerRule` (D-CU-02-5): the peer is the
+/// service user `bothy-host` or root, the folder chain of the endpoint cannot be changed by
+/// another user, and the socket belongs to the peer. A development build may name another endpoint in
 /// `BOTHY_COMPUTER_HELPER_CHANNEL` and then skips the check, so CI can run a fake host; a
 /// verified build ignores the variable.
 public final class UnixSocketChannel: HostChannel {
@@ -123,27 +123,36 @@ public final class UnixSocketChannel: HostChannel {
         }
     }
 
-    /// The host side check of D-CU-02-5.
-    /// - Throws: `ChannelConnectError.peerRefused` when the peer runs as the helper's own user
-    ///   or does not own the endpoint folder.
+    /// The host side check of D-CU-02-5 with the system's facts; the decision is
+    /// `PeerRule.check`.
+    /// - Throws: `PeerRule.Refusal` when the rule fails, `ChannelConnectError.system` when a
+    ///   system call fails.
     static func checkPeer(fd: Int32, path: String) throws {
         var uid: uid_t = 0
         var gid: gid_t = 0
         guard getpeereid(fd, &uid, &gid) == 0 else { throw ChannelConnectError.system(errno) }
-        let folder = (path as NSString).deletingLastPathComponent
-        var info = stat()
-        guard stat(folder, &info) == 0 else { throw ChannelConnectError.system(errno) }
-        try verifyPeer(peerUID: uid, ownUID: getuid(), folderOwner: info.st_uid)
+        try PeerRule.check(
+            socketPath: path, ownUID: getuid(), serviceUID: serviceUID(), peerUID: uid,
+            status: fileStatus)
     }
 
-    /// The rule of the check, apart from the system calls.
-    /// - Parameters:
-    ///   - peerUID: the user of the process on the other end.
-    ///   - ownUID: the helper's user.
-    ///   - folderOwner: the owner of the endpoint folder.
-    /// - Throws: `ChannelConnectError.peerRefused` when the rule fails.
-    public static func verifyPeer(peerUID: uid_t, ownUID: uid_t, folderOwner: uid_t) throws {
-        guard peerUID != ownUID, peerUID == folderOwner else { throw ChannelConnectError.peerRefused }
+    /// The UID of the service user from the user database, nil without the account.
+    static func serviceUID() -> UInt32? {
+        guard let entry = getpwnam(PeerRule.serviceUserName) else { return nil }
+        return entry.pointee.pw_uid
+    }
+
+    /// `lstat` of a path as `FileStatus`; a link is `other`, so it is never followed.
+    static func fileStatus(_ path: String) -> FileStatus? {
+        var info = stat()
+        guard lstat(path, &info) == 0 else { return nil }
+        let kind: FileStatus.Kind =
+            switch info.st_mode & S_IFMT {
+            case S_IFDIR: .directory
+            case S_IFSOCK: .socket
+            default: .other
+            }
+        return FileStatus(uid: info.st_uid, mode: UInt16(info.st_mode & 0o7777), kind: kind)
     }
 }
 
@@ -153,8 +162,6 @@ public enum ChannelConnectError: Error, Equatable {
     case system(Int32)
     /// The socket path does not fit into `sockaddr_un`.
     case pathTooLong
-    /// The peer check of D-CU-02-5 failed.
-    case peerRefused
     /// The channel is closed.
     case closed
 }

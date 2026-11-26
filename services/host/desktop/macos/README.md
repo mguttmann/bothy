@@ -6,11 +6,17 @@ desktop session of the person who owns the account, as an accessory app with a m
 and talks only to the local host service `bothy-host` over the channel of 27 section 9.4. It is
 built and signed on the owner's own Mac and never published (D-CU-01-29).
 
+Names: the app bundle is `bothy-computer-helper.app` (bundle ID `com.example.bothy-computer-helper`,
+executable `bothy-computer-helper`), installed to
+`/Library/Application Support/bothy-host/desktop/bothy-computer-helper.app`; its display name and
+menu bar title are "Computer Helper", because code and configuration carry the working name only
+in its prefix forms (docs/spec/02-architecture.md "6. Code layout").
+
 What it does:
 
 - **Enablement.** Off after installation. Only a click on "Allow computer control" in the menu
   bar switches it on; every switch-on raises the generation by one. Switch and generation live
-  in `~/Library/Application Support/Bothy Computer Helper/state.json` (mode `0600`, folder
+  in `~/Library/Application Support/bothy-computer-helper/state.json` (mode `0600`, folder
   `0700`, D-CU-02-4). The file is read at start only; changing it is no order. The host service
   can switch off (`disable`), never on.
 - **Session.** `show` draws a border in `#FF6A00` around every screen (D-CU-02-9) with a stop
@@ -27,6 +33,11 @@ What it does:
 - **Input.** Clicks with modifiers, double and triple click, move, scroll, Unicode text
   independent of the keyboard layout, and every key or combination of D-CU-02-7. The helper
   refuses no key and no app.
+- **Stopping a running action.** The Esc tap, the stop button, the lock monitor and the channel
+  reader (`hide`, `disable`, a broken channel) set a shared flag (`ActionInterrupt`) on their own
+  threads; an action checks it before every event, releases every key and button and ends.
+  `repeat` above the default of `computer.key_repeat_max` and a `text` longer than one frame of
+  `host_service.computer_frame_max_bytes` are `invalid_action` before anything is injected.
 - **Lock.** Lock, screen saver, user switch and display sleep count as locked: the helper
   reports `state` with `locked`, and every `capture` and `do` answers `screen_locked` and
   injects nothing.
@@ -40,7 +51,7 @@ What it does:
 | Path | Content |
 |---|---|
 | `Package.swift` | Swift package, tools version 5.9, macOS 14 (D-CU-02-1) |
-| `Sources/HelperCore/` | The logic, Foundation only: channel codec (`ChannelCodec.swift`), JSON model (`JSONValue.swift`, `Model.swift`), key names (`KeyNames.swift`), the platform interfaces (`Interfaces.swift`), the controller (`HelperController.swift`), the connection loop (`ChannelRunner.swift`), the state file (`FileEnablementStore.swift`) and the frame limit from the host configuration (`HostConfig.swift`) |
+| `Sources/HelperCore/` | The logic, Foundation only: channel codec (`ChannelCodec.swift`), JSON model (`JSONValue.swift`, `Model.swift`), key names (`KeyNames.swift`), the platform interfaces (`Interfaces.swift`), the controller (`HelperController.swift`, `ActionInterrupt.swift`), the peer rule (`PeerRule.swift`), the connection loop (`ChannelRunner.swift`), the state file (`FileEnablementStore.swift`) and the frame limit from the host configuration (`HostConfig.swift`) |
 | `Sources/HelperMac/` | The macOS implementations of the interfaces and the app wiring (`HelperApp.swift`) |
 | `Sources/bothy-computer-helper/` | The executable; `--version` prints the version and exits |
 | `Tests/HelperCoreTests/` | XCTest unit tests of `HelperCore` against fakes and the shared channel vectors |
@@ -68,8 +79,11 @@ controller runs against fakes in the unit tests:
 The channel: frames of a 4-byte big-endian length, a type byte (`0x01` JSON object, `0x02` image
 bytes) and the content; the longest frame is `host_service.computer_frame_max_bytes`, read from
 the host service's `config.yaml` when readable, else the default of 27 section 18 (D-CU-02-8).
-Before `hello` the helper checks that the socket's peer is another user that owns the endpoint
-folder (D-CU-02-5). A development build accepts another endpoint in the environment variable
+Before `hello` the helper checks the host side (D-CU-02-5, rule in `PeerRule.swift`): the peer
+(`getpeereid`) is the service user `bothy-host` or root and never the helper's own user; every
+folder from `/` to `bothy-host/` is owned by root, the endpoint folder `computer/` by root or the
+service user, none writable by group or others; and the socket (read with `lstat`) is owned by
+the peer. A development build accepts another endpoint in the environment variable
 `BOTHY_COMPUTER_HELPER_CHANNEL` and then skips that check; a verified build ignores the variable.
 
 ## Build and test
@@ -85,7 +99,7 @@ The tests read `services/host/testdata/computer/channel-vectors.json`, so run th
 checkout. They use fakes only: no test captures the screen, sends input or opens a window. The
 native behaviour is tested by the CI jobs of `host-platform.yml` on hosted runners.
 
-`bundle.sh` writes `<out_dir>/Bothy Computer Helper.app` with the executable in
+`bundle.sh` writes `<out_dir>/bothy-computer-helper.app` with the executable in
 `Contents/MacOS/bothy-computer-helper` and the version in `Info.plist`, and signs it ad hoc with
 the hardened runtime. Such a bundle reports `signature: development`.
 

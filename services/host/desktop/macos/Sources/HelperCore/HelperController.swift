@@ -28,6 +28,9 @@ public final class HelperController {
     private let info: HelperInfo
     private let codec: FrameCodec
     private let log: (String) -> Void
+    /// The flag a running action checks between its steps; the platform layer sets it from the
+    /// Esc tap, the stop button, the lock monitor and the channel reader.
+    public let interrupt: ActionInterrupt
 
     private var enablement = EnablementState.off
     private var locked = false
@@ -51,13 +54,16 @@ public final class HelperController {
     ///   - store: the persisted enablement.
     ///   - info: version, signature state and account.
     ///   - frameMaxBytes: `host_service.computer_frame_max_bytes` (D-CU-02-8).
+    ///   - interrupt: the flag shared with the platform layer; a fresh one by default.
     ///   - log: receives short lines without image bytes or message contents.
     public init(
         capturer: Capturer, injector: Injector, appInspector: AppInspector,
         lockMonitor: LockMonitor, waker: Waker, escTap: EscTap, indicator: Indicator,
         store: EnablementStore, info: HelperInfo, frameMaxBytes: Int,
+        interrupt: ActionInterrupt = ActionInterrupt(),
         log: @escaping (String) -> Void = { _ in }
     ) {
+        self.interrupt = interrupt
         self.capturer = capturer
         self.injector = injector
         self.appInspector = appInspector
@@ -99,6 +105,7 @@ public final class HelperController {
         enablement = store.load()
         lockMonitor.start { [weak self] in self?.lockStateChanged() }
         locked = lockMonitor.isLocked()
+        interrupt.setLocked(locked)
         indicator.update(status: status)
     }
 
@@ -165,6 +172,7 @@ public final class HelperController {
     /// indicator and the display assertion (27 8.2) and is reported as `state`.
     public func lockStateChanged() {
         let now = lockMonitor.isLocked()
+        interrupt.setLocked(now)
         if now && !locked { injector.releaseAll() }
         locked = now
         reportChanges()
@@ -175,6 +183,7 @@ public final class HelperController {
     /// the menu opens and when the system reports an accessibility change; there is no timer.
     public func refreshStatus() {
         locked = lockMonitor.isLocked()
+        interrupt.setLocked(locked)
         reportChanges()
         indicator.update(status: status)
     }
@@ -233,6 +242,7 @@ public final class HelperController {
         if session != nil { endLocally() }
         injector.releaseAll()
         session = (sessionID, agent)
+        interrupt.begin(sessionID: sessionID)
         indicator.show(agentName: agent) { [weak self] in self?.indicatorStopClicked() }
         do {
             try escTap.start { [weak self] injected in
@@ -274,6 +284,7 @@ public final class HelperController {
     /// step runs even without a session, because the start uses it to clean up after a crash.
     private func endLocally() {
         session = nil
+        interrupt.finish()
         injector.releaseAll()
         indicator.hide()
         escTap.stop()
@@ -288,6 +299,7 @@ public final class HelperController {
             return
         }
         locked = lockMonitor.isLocked()
+        interrupt.setLocked(locked)
         if locked {
             answer(seq: seq, code: .screenLocked)
             return
@@ -402,6 +414,13 @@ public final class HelperController {
         }
         do {
             for step in steps {
+                // Checked before every step, so a stop, an end or a lock that arrives on
+                // another thread takes effect within one event, however long the action.
+                if let reason = interrupt.reason {
+                    injector.releaseAll()
+                    abort(seq: seq, reason: reason)
+                    return
+                }
                 switch step {
                 case .move(let point): try injector.move(to: point)
                 case .down(let key): try injector.keyDown(key)
@@ -422,6 +441,23 @@ public final class HelperController {
             return
         }
         answer(seq: seq, code: .ok)
+    }
+
+    /// Ends an action that an interrupt stopped: a lock answers `screen_locked` and keeps the
+    /// session; the person's stop ends the session with its `stop` frame first; an end by the
+    /// host or the channel leaves the session to the queued `hide`, `disable` or break. The
+    /// action is answered `invalid_action` when the session is gone, because nothing more of it
+    /// runs and none of it is retried.
+    private func abort(seq: Int64, reason: ActionInterrupt.Reason) {
+        switch reason {
+        case .locked:
+            answer(seq: seq, code: .screenLocked)
+        case .person(let detail):
+            stopByPerson(detail)
+            answer(seq: seq, code: .invalidAction)
+        case .ended:
+            answer(seq: seq, code: .invalidAction)
+        }
     }
 
     private func plan(_ message: JSONValue) -> [Step]? {
@@ -448,7 +484,10 @@ public final class HelperController {
             else { return nil }
             return [.move(point), .scroll(point, direction, Int(amount))]
         case "type":
-            guard let text = message["text"]?.stringValue else { return nil }
+            // A text longer than one frame of host_service.computer_frame_max_bytes cannot have
+            // come from the host service; it is refused before anything is typed.
+            guard let text = message["text"]?.stringValue, text.utf8.count <= codec.maxFrameBytes
+            else { return nil }
             return typeSteps(text)
         case "key":
             guard let keys = message["keys"]?.stringValue,
@@ -456,9 +495,9 @@ public final class HelperController {
                 combo.keys.allSatisfy(injector.supports)
             else { return nil }
             let repeatCount = message["repeat"]?.intValue ?? 1
-            // The upper bound is computer.key_repeat_max, enforced by the host service; the
-            // helper only needs a count it can loop over.
-            guard repeatCount >= 1, repeatCount <= Int64(Int32.max) else { return nil }
+            // The host service enforces computer.key_repeat_max; the helper holds its default
+            // as an outer bound, so no request builds an unbounded action.
+            guard repeatCount >= 1, repeatCount <= Int64(Limits.keyRepeatMax) else { return nil }
             let once = combo.keys.map(Step.down) + combo.keys.reversed().map(Step.up)
             return Array(repeating: once, count: Int(repeatCount)).flatMap { $0 }
         default:

@@ -6,7 +6,9 @@ import os
 /// Wires the platform implementations to `HelperController` and runs the accessory app.
 ///
 /// Threads: AppKit on the main thread; the controller on one serial queue; the channel reader
-/// on its own thread, which enters the controller with `sync`; the Esc tap on its own run loop.
+/// on its own thread, which queues frames for the controller; the Esc tap on its own run loop.
+/// The tap, the stop button, the lock monitor and the reader also set the shared
+/// `ActionInterrupt` directly, because the controller's queue may be busy with an action.
 /// The main thread enters the controller only with `async`, and the controller may wait for the
 /// main thread (`MainThread.sync`), so the two never wait for each other.
 public final class HelperApp: NSObject, NSApplicationDelegate {
@@ -36,19 +38,21 @@ public final class HelperApp: NSObject, NSApplicationDelegate {
         let info = HelperInfo(version: Self.version, signature: signature, osAccount: NSUserName())
         let injector = MacInjector()
         let frameMax = HostConfig.frameMaxBytes()
+        let interrupt = ActionInterrupt()
         var controllerRef: HelperController?
         let indicator = MacIndicator(
-            dispatch: dispatch, onToggle: { controllerRef?.toggleEnablementByClick() },
+            dispatch: dispatch, interrupt: interrupt, onToggle: { controllerRef?.toggleEnablementByClick() },
             onMenuOpen: { controllerRef?.refreshStatus() })
         indicator.install()
         let logger = self.logger
         let controller = HelperController(
             capturer: MacCapturer(), injector: injector, appInspector: MacAppInspector(),
-            lockMonitor: MacLockMonitor(dispatch: dispatch),
+            lockMonitor: MacLockMonitor(interrupt: interrupt, dispatch: dispatch),
             waker: MacWaker(),
-            escTap: MacEscTap(ownSourceStateID: injector.sourceStateID, dispatch: dispatch),
+            escTap: MacEscTap(
+                ownSourceStateID: injector.sourceStateID, interrupt: interrupt, dispatch: dispatch),
             indicator: indicator, store: FileEnablementStore(folder: FileEnablementStore.defaultFolder()),
-            info: info, frameMaxBytes: frameMax,
+            info: info, frameMaxBytes: frameMax, interrupt: interrupt,
             log: { logger.notice("\($0, privacy: .public)") })
         controllerRef = controller
         self.controller = controller
@@ -67,7 +71,9 @@ public final class HelperApp: NSObject, NSApplicationDelegate {
         }
         let runner = ChannelRunner(
             channel: channel, controller: controller, frameMaxBytes: frameMax,
-            perform: { work in queue.sync(execute: work) },
+            // Asynchronous, so the reader keeps reading during a long action and a hide,
+            // disable or break reaches the interrupt flag at once.
+            perform: { work in queue.async(execute: work) },
             log: { logger.notice("\($0, privacy: .public)") })
         let thread = Thread { runner.run() }
         thread.name = "channel"

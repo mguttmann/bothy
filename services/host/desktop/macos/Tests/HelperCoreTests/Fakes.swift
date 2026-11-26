@@ -256,11 +256,16 @@ final class Rig {
         capturer: capturer, injector: injector, appInspector: inspector, lockMonitor: lock,
         waker: waker, escTap: tap, indicator: indicator, store: store,
         info: HelperInfo(version: "1.2.3", signature: .development, osAccount: "alex"),
-        frameMaxBytes: HostConfig.defaultFrameMaxBytes)
+        frameMaxBytes: frameMaxBytes)
+    let frameMaxBytes: Int
 
     static let sessionID = "0192f3a4-5b6c-7d8e-9f01-23456789abcd"
 
-    init(enabled: Bool = true, generation: Int = 3, connect: Bool = true) {
+    init(
+        enabled: Bool = true, generation: Int = 3, connect: Bool = true,
+        frameMaxBytes: Int = HostConfig.defaultFrameMaxBytes
+    ) {
+        self.frameMaxBytes = frameMaxBytes
         store = MemoryStore(EnablementState(enabled: enabled, generation: generation))
         controller.start()
         if connect { controller.channelOpened(channel) }
