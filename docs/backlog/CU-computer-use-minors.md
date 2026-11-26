@@ -21,3 +21,6 @@ Collected minors without a reproduced harm; the next run in this area reads and 
     trims Unicode white space (only matters for a brand name ending in such a character).
   - `BRANDING_APP_NAME_W` with non-ASCII characters depends on MSVC's source character set (no
     `/utf-8`), while `Runner.rc` reads its narrow name as UTF-8; the two folder names could differ.
+- (26.11., review b4151427e) `start-computer-helper.sh`: no test for the exit 1 path (bootstrap keeps failing, service gone); the `kickstart -k` fallback keeps the loaded plist definition.
+- (26.11., review b4151427e) macOS permission item: during a running action the pane opens only after the action; `CGRequestScreenCaptureAccess` and the pane can show two dialogs at once.
+- (26.11., live) Windows tray icon of the helper is the generic application icon and lands in the overflow ("^"); the owner did not find the switch "Allow computer control". An own icon would make it findable.
