@@ -42,7 +42,7 @@ void main() {
   final userId = Uint8List.fromList([9, 8, 7]);
 
   Map<String, Object?> creation({Map<String, Object?>? selection}) => {
-    'rp': {'id': 'chat.example.com', 'name': 'Bothy'},
+    'rp': {'id': 'chat.example.com', 'name': 'Team Chat'},
     'user': {'id': b64(userId), 'name': 'ada', 'displayName': 'Ada L.'},
     'challenge': 'Y2hhbGxlbmdlLWNyZWF0ZQ',
     'pubKeyCredParams': [
@@ -78,7 +78,7 @@ void main() {
     expect(calls.single.method, 'makeCredential');
     final args = calls.single.arguments as Map;
     expect(args['rpId'], 'chat.example.com');
-    expect(args['rpName'], 'Bothy');
+    expect(args['rpName'], 'Team Chat');
     expect(args['userId'], userId);
     expect(args['userName'], 'ada');
     expect(args['userDisplayName'], 'Ada L.');
