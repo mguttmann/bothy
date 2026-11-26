@@ -84,6 +84,31 @@ new sessions of that session user and ends its running ones, no other session us
 any other start-refusing finding refuses new sessions with `pty_failed`.
 Every change of the result sends `report`.
 
+## Computer sessions (CU-03)
+
+Normative: [27-computer-use.md](../../docs/spec/27-computer-use.md); rulings:
+[decisions.d/CU-03.md](../../docs/decisions.d/CU-03.md). Only with `host_service.computer_use`
+(refused together with `host_service.owner_account`): the service opens the helper endpoint
+(macOS `/Library/Application Support/bothy-host/computer/computer.sock`, Windows
+`\\.\pipe\bothy-host-computer`, Linux `/run/bothy-host-computer/computer.sock` for the test peer
+of `host_service.computer_test_peer` only) and admits the computer helper by the peer rule of 27 9.4
+(console user, not the service user or a session user, the installed helper path with the rule of
+HD10, the signing requirement of the build); a refused peer is closed and logged with
+`computer_peer_refused`. The helper's `hello` and `state` become the `report` object `computer`;
+without the key nothing listens and the object says `helper: absent`.
+
+`computer.open` checks helper, enablement and the controller lock (one live computer session per
+host), shows the indicator and dials `/api/v1/hosts/computer-sessions/{session_id}/stream`; message
+1 runs the checks of 27 5.3 with the prologue `bothy-computer/1` and the attach token
+(`computer-session+jwt`, verified with the JWKS of purpose `terminal` of that connection). Frames
+`0x20` to `0x25` (`internal/frame`, `frame.Decode` takes the session kind). Actions are mapped back
+from screenshot pixels with scale IDs, images go out in `cu_image_data` chunks of at most
+`frame.MaxImageChunk` bytes and live only in memory. A lock pauses the session (`screen_locked` per
+action, every key released), the unlock resumes. Every end the host sees releases every key and
+button, hides the indicator, sends `cu_state` `stopped` and exactly one `computer.ended` (none after
+`computer.close`). The Linux test backend of the helper is
+[test/computer_backend](test/computer_backend/README.md).
+
 ## Session ops of the local channel
 
 Kind `0x00` carries JSON ops `{"op","id","d"}`:
@@ -293,7 +318,10 @@ place; it never prints a path.
 `doctor` prints one line per entry (`HD<n> ok`, `HD<n> WARN <code>`, `HD<n> FAIL <code>` with
 `session_user=`, `user=`, `drive=` or `item=`), the summary and the declaration in use; never a
 path, a content or a value. The codes are the table "Codes of `doctor`" in 24 2.2. The report to
-the server carries codes and, by the rule for names, the names of session users only.
+the server carries codes and, by the rule for names, the names of session users only. After the
+summary follows the section `computer` (27 9.3; no HD check): `computer: off`, or the helper
+installed, its path trusted, the build signed or development, the helper connected, switched on
+with its generation, and the two permissions.
 
 ## Exit policy and the way per platform
 
@@ -339,8 +367,10 @@ the server carries codes and, by the rule for names, the names of session users 
 | `internal/pty/` | PTY and process tree per platform (cgroup, process group and run file, Job Object) |
 | `internal/profiles/` | offered profiles, start specifications and allow-list environments |
 | `internal/confirm/` | confirmation endpoint, peer rule and the agent with its dialogs |
+| `internal/computer/` | computer sessions (CU-03): manager, session, helper channel, peer rule, scale map, chunking, attach token check |
 | `testdata/fakeclaude/` | stand-in for `claude auth status` ([README](testdata/fakeclaude/README.md)) |
 | `test/platform/` | the platform suite (build tag `platform`), its marker guard (`guard.go`, untagged) and the accounts it creates (`accounts.go`, untagged) |
+| `test/computer_backend/` | Linux test backend of the computer helper (Python, python-xlib and XTEST) and the fixture app ([README](test/computer_backend/README.md)) |
 | `test/noisedevice/` | the Noise sidecar of the Go test device of the terminal suite in `services/server/test/terminal` (M2-48): JSON lines on stdin and stdout, `internal/noise` and `internal/frame` unchanged |
 | `.go-arch-lint.yml` | architecture rules, maintained by hand, one component per package |
 
