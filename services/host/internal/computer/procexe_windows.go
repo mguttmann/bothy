@@ -70,8 +70,11 @@ func (w *winProc) Close() error { return windows.CloseHandle(w.h) }
 
 // DefaultVerifySignature checks the Authenticode signature of path with WinVerifyTrust and that
 // the certificate of the signer itself (the leaf of the signer's chain that the trust provider
-// built, not any certificate embedded in the signature) carries the subject requirement as its
-// simple display name (docs/spec/27-computer-use.md 9.4: Authenticode with the publisher subject).
+// built, not any certificate embedded in the signature) has the subject requirement as its
+// distinguished name, written as Windows shows a subject ("CN=bothy-computer-helper (local)",
+// hostdist.HELPER_CERT_SUBJECT; docs/spec/27-computer-use.md 9.4: Authenticode with the publisher
+// subject). It compared the simple display name ("bothy-computer-helper (local)") before, so the
+// requirement the package carries never matched (a Windows 11 test machine, reason signature).
 func DefaultVerifySignature(_ context.Context, path, requirement string) error {
 	p, err := windows.UTF16PtrFromString(path)
 	if err != nil {
@@ -101,6 +104,13 @@ var (
 	procWTHelperGetProvCertFromChain   = wintrust.NewProc("WTHelperGetProvCertFromChain")
 )
 
+// String formats of CertGetNameString with CERT_NAME_RDN_TYPE (wincrypt.h), which
+// golang.org/x/sys/windows does not name.
+const (
+	certX500NameStr        = 3          // CERT_X500_NAME_STR
+	certNameStrReverseFlag = 0x02000000 // CERT_NAME_STR_REVERSE_FLAG
+)
+
 // cryptProviderCert is the start of CRYPT_PROVIDER_CERT (wintrust.h): cbStruct, then pCert.
 type cryptProviderCert struct {
 	CbStruct uint32
@@ -108,7 +118,7 @@ type cryptProviderCert struct {
 }
 
 // signerSubjectIs reports whether the leaf certificate of the first signer of the verification
-// state has the simple display name subject.
+// state has the distinguished name subject (X.500 string, the order .NET's Subject shows).
 func signerSubjectIs(state windows.Handle, subject string) bool {
 	prov, _, _ := procWTHelperProvDataFromStateData.Call(uintptr(state))
 	if prov == 0 {
@@ -128,7 +138,9 @@ func signerSubjectIs(state windows.Handle, subject string) bool {
 	if cert.PCert == nil {
 		return false
 	}
-	var buf [512]uint16
-	n := windows.CertGetNameString(cert.PCert, windows.CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, nil, &buf[0], uint32(len(buf)))
+	var buf [1024]uint16
+	// The X.500 string in the order .NET's Subject shows ("CN=..., O=...").
+	format := uint32(certX500NameStr | certNameStrReverseFlag)
+	n := windows.CertGetNameString(cert.PCert, windows.CERT_NAME_RDN_TYPE, 0, unsafe.Pointer(&format), &buf[0], uint32(len(buf))) //nolint:gosec // G103: pvTypePara points at the DWORD of the string format
 	return n > 1 && windows.UTF16ToString(buf[:n-1]) == subject
 }

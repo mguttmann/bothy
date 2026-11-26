@@ -479,7 +479,8 @@ start is not refused, and the host gives no terminal session.
   Windows `%ProgramFiles%\bothy-host\bothy-computer-helper.exe`, D-CU-03-7),
   whose file and folder chain belong to a trusted owner (the rule of HD10); and when the host
   service's build carries a code signing requirement, the executable satisfies it (macOS: the
-  designated requirement with the team ID; Windows: Authenticode with the publisher subject).
+  designated requirement with the team ID; Windows: Authenticode with the publisher subject, compared
+  as the signer's distinguished name such as `CN=bothy-computer-helper (local)`).
   Otherwise the connection is closed and logged with `computer_peer_refused` and the key `reason`,
   the step that refused it (`no_peer`, `no_binding`, `console_user`, `process_changed`, `exe_unavailable`,
   `path_mismatch`, `path_untrusted`, `signature`, `test_peer`, or `no_hello` for a peer without a
