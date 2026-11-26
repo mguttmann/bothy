@@ -1105,6 +1105,7 @@ def test_rendered_rows_follow_the_sources() -> None:
     )
     assert (
         f"| `pairHost` | POST | `/api/v1/hosts/pair` | {AUTH_FLOW} |\n"
+        f"| `openComputerSession` | POST | `/api/v1/computer/sessions` | {AUTH_FLOW} |\n"
         "| `openTerminalSession` | POST | `/api/v1/hosts/{host_id}/terminal/sessions` | "
         f"{AUTH_FLOW} |\n"
     ) in chapter["idempotency_exempt"]

@@ -76,6 +76,11 @@ def test_release_build_writes_one_binary_per_platform(tmp_path: Path) -> None:
         f"bothy-host_{version}_linux_arm64": ("elf", 0xB7),
         f"bothy-host_{version}_windows_amd64.exe": ("pe", 0x8664),
     }
+    # The MCP server of computer use ships with the host release (docs/spec/27-computer-use.md C1).
+    expected |= {
+        name.replace("bothy-host_", "bothy-computer-mcp_", 1): want
+        for name, want in expected.items()
+    }
     packages = {
         f"bothy-host_{version}_linux_{arch}.{kind}"
         for kind in ("deb", "rpm")
