@@ -41,7 +41,13 @@ const pipeSDDL = "D:P(A;;GA;;;SY)(A;;0x4;;;OW)(A;;0x12008b;;;IU)"
 // FILE_FLAG_FIRST_PIPE_INSTANCE, so a pipe of this name created first by another process makes
 // Listen fail instead of sharing the name.
 func Listen(endpoint string) (net.Listener, error) {
-	sd, err := windows.SecurityDescriptorFromString(pipeSDDL)
+	sddl := pipeSDDL
+	// The account of the service creates the further instances by name as well, not only through
+	// OWNER RIGHTS (as localchan.WithCreator, AUD-PKG-R2-06/8).
+	if u, err := windows.GetCurrentProcessToken().GetTokenUser(); err == nil {
+		sddl += "(A;;0x4;;;" + u.User.Sid.String() + ")"
+	}
+	sd, err := windows.SecurityDescriptorFromString(sddl)
 	if err != nil {
 		return nil, fmt.Errorf("confirm: pipe security: %w", err)
 	}

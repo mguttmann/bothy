@@ -42,18 +42,22 @@ func TestPipeRoundTripChecksTheClientAfterItsFirstMessage(t *testing.T) {
 			return OpHello, map[string]any{"version": ProtocolVersion, "session_user": m.Op}
 		})
 	}()
-	c, err := DialHelper(ctx, path, func() (Expect, error) { return Expect{UID: sid, PID: os.Getpid()}, nil })
-	if err != nil {
-		t.Fatalf("dial: %v", err)
+	// Two connections one after the other: the second needs a new instance of the pipe, which
+	// the server creates after the first client connected.
+	for i := range 2 {
+		c, err := DialHelper(ctx, path, func() (Expect, error) { return Expect{UID: sid, PID: os.Getpid()}, nil })
+		if err != nil {
+			t.Fatalf("dial %d: %v", i, err)
+		}
+		var hello struct {
+			Version     int    `json:"version"`
+			SessionUser string `json:"session_user"`
+		}
+		if err := c.Call(ctx, OpHello, struct{}{}, OpHello, &hello); err != nil || hello.Version != ProtocolVersion || hello.SessionUser != OpHello {
+			t.Fatalf("call %d: %+v %v", i, hello, err)
+		}
+		_ = c.Close()
 	}
-	var hello struct {
-		Version     int    `json:"version"`
-		SessionUser string `json:"session_user"`
-	}
-	if err := c.Call(ctx, OpHello, struct{}{}, OpHello, &hello); err != nil || hello.Version != ProtocolVersion || hello.SessionUser != OpHello {
-		t.Fatalf("call: %+v %v", hello, err)
-	}
-	_ = c.Close()
 	cancel()
 	select {
 	case err := <-done:

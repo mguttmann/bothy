@@ -86,7 +86,7 @@ func windowsHelperProbe(users []string) []string {
 	_, _ = try("net", "user", u, windowsPassword)
 	errFile := filepath.Join(os.TempDir(), "bothy-helper-probe.err")
 	script := "$p = ConvertTo-SecureString '" + windowsPassword + "' -AsPlainText -Force; " +
-		"$c = New-Object System.Management.Automation.PSCredential('" + u + "', $p); " +
+		"$c = New-Object System.Management.Automation.PSCredential('.\\" + u + "', $p); " +
 		"$r = Start-Process -PassThru -NoNewWindow -Credential $c -FilePath '" + installedBinary() + "' " +
 		"-ArgumentList 'pty-helper','--session-user','" + u + "' -RedirectStandardError '" + errFile + "' -RedirectStandardOutput '" + errFile + ".out'; " +
 		"if ($r.WaitForExit(10000)) { 'helper by hand: exit ' + $r.ExitCode } else { 'helper by hand: still running after 10 s'; Stop-Process -Id $r.Id -Force }"
