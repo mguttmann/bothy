@@ -849,9 +849,13 @@ def _expand(text: str) -> str:
 
 
 def _capture(path: Path) -> list[dict[str, Any]]:
+    # Another fake process may be appending a record: a last line without its newline is left
+    # out, as in helper.read_capture.
     if not path.exists():
         return []
-    return [json.loads(x) for x in path.read_text().splitlines() if x.strip()]
+    text = path.read_text()
+    complete = text[: text.rfind("\n") + 1]
+    return [json.loads(x) for x in complete.splitlines() if x.strip()]
 
 
 def _uuid_of(raw: str) -> str:
