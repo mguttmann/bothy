@@ -117,6 +117,12 @@ class _$Host extends Host {
   @override
   final DateTime? lastSeenAt;
   @override
+  final HostComputer? computer;
+  @override
+  final bool? computerListed;
+  @override
+  final int? computerDisabledGeneration;
+  @override
   final DateTime createdAt;
   @override
   final int version;
@@ -147,6 +153,9 @@ class _$Host extends Host {
     this.hostVersion,
     this.osVersion,
     this.lastSeenAt,
+    this.computer,
+    this.computerListed,
+    this.computerDisabledGeneration,
     required this.createdAt,
     required this.version,
   }) : super._();
@@ -183,6 +192,9 @@ class _$Host extends Host {
         hostVersion == other.hostVersion &&
         osVersion == other.osVersion &&
         lastSeenAt == other.lastSeenAt &&
+        computer == other.computer &&
+        computerListed == other.computerListed &&
+        computerDisabledGeneration == other.computerDisabledGeneration &&
         createdAt == other.createdAt &&
         version == other.version;
   }
@@ -212,6 +224,9 @@ class _$Host extends Host {
     _$hash = $jc(_$hash, hostVersion.hashCode);
     _$hash = $jc(_$hash, osVersion.hashCode);
     _$hash = $jc(_$hash, lastSeenAt.hashCode);
+    _$hash = $jc(_$hash, computer.hashCode);
+    _$hash = $jc(_$hash, computerListed.hashCode);
+    _$hash = $jc(_$hash, computerDisabledGeneration.hashCode);
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jc(_$hash, version.hashCode);
     _$hash = $jf(_$hash);
@@ -243,6 +258,9 @@ class _$Host extends Host {
           ..add('hostVersion', hostVersion)
           ..add('osVersion', osVersion)
           ..add('lastSeenAt', lastSeenAt)
+          ..add('computer', computer)
+          ..add('computerListed', computerListed)
+          ..add('computerDisabledGeneration', computerDisabledGeneration)
           ..add('createdAt', createdAt)
           ..add('version', version))
         .toString();
@@ -358,6 +376,21 @@ class HostBuilder implements Builder<Host, HostBuilder> {
   DateTime? get lastSeenAt => _$this._lastSeenAt;
   set lastSeenAt(DateTime? lastSeenAt) => _$this._lastSeenAt = lastSeenAt;
 
+  HostComputerBuilder? _computer;
+  HostComputerBuilder get computer =>
+      _$this._computer ??= HostComputerBuilder();
+  set computer(HostComputerBuilder? computer) => _$this._computer = computer;
+
+  bool? _computerListed;
+  bool? get computerListed => _$this._computerListed;
+  set computerListed(bool? computerListed) =>
+      _$this._computerListed = computerListed;
+
+  int? _computerDisabledGeneration;
+  int? get computerDisabledGeneration => _$this._computerDisabledGeneration;
+  set computerDisabledGeneration(int? computerDisabledGeneration) =>
+      _$this._computerDisabledGeneration = computerDisabledGeneration;
+
   DateTime? _createdAt;
   DateTime? get createdAt => _$this._createdAt;
   set createdAt(DateTime? createdAt) => _$this._createdAt = createdAt;
@@ -395,6 +428,9 @@ class HostBuilder implements Builder<Host, HostBuilder> {
       _hostVersion = $v.hostVersion;
       _osVersion = $v.osVersion;
       _lastSeenAt = $v.lastSeenAt;
+      _computer = $v.computer?.toBuilder();
+      _computerListed = $v.computerListed;
+      _computerDisabledGeneration = $v.computerDisabledGeneration;
       _createdAt = $v.createdAt;
       _version = $v.version;
       _$v = null;
@@ -463,6 +499,9 @@ class HostBuilder implements Builder<Host, HostBuilder> {
             hostVersion: hostVersion,
             osVersion: osVersion,
             lastSeenAt: lastSeenAt,
+            computer: _computer?.build(),
+            computerListed: computerListed,
+            computerDisabledGeneration: computerDisabledGeneration,
             createdAt: BuiltValueNullFieldError.checkNotNull(
               createdAt,
               r'Host',
@@ -485,6 +524,9 @@ class HostBuilder implements Builder<Host, HostBuilder> {
         _sessionUsers?.build();
         _$failedField = 'reportedSessionUsers';
         _reportedSessionUsers?.build();
+
+        _$failedField = 'computer';
+        _computer?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(r'Host', _$failedField, e.toString());
       }

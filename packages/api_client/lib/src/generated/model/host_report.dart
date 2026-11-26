@@ -7,6 +7,7 @@ import 'package:built_collection/built_collection.dart';
 import 'package:api_client/src/generated/model/host_reported_session_user.dart';
 import 'package:api_client/src/generated/model/host_doctor_check.dart';
 import 'package:api_client/src/generated/model/host_profile.dart';
+import 'package:api_client/src/generated/model/host_computer.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -21,6 +22,7 @@ part 'host_report.g.dart';
 /// * [isServerHost]
 /// * [requireLocalConfirm]
 /// * [osVersion]
+/// * [computer] - The state of the computer helper (27 4 item 2 and 12.3); absent while `host_service.computer_use` is off. Not a doctor check (the list stays HD1 to HD11).
 @BuiltValue()
 abstract class HostReport implements Built<HostReport, HostReportBuilder> {
   @BuiltValueField(wireName: r'profiles')
@@ -41,6 +43,10 @@ abstract class HostReport implements Built<HostReport, HostReportBuilder> {
 
   @BuiltValueField(wireName: r'os_version')
   String? get osVersion;
+
+  /// The state of the computer helper (27 4 item 2 and 12.3); absent while `host_service.computer_use` is off. Not a doctor check (the list stays HD1 to HD11).
+  @BuiltValueField(wireName: r'computer')
+  HostComputer? get computer;
 
   HostReport._();
 
@@ -97,6 +103,13 @@ class _$HostReportSerializer implements PrimitiveSerializer<HostReport> {
       yield serializers.serialize(
         object.osVersion,
         specifiedType: const FullType(String),
+      );
+    }
+    if (object.computer != null) {
+      yield r'computer';
+      yield serializers.serialize(
+        object.computer,
+        specifiedType: const FullType(HostComputer),
       );
     }
   }
@@ -172,6 +185,14 @@ class _$HostReportSerializer implements PrimitiveSerializer<HostReport> {
           ) as String?;
           if (valueDes == null) continue;
           result.osVersion = valueDes;
+          break;
+        case r'computer':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(HostComputer),
+          ) as HostComputer?;
+          if (valueDes == null) continue;
+          result.computer.replace(valueDes);
           break;
         default:
           unhandled.add(key);
