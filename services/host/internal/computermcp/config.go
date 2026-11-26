@@ -104,22 +104,22 @@ func ConfigFromEnv(getenv func(string) string) (Config, error) {
 	}
 	u.Path = ""
 	cfg.Server = u
-	if ca := getenv(EnvCAFile); ca != "" {
-		if !filepath.IsAbs(ca) {
-			return bad(EnvCAFile, "must be an absolute path")
-		}
-		pool, err := rootsWith(filepath.Clean(ca))
-		if err != nil {
-			return bad(EnvCAFile, err.Error())
-		}
-		cfg.RootCAs = pool
+	if cfg.RootCAs, err = rootsOf(getenv(EnvCAFile)); err != nil {
+		return bad(EnvCAFile, err.Error())
 	}
 	return cfg, nil
 }
 
-// rootsWith returns the system roots plus the certificates of the PEM file path.
-func rootsWith(path string) (*x509.CertPool, error) {
-	pem, err := os.ReadFile(path) // #nosec G304 -- the runner names its own CA file (D-CU-06-12)
+// rootsOf returns nil for an empty path (the system roots), else the system roots plus the
+// certificates of the PEM file path, which must be absolute.
+func rootsOf(path string) (*x509.CertPool, error) {
+	if path == "" {
+		return nil, nil
+	}
+	if !filepath.IsAbs(path) {
+		return nil, errors.New("must be an absolute path")
+	}
+	pem, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 -- the runner names its own CA file (D-CU-06-12)
 	if err != nil {
 		return nil, errors.New("cannot be read")
 	}

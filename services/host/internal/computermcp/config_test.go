@@ -3,6 +3,7 @@
 package computermcp
 
 import (
+	"crypto/x509"
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
@@ -77,7 +78,14 @@ func TestCAFileJoinsTheSystemRoots(t *testing.T) {
 	if err != nil || cfg.RootCAs != nil {
 		t.Fatalf("without the variable: %v %v", cfg.RootCAs, err)
 	}
-	resp, err := newHTTPClient(cfg.RootCAs).Get(srv.URL)
+	get0 := func(roots *x509.CertPool) (*http.Response, error) {
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return newHTTPClient(roots).Do(req)
+	}
+	resp, err := get0(cfg.RootCAs)
 	if err == nil {
 		_ = resp.Body.Close()
 		t.Fatal("the system roots trusted the test CA")
@@ -87,7 +95,7 @@ func TestCAFileJoinsTheSystemRoots(t *testing.T) {
 	if cfg, err = ConfigFromEnv(get); err != nil || cfg.RootCAs == nil {
 		t.Fatalf("with the variable: %v", err)
 	}
-	resp, err = newHTTPClient(cfg.RootCAs).Get(srv.URL)
+	resp, err = get0(cfg.RootCAs)
 	if err != nil {
 		t.Fatalf("with the CA file: %v", err)
 	}
