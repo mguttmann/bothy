@@ -14,14 +14,15 @@ endif
 .DEFAULT_GOAL := help
 MAKEFLAGS += --no-builtin-rules --no-print-directory
 
-.PHONY: help release-build release-apple release-windows trial-apple recordings platform-bundle platform-test
+.PHONY: help release-build release-apple release-windows trial-apple recordings platform-bundle platform-test computer-mcp-e2e
 
 help: ## Show the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # The release of the component host (brief M7-23, docs/spec/18-release.md 2 and 6): the steps live in
 # tools/distribution/hostdist.py, run with the pinned Python environment of tools/ and nfpm of
-# tools/bin/tools.lock.json. release-build writes the five release binaries without cgo
+# tools/bin/tools.lock.json. release-build writes the five release binaries of bothy-host and the
+# five of bothy-computer-mcp (docs/spec/27-computer-use.md C1, CU-05) without cgo
 # (docs/DECISIONS.md D-M2-38-6) and the .deb and .rpm packages of infra/host/linux; release.yml
 # signs them with SBOMs and SHA256SUMS. release-apple (macOS, environment release-apple) and
 # release-windows (environment release-windows) sign and package the .pkg and the MSI; the trials
@@ -47,6 +48,9 @@ release-windows: ## Signed MSI (Windows, release.yml calls hostdist.py directly)
 trial-apple: ## The macOS package chain with a test publisher, installed on this machine (disposable CI runner only): make trial-apple OUT=<dir>
 	@[ -n "$${OUT:-}" ] || { echo "usage: make trial-apple OUT=<dir>"; exit 2; }
 	@mkdir -p "$$OUT" && $(HOSTDIST) apple-trial --out "$$(cd "$$OUT" && pwd)"
+
+computer-mcp-e2e: ## End-to-end test of bothy-computer-mcp with the Linux test backend in a throwaway container (needs Docker)
+	test/computermcp/run.sh
 
 recordings: ## Rewrite testdata/noise/recordings/go.json, testdata/noise/fingerprint.json and testdata/control/host_frames.json
 	UPDATE_RECORDINGS=1 GOTOOLCHAIN=local go test -count=1 -run 'TestRecordingsCurrent|TestFingerprintFileCurrent|TestHostFramesRecordingCurrent' ./internal/noise ./internal/fingerprint ./internal/control
