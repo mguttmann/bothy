@@ -97,6 +97,9 @@ func checkNoImageOnServer(t *testing.T, env *suite.Env, d *desktop, r *runnerMac
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(entries) == 0 {
+		t.Fatal("the collector export is empty: the telemetry of the server would go unscanned")
+	}
 	for _, e := range entries {
 		b, err := os.ReadFile(filepath.Join(export, e.Name())) //nolint:gosec // G304: the copied export in the test's temp dir
 		if err != nil {

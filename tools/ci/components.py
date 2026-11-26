@@ -252,6 +252,23 @@ POSTGRES_IMAGE_JOBS = ("postgres-image-amd64", "postgres-image-arm64")
 # builds the server and the console: the job runs when the build context of
 # services/server/Dockerfile.dockerignore or the Compose stack of the test changes, and for the
 # component server or apps without a diff.
+# CU-T24 (make computer-e2e, a step of test-adapters-e2e): the computer use code of the host
+# service, bothy-computer-mcp, the Linux test backend and the test host image run the job, which
+# the components alone select only for an SDK, plugin or server change (CU-06).
+COMPUTER_E2E_JOBS = ("test-adapters-e2e",)
+COMPUTER_E2E_PREFIXES = (
+    "services/host/internal/computer/",
+    "services/host/internal/computermcp/",
+    "services/host/cmd/bothy-computer-mcp/",
+    "services/host/test/computer_backend/",
+    "services/host/test/computermcp/",
+    "infra/compose/test/host/",
+)
+COMPUTER_E2E_FILES = (
+    "services/host/cmd/bothy-host/computer.go",
+    "services/host/internal/frame/computer.go",
+    "services/host/internal/control/computers.go",
+)
 CONSOLE_E2E_JOBS = ("console-e2e",)
 CONSOLE_E2E_PREFIXES = (
     "services/server/api/",
@@ -534,6 +551,9 @@ def ci_plan(
             f.startswith(POSTGRES_IMAGE_PREFIXES) or f in POSTGRES_IMAGE_FILES for f in files
         )
         console = any(f.startswith(CONSOLE_E2E_PREFIXES) or f in CONSOLE_E2E_FILES for f in files)
+        computer = any(
+            f.startswith(COMPUTER_E2E_PREFIXES) or f in COMPUTER_E2E_FILES for f in files
+        )
     else:
         names = list(selected or [])
         unknown = [n for n in names if n != "all" and n not in GATE_COMPONENTS]
@@ -543,6 +563,7 @@ def ci_plan(
         platform = "apps" in names
         postgres = "server" in names
         console = bool({"apps", "server"} & set(names))
+        computer = False
     trials = {*DISTRIBUTION_JOBS, *MOBILE_TRIAL_JOBS, *HOST_TRIAL_JOBS}
     jobs: set[str] = set(CONDITIONAL_JOBS) - trials if full else set()
     if not full:
@@ -553,6 +574,8 @@ def ci_plan(
             jobs.update(POSTGRES_IMAGE_JOBS)
         if console:
             jobs.update(CONSOLE_E2E_JOBS)
+        if computer:
+            jobs.update(COMPUTER_E2E_JOBS)
     jobs.update(_trial_jobs(files or []))
     if not public:
         jobs.difference_update(ANDROID_JOBS)

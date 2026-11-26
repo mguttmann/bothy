@@ -67,6 +67,7 @@ class _Client:
         self.next_id = 0
 
     def notify(self, method: str, params: dict[str, Any] | None = None) -> None:
+        """Send one notification (no answer)."""
         message: dict[str, Any] = {"jsonrpc": "2.0", "method": method}
         if params is not None:
             message["params"] = params
@@ -146,6 +147,7 @@ def _script(
     write: Callable[[dict[str, Any]], None],
     patience: float,
 ) -> None:
+    """Initialize, list the tools and run the steps, writing one line per step."""
     init = client.request(
         "initialize",
         {
@@ -193,6 +195,7 @@ def _call(client: _Client, index: int, step: dict[str, Any], patience: float) ->
 
 
 def _holds(step: dict[str, Any], entry: dict[str, Any]) -> bool:
+    """Report whether the result of a call step meets its condition."""
     prefix = step.get("until_prefix")
     if prefix is not None and not str(entry["text"]).startswith(str(prefix)):
         return False
@@ -200,6 +203,7 @@ def _holds(step: dict[str, Any], entry: dict[str, Any]) -> bool:
 
 
 def _entry(index: int, tool: str, result: dict[str, Any], attempts: int) -> dict[str, Any]:
+    """Return the output line of one tool result."""
     content = result.get("content") or []
     texts = [c.get("text", "") for c in content if c.get("type") == "text"]
     images = [
@@ -219,6 +223,7 @@ def _entry(index: int, tool: str, result: dict[str, Any], attempts: int) -> dict
 
 
 def _wait(cond: Callable[[], bool], patience: float, what: str) -> None:
+    """Wait until cond holds; raise UnmetError after patience seconds."""
     deadline = time.monotonic() + patience
     while not cond():
         if time.monotonic() > deadline:
@@ -227,6 +232,7 @@ def _wait(cond: Callable[[], bool], patience: float, what: str) -> None:
 
 
 def _after(argv: list[str], flag: str) -> str | None:
+    """Return the argument after flag, or None."""
     if flag in argv:
         index = argv.index(flag)
         if index + 1 < len(argv):

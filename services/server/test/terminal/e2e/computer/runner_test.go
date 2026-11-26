@@ -58,9 +58,10 @@ func newRunnerMachine(t *testing.T, h *stack.Host) *runnerMachine {
 	return &runnerMachine{h: h}
 }
 
-// mark and gate name the files of a mark the script writes and of a gate the test opens.
+// mark names the file of a mark the script writes.
 func (r *runnerMachine) mark(name string) string { return workDir + "/" + name + ".reached" }
 
+// gate names the file of a gate the test opens.
 func (r *runnerMachine) gate(name string) string { return workDir + "/" + name + ".open" }
 
 // install copies the runner of this tree with its dependencies, Fake-Claude with the script and

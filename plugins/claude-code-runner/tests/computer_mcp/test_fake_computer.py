@@ -193,7 +193,7 @@ def test_fake_claude_calls_the_tools_of_its_script(tmp_path: Path) -> None:
             ],
         }
     ]
-    # Without the key the turn equals the turn before: no record of a computer server.
+    # The turn goes on after the script: the fixture plays and the result line follows.
     assert '"result"' in turn.stdout
 
 
