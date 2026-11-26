@@ -65,7 +65,11 @@ void main() {
     expect(find.byType(Switch), findsNothing);
     expect(find.byType(Image), findsNothing);
     await tapKey(tester, 'host.computer.disable');
-    expect(repository.computerCalls, ['live desk', 'disable desk', 'live desk']);
+    expect(repository.computerCalls, [
+      'live desk',
+      'disable desk',
+      'live desk',
+    ]);
     expect(find.text('Switched off from a client'), findsOneWidget);
     expect(find.byKey(const ValueKey('host.computer.disable')), findsNothing);
   });

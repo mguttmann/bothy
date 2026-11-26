@@ -111,7 +111,7 @@ final class ComputerSessionsProvider
   }
 }
 
-String _$computerSessionsHash() => r'e2083f4aa559832ae98f35c7090d36419622fd26';
+String _$computerSessionsHash() => r'26c78229368a8113e372b9ad9ab23349f8b95203';
 
 /// The owner's computer sessions (27 11): the live ones and the ended ones this device saw
 /// end, each ended one until [dismiss].
